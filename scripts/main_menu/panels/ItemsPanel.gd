@@ -2,10 +2,12 @@ extends Control
 class_name ItemsPanel
 
 ## ItemsPanel — CSV is source-of-truth; show only owned (>0) CSV-defined items.
+## Also injects per-instance Sigils from aSigilSystem as virtual rows.
 
-const INV_PATH      : String = "/root/aInventorySystem"
-const CSV_PATH      : String = "/root/aCSVLoader"
-const INSPECT_SCENE : String = "res://scenes/main_menu/panels/ItemInspect.tscn"
+const INV_PATH       : String = "/root/aInventorySystem"
+const CSV_PATH       : String = "/root/aCSVLoader"
+const SIGIL_SYS_PATH : String = "/root/aSigilSystem"
+const INSPECT_SCENE  : String = "res://scenes/main_menu/panels/ItemInspect.tscn"
 
 const ITEMS_CSV : String = "res://data/items/items.csv"
 const KEY_ID    : String = "item_id"
@@ -50,6 +52,12 @@ func _ready() -> void:
 		if not _inv.is_connected("inventory_changed", Callable(self, "_rebuild")):
 			_inv.connect("inventory_changed", Callable(self, "_rebuild"))
 
+	# Watch sigil loadout/level changes so instance rows refresh
+	var ss: Node = get_node_or_null(SIGIL_SYS_PATH)
+	if ss != null and ss.has_signal("loadout_changed"):
+		if not ss.is_connected("loadout_changed", Callable(self, "_on_loadout_changed")):
+			ss.connect("loadout_changed", Callable(self, "_on_loadout_changed"))
+
 	if _filter != null and _filter.item_count == 0:
 		for i in range(CATEGORIES.size()):
 			_filter.add_item(CATEGORIES[i], i)
@@ -70,26 +78,21 @@ func _rebuild() -> void:
 	_defs       = _read_defs()
 	_counts_map = _read_counts()
 
+	# Inject per-instance Sigils as virtual rows
+	_inject_sigil_instances()
+
 	var want: String = _current_category()
 
-	# Total count label: sum all owned counts
+	# Total count label: sum all owned counts (instances count as 1 each)
 	var total_qty: int = 0
 	for k_v in _counts_map.keys():
 		total_qty += int(_counts_map.get(String(k_v), 0))
 	if _counts_tv:
 		_counts_tv.text = str(total_qty)
 
-	# IDs to render: ONLY those that exist in CSV defs (source of truth)
+	# IDs to render: ONLY those we have defs for
 	var ids: Array = _defs.keys()
-
-	# Sort by display name
-	ids.sort_custom(func(a, b):
-		var da: Dictionary = _defs.get(a, {}) as Dictionary
-		var db: Dictionary = _defs.get(b, {}) as Dictionary
-		var na := _display_name(String(a), da)
-		var nb := _display_name(String(b), db)
-		return na < nb
-	)
+	ids.sort_custom(Callable(self, "_cmp_ids_by_name"))
 
 	for id_v in ids:
 		var id: String = String(id_v)
@@ -135,6 +138,13 @@ func _rebuild() -> void:
 	_list_box.queue_sort()
 
 # --- name/category helpers ----------------------------------------------------
+
+func _cmp_ids_by_name(a: Variant, b: Variant) -> bool:
+	var da: Dictionary = _defs.get(String(a), {}) as Dictionary
+	var db: Dictionary = _defs.get(String(b), {}) as Dictionary
+	var na := _display_name(String(a), da)
+	var nb := _display_name(String(b), db)
+	return na < nb
 
 func _display_name(id: String, def: Dictionary) -> String:
 	if not def.is_empty():
@@ -194,7 +204,7 @@ func _read_defs() -> Dictionary:
 	return {}
 
 func _read_counts() -> Dictionary:
-	# Ask Inventory for counts; its frc returns only known IDs.
+	# Ask Inventory for counts; it returns only known IDs.
 	if _inv != null:
 		for m in ["get_counts_dict","get_item_counts","get_counts"]:
 			if _inv.has_method(m):
@@ -207,6 +217,54 @@ func _read_counts() -> Dictionary:
 						ret[id] = int(vd.get(id, 0))
 					return ret
 	return {}
+
+# --- Sigil instances injection ------------------------------------------------
+
+func _inject_sigil_instances() -> void:
+	var ss: Node = get_node_or_null(SIGIL_SYS_PATH)
+	if ss == null:
+		return
+
+	# Collect all known instance IDs (owned/equipped)
+	var ids: Array[String] = []
+	if ss.has_method("list_all_instances"):
+		var arr_v: Variant = ss.call("list_all_instances", false)
+		if typeof(arr_v) == TYPE_ARRAY:
+			for v in (arr_v as Array):
+				ids.append(String(v))
+
+	for instance_id in ids:
+		# Build a faux-def row for the instance so the list treats it like an item
+		var display_name := instance_id
+		if ss.has_method("get_display_name_for"):
+			display_name = String(ss.call("get_display_name_for", instance_id))
+
+		var info: Dictionary = {}
+		if ss.has_method("get_instance_info"):
+			var inf_v: Variant = ss.call("get_instance_info", instance_id)
+			if typeof(inf_v) == TYPE_DICTIONARY:
+				info = inf_v as Dictionary
+
+		var school := String(info.get("school",""))
+		var lvl    := int(info.get("level", 1))
+		var active := ""
+		if ss.has_method("get_active_skill_name_for_instance"):
+			active = String(ss.call("get_active_skill_name_for_instance", instance_id))
+
+		var def: Dictionary = {
+			"name": display_name,
+			"category": "Sigils",
+			"equip_slot": "Sigil",
+			"sigil_instance": true,  # flag for inspector
+			"instance_id": instance_id,
+			"base_id": String(info.get("base_id","")),
+			"school": school,
+			"level": lvl,
+			"active_skill_name": active
+		}
+
+		_defs[instance_id] = def
+		_counts_map[instance_id] = 1  # instances are singletons
 
 # --- UI glue ------------------------------------------------------------------
 
@@ -244,4 +302,7 @@ func _on_inspect_row(btn: Button) -> void:
 
 func _on_item_used(_item_id: String, _new_count: int) -> void:
 	_counts_map = _read_counts()
+	_rebuild()
+
+func _on_loadout_changed(_member: String) -> void:
 	_rebuild()

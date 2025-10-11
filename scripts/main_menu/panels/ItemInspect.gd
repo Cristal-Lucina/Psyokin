@@ -3,7 +3,7 @@ class_name ItemInspect
 
 ## ItemInspect — reads name/category/descriptions from CSV-style fields.
 ## Adds Use / Discard / Give +1 (for quick testing).
-## Emits `item_used(item_id, new_count)` when counts change.
+## For Sigil instances (injected by ItemsPanel), shows read-only Level/XP/Active.
 
 signal item_used(item_id: String, new_count: int)
 
@@ -62,15 +62,43 @@ func _ensure_extra_buttons() -> void:
 	if not _add_btn.pressed.is_connected(_on_add):
 		_add_btn.pressed.connect(_on_add)
 
+func _is_sigil_instance() -> bool:
+	return _def.has("sigil_instance") and bool(_def["sigil_instance"])
+
 func _desc_text() -> String:
-	# Prefer short_description/full_description from your CSV; fall back to generic.
+	# Sigil instance path: show school/level/active/progress
+	if _is_sigil_instance():
+		var ss: Node = get_node_or_null("/root/aSigilSystem")
+		var lvl: int = 1
+		var pct: int = 0
+		var active: String = ""
+		var school: String = String(_def.get("school",""))
+
+		if ss != null:
+			if ss.has_method("get_instance_info"):
+				var info_v: Variant = ss.call("get_instance_info", _id)
+				if typeof(info_v) == TYPE_DICTIONARY:
+					var info: Dictionary = info_v
+					lvl = int(info.get("level", 1))
+			if ss.has_method("get_instance_progress"):
+				var pr_v: Variant = ss.call("get_instance_progress", _id)
+				if typeof(pr_v) == TYPE_DICTIONARY:
+					var pr: Dictionary = pr_v
+					pct = int(pr.get("pct", 0))
+			if ss.has_method("get_active_skill_name_for_instance"):
+				active = String(ss.call("get_active_skill_name_for_instance", _id))
+
+		var active_str := (active if active != "" else "—")
+		var school_str := (school if school != "" else "—")
+		return "[b]Sigil Instance[/b]\nSchool: %s\nLevel: %d\nActive: %s\nProgress: %d%% to next" % [school_str, lvl, active_str, pct]
+
+	# CSV-backed items:
 	if _def.has("short_description") and typeof(_def["short_description"]) == TYPE_STRING:
 		var s := String(_def["short_description"]).strip_edges()
 		if s != "": return s
 	if _def.has("full_description") and typeof(_def["full_description"]) == TYPE_STRING:
 		var f := String(_def["full_description"]).strip_edges()
 		if f != "": return f
-	# sometimes older defs use "desc"
 	if _def.has("desc") and typeof(_def["desc"]) == TYPE_STRING:
 		var d := String(_def["desc"]).strip_edges()
 		if d != "": return d
@@ -81,15 +109,23 @@ func _update_ui() -> void:
 	var cat: String = String(_def.get("category", "Other"))
 	if _title: _title.text = nm
 	if _cat:   _cat.text   = cat
-	if _count: _count.text = str(_qty)
+
+	# For sigil instances, show a dash instead of a stack count
+	if _count:
+		_count.text = ("—" if _is_sigil_instance() else str(_qty))
+
 	if _desc:  _desc.text  = _desc_text()
 
 	var can_consume: bool = (_qty > 0) and _inventory_can_consume()
+	if _is_sigil_instance():
+		can_consume = false
 	if _use:         _use.disabled = not can_consume
-	if _discard_btn: _discard_btn.disabled = (_qty <= 0 or _inv == null)
-	if _add_btn:     _add_btn.disabled = (_inv == null)
+	if _discard_btn: _discard_btn.disabled = (_qty <= 0 or _inv == null or _is_sigil_instance())
+	if _add_btn:     _add_btn.disabled = (_inv == null or _is_sigil_instance())
 
 func _inventory_can_consume() -> bool:
+	if _is_sigil_instance():
+		return false
 	if _inv == null: return false
 	if _inv.has_method("use_item"): return true
 	if _inv.has_method("remove_item"): return true
@@ -97,6 +133,8 @@ func _inventory_can_consume() -> bool:
 	return false
 
 func _on_use() -> void:
+	if _is_sigil_instance():
+		return
 	if _qty <= 0 or not _inventory_can_consume():
 		return
 	var ok: bool = false
@@ -115,6 +153,8 @@ func _on_use() -> void:
 		_emit_changed()
 
 func _on_discard() -> void:
+	if _is_sigil_instance():
+		return
 	if _qty <= 0 or _inv == null: return
 	var ok: bool = false
 	if _inv.has_method("discard_item"):
@@ -126,6 +166,8 @@ func _on_discard() -> void:
 		_emit_changed()
 
 func _on_add() -> void:
+	if _is_sigil_instance():
+		return
 	if _inv == null: return
 	if _inv.has_method("add_item"):
 		_inv.call("add_item", _id, 1)

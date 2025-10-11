@@ -13,13 +13,13 @@ const HOLDER_CSV  : String = "res://data/skills/sigil_holder.csv"
 const SIGIL_ID_PREFIX : String = "SIG_"
 const INSTANCE_SEP    : String = "#"
 
-var _skills_by_school : Dictionary = {}
-var _holder_map       : Dictionary = {}
-var _instances        : Dictionary = {}
-var _owned            : PackedStringArray = PackedStringArray()
-var _loadouts         : Dictionary = {}
-var _capacity_by_member : Dictionary = {}
-var _next_instance_idx : int = 1
+var _skills_by_school     : Dictionary = {}
+var _holder_map           : Dictionary = {}
+var _instances            : Dictionary = {}         # inst_id -> {base_id, school, tier, level, xp, active_skill}
+var _owned                : PackedStringArray = PackedStringArray()
+var _loadouts             : Dictionary = {}         # member -> Array[String] of inst_ids (size = capacity)
+var _capacity_by_member   : Dictionary = {}         # member -> int
+var _next_instance_idx    : int = 1
 
 func _ready() -> void:
 	_load_skills_csv()
@@ -54,13 +54,14 @@ func _load_skills_csv() -> void:
 				}
 				if not _skills_by_school.has(school):
 					_skills_by_school[school] = []
-				var arr: Array = _skills_by_school[school]
+				var arr_any: Variant = _skills_by_school[school]
+				var arr: Array = (arr_any as Array) if typeof(arr_any) == TYPE_ARRAY else []
 				arr.append(srec)
 				_skills_by_school[school] = arr
 
 	# Fallback seed if CSV missing/empty
 	if _skills_by_school.is_empty():
-		var schools: Array = ["Fire","Water","Earth","Air","Data","Void","Omega"]
+		var schools: Array[String] = ["Fire","Water","Earth","Air","Data","Void","Omega"]
 		for s in schools:
 			_skills_by_school[s] = [
 				{"skill_id":"%s_I"   % s, "name":"%s I"   % s, "school":s, "level_req":1, "desc":""},
@@ -119,17 +120,19 @@ func get_capacity(member: String) -> int:
 func get_loadout(member: String) -> PackedStringArray:
 	if not _loadouts.has(member):
 		return PackedStringArray()
-	var arr_any: Array = _loadouts[member] as Array
+	var arr_any: Variant = _loadouts[member]
 	var out := PackedStringArray()
-	for v in arr_any:
-		out.append(String(v))
+	if typeof(arr_any) == TYPE_ARRAY:
+		for v in (arr_any as Array):
+			out.append(String(v))
 	return out
 
 # --- compatibility (some UIs expect plain Array) ---
 func get_loadout_array(member: String) -> Array[String]:
 	var out: Array[String] = []
 	var ps: PackedStringArray = get_loadout(member)
-	for s in ps: out.append(String(s))
+	for s in ps:
+		out.append(String(s))
 	return out
 
 func get_display_name_for(id: String) -> String:
@@ -182,11 +185,13 @@ func get_skills_for_instance(instance_id: String) -> Array:
 	var allowed: PackedStringArray = _allowed_for_instance(instance_id)
 
 	# Map allowed IDs to display records
-	var names: Dictionary = {}  # sid -> name
+	var names: Dictionary = {}  # sid -> String
 	if _skills_by_school.has(sch):
-		for s in (_skills_by_school[sch] as Array):
-			var rec: Dictionary = s
-			names[String(rec["skill_id"])] = String(rec["name"])
+		var arr_any: Variant = _skills_by_school[sch]
+		if typeof(arr_any) == TYPE_ARRAY:
+			for s in (arr_any as Array):
+				var rec: Dictionary = s
+				names[String(rec["skill_id"])] = String(rec["name"])
 
 	for sid in allowed:
 		var nm: String = String(names.get(sid, sid))
@@ -257,9 +262,15 @@ func equip_into_socket(member: String, socket_index: int, id_or_base: String) ->
 	_ensure_loadout(member)
 	_trim_or_expand_sockets(member)
 
-	var sockets: Array = _loadouts[member] as Array
+	var sockets_any: Variant = _loadouts.get(member, [])
+	var sockets: Array = (sockets_any as Array) if typeof(sockets_any) == TYPE_ARRAY else []
 	if socket_index < 0 or socket_index >= sockets.size():
 		return false
+
+	# avoid double-equipping same instance
+	for s in sockets:
+		if String(s) == inst_id:
+			return false
 
 	sockets[socket_index] = inst_id
 	_loadouts[member] = sockets
@@ -270,10 +281,21 @@ func equip_into_socket(member: String, socket_index: int, id_or_base: String) ->
 	loadout_changed.emit(member)
 	return true
 
+func equip_from_inventory(member: String, socket_index: int, base_id: String) -> bool:
+	# convenience wrapper many UIs call
+	var iid: String = _mint_instance_from_inventory(base_id)
+	if iid == "":
+		return false
+	return equip_into_socket(member, socket_index, iid)
+
+
 func remove_sigil_at(member: String, socket_index: int) -> void:
 	if not _loadouts.has(member):
 		return
-	var sockets: Array = _loadouts[member] as Array
+	var sockets_any: Variant = _loadouts[member]
+	if typeof(sockets_any) != TYPE_ARRAY:
+		return
+	var sockets: Array = sockets_any
 	if socket_index < 0 or socket_index >= sockets.size():
 		return
 	sockets[socket_index] = ""
@@ -317,17 +339,15 @@ func _trim_or_expand_sockets(member: String) -> void:
 	var cap: int = get_capacity(member)
 	var sockets: Array = []
 	if _loadouts.has(member):
-		sockets = _loadouts[member] as Array
-	else:
-		sockets = []
-
+		var arr_any: Variant = _loadouts[member]
+		if typeof(arr_any) == TYPE_ARRAY:
+			sockets = arr_any
 	if cap < sockets.size():
 		while sockets.size() > cap:
 			sockets.remove_at(sockets.size() - 1)
 	elif cap > sockets.size():
 		while sockets.size() < cap:
 			sockets.append("")
-
 	_loadouts[member] = sockets
 
 func _ensure_loadout(member: String) -> void:
@@ -342,13 +362,33 @@ func _mint_instance_from_inventory(base_id: String) -> String:
 	if inv == null:
 		return ""
 
+	# check availability
+	var count: int = 0
 	if inv.has_method("get_count"):
-		var c: int = int(inv.call("get_count", base_id))
-		if c <= 0:
-			return ""
+		var c_v: Variant = inv.call("get_count", base_id)
+		if typeof(c_v) == TYPE_INT:
+			count = int(c_v)
+	elif inv.has_method("get_counts_dict"):
+		var cd_v: Variant = inv.call("get_counts_dict")
+		if typeof(cd_v) == TYPE_DICTIONARY:
+			var cd: Dictionary = cd_v
+			count = int(cd.get(base_id, 0))
+	if count <= 0:
+		return ""
+
+	# decrement one (support multiple inventory APIs)
 	if inv.has_method("remove_item"):
 		inv.call("remove_item", base_id, 1)
+	elif inv.has_method("dec"):
+		inv.call("dec", base_id, 1)
+	elif inv.has_method("consume"):
+		inv.call("consume", base_id, 1)
+	elif inv.has_method("decrement"):
+		inv.call("decrement", base_id, 1)
+	elif inv.has_method("add"):
+		inv.call("add", base_id, -1)
 
+	# determine school
 	var school: String = ""
 	if inv.has_method("get_item_defs"):
 		var defs_v: Variant = inv.call("get_item_defs")
@@ -399,9 +439,9 @@ func get_instance_progress(instance_id: String) -> Dictionary:
 	var lvl: int = int(inst.get("level", 1))
 	if lvl >= 4:
 		return {"pct": 100}
-	var xp: int = int(inst.get("xp", 0))
+	var xp_cur: int = int(inst.get("xp", 0))
 	var need: int = max(1, _xp_needed_for_level(lvl))
-	var pct: int = int(clamp((float(xp) / float(need)) * 100.0, 0.0, 100.0))
+	var pct: int = int(clamp((float(xp_cur) / float(need)) * 100.0, 0.0, 100.0))
 	return {"pct": pct}
 
 # ---- Cheat/XP APIs used by dev tools --------------------------------
@@ -412,21 +452,21 @@ func cheat_add_xp_to_instance(instance_id: String, amount: int, require_equipped
 		return
 	var inst: Dictionary = _instances[instance_id]
 	var lvl: int = int(inst.get("level", 1))
-	var xp: int  = int(inst.get("xp", 0))
-	xp = max(0, xp + max(0, amount))
+	var xp_cur: int = int(inst.get("xp", 0))
+	xp_cur = max(0, xp_cur + max(0, amount))
 
 	var leveled: bool = false
 	while lvl < 4:
 		var need: int = max(1, _xp_needed_for_level(lvl))
-		if xp >= need:
-			xp -= need
+		if xp_cur >= need:
+			xp_cur -= need
 			lvl += 1
 			leveled = true
 		else:
 			break
 
 	inst["level"] = lvl
-	inst["xp"] = (0 if lvl >= 4 else xp)
+	inst["xp"] = (0 if lvl >= 4 else xp_cur)
 
 	# keep active legal / prefer highest unlocked
 	var allowed: PackedStringArray = _allowed_for_instance(instance_id)
@@ -453,8 +493,10 @@ func grant_xp_to_instance(instance_id: String, amount: int) -> void:
 func list_free_instances() -> PackedStringArray:
 	var in_sockets: Dictionary = {}
 	for m in _loadouts.keys():
-		var arr: Array = _loadouts[m] as Array
-		for s in arr:
+		var arr_any: Variant = _loadouts[m]
+		if typeof(arr_any) != TYPE_ARRAY:
+			continue
+		for s in (arr_any as Array):
 			var sid: String = String(s)
 			if sid != "":
 				in_sockets[sid] = true
@@ -477,8 +519,10 @@ func list_all_instances(equipped_only: bool = false) -> Array[String]:
 		for s in _owned:
 			ids[String(s)] = true
 	for m in _loadouts.keys():
-		var arr: Array = _loadouts[m] as Array
-		for v in arr:
+		var arr_any: Variant = _loadouts[m]
+		if typeof(arr_any) != TYPE_ARRAY:
+			continue
+		for v in (arr_any as Array):
 			var sid: String = String(v)
 			if sid != "":
 				ids[sid] = true
@@ -554,40 +598,46 @@ func _allowed_for_instance(instance_id: String) -> PackedStringArray:
 
 	# Holder-gated path (preferred)
 	if _holder_map.has(base_id):
-		var rec: Dictionary = _holder_map[base_id]
-		var seen: Dictionary = {}
-		for i in range(1, clamp(level,1,4) + 1):
-			var key := "lv%d" % i
-			if rec.has(key):
-				var sid: String = String(rec[key])
-				if sid != "" and not seen.has(sid):
-					seen[sid] = true
-					out.append(sid)
+		var rec_any: Variant = _holder_map[base_id]
+		if typeof(rec_any) == TYPE_DICTIONARY:
+			var rec: Dictionary = rec_any
+			var seen: Dictionary = {}
+			for i in range(1, clamp(level,1,4) + 1):
+				var key := "lv%d" % i
+				if rec.has(key):
+					var sid: String = String(rec[key])
+					if sid != "" and not seen.has(sid):
+						seen[sid] = true
+						out.append(sid)
 		return out
 
 	# Fallback: use school list + level_req <= level
 	if _skills_by_school.has(school):
-		for s in (_skills_by_school[school] as Array):
-			var d: Dictionary = s
-			if int(d.get("level_req", 1)) <= level:
-				out.append(String(d["skill_id"]))
+		var arr_any: Variant = _skills_by_school[school]
+		if typeof(arr_any) == TYPE_ARRAY:
+			for s in (arr_any as Array):
+				var d: Dictionary = s
+				if int(d.get("level_req", 1)) <= level:
+					out.append(String(d["skill_id"]))
 	return out
 
 func _is_equipped(instance_id: String) -> bool:
 	for m in _loadouts.keys():
-		var arr_v: Variant = _loadouts[m]
-		if typeof(arr_v) == TYPE_ARRAY:
-			var arr: Array = arr_v
-			for s in arr:
-				if String(s) == instance_id:
-					return true
+		var arr_any: Variant = _loadouts[m]
+		if typeof(arr_any) != TYPE_ARRAY:
+			continue
+		for s in (arr_any as Array):
+			if String(s) == instance_id:
+				return true
 	return false
 
 func _find_member_by_instance(instance_id: String) -> String:
 	for m_k in _loadouts.keys():
 		var member: String = String(m_k)
-		var arr: Array = _loadouts[member] as Array
-		for v in arr:
+		var arr_any: Variant = _loadouts[member]
+		if typeof(arr_any) != TYPE_ARRAY:
+			continue
+		for v in (arr_any as Array):
 			if String(v) == instance_id:
 				return member
 	return ""
