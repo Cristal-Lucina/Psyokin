@@ -1,0 +1,151 @@
+[gd_scene load_steps=2 format=3 uid="uid://cyd1qjnchdthb"]
+
+[ext_resource type="Script" uid="uid://debx6ongvnqax" path="res://scripts/main_menu/panels/LoadoutPanel.gd" id="1"]
+
+[node name="LoadoutPanel" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1")
+
+[node name="Row" type="HBoxContainer" parent="."]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 16
+
+[node name="Party" type="VBoxContainer" parent="Row"]
+custom_minimum_size = Vector2(260, 0)
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="PartyLabel" type="Label" parent="Row/Party"]
+layout_mode = 2
+text = "Party"
+
+[node name="PartyList" type="ItemList" parent="Row/Party"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="Right" type="VBoxContainer" parent="Row"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 10
+
+[node name="MemberName" type="Label" parent="Row/Right"]
+custom_minimum_size = Vector2(0, 28)
+layout_mode = 2
+text = "(Select a member)"
+
+[node name="Grid" type="GridContainer" parent="Row/Right"]
+layout_mode = 2
+theme_override_constants/h_separation = 8
+theme_override_constants/v_separation = 4
+columns = 3
+
+[node name="WValue" type="Label" parent="Row/Right/Grid"]
+custom_minimum_size = Vector2(200, 0)
+layout_mode = 2
+text = "—"
+
+[node name="WBtn" type="Button" parent="Row/Right/Grid"]
+layout_mode = 2
+text = "Equip…"
+
+[node name="WFill" type="Control" parent="Row/Right/Grid"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="AValue" type="Label" parent="Row/Right/Grid"]
+layout_mode = 2
+text = "—"
+
+[node name="ABtn" type="Button" parent="Row/Right/Grid"]
+layout_mode = 2
+text = "Equip…"
+
+[node name="AFill" type="Control" parent="Row/Right/Grid"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="HValue" type="Label" parent="Row/Right/Grid"]
+layout_mode = 2
+text = "—"
+
+[node name="HBtn" type="Button" parent="Row/Right/Grid"]
+layout_mode = 2
+text = "Equip…"
+
+[node name="HFill" type="Control" parent="Row/Right/Grid"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="FValue" type="Label" parent="Row/Right/Grid"]
+layout_mode = 2
+text = "—"
+
+[node name="FBtn" type="Button" parent="Row/Right/Grid"]
+layout_mode = 2
+text = "Equip…"
+
+[node name="FFill" type="Control" parent="Row/Right/Grid"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="BValue" type="Label" parent="Row/Right/Grid"]
+layout_mode = 2
+text = "—"
+
+[node name="BBtn" type="Button" parent="Row/Right/Grid"]
+layout_mode = 2
+text = "Equip…"
+
+[node name="BFill" type="Control" parent="Row/Right/Grid"]
+custom_minimum_size = Vector2(0, 4)
+layout_mode = 2
+size_flags_horizontal = 3
+metadata/_spacer = true
+
+[node name="Spacer" type="VBoxContainer" parent="Row/Right/Grid"]
+custom_minimum_size = Vector2(0, 20)
+layout_mode = 2
+
+[node name="Sigils" type="VBoxContainer" parent="Row/Right"]
+custom_minimum_size = Vector2(100, 0)
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="Title" type="Label" parent="Row/Right/Sigils"]
+layout_mode = 2
+text = "Sigils"
+
+[node name="List" type="VBoxContainer" parent="Row/Right/Sigils"]
+custom_minimum_size = Vector2(300, 0)
+layout_mode = 2
+size_flags_horizontal = 0
+size_flags_vertical = 3
+size_flags_stretch_ratio = 1.65
+theme_override_constants/separation = 2
+
+[node name="Buttons" type="HBoxContainer" parent="Row/Right"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="BtnEquip" type="Button" parent="Row/Right/Buttons"]
+layout_mode = 2
+disabled = true
+text = "Equip"
+
+[node name="BtnUnequip" type="Button" parent="Row/Right/Buttons"]
+layout_mode = 2
+disabled = true
+text = "Unequip"
+
+[node name="BtnManageSigils" type="Button" parent="Row/Right/Buttons"]
+layout_mode = 2
+text = "Manage Sigils"

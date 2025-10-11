@@ -1,0 +1,61 @@
+[gd_scene load_steps=2 format=3 uid="uid://do5gxtcxycqhe"]
+
+[ext_resource type="Script" uid="uid://b37py64qy7a8t" path="res://scripts/ui/save/SaveMenu.gd" id="1"]
+
+[node name="SaveMenu" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("1")
+
+[node name="Backdrop" type="ColorRect" parent="."]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.9)
+
+[node name="Center" type="CenterContainer" parent="."]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Window" type="Panel" parent="Center"]
+custom_minimum_size = Vector2(780, 420)
+layout_mode = 2
+
+[node name="Root" type="VBoxContainer" parent="Center/Window"]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Header" type="HBoxContainer" parent="Center/Window/Root"]
+layout_mode = 2
+
+[node name="Title" type="Label" parent="Center/Window/Root/Header"]
+layout_mode = 2
+text = "Save Game"
+
+[node name="Spacer" type="Control" parent="Center/Window/Root/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="CloseBtn" type="Button" parent="Center/Window/Root/Header"]
+layout_mode = 2
+text = "Close"
+
+[node name="Hint" type="Label" parent="Center/Window/Root"]
+layout_mode = 2
+text = "Choose a slot to overwrite."
+
+[node name="Slots" type="VBoxContainer" parent="Center/Window/Root"]
+layout_mode = 2

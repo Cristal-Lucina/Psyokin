@@ -1,0 +1,78 @@
+[gd_scene load_steps=2 format=3 uid="uid://d2re1bwcuw8p3"]
+
+[ext_resource type="Script" uid="uid://egnkwaf03q6b" path="res://scripts/ui/training/TrainingMenu.gd" id="1_n2umi"]
+
+[node name="TrainingMenu" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+script = ExtResource("1_n2umi")
+
+[node name="ColorRect" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.501961)
+
+[node name="CenterContainer" type="CenterContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Panel" type="Panel" parent="CenterContainer"]
+custom_minimum_size = Vector2(600, 420)
+layout_mode = 2
+
+[node name="MarginContainer" type="MarginContainer" parent="CenterContainer/Panel"]
+layout_mode = 0
+offset_right = 40.0
+offset_bottom = 40.0
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 16
+
+[node name="Root" type="VBoxContainer" parent="CenterContainer/Panel/MarginContainer"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="HBoxContainer" type="HBoxContainer" parent="CenterContainer/Panel/MarginContainer/Root"]
+layout_mode = 2
+
+[node name="Title" type="Label" parent="CenterContainer/Panel/MarginContainer/Root/HBoxContainer"]
+layout_mode = 2
+text = "Train at a Spot"
+
+[node name="Spacer" type="Control" parent="CenterContainer/Panel/MarginContainer/Root/HBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="CloseBtn" type="Button" parent="CenterContainer/Panel/MarginContainer/Root/HBoxContainer"]
+layout_mode = 2
+text = "Close"
+
+[node name="Hint" type="Label" parent="CenterContainer/Panel/MarginContainer/Root"]
+layout_mode = 2
+text = "Choose a spot available this phase"
+
+[node name="Scroll" type="ScrollContainer" parent="CenterContainer/Panel/MarginContainer/Root"]
+layout_mode = 2
+size_flags_vertical = 3
+scroll_vertical = 100
+
+[node name="List" type="VBoxContainer" parent="CenterContainer/Panel/MarginContainer/Root/Scroll"]
+custom_minimum_size = Vector2(0, 200)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 6

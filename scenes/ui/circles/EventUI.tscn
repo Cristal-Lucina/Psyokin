@@ -1,0 +1,5 @@
+[gd_scene format=3 uid="uid://c1bv55h6r16lw"]
+
+[node name="EventUi" type="Control"]
+layout_mode = 3
+anchors_preset = 0

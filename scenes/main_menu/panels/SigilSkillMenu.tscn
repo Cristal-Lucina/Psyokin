@@ -1,0 +1,121 @@
+[gd_scene load_steps=2 format=3 uid="uid://dc4iaolwtw0pv"]
+
+[ext_resource type="Script" uid="uid://bxt1f7yvmfrpg" path="res://scripts/main_menu/panels/SigilSkillMenu.gd" id="1"]
+
+[node name="SigilSkillMenu" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("1")
+
+[node name="Backdrop" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.65)
+
+[node name="Center" type="CenterContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Card" type="Panel" parent="Center"]
+custom_minimum_size = Vector2(820, 480)
+layout_mode = 2
+
+[node name="CardPad" type="MarginContainer" parent="Center/Card"]
+layout_mode = 2
+offset_right = 812.0
+offset_bottom = 449.0
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 16
+
+[node name="MainRow" type="HBoxContainer" parent="Center/Card/CardPad"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="LeftColumn" type="VBoxContainer" parent="Center/Card/CardPad/MainRow"]
+custom_minimum_size = Vector2(320, 0)
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="HeaderRow" type="HBoxContainer" parent="Center/Card/CardPad/MainRow/LeftColumn"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Title" type="Label" parent="Center/Card/CardPad/MainRow/LeftColumn/HeaderRow"]
+layout_mode = 2
+text = "Sigil Skills"
+
+[node name="Sub" type="Label" parent="Center/Card/CardPad/MainRow/LeftColumn"]
+layout_mode = 2
+text = "(Select a socket)"
+autowrap_mode = 2
+
+[node name="LevelRow" type="HBoxContainer" parent="Center/Card/CardPad/MainRow/LeftColumn"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="LvLabel" type="Label" parent="Center/Card/CardPad/MainRow/LeftColumn/LevelRow"]
+layout_mode = 2
+text = "Lv —"
+
+[node name="XPBar" type="ProgressBar" parent="Center/Card/CardPad/MainRow/LeftColumn/LevelRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="XPValue" type="Label" parent="Center/Card/CardPad/MainRow/LeftColumn/LevelRow"]
+layout_mode = 2
+text = "0%"
+
+[node name="SocketsHeader" type="Label" parent="Center/Card/CardPad/MainRow/LeftColumn"]
+layout_mode = 2
+text = "Sockets"
+
+[node name="SocketsList" type="ItemList" parent="Center/Card/CardPad/MainRow/LeftColumn"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="RightColumn" type="VBoxContainer" parent="Center/Card/CardPad/MainRow"]
+custom_minimum_size = Vector2(100, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="SkillsHeader" type="Label" parent="Center/Card/CardPad/MainRow/RightColumn"]
+layout_mode = 2
+text = "Skills"
+
+[node name="SkillsList" type="ItemList" parent="Center/Card/CardPad/MainRow/RightColumn"]
+custom_minimum_size = Vector2(100, 0)
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="ButtonsRow" type="HBoxContainer" parent="Center/Card/CardPad/MainRow/RightColumn"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="BtnSetActive" type="Button" parent="Center/Card/CardPad/MainRow/RightColumn/ButtonsRow"]
+layout_mode = 2
+disabled = true
+text = "Set Active"
+
+[node name="ButtonsSpacer" type="Control" parent="Center/Card/CardPad/MainRow/RightColumn/ButtonsRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="BtnClose" type="Button" parent="Center/Card/CardPad/MainRow/RightColumn/ButtonsRow"]
+layout_mode = 2
+text = "Close"

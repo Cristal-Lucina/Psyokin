@@ -1,0 +1,3 @@
+event_id,circle_id,layer,phase_mask,weekday_mask,locations,date_start,date_end,difficulty,ggt_bonus_ep,synergy_tags,pass_target_override,gates_stats,gates_items,gates_flags,notes,is_bonus_date
+love_intro_01,love_red,1,MA,Mon,card_shop|dance_club,11-May,20-May,Normal,1,perfume,,BRW>=2|FCS>=2,,,First meet-up,0
+other_coach_01,coach,1,E,Wed,training_ground,,,Hard,0,protein,,,VTL>=2,,Tough coach,0

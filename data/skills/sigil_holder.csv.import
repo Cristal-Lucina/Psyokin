@@ -1,0 +1,17 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://bhllwe43om6y5"
+
+[deps]
+
+files=["res://data/skills/sigil_holder.lv1.translation", "res://data/skills/sigil_holder.lv2.translation", "res://data/skills/sigil_holder.lv3.translation", "res://data/skills/sigil_holder.lv4.translation"]
+
+source_file="res://data/skills/sigil_holder.csv"
+dest_files=["res://data/skills/sigil_holder.lv1.translation", "res://data/skills/sigil_holder.lv2.translation", "res://data/skills/sigil_holder.lv3.translation", "res://data/skills/sigil_holder.lv4.translation"]
+
+[params]
+
+compress=true
+delimiter=0

@@ -1,0 +1,17 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://8qoghc5mqvme"
+
+[deps]
+
+files=["res://data/circles/circles_events.circle.translation", "res://data/circles/circles_events.layer.translation", "res://data/circles/circles_events.phase.translation", "res://data/circles/circles_events.weekday.translation", "res://data/circles/circles_events.locations.translation", "res://data/circles/circles_events.date.translation", "res://data/circles/circles_events.date.translation", "res://data/circles/circles_events.difficulty.translation", "res://data/circles/circles_events.ggt.translation", "res://data/circles/circles_events.synergy.translation", "res://data/circles/circles_events.pass.translation", "res://data/circles/circles_events.gates.translation", "res://data/circles/circles_events.gates.translation", "res://data/circles/circles_events.gates.translation", "res://data/circles/circles_events.notes.translation", "res://data/circles/circles_events.is.translation"]
+
+source_file="res://data/circles/circles_events.csv"
+dest_files=["res://data/circles/circles_events.circle.translation", "res://data/circles/circles_events.layer.translation", "res://data/circles/circles_events.phase.translation", "res://data/circles/circles_events.weekday.translation", "res://data/circles/circles_events.locations.translation", "res://data/circles/circles_events.date.translation", "res://data/circles/circles_events.date.translation", "res://data/circles/circles_events.difficulty.translation", "res://data/circles/circles_events.ggt.translation", "res://data/circles/circles_events.synergy.translation", "res://data/circles/circles_events.pass.translation", "res://data/circles/circles_events.gates.translation", "res://data/circles/circles_events.gates.translation", "res://data/circles/circles_events.gates.translation", "res://data/circles/circles_events.notes.translation", "res://data/circles/circles_events.is.translation"]
+
+[params]
+
+compress=true
+delimiter=0

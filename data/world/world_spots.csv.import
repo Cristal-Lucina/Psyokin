@@ -1,0 +1,17 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://ckxrnin4bms0t"
+
+[deps]
+
+files=["res://data/world/world_spots.name.translation", "res://data/world/world_spots.phase.translation", "res://data/world/world_spots.location.translation", "res://data/world/world_spots.base.translation", "res://data/world/world_spots.stats.translation", "res://data/world/world_spots.tags.translation", "res://data/world/world_spots.first.translation", "res://data/world/world_spots.weekend.translation", "res://data/world/world_spots.tournament.translation", "res://data/world/world_spots.cred.translation", "res://data/world/world_spots.gates.translation", "res://data/world/world_spots.notes.translation", "res://data/world/world_spots.start.translation", "res://data/world/world_spots.end.translation", "res://data/world/world_spots.track.translation"]
+
+source_file="res://data/world/world_spots.csv"
+dest_files=["res://data/world/world_spots.name.translation", "res://data/world/world_spots.phase.translation", "res://data/world/world_spots.location.translation", "res://data/world/world_spots.base.translation", "res://data/world/world_spots.stats.translation", "res://data/world/world_spots.tags.translation", "res://data/world/world_spots.first.translation", "res://data/world/world_spots.weekend.translation", "res://data/world/world_spots.tournament.translation", "res://data/world/world_spots.cred.translation", "res://data/world/world_spots.gates.translation", "res://data/world/world_spots.notes.translation", "res://data/world/world_spots.start.translation", "res://data/world/world_spots.end.translation", "res://data/world/world_spots.track.translation"]
+
+[params]
+
+compress=true
+delimiter=0

@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://bec0bhjlrfjdj"]
+
+[ext_resource type="Script" uid="uid://ro2nwvl5wk0l" path="res://tests/CalendarSystemTest.gd" id="1_a1an6"]
+
+[node name="Node" type="Node"]
+script = ExtResource("1_a1an6")

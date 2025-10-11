@@ -1,0 +1,113 @@
+[gd_scene load_steps=2 format=3 uid="uid://crt84ftcxj55h"]
+
+[ext_resource type="Script" uid="uid://chvung4jj6la3" path="res://scripts/main_menu/panels/StatusPanel.gd" id="1"]
+
+[node name="StatusPanel" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1")
+
+[node name="Root" type="HBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 16.0
+offset_top = 16.0
+offset_right = -16.0
+offset_bottom = -16.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 16
+
+[node name="Left" type="VBoxContainer" parent="Root"]
+custom_minimum_size = Vector2(280, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/separation = 8
+
+[node name="PartyHeader" type="HBoxContainer" parent="Root/Left"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="PartyTitle" type="Label" parent="Root/Left/PartyHeader"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Party"
+
+[node name="RefreshBtn" type="Button" parent="Root/Left/PartyHeader"]
+layout_mode = 2
+text = "Refresh"
+
+[node name="PartyScroll" type="ScrollContainer" parent="Root/Left"]
+custom_minimum_size = Vector2(0, 220)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="PartyList" type="VBoxContainer" parent="Root/Left/PartyScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/separation = 10
+
+[node name="Right" type="VBoxContainer" parent="Root"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/separation = 10
+
+[node name="InfoGrid" type="GridContainer" parent="Root/Right"]
+layout_mode = 2
+theme_override_constants/h_separation = 8
+theme_override_constants/v_separation = 6
+columns = 2
+
+[node name="MoneyLabel" type="Label" parent="Root/Right/InfoGrid"]
+layout_mode = 2
+text = "Money"
+
+[node name="MoneyValue" type="Label" parent="Root/Right/InfoGrid"]
+layout_mode = 2
+text = "0"
+
+[node name="PerkLabel" type="Label" parent="Root/Right/InfoGrid"]
+layout_mode = 2
+text = "Perk Pts"
+
+[node name="PerkValue" type="Label" parent="Root/Right/InfoGrid"]
+layout_mode = 2
+text = "0"
+
+[node name="DateLabel" type="Label" parent="Root/Right/InfoGrid"]
+layout_mode = 2
+text = "Date"
+
+[node name="DateValue" type="Label" parent="Root/Right/InfoGrid"]
+layout_mode = 2
+text = "--/--"
+
+[node name="PhaseLabel" type="Label" parent="Root/Right/InfoGrid"]
+layout_mode = 2
+text = "Phase"
+
+[node name="PhaseValue" type="Label" parent="Root/Right/InfoGrid"]
+layout_mode = 2
+text = "—"
+
+[node name="HintHeader" type="Label" parent="Root/Right"]
+layout_mode = 2
+text = "Next Mission"
+
+[node name="HintValue" type="RichTextLabel" parent="Root/Right"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+bbcode_enabled = true
+text = "[i]TBD[/i]"
+fit_content = true

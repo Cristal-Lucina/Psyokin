@@ -1,0 +1,5 @@
+[gd_scene format=3 uid="uid://ce2asya4q35op"]
+
+[node name="Journal" type="Control"]
+layout_mode = 3
+anchors_preset = 0

@@ -1,0 +1,17 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://cq7nhnyryxlg7"
+
+[deps]
+
+files=["res://data/skills/skills.name.translation", "res://data/skills/skills.school.translation", "res://data/skills/skills.type.translation", "res://data/skills/skills.element.translation", "res://data/skills/skills.target.translation", "res://data/skills/skills.power.translation", "res://data/skills/skills.acc.translation", "res://data/skills/skills.cost.translation", "res://data/skills/skills.cooldown.translation", "res://data/skills/skills.uses.translation", "res://data/skills/skills.aoe.translation", "res://data/skills/skills.crit.translation", "res://data/skills/skills.notes.translation", "res://data/skills/skills.tags.translation", "res://data/skills/skills.scaling.translation", "res://data/skills/skills.scaling.translation", "res://data/skills/skills.scaling.translation", "res://data/skills/skills.status.translation", "res://data/skills/skills.status.translation", "res://data/skills/skills.duration.translation"]
+
+source_file="res://data/skills/skills.csv"
+dest_files=["res://data/skills/skills.name.translation", "res://data/skills/skills.school.translation", "res://data/skills/skills.type.translation", "res://data/skills/skills.element.translation", "res://data/skills/skills.target.translation", "res://data/skills/skills.power.translation", "res://data/skills/skills.acc.translation", "res://data/skills/skills.cost.translation", "res://data/skills/skills.cooldown.translation", "res://data/skills/skills.uses.translation", "res://data/skills/skills.aoe.translation", "res://data/skills/skills.crit.translation", "res://data/skills/skills.notes.translation", "res://data/skills/skills.tags.translation", "res://data/skills/skills.scaling.translation", "res://data/skills/skills.scaling.translation", "res://data/skills/skills.scaling.translation", "res://data/skills/skills.status.translation", "res://data/skills/skills.status.translation", "res://data/skills/skills.duration.translation"]
+
+[params]
+
+compress=true
+delimiter=0

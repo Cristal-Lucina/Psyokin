@@ -1,0 +1,5 @@
+spot_id,name,phase,location_id,base_sxp,stats,tags,first_time_bonus,weekend_bonus,tournament_bonus,cred_payout,gates,notes,start_date,end_date,track
+ARC_MORNING,Arcade Training (AM),M/A/E,DOWNTOWN,6,BRW;FCS,Arcade|Fun,1,0,0,10;25,-;-;-;1100000,Test AM,05/11,05/20,Dex
+LIB_AFTERNOON,Library Study (PM),M/A/E,CAMPUS,8,MND;FCS,Quiet|Study,1,0,0,0;0,-;-;-;0011000,Test PM,05/11,05/20,Mind
+MOVIE_EVENING,Movie Night (EV),M/A/E,DOWNTOWN,10,RND,Social,0,0,0,0;0,-;-;-;0000110,Random stat,05/11,05/20,Rand
+,,,,,,,,,,,,,,,

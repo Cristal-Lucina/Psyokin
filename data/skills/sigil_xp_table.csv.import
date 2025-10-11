@@ -1,0 +1,17 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://5n0tas08kgro"
+
+[deps]
+
+files=["res://data/skills/sigil_xp_table.lv2.translation", "res://data/skills/sigil_xp_table.lv3.translation", "res://data/skills/sigil_xp_table.lv4.translation"]
+
+source_file="res://data/skills/sigil_xp_table.csv"
+dest_files=["res://data/skills/sigil_xp_table.lv2.translation", "res://data/skills/sigil_xp_table.lv3.translation", "res://data/skills/sigil_xp_table.lv4.translation"]
+
+[params]
+
+compress=true
+delimiter=0

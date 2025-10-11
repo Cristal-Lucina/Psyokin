@@ -1,0 +1,17 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://ddt0f534rgost"
+
+[deps]
+
+files=["res://data/items/study_items.sxp.translation", "res://data/items/study_items.stat.translation", "res://data/items/study_items.weekly.translation", "res://data/items/study_items.consumes.translation", "res://data/items/study_items.schema.translation"]
+
+source_file="res://data/items/study_items.csv"
+dest_files=["res://data/items/study_items.sxp.translation", "res://data/items/study_items.stat.translation", "res://data/items/study_items.weekly.translation", "res://data/items/study_items.consumes.translation", "res://data/items/study_items.schema.translation"]
+
+[params]
+
+compress=true
+delimiter=0

@@ -1,0 +1,182 @@
+extends Control
+class_name LoadMenu
+
+## LoadMenu — wired to your scene:
+## LoadMenu
+## └─ Center/Window/Root
+##    ├─ Header (Title, ToTitleBtn, CloseBtn)
+##    ├─ Hint
+##    └─ Scroll  <-- we'll ensure a "Slots" VBox exists here
+
+const SAVE_DIR   : String = "user://saves"
+const MAIN_SCENE : String = "res://scenes/main/Main.tscn"
+const TITLE_SCENE: String = "res://scenes/main_menu/Title.tscn"
+
+@onready var _title     : Label           = get_node("Center/Window/Root/Header/Title") as Label
+@onready var _btn_title : Button          = get_node("Center/Window/Root/Header/ToTitleBtn") as Button
+@onready var _btn_close : Button          = get_node("Center/Window/Root/Header/CloseBtn") as Button
+@onready var _hint      : Label           = get_node("Center/Window/Root/Hint") as Label
+@onready var _scroll    : ScrollContainer = get_node("Center/Window/Root/Scroll") as ScrollContainer
+
+var _slots : VBoxContainer = null
+
+func _ready() -> void:
+	# Make this overlay actually capture clicks.
+	mouse_filter = Control.MOUSE_FILTER_STOP
+
+	# Ensure Slots container exists under Scroll.
+	_slots = _scroll.get_node_or_null("Slots") as VBoxContainer
+	if _slots == null:
+		_slots = VBoxContainer.new()
+		_slots.name = "Slots"
+		_slots.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_slots.size_flags_vertical   = Control.SIZE_EXPAND_FILL
+		_slots.add_theme_constant_override("separation", 6)
+		_scroll.add_child(_slots)
+
+	_title.text = "Load Game"
+	_hint.text  = "Choose a slot. Press Esc to close."
+
+	if not _btn_title.pressed.is_connected(_on_to_title):
+		_btn_title.pressed.connect(_on_to_title)
+	if not _btn_close.pressed.is_connected(_on_close):
+		_btn_close.pressed.connect(_on_close)
+
+	set_process_unhandled_input(true)
+	_rebuild()
+
+func _unhandled_input(e: InputEvent) -> void:
+	if e.is_action_pressed("ui_cancel"):
+		_on_close()
+		get_viewport().set_input_as_handled()
+
+# ---------------- list build ----------------
+
+func _rebuild() -> void:
+	for c in _slots.get_children():
+		c.queue_free()
+
+	var slots: Array[int] = _collect_slots()
+	_hint.text = "Found %d save(s)" % [slots.size()]
+	if slots.is_empty():
+		return
+
+	for slot in slots:
+		_slots.add_child(_make_row(slot))
+
+	await get_tree().process_frame
+	_slots.queue_sort()
+
+func _collect_slots() -> Array[int]:
+	var out: Array[int] = []
+	var sl: Node = get_node_or_null("/root/aSaveLoad")
+	if sl != null and sl.has_method("list_slots"):
+		var arr_v: Variant = sl.call("list_slots")
+		if typeof(arr_v) == TYPE_ARRAY:
+			for s in (arr_v as Array):
+				var idx := int(s)
+				if not out.has(idx):
+					out.append(idx)
+
+	var d := DirAccess.open(SAVE_DIR)
+	if d != null:
+		for f in d.get_files():
+			if f.begins_with("slot_") and f.ends_with(".json"):
+				var idx2 := int(f.substr(5, f.length() - 10))
+				if not out.has(idx2):
+					out.append(idx2)
+	out.sort()
+	return out
+
+func _format_slot_meta(slot: int) -> String:
+	var label := "Slot %d" % slot
+	var sl: Node = get_node_or_null("/root/aSaveLoad")
+	if sl != null and sl.has_method("get_slot_meta"):
+		var meta_v: Variant = sl.call("get_slot_meta", slot)
+		if typeof(meta_v) == TYPE_DICTIONARY:
+			var meta: Dictionary = meta_v
+			if bool(meta.get("exists", false)):
+				var when := ""
+				var ts := int(meta.get("ts", 0))
+				var scene := String(meta.get("scene", ""))
+				var summary := String(meta.get("summary", scene))
+				if ts > 0:
+					when = Time.get_datetime_string_from_unix_time(ts, true)
+				var parts: Array[String] = ["Slot %d" % slot]
+				if when    != "": parts.append(when)
+				if summary != "": parts.append(summary)
+				return "  —  ".join(parts)
+	return label
+
+func _make_row(slot: int) -> Control:
+	var row := HBoxContainer.new()
+	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.custom_minimum_size.y = 40
+	row.add_theme_constant_override("separation", 8)
+
+	# Big row button (click anywhere to load)
+	var row_btn := Button.new()
+	row_btn.text = _format_slot_meta(slot)
+	row_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row_btn.focus_mode = Control.FOCUS_ALL
+	row_btn.flat = false
+	row_btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	row_btn.pressed.connect(_on_load_pressed.bind(slot))
+	row.add_child(row_btn)
+
+	var load_b := Button.new()
+	load_b.text = "Load"
+	load_b.custom_minimum_size.y = 28
+	load_b.pressed.connect(_on_load_pressed.bind(slot))
+	row.add_child(load_b)
+
+	var del_b := Button.new()
+	del_b.text = "Delete"
+	del_b.custom_minimum_size.y = 28
+	del_b.pressed.connect(_on_delete_pressed.bind(slot))
+	row.add_child(del_b)
+
+	return row
+
+# ---------------- actions ----------------
+
+func _on_load_pressed(slot: int) -> void:
+	var sl: Node = get_node_or_null("/root/aSaveLoad")
+	var payload: Dictionary = {}
+	if sl != null and sl.has_method("load_game"):
+		var v: Variant = sl.call("load_game", slot)
+		if typeof(v) == TYPE_DICTIONARY:
+			payload = v
+
+	if has_node("/root/aGameState") and not payload.is_empty() and aGameState.has_method("apply_loaded_save"):
+		aGameState.apply_loaded_save(payload)
+
+	if has_node("/root/aSceneRouter"):
+		aSceneRouter.goto_main()
+	elif ResourceLoader.exists(MAIN_SCENE):
+		get_tree().change_scene_to_file(MAIN_SCENE)
+
+	queue_free()
+
+func _on_delete_pressed(slot: int) -> void:
+	var ok := false
+	var sl: Node = get_node_or_null("/root/aSaveLoad")
+	if sl != null and sl.has_method("delete_slot"):
+		ok = bool(sl.call("delete_slot", slot))
+	else:
+		var path := "%s/slot_%d.json" % [SAVE_DIR, slot]
+		if FileAccess.file_exists(path):
+			ok = (DirAccess.remove_absolute(path) == OK)
+
+	if not ok:
+		push_warning("[LoadMenu] Could not delete slot %d" % slot)
+	_rebuild()
+
+func _on_close() -> void:
+	queue_free()
+
+func _on_to_title() -> void:
+	if has_node("/root/aSceneRouter"):
+		aSceneRouter.goto_title()
+	elif ResourceLoader.exists(TITLE_SCENE):
+		get_tree().change_scene_to_file(TITLE_SCENE)

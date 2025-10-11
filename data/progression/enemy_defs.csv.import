@@ -1,0 +1,17 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://deuts5cq6vy3u"
+
+[deps]
+
+files=["res://data/progression/enemy_defs.name.translation", "res://data/progression/enemy_defs.hp.translation", "res://data/progression/enemy_defs.atk.translation", "res://data/progression/enemy_defs.def.translation", "res://data/progression/enemy_defs.exp.translation", "res://data/progression/enemy_defs.notes.translation"]
+
+source_file="res://data/progression/enemy_defs.csv"
+dest_files=["res://data/progression/enemy_defs.name.translation", "res://data/progression/enemy_defs.hp.translation", "res://data/progression/enemy_defs.atk.translation", "res://data/progression/enemy_defs.def.translation", "res://data/progression/enemy_defs.exp.translation", "res://data/progression/enemy_defs.notes.translation"]
+
+[params]
+
+compress=true
+delimiter=0

@@ -1,0 +1,104 @@
+[gd_scene load_steps=2 format=3 uid="uid://lj5m5xdd6aob"]
+
+[ext_resource type="Script" uid="uid://bk358jekyw06n" path="res://scripts/main_menu/panels/ItemInspect.gd" id="1"]
+
+[node name="ItemInspect" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1")
+
+[node name="Backdrop" type="ColorRect" parent="."]
+unique_name_in_owner = true
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0, 0, 0, 0.98)
+
+[node name="Center" type="CenterContainer" parent="."]
+unique_name_in_owner = true
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Panel" type="Panel" parent="Center"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(520, 360)
+layout_mode = 2
+
+[node name="Margin" type="MarginContainer" parent="Center/Panel"]
+unique_name_in_owner = true
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 16
+
+[node name="Root" type="VBoxContainer" parent="Center/Panel/Margin"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/separation = 10
+
+[node name="Title" type="Label" parent="Center/Panel/Margin/Root"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Item"
+
+[node name="MetaRow" type="HBoxContainer" parent="Center/Panel/Margin/Root"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="CategoryLabel" type="Label" parent="Center/Panel/Margin/Root/MetaRow"]
+layout_mode = 2
+text = "Category:"
+
+[node name="CategoryValue" type="Label" parent="Center/Panel/Margin/Root/MetaRow"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "—"
+
+[node name="CountLabel" type="Label" parent="Center/Panel/Margin/Root/MetaRow"]
+layout_mode = 2
+text = "Count:"
+
+[node name="CountValue" type="Label" parent="Center/Panel/Margin/Root/MetaRow"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "0"
+
+[node name="Desc" type="RichTextLabel" parent="Center/Panel/Margin/Root"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+bbcode_enabled = true
+text = "[i]No description.[/i]"
+
+[node name="Buttons" type="HBoxContainer" parent="Center/Panel/Margin/Root"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="UseBtn" type="Button" parent="Center/Panel/Margin/Root/Buttons"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Use"
+
+[node name="CloseBtn" type="Button" parent="Center/Panel/Margin/Root/Buttons"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Close"
