@@ -30,7 +30,7 @@ func set_null_tokens(tokens: PackedStringArray) -> void:
 
 ## Loads a CSV from `path` and returns a Dictionary keyed by `key_field`.
 ## Cells equal to one of _null_tokens (or empty) are omitted from the row.
-func load_csv(path: String, key_field: String) -> Dictionary:
+func load_csv(path: String, mind_type: String) -> Dictionary:
 	var table: Dictionary = {}
 
 	var f := FileAccess.open(path, FileAccess.READ)
@@ -51,11 +51,11 @@ func load_csv(path: String, key_field: String) -> Dictionary:
 
 	var key_index: int = -1
 	for i in range(header.size()):
-		if header[i] == key_field:
+		if header[i] == mind_type:
 			key_index = i
 			break
 	if key_index == -1:
-		push_error("CSVLoader: Key field '%s' not found in %s" % [key_field, path])
+		push_error("CSVLoader: Key field '%s' not found in %s" % [mind_type, path])
 		f.close()
 		return {}
 

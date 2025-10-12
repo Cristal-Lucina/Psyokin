@@ -15,6 +15,31 @@ const HOLDER_CSV  : String = "res://data/skills/sigil_holder.csv"
 const SIGIL_ID_PREFIX : String = "SIG_"
 const INSTANCE_SEP    : String = "#"
 
+# ───── CSV fallbacks for Mind Type gating (party + mind types) ─────
+const PARTY_CSV_CANDIDATES: Array[String] = [
+	"res://data/party/party.csv",
+	"res://data/party.csv",
+	"res://data/actors/party.csv"
+]
+const MIND_TYPES_CSV_CANDIDATES: Array[String] = [
+	"res://data/combat/mind_type.csv",
+	"res://data/combat/mind_types.csv"
+]
+const PARTY_ID_KEYS     : Array[String] = ["id","actor_id","member_id","key","member","code"]
+const PARTY_NAME_KEYS   : Array[String] = ["name","display_name","character","alias"]
+const PARTY_MIND_KEYS   : Array[String] = ["mind_type","mind_type_id","mind","mind_id","mind_base"]
+const MIND_ID_KEYS      : Array[String] = ["id","mind_type_id","mind","base","key","code"]
+const MIND_ALLOWED_KEYS : Array[String] = ["allowed_schools","schools","allowed","allowed_types"]
+
+# ───── Items CSV (source of truth for sigil_school on items) ─────
+const ITEMS_CSV_CANDIDATES: Array[String] = [
+	"res://data/items/items.csv",
+	"res://data/items/item.csv",
+	"res://data/item.csv"
+]
+const ITEM_ID_KEYS     : Array[String] = ["id","item_id","key","code"]
+const ITEM_SCHOOL_KEYS : Array[String] = ["sigil_school","school","mind_type","mind_type_tag","mind_tag"]
+
 var _skills_by_school     : Dictionary = {}
 var _holder_map           : Dictionary = {}
 var _instances            : Dictionary = {}         # inst_id -> {base_id, school, tier, level, xp, active_skill}
@@ -226,7 +251,6 @@ func set_active_skill_member(member: String, socket_index: int, skill_id: String
 	return ok
 
 # ───────────────── Equip / Remove ─────────────────
-
 func equip_into_socket(member: String, socket_index: int, id_or_base: String) -> bool:
 	var inst_id: String = ""
 	# Gate by school before equipping
@@ -296,7 +320,6 @@ func remove_sigil_at(member: String, socket_index: int) -> void:
 	loadout_changed.emit(member)
 
 # ───────────── Capacity: call when bracelet changes ─────────────
-
 func on_bracelet_changed(member: String) -> void:
 	_ensure_capacity_from_bracelet(member)
 	_trim_or_expand_sockets(member)
@@ -347,7 +370,6 @@ func _ensure_loadout(member: String) -> void:
 		_loadouts[member] = []
 
 # ───────────────── Instance minting ─────────────────
-
 func _mint_instance_from_inventory(base_id: String) -> String:
 	var inv: Node = get_node_or_null(INV_PATH)
 	if inv == null:
@@ -399,7 +421,6 @@ func _mint_instance_from_inventory(base_id: String) -> String:
 	return inst_id
 
 # ───────────────── Progress / XP ─────────────────
-
 func _xp_needed_for_level(_level: int) -> int:
 	return 100
 
@@ -457,7 +478,6 @@ func grant_xp_to_instance(instance_id: String, amount: int) -> void:
 	cheat_add_xp_to_instance(instance_id, amount, false)
 
 # ───────────────── Cheat helpers ─────────────────
-
 func list_free_instances() -> PackedStringArray:
 	var in_sockets: Dictionary = {}
 	for m in _loadouts.keys():
@@ -539,20 +559,17 @@ func debug_spawn_instance(base_id: String, level: int = 1, tier: int = 1, xp: in
 		_owned.append(inst_id)
 	return inst_id
 
-
 # --------------------------------------------------------------------
 # Save / Load
 # --------------------------------------------------------------------
 func get_save_blob() -> Dictionary:
-	# Persist instances, owned list, loadouts, and next id counter.
 	var blob := {
-		"instances": _instances.duplicate(true),     # inst_id -> {base_id, school, tier, level, xp, active_skill}
-		"owned": _owned.duplicate(),                # PackedStringArray of inst_ids
-		"loadouts": _loadouts.duplicate(true),      # member -> Array[String] of inst_ids
-		"next_idx": _next_instance_idx               # int
+		"instances": _instances.duplicate(true),
+		"owned": _owned.duplicate(),
+		"loadouts": _loadouts.duplicate(true),
+		"next_idx": _next_instance_idx
 	}
 	return blob
-
 
 func apply_save_blob(blob: Dictionary) -> void:
 	# -------- instances --------
@@ -611,12 +628,11 @@ func apply_save_blob(blob: Dictionary) -> void:
 				arr = Array(arr_v)
 			elif typeof(arr_v) == TYPE_ARRAY:
 				arr = arr_v
-			# keep only valid instance IDs
 			var clean: Array = []
 			for sid_v in arr:
 				var sid := String(sid_v)
 				if sid == "" or not _instances.has(sid):
-					clean.append("")  # keep socket count stable, leave empty
+					clean.append("")
 				else:
 					clean.append(sid)
 			new_loadouts[member] = clean
@@ -641,9 +657,7 @@ func apply_save_blob(blob: Dictionary) -> void:
 		_trim_or_expand_sockets(member)
 		loadout_changed.emit(member)
 
-
 # ───────────────── Local helpers ─────────────────
-
 func _allowed_for_instance(instance_id: String) -> PackedStringArray:
 	var out := PackedStringArray()
 	if not _instances.has(instance_id):
@@ -719,7 +733,9 @@ func _skill_name(skill_id: String) -> String:
 					return String(d["name"])
 	return skill_id
 
+# Prefer Inventory defs -> items.csv (sigil_school) -> parse from id
 func _school_of_base(base_id: String) -> String:
+	# 1) Try item defs already in memory
 	var inv: Node = get_node_or_null(INV_PATH)
 	if inv and inv.has_method("get_item_defs"):
 		var dv: Variant = inv.call("get_item_defs")
@@ -727,28 +743,177 @@ func _school_of_base(base_id: String) -> String:
 			var defs: Dictionary = dv
 			if defs.has(base_id):
 				var rec: Dictionary = defs[base_id]
-				if rec.has("sigil_school"):
-					return String(rec["sigil_school"]).capitalize()
-				if rec.has("mind_type_tag"):
-					return String(rec["mind_type_tag"]).capitalize()
+				for k in ["sigil_school","school","mind_type_tag","mind_type","mind_tag"]:
+					if rec.has(k):
+						var s := String(rec[k]).strip_edges()
+						if s != "":
+							return s.capitalize()
+
+	# 2) Items CSV (source of truth for sigil_school)
+	var from_csv := _item_school_from_items_csv(base_id)
+	if from_csv != "":
+		return from_csv
+
+	# 3) Parse from id like "SIG_FIRE_*"
+	if base_id.begins_with(SIGIL_ID_PREFIX):
+		var rest := base_id.substr(SIGIL_ID_PREFIX.length())
+		var cut := rest.find("_")
+		var token := (rest if cut < 0 else rest.substr(0, cut))
+		if token != "":
+			return token.capitalize()
+
 	return ""
 
-func _member_allows_school(member: String, school: String) -> bool:
+# ───── Mind Type gating resolvers (Party/Mind systems with CSV fallback) ─────
+func resolve_member_mind_base(member: String) -> String:
 	var ps := get_node_or_null(PARTY_PATH)
-	var mt := get_node_or_null(MIND_PATH)
-	if ps == null or mt == null:
-		return true  # fail-open if systems missing
-	var base := ""
-	if ps.has_method("get_member_mind_base"):
-		base = String(ps.call("get_member_mind_base", member))
-	if base == "":
-		base = "Fire"
+	if ps and ps.has_method("get_member_mind_base"):
+		var v: Variant = ps.call("get_member_mind_base", member)
+		if typeof(v) == TYPE_STRING and String(v) != "":
+			return String(v).capitalize()
+	var from_csv := _member_mind_from_csv(member)
+	if from_csv != "":
+		return from_csv.capitalize()
+	return "Omega"
+
+func is_school_allowed_for_member(member: String, school: String) -> bool:
+	if school.strip_edges() == "" or member.strip_edges() == "":
+		return true
+	var base := resolve_member_mind_base(member)
 	if base == "Omega":
 		return true
-	if mt.has_method("is_school_allowed"):
+	var mt := get_node_or_null(MIND_PATH)
+	if mt and mt.has_method("is_school_allowed"):
 		return bool(mt.call("is_school_allowed", base, school))
+	return _mind_allows_school_csv(base, school)
+
+func _member_allows_school(member: String, school: String) -> bool:
+	return is_school_allowed_for_member(member, school)
+
+# ───── CSV helper functions (raw reader; no CSVLoader usage) ─────
+func _first_existing_csv(paths: Array) -> String:
+	for p in paths:
+		if FileAccess.file_exists(String(p)):
+			return String(p)
+	return ""
+
+func _csv_read_rows_raw(path: String) -> Array:
+	var rows: Array = []
+	if path == "" or not FileAccess.file_exists(path):
+		return rows
+
+	var f: FileAccess = FileAccess.open(path, FileAccess.READ)
+	if f == null:
+		return rows
+	if f.eof_reached():
+		f.close()
+		return rows
+
+	var header_psa: PackedStringArray = f.get_csv_line() # supports quoted CSV
+	var header: Array[String] = []
+	for h in header_psa:
+		header.append(String(h).strip_edges().to_lower())
+
+	while not f.eof_reached():
+		var cols: PackedStringArray = f.get_csv_line()
+		if cols.is_empty():
+			continue
+		var row: Dictionary = {}
+		var n: int = min(header.size(), cols.size())
+		for i in range(n):
+			var key: String = header[i]
+			var val: String = String(cols[i])
+			row[key] = val
+		rows.append(row)
+
+	f.close()
+	return rows
+
+func _pick_first(row: Dictionary, keys: Array, default_val: String = "") -> String:
+	# row keys are lower-cased by _csv_read_rows_raw
+	for k_any in keys:
+		var key: String = String(k_any).to_lower()
+		if row.has(key):
+			var v: Variant = row[key]
+			var t := typeof(v)
+			if t == TYPE_STRING or t == TYPE_INT or t == TYPE_FLOAT:
+				var s: String = String(v).strip_edges()
+				if s != "":
+					return s
+	return default_val
+
+func _item_school_from_items_csv(base_id: String) -> String:
+	var path := _first_existing_csv(ITEMS_CSV_CANDIDATES)
+	if path == "":
+		return ""
+	var rows := _csv_read_rows_raw(path)
+	var want := base_id.strip_edges().to_lower()
+	for row_any in rows:
+		if typeof(row_any) != TYPE_DICTIONARY:
+			continue
+		var row: Dictionary = row_any
+		var id_txt := _pick_first(row, ITEM_ID_KEYS, "").strip_edges().to_lower()
+		if id_txt != want:
+			continue
+		var school := _pick_first(row, ITEM_SCHOOL_KEYS, "").strip_edges()
+		if school != "":
+			return school.capitalize()
+	return ""
+
+func _member_mind_from_csv(member: String) -> String:
+	var party_csv := _first_existing_csv(PARTY_CSV_CANDIDATES)
+	if party_csv == "":
+		return ""
+	var rows := _csv_read_rows_raw(party_csv)
+	if rows.is_empty():
+		return ""
+	var member_lc := member.strip_edges().to_lower()
+
+	for row_any in rows:
+		if typeof(row_any) != TYPE_DICTIONARY:
+			continue
+		var row: Dictionary = row_any
+		var id_txt   := _pick_first(row, PARTY_ID_KEYS, "")
+		var name_txt := _pick_first(row, PARTY_NAME_KEYS, "")
+		if id_txt.to_lower() == member_lc or name_txt.to_lower() == member_lc:
+			var mind := _pick_first(row, PARTY_MIND_KEYS, "")
+			if mind != "":
+				return mind.capitalize()
+	return ""
+
+func _mind_allows_school_csv(mind_base: String, school: String) -> bool:
+	var mind_csv := _first_existing_csv(MIND_TYPES_CSV_CANDIDATES)
+	if mind_csv == "":
+		return true
+	var rows := _csv_read_rows_raw(mind_csv)
+	if rows.is_empty():
+		return true
+
+	var want := mind_base.strip_edges().to_lower()
+	var school_lc := school.strip_edges().to_lower()
+	if want == "":
+		return true
+
+	for row_any in rows:
+		if typeof(row_any) != TYPE_DICTIONARY:
+			continue
+		var row: Dictionary = row_any
+		var id_txt := _pick_first(row, MIND_ID_KEYS, "").to_lower()
+		if id_txt == want:
+			var allowed_raw := _pick_first(row, MIND_ALLOWED_KEYS, "")
+			if allowed_raw == "":
+				return true
+			var toks := allowed_raw.split(",", false)
+			if toks.size() == 1: toks = allowed_raw.split(";", false)
+			if toks.size() == 1: toks = allowed_raw.split("|", false)
+			if toks.size() == 1: toks = allowed_raw.split(" ", false)
+			for t in toks:
+				if String(t).strip_edges().to_lower() == school_lc:
+					return true
+			return false
 	return true
 
+# ───── Misc ─────
 func _to_int(v: Variant) -> int:
 	var t: int = typeof(v)
 	if t == TYPE_INT: return int(v)
