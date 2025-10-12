@@ -1,0 +1,6 @@
+actor_id,name,level_start,start_brw,start_mnd,start_tpo,start_vtl,start_fcs,start_weapon,start_armor,start_head,start_foot,start_bracelet,start_sigils,portrait,sprite,join_to_active,notes
+hero,Hero,1,2,1,2,2,1,,,,,,SIG_FIRE,portraits/hero.png,sprites/hero.tres,true,Main character (balanced STR/VIT/DEX)
+rhea,Rhea,1,1,2,2,1,2,,,,,,SIG_FIRE;SIG_WATER,portraits/rhea.png,sprites/rhea.tres,true,Mage archetype (MND/FCS/TPO)
+nitro,Nitro,1,2,1,2,2,1,,,,,,SIG_EARTH,portraits/nitro.png,sprites/nitro.tres,true,Brawler (BRW/VTL/TPO)
+scout,Scout,1,1,1,2,2,2,,,,,,SIG_AIR,portraits/scout.png,sprites/scout.tres,false,Fast utility (TPO/VTL/FCS)
+warden,Warden,1,2,1,1,2,2,,,,,,SIG_WATER,portraits/warden.png,sprites/warden.tres,false,Defensive hybrid (BRW/VTL/FCS)

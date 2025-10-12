@@ -6,6 +6,8 @@ signal loadout_changed(member: String)
 const INV_PATH    : String = "/root/aInventorySystem"
 const CSV_PATH    : String = "/root/aCSVLoader"
 const EQUIP_PATH  : String = "/root/aEquipmentSystem"
+const PARTY_PATH  : String = "/root/aPartySystem"
+const MIND_PATH   : String = "/root/aMindTypeSystem"
 
 const SKILLS_CSV  : String = "res://data/skills/skills.csv"
 const HOLDER_CSV  : String = "res://data/skills/sigil_holder.csv"
@@ -25,12 +27,9 @@ func _ready() -> void:
 	_load_skills_csv()
 	_load_holder_csv()
 
-# --------------------------------------------------------------------
-# Skills CSV
-# --------------------------------------------------------------------
+# ───────────────────── Skills CSV ─────────────────────
 func _load_skills_csv() -> void:
 	_skills_by_school.clear()
-
 	var csv_loader: Node = get_node_or_null(CSV_PATH)
 	if csv_loader != null and FileAccess.file_exists(SKILLS_CSV):
 		var table_v: Variant = csv_loader.call("load_csv", SKILLS_CSV, "skill_id")
@@ -44,7 +43,6 @@ func _load_skills_csv() -> void:
 				var school: String = String(row.get("school","")).capitalize()
 				if school == "":
 					continue
-
 				var srec: Dictionary = {
 					"skill_id": String(sid),
 					"name": String(row.get("name", String(sid))),
@@ -59,7 +57,6 @@ func _load_skills_csv() -> void:
 				arr.append(srec)
 				_skills_by_school[school] = arr
 
-	# Fallback seed if CSV missing/empty
 	if _skills_by_school.is_empty():
 		var schools: Array[String] = ["Fire","Water","Earth","Air","Data","Void","Omega"]
 		for s in schools:
@@ -70,7 +67,6 @@ func _load_skills_csv() -> void:
 				{"skill_id":"%s_IV"  % s, "name":"%s IV"  % s, "school":s, "level_req":4, "desc":""}
 			]
 
-	# ensure sorted by level_req
 	for k in _skills_by_school.keys():
 		var a_v: Variant = _skills_by_school[k]
 		if typeof(a_v) == TYPE_ARRAY:
@@ -83,9 +79,7 @@ func _cmp_skill_by_level(x: Variant, y: Variant) -> bool:
 	var dy: Dictionary = y as Dictionary
 	return int(dx["level_req"]) < int(dy["level_req"])
 
-# --------------------------------------------------------------------
-# Sigil Holder CSV (gating per base_id)
-# --------------------------------------------------------------------
+# ───────────────── Sigil Holder CSV ─────────────────
 func _load_holder_csv() -> void:
 	_holder_map.clear()
 	var csv_loader: Node = get_node_or_null(CSV_PATH)
@@ -105,9 +99,7 @@ func _load_holder_csv() -> void:
 			"lv4": String(row.get("lv4",""))
 		}
 
-# --------------------------------------------------------------------
-# Public helpers
-# --------------------------------------------------------------------
+# ───────────────── Public helpers ─────────────────
 func is_instance_id(id: String) -> bool:
 	return id.find(INSTANCE_SEP) >= 0
 
@@ -127,7 +119,6 @@ func get_loadout(member: String) -> PackedStringArray:
 			out.append(String(v))
 	return out
 
-# --- compatibility (some UIs expect plain Array) ---
 func get_loadout_array(member: String) -> Array[String]:
 	var out: Array[String] = []
 	var ps: PackedStringArray = get_loadout(member)
@@ -144,7 +135,6 @@ func get_display_name_for(id: String) -> String:
 		return "%s [Lv%d]" % [nm, lvl]
 	return _item_name(id)
 
-# alias some cheat UIs call
 func get_instance_display_name(instance_id: String) -> String:
 	return get_display_name_for(instance_id)
 
@@ -177,28 +167,23 @@ func get_skills_for_instance(instance_id: String) -> Array:
 	var out: Array = []
 	if not _instances.has(instance_id):
 		return out
-
 	var inst: Dictionary = _instances[instance_id]
 	var sch: String = String(inst.get("school",""))
 	var active: String = String(inst.get("active_skill",""))
-
 	var allowed: PackedStringArray = _allowed_for_instance(instance_id)
-
-	# Map allowed IDs to display records
-	var names: Dictionary = {}  # sid -> String
+	var names: Dictionary = {}
 	if _skills_by_school.has(sch):
 		var arr_any: Variant = _skills_by_school[sch]
 		if typeof(arr_any) == TYPE_ARRAY:
 			for s in (arr_any as Array):
 				var rec: Dictionary = s
 				names[String(rec["skill_id"])] = String(rec["name"])
-
 	for sid in allowed:
 		var nm: String = String(names.get(sid, sid))
 		out.append({
 			"skill_id": sid,
 			"name": nm,
-			"level_req": 0, # already gated
+			"level_req": 0,
 			"unlocked": true,
 			"is_active": (sid == active),
 			"desc": ""
@@ -216,7 +201,6 @@ func get_instance_info(instance_id: String) -> Dictionary:
 		return {}
 	return (_instances[instance_id] as Dictionary).duplicate(true)
 
-# Preferred API: instance-based
 func set_active_skill_for_instance(instance_id: String, skill_id: String) -> bool:
 	if not _instances.has(instance_id):
 		return false
@@ -228,11 +212,9 @@ func set_active_skill_for_instance(instance_id: String, skill_id: String) -> boo
 	_instances[instance_id] = inst
 	return true
 
-# Back-compat alias used by older UI
 func set_active_skill(instance_id: String, skill_id: String) -> bool:
 	return set_active_skill_for_instance(instance_id, skill_id)
 
-# Member+socket API (some UIs call this)
 func set_active_skill_member(member: String, socket_index: int, skill_id: String) -> bool:
 	var sockets := get_loadout(member)
 	if socket_index < 0 or socket_index >= sockets.size():
@@ -243,20 +225,30 @@ func set_active_skill_member(member: String, socket_index: int, skill_id: String
 		loadout_changed.emit(member)
 	return ok
 
-# --------------------------------------------------------------------
-# Equip / Remove
-# --------------------------------------------------------------------
+# ───────────────── Equip / Remove ─────────────────
+
 func equip_into_socket(member: String, socket_index: int, id_or_base: String) -> bool:
 	var inst_id: String = ""
-	if not is_instance_id(id_or_base):
+	# Gate by school before equipping
+	if is_instance_id(id_or_base):
+		var iid := id_or_base
+		if not _instances.has(iid):
+			return false
+		var school_i := String((_instances[iid] as Dictionary).get("school",""))
+		if school_i != "" and not _member_allows_school(member, school_i):
+			return false
+		inst_id = iid
+	else:
+		# base id path: peek school and gate
+		var school_b := _school_of_base(id_or_base)
+		if school_b != "" and not _member_allows_school(member, school_b):
+			return false
 		if id_or_base.begins_with(SIGIL_ID_PREFIX):
 			inst_id = _mint_instance_from_inventory(id_or_base)
 			if inst_id == "":
 				return false
 		else:
 			return false
-	else:
-		inst_id = id_or_base
 
 	_ensure_capacity_from_bracelet(member)
 	_ensure_loadout(member)
@@ -267,7 +259,6 @@ func equip_into_socket(member: String, socket_index: int, id_or_base: String) ->
 	if socket_index < 0 or socket_index >= sockets.size():
 		return false
 
-	# avoid double-equipping same instance
 	for s in sockets:
 		if String(s) == inst_id:
 			return false
@@ -282,12 +273,14 @@ func equip_into_socket(member: String, socket_index: int, id_or_base: String) ->
 	return true
 
 func equip_from_inventory(member: String, socket_index: int, base_id: String) -> bool:
-	# convenience wrapper many UIs call
 	var iid: String = _mint_instance_from_inventory(base_id)
 	if iid == "":
 		return false
+	# gate instance school as well
+	var school := String(_instances.get(iid, {}).get("school",""))
+	if school != "" and not _member_allows_school(member, school):
+		return false
 	return equip_into_socket(member, socket_index, iid)
-
 
 func remove_sigil_at(member: String, socket_index: int) -> void:
 	if not _loadouts.has(member):
@@ -302,9 +295,8 @@ func remove_sigil_at(member: String, socket_index: int) -> void:
 	_loadouts[member] = sockets
 	loadout_changed.emit(member)
 
-# --------------------------------------------------------------------
-# Capacity: call this when bracelet changes
-# --------------------------------------------------------------------
+# ───────────── Capacity: call when bracelet changes ─────────────
+
 func on_bracelet_changed(member: String) -> void:
 	_ensure_capacity_from_bracelet(member)
 	_trim_or_expand_sockets(member)
@@ -354,15 +346,13 @@ func _ensure_loadout(member: String) -> void:
 	if not _loadouts.has(member):
 		_loadouts[member] = []
 
-# --------------------------------------------------------------------
-# Instance minting
-# --------------------------------------------------------------------
+# ───────────────── Instance minting ─────────────────
+
 func _mint_instance_from_inventory(base_id: String) -> String:
 	var inv: Node = get_node_or_null(INV_PATH)
 	if inv == null:
 		return ""
 
-	# check availability
 	var count: int = 0
 	if inv.has_method("get_count"):
 		var c_v: Variant = inv.call("get_count", base_id)
@@ -376,7 +366,6 @@ func _mint_instance_from_inventory(base_id: String) -> String:
 	if count <= 0:
 		return ""
 
-	# decrement one (support multiple inventory APIs)
 	if inv.has_method("remove_item"):
 		inv.call("remove_item", base_id, 1)
 	elif inv.has_method("dec"):
@@ -388,18 +377,7 @@ func _mint_instance_from_inventory(base_id: String) -> String:
 	elif inv.has_method("add"):
 		inv.call("add", base_id, -1)
 
-	# determine school
-	var school: String = ""
-	if inv.has_method("get_item_defs"):
-		var defs_v: Variant = inv.call("get_item_defs")
-		if typeof(defs_v) == TYPE_DICTIONARY:
-			var defs: Dictionary = defs_v
-			if defs.has(base_id):
-				var rec: Dictionary = defs[base_id]
-				if rec.has("sigil_school"):
-					school = String(rec["sigil_school"]).capitalize()
-				elif rec.has("mind_type_tag"):
-					school = String(rec["mind_type_tag"]).capitalize()
+	var school: String = _school_of_base(base_id)
 	if school == "":
 		school = "Fire"
 
@@ -420,9 +398,8 @@ func _mint_instance_from_inventory(base_id: String) -> String:
 		_owned.append(inst_id)
 	return inst_id
 
-# --------------------------------------------------------------------
-# Progress / XP
-# --------------------------------------------------------------------
+# ───────────────── Progress / XP ─────────────────
+
 func _xp_needed_for_level(_level: int) -> int:
 	return 100
 
@@ -444,7 +421,6 @@ func get_instance_progress(instance_id: String) -> Dictionary:
 	var pct: int = int(clamp((float(xp_cur) / float(need)) * 100.0, 0.0, 100.0))
 	return {"pct": pct}
 
-# ---- Cheat/XP APIs used by dev tools --------------------------------
 func cheat_add_xp_to_instance(instance_id: String, amount: int, require_equipped: bool = false) -> void:
 	if not _instances.has(instance_id):
 		return
@@ -454,7 +430,6 @@ func cheat_add_xp_to_instance(instance_id: String, amount: int, require_equipped
 	var lvl: int = int(inst.get("level", 1))
 	var xp_cur: int = int(inst.get("xp", 0))
 	xp_cur = max(0, xp_cur + max(0, amount))
-
 	var leveled: bool = false
 	while lvl < 4:
 		var need: int = max(1, _xp_needed_for_level(lvl))
@@ -464,32 +439,25 @@ func cheat_add_xp_to_instance(instance_id: String, amount: int, require_equipped
 			leveled = true
 		else:
 			break
-
 	inst["level"] = lvl
 	inst["xp"] = (0 if lvl >= 4 else xp_cur)
-
-	# keep active legal / prefer highest unlocked
 	var allowed: PackedStringArray = _allowed_for_instance(instance_id)
 	var active: String = String(inst.get("active_skill",""))
 	if allowed.size() > 0 and (active == "" or allowed.find(active) < 0):
 		inst["active_skill"] = allowed[allowed.size() - 1]
-
 	_instances[instance_id] = inst
-
 	var who: String = _find_member_by_instance(instance_id)
 	if leveled and who != "":
 		loadout_changed.emit(who)
 
-# Compatibility names a few tools might try
 func add_xp_to_instance(instance_id: String, amount: int) -> void:
 	cheat_add_xp_to_instance(instance_id, amount, false)
 
 func grant_xp_to_instance(instance_id: String, amount: int) -> void:
 	cheat_add_xp_to_instance(instance_id, amount, false)
 
-# --------------------------------------------------------------------
-# Cheat helpers
-# --------------------------------------------------------------------
+# ───────────────── Cheat helpers ─────────────────
+
 func list_free_instances() -> PackedStringArray:
 	var in_sockets: Dictionary = {}
 	for m in _loadouts.keys():
@@ -506,7 +474,6 @@ func list_free_instances() -> PackedStringArray:
 			out.append(id)
 	return out
 
-# plain Array variants for older cheat bars
 func list_free_instances_array() -> Array[String]:
 	var out: Array[String] = []
 	for s in list_free_instances():
@@ -542,11 +509,10 @@ func cheat_set_instance_level(instance_id: String, new_level: int) -> void:
 	inst["level"] = clamped
 	if clamped >= 4:
 		inst["xp"] = 0
-	# ensure active skill is legal for new level
 	var allowed: PackedStringArray = _allowed_for_instance(instance_id)
 	var active: String = String(inst.get("active_skill",""))
 	if allowed.size() > 0 and allowed.find(active) < 0:
-		inst["active_skill"] = allowed[allowed.size() - 1]  # prefer highest
+		inst["active_skill"] = allowed[allowed.size() - 1]
 	_instances[instance_id] = inst
 	var who: String = _find_member_by_instance(instance_id)
 	if who != "":
@@ -555,18 +521,7 @@ func cheat_set_instance_level(instance_id: String, new_level: int) -> void:
 func debug_spawn_instance(base_id: String, level: int = 1, tier: int = 1, xp: int = 0) -> String:
 	if base_id == "":
 		return ""
-	var school: String = ""
-	var inv: Node = get_node_or_null(INV_PATH)
-	if inv and inv.has_method("get_item_defs"):
-		var dv: Variant = inv.call("get_item_defs")
-		if typeof(dv) == TYPE_DICTIONARY:
-			var defs: Dictionary = dv
-			if defs.has(base_id):
-				var rec: Dictionary = defs[base_id]
-				if rec.has("sigil_school"):
-					school = String(rec["sigil_school"]).capitalize()
-				elif rec.has("mind_type_tag"):
-					school = String(rec["mind_type_tag"]).capitalize()
+	var school: String = _school_of_base(base_id)
 	if school == "":
 		school = "Fire"
 	var idx: int = _next_instance_idx
@@ -584,9 +539,111 @@ func debug_spawn_instance(base_id: String, level: int = 1, tier: int = 1, xp: in
 		_owned.append(inst_id)
 	return inst_id
 
+
 # --------------------------------------------------------------------
-# Local helpers
+# Save / Load
 # --------------------------------------------------------------------
+func get_save_blob() -> Dictionary:
+	# Persist instances, owned list, loadouts, and next id counter.
+	var blob := {
+		"instances": _instances.duplicate(true),     # inst_id -> {base_id, school, tier, level, xp, active_skill}
+		"owned": _owned.duplicate(),                # PackedStringArray of inst_ids
+		"loadouts": _loadouts.duplicate(true),      # member -> Array[String] of inst_ids
+		"next_idx": _next_instance_idx               # int
+	}
+	return blob
+
+
+func apply_save_blob(blob: Dictionary) -> void:
+	# -------- instances --------
+	var inst_in_v: Variant = blob.get("instances", {})
+	var new_inst: Dictionary = {}
+	if typeof(inst_in_v) == TYPE_DICTIONARY:
+		var inst_in: Dictionary = inst_in_v
+		for k_v in inst_in.keys():
+			var iid: String = String(k_v)
+			var row_v: Variant = inst_in[k_v]
+			if typeof(row_v) != TYPE_DICTIONARY:
+				continue
+			var row: Dictionary = row_v
+			var base_id: String = String(row.get("base_id",""))
+			if base_id == "":
+				continue
+			new_inst[iid] = {
+				"base_id": base_id,
+				"school": String(row.get("school","")),
+				"tier": int(row.get("tier",1)),
+				"level": int(row.get("level",1)),
+				"xp": int(row.get("xp",0)),
+				"active_skill": String(row.get("active_skill",""))
+			}
+	_instances = new_inst
+
+	# -------- owned --------
+	var owned_in_v: Variant = blob.get("owned", [])
+	var new_owned := PackedStringArray()
+	if typeof(owned_in_v) == TYPE_PACKED_STRING_ARRAY:
+		new_owned = owned_in_v as PackedStringArray
+	elif typeof(owned_in_v) == TYPE_ARRAY:
+		for v in (owned_in_v as Array):
+			var s := String(v)
+			if _instances.has(s): new_owned.append(s)
+	# ensure anything in sockets is also marked owned
+	for m_k in _loadouts.keys():
+		var arr_any: Variant = _loadouts[m_k]
+		if typeof(arr_any) == TYPE_ARRAY:
+			for sid_v in (arr_any as Array):
+				var sid := String(sid_v)
+				if sid != "" and _instances.has(sid) and new_owned.find(sid) < 0:
+					new_owned.append(sid)
+	_owned = new_owned
+
+	# -------- loadouts --------
+	var lo_in_v: Variant = blob.get("loadouts", {})
+	var new_loadouts: Dictionary = {}
+	if typeof(lo_in_v) == TYPE_DICTIONARY:
+		var lo_in: Dictionary = lo_in_v
+		for m_k in lo_in.keys():
+			var member := String(m_k)
+			var arr_v: Variant = lo_in[m_k]
+			var arr: Array = []
+			if typeof(arr_v) == TYPE_PACKED_STRING_ARRAY:
+				arr = Array(arr_v)
+			elif typeof(arr_v) == TYPE_ARRAY:
+				arr = arr_v
+			# keep only valid instance IDs
+			var clean: Array = []
+			for sid_v in arr:
+				var sid := String(sid_v)
+				if sid == "" or not _instances.has(sid):
+					clean.append("")  # keep socket count stable, leave empty
+				else:
+					clean.append(sid)
+			new_loadouts[member] = clean
+	_loadouts = new_loadouts
+
+	# -------- next index (defensive: recompute if needed) --------
+	var want_next: int = int(blob.get("next_idx", 1))
+	var max_seen: int = 0
+	for iid_k in _instances.keys():
+		var iid := String(iid_k)
+		var pos := iid.rfind(INSTANCE_SEP)
+		if pos >= 0 and pos + 1 < iid.length():
+			var n_txt := iid.substr(pos + INSTANCE_SEP.length())
+			var n := n_txt.to_int()
+			if n > max_seen: max_seen = n
+	_next_instance_idx = max(want_next, max_seen + 1)
+
+	# -------- fit sockets to current bracelets and notify --------
+	for m_k in _loadouts.keys():
+		var member := String(m_k)
+		_ensure_capacity_from_bracelet(member)
+		_trim_or_expand_sockets(member)
+		loadout_changed.emit(member)
+
+
+# ───────────────── Local helpers ─────────────────
+
 func _allowed_for_instance(instance_id: String) -> PackedStringArray:
 	var out := PackedStringArray()
 	if not _instances.has(instance_id):
@@ -596,7 +653,6 @@ func _allowed_for_instance(instance_id: String) -> PackedStringArray:
 	var level: int = int(inst.get("level", 1))
 	var school: String = String(inst.get("school",""))
 
-	# Holder-gated path (preferred)
 	if _holder_map.has(base_id):
 		var rec_any: Variant = _holder_map[base_id]
 		if typeof(rec_any) == TYPE_DICTIONARY:
@@ -611,7 +667,6 @@ func _allowed_for_instance(instance_id: String) -> PackedStringArray:
 						out.append(sid)
 		return out
 
-	# Fallback: use school list + level_req <= level
 	if _skills_by_school.has(school):
 		var arr_any: Variant = _skills_by_school[school]
 		if typeof(arr_any) == TYPE_ARRAY:
@@ -663,6 +718,36 @@ func _skill_name(skill_id: String) -> String:
 				if String(d["skill_id"]) == skill_id:
 					return String(d["name"])
 	return skill_id
+
+func _school_of_base(base_id: String) -> String:
+	var inv: Node = get_node_or_null(INV_PATH)
+	if inv and inv.has_method("get_item_defs"):
+		var dv: Variant = inv.call("get_item_defs")
+		if typeof(dv) == TYPE_DICTIONARY:
+			var defs: Dictionary = dv
+			if defs.has(base_id):
+				var rec: Dictionary = defs[base_id]
+				if rec.has("sigil_school"):
+					return String(rec["sigil_school"]).capitalize()
+				if rec.has("mind_type_tag"):
+					return String(rec["mind_type_tag"]).capitalize()
+	return ""
+
+func _member_allows_school(member: String, school: String) -> bool:
+	var ps := get_node_or_null(PARTY_PATH)
+	var mt := get_node_or_null(MIND_PATH)
+	if ps == null or mt == null:
+		return true  # fail-open if systems missing
+	var base := ""
+	if ps.has_method("get_member_mind_base"):
+		base = String(ps.call("get_member_mind_base", member))
+	if base == "":
+		base = "Fire"
+	if base == "Omega":
+		return true
+	if mt.has_method("is_school_allowed"):
+		return bool(mt.call("is_school_allowed", base, school))
+	return true
 
 func _to_int(v: Variant) -> int:
 	var t: int = typeof(v)

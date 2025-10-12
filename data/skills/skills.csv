@@ -1,5 +1,9 @@
 skill_id,name,school,type,element,target,power,acc,cost_mp,cooldown,uses_per_battle,aoe,crit_bonus_pct,notes,tags,scaling_brw,scaling_mnd,scaling_fcs,status_apply,status_chance,duration
-FIRE_L1,Fire Bolt,Fire,Attack,fire,Enemy,30,90,6,0,0,0,0,"Basic single-target fire.",Burn,0,1,0,Burn,20,3
-FIRE_L2,Fire Burst,Fire,Attack,fire,Enemies,40,88,10,0,0,1,0,"Small AoE fire.",Burn,0,1,0,Burn,25,3
-FIRE_L3,Fire Wave,Fire,Attack,fire,Enemy,65,86,14,0,0,0,5,"Stronger fire wave.",Burn;Stagger,0,1,0,Burn,30,3
-FIRE_L4,Fire Nova,Fire,Attack,fire,Enemies,95,84,20,0,0,1,10,"Big AoE fire.",Burn;Stagger,0,1,0,Burn,40,3
+FIRE_L1,Fire Bolt,Fire,Attack,fire,Enemy,30,90,6,0,0,0,0,Basic single-target fire.,Burn,0,1,0,Burn,20,3
+FIRE_L2,Fire Burst,Fire,Attack,fire,Enemies,40,88,10,0,0,1,0,Small AoE fire.,Burn,0,1,0,Burn,25,3
+FIRE_L3,Fire Wave,Fire,Attack,fire,Enemy,65,86,14,0,0,0,5,Stronger fire wave.,Burn;Stagger,0,1,0,Burn,30,3
+FIRE_L4,Fire Nova,Fire,Attack,fire,Enemies,95,84,20,0,0,1,10,Big AoE fire.,Burn;Stagger,0,1,0,Burn,40,3
+WATER_L1,Splash,Water,Attack,Water,Enemy,30,90,6,0,0,0,0,Basic single-target water.,Confuse,0,1,0,Confuse,20,3
+WATER_L2,Surf,Water,Attack,Water,Enemies,40,88,10,0,0,1,0,Small AoE water.,Confuse,0,1,0,Confuse,25,3
+WATER_L3,Tidal,Water,Attack,Water,Enemy,65,86,14,0,0,0,5,Stronger water wave.,Confuse;Stagger,0,1,0,Confuse,30,3
+WATER_L4,Hurricane,Water,Attack,Water,Enemies,95,84,20,0,0,1,10,Big AoE water.,Confuse;Stagger,0,1,0,Confuse,40,3

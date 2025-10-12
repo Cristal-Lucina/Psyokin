@@ -1,11 +1,8 @@
 extends Control
 class_name StatusPanel
 
-## StatusPanel (robust)
-## - Shows party (name → Lv, HP/MP with bars), money/perk/date/phase/hint.
-## - Appearance block is unchanged.
-## - Reads from GameState if present; otherwise falls back to PartySystem + HeroSystem.
-## - MaxHP/MaxMP follow Ch. 3 formulas.
+## Shows party HP/MP, summary info, and appearance. 
+## Refreshes on time/stat/party changes. Fallbacks if a system is missing.
 
 const GS_PATH    := "/root/aGameState"
 const STATS_PATH := "/root/aStatsSystem"
@@ -34,7 +31,7 @@ var _mes : Node = null
 var _hero: Node = null
 var _party_sys: Node = null
 
-# Appearance UI (unchanged)
+# Appearance UI
 var _app_box    : VBoxContainer = null
 var _app_grid   : GridContainer = null
 var _app_labels : Dictionary = {}
@@ -57,25 +54,45 @@ func _ready() -> void:
 
 	_resolve_event_system()
 	_normalize_scroll_children()
+	_connect_signals()
 
 	if _refresh and not _refresh.pressed.is_connected(_rebuild_all):
 		_refresh.pressed.connect(_rebuild_all)
 
-	if _cal:
-		if _cal.has_signal("day_advanced"):
-			_cal.connect("day_advanced", Callable(self, "_rebuild_all"))
-		if _cal.has_signal("phase_advanced"):
-			_cal.connect("phase_advanced", Callable(self, "_rebuild_all"))
-		if _cal.has_signal("week_reset"):
-			_cal.connect("week_reset", Callable(self, "_rebuild_all"))
+	# Defer first fill so systems have time to boot and emit party.
+	call_deferred("_first_fill")
 
+func _first_fill() -> void:
+	# Late-bind in case systems spawned after our _ready
+	if _gs == null:        _gs        = get_node_or_null(GS_PATH)
+	if _st == null:        _st        = get_node_or_null(STATS_PATH)
+	if _cal == null:       _cal       = get_node_or_null(CAL_PATH)
+	if _hero == null:      _hero      = get_node_or_null(HERO_PATH)
+	if _hero == null:      _hero      = get_node_or_null("/root/HeroSystem")
+	if _party_sys == null: _party_sys = get_node_or_null(PARTY_PATH)
+	_rebuild_all()
+
+func _connect_signals() -> void:
+	# Calendar
+	if _cal:
+		if _cal.has_signal("day_advanced"):   _cal.connect("day_advanced",   Callable(self, "_rebuild_all"))
+		if _cal.has_signal("phase_advanced"): _cal.connect("phase_advanced", Callable(self, "_rebuild_all"))
+		if _cal.has_signal("week_reset"):     _cal.connect("week_reset",     Callable(self, "_rebuild_all"))
+	# Stats
 	if _st and _st.has_signal("stats_changed"):
 		_st.connect("stats_changed", Callable(self, "_rebuild_all"))
-
+	# Hero
 	if _hero and _hero.has_signal("creation_applied"):
 		_hero.connect("creation_applied", Callable(self, "_rebuild_all"))
+	# Party / GameState changes (try a few common names)
+	for src in [_gs, _party_sys]:
+		if src == null: continue
+		for sig in ["party_changed","active_changed","roster_changed","changed"]:
+			if src.has_signal(sig) and not src.is_connected(sig, Callable(self, "_on_party_changed")):
+				src.connect(sig, Callable(self, "_on_party_changed"))
 
-	_rebuild_all()
+func _on_party_changed(_a: Variant = null) -> void:
+	_rebuild_party()
 
 func _resolve_event_system() -> void:
 	_mes = get_node_or_null(MES_PATH)
@@ -86,8 +103,7 @@ func _resolve_event_system() -> void:
 	if _mes == null:
 		for n in get_tree().root.get_children():
 			if n.has_method("get_current_hint"):
-				_mes = n
-				break
+				_mes = n; break
 	if _mes and _mes.has_signal("event_changed"):
 		if not _mes.is_connected("event_changed", Callable(self, "_on_event_changed")):
 			_mes.connect("event_changed", Callable(self, "_on_event_changed"))
@@ -109,8 +125,7 @@ func _rebuild_all() -> void:
 
 func _rebuild_party() -> void:
 	if not _party: return
-	for c in _party.get_children():
-		c.queue_free()
+	for c in _party.get_children(): c.queue_free()
 
 	var members: Array = _get_party_snapshot()
 	for it_v in members:
@@ -163,7 +178,7 @@ func _rebuild_party() -> void:
 	await get_tree().process_frame
 	_party.queue_sort()
 
-# --------------------- Right column summary (unchanged) ---------------------
+# --------------------- Right column summary -------------------
 
 func _update_summary() -> void:
 	if _money: _money.text = _read_money()
@@ -177,7 +192,7 @@ func _update_summary() -> void:
 		var h := _read_mission_hint()
 		_hint.text = h if h != "" else "[i]TBD[/i]"
 
-# --------------------- Appearance (unchanged UI) ---------------------
+# --------------------- Appearance -----------------------------
 
 func _rebuild_appearance() -> void:
 	_ensure_appearance_ui()
@@ -189,10 +204,8 @@ func _ensure_appearance_ui() -> void:
 	_app_box = null
 	for c in right_parent.get_children():
 		if c is VBoxContainer and (c as VBoxContainer).name == "AppearanceBox":
-			_app_box = c
-			break
-	if _app_box != null:
-		return
+			_app_box = c; break
+	if _app_box != null: return
 
 	_app_box = VBoxContainer.new()
 	_app_box.name = "AppearanceBox"
@@ -269,8 +282,7 @@ func _read_hero_identity() -> Dictionary:
 		"hair_color": Color(1, 1, 1)
 	}
 	var h := _hero
-	if h == null:
-		return out
+	if h == null: return out
 
 	if h.has_method("get_save_blob"):
 		var v: Variant = h.call("get_save_blob")
@@ -291,7 +303,6 @@ func _read_hero_identity() -> Dictionary:
 				out["hair_color"] = _as_color(id.get("hair_color", out["hair_color"]))
 			return out
 
-	# Fallback: read properties directly
 	if h.has_method("get"):
 		var props: Dictionary = {
 			"hero_name":"name", "pronoun":"pronoun",
@@ -314,7 +325,7 @@ func _as_color(v: Variant) -> Color:
 	if typeof(v) == TYPE_STRING: return Color(String(v))
 	return Color(1,1,1)
 
-# --------------------- Small helpers (money/date/hint) ---------------------
+# --------------------- Small helpers -------------------------
 
 func _read_money() -> String:
 	if _gs:
@@ -367,80 +378,72 @@ func _on_event_changed(_id: String) -> void:
 func _fmt_pair(a: int, b: int) -> String:
 	return "%d / %d" % [a, b] if a >= 0 and b > 0 else "—"
 
-# --------------------- Party snapshot logic ---------------------
+# --------------------- Party snapshot logic -------------------
 
 func _get_party_snapshot() -> Array:
-	# Preferred: let GameState provide a ready-made snapshot (if your GS does that).
+	# If GameState already exposes a ready-made snapshot, use it.
 	if _gs and _gs.has_method("get_party_snapshot"):
 		var res: Variant = _gs.call("get_party_snapshot")
 		if typeof(res) == TYPE_ARRAY: return res as Array
+	# Otherwise build one from whatever active/roster shape exists.
+	return _build_snapshot_flexible()
 
-	# Fallback: build from PartySystem + HeroSystem using Chapter 3 formulas.
-	return _build_snapshot_from_party_system()
-
-func _build_snapshot_from_party_system() -> Array:
+func _build_snapshot_flexible() -> Array:
 	var out: Array = []
+	var roster := _read_roster()
 
-	if _party_sys == null:
-		# Last fallback: show the hero from HeroSystem so the panel isn’t blank.
-		var nm := _safe_hero_name()
-		var lvl := _safe_hero_level()
-		var vtl := 1
-		var fcs := 1
-		var max_hp := _calc_max_hp(lvl, vtl)
-		var max_mp := _calc_max_mp(lvl, fcs)
-		out.append({"name":"%s  (Lv %d)" % [nm, lvl], "hp": max_hp, "hp_max": max_hp, "mp": max_mp, "mp_max": max_mp})
-		return out
+	# Collect active as robust entries {key, label}
+	var entries := _gather_active_entries(roster)
 
-	# Active party IDs (Array[String])
-	var active_ids: Array = []
-	var a_v: Variant = _party_sys.get("active")
-	if typeof(a_v) == TYPE_ARRAY: active_ids = (a_v as Array)
-	elif _party_sys.has_method("get_active"): 
-		var r: Variant = _party_sys.call("get_active")
-		if typeof(r) == TYPE_ARRAY: active_ids = (r as Array)
+	for e_v in entries:
+		if typeof(e_v) != TYPE_DICTIONARY: continue
+		var e: Dictionary = e_v
+		var pid: String = String(e.get("key",""))
+		var label: String = String(e.get("label",""))
 
-	# Roster snapshot (Dictionary)
-	var roster: Dictionary = {}
-	var r_v: Variant = _party_sys.get("roster")
-	if typeof(r_v) == TYPE_DICTIONARY: roster = (r_v as Dictionary)
+		# Try direct roster hit; if not, try by name
+		var rec: Dictionary = {}
+		if pid != "" and roster.has(pid):
+			rec = roster[pid]
+		elif label != "":
+			for rk in roster.keys():
+				var rr: Dictionary = roster[rk]
+				if rr.has("name") and String(rr["name"]).strip_edges() == label.strip_edges():
+					rec = rr; pid = String(rk); break
 
-	for id_v in active_ids:
-		var pid: String = String(id_v)
-		var rec: Dictionary = roster.get(pid, {}) as Dictionary
-
-		# Name + Level (avoid shadowing Node.name)
-		var char_name: String = pid
-		if pid == "hero":
+		# Name / level
+		var char_name: String = (label if label != "" else pid)
+		if pid == "hero" or char_name == "":
 			char_name = _safe_hero_name()
-		elif rec.has("name") and typeof(rec["name"]) == TYPE_STRING:
-			char_name = String(rec["name"])
 
-		var level: int = (int(_hero.get("level")) if (_hero and _hero.has_method("get")) and pid == "hero" else int(rec.get("level", 1)))
+		var level: int = 1
+		if pid == "hero" and _hero and _hero.has_method("get"):
+			level = int(_hero.get("level"))
+		elif not rec.is_empty():
+			level = int(rec.get("level", 1))
 
-		# Stats dictionary for growth calcs
-		var stats_d: Dictionary = (rec.get("stats", {}) as Dictionary) if rec.has("stats") and typeof(rec["stats"]) == TYPE_DICTIONARY else {}
+		# Stats to compute maxima
+		var stats_d: Dictionary = {}
+		if not rec.is_empty() and rec.has("stats") and typeof(rec["stats"]) == TYPE_DICTIONARY:
+			stats_d = rec["stats"]
 		var vtl: int = int(stats_d.get("VTL", 1))
 		var fcs: int = int(stats_d.get("FCS", 1))
 
 		var hp_max: int = _calc_max_hp(level, vtl)
 		var mp_max: int = _calc_max_mp(level, fcs)
 
-		# Current HP/MP (use roster if present, else start full)
+		# Current HP/MP if provided
 		var hp_cur := hp_max
 		var mp_cur := mp_max
-
-		if rec.has("hp") and typeof(rec["hp"]) == TYPE_DICTIONARY:
+		if not rec.is_empty() and rec.has("hp") and typeof(rec["hp"]) == TYPE_DICTIONARY:
 			var hp_d: Dictionary = rec["hp"]
 			hp_cur = int(hp_d.get("cur", hp_max))
 			hp_max = int(hp_d.get("max", hp_max))
-
-		if rec.has("mp") and typeof(rec["mp"]) == TYPE_DICTIONARY:
+		if not rec.is_empty() and rec.has("mp") and typeof(rec["mp"]) == TYPE_DICTIONARY:
 			var mp_d: Dictionary = rec["mp"]
 			mp_cur = int(mp_d.get("cur", mp_max))
 			mp_max = int(mp_d.get("max", mp_max))
 
-		# Clamp in case external data is off
 		hp_cur = clamp(hp_cur, 0, hp_max)
 		mp_cur = clamp(mp_cur, 0, mp_max)
 
@@ -450,17 +453,105 @@ func _build_snapshot_from_party_system() -> Array:
 			"mp": mp_cur, "mp_max": mp_max
 		})
 
+	# Last resort: show hero only
 	if out.is_empty():
-		# Ensure panel isn’t blank if party is empty
-		var nm2 := _safe_hero_name()
-		var lvl2 := _safe_hero_level()
-		var max_hp2 := _calc_max_hp(lvl2, 1)
-		var max_mp2 := _calc_max_mp(lvl2, 1)
-		out.append({"name":"%s  (Lv %d)" % [nm2, lvl2], "hp": max_hp2, "hp_max": max_hp2, "mp": max_mp2, "mp_max": max_mp2})
+		var nm := _safe_hero_name()
+		var lvl := _safe_hero_level()
+		var mh := _calc_max_hp(lvl, 1)
+		var mm := _calc_max_mp(lvl, 1)
+		out.append({"name":"%s  (Lv %d)" % [nm, lvl], "hp": mh, "hp_max": mh, "mp": mm, "mp_max": mm})
 
 	return out
 
-# Growth formulas (Ch. 3)
+# ---- Active/roster discovery helpers --------------------------------
+
+func _array_from_any(v: Variant) -> Array:
+	if typeof(v) == TYPE_ARRAY: return v as Array
+	if typeof(v) == TYPE_PACKED_STRING_ARRAY:
+		var out: Array = []
+		for s in (v as PackedStringArray): out.append(String(s))
+		return out
+	return []
+
+func _read_roster() -> Dictionary:
+	var roster: Dictionary = {}
+	if _party_sys:
+		if _party_sys.has_method("get"):
+			var r_v: Variant = _party_sys.get("roster")
+			if typeof(r_v) == TYPE_DICTIONARY: roster = r_v as Dictionary
+		if roster.is_empty() and _party_sys.has_method("get_roster"):
+			var r2_v: Variant = _party_sys.call("get_roster")
+			if typeof(r2_v) == TYPE_DICTIONARY: roster = r2_v as Dictionary
+	return roster
+
+func _label_for_id(pid: String, roster: Dictionary) -> String:
+	if pid == "hero": return _safe_hero_name()
+	if roster.has(pid):
+		var rec: Dictionary = roster[pid]
+		if rec.has("name") and typeof(rec["name"]) == TYPE_STRING and String(rec["name"]).strip_edges() != "":
+			return String(rec["name"])
+	return (pid.capitalize() if pid != "" else "")
+
+func _gather_active_entries(roster: Dictionary) -> Array:
+	var entries: Array = []
+
+	# 1) GameState: ids (some projects expose this)
+	if _gs and _gs.has_method("get_active_party_ids"):
+		var v: Variant = _gs.call("get_active_party_ids")
+		for s in _array_from_any(v):
+			var pid := String(s)
+			entries.append({"key": pid, "label": _label_for_id(pid, roster)})
+		if entries.size() > 0: return entries
+
+	# 2) GameState: get_active (ids)
+	if _gs and _gs.has_method("get_active"):
+		var v2: Variant = _gs.call("get_active")
+		for s2 in _array_from_any(v2):
+			var pid2 := String(s2)
+			entries.append({"key": pid2, "label": _label_for_id(pid2, roster)})
+		if entries.size() > 0: return entries
+
+	# 3) GameState: names only
+	if _gs and _gs.has_method("get_party_names"):
+		var n_v: Variant = _gs.call("get_party_names")
+		for n in _array_from_any(n_v):
+			var nm := String(n)
+			if nm.strip_edges() != "":
+				entries.append({"key": "", "label": nm})
+		if entries.size() > 0: return entries
+
+	# 4) GameState: party property (ids)
+	if _gs and _gs.has_method("get"):
+		var p_v: Variant = _gs.get("party")
+		for s3 in _array_from_any(p_v):
+			var pid3 := String(s3)
+			entries.append({"key": pid3, "label": _label_for_id(pid3, roster)})
+		if entries.size() > 0: return entries
+
+	# 5) PartySystem: common method names
+	if _party_sys:
+		for m in ["get_active_party","get_party","list_active_members","list_party","get_active"]:
+			if _party_sys.has_method(m):
+				var r: Variant = _party_sys.call(m)
+				for s4 in _array_from_any(r):
+					var pid4 := String(s4)
+					entries.append({"key": pid4, "label": _label_for_id(pid4, roster)})
+				if entries.size() > 0: return entries
+		# properties
+		for prop in ["active","party"]:
+			if _party_sys.has_method("get"):
+				var a_v: Variant = _party_sys.get(prop)
+				for s5 in _array_from_any(a_v):
+					var pid5 := String(s5)
+					entries.append({"key": pid5, "label": _label_for_id(pid5, roster)})
+				if entries.size() > 0: return entries
+
+	# 6) Fallback: hero only
+	entries.append({"key":"hero","label":_safe_hero_name()})
+	return entries
+
+# ---- Stat helpers ----------------------------------------------------
+
 func _calc_max_hp(level: int, vtl: int) -> int:
 	return 150 + (max(1, vtl) * max(1, level) * 6)
 
@@ -477,6 +568,5 @@ func _safe_hero_name() -> String:
 func _safe_hero_level() -> int:
 	if _hero and _hero.has_method("get"):
 		var v: Variant = _hero.get("level")
-		if typeof(v) in [TYPE_INT, TYPE_FLOAT]:
-			return int(v)
+		if typeof(v) in [TYPE_INT, TYPE_FLOAT]: return int(v)
 	return 1

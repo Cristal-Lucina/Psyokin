@@ -1,0 +1,17 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://bmkxs833hraif"
+
+[deps]
+
+files=["res://data/combat/mind_types.name.translation", "res://data/combat/mind_types.allowed.translation", "res://data/combat/mind_types.weak.translation", "res://data/combat/mind_types.resist.translation", "res://data/combat/mind_types.desc.translation"]
+
+source_file="res://data/combat/mind_types.csv"
+dest_files=["res://data/combat/mind_types.name.translation", "res://data/combat/mind_types.allowed.translation", "res://data/combat/mind_types.weak.translation", "res://data/combat/mind_types.resist.translation", "res://data/combat/mind_types.desc.translation"]
+
+[params]
+
+compress=true
+delimiter=0

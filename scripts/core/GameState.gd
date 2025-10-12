@@ -1,6 +1,8 @@
 extends Node
 class_name GameState
 
+signal party_changed
+
 var player_name: String = "Player"
 var difficulty: String = "Normal"
 var money: int = 0
@@ -23,13 +25,15 @@ const CALENDAR_PATH := "/root/aCalendarSystem"
 const STATS_PATH    := "/root/aStatsSystem"
 const SAVELOAD_PATH := "/root/aSaveLoad"
 const PERK_PATH     := "/root/aPerkSystem"
+const CSV_PATH      := "/root/aCSVLoader"            # used for id<->name lookups
+const PARTY_CSV     := "res://data/actors/party.csv" # your Party.csv
 
 const SAVE_MODULES: Array = [
 	{"id":"perks",    "path": PERK_PATH,                 "export":"get_save_blob", "import":"apply_save_blob", "reset":"clear_all"},
 	{"id":"hero",     "path": "/root/aHeroSystem",       "export":"get_save_blob", "import":"apply_save_blob", "reset":"clear_all"},
 	{"id":"stats",    "path": "/root/aStatsSystem",      "export":"get_save_blob", "import":"apply_save_blob", "reset":"clear_all"},
 	{"id":"inventory","path": "/root/aInventorySystem",  "export":"get_save_blob", "import":"apply_save_blob", "reset":"clear_all"},
-	{"id":"equipment","path": "/root/aEquipmentSystem",   "export":"get_save_blob", "import":"apply_save_blob", "reset":"clear_all"},
+	{"id":"equipment","path": "/root/aEquipmentSystem",  "export":"get_save_blob", "import":"apply_save_blob", "reset":"clear_all"},
 	{"id":"party",    "path": "/root/aPartySystem",      "export":"get_save_blob", "import":"apply_save_blob", "reset":"clear_all"},
 	{"id":"effects",  "path": "/root/aStatusEffects",    "export":"get_save_blob", "import":"apply_save_blob", "reset":"clear_all"},
 	{"id":"sigils",   "path": "/root/aSigilSystem",      "export":"get_save_blob", "import":"apply_save_blob", "reset":"clear_all"},
@@ -73,6 +77,7 @@ func new_game() -> void:
 		stats.reset_week()
 
 	_reset_modules_for_new_game()
+	emit_signal("party_changed")
 
 func save_to_slot(slot: int) -> bool:
 	var saver: SaveLoad = get_node_or_null(SAVELOAD_PATH) as SaveLoad
@@ -155,6 +160,99 @@ func apply_index_blob(blob: Dictionary) -> void:
 	if typeof(w_v) == TYPE_DICTIONARY: out["lore"] = (w_v as Dictionary).duplicate(true)
 	index_blob = out
 
+# ─────────────────────── BRIDGES FOR PARTY UI ───────────────────────
+
+func get_party_names() -> PackedStringArray:
+	var ids: Array[String] = _active_party_ids()
+	var out: PackedStringArray = PackedStringArray()
+	for id in ids:
+		out.append(_display_name_for_id(String(id)))
+	return out
+
+func get_member_equip(member: String) -> Dictionary:
+	var eq := get_node_or_null("/root/aEquipmentSystem")
+	if eq == null or not eq.has_method("get_member_equip"):
+		return {}
+	var d1: Variant = eq.call("get_member_equip", member)
+	if typeof(d1) == TYPE_DICTIONARY:
+		return d1 as Dictionary
+	var mid := _resolve_member_id(member)
+	if mid != member:
+		var d2: Variant = eq.call("get_member_equip", mid)
+		if typeof(d2) == TYPE_DICTIONARY:
+			return d2 as Dictionary
+	return {}
+
+func _active_party_ids() -> Array[String]:
+	var out: Array[String] = []
+	var ps := get_node_or_null("/root/aPartySystem")
+	if ps:
+		for m in ["get_active_party", "get_party", "list_active_members", "list_party"]:
+			if ps.has_method(m):
+				var v: Variant = ps.call(m)
+				if typeof(v) == TYPE_ARRAY:
+					for s in (v as Array): out.append(String(s))
+				elif typeof(v) == TYPE_PACKED_STRING_ARRAY:
+					for s2 in (v as PackedStringArray): out.append(String(s2))
+				if not out.is_empty(): return out
+	for s3 in party: out.append(s3)
+	if out.is_empty(): out.append("hero")
+	return out
+
+func _display_name_for_id(id: String) -> String:
+	# Hero uses the runtime hero_name if set
+	if id == "hero":
+		var hs := get_node_or_null("/root/aHeroSystem")
+		if hs:
+			var nm: Variant = hs.get("hero_name")   # safe even if missing
+			if typeof(nm) == TYPE_STRING and String(nm) != "":
+				return String(nm)
+	# PartySystem can provide a display name
+	var ps := get_node_or_null("/root/aPartySystem")
+	if ps:
+		for m in ["get_display_name_for", "get_name_for", "name_for"]:
+			if ps.has_method(m):
+				var v: Variant = ps.call(m, id)
+				if typeof(v) == TYPE_STRING and String(v) != "":
+					return String(v)
+	# CSV lookup fallback
+	var csv := get_node_or_null(CSV_PATH)
+	if csv and csv.has_method("load_csv"):
+		var defs_v: Variant = csv.call("load_csv", PARTY_CSV, "actor_id")
+		if typeof(defs_v) == TYPE_DICTIONARY:
+			var defs: Dictionary = defs_v
+			if defs.has(id):
+				var row: Dictionary = defs[id]
+				var nm2 := String(row.get("name",""))
+				if nm2 != "": return nm2
+	return id.capitalize()
+
+func _resolve_member_id(name_in: String) -> String:
+	var hs := get_node_or_null("/root/aHeroSystem")
+	if hs:
+		var hv: Variant = hs.get("hero_name")  # safe even if not defined
+		if typeof(hv) == TYPE_STRING and String(hv).to_lower() == name_in.to_lower():
+			return "hero"
+	var ps := get_node_or_null("/root/aPartySystem")
+	if ps:
+		for m in ["id_for_name", "get_id_for_name", "resolve_id_for_name"]:
+			if ps.has_method(m):
+				var v: Variant = ps.call(m, name_in)
+				if typeof(v) == TYPE_STRING and String(v) != "":
+					return String(v)
+	var csv := get_node_or_null(CSV_PATH)
+	if csv and csv.has_method("load_csv"):
+		var defs_v: Variant = csv.call("load_csv", PARTY_CSV, "actor_id")
+		if typeof(defs_v) == TYPE_DICTIONARY:
+			var defs: Dictionary = defs_v
+			for id_any in defs.keys():
+				var row: Dictionary = defs[id_any]
+				if String(row.get("name","")).to_lower() == name_in.to_lower():
+					return String(id_any)
+	return name_in
+
+# ────────────────────────────────────────────────────────────────────
+
 func _to_payload() -> Dictionary:
 	var cal: Node = get_node_or_null(CALENDAR_PATH)
 	var cal_date: Dictionary = {}
@@ -202,7 +300,6 @@ func _to_payload() -> Dictionary:
 			"phase": cal_phase,
 			"weekday": cal_weekday,
 		},
-		# store current equip outside modules so we can restore before/after as needed
 		"equipment": _snapshot_equipment(),
 		"index": get_index_blob(),
 		"modules": modules_blob,
@@ -210,7 +307,6 @@ func _to_payload() -> Dictionary:
 	}
 
 func _from_payload(p: Dictionary) -> void:
-	# Basic top-level fields
 	player_name     = String(p.get("player_name", "Player"))
 	difficulty      = String(p.get("difficulty", "Normal"))
 	money           = int(p.get("money", 0))
@@ -229,39 +325,32 @@ func _from_payload(p: Dictionary) -> void:
 	var bench_v: Variant = p.get("bench", [])
 	bench.clear()
 	if typeof(bench_v) == TYPE_ARRAY:
-		for m in (bench_v as Array): bench.append(String(m))
+		for m2 in (bench_v as Array): bench.append(String(m2))
 
 	var flags_v: Variant = p.get("flags", {})
 	flags = (flags_v as Dictionary).duplicate(true) if typeof(flags_v) == TYPE_DICTIONARY else {}
 
-	# Defer equipment application until AFTER modules (Inventory/Sigils) are restored.
 	var equip_snap: Variant = p.get("equipment", null)
 
-	# Deterministic module import order
 	var mods_v: Variant = p.get("modules", {})
 	if typeof(mods_v) == TYPE_DICTIONARY:
 		_import_modules_payload(mods_v as Dictionary)
 
-	# Now apply equipment snapshot (Inventory is back, equip calls won't fail).
 	if equip_snap != null:
 		_apply_equipment_snapshot(equip_snap)
-		# Ensure Sigil capacity matches the bracelet post-equip
 		var sig := get_node_or_null("/root/aSigilSystem")
 		if sig and sig.has_method("on_bracelet_changed"):
-			for m in _list_party_members():
-				sig.call("on_bracelet_changed", String(m))
+			for m3 in _list_party_members():
+				sig.call("on_bracelet_changed", String(m3))
 
-	# Legacy perks block, if present
 	var perks_v: Variant = p.get("perks", {})
 	if typeof(perks_v) == TYPE_DICTIONARY:
 		_import_perks_blob(perks_v as Dictionary)
 
-	# Index blob
 	var idx_v: Variant = p.get("index", {})
 	if typeof(idx_v) == TYPE_DICTIONARY:
 		apply_index_blob(idx_v as Dictionary)
 
-	# Calendar
 	var cal: Node = get_node_or_null(CALENDAR_PATH)
 	if cal:
 		var set_any_date: bool = false
@@ -298,6 +387,8 @@ func _from_payload(p: Dictionary) -> void:
 
 		if cal.has_signal("day_advanced"):   cal.emit_signal("day_advanced", cal.current_date)
 		if cal.has_signal("phase_advanced"): cal.emit_signal("phase_advanced", cal.current_phase)
+
+	emit_signal("party_changed")
 
 func _export_modules_payload() -> Dictionary:
 	var out: Dictionary = {}
@@ -378,7 +469,6 @@ func _snapshot_equipment() -> Dictionary:
 func _apply_equipment_snapshot(snap_v: Variant) -> void:
 	if typeof(snap_v) != TYPE_DICTIONARY:
 		return
-	# If EquipmentSystem isn't ready *right now*, try again next frame.
 	var eq := get_node_or_null("/root/aEquipmentSystem")
 	if eq == null:
 		call_deferred("_apply_equipment_snapshot", snap_v)

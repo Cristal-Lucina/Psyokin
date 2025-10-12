@@ -1,13 +1,6 @@
 extends Control
 class_name LoadMenu
 
-## LoadMenu — wired to your scene:
-## LoadMenu
-## └─ Center/Window/Root
-##    ├─ Header (Title, ToTitleBtn, CloseBtn)
-##    ├─ Hint
-##    └─ Scroll  <-- we'll ensure a "Slots" VBox exists here
-
 const SAVE_DIR   : String = "user://saves"
 const MAIN_SCENE : String = "res://scenes/main/Main.tscn"
 const TITLE_SCENE: String = "res://scenes/main_menu/Title.tscn"
@@ -21,10 +14,8 @@ const TITLE_SCENE: String = "res://scenes/main_menu/Title.tscn"
 var _slots : VBoxContainer = null
 
 func _ready() -> void:
-	# Make this overlay actually capture clicks.
 	mouse_filter = Control.MOUSE_FILTER_STOP
 
-	# Ensure Slots container exists under Scroll.
 	_slots = _scroll.get_node_or_null("Slots") as VBoxContainer
 	if _slots == null:
 		_slots = VBoxContainer.new()
@@ -49,8 +40,6 @@ func _unhandled_input(e: InputEvent) -> void:
 	if e.is_action_pressed("ui_cancel"):
 		_on_close()
 		get_viewport().set_input_as_handled()
-
-# ---------------- list build ----------------
 
 func _rebuild() -> void:
 	for c in _slots.get_children():
@@ -114,7 +103,6 @@ func _make_row(slot: int) -> Control:
 	row.custom_minimum_size.y = 40
 	row.add_theme_constant_override("separation", 8)
 
-	# Big row button (click anywhere to load)
 	var row_btn := Button.new()
 	row_btn.text = _format_slot_meta(slot)
 	row_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -138,8 +126,6 @@ func _make_row(slot: int) -> Control:
 
 	return row
 
-# ---------------- actions ----------------
-
 func _on_load_pressed(slot: int) -> void:
 	var sl: Node = get_node_or_null("/root/aSaveLoad")
 	var payload: Dictionary = {}
@@ -148,8 +134,17 @@ func _on_load_pressed(slot: int) -> void:
 		if typeof(v) == TYPE_DICTIONARY:
 			payload = v
 
+	# 1) Let GameState restore everything (modules + equip snapshot etc.)
 	if has_node("/root/aGameState") and not payload.is_empty() and aGameState.has_method("apply_loaded_save"):
 		aGameState.apply_loaded_save(payload)
+
+	# 2) Safety net: if this save has a top-level "sigils" blob, apply it too.
+	if not payload.is_empty() and payload.has("sigils"):
+		var sb_v: Variant = payload.get("sigils", {})
+		if typeof(sb_v) == TYPE_DICTIONARY:
+			var sig := get_node_or_null("/root/aSigilSystem")
+			if sig != null and sig.has_method("apply_save_blob"):
+				sig.call("apply_save_blob", (sb_v as Dictionary))
 
 	if has_node("/root/aSceneRouter"):
 		aSceneRouter.goto_main()
