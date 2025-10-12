@@ -109,6 +109,9 @@ func _ready() -> void:
 	_ensure_row3(); _bind_row3_signals(); _populate_stat_picker()
 	_ensure_row4(); _bind_row4_signals()
 
+	# Make the dropdowns smaller + scrollable
+	_apply_optionbutton_tweaks()
+
 	# Data
 	_refresh_defs()
 	_refresh_sig_dropdown()
@@ -117,6 +120,27 @@ func _ready() -> void:
 	if _sig and _sig.has_signal("loadout_changed"):
 		if not _sig.is_connected("loadout_changed", Callable(self, "_on_loadout_changed")):
 			_sig.connect("loadout_changed", Callable(self, "_on_loadout_changed"))
+
+# ---- visual tweaks for OptionButtons (smaller text + scrollable popup) ----
+func _style_option_button(ob: OptionButton, font_px: int = 11, popup_max_h: int = 300, popup_max_w: int = 300) -> void:
+	if ob == null:
+		return
+	# Button text size
+	ob.add_theme_font_size_override("font_size", 12)
+
+	# Popup styling
+	var pm: PopupMenu = ob.get_popup()
+	if pm != null:
+		pm.add_theme_font_size_override("font_size", 12)
+		# Cap popup height so it scrolls when there are many items.
+		# In Godot 4, PopupMenu is a Window; max_size is respected on popup open.
+		pm.set("max_size", Vector2i(300, popup_max_h))  # limit height only
+
+func _apply_optionbutton_tweaks() -> void:
+	_style_option_button(_picker, 11, 300)
+	if _sig_inst_pick: _style_option_button(_sig_inst_pick, 11, 300)
+	if _roster_pick:   _style_option_button(_roster_pick, 11, 300)
+	if _stat_pick:     _style_option_button(_stat_pick, 11, 300)
 
 # ---------------- Layout helpers ----------------
 
@@ -142,6 +166,7 @@ func _ensure_row2() -> void:
 		_btn_xp_25     = _ctl("BtnXP25") as Button
 		_btn_xp_100    = _ctl("BtnXP100") as Button
 		_chk_equipped  = _ctl("ChkEquipped") as CheckBox
+		if _sig_inst_pick: _style_option_button(_sig_inst_pick, 11, 300)
 		return
 
 	_row2 = HBoxContainer.new()
@@ -152,6 +177,8 @@ func _ensure_row2() -> void:
 	var title := Label.new(); title.text = "Sigil Cheats:"; _row2.add_child(title)
 
 	_sig_inst_pick = OptionButton.new(); _sig_inst_pick.name = "InstPicker"; _sig_inst_pick.custom_minimum_size = Vector2(260,0); _row2.add_child(_sig_inst_pick)
+	_style_option_button(_sig_inst_pick, 11, 300)
+
 	_btn_lv_up     = Button.new(); _btn_lv_up.name = "BtnLvUp"; _btn_lv_up.text = "Lv +1"; _row2.add_child(_btn_lv_up)
 	_btn_lv_down   = Button.new(); _btn_lv_down.name = "BtnLvDown"; _btn_lv_down.text = "Lv -1"; _row2.add_child(_btn_lv_down)
 	_btn_xp_25     = Button.new(); _btn_xp_25.name = "BtnXP25"; _btn_xp_25.text = "XP +25"; _row2.add_child(_btn_xp_25)
@@ -170,6 +197,7 @@ func _ensure_row3() -> void:
 		_stat_pick     = _ctl("StatPick") as OptionButton
 		_sxp_amt       = _ctl("SpinSXP") as SpinBox
 		_btn_add_sxp   = _ctl("BtnAddSXP") as Button
+		if _stat_pick: _style_option_button(_stat_pick, 11, 300)
 		return
 
 	_row3 = HBoxContainer.new()
@@ -194,6 +222,8 @@ func _ensure_row3() -> void:
 	var sep2 := HSeparator.new(); sep2.custom_minimum_size = Vector2(6,0); _row3.add_child(sep2)
 
 	_stat_pick = OptionButton.new(); _stat_pick.name = "StatPick"; _stat_pick.custom_minimum_size = Vector2(120,0); _row3.add_child(_stat_pick)
+	_style_option_button(_stat_pick, 11, 300)
+
 	_sxp_amt = SpinBox.new(); _sxp_amt.name = "SpinSXP"; _sxp_amt.min_value = 1; _sxp_amt.max_value = 999; _sxp_amt.step = 1; _sxp_amt.value = 10; _sxp_amt.custom_minimum_size = Vector2(70,0); _row3.add_child(_sxp_amt)
 	_btn_add_sxp = Button.new(); _btn_add_sxp.name = "BtnAddSXP"; _btn_add_sxp.text = "Add SXP"; _row3.add_child(_btn_add_sxp)
 
@@ -204,6 +234,7 @@ func _ensure_row4() -> void:
 	if _row4 != null:
 		_roster_pick   = _ctl("RosterPick") as OptionButton
 		_btn_add_party = _ctl("BtnAddParty") as Button
+		if _roster_pick: _style_option_button(_roster_pick, 11, 300)
 		return
 
 	_row4 = HBoxContainer.new()
@@ -217,6 +248,7 @@ func _ensure_row4() -> void:
 	_roster_pick.name = "RosterPick"
 	_roster_pick.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_row4.add_child(_roster_pick)
+	_style_option_button(_roster_pick, 11, 300)
 
 	_btn_add_party = Button.new()
 	_btn_add_party.name = "BtnAddParty"

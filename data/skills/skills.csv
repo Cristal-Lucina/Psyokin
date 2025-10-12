@@ -7,3 +7,19 @@ WATER_L1,Splash,Water,Attack,Water,Enemy,30,90,6,0,0,0,0,Basic single-target wat
 WATER_L2,Surf,Water,Attack,Water,Enemies,40,88,10,0,0,1,0,Small AoE water.,Confuse,0,1,0,Confuse,25,3
 WATER_L3,Tidal,Water,Attack,Water,Enemy,65,86,14,0,0,0,5,Stronger water wave.,Confuse;Stagger,0,1,0,Confuse,30,3
 WATER_L4,Hurricane,Water,Attack,Water,Enemies,95,84,20,0,0,1,10,Big AoE water.,Confuse;Stagger,0,1,0,Confuse,40,3
+EARTH_L1,Rock Throw,Earth,Attack,Earth,Enemies,30,90,6,0,0,0,0,Basic single-target earth.,Defense Down,0,1,0,Defense Down,20,3
+EARTH_L2,Quake,Earth,Attack,Earth,Enemies,40,88,10,0,0,1,0,Small AoE earth.,Defense Down,0,1,0,Defense Down,25,3
+EARTH_L3,Earth Shift,Earth,Attack,Earth,Enemies,65,86,14,0,0,0,5,Stronger earth wave.,Defense Down;Stagger,0,1,0,Defense Down,30,3
+EARTH_L4,Comet,Earth,Attack,Earth,Enemies,95,84,20,0,0,1,10,Big AoE earth.,Defense Down;Stagger,0,1,0,Defense Down,40,3
+AIR_L1,Gust,Air,Attack,Air,Enemies,30,90,6,0,0,0,0,Basic single-target earth.,Charm,0,1,0,Charm,20,3
+AIR_L2,Whirlwind,Air,Attack,Air,Enemies,40,88,10,0,0,1,0,Small AoE earth.,Charm,0,1,0,Charm,25,3
+AIR_L3,Razer Winds,Air,Attack,Air,Enemies,65,86,14,0,0,0,5,Stronger earth wave.,Charm,0,1,0,Charm,30,3
+AIR_L4,Tornado,Air,Attack,Air,Enemies,95,84,20,0,0,1,10,Big AoE earth.,Charm,0,1,0,Charm,40,3
+VOID_L1,Pulse,Void,Attack,Void,Enemies,30,90,6,0,0,0,0,Basic single-target earth.,Malaise,0,1,0,Malaise,20,3
+VOID_L2,Negative Space,Void,Attack,Void,Enemies,40,88,10,0,0,1,0,Small AoE earth.,Malaise,0,1,0,Malaise,25,3
+VOID_L3,Space Vacum,Void,Attack,Void,Enemies,65,86,14,0,0,0,5,Stronger earth wave.,Malaise,0,1,0,Malaise,30,3
+VOID_L4,Blackhole,Void,Attack,Void,Enemies,95,84,20,0,0,1,10,Big AoE earth.,Malaise,0,1,0,Malaise,40,3
+DATA_L1,Spam,Data,Attack,Data,Enemies,30,90,6,0,0,0,0,Basic single-target data.,Mind Block,0,1,0,Mind Block,20,3
+DATA_L2,Trojan,Data,Attack,Data,Enemies,40,88,10,0,0,1,0,Small AoE data.,Mind Block,0,1,0,Mind Block,25,3
+DATA_L3,Malware,Data,Attack,Data,Enemies,65,86,14,0,0,0,5,Stronger data wave.,Mind Block,0,1,0,Mind Block,30,3
+DATA_L4,Total Corruption,Data,Attack,Data,Enemies,95,84,20,0,0,1,10,Big AoE data.,Mind Block,0,1,0,Mind Block,40,3
