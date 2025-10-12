@@ -197,7 +197,7 @@ func _refresh_party() -> void:
 	var entries: Array = _gather_party_entries()
 
 	# Dedup while preserving order
-	var seen := {}
+	var seen: Dictionary = {}
 	for e_v in entries:
 		if typeof(e_v) != TYPE_DICTIONARY: continue
 		var e: Dictionary = e_v
@@ -213,7 +213,6 @@ func _refresh_party() -> void:
 	if _labels.is_empty():
 		_tokens.append("hero"); _labels.append(_hero_name())
 
-	# ✅ correct loop
 	for i in range(_labels.size()):
 		_party_list.add_item(_labels[i])
 
@@ -510,11 +509,21 @@ func _collect_base_sigils() -> PackedStringArray:
 # ───────────── Mind Type helpers ─────────────
 
 func _get_member_mind_type(member_token: String) -> String:
-	if _party_sys and _party_sys.has_method("get_mind_type"):
-		var v: Variant = _party_sys.call("get_mind_type", member_token)
-		if typeof(v) == TYPE_STRING and String(v).strip_edges() != "":
-			return String(v)
+	# Ask SigilSystem (handles PartySystem + CSV fallbacks)
+	var ss: Node = get_node_or_null("/root/aSigilSystem")
+	if ss and ss.has_method("resolve_member_mind_base"):
+		var v: Variant = ss.call("resolve_member_mind_base", member_token)
+		var mt := String(v).strip_edges()
+		if mt != "":
+			return mt
 
+	# Try PartySystem direct helper, if it exists
+	if _party_sys and _party_sys.has_method("get_mind_type"):
+		var v2: Variant = _party_sys.call("get_mind_type", member_token)
+		if typeof(v2) == TYPE_STRING and String(v2).strip_edges() != "":
+			return String(v2)
+
+	# Look inside roster records we already have
 	var ros: Dictionary = _roster()
 	if ros.has(member_token):
 		var rec_key: Dictionary = ros[member_token]
@@ -522,7 +531,7 @@ func _get_member_mind_type(member_token: String) -> String:
 			if rec_key.has(k) and typeof(rec_key[k]) == TYPE_STRING and String(rec_key[k]).strip_edges() != "":
 				return String(rec_key[k])
 	else:
-		var n := _norm(member_token)
+		var n: String = _norm(member_token)
 		for key in ros.keys():
 			var rec: Dictionary = ros[key]
 			if rec.has("name") and _norm(String(rec["name"])) == n:
@@ -531,15 +540,18 @@ func _get_member_mind_type(member_token: String) -> String:
 						return String(rec[k])
 				break
 
+	# Hero default
 	if member_token == "hero" or _norm(member_token) == _norm(_hero_name()):
 		return "Omega"
 
+	# Last resort: GameState scratch field
 	if _gs and _gs.has_method("get_member_field"):
-		var v2: Variant = _gs.call("get_member_field", member_token, "mind_type")
-		if typeof(v2) == TYPE_STRING and String(v2).strip_edges() != "":
-			return String(v2)
+		var v3: Variant = _gs.call("get_member_field", member_token, "mind_type")
+		if typeof(v3) == TYPE_STRING and String(v3).strip_edges() != "":
+			return String(v3)
 
-	return ""
+	# Final fallback: read party.csv directly
+	return _get_member_mind_from_party_csv(member_token)
 
 func _sigil_element(id_or_inst: String) -> String:
 	if _sig:
@@ -564,6 +576,54 @@ func _is_sigil_compatible(member_mind: String, sigil_id_or_inst: String) -> bool
 	if mm == "" or mm == "omega": return true
 	var se: String = _norm(_sigil_element(sigil_id_or_inst))
 	return se == "" or se == mm
+
+# CSV fallback for party minds
+func _get_member_mind_from_party_csv(member_token: String) -> String:
+	var PARTY_PATHS := [
+		"res://data/actors/party.csv",
+		"res://data/party/party.csv",
+		"res://data/party.csv"
+	]
+
+	var path: String = ""
+	for p in PARTY_PATHS:
+		if FileAccess.file_exists(p):
+			path = p
+			break
+	if path == "":
+		return ""
+
+	var f: FileAccess = FileAccess.open(path, FileAccess.READ)
+	if f == null or f.eof_reached():
+		if f != null: f.close()
+		return ""
+
+	# read header
+	var header_psa: PackedStringArray = f.get_csv_line()
+	var idx_actor: int = -1
+	var idx_name: int = -1
+	var idx_mind: int = -1
+	for i in range(header_psa.size()):
+		var h := String(header_psa[i]).strip_edges().to_lower()
+		if h in ["actor_id","member_id","id","code"]: idx_actor = i
+		elif h in ["name","display_name","character","alias"]: idx_name = i
+		elif h in ["mind_type","mind","mind_base","mind_type_id"]: idx_mind = i
+
+	var want: String = member_token.strip_edges().to_lower()
+	var result: String = ""
+
+	while not f.eof_reached():
+		var row: PackedStringArray = f.get_csv_line()
+		if row.is_empty():
+			continue
+		var actor: String = (String(row[idx_actor]).strip_edges().to_lower() if (idx_actor >= 0 and idx_actor < row.size()) else "")
+		var name: String  = (String(row[idx_name]).strip_edges().to_lower()  if (idx_name  >= 0 and idx_name  < row.size()) else "")
+		if actor == want or name == want:
+			result = (String(row[idx_mind]).strip_edges() if (idx_mind >= 0 and idx_mind < row.size()) else "")
+			break
+
+	f.close()
+	return (result.capitalize() if result != "" else "")
 
 # ───────────── Stats grid + item defs ─────────────
 
@@ -735,7 +795,8 @@ func _on_sigils_changed(member: String) -> void:
 # ───────────── Mind Type row ─────────────
 
 func _refresh_mind_row(member_token: String) -> void:
-	if _mind_value == null: return
+	if _mind_value == null:
+		return
 	var mt: String = _get_member_mind_type(member_token)
 	_mind_value.text = (mt if mt != "" else "—")
 
