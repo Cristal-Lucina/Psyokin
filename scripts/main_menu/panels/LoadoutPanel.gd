@@ -22,6 +22,12 @@ class_name LoadoutPanel
 
 @onready var _stats_grid : GridContainer = get_node("Row/Right/StatsGrid") as GridContainer
 @onready var _mind_value : Label         = get_node_or_null("Row/Right/MindRow/Value") as Label
+@onready var _mind_row   : HBoxContainer = get_node_or_null("Row/Right/MindRow") as HBoxContainer
+
+# Hero-only "Active Type" UI bits
+var _active_name_lbl  : Label = null
+var _active_value_lbl : Label = null
+var _active_btn       : Button = null
 
 # Parallel arrays: display vs token we pass into systems
 var _labels: PackedStringArray = []
@@ -68,6 +74,7 @@ func _ready() -> void:
 			_sig.connect("loadout_changed", Callable(self, "_on_sigils_changed"))
 
 	_hook_party_signals()
+	_setup_active_type_widgets() # create the Hero-only strip, stays hidden for others
 
 	# defer first build so we don’t miss early system init / signals
 	call_deferred("_first_fill")
@@ -238,6 +245,8 @@ func _on_party_selected(index: int) -> void:
 	_rebuild_stats_grid(token, equip)
 	_rebuild_sigils(token)
 	_refresh_mind_row(token)
+	_refresh_active_type_row(token)
+
 
 func _current_label() -> String:
 	var sel: PackedInt32Array = _party_list.get_selected_items()
@@ -617,8 +626,9 @@ func _get_member_mind_from_party_csv(member_token: String) -> String:
 		if row.is_empty():
 			continue
 		var actor: String = (String(row[idx_actor]).strip_edges().to_lower() if (idx_actor >= 0 and idx_actor < row.size()) else "")
-		var name: String  = (String(row[idx_name]).strip_edges().to_lower()  if (idx_name  >= 0 and idx_name  < row.size()) else "")
-		if actor == want or name == want:
+		var name_col: String = (String(row[idx_name]).strip_edges().to_lower() if (idx_name >= 0 and idx_name < row.size()) else "")
+		if actor == want or name_col == want:
+
 			result = (String(row[idx_mind]).strip_edges() if (idx_mind >= 0 and idx_mind < row.size()) else "")
 			break
 
@@ -782,6 +792,8 @@ func _on_equipment_changed(member: String) -> void:
 		_rebuild_stats_grid(cur, equip)
 		_rebuild_sigils(cur)
 		_refresh_mind_row(cur)
+		_refresh_active_type_row(cur)
+
 
 func _on_sigils_changed(member: String) -> void:
 	var cur: String = _current_token()
@@ -791,6 +803,8 @@ func _on_sigils_changed(member: String) -> void:
 		var equip: Dictionary = _fetch_equip_for(cur)
 		_rebuild_stats_grid(cur, equip)
 		_refresh_mind_row(cur)
+		_refresh_active_type_row(cur)
+
 
 # ───────────── Mind Type row ─────────────
 
@@ -853,3 +867,136 @@ func _on_manage_sigils() -> void:
 	var host := get_tree().current_scene
 	if host == null: host = get_tree().root
 	host.add_child(inst)
+func _setup_active_type_widgets() -> void:
+	if _mind_row == null: return
+	# Create once; keep hidden until the Hero is selected
+	if _active_name_lbl == null:
+		_active_name_lbl = Label.new()
+		_active_name_lbl.text = "Active Type:"
+		_active_name_lbl.visible = false
+		_mind_row.add_child(_active_name_lbl)
+
+	if _active_value_lbl == null:
+		_active_value_lbl = Label.new()
+		_active_value_lbl.text = "Omega"
+		_active_value_lbl.visible = false
+		_mind_row.add_child(_active_value_lbl)
+
+	if _active_btn == null:
+		_active_btn = Button.new()
+		_active_btn.text = "Set…"
+		_active_btn.visible = false
+		_active_btn.pressed.connect(_open_active_type_picker)
+		_mind_row.add_child(_active_btn)
+
+func _refresh_active_type_row(member_token: String) -> void:
+	var is_hero := (member_token == "hero" or _norm(member_token) == _norm(_hero_name()))
+	var should_show := is_hero and _active_name_lbl != null and _active_value_lbl != null and _active_btn != null
+	if not should_show:
+		if _active_name_lbl:  _active_name_lbl.visible = false
+		if _active_value_lbl: _active_value_lbl.visible = false
+		if _active_btn:       _active_btn.visible = false
+		return
+
+	var cur := _get_hero_active_type()
+	_active_name_lbl.visible = true
+	_active_value_lbl.text = (cur if cur != "" else "Omega")
+	_active_value_lbl.visible = true
+	_active_btn.visible = true
+
+
+func _get_hero_active_type() -> String:
+	if _gs:
+		# Prefer metadata (always exists, no typed property required)
+		if _gs.has_meta("hero_active_type"):
+			var mv: Variant = _gs.get_meta("hero_active_type")
+			if typeof(mv) == TYPE_STRING and String(mv).strip_edges() != "":
+				return String(mv)
+		# Fallback: if you DID add a real property in aGameState
+		if _gs.has_method("get"):
+			var v: Variant = _gs.get("hero_active_type")
+			if typeof(v) == TYPE_STRING and String(v).strip_edges() != "":
+				return String(v)
+	return "Omega"
+
+
+func _set_hero_active_type(school: String) -> void:
+	var val := school.strip_edges()
+	if val == "": val = "Omega"
+	if _gs:
+		# Always safe
+		_gs.set_meta("hero_active_type", val)
+		# Optional: also try a real property if you later add it to aGameState
+		if _gs.has_method("set"):
+			_gs.set("hero_active_type", val)
+	# Let other systems react if they listen
+	if _stats and _stats.has_signal("stats_changed"):
+		_stats.emit_signal("stats_changed")
+
+
+func _collect_all_schools() -> Array[String]:
+	var out: Array[String] = []
+	if _inv and _inv.has_method("get_item_defs"):
+		var v: Variant = _inv.call("get_item_defs")
+		if typeof(v) == TYPE_DICTIONARY:
+			var defs: Dictionary = v
+			for id_v in defs.keys():
+				var rec: Dictionary = defs[id_v]
+				# only sigil items
+				var tag := ""
+				for k in ["equip_slot","slot","equip","equip_to","category","cat","type"]:
+					if rec.has(k) and typeof(rec[k]) == TYPE_STRING:
+						tag = String(rec[k]).strip_edges().to_lower()
+						break
+				if tag != "sigil" and tag != "sigils":
+					continue
+				# pull school
+				for sk in ["sigil_school","school","mind_type","mind_type_tag","mind_tag"]:
+					if rec.has(sk) and typeof(rec[sk]) == TYPE_STRING:
+						var s := String(rec[sk]).strip_edges()
+						if s != "":
+							var cap := s.capitalize()
+							if not out.has(cap): out.append(cap)
+						break
+	if out.is_empty():
+		out = ["Omega","Fire","Water","Earth","Air","Data","Void"]
+	out.sort()
+	return out
+
+func _open_active_type_picker() -> void:
+	# Only makes sense for the Hero
+	var token := _current_token()
+	if not (token == "hero" or _norm(token) == _norm(_hero_name())):
+		return
+
+	var schools := _collect_all_schools()
+	var cur := _get_hero_active_type()
+
+	var pm := PopupMenu.new()
+	add_child(pm)
+
+	# Always include Omega first
+	pm.add_item("Omega")
+	pm.set_item_metadata(0, "Omega")
+	pm.set_item_checked(0, _norm(cur) == "omega")
+	pm.add_separator()
+
+	for s in schools:
+		if s == "Omega": continue
+		pm.add_item(s)
+		pm.set_item_metadata(pm.get_item_count() - 1, s)
+		if _norm(s) == _norm(cur):
+			pm.set_item_checked(pm.get_item_count() - 1, true)
+
+	var _pick := func(i: int) -> void:
+		var meta: Variant = pm.get_item_metadata(i)
+		pm.queue_free()
+		if typeof(meta) == TYPE_STRING:
+			_set_hero_active_type(String(meta))
+			_refresh_active_type_row("hero")
+
+	pm.index_pressed.connect(_pick)
+	pm.id_pressed.connect(func(idnum: int) -> void:
+		_pick.call(pm.get_item_index(idnum))
+	)
+	pm.popup(Rect2(get_global_mouse_position(), Vector2(200, 0)))

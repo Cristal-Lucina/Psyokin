@@ -139,16 +139,6 @@ theme_override_constants/separation = 2
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="BtnEquip" type="Button" parent="Row/Right/Buttons"]
-layout_mode = 2
-disabled = true
-text = "Equip"
-
-[node name="BtnUnequip" type="Button" parent="Row/Right/Buttons"]
-layout_mode = 2
-disabled = true
-text = "Unequip"
-
 [node name="BtnManageSigils" type="Button" parent="Row/Right/Buttons"]
 layout_mode = 2
 text = "Manage Sigils"
