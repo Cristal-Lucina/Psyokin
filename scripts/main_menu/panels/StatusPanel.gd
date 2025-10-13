@@ -2,14 +2,19 @@ extends Control
 class_name StatusPanel
 
 ## Shows party HP/MP, summary info, and appearance.
-## Pulls non-hero levels + stats from party.csv (level_start, start_* headers).
+## - Hero stats: live (HeroSystem + StatsSystem)
+## - Others: party.csv (level_start, start_brw, start_mnd, start_tpo, start_vtl, start_fcs)
+## - Optional: /root/PartyStatsResolver to supply snapshots.
+## Dev: prints a combat profile dump on visibility + F9.
 
-const GS_PATH    := "/root/aGameState"
-const STATS_PATH := "/root/aStatsSystem"
-const CAL_PATH   := "/root/aCalendarSystem"
-const HERO_PATH  := "/root/aHeroSystem"
-const PARTY_PATH := "/root/aPartySystem"
-const CSV_PATH   := "/root/aCSVLoader"
+const GS_PATH        := "/root/aGameState"
+const STATS_PATH     := "/root/aStatsSystem"
+const CAL_PATH       := "/root/aCalendarSystem"
+const HERO_PATH      := "/root/aHeroSystem"
+const PARTY_PATH     := "/root/aPartySystem"
+const CSV_PATH       := "/root/aCSVLoader"
+const RESOLVER_PATH  := "/root/PartyStatsResolver"
+const SIGIL_PATH     := "/root/aSigilSystem"
 
 const PARTY_CSV := "res://data/actors/party.csv"
 const MES_PATH  := "/root/aMainEventSystem"
@@ -33,6 +38,8 @@ var _mes       : Node = null
 var _hero      : Node = null
 var _party_sys : Node = null
 var _csv       : Node = null
+var _resolver  : Node = null
+var _sig       : Node = null
 
 # party.csv cache
 var _csv_by_id   : Dictionary = {}      # "actor_id" -> row dict
@@ -46,6 +53,7 @@ var _sw_skin    : ColorRect = null
 var _sw_brow    : ColorRect = null
 var _sw_eye     : ColorRect = null
 var _sw_hair    : ColorRect = null
+var _csv_loaded_once: bool = false
 
 func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -59,6 +67,8 @@ func _ready() -> void:
 	if _hero == null: _hero = get_node_or_null("/root/HeroSystem")
 	_party_sys = get_node_or_null(PARTY_PATH)
 	_csv       = get_node_or_null(CSV_PATH)
+	_resolver  = get_node_or_null(RESOLVER_PATH)
+	_sig       = get_node_or_null(SIGIL_PATH)
 
 	_resolve_event_system()
 	_normalize_scroll_children()
@@ -68,7 +78,10 @@ func _ready() -> void:
 	if _refresh and not _refresh.pressed.is_connected(_rebuild_all):
 		_refresh.pressed.connect(_rebuild_all)
 
-	# Defer first fill so systems have time to boot and emit party.
+	# Print on show
+	if not is_connected("visibility_changed", Callable(self, "_on_visibility_changed")):
+		connect("visibility_changed", Callable(self, "_on_visibility_changed"))
+
 	call_deferred("_first_fill")
 
 func _first_fill() -> void:
@@ -79,21 +92,38 @@ func _first_fill() -> void:
 	if _hero == null:      _hero      = get_node_or_null("/root/HeroSystem")
 	if _party_sys == null: _party_sys = get_node_or_null(PARTY_PATH)
 	if _csv == null:       _csv       = get_node_or_null(CSV_PATH)
+	if _resolver == null:  _resolver  = get_node_or_null(RESOLVER_PATH)
+	if _sig == null:       _sig       = get_node_or_null(SIGIL_PATH)
 	_load_party_csv_cache()
 	_rebuild_all()
 
 func _connect_signals() -> void:
 	# Calendar
 	if _cal:
-		if _cal.has_signal("day_advanced"):   _cal.connect("day_advanced",   Callable(self, "_rebuild_all"))
-		if _cal.has_signal("phase_advanced"): _cal.connect("phase_advanced", Callable(self, "_rebuild_all"))
-		if _cal.has_signal("week_reset"):     _cal.connect("week_reset",     Callable(self, "_rebuild_all"))
+		# Remove old direct connections if they exist
+		if _cal.is_connected("day_advanced", Callable(self, "_rebuild_all")):
+			_cal.disconnect("day_advanced", Callable(self, "_rebuild_all"))
+		if _cal.is_connected("phase_advanced", Callable(self, "_rebuild_all")):
+			_cal.disconnect("phase_advanced", Callable(self, "_rebuild_all"))
+
+		# Connect via arg-swallowing handlers
+		if _cal.has_signal("day_advanced") and not _cal.is_connected("day_advanced", Callable(self, "_on_cal_day_adv")):
+			_cal.connect("day_advanced", Callable(self, "_on_cal_day_adv"))
+		if _cal.has_signal("phase_advanced") and not _cal.is_connected("phase_advanced", Callable(self, "_on_cal_phase_adv")):
+			_cal.connect("phase_advanced", Callable(self, "_on_cal_phase_adv"))
+		if _cal.has_signal("week_reset") and not _cal.is_connected("week_reset", Callable(self, "_rebuild_all")):
+			_cal.connect("week_reset", Callable(self, "_rebuild_all"))
+
 	# Stats
 	if _st and _st.has_signal("stats_changed"):
 		_st.connect("stats_changed", Callable(self, "_rebuild_all"))
+	if _st and _st.has_signal("stat_leveled_up"):
+		_st.connect("stat_leveled_up", Callable(self, "_rebuild_all"))
+
 	# Hero
 	if _hero and _hero.has_signal("creation_applied"):
 		_hero.connect("creation_applied", Callable(self, "_rebuild_all"))
+
 	# Party / GameState changes (try a few common names)
 	for src in [_gs, _party_sys]:
 		if src == null: continue
@@ -101,8 +131,17 @@ func _connect_signals() -> void:
 			if src.has_signal(sig) and not src.is_connected(sig, Callable(self, "_on_party_changed")):
 				src.connect(sig, Callable(self, "_on_party_changed"))
 
+func _on_cal_day_adv(_date_dict: Dictionary) -> void:
+	_rebuild_all()
+
+func _on_cal_phase_adv(_phase_i: int) -> void:
+	_rebuild_all()
+
+
+
+
 func _on_party_changed(_a: Variant = null) -> void:
-	_load_party_csv_cache() # in case you've edited CSV while running
+	_load_party_csv_cache()
 	_rebuild_party()
 
 func _resolve_event_system() -> void:
@@ -146,11 +185,10 @@ func _rebuild_party() -> void:
 		var row := VBoxContainer.new()
 		row.add_theme_constant_override("separation", 4)
 
-		var name_lbl := Label.new()
-		name_lbl.text = String(it.get("name", "Member"))
-		row.add_child(name_lbl)
+		var disp := Label.new()
+		disp.text = String(it.get("name", "Member"))
+		row.add_child(disp)
 
-		# HP
 		var hp_box := HBoxContainer.new(); hp_box.add_theme_constant_override("separation", 6)
 		var hp_lbl := Label.new(); hp_lbl.custom_minimum_size.x = 36; hp_lbl.text = "HP"
 		var hp_val := Label.new()
@@ -167,7 +205,6 @@ func _rebuild_party() -> void:
 			row.add_child(hp_bar)
 		row.add_child(hp_box)
 
-		# MP
 		var mp_box := HBoxContainer.new(); mp_box.add_theme_constant_override("separation", 6)
 		var mp_lbl := Label.new(); mp_lbl.custom_minimum_size.x = 36; mp_lbl.text = "MP"
 		var mp_val := Label.new()
@@ -362,7 +399,8 @@ func _read_date_phase() -> Dictionary:
 	if _cal:
 		if _cal.has_method("get_date_string"): out["date_text"] = String(_cal.call("get_date_string"))
 		if _cal.has_method("get_phase_name"):   out["phase_text"] = String(_cal.call("get_phase_name"))
-	if not out.has("date_text"): out["date_text"] = "—"
+	if not out.has("date_text"): out["date_text"] = "—
+"
 	if not out.has("phase_text"): out["phase_text"] = "—"
 	return out
 
@@ -392,11 +430,26 @@ func _fmt_pair(a: int, b: int) -> String:
 # --------------------- Party snapshot logic -------------------
 
 func _get_party_snapshot() -> Array:
-	# If GameState already exposes a ready-made snapshot, use it.
-	if _gs and _gs.has_method("get_party_snapshot"):
-		var res: Variant = _gs.call("get_party_snapshot")
-		if typeof(res) == TYPE_ARRAY: return res as Array
-	# Otherwise build one from whatever active/roster shape exists.
+	if _resolver and _resolver.has_method("get_party_snapshots"):
+		var r_v: Variant = _resolver.call("get_party_snapshots")
+		if typeof(r_v) == TYPE_ARRAY:
+			var out_rs: Array = []
+			for d_v in (r_v as Array):
+				if typeof(d_v) != TYPE_DICTIONARY: continue
+				var d: Dictionary = d_v
+				var label: String = String(d.get("label", String(d.get("name","Member"))))
+				var lvl: int = int(d.get("level", 1))
+				var hp_max_i: int = int(d.get("hp_max", -1))
+				var mp_max_i: int = int(d.get("mp_max", -1))
+				var hp_cur_i: int = (hp_max_i if hp_max_i >= 0 else -1)
+				var mp_cur_i: int = (mp_max_i if mp_max_i >= 0 else -1)
+				out_rs.append({
+					"name": "%s  (Lv %d)" % [label, lvl],
+					"hp": hp_cur_i, "hp_max": hp_max_i,
+					"mp": mp_cur_i, "mp_max": mp_max_i
+				})
+			if out_rs.size() > 0:
+				return out_rs
 	return _build_snapshot_flexible()
 
 func _build_snapshot_flexible() -> Array:
@@ -411,7 +464,7 @@ func _build_snapshot_flexible() -> Array:
 		var label: String = String(e.get("label",""))
 
 		var resolved: Dictionary = _resolve_member_stats(pid, label)
-		var nm: String = String(resolved.get("name", (label if label != "" else pid)))
+		var disp_name: String = String(resolved.get("name", (label if label != "" else pid)))
 		var lvl: int = int(resolved.get("level", 1))
 		var vtl: int = int(resolved.get("VTL", 1))
 		var fcs: int = int(resolved.get("FCS", 1))
@@ -422,12 +475,11 @@ func _build_snapshot_flexible() -> Array:
 		var mp_cur_i: int = clamp(int(resolved.get("mp_cur", mp_max_i)), 0, mp_max_i)
 
 		out.append({
-			"name": "%s  (Lv %d)" % [nm, lvl],
+			"name": "%s  (Lv %d)" % [disp_name, lvl],
 			"hp": hp_cur_i, "hp_max": hp_max_i,
 			"mp": mp_cur_i, "mp_max": mp_max_i
 		})
 
-	# Last resort: hero only
 	if out.is_empty():
 		var nm2 := _safe_hero_name()
 		var lvl2 := _safe_hero_level()
@@ -469,7 +521,6 @@ func _label_for_id(pid: String, roster: Dictionary) -> String:
 func _gather_active_entries(roster: Dictionary) -> Array:
 	var entries: Array = []
 
-	# 1) GameState: ids (some projects expose this)
 	if _gs and _gs.has_method("get_active_party_ids"):
 		var v: Variant = _gs.call("get_active_party_ids")
 		for s in _array_from_any(v):
@@ -477,7 +528,6 @@ func _gather_active_entries(roster: Dictionary) -> Array:
 			entries.append({"key": pid, "label": _label_for_id(pid, roster)})
 		if entries.size() > 0: return entries
 
-	# 2) GameState: get_active (ids)
 	if _gs and _gs.has_method("get_active"):
 		var v2: Variant = _gs.call("get_active")
 		for s2 in _array_from_any(v2):
@@ -485,7 +535,6 @@ func _gather_active_entries(roster: Dictionary) -> Array:
 			entries.append({"key": pid2, "label": _label_for_id(pid2, roster)})
 		if entries.size() > 0: return entries
 
-	# 3) GameState: names only
 	if _gs and _gs.has_method("get_party_names"):
 		var n_v: Variant = _gs.call("get_party_names")
 		for n in _array_from_any(n_v):
@@ -494,7 +543,6 @@ func _gather_active_entries(roster: Dictionary) -> Array:
 				entries.append({"key": "", "label": nm})
 		if entries.size() > 0: return entries
 
-	# 4) GameState: party property (ids)
 	if _gs and _gs.has_method("get"):
 		var p_v: Variant = _gs.get("party")
 		for s3 in _array_from_any(p_v):
@@ -502,7 +550,6 @@ func _gather_active_entries(roster: Dictionary) -> Array:
 			entries.append({"key": pid3, "label": _label_for_id(pid3, roster)})
 		if entries.size() > 0: return entries
 
-	# 5) PartySystem
 	if _party_sys:
 		for m in ["get_active_party","get_party","list_active_members","list_party","get_active"]:
 			if _party_sys.has_method(m):
@@ -511,7 +558,6 @@ func _gather_active_entries(roster: Dictionary) -> Array:
 					var pid4 := String(s4)
 					entries.append({"key": pid4, "label": _label_for_id(pid4, roster)})
 				if entries.size() > 0: return entries
-		# properties
 		for prop in ["active","party"]:
 			if _party_sys.has_method("get"):
 				var a_v: Variant = _party_sys.get(prop)
@@ -520,7 +566,6 @@ func _gather_active_entries(roster: Dictionary) -> Array:
 					entries.append({"key": pid5, "label": _label_for_id(pid5, roster)})
 				if entries.size() > 0: return entries
 
-	# 6) Fallback: hero only
 	entries.append({"key":"hero","label":_safe_hero_name()})
 	return entries
 
@@ -530,7 +575,6 @@ func _load_party_csv_cache() -> void:
 	_csv_by_id.clear()
 	_name_to_id.clear()
 
-	# Preferred: CSV loader
 	if _csv and _csv.has_method("load_csv"):
 		var defs_v: Variant = _csv.call("load_csv", PARTY_CSV, "actor_id")
 		if typeof(defs_v) == TYPE_DICTIONARY:
@@ -545,11 +589,13 @@ func _load_party_csv_cache() -> void:
 					if key != "": _name_to_id[key] = rid
 			return
 
-	# Fallback: FileAccess (simple csv)
 	if not FileAccess.file_exists(PARTY_CSV):
 		return
 	var f := FileAccess.open(PARTY_CSV, FileAccess.READ)
 	if f == null: return
+	if f.eof_reached():
+		f.close()
+		return
 	var header: PackedStringArray = f.get_csv_line()
 	var idx_id := header.find("actor_id")
 	var idx_name := header.find("name")
@@ -568,7 +614,6 @@ func _load_party_csv_cache() -> void:
 	f.close()
 
 func _resolve_member_stats(pid_in: String, label_in: String) -> Dictionary:
-	# HERO — live systems
 	if pid_in == "hero" or label_in.strip_edges().to_lower() == _safe_hero_name().strip_edges().to_lower():
 		var lvl: int = _safe_hero_level()
 		var vtl: int = 1
@@ -585,7 +630,6 @@ func _resolve_member_stats(pid_in: String, label_in: String) -> Dictionary:
 			"FCS": max(1, fcs)
 		}
 
-	# OTHERS — lookup from party.csv by id, else by name
 	var pid: String = pid_in
 	if pid == "" and label_in.strip_edges() != "":
 		var key: String = label_in.strip_edges().to_lower()
@@ -598,8 +642,6 @@ func _resolve_member_stats(pid_in: String, label_in: String) -> Dictionary:
 			var pid2: String = String(_name_to_id[key2])
 			row = _csv_by_id.get(pid2, {}) as Dictionary
 
-	# Expected headers:
-	# level_start, start_brw, start_mnd, start_tpo, start_vtl, start_fcs
 	var lvl_csv: int = _to_int(row.get("level_start", 1))
 	var vtl_csv: int = _to_int(row.get("start_vtl", 1))
 	var fcs_csv: int = _to_int(row.get("start_fcs", 1))
@@ -642,3 +684,81 @@ func _safe_hero_level() -> int:
 		var v: Variant = _hero.get("level")
 		if typeof(v) in [TYPE_INT, TYPE_FLOAT]: return int(v)
 	return 1
+
+# --------------------- Dev: auto dump + hotkey ------------------------
+
+func _on_visibility_changed() -> void:
+	if not OS.is_debug_build(): return
+	_dev_dump_profiles()
+
+func _unhandled_input(event: InputEvent) -> void:
+	if not OS.is_debug_build(): return
+	if event is InputEventKey and (event as InputEventKey).pressed and not (event as InputEventKey).echo:
+		var ek := event as InputEventKey
+		if ek.keycode == KEY_F9:
+			_dev_dump_profiles()
+
+func _dev_dump_profiles() -> void:
+	# Call external (if present) AND always run local fallback so you never see "No profiles available" alone.
+	var cps: Node = get_node_or_null("/root/aCombatProfileSystem")
+	if cps == null: cps = get_node_or_null("/root/CombatProfileSystem")
+	if cps == null:
+		for n in get_tree().root.get_children():
+			if n.has_method("debug_dump_active_party"):
+				cps = n; break
+	if cps and cps.has_method("debug_dump_active_party"):
+		# Let theirs print whatever it wants.
+		cps.call_deferred("debug_dump_active_party")
+
+	# Our guaranteed dump
+	print_rich("[b]=== Combat Profiles (StatusPanel fallback) ===[/b]")
+	var entries: Array = _gather_active_entries(_read_roster())
+	# Show who we think is active
+	var labels: Array = []
+	for e_v in entries:
+		if typeof(e_v) == TYPE_DICTIONARY:
+			labels.append(String((e_v as Dictionary).get("label","")))
+	print("[StatusPanel] active entries: %s" % [String(", ").join(labels)])
+
+	if entries.is_empty():
+		# Shouldn't happen; we always inject hero. Just in case:
+		print("[StatusPanel] No entries gathered; injecting Hero.")
+		entries.append({"key":"hero","label":_safe_hero_name()})
+
+	for e_v in entries:
+		if typeof(e_v) != TYPE_DICTIONARY: continue
+		var e: Dictionary = e_v
+		var pid: String = String(e.get("key",""))
+		var label: String = String(e.get("label",""))
+		var rec: Dictionary = _resolve_member_stats(pid, label)
+		var lvl: int = int(rec.get("level", 1))
+		var vtl: int = int(rec.get("VTL", 1))
+		var fcs: int = int(rec.get("FCS", 1))
+		var hpmax: int = _calc_max_hp(lvl, vtl)
+		var mpmax: int = _calc_max_mp(lvl, fcs)
+		var who: String = String(rec.get("name", (label if label != "" else pid)))
+		var mind: String = _resolve_mind(pid, label)
+		print("%s | Lv %d | VTL %d  FCS %d | HPmax %d  MPmax %d | Mind %s" %
+			[who, lvl, vtl, fcs, hpmax, mpmax, (mind if mind != "" else "—")])
+
+func _resolve_mind(pid_in: String, label_in: String) -> String:
+	if _sig:
+		for m in ["resolve_member_mind_base","get_mind_type","get_member_mind_base"]:
+			if _sig.has_method(m):
+				var v: Variant = _sig.call(m, (pid_in if pid_in != "" else label_in))
+				if typeof(v) == TYPE_STRING and String(v).strip_edges() != "":
+					return String(v)
+	if _party_sys and _party_sys.has_method("get_mind_type"):
+		var v2: Variant = _party_sys.call("get_mind_type", (pid_in if pid_in != "" else label_in))
+		if typeof(v2) == TYPE_STRING and String(v2).strip_edges() != "":
+			return String(v2)
+	var pid: String = pid_in
+	if pid == "" and label_in.strip_edges() != "":
+		var key: String = label_in.strip_edges().to_lower()
+		if _name_to_id.has(key): pid = String(_name_to_id[key])
+	var row: Dictionary = _csv_by_id.get(pid, {}) as Dictionary
+	if row.has("mind_type") and typeof(row["mind_type"]) == TYPE_STRING:
+		return String(row["mind_type"])
+	if pid_in == "hero" or label_in.strip_edges().to_lower() == _safe_hero_name().strip_edges().to_lower():
+		return "Omega"
+	return ""

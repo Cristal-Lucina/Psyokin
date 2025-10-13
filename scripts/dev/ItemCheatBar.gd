@@ -125,16 +125,16 @@ func _ready() -> void:
 func _style_option_button(ob: OptionButton, font_px: int = 11, popup_max_h: int = 300, popup_max_w: int = 300) -> void:
 	if ob == null:
 		return
+
 	# Button text size
-	ob.add_theme_font_size_override("font_size", 12)
+	ob.add_theme_font_size_override("font_size", font_px)
 
 	# Popup styling
 	var pm: PopupMenu = ob.get_popup()
 	if pm != null:
-		pm.add_theme_font_size_override("font_size", 12)
-		# Cap popup height so it scrolls when there are many items.
-		# In Godot 4, PopupMenu is a Window; max_size is respected on popup open.
-		pm.set("max_size", Vector2i(300, popup_max_h))  # limit height only
+		pm.add_theme_font_size_override("font_size", font_px)
+		# Cap popup size so it scrolls when there are many items
+		pm.max_size = Vector2i(popup_max_w, popup_max_h)
 
 func _apply_optionbutton_tweaks() -> void:
 	_style_option_button(_picker, 11, 300)
