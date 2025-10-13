@@ -2,12 +2,14 @@
 
 importer="csv_translation"
 type="Translation"
-uid="uid://dbl6y217gkln3"
-valid=false
+uid="uid://c8dxfl6bjbxrr"
 
 [deps]
 
+files=["res://data/actors/actors.name.translation", "res://data/actors/actors.level.translation", "res://data/actors/actors.start.translation", "res://data/actors/actors.start.translation", "res://data/actors/actors.start.translation", "res://data/actors/actors.start.translation", "res://data/actors/actors.start.translation", "res://data/actors/actors.start.translation", "res://data/actors/actors.start.translation", "res://data/actors/actors.start.translation", "res://data/actors/actors.start.translation", "res://data/actors/actors.start.translation", "res://data/actors/actors.start.translation", "res://data/actors/actors.portrait.translation", "res://data/actors/actors.sprite.translation", "res://data/actors/actors.join.translation", "res://data/actors/actors.notes.translation"]
+
 source_file="res://data/actors/actors.csv"
+dest_files=["res://data/actors/actors.name.translation", "res://data/actors/actors.level.translation", "res://data/actors/actors.start.translation", "res://data/actors/actors.start.translation", "res://data/actors/actors.start.translation", "res://data/actors/actors.start.translation", "res://data/actors/actors.start.translation", "res://data/actors/actors.start.translation", "res://data/actors/actors.start.translation", "res://data/actors/actors.start.translation", "res://data/actors/actors.start.translation", "res://data/actors/actors.start.translation", "res://data/actors/actors.start.translation", "res://data/actors/actors.portrait.translation", "res://data/actors/actors.sprite.translation", "res://data/actors/actors.join.translation", "res://data/actors/actors.notes.translation"]
 
 [params]
 

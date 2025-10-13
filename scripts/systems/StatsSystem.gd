@@ -108,3 +108,8 @@ func clear_all() -> void:
 	for k in ["FCS","MND","TPO","BRW","VTL"]:
 		stat_level[k] = 1
 		stat_sxp[k] = 0
+func compute_max_hp(level: int, vtl: int) -> int:
+	return 150 + (vtl * level * 6)
+
+func compute_max_mp(level: int, fcs: int) -> int:
+	return 20 + int(round(float(fcs) * float(level) * 1.5))

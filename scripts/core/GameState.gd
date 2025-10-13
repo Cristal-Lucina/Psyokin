@@ -252,6 +252,86 @@ func _resolve_member_id(name_in: String) -> String:
 	return name_in
 
 # ────────────────────────────────────────────────────────────────────
+# ---- Party CSV helpers (cache) -----------------------------------------------
+var _party_defs_cached: Dictionary = {}   # actor_id -> row dict
+const PARTY_NAME_KEYS := ["name","display_name","disp_name","character","alias"]
+
+func _ensure_party_defs() -> void:
+	if not _party_defs_cached.is_empty():
+		return
+	var csv := get_node_or_null(CSV_PATH)
+	if csv and csv.has_method("load_csv"):
+		var v: Variant = csv.call("load_csv", PARTY_CSV, "actor_id")
+		if typeof(v) == TYPE_DICTIONARY:
+			_party_defs_cached = (v as Dictionary)
+
+func _row_for_member(member: String) -> Dictionary:
+	_ensure_party_defs()
+	if _party_defs_cached.is_empty():
+		return {}
+	# Prefer id lookup
+	var id := _resolve_member_id(member)
+	if _party_defs_cached.has(id):
+		return _party_defs_cached[id]
+	# Fallback: match by name-ish column
+	var want := member.strip_edges().to_lower()
+	for aid in _party_defs_cached.keys():
+		var row: Dictionary = _party_defs_cached[aid]
+		for k in PARTY_NAME_KEYS:
+			if row.has(k) and typeof(row[k]) == TYPE_STRING:
+				if String(row[k]).strip_edges().to_lower() == want:
+					return row
+	return {}
+
+# ---- Public getters the Party UI can use -------------------------------------
+
+func get_member_level(member: String) -> int:
+	# Hero: live level
+	if member == "hero" or _display_name_for_id("hero").to_lower() == member.to_lower():
+		var hs := get_node_or_null("/root/aHeroSystem")
+		return int(hs.get("level")) if hs else 1
+
+	# Others: try CSV fields
+	var row := _row_for_member(member)
+	for k in ["level","lvl","lv"]:
+		if row.has(k) and typeof(row[k]) in [TYPE_INT, TYPE_FLOAT, TYPE_STRING]:
+			return int(row[k])
+	return 1
+
+func get_member_stat(member: String, stat: String) -> int:
+	# Hero: live stats from StatsSystem
+	if member == "hero" or _display_name_for_id("hero").to_lower() == member.to_lower():
+		var stats := get_node_or_null(STATS_PATH)
+		if stats and stats.has_method("get_stat"):
+			return int(stats.call("get_stat", stat))
+		return 1
+
+	# Others: CSV columns (e.g., VTL, FCS, stat_vtl, vtl_level, etc.)
+	var row := _row_for_member(member)
+	var cand := [
+		stat, stat + "_level",
+		stat.to_lower(), stat.to_lower() + "_level",
+		"stat_" + stat, "stat_" + stat.to_lower()
+	]
+	for k in cand:
+		if row.has(k) and typeof(row[k]) in [TYPE_INT, TYPE_FLOAT, TYPE_STRING]:
+			return int(row[k])
+	return 1
+
+func compute_member_pools(member: String) -> Dictionary:
+	var lvl := get_member_level(member)
+	var vtl := get_member_stat(member, "VTL")
+	var fcs := get_member_stat(member, "FCS")
+
+	var stats := get_node_or_null(STATS_PATH)
+	var hp_max := 150 + (vtl * lvl * 6)
+	var mp_max := 20 + int(round(float(fcs) * float(lvl) * 1.5))
+	if stats and stats.has_method("compute_max_hp"):
+		hp_max = int(stats.call("compute_max_hp", lvl, vtl))
+	if stats and stats.has_method("compute_max_mp"):
+		mp_max = int(stats.call("compute_max_mp", lvl, fcs))
+
+	return {"level": lvl, "hp_max": hp_max, "mp_max": mp_max}
 
 func _to_payload() -> Dictionary:
 	var cal: Node = get_node_or_null(CALENDAR_PATH)

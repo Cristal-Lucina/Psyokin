@@ -1,17 +1,19 @@
 extends Control
 class_name StatusPanel
 
-## Shows party HP/MP, summary info, and appearance. 
-## Refreshes on time/stat/party changes. Fallbacks if a system is missing.
+## Shows party HP/MP, summary info, and appearance.
+## Pulls non-hero levels + stats from party.csv (level_start, start_* headers).
 
 const GS_PATH    := "/root/aGameState"
 const STATS_PATH := "/root/aStatsSystem"
 const CAL_PATH   := "/root/aCalendarSystem"
 const HERO_PATH  := "/root/aHeroSystem"
 const PARTY_PATH := "/root/aPartySystem"
+const CSV_PATH   := "/root/aCSVLoader"
 
-const MES_PATH        := "/root/aMainEventSystem"
-const ALT_MES_PATHS   := [
+const PARTY_CSV := "res://data/actors/party.csv"
+const MES_PATH  := "/root/aMainEventSystem"
+const ALT_MES_PATHS := [
 	"/root/aMainEvents", "/root/aMainEvent",
 	"/root/MainEventSystem", "/root/MainEvents", "/root/MainEvent"
 ]
@@ -24,12 +26,17 @@ const ALT_MES_PATHS   := [
 @onready var _phase   : Label         = $Root/Right/InfoGrid/PhaseValue
 @onready var _hint    : RichTextLabel = $Root/Right/HintValue
 
-var _gs  : Node = null
-var _st  : Node = null
-var _cal : Node = null
-var _mes : Node = null
-var _hero: Node = null
-var _party_sys: Node = null
+var _gs        : Node = null
+var _st        : Node = null
+var _cal       : Node = null
+var _mes       : Node = null
+var _hero      : Node = null
+var _party_sys : Node = null
+var _csv       : Node = null
+
+# party.csv cache
+var _csv_by_id   : Dictionary = {}      # "actor_id" -> row dict
+var _name_to_id  : Dictionary = {}      # lowercase "name" -> "actor_id"
 
 # Appearance UI
 var _app_box    : VBoxContainer = null
@@ -45,16 +52,18 @@ func _ready() -> void:
 	size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	size_flags_vertical   = Control.SIZE_EXPAND_FILL
 
-	_gs       = get_node_or_null(GS_PATH)
-	_st       = get_node_or_null(STATS_PATH)
-	_cal      = get_node_or_null(CAL_PATH)
-	_hero     = get_node_or_null(HERO_PATH)
+	_gs        = get_node_or_null(GS_PATH)
+	_st        = get_node_or_null(STATS_PATH)
+	_cal       = get_node_or_null(CAL_PATH)
+	_hero      = get_node_or_null(HERO_PATH)
 	if _hero == null: _hero = get_node_or_null("/root/HeroSystem")
 	_party_sys = get_node_or_null(PARTY_PATH)
+	_csv       = get_node_or_null(CSV_PATH)
 
 	_resolve_event_system()
 	_normalize_scroll_children()
 	_connect_signals()
+	_load_party_csv_cache()
 
 	if _refresh and not _refresh.pressed.is_connected(_rebuild_all):
 		_refresh.pressed.connect(_rebuild_all)
@@ -63,13 +72,14 @@ func _ready() -> void:
 	call_deferred("_first_fill")
 
 func _first_fill() -> void:
-	# Late-bind in case systems spawned after our _ready
 	if _gs == null:        _gs        = get_node_or_null(GS_PATH)
 	if _st == null:        _st        = get_node_or_null(STATS_PATH)
 	if _cal == null:       _cal       = get_node_or_null(CAL_PATH)
 	if _hero == null:      _hero      = get_node_or_null(HERO_PATH)
 	if _hero == null:      _hero      = get_node_or_null("/root/HeroSystem")
 	if _party_sys == null: _party_sys = get_node_or_null(PARTY_PATH)
+	if _csv == null:       _csv       = get_node_or_null(CSV_PATH)
+	_load_party_csv_cache()
 	_rebuild_all()
 
 func _connect_signals() -> void:
@@ -92,6 +102,7 @@ func _connect_signals() -> void:
 				src.connect(sig, Callable(self, "_on_party_changed"))
 
 func _on_party_changed(_a: Variant = null) -> void:
+	_load_party_csv_cache() # in case you've edited CSV while running
 	_rebuild_party()
 
 func _resolve_event_system() -> void:
@@ -143,16 +154,16 @@ func _rebuild_party() -> void:
 		var hp_box := HBoxContainer.new(); hp_box.add_theme_constant_override("separation", 6)
 		var hp_lbl := Label.new(); hp_lbl.custom_minimum_size.x = 36; hp_lbl.text = "HP"
 		var hp_val := Label.new()
-		var hp := int(it.get("hp", -1))
-		var hp_max := int(it.get("hp_max", -1))
-		hp_val.text = _fmt_pair(hp, hp_max)
+		var hp_i: int = int(it.get("hp", -1))
+		var hp_max_i: int = int(it.get("hp_max", -1))
+		hp_val.text = _fmt_pair(hp_i, hp_max_i)
 		hp_box.add_child(hp_lbl); hp_box.add_child(hp_val)
-		if hp >= 0 and hp_max > 0:
+		if hp_i >= 0 and hp_max_i > 0:
 			var hp_bar := ProgressBar.new()
 			hp_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			hp_bar.min_value = 0.0
-			hp_bar.max_value = float(hp_max)
-			hp_bar.value     = clamp(float(hp), 0.0, float(hp_max))
+			hp_bar.max_value = float(hp_max_i)
+			hp_bar.value     = clamp(float(hp_i), 0.0, float(hp_max_i))
 			row.add_child(hp_bar)
 		row.add_child(hp_box)
 
@@ -160,16 +171,16 @@ func _rebuild_party() -> void:
 		var mp_box := HBoxContainer.new(); mp_box.add_theme_constant_override("separation", 6)
 		var mp_lbl := Label.new(); mp_lbl.custom_minimum_size.x = 36; mp_lbl.text = "MP"
 		var mp_val := Label.new()
-		var mp := int(it.get("mp", -1))
-		var mp_max := int(it.get("mp_max", -1))
-		mp_val.text = _fmt_pair(mp, mp_max)
+		var mp_i: int = int(it.get("mp", -1))
+		var mp_max_i: int = int(it.get("mp_max", -1))
+		mp_val.text = _fmt_pair(mp_i, mp_max_i)
 		mp_box.add_child(mp_lbl); mp_box.add_child(mp_val)
-		if mp >= 0 and mp_max > 0:
+		if mp_i >= 0 and mp_max_i > 0:
 			var mp_bar := ProgressBar.new()
 			mp_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			mp_bar.min_value = 0.0
-			mp_bar.max_value = float(mp_max)
-			mp_bar.value     = clamp(float(mp), 0.0, float(mp_max))
+			mp_bar.max_value = float(mp_max_i)
+			mp_bar.value     = clamp(float(mp_i), 0.0, float(mp_max_i))
 			row.add_child(mp_bar)
 		row.add_child(mp_box)
 
@@ -184,7 +195,7 @@ func _update_summary() -> void:
 	if _money: _money.text = _read_money()
 	if _perk:  _perk.text  = _read_perk_points()
 
-	var dp := _read_date_phase()
+	var dp: Dictionary = _read_date_phase()
 	if _date:  _date.text  = String(dp.get("date_text", "—"))
 	if _phase: _phase.text = String(dp.get("phase_text", "—"))
 
@@ -253,7 +264,7 @@ func _make_swatch(parent_box: HBoxContainer, label_text: String) -> ColorRect:
 	return cr
 
 func _update_appearance_values() -> void:
-	var snap := _read_hero_identity()
+	var snap: Dictionary = _read_hero_identity()
 	var name_lbl: Label = _app_labels.get("name", null)
 	var p_lbl: Label    = _app_labels.get("pronoun", null)
 	var b_lbl: Label    = _app_labels.get("body", null)
@@ -390,10 +401,8 @@ func _get_party_snapshot() -> Array:
 
 func _build_snapshot_flexible() -> Array:
 	var out: Array = []
-	var roster := _read_roster()
-
-	# Collect active as robust entries {key, label}
-	var entries := _gather_active_entries(roster)
+	var roster: Dictionary = _read_roster()
+	var entries: Array = _gather_active_entries(roster)
 
 	for e_v in entries:
 		if typeof(e_v) != TYPE_DICTIONARY: continue
@@ -401,65 +410,30 @@ func _build_snapshot_flexible() -> Array:
 		var pid: String = String(e.get("key",""))
 		var label: String = String(e.get("label",""))
 
-		# Try direct roster hit; if not, try by name
-		var rec: Dictionary = {}
-		if pid != "" and roster.has(pid):
-			rec = roster[pid]
-		elif label != "":
-			for rk in roster.keys():
-				var rr: Dictionary = roster[rk]
-				if rr.has("name") and String(rr["name"]).strip_edges() == label.strip_edges():
-					rec = rr; pid = String(rk); break
+		var resolved: Dictionary = _resolve_member_stats(pid, label)
+		var nm: String = String(resolved.get("name", (label if label != "" else pid)))
+		var lvl: int = int(resolved.get("level", 1))
+		var vtl: int = int(resolved.get("VTL", 1))
+		var fcs: int = int(resolved.get("FCS", 1))
 
-		# Name / level
-		var char_name: String = (label if label != "" else pid)
-		if pid == "hero" or char_name == "":
-			char_name = _safe_hero_name()
-
-		var level: int = 1
-		if pid == "hero" and _hero and _hero.has_method("get"):
-			level = int(_hero.get("level"))
-		elif not rec.is_empty():
-			level = int(rec.get("level", 1))
-
-		# Stats to compute maxima
-		var stats_d: Dictionary = {}
-		if not rec.is_empty() and rec.has("stats") and typeof(rec["stats"]) == TYPE_DICTIONARY:
-			stats_d = rec["stats"]
-		var vtl: int = int(stats_d.get("VTL", 1))
-		var fcs: int = int(stats_d.get("FCS", 1))
-
-		var hp_max: int = _calc_max_hp(level, vtl)
-		var mp_max: int = _calc_max_mp(level, fcs)
-
-		# Current HP/MP if provided
-		var hp_cur := hp_max
-		var mp_cur := mp_max
-		if not rec.is_empty() and rec.has("hp") and typeof(rec["hp"]) == TYPE_DICTIONARY:
-			var hp_d: Dictionary = rec["hp"]
-			hp_cur = int(hp_d.get("cur", hp_max))
-			hp_max = int(hp_d.get("max", hp_max))
-		if not rec.is_empty() and rec.has("mp") and typeof(rec["mp"]) == TYPE_DICTIONARY:
-			var mp_d: Dictionary = rec["mp"]
-			mp_cur = int(mp_d.get("cur", mp_max))
-			mp_max = int(mp_d.get("max", mp_max))
-
-		hp_cur = clamp(hp_cur, 0, hp_max)
-		mp_cur = clamp(mp_cur, 0, mp_max)
+		var hp_max_i: int = _calc_max_hp(lvl, vtl)
+		var mp_max_i: int = _calc_max_mp(lvl, fcs)
+		var hp_cur_i: int = clamp(int(resolved.get("hp_cur", hp_max_i)), 0, hp_max_i)
+		var mp_cur_i: int = clamp(int(resolved.get("mp_cur", mp_max_i)), 0, mp_max_i)
 
 		out.append({
-			"name": "%s  (Lv %d)" % [char_name, level],
-			"hp": hp_cur, "hp_max": hp_max,
-			"mp": mp_cur, "mp_max": mp_max
+			"name": "%s  (Lv %d)" % [nm, lvl],
+			"hp": hp_cur_i, "hp_max": hp_max_i,
+			"mp": mp_cur_i, "mp_max": mp_max_i
 		})
 
-	# Last resort: show hero only
+	# Last resort: hero only
 	if out.is_empty():
-		var nm := _safe_hero_name()
-		var lvl := _safe_hero_level()
-		var mh := _calc_max_hp(lvl, 1)
-		var mm := _calc_max_mp(lvl, 1)
-		out.append({"name":"%s  (Lv %d)" % [nm, lvl], "hp": mh, "hp_max": mh, "mp": mm, "mp_max": mm})
+		var nm2 := _safe_hero_name()
+		var lvl2 := _safe_hero_level()
+		var mh := _calc_max_hp(lvl2, 1)
+		var mm := _calc_max_mp(lvl2, 1)
+		out.append({"name":"%s  (Lv %d)" % [nm2, lvl2], "hp": mh, "hp_max": mh, "mp": mm, "mp_max": mm})
 
 	return out
 
@@ -528,7 +502,7 @@ func _gather_active_entries(roster: Dictionary) -> Array:
 			entries.append({"key": pid3, "label": _label_for_id(pid3, roster)})
 		if entries.size() > 0: return entries
 
-	# 5) PartySystem: common method names
+	# 5) PartySystem
 	if _party_sys:
 		for m in ["get_active_party","get_party","list_active_members","list_party","get_active"]:
 			if _party_sys.has_method(m):
@@ -549,6 +523,104 @@ func _gather_active_entries(roster: Dictionary) -> Array:
 	# 6) Fallback: hero only
 	entries.append({"key":"hero","label":_safe_hero_name()})
 	return entries
+
+# ---- CSV cache + per-member resolution -----------------------
+
+func _load_party_csv_cache() -> void:
+	_csv_by_id.clear()
+	_name_to_id.clear()
+
+	# Preferred: CSV loader
+	if _csv and _csv.has_method("load_csv"):
+		var defs_v: Variant = _csv.call("load_csv", PARTY_CSV, "actor_id")
+		if typeof(defs_v) == TYPE_DICTIONARY:
+			var defs: Dictionary = defs_v
+			for id_any in defs.keys():
+				var rid: String = String(id_any)
+				var row: Dictionary = defs[rid]
+				_csv_by_id[rid] = row
+				var n_v: Variant = row.get("name", "")
+				if typeof(n_v) == TYPE_STRING:
+					var key := String(n_v).strip_edges().to_lower()
+					if key != "": _name_to_id[key] = rid
+			return
+
+	# Fallback: FileAccess (simple csv)
+	if not FileAccess.file_exists(PARTY_CSV):
+		return
+	var f := FileAccess.open(PARTY_CSV, FileAccess.READ)
+	if f == null: return
+	var header: PackedStringArray = f.get_csv_line()
+	var idx_id := header.find("actor_id")
+	var idx_name := header.find("name")
+	while not f.eof_reached():
+		var row_psa: PackedStringArray = f.get_csv_line()
+		if row_psa.is_empty(): continue
+		var rid2: String = (String(row_psa[idx_id]) if idx_id >= 0 and idx_id < row_psa.size() else "")
+		var nm2: String  = (String(row_psa[idx_name]) if idx_name >= 0 and idx_name < row_psa.size() else "")
+		var row_dict: Dictionary = {}
+		for i in range(header.size()):
+			row_dict[String(header[i])] = (row_psa[i] if i < row_psa.size() else "")
+		if rid2 != "":
+			_csv_by_id[rid2] = row_dict
+		if nm2.strip_edges() != "":
+			_name_to_id[nm2.strip_edges().to_lower()] = rid2
+	f.close()
+
+func _resolve_member_stats(pid_in: String, label_in: String) -> Dictionary:
+	# HERO — live systems
+	if pid_in == "hero" or label_in.strip_edges().to_lower() == _safe_hero_name().strip_edges().to_lower():
+		var lvl: int = _safe_hero_level()
+		var vtl: int = 1
+		var fcs: int = 1
+		if _st and _st.has_method("get_stat"):
+			var v_v: Variant = _st.call("get_stat", "VTL")
+			if typeof(v_v) in [TYPE_INT, TYPE_FLOAT]: vtl = int(v_v)
+			var f_v: Variant = _st.call("get_stat", "FCS")
+			if typeof(f_v) in [TYPE_INT, TYPE_FLOAT]: fcs = int(f_v)
+		return {
+			"name": _safe_hero_name(),
+			"level": max(1, lvl),
+			"VTL": max(1, vtl),
+			"FCS": max(1, fcs)
+		}
+
+	# OTHERS — lookup from party.csv by id, else by name
+	var pid: String = pid_in
+	if pid == "" and label_in.strip_edges() != "":
+		var key: String = label_in.strip_edges().to_lower()
+		if _name_to_id.has(key): pid = String(_name_to_id[key])
+
+	var row: Dictionary = _csv_by_id.get(pid, {}) as Dictionary
+	if row.is_empty() and label_in.strip_edges() != "":
+		var key2: String = label_in.strip_edges().to_lower()
+		if _name_to_id.has(key2):
+			var pid2: String = String(_name_to_id[key2])
+			row = _csv_by_id.get(pid2, {}) as Dictionary
+
+	# Expected headers:
+	# level_start, start_brw, start_mnd, start_tpo, start_vtl, start_fcs
+	var lvl_csv: int = _to_int(row.get("level_start", 1))
+	var vtl_csv: int = _to_int(row.get("start_vtl", 1))
+	var fcs_csv: int = _to_int(row.get("start_fcs", 1))
+	var nm: String = (String(row.get("name","")) if row.has("name") else (label_in if label_in != "" else pid_in))
+
+	return {
+		"name": (nm if nm != "" else (label_in if label_in != "" else pid_in)),
+		"level": max(1, lvl_csv),
+		"VTL": max(1, vtl_csv),
+		"FCS": max(1, fcs_csv)
+	}
+
+func _to_int(v: Variant) -> int:
+	match typeof(v):
+		TYPE_INT: return int(v)
+		TYPE_FLOAT: return int(round(float(v)))
+		TYPE_STRING:
+			var s := String(v).strip_edges()
+			if s == "": return 0
+			return int(s.to_int())
+		_: return 0
 
 # ---- Stat helpers ----------------------------------------------------
 

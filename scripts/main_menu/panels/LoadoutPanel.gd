@@ -667,6 +667,17 @@ func _stat(s: String) -> int:
 		if typeof(v) == TYPE_INT: return int(v)
 	return 0
 
+func _stat_for_member(member_token: String, s: String) -> int:
+	# Hero: live stat from StatsSystem
+	if member_token == "hero" or _norm(member_token) == _norm(_hero_name()):
+		if _stats and _stats.has_method("get_stat"):
+			return int(_stats.call("get_stat", s))
+	# Others: ask GameState (CSV-backed)
+	if _gs and _gs.has_method("get_member_stat"):
+		return int(_gs.call("get_member_stat", member_token, s))
+	return 1
+
+
 func _item_def(id: String) -> Dictionary:
 	var empty: Dictionary = {}
 	if id == "" or id == "—": return empty
@@ -693,6 +704,14 @@ func _eva_mods_from_other(equip: Dictionary, exclude_id: String) -> int:
 func _rebuild_stats_grid(member_token: String, equip: Dictionary) -> void:
 	if _stats_grid == null: return
 	_clear_stats_grid()
+	var lvl := 1
+	var hp_max := 0
+	var mp_max := 0
+	if _gs and _gs.has_method("compute_member_pools"):
+		var pools: Dictionary = _gs.call("compute_member_pools", member_token)
+		lvl    = int(pools.get("level", 1))
+		hp_max = int(pools.get("hp_max", 0))
+		mp_max = int(pools.get("mp_max", 0))
 
 	var d_wea: Dictionary  = _item_def(String(equip.get("weapon","")))
 	var d_arm: Dictionary  = _item_def(String(equip.get("armor","")))
@@ -700,7 +719,7 @@ func _rebuild_stats_grid(member_token: String, equip: Dictionary) -> void:
 	var d_foot: Dictionary = _item_def(String(equip.get("foot","")))
 	var d_brac: Dictionary = _item_def(String(equip.get("bracelet","")))
 
-	var brw: int = _stat("BRW")
+	var brw: int = _stat_for_member(member_token, "BRW")
 	var base_watk: int  = int(d_wea.get("base_watk", 0))
 	var scale_brw: float = float(d_wea.get("scale_brw", 0.0))
 	var weapon_attack: int = base_watk + int(round(scale_brw * float(brw)))
@@ -712,12 +731,12 @@ func _rebuild_stats_grid(member_token: String, equip: Dictionary) -> void:
 	var weapon_type: String = ("Neutral" if (type_raw == "" or type_raw == "wand") else type_raw.capitalize())
 	var special: String = ("NL" if bool(d_wea.get("non_lethal", false)) else "")
 
-	var vtl: int = _stat("VTL")
+	var vtl: int = _stat_for_member(member_token, "VTL")
 	var armor_flat: int = int(d_arm.get("armor_flat", 0))
 	var pdef: int = int(round(float(armor_flat) * (_DEF_BASELINE + 0.25 * float(vtl))))
 	var ail_res: int = int(d_arm.get("ail_resist_pct", 0))
 
-	var fcs: int = _stat("FCS")
+	var fcs: int = _stat_for_member(member_token, "FCS")
 	var hp_bonus: int = int(d_head.get("max_hp_boost", 0))
 	var mp_bonus: int = int(d_head.get("max_mp_boost", 0))
 	var ward_flat: int = int(d_head.get("ward_flat", 0))
@@ -749,6 +768,9 @@ func _rebuild_stats_grid(member_token: String, equip: Dictionary) -> void:
 	var _pair := func(lbl: String, val: String) -> void:
 		_stats_grid.add_child(_label_cell(lbl))
 		_stats_grid.add_child(_value_cell(val))
+	_pair.call("Level",  str(lvl))
+	_pair.call("Max HP", str(hp_max))
+	_pair.call("Max MP", str(mp_max))
 
 	_pair.call("Weapon Attack", ("" if d_wea.is_empty() else str(weapon_attack)))
 	_pair.call("Weapon Scale",  ("" if d_wea.is_empty() else weapon_scale))
