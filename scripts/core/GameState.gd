@@ -57,6 +57,9 @@ func new_game() -> void:
 	bench = []
 	flags = {}
 
+	# Initialize hero active type default so UI/Combat have a value from the start.
+	self.set_meta("hero_active_type", "Omega")
+
 	index_blob = {
 		"tutorials": [],
 		"enemies":   {},
@@ -362,6 +365,19 @@ func _to_payload() -> Dictionary:
 		if typeof(pv) == TYPE_DICTIONARY:
 			perks_legacy = pv as Dictionary
 
+	# Pull hero active type from meta/property and include in save payload.
+	var hero_active_type := "Omega"
+	if self.has_meta("hero_active_type"):
+		var mv: Variant = self.get_meta("hero_active_type")
+		if typeof(mv) == TYPE_STRING:
+			var s := String(mv).strip_edges()
+			if s != "": hero_active_type = s
+	elif self.has_method("get"):
+		var v: Variant = self.get("hero_active_type")
+		if typeof(v) == TYPE_STRING:
+			var s2 := String(v).strip_edges()
+			if s2 != "": hero_active_type = s2
+
 	return {
 		"scene": "Main",
 		"label": label,
@@ -384,6 +400,7 @@ func _to_payload() -> Dictionary:
 		"index": get_index_blob(),
 		"modules": modules_blob,
 		"perks": perks_legacy,
+		"hero_active_type": hero_active_type,   # ← persisted
 	}
 
 func _from_payload(p: Dictionary) -> void:
@@ -415,6 +432,20 @@ func _from_payload(p: Dictionary) -> void:
 	var mods_v: Variant = p.get("modules", {})
 	if typeof(mods_v) == TYPE_DICTIONARY:
 		_import_modules_payload(mods_v as Dictionary)
+
+	# Restore hero active type from payload (default Omega).
+	var at_v: Variant = p.get("hero_active_type", null)
+	var atype: String = "Omega"
+	if typeof(at_v) == TYPE_STRING:
+		var s := String(at_v).strip_edges()
+		if s != "": atype = s
+	self.set_meta("hero_active_type", atype)
+	if self.has_method("set"):
+		self.set("hero_active_type", atype)
+	# Optionally notify listeners so UI/derived views refresh.
+	var stats := get_node_or_null(STATS_PATH)
+	if stats and stats.has_signal("stats_changed"):
+		stats.emit_signal("stats_changed")
 
 	if equip_snap != null:
 		_apply_equipment_snapshot(equip_snap)

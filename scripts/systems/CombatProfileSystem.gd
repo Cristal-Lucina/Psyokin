@@ -1,6 +1,8 @@
 extends Node
 class_name CombatProfileSystem
 
+signal hero_active_type_changed(new_type: String)
+
 # Paths
 const STATS_PATH    := "/root/aStatsSystem"
 const PARTY_PATH    := "/root/aPartySystem"
@@ -31,6 +33,10 @@ func _ready() -> void:
 	_cal   = get_node_or_null(CAL_PATH)
 
 	_load_party_csv_cache()
+
+	# Ensure a default hero active type exists (Omega) to avoid blanks.
+	if _gs and not _gs.has_meta("hero_active_type"):
+		_gs.set_meta("hero_active_type", "Omega")
 
 	# keep things fresh
 	for src in [_gs, _party]:
@@ -77,6 +83,38 @@ func debug_dump_active_party() -> void:
 		print("%s | Lv %d | BRW %d  MND %d  TPO %d  VTL %d  FCS %d | HPmax %d  MPmax %d | Mind %s" % [
 			label, char_level, brw, mnd, tpo, vtl, fcs, hp_max, mp_max, mind_txt
 		])
+
+# ───────────────────────── public API ─────────────────────────
+
+func get_hero_active_type() -> String:
+	# Authoritative value lives in GameState meta; falls back to Omega.
+	if _gs:
+		if _gs.has_meta("hero_active_type"):
+			var mv: Variant = _gs.get_meta("hero_active_type")
+			if typeof(mv) == TYPE_STRING:
+				var s := String(mv).strip_edges()
+				return (s if s != "" else "Omega")
+		if _gs.has_method("get"):
+			var v: Variant = _gs.get("hero_active_type")
+			if typeof(v) == TYPE_STRING:
+				var s2 := String(v).strip_edges()
+				return (s2 if s2 != "" else "Omega")
+	return "Omega"
+
+func set_hero_active_type(school: String) -> void:
+	var val := String(school).strip_edges()
+	if val == "": val = "Omega"
+	var prev := get_hero_active_type()
+	if _gs:
+		_gs.set_meta("hero_active_type", val)
+		if _gs.has_method("set"):
+			_gs.set("hero_active_type", val)
+	# Let listeners refresh any UI or derived combat views
+	var stats := get_node_or_null(STATS_PATH)
+	if stats and stats.has_signal("stats_changed"):
+		stats.emit_signal("stats_changed")
+	if val != prev:
+		hero_active_type_changed.emit(val)
 
 # ───────────────────────── helpers ─────────────────────────
 
@@ -162,12 +200,8 @@ func _mp_max_for(_member_id: String, char_level: int, fcs: int) -> int:
 
 func _mind_for(member_id: String) -> String:
 	if member_id == "hero":
-		# If hero has a field for mind/school, adapt here.
-		if _hero and _hero.has_method("get"):
-			var m_v: Variant = _hero.get("school_track")
-			if typeof(m_v) == TYPE_STRING and String(m_v).strip_edges() != "":
-				return String(m_v)
-		return "—"
+		# Authoritative: hero Active Type saved in GameState (default Omega).
+		return get_hero_active_type()
 	if _csv_by_id.has(member_id):
 		var row: Dictionary = _csv_by_id[member_id]
 		var mv: Variant = row.get("mind_type", "")
