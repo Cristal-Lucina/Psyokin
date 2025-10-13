@@ -1,7 +1,7 @@
 # Psyokin
 
 P S Y O K I N
-Plain-Text Project README
+
 
 1) PROJECT TITLE AND DESCRIPTION
 Psyokin is a single‑player indie RPG built with Godot 4.4.1. It blends a school‑life calendar with strategic battles and relationship systems. Each in‑game day has phases, you attend classes, train, run missions or VR, manage gear and Sigils, and deepen Circle Bonds. Systems are data‑driven through CSV files and the game state is saved to JSON for fast resume.
