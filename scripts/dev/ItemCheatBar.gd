@@ -1,20 +1,24 @@
+# =======================
+# ItemsCheatBar.gd (FULL)
+# =======================
 extends Control
 class_name ItemsCheatBar
 
+# --- Autoload paths ------------------------------------------------------------
 const INV_PATH   := "/root/aInventorySystem"
 const CSV_PATH   := "/root/aCSVLoader"
 const SIG_PATH   := "/root/aSigilSystem"
 const GS_PATH    := "/root/aGameState"
-const HERO_PATH  := "/root/aHeroSystem"
 const STATS_PATH := "/root/aStatsSystem"
 const PERK_PATH  := "/root/aPerkSystem"
 const PARTY_PATH := "/root/aPartySystem"
+const HERO_PATH  := "/root/aHeroSystem"
 
+# --- CSV paths / keys ----------------------------------------------------------
 const ITEMS_CSV := "res://data/items/items.csv"
 const KEY_ID    := "item_id"
 
-# Candidate CSVs for party roster (first existing wins)
-const PARTY_CSV_CANDIDATES: PackedStringArray = [
+const PARTY_CSV_CANDIDATES: Array[String] = [
 	"res://data/party/party.csv",
 	"res://data/Party.csv",
 	"res://data/party.csv",
@@ -22,244 +26,346 @@ const PARTY_CSV_CANDIDATES: PackedStringArray = [
 	"res://data/actors/party.csv",
 	"res://data/actors.csv"
 ]
+const PARTY_ID_KEYS   : Array[String] = ["actor_id", "id", "actor", "member_id"]
+const PARTY_NAME_KEYS : Array[String] = ["name", "display_name", "disp_name"]
 
-# Column name candidates in the Party CSV
-const PARTY_ID_KEYS:   PackedStringArray = ["actor_id", "id", "actor", "member_id"]
-const PARTY_NAME_KEYS: PackedStringArray = ["name", "display_name", "disp_name"]
+# --- Scene node refs (existing in your .tscn) ---------------------------------
+@onready var _picker     : OptionButton = find_child("Picker", true, false) as OptionButton
+@onready var _qty        : SpinBox      = find_child("Qty", true, false) as SpinBox
+@onready var _give       : Button       = find_child("BtnGive", true, false) as Button
+@onready var _rem        : Button       = find_child("BtnRemove", true, false) as Button
+@onready var _give10     : Button       = find_child("BtnGive10", true, false) as Button
+@onready var _reload     : Button       = find_child("BtnReloadCSV", true, false) as Button
 
-# --- find-by-name (path agnostic)
-func _ctl(node_name: String) -> Node:
-	return find_child(node_name, true, false)
+# Sigil cheat row (may be built at runtime if missing in scene)
+@onready var _sig_inst_pick : OptionButton = find_child("InstPicker", true, false) as OptionButton
+@onready var _btn_lv_up     : Button       = find_child("BtnLvUp", true, false) as Button
+@onready var _btn_lv_down   : Button       = find_child("BtnLvDown", true, false) as Button
+@onready var _btn_xp_25     : Button       = find_child("BtnXP25", true, false) as Button
+@onready var _btn_xp_100    : Button       = find_child("BtnXP100", true, false) as Button
+@onready var _chk_equipped  : CheckBox     = find_child("ChkEquipped", true, false) as CheckBox
 
-# Row1 (Items)
-@onready var _picker : OptionButton = _ctl("Picker") as OptionButton
-@onready var _qty    : SpinBox      = _ctl("Qty") as SpinBox
-@onready var _give   : Button       = _ctl("BtnGive") as Button
-@onready var _rem    : Button       = _ctl("BtnRemove") as Button
-@onready var _give10 : Button       = _ctl("BtnGive10") as Button
-@onready var _reload : Button       = _ctl("BtnReloadCSV") as Button
+# Common (level/sxp) controls
+@onready var _btn_lvl_m1    : Button       = find_child("BtnLvlM1", true, false) as Button
+@onready var _btn_lvl_p1    : Button       = find_child("BtnLvlP1", true, false) as Button
+@onready var _spin_lvl      : SpinBox      = find_child("SpinLvl", true, false) as SpinBox
+@onready var _btn_set_level : Button       = find_child("BtnSetLvl", true, false) as Button
 
-# Row2 (Sigils)
-var _row2            : HBoxContainer = null
-var _sig_inst_pick   : OptionButton  = null
-var _btn_lv_up       : Button        = null
-var _btn_lv_down     : Button        = null
-var _btn_xp_25       : Button        = null
-var _btn_xp_100      : Button        = null
-var _chk_equipped    : CheckBox      = null
+# --- Party UI (optional external) ---------------------------------------------
+var _xp_amt      : SpinBox      = null
+var _btn_add_xp  : Button       = null
+var _stat_pick   : OptionButton = null
+var _sxp_amt     : SpinBox      = null
+var _btn_add_sxp : Button       = null
 
-# Row3 (Level / Perk / SXP)
-var _row3           : HBoxContainer = null
-var _btn_lvl_m1     : Button        = null
-var _btn_lvl_p1     : Button        = null
-var _spin_lvl       : SpinBox       = null
-var _btn_set_level  : Button        = null
-var _btn_bpp_p1     : Button        = null
-var _btn_bpp_p5     : Button        = null
-var _stat_pick      : OptionButton  = null
-var _sxp_amt        : SpinBox       = null
-var _btn_add_sxp    : Button        = null
+@onready var _roster_pick   : OptionButton = find_child("RosterPick", true, false) as OptionButton
+@onready var _member_id_le  : LineEdit     = find_child("MemberId",  true, false) as LineEdit
+@onready var _btn_add_party : Button       = find_child("BtnAddParty",    true, false) as Button
+@onready var _btn_rem_party : Button       = find_child("BtnRemoveParty", true, false) as Button
+@onready var _btn_to_bench  : Button       = find_child("BtnToBench",     true, false) as Button
 
-# Row4 (Party Cheats)
-var _row4           : HBoxContainer = null
-var _roster_pick    : OptionButton  = null
-var _btn_add_party  : Button        = null
+# -------- Hero cheat widgets (runtime-built if missing) --------
+var _hero_row         : HBoxContainer = null
+var _hero_xp_spin     : SpinBox       = null
+var _btn_hero_add_xp  : Button        = null
+var _hero_stat_pick   : OptionButton  = null
+var _hero_sxp_spin    : SpinBox       = null
+var _btn_hero_add_sxp : Button        = null
 
-# Systems
+# -------- Party cheat widgets (runtime-built if missing) -------
+var _party_lxp_row  : HBoxContainer = null
+var _party_sxp_row  : HBoxContainer = null
+
+# --- Systems ------------------------------------------------------------------
 var _inv   : Node = null
 var _csv   : Node = null
 var _sig   : Node = null
 var _gs    : Node = null
-var _hero  : Node = null
 var _stats : Node = null
 var _perk  : Node = null
 var _party : Node = null
+var _hero  : Node = null
 
-var _defs : Dictionary = {} # item id -> row dict
-var _rows_vbox : VBoxContainer = null
+# --- Data caches ---------------------------------------------------------------
+var _defs            : Dictionary = {}  # items
+var _party_defs_by_id: Dictionary = {}
+var _party_csv_path  : String     = ""
 
-# Cached Party CSV rows keyed by id ("actor_id")
-var _party_defs_by_id: Dictionary = {}   # id -> row-dict
-var _party_csv_path: String = ""
+# --- Debug switch --------------------------------------------------------------
+const DEBUG_ICB_SIG: bool = false
 
-# ---------------- lifecycle ----------------
+# --- Helper: find any node by exact name anywhere in the tree ------------------
+func _find_anywhere(node_name: String) -> Node:
+	var root: Node = get_tree().root
+	var arr: Array = root.find_children(node_name, "", true, false)
+	return (arr[0] as Node) if arr.size() > 0 else null
 
+# --- Ready ---------------------------------------------------------------------
 func _ready() -> void:
-	# Systems
 	_inv   = get_node_or_null(INV_PATH)
 	_csv   = get_node_or_null(CSV_PATH)
 	_sig   = get_node_or_null(SIG_PATH)
 	_gs    = get_node_or_null(GS_PATH)
-	_hero  = get_node_or_null(HERO_PATH)
 	_stats = get_node_or_null(STATS_PATH)
 	_perk  = get_node_or_null(PERK_PATH)
 	_party = get_node_or_null(PARTY_PATH)
+	_hero  = get_node_or_null(HERO_PATH)
 
-	# Ensure vertical stacking container; move existing Row into it
-	_normalize_rows_layout()
+	# Listen to inventory signals so the picker stays fresh
+	if _inv != null:
+		if _inv.has_signal("items_loaded") and not _inv.is_connected("items_loaded", Callable(self, "_on_inv_defs_loaded")):
+			_inv.connect("items_loaded", Callable(self, "_on_inv_defs_loaded"))
+		if _inv.has_signal("inventory_changed") and not _inv.is_connected("inventory_changed", Callable(self, "_on_inv_counts_changed")):
+			_inv.connect("inventory_changed", Callable(self, "_on_inv_counts_changed"))
+		if _inv.has_signal("items_changed") and not _inv.is_connected("items_changed", Callable(self, "_on_inv_counts_changed")):
+			_inv.connect("items_changed", Callable(self, "_on_inv_counts_changed"))
 
-	# Wire Row1
-	if _give and not _give.pressed.is_connected(_on_give):       _give.pressed.connect(_on_give)
-	if _rem and not _rem.pressed.is_connected(_on_remove):       _rem.pressed.connect(_on_remove)
-	if _give10 and not _give10.pressed.is_connected(_on_give10): _give10.pressed.connect(_on_give10)
-	if _reload and not _reload.pressed.is_connected(_on_reload): _reload.pressed.connect(_on_reload)
+	_bind_optional_external_ui()
 
-	# Ensure other rows (create if missing)
-	_ensure_row2(); _bind_row2_signals()
-	_ensure_row3(); _bind_row3_signals(); _populate_stat_picker()
-	_ensure_row4(); _bind_row4_signals()
+	# Build runtime rows that might be missing from scene
+	_ensure_sigil_row()
+	_ensure_hero_row()
+	_ensure_party_rows()
 
-	# Make the dropdowns smaller + scrollable
-	_apply_optionbutton_tweaks()
+	# Style + populate static pickers
+	_style_option_button(_hero_stat_pick, 11, 300)
+	_populate_hero_stat_picker()
+	_style_option_button(_stat_pick, 11, 300)
+	_populate_stat_picker()
 
-	# Data
+	# Row1 (Items)
+	if _give and not _give.pressed.is_connected(_on_give):          _give.pressed.connect(_on_give)
+	if _rem and not _rem.pressed.is_connected(_on_remove):           _rem.pressed.connect(_on_remove)
+	if _give10 and not _give10.pressed.is_connected(_on_give10):     _give10.pressed.connect(_on_give10)
+	if _reload and not _reload.pressed.is_connected(_on_reload):     _reload.pressed.connect(_on_reload)
+
+	# Row2 (Sigils)
+	if _btn_lv_up and not _btn_lv_up.pressed.is_connected(_on_sig_lv_up):     _btn_lv_up.pressed.connect(_on_sig_lv_up)
+	if _btn_lv_down and not _btn_lv_down.pressed.is_connected(_on_sig_lv_dn): _btn_lv_down.pressed.connect(_on_sig_lv_dn)
+	if _btn_xp_25 and not _btn_xp_25.pressed.is_connected(_on_sig_xp_25):     _btn_xp_25.pressed.connect(_on_sig_xp_25)
+	if _btn_xp_100 and not _btn_xp_100.pressed.is_connected(_on_sig_xp_100):  _btn_xp_100.pressed.connect(_on_sig_xp_100)
+	if _chk_equipped and not _chk_equipped.toggled.is_connected(_on_equipped_toggle):
+		_chk_equipped.toggled.connect(_on_equipped_toggle)
+
+	# Row3 (Level/SXP common controls)
+	if _btn_lvl_m1 and not _btn_lvl_m1.pressed.is_connected(_on_lvl_m1): _btn_lvl_m1.pressed.connect(_on_lvl_m1)
+	if _btn_lvl_p1 and not _btn_lvl_p1.pressed.is_connected(_on_lvl_p1): _btn_lvl_p1.pressed.connect(_on_lvl_p1)
+	if _btn_set_level and not _btn_set_level.pressed.is_connected(_on_set_level):
+		_btn_set_level.pressed.connect(_on_set_level)
+
+	# Party LXP/SXP (either external or our runtime-built)
+	if _btn_add_sxp and not _btn_add_sxp.pressed.is_connected(_on_add_sxp): _btn_add_sxp.pressed.connect(_on_add_sxp)
+	if _btn_add_xp  and not _btn_add_xp.pressed.is_connected(_on_add_xp):   _btn_add_xp.pressed.connect(_on_add_xp)
+
+	# Row4 (Party roster)
+	if _btn_add_party and not _btn_add_party.pressed.is_connected(_on_add_to_party):
+		_btn_add_party.pressed.connect(_on_add_to_party)
+	if _btn_rem_party and not _btn_rem_party.pressed.is_connected(_on_remove_from_party):
+		_btn_rem_party.pressed.connect(_on_remove_from_party)
+	if _btn_to_bench and not _btn_to_bench.pressed.is_connected(_on_move_to_bench):
+		_btn_to_bench.pressed.connect(_on_move_to_bench)
+	if _roster_pick and not _roster_pick.item_selected.is_connected(_on_roster_pick_selected):
+		_roster_pick.item_selected.connect(_on_roster_pick_selected)
+
+	# Style pickers that exist
+	_style_option_button(_picker, 11, 300)
+	_style_option_button(_sig_inst_pick, 11, 300)
+	_style_option_button(_roster_pick, 11, 300)
+
+	# Populate
 	_refresh_defs()
 	_refresh_sig_dropdown()
 	_refresh_roster_picker()
+	if _spin_lvl:
+		_spin_lvl.value = _get_member_level()
 
-	if _sig and _sig.has_signal("loadout_changed"):
-		if not _sig.is_connected("loadout_changed", Callable(self, "_on_loadout_changed")):
+	# Sigil system signals
+	if _sig:
+		if _sig.has_signal("loadout_changed") and not _sig.is_connected("loadout_changed", Callable(self, "_on_loadout_changed")):
 			_sig.connect("loadout_changed", Callable(self, "_on_loadout_changed"))
+		if _sig.has_signal("sigil_xp_changed") and not _sig.is_connected("sigil_xp_changed", Callable(self, "_on_sig_xp_changed")):
+			_sig.connect("sigil_xp_changed", Callable(self, "_on_sig_xp_changed"))
 
-# ---- visual tweaks for OptionButtons (smaller text + scrollable popup) ----
-func _style_option_button(ob: OptionButton, font_px: int = 11, popup_max_h: int = 300, popup_max_w: int = 300) -> void:
-	if ob == null:
+# --- Build Sigil row at runtime if missing ------------------------------------
+func _ensure_sigil_row() -> void:
+	# If the scene already provides these nodes, nothing to do.
+	if _sig_inst_pick != null and _btn_xp_25 != null and _btn_xp_100 != null and _chk_equipped != null:
 		return
 
-	# Button text size
-	ob.add_theme_font_size_override("font_size", font_px)
+	var parent := _attach_point()
+	var row := parent.get_node_or_null("SigilRow") as HBoxContainer
+	if row == null:
+		row = HBoxContainer.new()
+		row.name = "SigilRow"
+		row.add_theme_constant_override("separation", 8)
+		parent.add_child(row)
 
-	# Popup styling
-	var pm: PopupMenu = ob.get_popup()
-	if pm != null:
-		pm.add_theme_font_size_override("font_size", font_px)
-		# Cap popup size so it scrolls when there are many items
-		pm.max_size = Vector2i(popup_max_w, popup_max_h)
+	var lbl := Label.new(); lbl.text = "Sigils:"; row.add_child(lbl)
 
-func _apply_optionbutton_tweaks() -> void:
-	_style_option_button(_picker, 11, 300)
-	if _sig_inst_pick: _style_option_button(_sig_inst_pick, 11, 300)
-	if _roster_pick:   _style_option_button(_roster_pick, 11, 300)
-	if _stat_pick:     _style_option_button(_stat_pick, 11, 300)
+	_chk_equipped = CheckBox.new()
+	_chk_equipped.name = "ChkEquipped"
+	_chk_equipped.text = "Equipped only"
+	row.add_child(_chk_equipped)
 
-# ---------------- Layout helpers ----------------
+	_sig_inst_pick = OptionButton.new()
+	_sig_inst_pick.name = "InstPicker"
+	_sig_inst_pick.custom_minimum_size = Vector2(240, 0)
+	row.add_child(_sig_inst_pick)
 
-func _normalize_rows_layout() -> void:
-	_rows_vbox = get_node_or_null("Rows") as VBoxContainer
-	if _rows_vbox == null:
-		_rows_vbox = VBoxContainer.new()
-		_rows_vbox.name = "Rows"
-		_rows_vbox.add_theme_constant_override("separation", 8)
-		add_child(_rows_vbox)
+	_btn_lv_down = Button.new(); _btn_lv_down.name = "BtnLvDown"; _btn_lv_down.text = "Lv-"
+	row.add_child(_btn_lv_down)
 
-	var existing_row: HBoxContainer = get_node_or_null("Row") as HBoxContainer
-	if existing_row and existing_row.get_parent() == self:
-		remove_child(existing_row)
-		_rows_vbox.add_child(existing_row)
+	_btn_lv_up = Button.new(); _btn_lv_up.name = "BtnLvUp"; _btn_lv_up.text = "Lv+"
+	row.add_child(_btn_lv_up)
 
-func _ensure_row2() -> void:
-	_row2 = _ctl("SigilRow") as HBoxContainer
-	if _row2 != null:
-		_sig_inst_pick = _ctl("InstPicker") as OptionButton
-		_btn_lv_up     = _ctl("BtnLvUp") as Button
-		_btn_lv_down   = _ctl("BtnLvDown") as Button
-		_btn_xp_25     = _ctl("BtnXP25") as Button
-		_btn_xp_100    = _ctl("BtnXP100") as Button
-		_chk_equipped  = _ctl("ChkEquipped") as CheckBox
-		if _sig_inst_pick: _style_option_button(_sig_inst_pick, 11, 300)
-		return
+	_btn_xp_25 = Button.new(); _btn_xp_25.name = "BtnXP25"; _btn_xp_25.text = "+25 XP"
+	row.add_child(_btn_xp_25)
 
-	_row2 = HBoxContainer.new()
-	_row2.name = "SigilRow"
-	_row2.add_theme_constant_override("separation", 8)
-	_rows_vbox.add_child(_row2)
+	_btn_xp_100 = Button.new(); _btn_xp_100.name = "BtnXP100"; _btn_xp_100.text = "+100 XP"
+	row.add_child(_btn_xp_100)
 
-	var title := Label.new(); title.text = "Sigil Cheats:"; _row2.add_child(title)
+	# Wire signals
+	if not _btn_lv_up.pressed.is_connected(_on_sig_lv_up):      _btn_lv_up.pressed.connect(_on_sig_lv_up)
+	if not _btn_lv_down.pressed.is_connected(_on_sig_lv_dn):     _btn_lv_down.pressed.connect(_on_sig_lv_dn)
+	if not _btn_xp_25.pressed.is_connected(_on_sig_xp_25):       _btn_xp_25.pressed.connect(_on_sig_xp_25)
+	if not _btn_xp_100.pressed.is_connected(_on_sig_xp_100):     _btn_xp_100.pressed.connect(_on_sig_xp_100)
+	if not _chk_equipped.toggled.is_connected(_on_equipped_toggle):
+		_chk_equipped.toggled.connect(_on_equipped_toggle)
 
-	_sig_inst_pick = OptionButton.new(); _sig_inst_pick.name = "InstPicker"; _sig_inst_pick.custom_minimum_size = Vector2(260,0); _row2.add_child(_sig_inst_pick)
 	_style_option_button(_sig_inst_pick, 11, 300)
 
-	_btn_lv_up     = Button.new(); _btn_lv_up.name = "BtnLvUp"; _btn_lv_up.text = "Lv +1"; _row2.add_child(_btn_lv_up)
-	_btn_lv_down   = Button.new(); _btn_lv_down.name = "BtnLvDown"; _btn_lv_down.text = "Lv -1"; _row2.add_child(_btn_lv_down)
-	_btn_xp_25     = Button.new(); _btn_xp_25.name = "BtnXP25"; _btn_xp_25.text = "XP +25"; _row2.add_child(_btn_xp_25)
-	_btn_xp_100    = Button.new(); _btn_xp_100.name = "BtnXP100"; _btn_xp_100.text = "XP +100"; _row2.add_child(_btn_xp_100)
-	_chk_equipped  = CheckBox.new(); _chk_equipped.name = "ChkEquipped"; _chk_equipped.text = "Equipped only"; _chk_equipped.button_pressed = true; _row2.add_child(_chk_equipped)
+# --- Bind external cheat UI if it's not a child of this node -------------------
+func _bind_optional_external_ui() -> void:
+	if _xp_amt == null:
+		_xp_amt = find_child("SpinXP", true, false) as SpinBox
+		if _xp_amt == null: _xp_amt = _find_anywhere("SpinXP") as SpinBox
 
-func _ensure_row3() -> void:
-	_row3 = _ctl("HeroRow") as HBoxContainer
-	if _row3 != null:
-		_btn_lvl_m1    = _ctl("BtnLvlM1") as Button
-		_btn_lvl_p1    = _ctl("BtnLvlP1") as Button
-		_spin_lvl      = _ctl("SpinLvl") as SpinBox
-		_btn_set_level = _ctl("BtnSetLvl") as Button
-		_btn_bpp_p1    = _ctl("BtnBPPp1") as Button
-		_btn_bpp_p5    = _ctl("BtnBPPp5") as Button
-		_stat_pick     = _ctl("StatPick") as OptionButton
-		_sxp_amt       = _ctl("SpinSXP") as SpinBox
-		_btn_add_sxp   = _ctl("BtnAddSXP") as Button
-		if _stat_pick: _style_option_button(_stat_pick, 11, 300)
+	if _btn_add_xp == null:
+		_btn_add_xp = find_child("BtnAddXP", true, false) as Button
+		if _btn_add_xp == null: _btn_add_xp = _find_anywhere("BtnAddXP") as Button
+
+	if _stat_pick == null:
+		_stat_pick = find_child("StatPick", true, false) as OptionButton
+		if _stat_pick == null: _stat_pick = _find_anywhere("StatPick") as OptionButton
+
+	if _sxp_amt == null:
+		_sxp_amt = find_child("SpinSXP", true, false) as SpinBox
+		if _sxp_amt == null: _sxp_amt = _find_anywhere("SpinSXP") as SpinBox
+
+	if _btn_add_sxp == null:
+		_btn_add_sxp = find_child("BtnAddSXP", true, false) as Button
+		if _btn_add_sxp == null: _btn_add_sxp = _find_anywhere("BtnAddSXP") as Button
+
+	if _roster_pick == null:
+		_roster_pick = find_child("RosterPick", true, false) as OptionButton
+		if _roster_pick == null: _roster_pick = _find_anywhere("RosterPick") as OptionButton
+
+	if _member_id_le == null:
+		_member_id_le = find_child("MemberId", true, false) as LineEdit
+		if _member_id_le == null: _member_id_le = _find_anywhere("MemberId") as LineEdit
+
+# --- OptionButton UX tweaks ----------------------------------------------------
+func _style_option_button(ob: OptionButton, font_px: int, popup_max_h: int, popup_max_w: int = 300) -> void:
+	if ob == null: return
+	ob.add_theme_font_size_override("font_size", font_px)
+	var pm: PopupMenu = ob.get_popup()
+	if pm:
+		pm.add_theme_font_size_override("font_size", font_px)
+		pm.max_size = Vector2i(popup_max_w, popup_max_h)
+
+# --- Runtime rows: Hero + Party cheats ----------------------------------------
+func _attach_point() -> Control:
+	var host := find_child("CheatRoot", true, false) as Control
+	return host if host != null else self
+
+func _ensure_hero_row() -> void:
+	var parent := _attach_point()
+	_hero_row = parent.get_node_or_null("HeroRow") as HBoxContainer
+	if _hero_row != null:
 		return
 
-	_row3 = HBoxContainer.new()
-	_row3.name = "HeroRow"
-	_row3.add_theme_constant_override("separation", 8)
-	_rows_vbox.add_child(_row3)
+	_hero_row = HBoxContainer.new()
+	_hero_row.name = "HeroRow"
+	_hero_row.add_theme_constant_override("separation", 8)
+	parent.add_child(_hero_row)
 
-	var title := Label.new(); title.text = "Hero / SXP Cheats:"; _row3.add_child(title)
+	var title := Label.new(); title.text = "Hero:"; _hero_row.add_child(title)
 
-	_btn_lvl_m1 = Button.new(); _btn_lvl_m1.name = "BtnLvlM1"; _btn_lvl_m1.text = "Lv -1"; _row3.add_child(_btn_lvl_m1)
-	_btn_lvl_p1 = Button.new(); _btn_lvl_p1.name = "BtnLvlP1"; _btn_lvl_p1.text = "Lv +1"; _row3.add_child(_btn_lvl_p1)
+	var xp_lbl := Label.new(); xp_lbl.text = "LXP"; _hero_row.add_child(xp_lbl)
+	_hero_xp_spin = SpinBox.new()
+	_hero_xp_spin.min_value = 1; _hero_xp_spin.max_value = 99999; _hero_xp_spin.step = 1; _hero_xp_spin.value = 100
+	_hero_xp_spin.custom_minimum_size = Vector2(80, 0)
+	_hero_row.add_child(_hero_xp_spin)
 
-	_spin_lvl = SpinBox.new(); _spin_lvl.name = "SpinLvl"; _spin_lvl.min_value = 1; _spin_lvl.max_value = 99; _spin_lvl.step = 1; _row3.add_child(_spin_lvl)
+	_btn_hero_add_xp = Button.new(); _btn_hero_add_xp.text = "Add Hero XP"
+	_hero_row.add_child(_btn_hero_add_xp)
 
-	_btn_set_level = Button.new(); _btn_set_level.name = "BtnSetLvl"; _btn_set_level.text = "Set Lv"; _row3.add_child(_btn_set_level)
+	var sxp_lbl := Label.new(); sxp_lbl.text = "SXP"; _hero_row.add_child(sxp_lbl)
+	_hero_stat_pick = OptionButton.new()
+	_hero_stat_pick.custom_minimum_size = Vector2(120, 0)
+	_hero_row.add_child(_hero_stat_pick)
 
-	var sep1 := HSeparator.new(); sep1.custom_minimum_size = Vector2(6,0); _row3.add_child(sep1)
+	_hero_sxp_spin = SpinBox.new()
+	_hero_sxp_spin.min_value = 1; _hero_sxp_spin.max_value = 9999; _hero_sxp_spin.step = 1; _hero_sxp_spin.value = 10
+	_hero_sxp_spin.custom_minimum_size = Vector2(70, 0)
+	_hero_row.add_child(_hero_sxp_spin)
 
-	_btn_bpp_p1 = Button.new(); _btn_bpp_p1.name = "BtnBPPp1"; _btn_bpp_p1.text = "BPP +1"; _row3.add_child(_btn_bpp_p1)
-	_btn_bpp_p5 = Button.new(); _btn_bpp_p5.name = "BtnBPPp5"; _btn_bpp_p5.text = "BPP +5"; _row3.add_child(_btn_bpp_p5)
+	_btn_hero_add_sxp = Button.new(); _btn_hero_add_sxp.text = "Add Hero SXP"
+	_hero_row.add_child(_btn_hero_add_sxp)
 
-	var sep2 := HSeparator.new(); sep2.custom_minimum_size = Vector2(6,0); _row3.add_child(sep2)
+	if not _btn_hero_add_xp.pressed.is_connected(_on_hero_add_xp):
+		_btn_hero_add_xp.pressed.connect(_on_hero_add_xp)
+	if not _btn_hero_add_sxp.pressed.is_connected(_on_hero_add_sxp):
+		_btn_hero_add_sxp.pressed.connect(_on_hero_add_sxp)
 
-	_stat_pick = OptionButton.new(); _stat_pick.name = "StatPick"; _stat_pick.custom_minimum_size = Vector2(120,0); _row3.add_child(_stat_pick)
-	_style_option_button(_stat_pick, 11, 300)
+func _populate_hero_stat_picker() -> void:
+	if _hero_stat_pick == null: return
+	_hero_stat_pick.clear()
+	for s in ["BRW","MND","TPO","VTL","FCS"]:
+		_hero_stat_pick.add_item(s)
+		_hero_stat_pick.set_item_metadata(_hero_stat_pick.get_item_count() - 1, s)
+	_hero_stat_pick.select(0)
 
-	_sxp_amt = SpinBox.new(); _sxp_amt.name = "SpinSXP"; _sxp_amt.min_value = 1; _sxp_amt.max_value = 999; _sxp_amt.step = 1; _sxp_amt.value = 10; _sxp_amt.custom_minimum_size = Vector2(70,0); _row3.add_child(_sxp_amt)
-	_btn_add_sxp = Button.new(); _btn_add_sxp.name = "BtnAddSXP"; _btn_add_sxp.text = "Add SXP"; _row3.add_child(_btn_add_sxp)
-
-	if _spin_lvl: _spin_lvl.value = _get_hero_level()
-
-func _ensure_row4() -> void:
-	_row4 = _ctl("PartyRow") as HBoxContainer
-	if _row4 != null:
-		_roster_pick   = _ctl("RosterPick") as OptionButton
-		_btn_add_party = _ctl("BtnAddParty") as Button
-		if _roster_pick: _style_option_button(_roster_pick, 11, 300)
+func _ensure_party_rows() -> void:
+	if _xp_amt != null and _btn_add_xp != null and _stat_pick != null and _sxp_amt != null and _btn_add_sxp != null:
 		return
 
-	_row4 = HBoxContainer.new()
-	_row4.name = "PartyRow"
-	_row4.add_theme_constant_override("separation", 8)
-	_rows_vbox.add_child(_row4)
+	var parent := _attach_point()
 
-	var title := Label.new(); title.text = "Party Cheats:"; _row4.add_child(title)
+	_party_lxp_row = parent.get_node_or_null("PartyLxpRow") as HBoxContainer
+	if _party_lxp_row == null:
+		_party_lxp_row = HBoxContainer.new()
+		_party_lxp_row.name = "PartyLxpRow"
+		_party_lxp_row.add_theme_constant_override("separation", 8)
+		parent.add_child(_party_lxp_row)
 
-	_roster_pick = OptionButton.new()
-	_roster_pick.name = "RosterPick"
-	_roster_pick.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_row4.add_child(_roster_pick)
-	_style_option_button(_roster_pick, 11, 300)
+		var lbl := Label.new(); lbl.text = "Party LXP:"; _party_lxp_row.add_child(lbl)
+		_xp_amt = SpinBox.new(); _xp_amt.min_value = 1; _xp_amt.max_value = 99999; _xp_amt.value = 100; _xp_amt.step = 1
+		_xp_amt.custom_minimum_size = Vector2(80, 0); _party_lxp_row.add_child(_xp_amt)
+		_btn_add_xp = Button.new(); _btn_add_xp.text = "Add XP to Member"
+		_party_lxp_row.add_child(_btn_add_xp)
+		if not _btn_add_xp.pressed.is_connected(_on_add_xp): _btn_add_xp.pressed.connect(_on_add_xp)
 
-	_btn_add_party = Button.new()
-	_btn_add_party.name = "BtnAddParty"
-	_btn_add_party.text = "Add to Party"
-	_row4.add_child(_btn_add_party)
+	_party_sxp_row = parent.get_node_or_null("PartySxpRow") as HBoxContainer
+	if _party_sxp_row == null:
+		_party_sxp_row = HBoxContainer.new()
+		_party_sxp_row.name = "PartySxpRow"
+		_party_sxp_row.add_theme_constant_override("separation", 8)
+		parent.add_child(_party_sxp_row)
 
-# ---------------- Items (Row1) ----------------
+		var sl := Label.new(); sl.text = "Party SXP:"; _party_sxp_row.add_child(sl)
+		_stat_pick = OptionButton.new(); _stat_pick.custom_minimum_size = Vector2(120, 0); _party_sxp_row.add_child(_stat_pick)
+		_sxp_amt = SpinBox.new(); _sxp_amt.min_value = 1; _sxp_amt.max_value = 9999; _sxp_amt.value = 10; _sxp_amt.step = 1
+		_sxp_amt.custom_minimum_size = Vector2(70, 0); _party_sxp_row.add_child(_sxp_amt)
+		_btn_add_sxp = Button.new(); _btn_add_sxp.text = "Add SXP to Member"
+		_party_sxp_row.add_child(_btn_add_sxp)
+		if not _btn_add_sxp.pressed.is_connected(_on_add_sxp): _btn_add_sxp.pressed.connect(_on_add_sxp)
 
+# --- Items (Row1) --------------------------------------------------------------
 func _refresh_defs() -> void:
 	_defs.clear()
-	if _picker: _picker.clear()
+	if _picker:
+		_picker.clear()
 
 	if _inv and _inv.has_method("get_item_defs"):
 		var v: Variant = _inv.call("get_item_defs")
@@ -271,20 +377,20 @@ func _refresh_defs() -> void:
 		if typeof(loaded) == TYPE_DICTIONARY:
 			_defs = loaded as Dictionary
 
-	if not _picker: return
+	if _picker == null:
+		return
 
-	var ids_any: Array = _defs.keys()
-	ids_any.sort_custom(Callable(self, "_cmp_ids_by_name"))
-
-	var idx: int = 0
-	for id_any in ids_any:
+	var ids: Array = _defs.keys()
+	ids.sort_custom(Callable(self, "_cmp_ids_by_name"))
+	for id_any in ids:
 		var item_id: String = String(id_any)
 		var rec: Dictionary = _defs.get(item_id, {}) as Dictionary
 		var disp: String = String(rec.get("name", item_id))
-		var cat: String = String(rec.get("category","Other"))
+		var cat: String  = String(rec.get("category", "Other"))
 		_picker.add_item("%s — %s [%s]" % [item_id, disp, cat])
-		_picker.set_item_metadata(idx, item_id)
-		idx += 1
+		_picker.set_item_metadata(_picker.get_item_count() - 1, item_id)
+
+	print("[ItemsCheatBar] defs refreshed: %d items" % _defs.size())
 
 func _cmp_ids_by_name(a: Variant, b: Variant) -> bool:
 	var da: Dictionary = _defs.get(a, {}) as Dictionary
@@ -293,185 +399,224 @@ func _cmp_ids_by_name(a: Variant, b: Variant) -> bool:
 	var nb: String = String(db.get("name", String(b)))
 	return na < nb
 
-func _selected_id() -> String:
+func _selected_item_id() -> String:
 	if _picker == null: return ""
 	var i: int = _picker.get_selected()
 	if i < 0: return ""
 	return String(_picker.get_item_metadata(i))
 
 func _on_give() -> void:
-	var id: String = _selected_id()
-	var n: int = (int(_qty.value) if _qty != null else 0)
+	var id: String = _selected_item_id()
+	var n: int = int(_qty.value) if _qty != null else 0
 	if id == "" or n <= 0: return
 	if _inv and _inv.has_method("add_item"):
 		_inv.call("add_item", id, n)
+		print("[ItemsCheatBar] GIVE %s x%d" % [id, n])
+	if _is_sigil_item(id):
+		_draft_n_from_inventory(id, n)
+	_refresh_sig_dropdown()
 
 func _on_remove() -> void:
-	var id: String = _selected_id()
-	var n: int = (int(_qty.value) if _qty != null else 0)
+	var id: String = _selected_item_id()
+	var n: int = int(_qty.value) if _qty != null else 0
 	if id == "" or n <= 0: return
 	if _inv and _inv.has_method("remove_item"):
 		_inv.call("remove_item", id, n)
+		print("[ItemsCheatBar] REMOVE %s x%d" % [id, n])
+	_refresh_sig_dropdown()
 
 func _on_give10() -> void:
-	var id: String = _selected_id()
+	var id: String = _selected_item_id()
 	if id == "": return
 	if _inv and _inv.has_method("add_item"):
 		_inv.call("add_item", id, 10)
+		print("[ItemsCheatBar] GIVE10 %s x10" % [id])
+	if _is_sigil_item(id):
+		_draft_n_from_inventory(id, 10)
+	_refresh_sig_dropdown()
 
 func _on_reload() -> void:
 	if _csv and _csv.has_method("reload_csv"):
 		_csv.call("reload_csv", ITEMS_CSV, KEY_ID)
 	if _inv and _inv.has_method("load_definitions"):
 		_inv.call("load_definitions")
+	print("[ItemsCheatBar] requested reload of item defs")
+	_refresh_defs()
+	_refresh_sig_dropdown()
+
+# callbacks from InventorySystem signals
+func _on_inv_defs_loaded() -> void:
+	print("[ItemsCheatBar] signal: items_loaded -> refreshing item picker")
 	_refresh_defs()
 
-# ---------------- Sigil cheats (Row2) ----------------
+func _on_inv_counts_changed() -> void:
+	print("[ItemsCheatBar] signal: inventory_changed")
 
-func _bind_row2_signals() -> void:
-	if _btn_lv_up and not _btn_lv_up.pressed.is_connected(_on_lv_up):        _btn_lv_up.pressed.connect(_on_lv_up)
-	if _btn_lv_down and not _btn_lv_down.pressed.is_connected(_on_lv_down):  _btn_lv_down.pressed.connect(_on_lv_down)
-	if _btn_xp_25 and not _btn_xp_25.pressed.is_connected(_on_xp_25):        _btn_xp_25.pressed.connect(_on_xp_25)
-	if _btn_xp_100 and not _btn_xp_100.pressed.is_connected(_on_xp_100):     _btn_xp_100.pressed.connect(_on_xp_100)
-	if _chk_equipped and not _chk_equipped.toggled.is_connected(_on_equipped_toggle):
-		_chk_equipped.toggled.connect(_on_equipped_toggle)
+# --- Sigils (Row2) -------------------------------------------------------------
+func _log_s(msg: String) -> void:
+	if DEBUG_ICB_SIG:
+		print("[ItemsCheatBar] ", msg)
 
-func _collect_party_names() -> Array[String]:
+func _method_arity(obj: Object, method_name: String) -> int:
+	if obj == null: return -1
+	var lst: Array = obj.get_method_list()
+	for m in lst:
+		if typeof(m) == TYPE_DICTIONARY and String(m.get("name","")) == method_name:
+			var args: Array = m.get("args", [])
+			return (args.size() if typeof(args) == TYPE_ARRAY else 0)
+	return -1
+
+func _call_list_all_instances(sig: Object, equipped_only: bool) -> Array[String]:
 	var out: Array[String] = []
-	if _gs and _gs.has_method("get_party_names"):
-		var pn_v: Variant = _gs.call("get_party_names")
-		if typeof(pn_v) == TYPE_PACKED_STRING_ARRAY:
-			for s in (pn_v as PackedStringArray): out.append(String(s))
-		elif typeof(pn_v) == TYPE_ARRAY:
-			for s2 in (pn_v as Array): out.append(String(s2))
+	if sig == null:
+		return out
+
+	for meth in ["list_all_instances","list_instances","get_all_instances","get_instances","enumerate_instances"]:
+		if not sig.has_method(meth):
+			continue
+
+		var argc: int = _method_arity(sig, meth)
+		var raw: Variant = null
+
+		if argc == 1:
+			raw = sig.call(meth, equipped_only)
+		elif argc == 0:
+			raw = sig.call(meth)
+		else:
+			raw = sig.call(meth, equipped_only)
+			if raw == null:
+				raw = sig.call(meth)
+
+		match typeof(raw):
+			TYPE_PACKED_STRING_ARRAY:
+				for s in (raw as PackedStringArray): out.append(String(s))
+			TYPE_ARRAY:
+				for v in (raw as Array):
+					match typeof(v):
+						TYPE_STRING: out.append(String(v))
+						TYPE_DICTIONARY:
+							var d: Dictionary = v as Dictionary
+							for k in ["id","instance_id","inst","sid","guid"]:
+								if d.has(k) and typeof(d[k]) == TYPE_STRING:
+									out.append(String(d[k])); break
+						_: out.append(String(v))
+			TYPE_DICTIONARY:
+				for k in (raw as Dictionary).keys(): out.append(String(k))
+			_:
+				pass
+
+		if out.size() > 0:
+			return out
+
+	return out
+
+func _collect_party_tokens() -> Array[String]:
+	var out: Array[String] = []
+	if _gs and _gs.has_method("get_active_party_ids"):
+		var v: Variant = _gs.call("get_active_party_ids")
+		if typeof(v) == TYPE_ARRAY:
+			for t in (v as Array): out.append(String(t))
+	if out.is_empty() and _party:
+		for m in ["get_active","list_active_members","get_party","list_party","get_active_party"]:
+			if _party.has_method(m):
+				var pv: Variant = _party.call(m)
+				if typeof(pv) == TYPE_ARRAY:
+					for s in (pv as Array): out.append(String(s)); break
+				elif typeof(pv) == TYPE_PACKED_STRING_ARRAY:
+					for s2 in (pv as PackedStringArray): out.append(String(s2)); break
+	if out.is_empty() and _gs and _gs.has_method("get"):
+		var gpv: Variant = _gs.get("party")
+		if typeof(gpv) == TYPE_ARRAY:
+			for s3 in (gpv as Array): out.append(String(s3))
+	if out.is_empty():
+		out.append("hero")
 	return out
 
 func _append_ids_from_loadout(ids: Array[String], member: String) -> void:
 	if _sig == null or not _sig.has_method("get_loadout"):
 		return
-	var l_v: Variant = _sig.call("get_loadout", member)
-	if typeof(l_v) == TYPE_PACKED_STRING_ARRAY:
-		for s in (l_v as PackedStringArray):
-			var sid := String(s)
+	var l: Variant = _sig.call("get_loadout", member)
+	if typeof(l) == TYPE_ARRAY:
+		for s in (l as Array):
+			var sid: String = String(s)
 			if sid != "": ids.append(sid)
-	elif typeof(l_v) == TYPE_ARRAY:
-		for s2 in (l_v as Array):
-			var sid2 := String(s2)
+	elif typeof(l) == TYPE_PACKED_STRING_ARRAY:
+		for s2 in (l as PackedStringArray):
+			var sid2: String = String(s2)
 			if sid2 != "": ids.append(sid2)
 
 func _append_ids_free(ids: Array[String]) -> void:
 	if _sig and _sig.has_method("list_free_instances"):
-		var v_free: Variant = _sig.call("list_free_instances")
-		if typeof(v_free) == TYPE_PACKED_STRING_ARRAY:
-			for s in (v_free as PackedStringArray):
-				var sid := String(s); if sid != "": ids.append(sid)
-		elif typeof(v_free) == TYPE_ARRAY:
-			for s2 in (v_free as Array):
-				var sid2 := String(s2); if sid2 != "": ids.append(sid2)
+		var v: Variant = _sig.call("list_free_instances")
+		if typeof(v) == TYPE_ARRAY:
+			for s in (v as Array):
+				var sid: String = String(s)
+				if sid != "": ids.append(sid)
+		elif typeof(v) == TYPE_PACKED_STRING_ARRAY:
+			for s2 in (v as PackedStringArray):
+				var sid2: String = String(s2)
+				if sid2 != "": ids.append(sid2)
 
 func _refresh_sig_dropdown() -> void:
 	if _sig_inst_pick == null:
+		_log_s("InstPicker not found. Ensure the node is named 'InstPicker'.")
 		return
 	_sig_inst_pick.clear()
 
 	if _sig == null:
 		_sig_inst_pick.add_item("(No SigilSystem)")
 		_sig_inst_pick.disabled = true
-		if _btn_lv_up:   _btn_lv_up.disabled   = true
-		if _btn_lv_down: _btn_lv_down.disabled = true
-		if _btn_xp_25:   _btn_xp_25.disabled   = true
-		if _btn_xp_100:  _btn_xp_100.disabled  = true
+		_log_s("aSigilSystem not found at %s" % SIG_PATH)
 		return
 
-	var ids: Array[String] = []
 	var equipped_only: bool = (_chk_equipped != null and _chk_equipped.button_pressed)
 
-	if equipped_only:
-		for member in _collect_party_names():
-			_append_ids_from_loadout(ids, member)
-	else:
-		_append_ids_free(ids)
-		for member2 in _collect_party_names():
-			_append_ids_from_loadout(ids, member2)
+	var ids: Array[String] = _call_list_all_instances(_sig, equipped_only)
 
-	# dedup + sort by display name
-	var uniq: Dictionary = {}
-	var id_list: Array[String] = []
-	for id_any in ids:
-		var sid: String = String(id_any)
-		if not uniq.has(sid):
-			uniq[sid] = true
-			id_list.append(sid)
+	if ids.is_empty():
+		if equipped_only:
+			for member in _collect_party_tokens():
+				_append_ids_from_loadout(ids, member)
+		else:
+			_append_ids_free(ids)
+			for member2 in _collect_party_tokens():
+				_append_ids_from_loadout(ids, member2)
 
-	id_list.sort_custom(Callable(self, "_cmp_sig_by_name"))
+	if ids.is_empty():
+		if _auto_seed_one_instance_from_inventory():
+			ids = _call_list_all_instances(_sig, false)
+			if ids.is_empty():
+				_append_ids_free(ids)
 
-	var idx: int = 0
-	for sid in id_list:
-		var disp: String = sid
+	var seen: Dictionary = {}
+	var list: Array[String] = []
+	for sid in ids:
+		if sid == "": continue
+		if not seen.has(sid):
+			seen[sid] = true
+			list.append(sid)
+	list.sort()
+
+	if list.size() == 0:
+		_sig_inst_pick.add_item("— no sigils —")
+		_sig_inst_pick.disabled = true
+		return
+
+	_sig_inst_pick.disabled = false
+	for sid2 in list:
+		var disp: String = sid2
 		if _sig.has_method("get_display_name_for"):
-			var nm_v: Variant = _sig.call("get_display_name_for", sid)
-			if typeof(nm_v) == TYPE_STRING: disp = String(nm_v)
-		_sig_inst_pick.add_item(disp, idx)
-		_sig_inst_pick.set_item_metadata(idx, sid)
-		idx += 1
+			var nm_v: Variant = _sig.call("get_display_name_for", sid2)
+			if typeof(nm_v) == TYPE_STRING:
+				disp = String(nm_v)
+		_sig_inst_pick.add_item(disp)
+		_sig_inst_pick.set_item_metadata(_sig_inst_pick.get_item_count() - 1, sid2)
 
-	var has_any: bool = idx > 0
-	_sig_inst_pick.disabled = not has_any
-	if _btn_lv_up:   _btn_lv_up.disabled   = not has_any
-	if _btn_lv_down: _btn_lv_down.disabled = not has_any
-	if _btn_xp_25:   _btn_xp_25.disabled   = not has_any
-	if _btn_xp_100:  _btn_xp_100.disabled  = not has_any
-
-func _cmp_sig_by_name(a: Variant, b: Variant) -> bool:
-	var sa: String = String(a)
-	var sb: String = String(b)
-	var na: String = sa
-	var nb: String = sb
-	if _sig and _sig.has_method("get_display_name_for"):
-		var va: Variant = _sig.call("get_display_name_for", sa)
-		var vb: Variant = _sig.call("get_display_name_for", sb)
-		if typeof(va) == TYPE_STRING: na = String(va)
-		if typeof(vb) == TYPE_STRING: nb = String(vb)
-	return na < nb
-
-func _selected_inst_id() -> String:
+func _selected_sig_inst() -> String:
 	if _sig_inst_pick == null: return ""
 	var i: int = _sig_inst_pick.get_selected()
 	if i < 0: return ""
 	return String(_sig_inst_pick.get_item_metadata(i))
-
-func _on_lv_up() -> void:
-	var id: String = _selected_inst_id()
-	if id == "" or _sig == null: return
-	var lvl: int = 1
-	if _sig.has_method("get_instance_level"):
-		lvl = int(_sig.call("get_instance_level", id))
-	var new_lvl: int = clamp(lvl + 1, 1, 4)
-	if _sig.has_method("cheat_set_instance_level"):
-		_sig.call("cheat_set_instance_level", id, new_lvl)
-	_refresh_sig_dropdown()
-
-func _on_lv_down() -> void:
-	var id: String = _selected_inst_id()
-	if id == "" or _sig == null: return
-	var lvl: int = 1
-	if _sig.has_method("get_instance_level"):
-		lvl = int(_sig.call("get_instance_level", id))
-	var new_lvl: int = clamp(lvl - 1, 1, 4)
-	if _sig.has_method("cheat_set_instance_level"):
-		_sig.call("cheat_set_instance_level", id, new_lvl)
-	_refresh_sig_dropdown()
-
-func _on_xp_25() -> void: _grant_xp(25)
-func _on_xp_100() -> void: _grant_xp(100)
-
-func _grant_xp(amount: int) -> void:
-	var id: String = _selected_inst_id()
-	if id == "" or _sig == null: return
-	var require_equipped: bool = (_chk_equipped != null and _chk_equipped.button_pressed)
-	if _sig.has_method("cheat_add_xp_to_instance"):
-		_sig.call("cheat_add_xp_to_instance", id, amount, require_equipped)
-	_refresh_sig_dropdown()
 
 func _on_equipped_toggle(_pressed: bool) -> void:
 	_refresh_sig_dropdown()
@@ -479,28 +624,101 @@ func _on_equipped_toggle(_pressed: bool) -> void:
 func _on_loadout_changed(_member: String) -> void:
 	_refresh_sig_dropdown()
 
-# ---------------- Level / Perk / SXP (Row3) ----------------
+func _on_sig_xp_changed(inst_id: String, _level: int, _pool: int, _to_next: int) -> void:
+	# Only react if UI is pointing at this instance
+	if inst_id != "" and inst_id == _selected_sig_inst():
+		print("[ItemsCheatBar] sigil_xp_changed -> %s" % inst_id)
+		_refresh_sig_dropdown()
 
-func _bind_row3_signals() -> void:
-	if _btn_lvl_m1 and not _btn_lvl_m1.pressed.is_connected(_on_lvl_m1):    _btn_lvl_m1.pressed.connect(_on_lvl_m1)
-	if _btn_lvl_p1 and not _btn_lvl_p1.pressed.is_connected(_on_lvl_p1):    _btn_lvl_p1.pressed.connect(_on_lvl_p1)
-	if _btn_set_level and not _btn_set_level.pressed.is_connected(_on_set_level): _btn_set_level.pressed.connect(_on_set_level)
-	if _btn_bpp_p1 and not _btn_bpp_p1.pressed.is_connected(_on_bpp_p1):    _btn_bpp_p1.pressed.connect(_on_bpp_p1)
-	if _btn_bpp_p5 and not _btn_bpp_p5.pressed.is_connected(_on_bpp_p5):    _btn_bpp_p5.pressed.connect(_on_bpp_p5)
-	if _btn_add_sxp and not _btn_add_sxp.pressed.is_connected(_on_add_sxp): _btn_add_sxp.pressed.connect(_on_add_sxp)
+func _grant_xp_to_sigil(amount: int) -> void:
+	if _sig == null: return
+	var id: String = _selected_sig_inst()
+	if id == "": return
+	var require_equipped: bool = (_chk_equipped != null and _chk_equipped.button_pressed)
+	if _sig.has_method("cheat_add_xp_to_instance"):
+		_sig.call("cheat_add_xp_to_instance", id, amount, require_equipped)
+	_refresh_sig_dropdown()
 
+func _on_sig_lv_up() -> void:
+	if _sig == null: return
+	var id: String = _selected_sig_inst()
+	if id == "": return
+	var lvl: int = 1
+	if _sig.has_method("get_instance_level"):
+		var got: Variant = _sig.call("get_instance_level", id)
+		if typeof(got) == TYPE_INT or typeof(got) == TYPE_FLOAT:
+			lvl = int(got)
+	var new_lvl: int = clampi(lvl + 1, 1, 99)
+	if _sig.has_method("cheat_set_instance_level"):
+		_sig.call("cheat_set_instance_level", id, new_lvl)
+	_refresh_sig_dropdown()
+
+func _on_sig_lv_dn() -> void:
+	if _sig == null: return
+	var id: String = _selected_sig_inst()
+	if id == "": return
+	var lvl: int = 1
+	if _sig.has_method("get_instance_level"):
+		var got: Variant = _sig.call("get_instance_level", id)
+		if typeof(got) == TYPE_INT or typeof(got) == TYPE_FLOAT:
+			lvl = int(got)
+	var new_lvl: int = clampi(lvl - 1, 1, 99)
+	if _sig.has_method("cheat_set_instance_level"):
+		_sig.call("cheat_set_instance_level", id, new_lvl)
+	_refresh_sig_dropdown()
+
+func _on_sig_xp_25() -> void: _grant_xp_to_sigil(25)
+func _on_sig_xp_100() -> void: _grant_xp_to_sigil(100)
+
+# --- Character Level / Perk / SXP (Row3) --------------------------------------
 func _populate_stat_picker() -> void:
 	if _stat_pick == null: return
 	_stat_pick.clear()
-	var stats: Array = ["BRW","VTL","TPO","FCS","MND"]
-	for i in range(stats.size()):
-		_stat_pick.add_item(stats[i], i)
-		_stat_pick.set_item_metadata(i, stats[i])
-	if _spin_lvl: _spin_lvl.value = _get_hero_level()
+	var stats: Array[String] = ["BRW","MND","TPO","VTL","FCS"]
+	for s in stats:
+		_stat_pick.add_item(s)
+		_stat_pick.set_item_metadata(_stat_pick.get_item_count() - 1, s)
+	_stat_pick.select(0)
 
-func _on_lvl_m1() -> void: _set_hero_level_delta(-1)
-func _on_lvl_p1() -> void: _set_hero_level_delta(+1)
-func _on_set_level() -> void: _set_hero_level_exact(int(_spin_lvl.value))
+func _current_member_id() -> String:
+	if _roster_pick:
+		var idx: int = _roster_pick.get_selected()
+		if idx >= 0:
+			return String(_roster_pick.get_item_metadata(idx))
+	if _member_id_le and _member_id_le.text.strip_edges() != "":
+		return _member_id_le.text.strip_edges()
+	return "hero"
+
+func _get_member_level() -> int:
+	var member_id: String = _current_member_id()
+	return _get_member_level_of(member_id)
+
+func _get_member_level_of(member_id: String) -> int:
+	if _stats and _stats.has_method("get_member_level"):
+		var v: Variant = _stats.call("get_member_level", member_id)
+		if typeof(v) == TYPE_INT or typeof(v) == TYPE_FLOAT:
+			return int(v)
+	if member_id == "hero" and _hero:
+		var lv_v: Variant = _hero.get("level")
+		if typeof(lv_v) == TYPE_INT or typeof(lv_v) == TYPE_FLOAT:
+			return int(lv_v)
+	if _stats and _stats.has("_party_progress"):
+		var all_v: Variant = _stats.get("_party_progress")
+		if typeof(all_v) == TYPE_DICTIONARY:
+			var all: Dictionary = all_v as Dictionary
+			if all.has(member_id):
+				var prog: Dictionary = all[member_id]
+				if prog.has("char_level"):
+					return int(prog["char_level"])
+	return 1
+
+func _on_lvl_m1() -> void: _set_member_level_delta(-1)
+func _on_lvl_p1() -> void: _set_member_level_delta(1)
+
+func _on_set_level() -> void:
+	if _spin_lvl == null: return
+	_set_member_level_exact(int(_spin_lvl.value))
+
 func _on_bpp_p1() -> void: _add_perk_points(1)
 func _on_bpp_p5() -> void: _add_perk_points(5)
 
@@ -510,218 +728,351 @@ func _on_add_sxp() -> void:
 	if i < 0: return
 	var stat_id: String = String(_stat_pick.get_item_metadata(i))
 	var amt: int = int(_sxp_amt.value)
-	_add_sxp(stat_id, amt)
+	_add_sxp_to_member(stat_id, amt)
 
-# --- hero ops
-func _get_hero_level() -> int:
-	if _hero and _hero.has_method("get"):
-		return int(_hero.get("level"))
-	return 1
+func _on_add_xp() -> void:
+	if _xp_amt == null: return
+	_grant_xp_to_member(int(_xp_amt.value))
 
-func _set_hero_level_delta(delta: int) -> void:
-	var cur: int = _get_hero_level()
-	_set_hero_level_exact(cur + delta)
+# --- Hero handlers -------------------------------------------------------------
+func _on_hero_add_xp() -> void:
+	if _hero_xp_spin == null: return
+	_grant_xp_to_member_id("hero", int(_hero_xp_spin.value))
 
-func _set_hero_level_exact(new_level: int) -> void:
-	if _hero == null:
-		push_warning("Cheat: aHeroSystem not found.")
+func _on_hero_add_sxp() -> void:
+	if _hero_stat_pick == null or _hero_sxp_spin == null: return
+	var idx: int = _hero_stat_pick.get_selected()
+	if idx < 0: return
+	var stat_id: String = String(_hero_stat_pick.get_item_metadata(idx))
+	_add_sxp_to_member_id("hero", stat_id, int(_hero_sxp_spin.value))
+
+# --- Level helpers ---
+func _set_member_level_delta(delta: int) -> void:
+	var cur: int = _get_member_level()
+	_set_member_level_exact(cur + delta)
+
+func _set_member_level_exact(new_level: int) -> void:
+	var member_id: String = _current_member_id()
+	new_level = clampi(new_level, 1, 99)
+	var old_level: int = _get_member_level()
+	if new_level == old_level:
 		return
-	var old: int = _get_hero_level()
-	new_level = clamp(new_level, 1, 99)
-	if new_level == old: return
 
-	_hero.set("level", new_level)
+	if member_id != "hero":
+		var prog: Dictionary = _ensure_member_progress(member_id)
+		if prog.size() > 0:
+			prog["char_level"] = new_level
+			if _stats and _stats.has("_party_progress"):
+				var all_v: Variant = _stats.get("_party_progress")
+				if typeof(all_v) == TYPE_DICTIONARY:
+					var d: Dictionary = all_v
+					d[member_id] = prog.duplicate(true)
+					_stats.set("_party_progress", d)
+	else:
+		if _hero:
+			_hero.set("level", new_level)
+		_recalc_hero_hp_mp(new_level)
 
-	var gained_bpp: int = int(floor(new_level / 3.0)) - int(floor(old / 3.0))
-	if gained_bpp > 0: _add_perk_points(gained_bpp)
+	if member_id == "hero":
+		var gained_bpp: int = int(floor(new_level / 3.0)) - int(floor(old_level / 3.0))
+		if gained_bpp > 0: _add_perk_points(gained_bpp)
 
-	_recalc_hp_mp()
-	if _spin_lvl: _spin_lvl.value = new_level
+	if _spin_lvl and member_id == _current_member_id():
+		_spin_lvl.value = new_level
+
+	print("[ItemsCheatBar] Set Level -> %s | Lv %d → %d" % [member_id, old_level, new_level])
 	_emit_refresh()
 
+# --- Character XP --------------------------------------------------------------
+func _xp_to_next_level(level: int) -> int:
+	return 120 + 30 * level + 6 * level * level
+
+func _grant_xp_to_member(amount: int) -> void:
+	_grant_xp_to_member_id(_current_member_id(), amount)
+
+func _grant_xp_to_member_id(member_id: String, amount: int) -> void:
+	if amount <= 0 or _stats == null: return
+	var before: int = _get_member_level_of(member_id)
+	if _stats.has_method("add_xp"):
+		_stats.call("add_xp", member_id, amount)
+	var after: int = _get_member_level_of(member_id)
+	print("[ItemsCheatBar] +%d LXP -> %s | Lv %d → %d" % [amount, member_id, before, after])
+	_emit_refresh()
+
+# --- SXP (stat XP) -------------------------------------------------------------
+func _add_sxp_to_member(stat_id: String, amount: int) -> void:
+	_add_sxp_to_member_id(_current_member_id(), stat_id, amount)
+
+func _add_sxp_to_member_id(member_id: String, stat_id: String, amount: int) -> void:
+	if amount <= 0: return
+	stat_id = stat_id.strip_edges().to_upper()
+
+	var applied: int = amount
+	if _stats and (_stats.has_method("add_sxp_to_member") or _stats.has_method("add_member_sxp")):
+		if _stats.has_method("add_sxp_to_member"):
+			var ret: Variant = _stats.call("add_sxp_to_member", member_id, stat_id, amount)
+			if typeof(ret) == TYPE_INT or typeof(ret) == TYPE_FLOAT: applied = int(ret)
+		else:
+			var ret2: Variant = _stats.call("add_member_sxp", member_id, stat_id, amount)
+			if typeof(ret2) == TYPE_INT or typeof(ret2) == TYPE_FLOAT: applied = int(ret2)
+	else:
+		var prog: Dictionary = _ensure_member_progress(member_id)
+		if prog.size() == 0: return
+		var sxp: Dictionary = prog.get("sxp", {}) as Dictionary
+		if sxp.is_empty(): sxp = {"BRW":0,"MND":0,"TPO":0,"VTL":0,"FCS":0}
+		sxp[stat_id] = int(sxp.get(stat_id, 0)) + amount
+		prog["sxp"] = sxp
+		if _stats and _stats.has("_party_progress"):
+			var all_v: Variant = _stats.get("_party_progress")
+			if typeof(all_v) == TYPE_DICTIONARY:
+				var d: Dictionary = all_v
+				d[member_id] = prog.duplicate(true)
+				_stats.set("_party_progress", d)
+
+	var new_stat_lv: int = 1
+	if _stats and _stats.has_method("get_member_stat_level"):
+		var lv_v: Variant = _stats.call("get_member_stat_level", member_id, stat_id)
+		if typeof(lv_v) == TYPE_INT or typeof(lv_v) == TYPE_FLOAT: new_stat_lv = int(lv_v)
+
+	print("[ItemsCheatBar] +%d SXP (%s) -> %s | Stat Lv now %d (applied %d)" % [amount, stat_id, member_id, new_stat_lv, applied])
+	_emit_refresh()
+
+# --- Perk points (hero) --------------------------------------------------------
 func _add_perk_points(points: int) -> void:
 	if points == 0: return
 	if _gs and _gs.has_method("get") and _gs.has_method("set"):
-		var cur: int = int(_gs.get("perk_points"))
+		var cur_v: Variant = _gs.get("perk_points")
+		var cur: int = int(cur_v) if (typeof(cur_v) == TYPE_INT or typeof(cur_v) == TYPE_FLOAT) else 0
 		_gs.set("perk_points", max(0, cur + points))
 	if _perk:
-		if _perk.has_method("add_points"): _perk.call("add_points", points)
-		elif _perk.has_method("grant_points"): _perk.call("grant_points", points)
+		if _perk.has_method("add_points"):
+			_perk.call("add_points", points)
+		elif _perk.has_method("grant_points"):
+			_perk.call("grant_points", points)
 	_emit_refresh()
 
-func _add_sxp(stat_id: String, amount: int) -> void:
-	if amount <= 0: return
-	if _stats == null:
-		push_warning("Cheat: aStatsSystem not found.")
-		return
+# --- Party (Row4) --------------------------------------------------------------
+func _on_roster_pick_selected(_index: int) -> void:
+	if _spin_lvl: _spin_lvl.value = _get_member_level()
+	_refresh_sig_dropdown()
 
-	if _stats.has_method("add_sxp"):
-		_stats.call("add_sxp", stat_id, amount)
-	else:
-		if _stats.has_method("add_stat_xp"):
-			_stats.call("add_stat_xp", stat_id, amount)
-		elif _stats.has_method("set_stat_level"):
-			if amount >= 50:
-				var cur_lv: int = _read_stat_level(stat_id)
-				_stats.call("set_stat_level", stat_id, cur_lv + 1)
+func _selected_roster_id() -> String:
+	if _roster_pick == null: return ""
+	var i: int = _roster_pick.get_selected()
+	if i < 0: return ""
+	return String(_roster_pick.get_item_metadata(i))
 
-	_recalc_hp_mp()
-	_emit_refresh()
-
-func _read_stat_level(stat_id: String) -> int:
-	if _stats == null: return 1
-	if _stats.has_method("get_stats_dict"):
-		var v: Variant = _stats.call("get_stats_dict")
-		if typeof(v) == TYPE_DICTIONARY:
-			var d: Dictionary = v
-			if d.has(stat_id):
-				var row_v: Variant = d[stat_id]
-				if typeof(row_v) == TYPE_INT: return int(row_v)
-				if typeof(row_v) == TYPE_DICTIONARY:
-					var row: Dictionary = row_v
-					if row.has("level"): return int(row["level"])
-					if row.has("lvl"):   return int(row["lvl"])
-	return 1
-
-func _recalc_hp_mp() -> void:
-	if _hero == null: return
-	var lvl: int = _get_hero_level()
-	var vtl: int = _read_stat_level("VTL")
-	var fcs: int = _read_stat_level("FCS")
-
-	var new_hp_max: int = 150 + (vtl * lvl * 6)
-	var new_mp_max: int = 20 + int(round(float(fcs) * float(lvl) * 1.5))
-
-	_hero.set("hp_max", new_hp_max)
-	_hero.set("hp", new_hp_max)
-	_hero.set("mp_max", new_mp_max)
-	_hero.set("mp", new_mp_max)
-
-func _emit_refresh() -> void:
-	if _stats and _stats.has_signal("stats_changed"):
-		_stats.emit_signal("stats_changed")
-	if _hero and _hero.has_signal("creation_applied"):
-		_hero.emit_signal("creation_applied")
-
-# ---------------- Party Cheats (Row4) ----------------
-
-func _bind_row4_signals() -> void:
-	if _btn_add_party and not _btn_add_party.pressed.is_connected(_on_add_to_party):
-		_btn_add_party.pressed.connect(_on_add_to_party)
+func _member_id_from_ui_row4() -> String:
+	var id: String = _selected_roster_id()
+	if id != "": return id
+	if _member_id_le and _member_id_le.text.strip_edges() != "":
+		return _member_id_le.text.strip_edges()
+	return ""
 
 func _on_add_to_party() -> void:
-	var id := _selected_roster_id()
+	var id: String = _member_id_from_ui_row4()
 	if id == "": return
-
-	# Try party system first
 	if _party:
-		if _party.has_method("add_member"):
-			_party.call("add_member", id)
-		elif _party.has_method("add_to_party"):
-			_party.call("add_to_party", id)
-		elif _party.has_method("recruit"):
-			_party.call("recruit", id)
-		elif _party.has_method("try_add_member"):
-			_party.call("try_add_member", id)
-	# Fallback: GameState list
+		for m in ["add_member","add_to_party","recruit","try_add_member"]:
+			if _party.has_method(m): _party.call(m, id); break
 	elif _gs:
 		var cur: Array = []
-		if _gs.has_method("get") and typeof(_gs.get("party")) == TYPE_ARRAY:
-			cur = _gs.get("party")
+		if _gs.has_method("get"):
+			var v: Variant = _gs.get("party")
+			if typeof(v) == TYPE_ARRAY: cur = v
 		if not cur.has(id):
 			cur.append(id)
-			if _gs.has_method("set"):
-				_gs.set("party", cur)
+			if _gs.has_method("set"): _gs.set("party", cur)
+	_emit_party_changed(); _refresh_roster_picker()
 
-	# Let interested UIs react
+func _on_remove_from_party() -> void:
+	var id: String = _member_id_from_ui_row4()
+	if id == "": return
+	if _party and _party.has_method("remove_member"):
+		_party.call("remove_member", id)
+	elif _gs and _gs.has_method("get") and _gs.has_method("set"):
+		var cur: Array = []
+		var v: Variant = _gs.get("party")
+		if typeof(v) == TYPE_ARRAY: cur = v
+		if cur.has(id):
+			cur.erase(id); _gs.set("party", cur)
+	_emit_party_changed(); _refresh_roster_picker()
+
+func _on_move_to_bench() -> void:
+	var id: String = _member_id_from_ui_row4()
+	if id == "": return
+	if _gs and _gs.has_method("get") and _gs.has_method("set"):
+		var cur: Array = []
+		var v: Variant = _gs.get("party")
+		if typeof(v) == TYPE_ARRAY: cur = v
+		if cur.has(id):
+			cur.erase(id); _gs.set("party", cur)
+		var bench: Array = []
+		var b: Variant = _gs.get("bench")
+		if typeof(b) == TYPE_ARRAY: bench = b
+		if not bench.has(id): bench.append(id)
+		_gs.set("bench", bench)
+	_emit_party_changed(); _refresh_roster_picker()
+
+func _emit_party_changed() -> void:
 	if _party and _party.has_signal("party_changed"):
 		_party.emit_signal("party_changed")
 	elif _gs and _gs.has_signal("party_changed"):
 		_gs.emit_signal("party_changed")
 
-	_refresh_roster_picker()
-
-func _selected_roster_id() -> String:
-	if _roster_pick == null: return ""
-	var i := _roster_pick.get_selected()
-	if i < 0: return ""
-	return String(_roster_pick.get_item_metadata(i))
-
 func _refresh_roster_picker() -> void:
-	if _roster_pick == null:
-		return
+	if _roster_pick == null: return
 	_roster_pick.clear()
 
 	_party_defs_by_id.clear()
-	_party_csv_path = _guess_party_csv_path()
-	if _party_csv_path != "" and _csv and _csv.has_method("load_csv"):
-		# Try id candidates until loader returns non-empty dict
-		for id_key in PARTY_ID_KEYS:
-			var loaded_v: Variant = _csv.call("load_csv", _party_csv_path, String(id_key))
-			if typeof(loaded_v) == TYPE_DICTIONARY and (loaded_v as Dictionary).size() > 0:
-				_party_defs_by_id = (loaded_v as Dictionary)
-				break
+	_party_csv_path = ""
+	for p in PARTY_CSV_CANDIDATES:
+		if ResourceLoader.exists(p):
+			_party_csv_path = p; break
 
-	var list_ids: Array[String] = []
+	if _party_csv_path != "" and _csv and _csv.has_method("load_csv"):
+		for id_key in PARTY_ID_KEYS:
+			var loaded: Variant = _csv.call("load_csv", _party_csv_path, String(id_key))
+			if typeof(loaded) == TYPE_DICTIONARY and (loaded as Dictionary).size() > 0:
+				_party_defs_by_id = loaded as Dictionary; break
 
 	if not _party_defs_by_id.is_empty():
-		# Build nicely labeled entries from CSV rows
-		var idx := 0
-		var ids_any := _party_defs_by_id.keys()
-		ids_any.sort()
+		var ids_any: Array = _party_defs_by_id.keys(); ids_any.sort()
 		for id_any in ids_any:
 			var rid: String = String(id_any)
 			var row: Dictionary = _party_defs_by_id.get(rid, {}) as Dictionary
-			var disp := _extract_display_from_row(row, rid)
+			var disp: String = _extract_display_from_row(row, rid)
 			_roster_pick.add_item(disp)
-			_roster_pick.set_item_metadata(idx, rid)
-			idx += 1
-		return  # prefer CSV; no fallback clutter
-	else:
-		# Fallback: any known members from systems
-		list_ids = _collect_all_known_members()
+			_roster_pick.set_item_metadata(_roster_pick.get_item_count() - 1, rid)
+		return
 
-	var idx2 := 0
-	for rid2 in list_ids:
-		_roster_pick.add_item(rid2)
-		_roster_pick.set_item_metadata(idx2, rid2)
-		idx2 += 1
-
-func _guess_party_csv_path() -> String:
-	for p in PARTY_CSV_CANDIDATES:
-		if ResourceLoader.exists(p):
-			return p
-	return ""
+	var list: Array[String] = _collect_all_known_members()
+	for rid2 in list:
+		_roster_pick.add_item(String(rid2).capitalize())
+		_roster_pick.set_item_metadata(_roster_pick.get_item_count() - 1, String(rid2))
 
 func _extract_display_from_row(row: Dictionary, rid: String) -> String:
-	var disp := ""
+	var disp: String = ""
 	for k in PARTY_NAME_KEYS:
 		if row.has(k) and typeof(row[k]) == TYPE_STRING:
-			disp = String(row[k])
-			break
+			var s: String = String(row[k]).strip_edges()
+			if s != "": disp = s; break
 	if disp == "": disp = rid
 	return disp
 
 func _collect_all_known_members() -> Array[String]:
 	var out: Array[String] = []
-	# Party system might expose its own catalog
-	if _party and _party.has_method("list_all_member_ids"):
-		var v: Variant = _party.call("list_all_member_ids")
-		if typeof(v) == TYPE_ARRAY:
-			for s in (v as Array): out.append(String(s))
-		elif typeof(v) == TYPE_PACKED_STRING_ARRAY:
-			for s2 in (v as PackedStringArray): out.append(String(s2))
-	# GameState known party + bench (fallback)
-	if _gs:
-		if _gs.has_method("get"):
-			var p_v: Variant = _gs.get("party")
-			if typeof(p_v) == TYPE_ARRAY:
-				for s3 in (p_v as Array):
-					var a := String(s3); if not out.has(a): out.append(a)
-			var b_v: Variant = _gs.get("bench")
-			if typeof(b_v) == TYPE_ARRAY:
-				for s4 in (b_v as Array):
-					var b := String(s4); if not out.has(b): out.append(b)
-	# Ensure stable order
-	out.sort()
-	return out
+	if _party:
+		var ms: Array[String] = ["list_all_member_ids","get_party","list_party","get_active_party","list_active_members"]
+		for m in ms:
+			if _party.has_method(m):
+				var v: Variant = _party.call(m)
+				if typeof(v) == TYPE_ARRAY:
+					for s in (v as Array): out.append(String(s))
+				elif typeof(v) == TYPE_PACKED_STRING_ARRAY:
+					for s2 in (v as PackedStringArray): out.append(String(s2))
+				if out.size() > 0: break
+	if _gs and _gs.has_method("get"):
+		var p_v: Variant = _gs.get("party")
+		if typeof(p_v) == TYPE_ARRAY:
+			for s3 in (p_v as Array):
+				var a: String = String(s3); if not out.has(a): out.append(a)
+		var b_v: Variant = _gs.get("bench")
+		if typeof(b_v) == TYPE_ARRAY:
+			for s4 in (b_v as Array):
+				var t: String = String(s4); if not out.has(t): out.append(t)
+	out.sort(); return out
+
+# --- Internals -----------------------------------------------------------------
+func _ensure_member_progress(member_id: String) -> Dictionary:
+	if _stats == null: return {}
+	if _stats.has_method("_ensure_progress"):
+		var prog_v: Variant = _stats.call("_ensure_progress", member_id)
+		if typeof(prog_v) == TYPE_DICTIONARY: return prog_v as Dictionary
+
+	var all_v: Variant = _stats.get("_party_progress")
+	var all: Dictionary = {}
+	if typeof(all_v) == TYPE_DICTIONARY: all = all_v as Dictionary
+	if all.has(member_id): return all[member_id] as Dictionary
+
+	var zeros: Dictionary = {"BRW":0,"MND":0,"TPO":0,"VTL":0,"FCS":0}
+	var seeded: Dictionary = {
+		"label": member_id,
+		"char_level": 1,
+		"start": {"BRW":1,"MND":1,"TPO":1,"VTL":1,"FCS":1},
+		"sxp": zeros.duplicate(),
+		"tenths": zeros.duplicate(),
+		"dsi_tenths": {"BRW":10,"MND":20,"TPO":30,"VTL":10,"FCS":30}
+	}
+	all[member_id] = seeded
+	_stats.set("_party_progress", all)
+	return seeded
+
+func _recalc_hero_hp_mp(new_level: int) -> void:
+	var vtl: int = 1
+	var fcs: int = 1
+	if _stats and _stats.has_method("get_stat"):
+		var vtl_v: Variant = _stats.call("get_stat", "VTL")
+		if typeof(vtl_v) == TYPE_INT or typeof(vtl_v) == TYPE_FLOAT: vtl = int(vtl_v)
+		var fcs_v: Variant = _stats.call("get_stat", "FCS")
+		if typeof(fcs_v) == TYPE_INT or typeof(fcs_v) == TYPE_FLOAT: fcs = int(fcs_v)
+
+	var new_hp_max: int = 150 + (max(1, vtl) * max(1, new_level) * 6)
+	var new_mp_max: int = 20 + int(round(float(max(1, fcs)) * float(max(1, new_level)) * 1.5))
+
+	if _hero:
+		_hero.set("level", new_level)
+		_hero.set("hp_max", new_hp_max); _hero.set("hp", new_hp_max)
+		_hero.set("mp_max", new_mp_max); _hero.set("mp", new_mp_max)
+
+func _emit_refresh() -> void:
+	if _stats and _stats.has_signal("stats_changed"):
+		_stats.emit_signal("stats_changed")
+
+# ---------- Sigil helpers: detect + draft from inventory -----------------------
+func _is_sigil_item(item_id: String) -> bool:
+	if item_id == "": return false
+	var rec: Dictionary = _defs.get(item_id, {}) as Dictionary
+	for k in ["equip_slot","slot","equip","equip_to","category","cat","type"]:
+		if rec.has(k) and typeof(rec[k]) == TYPE_STRING:
+			var tag: String = String(rec[k]).strip_edges().to_lower()
+			if tag == "sigil" or tag == "sigils": return true
+	return false
+
+func _draft_n_from_inventory(base_id: String, n: int) -> int:
+	if _sig == null or n <= 0: return 0
+	var made: int = 0
+	for i in range(n):
+		if _sig.has_method("draft_from_inventory"):
+			var inst_v: Variant = _sig.call("draft_from_inventory", base_id)
+			if typeof(inst_v) == TYPE_STRING and String(inst_v) != "":
+				made += 1
+			else:
+				break
+		elif _sig.has_method("create_instance"):
+			var inst2: Variant = _sig.call("create_instance", base_id)
+			if typeof(inst2) == TYPE_STRING and String(inst2) != "":
+				made += 1
+				if _inv:
+					if _inv.has_method("dec"): _inv.call("dec", base_id, 1)
+					elif _inv.has_method("consume"): _inv.call("consume", base_id, 1)
+					elif _inv.has_method("decrement"): _inv.call("decrement", base_id, 1)
+					elif _inv.has_method("add"): _inv.call("add", base_id, -1)
+			else:
+				break
+	return made
+
+func _auto_seed_one_instance_from_inventory() -> bool:
+	if _inv == null or _sig == null: return false
+	var counts: Dictionary = {}
+	if _inv.has_method("get_counts_dict"):
+		var c_v: Variant = _inv.call("get_counts_dict")
+		if typeof(c_v) == TYPE_DICTIONARY: counts = c_v as Dictionary
+	if counts.is_empty(): return false
+
+	for id_v in counts.keys():
+		var id: String = String(id_v)
+		if int(counts.get(id, 0)) <= 0: continue
+		if _is_sigil_item(id):
+			return _draft_n_from_inventory(id, 1) > 0
+	return false

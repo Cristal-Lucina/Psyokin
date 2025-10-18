@@ -1,260 +1,435 @@
 extends Node
 class_name CombatProfileSystem
 
-signal hero_active_type_changed(new_type: String)
+# ───────────────────────── Signals ─────────────────────────
+signal profiles_changed                    # fired when any profile changed
+signal profile_changed                     # fired when a specific member changed (no args)
 
-# Paths
-const STATS_PATH    := "/root/aStatsSystem"
-const PARTY_PATH    := "/root/aPartySystem"
-const GS_PATH       := "/root/aGameState"
-const HERO_PATH     := "/root/aHeroSystem"
-const CSV_PATH      := "/root/aCSVLoader"
-const CAL_PATH      := "/root/aCalendarSystem"
-const PARTY_CSV     := "res://data/actors/party.csv"
+# ───────────────────────── Autoload paths ─────────────────────────
+const GS_PATH: String    = "/root/aGameState"
+const STATS_PATH: String = "/root/aStatsSystem"
+const EQUIP_PATH: String = "/root/aEquipmentSystem"
+const INV_PATH: String   = "/root/aInventorySystem"
+const SIG_PATH: String   = "/root/aSigilSystem"
+const CSV_PATH: String   = "/root/aCSVLoader"
 
-# Cached nodes
-var _st: Node = null
-var _party: Node = null
-var _gs: Node = null
-var _hero: Node = null
-var _csv: Node = null
-var _cal: Node = null
+# Baseline used by your earlier UI math
+const DEF_BASELINE: float = 5.0
 
-# CSV caches
-var _csv_by_id  : Dictionary = {}   # id -> row
-var _name_to_id : Dictionary = {}   # lower(name) -> id
+# Cached outputs
+var _profiles: Dictionary = {}         # member_id -> computed profile Dictionary
+var _party_meta: Dictionary = {}       # optional current hp/mp/buffs/etc. (from apply_save_blob)
 
 func _ready() -> void:
-	_st    = get_node_or_null(STATS_PATH)
-	_party = get_node_or_null(PARTY_PATH)
-	_gs    = get_node_or_null(GS_PATH)
-	_hero  = get_node_or_null(HERO_PATH); if _hero == null: _hero = get_node_or_null("/root/HeroSystem")
-	_csv   = get_node_or_null(CSV_PATH)
-	_cal   = get_node_or_null(CAL_PATH)
+	var gs: Node = get_node_or_null(GS_PATH)
+	var st: Node = get_node_or_null(STATS_PATH)
+	var eq: Node = get_node_or_null(EQUIP_PATH)
+	var sig: Node = get_node_or_null(SIG_PATH)
 
-	_load_party_csv_cache()
+	# Hook GameState for party changes and loads
+	if gs != null:
+		for s in ["party_changed", "roster_changed", "perk_points_changed"]:
+			if gs.has_signal(s) and not gs.is_connected(s, Callable(self, "_on_gs_changed")):
+				gs.connect(s, Callable(self, "_on_gs_changed"))
 
-	# Ensure a default hero active type exists (Omega) to avoid blanks.
-	if _gs and not _gs.has_meta("hero_active_type"):
-		_gs.set_meta("hero_active_type", "Omega")
+	# Hook StatsSystem for any stat changes
+	if st != null and st.has_signal("stats_changed") and not st.is_connected("stats_changed", Callable(self, "_on_stats_changed")):
+		st.connect("stats_changed", Callable(self, "_on_stats_changed"))
 
-	# keep things fresh
-	for src in [_gs, _party]:
-		if src == null: continue
-		for sig in ["party_changed","active_changed","roster_changed","changed"]:
-			if src.has_signal(sig):
-				src.connect(sig, Callable(self, "_on_roster_changed"))
-	if _cal and _cal.has_signal("day_advanced"):
-		_cal.connect("day_advanced", Callable(self, "_on_day"))
+	# Hook EquipmentSystem to recompute when gear changes
+	if eq != null and eq.has_signal("equipment_changed") and not eq.is_connected("equipment_changed", Callable(self, "_on_equipment_changed")):
+		eq.connect("equipment_changed", Callable(self, "_on_equipment_changed"))
 
-func _on_roster_changed(_v: Variant = null) -> void:
-	_load_party_csv_cache()
+	# Hook SigilSystem to recompute when loadout changes
+	if sig != null and sig.has_signal("loadout_changed") and not sig.is_connected("loadout_changed", Callable(self, "_on_sigils_changed")):
+		sig.connect("loadout_changed", Callable(self, "_on_sigils_changed"))
 
-func _on_day(_date: Variant = null) -> void:
-	# optional: auto-dump each day tick during debug runs
-	if OS.is_debug_build():
-		debug_dump_active_party()
+	# Initial fill
+	refresh_all()
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Public dev helper — prints to Output panel
-# ──────────────────────────────────────────────────────────────────────────────
-func debug_dump_active_party() -> void:
-	print_rich("[b]=== Combat Profiles ===[/b]")
+# ───────────────────────── Public API ─────────────────────────
+
+func refresh_all() -> void:
+	_profiles.clear()
 	var ids: Array = _active_party_ids()
 	if ids.is_empty():
-		print("No profiles available")
-		return
-
+		ids = ["hero"]
 	for id_any in ids:
-		var member_id: String = String(id_any)
-		var label: String = _label_for(member_id)
+		var pid: String = String(id_any)
+		_profiles[pid] = _compute_for_member(pid)
+	emit_signal("profiles_changed")
 
-		var char_level: int = _char_level_for(member_id)
-		var brw: int = _stat_level_for(member_id, "BRW")
-		var mnd: int = _stat_level_for(member_id, "MND")
-		var tpo: int = _stat_level_for(member_id, "TPO")
-		var vtl: int = _stat_level_for(member_id, "VTL")
-		var fcs: int = _stat_level_for(member_id, "FCS")
+func refresh_member(member: String) -> void:
+	var pid: String = _resolve_id(member)
+	_profiles[pid] = _compute_for_member(pid)
+	emit_signal("profile_changed")     # ← no args now
+	emit_signal("profiles_changed")
 
-		var hp_max: int = _hp_max_for(member_id, char_level, vtl)
-		var mp_max: int = _mp_max_for(member_id, char_level, fcs)
-		var mind_txt: String = _mind_for(member_id)
+func get_profile(member: String) -> Dictionary:
+	var pid: String = _resolve_id(member)
+	if not _profiles.has(pid):
+		_profiles[pid] = _compute_for_member(pid)
+	return (_profiles.get(pid, {}) as Dictionary)
 
-		print("%s | Lv %d | BRW %d  MND %d  TPO %d  VTL %d  FCS %d | HPmax %d  MPmax %d | Mind %s" % [
-			label, char_level, brw, mnd, tpo, vtl, fcs, hp_max, mp_max, mind_txt
-		])
+# Optional: accept runtime HP/MP/buffs from save blobs
+func apply_save_blob(blob: Dictionary) -> void:
+	# expected format (used by your GameState loader):
+	# { "party": { "<id>": {"hp":int,"mp":int,"ailment":String,"flags":{}, "buffs":[], "debuffs":[]} }, "enemies":{} }
+	if blob.has("party"):
+		var p: Variant = blob["party"]
+		if typeof(p) == TYPE_DICTIONARY:
+			_party_meta = (p as Dictionary).duplicate(true)
+	refresh_all()
 
-# ───────────────────────── public API ─────────────────────────
+# ───────────────────────── Signals → Refresh ─────────────────────────
 
-func get_hero_active_type() -> String:
-	# Authoritative value lives in GameState meta; falls back to Omega.
-	if _gs:
-		if _gs.has_meta("hero_active_type"):
-			var mv: Variant = _gs.get_meta("hero_active_type")
-			if typeof(mv) == TYPE_STRING:
-				var s := String(mv).strip_edges()
-				return (s if s != "" else "Omega")
-		if _gs.has_method("get"):
-			var v: Variant = _gs.get("hero_active_type")
-			if typeof(v) == TYPE_STRING:
-				var s2 := String(v).strip_edges()
-				return (s2 if s2 != "" else "Omega")
-	return "Omega"
+func _on_gs_changed(_a: Variant = null) -> void:
+	refresh_all()
 
-func set_hero_active_type(school: String) -> void:
-	var val := String(school).strip_edges()
-	if val == "": val = "Omega"
-	var prev := get_hero_active_type()
-	if _gs:
-		_gs.set_meta("hero_active_type", val)
-		if _gs.has_method("set"):
-			_gs.set("hero_active_type", val)
-	# Let listeners refresh any UI or derived combat views
-	var stats := get_node_or_null(STATS_PATH)
-	if stats and stats.has_signal("stats_changed"):
-		stats.emit_signal("stats_changed")
-	if val != prev:
-		hero_active_type_changed.emit(val)
+func _on_stats_changed() -> void:
+	refresh_all()
 
-# ───────────────────────── helpers ─────────────────────────
+func _on_equipment_changed(member: String) -> void:
+	refresh_member(member)
+
+func _on_sigils_changed(member: String) -> void:
+	refresh_member(member)
+
+# ───────────────────────── Core compute ─────────────────────────
+
+func _compute_for_member(member: String) -> Dictionary:
+	var pid: String = _resolve_id(member)
+
+	# Name/label
+	var label: String = _display_name(pid)
+
+	# Pools/level from GameState (falls back to StatsSystem if needed)
+	var pools: Dictionary = _member_pools(pid)
+	var lvl: int   = int(pools.get("level", 1))
+	var hp_max: int = int(pools.get("hp_max", 0))
+	var mp_max: int = int(pools.get("mp_max", 0))
+
+	# Current runtime state if provided via apply_save_blob
+	var cur_hp: int = hp_max
+	var cur_mp: int = mp_max
+	var ailment: String = ""
+	var buffs: Array = []
+	var debuffs: Array = []
+	var flags: Dictionary = {}
+	if _party_meta.has(pid):
+		var rec: Dictionary = _party_meta[pid]
+		cur_hp = int(rec.get("hp", hp_max))
+		cur_mp = int(rec.get("mp", mp_max))
+		ailment = String(rec.get("ailment", ""))
+		buffs = (rec.get("buffs", []) as Array).duplicate()
+		debuffs = (rec.get("debuffs", []) as Array).duplicate()
+		flags = (rec.get("flags", {}) as Dictionary).duplicate(true)
+
+	# Base stats
+	var brw: int = _stat_for(pid, "BRW")
+	var vtl: int = _stat_for(pid, "VTL")
+	var fcs: int = _stat_for(pid, "FCS")
+
+	# Gear/equip
+	var equip: Dictionary = _equip_for(pid)
+	var d_wea: Dictionary  = _item_def(String(equip.get("weapon","")))
+	var d_arm: Dictionary  = _item_def(String(equip.get("armor","")))
+	var d_head: Dictionary = _item_def(String(equip.get("head","")))
+	var d_foot: Dictionary = _item_def(String(equip.get("foot","")))
+	var d_brac: Dictionary = _item_def(String(equip.get("bracelet","")))
+
+	# Derived: weapon
+	var base_watk: int   = int(d_wea.get("base_watk", 0))
+	var scale_brw: float = float(d_wea.get("scale_brw", 0.0))
+	var weapon_attack: int = base_watk + int(round(scale_brw * float(brw)))
+	var weapon_acc: int  = int(d_wea.get("base_acc", 0))
+	var skill_acc_boost: int = int(d_wea.get("skill_acc_boost", 0))
+	var crit_bonus: int  = int(d_wea.get("crit_bonus_pct", 0))
+	var type_raw: String = String(d_wea.get("watk_type_tag","")).strip_edges().to_lower()
+	var weapon_type: String = "Neutral"
+	if type_raw != "" and type_raw != "wand":
+		weapon_type = type_raw.capitalize()
+	var special: String = ""
+# if bool(d_wea.get("non_lethal", false)):
+	if _as_bool(d_wea.get("non_lethal", false)):
+		special = "NL"
+
+
+	# Derived: defenses
+	var armor_flat: int = int(d_arm.get("armor_flat", 0))
+	var pdef: int = int(round(float(armor_flat) * (DEF_BASELINE + 0.25 * float(vtl))))
+	var ail_res: int = int(d_arm.get("ail_resist_pct", 0))
+
+	var ward_flat: int = int(d_head.get("ward_flat", 0))
+	var mdef: int = int(round(float(ward_flat) * (DEF_BASELINE + 0.25 * float(fcs))))
+	var hp_bonus: int = int(d_head.get("max_hp_boost", 0))
+	var mp_bonus: int = int(d_head.get("max_mp_boost", 0))
+
+	# EVA from foot + mods from other gear base_eva
+	var base_eva: int = int(d_foot.get("base_eva", 0))
+	var eva_mods: int = _eva_mods_from_other(equip, String(equip.get("foot","")))
+	var peva: int = base_eva + int(round(0.25 * float(vtl))) + eva_mods
+	var meva: int = base_eva + int(round(0.25 * float(fcs))) + eva_mods
+	var speed: int = int(d_foot.get("speed", 0))
+
+	# Sigils / bracelet
+	var slots: int = int(d_brac.get("sigil_slots", 0))
+	var active_sigil_name: String = _active_sigil_display(pid)
+	var loadout: Array = _sigil_loadout(pid)
+
+	# Mind info
+	var mind_base: String = _member_mind_base(pid)
+	var mind_active: String = _hero_active_type_if_hero(pid, mind_base)
+
+	# Optional set bonus hook (leave empty for now)
+	var set_bonus: String = ""
+
+	# Pretty item names
+	var weapon_name: String   = _pretty_item(String(equip.get("weapon","")))
+	var armor_name: String    = _pretty_item(String(equip.get("armor","")))
+	var head_name: String     = _pretty_item(String(equip.get("head","")))
+	var foot_name: String     = _pretty_item(String(equip.get("foot","")))
+	var bracelet_name: String = _pretty_item(String(equip.get("bracelet","")))
+
+	# Build profile dictionary
+	var prof: Dictionary = {
+		"member": pid,
+		"label": label,
+		"level": lvl,
+		"hp_max": hp_max + hp_bonus,
+		"mp_max": mp_max + mp_bonus,
+		"hp": cur_hp,
+		"mp": cur_mp,
+		"ailment": ailment,
+		"buffs": buffs,
+		"debuffs": debuffs,
+		"flags": flags,
+		"stats": {"BRW": brw, "VTL": vtl, "FCS": fcs},
+		"weapon": {
+			"id": String(equip.get("weapon","")),
+			"name": weapon_name,
+			"attack": weapon_attack,
+			"scale_brw": scale_brw,
+			"accuracy": weapon_acc,
+			"skill_acc_boost": skill_acc_boost,
+			"crit_bonus_pct": crit_bonus,
+			"type": weapon_type,
+			"special": special
+		},
+		"defense": {
+			"pdef": pdef,
+			"mdef": mdef,
+			"ail_resist_pct": ail_res,
+			"peva": peva,
+			"meva": meva,
+			"speed": speed
+		},
+		"bracelet": {
+			"id": String(equip.get("bracelet","")),
+			"name": bracelet_name,
+			"sigil_slots": slots,
+			"active_sigil": active_sigil_name
+		},
+		"equipment_names": {
+			"weapon": weapon_name,
+			"armor": armor_name,
+			"head": head_name,
+			"foot": foot_name,
+			"bracelet": bracelet_name
+		},
+		"mind": {"base": mind_base, "active": mind_active},
+		"set_bonus": set_bonus,
+		"sigils": {
+			"loadout": loadout
+		}
+	}
+
+	return prof
+
+# ───────────────────────── Helpers ─────────────────────────
+func _as_bool(v: Variant) -> bool:
+	match typeof(v):
+		TYPE_BOOL:   return v
+		TYPE_INT:    return int(v) != 0
+		TYPE_FLOAT:  return float(v) != 0.0
+		TYPE_STRING:
+			var s := String(v).strip_edges().to_lower()
+			return s in ["true","1","yes","y","on","t"]
+		_:           return false
+
+func _resolve_id(name_in: String) -> String:
+	var gs: Node = get_node_or_null(GS_PATH)
+	var want: String = String(name_in).strip_edges().to_lower()
+	if gs != null:
+		var pn_v: Variant = gs.get("player_name")
+		if typeof(pn_v) == TYPE_STRING and String(pn_v).strip_edges().to_lower() == want:
+			return "hero"
+	return name_in
 
 func _active_party_ids() -> Array:
-	# Try PartySystem first
-	if _party:
-		for m in ["get_active_party","get_party","list_active_members","list_party","get_active"]:
-			if _party.has_method(m):
-				var v: Variant = _party.call(m)
-				var arr: Array = _array_from_any(v)
-				if not arr.is_empty(): return arr
-		for prop in ["active","party"]:
-			if _party.has_method("get"):
-				var pv: Variant = _party.get(prop)
-				var arr2: Array = _array_from_any(pv)
-				if not arr2.is_empty(): return arr2
-	# GameState fallbacks
-	if _gs:
-		if _gs.has_method("get_active_party_ids"):
-			var v3: Variant = _gs.call("get_active_party_ids")
-			var arr3: Array = _array_from_any(v3)
-			if not arr3.is_empty(): return arr3
-		if _gs.has_method("get"):
-			var p_v: Variant = _gs.get("party")
-			var arr4: Array = _array_from_any(p_v)
-			if not arr4.is_empty(): return arr4
-	# Last resort: hero
+	var gs: Node = get_node_or_null(GS_PATH)
+	if gs != null and gs.has_method("get_active_party_ids"):
+		var v: Variant = gs.call("get_active_party_ids")
+		if typeof(v) == TYPE_ARRAY:
+			return v as Array
 	return ["hero"]
 
-func _label_for(member_id: String) -> String:
-	if member_id == "hero":
-		return _safe_hero_name()
-	if _csv_by_id.has(member_id):
-		var row: Dictionary = _csv_by_id[member_id]
-		var n_v: Variant = row.get("name", "")
-		if typeof(n_v) == TYPE_STRING and String(n_v).strip_edges() != "":
-			return String(n_v)
-	return member_id.capitalize()
+func _display_name(id: String) -> String:
+	var gs: Node = get_node_or_null(GS_PATH)
+	if gs != null and gs.has_method("get_party_names"):
+		var ids: Array = _active_party_ids()
+		for i in range(ids.size()):
+			if String(ids[i]) == id:
+				var names: PackedStringArray = gs.call("get_party_names")
+				if i >= 0 and i < names.size():
+					return String(names[i])
+	# Fallback
+	if id == "hero":
+		if gs != null:
+			var nm_v: Variant = gs.get("player_name")
+			if typeof(nm_v) == TYPE_STRING and String(nm_v).strip_edges() != "":
+				return String(nm_v)
+		return "Player"
+	return id.capitalize()
 
-func _char_level_for(member_id: String) -> int:
-	if member_id == "hero":
-		return _hero_get_int("level", 1)
-	if _csv_by_id.has(member_id):
-		return _to_int((_csv_by_id[member_id] as Dictionary).get("level_start", 1))
-	return 1
+func _member_pools(member: String) -> Dictionary:
+	var gs: Node = get_node_or_null(GS_PATH)
+	if gs != null and gs.has_method("compute_member_pools"):
+		var v: Variant = gs.call("compute_member_pools", member)
+		if typeof(v) == TYPE_DICTIONARY:
+			return v as Dictionary
+	# Fallback: rough calc if GS missing
+	var st: Node = get_node_or_null(STATS_PATH)
+	var lvl: int = _member_level(member)
+	var vtl: int = _stat_for(member, "VTL")
+	var fcs: int = _stat_for(member, "FCS")
+	var hp_max: int = 150 + (max(1, vtl) * max(1, lvl) * 6)
+	var mp_max: int = 20 + int(round(float(max(1, fcs)) * float(max(1, lvl)) * 1.5))
+	if st != null and st.has_method("compute_max_hp"):
+		hp_max = int(st.call("compute_max_hp", lvl, vtl))
+	if st != null and st.has_method("compute_max_mp"):
+		mp_max = int(st.call("compute_max_mp", lvl, fcs))
+	return {"level": lvl, "hp_max": hp_max, "mp_max": mp_max}
 
-func _stat_level_for(member_id: String, stat: String) -> int:
-	# Prefer StatsSystem DSI API if present (so you see live drip)
-	if _st and _st.has_method("get_member_stat_level") and member_id != "hero":
-		var v: Variant = _st.call("get_member_stat_level", member_id, stat)
-		if typeof(v) in [TYPE_INT, TYPE_FLOAT]:
+func _member_level(member: String) -> int:
+	var st: Node = get_node_or_null(STATS_PATH)
+	if st != null and st.has_method("get_member_level"):
+		var v: Variant = st.call("get_member_level", member)
+		if typeof(v) == TYPE_INT or typeof(v) == TYPE_FLOAT:
 			return int(v)
-
-	# Hero → live hero stat level
-	if member_id == "hero" and _st:
-		var hv: Variant = _st.call("get_stat", stat)
-		if typeof(hv) in [TYPE_INT, TYPE_FLOAT]:
-			return int(hv)
-		return 1
-
-	# Fallback to CSV starting levels
-	if _csv_by_id.has(member_id):
-		var row: Dictionary = _csv_by_id[member_id]
-		match stat:
-			"BRW": return max(1, _to_int(row.get("start_brw", 1)))
-			"MND": return max(1, _to_int(row.get("start_mnd", 1)))
-			"TPO": return max(1, _to_int(row.get("start_tpo", 1)))
-			"VTL": return max(1, _to_int(row.get("start_vtl", 1)))
-			"FCS": return max(1, _to_int(row.get("start_fcs", 1)))
-			_:     return 1
 	return 1
 
-func _hp_max_for(_member_id: String, char_level: int, vtl: int) -> int:
-	if _st and _st.has_method("compute_max_hp"):
-		return _st.call("compute_max_hp", char_level, vtl)
-	# fallback mirrors your formula
-	return 150 + (max(1, vtl) * max(1, char_level) * 6)
+func _stat_for(member: String, stat: String) -> int:
+	var st: Node = get_node_or_null(STATS_PATH)
+	if st != null and st.has_method("get_member_stat_level"):
+		var v: Variant = st.call("get_member_stat_level", member, stat)
+		if typeof(v) == TYPE_INT or typeof(v) == TYPE_FLOAT:
+			return int(v)
+	return 1
 
-func _mp_max_for(_member_id: String, char_level: int, fcs: int) -> int:
-	if _st and _st.has_method("compute_max_mp"):
-		return _st.call("compute_max_mp", char_level, fcs)
-	return 20 + int(round(float(max(1, fcs)) * float(max(1, char_level)) * 1.5))
+func _equip_for(member: String) -> Dictionary:
+	var eq: Node = get_node_or_null(EQUIP_PATH)
+	if eq != null and eq.has_method("get_member_equip"):
+		var d_v: Variant = eq.call("get_member_equip", member)
+		if typeof(d_v) == TYPE_DICTIONARY:
+			var d: Dictionary = d_v
+			# normalize key "feet" -> "foot"
+			if d.has("feet") and not d.has("foot"):
+				d["foot"] = String(d["feet"])
+			for k in ["weapon","armor","head","foot","bracelet"]:
+				if not d.has(k):
+					d[k] = ""
+			return d
+	return {"weapon":"","armor":"","head":"","foot":"","bracelet":""}
 
-func _mind_for(member_id: String) -> String:
-	if member_id == "hero":
-		# Authoritative: hero Active Type saved in GameState (default Omega).
-		return get_hero_active_type()
-	if _csv_by_id.has(member_id):
-		var row: Dictionary = _csv_by_id[member_id]
-		var mv: Variant = row.get("mind_type", "")
-		if typeof(mv) == TYPE_STRING and String(mv).strip_edges() != "":
-			return String(mv)
-	return "—"
+func _item_def(id: String) -> Dictionary:
+	if id == "" or id == "—":
+		return {}
+	var eq: Node = get_node_or_null(EQUIP_PATH)
+	if eq != null and eq.has_method("get_item_def"):
+		var v: Variant = eq.call("get_item_def", id)
+		if typeof(v) == TYPE_DICTIONARY:
+			return v as Dictionary
+	var inv: Node = get_node_or_null(INV_PATH)
+	if inv != null and inv.has_method("get_item_defs"):
+		var d: Variant = inv.call("get_item_defs")
+		if typeof(d) == TYPE_DICTIONARY:
+			var defs: Dictionary = d
+			return defs.get(id, {}) as Dictionary
+	return {}
 
-# CSV cache
-func _load_party_csv_cache() -> void:
-	_csv_by_id.clear()
-	_name_to_id.clear()
-	if _csv and _csv.has_method("load_csv"):
-		var defs_v: Variant = _csv.call("load_csv", PARTY_CSV, "actor_id")
-		if typeof(defs_v) == TYPE_DICTIONARY:
-			var defs: Dictionary = defs_v
-			for id_any in defs.keys():
-				var rid: String = String(id_any)
-				var row: Dictionary = defs[rid]
-				_csv_by_id[rid] = row
-				var n_v: Variant = row.get("name", "")
-				if typeof(n_v) == TYPE_STRING:
-					var key: String = String(n_v).strip_edges().to_lower()
-					if key != "": _name_to_id[key] = rid
+func _pretty_item(id: String) -> String:
+	if id == "" or id == "—":
+		return "—"
+	var eq: Node = get_node_or_null(EQUIP_PATH)
+	if eq != null and eq.has_method("get_item_display_name"):
+		var v: Variant = eq.call("get_item_display_name", id)
+		if typeof(v) == TYPE_STRING:
+			return String(v)
+	return id
 
-# Small utils
-func _array_from_any(v: Variant) -> Array:
-	if typeof(v) == TYPE_ARRAY: return v as Array
-	if typeof(v) == TYPE_PACKED_STRING_ARRAY:
-		var out: Array = []
-		for s in (v as PackedStringArray): out.append(String(s))
-		return out
+func _eva_mods_from_other(equip: Dictionary, exclude_id: String) -> int:
+	var sum: int = 0
+	for k in ["weapon","armor","head","bracelet"]:
+		var id: String = String(equip.get(k,""))
+		if id == "" or id == exclude_id:
+			continue
+		var d: Dictionary = _item_def(id)
+		if d.has("base_eva"):
+			sum += int(d.get("base_eva",0))
+	return sum
+
+func _sigil_loadout(member: String) -> Array:
+	var sig: Node = get_node_or_null(SIG_PATH)
+	if sig != null and sig.has_method("get_loadout"):
+		var v: Variant = sig.call("get_loadout", member)
+		if typeof(v) == TYPE_PACKED_STRING_ARRAY:
+			return Array(v)
+		if typeof(v) == TYPE_ARRAY:
+			return v as Array
 	return []
 
-func _to_int(v: Variant) -> int:
-	match typeof(v):
-		TYPE_INT: return int(v)
-		TYPE_FLOAT: return int(floor(float(v)))
-		TYPE_STRING:
-			var s: String = String(v).strip_edges()
-			if s == "": return 0
-			return int(s.to_int())
-		_: return 0
+func _active_sigil_display(member: String) -> String:
+	var sig: Node = get_node_or_null(SIG_PATH)
+	var arr: Array = _sigil_loadout(member)
+	if arr.size() == 0:
+		return ""
+	var first: String = String(arr[0])
+	if first == "":
+		return ""
+	if sig != null and sig.has_method("get_display_name_for"):
+		var dn: Variant = sig.call("get_display_name_for", first)
+		if typeof(dn) == TYPE_STRING:
+			return String(dn)
+	return first
 
-func _safe_hero_name() -> String:
-	if _hero and _hero.has_method("get"):
-		var v: Variant = _hero.get("hero_name")
+func _member_mind_base(member: String) -> String:
+	# Prefer SigilSystem’s resolver if present
+	var sig: Node = get_node_or_null(SIG_PATH)
+	if sig != null and sig.has_method("resolve_member_mind_base"):
+		var v: Variant = sig.call("resolve_member_mind_base", member)
+		if typeof(v) == TYPE_STRING and String(v).strip_edges() != "":
+			return String(v).capitalize()
+
+	# Fallback to GameState
+	var gs: Node = get_node_or_null(GS_PATH)
+	if gs != null and gs.has_method("get_member_field"):
+		var mv: Variant = gs.call("get_member_field", member, "mind_type")
+		if typeof(mv) == TYPE_STRING and String(mv).strip_edges() != "":
+			return String(mv).capitalize()
+
+	return "Omega"
+
+func _hero_active_type_if_hero(member: String, mind_base: String) -> String:
+	if member != "hero":
+		return mind_base
+	var gs: Node = get_node_or_null(GS_PATH)
+	if gs != null:
+		if gs.has_meta("hero_active_type"):
+			var mv: Variant = gs.get_meta("hero_active_type")
+			if typeof(mv) == TYPE_STRING and String(mv).strip_edges() != "":
+				return String(mv)
+		var v: Variant = gs.get("hero_active_type")
 		if typeof(v) == TYPE_STRING and String(v).strip_edges() != "":
 			return String(v)
-	return "Player"
-
-func _hero_get_int(prop: String, def: int) -> int:
-	if _hero and _hero.has_method("get"):
-		var v: Variant = _hero.get(prop)
-		if typeof(v) in [TYPE_INT, TYPE_FLOAT]:
-			return int(v)
-	return def
+	return mind_base

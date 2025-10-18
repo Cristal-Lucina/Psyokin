@@ -1,412 +1,56 @@
 extends Node
 class_name SigilSystem
 
+# ─────────────────────── Signals ───────────────────────
+signal grant_sigil_xp(inst_id: String, amount: int, require_equipped: bool, source: String)
+signal instance_xp_changed(inst_id: String, level: int, xp_pool: int, to_next: int)
+signal instances_changed
 signal loadout_changed(member: String)
 
-const INV_PATH    : String = "/root/aInventorySystem"
-const CSV_PATH    : String = "/root/aCSVLoader"
-const EQUIP_PATH  : String = "/root/aEquipmentSystem"
-const PARTY_PATH  : String = "/root/aPartySystem"
-const MIND_PATH   : String = "/root/aMindTypeSystem"
+# ─────────────────────── Paths / Data ───────────────────────
+const INV_PATH: String   = "/root/aInventorySystem"
+const EQUIP_PATH: String = "/root/aEquipmentSystem"
+const MIND_PATH: String  = "/root/aMindTypeSystem"
 
-const SKILLS_CSV  : String = "res://data/skills/skills.csv"
-const HOLDER_CSV  : String = "res://data/skills/sigil_holder.csv"
+const DATA_DIR: String        = "res://data/skills/"
+const PATH_SKILLS: String     = DATA_DIR + "skills.csv"         # columns: skill_id,name,...
+const PATH_HOLDER: String     = DATA_DIR + "sigil_holder.csv"   # columns: sigil_id,lv1,lv2,lv3,lv4
+const PATH_XP_TABLE: String   = DATA_DIR + "sigil_xp_table.csv" # optional, not required for names
+const MAX_LEVEL: int = 4
 
-const SIGIL_ID_PREFIX : String = "SIG_"
-const INSTANCE_SEP    : String = "#"
+const SIGIL_ID_PREFIX: String = "SIG_"
+const INSTANCE_SEP: String    = "#"
 
-# ───── CSV fallbacks for Mind Type gating (party + mind types) ─────
-const PARTY_CSV_CANDIDATES: Array[String] = [
-	"res://data/party/party.csv",
-	"res://data/party.csv",
-	"res://data/actors/party.csv"
-]
-const MIND_TYPES_CSV_CANDIDATES: Array[String] = [
-	"res://data/combat/mind_type.csv",
-	"res://data/combat/mind_types.csv"
-]
-const PARTY_ID_KEYS     : Array[String] = ["id","actor_id","member_id","key","member","code"]
-const PARTY_NAME_KEYS   : Array[String] = ["name","display_name","character","alias"]
-const PARTY_MIND_KEYS   : Array[String] = ["mind_type","mind_type_id","mind","mind_id","mind_base"]
-const MIND_ID_KEYS      : Array[String] = ["id","mind_type_id","mind","base","key","code"]
-const MIND_ALLOWED_KEYS : Array[String] = ["allowed_schools","schools","allowed","allowed_types"]
+# ─────────────────────── Runtime state ───────────────────────
+# instance_id -> {base_id, school, tier, level, xp, active_skill}
+var _instances: Dictionary = {}
+var _owned: PackedStringArray = PackedStringArray()
+var _loadouts: Dictionary = {}           # member -> Array[String]
+var _capacity_by_member: Dictionary = {} # member -> int
+var _next_instance_idx: int = 1
 
-# ───── Items CSV (source of truth for sigil_school on items) ─────
-const ITEMS_CSV_CANDIDATES: Array[String] = [
-	"res://data/items/items.csv",
-	"res://data/items/item.csv",
-	"res://data/item.csv"
-]
-const ITEM_ID_KEYS     : Array[String] = ["id","item_id","key","code"]
-const ITEM_SCHOOL_KEYS : Array[String] = ["sigil_school","school","mind_type","mind_type_tag","mind_tag"]
+# CSV-backed DBs
+# e.g. "FIRE_L1" -> "Fire Bolt"
+var _skill_name_by_id: Dictionary = {}
+# e.g. "SIG_001" -> ["FIRE_L1","FIRE_L2","FIRE_L3","FIRE_L4"]
+var _holder_skills_by_base: Dictionary = {}
 
-var _skills_by_school     : Dictionary = {}
-var _holder_map           : Dictionary = {}
-var _instances            : Dictionary = {}         # inst_id -> {base_id, school, tier, level, xp, active_skill}
-var _owned                : PackedStringArray = PackedStringArray()
-var _loadouts             : Dictionary = {}         # member -> Array[String] of inst_ids (size = capacity)
-var _capacity_by_member   : Dictionary = {}         # member -> int
-var _next_instance_idx    : int = 1
-
+# ─────────────────────── Lifecycle ───────────────────────
 func _ready() -> void:
-	_load_skills_csv()
-	_load_holder_csv()
+	_load_databases()
+	if not grant_sigil_xp.is_connected(_on_grant_sigil_xp):
+		grant_sigil_xp.connect(_on_grant_sigil_xp)
 
-# ───────────────────── Skills CSV ─────────────────────
-func _load_skills_csv() -> void:
-	_skills_by_school.clear()
-	var csv_loader: Node = get_node_or_null(CSV_PATH)
-	if csv_loader != null and FileAccess.file_exists(SKILLS_CSV):
-		var table_v: Variant = csv_loader.call("load_csv", SKILLS_CSV, "skill_id")
-		if typeof(table_v) == TYPE_DICTIONARY:
-			var table: Dictionary = table_v
-			for sid in table.keys():
-				var row_v: Variant = table[sid]
-				if typeof(row_v) != TYPE_DICTIONARY:
-					continue
-				var row: Dictionary = row_v
-				var school: String = String(row.get("school","")).capitalize()
-				if school == "":
-					continue
-				var srec: Dictionary = {
-					"skill_id": String(sid),
-					"name": String(row.get("name", String(sid))),
-					"school": school,
-					"level_req": int(_to_int(row.get("level_req", 1))),
-					"desc": String(row.get("desc",""))
-				}
-				if not _skills_by_school.has(school):
-					_skills_by_school[school] = []
-				var arr_any: Variant = _skills_by_school[school]
-				var arr: Array = (arr_any as Array) if typeof(arr_any) == TYPE_ARRAY else []
-				arr.append(srec)
-				_skills_by_school[school] = arr
+# Public: if you hot-reload CSVs during dev
+func reload_skill_data() -> void:
+	_load_databases()
 
-	if _skills_by_school.is_empty():
-		var schools: Array[String] = ["Fire","Water","Earth","Air","Data","Void","Omega"]
-		for s in schools:
-			_skills_by_school[s] = [
-				{"skill_id":"%s_I"   % s, "name":"%s I"   % s, "school":s, "level_req":1, "desc":""},
-				{"skill_id":"%s_II"  % s, "name":"%s II"  % s, "school":s, "level_req":2, "desc":""},
-				{"skill_id":"%s_III" % s, "name":"%s III" % s, "school":s, "level_req":3, "desc":""},
-				{"skill_id":"%s_IV"  % s, "name":"%s IV"  % s, "school":s, "level_req":4, "desc":""}
-			]
-
-	for k in _skills_by_school.keys():
-		var a_v: Variant = _skills_by_school[k]
-		if typeof(a_v) == TYPE_ARRAY:
-			var a: Array = a_v
-			a.sort_custom(Callable(self, "_cmp_skill_by_level"))
-			_skills_by_school[k] = a
-
-func _cmp_skill_by_level(x: Variant, y: Variant) -> bool:
-	var dx: Dictionary = x as Dictionary
-	var dy: Dictionary = y as Dictionary
-	return int(dx["level_req"]) < int(dy["level_req"])
-
-# ───────────────── Sigil Holder CSV ─────────────────
-func _load_holder_csv() -> void:
-	_holder_map.clear()
-	var csv_loader: Node = get_node_or_null(CSV_PATH)
-	if csv_loader == null or not FileAccess.file_exists(HOLDER_CSV):
-		return
-	var table_v: Variant = csv_loader.call("load_csv", HOLDER_CSV, "sigil_id")
-	if typeof(table_v) != TYPE_DICTIONARY:
-		return
-	var table: Dictionary = table_v
-	for base_id_v in table.keys():
-		var base_id: String = String(base_id_v)
-		var row: Dictionary = table[base_id]
-		_holder_map[base_id] = {
-			"lv1": String(row.get("lv1","")),
-			"lv2": String(row.get("lv2","")),
-			"lv3": String(row.get("lv3","")),
-			"lv4": String(row.get("lv4",""))
-		}
-
-# ───────────────── Public helpers ─────────────────
-func is_instance_id(id: String) -> bool:
-	return id.find(INSTANCE_SEP) >= 0
-
-func list_owned_sigils() -> PackedStringArray:
-	return _owned.duplicate()
-
-func get_capacity(member: String) -> int:
-	return int(_capacity_by_member.get(member, 0))
-
-func get_loadout(member: String) -> PackedStringArray:
-	if not _loadouts.has(member):
-		return PackedStringArray()
-	var arr_any: Variant = _loadouts[member]
-	var out := PackedStringArray()
-	if typeof(arr_any) == TYPE_ARRAY:
-		for v in (arr_any as Array):
-			out.append(String(v))
-	return out
-
-func get_loadout_array(member: String) -> Array[String]:
-	var out: Array[String] = []
-	var ps: PackedStringArray = get_loadout(member)
-	for s in ps:
-		out.append(String(s))
-	return out
-
-func get_display_name_for(id: String) -> String:
-	if is_instance_id(id) and _instances.has(id):
-		var inst: Dictionary = _instances[id]
-		var base_id: String = String(inst.get("base_id",""))
-		var nm: String = _item_name(base_id)
-		var lvl: int = int(inst.get("level", 1))
-		return "%s [Lv%d]" % [nm, lvl]
-	return _item_name(id)
-
-func get_instance_display_name(instance_id: String) -> String:
-	return get_display_name_for(instance_id)
-
-func get_active_skill_name_for_instance(instance_id: String) -> String:
-	if not _instances.has(instance_id):
-		return ""
-	var inst: Dictionary = _instances[instance_id]
-	var cur: String = String(inst.get("active_skill",""))
-	var allowed: PackedStringArray = _allowed_for_instance(instance_id)
-	if cur == "" or (allowed.size() > 0 and allowed.find(cur) < 0):
-		cur = (allowed[0] if allowed.size() > 0 else "")
-		inst["active_skill"] = cur
-		_instances[instance_id] = inst
-	return _skill_name(cur)
-
-func get_active_skill_name(member: String, socket_index: int) -> String:
-	var sockets: PackedStringArray = get_loadout(member)
-	if socket_index < 0 or socket_index >= sockets.size():
-		return ""
-	var id: String = String(sockets[socket_index])
-	return get_active_skill_name_for_instance(id)
-
-func get_active_skill_id_for_instance(instance_id: String) -> String:
-	if not _instances.has(instance_id):
-		return ""
-	var inst: Dictionary = _instances[instance_id]
-	return String(inst.get("active_skill",""))
-
-func get_skills_for_instance(instance_id: String) -> Array:
-	var out: Array = []
-	if not _instances.has(instance_id):
-		return out
-	var inst: Dictionary = _instances[instance_id]
-	var sch: String = String(inst.get("school",""))
-	var active: String = String(inst.get("active_skill",""))
-	var allowed: PackedStringArray = _allowed_for_instance(instance_id)
-	var names: Dictionary = {}
-	if _skills_by_school.has(sch):
-		var arr_any: Variant = _skills_by_school[sch]
-		if typeof(arr_any) == TYPE_ARRAY:
-			for s in (arr_any as Array):
-				var rec: Dictionary = s
-				names[String(rec["skill_id"])] = String(rec["name"])
-	for sid in allowed:
-		var nm: String = String(names.get(sid, sid))
-		out.append({
-			"skill_id": sid,
-			"name": nm,
-			"level_req": 0,
-			"unlocked": true,
-			"is_active": (sid == active),
-			"desc": ""
-		})
-	return out
-
-func list_unlocked_skills(instance_id: String) -> PackedStringArray:
-	return _allowed_for_instance(instance_id)
-
-func get_skill_display_name(skill_id: String) -> String:
-	return _skill_name(skill_id)
-
-func get_instance_info(instance_id: String) -> Dictionary:
-	if not _instances.has(instance_id):
-		return {}
-	return (_instances[instance_id] as Dictionary).duplicate(true)
-
-func set_active_skill_for_instance(instance_id: String, skill_id: String) -> bool:
-	if not _instances.has(instance_id):
-		return false
-	var allowed: PackedStringArray = _allowed_for_instance(instance_id)
-	if allowed.find(skill_id) < 0:
-		return false
-	var inst: Dictionary = _instances[instance_id]
-	inst["active_skill"] = skill_id
-	_instances[instance_id] = inst
-	return true
-
-func set_active_skill(instance_id: String, skill_id: String) -> bool:
-	return set_active_skill_for_instance(instance_id, skill_id)
-
-func set_active_skill_member(member: String, socket_index: int, skill_id: String) -> bool:
-	var sockets := get_loadout(member)
-	if socket_index < 0 or socket_index >= sockets.size():
-		return false
-	var inst_id := String(sockets[socket_index])
-	var ok := set_active_skill_for_instance(inst_id, skill_id)
-	if ok:
-		loadout_changed.emit(member)
-	return ok
-
-# ───────────────── Equip / Remove ─────────────────
-func equip_into_socket(member: String, socket_index: int, id_or_base: String) -> bool:
-	var inst_id: String = ""
-	# Gate by school before equipping
-	if is_instance_id(id_or_base):
-		var iid := id_or_base
-		if not _instances.has(iid):
-			return false
-		var school_i := String((_instances[iid] as Dictionary).get("school",""))
-		if school_i != "" and not _member_allows_school(member, school_i):
-			return false
-		inst_id = iid
-	else:
-		# base id path: peek school and gate
-		var school_b := _school_of_base(id_or_base)
-		if school_b != "" and not _member_allows_school(member, school_b):
-			return false
-		if id_or_base.begins_with(SIGIL_ID_PREFIX):
-			inst_id = _mint_instance_from_inventory(id_or_base)
-			if inst_id == "":
-				return false
-		else:
-			return false
-
-	_ensure_capacity_from_bracelet(member)
-	_ensure_loadout(member)
-	_trim_or_expand_sockets(member)
-
-	var sockets_any: Variant = _loadouts.get(member, [])
-	var sockets: Array = (sockets_any as Array) if typeof(sockets_any) == TYPE_ARRAY else []
-	if socket_index < 0 or socket_index >= sockets.size():
-		return false
-
-	for s in sockets:
-		if String(s) == inst_id:
-			return false
-
-	sockets[socket_index] = inst_id
-	_loadouts[member] = sockets
-
-	if _owned.find(inst_id) < 0:
-		_owned.append(inst_id)
-
-	loadout_changed.emit(member)
-	return true
-
-func equip_from_inventory(member: String, socket_index: int, base_id: String) -> bool:
-	var iid: String = _mint_instance_from_inventory(base_id)
-	if iid == "":
-		return false
-	# gate instance school as well
-	var school := String(_instances.get(iid, {}).get("school",""))
-	if school != "" and not _member_allows_school(member, school):
-		return false
-	return equip_into_socket(member, socket_index, iid)
-
-func remove_sigil_at(member: String, socket_index: int) -> void:
-	if not _loadouts.has(member):
-		return
-	var sockets_any: Variant = _loadouts[member]
-	if typeof(sockets_any) != TYPE_ARRAY:
-		return
-	var sockets: Array = sockets_any
-	if socket_index < 0 or socket_index >= sockets.size():
-		return
-	sockets[socket_index] = ""
-	_loadouts[member] = sockets
-	loadout_changed.emit(member)
-
-# ───────────── Capacity: call when bracelet changes ─────────────
-func on_bracelet_changed(member: String) -> void:
-	_ensure_capacity_from_bracelet(member)
-	_trim_or_expand_sockets(member)
-	loadout_changed.emit(member)
-
-func _ensure_capacity_from_bracelet(member: String) -> void:
-	var cap: int = 0
-	var eq: Node = get_node_or_null(EQUIP_PATH)
-	var inv: Node = get_node_or_null(INV_PATH)
-
-	var bracelet_id: String = ""
-	if eq and eq.has_method("get_member_equip"):
-		var d_v: Variant = eq.call("get_member_equip", member)
-		if typeof(d_v) == TYPE_DICTIONARY:
-			var d: Dictionary = d_v
-			bracelet_id = String(d.get("bracelet",""))
-
-	if bracelet_id != "" and inv and inv.has_method("get_item_defs"):
-		var defs_v: Variant = inv.call("get_item_defs")
-		if typeof(defs_v) == TYPE_DICTIONARY:
-			var defs: Dictionary = defs_v
-			if defs.has(bracelet_id):
-				var rec: Dictionary = defs[bracelet_id]
-				for k in ["sigil_slots","slots","capacity","slot_count"]:
-					if rec.has(k):
-						cap = int(_to_int(rec[k]))
-						break
-
-	_capacity_by_member[member] = max(0, cap)
-
-func _trim_or_expand_sockets(member: String) -> void:
-	var cap: int = get_capacity(member)
-	var sockets: Array = []
-	if _loadouts.has(member):
-		var arr_any: Variant = _loadouts[member]
-		if typeof(arr_any) == TYPE_ARRAY:
-			sockets = arr_any
-	if cap < sockets.size():
-		while sockets.size() > cap:
-			sockets.remove_at(sockets.size() - 1)
-	elif cap > sockets.size():
-		while sockets.size() < cap:
-			sockets.append("")
-	_loadouts[member] = sockets
-
-func _ensure_loadout(member: String) -> void:
-	if not _loadouts.has(member):
-		_loadouts[member] = []
-
-# ───────────────── Instance minting ─────────────────
-func _mint_instance_from_inventory(base_id: String) -> String:
-	var inv: Node = get_node_or_null(INV_PATH)
-	if inv == null:
-		return ""
-
-	var count: int = 0
-	if inv.has_method("get_count"):
-		var c_v: Variant = inv.call("get_count", base_id)
-		if typeof(c_v) == TYPE_INT:
-			count = int(c_v)
-	elif inv.has_method("get_counts_dict"):
-		var cd_v: Variant = inv.call("get_counts_dict")
-		if typeof(cd_v) == TYPE_DICTIONARY:
-			var cd: Dictionary = cd_v
-			count = int(cd.get(base_id, 0))
-	if count <= 0:
-		return ""
-
-	if inv.has_method("remove_item"):
-		inv.call("remove_item", base_id, 1)
-	elif inv.has_method("dec"):
-		inv.call("dec", base_id, 1)
-	elif inv.has_method("consume"):
-		inv.call("consume", base_id, 1)
-	elif inv.has_method("decrement"):
-		inv.call("decrement", base_id, 1)
-	elif inv.has_method("add"):
-		inv.call("add", base_id, -1)
-
+# ─────────────────────── Public API (instances / sockets) ───────────────────────
+func acquire_sigil(base_id: String) -> String:
 	var school: String = _school_of_base(base_id)
-	if school == "":
-		school = "Fire"
-
 	var idx: int = _next_instance_idx
 	_next_instance_idx += 1
 	var inst_id: String = "%s%s%04d" % [base_id, INSTANCE_SEP, idx]
-
 	_instances[inst_id] = {
 		"base_id": base_id,
 		"school": school,
@@ -415,329 +59,435 @@ func _mint_instance_from_inventory(base_id: String) -> String:
 		"xp": 0,
 		"active_skill": ""
 	}
-
 	if _owned.find(inst_id) < 0:
 		_owned.append(inst_id)
 	return inst_id
 
-# ───────────────── Progress / XP ─────────────────
-func _xp_needed_for_level(_level: int) -> int:
-	return 100
+func equip_into_socket(member: String, socket_index: int, inst_or_base: String) -> bool:
+	_ensure_capacity_from_bracelet(member)
+	_ensure_loadout(member)
+	_trim_or_expand_sockets(member)
 
-func get_instance_level(instance_id: String) -> int:
-	if not _instances.has(instance_id):
-		return 1
-	var inst: Dictionary = _instances[instance_id]
-	return int(inst.get("level", 1))
+	# Normalize: if a base id sneaks in, auto-create an instance so sockets never store bases
+	var inst_id := inst_or_base
+	if not _instances.has(inst_id) and inst_id != "":
+		inst_id = acquire_sigil(inst_id)  # create an instance from base id (no inventory ops here)
 
-func get_instance_progress(instance_id: String) -> Dictionary:
-	if not _instances.has(instance_id):
-		return {"pct": 0}
-	var inst: Dictionary = _instances[instance_id]
-	var lvl: int = int(inst.get("level", 1))
-	if lvl >= 4:
-		return {"pct": 100}
-	var xp_cur: int = int(inst.get("xp", 0))
-	var need: int = max(1, _xp_needed_for_level(lvl))
-	var pct: int = int(clamp((float(xp_cur) / float(need)) * 100.0, 0.0, 100.0))
-	return {"pct": pct}
+	var sockets: Array = []
+	var sockets_any: Variant = _loadouts.get(member, [])
+	if typeof(sockets_any) == TYPE_ARRAY:
+		sockets = sockets_any as Array
 
-func cheat_add_xp_to_instance(instance_id: String, amount: int, require_equipped: bool = false) -> void:
-	if not _instances.has(instance_id):
-		return
-	if require_equipped and not _is_equipped(instance_id):
-		return
-	var inst: Dictionary = _instances[instance_id]
-	var lvl: int = int(inst.get("level", 1))
-	var xp_cur: int = int(inst.get("xp", 0))
-	xp_cur = max(0, xp_cur + max(0, amount))
-	var leveled: bool = false
-	while lvl < 4:
-		var need: int = max(1, _xp_needed_for_level(lvl))
-		if xp_cur >= need:
-			xp_cur -= need
-			lvl += 1
-			leveled = true
-		else:
-			break
-	inst["level"] = lvl
-	inst["xp"] = (0 if lvl >= 4 else xp_cur)
-	var allowed: PackedStringArray = _allowed_for_instance(instance_id)
-	var active: String = String(inst.get("active_skill",""))
-	if allowed.size() > 0 and (active == "" or allowed.find(active) < 0):
-		inst["active_skill"] = allowed[allowed.size() - 1]
-	_instances[instance_id] = inst
-	var who: String = _find_member_by_instance(instance_id)
-	if leveled and who != "":
-		loadout_changed.emit(who)
+	if socket_index < 0 or socket_index >= sockets.size():
+		return false
 
-func add_xp_to_instance(instance_id: String, amount: int) -> void:
-	cheat_add_xp_to_instance(instance_id, amount, false)
+	# prevent duplicates
+	for s in sockets:
+		if String(s) == inst_id:
+			return false
 
-func grant_xp_to_instance(instance_id: String, amount: int) -> void:
-	cheat_add_xp_to_instance(instance_id, amount, false)
+	# ── NEW: ensure the instance has an active skill selected ─────────────
+	if _instances.has(inst_id):
+		var cur_active := String(_instances[inst_id].get("active_skill",""))
+		if cur_active.strip_edges() == "":
+			var unlocked: PackedStringArray = list_unlocked_skills(inst_id)
+			if unlocked.size() > 0:
+				# set directly (quiet) or use helper:
+				_instances[inst_id]["active_skill"] = String(unlocked[0])
+	# ──────────────────────────────────────────────────────────────────────
 
-# ───────────────── Cheat helpers ─────────────────
+	sockets[socket_index] = inst_id
+	_loadouts[member] = sockets
+
+	if _owned.find(inst_id) < 0:
+		_owned.append(inst_id)
+
+	emit_signal("loadout_changed", member)
+	return true
+
+
+func remove_sigil_at(member: String, socket_index: int) -> void:
+	if not _loadouts.has(member): return
+	var sockets_any: Variant = _loadouts[member]
+	if typeof(sockets_any) != TYPE_ARRAY: return
+	var sockets: Array = sockets_any
+	if socket_index < 0 or socket_index >= sockets.size(): return
+	sockets[socket_index] = ""
+	_loadouts[member] = sockets
+	emit_signal("loadout_changed", member)
+
+func equip_from_inventory(member: String, socket_index: int, base_id: String) -> bool:
+	var inv: Node = get_node_or_null(INV_PATH)
+	if inv != null:
+		if inv.has_method("get_count"):
+			var c_v: Variant = inv.call("get_count", base_id)
+			if typeof(c_v) == TYPE_INT and int(c_v) <= 0:
+				return false
+		if inv.has_method("remove_item"): inv.call("remove_item", base_id, 1)
+		elif inv.has_method("consume"):    inv.call("consume", base_id, 1)
+		elif inv.has_method("add"):        inv.call("add", base_id, -1)
+	var iid: String = acquire_sigil(base_id)
+	if iid == "": return false
+	var school: String = String(_instances[iid].get("school", ""))
+	if school != "" and not _member_allows_school(member, school): return false
+	return equip_into_socket(member, socket_index, iid)
+
+func get_capacity(member: String) -> int:
+	return int(_capacity_by_member.get(member, 0))
+
+func get_loadout(member: String) -> PackedStringArray:
+	_ensure_capacity_from_bracelet(member)
+	_ensure_loadout(member)
+	_trim_or_expand_sockets(member)
+
+	# Convert any base ids found in sockets into instances on the fly
+	var changed := false
+	if _loadouts.has(member) and typeof(_loadouts[member]) == TYPE_ARRAY:
+		var arr: Array = _loadouts[member]
+		for i in range(arr.size()):
+			var s: String = String(arr[i])
+			if s != "" and not _instances.has(s):
+				var iid := acquire_sigil(s)
+				arr[i] = iid
+				if _owned.find(iid) < 0:
+					_owned.append(iid)
+				changed = true
+		if changed:
+			_loadouts[member] = arr
+			if has_signal("loadout_changed"):
+				emit_signal("loadout_changed", member)
+
+	var out := PackedStringArray()
+	var arr_any: Variant = _loadouts.get(member, [])
+	if typeof(arr_any) == TYPE_ARRAY:
+		for v in (arr_any as Array):
+			out.append(String(v))
+	return out
+
 func list_free_instances() -> PackedStringArray:
-	var in_sockets: Dictionary = {}
+	var slotted: Dictionary = {}
 	for m in _loadouts.keys():
 		var arr_any: Variant = _loadouts[m]
-		if typeof(arr_any) != TYPE_ARRAY:
-			continue
+		if typeof(arr_any) != TYPE_ARRAY: continue
 		for s in (arr_any as Array):
 			var sid: String = String(s)
-			if sid != "":
-				in_sockets[sid] = true
+			if sid != "": slotted[sid] = true
 	var out := PackedStringArray()
-	for id in _owned:
-		if not in_sockets.has(id):
-			out.append(id)
+	for iid in _owned:
+		if not slotted.has(iid): out.append(iid)
 	return out
 
-func list_free_instances_array() -> Array[String]:
-	var out: Array[String] = []
-	for s in list_free_instances():
-		out.append(String(s))
+# ── ID helpers ──────────────────────────────────────────────
+func is_instance_id(s: String) -> bool:
+	return _instances.has(s)
+
+func get_base_from_instance(id_or_inst: String) -> String:
+	if _instances.has(id_or_inst):
+		return String(_instances[id_or_inst].get("base_id", ""))
+	return id_or_inst
+
+# Common aliases
+func get_base_id(id_or_inst: String) -> String:
+	return get_base_from_instance(id_or_inst)
+func get_base_for(id_or_inst: String) -> String:
+	return get_base_from_instance(id_or_inst)
+func get_source_base(id_or_inst: String) -> String:
+	return get_base_from_instance(id_or_inst)
+
+# ── School helpers for UI filtering ─────────────────────────
+func get_element_for(base_id: String) -> String:
+	return _school_of_base(base_id)
+func get_mind_for(base_id: String) -> String:
+	return _school_of_base(base_id)
+func get_element_for_instance(inst_id: String) -> String:
+	if _instances.has(inst_id):
+		return String(_instances[inst_id].get("school",""))
+	return _school_of_base(get_base_from_instance(inst_id))
+func get_mind_for_instance(inst_id: String) -> String:
+	return get_element_for_instance(inst_id)
+
+# ─────────────────────── Names / labels ───────────────────────
+func get_display_name_for(id_or_inst: String) -> String:
+	var base: String = get_base_from_instance(id_or_inst)
+	if base == "":
+		base = id_or_inst
+	var rec: Dictionary = _item_def(base)
+	var label: String = ""
+	for k in ["display_name","name"]:
+		if rec.has(k) and typeof(rec[k]) == TYPE_STRING:
+			label = String(rec[k]); break
+	if label == "": label = base
+	if is_instance_id(id_or_inst):
+		var idx_text: String = id_or_inst.substr(id_or_inst.find(INSTANCE_SEP) + INSTANCE_SEP.length())
+		if idx_text != "":
+			label = "%s #%s" % [label, idx_text]
+	return label
+
+# Pretty-name for a skill id from CSVs
+func get_skill_display_name(skill_id: String) -> String:
+	if skill_id == "": return ""
+	if _skill_name_by_id.has(skill_id):
+		return String(_skill_name_by_id[skill_id])
+	return skill_id
+
+# Active skill helpers
+func get_active_skill_id_for_instance(inst_id: String) -> String:
+	if _instances.has(inst_id):
+		return String(_instances[inst_id].get("active_skill", ""))
+	return ""
+
+func get_active_skill_name_for_instance(inst_id: String) -> String:
+	var sid: String = get_active_skill_id_for_instance(inst_id)
+	return (get_skill_display_name(sid) if sid != "" else "")
+
+# ─────────────────────── Unlock logic ───────────────────────
+func list_unlocked_skills(inst_id: String) -> PackedStringArray:
+	var out := PackedStringArray()
+	if not _instances.has(inst_id): return out
+
+	var lvl: int = int(_instances[inst_id].get("level", 1))
+	var base_id: String = String(_instances[inst_id].get("base_id", ""))
+
+	if base_id != "" and _holder_skills_by_base.has(base_id):
+		var arr_any: Variant = _holder_skills_by_base[base_id]
+		if typeof(arr_any) == TYPE_ARRAY:
+			var arr: Array = arr_any as Array
+			var count: int = clampi(lvl, 1, arr.size())
+			for i in range(count):
+				out.append(String(arr[i]))
+			return out
+
+	# Fallback unlocks
+	out.append("Skill I")
+	if lvl >= 3: out.append("Skill II")
+	if lvl >= 5: out.append("Skill III")
 	return out
 
-func list_all_instances(equipped_only: bool = false) -> Array[String]:
-	var ids: Dictionary = {}
-	if not equipped_only:
-		for s in _owned:
-			ids[String(s)] = true
+func set_active_skill_for_instance(inst_id: String, skill_id: String) -> bool:
+	if not _instances.has(inst_id): return false
+	var unlocked: PackedStringArray = list_unlocked_skills(inst_id)
+	if unlocked.find(skill_id) < 0: return false
+	_instances[inst_id]["active_skill"] = skill_id
 	for m in _loadouts.keys():
 		var arr_any: Variant = _loadouts[m]
-		if typeof(arr_any) != TYPE_ARRAY:
-			continue
-		for v in (arr_any as Array):
-			var sid: String = String(v)
-			if sid != "":
-				ids[sid] = true
-	var out: Array[String] = []
-	for k in ids.keys():
-		out.append(String(k))
-	return out
+		if typeof(arr_any) == TYPE_ARRAY:
+			for s in (arr_any as Array):
+				if String(s) == inst_id and has_signal("loadout_changed"):
+					emit_signal("loadout_changed", String(m))
+	return true
 
-func draft_from_inventory(base_id: String) -> String:
-	return _mint_instance_from_inventory(base_id)
+# ─────────────────────── Cheats / XP API ───────────────────────
+func get_instance_level(inst_id: String) -> int:
+	if _instances.has(inst_id): return int(_instances[inst_id].get("level", 1))
+	return 1
 
-func cheat_set_instance_level(instance_id: String, new_level: int) -> void:
-	if not _instances.has(instance_id):
+func cheat_set_instance_level(inst_id: String, new_level: int) -> void:
+	if not _instances.has(inst_id):
 		return
-	var inst: Dictionary = _instances[instance_id]
-	var clamped: int = clamp(new_level, 1, 4)
-	inst["level"] = clamped
-	if clamped >= 4:
-		inst["xp"] = 0
-	var allowed: PackedStringArray = _allowed_for_instance(instance_id)
-	var active: String = String(inst.get("active_skill",""))
-	if allowed.size() > 0 and allowed.find(active) < 0:
-		inst["active_skill"] = allowed[allowed.size() - 1]
-	_instances[instance_id] = inst
-	var who: String = _find_member_by_instance(instance_id)
-	if who != "":
-		loadout_changed.emit(who)
+	var lvl: int = clamp(new_level, 1, MAX_LEVEL)
+	_instances[inst_id]["level"] = lvl
+	_instances[inst_id]["xp"] = 0 if lvl >= MAX_LEVEL else int(_instances[inst_id].get("xp", 0))
+	_emit_progress(inst_id)
 
-func debug_spawn_instance(base_id: String, level: int = 1, tier: int = 1, xp: int = 0) -> String:
-	if base_id == "":
-		return ""
-	var school: String = _school_of_base(base_id)
-	if school == "":
-		school = "Fire"
-	var idx: int = _next_instance_idx
-	_next_instance_idx += 1
-	var inst_id: String = "%s%s%04d" % [base_id, INSTANCE_SEP, idx]
-	_instances[inst_id] = {
-		"base_id": base_id,
-		"school": school,
-		"tier": max(1, tier),
-		"level": clamp(level, 1, 4),
-		"xp": max(0, xp),
-		"active_skill": ""
-	}
-	if _owned.find(inst_id) < 0:
-		_owned.append(inst_id)
-	return inst_id
+func cheat_add_xp_to_instance(inst_id: String, amount: int, require_equipped: bool) -> void:
+	add_xp_to_instance(inst_id, amount, require_equipped, "cheat")
 
-# --------------------------------------------------------------------
-# Save / Load
-# --------------------------------------------------------------------
-func get_save_blob() -> Dictionary:
-	var blob := {
+func add_xp_to_instance(inst_id: String, amount: int, require_equipped: bool = false, _source: String = "") -> void:
+	if amount == 0 or not _instances.has(inst_id):
+		return
+	if require_equipped and not _is_equipped(inst_id):
+		return
+
+	var row: Dictionary = _instances[inst_id]
+	var cur_lvl: int = int(row.get("level", 1))
+	var pool: int = int(row.get("xp", 0)) + amount
+
+	while cur_lvl < MAX_LEVEL and pool >= _xp_to_next_level(cur_lvl):
+		pool -= _xp_to_next_level(cur_lvl)
+		cur_lvl += 1
+
+	_instances[inst_id]["level"] = cur_lvl
+	_instances[inst_id]["xp"]    = (0 if cur_lvl >= MAX_LEVEL else max(0, pool))
+
+	_emit_progress(inst_id)
+
+func get_instance_progress(inst_id: String) -> Dictionary:
+	if not _instances.has(inst_id):
+		return {"pct": 0, "xp": 0, "to_next": 0, "level": 1}
+	var lvl: int = int(_instances[inst_id].get("level", 1))
+	var xp: int  = int(_instances[inst_id].get("xp", 0))
+	if lvl >= MAX_LEVEL:
+		return {"pct": 100, "xp": 0, "to_next": 0, "level": MAX_LEVEL}
+	var to_next: int = _xp_to_next_level(lvl)
+	var pct: int = int(round(100.0 * float(xp) / float(max(1, to_next))))
+	return {"pct": clampi(pct, 0, 100), "xp": xp, "to_next": to_next, "level": lvl}
+
+# ─────────────────────── Save / Load ───────────────────────
+func save() -> Dictionary:
+	return {
 		"instances": _instances.duplicate(true),
 		"owned": _owned.duplicate(),
 		"loadouts": _loadouts.duplicate(true),
 		"next_idx": _next_instance_idx
 	}
-	return blob
 
-func apply_save_blob(blob: Dictionary) -> void:
-	# -------- instances --------
-	var inst_in_v: Variant = blob.get("instances", {})
+func load(data: Dictionary) -> void:
+	var inst_in_v: Variant = data.get("instances", {})
 	var new_inst: Dictionary = {}
 	if typeof(inst_in_v) == TYPE_DICTIONARY:
 		var inst_in: Dictionary = inst_in_v
 		for k_v in inst_in.keys():
 			var iid: String = String(k_v)
 			var row_v: Variant = inst_in[k_v]
-			if typeof(row_v) != TYPE_DICTIONARY:
-				continue
+			if typeof(row_v) != TYPE_DICTIONARY: continue
 			var row: Dictionary = row_v
-			var base_id: String = String(row.get("base_id",""))
-			if base_id == "":
-				continue
+			var base_id: String = String(row.get("base_id", ""))
+			if base_id == "": continue
 			new_inst[iid] = {
 				"base_id": base_id,
-				"school": String(row.get("school","")),
-				"tier": int(row.get("tier",1)),
-				"level": int(row.get("level",1)),
-				"xp": int(row.get("xp",0)),
-				"active_skill": String(row.get("active_skill",""))
+				"school": String(row.get("school", "")),
+				"tier": int(row.get("tier", 1)),
+				"level": int(row.get("level", 1)),
+				"xp": int(row.get("xp", 0)),
+				"active_skill": String(row.get("active_skill", ""))
 			}
 	_instances = new_inst
 
-	# -------- owned --------
-	var owned_in_v: Variant = blob.get("owned", [])
-	var new_owned := PackedStringArray()
-	if typeof(owned_in_v) == TYPE_PACKED_STRING_ARRAY:
-		new_owned = owned_in_v as PackedStringArray
-	elif typeof(owned_in_v) == TYPE_ARRAY:
-		for v in (owned_in_v as Array):
-			var s := String(v)
-			if _instances.has(s): new_owned.append(s)
-	# ensure anything in sockets is also marked owned
-	for m_k in _loadouts.keys():
-		var arr_any: Variant = _loadouts[m_k]
-		if typeof(arr_any) == TYPE_ARRAY:
-			for sid_v in (arr_any as Array):
-				var sid := String(sid_v)
-				if sid != "" and _instances.has(sid) and new_owned.find(sid) < 0:
-					new_owned.append(sid)
-	_owned = new_owned
-
-	# -------- loadouts --------
-	var lo_in_v: Variant = blob.get("loadouts", {})
+	var lo_in_v: Variant = data.get("loadouts", {})
 	var new_loadouts: Dictionary = {}
 	if typeof(lo_in_v) == TYPE_DICTIONARY:
 		var lo_in: Dictionary = lo_in_v
 		for m_k in lo_in.keys():
-			var member := String(m_k)
+			var member: String = String(m_k)
 			var arr_v: Variant = lo_in[m_k]
 			var arr: Array = []
-			if typeof(arr_v) == TYPE_PACKED_STRING_ARRAY:
-				arr = Array(arr_v)
-			elif typeof(arr_v) == TYPE_ARRAY:
-				arr = arr_v
+			if typeof(arr_v) == TYPE_PACKED_STRING_ARRAY: arr = Array(arr_v)
+			elif typeof(arr_v) == TYPE_ARRAY: arr = arr_v as Array
 			var clean: Array = []
 			for sid_v in arr:
-				var sid := String(sid_v)
-				if sid == "" or not _instances.has(sid):
-					clean.append("")
-				else:
-					clean.append(sid)
+				var sid_str: String = String(sid_v)
+				clean.append(sid_str if sid_str != "" and _instances.has(sid_str) else "")
 			new_loadouts[member] = clean
 	_loadouts = new_loadouts
 
-	# -------- next index (defensive: recompute if needed) --------
-	var want_next: int = int(blob.get("next_idx", 1))
+	var owned_in_v: Variant = data.get("owned", [])
+	var new_owned: PackedStringArray = PackedStringArray()
+	if typeof(owned_in_v) == TYPE_PACKED_STRING_ARRAY:
+		new_owned = owned_in_v as PackedStringArray
+	elif typeof(owned_in_v) == TYPE_ARRAY:
+		for v in (owned_in_v as Array):
+			var s: String = String(v)
+			if _instances.has(s): new_owned.append(s)
+	for m_k in _loadouts.keys():
+		var arr_any: Variant = _loadouts[m_k]
+		if typeof(arr_any) == TYPE_ARRAY:
+			for sid_v in (arr_any as Array):
+				var sid: String = String(sid_v)
+				if sid != "" and _instances.has(sid) and new_owned.find(sid) < 0:
+					new_owned.append(sid)
+	_owned = new_owned
+
+	var want_next: int = int(data.get("next_idx", _next_instance_idx))
 	var max_seen: int = 0
 	for iid_k in _instances.keys():
-		var iid := String(iid_k)
-		var pos := iid.rfind(INSTANCE_SEP)
-		if pos >= 0 and pos + 1 < iid.length():
-			var n_txt := iid.substr(pos + INSTANCE_SEP.length())
-			var n := n_txt.to_int()
-			if n > max_seen: max_seen = n
+		var iid_str: String = String(iid_k)
+		var pos: int = iid_str.rfind(INSTANCE_SEP)
+		if pos >= 0 and pos + 1 < iid_str.length():
+			var n_txt: String = iid_str.substr(pos + INSTANCE_SEP.length())
+			var n_val: int = n_txt.to_int()
+			if n_val > max_seen: max_seen = n_val
 	_next_instance_idx = max(want_next, max_seen + 1)
 
-	# -------- fit sockets to current bracelets and notify --------
 	for m_k in _loadouts.keys():
-		var member := String(m_k)
-		_ensure_capacity_from_bracelet(member)
-		_trim_or_expand_sockets(member)
-		loadout_changed.emit(member)
+		var member_name: String = String(m_k)
+		_ensure_capacity_from_bracelet(member_name)
+		_trim_or_expand_sockets(member_name)
+		emit_signal("loadout_changed", member_name)
 
-# ───────────────── Local helpers ─────────────────
-func _allowed_for_instance(instance_id: String) -> PackedStringArray:
-	var out := PackedStringArray()
-	if not _instances.has(instance_id):
-		return out
-	var inst: Dictionary = _instances[instance_id]
-	var base_id: String = String(inst.get("base_id",""))
-	var level: int = int(inst.get("level", 1))
-	var school: String = String(inst.get("school",""))
+func grant_sigil_instance(_id: String, _amount: int = 1) -> void:
+	emit_signal("instances_changed")
 
-	if _holder_map.has(base_id):
-		var rec_any: Variant = _holder_map[base_id]
-		if typeof(rec_any) == TYPE_DICTIONARY:
-			var rec: Dictionary = rec_any
-			var seen: Dictionary = {}
-			for i in range(1, clamp(level,1,4) + 1):
-				var key := "lv%d" % i
-				if rec.has(key):
-					var sid: String = String(rec[key])
-					if sid != "" and not seen.has(sid):
-						seen[sid] = true
-						out.append(sid)
-		return out
+# ─────────────────────── Internals ───────────────────────
+func _on_grant_sigil_xp(inst_id: String, amount: int, require_equipped: bool, _source: String) -> void:
+	add_xp_to_instance(inst_id, amount, require_equipped, _source)
 
-	if _skills_by_school.has(school):
-		var arr_any: Variant = _skills_by_school[school]
-		if typeof(arr_any) == TYPE_ARRAY:
-			for s in (arr_any as Array):
-				var d: Dictionary = s
-				if int(d.get("level_req", 1)) <= level:
-					out.append(String(d["skill_id"]))
-	return out
+func _emit_progress(inst_id: String) -> void:
+	var p: Dictionary = get_instance_progress(inst_id)
+	emit_signal("instance_xp_changed", inst_id, int(p.get("level", 1)), int(p.get("xp", 0)), int(p.get("to_next", 0)))
 
-func _is_equipped(instance_id: String) -> bool:
-	for m in _loadouts.keys():
-		var arr_any: Variant = _loadouts[m]
-		if typeof(arr_any) != TYPE_ARRAY:
-			continue
-		for s in (arr_any as Array):
-			if String(s) == instance_id:
-				return true
-	return false
+func _ensure_loadout(member: String) -> void:
+	if not _loadouts.has(member):
+		_loadouts[member] = []
 
-func _find_member_by_instance(instance_id: String) -> String:
-	for m_k in _loadouts.keys():
-		var member: String = String(m_k)
-		var arr_any: Variant = _loadouts[member]
-		if typeof(arr_any) != TYPE_ARRAY:
-			continue
-		for v in (arr_any as Array):
-			if String(v) == instance_id:
-				return member
-	return ""
-
-func _item_name(item_id: String) -> String:
+func _ensure_capacity_from_bracelet(member: String) -> void:
+	var cap: int = 0
+	var eq: Node = get_node_or_null(EQUIP_PATH)
 	var inv: Node = get_node_or_null(INV_PATH)
-	if inv and inv.has_method("get_item_defs"):
-		var d_v: Variant = inv.call("get_item_defs")
+	var bracelet_id: String = ""
+	if eq != null and eq.has_method("get_member_equip"):
+		var d_v: Variant = eq.call("get_member_equip", member)
 		if typeof(d_v) == TYPE_DICTIONARY:
 			var d: Dictionary = d_v
-			if d.has(item_id):
-				var r: Dictionary = d[item_id]
-				return String(r.get("name", item_id))
-	return item_id
+			bracelet_id = String(d.get("bracelet", ""))
+	if bracelet_id != "" and inv != null and inv.has_method("get_item_defs"):
+		var defs_v: Variant = inv.call("get_item_defs")
+		if typeof(defs_v) == TYPE_DICTIONARY:
+			var defs: Dictionary = defs_v
+			if defs.has(bracelet_id):
+				var rec: Dictionary = defs[bracelet_id]
+				for k in ["sigil_slots","slots","capacity","slot_count"]:
+					if rec.has(k): cap = int(rec[k]); break
+	_capacity_by_member[member] = max(0, cap)
 
-func _skill_name(skill_id: String) -> String:
-	for k in _skills_by_school.keys():
-		var arr_v: Variant = _skills_by_school[k]
-		if typeof(arr_v) == TYPE_ARRAY:
-			var arr: Array = arr_v
-			for s in arr:
-				var d: Dictionary = s as Dictionary
-				if String(d["skill_id"]) == skill_id:
-					return String(d["name"])
-	return skill_id
+func _trim_or_expand_sockets(member: String) -> void:
+	var cap: int = get_capacity(member)
+	var sockets: Array = []
+	if _loadouts.has(member):
+		var arr_any: Variant = _loadouts[member]
+		if typeof(arr_any) == TYPE_ARRAY:
+			sockets = arr_any as Array
+	if cap < sockets.size():
+		while sockets.size() > cap: sockets.remove_at(sockets.size() - 1)
+	elif cap > sockets.size():
+		while sockets.size() < cap: sockets.append("")
+	_loadouts[member] = sockets
 
-# Prefer Inventory defs -> items.csv (sigil_school) -> parse from id
+func _member_allows_school(member: String, school: String) -> bool:
+	return is_school_allowed_for_member(member, school)
+
+func is_school_allowed_for_member(member: String, school: String) -> bool:
+	if school.strip_edges() == "" or String(member).strip_edges() == "":
+		return true
+	var base: String = resolve_member_mind_base(member)
+	if base == "Omega": return true
+	var mt: Node = get_node_or_null(MIND_PATH)
+	if mt != null and mt.has_method("is_school_allowed"):
+		return bool(mt.call("is_school_allowed", base, school))
+	return true
+
+func resolve_member_mind_base(member: String) -> String:
+	var stats_sys: Node = get_node_or_null("/root/aStatsSystem")
+	if stats_sys != null:
+		var defs_v: Variant = stats_sys.get("_csv_by_id")
+		if typeof(defs_v) == TYPE_DICTIONARY:
+			var defs: Dictionary = defs_v
+			var rid: String = String(member)
+			if defs.has(rid):
+				var row: Dictionary = defs[rid] as Dictionary
+				for k in ["mind_type","mind_type_id","mind","mind_base","mind_tag"]:
+					if row.has(k):
+						var base := String(row[k]).strip_edges()
+						if base != "": return base.capitalize()
+	var gs: Node = get_node_or_null("/root/aGameState")
+	if gs != null and gs.has_method("get_member_field"):
+		var mv: Variant = gs.call("get_member_field", member, "mind_type")
+		if typeof(mv) == TYPE_STRING and String(mv).strip_edges() != "":
+			return String(mv).capitalize()
+	return "Omega"
+
 func _school_of_base(base_id: String) -> String:
-	# 1) Try item defs already in memory
 	var inv: Node = get_node_or_null(INV_PATH)
-	if inv and inv.has_method("get_item_defs"):
+	if inv != null and inv.has_method("get_item_defs"):
 		var dv: Variant = inv.call("get_item_defs")
 		if typeof(dv) == TYPE_DICTIONARY:
 			var defs: Dictionary = dv
@@ -745,177 +495,231 @@ func _school_of_base(base_id: String) -> String:
 				var rec: Dictionary = defs[base_id]
 				for k in ["sigil_school","school","mind_type_tag","mind_type","mind_tag"]:
 					if rec.has(k):
-						var s := String(rec[k]).strip_edges()
-						if s != "":
-							return s.capitalize()
-
-	# 2) Items CSV (source of truth for sigil_school)
-	var from_csv := _item_school_from_items_csv(base_id)
-	if from_csv != "":
-		return from_csv
-
-	# 3) Parse from id like "SIG_FIRE_*"
+						var s: String = String(rec[k]).strip_edges()
+						if s != "": return s.capitalize()
 	if base_id.begins_with(SIGIL_ID_PREFIX):
-		var rest := base_id.substr(SIGIL_ID_PREFIX.length())
-		var cut := rest.find("_")
-		var token := (rest if cut < 0 else rest.substr(0, cut))
-		if token != "":
-			return token.capitalize()
-
+		var rest: String = base_id.substr(SIGIL_ID_PREFIX.length())
+		var cut: int = rest.find("_")
+		var token: String = (rest if cut < 0 else rest.substr(0, cut))
+		if token != "": return token.capitalize()
 	return ""
 
-# ───── Mind Type gating resolvers (Party/Mind systems with CSV fallback) ─────
-func resolve_member_mind_base(member: String) -> String:
-	var ps := get_node_or_null(PARTY_PATH)
-	if ps and ps.has_method("get_member_mind_base"):
-		var v: Variant = ps.call("get_member_mind_base", member)
-		if typeof(v) == TYPE_STRING and String(v) != "":
-			return String(v).capitalize()
-	var from_csv := _member_mind_from_csv(member)
-	if from_csv != "":
-		return from_csv.capitalize()
-	return "Omega"
+func _item_def(id: String) -> Dictionary:
+	var inv: Node = get_node_or_null(INV_PATH)
+	if inv != null and inv.has_method("get_item_defs"):
+		var dv: Variant = inv.call("get_item_defs")
+		if typeof(dv) == TYPE_DICTIONARY:
+			var defs: Dictionary = dv
+			return defs.get(id, {}) as Dictionary
+	return {}
 
-func is_school_allowed_for_member(member: String, school: String) -> bool:
-	if school.strip_edges() == "" or member.strip_edges() == "":
-		return true
-	var base := resolve_member_mind_base(member)
-	if base == "Omega":
-		return true
-	var mt := get_node_or_null(MIND_PATH)
-	if mt and mt.has_method("is_school_allowed"):
-		return bool(mt.call("is_school_allowed", base, school))
-	return _mind_allows_school_csv(base, school)
+func _is_equipped(inst_id: String) -> bool:
+	for m in _loadouts.keys():
+		var arr_any: Variant = _loadouts[m]
+		if typeof(arr_any) != TYPE_ARRAY: continue
+		for s in (arr_any as Array):
+			if String(s) == inst_id: return true
+	return false
 
-func _member_allows_school(member: String, school: String) -> bool:
-	return is_school_allowed_for_member(member, school)
+# You can swap these numbers to match your CSV later.
+func _xp_to_next_level(level: int) -> int:
+	match level:
+		1: return 120
+		2: return 240
+		3: return 360    # 3 -> 4
+		_: return 0      # at MAX or invalid, no progress
 
-# ───── CSV helper functions (raw reader; no CSVLoader usage) ─────
-func _first_existing_csv(paths: Array) -> String:
-	for p in paths:
-		if FileAccess.file_exists(String(p)):
-			return String(p)
-	return ""
+# ─────────────────────── CSV loading ───────────────────────
+func _load_databases() -> void:
+	_skill_name_by_id = {}
+	_holder_skills_by_base = {}
+	_load_skill_names(PATH_SKILLS)
+	_load_holder_map(PATH_HOLDER)
 
-func _csv_read_rows_raw(path: String) -> Array:
-	var rows: Array = []
-	if path == "" or not FileAccess.file_exists(path):
-		return rows
+func _load_skill_names(path: String) -> void:
+	var rows: Array[PackedStringArray] = _read_csv_rows(path)
+	if rows.size() == 0: return
+	var header: PackedStringArray = rows[0]
+	var idx_id: int = _find_col(header, ["skill_id","id"])
+	var idx_name: int = _find_col(header, ["name","display_name","label"])
+	if idx_id < 0 or idx_name < 0: return
+	for i in range(1, rows.size()):
+		var r: PackedStringArray = rows[i]
+		if r.size() <= max(idx_id, idx_name): continue
+		var sid: String = String(r[idx_id]).strip_edges()
+		var nm: String  = String(r[idx_name]).strip_edges()
+		if sid != "" and nm != "":
+			_skill_name_by_id[sid] = nm
 
+func _load_holder_map(path: String) -> void:
+	var rows: Array[PackedStringArray] = _read_csv_rows(path)
+	if rows.size() == 0: return
+	var header: PackedStringArray = rows[0]
+	var idx_sig: int = _find_col(header, ["sigil_id","base_id","sigil"])
+	if idx_sig < 0: return
+	# accept any columns named lv1..lv99 (we’ll just read in order)
+	var lv_cols: Array[int] = []
+	for i in range(header.size()):
+		var h: String = String(header[i]).strip_edges().to_lower()
+		if h.begins_with("lv"):
+			lv_cols.append(i)
+	lv_cols.sort()
+	for i in range(1, rows.size()):
+		var r: PackedStringArray = rows[i]
+		if r.size() <= idx_sig: continue
+		var base_id: String = String(r[idx_sig]).strip_edges()
+		if base_id == "": continue
+		var arr: Array[String] = []
+		for ci in lv_cols:
+			if ci < r.size():
+				var sid: String = String(r[ci]).strip_edges()
+				if sid != "": arr.append(sid)
+		_holder_skills_by_base[base_id] = arr
+
+func _find_col(header: PackedStringArray, names: Array[String]) -> int:
+	for i in range(header.size()):
+		var h: String = String(header[i]).strip_edges().to_lower()
+		for n in names:
+			if h == n.to_lower():
+				return i
+	return -1
+
+func _read_csv_rows(path: String) -> Array[PackedStringArray]:
+	var out: Array[PackedStringArray] = []
+	if not FileAccess.file_exists(path):
+		return out
 	var f: FileAccess = FileAccess.open(path, FileAccess.READ)
 	if f == null:
-		return rows
-	if f.eof_reached():
-		f.close()
-		return rows
-
-	var header_psa: PackedStringArray = f.get_csv_line() # supports quoted CSV
-	var header: Array[String] = []
-	for h in header_psa:
-		header.append(String(h).strip_edges().to_lower())
-
+		return out
 	while not f.eof_reached():
-		var cols: PackedStringArray = f.get_csv_line()
-		if cols.is_empty():
+		var line: String = f.get_line()
+		if out.is_empty() and line.begins_with("\ufeff"):
+			line = line.substr(1) # strip BOM
+		# NOTE: simple split; your files are plain commas with no quoted commas
+		var parts := PackedStringArray()
+		for cell in line.split(","):
+			parts.append(String(cell).strip_edges())
+		# skip empty trailing rows
+		var nonempty: bool = false
+		for c in parts:
+			if String(c) != "":
+				nonempty = true; break
+		if nonempty:
+			out.append(parts)
+	return out
+# List all owned instance IDs.
+# If free_only==true, returns only not-equipped.
+func list_all_instances(free_only: bool=false) -> PackedStringArray:
+	var out := PackedStringArray()
+	var slotted: Dictionary = {}
+	if free_only:
+		for m in _loadouts.keys():
+			var arr_any: Variant = _loadouts[m]
+			if typeof(arr_any) == TYPE_ARRAY:
+				for s in (arr_any as Array):
+					var sid := String(s)
+					if sid != "": slotted[sid] = true
+	for iid in _owned:
+		if free_only and slotted.has(iid):
 			continue
-		var row: Dictionary = {}
-		var n: int = min(header.size(), cols.size())
-		for i in range(n):
-			var key: String = header[i]
-			var val: String = String(cols[i])
-			row[key] = val
-		rows.append(row)
+		out.append(iid)
+	return out
 
-	f.close()
-	return rows
-
-func _pick_first(row: Dictionary, keys: Array, default_val: String = "") -> String:
-	# row keys are lower-cased by _csv_read_rows_raw
-	for k_any in keys:
-		var key: String = String(k_any).to_lower()
-		if row.has(key):
-			var v: Variant = row[key]
-			var t := typeof(v)
-			if t == TYPE_STRING or t == TYPE_INT or t == TYPE_FLOAT:
-				var s: String = String(v).strip_edges()
-				if s != "":
-					return s
-	return default_val
-
-func _item_school_from_items_csv(base_id: String) -> String:
-	var path := _first_existing_csv(ITEMS_CSV_CANDIDATES)
-	if path == "":
-		return ""
-	var rows := _csv_read_rows_raw(path)
-	var want := base_id.strip_edges().to_lower()
-	for row_any in rows:
-		if typeof(row_any) != TYPE_DICTIONARY:
-			continue
-		var row: Dictionary = row_any
-		var id_txt := _pick_first(row, ITEM_ID_KEYS, "").strip_edges().to_lower()
-		if id_txt != want:
-			continue
-		var school := _pick_first(row, ITEM_SCHOOL_KEYS, "").strip_edges()
-		if school != "":
-			return school.capitalize()
+# Who (if anyone) equips this instance.
+func who_equips_instance(inst_id: String) -> String:
+	for m in _loadouts.keys():
+		var arr_any: Variant = _loadouts[m]
+		if typeof(arr_any) == TYPE_ARRAY:
+			for s in (arr_any as Array):
+				if String(s) == inst_id:
+					return String(m)
 	return ""
 
-func _member_mind_from_csv(member: String) -> String:
-	var party_csv := _first_existing_csv(PARTY_CSV_CANDIDATES)
-	if party_csv == "":
-		return ""
-	var rows := _csv_read_rows_raw(party_csv)
-	if rows.is_empty():
-		return ""
-	var member_lc := member.strip_edges().to_lower()
+func list_equipped_instances() -> PackedStringArray:
+	var out := PackedStringArray()
+	for m in _loadouts.keys():
+		var arr_any: Variant = _loadouts[m]
+		if typeof(arr_any) != TYPE_ARRAY: continue
+		for s in (arr_any as Array):
+			var sid := String(s)
+			if sid != "" and out.find(sid) < 0:
+				out.append(sid)
+	return out
 
-	for row_any in rows:
-		if typeof(row_any) != TYPE_DICTIONARY:
-			continue
-		var row: Dictionary = row_any
-		var id_txt   := _pick_first(row, PARTY_ID_KEYS, "")
-		var name_txt := _pick_first(row, PARTY_NAME_KEYS, "")
-		if id_txt.to_lower() == member_lc or name_txt.to_lower() == member_lc:
-			var mind := _pick_first(row, PARTY_MIND_KEYS, "")
-			if mind != "":
-				return mind.capitalize()
-	return ""
+# Rich info bundle for UI panels.
+func get_instance_info(inst_id: String) -> Dictionary:
+	if not _instances.has(inst_id):
+		return {}
+	var row: Dictionary = _instances[inst_id]
+	var base_id := String(row.get("base_id",""))
+	var school  := String(row.get("school",""))
+	var level   := int(row.get("level",1))
+	var xp      := int(row.get("xp",0))
+	var active  := String(row.get("active_skill",""))
+	var active_name := (get_skill_display_name(active) if active != "" else "")
+	var eq_by := who_equips_instance(inst_id)
+	return {
+		"instance_id": inst_id,
+		"base_id": base_id,
+		"school": school,
+		"level": level,
+		"xp": xp,
+		"tier": int(row.get("tier",1)),
+		"active_skill_id": active,
+		"active_skill_name": active_name,
+		"equipped": eq_by != "",
+		"equipped_by": eq_by
+	}
+# ─────────────────────── Instance removal API ───────────────────────
+func unequip_instance(member: String, inst_id: String) -> bool:
+	if not _loadouts.has(member):
+		return false
+	var sockets_any: Variant = _loadouts[member]
+	if typeof(sockets_any) != TYPE_ARRAY:
+		return false
+	var sockets: Array = sockets_any as Array
+	var changed := false
+	for i in range(sockets.size()):
+		if String(sockets[i]) == inst_id:
+			sockets[i] = ""
+			changed = true
+	if changed:
+		_loadouts[member] = sockets
+		emit_signal("loadout_changed", member)
+	return changed
 
-func _mind_allows_school_csv(mind_base: String, school: String) -> bool:
-	var mind_csv := _first_existing_csv(MIND_TYPES_CSV_CANDIDATES)
-	if mind_csv == "":
-		return true
-	var rows := _csv_read_rows_raw(mind_csv)
-	if rows.is_empty():
-		return true
 
-	var want := mind_base.strip_edges().to_lower()
-	var school_lc := school.strip_edges().to_lower()
-	if want == "":
-		return true
+func delete_instance(inst_id: String) -> void:
+	if inst_id.strip_edges() == "":
+		return
+	# Remove from every member's loadout
+	for m_k in _loadouts.keys():
+		unequip_instance(String(m_k), inst_id)
 
-	for row_any in rows:
-		if typeof(row_any) != TYPE_DICTIONARY:
-			continue
-		var row: Dictionary = row_any
-		var id_txt := _pick_first(row, MIND_ID_KEYS, "").to_lower()
-		if id_txt == want:
-			var allowed_raw := _pick_first(row, MIND_ALLOWED_KEYS, "")
-			if allowed_raw == "":
-				return true
-			var toks := allowed_raw.split(",", false)
-			if toks.size() == 1: toks = allowed_raw.split(";", false)
-			if toks.size() == 1: toks = allowed_raw.split("|", false)
-			if toks.size() == 1: toks = allowed_raw.split(" ", false)
-			for t in toks:
-				if String(t).strip_edges().to_lower() == school_lc:
-					return true
-			return false
-	return true
+	# Remove from owned list
+	var new_owned := PackedStringArray()
+	for s in _owned:
+		if String(s) != inst_id:
+			new_owned.append(String(s))
+	_owned = new_owned
 
-# ───── Misc ─────
-func _to_int(v: Variant) -> int:
-	var t: int = typeof(v)
-	if t == TYPE_INT: return int(v)
-	if t == TYPE_FLOAT: return int(roundf(float(v)))
-	return String(v).to_int()
+	# Remove from instance table
+	_instances.erase(inst_id)
+
+	# Let UIs refresh
+	emit_signal("instances_changed")
+
+
+# Optional aliases so callers with different names still work
+func remove_instance(inst_id: String) -> void: delete_instance(inst_id)
+func discard_instance(inst_id: String) -> void: delete_instance(inst_id)
+func destroy_instance(inst_id: String) -> void: delete_instance(inst_id)
+
+# (Optional) setters used by some UIs; safe no-ops if you don’t call them.
+func set_loadout(member: String, sockets: PackedStringArray) -> void:
+	_loadouts[member] = Array(sockets)
+	_trim_or_expand_sockets(member)
+	emit_signal("loadout_changed", member)
+
+func set_member_loadout(member: String, sockets: PackedStringArray) -> void:
+	set_loadout(member, sockets)

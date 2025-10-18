@@ -22,9 +22,6 @@ const TAB_ORDER: PackedStringArray = [
 	"status","stats","perks","items","loadout","bonds","outreach","dorms","calendar","index","system"
 ]
 
-
-
-
 @onready var _left_tabs: VBoxContainer = %LeftTabs
 @onready var _panel_holder: Control    = %PanelHolder
 
@@ -51,11 +48,13 @@ func _build_tabs() -> void:
 		child.queue_free()
 	await get_tree().process_frame
 
-	var ids: PackedStringArray = TAB_ORDER
-	if ids.is_empty():
+	# Use a plain Array to avoid PackedStringArray mutability/typing traps
+	var ids: Array = Array(TAB_ORDER)
+	if ids.size() == 0:
 		ids = TAB_DEFS.keys()
 
-	for tab_id in ids:
+	for tab_id_any in ids:
+		var tab_id: String = String(tab_id_any)
 		if not TAB_DEFS.has(tab_id):
 			continue
 		var meta: Dictionary = TAB_DEFS[tab_id]

@@ -1,167 +1,164 @@
 extends Control
 class_name SigilSkillMenu
 
-# ------------------------------ robust node lookup ----------------------------
-func _find_node_of_type(root: Node, type_name: String, wanted_name: String) -> Node:
-	var by_unique: Node = root.get_node_or_null("%" + wanted_name)
-	if by_unique != null:
-		return by_unique
-	var exact: Node = root.find_child(wanted_name, true, false)
-	if exact != null:
-		return exact
-	var stack: Array[Node] = [root]
-	while stack.size() > 0:
-		var cur: Node = stack.pop_back() as Node
-		var cls: String = cur.get_class()
-		if cls == type_name \
-		or (type_name == "ItemList" and cur is ItemList) \
-		or (type_name == "Label" and cur is Label) \
-		or (type_name == "TextureProgressBar" and cur is TextureProgressBar) \
-		or (type_name == "Button" and cur is Button):
-			if wanted_name == "" or String(cur.name).to_lower().find(wanted_name.to_lower()) >= 0:
-				return cur
-		var children: Array = cur.get_children()
-		for c in children:
-			if c is Node:
-				stack.append(c)
-	return null
+# Systems
+var _sig: Node = null
 
-# ------------------------------ scene refs ------------------------------------
-var _title_lbl      : Label               = null
-var _sub_lbl        : Label               = null
-var _lv_label       : Label               = null
-var _xp_bar         : TextureProgressBar  = null
-var _xp_value       : Label               = null
-var _sockets_il     : ItemList            = null
-var _skills_il      : ItemList            = null
-var _btn_set_active : Button              = null
-var _btn_close      : Button              = null
+# State
+var _member: String = ""
+var _capacity: int = 0
+var _loadout: PackedStringArray = PackedStringArray()
+var _selected_socket: int = -1
+var _selected_inst: String = ""
+var _skill_ids: Array[String] = []
 
-# systems
-var _sig : Node = null
+# Scene nodes (from your .tscn)
+@onready var _backdrop: ColorRect = $"Backdrop" as ColorRect
+@onready var _title: Label = $"Center/Card/CardPad/MainRow/LeftColumn/HeaderRow/Title" as Label
+@onready var _sub: Label = $"Center/Card/CardPad/MainRow/LeftColumn/Sub" as Label
+@onready var _lv: Label = $"Center/Card/CardPad/MainRow/LeftColumn/LevelRow/LvLabel" as Label
+@onready var _xpbar: ProgressBar = $"Center/Card/CardPad/MainRow/LeftColumn/LevelRow/XPBar" as ProgressBar
+@onready var _xpval: Label = $"Center/Card/CardPad/MainRow/LeftColumn/LevelRow/XPValue" as Label
+@onready var _sockets: ItemList = $"Center/Card/CardPad/MainRow/LeftColumn/SocketsList" as ItemList
+@onready var _skills: ItemList = $"Center/Card/CardPad/MainRow/RightColumn/SkillsList" as ItemList
+@onready var _btn_set: Button = $"Center/Card/CardPad/MainRow/RightColumn/ButtonsRow/BtnSetActive" as Button
+@onready var _btn_close: Button = $"Center/Card/CardPad/MainRow/RightColumn/ButtonsRow/BtnClose" as Button
 
-# state
-var _member          : String            = ""
-var _capacity        : int               = 0
-var _sockets         : PackedStringArray = PackedStringArray()
-var _selected_socket : int               = -1
-var _selected_inst   : String            = ""
-var _skill_ids       : Array[String]     = []
-
-# ------------------------------ lifecycle -------------------------------------
 func _ready() -> void:
 	_sig = get_node_or_null("/root/aSigilSystem")
+	# Softer dimmer so the game behind isn’t shouting
+	if _backdrop:
+		_backdrop.color = Color(0, 0, 0, 0.35)
+	mouse_filter = Control.MOUSE_FILTER_STOP
 
-	_title_lbl      = _find_node_of_type(self, "Label",              "Title")        as Label
-	_sub_lbl        = _find_node_of_type(self, "Label",              "Sub")          as Label
-	_lv_label       = _find_node_of_type(self, "Label",              "LvLabel")      as Label
-	_xp_bar         = _find_node_of_type(self, "TextureProgressBar", "XPBar")        as TextureProgressBar
-	_xp_value       = _find_node_of_type(self, "Label",              "XPValue")      as Label
-	_sockets_il     = _find_node_of_type(self, "ItemList",           "SocketsList")  as ItemList
-	_skills_il      = _find_node_of_type(self, "ItemList",           "SkillsList")   as ItemList
-	_btn_set_active = _find_node_of_type(self, "Button",             "BtnSetActive") as Button
-	_btn_close      = _find_node_of_type(self, "Button",             "BtnClose")     as Button
-
-	if _btn_close and not _btn_close.pressed.is_connected(_on_close):
-		_btn_close.pressed.connect(_on_close)
-	if _sockets_il and not _sockets_il.item_selected.is_connected(_on_socket_pick):
-		_sockets_il.item_selected.connect(_on_socket_pick)
-	if _btn_set_active and not _btn_set_active.pressed.is_connected(_on_set_active):
-		_btn_set_active.pressed.connect(_on_set_active)
+	# Wire signals
+	if _sockets and not _sockets.item_selected.is_connected(Callable(self, "_on_socket_pick")):
+		_sockets.item_selected.connect(Callable(self, "_on_socket_pick"))
+	if _btn_set and not _btn_set.pressed.is_connected(Callable(self, "_on_set_active")):
+		_btn_set.pressed.connect(Callable(self, "_on_set_active"))
+	if _btn_close and not _btn_close.pressed.is_connected(Callable(self, "_on_close")):
+		_btn_close.pressed.connect(Callable(self, "_on_close"))
 
 	set_process_unhandled_input(true)
 	_refresh_all()
 
-func _unhandled_input(event: InputEvent) -> void:
-	if event is InputEventKey and event.is_pressed() and event.keycode == KEY_ESCAPE:
+func _unhandled_input(e: InputEvent) -> void:
+	if e is InputEventKey and e.is_pressed() and e.keycode == KEY_ESCAPE:
 		_on_close()
 
-# ------------------------------ public API ------------------------------------
+# Public
 func set_member(member: String) -> void:
 	_member = member
 	_refresh_all()
 
-# ------------------------------ refresh pipeline ------------------------------
+# ───────────────── data refresh ─────────────────
 func _refresh_all() -> void:
 	_refresh_capacity_and_loadout()
 	_refresh_sockets()
 
 	if _selected_socket < 0:
-		for i in range(min(_capacity, _sockets.size())):
-			if String(_sockets[i]) != "":
+		for i in range(min(_capacity, _loadout.size())):
+			if String(_loadout[i]) != "":
 				_selected_socket = i
 				break
 	if _selected_socket < 0 and _capacity > 0:
 		_selected_socket = 0
 
-	if _sockets_il and _selected_socket >= 0 and _selected_socket < _sockets_il.item_count:
-		_sockets_il.select(_selected_socket)
+	if _sockets and _selected_socket >= 0 and _selected_socket < _sockets.item_count:
+		_sockets.select(_selected_socket)
 		_on_socket_pick(_selected_socket)
 	else:
 		_refresh_detail("")
 
 func _refresh_capacity_and_loadout() -> void:
 	_capacity = 0
-	_sockets.clear()
+	_loadout.clear()
 
 	if _sig:
 		if _sig.has_method("get_capacity"):
 			var cap_v: Variant = _sig.call("get_capacity", _member)
 			_capacity = int(cap_v)
+
 		if _sig.has_method("get_loadout"):
 			var ld_v: Variant = _sig.call("get_loadout", _member)
 			if typeof(ld_v) == TYPE_PACKED_STRING_ARRAY:
-				_sockets = (ld_v as PackedStringArray)
+				_loadout = ld_v as PackedStringArray
 			elif typeof(ld_v) == TYPE_ARRAY:
 				var tmp: PackedStringArray = PackedStringArray()
 				for e in (ld_v as Array):
 					tmp.append(String(e))
-				_sockets = tmp
+				_loadout = tmp
 
-	while _sockets.size() < _capacity:
-		_sockets.append("")
+	while _loadout.size() < _capacity:
+		_loadout.append("")
 
 func _refresh_sockets() -> void:
-	if _sockets_il == null:
+	if _sockets == null:
 		return
 
-	_sockets_il.clear()
-
+	_sockets.clear()
 	var used: int = 0
 	for i in range(_capacity):
-		var inst_id: String = (String(_sockets[i]) if i < _sockets.size() else "")
+		var inst_id: String = (String(_loadout[i]) if i < _loadout.size() else "")
 		var disp: String = "(empty)"
 		if inst_id != "":
 			used += 1
-			disp = _get_display_name(inst_id)
-		_sockets_il.add_item("%d) %s" % [i + 1, disp])
+			disp = _sigil_label(inst_id)
+		_sockets.add_item("%d) %s" % [i + 1, disp])
 
-	if _title_lbl:
-		_title_lbl.text = "Sigil Skills"
-	if _sub_lbl:
-		_sub_lbl.text = "(%d/%d)" % [used, _capacity]
+	if _title:
+		_title.text = "Sigil Skills"
+	if _sub:
+		_sub.text = "(%d/%d)" % [used, _capacity]
+
+func _sigil_label(inst_id: String) -> String:
+	var base_id := inst_id
+	if _sig and _sig.has_method("get_base_from_instance"):
+		base_id = String(_sig.call("get_base_from_instance", inst_id))
+
+	var name_txt := base_id
+	if _sig and _sig.has_method("get_display_name_for"):
+		var n_v: Variant = _sig.call("get_display_name_for", base_id)
+		if typeof(n_v) == TYPE_STRING:
+			name_txt = String(n_v)
+
+	var lvl := 1
+	if _sig and _sig.has_method("get_instance_level"):
+		lvl = int(_sig.call("get_instance_level", inst_id))
+
+	var star := ""
+	if _sig and _sig.has_method("get_active_skill_name_for_instance"):
+		var act_v: Variant = _sig.call("get_active_skill_name_for_instance", inst_id)
+		if typeof(act_v) == TYPE_STRING and String(act_v).strip_edges() != "":
+			star = "  —  ★ " + String(act_v)
+
+	return "%s  (Lv %d)%s" % [name_txt, lvl, star]
+
 
 func _on_socket_pick(index: int) -> void:
 	_selected_socket = index
 	_selected_inst = ""
-	if index >= 0 and index < _sockets.size():
-		_selected_inst = String(_sockets[index])
+	if index >= 0 and index < _loadout.size():
+		_selected_inst = String(_loadout[index])
 	_refresh_detail(_selected_inst)
 
 func _refresh_detail(inst_id: String) -> void:
-	if _skills_il:
-		_skills_il.clear()
+	if _skills:
+		_skills.clear()
 	_skill_ids.clear()
 
 	if inst_id == "":
-		if _lv_label:  _lv_label.text = "Lv —"
-		if _xp_bar:    _xp_bar.value = 0
-		if _xp_value:  _xp_value.text = "0%"
-		if _btn_set_active: _btn_set_active.disabled = true
+		if _lv:     _lv.text = "Lv —"
+		if _xpbar:  _xpbar.value = 0
+		if _xpval:  _xpval.text = "0%"
+		if _btn_set: _btn_set.disabled = true
 		return
 
+	# Level + XP (show current XP and to-next)
 	var lvl: int = 1
 	var pct: int = 0
+	var xp: int = 0
+	var to_next: int = 0
 
 	if _sig:
 		if _sig.has_method("get_instance_level"):
@@ -169,26 +166,29 @@ func _refresh_detail(inst_id: String) -> void:
 			lvl = int(lvl_v)
 
 		if _sig.has_method("get_instance_progress"):
-			var pr: Variant = _sig.call("get_instance_progress", inst_id)
-			if typeof(pr) == TYPE_DICTIONARY:
-				var d: Dictionary = pr
-				if d.has("pct"):
-					pct = int(clamp(float(d["pct"]), 0.0, 100.0))
+			var pr_v: Variant = _sig.call("get_instance_progress", inst_id)
+			if typeof(pr_v) == TYPE_DICTIONARY:
+				var d: Dictionary = pr_v as Dictionary
+				if d.has("pct"):     pct = int(clamp(float(d["pct"]), 0.0, 100.0))
+				if d.has("xp"):      xp = int(d["xp"])
+				if d.has("to_next"): to_next = int(d["to_next"])
 
-	if _lv_label:
-		_lv_label.text = "Lv %d" % lvl
-	if _xp_bar:
-		_xp_bar.value = pct
-	if _xp_value:
-		_xp_value.text = "%d%%" % pct
+	if _lv:
+		_lv.text = "Lv %d" % lvl
+	if _xpbar:
+		_xpbar.value = pct
+	if _xpval:
+		_xpval.text = ("MAX" if to_next <= 0 else "%d / %d (%d%%)" % [xp, to_next, pct])
 
+	# Skills
 	var active_id: String = ""
 	if _sig and _sig.has_method("get_active_skill_id_for_instance"):
-		var act_v: Variant = _sig.call("get_active_skill_id_for_instance", inst_id)
-		if typeof(act_v) == TYPE_STRING:
-			active_id = String(act_v)
+		var act_id_v: Variant = _sig.call("get_active_skill_id_for_instance", inst_id)
+		if typeof(act_id_v) == TYPE_STRING:
+			active_id = String(act_id_v)
+	elif _sig and _sig.has_method("get_active_skill_name_for_instance"):
+		active_id = String(_sig.call("get_active_skill_name_for_instance", inst_id))
 
-	# unlocked list comes pre-gated from SigilSystem
 	var unlocked: PackedStringArray = PackedStringArray()
 	if _sig and _sig.has_method("list_unlocked_skills"):
 		var un_v: Variant = _sig.call("list_unlocked_skills", inst_id)
@@ -197,6 +197,8 @@ func _refresh_detail(inst_id: String) -> void:
 		elif typeof(un_v) == TYPE_ARRAY:
 			for e in (un_v as Array):
 				unlocked.append(String(e))
+	else:
+		unlocked = _fallback_unlocked_for_level(lvl)
 
 	for sid in unlocked:
 		var disp: String = sid
@@ -204,26 +206,33 @@ func _refresh_detail(inst_id: String) -> void:
 			var n_v: Variant = _sig.call("get_skill_display_name", sid)
 			if typeof(n_v) == TYPE_STRING:
 				disp = String(n_v)
-		if sid == active_id:
+		if active_id != "" and sid == active_id:
 			disp = "★ " + disp
 		_skill_ids.append(sid)
-		if _skills_il:
-			_skills_il.add_item(disp)
+		if _skills:
+			_skills.add_item(disp)
 
-	if _skills_il and active_id != "":
+	if _skills and active_id != "":
 		for i in range(_skill_ids.size()):
 			if _skill_ids[i] == active_id:
-				_skills_il.select(i)
+				_skills.select(i)
 				break
 
-	if _btn_set_active:
-		_btn_set_active.disabled = (_skills_il == null or _skills_il.item_count == 0)
+	if _btn_set:
+		_btn_set.disabled = (_skills == null or _skills.item_count == 0)
 
-# ------------------------------ actions ---------------------------------------
+func _fallback_unlocked_for_level(level: int) -> PackedStringArray:
+	var out: PackedStringArray = PackedStringArray()
+	out.append("Skill I")
+	if level >= 3: out.append("Skill II")
+	if level >= 5: out.append("Skill III")
+	return out
+
+# ───────────────── actions ─────────────────
 func _on_set_active() -> void:
-	if _skills_il == null or _selected_inst == "" or _sig == null:
+	if _skills == null or _selected_inst == "" or _sig == null:
 		return
-	var picks: PackedInt32Array = _skills_il.get_selected_items()
+	var picks: PackedInt32Array = _skills.get_selected_items()
 	if picks.size() == 0:
 		return
 	var idx: int = picks[0]
@@ -247,7 +256,7 @@ func _on_set_active() -> void:
 func _on_close() -> void:
 	queue_free()
 
-# ------------------------------ helpers ---------------------------------------
+# ───────────────── helpers ─────────────────
 func _get_display_name(id: String) -> String:
 	if _sig and _sig.has_method("get_display_name_for"):
 		var v: Variant = _sig.call("get_display_name_for", id)

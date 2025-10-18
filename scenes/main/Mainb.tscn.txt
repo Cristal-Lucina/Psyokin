@@ -1,0 +1,118 @@
+[node name="ItemsCheatBar" type="Control" parent="MarginContainer/Root"]
+layout_mode = 2
+size_flags_horizontal = 3
+script = ExtResource("2_itemsbar")
+
+[node name="Rows" type="VBoxContainer" parent="MarginContainer/Root/ItemsCheatBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="ItemsRow" type="HBoxContainer" parent="MarginContainer/Root/ItemsCheatBar/Rows"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Lbl" type="Label" parent="MarginContainer/Root/ItemsCheatBar/Rows/ItemsRow"]
+layout_mode = 2
+text = "Item:"
+
+[node name="Picker" type="OptionButton" parent="MarginContainer/Root/ItemsCheatBar/Rows/ItemsRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Qty" type="SpinBox" parent="MarginContainer/Root/ItemsCheatBar/Rows/ItemsRow"]
+layout_mode = 2
+custom_minimum_size = Vector2(64, 0)
+min_value = 1.0
+max_value = 999.0
+value = 1.0
+
+[node name="BtnGive" type="Button" parent="MarginContainer/Root/ItemsCheatBar/Rows/ItemsRow"]
+layout_mode = 2
+text = "Give"
+
+[node name="BtnRemove" type="Button" parent="MarginContainer/Root/ItemsCheatBar/Rows/ItemsRow"]
+layout_mode = 2
+text = "Remove"
+
+[node name="BtnGive10" type="Button" parent="MarginContainer/Root/ItemsCheatBar/Rows/ItemsRow"]
+layout_mode = 2
+text = "+10"
+
+[node name="BtnReloadCSV" type="Button" parent="MarginContainer/Root/ItemsCheatBar/Rows/ItemsRow"]
+layout_mode = 2
+text = "Reload CSV (defs)"
+
+[node name="PartyRow" type="HBoxContainer" parent="MarginContainer/Root/ItemsCheatBar/Rows"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Title" type="Label" parent="MarginContainer/Root/ItemsCheatBar/Rows/PartyRow"]
+layout_mode = 2
+text = "Party:"
+
+[node name="RosterPick" type="OptionButton" parent="MarginContainer/Root/ItemsCheatBar/Rows/PartyRow"]
+layout_mode = 2
+custom_minimum_size = Vector2(180, 0)
+size_flags_horizontal = 3
+
+[node name="MemberId" type="LineEdit" parent="MarginContainer/Root/ItemsCheatBar/Rows/PartyRow"]
+layout_mode = 2
+custom_minimum_size = Vector2(160, 0)
+placeholder_text = "member id"
+
+[node name="BtnAddParty" type="Button" parent="MarginContainer/Root/ItemsCheatBar/Rows/PartyRow"]
+layout_mode = 2
+text = "Add"
+
+[node name="BtnRemoveParty" type="Button" parent="MarginContainer/Root/ItemsCheatBar/Rows/PartyRow"]
+layout_mode = 2
+text = "Remove"
+
+[node name="BtnToBench" type="Button" parent="MarginContainer/Root/ItemsCheatBar/Rows/PartyRow"]
+layout_mode = 2
+text = "To Bench"
+
+[node name="LxpRow" type="HBoxContainer" parent="MarginContainer/Root/ItemsCheatBar/Rows"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Title" type="Label" parent="MarginContainer/Root/ItemsCheatBar/Rows/LxpRow"]
+layout_mode = 2
+text = "LXP:"
+
+[node name="SpinXP" type="SpinBox" parent="MarginContainer/Root/ItemsCheatBar/Rows/LxpRow"]
+layout_mode = 2
+custom_minimum_size = Vector2(80, 0)
+min_value = 1.0
+max_value = 9999.0
+step = 1.0
+value = 100.0
+
+[node name="BtnAddXP" type="Button" parent="MarginContainer/Root/ItemsCheatBar/Rows/LxpRow"]
+layout_mode = 2
+text = "Add XP"
+
+[node name="SxpRow" type="HBoxContainer" parent="MarginContainer/Root/ItemsCheatBar/Rows"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Title" type="Label" parent="MarginContainer/Root/ItemsCheatBar/Rows/SxpRow"]
+layout_mode = 2
+text = "SXP:"
+
+[node name="StatPick" type="OptionButton" parent="MarginContainer/Root/ItemsCheatBar/Rows/SxpRow"]
+layout_mode = 2
+custom_minimum_size = Vector2(120, 0)
+
+[node name="SpinSXP" type="SpinBox" parent="MarginContainer/Root/ItemsCheatBar/Rows/SxpRow"]
+layout_mode = 2
+custom_minimum_size = Vector2(70, 0)
+min_value = 1.0
+max_value = 999.0
+step = 1.0
+value = 10.0
+
+[node name="BtnAddSXP" type="Button" parent="MarginContainer/Root/ItemsCheatBar/Rows/SxpRow"]
+layout_mode = 2
+text = "Add SXP"

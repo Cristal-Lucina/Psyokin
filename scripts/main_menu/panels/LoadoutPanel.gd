@@ -1,209 +1,206 @@
 extends Control
 class_name LoadoutPanel
 
-@onready var _party_list  : ItemList      = get_node("Row/Party/PartyList") as ItemList
-@onready var _member_name : Label         = get_node("Row/Right/MemberName") as Label
+@onready var _party_list: ItemList       = get_node("Row/Party/PartyList") as ItemList
+@onready var _member_name: Label         = get_node("Row/Right/MemberName") as Label
 
-@onready var _w_val : Label = get_node("Row/Right/Grid/WValue") as Label
-@onready var _a_val : Label = get_node("Row/Right/Grid/AValue") as Label
-@onready var _h_val : Label = get_node("Row/Right/Grid/HValue") as Label
-@onready var _f_val : Label = get_node("Row/Right/Grid/FValue") as Label
-@onready var _b_val : Label = get_node("Row/Right/Grid/BValue") as Label
+@onready var _w_val: Label = get_node("Row/Right/Grid/WValue") as Label
+@onready var _a_val: Label = get_node("Row/Right/Grid/AValue") as Label
+@onready var _h_val: Label = get_node("Row/Right/Grid/HValue") as Label
+@onready var _f_val: Label = get_node("Row/Right/Grid/FValue") as Label
+@onready var _b_val: Label = get_node("Row/Right/Grid/BValue") as Label
 
-@onready var _w_btn : Button = get_node_or_null("Row/Right/Grid/WBtn") as Button
-@onready var _a_btn : Button = get_node_or_null("Row/Right/Grid/ABtn") as Button
-@onready var _h_btn : Button = get_node_or_null("Row/Right/Grid/HBtn") as Button
-@onready var _f_btn : Button = get_node_or_null("Row/Right/Grid/FBtn") as Button
-@onready var _b_btn : Button = get_node_or_null("Row/Right/Grid/BBtn") as Button
+@onready var _w_btn: Button = get_node_or_null("Row/Right/Grid/WBtn") as Button
+@onready var _a_btn: Button = get_node_or_null("Row/Right/Grid/ABtn") as Button
+@onready var _h_btn: Button = get_node_or_null("Row/Right/Grid/HBtn") as Button
+@onready var _f_btn: Button = get_node_or_null("Row/Right/Grid/FBtn") as Button
+@onready var _b_btn: Button = get_node_or_null("Row/Right/Grid/BBtn") as Button
 
-@onready var _sigils_title : Label         = get_node_or_null("Row/Right/Sigils/Title") as Label
-@onready var _sigils_list  : VBoxContainer = get_node_or_null("Row/Right/Sigils/List") as VBoxContainer
-@onready var _btn_manage   : Button        = get_node_or_null("Row/Right/Buttons/BtnManageSigils") as Button
+@onready var _sigils_title: Label         = get_node_or_null("Row/Right/Sigils/Title") as Label
+@onready var _sigils_list:  VBoxContainer = get_node_or_null("Row/Right/Sigils/List") as VBoxContainer
+@onready var _btn_manage:   Button        = get_node_or_null("Row/Right/Buttons/BtnManageSigils") as Button
 
-@onready var _stats_grid : GridContainer = get_node("Row/Right/StatsGrid") as GridContainer
-@onready var _mind_value : Label         = get_node_or_null("Row/Right/MindRow/Value") as Label
-@onready var _mind_row   : HBoxContainer = get_node_or_null("Row/Right/MindRow") as HBoxContainer
+@onready var _stats_grid:  GridContainer = get_node("Row/Right/StatsGrid") as GridContainer
+@onready var _mind_value:  Label         = get_node_or_null("Row/Right/MindRow/Value") as Label
+@onready var _mind_row:    HBoxContainer = get_node_or_null("Row/Right/MindRow") as HBoxContainer
 
-# Hero-only "Active Type" UI bits
-var _active_name_lbl  : Label = null
-var _active_value_lbl : Label = null
-var _active_btn       : Button = null
+var _active_name_lbl:  Label  = null
+var _active_value_lbl: Label  = null
+var _active_btn:       Button = null
 
-# Parallel arrays: display vs token we pass into systems
-var _labels: PackedStringArray = []
-var _tokens: PackedStringArray = []
+var _labels: PackedStringArray = PackedStringArray()
+var _tokens: PackedStringArray = PackedStringArray()
 
-var _gs        : Node = null
-var _inv       : Node = null
-var _sig       : Node = null
-var _eq        : Node = null
-var _stats     : Node = null
-var _party_sys : Node = null
-var _hero_sys  : Node = null
+var _gs:    Node = null
+var _inv:   Node = null
+var _sig:   Node = null
+var _eq:    Node = null
+var _stats: Node = null
 
-const _SLOTS = ["weapon","armor","head","foot","bracelet"]
-const _DEF_BASELINE := 5.0
-const STATS_FONT_SIZE := 9
+const _SLOTS: Array[String] = ["weapon", "armor", "head", "foot", "bracelet"]
+const STATS_FONT_SIZE: int = 9
+
+# Skills menu scene lookup
+const _SIGIL_MENU_SCENE_PATHS: Array[String] = [
+	"res://SigilSkillMenu.tscn",
+	"res://ui/sigils/SigilSkillMenu.tscn",
+	"res://scenes/main_menu/panels/SigilSkillMenu.tscn",
+	"res://ui/SigilSkillMenu.tscn",
+]
+
+# change tracking (for cheap polling fallback)
+var _party_sig: String = ""
+var _sigils_sig: String = ""
+var _poll_accum: float = 0.0
 
 func _ready() -> void:
-	_gs        = get_node_or_null("/root/aGameState")
-	_inv       = get_node_or_null("/root/aInventorySystem")
-	_sig       = get_node_or_null("/root/aSigilSystem")
-	_eq        = get_node_or_null("/root/aEquipmentSystem")
-	_stats     = get_node_or_null("/root/aStatsSystem")
-	_party_sys = get_node_or_null("/root/aPartySystem")
-	_hero_sys  = get_node_or_null("/root/aHeroSystem")
+	_gs    = get_node_or_null("/root/aGameState")
+	_inv   = get_node_or_null("/root/aInventorySystem")
+	_sig   = get_node_or_null("/root/aSigilSystem")
+	_eq    = get_node_or_null("/root/aEquipmentSystem")
+	_stats = get_node_or_null("/root/aStatsSystem")
 
-	if _w_btn: _w_btn.pressed.connect(_on_slot_button.bind("weapon"))
-	if _a_btn: _a_btn.pressed.connect(_on_slot_button.bind("armor"))
-	if _h_btn: _h_btn.pressed.connect(_on_slot_button.bind("head"))
-	if _f_btn: _f_btn.pressed.connect(_on_slot_button.bind("foot"))
-	if _b_btn: _b_btn.pressed.connect(_on_slot_button.bind("bracelet"))
+	if _w_btn: _w_btn.pressed.connect(Callable(self, "_on_slot_button").bind("weapon"))
+	if _a_btn: _a_btn.pressed.connect(Callable(self, "_on_slot_button").bind("armor"))
+	if _h_btn: _h_btn.pressed.connect(Callable(self, "_on_slot_button").bind("head"))
+	if _f_btn: _f_btn.pressed.connect(Callable(self, "_on_slot_button").bind("foot"))
+	if _b_btn: _b_btn.pressed.connect(Callable(self, "_on_slot_button").bind("bracelet"))
 
-	if not _party_list.item_selected.is_connected(_on_party_selected):
-		_party_list.item_selected.connect(_on_party_selected)
+	if not _party_list.item_selected.is_connected(Callable(self, "_on_party_selected")):
+		_party_list.item_selected.connect(Callable(self, "_on_party_selected"))
 
-	if _btn_manage and not _btn_manage.pressed.is_connected(_on_manage_sigils):
-		_btn_manage.pressed.connect(_on_manage_sigils)
+	if _btn_manage and not _btn_manage.pressed.is_connected(Callable(self, "_on_manage_sigils")):
+		_btn_manage.pressed.connect(Callable(self, "_on_manage_sigils"))
 
 	if _eq and _eq.has_signal("equipment_changed"):
 		if not _eq.is_connected("equipment_changed", Callable(self, "_on_equipment_changed")):
 			_eq.connect("equipment_changed", Callable(self, "_on_equipment_changed"))
+
 	if _sig and _sig.has_signal("loadout_changed"):
 		if not _sig.is_connected("loadout_changed", Callable(self, "_on_sigils_changed")):
 			_sig.connect("loadout_changed", Callable(self, "_on_sigils_changed"))
 
-	_hook_party_signals()
-	_setup_active_type_widgets() # create the Hero-only strip, stays hidden for others
+	# Extra refresh hooks (level ups, roster changes)
+	_wire_refresh_signals()
 
-	# defer first build so we don’t miss early system init / signals
+	_setup_active_type_widgets()
 	call_deferred("_first_fill")
+
+	# polling fallback so UI never goes stale
+	set_process(true)
 
 func _first_fill() -> void:
 	_refresh_party()
 	if _party_list.get_item_count() > 0:
 		_party_list.select(0)
 		_on_party_selected(0)
+	_party_sig = _snapshot_party_signature()
+	var cur := _current_token()
+	_sigils_sig = _snapshot_sigil_signature(cur) if cur != "" else ""
 
-# ───────────── helpers ─────────────
+# ────────────────── tiny util ──────────────────
+func _connect_if(n: Object, sig: String, cb: Callable) -> void:
+	if n and n.has_signal(sig):
+		if not n.is_connected(sig, cb):
+			n.connect(sig, cb)
 
-func _norm(s: String) -> String:
-	return String(s).strip_edges().to_lower()
+func _wire_refresh_signals() -> void:
+	# Instance XP/Level changes (canonical signal name)
+	_connect_if(_sig, "instance_xp_changed",    Callable(self, "_on_sigil_instances_updated"))
+	# Plus some aliases in case your system exposes them
+	_connect_if(_sig, "sigils_changed",         Callable(self, "_on_sigil_instances_updated"))
+	_connect_if(_sig, "sigil_instance_changed", Callable(self, "_on_sigil_instances_updated"))
+	_connect_if(_sig, "sigil_level_changed",    Callable(self, "_on_sigil_instances_updated"))
+	_connect_if(_sig, "sigil_xp_changed",       Callable(self, "_on_sigil_instances_updated"))
 
-func _hero_name() -> String:
-	if _hero_sys and _hero_sys.has_method("get"):
-		var v: Variant = _hero_sys.get("hero_name")
-		if typeof(v) == TYPE_STRING and String(v).strip_edges() != "":
-			return String(v)
-	return "Player"
+	# Party / roster updates
+	_connect_if(_gs,  "party_changed",          Callable(self, "_on_party_roster_changed"))
+	_connect_if(_gs,  "active_party_changed",   Callable(self, "_on_party_roster_changed"))
+	_connect_if(_gs,  "roster_changed",         Callable(self, "_on_party_roster_changed"))
+	_connect_if(_gs,  "member_joined",          Callable(self, "_on_party_roster_changed"))
+	_connect_if(_gs,  "member_removed",         Callable(self, "_on_party_roster_changed"))
 
-func _roster() -> Dictionary:
-	var roster: Dictionary = {}
-	if _party_sys:
-		if _party_sys.has_method("get"):
-			var r_v: Variant = _party_sys.get("roster")
-			if typeof(r_v) == TYPE_DICTIONARY: roster = r_v as Dictionary
-		if roster.is_empty() and _party_sys.has_method("get_roster"):
-			var r2_v: Variant = _party_sys.call("get_roster")
-			if typeof(r2_v) == TYPE_DICTIONARY: roster = r2_v as Dictionary
-	return roster
+	# Derived stats bump (level-ups etc.)
+	_connect_if(_stats, "stats_changed",        Callable(self, "_on_stats_changed"))
 
-func _label_for_token(token: String, roster: Dictionary) -> String:
-	if token == "hero": return _hero_name()
-	if roster.has(token):
-		var rec: Dictionary = roster[token]
-		if rec.has("name") and typeof(rec["name"]) == TYPE_STRING:
-			return String(rec["name"])
-	return token
+func _refresh_all_for_current() -> void:
+	var cur: String = _current_token()
+	if cur == "":
+		return
+	var equip: Dictionary = _fetch_equip_for(cur)
+	_w_val.text = _pretty_item(String(equip.get("weapon","")))
+	_a_val.text = _pretty_item(String(equip.get("armor","")))
+	_h_val.text = _pretty_item(String(equip.get("head","")))
+	_f_val.text = _pretty_item(String(equip.get("foot","")))
+	_b_val.text = _pretty_item(String(equip.get("bracelet","")))
+	_rebuild_stats_grid(cur, equip)
+	_rebuild_sigils(cur)
+	_refresh_mind_row(cur)
+	_refresh_active_type_row(cur)
 
-# ───────────── party discovery ─────────────
+func _on_sigil_instances_updated(_a=null,_b=null,_c=null) -> void:
+	_refresh_all_for_current()
 
-func _gather_party_entries() -> Array:
-	var ros: Dictionary = _roster()
-	var entries: Array = []
+func _on_stats_changed() -> void:
+	_refresh_all_for_current()
 
-	# 1) From GameState (ids)
-	if _gs and _gs.has_method("get_active_party_ids"):
-		var v: Variant = _gs.call("get_active_party_ids")
-		if typeof(v) == TYPE_ARRAY:
-			for t in (v as Array):
-				var tok := String(t)
-				entries.append({"key": tok, "label": _label_for_token(tok, ros)})
-			return entries
-
-	# 2) From GameState (names)
-	if _gs and _gs.has_method("get_party_names"):
-		var n_v: Variant = _gs.call("get_party_names")
-		if typeof(n_v) == TYPE_PACKED_STRING_ARRAY and (n_v as PackedStringArray).size() > 0:
-			for s in (n_v as PackedStringArray):
-				var nm := String(s)
-				if nm.strip_edges() != "":
-					entries.append({"key": nm, "label": nm})
-			if entries.size() > 0:
-				return entries
-		elif typeof(n_v) == TYPE_ARRAY and (n_v as Array).size() > 0:
-			for s2 in (n_v as Array):
-				var nm2 := String(s2)
-				if nm2.strip_edges() != "":
-					entries.append({"key": nm2, "label": nm2})
-			if entries.size() > 0:
-				return entries
-
-	# 3) From PartySystem (ids)
-	if _party_sys:
-		if _party_sys.has_method("get_active"):
-			var r: Variant = _party_sys.call("get_active")
-			if typeof(r) == TYPE_ARRAY and (r as Array).size() > 0:
-				for t3 in (r as Array):
-					var tok3 := String(t3)
-					entries.append({"key": tok3, "label": _label_for_token(tok3, ros)})
-				return entries
-		if _party_sys.has_method("get"):
-			var a_v: Variant = _party_sys.get("active")
-			if typeof(a_v) == TYPE_ARRAY and (a_v as Array).size() > 0:
-				for t4 in (a_v as Array):
-					var tok4 := String(t4)
-					entries.append({"key": tok4, "label": _label_for_token(tok4, ros)})
-				return entries
-
-	# 4) Last resort: hero only
-	entries.append({"key": "hero", "label": _hero_name()})
-	return entries
-
-# ───────────── signals ─────────────
-
-func _hook_party_signals() -> void:
-	var cb := Callable(self, "_on_party_dirty")
-	if _gs:
-		for s in ["party_changed", "member_added", "member_removed"]:
-			if _gs.has_signal(s) and not _gs.is_connected(s, cb):
-				_gs.connect(s, cb)
-	if _party_sys:
-		for s2 in ["active_changed", "roster_changed", "party_changed"]:
-			if _party_sys.has_signal(s2) and not _party_sys.is_connected(s2, cb):
-				_party_sys.connect(s2, cb)
-
-func _on_party_dirty(_a: Variant = null, _b: Variant = null) -> void:
-	var prev_token: String = _current_token()
+func _on_party_roster_changed(_arg=null) -> void:
+	var keep: String = _current_token()
 	_refresh_party()
-	var idx: int = _tokens.find(prev_token)
-	if idx >= 0:
+	var idx: int = max(0, _tokens.find(keep))
+	if _party_list.get_item_count() > 0:
 		_party_list.select(idx)
 		_on_party_selected(idx)
-	elif _party_list.get_item_count() > 0:
-		_party_list.select(0)
-		_on_party_selected(0)
+	_party_sig = _snapshot_party_signature()
 
-# ───────────── populate UI ─────────────
+# ────────────────── party ──────────────────
+func _hero_name() -> String:
+	var s: String = ""
+	if _gs and _gs.has_method("get"):
+		s = String(_gs.get("player_name"))
+	if s.strip_edges() == "":
+		s = "Player"
+	return s
+
+func _gather_party_tokens() -> Array[String]:
+	var out: Array[String] = []
+	if _gs == null:
+		return out
+
+	for m in ["get_active_party_ids", "get_party_ids", "list_active_party", "get_active_party"]:
+		if _gs.has_method(m):
+			var raw: Variant = _gs.call(m)
+			if typeof(raw) == TYPE_PACKED_STRING_ARRAY:
+				for s in (raw as PackedStringArray): out.append(String(s))
+			elif typeof(raw) == TYPE_ARRAY:
+				for s2 in (raw as Array): out.append(String(s2))
+			if out.size() > 0: return out
+
+	for p in ["active_party_ids", "active_party", "party_ids", "party"]:
+		var raw2: Variant = _gs.get(p) if _gs.has_method("get") else null
+		if typeof(raw2) == TYPE_PACKED_STRING_ARRAY:
+			for s3 in (raw2 as PackedStringArray): out.append(String(s3))
+		elif typeof(raw2) == TYPE_ARRAY:
+			for s4 in (raw2 as Array): out.append(String(s4))
+		if out.size() > 0: return out
+
+	return out
 
 func _refresh_party() -> void:
 	_party_list.clear()
-	_labels.clear()
-	_tokens.clear()
+	_labels = PackedStringArray()
+	_tokens = PackedStringArray()
 
-	var entries: Array = _gather_party_entries()
+	var tokens: Array[String] = _gather_party_tokens()
+	var entries: Array = []
 
-	# Dedup while preserving order
+	for t in tokens:
+		var tok: String = String(t)
+		entries.append({"key": tok, "label": _display_for_token(tok)})
+
+	if entries.is_empty():
+		entries.append({"key": "hero", "label": _hero_name()})
+
 	var seen: Dictionary = {}
 	for e_v in entries:
 		if typeof(e_v) != TYPE_DICTIONARY: continue
@@ -218,14 +215,29 @@ func _refresh_party() -> void:
 			_labels.append(label if label != "" else key)
 
 	if _labels.is_empty():
-		_tokens.append("hero"); _labels.append(_hero_name())
+		_tokens.append("hero")
+		_labels.append(_hero_name())
 
 	for i in range(_labels.size()):
 		_party_list.add_item(_labels[i])
 
 	_party_list.queue_redraw()
 
-# ───────────── selection + equip ─────────────
+func _display_for_token(token: String) -> String:
+	if token == "hero":
+		return _hero_name()
+	if _gs and _gs.has_method("_display_name_for_id"):
+		var v: Variant = _gs.call("_display_name_for_id", token)
+		if typeof(v) == TYPE_STRING and String(v) != "":
+			return String(v)
+	return token.capitalize()
+
+func _current_token() -> String:
+	var sel: PackedInt32Array = _party_list.get_selected_items()
+	if sel.size() == 0:
+		return (_tokens[0] if _tokens.size() > 0 else "")
+	var i: int = sel[0]
+	return (_tokens[i] if i >= 0 and i < _tokens.size() else "")
 
 func _on_party_selected(index: int) -> void:
 	var label: String = "(Unknown)"
@@ -233,40 +245,27 @@ func _on_party_selected(index: int) -> void:
 		label = _labels[index]
 	_member_name.text = label
 
-	var token: String = _current_token()
-	var equip: Dictionary = _fetch_equip_for(token)
+	_refresh_all_for_current()
+	_sigils_sig = _snapshot_sigil_signature(_current_token())
 
-	_w_val.text = _pretty_item(String(equip.get("weapon","")))
-	_a_val.text = _pretty_item(String(equip.get("armor","")))
-	_h_val.text = _pretty_item(String(equip.get("head","")))
-	_f_val.text = _pretty_item(String(equip.get("foot","")))
-	_b_val.text = _pretty_item(String(equip.get("bracelet","")))
+func _on_equipment_changed(member: String) -> void:
+	var cur: String = _current_token()
+	if cur == "" or cur.to_lower() != member.to_lower():
+		return
+	_refresh_all_for_current()
 
-	_rebuild_stats_grid(token, equip)
-	_rebuild_sigils(token)
-	_refresh_mind_row(token)
-	_refresh_active_type_row(token)
+func _on_sigils_changed(member: String) -> void:
+	var cur: String = _current_token()
+	if cur == "" or cur.to_lower() != member.to_lower():
+		return
+	_refresh_all_for_current()
+	_sigils_sig = _snapshot_sigil_signature(cur)
 
-
-func _current_label() -> String:
-	var sel: PackedInt32Array = _party_list.get_selected_items()
-	if sel.size() == 0: return ""
-	var i: int = sel[0]
-	if i >= 0 and i < _labels.size(): return _labels[i]
-	return ""
-
-func _current_token() -> String:
-	var sel: PackedInt32Array = _party_list.get_selected_items()
-	if sel.size() == 0:
-		return (_tokens[0] if _tokens.size() > 0 else "")
-	var i: int = sel[0]
-	if i >= 0 and i < _tokens.size():
-		return _tokens[i]
-	return ""
-
+# ────────────────── equip menu ──────────────────
 func _on_slot_button(slot: String) -> void:
 	var token: String = _current_token()
-	if token == "": return
+	if token == "":
+		return
 	_show_item_menu_for_slot(token, slot)
 
 func _show_item_menu_for_slot(member_token: String, slot: String) -> void:
@@ -274,7 +273,7 @@ func _show_item_menu_for_slot(member_token: String, slot: String) -> void:
 	var cur: Dictionary = _fetch_equip_for(member_token)
 	var cur_id: String = String(cur.get(slot, ""))
 
-	var pm := PopupMenu.new()
+	var pm: PopupMenu = PopupMenu.new()
 	add_child(pm)
 
 	if cur_id != "" and cur_id != "—":
@@ -291,7 +290,7 @@ func _show_item_menu_for_slot(member_token: String, slot: String) -> void:
 			pm.add_item(label)
 			pm.set_item_metadata(pm.get_item_count() - 1, id)
 
-	var _handle := func(index: int) -> void:
+	var _handle: Callable = func(index: int) -> void:
 		var meta: Variant = pm.get_item_metadata(index)
 		pm.queue_free()
 		if typeof(meta) == TYPE_NIL:
@@ -315,94 +314,150 @@ func _show_item_menu_for_slot(member_token: String, slot: String) -> void:
 	)
 	pm.popup(Rect2(get_global_mouse_position(), Vector2(280, 0)))
 
-# ───────────── Sigils + Mind Type ─────────────
+# ────────────────── sigils ──────────────────
+func _sigil_disp(inst_id: String) -> String:
+	var result: String = "(empty)"
+	if inst_id == "":
+		return result
+
+	# name comes from base; level/star from instance
+	var base_id: String = inst_id
+	if _sig and _sig.has_method("get_base_from_instance"):
+		base_id = String(_sig.call("get_base_from_instance", inst_id))
+
+	var disp_name: String = base_id
+	if _sig and _sig.has_method("get_display_name_for"):
+		var n_v: Variant = _sig.call("get_display_name_for", base_id)
+		if typeof(n_v) == TYPE_STRING:
+			disp_name = String(n_v)
+
+	var lv: int = 1
+	if _sig and _sig.has_method("get_instance_level"):
+		lv = int(_sig.call("get_instance_level", inst_id))
+
+	var lv_str: String = ("MAX" if lv >= 4 else "Lv %d" % lv)
+
+	var star: String = ""
+	if _sig and _sig.has_method("get_active_skill_name_for_instance"):
+		var a_v: Variant = _sig.call("get_active_skill_name_for_instance", inst_id)
+		if typeof(a_v) == TYPE_STRING and String(a_v).strip_edges() != "":
+			star = "  —  ★ " + String(a_v)
+
+	result = "%s  (%s)%s" % [disp_name, lv_str, star]
+	return result
 
 func _rebuild_sigils(member_token: String) -> void:
-	if _sigils_list == null: return
-	for c in _sigils_list.get_children(): c.queue_free()
+	if _sigils_list == null:
+		return
+	for c in _sigils_list.get_children():
+		c.queue_free()
 
 	var cap: int = 0
-	var sockets := PackedStringArray()
+	var sockets: PackedStringArray = PackedStringArray()
 	if _sig:
 		if _sig.has_method("get_capacity"): cap = int(_sig.call("get_capacity", member_token))
 		if _sig.has_method("get_loadout"):
 			var v2: Variant = _sig.call("get_loadout", member_token)
-			if typeof(v2) == TYPE_PACKED_STRING_ARRAY: sockets = v2 as PackedStringArray
+			if typeof(v2) == TYPE_PACKED_STRING_ARRAY:
+				sockets = v2 as PackedStringArray
 			elif typeof(v2) == TYPE_ARRAY:
 				for s in (v2 as Array): sockets.append(String(s))
 
+	var used: int = 0
+	for s in sockets:
+		if String(s) != "": used += 1
+
 	if _sigils_title:
-		_sigils_title.text = "Sigils  (%d/%d)" % [sockets.size(), cap]
+		_sigils_title.text = "Sigils  (%d/%d)" % [used, cap]
 
 	if cap <= 0:
-		var none := Label.new()
+		var none: Label = Label.new()
 		none.text = "No bracelet slots"
 		none.autowrap_mode = TextServer.AUTOWRAP_WORD
 		_sigils_list.add_child(none)
 		return
 
 	for idx in range(cap):
-		var row := HBoxContainer.new()
+		var row: HBoxContainer = HBoxContainer.new()
 		row.add_theme_constant_override("separation", 6)
 
-		var nm := Label.new()
+		var nm: Label = Label.new()
 		nm.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
-		var has: bool = (idx < sockets.size() and String(sockets[idx]) != "")
-		var cur_id: String = ""
-		if has: cur_id = String(sockets[idx])
-
-		if has and _sig and _sig.has_method("get_display_name_for"):
-			nm.text = String(_sig.call("get_display_name_for", cur_id))
-			if _sig.has_method("get_active_skill_name_for_instance"):
-				var act: String = String(_sig.call("get_active_skill_name_for_instance", cur_id))
-				if act != "": nm.text += "  —  " + act
-		else:
-			nm.text = "(empty)"
+		var cur_id: String = (String(sockets[idx]) if idx < sockets.size() else "")
+		nm.text = (_sigil_disp(cur_id) if cur_id != "" else "(empty)")
 		row.add_child(nm)
 
-		if not has:
-			var btn_e := Button.new()
-			btn_e.text = "Equip…"
-			btn_e.pressed.connect(_on_equip_sigil.bind(member_token, idx))
-			row.add_child(btn_e)
+		var btn: Button = Button.new()
+		if cur_id == "":
+			btn.text = "Equip…"
+			btn.pressed.connect(Callable(self, "_on_equip_sigil").bind(member_token, idx))
 		else:
-			var btn_u := Button.new()
-			btn_u.text = "Remove"
-			btn_u.pressed.connect(_on_remove_sigil.bind(member_token, idx))
-			row.add_child(btn_u)
+			btn.text = "Remove"
+			btn.pressed.connect(Callable(self, "_on_remove_sigil").bind(member_token, idx))
+		row.add_child(btn)
 
 		_sigils_list.add_child(row)
 
+	if _btn_manage:
+		_btn_manage.disabled = false
+
 func _on_equip_sigil(member_token: String, socket_index: int) -> void:
-	if _sig == null: return
+	if _sig == null:
+		return
 
-	var member_mind: String = _get_member_mind_type(member_token)
+	# Helper: allowed?
+	var _allowed := func(school: String) -> bool:
+		if _sig and _sig.has_method("is_school_allowed_for_member"):
+			return bool(_sig.call("is_school_allowed_for_member", member_token, school))
+		return true
 
-	var free_instances := PackedStringArray()
+	# Gather free instances and filter by mind type
+	var free_instances_all := PackedStringArray()
 	if _sig.has_method("list_free_instances"):
 		var v0: Variant = _sig.call("list_free_instances")
-		if typeof(v0) == TYPE_PACKED_STRING_ARRAY: free_instances = v0 as PackedStringArray
+		if typeof(v0) == TYPE_PACKED_STRING_ARRAY:
+			free_instances_all = v0 as PackedStringArray
 		elif typeof(v0) == TYPE_ARRAY:
-			for s in (v0 as Array): free_instances.append(String(s))
+			for s in (v0 as Array): free_instances_all.append(String(s))
 
-	var base_ids: PackedStringArray = _collect_base_sigils()
+	var free_instances := PackedStringArray()
+	for inst in free_instances_all:
+		var school := ""
+		if _sig.has_method("get_element_for_instance"):
+			school = String(_sig.call("get_element_for_instance", inst))
+		elif _sig.has_method("get_mind_for_instance"):
+			school = String(_sig.call("get_mind_for_instance", inst))
+		else:
+			var base := (String(_sig.call("get_base_from_instance", inst)) if _sig.has_method("get_base_from_instance") else inst)
+			if _sig.has_method("get_element_for"):
+				school = String(_sig.call("get_element_for", base))
+		if _allowed.call(school):
+			free_instances.append(inst)
 
-	var pm := PopupMenu.new()
+	# Gather base sigils from inventory and filter by mind type
+	var base_ids_all := _collect_base_sigils()
+	var base_ids := PackedStringArray()
+	for base in base_ids_all:
+		var school := ""
+		if _sig.has_method("get_element_for"):
+			school = String(_sig.call("get_element_for", base))
+		elif _sig.has_method("get_mind_for"):
+			school = String(_sig.call("get_mind_for", base))
+		if _allowed.call(school):
+			base_ids.append(base)
+
+	# Build the popup
+	var pm: PopupMenu = PopupMenu.new()
 	add_child(pm)
-	var any: bool = false
+	var any := false
 
 	if free_instances.size() > 0:
 		pm.add_item("— Unslotted Instances —")
 		pm.set_item_disabled(pm.get_item_count() - 1, true)
 		for inst in free_instances:
-			var label: String = (String(_sig.call("get_display_name_for", inst)) if (_sig and _sig.has_method("get_display_name_for")) else inst)
-			var ok_inst: bool = _is_sigil_compatible(member_mind, inst)
-			if not ok_inst: label += "  (incompatible)"
-			var row_i: int = pm.get_item_count()
-			pm.add_item(label)
-			pm.set_item_metadata(row_i, {"kind":"inst","id":inst,"ok":ok_inst})
-			if not ok_inst: pm.set_item_disabled(row_i, true)
+			pm.add_item(_sigil_disp(inst))
+			pm.set_item_metadata(pm.get_item_count() - 1, {"kind":"inst","id":inst})
 		any = true
 
 	if base_ids.size() > 0:
@@ -411,40 +466,35 @@ func _on_equip_sigil(member_token: String, socket_index: int) -> void:
 		pm.set_item_disabled(pm.get_item_count() - 1, true)
 		for base in base_ids:
 			var label2: String = (String(_sig.call("get_display_name_for", base)) if (_sig and _sig.has_method("get_display_name_for")) else _pretty_item(base))
-			var ok2: bool = _is_sigil_compatible(member_mind, base)
-			if not ok2: label2 += "  (incompatible)"
-			var row_b: int = pm.get_item_count()
 			pm.add_item(label2)
-			pm.set_item_metadata(row_b, {"kind":"base","id":base,"ok":ok2})
-			if not ok2: pm.set_item_disabled(row_b, true)
+			pm.set_item_metadata(pm.get_item_count() - 1, {"kind":"base","id":base})
 		any = true
 
 	if not any:
 		pm.add_item("(No sigils available)")
 		pm.set_item_disabled(pm.get_item_count() - 1, true)
 
-	var _handle_pick := func(index: int) -> void:
+	var _handle_pick: Callable = func(index: int) -> void:
 		var meta: Variant = pm.get_item_metadata(index)
 		pm.queue_free()
-		if typeof(meta) != TYPE_DICTIONARY and typeof(meta) != TYPE_STRING: return
+		if typeof(meta) != TYPE_DICTIONARY and typeof(meta) != TYPE_STRING:
+			return
 
 		var kind: String = ""
 		var id: String = ""
-		var ok_meta: bool = true
 		if typeof(meta) == TYPE_DICTIONARY:
 			var d: Dictionary = meta
-			kind    = String(d.get("kind",""))
-			id      = String(d.get("id",""))
-			ok_meta = bool(d.get("ok", true))
+			kind = String(d.get("kind",""))
+			id   = String(d.get("id",""))
 		else:
 			id = String(meta)
 
-		if not ok_meta: return
-
 		var final_inst: String = ""
+		# instances: equip instance directly (system re-checks)
 		if kind == "inst" or (_sig and _sig.has_method("is_instance_id") and bool(_sig.call("is_instance_id", id))):
 			final_inst = id
 
+		# base: try direct “from inventory”, else draft then equip
 		if final_inst == "" and (kind == "base" or kind == ""):
 			if _sig.has_method("equip_from_inventory"):
 				var ok_direct: bool = bool(_sig.call("equip_from_inventory", member_token, socket_index, id))
@@ -456,26 +506,11 @@ func _on_equip_sigil(member_token: String, socket_index: int) -> void:
 				if typeof(drafted) == TYPE_STRING:
 					final_inst = String(drafted)
 
-		if final_inst == "":
-			if _sig.has_method("create_instance"):
-				var inst_v: Variant = _sig.call("create_instance", id)
-				if typeof(inst_v) == TYPE_STRING:
-					final_inst = String(inst_v)
-					if _inv:
-						if _inv.has_method("dec"): _inv.call("dec", id, 1)
-						elif _inv.has_method("consume"): _inv.call("consume", id, 1)
-						elif _inv.has_method("decrement"): _inv.call("decrement", id, 1)
-						elif _inv.has_method("add"): _inv.call("add", id, -1)
-
 		if final_inst != "" and _sig.has_method("equip_into_socket"):
 			var ok_e: bool = bool(_sig.call("equip_into_socket", member_token, socket_index, final_inst))
 			if ok_e and _sig.has_method("on_bracelet_changed"):
 				_sig.call("on_bracelet_changed", member_token)
 			_on_sigils_changed(member_token)
-		elif final_inst == "" and _sig.has_method("equip_into_socket"):
-			var ok_base: bool = bool(_sig.call("equip_into_socket", member_token, socket_index, id))
-			if ok_base:
-				_on_sigils_changed(member_token)
 
 	pm.index_pressed.connect(_handle_pick)
 	pm.id_pressed.connect(func(idnum: int) -> void:
@@ -489,17 +524,17 @@ func _on_remove_sigil(member_token: String, socket_index: int) -> void:
 	_on_sigils_changed(member_token)
 
 func _collect_base_sigils() -> PackedStringArray:
-	var out := PackedStringArray()
-	var inv: Node = get_node_or_null("/root/aInventorySystem")
-	if inv == null: return out
+	var out: PackedStringArray = PackedStringArray()
+	if _inv == null:
+		return out
 
 	var defs: Dictionary = {}
 	var counts: Dictionary = {}
-	if inv.has_method("get_item_defs"):
-		var d_v: Variant = inv.call("get_item_defs")
+	if _inv.has_method("get_item_defs"):
+		var d_v: Variant = _inv.call("get_item_defs")
 		if typeof(d_v) == TYPE_DICTIONARY: defs = d_v as Dictionary
-	if inv.has_method("get_counts_dict"):
-		var c_v: Variant = inv.call("get_counts_dict")
+	if _inv.has_method("get_counts_dict"):
+		var c_v: Variant = _inv.call("get_counts_dict")
 		if typeof(c_v) == TYPE_DICTIONARY: counts = c_v as Dictionary
 
 	for id_v in counts.keys():
@@ -510,132 +545,53 @@ func _collect_base_sigils() -> PackedStringArray:
 		for k in ["equip_slot","slot","equip","equip_to","category","cat","type"]:
 			if rec.has(k) and typeof(rec[k]) == TYPE_STRING:
 				tag = String(rec[k]).strip_edges().to_lower()
-				if tag == "sigil" or tag == "sigils":
-					out.append(id)
-					break
+				break
+		if tag == "sigil" or tag == "sigils":
+			out.append(id)
 	return out
 
-# ───────────── Mind Type helpers ─────────────
-
+# ────────────────── stats / mind ──────────────────
 func _get_member_mind_type(member_token: String) -> String:
-	# Ask SigilSystem (handles PartySystem + CSV fallbacks)
-	var ss: Node = get_node_or_null("/root/aSigilSystem")
-	if ss and ss.has_method("resolve_member_mind_base"):
-		var v: Variant = ss.call("resolve_member_mind_base", member_token)
-		var mt := String(v).strip_edges()
-		if mt != "":
-			return mt
-
-	# Try PartySystem direct helper, if it exists
-	if _party_sys and _party_sys.has_method("get_mind_type"):
-		var v2: Variant = _party_sys.call("get_mind_type", member_token)
-		if typeof(v2) == TYPE_STRING and String(v2).strip_edges() != "":
-			return String(v2)
-
-	# Look inside roster records we already have
-	var ros: Dictionary = _roster()
-	if ros.has(member_token):
-		var rec_key: Dictionary = ros[member_token]
-		for k in ["mind_type","mind","element"]:
-			if rec_key.has(k) and typeof(rec_key[k]) == TYPE_STRING and String(rec_key[k]).strip_edges() != "":
-				return String(rec_key[k])
-	else:
-		var n: String = _norm(member_token)
-		for key in ros.keys():
-			var rec: Dictionary = ros[key]
-			if rec.has("name") and _norm(String(rec["name"])) == n:
-				for k in ["mind_type","mind","element"]:
-					if rec.has(k) and typeof(rec[k]) == TYPE_STRING and String(rec[k]).strip_edges() != "":
-						return String(rec[k])
-				break
-
-	# Hero default
-	if member_token == "hero" or _norm(member_token) == _norm(_hero_name()):
-		return "Omega"
-
-	# Last resort: GameState scratch field
+	if _sig and _sig.has_method("resolve_member_mind_base"):
+		var v: Variant = _sig.call("resolve_member_mind_base", member_token)
+		if typeof(v) == TYPE_STRING and String(v).strip_edges() != "": return String(v)
 	if _gs and _gs.has_method("get_member_field"):
-		var v3: Variant = _gs.call("get_member_field", member_token, "mind_type")
-		if typeof(v3) == TYPE_STRING and String(v3).strip_edges() != "":
-			return String(v3)
+		var v2: Variant = _gs.call("get_member_field", member_token, "mind_type")
+		if typeof(v2) == TYPE_STRING and String(v2).strip_edges() != "": return String(v2)
+	return "Omega"
 
-	# Final fallback: read party.csv directly
-	return _get_member_mind_from_party_csv(member_token)
+func _refresh_mind_row(member_token: String) -> void:
+	if _mind_value == null: return
+	var mt: String = _get_member_mind_type(member_token)
+	_mind_value.text = (mt if mt != "" else "—")
 
-func _sigil_element(id_or_inst: String) -> String:
-	if _sig:
-		for m in ["get_element_for_instance","get_mind_for_instance","get_element_for","get_mind_for"]:
-			if _sig.has_method(m):
-				var v: Variant = _sig.call(m, id_or_inst)
-				if typeof(v) == TYPE_STRING and String(v) != "":
-					return String(v)
-		for m2 in ["get_base_id","get_base_for","get_source_base","get_base_from_instance"]:
-			if _sig.has_method(m2):
-				var base_v: Variant = _sig.call(m2, id_or_inst)
-				if typeof(base_v) == TYPE_STRING and String(base_v) != "":
-					return _sigil_element(String(base_v))
-	var rec: Dictionary = _item_def(id_or_inst)
-	for k in ["mind_type","mind","element","elem"]:
-		if rec.has(k) and typeof(rec[k]) == TYPE_STRING:
-			return String(rec[k])
-	return ""
+func _fetch_equip_for(member_token: String) -> Dictionary:
+	if _gs and _gs.has_method("get_member_equip"):
+		var d_v: Variant = _gs.call("get_member_equip", member_token)
+		if typeof(d_v) == TYPE_DICTIONARY:
+			var d: Dictionary = d_v
+			if d.has("feet") and not d.has("foot"): d["foot"] = String(d["feet"])
+			for k in _SLOTS:
+				if not d.has(k): d[k] = ""
+			return d
+	return {"weapon":"","armor":"","head":"","foot":"","bracelet":""}
 
-func _is_sigil_compatible(member_mind: String, sigil_id_or_inst: String) -> bool:
-	var mm: String = _norm(member_mind)
-	if mm == "" or mm == "omega": return true
-	var se: String = _norm(_sigil_element(sigil_id_or_inst))
-	return se == "" or se == mm
+func _pretty_item(id: String) -> String:
+	if id == "" or id == "—": return "—"
+	if _eq and _eq.has_method("get_item_display_name"):
+		var v: Variant = _eq.call("get_item_display_name", id)
+		if typeof(v) == TYPE_STRING: return String(v)
+	return id
 
-# CSV fallback for party minds
-func _get_member_mind_from_party_csv(member_token: String) -> String:
-	var PARTY_PATHS := [
-		"res://data/actors/party.csv",
-		"res://data/party/party.csv",
-		"res://data/party.csv"
-	]
-
-	var path: String = ""
-	for p in PARTY_PATHS:
-		if FileAccess.file_exists(p):
-			path = p
-			break
-	if path == "":
-		return ""
-
-	var f: FileAccess = FileAccess.open(path, FileAccess.READ)
-	if f == null or f.eof_reached():
-		if f != null: f.close()
-		return ""
-
-	# read header
-	var header_psa: PackedStringArray = f.get_csv_line()
-	var idx_actor: int = -1
-	var idx_name: int = -1
-	var idx_mind: int = -1
-	for i in range(header_psa.size()):
-		var h := String(header_psa[i]).strip_edges().to_lower()
-		if h in ["actor_id","member_id","id","code"]: idx_actor = i
-		elif h in ["name","display_name","character","alias"]: idx_name = i
-		elif h in ["mind_type","mind","mind_base","mind_type_id"]: idx_mind = i
-
-	var want: String = member_token.strip_edges().to_lower()
-	var result: String = ""
-
-	while not f.eof_reached():
-		var row: PackedStringArray = f.get_csv_line()
-		if row.is_empty():
-			continue
-		var actor: String = (String(row[idx_actor]).strip_edges().to_lower() if (idx_actor >= 0 and idx_actor < row.size()) else "")
-		var name_col: String = (String(row[idx_name]).strip_edges().to_lower() if (idx_name >= 0 and idx_name < row.size()) else "")
-		if actor == want or name_col == want:
-
-			result = (String(row[idx_mind]).strip_edges() if (idx_mind >= 0 and idx_mind < row.size()) else "")
-			break
-
-	f.close()
-	return (result.capitalize() if result != "" else "")
-
-# ───────────── Stats grid + item defs ─────────────
+func _list_equippable(member_token: String, slot: String) -> PackedStringArray:
+	if _eq and _eq.has_method("list_equippable"):
+		var v2: Variant = _eq.call("list_equippable", member_token, slot)
+		if typeof(v2) == TYPE_PACKED_STRING_ARRAY: return v2 as PackedStringArray
+		if typeof(v2) == TYPE_ARRAY:
+			var out2: PackedStringArray = PackedStringArray()
+			for e2 in (v2 as Array): out2.append(String(e2))
+			return out2
+	return PackedStringArray()
 
 func _clear_stats_grid() -> void:
 	if _stats_grid == null: return
@@ -643,7 +599,7 @@ func _clear_stats_grid() -> void:
 		c.queue_free()
 
 func _label_cell(txt: String) -> Label:
-	var l := Label.new()
+	var l: Label = Label.new()
 	l.text = txt
 	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD
@@ -651,7 +607,7 @@ func _label_cell(txt: String) -> Label:
 	return l
 
 func _value_cell(txt: String) -> Label:
-	var l := Label.new()
+	var l: Label = Label.new()
 	l.text = txt
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD
 	l.add_theme_font_size_override("font_size", STATS_FONT_SIZE)
@@ -661,22 +617,10 @@ func _fmt_num(n: float) -> String:
 	var as_int: int = int(round(n))
 	return str(as_int) if abs(n - float(as_int)) < 0.0001 else str(snapped(n, 0.1))
 
-func _stat(s: String) -> int:
-	if _stats and _stats.has_method("get_stat"):
-		var v: Variant = _stats.call("get_stat", s)
-		if typeof(v) == TYPE_INT: return int(v)
-	return 0
-
 func _stat_for_member(member_token: String, s: String) -> int:
-	# Hero: live stat from StatsSystem
-	if member_token == "hero" or _norm(member_token) == _norm(_hero_name()):
-		if _stats and _stats.has_method("get_stat"):
-			return int(_stats.call("get_stat", s))
-	# Others: ask GameState (CSV-backed)
 	if _gs and _gs.has_method("get_member_stat"):
 		return int(_gs.call("get_member_stat", member_token, s))
 	return 1
-
 
 func _item_def(id: String) -> Dictionary:
 	var empty: Dictionary = {}
@@ -704,23 +648,24 @@ func _eva_mods_from_other(equip: Dictionary, exclude_id: String) -> int:
 func _rebuild_stats_grid(member_token: String, equip: Dictionary) -> void:
 	if _stats_grid == null: return
 	_clear_stats_grid()
-	var lvl := 1
-	var hp_max := 0
-	var mp_max := 0
+
+	var lvl: int = 1
+	var hp_max: int = 0
+	var mp_max: int = 0
 	if _gs and _gs.has_method("compute_member_pools"):
 		var pools: Dictionary = _gs.call("compute_member_pools", member_token)
 		lvl    = int(pools.get("level", 1))
 		hp_max = int(pools.get("hp_max", 0))
 		mp_max = int(pools.get("mp_max", 0))
 
-	var d_wea: Dictionary  = _item_def(String(equip.get("weapon","")))
-	var d_arm: Dictionary  = _item_def(String(equip.get("armor","")))
+	var d_wea:  Dictionary = _item_def(String(equip.get("weapon","")))
+	var d_arm:  Dictionary = _item_def(String(equip.get("armor","")))
 	var d_head: Dictionary = _item_def(String(equip.get("head","")))
 	var d_foot: Dictionary = _item_def(String(equip.get("foot","")))
 	var d_brac: Dictionary = _item_def(String(equip.get("bracelet","")))
 
 	var brw: int = _stat_for_member(member_token, "BRW")
-	var base_watk: int  = int(d_wea.get("base_watk", 0))
+	var base_watk: int   = int(d_wea.get("base_watk", 0))
 	var scale_brw: float = float(d_wea.get("scale_brw", 0.0))
 	var weapon_attack: int = base_watk + int(round(scale_brw * float(brw)))
 	var weapon_scale: String = _fmt_num(scale_brw)
@@ -729,18 +674,18 @@ func _rebuild_stats_grid(member_token: String, equip: Dictionary) -> void:
 	var crit_bonus: int = int(d_wea.get("crit_bonus_pct", 0))
 	var type_raw: String = String(d_wea.get("watk_type_tag","")).strip_edges().to_lower()
 	var weapon_type: String = ("Neutral" if (type_raw == "" or type_raw == "wand") else type_raw.capitalize())
-	var special: String = ("NL" if bool(d_wea.get("non_lethal", false)) else "")
+	var special: String = ("NL" if _as_bool(d_wea.get("non_lethal", false)) else "")
 
 	var vtl: int = _stat_for_member(member_token, "VTL")
 	var armor_flat: int = int(d_arm.get("armor_flat", 0))
-	var pdef: int = int(round(float(armor_flat) * (_DEF_BASELINE + 0.25 * float(vtl))))
+	var pdef: int = int(round(float(armor_flat) * (5.0 + 0.25 * float(vtl))))
 	var ail_res: int = int(d_arm.get("ail_resist_pct", 0))
 
 	var fcs: int = _stat_for_member(member_token, "FCS")
 	var hp_bonus: int = int(d_head.get("max_hp_boost", 0))
 	var mp_bonus: int = int(d_head.get("max_mp_boost", 0))
 	var ward_flat: int = int(d_head.get("ward_flat", 0))
-	var mdef: int = int(round(float(ward_flat) * (_DEF_BASELINE + 0.25 * float(fcs))))
+	var mdef: int = int(round(float(ward_flat) * (5.0 + 0.25 * float(fcs))))
 
 	var base_eva: int = int(d_foot.get("base_eva", 0))
 	var mods: int = _eva_mods_from_other(equip, String(equip.get("foot","")))
@@ -756,18 +701,12 @@ func _rebuild_stats_grid(member_token: String, equip: Dictionary) -> void:
 		if typeof(v) == TYPE_PACKED_STRING_ARRAY: arr = Array(v)
 		elif typeof(v) == TYPE_ARRAY: arr = v
 		if arr.size() > 0 and String(arr[0]) != "":
-			var sid: String = String(arr[0])
-			if _sig.has_method("get_display_name_for"):
-				var dn: Variant = _sig.call("get_display_name_for", sid)
-				active = String(dn) if typeof(dn) == TYPE_STRING else sid
-			else:
-				active = sid
+			active = _sigil_disp(String(arr[0]))
 
-	var set_bonus: String = ""
-
-	var _pair := func(lbl: String, val: String) -> void:
+	var _pair: Callable = func(lbl: String, val: String) -> void:
 		_stats_grid.add_child(_label_cell(lbl))
 		_stats_grid.add_child(_value_cell(val))
+
 	_pair.call("Level",  str(lvl))
 	_pair.call("Max HP", str(hp_max))
 	_pair.call("Max MP", str(mp_max))
@@ -792,169 +731,58 @@ func _rebuild_stats_grid(member_token: String, equip: Dictionary) -> void:
 	_pair.call("Mind Evasion", ("" if d_foot.is_empty() else str(meva)))
 	_pair.call("Speed", ("" if d_foot.is_empty() else str(speed)))
 
-	_pair.call("Set Bonus", set_bonus)
+	_pair.call("Set Bonus", "")
 	_pair.call("Sigil Slots", ("" if d_brac.is_empty() else str(slots)))
 	_stats_grid.add_child(_label_cell("Active Sigil"))
-	var active_cell := _value_cell("" if d_brac.is_empty() else active)
+	var active_cell: Label = _value_cell("" if d_brac.is_empty() else active)
 	active_cell.custom_minimum_size.x = 60
 	_stats_grid.add_child(active_cell)
 
-# ───────────── refresh hooks ─────────────
-
-func _on_equipment_changed(member: String) -> void:
-	var cur: String = _current_token()
-	if cur == "": return
-	if _norm(member) == _norm(cur) or _norm(member) == _norm(_current_label()):
-		var equip: Dictionary = _fetch_equip_for(cur)
-		_w_val.text = _pretty_item(String(equip.get("weapon","")))
-		_a_val.text = _pretty_item(String(equip.get("armor","")))
-		_h_val.text = _pretty_item(String(equip.get("head","")))
-		_f_val.text = _pretty_item(String(equip.get("foot","")))
-		_b_val.text = _pretty_item(String(equip.get("bracelet","")))
-		_rebuild_stats_grid(cur, equip)
-		_rebuild_sigils(cur)
-		_refresh_mind_row(cur)
-		_refresh_active_type_row(cur)
-
-
-func _on_sigils_changed(member: String) -> void:
-	var cur: String = _current_token()
-	if cur == "": return
-	if _norm(member) == _norm(cur) or _norm(member) == _norm(_current_label()):
-		_rebuild_sigils(cur)
-		var equip: Dictionary = _fetch_equip_for(cur)
-		_rebuild_stats_grid(cur, equip)
-		_refresh_mind_row(cur)
-		_refresh_active_type_row(cur)
-
-
-# ───────────── Mind Type row ─────────────
-
-func _refresh_mind_row(member_token: String) -> void:
-	if _mind_value == null:
-		return
-	var mt: String = _get_member_mind_type(member_token)
-	_mind_value.text = (mt if mt != "" else "—")
-
-# ───────────── utils ─────────────
-
-func _pretty_item(id: String) -> String:
-	if id == "" or id == "—": return "—"
-	if _eq and _eq.has_method("get_item_display_name"):
-		var v: Variant = _eq.call("get_item_display_name", id)
-		if typeof(v) == TYPE_STRING: return String(v)
-	return id
-
-func _fetch_equip_for(member_token: String) -> Dictionary:
-	if _gs and _gs.has_method("get_member_equip"):
-		var d_v: Variant = _gs.call("get_member_equip", member_token)
-		if typeof(d_v) == TYPE_DICTIONARY:
-			var d: Dictionary = d_v
-			if d.has("feet") and not d.has("foot"): d["foot"] = String(d["feet"])
-			for k in _SLOTS:
-				if not d.has(k): d[k] = ""
-			return d
-	if _eq and _eq.has_method("get_member_equip"):
-		var d2_v: Variant = _eq.call("get_member_equip", member_token)
-		if typeof(d2_v) == TYPE_DICTIONARY:
-			return d2_v as Dictionary
-	return {"weapon":"","armor":"","head":"","foot":"","bracelet":""}
-
-func _list_equippable(member_token: String, slot: String) -> PackedStringArray:
-	if _eq and _eq.has_method("list_equippable"):
-		var v2: Variant = _eq.call("list_equippable", member_token, slot)
-		if typeof(v2) == TYPE_PACKED_STRING_ARRAY: return v2 as PackedStringArray
-		if typeof(v2) == TYPE_ARRAY:
-			var out2 := PackedStringArray()
-			for e2 in (v2 as Array): out2.append(String(e2))
-			return out2
-	return PackedStringArray()
-
-func _on_manage_sigils() -> void:
-	var path := "res://scenes/main_menu/panels/SigilSkillMenu.tscn"
-	if not ResourceLoader.exists(path):
-		push_warning("[LoadoutPanel] SigilSkillMenu scene missing: %s" % path)
-		return
-	var ps := load(path) as PackedScene
-	if ps == null: return
-	var inst := ps.instantiate()
-	if inst is Control:
-		var c := inst as Control
-		c.top_level = true
-		c.set_anchors_preset(Control.PRESET_FULL_RECT)
-		c.z_index = 3000
-	var who: String = _current_token()
-	if who != "" and inst.has_method("set_member"):
-		inst.call("set_member", who)
-	var host := get_tree().current_scene
-	if host == null: host = get_tree().root
-	host.add_child(inst)
+# ────────────────── Active Type (hero) ──────────────────
 func _setup_active_type_widgets() -> void:
 	if _mind_row == null: return
-	# Create once; keep hidden until the Hero is selected
 	if _active_name_lbl == null:
-		_active_name_lbl = Label.new()
-		_active_name_lbl.text = "Active Type:"
-		_active_name_lbl.visible = false
-		_mind_row.add_child(_active_name_lbl)
-
+		_active_name_lbl = Label.new(); _active_name_lbl.text = "Active Type:"; _active_name_lbl.visible = false; _mind_row.add_child(_active_name_lbl)
 	if _active_value_lbl == null:
-		_active_value_lbl = Label.new()
-		_active_value_lbl.text = "Omega"
-		_active_value_lbl.visible = false
-		_mind_row.add_child(_active_value_lbl)
-
+		_active_value_lbl = Label.new(); _active_value_lbl.text = "Omega"; _active_value_lbl.visible = false; _mind_row.add_child(_active_value_lbl)
 	if _active_btn == null:
-		_active_btn = Button.new()
-		_active_btn.text = "Set…"
-		_active_btn.visible = false
-		_active_btn.pressed.connect(_open_active_type_picker)
-		_mind_row.add_child(_active_btn)
+		_active_btn = Button.new(); _active_btn.text = "Set…"; _active_btn.visible = false
+		_active_btn.pressed.connect(Callable(self, "_open_active_type_picker")); _mind_row.add_child(_active_btn)
 
 func _refresh_active_type_row(member_token: String) -> void:
-	var is_hero := (member_token == "hero" or _norm(member_token) == _norm(_hero_name()))
-	var should_show := is_hero and _active_name_lbl != null and _active_value_lbl != null and _active_btn != null
-	if not should_show:
+	var is_hero: bool = (member_token == "hero" or member_token.strip_edges().to_lower() == _hero_name().strip_edges().to_lower())
+	var do_show: bool = is_hero and _active_name_lbl != null and _active_value_lbl != null and _active_btn != null
+	if not do_show:
 		if _active_name_lbl:  _active_name_lbl.visible = false
 		if _active_value_lbl: _active_value_lbl.visible = false
 		if _active_btn:       _active_btn.visible = false
 		return
 
-	var cur := _get_hero_active_type()
+	var cur: String = _get_hero_active_type()
 	_active_name_lbl.visible = true
 	_active_value_lbl.text = (cur if cur != "" else "Omega")
 	_active_value_lbl.visible = true
 	_active_btn.visible = true
 
-
 func _get_hero_active_type() -> String:
 	if _gs:
-		# Prefer metadata (always exists, no typed property required)
 		if _gs.has_meta("hero_active_type"):
 			var mv: Variant = _gs.get_meta("hero_active_type")
 			if typeof(mv) == TYPE_STRING and String(mv).strip_edges() != "":
 				return String(mv)
-		# Fallback: if you DID add a real property in aGameState
 		if _gs.has_method("get"):
 			var v: Variant = _gs.get("hero_active_type")
 			if typeof(v) == TYPE_STRING and String(v).strip_edges() != "":
 				return String(v)
 	return "Omega"
 
-
 func _set_hero_active_type(school: String) -> void:
-	var val := school.strip_edges()
+	var val: String = school.strip_edges()
 	if val == "": val = "Omega"
 	if _gs:
-		# Always safe
 		_gs.set_meta("hero_active_type", val)
-		# Optional: also try a real property if you later add it to aGameState
-		if _gs.has_method("set"):
-			_gs.set("hero_active_type", val)
-	# Let other systems react if they listen
-	if _stats and _stats.has_signal("stats_changed"):
-		_stats.emit_signal("stats_changed")
-
+		if _gs.has_method("set"): _gs.set("hero_active_type", val)
+	if _stats and _stats.has_signal("stats_changed"): _stats.emit_signal("stats_changed")
 
 func _collect_all_schools() -> Array[String]:
 	var out: Array[String] = []
@@ -964,53 +792,45 @@ func _collect_all_schools() -> Array[String]:
 			var defs: Dictionary = v
 			for id_v in defs.keys():
 				var rec: Dictionary = defs[id_v]
-				# only sigil items
-				var tag := ""
+				var tag: String = ""
 				for k in ["equip_slot","slot","equip","equip_to","category","cat","type"]:
 					if rec.has(k) and typeof(rec[k]) == TYPE_STRING:
 						tag = String(rec[k]).strip_edges().to_lower()
 						break
 				if tag != "sigil" and tag != "sigils":
 					continue
-				# pull school
 				for sk in ["sigil_school","school","mind_type","mind_type_tag","mind_tag"]:
 					if rec.has(sk) and typeof(rec[sk]) == TYPE_STRING:
-						var s := String(rec[sk]).strip_edges()
+						var s: String = String(rec[sk]).strip_edges()
 						if s != "":
-							var cap := s.capitalize()
+							var cap: String = s.capitalize()
 							if not out.has(cap): out.append(cap)
 						break
-	if out.is_empty():
-		out = ["Omega","Fire","Water","Earth","Air","Data","Void"]
+	if out.is_empty(): out = ["Omega","Fire","Water","Earth","Air","Data","Void"]
 	out.sort()
 	return out
 
 func _open_active_type_picker() -> void:
-	# Only makes sense for the Hero
-	var token := _current_token()
-	if not (token == "hero" or _norm(token) == _norm(_hero_name())):
+	var token: String = _current_token()
+	if not (token == "hero" or token.strip_edges().to_lower() == _hero_name().strip_edges().to_lower()):
 		return
+	var schools: Array[String] = _collect_all_schools()
+	var cur: String = _get_hero_active_type()
 
-	var schools := _collect_all_schools()
-	var cur := _get_hero_active_type()
-
-	var pm := PopupMenu.new()
+	var pm: PopupMenu = PopupMenu.new()
 	add_child(pm)
-
-	# Always include Omega first
 	pm.add_item("Omega")
 	pm.set_item_metadata(0, "Omega")
-	pm.set_item_checked(0, _norm(cur) == "omega")
+	pm.set_item_checked(0, cur.strip_edges().to_lower() == "omega")
 	pm.add_separator()
-
 	for s in schools:
 		if s == "Omega": continue
 		pm.add_item(s)
 		pm.set_item_metadata(pm.get_item_count() - 1, s)
-		if _norm(s) == _norm(cur):
+		if s.strip_edges().to_lower() == cur.strip_edges().to_lower():
 			pm.set_item_checked(pm.get_item_count() - 1, true)
 
-	var _pick := func(i: int) -> void:
+	var _pick: Callable = func(i: int) -> void:
 		var meta: Variant = pm.get_item_metadata(i)
 		pm.queue_free()
 		if typeof(meta) == TYPE_STRING:
@@ -1022,3 +842,86 @@ func _open_active_type_picker() -> void:
 		_pick.call(pm.get_item_index(idnum))
 	)
 	pm.popup(Rect2(get_global_mouse_position(), Vector2(200, 0)))
+
+# ────────────────── Manage Sigils action ──────────────────
+func _instance_sigil_menu_scene() -> Control:
+	for p in _SIGIL_MENU_SCENE_PATHS:
+		if ResourceLoader.exists(p):
+			var ps: PackedScene = load(p)
+			var inst: Node = ps.instantiate()
+			if inst is Control:
+				return inst as Control
+	return SigilSkillMenu.new()
+
+func _on_manage_sigils() -> void:
+	var token: String = _current_token()
+	if token == "": return
+
+	var menu: Control = _instance_sigil_menu_scene()
+	var layer := CanvasLayer.new()
+	layer.layer = 100
+	get_tree().root.add_child(layer)
+	layer.add_child(menu)
+	menu.set_anchors_preset(Control.PRESET_FULL_RECT)
+
+	if menu.has_method("set_member"):
+		menu.call("set_member", token)
+
+	if not menu.tree_exited.is_connected(Callable(self, "_on_overlay_closed")):
+		menu.tree_exited.connect(Callable(self, "_on_overlay_closed").bind(layer))
+
+func _on_overlay_closed(layer: CanvasLayer) -> void:
+	if is_instance_valid(layer):
+		layer.queue_free()
+	# In case levels/skills changed while overlay was open
+	_refresh_all_for_current()
+
+# ────────────────── polling fallback ──────────────────
+func _snapshot_party_signature() -> String:
+	return ",".join(_gather_party_tokens())
+
+func _snapshot_sigil_signature(member: String) -> String:
+	if _sig and _sig.has_method("get_loadout"):
+		var v: Variant = _sig.call("get_loadout", member)
+		var arr: Array = (Array(v) if typeof(v) in [TYPE_ARRAY, TYPE_PACKED_STRING_ARRAY] else [])
+		var parts: Array[String] = []
+		for s in arr:
+			var inst: String = String(s)
+			if inst == "":
+				parts.append("_")
+			else:
+				var lv: int = (_sig.call("get_instance_level", inst) if (_sig and _sig.has_method("get_instance_level")) else 0)
+				parts.append("%s:%d" % [inst, int(lv)])
+		return "|".join(parts)
+	return ""
+
+func _process(delta: float) -> void:
+	_poll_accum += delta
+	if _poll_accum < 0.5:
+		return
+	_poll_accum = 0.0
+
+	# Party drift?
+	var p_sig := _snapshot_party_signature()
+	if p_sig != _party_sig:
+		_party_sig = p_sig
+		_on_party_roster_changed()
+		return
+
+	# Sigil level drift for current
+	var cur := _current_token()
+	if cur != "":
+		var s_sig := _snapshot_sigil_signature(cur)
+		if s_sig != _sigils_sig:
+			_sigils_sig = s_sig
+			_refresh_all_for_current()
+
+func _as_bool(v: Variant) -> bool:
+	match typeof(v):
+		TYPE_BOOL:   return v
+		TYPE_INT:    return int(v) != 0
+		TYPE_FLOAT:  return float(v) != 0.0
+		TYPE_STRING:
+			var s := String(v).strip_edges().to_lower()
+			return s in ["true","1","yes","y","on","t"]
+		_:           return false

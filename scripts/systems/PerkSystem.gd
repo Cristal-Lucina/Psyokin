@@ -10,41 +10,41 @@ const STAT_IDS: PackedStringArray = ["BRW","VTL","MND","TPO","FCS"]
 const TIER_THRESHOLDS: PackedInt32Array = [1, 3, 5, 7, 10]
 
 # 25 placeholder perks (stable ids for saves)
-const PERK_DB := {
+const PERK_DB: Dictionary = {
 	"BRW": [
-		{"id":"brw_t1", "name":"Iron Grip",       "desc":"+2% Physical Hit."},
-		{"id":"brw_t2", "name":"Counter Stance",  "desc":"Defend adds +10% reflect."},
-		{"id":"brw_t3", "name":"Breaker",         "desc":"+10% vs Shielded."},
-		{"id":"brw_t4", "name":"Unstaggerable",   "desc":"Stumble pushback -1."},
-		{"id":"brw_t5", "name":"Titan Form",      "desc":"+10% DMG floor (Player→Enemy)."}
+		{"id":"brw_t1","name":"Iron Grip","desc":"+2% Physical Hit."},
+		{"id":"brw_t2","name":"Counter Stance","desc":"Defend adds +10% reflect."},
+		{"id":"brw_t3","name":"Breaker","desc":"+10% vs Shielded."},
+		{"id":"brw_t4","name":"Unstaggerable","desc":"Stumble pushback -1."},
+		{"id":"brw_t5","name":"Titan Form","desc":"+10% DMG floor (Player->Enemy)."}
 	],
 	"VTL": [
-		{"id":"vtl_t1", "name":"Second Wind",     "desc":"+5% heal at turn start under 30% HP."},
-		{"id":"vtl_t2", "name":"Bulwark",         "desc":"+5 ArmorFlat (placeholder)."},
-		{"id":"vtl_t3", "name":"Steadfast",       "desc":"-10% DoT damage."},
-		{"id":"vtl_t4", "name":"Stonewall",       "desc":"Defend ×0.65 instead of ×0.7."},
-		{"id":"vtl_t5", "name":"Nine Lives",      "desc":"Once per fight, survive lethal at 1 HP."}
+		{"id":"vtl_t1","name":"Second Wind","desc":"+5% heal at turn start under 30% HP."},
+		{"id":"vtl_t2","name":"Bulwark","desc":"+5 ArmorFlat (placeholder)."},
+		{"id":"vtl_t3","name":"Steadfast","desc":"-10% DoT damage."},
+		{"id":"vtl_t4","name":"Stonewall","desc":"Defend x0.65 instead of x0.7."},
+		{"id":"vtl_t5","name":"Nine Lives","desc":"Once per fight, survive lethal at 1 HP."}
 	],
 	"MND": [
-		{"id":"mnd_t1", "name":"Sharp Mind",      "desc":"+5 Skill Hit."},
-		{"id":"mnd_t2", "name":"Overchannel",     "desc":"Overcast HP cost -10%."},
-		{"id":"mnd_t3", "name":"Runic Echo",      "desc":"+10% Sigil damage."},
-		{"id":"mnd_t4", "name":"Mindguard",       "desc":"-10% MDEF damage taken."},
-		{"id":"mnd_t5", "name":"Arc Savant",      "desc":"Crit skills deal ×2.2 (placeholder)."}
+		{"id":"mnd_t1","name":"Sharp Mind","desc":"+5 Skill Hit."},
+		{"id":"mnd_t2","name":"Overchannel","desc":"Overcast HP cost -10%."},
+		{"id":"mnd_t3","name":"Runic Echo","desc":"+10% Sigil damage."},
+		{"id":"mnd_t4","name":"Mindguard","desc":"-10% MDEF damage taken."},
+		{"id":"mnd_t5","name":"Arc Savant","desc":"Crit skills deal x2.2 (placeholder)."}
 	],
 	"TPO": [
-		{"id":"tpo_t1", "name":"Quickstep",       "desc":"+1 Speed."},
-		{"id":"tpo_t2", "name":"Opportunist",     "desc":"+4 Burst on crit (cap obeyed)."},
-		{"id":"tpo_t3", "name":"Ambusher",        "desc":"+5% opening round Hit."},
-		{"id":"tpo_t4", "name":"Slipstream",      "desc":"Initiative pushback +1 on crit."},
-		{"id":"tpo_t5", "name":"Time Dancer",     "desc":"Small chance to act twice (TBD)."}
+		{"id":"tpo_t1","name":"Quickstep","desc":"+1 Speed."},
+		{"id":"tpo_t2","name":"Opportunist","desc":"+4 Burst on crit (cap obeyed)."},
+		{"id":"tpo_t3","name":"Ambusher","desc":"+5% opening round Hit."},
+		{"id":"tpo_t4","name":"Slipstream","desc":"Initiative pushback +1 on crit."},
+		{"id":"tpo_t5","name":"Time Dancer","desc":"Small chance to act twice (TBD)."}
 	],
 	"FCS": [
-		{"id":"fcs_t1", "name":"Eagle Eye",       "desc":"+2% Physical & Skill Hit."},
-		{"id":"fcs_t2", "name":"Study Pace",      "desc":"+5% SXP from study items."},
-		{"id":"fcs_t3", "name":"True Sight",      "desc":"+5% vs evasive foes."},
-		{"id":"fcs_t4", "name":"Spot Weakness",   "desc":"First Stumble each round +2 Burst."},
-		{"id":"fcs_t5", "name":"Perfect Focus",   "desc":"Clamp Hit min +2 (to a 7% floor)."}
+		{"id":"fcs_t1","name":"Eagle Eye","desc":"+2% Physical & Skill Hit."},
+		{"id":"fcs_t2","name":"Study Pace","desc":"+5% SXP from study items."},
+		{"id":"fcs_t3","name":"True Sight","desc":"+5% vs evasive foes."},
+		{"id":"fcs_t4","name":"Spot Weakness","desc":"First Stumble each round +2 Burst."},
+		{"id":"fcs_t5","name":"Perfect Focus","desc":"Clamp Hit min +2 (to a 7% floor)."}
 	]
 }
 
@@ -183,7 +183,7 @@ func _ensure_stat(stat_id: String) -> void:
 func _find_by_id(perk_id: String) -> Array:
 	for s in STAT_IDS:
 		var row: Array = PERK_DB.get(s, [])
-		for i in row.size():
+		for i in range(row.size()):
 			var rec: Dictionary = row[i]
 			if String(rec.get("id", "")) == perk_id:
 				return [s, i]
@@ -194,7 +194,7 @@ func _export_unlocked_ids() -> Array[String]:
 	for s in STAT_IDS:
 		_ensure_stat(s)
 		var row: PackedInt32Array = _unlocked[s]
-		for i in row.size():
+		for i in range(row.size()):
 			if row[i] == 1:
 				out.append(get_perk_id(s, i))
 	return out

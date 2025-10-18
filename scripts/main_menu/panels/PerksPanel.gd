@@ -1,11 +1,9 @@
 extends Control
 class_name PerksPanel
 
-## PerksPanel (MVP)
-## - 5 rows (stats) × 5 tiers (perks). Locked until stat meets tier threshold.
-## - Spend 1 Perk Point to unlock (if systems exist); otherwise UI-only.
-## - Defensive lookups of aStatsSystem and optional aPerkSystem.
-## - Typed GDScript; connect-once; short docstrings.
+## PerksPanel (gated)
+## - Buttons are disabled unless: stat meets tier threshold AND you have ≥1 perk point.
+## - On click: spend point first; attempt unlock; if unlock fails, refund 1.
 
 const STATS_PATH   : String = "/root/aStatsSystem"
 const PERKSYS_PATH : String = "/root/aPerkSystem"  # optional; UI works without it
@@ -30,7 +28,6 @@ var _cells      : Dictionary = {}            # {stat -> Array[Button]}
 var _points     : int = 0                    # available perk points (from system if possible)
 
 func _ready() -> void:
-	"""Resolve systems, wire signals, build UI."""
 	_stats = get_node_or_null(STATS_PATH)
 	_perk  = get_node_or_null(PERKSYS_PATH)
 
@@ -47,7 +44,7 @@ func _ready() -> void:
 	if _perk != null:
 		if _perk.has_signal("perk_unlocked"):
 			_perk.connect("perk_unlocked", Callable(self, "_rebuild_all"))
-		if _perk.has_signal("perks_changed"): # NEW
+		if _perk.has_signal("perks_changed"):
 			_perk.connect("perks_changed", Callable(self, "_rebuild_all"))
 
 	_rebuild_all()
@@ -55,7 +52,6 @@ func _ready() -> void:
 # ------------------------------------------------------------------------------
 
 func _rebuild_all() -> void:
-	"""Recompute levels/points, rebuild the 5×5 grid."""
 	_levels_map = _read_levels()
 	_stat_keys  = _choose_rows(_levels_map.keys())
 	_points     = _read_perk_points()
@@ -132,6 +128,7 @@ func _rebuild_all() -> void:
 			b.set_meta("stat_id", stat_id)
 			b.set_meta("tier", tier_i)
 
+			# Only connect if the user can actually buy right now
 			if can_buy and not b.pressed.is_connected(_on_cell_pressed):
 				b.pressed.connect(_on_cell_pressed.bind(b))
 
@@ -146,7 +143,6 @@ func _rebuild_all() -> void:
 # ------------------------------------------------------------------------------
 
 func _read_levels() -> Dictionary:
-	"""Return {stat:String -> level:int} using aStatsSystem; fallback empty."""
 	var out: Dictionary = {}
 	var st: Node = _stats
 	if st == null:
@@ -177,7 +173,7 @@ func _read_levels() -> Dictionary:
 				out[String(names[i])] = int(levels[i])
 			return out
 
-	# Last resort: single generic row
+	# Last resort
 	if out.is_empty():
 		var lvl: int = 0
 		if st.has_method("get"):
@@ -188,7 +184,6 @@ func _read_levels() -> Dictionary:
 	return out
 
 func _read_perk_points() -> int:
-	"""Ask Stats for perk points; fallback 0."""
 	var st: Node = _stats
 	if st != null:
 		if st.has_method("get_perk_points"):
@@ -200,7 +195,6 @@ func _read_perk_points() -> int:
 	return 0
 
 func _choose_rows(keys: Array) -> PackedStringArray:
-	"""Pick up to 5 stat keys, using system-provided order if available."""
 	var order: PackedStringArray = []
 	var st: Node = _stats
 	if st != null and st.has_method("get_stats_order"):
@@ -217,7 +211,6 @@ func _choose_rows(keys: Array) -> PackedStringArray:
 	return order
 
 func _tier_threshold(_stat_id: String, tier_index: int) -> int:
-	"""Return threshold for a given tier; allows system override."""
 	if _perk != null:
 		if _perk.has_method("get_threshold"):
 			return int(_perk.call("get_threshold", _stat_id, tier_index))
@@ -230,7 +223,6 @@ func _tier_threshold(_stat_id: String, tier_index: int) -> int:
 	return DEFAULT_THRESHOLDS[min(tier_index, DEFAULT_THRESHOLDS.size() - 1)]
 
 func _is_unlocked(stat_id: String, tier_index: int) -> bool:
-	"""Ask Perk system if available; fallback false."""
 	if _perk != null:
 		if _perk.has_method("is_unlocked"):
 			return bool(_perk.call("is_unlocked", stat_id, tier_index))
@@ -241,29 +233,39 @@ func _is_unlocked(stat_id: String, tier_index: int) -> bool:
 # ------------------------------------------------------------------------------
 
 func _on_cell_pressed(btn: Button) -> void:
-	"""Attempt to purchase/unlock a perk cell."""
+	# Gate: stat threshold and points are rechecked here (defense)
 	var stat_id: String = String(btn.get_meta("stat_id"))
 	var tier_i : int    = int(btn.get_meta("tier"))
 
 	var threshold: int = _tier_threshold(stat_id, tier_i)
 	var level: int = int(_levels_map.get(stat_id, 0))
-	if level < threshold or _points <= 0:
+	if level < threshold:
 		return
 
-	var consumed: bool = false
+	# Spend 1 point FIRST; if you don’t have it, bail.
+	var spent: int = 0
+	if _stats != null and _stats.has_method("spend_perk_point"):
+		spent = int(_stats.call("spend_perk_point", 1))
+	if spent < 1:
+		return
+
+	# Try to unlock the perk.
+	var unlocked: bool = false
 	if _perk != null:
 		if _perk.has_method("unlock_by_id") and btn.has_meta("perk_id"):
-			consumed = bool(_perk.call("unlock_by_id", String(btn.get_meta("perk_id"))))
+			unlocked = bool(_perk.call("unlock_by_id", String(btn.get_meta("perk_id"))))
 		elif _perk.has_method("unlock_perk"):
-			consumed = bool(_perk.call("unlock_perk", stat_id, tier_i))
+			unlocked = bool(_perk.call("unlock_perk", stat_id, tier_i))
 		elif _perk.has_method("unlock"):
-			consumed = bool(_perk.call("unlock", stat_id, tier_i))
+			unlocked = bool(_perk.call("unlock", stat_id, tier_i))
+	else:
+		# No PerkSystem? treat as UI-only “success”
+		unlocked = true
 
-	if not consumed and _stats != null and _stats.has_method("spend_perk_point"):
-		consumed = (int(_stats.call("spend_perk_point", 1)) >= 1)
-
-	if not consumed:
-		_points = max(0, _points - 1)
+	# If unlock FAILED, refund the point.
+	if not unlocked:
+		if _stats != null and _stats.has_method("add_perk_points"):
+			_stats.call("add_perk_points", 1)
 
 	_rebuild_all()
 
@@ -274,7 +276,6 @@ func _update_points_label() -> void:
 		_points_tv.text = str(_points)
 
 func _pretty_stat(id_str: String) -> String:
-	"""Humanize a stat key."""
 	if _stats != null:
 		if _stats.has_method("get_stat_display_name"):
 			var v: Variant = _stats.call("get_stat_display_name", id_str)

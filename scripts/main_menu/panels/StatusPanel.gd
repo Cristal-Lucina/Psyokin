@@ -2,19 +2,16 @@ extends Control
 class_name StatusPanel
 
 ## Shows party HP/MP, summary info, and appearance.
-## - Hero stats: live (HeroSystem + StatsSystem)
-## - Others: party.csv (level_start, start_brw, start_mnd, start_tpo, start_vtl, start_fcs)
-## - Optional: /root/PartyStatsResolver to supply snapshots.
-## Dev: prints a combat profile dump on visibility + F9.
+## Prefers GameState meta + CombatProfileSystem; falls back to Stats/CSV.
 
 const GS_PATH        := "/root/aGameState"
 const STATS_PATH     := "/root/aStatsSystem"
 const CAL_PATH       := "/root/aCalendarSystem"
-const HERO_PATH      := "/root/aHeroSystem"
 const PARTY_PATH     := "/root/aPartySystem"
 const CSV_PATH       := "/root/aCSVLoader"
 const RESOLVER_PATH  := "/root/PartyStatsResolver"
 const SIGIL_PATH     := "/root/aSigilSystem"
+const CPS_PATH       := "/root/aCombatProfileSystem"
 
 const PARTY_CSV := "res://data/actors/party.csv"
 const MES_PATH  := "/root/aMainEventSystem"
@@ -35,11 +32,11 @@ var _gs        : Node = null
 var _st        : Node = null
 var _cal       : Node = null
 var _mes       : Node = null
-var _hero      : Node = null
 var _party_sys : Node = null
 var _csv       : Node = null
 var _resolver  : Node = null
 var _sig       : Node = null
+var _cps       : Node = null
 
 # party.csv cache
 var _csv_by_id   : Dictionary = {}      # "actor_id" -> row dict
@@ -53,7 +50,6 @@ var _sw_skin    : ColorRect = null
 var _sw_brow    : ColorRect = null
 var _sw_eye     : ColorRect = null
 var _sw_hair    : ColorRect = null
-var _csv_loaded_once: bool = false
 
 func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -63,12 +59,11 @@ func _ready() -> void:
 	_gs        = get_node_or_null(GS_PATH)
 	_st        = get_node_or_null(STATS_PATH)
 	_cal       = get_node_or_null(CAL_PATH)
-	_hero      = get_node_or_null(HERO_PATH)
-	if _hero == null: _hero = get_node_or_null("/root/HeroSystem")
 	_party_sys = get_node_or_null(PARTY_PATH)
 	_csv       = get_node_or_null(CSV_PATH)
 	_resolver  = get_node_or_null(RESOLVER_PATH)
 	_sig       = get_node_or_null(SIGIL_PATH)
+	_cps       = get_node_or_null(CPS_PATH)
 
 	_resolve_event_system()
 	_normalize_scroll_children()
@@ -78,35 +73,27 @@ func _ready() -> void:
 	if _refresh and not _refresh.pressed.is_connected(_rebuild_all):
 		_refresh.pressed.connect(_rebuild_all)
 
-	# Print on show
 	if not is_connected("visibility_changed", Callable(self, "_on_visibility_changed")):
 		connect("visibility_changed", Callable(self, "_on_visibility_changed"))
 
 	call_deferred("_first_fill")
 
 func _first_fill() -> void:
+	# refresh soft refs (autoload init order resilience)
 	if _gs == null:        _gs        = get_node_or_null(GS_PATH)
 	if _st == null:        _st        = get_node_or_null(STATS_PATH)
 	if _cal == null:       _cal       = get_node_or_null(CAL_PATH)
-	if _hero == null:      _hero      = get_node_or_null(HERO_PATH)
-	if _hero == null:      _hero      = get_node_or_null("/root/HeroSystem")
 	if _party_sys == null: _party_sys = get_node_or_null(PARTY_PATH)
 	if _csv == null:       _csv       = get_node_or_null(CSV_PATH)
 	if _resolver == null:  _resolver  = get_node_or_null(RESOLVER_PATH)
 	if _sig == null:       _sig       = get_node_or_null(SIGIL_PATH)
+	if _cps == null:       _cps       = get_node_or_null(CPS_PATH)
 	_load_party_csv_cache()
 	_rebuild_all()
 
 func _connect_signals() -> void:
 	# Calendar
 	if _cal:
-		# Remove old direct connections if they exist
-		if _cal.is_connected("day_advanced", Callable(self, "_rebuild_all")):
-			_cal.disconnect("day_advanced", Callable(self, "_rebuild_all"))
-		if _cal.is_connected("phase_advanced", Callable(self, "_rebuild_all")):
-			_cal.disconnect("phase_advanced", Callable(self, "_rebuild_all"))
-
-		# Connect via arg-swallowing handlers
 		if _cal.has_signal("day_advanced") and not _cal.is_connected("day_advanced", Callable(self, "_on_cal_day_adv")):
 			_cal.connect("day_advanced", Callable(self, "_on_cal_day_adv"))
 		if _cal.has_signal("phase_advanced") and not _cal.is_connected("phase_advanced", Callable(self, "_on_cal_phase_adv")):
@@ -120,25 +107,29 @@ func _connect_signals() -> void:
 	if _st and _st.has_signal("stat_leveled_up"):
 		_st.connect("stat_leveled_up", Callable(self, "_rebuild_all"))
 
-	# Hero
-	if _hero and _hero.has_signal("creation_applied"):
-		_hero.connect("creation_applied", Callable(self, "_rebuild_all"))
-
-	# Party / GameState changes (try a few common names)
+	# GameState / Party changes
 	for src in [_gs, _party_sys]:
 		if src == null: continue
 		for sig in ["party_changed","active_changed","roster_changed","changed"]:
 			if src.has_signal(sig) and not src.is_connected(sig, Callable(self, "_on_party_changed")):
 				src.connect(sig, Callable(self, "_on_party_changed"))
 
+	# Combat Profile updates (reflect current HP/MP/level)
+	if _cps:
+		for sig2 in ["profile_changed","profiles_changed"]:
+			if _cps.has_signal(sig2) and not _cps.is_connected(sig2, Callable(self, "_rebuild_all")):
+				_cps.connect(sig2, Callable(self, "_rebuild_all"))
+
+	# Creation screen may fire this; listen globally
+	for n in get_tree().root.get_children():
+		if n.has_signal("creation_applied") and not n.is_connected("creation_applied", Callable(self, "_rebuild_all")):
+			n.connect("creation_applied", Callable(self, "_rebuild_all"))
+
 func _on_cal_day_adv(_date_dict: Dictionary) -> void:
 	_rebuild_all()
 
 func _on_cal_phase_adv(_phase_i: int) -> void:
 	_rebuild_all()
-
-
-
 
 func _on_party_changed(_a: Variant = null) -> void:
 	_load_party_csv_cache()
@@ -226,6 +217,63 @@ func _rebuild_party() -> void:
 	await get_tree().process_frame
 	_party.queue_sort()
 
+# Prefer CPS for real-time party pools
+func _get_party_snapshot() -> Array:
+	if _cps != null and _gs != null and _gs.has_method("get_active_party_ids"):
+		var out: Array = []
+		var ids_v: Variant = _gs.call("get_active_party_ids")
+		var ids: Array = []
+		if typeof(ids_v) == TYPE_ARRAY:
+			ids = ids_v
+		elif typeof(ids_v) == TYPE_PACKED_STRING_ARRAY:
+			for s in (ids_v as PackedStringArray): ids.append(String(s))
+		if ids.is_empty(): ids = ["hero"]
+
+		for id_any in ids:
+			var id: String = String(id_any)
+			if not _cps.has_method("get_profile"):
+				continue
+			var p_v: Variant = _cps.call("get_profile", id)
+			if typeof(p_v) != TYPE_DICTIONARY:
+				continue
+			var p: Dictionary = p_v
+			var lvl: int = int(p.get("level", 1))
+			var hp_cur: int = int(p.get("hp", -1))
+			var hp_max: int = int(p.get("hp_max", -1))
+			var mp_cur: int = int(p.get("mp", -1))
+			var mp_max: int = int(p.get("mp_max", -1))
+			var label: String = String(p.get("label", _label_for_id(id)))
+			out.append({
+				"name": "%s  (Lv %d)" % [label, lvl],
+				"hp": hp_cur, "hp_max": hp_max,
+				"mp": mp_cur, "mp_max": mp_max
+			})
+		if out.size() > 0:
+			return out
+
+	# Fallbacks
+	if _resolver and _resolver.has_method("get_party_snapshots"):
+		var r_v: Variant = _resolver.call("get_party_snapshots")
+		if typeof(r_v) == TYPE_ARRAY:
+			var out_rs: Array = []
+			for d_v in (r_v as Array):
+				if typeof(d_v) != TYPE_DICTIONARY: continue
+				var d: Dictionary = d_v
+				var label: String = String(d.get("label", String(d.get("name","Member"))))
+				var lvl: int = int(d.get("level", 1))
+				var hp_max_i: int = int(d.get("hp_max", -1))
+				var mp_max_i: int = int(d.get("mp_max", -1))
+				var hp_cur_i: int = (hp_max_i if hp_max_i >= 0 else -1)
+				var mp_cur_i: int = (mp_max_i if mp_max_i >= 0 else -1)
+				out_rs.append({
+					"name": "%s  (Lv %d)" % [label, lvl],
+					"hp": hp_cur_i, "hp_max": hp_max_i,
+					"mp": mp_cur_i, "mp_max": mp_max_i
+				})
+			if out_rs.size() > 0:
+				return out_rs
+	return _build_snapshot_flexible()
+
 # --------------------- Right column summary -------------------
 
 func _update_summary() -> void:
@@ -237,7 +285,7 @@ func _update_summary() -> void:
 	if _phase: _phase.text = String(dp.get("phase_text", "—"))
 
 	if _hint:
-		var h := _read_mission_hint()
+		var h: String = _read_mission_hint()
 		_hint.text = h if h != "" else "[i]TBD[/i]"
 
 # --------------------- Appearance -----------------------------
@@ -255,7 +303,8 @@ func _ensure_appearance_ui() -> void:
 			_app_box = c; break
 	if _app_box != null: return
 
-	_app_box = VBoxContainer.new()
+	var vb := VBoxContainer.new()
+	_app_box = vb
 	_app_box.name = "AppearanceBox"
 	_app_box.add_theme_constant_override("separation", 6)
 	right_parent.add_child(_app_box)
@@ -322,51 +371,43 @@ func _update_appearance_values() -> void:
 	if _sw_hair: _sw_hair.color = _as_color(snap.get("hair_color", Color(1, 1, 1)))
 
 func _read_hero_identity() -> Dictionary:
-	var out: Dictionary = {
+	# First: GameState meta blob written by CharacterCreation
+	if _gs:
+		if _gs.has_meta("hero_identity"):
+			var id_v: Variant = _gs.get_meta("hero_identity")
+			if typeof(id_v) == TYPE_DICTIONARY:
+				var id: Dictionary = id_v
+				return {
+					"name": String(id.get("name","Player")),
+					"pronoun": String(id.get("pronoun","they")),
+					"body": String(id.get("body","1")),
+					"face": String(id.get("face","1")),
+					"eyes": String(id.get("eyes","1")),
+					"hair": String(id.get("hair","1")),
+					"body_color": _as_color(id.get("body_color", Color(1.0,0.9,0.8))),
+					"brow_color": _as_color(id.get("brow_color", Color(0.2,0.2,0.2))),
+					"eye_color":  _as_color(id.get("eye_color",  Color(0.4,0.5,0.6))),
+					"hair_color": _as_color(id.get("hair_color", Color(1,1,1))),
+				}
+		# Soft fallback: properties
+		if _gs.has_method("get"):
+			var out: Dictionary = {
+				"name": String(_gs.get("player_name")) if _gs.get("player_name") != null else "Player",
+				"pronoun":"they","body":"1","face":"1","eyes":"1","hair":"1",
+				"body_color": Color(1.0,0.9,0.8),
+				"brow_color": Color(0.2,0.2,0.2),
+				"eye_color":  Color(0.4,0.5,0.6),
+				"hair_color": Color(1,1,1),
+			}
+			return out
+	# Default
+	return {
 		"name":"Player","pronoun":"they","body":"1","face":"1","eyes":"1","hair":"1",
 		"body_color": Color(1.0, 0.9, 0.8),
 		"brow_color": Color(0.2, 0.2, 0.2),
 		"eye_color" : Color(0.4, 0.5, 0.6),
 		"hair_color": Color(1, 1, 1)
 	}
-	var h := _hero
-	if h == null: return out
-
-	if h.has_method("get_save_blob"):
-		var v: Variant = h.call("get_save_blob")
-		if typeof(v) == TYPE_DICTIONARY:
-			var blob: Dictionary = v
-			var id_v: Variant = blob.get("identity", {})
-			if typeof(id_v) == TYPE_DICTIONARY:
-				var id: Dictionary = id_v
-				out["name"] = String(id.get("name", out["name"]))
-				out["pronoun"] = String(id.get("pronoun", out["pronoun"]))
-				out["body"] = String(id.get("body", out["body"]))
-				out["face"] = String(id.get("face", out["face"]))
-				out["eyes"] = String(id.get("eyes", out["eyes"]))
-				out["hair"] = String(id.get("hair", out["hair"]))
-				out["body_color"] = _as_color(id.get("body_color", out["body_color"]))
-				out["brow_color"] = _as_color(id.get("brow_color", out["brow_color"]))
-				out["eye_color"]  = _as_color(id.get("eye_color",  out["eye_color"]))
-				out["hair_color"] = _as_color(id.get("hair_color", out["hair_color"]))
-			return out
-
-	if h.has_method("get"):
-		var props: Dictionary = {
-			"hero_name":"name", "pronoun":"pronoun",
-			"body_id":"body","face_id":"face","eyes_id":"eyes","hair_id":"hair",
-			"body_color":"body_color","brow_color":"brow_color",
-			"eye_color":"eye_color","hair_color":"hair_color"
-		}
-		for k in props.keys():
-			var key_engine: String = String(k)
-			var key_out: String = String(props[k])
-			var vv: Variant = h.get(key_engine)
-			if key_out in ["name","pronoun","body","face","eyes","hair"]:
-				if typeof(vv) == TYPE_STRING: out[key_out] = String(vv)
-			else:
-				out[key_out] = _as_color(vv)
-	return out
 
 func _as_color(v: Variant) -> Color:
 	if typeof(v) == TYPE_COLOR: return v as Color
@@ -399,18 +440,17 @@ func _read_date_phase() -> Dictionary:
 	if _cal:
 		if _cal.has_method("get_date_string"): out["date_text"] = String(_cal.call("get_date_string"))
 		if _cal.has_method("get_phase_name"):   out["phase_text"] = String(_cal.call("get_phase_name"))
-	if not out.has("date_text"): out["date_text"] = "—
-"
+	if not out.has("date_text"): out["date_text"] = "—"
 	if not out.has("phase_text"): out["phase_text"] = "—"
 	return out
 
 func _read_mission_hint() -> String:
 	if _mes:
 		if _mes.has_method("get_current_hint"):
-			var h := String(_mes.call("get_current_hint"))
-			if h != "": return h
+			var h2: String = String(_mes.call("get_current_hint"))
+			if h2 != "": return h2
 		if _mes.has_method("get_current_title"):
-			var t := String(_mes.call("get_current_title"))
+			var t: String = String(_mes.call("get_current_title"))
 			if t != "": return t
 	if _gs:
 		if _gs.has_method("get_mission_hint"): return String(_gs.call("get_mission_hint"))
@@ -421,36 +461,13 @@ func _read_mission_hint() -> String:
 
 func _on_event_changed(_id: String) -> void:
 	if _hint:
-		var h := _read_mission_hint()
+		var h: String = _read_mission_hint()
 		_hint.text = h if h != "" else "[i]TBD[/i]"
 
 func _fmt_pair(a: int, b: int) -> String:
 	return "%d / %d" % [a, b] if a >= 0 and b > 0 else "—"
 
-# --------------------- Party snapshot logic -------------------
-
-func _get_party_snapshot() -> Array:
-	if _resolver and _resolver.has_method("get_party_snapshots"):
-		var r_v: Variant = _resolver.call("get_party_snapshots")
-		if typeof(r_v) == TYPE_ARRAY:
-			var out_rs: Array = []
-			for d_v in (r_v as Array):
-				if typeof(d_v) != TYPE_DICTIONARY: continue
-				var d: Dictionary = d_v
-				var label: String = String(d.get("label", String(d.get("name","Member"))))
-				var lvl: int = int(d.get("level", 1))
-				var hp_max_i: int = int(d.get("hp_max", -1))
-				var mp_max_i: int = int(d.get("mp_max", -1))
-				var hp_cur_i: int = (hp_max_i if hp_max_i >= 0 else -1)
-				var mp_cur_i: int = (mp_max_i if mp_max_i >= 0 else -1)
-				out_rs.append({
-					"name": "%s  (Lv %d)" % [label, lvl],
-					"hp": hp_cur_i, "hp_max": hp_max_i,
-					"mp": mp_cur_i, "mp_max": mp_max_i
-				})
-			if out_rs.size() > 0:
-				return out_rs
-	return _build_snapshot_flexible()
+# --------------------- Party snapshot fallbacks -------------------
 
 func _build_snapshot_flexible() -> Array:
 	var out: Array = []
@@ -481,23 +498,60 @@ func _build_snapshot_flexible() -> Array:
 		})
 
 	if out.is_empty():
-		var nm2 := _safe_hero_name()
-		var lvl2 := _safe_hero_level()
-		var mh := _calc_max_hp(lvl2, 1)
-		var mm := _calc_max_mp(lvl2, 1)
+		var nm2: String = _safe_hero_name()
+		var lvl2: int = _safe_hero_level()
+		var mh: int = _calc_max_hp(lvl2, 1)
+		var mm: int = _calc_max_mp(lvl2, 1)
 		out.append({"name":"%s  (Lv %d)" % [nm2, lvl2], "hp": mh, "hp_max": mh, "mp": mm, "mp_max": mm})
-
 	return out
 
-# ---- Active/roster discovery helpers --------------------------------
+# ---------- CSV cache + per-member resolution ----------------
 
-func _array_from_any(v: Variant) -> Array:
-	if typeof(v) == TYPE_ARRAY: return v as Array
-	if typeof(v) == TYPE_PACKED_STRING_ARRAY:
-		var out: Array = []
-		for s in (v as PackedStringArray): out.append(String(s))
-		return out
-	return []
+func _load_party_csv_cache() -> void:
+	_csv_by_id.clear()
+	_name_to_id.clear()
+
+	# Preferred: CSV autoload
+	_csv = (_csv if _csv != null else get_node_or_null(CSV_PATH))
+	if _csv and _csv.has_method("load_csv"):
+		var defs_v: Variant = _csv.call("load_csv", PARTY_CSV, "actor_id")
+		if typeof(defs_v) == TYPE_DICTIONARY:
+			var defs: Dictionary = defs_v
+			for id_any in defs.keys():
+				var rid: String = String(id_any)
+				var row: Dictionary = defs[rid]
+				_csv_by_id[rid] = row
+				var n_v: Variant = row.get("name", "")
+				if typeof(n_v) == TYPE_STRING:
+					var key: String = String(n_v).strip_edges().to_lower()
+					if key != "": _name_to_id[key] = rid
+			return
+
+	# Manual fallback
+	if not FileAccess.file_exists(PARTY_CSV):
+		return
+	var f := FileAccess.open(PARTY_CSV, FileAccess.READ)
+	if f == null: return
+	if f.eof_reached():
+		f.close()
+		return
+
+	var header: PackedStringArray = f.get_csv_line()
+	var idx_id: int = header.find("actor_id")
+	var idx_name: int = header.find("name")
+	while not f.eof_reached():
+		var row_psa: PackedStringArray = f.get_csv_line()
+		if row_psa.is_empty(): continue
+		var rid2: String = (String(row_psa[idx_id]) if idx_id >= 0 and idx_id < row_psa.size() else "")
+		var nm2: String  = (String(row_psa[idx_name]) if idx_name >= 0 and idx_name < row_psa.size() else "")
+		var row_dict: Dictionary = {}
+		for i in range(header.size()):
+			row_dict[String(header[i])] = (row_psa[i] if i < row_psa.size() else "")
+		if rid2 != "":
+			_csv_by_id[rid2] = row_dict
+		if nm2.strip_edges() != "":
+			_name_to_id[nm2.strip_edges().to_lower()] = rid2
+	f.close()
 
 func _read_roster() -> Dictionary:
 	var roster: Dictionary = {}
@@ -510,12 +564,17 @@ func _read_roster() -> Dictionary:
 			if typeof(r2_v) == TYPE_DICTIONARY: roster = r2_v as Dictionary
 	return roster
 
-func _label_for_id(pid: String, roster: Dictionary) -> String:
+func _label_for_id(pid: String, roster: Dictionary = {}) -> String:
 	if pid == "hero": return _safe_hero_name()
 	if roster.has(pid):
 		var rec: Dictionary = roster[pid]
 		if rec.has("name") and typeof(rec["name"]) == TYPE_STRING and String(rec["name"]).strip_edges() != "":
 			return String(rec["name"])
+	# CSV fallback
+	if _csv_by_id.has(pid):
+		var row: Dictionary = _csv_by_id[pid]
+		var nm: String = String(row.get("name",""))
+		if nm != "": return nm
 	return (pid.capitalize() if pid != "" else "")
 
 func _gather_active_entries(roster: Dictionary) -> Array:
@@ -526,21 +585,6 @@ func _gather_active_entries(roster: Dictionary) -> Array:
 		for s in _array_from_any(v):
 			var pid := String(s)
 			entries.append({"key": pid, "label": _label_for_id(pid, roster)})
-		if entries.size() > 0: return entries
-
-	if _gs and _gs.has_method("get_active"):
-		var v2: Variant = _gs.call("get_active")
-		for s2 in _array_from_any(v2):
-			var pid2 := String(s2)
-			entries.append({"key": pid2, "label": _label_for_id(pid2, roster)})
-		if entries.size() > 0: return entries
-
-	if _gs and _gs.has_method("get_party_names"):
-		var n_v: Variant = _gs.call("get_party_names")
-		for n in _array_from_any(n_v):
-			var nm := String(n)
-			if nm.strip_edges() != "":
-				entries.append({"key": "", "label": nm})
 		if entries.size() > 0: return entries
 
 	if _gs and _gs.has_method("get"):
@@ -569,52 +613,18 @@ func _gather_active_entries(roster: Dictionary) -> Array:
 	entries.append({"key":"hero","label":_safe_hero_name()})
 	return entries
 
-# ---- CSV cache + per-member resolution -----------------------
+func _array_from_any(v: Variant) -> Array:
+	if typeof(v) == TYPE_ARRAY: return v as Array
+	if typeof(v) == TYPE_PACKED_STRING_ARRAY:
+		var out: Array = []
+		for s in (v as PackedStringArray): out.append(String(s))
+		return out
+	return []
 
-func _load_party_csv_cache() -> void:
-	_csv_by_id.clear()
-	_name_to_id.clear()
-
-	if _csv and _csv.has_method("load_csv"):
-		var defs_v: Variant = _csv.call("load_csv", PARTY_CSV, "actor_id")
-		if typeof(defs_v) == TYPE_DICTIONARY:
-			var defs: Dictionary = defs_v
-			for id_any in defs.keys():
-				var rid: String = String(id_any)
-				var row: Dictionary = defs[rid]
-				_csv_by_id[rid] = row
-				var n_v: Variant = row.get("name", "")
-				if typeof(n_v) == TYPE_STRING:
-					var key := String(n_v).strip_edges().to_lower()
-					if key != "": _name_to_id[key] = rid
-			return
-
-	if not FileAccess.file_exists(PARTY_CSV):
-		return
-	var f := FileAccess.open(PARTY_CSV, FileAccess.READ)
-	if f == null: return
-	if f.eof_reached():
-		f.close()
-		return
-	var header: PackedStringArray = f.get_csv_line()
-	var idx_id := header.find("actor_id")
-	var idx_name := header.find("name")
-	while not f.eof_reached():
-		var row_psa: PackedStringArray = f.get_csv_line()
-		if row_psa.is_empty(): continue
-		var rid2: String = (String(row_psa[idx_id]) if idx_id >= 0 and idx_id < row_psa.size() else "")
-		var nm2: String  = (String(row_psa[idx_name]) if idx_name >= 0 and idx_name < row_psa.size() else "")
-		var row_dict: Dictionary = {}
-		for i in range(header.size()):
-			row_dict[String(header[i])] = (row_psa[i] if i < row_psa.size() else "")
-		if rid2 != "":
-			_csv_by_id[rid2] = row_dict
-		if nm2.strip_edges() != "":
-			_name_to_id[nm2.strip_edges().to_lower()] = rid2
-	f.close()
+# ---- per-member resolution & misc ------------------------------------
 
 func _resolve_member_stats(pid_in: String, label_in: String) -> Dictionary:
-	if pid_in == "hero" or label_in.strip_edges().to_lower() == _safe_hero_name().strip_edges().to_lower():
+	if pid_in == "hero":
 		var lvl: int = _safe_hero_level()
 		var vtl: int = 1
 		var fcs: int = 1
@@ -623,12 +633,7 @@ func _resolve_member_stats(pid_in: String, label_in: String) -> Dictionary:
 			if typeof(v_v) in [TYPE_INT, TYPE_FLOAT]: vtl = int(v_v)
 			var f_v: Variant = _st.call("get_stat", "FCS")
 			if typeof(f_v) in [TYPE_INT, TYPE_FLOAT]: fcs = int(f_v)
-		return {
-			"name": _safe_hero_name(),
-			"level": max(1, lvl),
-			"VTL": max(1, vtl),
-			"FCS": max(1, fcs)
-		}
+		return {"name": _safe_hero_name(), "level": max(1,lvl), "VTL": max(1,vtl), "FCS": max(1,fcs)}
 
 	var pid: String = pid_in
 	if pid == "" and label_in.strip_edges() != "":
@@ -647,12 +652,7 @@ func _resolve_member_stats(pid_in: String, label_in: String) -> Dictionary:
 	var fcs_csv: int = _to_int(row.get("start_fcs", 1))
 	var nm: String = (String(row.get("name","")) if row.has("name") else (label_in if label_in != "" else pid_in))
 
-	return {
-		"name": (nm if nm != "" else (label_in if label_in != "" else pid_in)),
-		"level": max(1, lvl_csv),
-		"VTL": max(1, vtl_csv),
-		"FCS": max(1, fcs_csv)
-	}
+	return {"name": (nm if nm != "" else (label_in if label_in != "" else pid_in)), "level": max(1,lvl_csv), "VTL": max(1,vtl_csv), "FCS": max(1,fcs_csv)}
 
 func _to_int(v: Variant) -> int:
 	match typeof(v):
@@ -664,8 +664,6 @@ func _to_int(v: Variant) -> int:
 			return int(s.to_int())
 		_: return 0
 
-# ---- Stat helpers ----------------------------------------------------
-
 func _calc_max_hp(level: int, vtl: int) -> int:
 	return 150 + (max(1, vtl) * max(1, level) * 6)
 
@@ -673,19 +671,23 @@ func _calc_max_mp(level: int, fcs: int) -> int:
 	return 20 + int(round(1.5 * float(max(1, fcs)) * float(max(1, level))))
 
 func _safe_hero_name() -> String:
-	if _hero and _hero.has_method("get"):
-		var v: Variant = _hero.get("hero_name")
+	if _gs and _gs.has_method("get"):
+		var v: Variant = _gs.get("player_name")
 		if typeof(v) == TYPE_STRING and String(v).strip_edges() != "":
 			return String(v)
 	return "Player"
 
 func _safe_hero_level() -> int:
-	if _hero and _hero.has_method("get"):
-		var v: Variant = _hero.get("level")
-		if typeof(v) in [TYPE_INT, TYPE_FLOAT]: return int(v)
+	if _st:
+		if _st.has_method("get_stat"):
+			var v: Variant = _st.call("get_stat","LVL")
+			if typeof(v) in [TYPE_INT, TYPE_FLOAT]: return int(v)
+		if _st.has_method("get_member_level"):
+			var v2: Variant = _st.call("get_member_level","hero")
+			if typeof(v2) in [TYPE_INT, TYPE_FLOAT]: return int(v2)
 	return 1
 
-# --------------------- Dev: auto dump + hotkey ------------------------
+# --------------------- Dev dump/hotkey ------------------------
 
 func _on_visibility_changed() -> void:
 	if not OS.is_debug_build(): return
@@ -699,66 +701,25 @@ func _unhandled_input(event: InputEvent) -> void:
 			_dev_dump_profiles()
 
 func _dev_dump_profiles() -> void:
-	# Call external (if present) AND always run local fallback so you never see "No profiles available" alone.
-	var cps: Node = get_node_or_null("/root/aCombatProfileSystem")
-	if cps == null: cps = get_node_or_null("/root/CombatProfileSystem")
-	if cps == null:
-		for n in get_tree().root.get_children():
-			if n.has_method("debug_dump_active_party"):
-				cps = n; break
-	if cps and cps.has_method("debug_dump_active_party"):
-		# Let theirs print whatever it wants.
-		cps.call_deferred("debug_dump_active_party")
-
-	# Our guaranteed dump
-	print_rich("[b]=== Combat Profiles (StatusPanel fallback) ===[/b]")
+	print_rich("[b]=== Combat Profiles (StatusPanel) ===[/b]")
 	var entries: Array = _gather_active_entries(_read_roster())
-	# Show who we think is active
 	var labels: Array = []
 	for e_v in entries:
 		if typeof(e_v) == TYPE_DICTIONARY:
 			labels.append(String((e_v as Dictionary).get("label","")))
 	print("[StatusPanel] active entries: %s" % [String(", ").join(labels)])
 
-	if entries.is_empty():
-		# Shouldn't happen; we always inject hero. Just in case:
-		print("[StatusPanel] No entries gathered; injecting Hero.")
-		entries.append({"key":"hero","label":_safe_hero_name()})
-
-	for e_v in entries:
-		if typeof(e_v) != TYPE_DICTIONARY: continue
-		var e: Dictionary = e_v
-		var pid: String = String(e.get("key",""))
-		var label: String = String(e.get("label",""))
-		var rec: Dictionary = _resolve_member_stats(pid, label)
-		var lvl: int = int(rec.get("level", 1))
-		var vtl: int = int(rec.get("VTL", 1))
-		var fcs: int = int(rec.get("FCS", 1))
-		var hpmax: int = _calc_max_hp(lvl, vtl)
-		var mpmax: int = _calc_max_mp(lvl, fcs)
-		var who: String = String(rec.get("name", (label if label != "" else pid)))
-		var mind: String = _resolve_mind(pid, label)
-		print("%s | Lv %d | VTL %d  FCS %d | HPmax %d  MPmax %d | Mind %s" %
-			[who, lvl, vtl, fcs, hpmax, mpmax, (mind if mind != "" else "—")])
-
-func _resolve_mind(pid_in: String, label_in: String) -> String:
-	if _sig:
-		for m in ["resolve_member_mind_base","get_mind_type","get_member_mind_base"]:
-			if _sig.has_method(m):
-				var v: Variant = _sig.call(m, (pid_in if pid_in != "" else label_in))
-				if typeof(v) == TYPE_STRING and String(v).strip_edges() != "":
-					return String(v)
-	if _party_sys and _party_sys.has_method("get_mind_type"):
-		var v2: Variant = _party_sys.call("get_mind_type", (pid_in if pid_in != "" else label_in))
-		if typeof(v2) == TYPE_STRING and String(v2).strip_edges() != "":
-			return String(v2)
-	var pid: String = pid_in
-	if pid == "" and label_in.strip_edges() != "":
-		var key: String = label_in.strip_edges().to_lower()
-		if _name_to_id.has(key): pid = String(_name_to_id[key])
-	var row: Dictionary = _csv_by_id.get(pid, {}) as Dictionary
-	if row.has("mind_type") and typeof(row["mind_type"]) == TYPE_STRING:
-		return String(row["mind_type"])
-	if pid_in == "hero" or label_in.strip_edges().to_lower() == _safe_hero_name().strip_edges().to_lower():
-		return "Omega"
-	return ""
+	if _cps and _cps.has_method("get_profile"):
+		for e_v in entries:
+			if typeof(e_v) != TYPE_DICTIONARY: continue
+			var pid: String = String((e_v as Dictionary).get("key",""))
+			var p_v: Variant = _cps.call("get_profile", pid)
+			if typeof(p_v) != TYPE_DICTIONARY: continue
+			var p: Dictionary = p_v
+			var mind: Dictionary = p.get("mind", {}) as Dictionary
+			var mind_str: String = String(mind.get("active", mind.get("base","—")))
+			print("%s | Lv %d | HP %d/%d MP %d/%d | mind %s"
+				% [ _label_for_id(pid), int(p.get("level",1)),
+					int(p.get("hp",0)), int(p.get("hp_max",0)),
+					int(p.get("mp",0)), int(p.get("mp_max",0)),
+					mind_str ])
