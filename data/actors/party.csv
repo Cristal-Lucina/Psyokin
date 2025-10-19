@@ -1,5 +1,5 @@
-actor_id,name,level_start,start_brw,start_mnd,start_tpo,start_vtl,start_fcs,mind_type,start_weapon,start_armor,start_head,start_foot,start_bracelet,start_sigils,portrait,sprite,join_to_active,notes,dsi_brw,dsi_mnd,dsi_tpo,dsi_vtl,dsi_fcs
-rhea,Rhea,1,1,1,1,1,1,Water,,,,,,SIG_002,portraits/rhea.png,sprites/rhea.tres,TRUE,Mage archetype,2,3,1,2,2
-nitro,Nitro,1,1,1,1,1,1,Earth,,,,,,SIG_003,portraits/nitro.png,sprites/nitro.tres,TRUE,Brawler,3,0.6,3,3,0.4
-scout,Scout,1,1,1,1,1,1,Air,,,,,,SIG_004,portraits/scout.png,sprites/scout.tres,FALSE,Fast utility,1,1.5,3,2,2.5
-warden,Warden,1,1,1,1,1,1,Water,,,,,,SIG_005,portraits/warden.png,sprites/warden.tres,FALSE,Defensive hybrid,2,2,2,3,1
+actor_id,name,level_start,start_brw,start_mnd,start_tpo,start_vtl,start_fcs,mind_type,start_weapon,start_armor,start_head,start_foot,start_bracelet,start_sigils,portrait,sprite,join_to_active,notes,dsi_brw,dsi_mnd,dsi_tpo,dsi_vtl,dsi_fcs,burst_skill
+rhea,Rhea,1,1,1,1,1,1,Water,,,,,,SIG_002,portraits/rhea.png,sprites/rhea.tres,TRUE,Mage archetype,2,3,1,2,2,
+nitro,Nitro,1,1,1,1,1,1,Earth,,,,,,SIG_003,portraits/nitro.png,sprites/nitro.tres,TRUE,Brawler,3,0.6,3,3,0.4,
+scout,Scout,1,1,1,1,1,1,Air,,,,,,SIG_004,portraits/scout.png,sprites/scout.tres,FALSE,Fast utility,1,1.5,3,2,2.5,
+warden,Warden,1,1,1,1,1,1,Water,,,,,,SIG_005,portraits/warden.png,sprites/warden.tres,FALSE,Defensive hybrid,2,2,2,3,1,

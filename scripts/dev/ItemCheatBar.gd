@@ -37,7 +37,6 @@ const PARTY_NAME_KEYS : Array[String] = ["name", "display_name", "disp_name"]
 @onready var _give10     : Button       = find_child("BtnGive10", true, false) as Button
 @onready var _reload     : Button       = find_child("BtnReloadCSV", true, false) as Button
 
-# Sigil cheat row (may be built at runtime if missing in scene)
 @onready var _sig_inst_pick : OptionButton = find_child("InstPicker", true, false) as OptionButton
 @onready var _btn_lv_up     : Button       = find_child("BtnLvUp", true, false) as Button
 @onready var _btn_lv_down   : Button       = find_child("BtnLvDown", true, false) as Button
@@ -45,7 +44,6 @@ const PARTY_NAME_KEYS : Array[String] = ["name", "display_name", "disp_name"]
 @onready var _btn_xp_100    : Button       = find_child("BtnXP100", true, false) as Button
 @onready var _chk_equipped  : CheckBox     = find_child("ChkEquipped", true, false) as CheckBox
 
-# Common (level/sxp) controls
 @onready var _btn_lvl_m1    : Button       = find_child("BtnLvlM1", true, false) as Button
 @onready var _btn_lvl_p1    : Button       = find_child("BtnLvlP1", true, false) as Button
 @onready var _spin_lvl      : SpinBox      = find_child("SpinLvl", true, false) as SpinBox
@@ -122,14 +120,11 @@ func _ready() -> void:
 
 	_bind_optional_external_ui()
 
-	# Build runtime rows that might be missing from scene
-	_ensure_sigil_row()
 	_ensure_hero_row()
-	_ensure_party_rows()
-
-	# Style + populate static pickers
 	_style_option_button(_hero_stat_pick, 11, 300)
 	_populate_hero_stat_picker()
+
+	_ensure_party_rows()
 	_style_option_button(_stat_pick, 11, 300)
 	_populate_stat_picker()
 
@@ -179,60 +174,8 @@ func _ready() -> void:
 	if _spin_lvl:
 		_spin_lvl.value = _get_member_level()
 
-	# Sigil system signals
-	if _sig:
-		if _sig.has_signal("loadout_changed") and not _sig.is_connected("loadout_changed", Callable(self, "_on_loadout_changed")):
-			_sig.connect("loadout_changed", Callable(self, "_on_loadout_changed"))
-		if _sig.has_signal("sigil_xp_changed") and not _sig.is_connected("sigil_xp_changed", Callable(self, "_on_sig_xp_changed")):
-			_sig.connect("sigil_xp_changed", Callable(self, "_on_sig_xp_changed"))
-
-# --- Build Sigil row at runtime if missing ------------------------------------
-func _ensure_sigil_row() -> void:
-	# If the scene already provides these nodes, nothing to do.
-	if _sig_inst_pick != null and _btn_xp_25 != null and _btn_xp_100 != null and _chk_equipped != null:
-		return
-
-	var parent := _attach_point()
-	var row := parent.get_node_or_null("SigilRow") as HBoxContainer
-	if row == null:
-		row = HBoxContainer.new()
-		row.name = "SigilRow"
-		row.add_theme_constant_override("separation", 8)
-		parent.add_child(row)
-
-	var lbl := Label.new(); lbl.text = "Sigils:"; row.add_child(lbl)
-
-	_chk_equipped = CheckBox.new()
-	_chk_equipped.name = "ChkEquipped"
-	_chk_equipped.text = "Equipped only"
-	row.add_child(_chk_equipped)
-
-	_sig_inst_pick = OptionButton.new()
-	_sig_inst_pick.name = "InstPicker"
-	_sig_inst_pick.custom_minimum_size = Vector2(240, 0)
-	row.add_child(_sig_inst_pick)
-
-	_btn_lv_down = Button.new(); _btn_lv_down.name = "BtnLvDown"; _btn_lv_down.text = "Lv-"
-	row.add_child(_btn_lv_down)
-
-	_btn_lv_up = Button.new(); _btn_lv_up.name = "BtnLvUp"; _btn_lv_up.text = "Lv+"
-	row.add_child(_btn_lv_up)
-
-	_btn_xp_25 = Button.new(); _btn_xp_25.name = "BtnXP25"; _btn_xp_25.text = "+25 XP"
-	row.add_child(_btn_xp_25)
-
-	_btn_xp_100 = Button.new(); _btn_xp_100.name = "BtnXP100"; _btn_xp_100.text = "+100 XP"
-	row.add_child(_btn_xp_100)
-
-	# Wire signals
-	if not _btn_lv_up.pressed.is_connected(_on_sig_lv_up):      _btn_lv_up.pressed.connect(_on_sig_lv_up)
-	if not _btn_lv_down.pressed.is_connected(_on_sig_lv_dn):     _btn_lv_down.pressed.connect(_on_sig_lv_dn)
-	if not _btn_xp_25.pressed.is_connected(_on_sig_xp_25):       _btn_xp_25.pressed.connect(_on_sig_xp_25)
-	if not _btn_xp_100.pressed.is_connected(_on_sig_xp_100):     _btn_xp_100.pressed.connect(_on_sig_xp_100)
-	if not _chk_equipped.toggled.is_connected(_on_equipped_toggle):
-		_chk_equipped.toggled.connect(_on_equipped_toggle)
-
-	_style_option_button(_sig_inst_pick, 11, 300)
+	if _sig and _sig.has_signal("loadout_changed") and not _sig.is_connected("loadout_changed", Callable(self, "_on_loadout_changed")):
+		_sig.connect("loadout_changed", Callable(self, "_on_loadout_changed"))
 
 # --- Bind external cheat UI if it's not a child of this node -------------------
 func _bind_optional_external_ui() -> void:
@@ -266,7 +209,8 @@ func _bind_optional_external_ui() -> void:
 
 # --- OptionButton UX tweaks ----------------------------------------------------
 func _style_option_button(ob: OptionButton, font_px: int, popup_max_h: int, popup_max_w: int = 300) -> void:
-	if ob == null: return
+	if ob == null:
+		return
 	ob.add_theme_font_size_override("font_size", font_px)
 	var pm: PopupMenu = ob.get_popup()
 	if pm:
@@ -313,9 +257,10 @@ func _ensure_hero_row() -> void:
 	_btn_hero_add_sxp = Button.new(); _btn_hero_add_sxp.text = "Add Hero SXP"
 	_hero_row.add_child(_btn_hero_add_sxp)
 
-	if not _btn_hero_add_xp.pressed.is_connected(_on_hero_add_xp):
+	# wire
+	if _btn_hero_add_xp and not _btn_hero_add_xp.pressed.is_connected(_on_hero_add_xp):
 		_btn_hero_add_xp.pressed.connect(_on_hero_add_xp)
-	if not _btn_hero_add_sxp.pressed.is_connected(_on_hero_add_sxp):
+	if _btn_hero_add_sxp and not _btn_hero_add_sxp.pressed.is_connected(_on_hero_add_sxp):
 		_btn_hero_add_sxp.pressed.connect(_on_hero_add_sxp)
 
 func _populate_hero_stat_picker() -> void:
@@ -327,11 +272,13 @@ func _populate_hero_stat_picker() -> void:
 	_hero_stat_pick.select(0)
 
 func _ensure_party_rows() -> void:
+	# Build only if the external nodes weren’t found
 	if _xp_amt != null and _btn_add_xp != null and _stat_pick != null and _sxp_amt != null and _btn_add_sxp != null:
 		return
 
 	var parent := _attach_point()
 
+	# LXP row
 	_party_lxp_row = parent.get_node_or_null("PartyLxpRow") as HBoxContainer
 	if _party_lxp_row == null:
 		_party_lxp_row = HBoxContainer.new()
@@ -346,6 +293,7 @@ func _ensure_party_rows() -> void:
 		_party_lxp_row.add_child(_btn_add_xp)
 		if not _btn_add_xp.pressed.is_connected(_on_add_xp): _btn_add_xp.pressed.connect(_on_add_xp)
 
+	# SXP row
 	_party_sxp_row = parent.get_node_or_null("PartySxpRow") as HBoxContainer
 	if _party_sxp_row == null:
 		_party_sxp_row = HBoxContainer.new()
@@ -400,15 +348,18 @@ func _cmp_ids_by_name(a: Variant, b: Variant) -> bool:
 	return na < nb
 
 func _selected_item_id() -> String:
-	if _picker == null: return ""
+	if _picker == null:
+		return ""
 	var i: int = _picker.get_selected()
-	if i < 0: return ""
+	if i < 0:
+		return ""
 	return String(_picker.get_item_metadata(i))
 
 func _on_give() -> void:
 	var id: String = _selected_item_id()
 	var n: int = int(_qty.value) if _qty != null else 0
-	if id == "" or n <= 0: return
+	if id == "" or n <= 0:
+		return
 	if _inv and _inv.has_method("add_item"):
 		_inv.call("add_item", id, n)
 		print("[ItemsCheatBar] GIVE %s x%d" % [id, n])
@@ -419,7 +370,8 @@ func _on_give() -> void:
 func _on_remove() -> void:
 	var id: String = _selected_item_id()
 	var n: int = int(_qty.value) if _qty != null else 0
-	if id == "" or n <= 0: return
+	if id == "" or n <= 0:
+		return
 	if _inv and _inv.has_method("remove_item"):
 		_inv.call("remove_item", id, n)
 		print("[ItemsCheatBar] REMOVE %s x%d" % [id, n])
@@ -427,7 +379,8 @@ func _on_remove() -> void:
 
 func _on_give10() -> void:
 	var id: String = _selected_item_id()
-	if id == "": return
+	if id == "":
+		return
 	if _inv and _inv.has_method("add_item"):
 		_inv.call("add_item", id, 10)
 		print("[ItemsCheatBar] GIVE10 %s x10" % [id])
@@ -450,6 +403,7 @@ func _on_inv_defs_loaded() -> void:
 	_refresh_defs()
 
 func _on_inv_counts_changed() -> void:
+	# counts changed; no picker change needed, but good to log
 	print("[ItemsCheatBar] signal: inventory_changed")
 
 # --- Sigils (Row2) -------------------------------------------------------------
@@ -458,7 +412,8 @@ func _log_s(msg: String) -> void:
 		print("[ItemsCheatBar] ", msg)
 
 func _method_arity(obj: Object, method_name: String) -> int:
-	if obj == null: return -1
+	if obj == null:
+		return -1
 	var lst: Array = obj.get_method_list()
 	for m in lst:
 		if typeof(m) == TYPE_DICTIONARY and String(m.get("name","")) == method_name:
@@ -613,9 +568,11 @@ func _refresh_sig_dropdown() -> void:
 		_sig_inst_pick.set_item_metadata(_sig_inst_pick.get_item_count() - 1, sid2)
 
 func _selected_sig_inst() -> String:
-	if _sig_inst_pick == null: return ""
+	if _sig_inst_pick == null:
+		return ""
 	var i: int = _sig_inst_pick.get_selected()
-	if i < 0: return ""
+	if i < 0:
+		return ""
 	return String(_sig_inst_pick.get_item_metadata(i))
 
 func _on_equipped_toggle(_pressed: bool) -> void:
@@ -624,16 +581,12 @@ func _on_equipped_toggle(_pressed: bool) -> void:
 func _on_loadout_changed(_member: String) -> void:
 	_refresh_sig_dropdown()
 
-func _on_sig_xp_changed(inst_id: String, _level: int, _pool: int, _to_next: int) -> void:
-	# Only react if UI is pointing at this instance
-	if inst_id != "" and inst_id == _selected_sig_inst():
-		print("[ItemsCheatBar] sigil_xp_changed -> %s" % inst_id)
-		_refresh_sig_dropdown()
-
 func _grant_xp_to_sigil(amount: int) -> void:
-	if _sig == null: return
+	if _sig == null:
+		return
 	var id: String = _selected_sig_inst()
-	if id == "": return
+	if id == "":
+		return
 	var require_equipped: bool = (_chk_equipped != null and _chk_equipped.button_pressed)
 	if _sig.has_method("cheat_add_xp_to_instance"):
 		_sig.call("cheat_add_xp_to_instance", id, amount, require_equipped)
@@ -648,7 +601,7 @@ func _on_sig_lv_up() -> void:
 		var got: Variant = _sig.call("get_instance_level", id)
 		if typeof(got) == TYPE_INT or typeof(got) == TYPE_FLOAT:
 			lvl = int(got)
-	var new_lvl: int = clampi(lvl + 1, 1, 99)
+	var new_lvl: int = clampi(lvl + 1, 1, 4)
 	if _sig.has_method("cheat_set_instance_level"):
 		_sig.call("cheat_set_instance_level", id, new_lvl)
 	_refresh_sig_dropdown()
@@ -662,7 +615,7 @@ func _on_sig_lv_dn() -> void:
 		var got: Variant = _sig.call("get_instance_level", id)
 		if typeof(got) == TYPE_INT or typeof(got) == TYPE_FLOAT:
 			lvl = int(got)
-	var new_lvl: int = clampi(lvl - 1, 1, 99)
+	var new_lvl: int = clampi(lvl - 1, 1, 4)
 	if _sig.has_method("cheat_set_instance_level"):
 		_sig.call("cheat_set_instance_level", id, new_lvl)
 	_refresh_sig_dropdown()
@@ -672,7 +625,8 @@ func _on_sig_xp_100() -> void: _grant_xp_to_sigil(100)
 
 # --- Character Level / Perk / SXP (Row3) --------------------------------------
 func _populate_stat_picker() -> void:
-	if _stat_pick == null: return
+	if _stat_pick == null:
+		return
 	_stat_pick.clear()
 	var stats: Array[String] = ["BRW","MND","TPO","VTL","FCS"]
 	for s in stats:
