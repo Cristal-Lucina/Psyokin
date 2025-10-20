@@ -2,12 +2,14 @@
 
 importer="csv_translation"
 type="Translation"
-uid="uid://cfjx3fhlavq6u"
-valid=false
+uid="uid://c7di5ic2o6en2"
 
 [deps]
 
+files=["res://data/actors/party.name.translation", "res://data/actors/party.level.translation", "res://data/actors/party.start.translation", "res://data/actors/party.start.translation", "res://data/actors/party.start.translation", "res://data/actors/party.start.translation", "res://data/actors/party.start.translation", "res://data/actors/party.mind.translation", "res://data/actors/party.start.translation", "res://data/actors/party.start.translation", "res://data/actors/party.start.translation", "res://data/actors/party.start.translation", "res://data/actors/party.start.translation", "res://data/actors/party.start.translation", "res://data/actors/party.portrait.translation", "res://data/actors/party.sprite.translation", "res://data/actors/party.join.translation", "res://data/actors/party.notes.translation", "res://data/actors/party.dsi.translation", "res://data/actors/party.dsi.translation", "res://data/actors/party.dsi.translation", "res://data/actors/party.dsi.translation", "res://data/actors/party.dsi.translation", "res://data/actors/party.burst.translation", "res://data/actors/party.bestie.translation", "res://data/actors/party.rival.translation"]
+
 source_file="res://data/actors/party.csv"
+dest_files=["res://data/actors/party.name.translation", "res://data/actors/party.level.translation", "res://data/actors/party.start.translation", "res://data/actors/party.start.translation", "res://data/actors/party.start.translation", "res://data/actors/party.start.translation", "res://data/actors/party.start.translation", "res://data/actors/party.mind.translation", "res://data/actors/party.start.translation", "res://data/actors/party.start.translation", "res://data/actors/party.start.translation", "res://data/actors/party.start.translation", "res://data/actors/party.start.translation", "res://data/actors/party.start.translation", "res://data/actors/party.portrait.translation", "res://data/actors/party.sprite.translation", "res://data/actors/party.join.translation", "res://data/actors/party.notes.translation", "res://data/actors/party.dsi.translation", "res://data/actors/party.dsi.translation", "res://data/actors/party.dsi.translation", "res://data/actors/party.dsi.translation", "res://data/actors/party.dsi.translation", "res://data/actors/party.burst.translation", "res://data/actors/party.bestie.translation", "res://data/actors/party.rival.translation"]
 
 [params]
 

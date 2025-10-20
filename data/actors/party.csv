@@ -1,5 +1,8 @@
-actor_id,name,level_start,start_brw,start_mnd,start_tpo,start_vtl,start_fcs,mind_type,start_weapon,start_armor,start_head,start_foot,start_bracelet,start_sigils,portrait,sprite,join_to_active,notes,dsi_brw,dsi_mnd,dsi_tpo,dsi_vtl,dsi_fcs,burst_skill
-rhea,Rhea,1,1,1,1,1,1,Water,,,,,,SIG_002,portraits/rhea.png,sprites/rhea.tres,TRUE,Mage archetype,2,3,1,2,2,
-nitro,Nitro,1,1,1,1,1,1,Earth,,,,,,SIG_003,portraits/nitro.png,sprites/nitro.tres,TRUE,Brawler,3,0.6,3,3,0.4,
-scout,Scout,1,1,1,1,1,1,Air,,,,,,SIG_004,portraits/scout.png,sprites/scout.tres,FALSE,Fast utility,1,1.5,3,2,2.5,
-warden,Warden,1,1,1,1,1,1,Water,,,,,,SIG_005,portraits/warden.png,sprites/warden.tres,FALSE,Defensive hybrid,2,2,2,3,1,
+actor_id,name,level_start,start_brw,start_mnd,start_tpo,start_vtl,start_fcs,mind_type,start_weapon,start_armor,start_head,start_foot,start_bracelet,start_sigils,portrait,sprite,join_to_active,notes,dsi_brw,dsi_mnd,dsi_tpo,dsi_vtl,dsi_fcs,burst_skill,bestie_buff,rival_debuff
+secret_girl,Tessa,1,1,1,1,1,1,Air,,,,,,SIG_002,portraits/rhea.png,sprites/rhea.tres,TRUE,Mage archetype,1,3,2,2,2,,red_girl;scientist,ai_friend
+best_friend,Kai,1,1,1,1,1,1,Earth,,,,,,SIG_003,portraits/nitro.png,sprites/nitro.tres,TRUE,Brawler,3,0.6,3,3,0.4,,blue_girl;ai_friend,scientist
+blue_girl,Skye,1,1,1,1,1,1,Water,,,,,,SIG_004,portraits/scout.png,sprites/scout.tres,FALSE,Fast utility,1,1.5,3,2,2.5,,green_friend;best_friend,red_girl
+red_girl,Risa,1,1,1,1,1,1,Fire,,,,,,SIG_005,portraits/warden.png,sprites/warden.tres,FALSE,Defensive hybrid,1,2,2,3,2,,scientist;secret_girl,blue_girl
+green_friend,Matcha,1,1,1,1,1,1,Earth,,,,,,SIG_006,portraits/warden.png,sprites/warden.tres,FALSE,Defensive hybrid,1,3,1,2,3,,blue_girl;best_friend,secret_girl
+scientist,Douglas,1,1,1,1,1,1,data,,,,,,SIG_007,portraits/warden.png,sprites/warden.tres,FALSE,Defensive hybrid,2,3,1,1,3,,red_girl;secret_girl,best_friend
+ai_friend,Sev,1,1,1,1,1,1,void,,,,,,SIG_008,portraits/warden.png,sprites/warden.tres,FALSE,Defensive hybrid,2,2,2,2,2,,best_friend;red_girl,green_friend

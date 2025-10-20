@@ -110,34 +110,6 @@ unique_name_in_owner = true
 layout_mode = 2
 text = "—"
 
-[node name="LevelRow" type="HBoxContainer" parent="Root/Frame/Content/Row/Right"]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="LevelLabel" type="Label" parent="Root/Frame/Content/Row/Right/LevelRow"]
-layout_mode = 2
-text = "Level:"
-
-[node name="LevelValue" type="Label" parent="Root/Frame/Content/Row/Right/LevelRow"]
-unique_name_in_owner = true
-layout_mode = 2
-text = "0"
-
-[node name="CBXPRow" type="HBoxContainer" parent="Root/Frame/Content/Row/Right"]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="CBXPLabel" type="Label" parent="Root/Frame/Content/Row/Right/CBXPRow"]
-layout_mode = 2
-text = "CBXP:"
-
-[node name="CBXPValue" type="Label" parent="Root/Frame/Content/Row/Right/CBXPRow"]
-unique_name_in_owner = true
-layout_mode = 2
-text = "0"
-
 [node name="Notes" type="RichTextLabel" parent="Root/Frame/Content/Row/Right"]
 unique_name_in_owner = true
 layout_mode = 2
