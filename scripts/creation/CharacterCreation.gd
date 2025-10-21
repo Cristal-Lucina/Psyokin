@@ -119,7 +119,6 @@ func _wire_stat_toggles() -> void:
 
 func _wire_stat_toggle(btn: CheckButton, stat_id: String) -> void:
 	if btn and not btn.toggled.is_connected(_on_stat_toggled):
-		# Signal gives (pressed: bool); we append stat_id and the button.
 		btn.toggled.connect(_on_stat_toggled.bind(stat_id, btn))
 
 func _on_stat_toggled(pressed: bool, stat_id: String, btn: CheckButton) -> void:
@@ -160,14 +159,16 @@ func _skin_from_value(t: float) -> Color:
 
 # ── perks (based on selected stats; only T1 options) ─────────────────────────
 func _rebuild_perk_dropdown() -> void:
-	if _perk_in == null: return
+	if _perk_in == null:
+		return
 	_perk_in.clear()
 	_perk_id_by_idx.clear()
 	_perk_stat_by_idx.clear()
 
 	# Build the offer list
 	var picks: Array[String] = []
-	for s in _selected_order: picks.append(String(s))
+	for i in range(_selected_order.size()):
+		picks.append(String(_selected_order[i]))
 	var offers: Array = []
 
 	var perk: Node = get_node_or_null(PERK_PATH)
@@ -175,15 +176,16 @@ func _rebuild_perk_dropdown() -> void:
 		var v: Variant = perk.call("get_starting_options", picks)
 		if typeof(v) == TYPE_ARRAY:
 			offers = v as Array
-	elif not picks.is_empty():
+	elif picks.size() > 0:
 		# Fallback: synthesize simple placeholder perks
-		for s2 in picks:
+		for i2 in range(picks.size()):
+			var s2: String = picks[i2]
 			offers.append({
-				"stat": String(s2),
+				"stat": s2,
 				"tier": 0,
-				"id": "%s_t1" % String(s2).to_lower(),
-				"name": "%s T1" % String(s2),
-				"desc": "Tier-1 perk for %s." % String(s2)
+				"id": "%s_t1" % s2.to_lower(),
+				"name": "%s T1" % s2,
+				"desc": "Tier-1 perk for %s." % s2
 			})
 
 	# Fill the dropdown
@@ -191,9 +193,11 @@ func _rebuild_perk_dropdown() -> void:
 	_perk_id_by_idx[0] = ""
 	_perk_stat_by_idx[0] = ""
 
-	var idx := 1
-	for it_v in offers:
-		if typeof(it_v) != TYPE_DICTIONARY: continue
+	var idx: int = 1
+	for j in range(offers.size()):
+		var it_v: Variant = offers[j]
+		if typeof(it_v) != TYPE_DICTIONARY:
+			continue
 		var it: Dictionary = it_v
 		var line: String = "%s — %s" % [
 			String(it.get("stat","")),
@@ -206,7 +210,7 @@ func _rebuild_perk_dropdown() -> void:
 
 	_perk_in.select(0)
 
-# Called when the perk dropdown selection changes
+
 func _on_perk_selected(_index: int) -> void:
 	_update_confirm_enabled()
 
@@ -217,51 +221,55 @@ func _on_confirm_pressed() -> void:
 		OS.alert("Pick 3 stats and 1 perk to continue.", "Character Creation")
 		return
 
-	var name_text : String = (_name_in.text if _name_in else "Player").strip_edges()
-	if name_text == "": name_text = "Player"
-	var pron_text : String = _opt_text(_pron_in)
+	var name_text: String = (_name_in.text if _name_in else "Player").strip_edges()
+	if name_text == "":
+		name_text = "Player"
+	var pron_text: String = _opt_text(_pron_in)
 
-	var body_id   : String = _opt_text(_body_in)
-	var face_id   : String = _opt_text(_face_in)
-	var hair_id   : String = _opt_text(_hair_in)
-	var eyes_id   : String = _opt_text(_eyes_in)
+	var body_id: String = _opt_text(_body_in)
+	var face_id: String = _opt_text(_face_in)
+	var hair_id: String = _opt_text(_hair_in)
+	var eyes_id: String = _opt_text(_eyes_in)
 
-	var c_skin : Color = _skin_from_value(float(_skin_sl.value if _skin_sl else 0.5))
-	var c_brow : Color = Color.from_hsv(_deg_to_unit(_brow_sl), 0.65, 0.35)
-	var c_eye  : Color = Color.from_hsv(_deg_to_unit(_eye_sl),  0.55, 0.85)
-	var c_hair : Color = Color.from_hsv(_deg_to_unit(_hair_sl), 0.75, 0.60)
+	var c_skin: Color = _skin_from_value(float(_skin_sl.value if _skin_sl else 0.5))
+	var c_brow: Color = Color.from_hsv(_deg_to_unit(_brow_sl), 0.65, 0.35)
+	var c_eye: Color  = Color.from_hsv(_deg_to_unit(_eye_sl),  0.55, 0.85)
+	var c_hair: Color = Color.from_hsv(_deg_to_unit(_hair_sl), 0.75, 0.60)
 
 	var gs: Node = get_node_or_null(GS_PATH)
 	if gs:
-		if gs.has_method("set"): gs.set("player_name", name_text)
-		# identity blob for StatusPanel / others
+		if gs.has_method("set"):
+			gs.set("player_name", name_text)
 		gs.set_meta("hero_identity", {
 			"name": name_text, "pronoun": pron_text,
 			"body": body_id, "face": face_id, "eyes": eyes_id, "hair": hair_id,
 			"body_color": c_skin, "brow_color": c_brow, "eye_color": c_eye, "hair_color": c_hair
 		})
-		# remember creation picks for panels that fall back to GS
 		var picked := PackedStringArray()
-		for s in _selected_order: picked.append(s)
+		for i in range(_selected_order.size()):
+			picked.append(_selected_order[i])
 		gs.set_meta("hero_picked_stats", picked)
 		# ensure hero in party
 		if gs.has_method("get"):
 			var pv: Variant = gs.get("party")
 			var arr: Array = []
-			if typeof(pv) == TYPE_ARRAY: arr = pv as Array
+			if typeof(pv) == TYPE_ARRAY:
+				arr = pv as Array
 			if arr.is_empty() and gs.has_method("set"):
 				gs.set("party", ["hero"])
 		# default mind type
-		if not gs.has_meta("hero_active_type"): gs.set_meta("hero_active_type", "Omega")
+		if not gs.has_meta("hero_active_type"):
+			gs.set_meta("hero_active_type", "Omega")
 
 	# apply +1 level to chosen stats
 	var st: Node = get_node_or_null(STATS_PATH)
 	if st and st.has_method("apply_creation_boosts"):
 		var picks_arr: Array = []
-		for s2 in _selected_order: picks_arr.append(s2)
+		for i2 in range(_selected_order.size()):
+			picks_arr.append(_selected_order[i2])
 		st.call("apply_creation_boosts", picks_arr)
 
-	# unlock chosen starting perk (guaranteed non-empty by gate)
+	# unlock chosen starting perk
 	var chosen_perk_id: String = _chosen_perk_id()
 	if chosen_perk_id != "":
 		var ps: Node = get_node_or_null(PERK_PATH)
@@ -269,14 +277,18 @@ func _on_confirm_pressed() -> void:
 			if ps.has_method("unlock_by_id"):
 				ps.call("unlock_by_id", chosen_perk_id)
 			elif ps.has_method("unlock"):
-				# fallback: unlock by stat + tier 0
-				var idx := _perk_in.get_selected() if _perk_in else 0
-				ps.call("unlock", String(_perk_stat_by_idx.get(idx,"")), 0)
+				var idx2: int = (_perk_in.get_selected() if _perk_in else 0)
+				ps.call("unlock", String(_perk_stat_by_idx.get(idx2,"")), 0)
 
-	# refresh combat profiles so status panel shows correct HP/MP
+	# refresh combat profiles
 	var cps: Node = get_node_or_null(CPS_PATH)
 	if cps and cps.has_method("refresh_all"):
 		cps.call("refresh_all")
+
+	# Nudge dorms to recompute bestie/rival from all THREE selected stats
+	var dorms := get_node_or_null("/root/aDormSystem")
+	if dorms and dorms.has_method("recompute_now"):
+		dorms.call("recompute_now")
 
 	creation_applied.emit()
 
@@ -287,19 +299,20 @@ func _on_confirm_pressed() -> void:
 
 # ── gating helpers ───────────────────────────────────────────────────────────
 func _chosen_perk_id() -> String:
-	if _perk_in == null: return ""
-	var sel := _perk_in.get_selected()
+	if _perk_in == null:
+		return ""
+	var sel: int = _perk_in.get_selected()
 	return String(_perk_id_by_idx.get(sel, ""))
 
 func _update_confirm_enabled() -> void:
 	if _confirm_btn == null: return
-	var ready_stats := (_selected_order.size() == 3)
-	var ready_perk := (_chosen_perk_id() != "")
+	var ready_stats: bool = (_selected_order.size() == 3)
+	var ready_perk: bool = (_chosen_perk_id() != "")
 	_confirm_btn.disabled = not (ready_stats and ready_perk)
 
 # ── small helpers ─────────────────────────────────────────────────────────────
 func _opt_text(ob: OptionButton) -> String:
 	if ob == null: return ""
-	var i := ob.get_selected()
+	var i: int = ob.get_selected()
 	if i < 0: i = 0
 	return ob.get_item_text(i)

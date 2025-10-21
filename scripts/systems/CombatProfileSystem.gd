@@ -150,10 +150,8 @@ func _compute_for_member(member: String) -> Dictionary:
 	if type_raw != "" and type_raw != "wand":
 		weapon_type = type_raw.capitalize()
 	var special: String = ""
-# if bool(d_wea.get("non_lethal", false)):
 	if _as_bool(d_wea.get("non_lethal", false)):
 		special = "NL"
-
 
 	# Derived: defenses
 	var armor_flat: int = int(d_arm.get("armor_flat", 0))

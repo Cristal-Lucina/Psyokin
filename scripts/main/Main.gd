@@ -173,6 +173,12 @@ func _ready() -> void:
 		if calendar.has_signal("phase_advanced"): calendar.connect("phase_advanced", Callable(self, "_on_calendar_updated"))
 		if calendar.has_signal("day_advanced"):   calendar.connect("day_advanced",   Callable(self, "_on_calendar_updated"))
 		if calendar.has_signal("week_reset"):     calendar.connect("week_reset",     Callable(self, "_on_week_reset"))
+		if calendar.has_signal("advance_blocked") and not calendar.is_connected("advance_blocked", Callable(self, "_on_advance_blocked")):
+			calendar.connect("advance_blocked", Callable(self, "_on_advance_blocked"))
+
+	# Also listen to GS relay (cheats/UI might go through it)
+	if gs and gs.has_signal("advance_blocked") and not gs.is_connected("advance_blocked", Callable(self, "_on_advance_blocked")):
+		gs.connect("advance_blocked", Callable(self, "_on_advance_blocked"))
 
 	# Shortcuts
 	set_process_unhandled_input(true)
@@ -262,9 +268,11 @@ func _on_week_reset() -> void:
 	_refresh_ui()
 
 func _on_advance_pressed() -> void:
-	var cal := get_node_or_null("/root/aCalendarSystem")
-	if cal and cal.has_method("advance_phase"):
-		cal.call("advance_phase")
+	# Route through GameState so it can block cleanly
+	if gs and gs.has_method("try_advance_phase"):
+		gs.call("try_advance_phase")
+	elif calendar and calendar.has_method("advance_phase"): # fallback
+		calendar.call("advance_phase")
 	_refresh_ui()
 
 func _on_reset_week_pressed() -> void:
@@ -782,7 +790,6 @@ func _call_sigil_xp_fn(fn: String, member_id: String, sigil_id: String, amount: 
 	# Special-case the cheat function so we never pass member_id to it.
 	if fn == "cheat_add_xp_to_instance":
 		if argc == 3:
-			# Common shapes: (instance_id, amount, require_equipped: bool)
 			_sig.call(fn, sigil_id, amount, false)
 			return true
 		elif argc == 2:
