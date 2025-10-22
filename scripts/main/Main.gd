@@ -1,3 +1,78 @@
+## ═══════════════════════════════════════════════════════════════════════════
+## Main - Primary Game Scene Controller
+## ═══════════════════════════════════════════════════════════════════════════
+##
+## PURPOSE:
+##   The main gameplay scene controller that manages the game menu overlay,
+##   time advancement, header display (date/time), cheat tools, and integration
+##   of all major systems. This is the hub scene players see during gameplay.
+##
+## RESPONSIBILITIES:
+##   • Game menu overlay (open/close with ui_menu input)
+##   • Phone menu overlay (open/close with ui_phone input)
+##   • Time advancement controls (Advance Phase, Reset Week)
+##   • Date/time header display (current day/phase)
+##   • Cheat tool UI (toggle with 'C' key):
+##     - Party management (add/remove members)
+##     - XP/Level cheats (hero and allies)
+##     - SXP cheats (stat experience points)
+##     - Item loading from CSV
+##   • Save menu access button
+##   • Training menu access button
+##   • World spots status display
+##
+## HEADER DISPLAY:
+##   • Current date (from CalendarSystem)
+##   • Current time phase (Morning/Afternoon/Evening)
+##   • Advance Phase button
+##   • Reset Week button (for testing weekly systems)
+##
+## CHEAT TOOLS (Dev Mode):
+##   Party Management:
+##   • Add member to party/bench from roster
+##   • Remove member from party
+##   • Move member to bench
+##
+##   Level/XP:
+##   • Add XP to selected member
+##   • Set hero level directly
+##   • Add XP to hero
+##
+##   Stats (SXP):
+##   • Add SXP to specific stat (BRW/MND/TPO/VTL/FCS)
+##   • Works for both hero and selected ally
+##
+## CONNECTED SYSTEMS (Autoloads):
+##   • CalendarSystem - Time advancement, date/phase display
+##   • GameState - Party roster, game state
+##   • StatsSystem - XP/SXP management
+##   • InventorySystem - Item loading from CSV
+##   • SigilSystem - Sigil management
+##   • PerkSystem - Perk unlocks
+##   • WorldSpotsSystem - Location management
+##   • CombatProfileSystem - HP/MP tracking
+##
+## OVERLAY SCENES:
+##   • GameMenu - Main menu (Status, Loadout, Items, Perks, etc.)
+##   • PhoneMenu - In-game phone interface
+##   • SaveMenu - Save game interface
+##   • TrainingMenu - Stat training interface
+##
+## CSV DATA SOURCES:
+##   • res://data/items/items.csv - Item definitions (cheat load)
+##   • res://data/actors/party.csv - Party roster (cheat dropdown)
+##
+## KEY METHODS:
+##   • _on_advance_pressed() - Advance time phase
+##   • _on_reset_week_pressed() - Reset weekly systems
+##   • _toggle_game_menu() - Open/close game menu overlay
+##   • _toggle_phone_menu() - Open/close phone menu overlay
+##   • _on_add_party_pressed() - Cheat: add member to party
+##   • _on_add_xp_pressed() - Cheat: grant XP to member
+##   • _on_add_sxp_pressed() - Cheat: grant SXP to stat
+##
+## ═══════════════════════════════════════════════════════════════════════════
+
 extends Control
 
 # ---- Autoloads (PartySystem removed) ----

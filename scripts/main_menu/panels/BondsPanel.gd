@@ -1,3 +1,55 @@
+## ═══════════════════════════════════════════════════════════════════════════
+## BondsPanel - Circle Bond Management UI
+## ═══════════════════════════════════════════════════════════════════════════
+##
+## PURPOSE:
+##   Main menu panel for viewing and managing social bonds with party members.
+##   Displays bond levels, discovered likes/dislikes, rewards, and provides
+##   access to bond story events.
+##
+## RESPONSIBILITIES:
+##   • Bond list display (all characters or filtered)
+##   • Bond level/layer visualization (Acquaintance → Core)
+##   • Discovered likes/dislikes display
+##   • Rewards preview (locked until bond level reached)
+##   • Story event access button
+##   • Filter system (All/Known/Locked/Maxed)
+##   • Real-time updates when bonds change
+##
+## FILTER MODES:
+##   • ALL - Show all characters
+##   • KNOWN - Show only met/discovered characters
+##   • LOCKED - Show only characters not yet at max bond
+##   • MAXED - Show only characters at Core level (8)
+##
+## BOND DISPLAY:
+##   Left Panel:
+##   • List of characters (filtered)
+##   • Current bond layer indicator
+##   • Selection highlighting
+##
+##   Right Panel:
+##   • Character name
+##   • Current bond stage (Not Met, Acquaintance, Outer, Middle, Inner, Core)
+##   • Discovered likes (topics/gifts they enjoy)
+##   • Discovered dislikes (topics/gifts they dislike)
+##   • Rewards preview (unlocks at specific bond levels)
+##   • Story Events button (opens event overlay)
+##
+## CONNECTED SYSTEMS (Autoloads):
+##   • CircleBondSystem - Bond data, BXP, likes/dislikes, events
+##
+## CSV DATA SOURCES:
+##   • res://data/circles/circle_bonds.csv - Bond definitions (fallback)
+##
+## KEY METHODS:
+##   • _rebuild() - Refresh entire bond list
+##   • _on_bond_selected(bond_id) - Display bond details
+##   • _on_filter_changed(index) - Apply filter to list
+##   • _on_story_btn_pressed() - Open bond story event overlay
+##
+## ═══════════════════════════════════════════════════════════════════════════
+
 extends Control
 class_name BondsPanel
 
