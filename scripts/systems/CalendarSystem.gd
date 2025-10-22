@@ -1,3 +1,53 @@
+## ═══════════════════════════════════════════════════════════════════════════
+## CalendarSystem - In-Game Time & Date Manager
+## ═══════════════════════════════════════════════════════════════════════════
+##
+## PURPOSE:
+##   Manages the in-game calendar (year, month, day, weekday) and time of day
+##   (Morning/Afternoon/Evening phases). Handles time advancement and provides
+##   blocking system for events that require user input before progressing.
+##
+## RESPONSIBILITIES:
+##   • Calendar tracking (year, month, day, weekday)
+##   • Time phase management (Morning, Afternoon, Evening)
+##   • Time advancement (next phase, next day)
+##   • Advance blocking system (prevents time skip during critical events)
+##   • Weekday calculation (Monday=0 through Sunday=6)
+##   • Formatted date/time labels for UI
+##   • Save/load calendar state
+##
+## TIME PHASES:
+##   0 = Morning
+##   1 = Afternoon
+##   2 = Evening
+##   After Evening, advancing goes to next day's Morning
+##
+## WEEKDAY SYSTEM:
+##   0 = Monday, 1 = Tuesday, ..., 6 = Sunday
+##   Calculated using Zeller's congruence (accounts for leap years)
+##
+## BLOCKING SYSTEM:
+##   Systems can block time advancement to force user interaction:
+##   • DormSystem blocks on Saturday until reassignment plan is accepted
+##   • Other systems can block for story events, choices, etc.
+##   • Emits advance_blocked(reason) signal when blocked
+##
+## CONNECTED SYSTEMS (Autoloads):
+##   • GameState - Save/load coordination, forwards advance_blocked signal
+##   • DormSystem - Saturday triggers for weekly reassignments
+##   • MainEventSystem - Story event scheduling
+##   • Other time-sensitive systems
+##
+## KEY METHODS:
+##   • advance_phase() - Move to next time phase (or next day if Evening)
+##   • advance_day() - Skip to next day's Morning
+##   • block_advance(reason: String) - Prevent time advancement
+##   • unblock_advance() - Allow time advancement again
+##   • hud_label() -> String - Formatted date/time for UI
+##   • save_label() -> String - Save slot display format
+##
+## ═══════════════════════════════════════════════════════════════════════════
+
 extends Node
 class_name CalendarSystem
 

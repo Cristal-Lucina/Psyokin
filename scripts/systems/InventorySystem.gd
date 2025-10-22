@@ -1,6 +1,52 @@
-# =========================
-# InventorySystem.gd (FULL)
-# =========================
+## ═══════════════════════════════════════════════════════════════════════════
+## InventorySystem - Item Definition & Quantity Manager
+## ═══════════════════════════════════════════════════════════════════════════
+##
+## PURPOSE:
+##   Manages item definitions (metadata from CSV) and item counts (how many
+##   of each item the player owns). Provides add/remove/use/consume operations
+##   and integrates with equipment and sigil systems.
+##
+## RESPONSIBILITIES:
+##   • Item definition storage (id -> properties dictionary)
+##   • Item quantity tracking (id -> count)
+##   • CSV-based item database loading
+##   • Add/remove/consume item operations
+##   • Item existence and availability checks
+##   • Save/load inventory state
+##
+## TWO-PART SYSTEM:
+##   1. Definitions (_defs) - Metadata for all items (name, stats, category, etc.)
+##   2. Counts (_counts) - How many of each item the player owns
+##
+## ITEM DEFINITION FIELDS (from CSV):
+##   Common fields: item_id, name, display_name, category, equip_slot,
+##   base_watk, armor_flat, sigil_slots, sigil_school, etc.
+##
+## CONNECTED SYSTEMS (Autoloads):
+##   • CSVLoader - Auto-loads item definitions from CSV on startup
+##   • EquipmentSystem - Queries item definitions for equipment stats
+##   • SigilSystem - Queries item definitions for base sigil properties
+##   • GameState - Save/load coordination
+##
+## CSV DATA SOURCES:
+##   Tries multiple paths in order:
+##   • res://data/items/items.csv
+##   • res://data/items.csv
+##   • res://data/inventory.csv
+##
+## KEY METHODS:
+##   • get_item_defs() -> Dictionary - All item definitions
+##   • get_item_def(id) -> Dictionary - Single item definition
+##   • get_count(id) -> int - How many of this item owned
+##   • add_item(id, amount) - Increase count
+##   • remove_item(id, amount) - Decrease count (returns success)
+##   • has_item(id) -> bool - Check if owned (count > 0)
+##   • get_save_blob() -> Dictionary - Export counts for save
+##   • apply_save_blob(data) - Restore counts from save
+##
+## ═══════════════════════════════════════════════════════════════════════════
+
 extends Node
 class_name InventorySystem
 
