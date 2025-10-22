@@ -195,12 +195,14 @@ func _ready() -> void:
 		# Snapshot layout right after plan is locked (for Saturday diff)
 		if ds.has_signal("plan_changed") and not ds.is_connected("plan_changed", Callable(self, "_on_dorms_plan_changed")):
 			ds.connect("plan_changed", Callable(self, "_on_dorms_plan_changed"))
-		# Show results popup when DormsSystem applies moves on Saturday (legacy)
-		if ds.has_signal("saturday_applied") and not ds.is_connected("saturday_applied", Callable(self, "_on_dorms_saturday_applied")):
-			ds.connect("saturday_applied", Callable(self, "_on_dorms_saturday_applied"))
-		# Prefer new signal that includes explicit moves, if available
-		if ds.has_signal("saturday_applied_v2") and not ds.is_connected("saturday_applied_v2", Callable(self, "_on_dorms_saturday_applied_v2")):
-			ds.connect("saturday_applied_v2", Callable(self, "_on_dorms_saturday_applied_v2"))
+		# Show results popup when DormsSystem applies moves on Saturday
+		# Prefer v2 signal (includes explicit moves); fall back to legacy if v2 doesn't exist
+		if ds.has_signal("saturday_applied_v2"):
+			if not ds.is_connected("saturday_applied_v2", Callable(self, "_on_dorms_saturday_applied_v2")):
+				ds.connect("saturday_applied_v2", Callable(self, "_on_dorms_saturday_applied_v2"))
+		elif ds.has_signal("saturday_applied"):
+			if not ds.is_connected("saturday_applied", Callable(self, "_on_dorms_saturday_applied")):
+				ds.connect("saturday_applied", Callable(self, "_on_dorms_saturday_applied"))
 
 # ---------- Input ----------
 func _unhandled_input(event: InputEvent) -> void:
