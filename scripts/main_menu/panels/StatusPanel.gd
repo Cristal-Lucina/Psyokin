@@ -1,3 +1,60 @@
+## ═══════════════════════════════════════════════════════════════════════════
+## StatusPanel - Party Status & Appearance Display
+## ═══════════════════════════════════════════════════════════════════════════
+##
+## PURPOSE:
+##   Main menu panel displaying party member HP/MP status, general game info
+##   (money, perk points, date/time), and character appearance customization.
+##
+## RESPONSIBILITIES:
+##   • Party member HP/MP display (with max values)
+##   • Party member level and appearance preview
+##   • Money and perk points display
+##   • Current date/time display
+##   • Hint/flavor text display
+##   • Character appearance editor (skin, brow, eye, hair colors)
+##   • Real-time status updates from combat/progression
+##
+## DISPLAY SECTIONS:
+##   Left Panel:
+##   • Party member list (name, level, HP/MP bars)
+##   • Refresh button to update display
+##
+##   Right Panel:
+##   • Money counter
+##   • Perk points available
+##   • Current date (calendar)
+##   • Current time phase (Morning/Afternoon/Evening)
+##   • Hint text area
+##   • Character appearance customization (colors)
+##
+## APPEARANCE SYSTEM:
+##   Four customizable color components:
+##   • Skin tone
+##   • Brow color
+##   • Eye color
+##   • Hair color
+##   Stored in GameState metadata and CombatProfileSystem
+##
+## CONNECTED SYSTEMS (Autoloads):
+##   • GameState - Money, perk points, party roster, appearance metadata
+##   • CombatProfileSystem - Current HP/MP values
+##   • StatsSystem - Member levels, stat-based HP/MP pools
+##   • CalendarSystem - Date/time display
+##   • SigilSystem - (future) Sigil status display
+##   • MainEventSystem - Hint text from story events
+##
+## CSV DATA SOURCES:
+##   • res://data/actors/party.csv - Member base data and appearance
+##
+## KEY METHODS:
+##   • _refresh_party() - Update party member list display
+##   • _refresh_summary() - Update money/perks/date/time
+##   • _refresh_appearance() - Update appearance color swatches
+##   • _on_color_changed(component, color) - Handle appearance edits
+##
+## ═══════════════════════════════════════════════════════════════════════════
+
 extends Control
 class_name StatusPanel
 

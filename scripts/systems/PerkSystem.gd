@@ -1,3 +1,51 @@
+## ═══════════════════════════════════════════════════════════════════════════
+## PerkSystem - Stat-Gated Perk Unlock Grid
+## ═══════════════════════════════════════════════════════════════════════════
+##
+## PURPOSE:
+##   Manages a 5x5 grid of perks (25 total) tied to the 5 core stats, with
+##   each stat having 5 tiers that unlock at specific stat level thresholds.
+##   Provides passive bonuses and combat modifiers.
+##
+## RESPONSIBILITIES:
+##   • 5 stat columns: BRW, VTL, MND, TPO, FCS
+##   • 5 tiers per stat (unlocked at levels 1, 3, 5, 7, 10)
+##   • 25 unique perks with combat/progression effects
+##   • Unlock tracking (which perks the player has chosen)
+##   • Availability checking (which perks can be unlocked based on stat level)
+##   • Save/load perk state
+##
+## PERK GRID STRUCTURE:
+##   Each stat has 5 tiers:
+##   Tier 1 (stat level 1)  - Basic bonus
+##   Tier 2 (stat level 3)  - Intermediate bonus
+##   Tier 3 (stat level 5)  - Advanced bonus
+##   Tier 4 (stat level 7)  - Expert bonus
+##   Tier 5 (stat level 10) - Master bonus
+##
+## EXAMPLE PERKS:
+##   BRW: Iron Grip, Counter Stance, Breaker, Unstaggerable, Titan Form
+##   VTL: Second Wind, Bulwark, Steadfast, Stonewall, Nine Lives
+##   MND: Sharp Mind, Overchannel, Runic Echo, Mindguard, Arc Savant
+##   TPO: Quickstep, Opportunist, Ambusher, Slipstream, Time Dancer
+##   FCS: Eagle Eye, Study Pace, True Sight, Spot Weakness, Perfect Focus
+##
+## CONNECTED SYSTEMS (Autoloads):
+##   • StatsSystem - Queries stat levels to determine perk availability
+##   • GameState - Save/load coordination, perk point tracking
+##   • CombatSystem - Applies perk effects during battle
+##
+## KEY METHODS:
+##   • is_unlocked(stat_id, tier) -> bool - Check if perk is unlocked
+##   • can_unlock(stat_id, tier) -> bool - Check if perk can be unlocked now
+##   • unlock_perk(stat_id, tier) -> bool - Unlock a perk (requires stat level)
+##   • get_perk_info(stat_id, tier) -> Dictionary - Get perk name/desc
+##   • get_all_unlocked() -> Array - List all unlocked perk IDs
+##   • get_save_blob() -> Dictionary - Export unlocked state
+##   • apply_save_blob(data) - Restore unlocked state
+##
+## ═══════════════════════════════════════════════════════════════════════════
+
 extends Node
 class_name PerkSystem
 
