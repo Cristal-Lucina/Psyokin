@@ -433,6 +433,41 @@ func save() -> Dictionary:
 		meta_dict[key] = get_meta(key)
 	payload["meta"] = meta_dict
 
+	# CircleBondSystem (bond progress)
+	var cb_sys: Node = get_node_or_null("/root/aCircleBondSystem")
+	if cb_sys and cb_sys.has_method("save"):
+		var cb_data: Variant = cb_sys.call("save")
+		if typeof(cb_data) == TYPE_DICTIONARY:
+			payload["circle_bonds"] = cb_data as Dictionary
+
+	# DormSystem (room assignments, dorm state)
+	var dorm_sys: Node = get_node_or_null("/root/aDormSystem")
+	if dorm_sys and dorm_sys.has_method("save"):
+		var dorm_data: Variant = dorm_sys.call("save")
+		if typeof(dorm_data) == TYPE_DICTIONARY:
+			payload["dorms"] = dorm_data as Dictionary
+
+	# EquipmentSystem (loadouts)
+	var equip_sys: Node = get_node_or_null(EQUIP_PATH)
+	if equip_sys and equip_sys.has_method("save"):
+		var equip_data: Variant = equip_sys.call("save")
+		if typeof(equip_data) == TYPE_DICTIONARY:
+			payload["equipment"] = equip_data as Dictionary
+
+	# RomanceSystem
+	var rom_sys: Node = get_node_or_null("/root/aRomanceSystem")
+	if rom_sys and rom_sys.has_method("save"):
+		var rom_data: Variant = rom_sys.call("save")
+		if typeof(rom_data) == TYPE_DICTIONARY:
+			payload["romance"] = rom_data as Dictionary
+
+	# AffinitySystem
+	var aff_sys: Node = get_node_or_null("/root/aAffinitySystem")
+	if aff_sys and aff_sys.has_method("save"):
+		var aff_data: Variant = aff_sys.call("save")
+		if typeof(aff_data) == TYPE_DICTIONARY:
+			payload["affinity"] = aff_data as Dictionary
+
 	return payload
 
 func load(data: Dictionary) -> void:
@@ -531,6 +566,74 @@ func load(data: Dictionary) -> void:
 		for mkey in meta_in.keys():
 			set_meta(String(mkey), meta_in[mkey])
 
+	# CircleBondSystem
+	var cb_v: Variant = data.get("circle_bonds", null)
+	var cb_sys: Node = get_node_or_null("/root/aCircleBondSystem")
+	if cb_sys and typeof(cb_v) == TYPE_DICTIONARY:
+		if cb_sys.has_method("load"):
+			cb_sys.call("load", cb_v)
+
+	# DormSystem
+	var dorm_v: Variant = data.get("dorms", null)
+	var dorm_sys: Node = get_node_or_null("/root/aDormSystem")
+	if dorm_sys and typeof(dorm_v) == TYPE_DICTIONARY:
+		if dorm_sys.has_method("load"):
+			dorm_sys.call("load", dorm_v)
+
+	# EquipmentSystem
+	var equip_v: Variant = data.get("equipment", null)
+	var equip_sys: Node = get_node_or_null(EQUIP_PATH)
+	if equip_sys and typeof(equip_v) == TYPE_DICTIONARY:
+		if equip_sys.has_method("load"):
+			equip_sys.call("load", equip_v)
+
+	# RomanceSystem
+	var rom_v: Variant = data.get("romance", null)
+	var rom_sys: Node = get_node_or_null("/root/aRomanceSystem")
+	if rom_sys and typeof(rom_v) == TYPE_DICTIONARY:
+		if rom_sys.has_method("load"):
+			rom_sys.call("load", rom_v)
+
+	# AffinitySystem
+	var aff_v: Variant = data.get("affinity", null)
+	var aff_sys: Node = get_node_or_null("/root/aAffinitySystem")
+	if aff_sys and typeof(aff_v) == TYPE_DICTIONARY:
+		if aff_sys.has_method("load"):
+			aff_sys.call("load", aff_v)
+
 	emit_signal("party_changed")
 	emit_signal("roster_changed")
 	emit_signal("perk_points_changed", perk_points)
+
+# ─── UI Bridge Methods (called by SaveMenu/LoadMenu) ────────────────
+## Called by SaveMenu when user clicks "Save" button.
+## Collects all game state and writes to the specified slot.
+func save_to_slot(slot: int) -> bool:
+	var payload: Dictionary = save()
+
+	# Add scene metadata for save slot display
+	payload["scene"] = "Main"
+
+	# Get calendar label for save slot display
+	var cal: Node = get_node_or_null(CALENDAR_PATH)
+	if cal and cal.has_method("save_label"):
+		payload["label"] = String(cal.call("save_label"))
+	elif cal and cal.has_method("hud_label"):
+		payload["label"] = String(cal.call("hud_label"))
+
+	var save_sys: Node = get_node_or_null(SAVELOAD_PATH)
+	if save_sys and save_sys.has_method("save_game"):
+		return bool(save_sys.call("save_game", slot, payload))
+	else:
+		push_error("[GameState] aSaveLoad system not found! Cannot save.")
+		return false
+
+## Called by LoadMenu when user clicks "Load" button.
+## Restores all game state from the loaded payload.
+func apply_loaded_save(payload: Dictionary) -> void:
+	if payload.is_empty():
+		push_warning("[GameState] Attempted to load empty save data.")
+		return
+
+	# Restore all state via the existing load() method
+	load(payload)
