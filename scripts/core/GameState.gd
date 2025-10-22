@@ -544,6 +544,13 @@ func load(data: Dictionary) -> void:
 		elif inv_sys.has_method("load"):
 			inv_sys.call("load", items_v)
 
+	# Equipment MUST load before sigils so bracelet capacity is known
+	var equip_v: Variant = data.get("equipment", null)
+	var equip_sys: Node = get_node_or_null(EQUIP_PATH)
+	if equip_sys and typeof(equip_v) == TYPE_DICTIONARY:
+		if equip_sys.has_method("load"):
+			equip_sys.call("load", equip_v)
+
 	# Sigils (system blob + robust snapshot with owners/slots/xp/level/active skill)
 	var sig_v: Variant = data.get("sigils", null)
 	var sigil_sys: Node = get_node_or_null(SIGIL_PATH)
@@ -597,11 +604,7 @@ func load(data: Dictionary) -> void:
 		if dorm_sys.has_method("load"):
 			dorm_sys.call("load", dorm_v)
 
-	var equip_v: Variant = data.get("equipment", null)
-	var equip_sys: Node = get_node_or_null(EQUIP_PATH)
-	if equip_sys and typeof(equip_v) == TYPE_DICTIONARY:
-		if equip_sys.has_method("load"):
-			equip_sys.call("load", equip_v)
+	# Equipment already loaded above (before sigils)
 
 	var rom_v: Variant = data.get("romance", null)
 	var rom_sys: Node = get_node_or_null("/root/aRomanceSystem")
