@@ -16,9 +16,10 @@ var _accept_btn  : Button        = null
 # State
 var _selected_room: String = ""
 var _selected_person: String = ""  # actor_id (from Common Room)
+var _pending_room: String = ""     # room-first flow: user clicked a room first
 var _group: ButtonGroup = null
 
-# Track rooms consumed during this reassignment session (turn them red)
+# Track rooms consumed during this reassignment session (turned red in UI)
 var _used_rooms: Dictionary = {}  # room_id -> true
 
 # Local mirror of DormsSystem.RoomVisual values (keep in sync)
@@ -53,6 +54,13 @@ func _ready() -> void:
 			ds.connect("plan_changed", Callable(self, "_on_model_bumped"))
 		if ds.has_signal("saturday_applied"):
 			ds.connect("saturday_applied", func(_snap: Dictionary) -> void: _on_model_bumped())
+		# Optional: react if the system is blocking time advance (could show a banner)
+		if ds.has_signal("blocking_state_changed"):
+			ds.connect("blocking_state_changed", func(_locked: bool) -> void: _refresh_accept_state())
+
+	# Guard: if someone tries to hide/swap the panel while Accept is active, cancel it.
+	if not visibility_changed.is_connected(_on_visibility_changed):
+		visibility_changed.connect(_on_visibility_changed)
 
 	_ensure_right_controls()
 	_rebuild()
@@ -61,9 +69,10 @@ func _on_model_bumped() -> void:
 	_rebuild()
 
 func _on_filter_changed(_ix: int) -> void:
-	# Leaving Reassignment view? clear our local "used" paint
+	# Leaving Reassignment view? clear local red paint
 	if _filter and _filter.get_selected_id() != 1:
 		_used_rooms.clear()
+		_pending_room = ""
 	_rebuild()
 
 # ─────────────────────────────────────────────────────────────
@@ -92,7 +101,7 @@ func _ensure_right_controls() -> void:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 6)
 	_reassign_btn = Button.new(); _reassign_btn.text = "Room Reassignment"
-	_reset_btn    = Button.new(); _reset_btn.text    = "Reset Placement"
+	_reset_btn    = Button.new(); _reset_btn.text    = "Cancel Move" # (was: Reset Placement)
 	_accept_btn   = Button.new(); _accept_btn.text   = "Accept Plan (Saturday)"
 	row.add_child(_reassign_btn); row.add_child(_reset_btn); row.add_child(_accept_btn)
 	holder.add_child(row)
@@ -142,8 +151,21 @@ func _build_grid() -> void:
 		b.pressed.connect(func(room_id := rid) -> void:
 			_selected_room = room_id
 			_update_detail(room_id)
+
+			# Room-first flow: if empty (green) or staged (yellow), remember it
+			var vis: int = int(ds.call("get_room_visual", room_id))
+			if vis == VIS_EMPTY or vis == VIS_STAGED:
+				_pending_room = room_id
+			else:
+				_pending_room = ""
+
+			# Person-first flow (standard)
 			if _selected_person != "":
 				_try_place_selected(room_id)
+			else:
+				# If no one selected and room is placeable, nudge user to pick from Common
+				if vis == VIS_EMPTY or vis == VIS_STAGED:
+					pass
 		)
 		if _selected_room == rid:
 			b.button_pressed = true
@@ -300,6 +322,13 @@ func _build_common_list() -> void:
 		_common_box.add_child(empty)
 		return
 
+	# A small hint row if user “armed” a room first
+	if _pending_room != "":
+		var hint := Label.new()
+		hint.text = "Place into room %s:" % _pending_room
+		hint.add_theme_font_size_override("font_size", 11)
+		_common_box.add_child(hint)
+
 	for i in range(list_psa.size()):
 		var aid: String = list_psa[i]
 		var btn := Button.new()
@@ -309,7 +338,11 @@ func _build_common_list() -> void:
 		btn.button_pressed = (_selected_person == aid)
 		btn.pressed.connect(func(id := aid) -> void:
 			_selected_person = ("" if _selected_person == id else id)
+			# If the user armed a room and now picked a person, try the place immediately
+			if _selected_person != "" and _pending_room != "":
+				_try_place_selected(_pending_room)
 			_build_common_list()
+			_update_tile_colors()
 		)
 		_common_box.add_child(btn)
 
@@ -346,7 +379,7 @@ func _update_detail(room_id: String) -> void:
 	var occ_line := "Occupant: [b]%s[/b]" % (String(ds.call("display_name", who)) if who != "" else "— empty —")
 	lines.append(occ_line)
 
-	# If a plan is locked and this room is involved, show red banner
+	# If plan is locked and this room is involved, show banner (tiles stay normal colors)
 	if ds.has_method("room_in_locked_plan") and bool(ds.call("room_in_locked_plan", room_id)):
 		lines.append("[color=#d33](Room Reassignments happening on Saturday)[/color]")
 
@@ -363,7 +396,7 @@ func _update_detail(room_id: String) -> void:
 		else:
 			var label_status: String = "Neutral"
 			if ds.has_method("is_pair_hidden") and who != "" and nwho != "" and bool(ds.call("is_pair_hidden", who, nwho)):
-				label_status = "Unknown (reveals Saturday)"
+				label_status = "Unknown (reveals Friday)"
 			elif ds.has_method("get_pair_status") and who != "" and nwho != "":
 				label_status = String(ds.call("get_pair_status", who, nwho))
 			lines.append("• %s — %s with [b]%s[/b]" % [nid, label_status, String(ds.call("display_name", nwho))])
@@ -375,11 +408,23 @@ func _update_detail(room_id: String) -> void:
 # ─────────────────────────────────────────────────────────────
 func _on_reassign_pressed() -> void:
 	var ds: Node = _ds()
-	if ds == null:
+	if ds == null or _selected_room == "":
+		# Even if no room is selected, ensure we flip to Reassignment mode on click.
+		if _filter and _filter.get_selected_id() != 1:
+			_filter.select(1)
+			_on_filter_changed(1)
 		return
 
-	if _selected_room == "":
+	# Flip the forms panel from Placements -> Reassignment (and leave it if already there)
+	if _filter and _filter.get_selected_id() != 1:
+		_filter.select(1)
+		_on_filter_changed(1)
+
+	# Block Friday/Saturday for starting reassignment
+	if ds.has_method("can_start_reassignment_today") and not bool(ds.call("can_start_reassignment_today")):
+		_show_toast("Room reassignment can only be started on Sunday.")
 		return
+
 	var r: Dictionary = ds.call("get_room", _selected_room)
 	var curr: String = String(r.get("occupant",""))
 	if curr == "":
@@ -403,6 +448,8 @@ func _on_reassign_pressed() -> void:
 			if not bool(res.get("ok", false)):
 				_show_toast(String(res.get("reason","Cannot stage.")))
 
+	# Fresh session markers
+	_pending_room = ""
 	# Refresh everything (summary/common/accept state)
 	_rebuild()
 
@@ -415,6 +462,7 @@ func _on_reset_pressed() -> void:
 	elif ds.has_method("reset_placement"):
 		ds.call("reset_placement")
 	_selected_person = ""
+	_pending_room = ""
 	_used_rooms.clear()  # clear our session paint
 	_rebuild()
 
@@ -423,11 +471,18 @@ func _on_accept_pressed() -> void:
 	if ds == null:
 		return
 
-	if not _compute_can_accept():
-		_show_toast("Pick a target room for each staged member before accepting.")
+	# Only when everyone staged has a target (no one left in "Common" for reassignment)
+	var ok_meta: bool = false
+	if ds.has_method("can_lock_plan"):
+		var meta: Dictionary = ds.call("can_lock_plan")
+		ok_meta = bool(meta.get("ok", false))
+	else:
+		ok_meta = _compute_can_accept()
+	if not ok_meta:
+		_show_toast("Place every staged member into a target room before accepting.")
 		return
 
-	# Lock the plan for Saturday (system executes on calendar tick)
+	# Lock the plan for Saturday; live layout reverts now (visuals back to blue/green)
 	var res: Dictionary = {}
 	if ds.has_method("accept_plan_for_saturday"):
 		res = ds.call("accept_plan_for_saturday")
@@ -441,7 +496,9 @@ func _on_accept_pressed() -> void:
 	else:
 		_show_toast("Plan locked. Changes will apply on Saturday.")
 
-	_used_rooms.clear()  # new section starts after lock
+	_selected_person = ""
+	_pending_room = ""
+	_used_rooms.clear()  # new session starts after lock
 	_rebuild()
 
 # Place selected person into a room (handles staged & immediate)
@@ -452,10 +509,28 @@ func _try_place_selected(room_id: String) -> void:
 
 	var staged: bool = false
 	if ds.has_method("is_staged"):
-		var staged_v: Variant = ds.call("is_staged", _selected_person)
-		staged = bool(staged_v)
+		staged = bool(ds.call("is_staged", _selected_person))
 
 	if staged:
+		# Disallow blue rooms explicitly: only green/yellow
+		var vis: int = int(ds.call("get_room_visual", room_id))
+		if not (vis == VIS_EMPTY or vis == VIS_STAGED):
+			_show_toast("Pick a green or yellow room for reassignment.")
+			return
+
+		# If trying to place back to original room, block
+		var origin: String = ""
+		if ds.has_method("get_staged_prev_room_for"):
+			origin = String(ds.call("get_staged_prev_room_for", _selected_person))
+		if origin != "" and origin == room_id:
+			_show_toast("That's their current room; placing them there doesn't require reassignment.")
+			return
+
+		# If another staged person already targets this room, block
+		if _room_targeted_in_plan(room_id, _selected_person):
+			_show_toast("That room is already targeted by another reassignment.")
+			return
+
 		var who_name: String = String(ds.call("display_name", _selected_person))
 		var ok: bool = await _ask_confirm("Assign %s to room %s?" % [who_name, room_id])
 		if not ok:
@@ -469,12 +544,18 @@ func _try_place_selected(room_id: String) -> void:
 			_show_toast(String(res.get("reason","Cannot place.")))
 			return
 		_selected_person = ""
+		_pending_room = ""
 		_show_toast("Placement staged.")
 
-		# mark room red only in reassignment mode
+		# Mark room used locally (UI red). Also DS will reflect this; we still keep a local flag for instant feedback.
 		if _filter and _filter.get_selected_id() == 1:
 			_used_rooms[room_id] = true
 	else:
+		# Immediate (new Common member). Only allow empty (green).
+		var vis2: int = int(ds.call("get_room_visual", room_id))
+		if vis2 != VIS_EMPTY:
+			_show_toast("That room is not empty.")
+			return
 		var who_name2: String = String(ds.call("display_name", _selected_person))
 		var ok2: bool = await _ask_confirm("Assign %s to room %s?" % [who_name2, room_id])
 		if not ok2:
@@ -485,6 +566,7 @@ func _try_place_selected(room_id: String) -> void:
 				_show_toast(String(res2.get("reason","Cannot assign.")))
 				return
 			_selected_person = ""
+			_pending_room = ""
 			_show_toast("Assigned.")
 
 	# One rebuild to refresh grid, summary, common list, and details
@@ -505,13 +587,25 @@ func _apply_room_visual(btn: Button, room_id: String) -> void:
 	elif state == VIS_OCCUPIED:
 		col = Color(0.12, 0.18, 0.32) # blue (occupied)
 	elif state == VIS_STAGED:
-		col = Color(0.40, 0.34, 0.08) # yellow (selected/staged)
+		col = Color(0.40, 0.34, 0.08) # yellow (staged tile)
 	elif state == VIS_LOCKED:
 		col = Color(0.38, 0.10, 0.10) # red (locked/kept)
 
-	# Only in Reassignment mode do we force red for rooms already used this session
+	# Only in Reassignment mode do we add our session red paints/overrides
 	if _filter and _filter.get_selected_id() == 1:
-		if ds.has_method("has_pending_plan") and bool(ds.call("has_pending_plan")) and _used_rooms.has(room_id):
+		# 1) Red for the origin room when a staged person is selected (can't place them back)
+		if _selected_person != "" and ds.has_method("is_staged") and bool(ds.call("is_staged", _selected_person)):
+			if ds.has_method("get_staged_prev_room_for"):
+				var origin: String = String(ds.call("get_staged_prev_room_for", _selected_person))
+				if origin == room_id:
+					col = Color(0.75, 0.15, 0.15)
+
+		# 2) Red for rooms already targeted by any staged assignment (no double-placing)
+		if _room_targeted_in_plan(room_id):
+			col = Color(0.75, 0.15, 0.15)
+
+		# 3) Also honor local 'used this session' paint
+		if _used_rooms.has(room_id):
 			col = Color(0.75, 0.15, 0.15)
 
 	var sb := StyleBoxFlat.new()
@@ -526,6 +620,24 @@ func _apply_room_visual(btn: Button, room_id: String) -> void:
 	btn.add_theme_stylebox_override("normal", sb)
 	btn.add_theme_stylebox_override("hover", sb)
 	btn.add_theme_stylebox_override("pressed", sb)
+
+func _room_targeted_in_plan(room_id: String, ignore_aid: String = "") -> bool:
+	var ds := _ds()
+	if ds == null:
+		return false
+	# Prefer explicit staged assignments
+	for fn in ["get_staged_assignments","staged_assignments","get_staged_places","list_staged_assignments"]:
+		if ds.has_method(fn):
+			var d_v: Variant = ds.call(fn)
+			if typeof(d_v) == TYPE_DICTIONARY:
+				var d: Dictionary = d_v
+				for k in d.keys():
+					var aid: String = String(k)
+					if ignore_aid != "" and aid == ignore_aid:
+						continue
+					if String(d[k]) == room_id:
+						return true
+	return false
 
 func _update_tile_colors() -> void:
 	var ds: Node = _ds()
@@ -553,10 +665,14 @@ func _compute_can_accept() -> bool:
 	var ds: Node = _ds()
 	if ds == null:
 		return false
-	# If the system exposes an explicit "locked" flag, don't allow
+	# If plan exposes an explicit "locked" flag, don't allow (already accepted)
 	if ds.has_method("is_plan_locked") and bool(ds.call("is_plan_locked")):
 		return false
-	# Can accept if there's at least one staged target
+	# Prefer explicit "can_lock_plan" when available
+	if ds.has_method("can_lock_plan"):
+		var meta: Dictionary = ds.call("can_lock_plan")
+		return bool(meta.get("ok", false))
+	# Otherwise: at least one staged target
 	if ds.has_method("staged_assign_size"):
 		return int(ds.call("staged_assign_size")) > 0
 	if ds.has_method("get_staged_assignments"):
@@ -564,6 +680,32 @@ func _compute_can_accept() -> bool:
 		if typeof(d_v) == TYPE_DICTIONARY:
 			return (d_v as Dictionary).size() > 0
 	return false
+
+# Helper: is Accept Plan currently active (enabled)?
+func _is_accept_active() -> bool:
+	return _accept_btn != null and not _accept_btn.disabled
+
+# ─────────────────────────────────────────────────────────────
+# Exit guard — block leaving the menu while Accept is active
+# ─────────────────────────────────────────────────────────────
+func _on_visibility_changed() -> void:
+	# If something tries to hide this panel while Accept is active, bring it back and warn.
+	if not is_visible_in_tree() and _is_accept_active():
+		# Re-show ourselves on the next frame to avoid flicker/race.
+		call_deferred("show")
+		call_deferred("_show_toast", "Room Reassignments not complete.")
+
+func _unhandled_input(event: InputEvent) -> void:
+	# Catch Esc / gamepad back while Accept is active.
+	if _is_accept_active():
+		if event.is_action_pressed("ui_cancel") or event.is_action_pressed("ui_end"):
+			_show_toast("Room Reassignments not complete.")
+			accept_event()
+
+# Public opt-in for parent menus that want to ask first.
+func can_close_panel() -> bool:
+	# Return false while Accept is active; parent can honor this to block tab changes.
+	return not _is_accept_active()
 
 # ─────────────────────────────────────────────────────────────
 # Tiny UX helpers

@@ -29,6 +29,9 @@ var _btn_group: ButtonGroup
 var _panels: Dictionary = {}  # tab_id -> Control
 var _current_tab: String = ""
 
+# --- Dorm hooks ---
+var _ds: Node = null
+
 func _ready() -> void:
 	_btn_group = ButtonGroup.new()
 	_build_tabs()
@@ -42,6 +45,11 @@ func _ready() -> void:
 		_select_first_tab()
 	else:
 		_select_tab(last_tab)
+
+	# Hook: auto-open Dorms tab when someone is added to Common (menu already open)
+	_ds = get_node_or_null("/root/aDormSystem")
+	if _ds and _ds.has_signal("common_added") and not _ds.is_connected("common_added", Callable(self, "_on_common_added")):
+		_ds.connect("common_added", Callable(self, "_on_common_added"))
 
 func _build_tabs() -> void:
 	for child in _left_tabs.get_children():
@@ -80,6 +88,16 @@ func _select_first_tab() -> void:
 		break
 
 func _select_tab(tab_id: String) -> void:
+	# Guard: don't leave Dorms if Common has people to place
+	if _current_tab == "dorms" and tab_id != "dorms":
+		if not _can_leave_dorms():
+			_toast("Finish placing everyone from the Common Room before leaving Dorms.")
+			# snap the toggle back to Dorms
+			for c in _left_tabs.get_children():
+				var b := c as Button
+				b.button_pressed = (String(b.get_meta("tab_id")) == "dorms")
+			return
+
 	if _current_tab == tab_id:
 		return
 	_current_tab = tab_id
@@ -118,3 +136,31 @@ func _get_or_create_panel(tab_id: String) -> Control:
 	_panel_holder.add_child(inst)
 	_panels[tab_id] = inst
 	return inst
+
+# --- Hooks / helpers ---
+
+func _on_common_added(_aid: String) -> void:
+	_open_dorms_tab()
+
+func _open_dorms_tab() -> void:
+	_select_tab("dorms")
+
+func _can_leave_dorms() -> bool:
+	var ds := get_node_or_null("/root/aDormSystem")
+	if ds == null:
+		return true
+	var list_v: Variant = ds.call("get_common") # merged Common + staged-to-place
+	if typeof(list_v) == TYPE_PACKED_STRING_ARRAY:
+		return (list_v as PackedStringArray).size() == 0
+	if typeof(list_v) == TYPE_ARRAY:
+		return (list_v as Array).size() == 0
+	return true
+
+func _toast(msg: String) -> void:
+	var dlg := AcceptDialog.new()
+	dlg.title = "Heads up"
+	dlg.dialog_text = msg
+	add_child(dlg)
+	dlg.popup_centered()
+	await dlg.confirmed
+	dlg.queue_free()

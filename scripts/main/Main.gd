@@ -111,6 +111,9 @@ func _find_cps() -> Node:
 		if n: return n
 	return null
 
+# --- Dorm hooks (new) ----------------------------------------------------------
+var _prelock_layout: Dictionary = {}  # room_id -> aid (snapshot after Accept Plan)
+
 func _ready() -> void:
 	# Systems
 	calendar = get_node_or_null(CALENDAR_PATH)
@@ -183,6 +186,22 @@ func _ready() -> void:
 	# Shortcuts
 	set_process_unhandled_input(true)
 
+	# ---- Dorm hooks: auto-open, plan snapshot, saturday popup -----------------
+	var ds := get_node_or_null("/root/aDormSystem")
+	if ds:
+		# Auto-open Dorms tab when a new Common occupant is added
+		if ds.has_signal("common_added") and not ds.is_connected("common_added", Callable(self, "_on_dorms_common_added")):
+			ds.connect("common_added", Callable(self, "_on_dorms_common_added"))
+		# Snapshot layout right after plan is locked (for Saturday diff)
+		if ds.has_signal("plan_changed") and not ds.is_connected("plan_changed", Callable(self, "_on_dorms_plan_changed")):
+			ds.connect("plan_changed", Callable(self, "_on_dorms_plan_changed"))
+		# Show results popup when DormsSystem applies moves on Saturday (legacy)
+		if ds.has_signal("saturday_applied") and not ds.is_connected("saturday_applied", Callable(self, "_on_dorms_saturday_applied")):
+			ds.connect("saturday_applied", Callable(self, "_on_dorms_saturday_applied"))
+		# Prefer new signal that includes explicit moves, if available
+		if ds.has_signal("saturday_applied_v2") and not ds.is_connected("saturday_applied_v2", Callable(self, "_on_dorms_saturday_applied_v2")):
+			ds.connect("saturday_applied_v2", Callable(self, "_on_dorms_saturday_applied_v2"))
+
 # ---------- Input ----------
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_echo(): return
@@ -201,6 +220,9 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _toggle_game_menu() -> void:
 	if _game_menu and is_instance_valid(_game_menu):
+		# About to hide? block if Dorms has unplaced occupants
+		if _game_menu.visible and not _menu_can_close():
+			return
 		_game_menu.visible = not _game_menu.visible
 		return
 	if not ResourceLoader.exists(GAME_MENU_SCENE): return
@@ -595,13 +617,23 @@ func _emit_stats_changed() -> void:
 	if stats and stats.has_signal("stats_changed"):
 		stats.emit_signal("stats_changed")
 
-func _refresh_cps(member_id: String) -> void:
-	if _cps == null: _cps = _find_cps()
-	if _cps:
-		if _cps.has_method("refresh_member"):
-			_cps.call("refresh_member", member_id)
-		elif _cps.has_method("refresh_all"):
-			_cps.call("refresh_all")
+# ---------- Perk/XP helpers ----------
+func _refresh_cps(member_id: String = "") -> void:
+	var cps: Object = _cps
+	if cps == null or not is_instance_valid(cps):
+		cps = _find_cps()
+		_cps = cps
+	if cps == null or not is_instance_valid(cps):
+		return
+
+	# Prefer targeted refresh; fall back to refresh_all.
+	if cps.has_method("refresh_member"):
+		var id_to_use := member_id
+		if id_to_use == "" and has_method("_hero_id"):
+			id_to_use = _hero_id()
+		cps.call("refresh_member", id_to_use)
+	elif cps.has_method("refresh_all"):
+		cps.call("refresh_all")
 
 # ---------- Hero row (build + actions) ----------
 func _ensure_hero_row() -> void:
@@ -831,3 +863,127 @@ func _try_add_sigil_xp(member_id: String, sigil_id: String, amount: int) -> void
 		var n := _method_argc(_sig, "add_xp")
 		if n == 3: _sig.call("add_xp", member_id, sigil_id, amount)
 		elif n == 2: _sig.call("add_xp", sigil_id, amount)
+
+# ---------- Dorm hooks (handlers) ---------------------------------------------
+func _on_dorms_common_added(_aid: String) -> void:
+	# Ensure the Game Menu is visible and on Dorms
+	_toggle_game_menu() # creates if needed
+	if _game_menu and not _game_menu.visible:
+		_game_menu.visible = true
+	_game_menu.move_to_front()
+	# Try to switch its tab if it exposes the helper
+	if _game_menu and (_game_menu as Control).has_method("_open_dorms_tab"):
+		(_game_menu as Control).call("_open_dorms_tab")
+
+func _on_dorms_plan_changed() -> void:
+	var ds := get_node_or_null("/root/aDormSystem")
+	if ds and ds.has_method("is_plan_locked") and bool(ds.call("is_plan_locked")):
+		# snapshot current layout once the plan is locked
+		if ds.has_method("current_layout"):
+			var snap_v: Variant = ds.call("current_layout")
+			if typeof(snap_v) == TYPE_DICTIONARY:
+				_prelock_layout = (snap_v as Dictionary).duplicate(true)
+	else:
+		_prelock_layout.clear()
+
+# v2 signal (preferred): we get explicit moves [{aid,name,from,to}, ...]
+func _on_dorms_saturday_applied_v2(new_layout: Dictionary, moves: Array) -> void:
+	_show_reassignments_summary(new_layout, moves)
+
+# Legacy signal: we only get the new layout; build moves from snapshot or DS helper.
+func _on_dorms_saturday_applied(new_layout: Dictionary) -> void:
+	_show_reassignments_summary(new_layout, [])
+
+# Build and show the final popup text with only actual reassignees.
+func _show_reassignments_summary(new_layout: Dictionary, moves_in: Array) -> void:
+	var ds := get_node_or_null("/root/aDormSystem")
+
+	# Prefer explicit moves from signal or DS cache.
+	var moves: Array = []
+	if moves_in.size() > 0:
+		moves = moves_in
+	elif ds and ds.has_method("get_last_applied_moves"):
+		var mv: Variant = ds.call("get_last_applied_moves")
+		if typeof(mv) == TYPE_ARRAY:
+			moves = (mv as Array)
+
+	var lines := PackedStringArray()
+
+	if moves.size() > 0:
+		for entry_any in moves:
+			if typeof(entry_any) != TYPE_DICTIONARY:
+				continue
+			var entry: Dictionary = entry_any
+			var nm: String = String(entry.get("name","")).strip_edges()
+			var aid: String = String(entry.get("aid","")).strip_edges()
+			var fr:  String = String(entry.get("from","")).strip_edges()
+			var to:  String = String(entry.get("to","")).strip_edges()
+			if nm == "" and ds and aid != "":
+				nm = String(ds.call("display_name", aid))
+			if fr != "" and to != "" and fr != to and nm != "":
+				lines.append("\"%s\" moved from \"%s\" to \"%s\"" % [nm, fr, to])
+	else:
+		# Fallback: derive moves from pre-lock snapshot vs new layout
+		var old_pos: Dictionary = {}
+		for k in _prelock_layout.keys():
+			var rid := String(k)
+			var aid_old := String(_prelock_layout.get(rid, ""))
+			if aid_old != "":
+				old_pos[aid_old] = rid
+		var new_pos: Dictionary = {}
+		for k2 in new_layout.keys():
+			var rid2 := String(k2)
+			var aid_new := String(new_layout.get(rid2, ""))
+			if aid_new != "":
+				new_pos[aid_new] = rid2
+
+		for aid_key in old_pos.keys():
+			var aid3: String = String(aid_key)
+			var fr2: String = String(old_pos.get(aid3, ""))
+			var to2: String = String(new_pos.get(aid3, ""))
+			if fr2 != "" and to2 != "" and fr2 != to2:
+				var nm2: String = (String(ds.call("display_name", aid3)) if ds else aid3)
+				lines.append("\"%s\" moved from \"%s\" to \"%s\"" % [nm2, fr2, to2])
+
+	# Dialog (unchanged behavior when nothing to report)
+	var dlg := AcceptDialog.new()
+	dlg.title = "Reassignments Applied"
+	dlg.dialog_text = ("Room changes have been applied." if lines.size() == 0 else _join_lines(lines))
+	add_child(dlg)
+	dlg.popup_centered()
+	await dlg.confirmed
+	dlg.queue_free()
+
+	_prelock_layout.clear()
+
+func _join_lines(arr: PackedStringArray) -> String:
+	var out := ""
+	for i in range(arr.size()):
+		if i > 0: out += "\n"
+		out += arr[i]
+	return out
+
+# Prevent closing menu while Common has people to place
+func _menu_can_close() -> bool:
+	var ds := get_node_or_null("/root/aDormSystem")
+	if ds == null:
+		return true
+	var list_v: Variant = ds.call("get_common") # merged Common + staged-to-place
+	var count := 0
+	if typeof(list_v) == TYPE_PACKED_STRING_ARRAY:
+		count = (list_v as PackedStringArray).size()
+	elif typeof(list_v) == TYPE_ARRAY:
+		count = (list_v as Array).size()
+	if count > 0:
+		_main_toast("Finish placing everyone from the Common Room before closing the menu.")
+		return false
+	return true
+
+func _main_toast(msg: String) -> void:
+	var dlg := AcceptDialog.new()
+	dlg.title = "Notice"
+	dlg.dialog_text = msg
+	add_child(dlg)
+	dlg.popup_centered()
+	await dlg.confirmed
+	dlg.queue_free()

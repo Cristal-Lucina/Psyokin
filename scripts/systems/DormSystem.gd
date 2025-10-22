@@ -3,7 +3,16 @@ class_name DormsSystem
 
 signal dorms_changed
 signal plan_changed
-signal saturday_applied(new_layout: Dictionary) # room_id -> actor_id (or "")
+signal saturday_applied(new_layout: Dictionary)        # legacy: layout only (compat)
+signal saturday_applied_v2(new_layout: Dictionary, moves: Array) # new: layout + moves
+signal common_added(aid: String)
+
+# NEW: results signals you can hook from Main/UI
+signal friday_reveals_ready(pairs: Array)              # pairs revealed on Friday (from prior-Saturday reassignments)
+signal saturday_reveals_ready(pairs: Array)            # pairs revealed on Saturday (from midweek Common placements)
+
+# NEW: broadcast when reassignment is in-progress (blocks day-advance UX until Accept Plan)
+signal blocking_state_changed(is_blocking: bool)
 
 const ROOM_IDS := [
 	"301","302","303","304",
@@ -34,9 +43,8 @@ var _hero_picks: Array[String] = []
 
 # Rooms + Common
 var _rooms: Dictionary = {}          # room_id -> {"name":rid, "occupant": String}
-var _common: Array[String] = []      # unassigned
-
-# Weekly staging
+var _common: Array[String] = []      # unassigned (true Common)
+# Weekly staging (treated like "Common" for UI until placed)
 var _staged_common: Array[String] = []
 var _staged_prev_room: Dictionary = {}  # aid -> from_room
 var _staged_assign: Dictionary = {}     # aid -> to_room
@@ -47,13 +55,17 @@ var _locked_involved_rooms: Dictionary = {} # room_id -> true
 var _bestie_map: Dictionary = {} # aid -> Array[String]
 var _rival_map : Dictionary = {} # aid -> Array[String]
 
-# Adjacency cache
+# Adjacency cache (current true labels)
 var _pair_status: Dictionary = {} # "a|b" -> "Bestie"/"Rival"/"Neutral"
 
-# Pairs hidden until Saturday
-var _hidden_pairs: Dictionary = {} # "a|b" -> true
+# Hiding pools
+# - Pairs created by Saturday reassignments → reveal next Friday
+var _hidden_pairs_friday: Dictionary = {}   # "a|b" -> true
+# - Pairs created by immediate Common placements → reveal next Saturday
+var _hidden_pairs_saturday: Dictionary = {} # "a|b" -> true
 
-enum RoomVisual { EMPTY_GREEN, OCCUPIED_BLUE, STAGED_YELLOW, LOCKED_RED }
+# Saturday reporting cache
+var _last_applied_moves: Array = []         # [{aid,name,from,to}...]
 
 # Calendar discovery
 const _CAL_PATHS := [
@@ -70,6 +82,15 @@ const _CAL_SIGNALS := [
 	"new_day","on_day_changed","tick_day","day_advanced","week_reset"
 ]
 var _calendar_node: Node = null
+
+# Cached weekday (shared by reveals + gating)
+var _last_weekday_index: int = -1     # 0=Mon..6=Sun
+var _last_weekday_name: String = ""
+
+# Local blocking mirror (so external UI can query)
+var _is_blocking_time_advance: bool = false
+
+enum RoomVisual { EMPTY_GREEN, OCCUPIED_BLUE, STAGED_YELLOW, LOCKED_RED }
 
 # CSV header aliases
 const _ID_KEYS      := ["actor_id","id","actor","member_id"]
@@ -107,6 +128,7 @@ func _ready() -> void:
 	if get_tree() != null:
 		get_tree().connect("node_added", Callable(self, "_on_tree_node_added"))
 	_recompute_adjacency()
+	_update_blocking_state()
 	dorms_changed.emit()
 
 # ─────────────────────────────────────────────────────────────
@@ -153,17 +175,35 @@ func _connect_calendar_signals() -> void:
 		return
 	for sig in _CAL_SIGNALS:
 		if _calendar_node.has_signal(sig) and not _calendar_node.is_connected(sig, Callable(self, "_on_calendar_day_changed")):
-			# Bound args are appended after emitted args; handler must take (emitted..., bound...)
 			_calendar_node.connect(sig, Callable(self, "_on_calendar_day_changed").bind(sig))
 
-# manual nudge if needed
+# Map weekday name/str → index
+func _weekday_name_to_index(s: String) -> int:
+	if s == null:
+		return -1
+	var t := String(s).strip_edges().to_lower()
+	if t.begins_with("mon") or t == "0": return 0
+	if t.begins_with("tue") or t == "1": return 1
+	if t.begins_with("wed") or t == "2": return 2
+	if t.begins_with("thu") or t == "3": return 3
+	if t.begins_with("fri") or t == "4": return 4
+	if t.begins_with("sat") or t == "5": return 5
+	if t.begins_with("sun") or t == "6": return 6
+	return -1
+
+# manual nudge if needed (accepts weekday name)
 func calendar_notify_weekday(weekday_name: String) -> void:
-	if _is_saturday_name(weekday_name):
+	_last_weekday_name = weekday_name
+	_last_weekday_index = _weekday_name_to_index(weekday_name)
+	# If we are blocking (unaccepted plan), swallow reveals/apply
+	if _compute_blocking():
+		return
+	if _is_friday_name(weekday_name):
+		_reveal_friday_now()
+	elif _is_saturday_name(weekday_name):
 		if _plan_locked:
 			saturday_execute_changes()
-		elif _hidden_pairs.size() > 0:
-			_hidden_pairs.clear()
-			dorms_changed.emit()
+		_reveal_saturday_now()
 
 # NOTE: emitted args first, then bound sig name last
 func _on_calendar_day_changed(a: Variant = null, _b: Variant = null, _c: Variant = null, _sig: String = "") -> void:
@@ -194,16 +234,71 @@ func _on_calendar_day_changed(a: Variant = null, _b: Variant = null, _c: Variant
 			for m2 in ["get_weekday","day_of_week","weekday","dow","current_weekday"]:
 				if _calendar_node.has_method(m2):
 					var got2: Variant = _calendar_node.call(m2)
-					if typeof(got2) == TYPE_INT or typeof(got2) == TYPE_FLOAT:
+					if (typeof(got2) == TYPE_INT or typeof(got2) == TYPE_FLOAT):
 						idx = int(got2)
 						break
 
-	if _is_saturday_name(wd_name) or _is_saturday_index(idx):
+	# Cache what we learned (prefer numeric, fallback to name)
+	var idx2 := idx
+	if idx2 < 0:
+		idx2 = _weekday_name_to_index(wd_name)
+	if idx2 >= 0:
+		_last_weekday_index = idx2
+	if wd_name != "":
+		_last_weekday_name = wd_name
+
+	# If we are blocking (unaccepted plan), swallow weekday effects
+	if _compute_blocking():
+		return
+
+	# Friday: reveal only the pairs created by last Saturday reassignments.
+	if _is_friday_name(wd_name) or _is_friday_index(idx2):
+		_reveal_friday_now()
+		return
+
+	# Saturday: apply plan (if any), then reveal pairs created by midweek Common placements.
+	if _is_saturday_name(wd_name) or _is_saturday_index(idx2):
 		if _plan_locked:
 			saturday_execute_changes()
-		elif _hidden_pairs.size() > 0:
-			_hidden_pairs.clear()
-			dorms_changed.emit()
+		_reveal_saturday_now()
+
+func _weekday_index() -> int:
+	# 0=Mon .. 6=Sun
+	if _calendar_node != null:
+		for m in ["get_weekday","day_of_week","weekday","dow","current_weekday"]:
+			if _calendar_node.has_method(m):
+				var v: Variant = _calendar_node.call(m)
+				if typeof(v) == TYPE_INT or typeof(v) == TYPE_FLOAT:
+					return int(v)
+				elif typeof(v) == TYPE_STRING:
+					var idx_from_str := _weekday_name_to_index(String(v))
+					if idx_from_str != -1:
+						return idx_from_str
+	# Try name getters and map
+	for m2 in ["get_weekday_name","get_day_name","weekday_name","day_name"]:
+		if _calendar_node != null and _calendar_node.has_method(m2):
+			var s := String(_calendar_node.call(m2))
+			var idx2 := _weekday_name_to_index(s)
+			if idx2 != -1:
+				return idx2
+
+	# Fall back to what we last saw through calendar signals/manual notify
+	if _last_weekday_index != -1:
+		return _last_weekday_index
+	if _last_weekday_name != "":
+		var idx3 := _weekday_name_to_index(_last_weekday_name)
+		if idx3 != -1:
+			return idx3
+	return -1
+
+func _is_friday_name(s: String) -> bool:
+	if s == null:
+		return false
+	var t: String = String(s).strip_edges().to_lower()
+	return t.begins_with("fri") or t == "4" # 0=Mon..6=Sun → Fri=4
+
+func _is_friday_index(i: int) -> bool:
+	return i == 4 # 0=Mon..6=Sun → Fri=4
 
 func _is_saturday_name(s: String) -> bool:
 	if s == null:
@@ -313,7 +408,7 @@ func _load_party_names_relationships_and_stats() -> void:
 		_bestie_map[aid] = _parse_rel_list_val_to_ids(bestie_val)
 		_rival_map[aid]  = _parse_rel_list_val_to_ids(rival_val)
 
-		# hero_neighbors stat — only store if we actually resolve something (no blank->NULL)
+		# hero_neighbors stat — only store if we actually resolve something (no blank->NULL mapping)
 		var raw_stat: String = (cols[idx_neigh] if idx_neigh >= 0 and idx_neigh < cols.size() else "").strip_edges().to_upper()
 		var code: String = ""
 		if raw_stat != "":
@@ -472,6 +567,7 @@ func occupants_of(room_id: String) -> PackedStringArray:
 	return out
 
 func get_common() -> PackedStringArray:
+	# Merge: true Common + staged people not yet assigned
 	var merged_list: Array[String] = _common.duplicate()
 	for aid in _staged_common:
 		if not _staged_assign.has(aid) and not merged_list.has(aid):
@@ -496,10 +592,18 @@ func room_in_locked_plan(room_id: String) -> bool:
 func get_locked_warning_for(room_id: String) -> String:
 	return "(Room Reassignments happening on Saturday)" if room_in_locked_plan(room_id) else ""
 
-func get_room_visual(room_id: String) -> int:
-	if _plan_locked and _locked_involved_rooms.has(room_id):
-		return RoomVisual.LOCKED_RED
+func get_staged_prev_room_for(aid: String) -> String:
+	return String(_staged_prev_room.get(aid, ""))
 
+func get_room_visual(room_id: String) -> int:
+	# After Accept Plan (plan locked), tiles should look normal (no red/yellow),
+	# but the right panel still shows a banner for involved rooms.
+	if _plan_locked:
+		var r_locked: Dictionary = get_room(room_id)
+		var who_locked: String = String(r_locked.get("occupant",""))
+		return (RoomVisual.EMPTY_GREEN if who_locked == "" else RoomVisual.OCCUPIED_BLUE)
+
+	# During staging, paint yellow for origin and targets
 	for aid_k in _staged_prev_room.keys():
 		var aid: String = String(aid_k)
 		if String(_staged_prev_room[aid]) == room_id:
@@ -526,7 +630,8 @@ func staged_assign_size() -> int:
 	return _staged_assign.size()
 
 func is_pair_hidden(a: String, b: String) -> bool:
-	return _hidden_pairs.has(_pair_key(a, b))
+	var key := _pair_key(a, b)
+	return _hidden_pairs_friday.has(key) or _hidden_pairs_saturday.has(key)
 
 func list_current_placements() -> Array:
 	var out: Array = []
@@ -577,6 +682,7 @@ func cheat_add_to_common(actor_id: String) -> void:
 	if actor_id == "hero": return
 	_common.append(actor_id)
 	dorms_changed.emit()
+	common_added.emit(actor_id) # <-- tell the menu to auto-open Dorms
 
 func assign_now_from_common(actor_id: String, to_room: String) -> Dictionary:
 	if not _common.has(actor_id):
@@ -596,9 +702,10 @@ func assign_now_from_common(actor_id: String, to_room: String) -> Dictionary:
 	_rooms[to_room]["occupant"] = actor_id
 	_common.erase(actor_id)
 	var new_neigh: Array[String] = _current_neighbors_of_actor(actor_id)
-	_mark_new_pairs_hidden(actor_id, prev_neigh, new_neigh)
+	_mark_new_pairs_hidden(actor_id, prev_neigh, new_neigh, "common") # SATURDAY bucket
 
 	_recompute_adjacency()
+	_update_blocking_state()
 	dorms_changed.emit()
 	return {"ok": true}
 
@@ -611,9 +718,16 @@ func _is_in_any_room(actor_id: String) -> bool:
 # ─────────────────────────────────────────────────────────────
 # Staging flow (weekly plan)
 # ─────────────────────────────────────────────────────────────
+func can_start_reassignment_today() -> bool:
+	var wd: int = _weekday_index()
+	# Sunday-only (0=Mon..6=Sun)
+	return wd == 6
+
 func begin_reassignment_for_room(room_id: String) -> Dictionary:
 	if not ROOM_IDS.has(room_id):
 		return {"ok": false, "reason": "Unknown room."}
+	if not can_start_reassignment_today():
+		return {"ok": false, "reason": "Reassignment can only start on Sunday."}
 	if room_id == "301":
 		return {"ok": false, "reason": "RA room (301) cannot be cleared."}
 	var who: String = String((_rooms[room_id] as Dictionary).get("occupant",""))
@@ -622,13 +736,15 @@ func begin_reassignment_for_room(room_id: String) -> Dictionary:
 	if who == "hero":
 		return {"ok": false, "reason": "Hero cannot be reassigned."}
 	if _staged_common.has(who):
+		_update_blocking_state()
 		return {"ok": true}
 
 	_staged_common.append(who)
 	_staged_prev_room[who] = room_id
-	_rooms[room_id]["occupant"] = ""
+	_rooms[room_id]["occupant"] = ""    # turn the tile yellow via visual
 	_staged_assign.erase(who)
 
+	_update_blocking_state()
 	dorms_changed.emit()
 	plan_changed.emit()
 	return {"ok": true}
@@ -644,6 +760,7 @@ func cancel_reassignment_for(aid: String) -> void:
 	_staged_assign.erase(aid)
 	_locked_involved_rooms.clear()
 	_plan_locked = false
+	_update_blocking_state()
 	dorms_changed.emit()
 	plan_changed.emit()
 
@@ -655,6 +772,11 @@ func pick_room_for(aid: String, to_room: String) -> Dictionary:
 	if to_room == "301":
 		return {"ok": false, "reason": "RA room (301) is reserved."}
 
+	# Don’t allow placing them back to their origin room
+	var origin: String = String(_staged_prev_room.get(aid, ""))
+	if origin != "" and origin == to_room:
+		return {"ok": false, "reason": "That’s their current room; no reassignment needed."}
+
 	var is_empty_preview: bool = (String((_rooms[to_room] as Dictionary).get("occupant","")) == "")
 	for k_any in _staged_assign.keys():
 		if String(_staged_assign[k_any]) == to_room and String(k_any) != aid:
@@ -664,11 +786,13 @@ func pick_room_for(aid: String, to_room: String) -> Dictionary:
 		return {"ok": false, "reason": "Room is occupied or targeted by another reassignment."}
 
 	_staged_assign[aid] = to_room
+	_update_blocking_state() # still blocking until Accept Plan
 	dorms_changed.emit()
 	plan_changed.emit()
 	return {"ok": true}
 
 func reset_placement() -> void:
+	# restore live layout back to before staging (safe no-op if already restored)
 	for aid_k in _staged_prev_room.keys():
 		var aid: String = String(aid_k)
 		var r: String = String(_staged_prev_room[aid])
@@ -680,12 +804,15 @@ func reset_placement() -> void:
 	_locked_involved_rooms.clear()
 	_plan_locked = false
 
+	_update_blocking_state()
 	dorms_changed.emit()
 	plan_changed.emit()
 
 func accept_plan_for_saturday() -> Dictionary:
 	if _staged_assign.size() == 0:
 		return {"ok": false, "reason": "No reassignment selected."}
+
+	# Compute involved rooms for banner visibility
 	_locked_involved_rooms.clear()
 	for aid_k in _staged_assign.keys():
 		var aid: String = String(aid_k)
@@ -693,7 +820,17 @@ func accept_plan_for_saturday() -> Dictionary:
 		var to_r: String = String(_staged_assign.get(aid, ""))
 		if from_r != "": _locked_involved_rooms[from_r] = true
 		if to_r   != "": _locked_involved_rooms[to_r]   = true
+
+	# IMPORTANT: After accepting, live layout reverts to pre-staging (no yellow/red tiles).
+	for aid2_k in _staged_prev_room.keys():
+		var aid2: String = String(aid2_k)
+		var fr: String = String(_staged_prev_room[aid2])
+		if fr != "":
+			_rooms[fr]["occupant"] = aid2
+
 	_plan_locked = true
+
+	_update_blocking_state() # accepting clears the "block day" guard
 	dorms_changed.emit()
 	plan_changed.emit()
 	return {"ok": true}
@@ -702,37 +839,98 @@ func saturday_execute_changes() -> void:
 	if not _plan_locked:
 		return
 
+	# Capture moves (only where from != to)
+	var moves: Array = []
 	for aid_k in _staged_assign.keys():
 		var aid: String = String(aid_k)
 		var from_r: String = String(_staged_prev_room.get(aid, ""))
 		var to_r: String = String(_staged_assign[aid])
+		if from_r != "" and to_r != "" and from_r != to_r:
+			moves.append({
+				"aid": aid,
+				"name": display_name(aid),
+				"from": from_r,
+				"to": to_r
+			})
 
-		var prev_neigh: Array[String] = _current_neighbors_of_actor(aid)
+	# Apply the layout
+	for aid_k2 in _staged_assign.keys():
+		var aid2: String = String(aid_k2)
+		var from_r2: String = String(_staged_prev_room.get(aid2, ""))
+		var to_r2: String = String(_staged_assign[aid2])
 
-		if from_r != "" and String((_rooms[from_r] as Dictionary).get("occupant","")) == aid:
-			_rooms[from_r]["occupant"] = ""
-		_rooms[to_r]["occupant"] = aid
+		var prev_neigh: Array[String] = _current_neighbors_of_actor(aid2)
 
-		var new_neigh: Array[String] = _current_neighbors_of_actor(aid)
-		_mark_new_pairs_hidden(aid, prev_neigh, new_neigh)
+		if from_r2 != "" and String((_rooms[from_r2] as Dictionary).get("occupant","")) == aid2:
+			_rooms[from_r2]["occupant"] = ""
+		_rooms[to_r2]["occupant"] = aid2
 
+		var new_neigh: Array[String] = _current_neighbors_of_actor(aid2)
+		# Reassignments create Friday-reveal pairs
+		_mark_new_pairs_hidden(aid2, prev_neigh, new_neigh, "reassign")
+
+	# Clean staging state
 	_staged_common.clear()
 	_staged_prev_room.clear()
 	_staged_assign.clear()
 	_locked_involved_rooms.clear()
 	_plan_locked = false
 
+	_last_applied_moves = moves.duplicate(true)
+
 	_recompute_adjacency()
+	_update_blocking_state()
 	dorms_changed.emit()
 	plan_changed.emit()
 
-	saturday_applied.emit(current_layout())
+	# Signals: legacy and extended
+	var snap := current_layout()
+	saturday_applied.emit(snap)                 # legacy (panel will catch this)
+	saturday_applied_v2.emit(snap, moves)       # new (optional)
 
 func current_layout() -> Dictionary:
 	var d: Dictionary = {}
 	for rid in ROOM_IDS:
 		d[rid] = String((_rooms[rid] as Dictionary).get("occupant",""))
 	return d
+
+# ─────────────────────────────────────────────────────────────
+# Friday/Saturday reveal drivers
+# ─────────────────────────────────────────────────────────────
+func _reveal_friday_now() -> void:
+	if _hidden_pairs_friday.size() == 0:
+		return
+	var pairs := _collect_hidden_pairs(_hidden_pairs_friday, true) # reveal true status
+	_hidden_pairs_friday.clear()
+	dorms_changed.emit()
+	friday_reveals_ready.emit(pairs)
+
+func _reveal_saturday_now() -> void:
+	if _hidden_pairs_saturday.size() == 0:
+		return
+	var pairs := _collect_hidden_pairs(_hidden_pairs_saturday, true)
+	_hidden_pairs_saturday.clear()
+	dorms_changed.emit()
+	saturday_reveals_ready.emit(pairs)
+
+func _collect_hidden_pairs(pool: Dictionary, reveal_true: bool) -> Array:
+	var out: Array = []
+	for key in pool.keys():
+		var k: String = String(key)
+		var parts := k.split("|")
+		if parts.size() != 2:
+			continue
+		var a := String(parts[0])
+		var b := String(parts[1])
+		var status := get_pair_status(a, b, reveal_true)
+		out.append({
+			"a": a,
+			"b": b,
+			"a_name": display_name(a),
+			"b_name": display_name(b),
+			"status": status
+		})
+	return out
 
 # ─────────────────────────────────────────────────────────────
 # Relationships & adjacency
@@ -814,13 +1012,17 @@ func _recompute_adjacency() -> void:
 			var base_status: String = _get_base_relationship(occ, occ2)
 			_set_pair_status(occ, occ2, base_status)
 
-func _mark_new_pairs_hidden(aid: String, before_list: Array[String], after_list: Array[String]) -> void:
+func _mark_new_pairs_hidden(aid: String, before_list: Array[String], after_list: Array[String], source: String) -> void:
 	var before: Dictionary = {}
 	for v in before_list: before[String(v)] = true
 	for nb in after_list:
 		var b: String = String(nb)
 		if not before.has(b):
-			_hidden_pairs[_pair_key(aid, b)] = true
+			var key := _pair_key(aid, b)
+			if source == "reassign":
+				_hidden_pairs_friday[key] = true     # Friday reveal (prior-Sat reassignments)
+			else:
+				_hidden_pairs_saturday[key] = true   # Saturday reveal (midweek Common placements)
 
 func _current_neighbors_of_actor(aid: String) -> Array[String]:
 	var out: Array[String] = []
@@ -844,7 +1046,7 @@ func _current_neighbors_of_actor(aid: String) -> Array[String]:
 # ─────────────────────────────────────────────────────────────
 func get_pair_status(a: String, b: String, reveal_hidden: bool = false) -> String:
 	var key: String = _pair_key(a, b)
-	if not reveal_hidden and _hidden_pairs.has(key):
+	if not reveal_hidden and (_hidden_pairs_friday.has(key) or _hidden_pairs_saturday.has(key)):
 		return "Unknown"
 	return String(_pair_status.get(key, _get_base_relationship(a, b)))
 
@@ -869,7 +1071,7 @@ func neighbors_summary(room_id: String) -> Array:
 	return out
 
 # ─────────────────────────────────────────────────────────────
-# Small utilities
+# Small utilities & blocking guard
 # ─────────────────────────────────────────────────────────────
 func occupant_of(room_id: String) -> String:
 	return String((_rooms.get(room_id, {}) as Dictionary).get("occupant",""))
@@ -879,18 +1081,33 @@ func put_occupant(room_id: String, aid: String) -> void:
 		_rooms[room_id]["occupant"] = aid
 
 func reveal_all_pairs_now() -> void:
-	_hidden_pairs.clear()
+	_hidden_pairs_friday.clear()
+	_hidden_pairs_saturday.clear()
 	dorms_changed.emit()
 
+func get_last_applied_moves() -> Array:
+	return _last_applied_moves.duplicate(true)
+
+func is_blocking_time_advance() -> bool:
+	return _is_blocking_time_advance
+
+func _compute_blocking() -> bool:
+	# Block while there is any in-progress reassignment (before Accept Plan)
+	return (_staged_common.size() > 0 or _staged_assign.size() > 0) and not _plan_locked
+
+func _update_blocking_state() -> void:
+	var b := _compute_blocking()
+	if b != _is_blocking_time_advance:
+		_is_blocking_time_advance = b
+		blocking_state_changed.emit(_is_blocking_time_advance)
+
 # ─────────────────────────────────────────────────────────────
-# Compat layer for older/newer UI (DormsPanel etc.)
+# Compat layer for older/newer UI
 # ─────────────────────────────────────────────────────────────
 func stage_vacate_room(room_id: String) -> Dictionary:
-	# stage occupant of this room into common
 	return begin_reassignment_for_room(room_id)
 
 func unstage_vacate_room(room_id: String) -> Dictionary:
-	# find who was staged from this room and cancel
 	var aid: String = ""
 	for k in _staged_prev_room.keys():
 		var a: String = String(k)
@@ -908,12 +1125,12 @@ func stage_set_target(aid: String, to_room: String) -> Dictionary:
 func stage_assign(aid: String, to_room: String) -> Dictionary:
 	return pick_room_for(aid, to_room)
 
-# Panel expects this name
 func stage_place(aid: String, to_room: String) -> Dictionary:
 	return pick_room_for(aid, to_room)
 
 func stage_clear_target(aid: String) -> void:
 	_staged_assign.erase(aid)
+	_update_blocking_state()
 	dorms_changed.emit()
 	plan_changed.emit()
 
@@ -938,13 +1155,11 @@ func get_locked_involved_rooms() -> PackedStringArray:
 		out.append(String(k))
 	return out
 
-# Extra shims used by your DormsPanel
+# UI helpers
 func can_accept_reassignment() -> Dictionary:
-	# enable Accept button if anything is staged/assigned
 	return {"ok": has_pending_plan()}
 
 func accept_reassignment_selection() -> Dictionary:
-	# Members are already in _staged_common; this is just an acknowledgement hook for the UI
 	return {"ok": _staged_common.size() > 0}
 
 func can_lock_plan() -> Dictionary:
@@ -958,5 +1173,4 @@ func can_lock_plan() -> Dictionary:
 	return {"ok": true}
 
 func reset_only_assignments() -> void:
-	# Simple, safe reset for current session
 	reset_placement()
