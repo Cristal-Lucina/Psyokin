@@ -1,3 +1,60 @@
+## ═══════════════════════════════════════════════════════════════════════════
+## CircleBondSystem - Social Bond & Relationship Manager
+## ═══════════════════════════════════════════════════════════════════════════
+##
+## PURPOSE:
+##   Manages social bonds between the hero and party members using a layered
+##   BXP (Bond Experience Points) system, tracking relationship progression,
+##   likes/dislikes discovery, love interests, and bond-specific events.
+##
+## RESPONSIBILITIES:
+##   • Bond level tracking (0-8: Acquaintance → Outer → Middle → Inner → Core)
+##   • BXP (Bond Experience Points) accumulation per character
+##   • Likes/dislikes discovery system (player learns character preferences)
+##   • Love interest identification and tracking
+##   • Poly connection tracking (polyamorous relationship compatibility)
+##   • Bond event scheduling (scenes unlock at specific bond levels)
+##   • CSV-based bond definitions and events
+##   • Save/load bond state
+##
+## BOND LAYER SYSTEM:
+##   Level 0-1: Acquaintance (just met, surface level)
+##   Level 2-3: Outer Circle (friendly, getting to know each other)
+##   Level 4-5: Middle Circle (close friends, personal conversations)
+##   Level 6-7: Inner Circle (deep trust, emotional support)
+##   Level 8: Core (closest bond, lifelong connection)
+##
+## BXP PROGRESSION:
+##   BXP range: 0-8 (matches layer 0-8)
+##   BXP increases through interactions, gifts, events, and story choices
+##
+## LIKES/DISLIKES SYSTEM:
+##   Each character has likes and dislikes (topics, gifts, activities)
+##   Player discovers these through interactions and observation
+##   Tracked separately as _discovered_likes and _discovered_dislikes
+##
+## CONNECTED SYSTEMS (Autoloads):
+##   • GameState - Save/load coordination
+##   • DormSystem - Bestie/Rival relationships may influence bonds
+##   • RomanceSystem - Love interest integration
+##   • EventRunner - Bond event scene playback
+##
+## CSV DATA SOURCES:
+##   • res://data/circles/circle_bonds.csv - Bond definitions
+##     (bond_id, bond_name, love_interest, likes, dislikes, poly_connects, rewards)
+##   • res://data/circles/circles_events.csv - Bond event scenes
+##     (actor_id, event_id, required_layer, scene_path, etc.)
+##
+## KEY METHODS:
+##   • get_layer(bond_id) -> int - Current bond level (0-8)
+##   • add_bxp(bond_id, amount) - Increase bond XP
+##   • mark_known(bond_id) - Mark character as met/discovered
+##   • is_love_interest(bond_id) -> bool - Check if romance option
+##   • discover_like/dislike(bond_id, topic) - Learn character preference
+##   • get_available_events(bond_id) -> Array - Events unlocked at current level
+##
+## ═══════════════════════════════════════════════════════════════════════════
+
 extends Node
 class_name CircleBondSystem
 
