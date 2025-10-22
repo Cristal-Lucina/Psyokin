@@ -276,18 +276,42 @@ func set_active_skill_for_instance(inst_id: String, skill_id: String) -> bool:
 					emit_signal("loadout_changed", String(m))
 	return true
 
+func set_active_skill_for_instance_by_name(inst_id: String, skill_name: String) -> bool:
+	if not _instances.has(inst_id): return false
+	var unlocked: PackedStringArray = list_unlocked_skills(inst_id)
+	for skill_id in unlocked:
+		var name: String = get_skill_display_name(skill_id)
+		if name == skill_name:
+			return set_active_skill_for_instance(inst_id, skill_id)
+	return false
+
 # ─────────────────────── Cheats / XP API ───────────────────────
 func get_instance_level(inst_id: String) -> int:
 	if _instances.has(inst_id): return int(_instances[inst_id].get("level", 1))
 	return 1
 
-func cheat_set_instance_level(inst_id: String, new_level: int) -> void:
+func set_instance_level(inst_id: String, new_level: int) -> void:
 	if not _instances.has(inst_id):
 		return
 	var lvl: int = clamp(new_level, 1, MAX_LEVEL)
 	_instances[inst_id]["level"] = lvl
 	_instances[inst_id]["xp"] = 0 if lvl >= MAX_LEVEL else int(_instances[inst_id].get("xp", 0))
 	_emit_progress(inst_id)
+
+func set_instance_xp(inst_id: String, xp_amount: int) -> void:
+	if not _instances.has(inst_id):
+		return
+	var lvl: int = int(_instances[inst_id].get("level", 1))
+	_instances[inst_id]["xp"] = (0 if lvl >= MAX_LEVEL else max(0, xp_amount))
+	_emit_progress(inst_id)
+
+func get_instance_xp(inst_id: String) -> int:
+	if _instances.has(inst_id):
+		return int(_instances[inst_id].get("xp", 0))
+	return 0
+
+func cheat_set_instance_level(inst_id: String, new_level: int) -> void:
+	set_instance_level(inst_id, new_level)
 
 func cheat_add_xp_to_instance(inst_id: String, amount: int, require_equipped: bool) -> void:
 	add_xp_to_instance(inst_id, amount, require_equipped, "cheat")
