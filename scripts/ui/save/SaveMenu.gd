@@ -243,3 +243,6 @@ func _do_delete(slot: int) -> void:
 
 func _on_close() -> void:
 	queue_free()
+	
+	#SAVED
+	

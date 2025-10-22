@@ -254,7 +254,7 @@ func _row_for_member(member: String) -> Dictionary:
 # ─── Roster ops ──────────────────────────────────────────────
 func add_member(member_id: String) -> bool:
 	var mem_name: String = String(member_id).strip_edges()
-	if mem_name == "" or party.has(mem_name) or bench.has(mem_name):
+	if mem_name == "" || party.has(mem_name) || bench.has(mem_name):
 		return false
 
 	if party.size() < MAX_PARTY_SIZE:
@@ -303,7 +303,7 @@ func swap_members(a_index: int, b_index: int) -> bool:
 # ─── Perks ───────────────────────────────────────────────────
 func unlock_perk(perk_id: String) -> bool:
 	var pid: String = String(perk_id).strip_edges()
-	if pid == "" or unlocked_perks.has(pid):
+	if pid == "" || unlocked_perks.has(pid):
 		return false
 	if perk_points < 1:
 		return false
@@ -325,24 +325,20 @@ func add_perk_points(points: int) -> void:
 
 # ─── Hero start picks (for DormsSystem) ──────────────────────
 func set_hero_start_picks(picks: PackedStringArray) -> void:
-	# store in meta in canonical 3-letter uppercase
 	var out := PackedStringArray()
 	for i in range(picks.size()):
 		out.append(String(picks[i]).strip_edges().to_upper())
 	set_meta("hero_start_picks", out)
 
 func get_hero_start_picks() -> PackedStringArray:
-	# 1) explicit meta (preferred)
 	if has_meta("hero_start_picks"):
 		var m: Variant = get_meta("hero_start_picks")
 		if typeof(m) == TYPE_PACKED_STRING_ARRAY:
 			return m as PackedStringArray
-	# legacy key
 	if has_meta("hero_picked_stats"):
 		var m2: Variant = get_meta("hero_picked_stats")
 		if typeof(m2) == TYPE_PACKED_STRING_ARRAY:
 			return m2 as PackedStringArray
-	# 2) ask StatsSystem if it exposes it
 	var out := PackedStringArray()
 	var st: Node = get_node_or_null(STATS_PATH)
 	if st and st.has_method("get_hero_start_picks"):
@@ -354,11 +350,10 @@ func get_hero_start_picks() -> PackedStringArray:
 			for i in range(a.size()):
 				out.append(String(a[i]).to_upper())
 			return out
-	# 3) infer from stats > 1
 	if st and st.has_method("get_stat"):
 		for code in ["BRW","MND","TPO","VTL","FCS"]:
 			var lv: Variant = st.call("get_stat", code)
-			if (typeof(lv) == TYPE_INT or typeof(lv) == TYPE_FLOAT) and int(lv) > 1:
+			if (typeof(lv) == TYPE_INT || typeof(lv) == TYPE_FLOAT) and int(lv) > 1:
 				out.append(code)
 			if out.size() >= 3:
 				break
@@ -368,7 +363,6 @@ func get_hero_start_picks() -> PackedStringArray:
 func save() -> Dictionary:
 	var payload: Dictionary = {}
 
-	# Basic state
 	payload["player_name"]     = player_name
 	payload["difficulty"]      = difficulty
 	payload["money"]           = money
@@ -376,19 +370,15 @@ func save() -> Dictionary:
 	payload["pacifist_score"]  = pacifist_score
 	payload["bloodlust_score"] = bloodlust_score
 
-	# Party
 	payload["party"] = party.duplicate()
 	payload["bench"] = bench.duplicate()
 
-	# Flags & index
 	payload["flags"] = flags.duplicate(true)
 	payload["index"] = index_blob.duplicate(true)
 
-	# Perks & member runtime
 	payload["unlocked_perks"] = unlocked_perks.duplicate()
 	payload["member_data"]    = member_data.duplicate(true)
 
-	# Calendar
 	var cal: Node = get_node_or_null(CALENDAR_PATH)
 	if cal:
 		var cal_data: Dictionary = {}
@@ -396,18 +386,16 @@ func save() -> Dictionary:
 		var p_val: Variant = (cal.get("current_phase") if cal.has_method("get") else null)
 		var w_val: Variant = (cal.get("current_weekday") if cal.has_method("get") else null)
 		cal_data["date"]    = (d_val if typeof(d_val) == TYPE_DICTIONARY else {})
-		cal_data["phase"]   = (int(p_val) if typeof(p_val) == TYPE_INT or typeof(p_val) == TYPE_FLOAT else 0)
-		cal_data["weekday"] = (int(w_val) if typeof(w_val) == TYPE_INT or typeof(w_val) == TYPE_FLOAT else 0)
+		cal_data["phase"]   = (int(p_val) if typeof(p_val) == TYPE_INT || typeof(p_val) == TYPE_FLOAT else 0)
+		cal_data["weekday"] = (int(w_val) if typeof(w_val) == TYPE_INT || typeof(w_val) == TYPE_FLOAT else 0)
 		payload["calendar"] = cal_data
 
-	# Stats
 	var stats_sys: Node = get_node_or_null(STATS_PATH)
 	if stats_sys and stats_sys.has_method("save"):
 		var stats_data: Variant = stats_sys.call("save")
 		if typeof(stats_data) == TYPE_DICTIONARY:
 			payload["stats"] = stats_data as Dictionary
 
-	# Inventory
 	var inv_sys: Node = get_node_or_null(INV_PATH)
 	if inv_sys and inv_sys.has_method("get_save_blob"):
 		var inv_blob: Variant = inv_sys.call("get_save_blob")
@@ -418,12 +406,16 @@ func save() -> Dictionary:
 			else:
 				payload["inventory"] = inv_dict.duplicate(true)
 
-	# Sigils
+	# SIGILS: keep system’s own blob AND our robust snapshot with owners/slots/xp/level/active skill
 	var sigil_sys: Node = get_node_or_null(SIGIL_PATH)
-	if sigil_sys and sigil_sys.has_method("save"):
-		var sig_data: Variant = sigil_sys.call("save")
-		if typeof(sig_data) == TYPE_DICTIONARY:
-			payload["sigils"] = sig_data as Dictionary
+	if sigil_sys:
+		if sigil_sys.has_method("save"):
+			var sig_data: Variant = sigil_sys.call("save")
+			if typeof(sig_data) == TYPE_DICTIONARY:
+				payload["sigils"] = sig_data as Dictionary
+		var snap: Dictionary = _build_sigil_snapshot(sigil_sys)
+		if not snap.is_empty():
+			payload["sigils_v2"] = snap
 
 	# Meta snapshot
 	var meta_dict: Dictionary = {}
@@ -433,40 +425,48 @@ func save() -> Dictionary:
 		meta_dict[key] = get_meta(key)
 	payload["meta"] = meta_dict
 
-	# CircleBondSystem (bond progress)
+	# Optional systems (if present)
 	var cb_sys: Node = get_node_or_null("/root/aCircleBondSystem")
 	if cb_sys and cb_sys.has_method("save"):
 		var cb_data: Variant = cb_sys.call("save")
 		if typeof(cb_data) == TYPE_DICTIONARY:
 			payload["circle_bonds"] = cb_data as Dictionary
 
-	# DormSystem (room assignments, dorm state)
 	var dorm_sys: Node = get_node_or_null("/root/aDormSystem")
 	if dorm_sys and dorm_sys.has_method("save"):
 		var dorm_data: Variant = dorm_sys.call("save")
 		if typeof(dorm_data) == TYPE_DICTIONARY:
 			payload["dorms"] = dorm_data as Dictionary
 
-	# EquipmentSystem (loadouts)
 	var equip_sys: Node = get_node_or_null(EQUIP_PATH)
 	if equip_sys and equip_sys.has_method("save"):
 		var equip_data: Variant = equip_sys.call("save")
 		if typeof(equip_data) == TYPE_DICTIONARY:
 			payload["equipment"] = equip_data as Dictionary
 
-	# RomanceSystem
 	var rom_sys: Node = get_node_or_null("/root/aRomanceSystem")
 	if rom_sys and rom_sys.has_method("save"):
 		var rom_data: Variant = rom_sys.call("save")
 		if typeof(rom_data) == TYPE_DICTIONARY:
 			payload["romance"] = rom_data as Dictionary
 
-	# AffinitySystem
 	var aff_sys: Node = get_node_or_null("/root/aAffinitySystem")
 	if aff_sys and aff_sys.has_method("save"):
 		var aff_data: Variant = aff_sys.call("save")
 		if typeof(aff_data) == TYPE_DICTIONARY:
 			payload["affinity"] = aff_data as Dictionary
+
+	var perk_sys: Node = get_node_or_null("/root/aPerkSystem")
+	if perk_sys and perk_sys.has_method("get_save_blob"):
+		var perk_data: Variant = perk_sys.call("get_save_blob")
+		if typeof(perk_data) == TYPE_DICTIONARY:
+			payload["perk_system"] = perk_data as Dictionary
+
+	var main_event_sys: Node = get_node_or_null("/root/aMainEventSystem")
+	if main_event_sys and main_event_sys.has_method("get_save_blob"):
+		var me_data: Variant = main_event_sys.call("get_save_blob")
+		if typeof(me_data) == TYPE_DICTIONARY:
+			payload["main_event"] = me_data as Dictionary
 
 	return payload
 
@@ -481,11 +481,26 @@ func load(data: Dictionary) -> void:
 	pacifist_score  = int(data.get("pacifist_score", pacifist_score))
 	bloodlust_score = int(data.get("bloodlust_score", bloodlust_score))
 
-	party          = (data.get("party", []) as Array).duplicate()
-	bench          = (data.get("bench", []) as Array).duplicate()
+	party.clear()
+	var party_v: Variant = data.get("party", [])
+	if typeof(party_v) == TYPE_ARRAY:
+		for v in (party_v as Array):
+			party.append(String(v))
+
+	bench.clear()
+	var bench_v: Variant = data.get("bench", [])
+	if typeof(bench_v) == TYPE_ARRAY:
+		for v2 in (bench_v as Array):
+			bench.append(String(v2))
+
 	flags          = (data.get("flags", flags) as Dictionary).duplicate(true)
 	index_blob     = (data.get("index", index_blob) as Dictionary).duplicate(true)
-	unlocked_perks = (data.get("unlocked_perks", unlocked_perks) as Array).duplicate()
+
+	unlocked_perks.clear()
+	var perks_v: Variant = data.get("unlocked_perks", [])
+	if typeof(perks_v) == TYPE_ARRAY:
+		for pv in (perks_v as Array):
+			unlocked_perks.append(String(pv))
 
 	member_data.clear()
 	var md_v: Variant = data.get("member_data", {})
@@ -529,7 +544,7 @@ func load(data: Dictionary) -> void:
 		elif inv_sys.has_method("load"):
 			inv_sys.call("load", items_v)
 
-	# Sigils
+	# Sigils (system blob + robust snapshot with owners/slots/xp/level/active skill)
 	var sig_v: Variant = data.get("sigils", null)
 	var sigil_sys: Node = get_node_or_null(SIGIL_PATH)
 	if sigil_sys and typeof(sig_v) == TYPE_DICTIONARY:
@@ -537,6 +552,9 @@ func load(data: Dictionary) -> void:
 			sigil_sys.call("load", sig_v)
 		elif sigil_sys.has_method("apply_save_blob"):
 			sigil_sys.call("apply_save_blob", sig_v)
+	var sig_snap_v: Variant = data.get("sigils_v2", null)
+	if sigil_sys and typeof(sig_snap_v) == TYPE_DICTIONARY:
+		_apply_sigil_snapshot(sigil_sys, sig_snap_v as Dictionary)
 
 	# Refresh CPS
 	var cps: Node = get_node_or_null(CPS_PATH)
@@ -566,61 +584,421 @@ func load(data: Dictionary) -> void:
 		for mkey in meta_in.keys():
 			set_meta(String(mkey), meta_in[mkey])
 
-	# CircleBondSystem
+	# Optional systems
 	var cb_v: Variant = data.get("circle_bonds", null)
 	var cb_sys: Node = get_node_or_null("/root/aCircleBondSystem")
 	if cb_sys and typeof(cb_v) == TYPE_DICTIONARY:
 		if cb_sys.has_method("load"):
 			cb_sys.call("load", cb_v)
 
-	# DormSystem
 	var dorm_v: Variant = data.get("dorms", null)
 	var dorm_sys: Node = get_node_or_null("/root/aDormSystem")
 	if dorm_sys and typeof(dorm_v) == TYPE_DICTIONARY:
 		if dorm_sys.has_method("load"):
 			dorm_sys.call("load", dorm_v)
 
-	# EquipmentSystem
 	var equip_v: Variant = data.get("equipment", null)
 	var equip_sys: Node = get_node_or_null(EQUIP_PATH)
 	if equip_sys and typeof(equip_v) == TYPE_DICTIONARY:
 		if equip_sys.has_method("load"):
 			equip_sys.call("load", equip_v)
 
-	# RomanceSystem
 	var rom_v: Variant = data.get("romance", null)
 	var rom_sys: Node = get_node_or_null("/root/aRomanceSystem")
 	if rom_sys and typeof(rom_v) == TYPE_DICTIONARY:
 		if rom_sys.has_method("load"):
 			rom_sys.call("load", rom_v)
 
-	# AffinitySystem
 	var aff_v: Variant = data.get("affinity", null)
 	var aff_sys: Node = get_node_or_null("/root/aAffinitySystem")
 	if aff_sys and typeof(aff_v) == TYPE_DICTIONARY:
 		if aff_sys.has_method("load"):
 			aff_sys.call("load", aff_v)
 
+	var perk_v: Variant = data.get("perk_system", null)
+	var perk_sys: Node = get_node_or_null("/root/aPerkSystem")
+	if perk_sys and typeof(perk_v) == TYPE_DICTIONARY:
+		if perk_sys.has_method("apply_save_blob"):
+			perk_sys.call("apply_save_blob", perk_v)
+		elif perk_sys.has_method("load"):
+			perk_sys.call("load", perk_v)
+
+	var me_v: Variant = data.get("main_event", null)
+	var me_sys: Node = get_node_or_null("/root/aMainEventSystem")
+	if me_sys and typeof(me_v) == TYPE_DICTIONARY:
+		if me_sys.has_method("apply_save_blob"):
+			me_sys.call("apply_save_blob", me_v)
+		elif me_sys.has_method("load"):
+			me_sys.call("load", me_v)
+
 	emit_signal("party_changed")
 	emit_signal("roster_changed")
 	emit_signal("perk_points_changed", perk_points)
 
-# ─── UI Bridge Methods (called by SaveMenu/LoadMenu) ────────────────
-## Called by SaveMenu when user clicks "Save" button.
-## Collects all game state and writes to the specified slot.
+# ─── Sigil snapshot helpers ──────────────────────────────────
+func _sigil_get_loadout(sys: Node, member: String) -> Array[String]:
+	var out: Array[String] = []
+	# common names
+	if sys.has_method("get_loadout"):
+		var v: Variant = sys.call("get_loadout", member)
+		if typeof(v) == TYPE_PACKED_STRING_ARRAY:
+			var psa: PackedStringArray = v
+			for i in range(psa.size()):
+				out.append(String(psa[i]))
+		elif typeof(v) == TYPE_ARRAY:
+			var arr: Array = v
+			for j in range(arr.size()):
+				out.append(String(arr[j]))
+	elif sys.has_method("list_loadout"):
+		var v2: Variant = sys.call("list_loadout", member)
+		if typeof(v2) == TYPE_ARRAY:
+			var arr2: Array = v2
+			for k in range(arr2.size()): out.append(String(arr2[k]))
+	return out
+
+func _sigil_get_capacity(sys: Node, member: String) -> int:
+	if sys.has_method("get_capacity"):
+		return int(sys.call("get_capacity", member))
+	if sys.has_method("get_member_capacity"):
+		return int(sys.call("get_member_capacity", member))
+	return 0
+
+func _sigil_inst_level(sys: Node, inst: String) -> int:
+	if sys.has_method("get_instance_level"):
+		return int(sys.call("get_instance_level", inst))
+	if sys.has_method("get_level"):
+		return int(sys.call("get_level", inst))
+	return 1
+
+func _sigil_inst_xp(sys: Node, inst: String) -> int:
+	if sys.has_method("get_instance_xp"):
+		return int(sys.call("get_instance_xp", inst))
+	if sys.has_method("get_xp"):
+		return int(sys.call("get_xp", inst))
+	return 0
+
+func _sigil_inst_base(sys: Node, inst: String) -> String:
+	if sys.has_method("get_base_from_instance"):
+		return String(sys.call("get_base_from_instance", inst))
+	if sys.has_method("get_instance_base"):
+		return String(sys.call("get_instance_base", inst))
+	if sys.has_method("get_base_id"):
+		return String(sys.call("get_base_id", inst))
+	return inst
+
+func _sigil_inst_active_skill(sys: Node, inst: String) -> Dictionary:
+	var out: Dictionary = {"id":"", "name":""}
+	if sys.has_method("get_active_skill_id_for_instance"):
+		out["id"] = String(sys.call("get_active_skill_id_for_instance", inst))
+	if out["id"] == "" and sys.has_method("get_active_skill_for_instance"):
+		out["id"] = String(sys.call("get_active_skill_for_instance", inst))
+	if sys.has_method("get_active_skill_name_for_instance"):
+		out["name"] = String(sys.call("get_active_skill_name_for_instance", inst))
+	return out
+
+func _sigil_list_free(sys: Node) -> Array[String]:
+	var out: Array[String] = []
+	if sys.has_method("list_free_instances"):
+		var v: Variant = sys.call("list_free_instances")
+		if typeof(v) == TYPE_PACKED_STRING_ARRAY:
+			var psa: PackedStringArray = v
+			for i in range(psa.size()):
+				out.append(String(psa[i]))
+		elif typeof(v) == TYPE_ARRAY:
+			var arr: Array = v
+			for j in range(arr.size()):
+				out.append(String(arr[j]))
+	return out
+
+func _sigil_is_instance_id(sys: Node, s: String) -> bool:
+	if sys.has_method("is_instance_id"):
+		return bool(sys.call("is_instance_id", s))
+	return false
+
+func _sigil_find_owner(sys: Node, inst: String, fallback_loadouts: Dictionary) -> String:
+	if sys.has_method("get_owner_of_instance"):
+		var v: Variant = sys.call("get_owner_of_instance", inst)
+		if typeof(v) == TYPE_STRING:
+			return String(v)
+	# fallback: scan snapshot loadouts
+	for mk in fallback_loadouts.keys():
+		var m: String = String(mk)
+		var lv: Variant = fallback_loadouts[mk]
+		if typeof(lv) == TYPE_ARRAY:
+			var arr: Array = lv
+			for item in arr:
+				if String(item) == inst:
+					return m
+		elif typeof(lv) == TYPE_PACKED_STRING_ARRAY:
+			var psa: PackedStringArray = lv
+			for i in range(psa.size()):
+				if String(psa[i]) == inst:
+					return m
+	return ""
+
+func _sigil_set_owner(sys: Node, inst: String, member: String) -> void:
+	if member == "":
+		return
+	if sys.has_method("set_owner_of_instance"):
+		sys.call("set_owner_of_instance", inst, member); return
+	if sys.has_method("assign_instance_to_member"):
+		sys.call("assign_instance_to_member", member, inst); return
+	if sys.has_method("give_instance_to_member"):
+		sys.call("give_instance_to_member", member, inst); return
+	if sys.has_method("transfer_instance_to_member"):
+		sys.call("transfer_instance_to_member", inst, member); return
+	if sys.has_method("set_owner"):
+		sys.call("set_owner", inst, member)
+
+func _sigil_find_slot_of_member_instance(sys: Node, member: String, inst: String) -> int:
+	var load_arr: Array[String] = _sigil_get_loadout(sys, member)
+	for i in range(load_arr.size()):
+		if String(load_arr[i]) == inst:
+			return i
+	return -1
+
+func _sigil_unequip_slot(sys: Node, member: String, slot_idx: int) -> void:
+	if slot_idx < 0:
+		return
+	if sys.has_method("remove_sigil_at"):
+		sys.call("remove_sigil_at", member, slot_idx)
+	elif sys.has_method("unequip_slot"):
+		sys.call("unequip_slot", member, slot_idx)
+	elif sys.has_method("clear_slot"):
+		sys.call("clear_slot", member, slot_idx)
+
+func _sigil_equip_instance(sys: Node, member: String, slot_idx: int, inst: String) -> String:
+	# Try various signatures; return the live instance id found in that slot after equip (may equal or differ)
+	var live: String = ""
+	# prefer explicit by instance id
+	if sys.has_method("equip_into_socket"):
+		sys.call("equip_into_socket", member, slot_idx, inst)
+		var now: Array[String] = _sigil_get_loadout(sys, member)
+		if slot_idx >= 0 and slot_idx < now.size():
+			live = String(now[slot_idx])
+			if live != "":
+				return live
+	# alt signatures
+	if sys.has_method("equip_member_instance"):
+		sys.call("equip_member_instance", member, inst, slot_idx)
+		var now2: Array[String] = _sigil_get_loadout(sys, member)
+		if slot_idx >= 0 and slot_idx < now2.size():
+			live = String(now2[slot_idx])
+			if live != "":
+				return live
+	if sys.has_method("equip_instance"):
+		sys.call("equip_instance", member, inst, slot_idx)
+		var now3: Array[String] = _sigil_get_loadout(sys, member)
+		if slot_idx >= 0 and slot_idx < now3.size():
+			live = String(now3[slot_idx])
+			if live != "":
+				return live
+	# last resort: if system only supports base-equip path, caller should use equip_from_inventory
+	return ""
+
+func _build_sigil_snapshot(sys: Node) -> Dictionary:
+	var out: Dictionary = {}
+	if sys == null:
+		return out
+
+	# members = party ∪ bench ∪ hero
+	var members: Array[String] = []
+	var seen_mem: Dictionary = {}
+	for i in range(party.size()):
+		var pid: String = String(party[i])
+		if not seen_mem.has(pid):
+			members.append(pid)
+			seen_mem[pid] = true
+	for j in range(bench.size()):
+		var bid: String = String(bench[j])
+		if not seen_mem.has(bid):
+			members.append(bid)
+			seen_mem[bid] = true
+	if not seen_mem.has("hero"):
+		members.append("hero")
+
+	var loadouts: Dictionary = {}
+	var capacities: Dictionary = {}
+	var instances: Dictionary = {}
+	var owners: Dictionary = {}
+	var seen_inst: Dictionary = {}
+
+	for m in members:
+		var cap: int = _sigil_get_capacity(sys, m)
+		capacities[m] = cap
+		var arr: Array[String] = _sigil_get_loadout(sys, m)
+		loadouts[m] = arr.duplicate()
+		for s in arr:
+			var inst: String = String(s)
+			if inst == "":
+				continue
+			if not seen_inst.has(inst):
+				seen_inst[inst] = true
+				var rec: Dictionary = {}
+				rec["base"]  = _sigil_inst_base(sys, inst)
+				rec["level"] = _sigil_inst_level(sys, inst)
+				rec["xp"]    = _sigil_inst_xp(sys, inst)
+				var act: Dictionary = _sigil_inst_active_skill(sys, inst)
+				rec["active_skill_id"]   = String(act.get("id",""))
+				rec["active_skill_name"] = String(act.get("name",""))
+				instances[inst] = rec
+				# owner
+				var owner_id: String = _sigil_find_owner(sys, inst, loadouts)
+				owners[inst] = owner_id
+
+	# free inventory instances
+	var free_list: Array[String] = _sigil_list_free(sys)
+	for inst2 in free_list:
+		var iid: String = String(inst2)
+		if iid == "":
+			continue
+		if not seen_inst.has(iid):
+			seen_inst[iid] = true
+			var rec2: Dictionary = {}
+			rec2["base"]  = _sigil_inst_base(sys, iid)
+			rec2["level"] = _sigil_inst_level(sys, iid)
+			rec2["xp"]    = _sigil_inst_xp(sys, iid)
+			var act2: Dictionary = _sigil_inst_active_skill(sys, iid)
+			rec2["active_skill_id"]   = String(act2.get("id",""))
+			rec2["active_skill_name"] = String(act2.get("name",""))
+			instances[iid] = rec2
+			owners[iid] = ""  # free
+
+	out["capacities"] = capacities
+	out["loadouts"]   = loadouts
+	out["instances"]  = instances
+	out["owners"]     = owners
+	out["free"]       = free_list.duplicate()
+	return out
+
+func _apply_sigil_snapshot(sys: Node, snap: Dictionary) -> void:
+	if sys == null or snap.is_empty():
+		return
+
+	var capacities: Dictionary = (snap.get("capacities", {}) as Dictionary)
+	var loadouts:   Dictionary = (snap.get("loadouts",   {}) as Dictionary)
+	var instances:  Dictionary = (snap.get("instances",  {}) as Dictionary)
+	var owners:     Dictionary = (snap.get("owners",     {}) as Dictionary)
+
+	# Map original instance id -> live instance id (when recreated from base)
+	var id_remap: Dictionary = {}
+
+	# 1) ensure ownership + equip per member/slot
+	for mk in loadouts.keys():
+		var member: String = String(mk)
+		var want_v: Variant = loadouts[mk]
+		var want: Array = []
+		if typeof(want_v) == TYPE_ARRAY:
+			want = (want_v as Array).duplicate()
+		elif typeof(want_v) == TYPE_PACKED_STRING_ARRAY:
+			want = Array(want_v)
+
+		# optional: normalize capacity (if system supports)
+		if capacities.has(member) and sys.has_method("set_capacity"):
+			sys.call("set_capacity", member, int(capacities[member]))
+
+		# walk desired slots in order
+		for idx in range(want.size()):
+			var desired_key: String = String(want[idx])  # snapshot’s instance id (or base if older saves)
+			if desired_key == "":
+				_sigil_unequip_slot(sys, member, idx)
+				continue
+
+			# If this exact instance is already in the right slot for this member, keep it.
+			var cur_load: Array[String] = _sigil_get_loadout(sys, member)
+			if idx < cur_load.size() and String(cur_load[idx]) == desired_key:
+				id_remap[desired_key] = desired_key
+				continue
+
+			# If the instance is on the same member but wrong slot → move it.
+			var have_slot: int = _sigil_find_slot_of_member_instance(sys, member, desired_key)
+			if have_slot >= 0 and have_slot != idx:
+				# try move/swap, fallback to unequip+equip
+				if sys.has_method("move_slot"):
+					sys.call("move_slot", member, have_slot, idx)
+				elif sys.has_method("swap_slots"):
+					sys.call("swap_slots", member, have_slot, idx)
+				else:
+					_sigil_unequip_slot(sys, member, have_slot)
+					var moved_live: String = _sigil_equip_instance(sys, member, idx, desired_key)
+					if moved_live != "":
+						id_remap[desired_key] = moved_live
+						continue
+				# verify post-move
+				var post: Array[String] = _sigil_get_loadout(sys, member)
+				if idx < post.size() and String(post[idx]) != "":
+					id_remap[desired_key] = String(post[idx])
+					continue
+
+			# If the instance belongs to someone else, take ownership back.
+			var owner_id: String = ""
+			if owners.has(desired_key):
+				owner_id = String(owners[desired_key])
+			else:
+				owner_id = _sigil_find_owner(sys, desired_key, loadouts)
+			if owner_id != "" and owner_id != member:
+				_sigil_set_owner(sys, desired_key, member)
+
+			# Try to equip this exact instance id
+			var live_id: String = _sigil_equip_instance(sys, member, idx, desired_key)
+			if live_id == "":
+				# Fallback: equip from base id, then map new instance id
+				var base_id: String = desired_key
+				if instances.has(desired_key):
+					var rec: Dictionary = instances[desired_key] as Dictionary
+					base_id = String(rec.get("base", desired_key))
+				if sys.has_method("equip_from_inventory"):
+					var ok: bool = bool(sys.call("equip_from_inventory", member, idx, base_id))
+					if ok:
+						var now: Array[String] = _sigil_get_loadout(sys, member)
+						if idx < now.size():
+							live_id = String(now[idx])
+			if live_id != "":
+				id_remap[desired_key] = live_id
+			else:
+				# give up on this slot silently (keeps game running)
+				_sigil_unequip_slot(sys, member, idx)
+
+		# let system react if needed
+		if sys.has_method("on_bracelet_changed"):
+			sys.call("on_bracelet_changed", member)
+
+	# 2) apply per-instance XP/level and active-skill to whatever live ids we ended with
+	for key in instances.keys():
+		var rec2: Dictionary = instances[key] as Dictionary
+		var live: String = String(id_remap.get(key, ""))
+		if live == "":
+			# maybe the instance id survived intact
+			live = String(key)
+		if live == "":
+			continue
+		var want_lvl: int = int(rec2.get("level", 1))
+		var want_xp:  int = int(rec2.get("xp", 0))
+		if sys.has_method("set_instance_level"):
+			sys.call("set_instance_level", live, want_lvl)
+		if sys.has_method("set_instance_xp"):
+			sys.call("set_instance_xp", live, want_xp)
+		var sk_id: String = String(rec2.get("active_skill_id",""))
+		var sk_nm: String = String(rec2.get("active_skill_name",""))
+		if sk_id != "" and sys.has_method("set_active_skill_for_instance"):
+			sys.call("set_active_skill_for_instance", live, sk_id)
+		elif sk_nm != "" and sys.has_method("set_active_skill_for_instance_by_name"):
+			sys.call("set_active_skill_for_instance_by_name", live, sk_nm)
+
+	# 3) emit loadout-changed per member if the system exposes it
+	if sys.has_signal("loadout_changed"):
+		for mk2 in loadouts.keys():
+			sys.emit_signal("loadout_changed", String(mk2))
+
+# ─── UI Bridge Methods (optional helpers) ────────────────────
 func save_to_slot(slot: int) -> bool:
 	var payload: Dictionary = save()
-
-	# Add scene metadata for save slot display
 	payload["scene"] = "Main"
-
-	# Get calendar label for save slot display
 	var cal: Node = get_node_or_null(CALENDAR_PATH)
 	if cal and cal.has_method("save_label"):
 		payload["label"] = String(cal.call("save_label"))
-	elif cal and cal.has_method("hud_label"):
+	elif cal and cal.has_method("hud_label"): 
 		payload["label"] = String(cal.call("hud_label"))
-
 	var save_sys: Node = get_node_or_null(SAVELOAD_PATH)
 	if save_sys and save_sys.has_method("save_game"):
 		return bool(save_sys.call("save_game", slot, payload))
@@ -628,12 +1006,9 @@ func save_to_slot(slot: int) -> bool:
 		push_error("[GameState] aSaveLoad system not found! Cannot save.")
 		return false
 
-## Called by LoadMenu when user clicks "Load" button.
-## Restores all game state from the loaded payload.
 func apply_loaded_save(payload: Dictionary) -> void:
 	if payload.is_empty():
 		push_warning("[GameState] Attempted to load empty save data.")
 		return
-
-	# Restore all state via the existing load() method
-	load(payload)
+	self.load(payload)
+	#save

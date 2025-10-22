@@ -331,6 +331,10 @@ func save() -> Dictionary:
 		"next_idx": _next_instance_idx
 	}
 
+# Bridge method for SaveLoad fallback compatibility
+func get_save_blob() -> Dictionary:
+	return save()
+
 func load(data: Dictionary) -> void:
 	var inst_in_v: Variant = data.get("instances", {})
 	var new_inst: Dictionary = {}
@@ -403,6 +407,10 @@ func load(data: Dictionary) -> void:
 		_ensure_capacity_from_bracelet(member_name)
 		_trim_or_expand_sockets(member_name)
 		emit_signal("loadout_changed", member_name)
+
+# Bridge method for SaveLoad fallback compatibility
+func apply_save_blob(blob: Dictionary) -> void:
+	self.load(blob)
 
 func grant_sigil_instance(_id: String, _amount: int = 1) -> void:
 	emit_signal("instances_changed")
