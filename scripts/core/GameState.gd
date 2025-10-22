@@ -1,3 +1,55 @@
+## ═══════════════════════════════════════════════════════════════════════════
+## GameState - Central Game State Manager
+## ═══════════════════════════════════════════════════════════════════════════
+##
+## PURPOSE:
+##   The core singleton that manages all persistent game state including player
+##   progression, party roster, inventory, equipment, and coordination of all
+##   game systems. Acts as the central hub for save/load operations.
+##
+## RESPONSIBILITIES:
+##   • Player data (name, difficulty, money, perk points, alignment scores)
+##   • Party/bench roster management (max 4 active party members)
+##   • Global flags and index tracking (tutorials, enemies, locations, lore)
+##   • Member runtime data (HP, MP, ailments, buffs, custom fields)
+##   • Perk system integration (points, unlocks)
+##   • Save/load orchestration across all systems
+##   • Sigil snapshot management (equipment-aware save/restore)
+##
+## CONNECTED SYSTEMS (Autoloads):
+##   • CalendarSystem - Time progression, advance blocking
+##   • StatsSystem - Member base stats (BRW, MND, TPO, VTL, FCS)
+##   • SaveLoad - File persistence system
+##   • CSVLoader - CSV data loading
+##   • CombatProfileSystem - Battle state (HP, MP, ailments, buffs)
+##   • InventorySystem - Item storage and counts
+##   • EquipmentSystem - Gear loadouts (weapon, armor, head, foot, bracelet)
+##   • SigilSystem - Sigil instances and socket assignments
+##
+## OPTIONAL SYSTEMS (loaded if present):
+##   • CircleBondSystem - Social bonds and relationship tracking
+##   • DormSystem - Room assignments and dorm state
+##   • RomanceSystem - Romance progression
+##   • AffinitySystem - Affinity tracking
+##   • PerkSystem - Perk unlocks and effects
+##   • MainEventSystem - Story event progress
+##
+## SAVE/LOAD ARCHITECTURE:
+##   1. Equipment loads FIRST (bracelets must exist before sigils)
+##   2. Sigils load SECOND (needs bracelet capacity)
+##   3. Other systems load in dependency order
+##   4. Dual sigil save: system blob + v2 snapshot (XP, level, active skills)
+##
+## KEY METHODS:
+##   • save() -> Dictionary - Collects state from all systems
+##   • load(data: Dictionary) - Restores state to all systems
+##   • save_to_slot(slot: int) - Saves to numbered slot via SaveLoad
+##   • apply_loaded_save(data: Dictionary) - UI bridge for loading
+##   • add_member(), remove_member(), swap_members() - Roster management
+##   • unlock_perk(), add_perk_points() - Perk system
+##
+## ═══════════════════════════════════════════════════════════════════════════
+
 extends Node
 class_name GameState
 

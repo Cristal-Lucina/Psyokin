@@ -1,3 +1,56 @@
+## ═══════════════════════════════════════════════════════════════════════════
+## SigilSystem - Sigil Instance & Loadout Manager
+## ═══════════════════════════════════════════════════════════════════════════
+##
+## PURPOSE:
+##   Manages sigil instances (unique copies of base sigils with individual XP,
+##   levels, and skill selections), loadout assignments (which sigils are
+##   equipped in which member's bracelet slots), and skill progression.
+##
+## RESPONSIBILITIES:
+##   • Sigil instance creation and tracking (base_id -> unique instance_id)
+##   • XP/level progression system (Level 1-4, with XP thresholds)
+##   • Active skill unlocking and selection per instance
+##   • Loadout management (member -> array of equipped instance IDs)
+##   • School/mind-type restrictions (member can only use compatible sigils)
+##   • Bracelet capacity tracking (slot count from equipped bracelet item)
+##   • CSV-based skill database (skill names, sigil holder mappings)
+##
+## INSTANCE ID FORMAT:
+##   Base sigils (e.g., "SIG_FIRE_001") become instances like "SIG_FIRE_001#0042"
+##   The "#" separator distinguishes instances from base IDs.
+##
+## CONNECTED SYSTEMS (Autoloads):
+##   • InventorySystem - Base sigil definitions, consuming sigils from inventory
+##   • EquipmentSystem - Bracelet item -> sigil slot capacity
+##   • MindTypeSystem - School compatibility checks (Fire, Water, Earth, etc.)
+##   • GameState - Save/load coordination, member roster
+##   • StatsSystem - Member mind types (indirectly via member data)
+##
+## CSV DATA SOURCES:
+##   • res://data/skills/skills.csv - skill_id, name, description
+##   • res://data/skills/sigil_holder.csv - sigil_id, lv1, lv2, lv3, lv4 skills
+##
+## PROGRESSION:
+##   Level 1 -> 120 XP -> Level 2 -> 240 XP -> Level 3 -> 360 XP -> Level 4 (MAX)
+##   Each level unlocks more skills from the sigil's holder CSV entry.
+##
+## SAVE/LOAD:
+##   Called by GameState after EquipmentSystem loads (needs bracelet capacity).
+##   Saves: instances dict, owned array, loadouts dict, next_idx counter.
+##   Restores: XP, levels, active skills, slot assignments.
+##
+## KEY METHODS:
+##   • acquire_sigil(base_id) -> instance_id - Create new instance
+##   • equip_into_socket(member, slot, inst_id) - Equip to specific slot
+##   • equip_from_inventory(member, slot, base_id) - Consume from inventory
+##   • get_loadout(member) -> PackedStringArray - Get equipped instances
+##   • list_free_instances() -> PackedStringArray - Get unequipped instances
+##   • set_instance_level/xp() - Restore saved progression
+##   • set_active_skill_for_instance() - Set chosen skill
+##
+## ═══════════════════════════════════════════════════════════════════════════
+
 extends Node
 class_name SigilSystem
 

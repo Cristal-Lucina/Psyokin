@@ -1,3 +1,45 @@
+## ═══════════════════════════════════════════════════════════════════════════
+## EquipmentSystem - Party Member Equipment Manager
+## ═══════════════════════════════════════════════════════════════════════════
+##
+## PURPOSE:
+##   Manages equipment loadouts for all party members, tracking which items
+##   are equipped in each of the 5 equipment slots (weapon, armor, head, foot,
+##   bracelet). Validates compatibility and provides item metadata.
+##
+## RESPONSIBILITIES:
+##   • Equipment loadout storage (member -> { slot: item_id })
+##   • 5 slots per member: weapon, armor, head, foot, bracelet
+##   • Equip/unequip operations with validation
+##   • Item metadata lookup (definitions, display names)
+##   • List available equippable items per slot
+##   • Save/load equipment state
+##
+## CONNECTED SYSTEMS (Autoloads):
+##   • InventorySystem - Item definitions (stats, names, equip_slot tags)
+##   • GameState - Save/load coordination, member roster
+##   • SigilSystem - Bracelet items provide sigil_slots capacity
+##
+## ITEM SLOT DETECTION:
+##   Automatically detects item slot from CSV fields:
+##   • equip_slot, slot, equip, equip_to, category, cat, type
+##
+## SAVE/LOAD ORDER:
+##   CRITICAL: Must load BEFORE SigilSystem (bracelets must exist first)
+##   GameState loads: Equipment -> Sigils -> Others
+##
+## KEY METHODS:
+##   • get_member_equip(member) -> Dictionary - Get current loadout
+##   • equip_item(member, item_id) -> bool - Auto-detect slot and equip
+##   • unequip_slot(member, slot) - Remove item from slot
+##   • list_equippable(member, slot) -> PackedStringArray - Available items
+##   • get_item_def(item_id) -> Dictionary - Full item definition
+##   • get_item_display_name(item_id) -> String - Pretty name
+##   • save() -> Dictionary - Export loadouts
+##   • load(data: Dictionary) - Restore loadouts
+##
+## ═══════════════════════════════════════════════════════════════════════════
+
 extends Node
 class_name EquipmentSystem
 
