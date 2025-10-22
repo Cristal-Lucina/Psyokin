@@ -1,3 +1,69 @@
+## ═══════════════════════════════════════════════════════════════════════════
+## DormsPanel - Dormitory Room Assignment UI
+## ═══════════════════════════════════════════════════════════════════════════
+##
+## PURPOSE:
+##   Main menu panel for managing dormitory room assignments, displaying the
+##   8-room layout, handling weekly Saturday reassignments, and showing
+##   neighbor relationships (Bestie/Rival pairs).
+##
+## RESPONSIBILITIES:
+##   • 8-room visual grid display (301-308)
+##   • Room occupancy display (name/empty/staged)
+##   • Common area management (unassigned members)
+##   • Two modes:
+##     - Placements: Immediate Common area assignments
+##     - Reassignment: Saturday weekly planning mode
+##   • Planning/staging system (preview moves before applying)
+##   • Accept/Cancel controls for staged reassignments
+##   • Neighbor relationship display (Bestie/Rival indicators)
+##   • Real-time updates when dorm state changes
+##
+## DISPLAY MODES:
+##   Placements Mode:
+##   • Show current room assignments
+##   • Common area member list
+##   • Click member + room to assign immediately
+##   • Shows neighbor relationships
+##
+##   Reassignment Mode (Saturday):
+##   • Plan room swaps/reassignments
+##   • Staged moves turn rooms red (consumed)
+##   • Accept Plan button (applies all changes)
+##   • Cancel button (discard staging)
+##   • Blocks time advancement until accepted/cancelled
+##
+## ROOM VISUAL STATES:
+##   • EMPTY (0) - No occupant, available
+##   • OCCUPIED (1) - Has occupant, normal state
+##   • STAGED (2) - Part of pending reassignment plan (red)
+##   • LOCKED (3) - Cannot be modified
+##
+## CONNECTED SYSTEMS (Autoloads):
+##   • DormSystem - Room assignments, neighbor tracking, reassignment logic
+##
+## UI ELEMENTS:
+##   Left Panel:
+##   • 8-room grid (2x4 layout)
+##   • Common area member list
+##   • Filter dropdown (Placements/Reassignment)
+##   • Refresh button
+##
+##   Right Panel:
+##   • Detail text (selected room/member info)
+##   • Reassignment controls (when in Reassignment mode)
+##   • Accept/Cancel buttons
+##
+## KEY METHODS:
+##   • _rebuild() - Refresh entire room grid and Common list
+##   • _on_room_clicked(room_id) - Handle room selection
+##   • _on_common_person_clicked(actor_id) - Handle Common member selection
+##   • _on_accept_plan() - Apply staged reassignments
+##   • _on_cancel_plan() - Discard staging, return to normal
+##   • _on_filter_changed(index) - Switch between Placements/Reassignment
+##
+## ═══════════════════════════════════════════════════════════════════════════
+
 extends Control
 class_name DormsPanel
 
