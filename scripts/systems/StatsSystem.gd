@@ -1,3 +1,65 @@
+## ═══════════════════════════════════════════════════════════════════════════
+## StatsSystem - Hero & Party Member Stat Progression Manager
+## ═══════════════════════════════════════════════════════════════════════════
+##
+## PURPOSE:
+##   Manages stat progression for the hero and all party members using an SXP
+##   (Stat Experience Points) system with daily automatic gains, fatigue
+##   mechanics, and level-up thresholds.
+##
+## RESPONSIBILITIES:
+##   • 5 core stats: BRW (Brawn), MND (Mind), TPO (Tempo), VTL (Vital), FCS (Focus)
+##   • SXP accumulation and level calculation per stat
+##   • Daily Stat Increment (DSI) system - automatic gains each day
+##   • Fatigue system - halves gains after 60 SXP/week per stat
+##   • Hero level & XP tracking
+##   • Ally individual progression (separate SXP pools per member)
+##   • Weekly reset for fatigue counters
+##   • CSV-based party member definitions
+##   • Save/load stat state
+##
+## STAT PROGRESSION:
+##   Each stat has:
+##   • Base level (1-10+)
+##   • SXP pool (stat experience points)
+##   • Weekly SXP counter (for fatigue)
+##   • DSI (Daily Stat Increment) - auto-gains per day
+##
+## SXP THRESHOLDS (bonus levels):
+##   [0, 59, 122, 189, 260, 336, 416, 500, 588, 680, 943]
+##   Level = base + bonus from SXP thresholds
+##
+## FATIGUE SYSTEM:
+##   Once a stat gains 60+ SXP in the current week, further gains are halved.
+##   Resets each Sunday.
+##
+## DAILY STAT INCREMENT (DSI):
+##   Default tenths per day:
+##   • BRW: 10 (1.0 SXP/day)
+##   • MND: 20 (2.0 SXP/day)
+##   • TPO: 30 (3.0 SXP/day)
+##   • VTL: 10 (1.0 SXP/day)
+##   • FCS: 30 (3.0 SXP/day)
+##
+## CONNECTED SYSTEMS (Autoloads):
+##   • CalendarSystem - Daily/weekly triggers for DSI and fatigue reset
+##   • PartySystem - Member roster
+##   • GameState - Save/load coordination, hero stat picks
+##   • CSVLoader - Party member definitions (base stats, names, etc.)
+##
+## CSV DATA SOURCES:
+##   • res://data/actors/party.csv - Member base stats, display names
+##
+## KEY METHODS:
+##   • get_stat(stat_code: String) -> int - Get hero stat level
+##   • get_member_stat(member_id, stat_code) -> int - Get member stat level
+##   • add_hero_sxp(stat_code, amount) - Grant SXP to hero stat
+##   • on_day_advanced() - Apply daily DSI to all stats
+##   • on_week_reset() - Reset fatigue counters
+##   • compute_pools(member_id) -> Dictionary - Calculate HP/MP pools
+##
+## ═══════════════════════════════════════════════════════════════════════════
+
 extends Node
 class_name StatsSystem
 

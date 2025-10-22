@@ -1,3 +1,74 @@
+## ═══════════════════════════════════════════════════════════════════════════
+## DormsSystem - Dormitory Room Assignment & Social Relationship Manager
+## ═══════════════════════════════════════════════════════════════════════════
+##
+## PURPOSE:
+##   Manages dorm room assignments for party members across 8 rooms, tracking
+##   social relationships (Bestie/Rival) based on room adjacency, and handling
+##   weekly reassignments with a planning/staging system.
+##
+## RESPONSIBILITIES:
+##   • Room assignment tracking (8 rooms: 301-308)
+##   • Neighbor adjacency relationships (defines who lives next to whom)
+##   • Bestie/Rival relationship detection (neighbors become Besties/Rivals)
+##   • Common area management (unassigned members)
+##   • Weekly Saturday reassignment system
+##   • Midweek Common placement (immediate moves)
+##   • Planning/staging system (preview moves before applying)
+##   • Blocking state (prevents day advance until plan is accepted)
+##   • Hidden relationship reveal queues (Friday/Saturday reveals)
+##   • Hero stat pick integration (preferred stats for room assignments)
+##
+## ROOM LAYOUT:
+##   8 rooms arranged in two rows:
+##   [301] — [302] — [303] — [304]
+##   [305] — [306] — [307] — [308]
+##
+##   Neighbors share walls or corners (e.g., 301 neighbors 302, 305)
+##
+## RELATIONSHIP SYSTEM:
+##   • Neighbors become Besties or Rivals (based on CSV data)
+##   • Hidden pairs queue for reveal on Friday (from Saturday moves)
+##   • Hidden pairs queue for reveal on Saturday (from midweek Common)
+##   • Once revealed, relationships persist
+##
+## WEEKLY CYCLE:
+##   Saturday: Reassignment planning mode activates
+##     - User can plan room swaps
+##     - Blocks day advance until "Accept Plan" or "Cancel"
+##     - On Accept: New layout applies, creates hidden pairs for Friday reveal
+##
+##   Midweek: Common placements
+##     - Adding members to Common immediately places them
+##     - Creates hidden pairs for Saturday reveal
+##
+##   Friday: Reveals pairs from prior Saturday reassignments
+##
+##   Saturday: Reveals pairs from midweek Common placements
+##
+## CONNECTED SYSTEMS (Autoloads):
+##   • GameState - Member roster, hero picks, save/load coordination
+##   • CalendarSystem - Saturday triggers, advance blocking
+##   • CircleBondSystem - Likely bond unlocks from relationships
+##
+## CSV DATA SOURCES:
+##   • Actor data CSVs for names, display names, stat preferences
+##   • Relationship CSVs for Bestie/Rival mappings
+##
+## KEY METHODS:
+##   • assign_room(actor_id, room_id) - Direct assignment
+##   • add_to_common(actor_id) - Place in common area
+##   • plan_reassignment_for_saturday(moves: Array) - Stage Saturday plan
+##   • accept_plan() - Apply staged reassignments
+##   • cancel_plan() - Discard staged reassignments
+##   • reveal_friday_pairs() - Show Saturday-generated relationships
+##   • reveal_saturday_pairs() - Show midweek-generated relationships
+##   • get_room_occupant(room_id) -> String - Who lives in this room
+##   • get_neighbors(actor_id) -> Array[String] - Adjacent room occupants
+##   • get_pair_label(a, b) -> String - "Bestie"/"Rival"/"Neutral"
+##
+## ═══════════════════════════════════════════════════════════════════════════
+
 extends Node
 class_name DormsSystem
 

@@ -1,16 +1,41 @@
-extends Node
-class_name SaveLoad
-
-## SaveLoad
-## JSON save files under `user://saves/` with one file per slot.
-## Wrapper structure written to disk:
-## {
-##   "version": 1,
-##   "ts": <unix time>,
-##   "scene": "Main",
-##   "label": "MM/DD — Weekday — Phase",
-##   "payload": { ... }  # GameState._to_payload()
-## }
+## ═══════════════════════════════════════════════════════════════════════════
+## SaveLoad - File Persistence System
+## ═══════════════════════════════════════════════════════════════════════════
+##
+## PURPOSE:
+##   Handles file I/O for save games, managing JSON files in the user://saves/
+##   directory with numbered slots (slot_0.json, slot_1.json, etc.).
+##
+## RESPONSIBILITIES:
+##   • Save game data to numbered slots (JSON format)
+##   • Load game data from slots
+##   • Delete save slots
+##   • List all save slots with metadata
+##   • Generate save slot labels (date, time, scene)
+##
+## FILE STRUCTURE:
+##   JSON save files under `user://saves/` with one file per slot.
+##   Wrapper structure written to disk:
+##   {
+##     "version": 1,
+##     "ts": <unix time>,
+##     "scene": "Main",
+##     "label": "MM/DD — Weekday — Phase",
+##     "payload": { ... }  # GameState.save()
+##   }
+##
+## CONNECTED SYSTEMS (Autoloads):
+##   • GameState - Receives payload from GameState.save()
+##   • CalendarSystem - For save slot label generation (date/time)
+##
+## KEY METHODS:
+##   • save_game(slot: int, payload: Dictionary) -> bool - Write to slot
+##   • load_game(slot: int) -> Dictionary - Read from slot (returns payload)
+##   • delete_slot(slot: int) - Remove save file
+##   • list_slots() -> Array[Dictionary] - Get all slots with metadata
+##   • has_save(slot: int) -> bool - Check if slot exists
+##
+## ═══════════════════════════════════════════════════════════════════════════
 
 const SAVE_DIR : String = "user://saves"
 

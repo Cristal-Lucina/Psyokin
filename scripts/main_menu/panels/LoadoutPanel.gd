@@ -1,3 +1,62 @@
+## ═══════════════════════════════════════════════════════════════════════════
+## LoadoutPanel - Party Member Equipment & Sigil UI
+## ═══════════════════════════════════════════════════════════════════════════
+##
+## PURPOSE:
+##   Main menu panel for managing party member equipment (5 slots) and sigil
+##   loadouts (bracelet socket assignments). Displays derived stats, active
+##   sigils, and provides equip/unequip interfaces.
+##
+## RESPONSIBILITIES:
+##   • Party member selection list
+##   • Equipment slot display (weapon, armor, head, foot, bracelet)
+##   • Sigil socket display (shows equipped sigils with level/XP/active skill)
+##   • Derived stat calculation display (HP, MP, attack, defense, etc.)
+##   • Equip/unequip popup menus for gear
+##   • Sigil equip/remove interface
+##   • Sigil Skills menu integration (manage sigil skills)
+##   • Hero active type selection (Omega/Fire/Water/etc.)
+##   • Real-time stat updates when equipment changes
+##
+## EQUIPMENT DISPLAY:
+##   5 slots shown with labels and buttons:
+##   • Weapon → Weapon Attack, Scale, Accuracy, Crit, Type, Special
+##   • Armor → Physical Defense, Ailment Resistance
+##   • Head → HP/MP Bonus, Mind Defense
+##   • Foot → Physical/Mind Evasion, Speed
+##   • Bracelet → Sigil Slots count, Active Sigil display
+##
+## SIGIL DISPLAY:
+##   For each sigil socket in the equipped bracelet:
+##   • Sigil name (from base def)
+##   • Level (Lv 1-4 or MAX)
+##   • Active skill (★ icon with skill name)
+##   • Equip/Remove buttons
+##
+## CONNECTED SYSTEMS (Autoloads):
+##   • GameState - Party roster, member data
+##   • EquipmentSystem - Get/set equipment, item definitions
+##   • SigilSystem - Get/set sigil loadouts, instance data
+##   • InventorySystem - Available items for equipping
+##   • StatsSystem - Derived stat calculations (HP, MP, pools)
+##
+## UI FEATURES:
+##   • Polling fallback (refreshes every 0.5s to catch external changes)
+##   • Signal-based reactivity (equipment_changed, loadout_changed, stats_changed)
+##   • Popup menus for item selection
+##   • SigilSkillMenu overlay for managing sigil active skills
+##   • Hero-only active type picker (set hero's mind type override)
+##
+## KEY METHODS:
+##   • _on_party_selected(index) - Switch displayed member
+##   • _on_slot_button(slot) - Open equip menu for slot
+##   • _on_equip_sigil(member, slot) - Open sigil selection menu
+##   • _on_remove_sigil(member, slot) - Unequip sigil from slot
+##   • _on_manage_sigils() - Open SigilSkillMenu overlay
+##   • _refresh_all_for_current() - Update all displays for selected member
+##
+## ═══════════════════════════════════════════════════════════════════════════
+
 extends Control
 class_name LoadoutPanel
 
