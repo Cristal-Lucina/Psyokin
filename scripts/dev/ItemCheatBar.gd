@@ -890,24 +890,24 @@ func _on_add_sigil_gxp() -> void:
 		return
 	var sigil_id: String = _selected_sigil_gxp()
 	if sigil_id == "":
-		print("[ItemsCheatBar] No sigil selected for GXP")
+		print("[ItemsCheatBar][GXP] No sigil selected for GXP")
 		return
 	var amount: int = int(_sigil_gxp_spin.value)
 
-	# Try to grant GXP via SigilSystem methods
-	if _sig.has_method("cheat_add_gxp"):
-		_sig.call("cheat_add_gxp", sigil_id, amount)
-		print("[ItemsCheatBar] Added %d GXP to sigil %s (via cheat_add_gxp)" % [amount, sigil_id])
-	elif _sig.has_method("add_sigil_xp"):
-		_sig.call("add_sigil_xp", sigil_id, amount)
-		print("[ItemsCheatBar] Added %d GXP to sigil %s (via add_sigil_xp)" % [amount, sigil_id])
-	elif _sig.has_method("grant_xp"):
-		_sig.call("grant_xp", sigil_id, amount)
-		print("[ItemsCheatBar] Added %d GXP to sigil %s (via grant_xp)" % [amount, sigil_id])
+	# Call the correct SigilSystem method: cheat_add_xp_to_instance
+	# Note: require_equipped is set to false since we're cheating
+	if _sig.has_method("cheat_add_xp_to_instance"):
+		_sig.call("cheat_add_xp_to_instance", sigil_id, amount, false)
+		print("[ItemsCheatBar][GXP] Added %d GXP to sigil %s" % [amount, sigil_id])
+	elif _sig.has_method("add_xp_to_instance"):
+		_sig.call("add_xp_to_instance", sigil_id, amount, false)
+		print("[ItemsCheatBar][GXP] Added %d GXP to sigil %s (via add_xp_to_instance)" % [amount, sigil_id])
 	else:
-		print("[ItemsCheatBar] Warning: No GXP method found on SigilSystem")
+		print("[ItemsCheatBar][GXP] ERROR: No XP method found on SigilSystem!")
+		print("[ItemsCheatBar][GXP] Available methods: %s" % str(_sig.get_method_list().map(func(m): return m.get("name", ""))))
 
 	_refresh_sig_dropdown()
+	_refresh_sigil_gxp_dropdown()
 
 # ─────────────────────────────────────────────────────────────
 # Character Level / Perk / SXP
