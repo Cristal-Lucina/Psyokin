@@ -84,6 +84,11 @@ var _btn_hero_add_sxp : Button        = null
 var _party_lxp_row  : HBoxContainer = null
 var _party_sxp_row  : HBoxContainer = null
 
+# -------- Sigil GXP cheat widgets (runtime-built if missing) ----
+var _sigil_gxp_row   : HBoxContainer = null
+var _sigil_gxp_spin  : SpinBox       = null
+var _btn_add_gxp     : Button        = null
+
 # --- Systems ------------------------------------------------------------------
 var _inv   : Node = null
 var _csv   : Node = null
@@ -146,6 +151,9 @@ func _ready() -> void:
 	_ensure_party_rows()
 	_style_option_button(_stat_pick, 11, 300)
 	_populate_stat_picker()
+
+	# Sigil GXP row
+	_ensure_sigil_gxp_row()
 
 	# CSV import buttons
 	_ensure_party_import_row()
@@ -403,6 +411,47 @@ func _ensure_party_rows() -> void:
 		_party_sxp_row.add_child(_btn_add_sxp)
 		if not _btn_add_sxp.pressed.is_connected(_on_add_sxp):
 			_btn_add_sxp.pressed.connect(_on_add_sxp)
+
+func _ensure_sigil_gxp_row() -> void:
+	var parent := _attach_point()
+	_sigil_gxp_row = parent.get_node_or_null("SigilGxpRow") as HBoxContainer
+	if _sigil_gxp_row == null:
+		_sigil_gxp_row = HBoxContainer.new()
+		_sigil_gxp_row.name = "SigilGxpRow"
+		_sigil_gxp_row.add_theme_constant_override("separation", 8)
+		parent.add_child(_sigil_gxp_row)
+
+		var lbl := Label.new()
+		lbl.text = "Sigil XP:"
+		_sigil_gxp_row.add_child(lbl)
+
+		var dropdown_lbl := Label.new()
+		dropdown_lbl.text = "Sigil"
+		_sigil_gxp_row.add_child(dropdown_lbl)
+
+		# Note: We already have _sig_inst_pick created by the scene, so add a label pointing to it
+		var hint := Label.new()
+		hint.text = "(Use dropdown above)"
+		hint.modulate = Color(0.7, 0.7, 0.7, 1.0)
+		_sigil_gxp_row.add_child(hint)
+
+		var gxp_lbl := Label.new()
+		gxp_lbl.text = "GXP"
+		_sigil_gxp_row.add_child(gxp_lbl)
+
+		_sigil_gxp_spin = SpinBox.new()
+		_sigil_gxp_spin.min_value = 1
+		_sigil_gxp_spin.max_value = 99999
+		_sigil_gxp_spin.step = 1
+		_sigil_gxp_spin.value = 100
+		_sigil_gxp_spin.custom_minimum_size = Vector2(80, 0)
+		_sigil_gxp_row.add_child(_sigil_gxp_spin)
+
+		_btn_add_gxp = Button.new()
+		_btn_add_gxp.text = "Add GXP"
+		_sigil_gxp_row.add_child(_btn_add_gxp)
+		if not _btn_add_gxp.pressed.is_connected(_on_add_sigil_gxp):
+			_btn_add_gxp.pressed.connect(_on_add_sigil_gxp)
 
 # --- Items (Row1) --------------------------------------------------------------
 func _refresh_defs() -> void:
@@ -743,6 +792,13 @@ func _on_sig_xp_25() -> void:
 
 func _on_sig_xp_100() -> void:
 	_grant_xp_to_sigil(100)
+
+func _on_add_sigil_gxp() -> void:
+	if _sigil_gxp_spin == null:
+		return
+	var amount: int = int(_sigil_gxp_spin.value)
+	_grant_xp_to_sigil(amount)
+	print("[ItemsCheatBar] Added %d GXP to sigil %s" % [amount, _selected_sig_inst()])
 
 # ─────────────────────────────────────────────────────────────
 # Character Level / Perk / SXP
