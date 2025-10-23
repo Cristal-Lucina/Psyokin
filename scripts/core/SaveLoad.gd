@@ -41,12 +41,16 @@ extends Node
 
 const SAVE_DIR : String = "user://saves"
 
+## Returns the file path for a specific save slot number
 func _path(slot: int) -> String:
 	return "%s/slot_%d.json" % [SAVE_DIR, slot]
 
+## Ensures the save directory exists, creating it recursively if needed
 func _ensure_dir() -> void:
 	DirAccess.make_dir_recursive_absolute(SAVE_DIR)
 
+## Generates a human-readable label from save payload using calendar data.
+## Format: "MM/DD — Weekday — Phase" (e.g., "05/05 — Monday — Morning")
 func _label_from_payload(payload: Dictionary) -> String:
 	if payload.has("calendar") and typeof(payload["calendar"]) == TYPE_DICTIONARY:
 		var c: Dictionary = payload["calendar"]
@@ -86,6 +90,7 @@ func _label_from_payload(payload: Dictionary) -> String:
 
 	return ""
 
+## Safely retrieves an autoload node by name from the SceneTree root
 func _get_autoload(name: String) -> Node:
 	# Safe autoload lookup without requiring this script to extend Node
 	var ml := Engine.get_main_loop()
@@ -95,6 +100,8 @@ func _get_autoload(name: String) -> Node:
 		return root.get_node_or_null(name)
 	return null
 
+## Saves game data to a numbered slot as JSON. Wraps payload with version, timestamp, scene, and label.
+## Automatically injects sigil data if missing. Returns true if save successful, false on file error.
 func save_game(slot: int, payload: Dictionary) -> bool:
 	# Wrap + save. Also inject a top-level "sigils" blob if missing.
 	_ensure_dir()
@@ -125,6 +132,8 @@ func save_game(slot: int, payload: Dictionary) -> bool:
 	f.close()
 	return true
 
+## Loads game data from a numbered slot. Returns the payload Dictionary from the save file.
+## Returns empty Dictionary if slot doesn't exist or file is corrupted.
 func load_game(slot: int) -> Dictionary:
 	if not FileAccess.file_exists(_path(slot)): return {}
 	var f := FileAccess.open(_path(slot), FileAccess.READ)
@@ -144,6 +153,9 @@ func load_game(slot: int) -> Dictionary:
 
 	return root
 
+## Retrieves metadata for a save slot without loading the full payload.
+## Returns Dictionary with: exists, ts (timestamp), scene, label, summary.
+## Returns {"exists": false} if slot doesn't exist.
 func get_slot_meta(slot: int) -> Dictionary:
 	if not FileAccess.file_exists(_path(slot)): return {"exists": false}
 	var f := FileAccess.open(_path(slot), FileAccess.READ)
@@ -166,14 +178,17 @@ func get_slot_meta(slot: int) -> Dictionary:
 		"summary": summary,
 	}
 
+## Checks if a save file exists for the given slot number
 func slot_exists(slot: int) -> bool:
 	return FileAccess.file_exists(_path(slot))
 
+## Deletes a save slot file. Returns true if deletion successful, false if slot doesn't exist.
 func delete_slot(slot: int) -> bool:
 	if FileAccess.file_exists(_path(slot)):
 		return DirAccess.remove_absolute(_path(slot)) == OK
 	return false
 
+## Returns a sorted array of all existing save slot numbers in the save directory
 func list_slots() -> Array[int]:
 	var out: Array[int] = []
 	var d := DirAccess.open(SAVE_DIR)
