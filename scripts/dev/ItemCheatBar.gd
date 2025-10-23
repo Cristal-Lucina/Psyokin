@@ -153,11 +153,11 @@ func _ready() -> void:
 	_style_option_button(_stat_pick, 11, 300)
 	_populate_stat_picker()
 
+	# CSV import buttons (before Sigil GXP row)
+	_ensure_party_import_row()
+
 	# Sigil GXP row
 	_ensure_sigil_gxp_row()
-
-	# CSV import buttons
-	_ensure_party_import_row()
 
 	# Row1 (Items)
 	if _give and not _give.pressed.is_connected(_on_give):          _give.pressed.connect(_on_give)
@@ -201,12 +201,17 @@ func _ready() -> void:
 	# Populate
 	_refresh_defs()
 	_refresh_sig_dropdown()
+	_refresh_sigil_gxp_dropdown()
 	_refresh_roster_picker()
 	if _spin_lvl:
 		_spin_lvl.value = _get_member_level()
 
 	if _sig and _sig.has_signal("loadout_changed") and not _sig.is_connected("loadout_changed", Callable(self, "_on_loadout_changed")):
 		_sig.connect("loadout_changed", Callable(self, "_on_loadout_changed"))
+	if _sig and _sig.has_signal("instance_created") and not _sig.is_connected("instance_created", Callable(self, "_on_sigil_changed")):
+		_sig.connect("instance_created", Callable(self, "_on_sigil_changed"))
+	if _sig and _sig.has_signal("sigils_changed") and not _sig.is_connected("sigils_changed", Callable(self, "_on_sigil_changed")):
+		_sig.connect("sigils_changed", Callable(self, "_on_sigil_changed"))
 
 # --- Bind external cheat UI if it's not a child of this node -------------------
 func _bind_optional_external_ui() -> void:
@@ -508,6 +513,7 @@ func _on_give() -> void:
 	if _is_sigil_item(id):
 		_draft_n_from_inventory(id, n)
 	_refresh_sig_dropdown()
+	_refresh_sigil_gxp_dropdown()
 
 func _on_remove() -> void:
 	var id: String = _selected_item_id()
@@ -518,6 +524,7 @@ func _on_remove() -> void:
 		_inv.call("remove_item", id, n)
 		print("[ItemsCheatBar] REMOVE %s x%d" % [id, n])
 	_refresh_sig_dropdown()
+	_refresh_sigil_gxp_dropdown()
 
 func _on_give10() -> void:
 	var id: String = _selected_item_id()
@@ -529,6 +536,7 @@ func _on_give10() -> void:
 	if _is_sigil_item(id):
 		_draft_n_from_inventory(id, 10)
 	_refresh_sig_dropdown()
+	_refresh_sigil_gxp_dropdown()
 
 func _on_reload() -> void:
 	if _csv and _csv.has_method("reload_csv"):
@@ -538,6 +546,7 @@ func _on_reload() -> void:
 	print("[ItemsCheatBar] requested reload of item defs")
 	_refresh_defs()
 	_refresh_sig_dropdown()
+	_refresh_sigil_gxp_dropdown()
 
 # callbacks from InventorySystem signals
 func _on_inv_defs_loaded() -> void:
@@ -735,28 +744,39 @@ func _refresh_sig_dropdown() -> void:
 
 func _refresh_sigil_gxp_dropdown() -> void:
 	if _sigil_gxp_pick == null:
+		print("[ItemsCheatBar][GXP] Dropdown not created yet")
 		return
 	_sigil_gxp_pick.clear()
 
 	if _sig == null:
 		_sigil_gxp_pick.add_item("(No SigilSystem)")
 		_sigil_gxp_pick.disabled = true
+		print("[ItemsCheatBar][GXP] No SigilSystem found")
 		return
 
 	# Get all sigils (not just equipped)
 	var ids: Array[String] = _call_list_all_instances(_sig, false)
+	print("[ItemsCheatBar][GXP] Initial list_all_instances returned: %d sigils" % ids.size())
 
+	# Always try to get free and equipped sigils
 	if ids.is_empty():
+		print("[ItemsCheatBar][GXP] No sigils from list_all_instances, trying free + loadout")
 		_append_ids_free(ids)
+		print("[ItemsCheatBar][GXP] After append_ids_free: %d sigils" % ids.size())
 		for member in _collect_party_tokens():
 			_append_ids_from_loadout(ids, member)
+		print("[ItemsCheatBar][GXP] After loadout scan: %d sigils" % ids.size())
 
+	# Try to auto-seed if still empty
 	if ids.is_empty():
+		print("[ItemsCheatBar][GXP] Still empty, trying auto-seed")
 		if _auto_seed_one_instance_from_inventory():
 			ids = _call_list_all_instances(_sig, false)
 			if ids.is_empty():
 				_append_ids_free(ids)
+			print("[ItemsCheatBar][GXP] After auto-seed: %d sigils" % ids.size())
 
+	# Deduplicate
 	var seen: Dictionary = {}
 	var list: Array[String] = []
 	for sid in ids:
@@ -767,9 +787,12 @@ func _refresh_sigil_gxp_dropdown() -> void:
 			list.append(sid)
 	list.sort()
 
+	print("[ItemsCheatBar][GXP] Final unique list: %d sigils" % list.size())
+
 	if list.size() == 0:
 		_sigil_gxp_pick.add_item("— no sigils —")
 		_sigil_gxp_pick.disabled = true
+		print("[ItemsCheatBar][GXP] No sigils to display")
 		return
 
 	_sigil_gxp_pick.disabled = false
@@ -781,6 +804,8 @@ func _refresh_sigil_gxp_dropdown() -> void:
 				disp = String(nm_v)
 		_sigil_gxp_pick.add_item(disp)
 		_sigil_gxp_pick.set_item_metadata(_sigil_gxp_pick.get_item_count() - 1, sid2)
+
+	print("[ItemsCheatBar][GXP] Dropdown populated with %d items" % _sigil_gxp_pick.get_item_count())
 
 func _selected_sig_inst() -> String:
 	if _sig_inst_pick == null:
@@ -804,6 +829,10 @@ func _on_equipped_toggle(_pressed: bool) -> void:
 func _on_loadout_changed(_member: String) -> void:
 	_refresh_sig_dropdown()
 
+func _on_sigil_changed(_arg: Variant = null) -> void:
+	_refresh_sig_dropdown()
+	_refresh_sigil_gxp_dropdown()
+
 func _grant_xp_to_sigil(amount: int) -> void:
 	if _sig == null:
 		return
@@ -814,6 +843,7 @@ func _grant_xp_to_sigil(amount: int) -> void:
 	if _sig.has_method("cheat_add_xp_to_instance"):
 		_sig.call("cheat_add_xp_to_instance", id, amount, require_equipped)
 	_refresh_sig_dropdown()
+	_refresh_sigil_gxp_dropdown()
 
 func _on_sig_lv_up() -> void:
 	if _sig == null:
@@ -830,6 +860,7 @@ func _on_sig_lv_up() -> void:
 	if _sig.has_method("cheat_set_instance_level"):
 		_sig.call("cheat_set_instance_level", id, new_lvl)
 	_refresh_sig_dropdown()
+	_refresh_sigil_gxp_dropdown()
 
 func _on_sig_lv_dn() -> void:
 	if _sig == null:
@@ -846,6 +877,7 @@ func _on_sig_lv_dn() -> void:
 	if _sig.has_method("cheat_set_instance_level"):
 		_sig.call("cheat_set_instance_level", id, new_lvl)
 	_refresh_sig_dropdown()
+	_refresh_sigil_gxp_dropdown()
 
 func _on_sig_xp_25() -> void:
 	_grant_xp_to_sigil(25)
