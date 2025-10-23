@@ -91,6 +91,7 @@ func _build_device_ui() -> void:
 	# Phone frame (PanelContainer → theme can give rounded panel/padding)
 	_phone = PanelContainer.new()
 	_phone.name = "Phone"
+	_phone.clip_contents = true  # Prevent content overflow
 
 	# Create rounded phone bezel style
 	var phone_style := StyleBoxFlat.new()
@@ -192,7 +193,7 @@ func _build_device_ui() -> void:
 	_home_indicator.add_child(indicator_center)
 	indicator_center.set_anchors_preset(Control.PRESET_FULL_RECT)
 
-# Phone takes left 1/3rd of screen
+# Phone takes left 1/3rd of screen with fixed size
 func _layout_device() -> void:
 	if _center == null:
 		return
@@ -212,23 +213,26 @@ func _layout_device() -> void:
 	_center.size_flags_horizontal = Control.SIZE_FILL
 	_center.size_flags_vertical = Control.SIZE_FILL
 
-	# Phone maintains aspect ratio within the 1/3rd area
+	# Phone has fixed size regardless of content
 	if _phone:
+		# Always use design size, fitting to the 1/3rd area
 		var available_width = vp.x * 0.333
 		var available_height = vp.y
 
-		# Maintain phone aspect ratio
-		var phone_aspect = PHONE_DESIGN_SIZE.x / PHONE_DESIGN_SIZE.y
-		var container_aspect = available_width / available_height
+		# Calculate scale to fit in 1/3rd area while maintaining aspect
+		var scale_x = (available_width - PHONE_SAFE_MARGIN) / PHONE_DESIGN_SIZE.x
+		var scale_y = (available_height - PHONE_SAFE_MARGIN) / PHONE_DESIGN_SIZE.y
+		var scale = min(scale_x, scale_y)
+		scale = min(scale, 1.0)  # Never scale up
 
-		if container_aspect > phone_aspect:
-			# Container is wider - fit to height
-			_phone.custom_minimum_size = Vector2(available_height * phone_aspect * 0.9, available_height * 0.95)
-		else:
-			# Container is taller - fit to width
-			_phone.custom_minimum_size = Vector2(available_width * 0.9, available_width / phone_aspect * 0.95)
+		# Set fixed size
+		_phone.custom_minimum_size = PHONE_DESIGN_SIZE * scale
+		_phone.size = PHONE_DESIGN_SIZE * scale
 
-	_center.scale = Vector2(1.0, 1.0)
+		# Prevent content from expanding the phone
+		if _vbox:
+			_vbox.custom_minimum_size = Vector2.ZERO
+			_vbox.size = PHONE_DESIGN_SIZE * scale
 
 # -----------------------------------------------------------------------------#
 # Screen management
@@ -258,15 +262,16 @@ func _show_home() -> void:
 
 	# Add some top spacing
 	var top_spacer := Control.new()
-	top_spacer.custom_minimum_size = Vector2(0, 40)
+	top_spacer.custom_minimum_size = Vector2(0, 20)
 	_screen_hold.add_child(top_spacer)
 
 	_home_grid = GridContainer.new()
 	_home_grid.columns = 4
-	_home_grid.add_theme_constant_override("h_separation", 20)
-	_home_grid.add_theme_constant_override("v_separation", 24)
-	_home_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_home_grid.add_theme_constant_override("h_separation", 12)
+	_home_grid.add_theme_constant_override("v_separation", 16)
+	_home_grid.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	_home_grid.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	_home_grid.custom_minimum_size = Vector2.ZERO  # Don't force size
 	_screen_hold.add_child(_home_grid)
 
 	# Modern app icons with colors
@@ -279,14 +284,17 @@ func _show_home() -> void:
 func _add_app_tile(kind: String, label: String, emoji: String, icon_color: Color) -> void:
 	# Container for icon + label
 	var vbox := VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 8)
-	vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	vbox.custom_minimum_size = Vector2(80, 100)
+	vbox.add_theme_constant_override("separation", 6)
+	vbox.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	vbox.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	vbox.custom_minimum_size = Vector2(70, 90)
 
 	# Circular icon button
 	var icon_btn := Button.new()
 	icon_btn.custom_minimum_size = Vector2(ICON_SIZE, ICON_SIZE)
+	icon_btn.custom_maximum_size = Vector2(ICON_SIZE, ICON_SIZE)  # Prevent expansion
 	icon_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	icon_btn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	icon_btn.focus_mode = Control.FOCUS_ALL
 	icon_btn.tooltip_text = label
 
@@ -328,10 +336,14 @@ func _add_app_tile(kind: String, label: String, emoji: String, icon_color: Color
 	var lbl := Label.new()
 	lbl.text = label
 	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	lbl.add_theme_font_size_override("font_size", 12)
+	lbl.add_theme_font_size_override("font_size", 11)
 	lbl.add_theme_color_override("font_color", Color(0.9, 0.9, 0.95, 1))
 	lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	lbl.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	lbl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	lbl.custom_minimum_size = Vector2(70, 0)
+	lbl.custom_maximum_size = Vector2(70, 0)
+	lbl.clip_text = false
 	vbox.add_child(lbl)
 
 	_home_grid.add_child(vbox)
