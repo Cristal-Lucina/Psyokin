@@ -17,6 +17,14 @@ const PHONE_DESIGN_SIZE  : Vector2 = Vector2(420, 820)  # target device size (px
 const PHONE_SAFE_MARGIN  : float   = 48.0               # keep gap to window edges
 const PHONE_SCALE_TO_FIT : bool    = true               # downscale to fit if needed
 
+# Modern phone styling
+const PHONE_BEZEL_COLOR  : Color   = Color(0.08, 0.08, 0.1, 1.0)  # Dark bezel
+const PHONE_SCREEN_COLOR : Color   = Color(0.05, 0.05, 0.08, 1.0) # Dark screen
+const STATUS_BAR_HEIGHT  : float   = 32.0
+const HOME_INDICATOR_HEIGHT : float = 24.0
+const PHONE_CORNER_RADIUS : int    = 40
+const ICON_SIZE          : float   = 64.0
+
 # Optional scene child (ok if missing)
 @onready var _backdrop: ColorRect = get_node_or_null("Backdrop") as ColorRect
 
@@ -29,6 +37,7 @@ var _time_lbl   : Label           = null
 var _screen     : VBoxContainer   = null     # container for current screen
 var _screen_hold: VBoxContainer   = null     # active screen root
 var _home_grid  : GridContainer   = null
+var _home_indicator : Control     = null     # bottom home indicator bar
 
 # kind -> Button (for badge updates)
 var _tiles: Dictionary = {}
@@ -80,44 +89,106 @@ func _build_device_ui() -> void:
 	# Phone frame (PanelContainer → theme can give rounded panel/padding)
 	_phone = PanelContainer.new()
 	_phone.name = "Phone"
-	_phone.add_theme_constant_override("margin_left",   12)
-	_phone.add_theme_constant_override("margin_right",  12)
-	_phone.add_theme_constant_override("margin_top",    12)
-	_phone.add_theme_constant_override("margin_bottom", 12)
+
+	# Create rounded phone bezel style
+	var phone_style := StyleBoxFlat.new()
+	phone_style.bg_color = PHONE_BEZEL_COLOR
+	phone_style.corner_radius_top_left = PHONE_CORNER_RADIUS
+	phone_style.corner_radius_top_right = PHONE_CORNER_RADIUS
+	phone_style.corner_radius_bottom_left = PHONE_CORNER_RADIUS
+	phone_style.corner_radius_bottom_right = PHONE_CORNER_RADIUS
+	phone_style.content_margin_left = 16
+	phone_style.content_margin_right = 16
+	phone_style.content_margin_top = 20
+	phone_style.content_margin_bottom = 16
+	phone_style.shadow_color = Color(0, 0, 0, 0.5)
+	phone_style.shadow_size = 20
+	phone_style.shadow_offset = Vector2(0, 4)
+	_phone.add_theme_stylebox_override("panel", phone_style)
+
 	_center.add_child(_phone)
 
 	# Root vertical layout inside the phone
 	_vbox = VBoxContainer.new()
 	_vbox.name = "Root"
-	_vbox.add_theme_constant_override("separation", 12)
+	_vbox.add_theme_constant_override("separation", 0)
 	_phone.add_child(_vbox)
 
-	# Header (time + simple indicators)
+	# Status bar (time + indicators) with modern phone look
 	_header = HBoxContainer.new()
-	_header.name = "Header"
-	_header.add_theme_constant_override("separation", 12)
+	_header.name = "StatusBar"
+	_header.custom_minimum_size = Vector2(0, STATUS_BAR_HEIGHT)
+	_header.add_theme_constant_override("separation", 8)
 	_vbox.add_child(_header)
 
+	# Time on left
 	_time_lbl = Label.new()
 	_time_lbl.name = "Time"
 	_time_lbl.text = _format_time()
+	_time_lbl.add_theme_font_size_override("font_size", 15)
+	_time_lbl.add_theme_color_override("font_color", Color(0.95, 0.95, 0.97, 1))
+	_time_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_header.add_child(_time_lbl)
 
-	var dots: Label = Label.new()
-	dots.text = "••••"
-	_header.add_child(dots)
+	# Spacer to push icons to the right
+	var spacer := Control.new()
+	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_header.add_child(spacer)
 
-	var battery: Label = Label.new()
-	battery.text = "▮▮▮▮"
-	_header.add_child(battery)
+	# Signal indicator (modern style)
+	var signal_lbl := Label.new()
+	signal_lbl.text = "⚫⚫⚫⚫"  # Signal dots
+	signal_lbl.add_theme_font_size_override("font_size", 12)
+	signal_lbl.add_theme_color_override("font_color", Color(0.9, 0.9, 0.95, 1))
+	signal_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_header.add_child(signal_lbl)
+
+	# Battery indicator
+	var battery_lbl := Label.new()
+	battery_lbl.text = "100%"
+	battery_lbl.add_theme_font_size_override("font_size", 15)
+	battery_lbl.add_theme_color_override("font_color", Color(0.95, 0.95, 0.97, 1))
+	battery_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_header.add_child(battery_lbl)
 
 	# Screen area — VBox so screens can add headers + content that expand
 	_screen = VBoxContainer.new()
 	_screen.name = "Screen"
-	_screen.add_theme_constant_override("separation", 10)
+	_screen.add_theme_constant_override("separation", 0)
 	_screen.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_screen.size_flags_vertical   = Control.SIZE_EXPAND_FILL
-	_vbox.add_child(_screen)
+	_screen.size_flags_vertical = Control.SIZE_EXPAND_FILL
+
+	# Add screen background
+	var screen_bg := StyleBoxFlat.new()
+	screen_bg.bg_color = PHONE_SCREEN_COLOR
+	screen_bg.content_margin_left = 20
+	screen_bg.content_margin_right = 20
+	screen_bg.content_margin_top = 20
+	screen_bg.content_margin_bottom = 20
+	var screen_panel := PanelContainer.new()
+	screen_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	screen_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	screen_panel.add_theme_stylebox_override("panel", screen_bg)
+	screen_panel.add_child(_screen)
+	_vbox.add_child(screen_panel)
+
+	# Home indicator bar (modern gesture bar)
+	_home_indicator = Control.new()
+	_home_indicator.name = "HomeIndicator"
+	_home_indicator.custom_minimum_size = Vector2(0, HOME_INDICATOR_HEIGHT)
+	_vbox.add_child(_home_indicator)
+
+	# Draw the indicator bar in the center
+	var indicator_bar := ColorRect.new()
+	indicator_bar.color = Color(0.6, 0.6, 0.65, 0.5)
+	indicator_bar.custom_minimum_size = Vector2(120, 5)
+	indicator_bar.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	indicator_bar.position = Vector2(0, 10)
+
+	var indicator_center := CenterContainer.new()
+	indicator_center.add_child(indicator_bar)
+	_home_indicator.add_child(indicator_center)
+	indicator_center.set_anchors_preset(Control.PRESET_FULL_RECT)
 
 # Constant size (downscale only if window is too small)
 func _layout_device() -> void:
@@ -162,54 +233,123 @@ func _show_home() -> void:
 	_ensure_screen_ready()
 	_clear_screen()
 
+	# Add some top spacing
+	var top_spacer := Control.new()
+	top_spacer.custom_minimum_size = Vector2(0, 40)
+	_screen_hold.add_child(top_spacer)
+
 	_home_grid = GridContainer.new()
 	_home_grid.columns = 4
-	_home_grid.add_theme_constant_override("h_separation", 12)
-	_home_grid.add_theme_constant_override("v_separation", 14)
+	_home_grid.add_theme_constant_override("h_separation", 20)
+	_home_grid.add_theme_constant_override("v_separation", 24)
 	_home_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_home_grid.size_flags_vertical   = Control.SIZE_EXPAND_FILL
+	_home_grid.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	_screen_hold.add_child(_home_grid)
 
-	_add_app_tile("messages", "Messages", ( "💬" if USE_EMOJI else "" ))
-	_add_app_tile("contacts", "Contacts", ( "👤" if USE_EMOJI else "" ))
-	_add_app_tile("bonds",    "Bonds",    ( "🤝" if USE_EMOJI else "" ))
-	_add_app_tile("apps",     "Apps",     ( "✴"  if USE_EMOJI else "" ))
-	_add_app_tile("settings", "Settings", ( "⚙"  if USE_EMOJI else "" ))
+	# Modern app icons with colors
+	_add_app_tile("messages", "Messages", "💬", Color(0.1, 0.6, 0.9))   # Blue
+	_add_app_tile("contacts", "Contacts", "👤", Color(0.5, 0.5, 0.55))  # Gray
+	_add_app_tile("bonds",    "Bonds",    "🤝", Color(0.9, 0.3, 0.5))   # Pink
+	_add_app_tile("apps",     "Apps",     "⊞",  Color(0.3, 0.7, 0.4))   # Green
+	_add_app_tile("settings", "Settings", "⚙",  Color(0.6, 0.6, 0.65))  # Gray
 
-func _add_app_tile(kind: String, label: String, emoji: String) -> void:
-	var b: Button = Button.new()
-	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	b.size_flags_vertical   = Control.SIZE_EXPAND_FILL
-	b.custom_minimum_size   = Vector2(96, 96)
-	b.focus_mode            = Control.FOCUS_ALL
-	b.clip_text             = false
-	b.tooltip_text          = label
-	b.text = (emoji + "\n" + label) if emoji != "" else label
-	b.pressed.connect(func() -> void: _open_app(kind))
-	_home_grid.add_child(b)
-	_tiles[kind] = b
+func _add_app_tile(kind: String, label: String, emoji: String, icon_color: Color) -> void:
+	# Container for icon + label
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 8)
+	vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	vbox.custom_minimum_size = Vector2(80, 100)
+
+	# Circular icon button
+	var icon_btn := Button.new()
+	icon_btn.custom_minimum_size = Vector2(ICON_SIZE, ICON_SIZE)
+	icon_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	icon_btn.focus_mode = Control.FOCUS_ALL
+	icon_btn.tooltip_text = label
+
+	# Create rounded icon background
+	var icon_style := StyleBoxFlat.new()
+	icon_style.bg_color = icon_color
+	icon_style.corner_radius_top_left = int(ICON_SIZE * 0.25)
+	icon_style.corner_radius_top_right = int(ICON_SIZE * 0.25)
+	icon_style.corner_radius_bottom_left = int(ICON_SIZE * 0.25)
+	icon_style.corner_radius_bottom_right = int(ICON_SIZE * 0.25)
+	icon_btn.add_theme_stylebox_override("normal", icon_style)
+
+	# Hover state
+	var icon_style_hover := StyleBoxFlat.new()
+	icon_style_hover.bg_color = icon_color.lightened(0.1)
+	icon_style_hover.corner_radius_top_left = int(ICON_SIZE * 0.25)
+	icon_style_hover.corner_radius_top_right = int(ICON_SIZE * 0.25)
+	icon_style_hover.corner_radius_bottom_left = int(ICON_SIZE * 0.25)
+	icon_style_hover.corner_radius_bottom_right = int(ICON_SIZE * 0.25)
+	icon_btn.add_theme_stylebox_override("hover", icon_style_hover)
+
+	# Pressed state
+	var icon_style_pressed := StyleBoxFlat.new()
+	icon_style_pressed.bg_color = icon_color.darkened(0.1)
+	icon_style_pressed.corner_radius_top_left = int(ICON_SIZE * 0.25)
+	icon_style_pressed.corner_radius_top_right = int(ICON_SIZE * 0.25)
+	icon_style_pressed.corner_radius_bottom_left = int(ICON_SIZE * 0.25)
+	icon_style_pressed.corner_radius_bottom_right = int(ICON_SIZE * 0.25)
+	icon_btn.add_theme_stylebox_override("pressed", icon_style_pressed)
+
+	icon_btn.text = emoji if USE_EMOJI else "●"
+	icon_btn.add_theme_font_size_override("font_size", 32)
+	icon_btn.add_theme_color_override("font_color", Color.WHITE)
+	icon_btn.pressed.connect(func() -> void: _open_app(kind))
+
+	vbox.add_child(icon_btn)
+
+	# Label below icon
+	var lbl := Label.new()
+	lbl.text = label
+	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lbl.add_theme_font_size_override("font_size", 12)
+	lbl.add_theme_color_override("font_color", Color(0.9, 0.9, 0.95, 1))
+	lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	vbox.add_child(lbl)
+
+	_home_grid.add_child(vbox)
+	_tiles[kind] = icon_btn  # Store the button for badge updates
 
 # -----------------------------------------------------------------------------#
 # Shared UI bits
 # -----------------------------------------------------------------------------#
 func _make_header_row(title: String) -> HBoxContainer:
 	var row: HBoxContainer = HBoxContainer.new()
-	row.add_theme_constant_override("separation", 8)
+	row.add_theme_constant_override("separation", 12)
 	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.custom_minimum_size = Vector2(0, 44)
 
+	# Back button (modern style)
 	var back: Button = Button.new()
-	back.text = "Back"
+	back.text = "‹ Back"
 	back.focus_mode = Control.FOCUS_ALL
+	back.add_theme_font_size_override("font_size", 16)
+	back.add_theme_color_override("font_color", Color(0.3, 0.6, 1.0))
+
+	# Flat style for back button
+	var back_style := StyleBoxFlat.new()
+	back_style.bg_color = Color(0, 0, 0, 0)  # Transparent
+	back.add_theme_stylebox_override("normal", back_style)
+	back.add_theme_stylebox_override("hover", back_style)
+	back.add_theme_stylebox_override("pressed", back_style)
+
 	back.pressed.connect(_show_home)
 	row.add_child(back)
 
-	# spacer + centered title
+	# Spacer + centered title
 	var spacer_l: Control = Control.new()
 	spacer_l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(spacer_l)
 
 	var ttl: Label = Label.new()
 	ttl.text = title
+	ttl.add_theme_font_size_override("font_size", 17)
+	ttl.add_theme_color_override("font_color", Color(0.95, 0.95, 0.97, 1))
+	ttl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	row.add_child(ttl)
 
 	var spacer_r: Control = Control.new()
@@ -221,14 +361,22 @@ func _make_header_row(title: String) -> HBoxContainer:
 func _panel_wrap(child: Control) -> PanelContainer:
 	var p: PanelContainer = PanelContainer.new()
 	p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	p.size_flags_vertical   = Control.SIZE_EXPAND_FILL
-	var pad: MarginContainer = MarginContainer.new()
-	pad.add_theme_constant_override("margin_left",  10)
-	pad.add_theme_constant_override("margin_right", 10)
-	pad.add_theme_constant_override("margin_top",    8)
-	pad.add_theme_constant_override("margin_bottom", 8)
-	p.add_child(pad)
-	pad.add_child(child)
+	p.size_flags_vertical = Control.SIZE_EXPAND_FILL
+
+	# Modern card-style panel
+	var panel_style := StyleBoxFlat.new()
+	panel_style.bg_color = Color(0.1, 0.1, 0.12, 0.6)
+	panel_style.corner_radius_top_left = 12
+	panel_style.corner_radius_top_right = 12
+	panel_style.corner_radius_bottom_left = 12
+	panel_style.corner_radius_bottom_right = 12
+	panel_style.content_margin_left = 16
+	panel_style.content_margin_right = 16
+	panel_style.content_margin_top = 16
+	panel_style.content_margin_bottom = 16
+	p.add_theme_stylebox_override("panel", panel_style)
+
+	p.add_child(child)
 	return p
 
 # -----------------------------------------------------------------------------#
@@ -249,7 +397,7 @@ func _open_app(kind: String) -> void:
 
 			var sc: ScrollContainer = ScrollContainer.new()
 			sc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			sc.size_flags_vertical   = Control.SIZE_EXPAND_FILL
+			sc.size_flags_vertical = Control.SIZE_EXPAND_FILL
 			_screen_hold.add_child(_panel_wrap(sc))
 
 			var body: VBoxContainer = VBoxContainer.new()
@@ -262,31 +410,40 @@ func _open_app(kind: String) -> void:
 			r.bbcode_enabled = true
 			r.fit_content = true
 			r.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-			r.text = "[i]Inbox is empty.[/i]"
+			r.add_theme_color_override("default_color", Color(0.7, 0.7, 0.75, 1))
+			r.text = "[center][i]Inbox is empty.[/i][/center]"
 			body.add_child(r)
 
 		"contacts":
 			_screen_hold.add_child(_make_header_row("Contacts"))
 			var lbl_c: Label = Label.new()
 			lbl_c.text = "Contacts — TBD"
+			lbl_c.add_theme_color_override("font_color", Color(0.7, 0.7, 0.75, 1))
+			lbl_c.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			_screen_hold.add_child(_panel_wrap(lbl_c))
 
 		"bonds":
 			_screen_hold.add_child(_make_header_row("Circle Bonds"))
 			var lbl_b: Label = Label.new()
 			lbl_b.text = "Circle Bonds — TBD"
+			lbl_b.add_theme_color_override("font_color", Color(0.7, 0.7, 0.75, 1))
+			lbl_b.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			_screen_hold.add_child(_panel_wrap(lbl_b))
 
 		"apps":
 			_screen_hold.add_child(_make_header_row("Apps"))
 			var lbl_a: Label = Label.new()
 			lbl_a.text = "Apps — TBD"
+			lbl_a.add_theme_color_override("font_color", Color(0.7, 0.7, 0.75, 1))
+			lbl_a.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			_screen_hold.add_child(_panel_wrap(lbl_a))
 
 		"settings":
 			_screen_hold.add_child(_make_header_row("Settings"))
 			var lbl_s: Label = Label.new()
 			lbl_s.text = "Settings — TBD"
+			lbl_s.add_theme_color_override("font_color", Color(0.7, 0.7, 0.75, 1))
+			lbl_s.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			_screen_hold.add_child(_panel_wrap(lbl_s))
 
 		_:
