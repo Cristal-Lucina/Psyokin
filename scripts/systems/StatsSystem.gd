@@ -114,6 +114,7 @@ var _party: Node = null
 var _csv: Node = null
 
 # ───────────────────────── Lifecycle ─────────────────────────
+## Initializes the StatsSystem, connecting to calendar/party signals and loading party CSV data
 func _ready() -> void:
 	_cal = get_node_or_null(CAL_PATH)
 	if _cal != null and _cal.has_signal("day_advanced"):
@@ -138,12 +139,13 @@ func _ready() -> void:
 	if _gs != null and _gs.has_signal("perk_points_changed"):
 		_gs.connect("perk_points_changed", Callable(self, "_on_perk_points_changed"))
 
-# Provide a "has()" so external code that mistakenly treats us like a Dictionary won’t crash.
+## Compatibility method that allows external code to treat StatsSystem like a Dictionary without crashing
 func has(prop: String) -> bool:
 	var v: Variant = get(prop)
 	return v != null
 
 # ───────────────────────── Helpers ─────────────────────────
+## Resolves a member name or ID to a canonical ID. Converts "hero" name to "hero" ID, and member names to IDs from CSV
 func _resolve_id(name_in: String) -> String:
 	var want: String = String(name_in).strip_edges().to_lower()
 	if _gs != null:
@@ -154,6 +156,7 @@ func _resolve_id(name_in: String) -> String:
 		return String(_name_to_id[want])
 	return name_in
 
+## Safely converts any Variant to an integer (handles int, float, string types)
 func _to_int(value: Variant) -> int:
 	if typeof(value) == TYPE_INT or typeof(value) == TYPE_FLOAT:
 		return int(value)
@@ -161,15 +164,16 @@ func _to_int(value: Variant) -> int:
 		return String(value).to_int()
 	return 0
 
-# Optional: allow other systems to use our max HP/MP math
+## Calculates maximum HP from level and VTL stat. Formula: 150 + (VTL × Level × 6)
 func compute_max_hp(level: int, vtl: int) -> int:
 	return 150 + (max(1, vtl) * max(1, level) * 6)
 
+## Calculates maximum MP from level and FCS stat. Formula: 20 + (FCS × Level × 1.5)
 func compute_max_mp(level: int, fcs: int) -> int:
 	return 20 + int(round(float(max(1, fcs)) * float(max(1, level)) * 1.5))
 
 # ───────────────────────── Weekday helpers ─────────────────────────
-# Sakamoto’s algorithm (Gregorian). Returns 0=Mon..6=Sun. Uses float math + floor to avoid integer-division warnings.
+## Calculates day of week using Sakamoto's algorithm (Gregorian calendar). Returns 0=Monday through 6=Sunday
 func _dow_index_gregorian(y: int, m: int, d: int) -> int:
 	var t: PackedInt32Array = PackedInt32Array([0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4])
 	var yy: int = y
@@ -184,6 +188,7 @@ func _dow_index_gregorian(y: int, m: int, d: int) -> int:
 	var mon0: int = (sun0 + 6) % 7                                    # shift so 0=Mon..6=Sun
 	return mon0
 
+## Extracts year/month/day from date Dictionary and returns day_index (0-6) and day_name
 func _derive_day_info(date: Dictionary) -> Dictionary:
 	var y: int = int(date.get("year", 0))
 	var m: int = int(date.get("month", 0))
@@ -195,6 +200,7 @@ func _derive_day_info(date: Dictionary) -> Dictionary:
 	return {"ok": true, "day_index": idx, "day_name": names[idx]}
 
 # ───────────────────────── Calendar hooks ─────────────────────────
+## Called when CalendarSystem advances a day. Applies daily DSI to all party members and resets fatigue on Mondays
 func _on_day_advanced(date: Dictionary) -> void:
 	_seed_known_members()
 
@@ -231,17 +237,21 @@ func _on_day_advanced(date: Dictionary) -> void:
 
 	emit_signal("stats_changed")
 
+## Called when CalendarSystem triggers week_reset signal (usually Sunday->Monday). Resets fatigue counters
 func _on_week_reset() -> void:
 	reset_week()
 
+## Called when PartySystem or GameState signals party roster changes. Re-seeds member progress data
 func _on_party_changed(_a: Variant = null, _b: Variant = null) -> void:
 	_seed_known_members()
 	emit_signal("stats_changed")
 
+## Forwards perk_points_changed signal from GameState to any listeners
 func _on_perk_points_changed(new_value: int) -> void:
 	emit_signal("perk_points_changed", new_value)
 
 # ───────────────────────── CSV cache ─────────────────────────
+## Loads party member definitions from CSV (actor_id, name, base stats, DSI values). Only runs once
 func _load_party_csv_cache() -> void:
 	if _csv_loaded_once:
 		return
@@ -264,6 +274,7 @@ func _load_party_csv_cache() -> void:
 			_csv_loaded_once = true
 
 # ───────────────────────── Progress seeds ─────────────────────────
+## Ensures all known members (from CSV, roster, or previous progress) have initialized progress data
 func _seed_known_members() -> void:
 	# Always include everyone from the CSV (non-hero).
 	for id_any in _csv_by_id.keys():
@@ -288,6 +299,7 @@ func _seed_known_members() -> void:
 		if pid3 != "hero":
 			_ensure_progress(pid3)
 
+## Creates progress tracking data for a member if it doesn't exist. Returns the member's progress Dictionary
 func _ensure_progress(pid: String) -> Dictionary:
 	if _party_progress.has(pid):
 		return _party_progress[pid] as Dictionary
@@ -331,6 +343,7 @@ func _ensure_progress(pid: String) -> Dictionary:
 	return _party_progress[pid] as Dictionary
 
 # ───────────────────────── Daily DSI (allies) ─────────────────────────
+## Applies one day of Daily Stat Increment (DSI) to a party member. Respects fatigue threshold (halves gains after 60 SXP/week)
 func _apply_daily_dsi(pid: String) -> void:
 	var info: Dictionary = _ensure_progress(pid)
 	var dsi: Dictionary = info.get("dsi_tenths", {}) as Dictionary
@@ -361,6 +374,7 @@ func _apply_daily_dsi(pid: String) -> void:
 	_party_progress[pid] = info
 
 # ───────────────────────── SXP → bonus levels (allies) ─────────────────────────
+## Converts total SXP to bonus stat levels using threshold table. Returns number of bonus levels earned
 func _bonus_levels_from_sxp(sxp: int) -> int:
 	for i in range(sxp_thresholds.size() - 1, -1, -1):
 		if sxp >= int(sxp_thresholds[i]):
@@ -368,9 +382,11 @@ func _bonus_levels_from_sxp(sxp: int) -> int:
 	return 0
 
 # ───────────────────────── Hero/Member XP ─────────────────────────
+## Calculates XP required to reach next level. Formula: 120 + 30×level + 6×level²
 func _xp_to_next_level(level: int) -> int:
 	return 120 + 30 * level + 6 * level * level
 
+## Grants XP to a member (hero or ally), processing level-ups and perk point gains. Emits stats_changed on level-up
 func add_xp(member_id: String, amount: int) -> void:
 	if amount <= 0:
 		return
@@ -413,6 +429,7 @@ func add_xp(member_id: String, amount: int) -> void:
 	else:
 		char_xp[pid] = 0 if level >= 99 else pool
 
+## Returns the current level of a member (hero or ally)
 func get_member_level(member_id: String) -> int:
 	var pid: String = _resolve_id(member_id)
 	if pid == "hero":
@@ -420,10 +437,12 @@ func get_member_level(member_id: String) -> int:
 	var info: Dictionary = _ensure_progress(pid)
 	return int(info.get("char_level", 1))
 
+## Sets the hero's level to a specific value (clamped 1-99). Emits stats_changed
 func set_hero_level(new_level: int) -> void:
 	hero_level = clamp(new_level, 1, 99)
 	emit_signal("stats_changed")
 
+## Returns the total level for a specific stat of a member (base + SXP bonus levels)
 func get_member_stat_level(member_id: String, stat: String) -> int:
 	var pid: String = _resolve_id(member_id)
 	if pid == "hero":
@@ -435,9 +454,11 @@ func get_member_stat_level(member_id: String, stat: String) -> int:
 	return base + bonus
 
 # ───────────────────────── Perk points passthrough ─────────────────────────
+## Internal helper to emit perk_points_changed signal with current value from GameState
 func _emit_pp_changed() -> void:
 	emit_signal("perk_points_changed", get_perk_points())
 
+## Returns the current perk points value from GameState
 func get_perk_points() -> int:
 	var gs_node: Node = get_node_or_null(GS_PATH)
 	if gs_node != null:
@@ -446,6 +467,7 @@ func get_perk_points() -> int:
 			return int(v)
 	return 0
 
+## Adds perk points to GameState (can be negative to subtract). Emits perk_points_changed signal
 func add_perk_points(points: int) -> void:
 	if points == 0:
 		return
@@ -461,6 +483,7 @@ func add_perk_points(points: int) -> void:
 				gs_node.set("perk_points", max(0, cur + points))
 	_emit_pp_changed()
 
+## Spends up to the specified amount of perk points. Returns the actual number spent (limited by available points)
 func spend_perk_point(amount: int) -> int:
 	if amount <= 0:
 		return 0
@@ -480,9 +503,11 @@ func spend_perk_point(amount: int) -> int:
 	return 0
 
 # ───────────────────────── Stat views ─────────────────────────
+## Returns the hero's current level for a specific stat (e.g., "BRW", "MND")
 func get_stat(stat: String) -> int:
 	return int(stat_level.get(stat, 1))
 
+## Checks if a member's stat is fatigued (has gained 60+ SXP this week, causing halved gains)
 func is_fatigued(stat: String, member_id: String = "hero") -> bool:
 	var s: String = String(stat).strip_edges().to_upper()
 	if member_id == "hero":
@@ -491,9 +516,11 @@ func is_fatigued(stat: String, member_id: String = "hero") -> bool:
 	var w: Dictionary = info.get("weekly_sxp", {}) as Dictionary
 	return int(w.get(s, 0)) >= FATIGUE_THRESHOLD_PER_WEEK
 
+## Returns an array of stat keys in canonical order: ["BRW", "MND", "TPO", "VTL", "FCS"]
 func get_stats_order() -> Array[String]:
 	return STATS_KEYS.duplicate()
 
+## Converts a stat key to its display name (e.g., "BRW" -> "Brawn")
 func get_stat_display_name(id_str: String) -> String:
 	var s: String = String(id_str)
 	match s:
@@ -504,6 +531,7 @@ func get_stat_display_name(id_str: String) -> String:
 		"FCS": return "Focus"
 		_:     return s
 
+## Returns a Dictionary with all hero stats containing level, SXP, weekly SXP, and fatigue status for each stat
 func get_stats_dict() -> Dictionary:
 	var out: Dictionary = {}
 	for s in STATS_KEYS:
@@ -519,16 +547,20 @@ func get_stats_dict() -> Dictionary:
 		}
 	return out
 
+## Alias for get_stats_dict(). Returns hero stats Dictionary
 func to_dict() -> Dictionary:
 	return get_stats_dict()
 
+## Returns the hero's total accumulated SXP for a specific stat
 func get_stat_sxp(stat: String) -> int:
 	return int(stat_sxp.get(stat, 0))
 
+## Returns the legacy weekly_actions Dictionary (kept for compatibility, not used by fatigue system)
 func get_weekly_actions_dict() -> Dictionary:
 	return weekly_actions.duplicate()
 
 # ───────────────────────── Hero SXP gain (fatigue-aware) ───────────────────────
+## Grants SXP to hero's stat, applying fatigue rules (halves gains after 60 SXP/week). Returns actual SXP gained. Emits stat_leveled_up and stats_changed
 func add_sxp(stat: String, base_amount: int) -> int:
 	var k: String = String(stat).strip_edges().to_upper()
 	if not stat_sxp.has(k):
@@ -559,6 +591,7 @@ func add_sxp(stat: String, base_amount: int) -> int:
 	return gain
 
 # ───────────────────────── Member SXP (hero or ally) ──────────────────────────
+## Grants SXP to any member's stat (hero or ally), applying fatigue rules. Returns actual SXP gained. Emits stats_changed
 func add_sxp_to_member(member_id: String, stat: String, base_amount: int) -> int:
 	if base_amount <= 0:
 		return 0
@@ -589,13 +622,16 @@ func add_sxp_to_member(member_id: String, stat: String, base_amount: int) -> int
 	emit_signal("stats_changed")
 	return gain
 
-# Back-compat aliases used by older code
+## Legacy alias for add_sxp_to_member(). Grants SXP to a member's stat
 func add_member_sxp(member_id: String, stat: String, amount: int) -> int:
 	return add_sxp_to_member(member_id, stat, amount)
+
+## Legacy alias for add_sxp_to_member(). Grants SXP to a member's stat
 func add_stat_xp_to_member(member_id: String, stat: String, amount: int) -> int:
 	return add_sxp_to_member(member_id, stat, amount)
 
 # ───────────────────────── Week reset ─────────────────────────
+## Resets weekly fatigue counters for hero and all allies (called every Monday). Emits stats_changed
 func reset_week() -> void:
 	# Legacy counter (harmless to clear)
 	for key in weekly_actions.keys():
@@ -618,6 +654,7 @@ func reset_week() -> void:
 	emit_signal("stats_changed")
 
 # ───────────────────────── Creation + Save/Load ─────────────────────────
+## Applies stat boosts from character creation (increments stat_level for each pick). Emits stats_changed
 func apply_creation_boosts(picks: Array) -> void:
 	for p in picks:
 		var k: String = String(p)
@@ -627,6 +664,7 @@ func apply_creation_boosts(picks: Array) -> void:
 		stat_level[k] = max(1, cur + 1)
 	emit_signal("stats_changed")
 
+## Returns save data Dictionary containing hero stats, SXP, levels, fatigue, party progress, and hero XP
 func save() -> Dictionary:
 	return {
 		"levels": stat_level.duplicate(true),
@@ -637,6 +675,7 @@ func save() -> Dictionary:
 		"hero": {"level": hero_level, "xp": hero_xp}
 	}
 
+## Restores stats from save data Dictionary, loading hero stats, SXP, levels, fatigue, and party progress. Emits stats_changed
 func load(data: Dictionary) -> void:
 	var lv_v: Variant = data.get("levels", {})
 	if typeof(lv_v) == TYPE_DICTIONARY:
