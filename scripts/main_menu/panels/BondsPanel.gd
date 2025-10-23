@@ -68,15 +68,16 @@ enum Filter { ALL, KNOWN, LOCKED, MAXED }
 @onready var _desc      : RichTextLabel  = %Notes               # description block
 
 # New/managed widgets
-var _layer_tv     : Label          = null   # shows stage text (Not Met, Outer…)
-var _likes_tv     : Label          = null
-var _dislikes_tv  : Label          = null
-var _unlock_hdr   : Label          = null   # "Unlocks:"
-var _unlock_outer : Button         = null   # Outer → Middle unlock
-var _unlock_middle: Button         = null   # Middle → Inner unlock
-var _unlock_inner : Button         = null   # Inner → Core unlock
-var _story_btn    : Button         = null
-var _story_overlay: Control        = null
+var _layer_tv       : Label          = null   # shows stage text (Not Met, Outer…)
+var _likes_tv       : Label          = null
+var _dislikes_tv    : Label          = null
+var _unlock_hdr     : Label          = null   # "Unlocks:"
+var _unlock_acq     : Button         = null   # Acquaintance → Outer unlock (BXP 2)
+var _unlock_outer   : Button         = null   # Outer → Middle unlock (BXP 4)
+var _unlock_middle  : Button         = null   # Middle → Inner unlock (BXP 6)
+var _unlock_inner   : Button         = null   # Inner → Core unlock (BXP 8)
+var _story_btn      : Button         = null
+var _story_overlay  : Control        = null
 
 # Data / state
 var _sys  : Node = null
@@ -169,11 +170,19 @@ func _ensure_detail_widgets() -> void:
 		row2.add_child(title2); row2.add_child(_dislikes_tv)
 		holder.add_child(row2)
 
-	# Unlocks: Header + 3 threshold buttons
+	# Unlocks: Header + 4 threshold buttons (BXP 2/4/6/8)
 	if _unlock_hdr == null:
 		_unlock_hdr = Label.new()
 		_unlock_hdr.text = "Bond Unlocks:"
 		holder.add_child(_unlock_hdr)
+
+	if _unlock_acq == null:
+		_unlock_acq = Button.new()
+		_unlock_acq.name = "UnlockAcquaintance"
+		_unlock_acq.text = "Acquaintance → Outer"
+		_unlock_acq.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_unlock_acq.disabled = true  # Will be enabled when unlocked
+		holder.add_child(_unlock_acq)
 
 	if _unlock_outer == null:
 		_unlock_outer = Button.new()
@@ -400,6 +409,7 @@ func _update_detail(id: String) -> void:
 		if _desc: _desc.text = "[i]Select a bond to see details.[/i]"
 		if _likes_tv: _likes_tv.text = "—"
 		if _dislikes_tv: _dislikes_tv.text = "—"
+		if _unlock_acq: _unlock_acq.disabled = true
 		if _unlock_outer: _unlock_outer.disabled = true
 		if _unlock_middle: _unlock_middle.disabled = true
 		if _unlock_inner: _unlock_inner.disabled = true
@@ -427,10 +437,15 @@ func _update_detail(id: String) -> void:
 	if _likes_tv: _likes_tv.text = _pretty_list(likes)
 	if _dislikes_tv: _dislikes_tv.text = _pretty_list(dislikes)
 
-	# Unlock buttons - enable based on bond tier reached
-	# Outer → Middle unlocks at layer 4+ (Middle Layer reached)
-	# Middle → Inner unlocks at layer 6+ (Inner Layer reached)
-	# Inner → Core unlocks at layer 8 (Core Layer reached)
+	# Unlock buttons - enable based on bond tier reached (thresholds at BXP 2/4/6/8 per Chapter 5)
+	# Acquaintance → Outer unlocks at BXP 2 (Outer Layer reached)
+	# Outer → Middle unlocks at BXP 4 (Middle Layer reached)
+	# Middle → Inner unlocks at BXP 6 (Inner Layer reached)
+	# Inner → Core unlocks at BXP 8 (Core Layer reached)
+	if _unlock_acq:
+		_unlock_acq.disabled = (layer_val < 2)
+		_unlock_acq.text = "Acquaintance → Outer" + (" [UNLOCKED]" if layer_val >= 2 else " [LOCKED]")
+
 	if _unlock_outer:
 		_unlock_outer.disabled = (layer_val < 4)
 		_unlock_outer.text = "Outer → Middle" + (" [UNLOCKED]" if layer_val >= 4 else " [LOCKED]")
