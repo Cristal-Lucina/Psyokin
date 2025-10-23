@@ -81,17 +81,18 @@ func _purge_runtime_children() -> void:
 # Build device
 # -----------------------------------------------------------------------------#
 func _build_device_ui() -> void:
-	# Left-aligned container for the phone (1/3rd of screen)
-	_center = CenterContainer.new()
+	# Container anchored to left side
+	_center = Control.new()
 	_center.name = "Center"
-	_center.set_anchors_preset(Control.PRESET_LEFT_WIDE)
-	_center.anchor_right = 0.0  # Will be set in _layout_device
+	_center.set_anchors_preset(Control.PRESET_TOP_LEFT)
 	add_child(_center)
 
-	# Phone frame (PanelContainer → theme can give rounded panel/padding)
+	# Phone frame with fixed size - never changes
 	_phone = PanelContainer.new()
 	_phone.name = "Phone"
 	_phone.clip_contents = true  # Prevent content overflow
+	_phone.custom_minimum_size = PHONE_DESIGN_SIZE
+	_phone.size = PHONE_DESIGN_SIZE
 
 	# Create rounded phone bezel style
 	var phone_style := StyleBoxFlat.new()
@@ -111,10 +112,13 @@ func _build_device_ui() -> void:
 
 	_center.add_child(_phone)
 
-	# Root vertical layout inside the phone
+	# Root vertical layout inside the phone - must not affect parent size
 	_vbox = VBoxContainer.new()
 	_vbox.name = "Root"
 	_vbox.add_theme_constant_override("separation", 0)
+	_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_vbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_vbox.custom_minimum_size = Vector2.ZERO  # Never force size
 	_phone.add_child(_vbox)
 
 	# Status bar (time + indicators) with modern phone look
@@ -160,6 +164,7 @@ func _build_device_ui() -> void:
 	_screen.add_theme_constant_override("separation", 0)
 	_screen.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_screen.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_screen.custom_minimum_size = Vector2.ZERO  # Never force size
 
 	# Add screen background
 	var screen_bg := StyleBoxFlat.new()
@@ -171,6 +176,8 @@ func _build_device_ui() -> void:
 	var screen_panel := PanelContainer.new()
 	screen_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	screen_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	screen_panel.custom_minimum_size = Vector2.ZERO  # Never force size
+	screen_panel.clip_contents = true  # Keep content inside
 	screen_panel.add_theme_stylebox_override("panel", screen_bg)
 	screen_panel.add_child(_screen)
 	_vbox.add_child(screen_panel)
@@ -193,46 +200,26 @@ func _build_device_ui() -> void:
 	_home_indicator.add_child(indicator_center)
 	indicator_center.set_anchors_preset(Control.PRESET_FULL_RECT)
 
-# Phone takes left 1/3rd of screen with fixed size
+# Phone at fixed position and size - never moves or resizes
 func _layout_device() -> void:
-	if _center == null:
+	if _center == null or _phone == null:
 		return
 
 	var vp: Vector2 = get_viewport_rect().size
 
-	# Set the container to take up left 1/3rd of the screen
-	_center.anchor_left = 0.0
-	_center.anchor_top = 0.0
-	_center.anchor_right = 0.333  # 1/3rd of screen
-	_center.anchor_bottom = 1.0
-	_center.offset_left = 0
-	_center.offset_top = 0
-	_center.offset_right = 0
-	_center.offset_bottom = 0
+	# Position container at top-left with fixed offset
+	_center.position = Vector2(20, 20)
+	_center.size = PHONE_DESIGN_SIZE
 
-	_center.size_flags_horizontal = Control.SIZE_FILL
-	_center.size_flags_vertical = Control.SIZE_FILL
+	# Phone stays at fixed design size
+	_phone.custom_minimum_size = PHONE_DESIGN_SIZE
+	_phone.size = PHONE_DESIGN_SIZE
 
-	# Phone has fixed size regardless of content
-	if _phone:
-		# Always use design size, fitting to the 1/3rd area
-		var available_width = vp.x * 0.333
-		var available_height = vp.y
-
-		# Calculate scale to fit in 1/3rd area while maintaining aspect
-		var scale_x = (available_width - PHONE_SAFE_MARGIN) / PHONE_DESIGN_SIZE.x
-		var scale_y = (available_height - PHONE_SAFE_MARGIN) / PHONE_DESIGN_SIZE.y
-		var scale = min(scale_x, scale_y)
-		scale = min(scale, 1.0)  # Never scale up
-
-		# Set fixed size
-		_phone.custom_minimum_size = PHONE_DESIGN_SIZE * scale
-		_phone.size = PHONE_DESIGN_SIZE * scale
-
-		# Prevent content from expanding the phone
-		if _vbox:
-			_vbox.custom_minimum_size = Vector2.ZERO
-			_vbox.size = PHONE_DESIGN_SIZE * scale
+	# Force vbox to match phone size exactly
+	if _vbox:
+		_vbox.custom_minimum_size = Vector2.ZERO
+		_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_vbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
 
 # -----------------------------------------------------------------------------#
 # Screen management
@@ -242,11 +229,12 @@ func _clear_screen() -> void:
 		return
 	for c in _screen.get_children():
 		(c as Node).queue_free()
-	# fresh screen root that stretches
+	# fresh screen root that stretches but doesn't force parent size
 	_screen_hold = VBoxContainer.new()
 	_screen_hold.add_theme_constant_override("separation", 8)
 	_screen_hold.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_screen_hold.size_flags_vertical   = Control.SIZE_EXPAND_FILL
+	_screen_hold.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_screen_hold.custom_minimum_size = Vector2.ZERO  # Never force size
 	_screen.add_child(_screen_hold)
 
 func _ensure_screen_ready() -> void:
