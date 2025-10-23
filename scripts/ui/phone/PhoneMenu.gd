@@ -29,7 +29,7 @@ const ICON_SIZE          : float   = 64.0
 @onready var _backdrop: ColorRect = get_node_or_null("Backdrop") as ColorRect
 
 # Built at runtime
-var _center     : CenterContainer = null
+var _center     : Control         = null
 var _phone      : PanelContainer  = null
 var _vbox       : VBoxContainer   = null
 var _header     : HBoxContainer   = null
