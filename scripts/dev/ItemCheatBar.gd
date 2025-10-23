@@ -86,6 +86,7 @@ var _party_sxp_row  : HBoxContainer = null
 
 # -------- Sigil GXP cheat widgets (runtime-built if missing) ----
 var _sigil_gxp_row   : HBoxContainer = null
+var _sigil_gxp_pick  : OptionButton  = null
 var _sigil_gxp_spin  : SpinBox       = null
 var _btn_add_gxp     : Button        = null
 
@@ -425,15 +426,9 @@ func _ensure_sigil_gxp_row() -> void:
 		lbl.text = "Sigil XP:"
 		_sigil_gxp_row.add_child(lbl)
 
-		var dropdown_lbl := Label.new()
-		dropdown_lbl.text = "Sigil"
-		_sigil_gxp_row.add_child(dropdown_lbl)
-
-		# Note: We already have _sig_inst_pick created by the scene, so add a label pointing to it
-		var hint := Label.new()
-		hint.text = "(Use dropdown above)"
-		hint.modulate = Color(0.7, 0.7, 0.7, 1.0)
-		_sigil_gxp_row.add_child(hint)
+		_sigil_gxp_pick = OptionButton.new()
+		_sigil_gxp_pick.custom_minimum_size = Vector2(200, 0)
+		_sigil_gxp_row.add_child(_sigil_gxp_pick)
 
 		var gxp_lbl := Label.new()
 		gxp_lbl.text = "GXP"
@@ -452,6 +447,9 @@ func _ensure_sigil_gxp_row() -> void:
 		_sigil_gxp_row.add_child(_btn_add_gxp)
 		if not _btn_add_gxp.pressed.is_connected(_on_add_sigil_gxp):
 			_btn_add_gxp.pressed.connect(_on_add_sigil_gxp)
+
+	# Style the dropdown
+	_style_option_button(_sigil_gxp_pick, 11, 300)
 
 # --- Items (Row1) --------------------------------------------------------------
 func _refresh_defs() -> void:
@@ -684,6 +682,7 @@ func _refresh_sig_dropdown() -> void:
 		_sig_inst_pick.add_item("(No SigilSystem)")
 		_sig_inst_pick.disabled = true
 		_log_s("aSigilSystem not found at %s" % SIG_PATH)
+		_refresh_sigil_gxp_dropdown()
 		return
 
 	var equipped_only: bool = (_chk_equipped != null and _chk_equipped.button_pressed)
@@ -718,6 +717,7 @@ func _refresh_sig_dropdown() -> void:
 	if list.size() == 0:
 		_sig_inst_pick.add_item("— no sigils —")
 		_sig_inst_pick.disabled = true
+		_refresh_sigil_gxp_dropdown()
 		return
 
 	_sig_inst_pick.disabled = false
@@ -730,6 +730,58 @@ func _refresh_sig_dropdown() -> void:
 		_sig_inst_pick.add_item(disp)
 		_sig_inst_pick.set_item_metadata(_sig_inst_pick.get_item_count() - 1, sid2)
 
+	# Also refresh the GXP dropdown
+	_refresh_sigil_gxp_dropdown()
+
+func _refresh_sigil_gxp_dropdown() -> void:
+	if _sigil_gxp_pick == null:
+		return
+	_sigil_gxp_pick.clear()
+
+	if _sig == null:
+		_sigil_gxp_pick.add_item("(No SigilSystem)")
+		_sigil_gxp_pick.disabled = true
+		return
+
+	# Get all sigils (not just equipped)
+	var ids: Array[String] = _call_list_all_instances(_sig, false)
+
+	if ids.is_empty():
+		_append_ids_free(ids)
+		for member in _collect_party_tokens():
+			_append_ids_from_loadout(ids, member)
+
+	if ids.is_empty():
+		if _auto_seed_one_instance_from_inventory():
+			ids = _call_list_all_instances(_sig, false)
+			if ids.is_empty():
+				_append_ids_free(ids)
+
+	var seen: Dictionary = {}
+	var list: Array[String] = []
+	for sid in ids:
+		if sid == "":
+			continue
+		if not seen.has(sid):
+			seen[sid] = true
+			list.append(sid)
+	list.sort()
+
+	if list.size() == 0:
+		_sigil_gxp_pick.add_item("— no sigils —")
+		_sigil_gxp_pick.disabled = true
+		return
+
+	_sigil_gxp_pick.disabled = false
+	for sid2 in list:
+		var disp: String = sid2
+		if _sig.has_method("get_display_name_for"):
+			var nm_v: Variant = _sig.call("get_display_name_for", sid2)
+			if typeof(nm_v) == TYPE_STRING:
+				disp = String(nm_v)
+		_sigil_gxp_pick.add_item(disp)
+		_sigil_gxp_pick.set_item_metadata(_sigil_gxp_pick.get_item_count() - 1, sid2)
+
 func _selected_sig_inst() -> String:
 	if _sig_inst_pick == null:
 		return ""
@@ -737,6 +789,14 @@ func _selected_sig_inst() -> String:
 	if i < 0:
 		return ""
 	return String(_sig_inst_pick.get_item_metadata(i))
+
+func _selected_sigil_gxp() -> String:
+	if _sigil_gxp_pick == null:
+		return ""
+	var i: int = _sigil_gxp_pick.get_selected()
+	if i < 0:
+		return ""
+	return String(_sigil_gxp_pick.get_item_metadata(i))
 
 func _on_equipped_toggle(_pressed: bool) -> void:
 	_refresh_sig_dropdown()
@@ -794,11 +854,28 @@ func _on_sig_xp_100() -> void:
 	_grant_xp_to_sigil(100)
 
 func _on_add_sigil_gxp() -> void:
-	if _sigil_gxp_spin == null:
+	if _sigil_gxp_spin == null or _sig == null:
+		return
+	var sigil_id: String = _selected_sigil_gxp()
+	if sigil_id == "":
+		print("[ItemsCheatBar] No sigil selected for GXP")
 		return
 	var amount: int = int(_sigil_gxp_spin.value)
-	_grant_xp_to_sigil(amount)
-	print("[ItemsCheatBar] Added %d GXP to sigil %s" % [amount, _selected_sig_inst()])
+
+	# Try to grant GXP via SigilSystem methods
+	if _sig.has_method("cheat_add_gxp"):
+		_sig.call("cheat_add_gxp", sigil_id, amount)
+		print("[ItemsCheatBar] Added %d GXP to sigil %s (via cheat_add_gxp)" % [amount, sigil_id])
+	elif _sig.has_method("add_sigil_xp"):
+		_sig.call("add_sigil_xp", sigil_id, amount)
+		print("[ItemsCheatBar] Added %d GXP to sigil %s (via add_sigil_xp)" % [amount, sigil_id])
+	elif _sig.has_method("grant_xp"):
+		_sig.call("grant_xp", sigil_id, amount)
+		print("[ItemsCheatBar] Added %d GXP to sigil %s (via grant_xp)" % [amount, sigil_id])
+	else:
+		print("[ItemsCheatBar] Warning: No GXP method found on SigilSystem")
+
+	_refresh_sig_dropdown()
 
 # ─────────────────────────────────────────────────────────────
 # Character Level / Perk / SXP
