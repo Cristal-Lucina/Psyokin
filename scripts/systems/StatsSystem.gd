@@ -453,11 +453,16 @@ func get_member_stat_level(member_id: String, stat: String) -> int:
 	var bonus: int = _bonus_levels_from_sxp(total_xp)
 	return base + bonus
 
-## Returns the display name for a member (from CSV or capitalized ID). For hero, returns "Hero"
+## Returns the display name for a member (from CSV or capitalized ID). For hero, returns player_name from GameState
 func get_member_display_name(member_id: String) -> String:
 	var pid: String = _resolve_id(member_id)
 	if pid == "hero":
-		return "Hero"
+		# Check for player's custom name from character creation
+		if _gs != null:
+			var pn_v: Variant = _gs.get("player_name")
+			if typeof(pn_v) == TYPE_STRING and String(pn_v).strip_edges() != "":
+				return String(pn_v)
+		return "Hero"  # Fallback if no custom name set
 	var info: Dictionary = _ensure_progress(pid)
 	var label_v: Variant = info.get("label", "")
 	if typeof(label_v) == TYPE_STRING and String(label_v).strip_edges() != "":
