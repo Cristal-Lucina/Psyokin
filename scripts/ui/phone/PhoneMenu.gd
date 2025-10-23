@@ -81,9 +81,11 @@ func _purge_runtime_children() -> void:
 # Build device
 # -----------------------------------------------------------------------------#
 func _build_device_ui() -> void:
-	# Center container so we can scale/center the whole phone easily
+	# Left-aligned container for the phone (1/3rd of screen)
 	_center = CenterContainer.new()
 	_center.name = "Center"
+	_center.set_anchors_preset(Control.PRESET_LEFT_WIDE)
+	_center.anchor_right = 0.0  # Will be set in _layout_device
 	add_child(_center)
 
 	# Phone frame (PanelContainer → theme can give rounded panel/padding)
@@ -190,22 +192,43 @@ func _build_device_ui() -> void:
 	_home_indicator.add_child(indicator_center)
 	indicator_center.set_anchors_preset(Control.PRESET_FULL_RECT)
 
-# Constant size (downscale only if window is too small)
+# Phone takes left 1/3rd of screen
 func _layout_device() -> void:
 	if _center == null:
 		return
 
-	_center.custom_minimum_size = PHONE_DESIGN_SIZE
-	_center.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	_center.size_flags_vertical   = Control.SIZE_SHRINK_CENTER
+	var vp: Vector2 = get_viewport_rect().size
 
-	var s: float = 1.0
-	if PHONE_SCALE_TO_FIT:
-		var vp: Vector2 = get_viewport_rect().size
-		var sx: float = (vp.x - PHONE_SAFE_MARGIN) / PHONE_DESIGN_SIZE.x
-		var sy: float = (vp.y - PHONE_SAFE_MARGIN) / PHONE_DESIGN_SIZE.y
-		s = min(1.0, min(sx, sy))
-	_center.scale = Vector2(s, s)
+	# Set the container to take up left 1/3rd of the screen
+	_center.anchor_left = 0.0
+	_center.anchor_top = 0.0
+	_center.anchor_right = 0.333  # 1/3rd of screen
+	_center.anchor_bottom = 1.0
+	_center.offset_left = 0
+	_center.offset_top = 0
+	_center.offset_right = 0
+	_center.offset_bottom = 0
+
+	_center.size_flags_horizontal = Control.SIZE_FILL
+	_center.size_flags_vertical = Control.SIZE_FILL
+
+	# Phone maintains aspect ratio within the 1/3rd area
+	if _phone:
+		var available_width = vp.x * 0.333
+		var available_height = vp.y
+
+		# Maintain phone aspect ratio
+		var phone_aspect = PHONE_DESIGN_SIZE.x / PHONE_DESIGN_SIZE.y
+		var container_aspect = available_width / available_height
+
+		if container_aspect > phone_aspect:
+			# Container is wider - fit to height
+			_phone.custom_minimum_size = Vector2(available_height * phone_aspect * 0.9, available_height * 0.95)
+		else:
+			# Container is taller - fit to width
+			_phone.custom_minimum_size = Vector2(available_width * 0.9, available_width / phone_aspect * 0.95)
+
+	_center.scale = Vector2(1.0, 1.0)
 
 # -----------------------------------------------------------------------------#
 # Screen management
