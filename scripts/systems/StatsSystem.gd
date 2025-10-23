@@ -453,6 +453,17 @@ func get_member_stat_level(member_id: String, stat: String) -> int:
 	var bonus: int = _bonus_levels_from_sxp(total_xp)
 	return base + bonus
 
+## Returns the display name for a member (from CSV or capitalized ID). For hero, returns "Hero"
+func get_member_display_name(member_id: String) -> String:
+	var pid: String = _resolve_id(member_id)
+	if pid == "hero":
+		return "Hero"
+	var info: Dictionary = _ensure_progress(pid)
+	var label_v: Variant = info.get("label", "")
+	if typeof(label_v) == TYPE_STRING and String(label_v).strip_edges() != "":
+		return String(label_v)
+	return pid.capitalize()
+
 # ───────────────────────── Perk points passthrough ─────────────────────────
 ## Internal helper to emit perk_points_changed signal with current value from GameState
 func _emit_pp_changed() -> void:
