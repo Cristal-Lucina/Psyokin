@@ -292,11 +292,11 @@ func _add_app_tile(kind: String, label: String, emoji: String, icon_color: Color
 	# Circular icon button
 	var icon_btn := Button.new()
 	icon_btn.custom_minimum_size = Vector2(ICON_SIZE, ICON_SIZE)
-	icon_btn.custom_maximum_size = Vector2(ICON_SIZE, ICON_SIZE)  # Prevent expansion
 	icon_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	icon_btn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	icon_btn.focus_mode = Control.FOCUS_ALL
 	icon_btn.tooltip_text = label
+	icon_btn.size_flags_stretch_ratio = 0.0  # Don't stretch
 
 	# Create rounded icon background
 	var icon_style := StyleBoxFlat.new()
@@ -342,8 +342,7 @@ func _add_app_tile(kind: String, label: String, emoji: String, icon_color: Color
 	lbl.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	lbl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	lbl.custom_minimum_size = Vector2(70, 0)
-	lbl.custom_maximum_size = Vector2(70, 0)
-	lbl.clip_text = false
+	lbl.clip_text = true
 	vbox.add_child(lbl)
 
 	_home_grid.add_child(vbox)
