@@ -71,8 +71,10 @@ enum Filter { ALL, KNOWN, LOCKED, MAXED }
 var _layer_tv     : Label          = null   # shows stage text (Not Met, Outer…)
 var _likes_tv     : Label          = null
 var _dislikes_tv  : Label          = null
-var _rewards_hdr  : Label          = null   # “Rewards:”
-var _rewards_val  : Label          = null   # “Locked”
+var _unlock_hdr   : Label          = null   # "Unlocks:"
+var _unlock_outer : Button         = null   # Outer → Middle unlock
+var _unlock_middle: Button         = null   # Middle → Inner unlock
+var _unlock_inner : Button         = null   # Inner → Core unlock
 var _story_btn    : Button         = null
 var _story_overlay: Control        = null
 
@@ -167,16 +169,35 @@ func _ensure_detail_widgets() -> void:
 		row2.add_child(title2); row2.add_child(_dislikes_tv)
 		holder.add_child(row2)
 
-	# Rewards: Header + “Locked” placeholder
-	if _rewards_hdr == null:
-		_rewards_hdr = Label.new()
-		_rewards_hdr.text = "Rewards:"
-		holder.add_child(_rewards_hdr)
+	# Unlocks: Header + 3 threshold buttons
+	if _unlock_hdr == null:
+		_unlock_hdr = Label.new()
+		_unlock_hdr.text = "Bond Unlocks:"
+		holder.add_child(_unlock_hdr)
 
-	if _rewards_val == null:
-		_rewards_val = Label.new()
-		_rewards_val.text = "Locked"
-		holder.add_child(_rewards_val)
+	if _unlock_outer == null:
+		_unlock_outer = Button.new()
+		_unlock_outer.name = "UnlockOuter"
+		_unlock_outer.text = "Outer → Middle"
+		_unlock_outer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_unlock_outer.disabled = true  # Will be enabled when unlocked
+		holder.add_child(_unlock_outer)
+
+	if _unlock_middle == null:
+		_unlock_middle = Button.new()
+		_unlock_middle.name = "UnlockMiddle"
+		_unlock_middle.text = "Middle → Inner"
+		_unlock_middle.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_unlock_middle.disabled = true
+		holder.add_child(_unlock_middle)
+
+	if _unlock_inner == null:
+		_unlock_inner = Button.new()
+		_unlock_inner.name = "UnlockInner"
+		_unlock_inner.text = "Inner → Core"
+		_unlock_inner.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_unlock_inner.disabled = true
+		holder.add_child(_unlock_inner)
 
 # ─────────────────────────────────────────────────────────────
 # System wiring
@@ -379,14 +400,20 @@ func _update_detail(id: String) -> void:
 		if _desc: _desc.text = "[i]Select a bond to see details.[/i]"
 		if _likes_tv: _likes_tv.text = "—"
 		if _dislikes_tv: _dislikes_tv.text = "—"
-		if _rewards_val: _rewards_val.text = "Locked"
+		if _unlock_outer: _unlock_outer.disabled = true
+		if _unlock_middle: _unlock_middle.disabled = true
+		if _unlock_inner: _unlock_inner.disabled = true
 		if _story_btn: _story_btn.set_meta("bond_id", "")
 		return
 
-	# Layer stage (always shown)
+	# Layer stage (show "Not Met" if unknown, otherwise show tier)
+	var known: bool = _read_known(id)
 	var layer_val: int = _read_layer(id)
 	if _layer_tv:
-		_layer_tv.text = _layer_stage(layer_val)
+		if not known:
+			_layer_tv.text = "Not Met"
+		else:
+			_layer_tv.text = _layer_stage(layer_val)
 
 	# Description
 	var rec: Dictionary = _bond_def(id)
@@ -394,27 +421,39 @@ func _update_detail(id: String) -> void:
 	if _desc:
 		_desc.text = desc
 
-	# Likes/Dislikes (discovered first, else full author list)
+	# Likes/Dislikes (only discovered, never show full list)
 	var likes: PackedStringArray = _read_discovered_or_full(id, true)
 	var dislikes: PackedStringArray = _read_discovered_or_full(id, false)
 	if _likes_tv: _likes_tv.text = _pretty_list(likes)
 	if _dislikes_tv: _dislikes_tv.text = _pretty_list(dislikes)
 
-	# Rewards placeholder (per request)
-	if _rewards_val:
-		_rewards_val.text = "Locked"
+	# Unlock buttons - enable based on bond tier reached
+	# Outer → Middle unlocks at layer 4+ (Middle Layer reached)
+	# Middle → Inner unlocks at layer 6+ (Inner Layer reached)
+	# Inner → Core unlocks at layer 8 (Core Layer reached)
+	if _unlock_outer:
+		_unlock_outer.disabled = (layer_val < 4)
+		_unlock_outer.text = "Outer → Middle" + (" [UNLOCKED]" if layer_val >= 4 else " [LOCKED]")
+
+	if _unlock_middle:
+		_unlock_middle.disabled = (layer_val < 6)
+		_unlock_middle.text = "Middle → Inner" + (" [UNLOCKED]" if layer_val >= 6 else " [LOCKED]")
+
+	if _unlock_inner:
+		_unlock_inner.disabled = (layer_val < 8)
+		_unlock_inner.text = "Inner → Core" + (" [UNLOCKED]" if layer_val >= 8 else " [LOCKED]")
 
 	# Story points
 	if _story_btn:
 		_story_btn.set_meta("bond_id", id)
 
 func _layer_stage(layer_val: int) -> String:
-	# Your mapping: Not Met → Outer → Middle → Inner → Core
-	if layer_val <= 1: return "Not Met"
-	if layer_val <= 3: return "Outer"
-	if layer_val <= 5: return "Middle"
-	if layer_val <= 7: return "Inner"
-	return "Core"
+	# Bond tier progression: Acquaintance (0-1) → Outer (2-3) → Middle (4-5) → Inner (6-7) → Core (8)
+	if layer_val <= 1: return "Acquaintance"
+	if layer_val <= 3: return "Outer Layer"
+	if layer_val <= 5: return "Middle Layer"
+	if layer_val <= 7: return "Inner Layer"
+	return "Core Layer"
 
 func _display_name(id: String) -> String:
 	if _sys and _sys.has_method("get_bond_name"):
@@ -459,17 +498,18 @@ func _to_psa_local(v: Variant) -> PackedStringArray:
 	return out
 
 func _read_discovered_or_full(id: String, likes: bool) -> PackedStringArray:
+	# Only return discovered preferences - do NOT fall back to full list
+	# Likes/dislikes remain hidden until discovered through item interaction
 	if _sys == null:
 		return PackedStringArray()
-	var first: PackedStringArray = PackedStringArray()
-	var second: PackedStringArray = PackedStringArray()
+	var discovered: PackedStringArray = PackedStringArray()
 	if likes:
-		if _sys.has_method("get_discovered_likes"): first = _to_psa_local(_sys.call("get_discovered_likes", id))
-		if _sys.has_method("get_likes"): second = _to_psa_local(_sys.call("get_likes", id))
+		if _sys.has_method("get_discovered_likes"):
+			discovered = _to_psa_local(_sys.call("get_discovered_likes", id))
 	else:
-		if _sys.has_method("get_discovered_dislikes"): first = _to_psa_local(_sys.call("get_discovered_dislikes", id))
-		if _sys.has_method("get_dislikes"): second = _to_psa_local(_sys.call("get_dislikes", id))
-	return (first if first.size() > 0 else second)
+		if _sys.has_method("get_discovered_dislikes"):
+			discovered = _to_psa_local(_sys.call("get_discovered_dislikes", id))
+	return discovered
 
 func _pretty_list(arr: PackedStringArray) -> String:
 	if arr.size() == 0:

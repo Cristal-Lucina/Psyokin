@@ -15,6 +15,7 @@ const PARTY_PATH := "/root/aPartySystem"
 const HERO_PATH  := "/root/aHeroSystem"
 const DORM_PATH  := "/root/aDormSystem"
 const AFF_PATH   := "/root/aAffinitySystem" # optional
+const BONDS_PATH := "/root/aCircleBondSystem"
 
 # --- CSV paths / keys ----------------------------------------------------------
 const ITEMS_CSV := "res://data/items/items.csv"
@@ -90,6 +91,14 @@ var _sigil_gxp_pick  : OptionButton  = null
 var _sigil_gxp_spin  : SpinBox       = null
 var _btn_add_gxp     : Button        = null
 
+# -------- Bond system cheat widgets (runtime-built if missing) ----
+var _bond_row        : HBoxContainer = null
+var _bond_pick       : OptionButton  = null
+var _bond_bxp_spin   : SpinBox       = null
+var _btn_add_bxp     : Button        = null
+var _btn_mark_known  : Button        = null
+var _btn_discover_like : Button      = null
+
 # --- Systems ------------------------------------------------------------------
 var _inv   : Node = null
 var _csv   : Node = null
@@ -101,6 +110,7 @@ var _party : Node = null
 var _hero  : Node = null
 var _dorm  : Node = null
 var _aff   : Node = null
+var _bonds : Node = null
 
 # --- Data caches ---------------------------------------------------------------
 var _defs            : Dictionary = {}  # items
@@ -133,6 +143,7 @@ func _ready() -> void:
 	_hero  = get_node_or_null(HERO_PATH)
 	_dorm  = get_node_or_null(DORM_PATH)
 	_aff   = get_node_or_null(AFF_PATH)
+	_bonds = get_node_or_null(BONDS_PATH)
 
 	# Listen to inventory signals so the picker stays fresh
 	if _inv != null:
@@ -158,6 +169,9 @@ func _ready() -> void:
 
 	# Sigil GXP row
 	_ensure_sigil_gxp_row()
+
+	# Bond system cheat row
+	_ensure_bond_row()
 
 	# Row1 (Items)
 	if _give and not _give.pressed.is_connected(_on_give):          _give.pressed.connect(_on_give)
@@ -455,6 +469,57 @@ func _ensure_sigil_gxp_row() -> void:
 
 	# Style the dropdown
 	_style_option_button(_sigil_gxp_pick, 11, 300)
+
+func _ensure_bond_row() -> void:
+	var parent := _attach_point()
+	_bond_row = parent.get_node_or_null("BondRow") as HBoxContainer
+	if _bond_row == null:
+		_bond_row = HBoxContainer.new()
+		_bond_row.name = "BondRow"
+		_bond_row.add_theme_constant_override("separation", 8)
+		parent.add_child(_bond_row)
+
+		var lbl := Label.new()
+		lbl.text = "Bonds:"
+		_bond_row.add_child(lbl)
+
+		_bond_pick = OptionButton.new()
+		_bond_pick.custom_minimum_size = Vector2(150, 0)
+		_bond_row.add_child(_bond_pick)
+
+		var bxp_lbl := Label.new()
+		bxp_lbl.text = "BXP"
+		_bond_row.add_child(bxp_lbl)
+
+		_bond_bxp_spin = SpinBox.new()
+		_bond_bxp_spin.min_value = 1
+		_bond_bxp_spin.max_value = 8
+		_bond_bxp_spin.step = 1
+		_bond_bxp_spin.value = 1
+		_bond_bxp_spin.custom_minimum_size = Vector2(60, 0)
+		_bond_row.add_child(_bond_bxp_spin)
+
+		_btn_add_bxp = Button.new()
+		_btn_add_bxp.text = "Add BXP"
+		_bond_row.add_child(_btn_add_bxp)
+		if not _btn_add_bxp.pressed.is_connected(_on_add_bxp):
+			_btn_add_bxp.pressed.connect(_on_add_bxp)
+
+		_btn_mark_known = Button.new()
+		_btn_mark_known.text = "Mark Known"
+		_bond_row.add_child(_btn_mark_known)
+		if not _btn_mark_known.pressed.is_connected(_on_mark_bond_known):
+			_btn_mark_known.pressed.connect(_on_mark_bond_known)
+
+		_btn_discover_like = Button.new()
+		_btn_discover_like.text = "Discover Like"
+		_bond_row.add_child(_btn_discover_like)
+		if not _btn_discover_like.pressed.is_connected(_on_discover_like):
+			_btn_discover_like.pressed.connect(_on_discover_like)
+
+	# Style the dropdown and populate
+	_style_option_button(_bond_pick, 11, 300)
+	_refresh_bond_dropdown()
 
 # --- Items (Row1) --------------------------------------------------------------
 func _refresh_defs() -> void:
@@ -1546,3 +1611,98 @@ func _auto_seed_one_instance_from_inventory() -> bool:
 		if _is_sigil_item(id):
 			return _draft_n_from_inventory(id, 1) > 0
 	return false
+
+# ─────────────────────────────────────────────────────────────
+# Bond System Cheats
+# ─────────────────────────────────────────────────────────────
+
+func _refresh_bond_dropdown() -> void:
+	if _bond_pick == null or _bonds == null:
+		return
+	_bond_pick.clear()
+
+	var ids: PackedStringArray = PackedStringArray()
+	if _bonds.has_method("get_ids"):
+		ids = _bonds.call("get_ids")
+
+	if ids.is_empty():
+		_bond_pick.add_item("— no bonds —")
+		_bond_pick.disabled = true
+		return
+
+	_bond_pick.disabled = false
+	for bond_id in ids:
+		var disp_name: String = bond_id
+		if _bonds.has_method("get_display_name"):
+			var nm_v: Variant = _bonds.call("get_display_name", bond_id)
+			if typeof(nm_v) == TYPE_STRING:
+				disp_name = String(nm_v)
+		_bond_pick.add_item(disp_name)
+		_bond_pick.set_item_metadata(_bond_pick.get_item_count() - 1, bond_id)
+
+func _selected_bond_id() -> String:
+	if _bond_pick == null:
+		return ""
+	var idx: int = _bond_pick.get_selected()
+	if idx < 0:
+		return ""
+	return String(_bond_pick.get_item_metadata(idx))
+
+func _on_add_bxp() -> void:
+	if _bonds == null or _bond_bxp_spin == null:
+		return
+	var bond_id: String = _selected_bond_id()
+	if bond_id == "":
+		print("[ItemsCheatBar][Bonds] No bond selected")
+		return
+	var amount: int = int(_bond_bxp_spin.value)
+
+	if _bonds.has_method("add_bxp"):
+		_bonds.call("add_bxp", bond_id, amount)
+		print("[ItemsCheatBar][Bonds] Added %d BXP to %s" % [amount, bond_id])
+	else:
+		print("[ItemsCheatBar][Bonds] ERROR: add_bxp method not found")
+
+func _on_mark_bond_known() -> void:
+	if _bonds == null:
+		return
+	var bond_id: String = _selected_bond_id()
+	if bond_id == "":
+		print("[ItemsCheatBar][Bonds] No bond selected")
+		return
+
+	if _bonds.has_method("set_known"):
+		_bonds.call("set_known", bond_id, true)
+		print("[ItemsCheatBar][Bonds] Marked %s as known" % bond_id)
+	else:
+		print("[ItemsCheatBar][Bonds] ERROR: set_known method not found")
+
+func _on_discover_like() -> void:
+	if _bonds == null:
+		return
+	var bond_id: String = _selected_bond_id()
+	if bond_id == "":
+		print("[ItemsCheatBar][Bonds] No bond selected")
+		return
+
+	# Discover first like from their gift_likes list
+	if _bonds.has_method("get_likes"):
+		var likes: PackedStringArray = PackedStringArray()
+		var likes_v: Variant = _bonds.call("get_likes", bond_id)
+		if typeof(likes_v) == TYPE_PACKED_STRING_ARRAY:
+			likes = likes_v
+		elif typeof(likes_v) == TYPE_ARRAY:
+			for item in (likes_v as Array):
+				likes.append(String(item))
+
+		if likes.size() > 0:
+			var first_like: String = likes[0]
+			if _bonds.has_method("mark_gift_discovered"):
+				_bonds.call("mark_gift_discovered", bond_id, first_like, "liked")
+				print("[ItemsCheatBar][Bonds] Discovered like: %s for %s" % [first_like, bond_id])
+			else:
+				print("[ItemsCheatBar][Bonds] ERROR: mark_gift_discovered method not found")
+		else:
+			print("[ItemsCheatBar][Bonds] No likes defined for %s" % bond_id)
+	else:
+		print("[ItemsCheatBar][Bonds] ERROR: get_likes method not found")

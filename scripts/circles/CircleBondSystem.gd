@@ -91,8 +91,38 @@ var _discovered_dislikes: Dictionary = {}  # id -> PackedStringArray
 const MAX_LAYER := 8      # 0..8 (0/1 Acquaintance, 2/3 Outer, 4/5 Middle, 6/7 Inner, 8 Core)
 const MAX_BXP   := 8
 
+# Party integration
+const PARTY_PATH := "/root/aPartySystem"
+const GS_PATH := "/root/aGameState"
+
 func _ready() -> void:
 	reload()
+	_connect_party_signals()
+	_auto_discover_party_members()
+
+## Connects to party system signals to auto-discover party members
+func _connect_party_signals() -> void:
+	var party := get_node_or_null(PARTY_PATH)
+	if party:
+		if party.has_signal("party_changed") and not party.is_connected("party_changed", Callable(self, "_on_party_changed")):
+			party.connect("party_changed", Callable(self, "_on_party_changed"))
+
+	var gs := get_node_or_null(GS_PATH)
+	if gs:
+		if gs.has_signal("party_changed") and not gs.is_connected("party_changed", Callable(self, "_on_party_changed")):
+			gs.connect("party_changed", Callable(self, "_on_party_changed"))
+
+## Called when party roster changes - automatically mark party members as known
+func _on_party_changed(_a: Variant = null, _b: Variant = null) -> void:
+	_auto_discover_party_members()
+
+## Automatically marks all party members as known in the bond system
+func _auto_discover_party_members() -> void:
+	var party_ids: Array = _get_party_member_ids()
+	for pid_v in party_ids:
+		var pid: String = String(pid_v)
+		if pid != "" and pid != "hero":
+			set_known(pid, true)
 
 # ────────────────────────────────────────────────────────────────────────────────
 # Loading / parsing
@@ -384,4 +414,32 @@ func get_story_points(id: String) -> PackedStringArray:
 		var s := String(seg).strip_edges()
 		if s != "":
 			out.append(s)
+	return out
+
+## Helper to get all party member IDs from PartySystem or GameState
+func _get_party_member_ids() -> Array:
+	var out: Array = []
+
+	# Try PartySystem first
+	var party := get_node_or_null(PARTY_PATH)
+	if party and party.has_method("get_active_party_ids"):
+		var ids_v: Variant = party.call("get_active_party_ids")
+		if typeof(ids_v) == TYPE_ARRAY:
+			return ids_v as Array
+		elif typeof(ids_v) == TYPE_PACKED_STRING_ARRAY:
+			for s in (ids_v as PackedStringArray):
+				out.append(String(s))
+			return out
+
+	# Fallback to GameState
+	var gs := get_node_or_null(GS_PATH)
+	if gs and gs.has_method("get_active_party_ids"):
+		var ids_v2: Variant = gs.call("get_active_party_ids")
+		if typeof(ids_v2) == TYPE_ARRAY:
+			return ids_v2 as Array
+		elif typeof(ids_v2) == TYPE_PACKED_STRING_ARRAY:
+			for s2 in (ids_v2 as PackedStringArray):
+				out.append(String(s2))
+			return out
+
 	return out
