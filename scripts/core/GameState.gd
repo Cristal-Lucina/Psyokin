@@ -93,15 +93,19 @@ var index_blob: Dictionary = {"tutorials": [], "enemies": {}, "locations": {}, "
 var member_data: Dictionary[String, Dictionary] = {}
 var unlocked_perks: Array[String] = []
 
+## Initializes GameState and connects to CalendarSystem's advance_blocked signal
 func _ready() -> void:
 	var cal: Node = get_node_or_null(CALENDAR_PATH)
 	if cal and cal.has_signal("advance_blocked") and not cal.is_connected("advance_blocked", Callable(self, "_on_cal_advance_blocked")):
 		cal.connect("advance_blocked", Callable(self, "_on_cal_advance_blocked"))
 
+## Forwards CalendarSystem's advance_blocked signal to GameState listeners
 func _on_cal_advance_blocked(reason: String) -> void:
 	emit_signal("advance_blocked", reason)
 
 # ─── New game bootstrap ──────────────────────────────────────
+## Resets all game state to default values for a new game. Sets hero as starting party
+## member with default stats, resets calendar to Monday Morning, and initializes systems.
 func new_game() -> void:
 	player_name = "Player"
 	difficulty = "Normal"
@@ -153,6 +157,8 @@ func new_game() -> void:
 	emit_signal("party_changed")
 
 # ─── Calendar helpers (respect Dorms blocking) ───────────────
+## Checks if anyone is waiting in the dorm's common room for room assignment
+## Returns true if common room has occupants, false otherwise
 func _anyone_in_common_room() -> bool:
 	var dorm: Node = get_node_or_null("/root/aDormSystem")
 	if dorm and dorm.has_method("get_common"):
@@ -163,6 +169,8 @@ func _anyone_in_common_room() -> bool:
 			return (v as Array).size() > 0
 	return false
 
+## Advances to the next phase of day (Morning -> Afternoon -> Evening).
+## Blocked if people are waiting in common room for dorm assignments.
 func try_advance_phase() -> void:
 	if _anyone_in_common_room():
 		emit_signal("advance_blocked", "There are people waiting in the Common Room for room assignments.")
@@ -171,6 +179,8 @@ func try_advance_phase() -> void:
 	if cal and cal.has_method("advance_phase"):
 		cal.call("advance_phase")
 
+## Advances the calendar by specified number of days.
+## Blocked if people are waiting in common room for dorm assignments.
 func try_advance_day(days: int = 1) -> void:
 	if days > 0 and _anyone_in_common_room():
 		emit_signal("advance_blocked", "There are people waiting in the Common Room for room assignments.")
@@ -180,6 +190,7 @@ func try_advance_day(days: int = 1) -> void:
 		cal.call("advance_day", days)
 
 # ─── Roster helpers ──────────────────────────────────────────
+## Returns an array of active party member IDs. Always returns at least ["hero"] if party is empty.
 func get_active_party_ids() -> Array:
 	var out: Array = []
 	for i in range(party.size()):
@@ -188,6 +199,7 @@ func get_active_party_ids() -> Array:
 		out.append("hero")
 	return out
 
+## Returns display names for all active party members by looking up their IDs
 func get_party_names() -> PackedStringArray:
 	var ids: Array = get_active_party_ids()
 	var out := PackedStringArray()
@@ -195,6 +207,7 @@ func get_party_names() -> PackedStringArray:
 		out.append(_display_name_for_id(String(ids[i])))
 	return out
 
+## Converts a member ID to a display name. "hero" returns player_name, others lookup from party CSV.
 func _display_name_for_id(id: String) -> String:
 	if id == "hero":
 		var nm: String = player_name.strip_edges()
@@ -215,6 +228,7 @@ func _display_name_for_id(id: String) -> String:
 	return id.capitalize()
 
 # Equipment snapshot (optional)
+## Returns the equipped items for a party member (weapon, armor, head, foot, bracelet)
 func get_member_equip(member: String) -> Dictionary:
 	var equip_sys: Node = get_node_or_null(EQUIP_PATH)
 	if equip_sys and equip_sys.has_method("get_member_equip"):
@@ -224,6 +238,7 @@ func get_member_equip(member: String) -> Dictionary:
 	return {}
 
 # Derived pools (HP/MP) — mirrors StatSystem if present
+## Calculates max HP and MP for a member based on level and stats (VTL for HP, FCS for MP)
 func compute_member_pools(member: String) -> Dictionary:
 	var st: Node = get_node_or_null(STATS_PATH)
 	var lvl: int = get_member_level(member)
@@ -239,6 +254,7 @@ func compute_member_pools(member: String) -> Dictionary:
 			mp_max = int(st.call("compute_max_mp", lvl, fcs))
 	return {"level": lvl, "hp_max": hp_max, "mp_max": mp_max}
 
+## Gets the level of a party member from StatsSystem or CSV data. Defaults to 1 if not found.
 func get_member_level(member: String) -> int:
 	var st: Node = get_node_or_null(STATS_PATH)
 	var member_id: String = _resolve_member_id(member)
@@ -255,6 +271,7 @@ func get_member_level(member: String) -> int:
 				return int(rv)
 	return 1
 
+## Gets a specific stat value (BRW, MND, TPO, VTL, FCS) for a member. Defaults to 1 if not found.
 func get_member_stat(member: String, stat: String) -> int:
 	var st: Node = get_node_or_null(STATS_PATH)
 	var member_id: String = _resolve_member_id(member)
@@ -273,6 +290,7 @@ func get_member_stat(member: String, stat: String) -> int:
 				return int(rv)
 	return 1
 
+## Gets custom field data for a member. Currently supports "mind_type" and "identity" for hero.
 func get_member_field(member: String, field: String) -> Variant:
 	if _resolve_member_id(member) == "hero":
 		if field == "mind_type":
@@ -281,12 +299,14 @@ func get_member_field(member: String, field: String) -> Variant:
 			return (get_meta("hero_identity") if has_meta("hero_identity") else {})
 	return null
 
+## Converts a member name to their ID. Converts player_name to "hero" automatically.
 func _resolve_member_id(name_in: String) -> String:
 	var want: String = String(name_in).strip_edges().to_lower()
 	if want == player_name.strip_edges().to_lower():
 		return "hero"
 	return name_in
 
+## Looks up CSV data row for a party member from party.csv
 func _row_for_member(member: String) -> Dictionary:
 	var csv_loader: Node = get_node_or_null(CSV_PATH)
 	if csv_loader and csv_loader.has_method("load_csv") and ResourceLoader.exists(PARTY_CSV):
@@ -304,6 +324,8 @@ func _row_for_member(member: String) -> Dictionary:
 	return {}
 
 # ─── Roster ops ──────────────────────────────────────────────
+## Adds a new member to the party (if space) or bench. Initializes their HP/MP pools.
+## Returns false if member already exists or ID is empty.
 func add_member(member_id: String) -> bool:
 	var mem_name: String = String(member_id).strip_edges()
 	if mem_name == "" || party.has(mem_name) || bench.has(mem_name):
@@ -327,6 +349,7 @@ func add_member(member_id: String) -> bool:
 		emit_signal("roster_changed")
 		return true
 
+## Removes a member from party or bench. Clears their member_data. Returns false if not found.
 func remove_member(member_id: String) -> bool:
 	var mem_name: String = String(member_id)
 	if party.has(mem_name):
@@ -343,6 +366,7 @@ func remove_member(member_id: String) -> bool:
 		return true
 	return false
 
+## Swaps positions of two party members by their array indices. Returns false if invalid indices.
 func swap_members(a_index: int, b_index: int) -> bool:
 	if a_index < 0 or a_index >= party.size() or b_index < 0 or b_index >= party.size():
 		return false
@@ -353,6 +377,8 @@ func swap_members(a_index: int, b_index: int) -> bool:
 	return true
 
 # ─── Perks ───────────────────────────────────────────────────
+## Unlocks a perk and deducts 1 perk point. Returns false if already unlocked,
+## perk ID is empty, or insufficient points.
 func unlock_perk(perk_id: String) -> bool:
 	var pid: String = String(perk_id).strip_edges()
 	if pid == "" || unlocked_perks.has(pid):
@@ -366,9 +392,11 @@ func unlock_perk(perk_id: String) -> bool:
 	emit_signal("perk_points_changed", perk_points)
 	return true
 
+## Returns the current number of unspent perk points
 func get_perk_points() -> int:
 	return perk_points
 
+## Adds (or subtracts if negative) perk points and emits change signal
 func add_perk_points(points: int) -> void:
 	if points == 0:
 		return
@@ -376,12 +404,14 @@ func add_perk_points(points: int) -> void:
 	emit_signal("perk_points_changed", perk_points)
 
 # ─── Hero start picks (for DormsSystem) ──────────────────────
+## Stores the hero's starting class picks as metadata for DormsSystem
 func set_hero_start_picks(picks: PackedStringArray) -> void:
 	var out := PackedStringArray()
 	for i in range(picks.size()):
 		out.append(String(picks[i]).strip_edges().to_upper())
 	set_meta("hero_start_picks", out)
 
+## Retrieves the hero's starting stat picks from metadata or StatsSystem
 func get_hero_start_picks() -> PackedStringArray:
 	if has_meta("hero_start_picks"):
 		var m: Variant = get_meta("hero_start_picks")
@@ -412,6 +442,9 @@ func get_hero_start_picks() -> PackedStringArray:
 	return out
 
 # ─── Save/Load ───────────────────────────────────────────────
+## Collects all game state into a Dictionary for saving. Calls save() on all connected systems
+## (Calendar, Stats, Inventory, Equipment, Sigils, Bonds, Dorm, Romance, etc.). Returns the
+## complete save payload. Note: Equipment loads BEFORE sigils to ensure bracelet capacity exists.
 func save() -> Dictionary:
 	var payload: Dictionary = {}
 
@@ -522,6 +555,9 @@ func save() -> Dictionary:
 
 	return payload
 
+## Restores game state from a save Dictionary. Loads data into all connected systems in proper
+## order: Equipment FIRST (for bracelet capacity), then Sigils, then other systems. Handles both
+## legacy and v2 sigil snapshot formats. Emits party_changed signal when complete.
 func load(data: Dictionary) -> void:
 	if data.is_empty():
 		return
@@ -1046,13 +1082,15 @@ func _apply_sigil_snapshot(sys: Node, snap: Dictionary) -> void:
 			sys.emit_signal("loadout_changed", String(mk2))
 
 # ─── UI Bridge Methods (optional helpers) ────────────────────
+## Saves the current game state to a numbered slot via SaveLoad system. Adds scene name
+## and calendar label to the save data. Returns true if save successful.
 func save_to_slot(slot: int) -> bool:
 	var payload: Dictionary = save()
 	payload["scene"] = "Main"
 	var cal: Node = get_node_or_null(CALENDAR_PATH)
 	if cal and cal.has_method("save_label"):
 		payload["label"] = String(cal.call("save_label"))
-	elif cal and cal.has_method("hud_label"): 
+	elif cal and cal.has_method("hud_label"):
 		payload["label"] = String(cal.call("hud_label"))
 	var save_sys: Node = get_node_or_null(SAVELOAD_PATH)
 	if save_sys and save_sys.has_method("save_game"):
@@ -1061,6 +1099,8 @@ func save_to_slot(slot: int) -> bool:
 		push_error("[GameState] aSaveLoad system not found! Cannot save.")
 		return false
 
+## UI bridge method for loading a save. Calls load() with the provided payload Dictionary.
+## Shows warning if payload is empty.
 func apply_loaded_save(payload: Dictionary) -> void:
 	if payload.is_empty():
 		push_warning("[GameState] Attempted to load empty save data.")

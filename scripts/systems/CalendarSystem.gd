@@ -97,28 +97,35 @@ const MONTH_NAMES: PackedStringArray = [
 ]
 const PHASE_NAMES: PackedStringArray = ["Morning", "Afternoon", "Evening"]
 
+## Returns the current weekday name (Monday through Sunday)
 func get_weekday_name() -> String:
 	return WEEKDAY_NAMES[clampi(weekday, 0, WEEKDAY_NAMES.size() - 1)]
 
+## Returns the month name for the given month number (1-12), or current month if not specified
 func get_month_name(m: int = -1) -> String:
 	var mm: int = (m if m >= 1 else month)
 	return MONTH_NAMES[clampi(mm, 1, 12) - 1]
 
+## Returns the current time phase name (Morning, Afternoon, or Evening)
 func get_phase_name() -> String:
 	return PHASE_NAMES[clampi(phase, 0, PHASE_NAMES.size() - 1)]
 
+## Returns formatted date string: "Weekday — Month Day" (e.g., "Monday — May 10")
 func get_date_string() -> String:
 	return "%s — %s %d" % [get_weekday_name(), get_month_name(), day]
 
+## Returns formatted datetime label for HUD display: "Weekday — Month Day — Phase"
 func hud_label() -> String:
 	return "%s — %s" % [get_date_string(), get_phase_name()]
 
+## Returns formatted label for save slots (same as hud_label)
 func save_label() -> String:
 	return hud_label()
 
 # ─────────────────────────────────────────────────────────────
 # Safe advance: block if Common Room has people waiting
 # ─────────────────────────────────────────────────────────────
+## Checks if DormSystem has people waiting in Common Room that would block time advancement
 func _has_common_blockers() -> bool:
 	var dorm: Node = get_node_or_null("/root/aDormSystem")
 	if dorm and dorm.has_method("get_common"):
@@ -130,9 +137,12 @@ func _has_common_blockers() -> bool:
 				return (v as Array).size() > 0
 	return false
 
+## Returns the blocking message for Common Room occupants
 func _advance_block_msg() -> String:
 	return "There are people waiting in the Common Room for room assignments."
 
+## Advances to the next time phase (Morning -> Afternoon -> Evening -> next day's Morning).
+## Emits phase_advanced signal. Blocked if Common Room has people waiting.
 func advance_phase() -> void:
 	if _has_common_blockers():
 		advance_blocked.emit(_advance_block_msg())
@@ -148,6 +158,8 @@ func advance_phase() -> void:
 	_advance_day()
 	phase_advanced.emit(phase)
 
+## Advances calendar by specified number of days (can be negative to go back in time).
+## Emits day_advanced for each day and week_reset on Mondays. Blocked if Common Room has people.
 func advance_day(days: int = 1) -> void:
 	if days == 0:
 		return
@@ -163,6 +175,7 @@ func advance_day(days: int = 1) -> void:
 		if weekday == 0:
 			week_reset.emit(weekday)
 
+## Internal helper to advance one day forward and emit signals
 func _advance_day() -> void:
 	_step_one_day(1)
 	day_advanced.emit(current_date)
@@ -170,11 +183,13 @@ func _advance_day() -> void:
 	if weekday == 0:
 		week_reset.emit(weekday)
 
+## Notifies DormSystem of the current weekday for Saturday reassignment triggers
 func _ping_dorms() -> void:
 	var dorm: Node = get_node_or_null("/root/aDormSystem")
 	if dorm and dorm.has_method("calendar_notify_weekday"):
 		dorm.call("calendar_notify_weekday", get_weekday_name())
 
+## Steps the calendar forward or backward by one day, handling month/year rollovers correctly
 func _step_one_day(delta: int) -> void:
 	weekday = (weekday + (1 if delta > 0 else -1) + 7) % 7
 
@@ -203,6 +218,7 @@ func _step_one_day(delta: int) -> void:
 	month = m
 	day = d
 
+## Returns the number of days in a given month, accounting for leap years
 func _days_in_month(y: int, m: int) -> int:
 	match m:
 		1,3,5,7,8,10,12: return 31
@@ -210,9 +226,11 @@ func _days_in_month(y: int, m: int) -> int:
 		2:               return 29 if _is_leap(y) else 28
 		_:               return 30
 
+## Checks if a year is a leap year (divisible by 4, except centuries unless divisible by 400)
 func _is_leap(y: int) -> bool:
 	return (y % 4 == 0 and (y % 100 != 0 or y % 400 == 0))
 
+## Calculates weekday from date using Zeller's congruence (0=Monday..6=Sunday)
 # 0=Monday..6=Sunday
 static func _weekday_0_mon(y: int, m: int, d: int) -> int:
 	var t: PackedInt32Array = [0,3,2,5,0,3,5,1,4,6,2,4]

@@ -73,6 +73,7 @@ var _defs: Dictionary = {}
 # Counts: id -> quantity
 var _counts: Dictionary = {}
 
+## Initializes the inventory system, loading item definitions from CSV and emitting items_loaded signal
 func _ready() -> void:
 	_try_load_defs_from_csv()
 	print("[InventorySystem] ready. defs=%d, counts_keys=%d" % [_defs.size(), _counts.size()])
@@ -80,35 +81,44 @@ func _ready() -> void:
 
 # ───────────── API: item defs ─────────────
 
+## Returns the complete dictionary of all item definitions (id -> properties)
 func get_item_defs() -> Dictionary:
 	return _defs
 
+## Sets the entire item definitions dictionary and emits items_loaded signal
 func set_item_defs(defs: Dictionary) -> void:
 	_defs = (defs if (typeof(defs) == TYPE_DICTIONARY) else {})
 	print("[InventorySystem] set_item_defs() -> defs=%d" % _defs.size())
 	emit_signal("items_loaded")
 
+## Returns the definition Dictionary for a specific item by ID. Returns empty Dict if not found.
 func get_item_def(id: String) -> Dictionary:
 	return (_defs.get(id, {}) as Dictionary)
 
+## Forces a reload of item definitions from CSV files
 func load_definitions() -> void:
 	_try_load_defs_from_csv(FORCE_RELOAD)
 
 
 # ───────────── API: counts (canonical) ─────────────
 
+## Returns the complete dictionary of item counts (id -> quantity)
 func get_counts_dict() -> Dictionary:
 	return _counts
 
+## Alias for get_counts_dict()
 func get_item_counts() -> Dictionary: # alias
 	return get_counts_dict()
 
+## Alias for get_counts_dict()
 func get_counts() -> Dictionary: # alias
 	return get_counts_dict()
 
+## Returns the quantity of a specific item. Returns 0 if not owned.
 func get_count(id: String) -> int:
 	return int(_counts.get(id, 0))
 
+## Sets the count for an item to a specific value. Removes entry if count is 0. Emits inventory_changed.
 func set_count(id: String, count: int) -> void:
 	var c: int = max(0, int(count))
 	if c == 0:
@@ -119,6 +129,7 @@ func set_count(id: String, count: int) -> void:
 	emit_signal("inventory_changed")
 	emit_signal("items_changed") # alias
 
+## Adds a quantity of an item. Amount can be negative to subtract. Emits inventory_changed.
 func add_item(id: String, amount: int = 1) -> void:
 	if amount == 0 or id.strip_edges() == "":
 		return
@@ -132,6 +143,7 @@ func add_item(id: String, amount: int = 1) -> void:
 	emit_signal("inventory_changed")
 	emit_signal("items_changed") # alias
 
+## Removes a quantity of an item. Does not go below 0. Emits inventory_changed.
 func remove_item(id: String, qty: int = 1) -> void:
 	if qty <= 0 or id.strip_edges() == "":
 		return
@@ -145,30 +157,38 @@ func remove_item(id: String, qty: int = 1) -> void:
 	emit_signal("inventory_changed")
 	emit_signal("items_changed") # alias
 
+## Alias for remove_item() - consumes an item
 func consume(id: String, qty: int = 1) -> void:
 	remove_item(id, qty)
 
 # Extra aliases some UIs may probe for:
+## Removes item quantity and returns true if count decreased, false otherwise
 func use_item(id: String, qty: int = 1) -> bool:
 	var before := get_count(id)
 	remove_item(id, qty)
 	return get_count(id) < before
 
+## Alias for use_item() - discards an item and returns success
 func discard_item(id: String, qty: int = 1) -> bool:
 	return use_item(id, qty)
 
+## Legacy alias for add_item()
 func add(id: String, delta: int) -> void: # legacy
 	add_item(id, delta)
 
+## Legacy alias for remove_item()
 func dec(id: String, n: int = 1) -> void: # legacy
 	remove_item(id, n)
 
 # ───────────── Save/Load ─────────────
 
+## Returns inventory data for saving. Format: {"items": {id -> count}}
 func get_save_blob() -> Dictionary:
 	# Standard key "items" for compatibility with GameState.save()
 	return {"items": _counts.duplicate(true)}
 
+## Restores inventory counts from save data. Accepts {"items": {...}} or raw count dictionary.
+## Emits inventory_changed signal.
 func apply_save_blob(blob: Dictionary) -> void:
 	if typeof(blob) != TYPE_DICTIONARY:
 		return
@@ -183,6 +203,7 @@ func apply_save_blob(blob: Dictionary) -> void:
 
 # ───────────── Internals ─────────────
 
+## Internal: Attempts to load item definitions from CSV files using CSVLoader
 func _try_load_defs_from_csv(force: bool=false) -> void:
 	if not force and not _defs.is_empty():
 		return
