@@ -1,3 +1,5 @@
+extends Node
+#GOOD
 ## ═══════════════════════════════════════════════════════════════════════════
 ## SaveLoad - File Persistence System
 ## ═══════════════════════════════════════════════════════════════════════════
@@ -84,6 +86,15 @@ func _label_from_payload(payload: Dictionary) -> String:
 
 	return ""
 
+func _get_autoload(name: String) -> Node:
+	# Safe autoload lookup without requiring this script to extend Node
+	var ml := Engine.get_main_loop()
+	if ml is SceneTree:
+		var root: Node = (ml as SceneTree).root
+		# Autoloads are direct children of /root with their autoload name
+		return root.get_node_or_null(name)
+	return null
+
 func save_game(slot: int, payload: Dictionary) -> bool:
 	# Wrap + save. Also inject a top-level "sigils" blob if missing.
 	_ensure_dir()
@@ -91,7 +102,7 @@ func save_game(slot: int, payload: Dictionary) -> bool:
 	var payload2 := payload.duplicate(true)
 
 	if not payload2.has("sigils"):
-		var sig := get_node_or_null("/root/aSigilSystem")
+		var sig: Node = _get_autoload("aSigilSystem")
 		if sig != null and sig.has_method("get_save_blob"):
 			var sb_v: Variant = sig.call("get_save_blob")
 			if typeof(sb_v) == TYPE_DICTIONARY:
