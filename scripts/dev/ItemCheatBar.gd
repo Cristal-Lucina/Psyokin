@@ -92,12 +92,17 @@ var _sigil_gxp_spin  : SpinBox       = null
 var _btn_add_gxp     : Button        = null
 
 # -------- Bond system cheat widgets (runtime-built if missing) ----
-var _bond_row        : HBoxContainer = null
-var _bond_pick       : OptionButton  = null
-var _bond_bxp_spin   : SpinBox       = null
-var _btn_add_bxp     : Button        = null
-var _btn_mark_known  : Button        = null
-var _btn_discover_like : Button      = null
+var _bond_row              : HBoxContainer = null
+var _bond_pick             : OptionButton  = null
+var _dialogue_score_spin   : SpinBox       = null
+var _btn_complete_event    : Button        = null
+var _gift_reaction_pick    : OptionButton  = null
+var _btn_give_gift         : Button        = null
+var _btn_side_meetup       : Button        = null
+var _btn_mark_known        : Button        = null
+var _btn_discover_like     : Button        = null
+var _btn_add_points        : Button        = null  # Raw points adder for testing
+var _points_spin           : SpinBox       = null
 
 # --- Systems ------------------------------------------------------------------
 var _inv   : Node = null
@@ -476,46 +481,91 @@ func _ensure_bond_row() -> void:
 	if _bond_row == null:
 		_bond_row = HBoxContainer.new()
 		_bond_row.name = "BondRow"
-		_bond_row.add_theme_constant_override("separation", 8)
+		_bond_row.add_theme_constant_override("separation", 4)
 		parent.add_child(_bond_row)
 
+		# Character picker
 		var lbl := Label.new()
-		lbl.text = "Bonds:"
+		lbl.text = "Bond:"
 		_bond_row.add_child(lbl)
 
 		_bond_pick = OptionButton.new()
-		_bond_pick.custom_minimum_size = Vector2(150, 0)
+		_bond_pick.custom_minimum_size = Vector2(100, 0)
 		_bond_row.add_child(_bond_pick)
 
-		var bxp_lbl := Label.new()
-		bxp_lbl.text = "BXP"
-		_bond_row.add_child(bxp_lbl)
+		# Complete Event (with dialogue score)
+		var dlg_lbl := Label.new()
+		dlg_lbl.text = "Dlg:"
+		_bond_row.add_child(dlg_lbl)
 
-		_bond_bxp_spin = SpinBox.new()
-		_bond_bxp_spin.min_value = 1
-		_bond_bxp_spin.max_value = 8
-		_bond_bxp_spin.step = 1
-		_bond_bxp_spin.value = 1
-		_bond_bxp_spin.custom_minimum_size = Vector2(60, 0)
-		_bond_row.add_child(_bond_bxp_spin)
+		_dialogue_score_spin = SpinBox.new()
+		_dialogue_score_spin.min_value = -3
+		_dialogue_score_spin.max_value = 6
+		_dialogue_score_spin.step = 1
+		_dialogue_score_spin.value = 0
+		_dialogue_score_spin.custom_minimum_size = Vector2(50, 0)
+		_dialogue_score_spin.tooltip_text = "Dialogue score: -3 to +6 (3×Best = +6)"
+		_bond_row.add_child(_dialogue_score_spin)
 
-		_btn_add_bxp = Button.new()
-		_btn_add_bxp.text = "Add BXP"
-		_bond_row.add_child(_btn_add_bxp)
-		if not _btn_add_bxp.pressed.is_connected(_on_add_bxp):
-			_btn_add_bxp.pressed.connect(_on_add_bxp)
+		_btn_complete_event = Button.new()
+		_btn_complete_event.text = "Complete Event"
+		_btn_complete_event.tooltip_text = "Complete next event (E1-E9) with dialogue score"
+		_bond_row.add_child(_btn_complete_event)
+		_btn_complete_event.pressed.connect(_on_complete_event)
 
+		# Give Gift
+		_gift_reaction_pick = OptionButton.new()
+		_gift_reaction_pick.add_item("Liked (+4)")
+		_gift_reaction_pick.set_item_metadata(0, "liked")
+		_gift_reaction_pick.add_item("Neutral (+1)")
+		_gift_reaction_pick.set_item_metadata(1, "neutral")
+		_gift_reaction_pick.add_item("Disliked (-2)")
+		_gift_reaction_pick.set_item_metadata(2, "disliked")
+		_gift_reaction_pick.custom_minimum_size = Vector2(80, 0)
+		_bond_row.add_child(_gift_reaction_pick)
+
+		_btn_give_gift = Button.new()
+		_btn_give_gift.text = "Give Gift"
+		_btn_give_gift.tooltip_text = "Give gift (once per layer)"
+		_bond_row.add_child(_btn_give_gift)
+		_btn_give_gift.pressed.connect(_on_give_gift)
+
+		# Side Meetup
+		_btn_side_meetup = Button.new()
+		_btn_side_meetup.text = "Side Meetup (+6)"
+		_btn_side_meetup.tooltip_text = "Optional filler scene for +6 points"
+		_bond_row.add_child(_btn_side_meetup)
+		_btn_side_meetup.pressed.connect(_on_side_meetup)
+
+		# Utility buttons
 		_btn_mark_known = Button.new()
 		_btn_mark_known.text = "Mark Known"
 		_bond_row.add_child(_btn_mark_known)
-		if not _btn_mark_known.pressed.is_connected(_on_mark_bond_known):
-			_btn_mark_known.pressed.connect(_on_mark_bond_known)
+		_btn_mark_known.pressed.connect(_on_mark_bond_known)
 
 		_btn_discover_like = Button.new()
 		_btn_discover_like.text = "Discover Like"
 		_bond_row.add_child(_btn_discover_like)
-		if not _btn_discover_like.pressed.is_connected(_on_discover_like):
-			_btn_discover_like.pressed.connect(_on_discover_like)
+		_btn_discover_like.pressed.connect(_on_discover_like)
+
+		# Raw points adder for testing
+		var pts_lbl := Label.new()
+		pts_lbl.text = "Pts:"
+		_bond_row.add_child(pts_lbl)
+
+		_points_spin = SpinBox.new()
+		_points_spin.min_value = -10
+		_points_spin.max_value = 20
+		_points_spin.step = 1
+		_points_spin.value = 1
+		_points_spin.custom_minimum_size = Vector2(50, 0)
+		_bond_row.add_child(_points_spin)
+
+		_btn_add_points = Button.new()
+		_btn_add_points.text = "Add Pts"
+		_btn_add_points.tooltip_text = "Directly add/remove points (cheat)"
+		_bond_row.add_child(_btn_add_points)
+		_btn_add_points.pressed.connect(_on_add_points)
 
 	# Style the dropdown and populate
 	_style_option_button(_bond_pick, 11, 300)
@@ -1648,18 +1698,76 @@ func _selected_bond_id() -> String:
 		return ""
 	return String(_bond_pick.get_item_metadata(idx))
 
-func _on_add_bxp() -> void:
-	if _bonds == null or _bond_bxp_spin == null:
+## Complete next event with dialogue score
+func _on_complete_event() -> void:
+	if _bonds == null or _dialogue_score_spin == null:
 		return
 	var bond_id: String = _selected_bond_id()
 	if bond_id == "":
 		print("[ItemsCheatBar][Bonds] No bond selected")
 		return
-	var amount: int = int(_bond_bxp_spin.value)
 
+	var dialogue_score: int = int(_dialogue_score_spin.value)
+
+	if _bonds.has_method("complete_event"):
+		_bonds.call("complete_event", bond_id, dialogue_score)
+		var event_idx: int = 0
+		if _bonds.has_method("get_event_index"):
+			event_idx = int(_bonds.call("get_event_index", bond_id))
+		print("[ItemsCheatBar][Bonds] Completed event E%d for %s (dialogue: %+d)" % [event_idx, bond_id, dialogue_score])
+	else:
+		print("[ItemsCheatBar][Bonds] ERROR: complete_event method not found")
+
+## Give gift with reaction
+func _on_give_gift() -> void:
+	if _bonds == null or _gift_reaction_pick == null:
+		return
+	var bond_id: String = _selected_bond_id()
+	if bond_id == "":
+		print("[ItemsCheatBar][Bonds] No bond selected")
+		return
+
+	var idx: int = _gift_reaction_pick.get_selected()
+	var reaction: String = String(_gift_reaction_pick.get_item_metadata(idx))
+
+	if _bonds.has_method("give_gift"):
+		var success: bool = bool(_bonds.call("give_gift", bond_id, reaction))
+		if success:
+			print("[ItemsCheatBar][Bonds] Gave %s gift to %s" % [reaction, bond_id])
+		else:
+			print("[ItemsCheatBar][Bonds] Gift failed (already used this layer?)")
+	else:
+		print("[ItemsCheatBar][Bonds] ERROR: give_gift method not found")
+
+## Do side meetup
+func _on_side_meetup() -> void:
+	if _bonds == null:
+		return
+	var bond_id: String = _selected_bond_id()
+	if bond_id == "":
+		print("[ItemsCheatBar][Bonds] No bond selected")
+		return
+
+	if _bonds.has_method("do_side_meetup"):
+		_bonds.call("do_side_meetup", bond_id)
+		print("[ItemsCheatBar][Bonds] Did side meetup with %s (+6 points)" % bond_id)
+	else:
+		print("[ItemsCheatBar][Bonds] ERROR: do_side_meetup method not found")
+
+## Add points directly (cheat/testing)
+func _on_add_points() -> void:
+	if _bonds == null or _points_spin == null:
+		return
+	var bond_id: String = _selected_bond_id()
+	if bond_id == "":
+		print("[ItemsCheatBar][Bonds] No bond selected")
+		return
+	var amount: int = int(_points_spin.value)
+
+	# Use internal _add_points or fallback to add_bxp
 	if _bonds.has_method("add_bxp"):
 		_bonds.call("add_bxp", bond_id, amount)
-		print("[ItemsCheatBar][Bonds] Added %d BXP to %s" % [amount, bond_id])
+		print("[ItemsCheatBar][Bonds] Added %d points to %s" % [amount, bond_id])
 	else:
 		print("[ItemsCheatBar][Bonds] ERROR: add_bxp method not found")
 
