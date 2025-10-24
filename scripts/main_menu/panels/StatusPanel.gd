@@ -470,8 +470,51 @@ func _read_hero_identity() -> Dictionary:
 	}
 
 func _as_color(v: Variant) -> Color:
-	if typeof(v) == TYPE_COLOR: return v as Color
-	if typeof(v) == TYPE_STRING: return Color(String(v))
+	# Already a Color object
+	if typeof(v) == TYPE_COLOR:
+		return v as Color
+
+	# Handle dictionary format (Godot JSON serialization of Color)
+	if typeof(v) == TYPE_DICTIONARY:
+		var d: Dictionary = v
+		# Check for r,g,b,a keys (Godot's JSON format for Color)
+		if d.has("r") and d.has("g") and d.has("b"):
+			var r: float = float(d.get("r", 1.0))
+			var g: float = float(d.get("g", 1.0))
+			var b: float = float(d.get("b", 1.0))
+			var a: float = float(d.get("a", 1.0))
+			return Color(r, g, b, a)
+		# Check for x,y,z,w keys (alternate format)
+		if d.has("x") and d.has("y") and d.has("z"):
+			var r2: float = float(d.get("x", 1.0))
+			var g2: float = float(d.get("y", 1.0))
+			var b2: float = float(d.get("z", 1.0))
+			var a2: float = float(d.get("w", 1.0))
+			return Color(r2, g2, b2, a2)
+
+	# Handle array format [r, g, b] or [r, g, b, a]
+	if typeof(v) == TYPE_ARRAY:
+		var arr: Array = v
+		if arr.size() >= 3:
+			var r3: float = float(arr[0])
+			var g3: float = float(arr[1])
+			var b3: float = float(arr[2])
+			var a3: float = float(arr[3]) if arr.size() >= 4 else 1.0
+			return Color(r3, g3, b3, a3)
+
+	# Handle string format
+	if typeof(v) == TYPE_STRING:
+		var s: String = String(v)
+		# Try to parse hex color (#RRGGBB or #RRGGBBAA)
+		if s.begins_with("#"):
+			return Color(s)
+		# Try standard Color constructor (works with named colors like "red", "blue")
+		if not s.contains("("):
+			return Color(s)
+		# Can't parse complex string format, return default
+		return Color(1,1,1)
+
+	# Default fallback (white)
 	return Color(1,1,1)
 
 # --------------------- Small helpers -------------------------
