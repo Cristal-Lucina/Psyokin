@@ -551,6 +551,11 @@ func is_school_allowed_for_member(member: String, school: String) -> bool:
 	return true
 
 func resolve_member_mind_base(member: String) -> String:
+	# Hero always has Omega mind type for sigil equipping (allows any sigil)
+	# Their "Active type" is only for combat purposes (weaknesses/resistances)
+	if member == "hero":
+		return "Omega"
+
 	var stats_sys: Node = get_node_or_null("/root/aStatsSystem")
 	if stats_sys != null:
 		var defs_v: Variant = stats_sys.get("_csv_by_id")
