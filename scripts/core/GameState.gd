@@ -382,6 +382,77 @@ func swap_members(a_index: int, b_index: int) -> bool:
 	emit_signal("party_changed")
 	return true
 
+## Moves a bench member to an active party slot at specified index. Returns false if invalid.
+## If slot already occupied, existing member is moved to bench.
+func move_to_active(member_id: String, slot_index: int) -> bool:
+	var mem_name: String = String(member_id).strip_edges()
+	if mem_name == "" or mem_name == "hero":
+		return false  # Hero cannot be moved
+	if not bench.has(mem_name):
+		return false  # Member not on bench
+	if slot_index < 1 or slot_index > 2:
+		return false  # Only slots 1-2 available (slot 0 is hero)
+
+	# Ensure party array has enough slots
+	while party.size() < slot_index + 1:
+		party.append("")
+
+	# If slot occupied, move existing member to bench
+	if party[slot_index] != "" and party[slot_index] != "hero":
+		var existing: String = party[slot_index]
+		bench.append(existing)
+
+	# Move member from bench to active
+	bench.erase(mem_name)
+	party[slot_index] = mem_name
+
+	emit_signal("party_changed")
+	emit_signal("roster_changed")
+	return true
+
+## Moves an active party member to the bench. Returns false if invalid or hero.
+func move_to_bench(member_id: String) -> bool:
+	var mem_name: String = String(member_id).strip_edges()
+	if mem_name == "" or mem_name == "hero":
+		return false  # Hero cannot be benched
+	if not party.has(mem_name):
+		return false  # Not in active party
+
+	# Move to bench
+	party.erase(mem_name)
+	bench.append(mem_name)
+
+	emit_signal("party_changed")
+	emit_signal("roster_changed")
+	return true
+
+## Swaps an active party member with a bench member. Returns false if invalid.
+func swap_active_bench(active_index: int, bench_member_id: String) -> bool:
+	if active_index < 1 or active_index >= party.size():
+		return false  # Only allow swapping slots 1-2 (not hero at 0)
+
+	var bench_mem: String = String(bench_member_id).strip_edges()
+	if bench_mem == "" or not bench.has(bench_mem):
+		return false  # Bench member not found
+
+	var active_mem: String = party[active_index]
+	if active_mem == "hero":
+		return false  # Cannot swap hero
+
+	# Perform swap
+	if active_mem != "":
+		bench.erase(bench_mem)
+		bench.append(active_mem)
+		party[active_index] = bench_mem
+	else:
+		# Empty slot, just move from bench
+		bench.erase(bench_mem)
+		party[active_index] = bench_mem
+
+	emit_signal("party_changed")
+	emit_signal("roster_changed")
+	return true
+
 # ─── Perks ───────────────────────────────────────────────────
 ## Unlocks a perk and deducts 1 perk point. Returns false if already unlocked,
 ## perk ID is empty, or insufficient points.
