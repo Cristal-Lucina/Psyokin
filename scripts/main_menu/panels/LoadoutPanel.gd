@@ -226,6 +226,7 @@ func _gather_party_tokens() -> Array[String]:
 	if _gs == null:
 		return out
 
+	# Get active party members
 	for m in ["get_active_party_ids", "get_party_ids", "list_active_party", "get_active_party"]:
 		if _gs.has_method(m):
 			var raw: Variant = _gs.call(m)
@@ -233,15 +234,28 @@ func _gather_party_tokens() -> Array[String]:
 				for s in (raw as PackedStringArray): out.append(String(s))
 			elif typeof(raw) == TYPE_ARRAY:
 				for s2 in (raw as Array): out.append(String(s2))
-			if out.size() > 0: return out
+			if out.size() > 0: break
 
-	for p in ["active_party_ids", "active_party", "party_ids", "party"]:
-		var raw2: Variant = _gs.get(p) if _gs.has_method("get") else null
-		if typeof(raw2) == TYPE_PACKED_STRING_ARRAY:
-			for s3 in (raw2 as PackedStringArray): out.append(String(s3))
-		elif typeof(raw2) == TYPE_ARRAY:
-			for s4 in (raw2 as Array): out.append(String(s4))
-		if out.size() > 0: return out
+	if out.is_empty():
+		for p in ["active_party_ids", "active_party", "party_ids", "party"]:
+			var raw2: Variant = _gs.get(p) if _gs.has_method("get") else null
+			if typeof(raw2) == TYPE_PACKED_STRING_ARRAY:
+				for s3 in (raw2 as PackedStringArray): out.append(String(s3))
+			elif typeof(raw2) == TYPE_ARRAY:
+				for s4 in (raw2 as Array): out.append(String(s4))
+			if out.size() > 0: break
+
+	# Get benched members
+	if _gs.has_method("get"):
+		var bench_v: Variant = _gs.get("bench")
+		if typeof(bench_v) == TYPE_PACKED_STRING_ARRAY:
+			for s in (bench_v as PackedStringArray):
+				if not out.has(String(s)):  # Avoid duplicates
+					out.append(String(s))
+		elif typeof(bench_v) == TYPE_ARRAY:
+			for s in (bench_v as Array):
+				if not out.has(String(s)):  # Avoid duplicates
+					out.append(String(s))
 
 	return out
 

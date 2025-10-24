@@ -268,13 +268,29 @@ func _on_pick_member(pid: String) -> void:
 
 # ---------- Helpers ----------
 func _active_party_ids() -> Array:
+	var combined: Array = []
+
+	# Get active party members
 	if _gs and _gs.has_method("get_active_party_ids"):
 		var v: Variant = _gs.call("get_active_party_ids")
-		if typeof(v) == TYPE_ARRAY: return v as Array
-		if typeof(v) == TYPE_PACKED_STRING_ARRAY:
-			var out: Array = []; for s in (v as PackedStringArray): out.append(String(s)); return out
-	# Fallback to hero
-	return ["hero"]
+		if typeof(v) == TYPE_ARRAY:
+			combined.append_array(v as Array)
+		elif typeof(v) == TYPE_PACKED_STRING_ARRAY:
+			for s in (v as PackedStringArray): combined.append(String(s))
+
+	# Get benched members
+	if _gs and _gs.has_method("get"):
+		var bench_v: Variant = _gs.get("bench")
+		if typeof(bench_v) == TYPE_ARRAY:
+			combined.append_array(bench_v as Array)
+		elif typeof(bench_v) == TYPE_PACKED_STRING_ARRAY:
+			for s in (bench_v as PackedStringArray): combined.append(String(s))
+
+	# Fallback to hero if nothing found
+	if combined.is_empty():
+		return ["hero"]
+
+	return combined
 
 func _in_party(pid: String) -> bool:
 	for id_any in _active_party_ids():
