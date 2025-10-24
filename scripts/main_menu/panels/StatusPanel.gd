@@ -531,6 +531,7 @@ func _show_member_picker(active_slot: int) -> void:
 	# Create picker popup
 	var picker := ConfirmationDialog.new()
 	picker.title = "Select Bench Member"
+	picker.max_size = Vector2(400, 500)  # Max height is 500px
 
 	# Create content container
 	var vbox := VBoxContainer.new()
@@ -543,9 +544,9 @@ func _show_member_picker(active_slot: int) -> void:
 	instruction.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	vbox.add_child(instruction)
 
-	# Add member list (reduced height to ensure buttons are visible)
+	# Add member list (scrollable, will fit within max dialog height)
 	var item_list := ItemList.new()
-	item_list.custom_minimum_size = Vector2(280, 120)
+	item_list.custom_minimum_size = Vector2(280, 150)
 	item_list.size_flags_vertical = Control.SIZE_EXPAND_FILL
 
 	# Get roster for accurate name lookup
@@ -574,8 +575,8 @@ func _show_member_picker(active_slot: int) -> void:
 	)
 	picker.canceled.connect(func(): picker.queue_free())
 
-	# Set a reasonable size and center the dialog
-	picker.popup_centered(Vector2(320, 280))
+	# Center the dialog (will auto-size within max_size constraint)
+	picker.popup_centered()
 
 func _perform_swap(active_slot: int, bench_member_id: String) -> void:
 	if not _gs or not _gs.has_method("swap_active_bench"): return
