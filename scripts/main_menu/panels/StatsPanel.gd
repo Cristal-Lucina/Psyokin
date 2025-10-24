@@ -24,6 +24,9 @@ const FATIGUE_THRESHOLD_PER_WEEK := 60
 @onready var _title      : Label         = %Title
 @onready var _member_bar : HBoxContainer = %MemberBar
 
+# Radar chart for stat visualization
+var _radar_chart : Control = null
+
 var _stats : Node = null
 var _cal   : Node = null
 var _gs    : Node = null
@@ -63,6 +66,9 @@ func _ready() -> void:
 	for n in get_tree().root.get_children():
 		if n.has_signal("creation_applied") and not n.is_connected("creation_applied", Callable(self, "_rebuild_all")):
 			n.connect("creation_applied", Callable(self, "_rebuild_all"))
+
+	# Create and add radar chart
+	_create_radar_chart()
 
 	# build
 	_rebuild_member_bar()
@@ -121,6 +127,10 @@ func _rebuild_all() -> void:
 func _rebuild_list_only() -> void:
 	for c in _list.get_children():
 		c.queue_free()
+
+	# Redraw radar chart with updated stats
+	if _radar_chart:
+		_radar_chart.queue_redraw()
 
 	var is_hero := (_current_id == "hero")
 	var data := ( _get_stats_for_hero() if is_hero else _get_stats_for_member(_current_id) )
@@ -367,3 +377,102 @@ func _add_row2(label_text: String, val: String) -> void:
 func _add_spacer_row() -> void:
 	var sep := HSeparator.new()
 	_list.add_child(sep)
+
+# ---------- Radar Chart ----------
+func _create_radar_chart() -> void:
+	_radar_chart = Control.new()
+	_radar_chart.custom_minimum_size = Vector2(300, 300)
+	_radar_chart.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	_radar_chart.set_process(false)  # No need for _process, we'll redraw manually
+
+	# Insert chart after MemberBar, before Scroll
+	var member_bar_idx := _member_bar.get_index()
+	_root_vb.add_child(_radar_chart)
+	_root_vb.move_child(_radar_chart, member_bar_idx + 1)
+
+	# Connect draw callback
+	_radar_chart.draw.connect(_on_radar_draw)
+
+func _on_radar_draw() -> void:
+	if _radar_chart == null:
+		return
+
+	# Get current member stats
+	var is_hero := (_current_id == "hero")
+	var data := (_get_stats_for_hero() if is_hero else _get_stats_for_member(_current_id))
+
+	# Extract stat levels in order: BRW, MND, TPO, VTL, FCS
+	var stat_levels: Array[float] = []
+	for key in STATS_KEYS:
+		var entry_v: Variant = data.get(key)
+		var level: float = 0.0
+		if typeof(entry_v) == TYPE_DICTIONARY:
+			level = float((entry_v as Dictionary).get("level", (entry_v as Dictionary).get("lvl", 0)))
+		elif typeof(entry_v) in [TYPE_INT, TYPE_FLOAT]:
+			level = float(entry_v)
+		stat_levels.append(level)
+
+	_draw_pentagon_radar(_radar_chart, stat_levels)
+
+func _draw_pentagon_radar(control: Control, stat_levels: Array[float]) -> void:
+	var size := control.size
+	var center := size / 2.0
+	var max_radius: float = min(size.x, size.y) / 2.0 - 20.0  # Padding
+
+	# Draw 10 concentric pentagons (grid layers)
+	for layer in range(1, 11):
+		var radius := max_radius * (float(layer) / 10.0)
+		var points := _get_pentagon_points(center, radius)
+		var color := Color(0.3, 0.3, 0.3, 0.3)  # Dark gray for grid
+		_draw_pentagon_outline(control, points, color, 1.0)
+
+	# Draw axis lines from center to each vertex
+	for i in range(5):
+		var angle := -PI / 2.0 + (TAU / 5.0) * float(i)  # Start from top
+		var end_point := center + Vector2(cos(angle), sin(angle)) * max_radius
+		control.draw_line(center, end_point, Color(0.4, 0.4, 0.4, 0.5), 1.0)
+
+	# Draw stat labels at each point
+	var label_names: Array[String] = ["BRW", "MND", "TPO", "VTL", "FCS"]
+	for i in range(5):
+		var angle := -PI / 2.0 + (TAU / 5.0) * float(i)
+		var label_pos := center + Vector2(cos(angle), sin(angle)) * (max_radius + 15.0)
+		# Offset label based on position so it doesn't overlap
+		label_pos.x -= 15.0  # Rough centering
+		label_pos.y -= 5.0
+		control.draw_string(ThemeDB.fallback_font, label_pos, label_names[i],
+							HORIZONTAL_ALIGNMENT_CENTER, -1, 12, Color.WHITE)
+
+	# Calculate stat polygon points (normalized to 0-10 range)
+	var stat_points: PackedVector2Array = PackedVector2Array()
+	for i in range(5):
+		var stat_level := clamp(stat_levels[i], 0.0, 10.0)
+		var normalized := stat_level / 10.0  # Normalize to 0-1
+		var angle := -PI / 2.0 + (TAU / 5.0) * float(i)
+		var point := center + Vector2(cos(angle), sin(angle)) * max_radius * normalized
+		stat_points.append(point)
+
+	# Draw filled stat polygon (light blue)
+	if stat_points.size() >= 3:
+		control.draw_colored_polygon(stat_points, Color(0.3, 0.6, 1.0, 0.4))
+
+	# Draw stat polygon outline (brighter blue)
+	if stat_points.size() >= 2:
+		for i in range(stat_points.size()):
+			var start := stat_points[i]
+			var end := stat_points[(i + 1) % stat_points.size()]
+			control.draw_line(start, end, Color(0.4, 0.7, 1.0, 0.8), 2.0)
+
+func _get_pentagon_points(center: Vector2, radius: float) -> PackedVector2Array:
+	var points := PackedVector2Array()
+	for i in range(5):
+		var angle := -PI / 2.0 + (TAU / 5.0) * float(i)  # Start from top
+		var point := center + Vector2(cos(angle), sin(angle)) * radius
+		points.append(point)
+	return points
+
+func _draw_pentagon_outline(control: Control, points: PackedVector2Array, color: Color, width: float) -> void:
+	for i in range(points.size()):
+		var start := points[i]
+		var end := points[(i + 1) % points.size()]
+		control.draw_line(start, end, color, width)
