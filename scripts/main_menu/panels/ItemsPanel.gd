@@ -120,6 +120,7 @@ func _setup_category_buttons() -> void:
 		var btn := Button.new()
 		btn.text = cat
 		btn.toggle_mode = true
+		btn.add_theme_font_size_override("font_size", 10)
 		btn.set_meta("category", cat)
 		if cat == "All":
 			btn.button_pressed = true  # Start with "All" selected
@@ -212,58 +213,19 @@ func _rebuild() -> void:
 		margin.add_theme_constant_override("margin_bottom", 4)
 		panel.add_child(margin)
 
-		var row := HBoxContainer.new()
-		row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		row.add_theme_constant_override("separation", 8)
-		margin.add_child(row)
-
-		var name_lbl := Label.new()
-		name_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		name_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-		name_lbl.clip_text = false
-		name_lbl.text = nm
-		name_lbl.add_theme_font_size_override("font_size", 10)
-		row.add_child(name_lbl)
-
-		var equip_lbl := Label.new()
-		equip_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-		equip_lbl.size_flags_horizontal = Control.SIZE_FILL
-		equip_lbl.clip_text = false
-		equip_lbl.add_theme_font_size_override("font_size", 10)
-		var equip_txt := _equip_string_for(id, def)
-		if equip_txt != "":
-			equip_lbl.text = equip_txt
-		row.add_child(equip_lbl)
-
-		var cat_lbl := Label.new()
-		cat_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-		cat_lbl.clip_text = false
-		cat_lbl.text = cat
-		cat_lbl.add_theme_font_size_override("font_size", 10)
-		row.add_child(cat_lbl)
-
-		var qty_lbl := Label.new()
-		qty_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-		qty_lbl.clip_text = false
-		qty_lbl.text = "x%d" % qty
-		qty_lbl.add_theme_font_size_override("font_size", 10)
-		row.add_child(qty_lbl)
-
-		var ins_btn := Button.new()
-		ins_btn.text = "Inspect"
-		ins_btn.disabled = (qty <= 0)
-		ins_btn.set_meta("id", id)
-		if not ins_btn.pressed.is_connected(_on_inspect_row):
-			ins_btn.pressed.connect(_on_inspect_row.bind(ins_btn))
-		row.add_child(ins_btn)
-
-		# --- Discard button (new) ---
-		var del_btn := Button.new()
-		del_btn.text = "Discard"
-		del_btn.set_meta("id", id)
-		if not del_btn.pressed.is_connected(_on_discard_row):
-			del_btn.pressed.connect(_on_discard_row.bind(del_btn))
-		row.add_child(del_btn)
+		# Create a clickable button showing item name and quantity
+		var item_btn := Button.new()
+		item_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		item_btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		item_btn.text = "%s  x%d" % [nm, qty]
+		item_btn.add_theme_font_size_override("font_size", 10)
+		item_btn.set_meta("id", id)
+		item_btn.set_meta("def", def)
+		item_btn.set_meta("qty", qty)
+		item_btn.disabled = (qty <= 0)
+		if not item_btn.pressed.is_connected(_on_item_clicked):
+			item_btn.pressed.connect(_on_item_clicked.bind(item_btn))
+		margin.add_child(item_btn)
 
 		_list_box.add_child(panel)
 
@@ -567,6 +529,71 @@ func _holders_of_instance(inst_id: String) -> PackedStringArray:
 
 func _current_category() -> String:
 	return _active_category
+
+func _on_item_clicked(btn: Button) -> void:
+	var id: String = String(btn.get_meta("id"))
+	var def: Dictionary = btn.get_meta("def")
+	var qty: int = int(btn.get_meta("qty"))
+	var nm: String = _display_name(id, def)
+
+	# Create a dialog with item info and action buttons
+	var dlg := AcceptDialog.new()
+	dlg.title = nm
+	dlg.min_size = Vector2(400, 0)
+
+	# Build dialog content
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 8)
+
+	# Show quantity
+	var qty_lbl := Label.new()
+	qty_lbl.text = "Quantity: x%d" % qty
+	qty_lbl.add_theme_font_size_override("font_size", 10)
+	vbox.add_child(qty_lbl)
+
+	# Show equipment info if equipped
+	var equip_txt := _equip_string_for(id, def)
+	if equip_txt != "":
+		var equip_lbl := Label.new()
+		equip_lbl.text = equip_txt
+		equip_lbl.add_theme_font_size_override("font_size", 10)
+		vbox.add_child(equip_lbl)
+
+	# Add button container
+	var btn_row := HBoxContainer.new()
+	btn_row.add_theme_constant_override("separation", 8)
+
+	# Inspect button
+	var inspect_btn := Button.new()
+	inspect_btn.text = "Inspect"
+	inspect_btn.set_meta("id", id)
+	inspect_btn.pressed.connect(func():
+		dlg.hide()
+		_on_inspect_row(inspect_btn)
+	)
+	btn_row.add_child(inspect_btn)
+
+	# Discard button
+	var discard_btn := Button.new()
+	discard_btn.text = "Discard"
+	discard_btn.set_meta("id", id)
+	discard_btn.pressed.connect(func():
+		dlg.hide()
+		_on_discard_row(discard_btn)
+	)
+	btn_row.add_child(discard_btn)
+
+	vbox.add_child(btn_row)
+
+	# Add custom content to dialog
+	dlg.add_child(vbox)
+
+	# Show dialog
+	var host := get_tree().current_scene
+	if host == null:
+		host = get_tree().root
+	host.add_child(dlg)
+	dlg.popup_centered()
 
 func _on_inspect_row(btn: Button) -> void:
 	var id_v: Variant = btn.get_meta("id")
