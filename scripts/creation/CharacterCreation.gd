@@ -19,7 +19,7 @@ const ROUTER_PATH  := "/root/aSceneRouter"
 @onready var _hair_in     : OptionButton  = %HairIdInput
 @onready var _eyes_in     : OptionButton  = %EyesIdInput
 
-@onready var _skin_sl     : HSlider       = %BodyColorInput
+@onready var _skin_opt    : OptionButton  = %BodyColorInput
 @onready var _skin_sw     : ColorRect     = %BodyColorSwatch
 @onready var _brow_opt    : OptionButton  = %EyebrowColorInput
 @onready var _brow_sw     : ColorRect     = %EyebrowColorSwatch
@@ -44,6 +44,16 @@ var _perk_id_by_idx : Dictionary = {}          # index -> perk_id
 var _perk_stat_by_idx : Dictionary = {}        # index -> stat_id (help text)
 
 # ── Color palettes ───────────────────────────────────────────────────────────
+# Skin tones: specific discrete options from darkest to lightest
+const SKIN_TONES := {
+	"Tone 1": Color(0.227, 0.239, 0.212),  # #3A3D36 - Darkest
+	"Tone 2": Color(0.400, 0.302, 0.282),  # #664D48 - Dark
+	"Tone 3": Color(0.588, 0.388, 0.306),  # #96634E - Medium-Dark
+	"Tone 4": Color(0.780, 0.553, 0.459),  # #C78D75 - Medium
+	"Tone 5": Color(0.839, 0.667, 0.553),  # #D6AA8D - Light
+	"Tone 6": Color(0.847, 0.733, 0.663)   # #D8BBA9 - Lightest
+}
+
 # Hair/Eyebrow: white, ROYGBIV, black
 const HAIR_COLORS := {
 	"White": Color(0.95, 0.95, 0.95),
@@ -107,10 +117,8 @@ func _fill_basics() -> void:
 	_fill_opt(_hair_in, ["1","2","3","4"])
 	_fill_opt(_eyes_in, ["1","2","3","4"])
 
-	# Skin tone slider (0..1: pale white to dark brown)
-	_set_slider_range(_skin_sl, 0.0, 1.0, 0.01)
-
 	# Color dropdowns
+	_fill_color_opt(_skin_opt, SKIN_TONES)
 	_fill_color_opt(_eye_opt, EYE_COLORS)
 	_fill_color_opt(_brow_opt, HAIR_COLORS)
 	_fill_color_opt(_hair_opt, HAIR_COLORS)
@@ -132,15 +140,9 @@ func _fill_color_opt(ob: OptionButton, colors: Dictionary) -> void:
 		ob.add_item(String(color_name))
 	ob.select(0)
 
-func _set_slider_range(sl: HSlider, min_v: float, max_v: float, step: float) -> void:
-	if sl == null: return
-	sl.min_value = min_v
-	sl.max_value = max_v
-	sl.step = step
-
 func _wire_colors() -> void:
-	if _skin_sl and not _skin_sl.value_changed.is_connected(_on_color_changed):
-		_skin_sl.value_changed.connect(_on_color_changed)
+	if _skin_opt and not _skin_opt.item_selected.is_connected(_on_color_option_changed):
+		_skin_opt.item_selected.connect(_on_color_option_changed)
 	if _brow_opt and not _brow_opt.item_selected.is_connected(_on_color_option_changed):
 		_brow_opt.item_selected.connect(_on_color_option_changed)
 	if _eye_opt and not _eye_opt.item_selected.is_connected(_on_color_option_changed):
@@ -174,14 +176,11 @@ func _on_stat_toggled(pressed: bool, stat_id: String, btn: CheckButton) -> void:
 	_update_confirm_enabled()
 
 # ── colors ───────────────────────────────────────────────────────────────────
-func _on_color_changed(_v: float) -> void:
-	_update_color_swatches()
-
 func _on_color_option_changed(_idx: int) -> void:
 	_update_color_swatches()
 
 func _update_color_swatches() -> void:
-	if _skin_sw: _skin_sw.color = _skin_from_value(float(_skin_sl.value if _skin_sl else 0.5))
+	if _skin_sw: _skin_sw.color = _get_color_from_option(_skin_opt, SKIN_TONES, Color(0.847, 0.733, 0.663))
 	if _brow_sw: _brow_sw.color = _get_color_from_option(_brow_opt, HAIR_COLORS, Color(0.15, 0.15, 0.15))
 	if _eye_sw:  _eye_sw.color  = _get_color_from_option(_eye_opt, EYE_COLORS, Color(0.4, 0.25, 0.15))
 	if _hair_sw: _hair_sw.color = _get_color_from_option(_hair_opt, HAIR_COLORS, Color(0.15, 0.15, 0.15))
@@ -192,13 +191,6 @@ func _get_color_from_option(opt: OptionButton, palette: Dictionary, default: Col
 	if idx < 0 or idx >= opt.item_count: return default
 	var color_name: String = opt.get_item_text(idx)
 	return palette.get(color_name, default)
-
-func _skin_from_value(t: float) -> Color:
-	# Interpolate from pale white (#FFF5E8) to dark brown (#3D2817)
-	var v: float = clamp(t, 0.0, 1.0)
-	var pale := Color(1.0, 0.96, 0.91)       # Pale white
-	var dark := Color(0.24, 0.16, 0.09)      # Dark brown
-	return pale.lerp(dark, v)
 
 # ── perks (based on selected stats; only T1 options) ─────────────────────────
 func _rebuild_perk_dropdown() -> void:
@@ -274,7 +266,7 @@ func _on_confirm_pressed() -> void:
 	var hair_id: String = _opt_text(_hair_in)
 	var eyes_id: String = _opt_text(_eyes_in)
 
-	var c_skin: Color = _skin_from_value(float(_skin_sl.value if _skin_sl else 0.5))
+	var c_skin: Color = _get_color_from_option(_skin_opt, SKIN_TONES, Color(0.847, 0.733, 0.663))
 	var c_brow: Color = _get_color_from_option(_brow_opt, HAIR_COLORS, Color(0.15, 0.15, 0.15))
 	var c_eye: Color  = _get_color_from_option(_eye_opt, EYE_COLORS, Color(0.4, 0.25, 0.15))
 	var c_hair: Color = _get_color_from_option(_hair_opt, HAIR_COLORS, Color(0.15, 0.15, 0.15))
