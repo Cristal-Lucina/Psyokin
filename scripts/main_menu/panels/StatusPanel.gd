@@ -85,6 +85,18 @@ const ALT_MES_PATHS := [
 @onready var _phase   : Label         = $Root/Right/InfoGrid/PhaseValue
 @onready var _hint    : RichTextLabel = $Root/Right/HintValue
 
+# Appearance UI (from TSCN)
+@onready var _app_name_value    : Label     = %NameValue
+@onready var _app_pronoun_value : Label     = %PronounValue
+@onready var _app_body_value    : Label     = %BodyValue
+@onready var _app_face_value    : Label     = %FaceValue
+@onready var _app_eyes_value    : Label     = %EyesValue
+@onready var _app_hair_value    : Label     = %HairValue
+@onready var _sw_skin           : ColorRect = %SkinColor
+@onready var _sw_brow           : ColorRect = %BrowColor
+@onready var _sw_eye            : ColorRect = %EyesColor
+@onready var _sw_hair           : ColorRect = %HairColor
+
 var _gs        : Node = null
 var _st        : Node = null
 var _cal       : Node = null
@@ -98,15 +110,6 @@ var _cps       : Node = null
 # party.csv cache
 var _csv_by_id   : Dictionary = {}      # "actor_id" -> row dict
 var _name_to_id  : Dictionary = {}      # lowercase "name" -> "actor_id"
-
-# Appearance UI
-var _app_box    : VBoxContainer = null
-var _app_grid   : GridContainer = null
-var _app_labels : Dictionary = {}
-var _sw_skin    : ColorRect = null
-var _sw_brow    : ColorRect = null
-var _sw_eye     : ColorRect = null
-var _sw_hair    : ColorRect = null
 
 func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -348,79 +351,17 @@ func _update_summary() -> void:
 # --------------------- Appearance -----------------------------
 
 func _rebuild_appearance() -> void:
-	_ensure_appearance_ui()
 	_update_appearance_values()
-
-func _ensure_appearance_ui() -> void:
-	var right_parent: Control = (_hint.get_parent() as Control) if _hint else self
-
-	_app_box = null
-	for c in right_parent.get_children():
-		if c is VBoxContainer and (c as VBoxContainer).name == "AppearanceBox":
-			_app_box = c; break
-	if _app_box != null: return
-
-	var vb := VBoxContainer.new()
-	_app_box = vb
-	_app_box.name = "AppearanceBox"
-	_app_box.add_theme_constant_override("separation", 6)
-	right_parent.add_child(_app_box)
-
-	var header := Label.new()
-	header.text = "Appearance"
-	_app_box.add_child(header)
-
-	_app_grid = GridContainer.new()
-	_app_grid.columns = 2
-	_app_grid.add_theme_constant_override("hseparation", 8)
-	_app_grid.add_theme_constant_override("vseparation", 4)
-	_app_box.add_child(_app_grid)
-
-	_appearance_add_row(_app_grid, _app_labels, "name", "Name")
-	_appearance_add_row(_app_grid, _app_labels, "pronoun", "Pronoun")
-	_appearance_add_row(_app_grid, _app_labels, "body", "Body ID")
-	_appearance_add_row(_app_grid, _app_labels, "face", "Face ID")
-	_appearance_add_row(_app_grid, _app_labels, "eyes", "Eyes ID")
-	_appearance_add_row(_app_grid, _app_labels, "hair", "Hair ID")
-
-	var sw := HBoxContainer.new()
-	sw.add_theme_constant_override("separation", 8)
-	_app_box.add_child(sw)
-
-	_sw_skin = _make_swatch(sw, "Skin")
-	_sw_brow = _make_swatch(sw, "Brows")
-	_sw_eye  = _make_swatch(sw, "Eyes")
-	_sw_hair = _make_swatch(sw, "Hair")
-
-func _appearance_add_row(grid: GridContainer, labels_store: Dictionary, key: String, display: String) -> void:
-	var l := Label.new(); l.text = display
-	var v := Label.new(); v.name = key + "Value"
-	grid.add_child(l); grid.add_child(v)
-	labels_store[key] = v
-
-func _make_swatch(parent_box: HBoxContainer, label_text: String) -> ColorRect:
-	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 4)
-	var lb := Label.new(); lb.text = label_text; box.add_child(lb)
-	var cr := ColorRect.new(); cr.custom_minimum_size = Vector2(42, 14); box.add_child(cr)
-	parent_box.add_child(box)
-	return cr
 
 func _update_appearance_values() -> void:
 	var snap: Dictionary = _read_hero_identity()
-	var name_lbl: Label = _app_labels.get("name", null)
-	var p_lbl: Label    = _app_labels.get("pronoun", null)
-	var b_lbl: Label    = _app_labels.get("body", null)
-	var f_lbl: Label    = _app_labels.get("face", null)
-	var e_lbl: Label    = _app_labels.get("eyes", null)
-	var h_lbl: Label    = _app_labels.get("hair", null)
 
-	if name_lbl: name_lbl.text = String(snap.get("name", "Player"))
-	if p_lbl:    p_lbl.text    = String(snap.get("pronoun", "they"))
-	if b_lbl:    b_lbl.text    = String(snap.get("body", "1"))
-	if f_lbl:    f_lbl.text    = String(snap.get("face", "1"))
-	if e_lbl:    e_lbl.text    = String(snap.get("eyes", "1"))
-	if h_lbl:    h_lbl.text    = String(snap.get("hair", "1"))
+	if _app_name_value:    _app_name_value.text    = String(snap.get("name", "Player"))
+	if _app_pronoun_value: _app_pronoun_value.text = String(snap.get("pronoun", "they"))
+	if _app_body_value:    _app_body_value.text    = String(snap.get("body", "1"))
+	if _app_face_value:    _app_face_value.text    = String(snap.get("face", "1"))
+	if _app_eyes_value:    _app_eyes_value.text    = String(snap.get("eyes", "1"))
+	if _app_hair_value:    _app_hair_value.text    = String(snap.get("hair", "1"))
 
 	if _sw_skin: _sw_skin.color = _as_color(snap.get("body_color", Color(1.0, 0.9, 0.8)))
 	if _sw_brow: _sw_brow.color = _as_color(snap.get("brow_color", Color(0.2, 0.2, 0.2)))
