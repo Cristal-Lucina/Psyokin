@@ -49,46 +49,58 @@ func _path(slot: int) -> String:
 func _ensure_dir() -> void:
 	DirAccess.make_dir_recursive_absolute(SAVE_DIR)
 
-## Generates a human-readable label from save payload using calendar data.
-## Format: "MM/DD — Weekday — Phase" (e.g., "05/05 — Monday — Morning")
+## Generates a human-readable label from save payload using player name and calendar data.
+## Format: "FirstName LastName : Mon 5/5 : Time Played"
 func _label_from_payload(payload: Dictionary) -> String:
+	# Get player name (first + last)
+	var player_name := "Player"
+	if payload.has("meta") and typeof(payload["meta"]) == TYPE_DICTIONARY:
+		var meta: Dictionary = payload["meta"]
+		if meta.has("hero_identity") and typeof(meta["hero_identity"]) == TYPE_DICTIONARY:
+			var identity: Dictionary = meta["hero_identity"]
+			var first_name := String(identity.get("name", ""))
+			var surname := String(identity.get("surname", ""))
+			if first_name != "":
+				player_name = first_name
+				if surname != "":
+					player_name += " " + surname
+
+	# Get date and weekday
+	var date_str := ""
 	if payload.has("calendar") and typeof(payload["calendar"]) == TYPE_DICTIONARY:
 		var c: Dictionary = payload["calendar"]
 		var date: Dictionary = c.get("date", {})
 		var month := int(date.get("month", 0))
 		var day   := int(date.get("day", 0))
 
-		var weekday_name := ""
+		var weekday_abbrev := ""
 		var wi := int(c.get("weekday", -1))
 		if wi >= 0:
-			var names := ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"]
-			if wi >= 0 and wi < names.size(): weekday_name = names[wi]
+			var abbrevs := ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+			if wi >= 0 and wi < abbrevs.size(): weekday_abbrev = abbrevs[wi]
 
-		var phase_name := ""
-		match int(c.get("phase", -1)):
-			0: phase_name = "Morning"
-			1: phase_name = "Afternoon"
-			2: phase_name = "Evening"
-			_: pass
+		if month > 0 and day > 0 and weekday_abbrev != "":
+			date_str = "%s %d/%d" % [weekday_abbrev, month, day]
 
-		if month > 0 and day > 0:
-			var md := "%02d/%02d" % [month, day]
-			var parts: Array[String] = [md]
-			if weekday_name != "": parts.append(weekday_name)
-			if phase_name  != "": parts.append(phase_name)
-			return " — ".join(parts)
+	# Get time played (placeholder for now - can be implemented when time tracking is added)
+	var time_played := "Time Played"
+	if payload.has("time_played"):
+		var seconds := int(payload.get("time_played", 0))
+		if seconds > 0:
+			var hours := seconds / 3600
+			var minutes := (seconds % 3600) / 60
+			time_played = "%d:%02d" % [hours, minutes]
 
+	# Format: "FirstName LastName : Mon 5/5 : Time Played"
+	if date_str != "":
+		return "%s : %s : %s" % [player_name, date_str, time_played]
+
+	# Fallback to old format if calendar data missing
 	var ds := String(payload.get("date_string",""))
-	var wd := String(payload.get("weekday",""))
-	var ph := String(payload.get("phase",""))
-	if ds != "" or wd != "" or ph != "":
-		var p2: Array[String] = []
-		if ds != "": p2.append(ds)
-		if wd != "": p2.append(wd)
-		if ph != "": p2.append(ph)
-		return " — ".join(p2)
+	if ds != "":
+		return "%s : %s : %s" % [player_name, ds, time_played]
 
-	return ""
+	return player_name
 
 ## Safely retrieves an autoload node by name from the SceneTree root
 func _get_autoload(autoload_name: String) -> Node:
