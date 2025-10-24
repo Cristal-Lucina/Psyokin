@@ -199,29 +199,54 @@ func _rebuild() -> void:
 		if qty <= 0: continue
 		if want != "All" and cat != want: continue
 
+		# Wrap each item in a PanelContainer for nice box effect
+		var panel := PanelContainer.new()
+		panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		panel.clip_contents = true
+
+		# Add margin inside the panel
+		var margin := MarginContainer.new()
+		margin.add_theme_constant_override("margin_left", 8)
+		margin.add_theme_constant_override("margin_top", 4)
+		margin.add_theme_constant_override("margin_right", 8)
+		margin.add_theme_constant_override("margin_bottom", 4)
+		panel.add_child(margin)
+
 		var row := HBoxContainer.new()
 		row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		row.add_theme_constant_override("separation", 8)
+		margin.add_child(row)
 
 		var name_lbl := Label.new()
 		name_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		name_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+		name_lbl.clip_text = false
 		name_lbl.text = nm
+		name_lbl.add_theme_font_size_override("font_size", 10)
 		row.add_child(name_lbl)
 
 		var equip_lbl := Label.new()
 		equip_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 		equip_lbl.size_flags_horizontal = Control.SIZE_FILL
+		equip_lbl.clip_text = false
+		equip_lbl.add_theme_font_size_override("font_size", 10)
 		var equip_txt := _equip_string_for(id, def)
 		if equip_txt != "":
 			equip_lbl.text = equip_txt
 		row.add_child(equip_lbl)
 
 		var cat_lbl := Label.new()
+		cat_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+		cat_lbl.clip_text = false
 		cat_lbl.text = cat
+		cat_lbl.add_theme_font_size_override("font_size", 10)
 		row.add_child(cat_lbl)
 
 		var qty_lbl := Label.new()
+		qty_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+		qty_lbl.clip_text = false
 		qty_lbl.text = "x%d" % qty
+		qty_lbl.add_theme_font_size_override("font_size", 10)
 		row.add_child(qty_lbl)
 
 		var ins_btn := Button.new()
@@ -240,7 +265,7 @@ func _rebuild() -> void:
 			del_btn.pressed.connect(_on_discard_row.bind(del_btn))
 		row.add_child(del_btn)
 
-		_list_box.add_child(row)
+		_list_box.add_child(panel)
 
 	await get_tree().process_frame
 	_list_box.queue_sort()
