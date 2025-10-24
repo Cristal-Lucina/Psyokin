@@ -187,11 +187,11 @@ func _refresh_all_for_current() -> void:
 	if cur == "":
 		return
 	var equip: Dictionary = _fetch_equip_for(cur)
-	_w_val.text = _pretty_item(String(equip.get("weapon","")))
-	_a_val.text = _pretty_item(String(equip.get("armor","")))
-	_h_val.text = _pretty_item(String(equip.get("head","")))
-	_f_val.text = _pretty_item(String(equip.get("foot","")))
-	_b_val.text = _pretty_item(String(equip.get("bracelet","")))
+	_w_val.text = _pretty_item_with_slot(String(equip.get("weapon","")), "weapon")
+	_a_val.text = _pretty_item_with_slot(String(equip.get("armor","")), "armor")
+	_h_val.text = _pretty_item_with_slot(String(equip.get("head","")), "head")
+	_f_val.text = _pretty_item_with_slot(String(equip.get("foot","")), "foot")
+	_b_val.text = _pretty_item_with_slot(String(equip.get("bracelet","")), "bracelet")
 	_rebuild_stats_grid(cur, equip)
 	_rebuild_sigils(cur)
 	_refresh_mind_row(cur)
@@ -637,6 +637,20 @@ func _fetch_equip_for(member_token: String) -> Dictionary:
 
 func _pretty_item(id: String) -> String:
 	if id == "" or id == "—": return "—"
+	if _eq and _eq.has_method("get_item_display_name"):
+		var v: Variant = _eq.call("get_item_display_name", id)
+		if typeof(v) == TYPE_STRING: return String(v)
+	return id
+
+func _pretty_item_with_slot(id: String, slot: String) -> String:
+	if id == "" or id == "—":
+		match slot:
+			"weapon": return "(Weapon)"
+			"armor": return "(Armor)"
+			"head": return "(Headwear)"
+			"foot": return "(Footwear)"
+			"bracelet": return "(Bracelet)"
+			_: return "—"
 	if _eq and _eq.has_method("get_item_display_name"):
 		var v: Variant = _eq.call("get_item_display_name", id)
 		if typeof(v) == TYPE_STRING: return String(v)
