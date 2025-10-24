@@ -173,6 +173,10 @@ func _build_list() -> void:
 	_list_group.allow_unpress = false
 
 	var f: int = _get_filter_id()
+
+	# Build list of bonds with their data for sorting
+	var bond_list: Array[Dictionary] = []
+
 	for rec: Dictionary in _rows:
 		var id: String = String(rec.get("id", ""))
 		var disp_name: String = String(rec.get("name", id))
@@ -185,6 +189,35 @@ func _build_list() -> void:
 		if f == Filter.KNOWN and not known:    continue
 		if f == Filter.LOCKED and known:       continue
 		if f == Filter.MAXED and not maxed:    continue
+
+		bond_list.append({
+			"id": id,
+			"disp_name": disp_name,
+			"known": known,
+			"maxed": maxed
+		})
+
+	# Sort: known bonds first, then unknown bonds
+	bond_list.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		var a_known: bool = bool(a.get("known", false))
+		var b_known: bool = bool(b.get("known", false))
+
+		# Known bonds come before unknown
+		if a_known != b_known:
+			return a_known
+
+		# Within same group, sort alphabetically by display name
+		var a_name: String = String(a.get("disp_name", ""))
+		var b_name: String = String(b.get("disp_name", ""))
+		return a_name < b_name
+	)
+
+	# Create UI rows from sorted list
+	for bond_data: Dictionary in bond_list:
+		var id: String = String(bond_data.get("id", ""))
+		var disp_name: String = String(bond_data.get("disp_name", ""))
+		var known: bool = bool(bond_data.get("known", false))
+		var maxed: bool = bool(bond_data.get("maxed", false))
 
 		var row := Button.new()
 		# Show "(Unknown)" for locked bonds instead of actual name
