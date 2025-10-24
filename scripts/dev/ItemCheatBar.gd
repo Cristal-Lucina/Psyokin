@@ -217,6 +217,22 @@ func _ready() -> void:
 	_style_option_button(_sig_inst_pick, 8, 210)
 	_style_option_button(_roster_pick, 8, 210)
 
+	# Apply 8pt font to all scene buttons
+	if _give: _give.add_theme_font_size_override("font_size", 8)
+	if _rem: _rem.add_theme_font_size_override("font_size", 8)
+	if _give10: _give10.add_theme_font_size_override("font_size", 8)
+	if _reload: _reload.add_theme_font_size_override("font_size", 8)
+	if _btn_lv_up: _btn_lv_up.add_theme_font_size_override("font_size", 8)
+	if _btn_lv_down: _btn_lv_down.add_theme_font_size_override("font_size", 8)
+	if _btn_xp_25: _btn_xp_25.add_theme_font_size_override("font_size", 8)
+	if _btn_xp_100: _btn_xp_100.add_theme_font_size_override("font_size", 8)
+	if _btn_lvl_m1: _btn_lvl_m1.add_theme_font_size_override("font_size", 8)
+	if _btn_lvl_p1: _btn_lvl_p1.add_theme_font_size_override("font_size", 8)
+	if _btn_set_level: _btn_set_level.add_theme_font_size_override("font_size", 8)
+	if _btn_add_party: _btn_add_party.add_theme_font_size_override("font_size", 8)
+	if _btn_rem_party: _btn_rem_party.add_theme_font_size_override("font_size", 8)
+	if _btn_to_bench: _btn_to_bench.add_theme_font_size_override("font_size", 8)
+
 	# Populate
 	_refresh_defs()
 	_refresh_sig_dropdown()
@@ -283,6 +299,7 @@ func _ensure_party_import_row() -> void:
 		_btn_import_all = Button.new()
 		_btn_import_all.name = "BtnImportParty"
 		_btn_import_all.text = "Import All (CSV) → Common"
+		_btn_import_all.add_theme_font_size_override("font_size", 8)
 		_party_import_row.add_child(_btn_import_all)
 		_btn_import_all.pressed.connect(_on_import_all)
 
@@ -290,6 +307,7 @@ func _ensure_party_import_row() -> void:
 		_btn_import_starters = Button.new()
 		_btn_import_starters.name = "BtnImportStarters"
 		_btn_import_starters.text = "Import Starters Only"
+		_btn_import_starters.add_theme_font_size_override("font_size", 8)
 		_party_import_row.add_child(_btn_import_starters)
 		_btn_import_starters.pressed.connect(_on_import_starters)
 
@@ -339,6 +357,7 @@ func _ensure_hero_row() -> void:
 
 	_btn_hero_add_xp = Button.new()
 	_btn_hero_add_xp.text = "Add Hero XP"
+	_btn_hero_add_xp.add_theme_font_size_override("font_size", 8)
 	_hero_row.add_child(_btn_hero_add_xp)
 
 	var sxp_lbl := Label.new()
@@ -359,6 +378,7 @@ func _ensure_hero_row() -> void:
 
 	_btn_hero_add_sxp = Button.new()
 	_btn_hero_add_sxp.text = "Add Hero SXP"
+	_btn_hero_add_sxp.add_theme_font_size_override("font_size", 8)
 	_hero_row.add_child(_btn_hero_add_sxp)
 
 	if _btn_hero_add_xp and not _btn_hero_add_xp.pressed.is_connected(_on_hero_add_xp):
@@ -403,6 +423,7 @@ func _ensure_party_rows() -> void:
 
 		_btn_add_xp = Button.new()
 		_btn_add_xp.text = "Add XP to Member"
+		_btn_add_xp.add_theme_font_size_override("font_size", 8)
 		_party_lxp_row.add_child(_btn_add_xp)
 		if not _btn_add_xp.pressed.is_connected(_on_add_xp):
 			_btn_add_xp.pressed.connect(_on_add_xp)
@@ -433,6 +454,7 @@ func _ensure_party_rows() -> void:
 
 		_btn_add_sxp = Button.new()
 		_btn_add_sxp.text = "Add SXP to Member"
+		_btn_add_sxp.add_theme_font_size_override("font_size", 8)
 		_party_sxp_row.add_child(_btn_add_sxp)
 		if not _btn_add_sxp.pressed.is_connected(_on_add_sxp):
 			_btn_add_sxp.pressed.connect(_on_add_sxp)
@@ -468,6 +490,7 @@ func _ensure_sigil_gxp_row() -> void:
 
 		_btn_add_gxp = Button.new()
 		_btn_add_gxp.text = "Add GXP"
+		_btn_add_gxp.add_theme_font_size_override("font_size", 8)
 		_sigil_gxp_row.add_child(_btn_add_gxp)
 		if not _btn_add_gxp.pressed.is_connected(_on_add_sigil_gxp):
 			_btn_add_gxp.pressed.connect(_on_add_sigil_gxp)
@@ -509,6 +532,7 @@ func _ensure_bond_row() -> void:
 
 		_btn_complete_event = Button.new()
 		_btn_complete_event.text = "Complete Event"
+		_btn_complete_event.add_theme_font_size_override("font_size", 8)
 		_btn_complete_event.tooltip_text = "Complete next event (E1-E9) with dialogue score"
 		_bond_row.add_child(_btn_complete_event)
 		_btn_complete_event.pressed.connect(_on_complete_event)
@@ -526,6 +550,7 @@ func _ensure_bond_row() -> void:
 
 		_btn_give_gift = Button.new()
 		_btn_give_gift.text = "Give Gift"
+		_btn_give_gift.add_theme_font_size_override("font_size", 8)
 		_btn_give_gift.tooltip_text = "Give gift (once per layer)"
 		_bond_row.add_child(_btn_give_gift)
 		_btn_give_gift.pressed.connect(_on_give_gift)
@@ -533,6 +558,7 @@ func _ensure_bond_row() -> void:
 		# Side Meetup
 		_btn_side_meetup = Button.new()
 		_btn_side_meetup.text = "Side Meetup (+6)"
+		_btn_side_meetup.add_theme_font_size_override("font_size", 8)
 		_btn_side_meetup.tooltip_text = "Optional filler scene for +6 points"
 		_bond_row.add_child(_btn_side_meetup)
 		_btn_side_meetup.pressed.connect(_on_side_meetup)
@@ -540,11 +566,13 @@ func _ensure_bond_row() -> void:
 		# Utility buttons
 		_btn_mark_known = Button.new()
 		_btn_mark_known.text = "Mark Known"
+		_btn_mark_known.add_theme_font_size_override("font_size", 8)
 		_bond_row.add_child(_btn_mark_known)
 		_btn_mark_known.pressed.connect(_on_mark_bond_known)
 
 		_btn_discover_like = Button.new()
 		_btn_discover_like.text = "Discover Like"
+		_btn_discover_like.add_theme_font_size_override("font_size", 8)
 		_bond_row.add_child(_btn_discover_like)
 		_btn_discover_like.pressed.connect(_on_discover_like)
 
@@ -563,6 +591,7 @@ func _ensure_bond_row() -> void:
 
 		_btn_add_points = Button.new()
 		_btn_add_points.text = "Add Pts"
+		_btn_add_points.add_theme_font_size_override("font_size", 8)
 		_btn_add_points.tooltip_text = "Directly add/remove points (cheat)"
 		_bond_row.add_child(_btn_add_points)
 		_btn_add_points.pressed.connect(_on_add_points)
