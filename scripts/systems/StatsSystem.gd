@@ -239,7 +239,9 @@ func _preserve_hp_mp_percentages(member_id: String, old_level: int = -1, old_vtl
 		var member_data_v: Variant = gs.get("member_data")
 		if typeof(member_data_v) == TYPE_DICTIONARY:
 			var member_data: Dictionary = member_data_v
-			if member_data.has(pid):
+			if not member_data.has(pid):
+				member_data[pid] = {"hp": new_current_hp, "mp": new_current_mp, "buffs": [], "debuffs": []}
+			else:
 				var data: Dictionary = member_data[pid]
 				data["hp"] = new_current_hp
 				data["mp"] = new_current_mp

@@ -514,7 +514,18 @@ func save() -> Dictionary:
 	var meta_keys: PackedStringArray = get_meta_list()
 	for i in range(meta_keys.size()):
 		var key: String = meta_keys[i]
-		meta_dict[key] = get_meta(key)
+		var meta_value: Variant = get_meta(key)
+
+		# Debug: Log hero_identity before saving
+		if OS.is_debug_build() and String(key) == "hero_identity" and typeof(meta_value) == TYPE_DICTIONARY:
+			var id: Dictionary = meta_value
+			print("[GameState.save] Saving hero_identity metadata:")
+			print("  body_color type: %s, value: %s" % [typeof(id.get("body_color")), str(id.get("body_color"))])
+			print("  brow_color type: %s, value: %s" % [typeof(id.get("brow_color")), str(id.get("brow_color"))])
+			print("  eye_color type: %s, value: %s" % [typeof(id.get("eye_color")), str(id.get("eye_color"))])
+			print("  hair_color type: %s, value: %s" % [typeof(id.get("hair_color")), str(id.get("hair_color"))])
+
+		meta_dict[key] = meta_value
 	payload["meta"] = meta_dict
 
 	# Optional systems (if present)
