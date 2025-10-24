@@ -415,9 +415,9 @@ func _on_radar_draw() -> void:
 	_draw_pentagon_radar(_radar_chart, stat_levels)
 
 func _draw_pentagon_radar(control: Control, stat_levels: Array[float]) -> void:
-	var size := control.size
-	var center := size / 2.0
-	var max_radius: float = min(size.x, size.y) / 2.0 - 20.0  # Padding
+	var chart_size: Vector2 = control.size
+	var center: Vector2 = chart_size / 2.0
+	var max_radius: float = min(chart_size.x, chart_size.y) / 2.0 - 20.0  # Padding
 
 	# Draw 10 concentric pentagons (grid layers)
 	for layer in range(1, 11):
@@ -446,10 +446,10 @@ func _draw_pentagon_radar(control: Control, stat_levels: Array[float]) -> void:
 	# Calculate stat polygon points (normalized to 0-10 range)
 	var stat_points: PackedVector2Array = PackedVector2Array()
 	for i in range(5):
-		var stat_level := clamp(stat_levels[i], 0.0, 10.0)
-		var normalized := stat_level / 10.0  # Normalize to 0-1
-		var angle := -PI / 2.0 + (TAU / 5.0) * float(i)
-		var point := center + Vector2(cos(angle), sin(angle)) * max_radius * normalized
+		var stat_level: float = clamp(stat_levels[i], 0.0, 10.0)
+		var normalized: float = stat_level / 10.0  # Normalize to 0-1
+		var angle: float = -PI / 2.0 + (TAU / 5.0) * float(i)
+		var point: Vector2 = center + Vector2(cos(angle), sin(angle)) * max_radius * normalized
 		stat_points.append(point)
 
 	# Draw filled stat polygon (light blue)
