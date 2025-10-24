@@ -68,13 +68,19 @@ enum Filter { ALL, KNOWN, LOCKED, MAXED }
 @onready var _desc      : RichTextLabel  = %Notes               # description block
 
 # New/managed widgets
-var _layer_tv     : Label          = null   # shows stage text (Not Met, Outer…)
-var _likes_tv     : Label          = null
-var _dislikes_tv  : Label          = null
-var _rewards_hdr  : Label          = null   # “Rewards:”
-var _rewards_val  : Label          = null   # “Locked”
-var _story_btn    : Button         = null
-var _story_overlay: Control        = null
+var _event_tv       : Label          = null   # shows event progress (E1-E9)
+var _layer_tv       : Label          = null   # shows stage text (Not Met, Outer…)
+var _points_tv      : Label          = null   # shows points bank / threshold
+var _gift_tv        : Label          = null   # shows gift status
+var _likes_tv       : Label          = null
+var _dislikes_tv    : Label          = null
+var _unlock_hdr     : Label          = null   # "Unlocks:"
+var _unlock_acq     : Button         = null   # Acquaintance → Outer unlock (10 pts)
+var _unlock_outer   : Button         = null   # Outer → Middle unlock (12 pts)
+var _unlock_middle  : Button         = null   # Middle → Inner unlock (14 pts)
+var _unlock_inner   : Button         = null   # Inner → Core unlock (16 pts)
+var _story_btn      : Button         = null
+var _story_overlay  : Control        = null
 
 # Data / state
 var _sys  : Node = null
@@ -118,22 +124,43 @@ func _hide_level_cbxp_labels() -> void:
 				(n as Label).visible = false
 
 func _ensure_detail_widgets() -> void:
-	# 1) Layer label directly under the name
-	if _layer_tv == null:
+	# 1) Event, Layer, Points, Gift labels directly under the name
+	var np: Node = (_name_tv.get_parent() if _name_tv else null)
+	var name_idx: int = 0
+	if np:
+		var kids: Array = np.get_children()
+		for i in range(kids.size()):
+			if kids[i] == _name_tv:
+				name_idx = i
+				break
+
+	if _event_tv == null and np:
+		_event_tv = Label.new()
+		_event_tv.name = "EventProgress"
+		_event_tv.text = "Event: —"
+		np.add_child(_event_tv)
+		np.move_child(_event_tv, name_idx + 1)
+
+	if _layer_tv == null and np:
 		_layer_tv = Label.new()
 		_layer_tv.name = "LayerStage"
-		_layer_tv.text = "—"
-		var np: Node = (_name_tv.get_parent() if _name_tv else null)
-		if np:
-			np.add_child(_layer_tv)
-			# place right after the name label
-			var idx: int = 0
-			var kids: Array = np.get_children()
-			for i in range(kids.size()):
-				if kids[i] == _name_tv:
-					idx = i
-					break
-			np.move_child(_layer_tv, idx + 1)
+		_layer_tv.text = "Layer: —"
+		np.add_child(_layer_tv)
+		np.move_child(_layer_tv, name_idx + 2)
+
+	if _points_tv == null and np:
+		_points_tv = Label.new()
+		_points_tv.name = "PointsBank"
+		_points_tv.text = "Points: —"
+		np.add_child(_points_tv)
+		np.move_child(_points_tv, name_idx + 3)
+
+	if _gift_tv == null and np:
+		_gift_tv = Label.new()
+		_gift_tv.name = "GiftStatus"
+		_gift_tv.text = "Gift: —"
+		np.add_child(_gift_tv)
+		np.move_child(_gift_tv, name_idx + 4)
 
 	# 2) Everything else gets added under the same parent as the description
 	if _desc == null:
@@ -167,16 +194,43 @@ func _ensure_detail_widgets() -> void:
 		row2.add_child(title2); row2.add_child(_dislikes_tv)
 		holder.add_child(row2)
 
-	# Rewards: Header + “Locked” placeholder
-	if _rewards_hdr == null:
-		_rewards_hdr = Label.new()
-		_rewards_hdr.text = "Rewards:"
-		holder.add_child(_rewards_hdr)
+	# Unlocks: Header + 4 layer transition buttons
+	if _unlock_hdr == null:
+		_unlock_hdr = Label.new()
+		_unlock_hdr.text = "Layer Transitions:"
+		holder.add_child(_unlock_hdr)
 
-	if _rewards_val == null:
-		_rewards_val = Label.new()
-		_rewards_val.text = "Locked"
-		holder.add_child(_rewards_val)
+	if _unlock_acq == null:
+		_unlock_acq = Button.new()
+		_unlock_acq.name = "UnlockAcquaintance"
+		_unlock_acq.text = "Acquaintance → Outer"
+		_unlock_acq.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_unlock_acq.disabled = true  # Will be enabled when unlocked
+		holder.add_child(_unlock_acq)
+
+	if _unlock_outer == null:
+		_unlock_outer = Button.new()
+		_unlock_outer.name = "UnlockOuter"
+		_unlock_outer.text = "Outer → Middle"
+		_unlock_outer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_unlock_outer.disabled = true  # Will be enabled when unlocked
+		holder.add_child(_unlock_outer)
+
+	if _unlock_middle == null:
+		_unlock_middle = Button.new()
+		_unlock_middle.name = "UnlockMiddle"
+		_unlock_middle.text = "Middle → Inner"
+		_unlock_middle.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_unlock_middle.disabled = true
+		holder.add_child(_unlock_middle)
+
+	if _unlock_inner == null:
+		_unlock_inner = Button.new()
+		_unlock_inner.name = "UnlockInner"
+		_unlock_inner.text = "Inner → Core"
+		_unlock_inner.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_unlock_inner.disabled = true
+		holder.add_child(_unlock_inner)
 
 # ─────────────────────────────────────────────────────────────
 # System wiring
@@ -326,6 +380,49 @@ func _read_csv_rows(path: String) -> Array[Dictionary]:
 	f.close()
 	return out
 
+## Read event index (0-9)
+func _read_event_index(id: String) -> int:
+	if _sys == null:
+		return 0
+	if _sys.has_method("get_event_index"):
+		return int(_sys.call("get_event_index", id))
+	return 0
+
+## Read points bank
+func _read_points_bank(id: String) -> int:
+	if _sys == null:
+		return 0
+	if _sys.has_method("get_points_bank"):
+		return int(_sys.call("get_points_bank", id))
+	# Backward compatibility
+	if _sys.has_method("get_bxp"):
+		return int(_sys.call("get_bxp", id))
+	return 0
+
+## Read next threshold
+func _read_next_threshold(id: String) -> int:
+	if _sys == null:
+		return 0
+	if _sys.has_method("get_next_threshold"):
+		return int(_sys.call("get_next_threshold", id))
+	return 0
+
+## Read layer name
+func _read_layer_name(id: String) -> String:
+	if _sys == null:
+		return "None"
+	if _sys.has_method("get_layer_name"):
+		return String(_sys.call("get_layer_name", id))
+	return "None"
+
+## Read gift used status
+func _read_gift_used(id: String) -> bool:
+	if _sys == null:
+		return false
+	if _sys.has_method("is_gift_used_in_layer"):
+		return bool(_sys.call("is_gift_used_in_layer", id))
+	return false
+
 func _read_layer(id: String) -> int:
 	if _sys == null:
 		return 0
@@ -336,13 +433,8 @@ func _read_layer(id: String) -> int:
 	return 0
 
 func _read_bxp(id: String) -> int:
-	if _sys == null:
-		return 0
-	if _sys.has_method("get_bxp"):
-		return int(_sys.call("get_bxp", id))
-	if _sys.has_method("get_cbxp"): # legacy
-		return int(_sys.call("get_cbxp", id))
-	return 0
+	# Backward compatibility - now reads points bank
+	return _read_points_bank(id)
 
 func _read_known(id: String) -> bool:
 	if _sys == null:
@@ -375,18 +467,59 @@ func _update_detail(id: String) -> void:
 	_name_tv.text = ("—" if id == "" else _display_name(id))
 
 	if id == "":
-		if _layer_tv: _layer_tv.text = "—"
+		if _event_tv: _event_tv.text = "Event: —"
+		if _layer_tv: _layer_tv.text = "Layer: —"
+		if _points_tv: _points_tv.text = "Points: —"
+		if _gift_tv: _gift_tv.text = "Gift: —"
 		if _desc: _desc.text = "[i]Select a bond to see details.[/i]"
 		if _likes_tv: _likes_tv.text = "—"
 		if _dislikes_tv: _dislikes_tv.text = "—"
-		if _rewards_val: _rewards_val.text = "Locked"
+		if _unlock_acq: _unlock_acq.disabled = true
+		if _unlock_outer: _unlock_outer.disabled = true
+		if _unlock_middle: _unlock_middle.disabled = true
+		if _unlock_inner: _unlock_inner.disabled = true
 		if _story_btn: _story_btn.set_meta("bond_id", "")
 		return
 
-	# Layer stage (always shown)
-	var layer_val: int = _read_layer(id)
+	# Get event-based progression data
+	var known: bool = _read_known(id)
+	var event_idx: int = _read_event_index(id)
+	var points: int = _read_points_bank(id)
+	var threshold: int = _read_next_threshold(id)
+	var layer_name: String = _read_layer_name(id)
+	var gift_used: bool = _read_gift_used(id)
+
+	# Event progress
+	if _event_tv:
+		if not known or event_idx == 0:
+			_event_tv.text = "Event: Not Started"
+		else:
+			_event_tv.text = "Event: E%d Complete" % event_idx
+
+	# Layer stage
 	if _layer_tv:
-		_layer_tv.text = _layer_stage(layer_val)
+		if not known:
+			_layer_tv.text = "Layer: Not Met"
+		else:
+			_layer_tv.text = "Layer: %s" % layer_name
+
+	# Points bank / threshold
+	if _points_tv:
+		if not known or event_idx == 0:
+			_points_tv.text = "Points: —"
+		elif threshold > 0:
+			_points_tv.text = "Points: %d / %d" % [points, threshold]
+		else:
+			_points_tv.text = "Points: %d (Max)" % points
+
+	# Gift status
+	if _gift_tv:
+		if not known or event_idx == 0:
+			_gift_tv.text = "Gift: —"
+		elif gift_used:
+			_gift_tv.text = "Gift: Used this layer"
+		else:
+			_gift_tv.text = "Gift: Available"
 
 	# Description
 	var rec: Dictionary = _bond_def(id)
@@ -394,27 +527,43 @@ func _update_detail(id: String) -> void:
 	if _desc:
 		_desc.text = desc
 
-	# Likes/Dislikes (discovered first, else full author list)
+	# Likes/Dislikes (only discovered, never show full list)
 	var likes: PackedStringArray = _read_discovered_or_full(id, true)
 	var dislikes: PackedStringArray = _read_discovered_or_full(id, false)
 	if _likes_tv: _likes_tv.text = _pretty_list(likes)
 	if _dislikes_tv: _dislikes_tv.text = _pretty_list(dislikes)
 
-	# Rewards placeholder (per request)
-	if _rewards_val:
-		_rewards_val.text = "Locked"
+	# Unlock buttons - show layer transitions (based on event completions)
+	# With new per-event threshold system (10+10+12+12+14+14+16+16 = 104 total):
+	# - E3 complete → Outer layer unlocked (paid 10+10 thresholds)
+	# - E5 complete → Middle layer unlocked (paid 10+10+12+12 thresholds)
+	# - E7 complete → Inner layer unlocked (paid 10+10+12+12+14+14 thresholds)
+	# - E9 complete → Core layer unlocked (paid all 104 pts thresholds)
+
+	var outer_unlocked: bool = event_idx >= 3   # E3 complete → transitioned to Outer
+	var middle_unlocked: bool = event_idx >= 5  # E5 complete → transitioned to Middle
+	var inner_unlocked: bool = event_idx >= 7   # E7 complete → transitioned to Inner
+	var core_unlocked: bool = event_idx >= 9    # E9 complete → transitioned to Core
+
+	if _unlock_acq:
+		_unlock_acq.disabled = not outer_unlocked
+		_unlock_acq.text = "Acquaintance → Outer" + (" [UNLOCKED]" if outer_unlocked else " [LOCKED]")
+
+	if _unlock_outer:
+		_unlock_outer.disabled = not middle_unlocked
+		_unlock_outer.text = "Outer → Middle" + (" [UNLOCKED]" if middle_unlocked else " [LOCKED]")
+
+	if _unlock_middle:
+		_unlock_middle.disabled = not inner_unlocked
+		_unlock_middle.text = "Middle → Inner" + (" [UNLOCKED]" if inner_unlocked else " [LOCKED]")
+
+	if _unlock_inner:
+		_unlock_inner.disabled = not core_unlocked
+		_unlock_inner.text = "Inner → Core" + (" [UNLOCKED]" if core_unlocked else " [LOCKED]")
 
 	# Story points
 	if _story_btn:
 		_story_btn.set_meta("bond_id", id)
-
-func _layer_stage(layer_val: int) -> String:
-	# Your mapping: Not Met → Outer → Middle → Inner → Core
-	if layer_val <= 1: return "Not Met"
-	if layer_val <= 3: return "Outer"
-	if layer_val <= 5: return "Middle"
-	if layer_val <= 7: return "Inner"
-	return "Core"
 
 func _display_name(id: String) -> String:
 	if _sys and _sys.has_method("get_bond_name"):
@@ -459,17 +608,18 @@ func _to_psa_local(v: Variant) -> PackedStringArray:
 	return out
 
 func _read_discovered_or_full(id: String, likes: bool) -> PackedStringArray:
+	# Only return discovered preferences - do NOT fall back to full list
+	# Likes/dislikes remain hidden until discovered through item interaction
 	if _sys == null:
 		return PackedStringArray()
-	var first: PackedStringArray = PackedStringArray()
-	var second: PackedStringArray = PackedStringArray()
+	var discovered: PackedStringArray = PackedStringArray()
 	if likes:
-		if _sys.has_method("get_discovered_likes"): first = _to_psa_local(_sys.call("get_discovered_likes", id))
-		if _sys.has_method("get_likes"): second = _to_psa_local(_sys.call("get_likes", id))
+		if _sys.has_method("get_discovered_likes"):
+			discovered = _to_psa_local(_sys.call("get_discovered_likes", id))
 	else:
-		if _sys.has_method("get_discovered_dislikes"): first = _to_psa_local(_sys.call("get_discovered_dislikes", id))
-		if _sys.has_method("get_dislikes"): second = _to_psa_local(_sys.call("get_dislikes", id))
-	return (first if first.size() > 0 else second)
+		if _sys.has_method("get_discovered_dislikes"):
+			discovered = _to_psa_local(_sys.call("get_discovered_dislikes", id))
+	return discovered
 
 func _pretty_list(arr: PackedStringArray) -> String:
 	if arr.size() == 0:

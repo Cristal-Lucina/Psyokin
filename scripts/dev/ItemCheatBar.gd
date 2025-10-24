@@ -15,6 +15,7 @@ const PARTY_PATH := "/root/aPartySystem"
 const HERO_PATH  := "/root/aHeroSystem"
 const DORM_PATH  := "/root/aDormSystem"
 const AFF_PATH   := "/root/aAffinitySystem" # optional
+const BONDS_PATH := "/root/aCircleBondSystem"
 
 # --- CSV paths / keys ----------------------------------------------------------
 const ITEMS_CSV := "res://data/items/items.csv"
@@ -84,6 +85,25 @@ var _btn_hero_add_sxp : Button        = null
 var _party_lxp_row  : HBoxContainer = null
 var _party_sxp_row  : HBoxContainer = null
 
+# -------- Sigil GXP cheat widgets (runtime-built if missing) ----
+var _sigil_gxp_row   : HBoxContainer = null
+var _sigil_gxp_pick  : OptionButton  = null
+var _sigil_gxp_spin  : SpinBox       = null
+var _btn_add_gxp     : Button        = null
+
+# -------- Bond system cheat widgets (runtime-built if missing) ----
+var _bond_row              : HBoxContainer = null
+var _bond_pick             : OptionButton  = null
+var _dialogue_score_spin   : SpinBox       = null
+var _btn_complete_event    : Button        = null
+var _gift_reaction_pick    : OptionButton  = null
+var _btn_give_gift         : Button        = null
+var _btn_side_meetup       : Button        = null
+var _btn_mark_known        : Button        = null
+var _btn_discover_like     : Button        = null
+var _btn_add_points        : Button        = null  # Raw points adder for testing
+var _points_spin           : SpinBox       = null
+
 # --- Systems ------------------------------------------------------------------
 var _inv   : Node = null
 var _csv   : Node = null
@@ -95,6 +115,7 @@ var _party : Node = null
 var _hero  : Node = null
 var _dorm  : Node = null
 var _aff   : Node = null
+var _bonds : Node = null
 
 # --- Data caches ---------------------------------------------------------------
 var _defs            : Dictionary = {}  # items
@@ -127,6 +148,7 @@ func _ready() -> void:
 	_hero  = get_node_or_null(HERO_PATH)
 	_dorm  = get_node_or_null(DORM_PATH)
 	_aff   = get_node_or_null(AFF_PATH)
+	_bonds = get_node_or_null(BONDS_PATH)
 
 	# Listen to inventory signals so the picker stays fresh
 	if _inv != null:
@@ -140,15 +162,21 @@ func _ready() -> void:
 	_bind_optional_external_ui()
 
 	_ensure_hero_row()
-	_style_option_button(_hero_stat_pick, 11, 300)
+	_style_option_button(_hero_stat_pick, 8, 210)
 	_populate_hero_stat_picker()
 
 	_ensure_party_rows()
-	_style_option_button(_stat_pick, 11, 300)
+	_style_option_button(_stat_pick, 8, 210)
 	_populate_stat_picker()
 
-	# CSV import buttons
+	# CSV import buttons (before Sigil GXP row)
 	_ensure_party_import_row()
+
+	# Sigil GXP row
+	_ensure_sigil_gxp_row()
+
+	# Bond system cheat row
+	_ensure_bond_row()
 
 	# Row1 (Items)
 	if _give and not _give.pressed.is_connected(_on_give):          _give.pressed.connect(_on_give)
@@ -185,19 +213,40 @@ func _ready() -> void:
 		_roster_pick.item_selected.connect(_on_roster_pick_selected)
 
 	# Style pickers that exist
-	_style_option_button(_picker, 11, 300)
-	_style_option_button(_sig_inst_pick, 11, 300)
-	_style_option_button(_roster_pick, 11, 300)
+	_style_option_button(_picker, 8, 210)
+	_style_option_button(_sig_inst_pick, 8, 210)
+	_style_option_button(_roster_pick, 8, 210)
+
+	# Apply 8pt font to all scene buttons
+	if _give: _give.add_theme_font_size_override("font_size", 8)
+	if _rem: _rem.add_theme_font_size_override("font_size", 8)
+	if _give10: _give10.add_theme_font_size_override("font_size", 8)
+	if _reload: _reload.add_theme_font_size_override("font_size", 8)
+	if _btn_lv_up: _btn_lv_up.add_theme_font_size_override("font_size", 8)
+	if _btn_lv_down: _btn_lv_down.add_theme_font_size_override("font_size", 8)
+	if _btn_xp_25: _btn_xp_25.add_theme_font_size_override("font_size", 8)
+	if _btn_xp_100: _btn_xp_100.add_theme_font_size_override("font_size", 8)
+	if _btn_lvl_m1: _btn_lvl_m1.add_theme_font_size_override("font_size", 8)
+	if _btn_lvl_p1: _btn_lvl_p1.add_theme_font_size_override("font_size", 8)
+	if _btn_set_level: _btn_set_level.add_theme_font_size_override("font_size", 8)
+	if _btn_add_party: _btn_add_party.add_theme_font_size_override("font_size", 8)
+	if _btn_rem_party: _btn_rem_party.add_theme_font_size_override("font_size", 8)
+	if _btn_to_bench: _btn_to_bench.add_theme_font_size_override("font_size", 8)
 
 	# Populate
 	_refresh_defs()
 	_refresh_sig_dropdown()
+	_refresh_sigil_gxp_dropdown()
 	_refresh_roster_picker()
 	if _spin_lvl:
 		_spin_lvl.value = _get_member_level()
 
 	if _sig and _sig.has_signal("loadout_changed") and not _sig.is_connected("loadout_changed", Callable(self, "_on_loadout_changed")):
 		_sig.connect("loadout_changed", Callable(self, "_on_loadout_changed"))
+	if _sig and _sig.has_signal("instance_created") and not _sig.is_connected("instance_created", Callable(self, "_on_sigil_changed")):
+		_sig.connect("instance_created", Callable(self, "_on_sigil_changed"))
+	if _sig and _sig.has_signal("sigils_changed") and not _sig.is_connected("sigils_changed", Callable(self, "_on_sigil_changed")):
+		_sig.connect("sigils_changed", Callable(self, "_on_sigil_changed"))
 
 # --- Bind external cheat UI if it's not a child of this node -------------------
 func _bind_optional_external_ui() -> void:
@@ -243,13 +292,14 @@ func _ensure_party_import_row() -> void:
 	if _party_import_row == null:
 		_party_import_row = HBoxContainer.new()
 		_party_import_row.name = "PartyImportRow"
-		_party_import_row.add_theme_constant_override("separation", 8)
+		_party_import_row.add_theme_constant_override("separation", 6)
 		parent.add_child(_party_import_row)
 
 	if _btn_import_all == null:
 		_btn_import_all = Button.new()
 		_btn_import_all.name = "BtnImportParty"
 		_btn_import_all.text = "Import All (CSV) → Common"
+		_btn_import_all.add_theme_font_size_override("font_size", 8)
 		_party_import_row.add_child(_btn_import_all)
 		_btn_import_all.pressed.connect(_on_import_all)
 
@@ -257,6 +307,7 @@ func _ensure_party_import_row() -> void:
 		_btn_import_starters = Button.new()
 		_btn_import_starters.name = "BtnImportStarters"
 		_btn_import_starters.text = "Import Starters Only"
+		_btn_import_starters.add_theme_font_size_override("font_size", 8)
 		_party_import_row.add_child(_btn_import_starters)
 		_btn_import_starters.pressed.connect(_on_import_starters)
 
@@ -285,7 +336,7 @@ func _ensure_hero_row() -> void:
 
 	_hero_row = HBoxContainer.new()
 	_hero_row.name = "HeroRow"
-	_hero_row.add_theme_constant_override("separation", 8)
+	_hero_row.add_theme_constant_override("separation", 6)
 	parent.add_child(_hero_row)
 
 	var title := Label.new()
@@ -301,11 +352,12 @@ func _ensure_hero_row() -> void:
 	_hero_xp_spin.max_value = 99999
 	_hero_xp_spin.step = 1
 	_hero_xp_spin.value = 100
-	_hero_xp_spin.custom_minimum_size = Vector2(80, 0)
+	_hero_xp_spin.custom_minimum_size = Vector2(56, 0)
 	_hero_row.add_child(_hero_xp_spin)
 
 	_btn_hero_add_xp = Button.new()
 	_btn_hero_add_xp.text = "Add Hero XP"
+	_btn_hero_add_xp.add_theme_font_size_override("font_size", 8)
 	_hero_row.add_child(_btn_hero_add_xp)
 
 	var sxp_lbl := Label.new()
@@ -313,7 +365,7 @@ func _ensure_hero_row() -> void:
 	_hero_row.add_child(sxp_lbl)
 
 	_hero_stat_pick = OptionButton.new()
-	_hero_stat_pick.custom_minimum_size = Vector2(120, 0)
+	_hero_stat_pick.custom_minimum_size = Vector2(84, 0)
 	_hero_row.add_child(_hero_stat_pick)
 
 	_hero_sxp_spin = SpinBox.new()
@@ -321,11 +373,12 @@ func _ensure_hero_row() -> void:
 	_hero_sxp_spin.max_value = 9999
 	_hero_sxp_spin.step = 1
 	_hero_sxp_spin.value = 10
-	_hero_sxp_spin.custom_minimum_size = Vector2(70, 0)
+	_hero_sxp_spin.custom_minimum_size = Vector2(49, 0)
 	_hero_row.add_child(_hero_sxp_spin)
 
 	_btn_hero_add_sxp = Button.new()
 	_btn_hero_add_sxp.text = "Add Hero SXP"
+	_btn_hero_add_sxp.add_theme_font_size_override("font_size", 8)
 	_hero_row.add_child(_btn_hero_add_sxp)
 
 	if _btn_hero_add_xp and not _btn_hero_add_xp.pressed.is_connected(_on_hero_add_xp):
@@ -353,7 +406,7 @@ func _ensure_party_rows() -> void:
 	if _party_lxp_row == null:
 		_party_lxp_row = HBoxContainer.new()
 		_party_lxp_row.name = "PartyLxpRow"
-		_party_lxp_row.add_theme_constant_override("separation", 8)
+		_party_lxp_row.add_theme_constant_override("separation", 6)
 		parent.add_child(_party_lxp_row)
 
 		var lbl := Label.new()
@@ -365,11 +418,12 @@ func _ensure_party_rows() -> void:
 		_xp_amt.max_value = 99999
 		_xp_amt.value = 100
 		_xp_amt.step = 1
-		_xp_amt.custom_minimum_size = Vector2(80, 0)
+		_xp_amt.custom_minimum_size = Vector2(56, 0)
 		_party_lxp_row.add_child(_xp_amt)
 
 		_btn_add_xp = Button.new()
 		_btn_add_xp.text = "Add XP to Member"
+		_btn_add_xp.add_theme_font_size_override("font_size", 8)
 		_party_lxp_row.add_child(_btn_add_xp)
 		if not _btn_add_xp.pressed.is_connected(_on_add_xp):
 			_btn_add_xp.pressed.connect(_on_add_xp)
@@ -379,7 +433,7 @@ func _ensure_party_rows() -> void:
 	if _party_sxp_row == null:
 		_party_sxp_row = HBoxContainer.new()
 		_party_sxp_row.name = "PartySxpRow"
-		_party_sxp_row.add_theme_constant_override("separation", 8)
+		_party_sxp_row.add_theme_constant_override("separation", 6)
 		parent.add_child(_party_sxp_row)
 
 		var sl := Label.new()
@@ -387,7 +441,7 @@ func _ensure_party_rows() -> void:
 		_party_sxp_row.add_child(sl)
 
 		_stat_pick = OptionButton.new()
-		_stat_pick.custom_minimum_size = Vector2(120, 0)
+		_stat_pick.custom_minimum_size = Vector2(84, 0)
 		_party_sxp_row.add_child(_stat_pick)
 
 		_sxp_amt = SpinBox.new()
@@ -395,14 +449,156 @@ func _ensure_party_rows() -> void:
 		_sxp_amt.max_value = 9999
 		_sxp_amt.value = 10
 		_sxp_amt.step = 1
-		_sxp_amt.custom_minimum_size = Vector2(70, 0)
+		_sxp_amt.custom_minimum_size = Vector2(49, 0)
 		_party_sxp_row.add_child(_sxp_amt)
 
 		_btn_add_sxp = Button.new()
 		_btn_add_sxp.text = "Add SXP to Member"
+		_btn_add_sxp.add_theme_font_size_override("font_size", 8)
 		_party_sxp_row.add_child(_btn_add_sxp)
 		if not _btn_add_sxp.pressed.is_connected(_on_add_sxp):
 			_btn_add_sxp.pressed.connect(_on_add_sxp)
+
+func _ensure_sigil_gxp_row() -> void:
+	var parent := _attach_point()
+	_sigil_gxp_row = parent.get_node_or_null("SigilGxpRow") as HBoxContainer
+	if _sigil_gxp_row == null:
+		_sigil_gxp_row = HBoxContainer.new()
+		_sigil_gxp_row.name = "SigilGxpRow"
+		_sigil_gxp_row.add_theme_constant_override("separation", 6)
+		parent.add_child(_sigil_gxp_row)
+
+		var lbl := Label.new()
+		lbl.text = "Sigil XP:"
+		_sigil_gxp_row.add_child(lbl)
+
+		_sigil_gxp_pick = OptionButton.new()
+		_sigil_gxp_pick.custom_minimum_size = Vector2(140, 0)
+		_sigil_gxp_row.add_child(_sigil_gxp_pick)
+
+		var gxp_lbl := Label.new()
+		gxp_lbl.text = "GXP"
+		_sigil_gxp_row.add_child(gxp_lbl)
+
+		_sigil_gxp_spin = SpinBox.new()
+		_sigil_gxp_spin.min_value = 1
+		_sigil_gxp_spin.max_value = 99999
+		_sigil_gxp_spin.step = 1
+		_sigil_gxp_spin.value = 100
+		_sigil_gxp_spin.custom_minimum_size = Vector2(56, 0)
+		_sigil_gxp_row.add_child(_sigil_gxp_spin)
+
+		_btn_add_gxp = Button.new()
+		_btn_add_gxp.text = "Add GXP"
+		_btn_add_gxp.add_theme_font_size_override("font_size", 8)
+		_sigil_gxp_row.add_child(_btn_add_gxp)
+		if not _btn_add_gxp.pressed.is_connected(_on_add_sigil_gxp):
+			_btn_add_gxp.pressed.connect(_on_add_sigil_gxp)
+
+	# Style the dropdown
+	_style_option_button(_sigil_gxp_pick, 8, 210)
+
+func _ensure_bond_row() -> void:
+	var parent := _attach_point()
+	_bond_row = parent.get_node_or_null("BondRow") as HBoxContainer
+	if _bond_row == null:
+		_bond_row = HBoxContainer.new()
+		_bond_row.name = "BondRow"
+		_bond_row.add_theme_constant_override("separation", 3)
+		parent.add_child(_bond_row)
+
+		# Character picker
+		var lbl := Label.new()
+		lbl.text = "Bond:"
+		_bond_row.add_child(lbl)
+
+		_bond_pick = OptionButton.new()
+		_bond_pick.custom_minimum_size = Vector2(70, 0)
+		_bond_row.add_child(_bond_pick)
+
+		# Complete Event (with dialogue score)
+		var dlg_lbl := Label.new()
+		dlg_lbl.text = "Dlg:"
+		_bond_row.add_child(dlg_lbl)
+
+		_dialogue_score_spin = SpinBox.new()
+		_dialogue_score_spin.min_value = -3
+		_dialogue_score_spin.max_value = 6
+		_dialogue_score_spin.step = 1
+		_dialogue_score_spin.value = 0
+		_dialogue_score_spin.custom_minimum_size = Vector2(35, 0)
+		_dialogue_score_spin.tooltip_text = "Dialogue score: -3 to +6 (3×Best = +6)"
+		_bond_row.add_child(_dialogue_score_spin)
+
+		_btn_complete_event = Button.new()
+		_btn_complete_event.text = "Complete Event"
+		_btn_complete_event.add_theme_font_size_override("font_size", 8)
+		_btn_complete_event.tooltip_text = "Complete next event (E1-E9) with dialogue score"
+		_bond_row.add_child(_btn_complete_event)
+		_btn_complete_event.pressed.connect(_on_complete_event)
+
+		# Give Gift
+		_gift_reaction_pick = OptionButton.new()
+		_gift_reaction_pick.add_item("Liked (+4)")
+		_gift_reaction_pick.set_item_metadata(0, "liked")
+		_gift_reaction_pick.add_item("Neutral (+1)")
+		_gift_reaction_pick.set_item_metadata(1, "neutral")
+		_gift_reaction_pick.add_item("Disliked (-2)")
+		_gift_reaction_pick.set_item_metadata(2, "disliked")
+		_gift_reaction_pick.custom_minimum_size = Vector2(56, 0)
+		_bond_row.add_child(_gift_reaction_pick)
+
+		_btn_give_gift = Button.new()
+		_btn_give_gift.text = "Give Gift"
+		_btn_give_gift.add_theme_font_size_override("font_size", 8)
+		_btn_give_gift.tooltip_text = "Give gift (once per layer)"
+		_bond_row.add_child(_btn_give_gift)
+		_btn_give_gift.pressed.connect(_on_give_gift)
+
+		# Side Meetup
+		_btn_side_meetup = Button.new()
+		_btn_side_meetup.text = "Side Meetup (+6)"
+		_btn_side_meetup.add_theme_font_size_override("font_size", 8)
+		_btn_side_meetup.tooltip_text = "Optional filler scene for +6 points"
+		_bond_row.add_child(_btn_side_meetup)
+		_btn_side_meetup.pressed.connect(_on_side_meetup)
+
+		# Utility buttons
+		_btn_mark_known = Button.new()
+		_btn_mark_known.text = "Mark Known"
+		_btn_mark_known.add_theme_font_size_override("font_size", 8)
+		_bond_row.add_child(_btn_mark_known)
+		_btn_mark_known.pressed.connect(_on_mark_bond_known)
+
+		_btn_discover_like = Button.new()
+		_btn_discover_like.text = "Discover Like"
+		_btn_discover_like.add_theme_font_size_override("font_size", 8)
+		_bond_row.add_child(_btn_discover_like)
+		_btn_discover_like.pressed.connect(_on_discover_like)
+
+		# Raw points adder for testing
+		var pts_lbl := Label.new()
+		pts_lbl.text = "Pts:"
+		_bond_row.add_child(pts_lbl)
+
+		_points_spin = SpinBox.new()
+		_points_spin.min_value = -10
+		_points_spin.max_value = 20
+		_points_spin.step = 1
+		_points_spin.value = 1
+		_points_spin.custom_minimum_size = Vector2(35, 0)
+		_bond_row.add_child(_points_spin)
+
+		_btn_add_points = Button.new()
+		_btn_add_points.text = "Add Pts"
+		_btn_add_points.add_theme_font_size_override("font_size", 8)
+		_btn_add_points.tooltip_text = "Directly add/remove points (cheat)"
+		_bond_row.add_child(_btn_add_points)
+		_btn_add_points.pressed.connect(_on_add_points)
+
+	# Style the dropdown and populate
+	_style_option_button(_bond_pick, 8, 210)
+	_refresh_bond_dropdown()
 
 # --- Items (Row1) --------------------------------------------------------------
 func _refresh_defs() -> void:
@@ -461,6 +657,7 @@ func _on_give() -> void:
 	if _is_sigil_item(id):
 		_draft_n_from_inventory(id, n)
 	_refresh_sig_dropdown()
+	_refresh_sigil_gxp_dropdown()
 
 func _on_remove() -> void:
 	var id: String = _selected_item_id()
@@ -471,6 +668,7 @@ func _on_remove() -> void:
 		_inv.call("remove_item", id, n)
 		print("[ItemsCheatBar] REMOVE %s x%d" % [id, n])
 	_refresh_sig_dropdown()
+	_refresh_sigil_gxp_dropdown()
 
 func _on_give10() -> void:
 	var id: String = _selected_item_id()
@@ -482,6 +680,7 @@ func _on_give10() -> void:
 	if _is_sigil_item(id):
 		_draft_n_from_inventory(id, 10)
 	_refresh_sig_dropdown()
+	_refresh_sigil_gxp_dropdown()
 
 func _on_reload() -> void:
 	if _csv and _csv.has_method("reload_csv"):
@@ -491,6 +690,7 @@ func _on_reload() -> void:
 	print("[ItemsCheatBar] requested reload of item defs")
 	_refresh_defs()
 	_refresh_sig_dropdown()
+	_refresh_sigil_gxp_dropdown()
 
 # callbacks from InventorySystem signals
 func _on_inv_defs_loaded() -> void:
@@ -635,6 +835,7 @@ func _refresh_sig_dropdown() -> void:
 		_sig_inst_pick.add_item("(No SigilSystem)")
 		_sig_inst_pick.disabled = true
 		_log_s("aSigilSystem not found at %s" % SIG_PATH)
+		_refresh_sigil_gxp_dropdown()
 		return
 
 	var equipped_only: bool = (_chk_equipped != null and _chk_equipped.button_pressed)
@@ -669,6 +870,7 @@ func _refresh_sig_dropdown() -> void:
 	if list.size() == 0:
 		_sig_inst_pick.add_item("— no sigils —")
 		_sig_inst_pick.disabled = true
+		_refresh_sigil_gxp_dropdown()
 		return
 
 	_sig_inst_pick.disabled = false
@@ -681,6 +883,74 @@ func _refresh_sig_dropdown() -> void:
 		_sig_inst_pick.add_item(disp)
 		_sig_inst_pick.set_item_metadata(_sig_inst_pick.get_item_count() - 1, sid2)
 
+	# Also refresh the GXP dropdown
+	_refresh_sigil_gxp_dropdown()
+
+func _refresh_sigil_gxp_dropdown() -> void:
+	if _sigil_gxp_pick == null:
+		print("[ItemsCheatBar][GXP] Dropdown not created yet")
+		return
+	_sigil_gxp_pick.clear()
+
+	if _sig == null:
+		_sigil_gxp_pick.add_item("(No SigilSystem)")
+		_sigil_gxp_pick.disabled = true
+		print("[ItemsCheatBar][GXP] No SigilSystem found")
+		return
+
+	# Get all sigils (not just equipped)
+	var ids: Array[String] = _call_list_all_instances(_sig, false)
+	print("[ItemsCheatBar][GXP] Initial list_all_instances returned: %d sigils" % ids.size())
+
+	# Always try to get free and equipped sigils
+	if ids.is_empty():
+		print("[ItemsCheatBar][GXP] No sigils from list_all_instances, trying free + loadout")
+		_append_ids_free(ids)
+		print("[ItemsCheatBar][GXP] After append_ids_free: %d sigils" % ids.size())
+		for member in _collect_party_tokens():
+			_append_ids_from_loadout(ids, member)
+		print("[ItemsCheatBar][GXP] After loadout scan: %d sigils" % ids.size())
+
+	# Try to auto-seed if still empty
+	if ids.is_empty():
+		print("[ItemsCheatBar][GXP] Still empty, trying auto-seed")
+		if _auto_seed_one_instance_from_inventory():
+			ids = _call_list_all_instances(_sig, false)
+			if ids.is_empty():
+				_append_ids_free(ids)
+			print("[ItemsCheatBar][GXP] After auto-seed: %d sigils" % ids.size())
+
+	# Deduplicate
+	var seen: Dictionary = {}
+	var list: Array[String] = []
+	for sid in ids:
+		if sid == "":
+			continue
+		if not seen.has(sid):
+			seen[sid] = true
+			list.append(sid)
+	list.sort()
+
+	print("[ItemsCheatBar][GXP] Final unique list: %d sigils" % list.size())
+
+	if list.size() == 0:
+		_sigil_gxp_pick.add_item("— no sigils —")
+		_sigil_gxp_pick.disabled = true
+		print("[ItemsCheatBar][GXP] No sigils to display")
+		return
+
+	_sigil_gxp_pick.disabled = false
+	for sid2 in list:
+		var disp: String = sid2
+		if _sig.has_method("get_display_name_for"):
+			var nm_v: Variant = _sig.call("get_display_name_for", sid2)
+			if typeof(nm_v) == TYPE_STRING:
+				disp = String(nm_v)
+		_sigil_gxp_pick.add_item(disp)
+		_sigil_gxp_pick.set_item_metadata(_sigil_gxp_pick.get_item_count() - 1, sid2)
+
+	print("[ItemsCheatBar][GXP] Dropdown populated with %d items" % _sigil_gxp_pick.get_item_count())
+
 func _selected_sig_inst() -> String:
 	if _sig_inst_pick == null:
 		return ""
@@ -689,11 +959,23 @@ func _selected_sig_inst() -> String:
 		return ""
 	return String(_sig_inst_pick.get_item_metadata(i))
 
+func _selected_sigil_gxp() -> String:
+	if _sigil_gxp_pick == null:
+		return ""
+	var i: int = _sigil_gxp_pick.get_selected()
+	if i < 0:
+		return ""
+	return String(_sigil_gxp_pick.get_item_metadata(i))
+
 func _on_equipped_toggle(_pressed: bool) -> void:
 	_refresh_sig_dropdown()
 
 func _on_loadout_changed(_member: String) -> void:
 	_refresh_sig_dropdown()
+
+func _on_sigil_changed(_arg: Variant = null) -> void:
+	_refresh_sig_dropdown()
+	_refresh_sigil_gxp_dropdown()
 
 func _grant_xp_to_sigil(amount: int) -> void:
 	if _sig == null:
@@ -705,6 +987,7 @@ func _grant_xp_to_sigil(amount: int) -> void:
 	if _sig.has_method("cheat_add_xp_to_instance"):
 		_sig.call("cheat_add_xp_to_instance", id, amount, require_equipped)
 	_refresh_sig_dropdown()
+	_refresh_sigil_gxp_dropdown()
 
 func _on_sig_lv_up() -> void:
 	if _sig == null:
@@ -721,6 +1004,7 @@ func _on_sig_lv_up() -> void:
 	if _sig.has_method("cheat_set_instance_level"):
 		_sig.call("cheat_set_instance_level", id, new_lvl)
 	_refresh_sig_dropdown()
+	_refresh_sigil_gxp_dropdown()
 
 func _on_sig_lv_dn() -> void:
 	if _sig == null:
@@ -737,12 +1021,37 @@ func _on_sig_lv_dn() -> void:
 	if _sig.has_method("cheat_set_instance_level"):
 		_sig.call("cheat_set_instance_level", id, new_lvl)
 	_refresh_sig_dropdown()
+	_refresh_sigil_gxp_dropdown()
 
 func _on_sig_xp_25() -> void:
 	_grant_xp_to_sigil(25)
 
 func _on_sig_xp_100() -> void:
 	_grant_xp_to_sigil(100)
+
+func _on_add_sigil_gxp() -> void:
+	if _sigil_gxp_spin == null or _sig == null:
+		return
+	var sigil_id: String = _selected_sigil_gxp()
+	if sigil_id == "":
+		print("[ItemsCheatBar][GXP] No sigil selected for GXP")
+		return
+	var amount: int = int(_sigil_gxp_spin.value)
+
+	# Call the correct SigilSystem method: cheat_add_xp_to_instance
+	# Note: require_equipped is set to false since we're cheating
+	if _sig.has_method("cheat_add_xp_to_instance"):
+		_sig.call("cheat_add_xp_to_instance", sigil_id, amount, false)
+		print("[ItemsCheatBar][GXP] Added %d GXP to sigil %s" % [amount, sigil_id])
+	elif _sig.has_method("add_xp_to_instance"):
+		_sig.call("add_xp_to_instance", sigil_id, amount, false)
+		print("[ItemsCheatBar][GXP] Added %d GXP to sigil %s (via add_xp_to_instance)" % [amount, sigil_id])
+	else:
+		print("[ItemsCheatBar][GXP] ERROR: No XP method found on SigilSystem!")
+		print("[ItemsCheatBar][GXP] Available methods: %s" % str(_sig.get_method_list().map(func(m): return m.get("name", ""))))
+
+	_refresh_sig_dropdown()
+	_refresh_sigil_gxp_dropdown()
 
 # ─────────────────────────────────────────────────────────────
 # Character Level / Perk / SXP
@@ -1381,3 +1690,156 @@ func _auto_seed_one_instance_from_inventory() -> bool:
 		if _is_sigil_item(id):
 			return _draft_n_from_inventory(id, 1) > 0
 	return false
+
+# ─────────────────────────────────────────────────────────────
+# Bond System Cheats
+# ─────────────────────────────────────────────────────────────
+
+func _refresh_bond_dropdown() -> void:
+	if _bond_pick == null or _bonds == null:
+		return
+	_bond_pick.clear()
+
+	var ids: PackedStringArray = PackedStringArray()
+	if _bonds.has_method("get_ids"):
+		ids = _bonds.call("get_ids")
+
+	if ids.is_empty():
+		_bond_pick.add_item("— no bonds —")
+		_bond_pick.disabled = true
+		return
+
+	_bond_pick.disabled = false
+	for bond_id in ids:
+		var disp_name: String = bond_id
+		if _bonds.has_method("get_display_name"):
+			var nm_v: Variant = _bonds.call("get_display_name", bond_id)
+			if typeof(nm_v) == TYPE_STRING:
+				disp_name = String(nm_v)
+		_bond_pick.add_item(disp_name)
+		_bond_pick.set_item_metadata(_bond_pick.get_item_count() - 1, bond_id)
+
+func _selected_bond_id() -> String:
+	if _bond_pick == null:
+		return ""
+	var idx: int = _bond_pick.get_selected()
+	if idx < 0:
+		return ""
+	return String(_bond_pick.get_item_metadata(idx))
+
+## Complete next event with dialogue score
+func _on_complete_event() -> void:
+	if _bonds == null or _dialogue_score_spin == null:
+		return
+	var bond_id: String = _selected_bond_id()
+	if bond_id == "":
+		print("[ItemsCheatBar][Bonds] No bond selected")
+		return
+
+	var dialogue_score: int = int(_dialogue_score_spin.value)
+
+	if _bonds.has_method("complete_event"):
+		_bonds.call("complete_event", bond_id, dialogue_score)
+		var event_idx: int = 0
+		if _bonds.has_method("get_event_index"):
+			event_idx = int(_bonds.call("get_event_index", bond_id))
+		print("[ItemsCheatBar][Bonds] Completed event E%d for %s (dialogue: %+d)" % [event_idx, bond_id, dialogue_score])
+	else:
+		print("[ItemsCheatBar][Bonds] ERROR: complete_event method not found")
+
+## Give gift with reaction
+func _on_give_gift() -> void:
+	if _bonds == null or _gift_reaction_pick == null:
+		return
+	var bond_id: String = _selected_bond_id()
+	if bond_id == "":
+		print("[ItemsCheatBar][Bonds] No bond selected")
+		return
+
+	var idx: int = _gift_reaction_pick.get_selected()
+	var reaction: String = String(_gift_reaction_pick.get_item_metadata(idx))
+
+	if _bonds.has_method("give_gift"):
+		var success: bool = bool(_bonds.call("give_gift", bond_id, reaction))
+		if success:
+			print("[ItemsCheatBar][Bonds] Gave %s gift to %s" % [reaction, bond_id])
+		else:
+			print("[ItemsCheatBar][Bonds] Gift failed (already used this layer?)")
+	else:
+		print("[ItemsCheatBar][Bonds] ERROR: give_gift method not found")
+
+## Do side meetup
+func _on_side_meetup() -> void:
+	if _bonds == null:
+		return
+	var bond_id: String = _selected_bond_id()
+	if bond_id == "":
+		print("[ItemsCheatBar][Bonds] No bond selected")
+		return
+
+	if _bonds.has_method("do_side_meetup"):
+		_bonds.call("do_side_meetup", bond_id)
+		print("[ItemsCheatBar][Bonds] Did side meetup with %s (+6 points)" % bond_id)
+	else:
+		print("[ItemsCheatBar][Bonds] ERROR: do_side_meetup method not found")
+
+## Add points directly (cheat/testing)
+func _on_add_points() -> void:
+	if _bonds == null or _points_spin == null:
+		return
+	var bond_id: String = _selected_bond_id()
+	if bond_id == "":
+		print("[ItemsCheatBar][Bonds] No bond selected")
+		return
+	var amount: int = int(_points_spin.value)
+
+	# Use internal _add_points or fallback to add_bxp
+	if _bonds.has_method("add_bxp"):
+		_bonds.call("add_bxp", bond_id, amount)
+		print("[ItemsCheatBar][Bonds] Added %d points to %s" % [amount, bond_id])
+	else:
+		print("[ItemsCheatBar][Bonds] ERROR: add_bxp method not found")
+
+func _on_mark_bond_known() -> void:
+	if _bonds == null:
+		return
+	var bond_id: String = _selected_bond_id()
+	if bond_id == "":
+		print("[ItemsCheatBar][Bonds] No bond selected")
+		return
+
+	if _bonds.has_method("set_known"):
+		_bonds.call("set_known", bond_id, true)
+		print("[ItemsCheatBar][Bonds] Marked %s as known" % bond_id)
+	else:
+		print("[ItemsCheatBar][Bonds] ERROR: set_known method not found")
+
+func _on_discover_like() -> void:
+	if _bonds == null:
+		return
+	var bond_id: String = _selected_bond_id()
+	if bond_id == "":
+		print("[ItemsCheatBar][Bonds] No bond selected")
+		return
+
+	# Discover first like from their gift_likes list
+	if _bonds.has_method("get_likes"):
+		var likes: PackedStringArray = PackedStringArray()
+		var likes_v: Variant = _bonds.call("get_likes", bond_id)
+		if typeof(likes_v) == TYPE_PACKED_STRING_ARRAY:
+			likes = likes_v
+		elif typeof(likes_v) == TYPE_ARRAY:
+			for item in (likes_v as Array):
+				likes.append(String(item))
+
+		if likes.size() > 0:
+			var first_like: String = likes[0]
+			if _bonds.has_method("mark_gift_discovered"):
+				_bonds.call("mark_gift_discovered", bond_id, first_like, "liked")
+				print("[ItemsCheatBar][Bonds] Discovered like: %s for %s" % [first_like, bond_id])
+			else:
+				print("[ItemsCheatBar][Bonds] ERROR: mark_gift_discovered method not found")
+		else:
+			print("[ItemsCheatBar][Bonds] No likes defined for %s" % bond_id)
+	else:
+		print("[ItemsCheatBar][Bonds] ERROR: get_likes method not found")

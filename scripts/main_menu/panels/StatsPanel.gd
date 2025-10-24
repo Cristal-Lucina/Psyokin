@@ -299,10 +299,19 @@ func _in_party(pid: String) -> bool:
 	return (pid == "hero")
 
 func _label_for(pid: String) -> String:
+	# First try StatsSystem's get_member_display_name (gets name from CSV)
+	if _stats and _stats.has_method("get_member_display_name"):
+		var name_v: Variant = _stats.call("get_member_display_name", pid)
+		if typeof(name_v) == TYPE_STRING and String(name_v).strip_edges() != "":
+			return String(name_v)
+
+	# Fallback for hero: check player_name in GameState
 	if pid == "hero" and _gs and _gs.has_method("get"):
 		var nm_v: Variant = _gs.get("player_name")
 		if typeof(nm_v) == TYPE_STRING and String(nm_v).strip_edges() != "":
 			return String(nm_v)
+
+	# Last resort: capitalize the ID
 	return pid.capitalize()
 
 func _update_title() -> void:
