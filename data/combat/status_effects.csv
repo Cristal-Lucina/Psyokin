@@ -1,6 +1,22 @@
 effect_id,category,name,default_duration,magnitude,description
 poison,ailment,Poison,0,5,DoT 5% MaxHP/turn
 burn,ailment,Burn,0,5,DoT 5% MaxHP/turn
+sleep,ailment,Sleep,0,0,Cannot act; wakes on damage
+freeze,ailment,Freeze,0,0,Cannot act or evade
+mind_block,ailment,Mind Block,0,0,Cannot use MND-based skills
+confused,ailment,Confused,0,0,May attack allies or self
+charm,ailment,Charm,0,0,Controlled by enemy
+berserk,ailment,Berserk,0,50,Only basic attacks; +50% ATK damage
+malaise,ailment,Malaise,0,50,Stat penalties and reduced effectiveness
 attack_up,buff,Attack Up,3,25,+25% ATK damage
 mind_up,buff,Mind Up,3,25,+25% MND damage
+regen,buff,Regen,3,5,Heal 5% MaxHP/turn
+haste,buff,Haste,3,0,Increased action speed
+protect,buff,Protect,3,25,+25% physical defense
+shell,buff,Shell,3,25,+25% magical defense
+accuracy_up,buff,Accuracy Up,3,15,+15% hit rate
+evasion_up,buff,Evasion Up,3,15,+15% evasion rate
+skill_acc_boost,buff,Skill ACC Boost,3,20,+20% skill accuracy
 attack_down,debuff,Attack Down,3,25,-25% ATK damage
+defense_down,debuff,Defense Down,3,25,-25% physical defense
+mind_down,debuff,Mind Down,3,25,-25% MND damage
