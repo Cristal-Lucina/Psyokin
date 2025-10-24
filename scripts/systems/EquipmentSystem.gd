@@ -112,7 +112,8 @@ func list_equippable(_member: String, slot: String) -> PackedStringArray:
 
 	var want: String = _norm_slot(slot)
 	for id_v in counts.keys():
-		if int(counts.get(id_v, 0)) <= 0:
+		var count_in_inv: int = int(counts.get(id_v, 0))
+		if count_in_inv <= 0:
 			continue
 		var iid: String = String(id_v)
 		var rec: Dictionary = defs.get(iid, {}) as Dictionary

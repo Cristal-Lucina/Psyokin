@@ -2,12 +2,14 @@
 
 importer="csv_translation"
 type="Translation"
-uid="uid://pe50ckv2t8r4"
-valid=false
+uid="uid://dn3b6dkkl2pu1"
 
 [deps]
 
+files=["res://data/circles/circle_bonds.bond.translation", "res://data/circles/circle_bonds.bond.translation", "res://data/circles/circle_bonds.love.translation", "res://data/circles/circle_bonds.poly.translation", "res://data/circles/circle_bonds.burst.translation", "res://data/circles/circle_bonds.gift.translation", "res://data/circles/circle_bonds.gift.translation", "res://data/circles/circle_bonds.bond.translation", "res://data/circles/circle_bonds.story.translation", "res://data/circles/circle_bonds.reward.translation", "res://data/circles/circle_bonds.reward.translation", "res://data/circles/circle_bonds.reward.translation", "res://data/circles/circle_bonds.reward.translation", "res://data/circles/circle_bonds.bond.translation"]
+
 source_file="res://data/circles/circle_bonds.csv"
+dest_files=["res://data/circles/circle_bonds.bond.translation", "res://data/circles/circle_bonds.bond.translation", "res://data/circles/circle_bonds.love.translation", "res://data/circles/circle_bonds.poly.translation", "res://data/circles/circle_bonds.burst.translation", "res://data/circles/circle_bonds.gift.translation", "res://data/circles/circle_bonds.gift.translation", "res://data/circles/circle_bonds.bond.translation", "res://data/circles/circle_bonds.story.translation", "res://data/circles/circle_bonds.reward.translation", "res://data/circles/circle_bonds.reward.translation", "res://data/circles/circle_bonds.reward.translation", "res://data/circles/circle_bonds.reward.translation", "res://data/circles/circle_bonds.bond.translation"]
 
 [params]
 

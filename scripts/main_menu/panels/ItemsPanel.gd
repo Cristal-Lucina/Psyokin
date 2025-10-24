@@ -20,10 +20,12 @@ const CATEGORIES : PackedStringArray = [
 	"Bracelets","Sigils","Battle","Materials","Gifts","Key","Other"
 ]
 
-@onready var _filter    : OptionButton  = %Filter
+@onready var _filter_container : HBoxContainer = null  # Will create dynamically
 @onready var _refresh   : Button        = %RefreshBtn
 @onready var _counts_tv : Label         = %CountsValue
-@onready var _list_box  : VBoxContainer = %List
+@onready var _list_box  : GridContainer = null  # Will change to GridContainer
+@onready var _header    : HBoxContainer = %Header
+@onready var _vbox      : VBoxContainer = %VBox
 
 var _inv  : Node = null
 var _csv  : Node = null
@@ -34,6 +36,7 @@ var _sig : Node = null
 var _defs        : Dictionary = {}    # {id -> row dict}
 var _counts_map  : Dictionary = {}    # {id -> int}  (after expansion, per-instance = 1)
 var _equipped_by : Dictionary = {}    # {base_id -> PackedStringArray of member display names}
+var _active_category : String = "All"  # Track currently selected category
 
 # Normalize arbitrary category strings to our canonical set
 const _CAT_MAP := {
@@ -58,6 +61,12 @@ func _ready() -> void:
 	_gs  = get_node_or_null(GS_PATH)
 	_sig = get_node_or_null(SIGIL_SYS_PATH)
 
+	# Setup UI: replace Filter dropdown with category buttons
+	_setup_category_buttons()
+
+	# Setup GridContainer for 2-column item layout
+	_setup_item_grid()
+
 	# Live refresh on inventory
 	if _inv != null and _inv.has_signal("inventory_changed"):
 		if not _inv.is_connected("inventory_changed", Callable(self, "_rebuild")):
@@ -77,14 +86,76 @@ func _ready() -> void:
 				if not _sig.is_connected(s, cb):
 					_sig.connect(s, cb)
 
-	if _filter != null and _filter.item_count == 0:
-		for i in range(CATEGORIES.size()):
-			_filter.add_item(CATEGORIES[i], i)
-	if _filter != null and not _filter.item_selected.is_connected(_on_filter_changed):
-		_filter.item_selected.connect(_on_filter_changed)
-
 	if _refresh != null and not _refresh.pressed.is_connected(_rebuild):
 		_refresh.pressed.connect(_rebuild)
+
+	_rebuild()
+
+func _setup_category_buttons() -> void:
+	# Remove old Filter dropdown if it exists
+	var old_filter: Node = get_node_or_null("%Filter")
+	if old_filter:
+		old_filter.queue_free()
+
+	# Create category buttons container and add it to header
+	_filter_container = HBoxContainer.new()
+	_filter_container.add_theme_constant_override("separation", 4)
+
+	# Find the spacer and insert categories before it
+	var spacer: Node = null
+	for child in _header.get_children():
+		if child.name == "Spacer":
+			spacer = child
+			break
+
+	if spacer:
+		_header.remove_child(spacer)
+		_header.add_child(_filter_container)
+		_header.add_child(spacer)
+	else:
+		_header.add_child(_filter_container)
+
+	# Create button for each category
+	for cat in CATEGORIES:
+		var btn := Button.new()
+		btn.text = cat
+		btn.toggle_mode = true
+		btn.add_theme_font_size_override("font_size", 10)
+		btn.set_meta("category", cat)
+		if cat == "All":
+			btn.button_pressed = true  # Start with "All" selected
+		btn.pressed.connect(_on_category_button_pressed.bind(btn))
+		_filter_container.add_child(btn)
+
+func _setup_item_grid() -> void:
+	# Find and replace the List VBoxContainer with GridContainer
+	var old_list: Node = get_node_or_null("%List")
+	if old_list and old_list.get_parent():
+		var parent: Node = old_list.get_parent()
+		var idx: int = old_list.get_index()
+
+		# Create new GridContainer
+		_list_box = GridContainer.new()
+		_list_box.columns = 2
+		_list_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_list_box.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		_list_box.add_theme_constant_override("h_separation", 16)
+		_list_box.add_theme_constant_override("v_separation", 6)
+
+		# Replace old with new
+		parent.remove_child(old_list)
+		parent.add_child(_list_box)
+		parent.move_child(_list_box, idx)
+		old_list.queue_free()
+
+func _on_category_button_pressed(btn: Button) -> void:
+	var cat: String = String(btn.get_meta("category"))
+	_active_category = cat
+
+	# Unpress all other category buttons
+	for child in _filter_container.get_children():
+		if child is Button and child != btn:
+			child.button_pressed = false
 
 	_rebuild()
 
@@ -129,48 +200,51 @@ func _rebuild() -> void:
 		if qty <= 0: continue
 		if want != "All" and cat != want: continue
 
-		var row := HBoxContainer.new()
-		row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		row.add_theme_constant_override("separation", 8)
+		# Wrap each item in a PanelContainer for nice box effect
+		var panel := PanelContainer.new()
+		panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		panel.clip_contents = true
 
-		var name_lbl := Label.new()
-		name_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		name_lbl.text = nm
-		row.add_child(name_lbl)
+		# Add margin inside the panel
+		var margin := MarginContainer.new()
+		margin.add_theme_constant_override("margin_left", 8)
+		margin.add_theme_constant_override("margin_top", 4)
+		margin.add_theme_constant_override("margin_right", 8)
+		margin.add_theme_constant_override("margin_bottom", 4)
+		panel.add_child(margin)
 
-		var equip_lbl := Label.new()
-		equip_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-		equip_lbl.size_flags_horizontal = Control.SIZE_FILL
+		# Create a VBox to hold item info and equipped status
+		var item_vbox := VBoxContainer.new()
+		item_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		item_vbox.add_theme_constant_override("separation", 2)
+
+		# Create a clickable button showing item name and quantity
+		var item_btn := Button.new()
+		item_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		item_btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		item_btn.text = "%s  x%d" % [nm, qty]
+		item_btn.add_theme_font_size_override("font_size", 10)
+		item_btn.set_meta("id", id)
+		item_btn.set_meta("def", def)
+		item_btn.set_meta("qty", qty)
+		item_btn.disabled = (qty <= 0)
+		if not item_btn.pressed.is_connected(_on_item_clicked):
+			item_btn.pressed.connect(_on_item_clicked.bind(item_btn))
+		item_vbox.add_child(item_btn)
+
+		# Show equipped info if applicable
 		var equip_txt := _equip_string_for(id, def)
 		if equip_txt != "":
-			equip_lbl.text = equip_txt
-		row.add_child(equip_lbl)
+			var equip_lbl := Label.new()
+			equip_lbl.text = "  " + equip_txt
+			equip_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+			equip_lbl.add_theme_font_size_override("font_size", 10)
+			equip_lbl.modulate = Color(0.7, 0.7, 0.7, 1.0)  # Slightly dimmed
+			item_vbox.add_child(equip_lbl)
 
-		var cat_lbl := Label.new()
-		cat_lbl.text = cat
-		row.add_child(cat_lbl)
+		margin.add_child(item_vbox)
 
-		var qty_lbl := Label.new()
-		qty_lbl.text = "x%d" % qty
-		row.add_child(qty_lbl)
-
-		var ins_btn := Button.new()
-		ins_btn.text = "Inspect"
-		ins_btn.disabled = (qty <= 0)
-		ins_btn.set_meta("id", id)
-		if not ins_btn.pressed.is_connected(_on_inspect_row):
-			ins_btn.pressed.connect(_on_inspect_row.bind(ins_btn))
-		row.add_child(ins_btn)
-
-		# --- Discard button (new) ---
-		var del_btn := Button.new()
-		del_btn.text = "Discard"
-		del_btn.set_meta("id", id)
-		if not del_btn.pressed.is_connected(_on_discard_row):
-			del_btn.pressed.connect(_on_discard_row.bind(del_btn))
-		row.add_child(del_btn)
-
-		_list_box.add_child(row)
+		_list_box.add_child(panel)
 
 	await get_tree().process_frame
 	_list_box.queue_sort()
@@ -471,13 +545,72 @@ func _holders_of_instance(inst_id: String) -> PackedStringArray:
 # --- UI glue ------------------------------------------------------------------
 
 func _current_category() -> String:
-	if _filter == null:
-		return "All"
-	var idx: int = _filter.get_selected()
-	return _filter.get_item_text(idx)
+	return _active_category
 
-func _on_filter_changed(_i: int) -> void:
-	_rebuild()
+func _on_item_clicked(btn: Button) -> void:
+	var id: String = String(btn.get_meta("id"))
+	var def: Dictionary = btn.get_meta("def")
+	var qty: int = int(btn.get_meta("qty"))
+	var nm: String = _display_name(id, def)
+
+	# Create a dialog with item info and action buttons
+	var dlg := AcceptDialog.new()
+	dlg.title = nm
+	dlg.min_size = Vector2(400, 0)
+
+	# Build dialog content
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 8)
+
+	# Show quantity
+	var qty_lbl := Label.new()
+	qty_lbl.text = "Quantity: x%d" % qty
+	qty_lbl.add_theme_font_size_override("font_size", 10)
+	vbox.add_child(qty_lbl)
+
+	# Show equipment info if equipped
+	var equip_txt := _equip_string_for(id, def)
+	if equip_txt != "":
+		var equip_lbl := Label.new()
+		equip_lbl.text = equip_txt
+		equip_lbl.add_theme_font_size_override("font_size", 10)
+		vbox.add_child(equip_lbl)
+
+	# Add button container
+	var btn_row := HBoxContainer.new()
+	btn_row.add_theme_constant_override("separation", 8)
+
+	# Inspect button
+	var inspect_btn := Button.new()
+	inspect_btn.text = "Inspect"
+	inspect_btn.set_meta("id", id)
+	inspect_btn.pressed.connect(func():
+		dlg.hide()
+		_on_inspect_row(inspect_btn)
+	)
+	btn_row.add_child(inspect_btn)
+
+	# Discard button
+	var discard_btn := Button.new()
+	discard_btn.text = "Discard"
+	discard_btn.set_meta("id", id)
+	discard_btn.pressed.connect(func():
+		dlg.hide()
+		_on_discard_row(discard_btn)
+	)
+	btn_row.add_child(discard_btn)
+
+	vbox.add_child(btn_row)
+
+	# Add custom content to dialog
+	dlg.add_child(vbox)
+
+	# Show dialog
+	var host := get_tree().current_scene
+	if host == null:
+		host = get_tree().root
+	host.add_child(dlg)
+	dlg.popup_centered()
 
 func _on_inspect_row(btn: Button) -> void:
 	var id_v: Variant = btn.get_meta("id")
@@ -695,6 +828,7 @@ func _gather_members() -> Array[String]:
 	if gs == null:
 		return out
 
+	# Get active party members
 	for m in ["get_active_party_ids", "get_party_ids", "list_active_party", "get_active_party"]:
 		if gs.has_method(m):
 			var raw: Variant = gs.call(m)
@@ -702,15 +836,28 @@ func _gather_members() -> Array[String]:
 				for s in (raw as PackedStringArray): out.append(String(s))
 			elif typeof(raw) == TYPE_ARRAY:
 				for s2 in (raw as Array): out.append(String(s2))
-			if out.size() > 0: return out
+			if out.size() > 0: break
 
-	for p in ["active_party_ids", "active_party", "party_ids", "party"]:
-		var raw2: Variant = gs.get(p) if gs.has_method("get") else null
-		if typeof(raw2) == TYPE_PACKED_STRING_ARRAY:
-			for s3 in (raw2 as PackedStringArray): out.append(String(s3))
-		elif typeof(raw2) == TYPE_ARRAY:
-			for s4 in (raw2 as Array): out.append(String(s4))
-		if out.size() > 0: return out
+	if out.is_empty():
+		for p in ["active_party_ids", "active_party", "party_ids", "party"]:
+			var raw2: Variant = gs.get(p) if gs.has_method("get") else null
+			if typeof(raw2) == TYPE_PACKED_STRING_ARRAY:
+				for s3 in (raw2 as PackedStringArray): out.append(String(s3))
+			elif typeof(raw2) == TYPE_ARRAY:
+				for s4 in (raw2 as Array): out.append(String(s4))
+			if out.size() > 0: break
+
+	# Get benched members
+	if gs.has_method("get"):
+		var bench_v: Variant = gs.get("bench")
+		if typeof(bench_v) == TYPE_PACKED_STRING_ARRAY:
+			for s in (bench_v as PackedStringArray):
+				if not out.has(String(s)):  # Avoid duplicates
+					out.append(String(s))
+		elif typeof(bench_v) == TYPE_ARRAY:
+			for s in (bench_v as Array):
+				if not out.has(String(s)):  # Avoid duplicates
+					out.append(String(s))
 
 	return out
 

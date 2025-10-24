@@ -25,6 +25,7 @@ func _ready() -> void:
 	var st: Node = get_node_or_null(STATS_PATH)
 	var eq: Node = get_node_or_null(EQUIP_PATH)
 	var sig: Node = get_node_or_null(SIG_PATH)
+	var cal: Node = get_node_or_null("/root/aCalendarSystem")
 
 	# Hook GameState for party changes and loads
 	if gs != null:
@@ -43,6 +44,10 @@ func _ready() -> void:
 	# Hook SigilSystem to recompute when loadout changes
 	if sig != null and sig.has_signal("loadout_changed") and not sig.is_connected("loadout_changed", Callable(self, "_on_sigils_changed")):
 		sig.connect("loadout_changed", Callable(self, "_on_sigils_changed"))
+
+	# Hook CalendarSystem to auto-heal on day advance
+	if cal != null and cal.has_signal("day_advanced") and not cal.is_connected("day_advanced", Callable(self, "_on_day_advanced")):
+		cal.connect("day_advanced", Callable(self, "_on_day_advanced"))
 
 	# Initial fill
 	refresh_all()
@@ -71,6 +76,88 @@ func get_profile(member: String) -> Dictionary:
 		_profiles[pid] = _compute_for_member(pid)
 	return (_profiles.get(pid, {}) as Dictionary)
 
+## Heals all party members (active and benched) to full HP/MP
+## Clears ailments, buffs, and debuffs
+func heal_all_to_full() -> void:
+	var gs: Node = get_node_or_null(GS_PATH)
+	if gs == null:
+		return
+
+	# Get all party members (active + benched)
+	var all_members: Array[String] = []
+
+	# Get active party
+	if gs.has_method("get_active_party_ids"):
+		var active_v: Variant = gs.call("get_active_party_ids")
+		if typeof(active_v) == TYPE_ARRAY:
+			for m in (active_v as Array):
+				all_members.append(String(m))
+		elif typeof(active_v) == TYPE_PACKED_STRING_ARRAY:
+			for m in (active_v as PackedStringArray):
+				all_members.append(String(m))
+
+	# Get benched members
+	if gs.has_method("get"):
+		var bench_v: Variant = gs.get("bench")
+		if typeof(bench_v) == TYPE_ARRAY:
+			for m in (bench_v as Array):
+				var mid := String(m)
+				if not all_members.has(mid):
+					all_members.append(mid)
+		elif typeof(bench_v) == TYPE_PACKED_STRING_ARRAY:
+			for m in (bench_v as PackedStringArray):
+				var mid := String(m)
+				if not all_members.has(mid):
+					all_members.append(mid)
+
+	# Heal each member to full
+	for member_id in all_members:
+		var pid: String = _resolve_id(member_id)
+		var pools: Dictionary = _member_pools(pid)
+		var hp_max: int = int(pools.get("hp_max", 0))
+		var mp_max: int = int(pools.get("mp_max", 0))
+
+		# Also account for equipment bonuses
+		var equip: Dictionary = _equip_for(pid)
+		var d_head: Dictionary = _item_def(String(equip.get("head","")))
+		var hp_bonus: int = int(d_head.get("max_hp_boost", 0))
+		var mp_bonus: int = int(d_head.get("max_mp_boost", 0))
+
+		var true_hp_max: int = hp_max + hp_bonus
+		var true_mp_max: int = mp_max + mp_bonus
+
+		# Update _party_meta
+		if not _party_meta.has(pid):
+			_party_meta[pid] = {}
+		var meta: Dictionary = _party_meta[pid]
+		meta["hp"] = true_hp_max
+		meta["mp"] = true_mp_max
+		meta["ailment"] = ""
+		meta["buffs"] = []
+		meta["debuffs"] = []
+		_party_meta[pid] = meta
+
+		# Update GameState.member_data for persistence
+		if gs.has_method("get"):
+			var member_data_v: Variant = gs.get("member_data")
+			if typeof(member_data_v) == TYPE_DICTIONARY:
+				var member_data: Dictionary = member_data_v
+				if not member_data.has(pid):
+					member_data[pid] = {}
+				var gs_rec: Dictionary = member_data[pid]
+				gs_rec["hp"] = true_hp_max
+				gs_rec["mp"] = true_mp_max
+				gs_rec["buffs"] = []
+				gs_rec["debuffs"] = []
+				member_data[pid] = gs_rec
+				# Set it back to GameState
+				if gs.has_method("set"):
+					gs.set("member_data", member_data)
+
+	# Refresh all profiles to show updated HP/MP
+	refresh_all()
+	print("[CombatProfileSystem] Healed all party members to full HP/MP")
+
 # Optional: accept runtime HP/MP/buffs from save blobs
 func apply_save_blob(blob: Dictionary) -> void:
 	# expected format (used by your GameState loader):
@@ -94,6 +181,10 @@ func _on_equipment_changed(member: String) -> void:
 
 func _on_sigils_changed(member: String) -> void:
 	refresh_member(member)
+
+func _on_day_advanced(_new_date: Dictionary) -> void:
+	# Auto-heal all party members at the start of each new day
+	heal_all_to_full()
 
 # ───────────────────────── Core compute ─────────────────────────
 

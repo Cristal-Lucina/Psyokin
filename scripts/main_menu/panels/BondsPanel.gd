@@ -79,6 +79,10 @@ enum Filter { ALL, KNOWN, LOCKED, MAXED }
 @onready var _unlock_inner   : Button = %UnlockInner
 @onready var _story_btn      : Button = %StoryBtn
 
+# Likes/Dislikes rows (containers with labels)
+var _likes_row      : HBoxContainer = null
+var _dislikes_row   : HBoxContainer = null
+
 # Old scene labels (may not exist - optional)
 var _lvl_tv    : Label          = null
 var _xp_tv     : Label          = null
@@ -97,6 +101,12 @@ func _ready() -> void:
 	# Optional old scene labels (may not exist)
 	_lvl_tv = get_node_or_null("%LevelValue")
 	_xp_tv = get_node_or_null("%CBXPValue")
+
+	# Get likes/dislikes row containers
+	if _likes_tv:
+		_likes_row = _likes_tv.get_parent()
+	if _dislikes_tv:
+		_dislikes_row = _dislikes_tv.get_parent()
 
 	_hide_level_cbxp_labels()
 	_wire_system_signals()
@@ -173,6 +183,10 @@ func _build_list() -> void:
 	_list_group.allow_unpress = false
 
 	var f: int = _get_filter_id()
+
+	# Build list of bonds with their data for sorting
+	var bond_list: Array[Dictionary] = []
+
 	for rec: Dictionary in _rows:
 		var id: String = String(rec.get("id", ""))
 		var disp_name: String = String(rec.get("name", id))
@@ -186,8 +200,38 @@ func _build_list() -> void:
 		if f == Filter.LOCKED and known:       continue
 		if f == Filter.MAXED and not maxed:    continue
 
+		bond_list.append({
+			"id": id,
+			"disp_name": disp_name,
+			"known": known,
+			"maxed": maxed
+		})
+
+	# Sort: known bonds first, then unknown bonds
+	bond_list.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		var a_known: bool = bool(a.get("known", false))
+		var b_known: bool = bool(b.get("known", false))
+
+		# Known bonds come before unknown
+		if a_known != b_known:
+			return a_known
+
+		# Within same group, sort alphabetically by display name
+		var a_name: String = String(a.get("disp_name", ""))
+		var b_name: String = String(b.get("disp_name", ""))
+		return a_name < b_name
+	)
+
+	# Create UI rows from sorted list
+	for bond_data: Dictionary in bond_list:
+		var id: String = String(bond_data.get("id", ""))
+		var disp_name: String = String(bond_data.get("disp_name", ""))
+		var known: bool = bool(bond_data.get("known", false))
+		var maxed: bool = bool(bond_data.get("maxed", false))
+
 		var row := Button.new()
-		row.text = disp_name
+		# Show "(Unknown)" for locked bonds instead of actual name
+		row.text = "(Unknown)" if not known else disp_name
 		row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		row.toggle_mode = true
 		row.button_group = _list_group     # ← exclusive selection
@@ -365,9 +409,9 @@ func _on_row_pressed(btn: Button) -> void:
 	_update_detail(_selected)
 
 func _update_detail(id: String) -> void:
-	_name_tv.text = ("—" if id == "" else _display_name(id))
-
+	# Handle empty selection
 	if id == "":
+		_name_tv.text = "—"
 		if _event_tv: _event_tv.text = "Event: —"
 		if _layer_tv: _layer_tv.text = "Layer: —"
 		if _points_tv: _points_tv.text = "Points: —"
@@ -380,10 +424,37 @@ func _update_detail(id: String) -> void:
 		if _unlock_middle: _unlock_middle.disabled = true
 		if _unlock_inner: _unlock_inner.disabled = true
 		if _story_btn: _story_btn.set_meta("bond_id", "")
+		# Show all widgets
+		_show_all_detail_widgets()
 		return
 
-	# Get event-based progression data
+	# Check if bond is known
 	var known: bool = _read_known(id)
+
+	# If unknown, hide all detail widgets and only show hint
+	if not known:
+		# Hide all detail widgets
+		_hide_all_detail_widgets()
+
+		# Only show the description with hint
+		if _desc:
+			_desc.visible = true
+			var rec: Dictionary = _bond_def(id)
+			var hint: String = String(rec.get("bond_hint", "")).strip_edges()
+			print("[BondsPanel] Unknown bond '%s' - hint: '%s'" % [id, hint])
+			print("[BondsPanel] Bond def keys: ", rec.keys())
+			if hint != "":
+				_desc.text = hint
+			else:
+				_desc.text = "[i]This character has not been met yet.[/i]"
+		return
+
+	# Known bond - show all widgets and populate with data
+	_show_all_detail_widgets()
+
+	_name_tv.text = _display_name(id)
+
+	# Get event-based progression data
 	var event_idx: int = _read_event_index(id)
 	var points: int = _read_points_bank(id)
 	var threshold: int = _read_next_threshold(id)
@@ -392,21 +463,18 @@ func _update_detail(id: String) -> void:
 
 	# Event progress
 	if _event_tv:
-		if not known or event_idx == 0:
+		if event_idx == 0:
 			_event_tv.text = "Event: Not Started"
 		else:
 			_event_tv.text = "Event: E%d Complete" % event_idx
 
 	# Layer stage
 	if _layer_tv:
-		if not known:
-			_layer_tv.text = "Layer: Not Met"
-		else:
-			_layer_tv.text = "Layer: %s" % layer_name
+		_layer_tv.text = "Layer: %s" % layer_name
 
 	# Points bank / threshold
 	if _points_tv:
-		if not known or event_idx == 0:
+		if event_idx == 0:
 			_points_tv.text = "Points: —"
 		elif threshold > 0:
 			_points_tv.text = "Points: %d / %d" % [points, threshold]
@@ -415,7 +483,7 @@ func _update_detail(id: String) -> void:
 
 	# Gift status
 	if _gift_tv:
-		if not known or event_idx == 0:
+		if event_idx == 0:
 			_gift_tv.text = "Gift: —"
 		elif gift_used:
 			_gift_tv.text = "Gift: Used this layer"
@@ -424,8 +492,8 @@ func _update_detail(id: String) -> void:
 
 	# Description
 	var rec: Dictionary = _bond_def(id)
-	var desc: String = String(rec.get("bond_description", "")).strip_edges()
 	if _desc:
+		var desc: String = String(rec.get("bond_description", "")).strip_edges()
 		_desc.text = desc
 
 	# Likes/Dislikes (only discovered, never show full list)
@@ -466,6 +534,40 @@ func _update_detail(id: String) -> void:
 	if _story_btn:
 		_story_btn.set_meta("bond_id", id)
 
+func _hide_all_detail_widgets() -> void:
+	if _name_tv: _name_tv.visible = false
+	if _event_tv: _event_tv.visible = false
+	if _layer_tv: _layer_tv.visible = false
+	if _points_tv: _points_tv.visible = false
+	if _gift_tv: _gift_tv.visible = false
+	# Hide the entire likes/dislikes rows (includes labels and values)
+	if _likes_row: _likes_row.visible = false
+	if _dislikes_row: _dislikes_row.visible = false
+	if _unlock_hdr: _unlock_hdr.visible = false
+	if _unlock_acq: _unlock_acq.visible = false
+	if _unlock_outer: _unlock_outer.visible = false
+	if _unlock_middle: _unlock_middle.visible = false
+	if _unlock_inner: _unlock_inner.visible = false
+	if _story_btn: _story_btn.visible = false
+	if _desc: _desc.visible = false
+
+func _show_all_detail_widgets() -> void:
+	if _name_tv: _name_tv.visible = true
+	if _event_tv: _event_tv.visible = true
+	if _layer_tv: _layer_tv.visible = true
+	if _points_tv: _points_tv.visible = true
+	if _gift_tv: _gift_tv.visible = true
+	# Show the entire likes/dislikes rows (includes labels and values)
+	if _likes_row: _likes_row.visible = true
+	if _dislikes_row: _dislikes_row.visible = true
+	if _unlock_hdr: _unlock_hdr.visible = true
+	if _unlock_acq: _unlock_acq.visible = true
+	if _unlock_outer: _unlock_outer.visible = true
+	if _unlock_middle: _unlock_middle.visible = true
+	if _unlock_inner: _unlock_inner.visible = true
+	if _story_btn: _story_btn.visible = true
+	if _desc: _desc.visible = true
+
 func _display_name(id: String) -> String:
 	if _sys and _sys.has_method("get_bond_name"):
 		return String(_sys.call("get_bond_name", id))
@@ -476,16 +578,26 @@ func _display_name(id: String) -> String:
 	return (nm if nm != "" else id.capitalize())
 
 func _bond_def(id: String) -> Dictionary:
+	var result: Dictionary = {}
+
+	# Try system first
 	if _sys and _sys.has_method("get_bond_def"):
 		var v: Variant = _sys.call("get_bond_def", id)
 		if typeof(v) == TYPE_DICTIONARY:
-			return (v as Dictionary)
+			result = (v as Dictionary).duplicate()
+
+	# Always check CSV to get bond_hint (and other new fields)
 	var rows: Array[Dictionary] = _read_csv_rows(CSV_FALLBACK)
 	for r in rows:
 		var rec: Dictionary = r
 		if String(rec.get("actor_id","")) == id:
-			return rec
-	return {}
+			# Merge CSV data into result, CSV takes priority for new fields
+			for key in rec.keys():
+				if not result.has(key) or key == "bond_hint":
+					result[key] = rec[key]
+			return result
+
+	return result if not result.is_empty() else {}
 
 # ─────────────────────────────────────────────────────────────
 # Helpers
