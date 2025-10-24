@@ -1289,12 +1289,12 @@ func _on_add_to_party() -> void:
 	var id: String = _member_id_from_ui_row4()
 	if id == "":
 		return
-	var added := false
+	var _added := false
 	if _party:
 		for m in ["add_member","add_to_party","recruit","try_add_member"]:
 			if _party.has_method(m):
 				_party.call(m, id)
-				added = true
+				_added = true
 				break
 	elif _gs:
 		var cur: Array = []
@@ -1304,7 +1304,7 @@ func _on_add_to_party() -> void:
 				cur = v
 		if not cur.has(id):
 			cur.append(id)
-			added = true
+			_added = true
 			if _gs.has_method("set"):
 				_gs.set("party", cur)
 

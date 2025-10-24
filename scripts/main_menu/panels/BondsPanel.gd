@@ -63,23 +63,26 @@ enum Filter { ALL, KNOWN, LOCKED, MAXED }
 @onready var _list_box  : VBoxContainer  = %List
 
 @onready var _name_tv   : Label          = %Name
-@onready var _lvl_tv    : Label          = %LevelValue          # old scene label (we hide)
-@onready var _xp_tv     : Label          = %CBXPValue           # old scene label (we hide)
-@onready var _desc      : RichTextLabel  = %Notes               # description block
+@onready var _desc      : RichTextLabel  = %Notes
 
-# New/managed widgets
-var _event_tv       : Label          = null   # shows event progress (E1-E9)
-var _layer_tv       : Label          = null   # shows stage text (Not Met, Outer…)
-var _points_tv      : Label          = null   # shows points bank / threshold
-var _gift_tv        : Label          = null   # shows gift status
-var _likes_tv       : Label          = null
-var _dislikes_tv    : Label          = null
-var _unlock_hdr     : Label          = null   # "Unlocks:"
-var _unlock_acq     : Button         = null   # Acquaintance → Outer unlock (10 pts)
-var _unlock_outer   : Button         = null   # Outer → Middle unlock (12 pts)
-var _unlock_middle  : Button         = null   # Middle → Inner unlock (14 pts)
-var _unlock_inner   : Button         = null   # Inner → Core unlock (16 pts)
-var _story_btn      : Button         = null
+# Detail widgets (from TSCN)
+@onready var _event_tv       : Label  = %EventProgress
+@onready var _layer_tv       : Label  = %LayerStage
+@onready var _points_tv      : Label  = %PointsBank
+@onready var _gift_tv        : Label  = %GiftStatus
+@onready var _likes_tv       : Label  = %LikesValue
+@onready var _dislikes_tv    : Label  = %DislikesValue
+@onready var _unlock_hdr     : Label  = %UnlockHeader
+@onready var _unlock_acq     : Button = %UnlockAcquaintance
+@onready var _unlock_outer   : Button = %UnlockOuter
+@onready var _unlock_middle  : Button = %UnlockMiddle
+@onready var _unlock_inner   : Button = %UnlockInner
+@onready var _story_btn      : Button = %StoryBtn
+
+# Old scene labels (may not exist - optional)
+var _lvl_tv    : Label          = null
+var _xp_tv     : Label          = null
+
 var _story_overlay  : Control        = null
 
 # Data / state
@@ -90,8 +93,12 @@ var _list_group: ButtonGroup = null  # exclusive selection group
 
 func _ready() -> void:
 	_sys = get_node_or_null(SYS_PATH)
+
+	# Optional old scene labels (may not exist)
+	_lvl_tv = get_node_or_null("%LevelValue")
+	_xp_tv = get_node_or_null("%CBXPValue")
+
 	_hide_level_cbxp_labels()
-	_ensure_detail_widgets()
 	_wire_system_signals()
 
 	if _filter != null and _filter.item_count == 0:
@@ -105,10 +112,13 @@ func _ready() -> void:
 	if _refresh != null and not _refresh.pressed.is_connected(_rebuild):
 		_refresh.pressed.connect(_rebuild)
 
+	if _story_btn != null and not _story_btn.pressed.is_connected(_on_story_points_pressed):
+		_story_btn.pressed.connect(_on_story_points_pressed)
+
 	_rebuild()
 
 # ─────────────────────────────────────────────────────────────
-# Scene fixes / dynamic widgets
+# Scene fixes
 # ─────────────────────────────────────────────────────────────
 
 func _hide_level_cbxp_labels() -> void:
@@ -116,121 +126,12 @@ func _hide_level_cbxp_labels() -> void:
 		_lvl_tv.visible = false
 	if _xp_tv:
 		_xp_tv.visible  = false
-	# Hide any stray “Level/CBXP/BXP” labels nearby.
+	# Hide any stray "Level/CBXP/BXP" labels nearby.
 	for n in get_children():
 		if n is Label:
 			var t: String = (n as Label).text.strip_edges().to_lower()
 			if t.begins_with("level") or t.begins_with("cbxp") or t.begins_with("bxp"):
 				(n as Label).visible = false
-
-func _ensure_detail_widgets() -> void:
-	# 1) Event, Layer, Points, Gift labels directly under the name
-	var np: Node = (_name_tv.get_parent() if _name_tv else null)
-	var name_idx: int = 0
-	if np:
-		var kids: Array = np.get_children()
-		for i in range(kids.size()):
-			if kids[i] == _name_tv:
-				name_idx = i
-				break
-
-	if _event_tv == null and np:
-		_event_tv = Label.new()
-		_event_tv.name = "EventProgress"
-		_event_tv.text = "Event: —"
-		np.add_child(_event_tv)
-		np.move_child(_event_tv, name_idx + 1)
-
-	if _layer_tv == null and np:
-		_layer_tv = Label.new()
-		_layer_tv.name = "LayerStage"
-		_layer_tv.text = "Layer: —"
-		np.add_child(_layer_tv)
-		np.move_child(_layer_tv, name_idx + 2)
-
-	if _points_tv == null and np:
-		_points_tv = Label.new()
-		_points_tv.name = "PointsBank"
-		_points_tv.text = "Points: —"
-		np.add_child(_points_tv)
-		np.move_child(_points_tv, name_idx + 3)
-
-	if _gift_tv == null and np:
-		_gift_tv = Label.new()
-		_gift_tv.name = "GiftStatus"
-		_gift_tv.text = "Gift: —"
-		np.add_child(_gift_tv)
-		np.move_child(_gift_tv, name_idx + 4)
-
-	# 2) Everything else gets added under the same parent as the description
-	if _desc == null:
-		return
-	var holder: Node = _desc.get_parent()
-	if holder == null:
-		return
-
-	if _story_btn == null:
-		_story_btn = Button.new()
-		_story_btn.name = "StoryBtnAuto"
-		_story_btn.text = "Story Points"
-		_story_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		if not _story_btn.pressed.is_connected(_on_story_points_pressed):
-			_story_btn.pressed.connect(_on_story_points_pressed)
-		holder.add_child(_story_btn)
-
-	if _likes_tv == null:
-		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 6)
-		var title := Label.new(); title.text = "Likes:"
-		_likes_tv = Label.new(); _likes_tv.text = "—"
-		row.add_child(title); row.add_child(_likes_tv)
-		holder.add_child(row)
-
-	if _dislikes_tv == null:
-		var row2 := HBoxContainer.new()
-		row2.add_theme_constant_override("separation", 6)
-		var title2 := Label.new(); title2.text = "Dislikes:"
-		_dislikes_tv = Label.new(); _dislikes_tv.text = "—"
-		row2.add_child(title2); row2.add_child(_dislikes_tv)
-		holder.add_child(row2)
-
-	# Unlocks: Header + 4 layer transition buttons
-	if _unlock_hdr == null:
-		_unlock_hdr = Label.new()
-		_unlock_hdr.text = "Layer Transitions:"
-		holder.add_child(_unlock_hdr)
-
-	if _unlock_acq == null:
-		_unlock_acq = Button.new()
-		_unlock_acq.name = "UnlockAcquaintance"
-		_unlock_acq.text = "Acquaintance → Outer"
-		_unlock_acq.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		_unlock_acq.disabled = true  # Will be enabled when unlocked
-		holder.add_child(_unlock_acq)
-
-	if _unlock_outer == null:
-		_unlock_outer = Button.new()
-		_unlock_outer.name = "UnlockOuter"
-		_unlock_outer.text = "Outer → Middle"
-		_unlock_outer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		_unlock_outer.disabled = true  # Will be enabled when unlocked
-		holder.add_child(_unlock_outer)
-
-	if _unlock_middle == null:
-		_unlock_middle = Button.new()
-		_unlock_middle.name = "UnlockMiddle"
-		_unlock_middle.text = "Middle → Inner"
-		_unlock_middle.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		_unlock_middle.disabled = true
-		holder.add_child(_unlock_middle)
-
-	if _unlock_inner == null:
-		_unlock_inner = Button.new()
-		_unlock_inner.name = "UnlockInner"
-		_unlock_inner.text = "Inner → Core"
-		_unlock_inner.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		_unlock_inner.disabled = true
-		holder.add_child(_unlock_inner)
 
 # ─────────────────────────────────────────────────────────────
 # System wiring

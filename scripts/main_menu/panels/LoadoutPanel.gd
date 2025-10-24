@@ -83,9 +83,9 @@ class_name LoadoutPanel
 @onready var _mind_value:  Label         = get_node_or_null("Row/Right/MindRow/Value") as Label
 @onready var _mind_row:    HBoxContainer = get_node_or_null("Row/Right/MindRow") as HBoxContainer
 
-var _active_name_lbl:  Label  = null
-var _active_value_lbl: Label  = null
-var _active_btn:       Button = null
+@onready var _active_name_lbl:  Label  = %ActiveNameLabel
+@onready var _active_value_lbl: Label  = %ActiveValueLabel
+@onready var _active_btn:       Button = %ActiveBtn
 
 var _labels: PackedStringArray = PackedStringArray()
 var _tokens: PackedStringArray = PackedStringArray()
@@ -799,14 +799,8 @@ func _rebuild_stats_grid(member_token: String, equip: Dictionary) -> void:
 
 # ────────────────── Active Type (hero) ──────────────────
 func _setup_active_type_widgets() -> void:
-	if _mind_row == null: return
-	if _active_name_lbl == null:
-		_active_name_lbl = Label.new(); _active_name_lbl.text = "Active Type:"; _active_name_lbl.visible = false; _mind_row.add_child(_active_name_lbl)
-	if _active_value_lbl == null:
-		_active_value_lbl = Label.new(); _active_value_lbl.text = "Omega"; _active_value_lbl.visible = false; _mind_row.add_child(_active_value_lbl)
-	if _active_btn == null:
-		_active_btn = Button.new(); _active_btn.text = "Set…"; _active_btn.visible = false
-		_active_btn.pressed.connect(Callable(self, "_open_active_type_picker")); _mind_row.add_child(_active_btn)
+	if _active_btn != null and not _active_btn.pressed.is_connected(_open_active_type_picker):
+		_active_btn.pressed.connect(_open_active_type_picker)
 
 func _refresh_active_type_row(member_token: String) -> void:
 	var is_hero: bool = (member_token == "hero" or member_token.strip_edges().to_lower() == _hero_name().strip_edges().to_lower())

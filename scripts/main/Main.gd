@@ -128,21 +128,21 @@ const PARTY_NAME_KEYS := ["name","display_name","disp_name"]
 @onready var open_save_btn: Button     = $MarginContainer/Root/HBoxContainer4/OpenSaveBtn
 
 # ---- Cheat area container (toggle with C) ----
-@onready var _cheat_root: VBoxContainer = $MarginContainer/Root/CheatRoot
+var _cheat_root: VBoxContainer = null
 
 # ---- Party / LXP / SXP refs ----
-@onready var _roster_pick: OptionButton = $MarginContainer/Root/CheatRoot/PartyRow/RosterPick
-@onready var _member_id_le: LineEdit    = $MarginContainer/Root/CheatRoot/PartyRow/MemberId
-@onready var _btn_add_party: Button     = $MarginContainer/Root/CheatRoot/PartyRow/BtnAddParty
-@onready var _btn_rem_party: Button     = $MarginContainer/Root/CheatRoot/PartyRow/BtnRemoveParty
-@onready var _btn_to_bench: Button      = $MarginContainer/Root/CheatRoot/PartyRow/BtnToBench
+var _roster_pick: OptionButton = null
+var _member_id_le: LineEdit = null
+var _btn_add_party: Button = null
+var _btn_rem_party: Button = null
+var _btn_to_bench: Button = null
 
-@onready var _spin_xp: SpinBox          = $MarginContainer/Root/CheatRoot/LxpRow/SpinXP
-@onready var _btn_add_xp: Button        = $MarginContainer/Root/CheatRoot/LxpRow/BtnAddXP
+var _spin_xp: SpinBox = null
+var _btn_add_xp: Button = null
 
-@onready var _stat_pick: OptionButton   = $MarginContainer/Root/CheatRoot/SxpRow/StatPick
-@onready var _spin_sxp: SpinBox         = $MarginContainer/Root/CheatRoot/SxpRow/SpinSXP
-@onready var _btn_add_sxp: Button       = $MarginContainer/Root/CheatRoot/SxpRow/BtnAddSXP
+var _stat_pick: OptionButton = null
+var _spin_sxp: SpinBox = null
+var _btn_add_sxp: Button = null
 
 # -------- Hero row (runtime-built) --------
 var _hero_lvl_spin: SpinBox       = null
@@ -199,6 +199,19 @@ func _ready() -> void:
 	inv      = get_node_or_null(INV_PATH)
 	_cps     = _find_cps()
 	_sig     = get_node_or_null(SIGIL_PATH)
+
+	# Cheat menu nodes (optional - may not exist in scene)
+	_cheat_root     = get_node_or_null("MarginContainer/Root/CheatRoot")
+	_roster_pick    = get_node_or_null("MarginContainer/Root/CheatRoot/PartyRow/RosterPick")
+	_member_id_le   = get_node_or_null("MarginContainer/Root/CheatRoot/PartyRow/MemberId")
+	_btn_add_party  = get_node_or_null("MarginContainer/Root/CheatRoot/PartyRow/BtnAddParty")
+	_btn_rem_party  = get_node_or_null("MarginContainer/Root/CheatRoot/PartyRow/BtnRemoveParty")
+	_btn_to_bench   = get_node_or_null("MarginContainer/Root/CheatRoot/PartyRow/BtnToBench")
+	_spin_xp        = get_node_or_null("MarginContainer/Root/CheatRoot/LxpRow/SpinXP")
+	_btn_add_xp     = get_node_or_null("MarginContainer/Root/CheatRoot/LxpRow/BtnAddXP")
+	_stat_pick      = get_node_or_null("MarginContainer/Root/CheatRoot/SxpRow/StatPick")
+	_spin_sxp       = get_node_or_null("MarginContainer/Root/CheatRoot/SxpRow/SpinSXP")
+	_btn_add_sxp    = get_node_or_null("MarginContainer/Root/CheatRoot/SxpRow/BtnAddSXP")
 
 	# Overlays shouldn’t block input
 	var overlays: Control = get_node_or_null("Overlays") as Control

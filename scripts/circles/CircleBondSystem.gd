@@ -169,7 +169,7 @@ func _connect_party_signals() -> void:
 			gs.connect("party_changed", Callable(self, "_on_party_changed"))
 
 ## Called when party roster changes - automatically mark party members as known
-func _on_party_changed(_a: Variant = null, _b: Variant = null) -> void:
+func _on_party_changed(_a: Variant = null, _arg2: Variant = null) -> void:
 	_auto_discover_party_members()
 
 ## Automatically marks all party members as known in the bond system

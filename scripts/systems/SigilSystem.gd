@@ -333,8 +333,8 @@ func set_active_skill_for_instance_by_name(inst_id: String, skill_name: String) 
 	if not _instances.has(inst_id): return false
 	var unlocked: PackedStringArray = list_unlocked_skills(inst_id)
 	for skill_id in unlocked:
-		var name: String = get_skill_display_name(skill_id)
-		if name == skill_name:
+		var display_name: String = get_skill_display_name(skill_id)
+		if display_name == skill_name:
 			return set_active_skill_for_instance(inst_id, skill_id)
 	return false
 

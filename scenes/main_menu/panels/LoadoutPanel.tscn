@@ -155,6 +155,24 @@ text = "Mind Type"
 layout_mode = 2
 text = "—"
 
+[node name="ActiveNameLabel" type="Label" parent="Row/Right/MindRow"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+text = "Active Type:"
+
+[node name="ActiveValueLabel" type="Label" parent="Row/Right/MindRow"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+text = "Omega"
+
+[node name="ActiveBtn" type="Button" parent="Row/Right/MindRow"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+text = "Set…"
+
 [node name="StatsGrid" type="GridContainer" parent="Row/Right"]
 layout_mode = 2
 theme_override_constants/h_separation = 20

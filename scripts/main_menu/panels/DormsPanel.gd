@@ -73,11 +73,11 @@ class_name DormsPanel
 @onready var _refresh_btn  : Button         = $Root/Left/Header/RefreshBtn
 @onready var _filter       : OptionButton   = $Root/Left/Filter
 
-# Right-side controls created in code
-var _common_box  : VBoxContainer = null
-var _reassign_btn: Button        = null
-var _reset_btn   : Button        = null
-var _accept_btn  : Button        = null
+# Right-side controls (from TSCN)
+@onready var _common_box  : VBoxContainer = %CommonBox
+@onready var _reassign_btn: Button        = %ReassignBtn
+@onready var _reset_btn   : Button        = %ResetBtn
+@onready var _accept_btn  : Button        = %AcceptBtn
 
 # State
 var _selected_room: String = ""
@@ -112,6 +112,14 @@ func _ready() -> void:
 	if _refresh_btn != null and not _refresh_btn.pressed.is_connected(_rebuild):
 		_refresh_btn.pressed.connect(_rebuild)
 
+	# Wire up right control buttons
+	if _reassign_btn != null and not _reassign_btn.pressed.is_connected(_on_reassign_pressed):
+		_reassign_btn.pressed.connect(_on_reassign_pressed)
+	if _reset_btn != null and not _reset_btn.pressed.is_connected(_on_reset_pressed):
+		_reset_btn.pressed.connect(_on_reset_pressed)
+	if _accept_btn != null and not _accept_btn.pressed.is_connected(_on_accept_pressed):
+		_accept_btn.pressed.connect(_on_accept_pressed)
+
 	var ds: Node = _ds()
 	if ds != null:
 		if ds.has_signal("dorms_changed"):
@@ -128,7 +136,6 @@ func _ready() -> void:
 	if not visibility_changed.is_connected(_on_visibility_changed):
 		visibility_changed.connect(_on_visibility_changed)
 
-	_ensure_right_controls()
 	_rebuild()
 
 func _on_model_bumped() -> void:
@@ -140,44 +147,6 @@ func _on_filter_changed(_ix: int) -> void:
 		_used_rooms.clear()
 		_pending_room = ""
 	_rebuild()
-
-# ─────────────────────────────────────────────────────────────
-# Right controls
-# ─────────────────────────────────────────────────────────────
-func _ensure_right_controls() -> void:
-	if _common_box != null:
-		return
-	if _detail == null:
-		return
-	var holder: Node = _detail.get_parent()
-	if holder == null:
-		return
-
-	var sep := HSeparator.new()
-	holder.add_child(sep)
-
-	var title := Label.new()
-	title.text = "Common Room"
-	holder.add_child(title)
-
-	_common_box = VBoxContainer.new()
-	_common_box.add_theme_constant_override("separation", 4)
-	holder.add_child(_common_box)
-
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 6)
-	_reassign_btn = Button.new(); _reassign_btn.text = "Room Reassignment"
-	_reset_btn    = Button.new(); _reset_btn.text    = "Cancel Move" # (was: Reset Placement)
-	_accept_btn   = Button.new(); _accept_btn.text   = "Accept Plan (Saturday)"
-	row.add_child(_reassign_btn); row.add_child(_reset_btn); row.add_child(_accept_btn)
-	holder.add_child(row)
-
-	if not _reassign_btn.pressed.is_connected(_on_reassign_pressed):
-		_reassign_btn.pressed.connect(_on_reassign_pressed)
-	if not _reset_btn.pressed.is_connected(_on_reset_pressed):
-		_reset_btn.pressed.connect(_on_reset_pressed)
-	if not _accept_btn.pressed.is_connected(_on_accept_pressed):
-		_accept_btn.pressed.connect(_on_accept_pressed)
 
 # ─────────────────────────────────────────────────────────────
 # Build grid + common list + summary
