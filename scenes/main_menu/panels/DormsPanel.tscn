@@ -1,12 +1,14 @@
-[gd_scene load_steps=2 format=3 uid="uid://dormspanel"]
+[gd_scene load_steps=2 format=3 uid="uid://c8bajx8ekpasd"]
 
-[ext_resource type="Script" path="res://scripts/main_menu/panels/DormsPanel.gd" id="1"]
+[ext_resource type="Script" uid="uid://b70twhl1c708m" path="res://scripts/main_menu/panels/DormsPanel.gd" id="1"]
 
 [node name="DormsPanel" type="Control"]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
 script = ExtResource("1")
 
 [node name="Root" type="HBoxContainer" parent="."]
@@ -18,13 +20,15 @@ offset_left = 16.0
 offset_top = 16.0
 offset_right = -16.0
 offset_bottom = -16.0
+grow_horizontal = 2
+grow_vertical = 2
 theme_override_constants/separation = 16
 
 [node name="Left" type="VBoxContainer" parent="Root"]
+custom_minimum_size = Vector2(260, 0)
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
-custom_minimum_size = Vector2(260, 0)
 theme_override_constants/separation = 8
 
 [node name="Header" type="HBoxContainer" parent="Root/Left"]
@@ -33,8 +37,8 @@ theme_override_constants/separation = 8
 
 [node name="Title" type="Label" parent="Root/Left/Header"]
 layout_mode = 2
-text = "Dorms"
 size_flags_horizontal = 3
+text = "Dorms"
 
 [node name="RefreshBtn" type="Button" parent="Root/Left/Header"]
 layout_mode = 2
@@ -44,10 +48,10 @@ text = "Refresh"
 layout_mode = 2
 
 [node name="Scroll" type="ScrollContainer" parent="Root/Left"]
+custom_minimum_size = Vector2(0, 280)
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
-custom_minimum_size = Vector2(0, 280)
 
 [node name="List" type="VBoxContainer" parent="Root/Left/Scroll"]
 layout_mode = 2
@@ -63,11 +67,11 @@ theme_override_constants/separation = 8
 
 [node name="Detail" type="RichTextLabel" parent="Root/Right"]
 layout_mode = 2
-bbcode_enabled = true
-fit_content = true
 size_flags_horizontal = 3
 size_flags_vertical = 3
+bbcode_enabled = true
 text = "[i]Select a placement or request for details.[/i]"
+fit_content = true
 
 [node name="Separator" type="HSeparator" parent="Root/Right"]
 layout_mode = 2
