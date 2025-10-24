@@ -441,26 +441,53 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 	return panel
 
 func _get_member_snapshot(member_id: String) -> Dictionary:
-	if not _cps or not _cps.has_method("get_profile"):
-		return {"name": member_id, "hp": -1, "hp_max": -1, "mp": -1, "mp_max": -1}
+	# Always get display name from _label_for_id as primary source
+	var display_name: String = _label_for_id(member_id)
 
-	var p_v: Variant = _cps.call("get_profile", member_id)
-	if typeof(p_v) != TYPE_DICTIONARY:
-		return {"name": member_id, "hp": -1, "hp_max": -1, "mp": -1, "mp_max": -1}
+	# Try to get combat profile for HP/MP/level
+	if _cps and _cps.has_method("get_profile"):
+		var p_v: Variant = _cps.call("get_profile", member_id)
+		if typeof(p_v) == TYPE_DICTIONARY:
+			var p: Dictionary = p_v
+			var lvl: int = int(p.get("level", 1))
+			var hp_cur: int = int(p.get("hp", -1))
+			var hp_max: int = int(p.get("hp_max", -1))
+			var mp_cur: int = int(p.get("mp", -1))
+			var mp_max: int = int(p.get("mp_max", -1))
 
-	var p: Dictionary = p_v
-	var lvl: int = int(p.get("level", 1))
-	var hp_cur: int = int(p.get("hp", -1))
-	var hp_max: int = int(p.get("hp_max", -1))
-	var mp_cur: int = int(p.get("mp", -1))
-	var mp_max: int = int(p.get("mp_max", -1))
-	var label: String = String(p.get("label", _label_for_id(member_id)))
+			# Use label from profile if available, otherwise use our display_name
+			var label: String = String(p.get("label", display_name))
+			if label == "" or label == member_id:
+				label = display_name
+
+			return {
+				"name": "%s  (Lv %d)" % [label, lvl],
+				"hp": hp_cur,
+				"hp_max": hp_max,
+				"mp": mp_cur,
+				"mp_max": mp_max,
+				"_member_id": member_id
+			}
+
+	# Fallback: no profile data, use display name and compute stats
+	var lvl: int = 1
+	var hp_max: int = 150
+	var mp_max: int = 20
+
+	if _gs:
+		lvl = _gs.call("get_member_level", member_id) if _gs.has_method("get_member_level") else 1
+		if _gs.has_method("compute_member_pools"):
+			var pools_v: Variant = _gs.call("compute_member_pools", member_id)
+			if typeof(pools_v) == TYPE_DICTIONARY:
+				var pools: Dictionary = pools_v
+				hp_max = int(pools.get("hp_max", hp_max))
+				mp_max = int(pools.get("mp_max", mp_max))
 
 	return {
-		"name": "%s  (Lv %d)" % [label, lvl],
-		"hp": hp_cur,
+		"name": "%s  (Lv %d)" % [display_name, lvl],
+		"hp": hp_max,
 		"hp_max": hp_max,
-		"mp": mp_cur,
+		"mp": mp_max,
 		"mp_max": mp_max,
 		"_member_id": member_id
 	}
@@ -502,9 +529,19 @@ func _show_member_picker(active_slot: int) -> void:
 	# Create picker popup
 	var picker := ConfirmationDialog.new()
 	picker.title = "Select Bench Member"
-	picker.dialog_text = "Choose a member from the bench to swap into this active slot:"
 
+	# Create content container
 	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 8)
+
+	# Add instruction text as a separate label
+	var instruction := Label.new()
+	instruction.text = "Choose a member from the bench to swap into this active slot:"
+	instruction.add_theme_font_size_override("font_size", 10)
+	instruction.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	vbox.add_child(instruction)
+
+	# Add member list
 	var item_list := ItemList.new()
 	item_list.custom_minimum_size = Vector2(250, 200)
 
