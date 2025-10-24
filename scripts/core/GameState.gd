@@ -100,6 +100,9 @@ func _ready() -> void:
 	if cal and cal.has_signal("advance_blocked") and not cal.is_connected("advance_blocked", Callable(self, "_on_cal_advance_blocked")):
 		cal.connect("advance_blocked", Callable(self, "_on_cal_advance_blocked"))
 
+	# Ensure party structure is correct on startup
+	call_deferred("_enforce_party_limits")
+
 ## Tracks playtime by accumulating delta time each frame
 func _process(delta: float) -> void:
 	time_played += delta
@@ -337,6 +340,9 @@ func add_member(member_id: String) -> bool:
 	if mem_name == "" || party.has(mem_name) || bench.has(mem_name):
 		return false
 
+	# Ensure party structure is correct (max 3: hero + 2 active)
+	_enforce_party_limits()
+
 	if party.size() < MAX_PARTY_SIZE:
 		party.append(mem_name)
 		var pools: Dictionary = compute_member_pools(mem_name)
@@ -354,6 +360,16 @@ func add_member(member_id: String) -> bool:
 		member_data[mem_name] = {"hp": hp_max2, "mp": mp_max2, "buffs": [], "debuffs": []}
 		emit_signal("roster_changed")
 		return true
+
+## Ensures party doesn't exceed MAX_PARTY_SIZE by moving extras to bench
+func _enforce_party_limits() -> void:
+	if party.size() > MAX_PARTY_SIZE:
+		for i in range(MAX_PARTY_SIZE, party.size()):
+			var overflow: String = party[i]
+			if overflow != "" and overflow != "hero" and not bench.has(overflow):
+				bench.append(overflow)
+		# Trim party to MAX_PARTY_SIZE
+		party.resize(MAX_PARTY_SIZE)
 
 ## Removes a member from party or bench. Clears their member_data. Returns false if not found.
 func remove_member(member_id: String) -> bool:
@@ -808,6 +824,9 @@ func load(data: Dictionary) -> void:
 			me_sys.call("apply_save_blob", me_v)
 		elif me_sys.has_method("load"):
 			me_sys.call("load", me_v)
+
+	# Enforce party limits after loading (in case save had 4+ members from old MAX_PARTY_SIZE)
+	_enforce_party_limits()
 
 	emit_signal("party_changed")
 	emit_signal("roster_changed")

@@ -237,6 +237,10 @@ func _rebuild_party() -> void:
 	if not _party: return
 	for c in _party.get_children(): c.queue_free()
 
+	# Enforce party limits first
+	if _gs and _gs.has_method("_enforce_party_limits"):
+		_gs.call("_enforce_party_limits")
+
 	# Get party structure from GameState
 	var party_ids: Array = []
 	var bench_ids: Array = []
@@ -251,6 +255,10 @@ func _rebuild_party() -> void:
 				for id in (b_v as Array):
 					bench_ids.append(String(id))
 
+	# Debug output
+	print("[StatusPanel] Party IDs: ", party_ids)
+	print("[StatusPanel] Bench IDs: ", bench_ids)
+
 	# Ensure hero is always at index 0
 	if party_ids.is_empty() or party_ids[0] != "hero":
 		party_ids.insert(0, "hero")
@@ -258,7 +266,8 @@ func _rebuild_party() -> void:
 	# Handle edge case: if party has more than 3 members, move extras to bench
 	if party_ids.size() > 3:
 		for i in range(3, party_ids.size()):
-			bench_ids.append(party_ids[i])
+			if not bench_ids.has(party_ids[i]):
+				bench_ids.append(party_ids[i])
 		party_ids = party_ids.slice(0, 3)
 
 	# === LEADER SECTION ===
@@ -463,6 +472,10 @@ func _on_switch_pressed(active_slot: int) -> void:
 func _show_member_picker(active_slot: int) -> void:
 	if not _gs: return
 
+	# Enforce limits before checking bench
+	if _gs.has_method("_enforce_party_limits"):
+		_gs.call("_enforce_party_limits")
+
 	# Get bench members
 	var bench_ids: Array = []
 	if _gs.has_method("get"):
@@ -470,6 +483,11 @@ func _show_member_picker(active_slot: int) -> void:
 		if typeof(b_v) == TYPE_ARRAY:
 			for id in (b_v as Array):
 				bench_ids.append(String(id))
+
+	# Debug output
+	print("[_show_member_picker] Active slot: ", active_slot)
+	print("[_show_member_picker] Bench IDs found: ", bench_ids)
+	print("[_show_member_picker] Bench array from GameState: ", _gs.get("bench") if _gs.has_method("get") else "N/A")
 
 	if bench_ids.is_empty():
 		# Show message: no bench members available
