@@ -68,3 +68,34 @@ fit_content = true
 size_flags_horizontal = 3
 size_flags_vertical = 3
 text = "[i]Select a placement or request for details.[/i]"
+
+[node name="Separator" type="HSeparator" parent="Root/Right"]
+layout_mode = 2
+
+[node name="CommonTitle" type="Label" parent="Root/Right"]
+layout_mode = 2
+text = "Common Room"
+
+[node name="CommonBox" type="VBoxContainer" parent="Root/Right"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="ButtonRow" type="HBoxContainer" parent="Root/Right"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="ReassignBtn" type="Button" parent="Root/Right/ButtonRow"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Room Reassignment"
+
+[node name="ResetBtn" type="Button" parent="Root/Right/ButtonRow"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Cancel Move"
+
+[node name="AcceptBtn" type="Button" parent="Root/Right/ButtonRow"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Accept Plan (Saturday)"
