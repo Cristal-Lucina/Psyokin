@@ -457,13 +457,9 @@ func _get_member_snapshot(member_id: String) -> Dictionary:
 			var mp_cur: int = int(p.get("mp", -1))
 			var mp_max: int = int(p.get("mp_max", -1))
 
-			# Use label from profile if available, otherwise use our display_name
-			var label: String = String(p.get("label", display_name))
-			if label == "" or label == member_id:
-				label = display_name
-
+			# Always use display_name from _label_for_id which has proper CSV/roster fallbacks
 			return {
-				"name": "%s  (Lv %d)" % [label, lvl],
+				"name": "%s  (Lv %d)" % [display_name, lvl],
 				"hp": hp_cur,
 				"hp_max": hp_max,
 				"mp": mp_cur,
