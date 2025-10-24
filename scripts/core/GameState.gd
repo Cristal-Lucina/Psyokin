@@ -686,7 +686,20 @@ func load(data: Dictionary) -> void:
 		for mkey in meta_in.keys():
 			# Deep copy dictionary metadata to prevent reference sharing between saves
 			if typeof(meta_in[mkey]) == TYPE_DICTIONARY:
-				set_meta(String(mkey), (meta_in[mkey] as Dictionary).duplicate(true))
+				var original_dict: Dictionary = meta_in[mkey]
+				var copied_dict: Dictionary = original_dict.duplicate(true)
+
+				# Debug: Log hero_identity metadata loading
+				if OS.is_debug_build() and String(mkey) == "hero_identity":
+					print("[GameState.load] Loading hero_identity metadata:")
+					print("  Original dict keys: %s" % str(original_dict.keys()))
+					if original_dict.has("body_color"):
+						print("  body_color type: %s, value: %s" % [typeof(original_dict.get("body_color")), str(original_dict.get("body_color"))])
+					if original_dict.has("hair_color"):
+						print("  hair_color type: %s, value: %s" % [typeof(original_dict.get("hair_color")), str(original_dict.get("hair_color"))])
+					print("  Copied dict keys: %s" % str(copied_dict.keys()))
+
+				set_meta(String(mkey), copied_dict)
 			else:
 				set_meta(String(mkey), meta_in[mkey])
 

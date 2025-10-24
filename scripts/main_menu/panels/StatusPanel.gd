@@ -354,7 +354,17 @@ func _rebuild_appearance() -> void:
 	_update_appearance_values()
 
 func _update_appearance_values() -> void:
+	if OS.is_debug_build():
+		print("[StatusPanel._update_appearance_values] Called - updating color swatches")
+
 	var snap: Dictionary = _read_hero_identity()
+
+	if OS.is_debug_build():
+		print("[StatusPanel._update_appearance_values] Snap dictionary color types:")
+		print("  body_color: type %s, value: %s" % [typeof(snap.get("body_color")), str(snap.get("body_color"))])
+		print("  brow_color: type %s, value: %s" % [typeof(snap.get("brow_color")), str(snap.get("brow_color"))])
+		print("  eye_color: type %s, value: %s" % [typeof(snap.get("eye_color")), str(snap.get("eye_color"))])
+		print("  hair_color: type %s, value: %s" % [typeof(snap.get("hair_color")), str(snap.get("hair_color"))])
 
 	if _app_name_value:    _app_name_value.text    = String(snap.get("name", "Player"))
 	if _app_pronoun_value: _app_pronoun_value.text = String(snap.get("pronoun", "they"))
@@ -368,6 +378,9 @@ func _update_appearance_values() -> void:
 	if _sw_eye:  _sw_eye.color  = _as_color(snap.get("eye_color",  Color(0.4, 0.5, 0.6)))
 	if _sw_hair: _sw_hair.color = _as_color(snap.get("hair_color", Color(1, 1, 1)))
 
+	if OS.is_debug_build():
+		print("[StatusPanel._update_appearance_values] Color swatches updated")
+
 func _read_hero_identity() -> Dictionary:
 	# First: GameState meta blob written by CharacterCreation
 	if _gs:
@@ -375,6 +388,15 @@ func _read_hero_identity() -> Dictionary:
 			var id_v: Variant = _gs.get_meta("hero_identity")
 			if typeof(id_v) == TYPE_DICTIONARY:
 				var id: Dictionary = id_v
+
+				# Debug: Log raw metadata values
+				if OS.is_debug_build():
+					print("[StatusPanel._read_hero_identity] Raw hero_identity metadata:")
+					print("  body_color type: %s, value: %s" % [typeof(id.get("body_color")), str(id.get("body_color"))])
+					print("  brow_color type: %s, value: %s" % [typeof(id.get("brow_color")), str(id.get("brow_color"))])
+					print("  eye_color type: %s, value: %s" % [typeof(id.get("eye_color")), str(id.get("eye_color"))])
+					print("  hair_color type: %s, value: %s" % [typeof(id.get("hair_color")), str(id.get("hair_color"))])
+
 				var first_name: String = String(id.get("name","Player"))
 				var surname: String = String(id.get("surname",""))
 				var full_name: String = "%s %s" % [first_name, surname] if surname != "" else first_name
@@ -411,8 +433,14 @@ func _read_hero_identity() -> Dictionary:
 	}
 
 func _as_color(v: Variant) -> Color:
+	# Debug: Log the input type and value
+	if OS.is_debug_build():
+		print("[StatusPanel._as_color] Input type: %s, Value: %s" % [typeof(v), str(v)])
+
 	# Already a Color object
 	if typeof(v) == TYPE_COLOR:
+		if OS.is_debug_build():
+			print("[StatusPanel._as_color] → Returning Color directly: %s" % str(v))
 		return v as Color
 
 	# Handle dictionary format (Godot JSON serialization of Color)
@@ -424,14 +452,23 @@ func _as_color(v: Variant) -> Color:
 			var g: float = float(d.get("g", 1.0))
 			var b: float = float(d.get("b", 1.0))
 			var a: float = float(d.get("a", 1.0))
-			return Color(r, g, b, a)
+			var color := Color(r, g, b, a)
+			if OS.is_debug_build():
+				print("[StatusPanel._as_color] → Converted dict {r,g,b,a} to Color: %s" % str(color))
+			return color
 		# Check for x,y,z,w keys (alternate format)
 		if d.has("x") and d.has("y") and d.has("z"):
 			var r2: float = float(d.get("x", 1.0))
 			var g2: float = float(d.get("y", 1.0))
 			var b2: float = float(d.get("z", 1.0))
 			var a2: float = float(d.get("w", 1.0))
-			return Color(r2, g2, b2, a2)
+			var color2 := Color(r2, g2, b2, a2)
+			if OS.is_debug_build():
+				print("[StatusPanel._as_color] → Converted dict {x,y,z,w} to Color: %s" % str(color2))
+			return color2
+		# Dictionary doesn't have expected keys
+		if OS.is_debug_build():
+			print("[StatusPanel._as_color] ⚠ Dictionary missing color keys! Keys: %s" % str(d.keys()))
 
 	# Handle array format [r, g, b] or [r, g, b, a]
 	if typeof(v) == TYPE_ARRAY:
@@ -441,21 +478,33 @@ func _as_color(v: Variant) -> Color:
 			var g3: float = float(arr[1])
 			var b3: float = float(arr[2])
 			var a3: float = float(arr[3]) if arr.size() >= 4 else 1.0
-			return Color(r3, g3, b3, a3)
+			var color3 := Color(r3, g3, b3, a3)
+			if OS.is_debug_build():
+				print("[StatusPanel._as_color] → Converted array to Color: %s" % str(color3))
+			return color3
 
 	# Handle string format
 	if typeof(v) == TYPE_STRING:
 		var s: String = String(v)
 		# Try to parse hex color (#RRGGBB or #RRGGBBAA)
 		if s.begins_with("#"):
-			return Color(s)
+			var color4 := Color(s)
+			if OS.is_debug_build():
+				print("[StatusPanel._as_color] → Converted hex string to Color: %s" % str(color4))
+			return color4
 		# Try standard Color constructor (works with named colors like "red", "blue")
 		if not s.contains("("):
-			return Color(s)
+			var color5 := Color(s)
+			if OS.is_debug_build():
+				print("[StatusPanel._as_color] → Converted named color to Color: %s" % str(color5))
+			return color5
 		# Can't parse complex string format, return default
-		return Color(1,1,1)
+		if OS.is_debug_build():
+			print("[StatusPanel._as_color] ⚠ Can't parse string format: %s" % s)
 
 	# Default fallback (white)
+	if OS.is_debug_build():
+		print("[StatusPanel._as_color] ⚠ WARNING: Falling back to white! Type %s not handled" % typeof(v))
 	return Color(1,1,1)
 
 # --------------------- Small helpers -------------------------
