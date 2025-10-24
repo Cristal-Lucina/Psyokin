@@ -75,7 +75,7 @@ const SIGIL_PATH: String    = "/root/aSigilSystem"
 # Optional CSV with party metadata (names, etc.)
 const PARTY_CSV: String   = "res://data/actors/party.csv"
 
-const MAX_PARTY_SIZE: int = 4
+const MAX_PARTY_SIZE: int = 3  # Hero + 2 active members
 
 # ─── Core state ──────────────────────────────────────────────
 var player_name: String = "Player"
@@ -99,6 +99,9 @@ func _ready() -> void:
 	var cal: Node = get_node_or_null(CALENDAR_PATH)
 	if cal and cal.has_signal("advance_blocked") and not cal.is_connected("advance_blocked", Callable(self, "_on_cal_advance_blocked")):
 		cal.connect("advance_blocked", Callable(self, "_on_cal_advance_blocked"))
+
+	# Ensure party structure is correct on startup
+	call_deferred("_enforce_party_limits")
 
 ## Tracks playtime by accumulating delta time each frame
 func _process(delta: float) -> void:
@@ -337,6 +340,9 @@ func add_member(member_id: String) -> bool:
 	if mem_name == "" || party.has(mem_name) || bench.has(mem_name):
 		return false
 
+	# Ensure party structure is correct (max 3: hero + 2 active)
+	_enforce_party_limits()
+
 	if party.size() < MAX_PARTY_SIZE:
 		party.append(mem_name)
 		var pools: Dictionary = compute_member_pools(mem_name)
@@ -354,6 +360,16 @@ func add_member(member_id: String) -> bool:
 		member_data[mem_name] = {"hp": hp_max2, "mp": mp_max2, "buffs": [], "debuffs": []}
 		emit_signal("roster_changed")
 		return true
+
+## Ensures party doesn't exceed MAX_PARTY_SIZE by moving extras to bench
+func _enforce_party_limits() -> void:
+	if party.size() > MAX_PARTY_SIZE:
+		for i in range(MAX_PARTY_SIZE, party.size()):
+			var overflow: String = party[i]
+			if overflow != "" and overflow != "hero" and not bench.has(overflow):
+				bench.append(overflow)
+		# Trim party to MAX_PARTY_SIZE
+		party.resize(MAX_PARTY_SIZE)
 
 ## Removes a member from party or bench. Clears their member_data. Returns false if not found.
 func remove_member(member_id: String) -> bool:
@@ -380,6 +396,81 @@ func swap_members(a_index: int, b_index: int) -> bool:
 	party[a_index] = party[b_index]
 	party[b_index] = temp
 	emit_signal("party_changed")
+	return true
+
+## Moves a bench member to an active party slot at specified index. Returns false if invalid.
+## If slot already occupied, existing member is moved to bench.
+func move_to_active(member_id: String, slot_index: int) -> bool:
+	var mem_name: String = String(member_id).strip_edges()
+	if mem_name == "" or mem_name == "hero":
+		return false  # Hero cannot be moved
+	if not bench.has(mem_name):
+		return false  # Member not on bench
+	if slot_index < 1 or slot_index > 2:
+		return false  # Only slots 1-2 available (slot 0 is hero)
+
+	# Ensure party array has enough slots
+	while party.size() < slot_index + 1:
+		party.append("")
+
+	# If slot occupied, move existing member to bench
+	if party[slot_index] != "" and party[slot_index] != "hero":
+		var existing: String = party[slot_index]
+		bench.append(existing)
+
+	# Move member from bench to active
+	bench.erase(mem_name)
+	party[slot_index] = mem_name
+
+	emit_signal("party_changed")
+	emit_signal("roster_changed")
+	return true
+
+## Moves an active party member to the bench. Returns false if invalid or hero.
+func move_to_bench(member_id: String) -> bool:
+	var mem_name: String = String(member_id).strip_edges()
+	if mem_name == "" or mem_name == "hero":
+		return false  # Hero cannot be benched
+	if not party.has(mem_name):
+		return false  # Not in active party
+
+	# Move to bench
+	party.erase(mem_name)
+	bench.append(mem_name)
+
+	emit_signal("party_changed")
+	emit_signal("roster_changed")
+	return true
+
+## Swaps an active party member with a bench member. Returns false if invalid.
+func swap_active_bench(active_index: int, bench_member_id: String) -> bool:
+	if active_index < 1 or active_index > 2:
+		return false  # Only allow swapping slots 1-2 (not hero at 0)
+
+	var bench_mem: String = String(bench_member_id).strip_edges()
+	if bench_mem == "" or not bench.has(bench_mem):
+		return false  # Bench member not found
+
+	# Ensure party array has enough slots
+	while party.size() < active_index + 1:
+		party.append("")
+
+	var active_mem: String = party[active_index]
+	if active_mem == "hero":
+		return false  # Cannot swap hero
+
+	# Perform swap
+	if active_mem != "":
+		bench.erase(bench_mem)
+		bench.append(active_mem)
+		party[active_index] = bench_mem
+	else:
+		# Empty slot, just move from bench
+		bench.erase(bench_mem)
+		party[active_index] = bench_mem
+
+	emit_signal("party_changed")
+	emit_signal("roster_changed")
 	return true
 
 # ─── Perks ───────────────────────────────────────────────────
@@ -733,6 +824,9 @@ func load(data: Dictionary) -> void:
 			me_sys.call("apply_save_blob", me_v)
 		elif me_sys.has_method("load"):
 			me_sys.call("load", me_v)
+
+	# Enforce party limits after loading (in case save had 4+ members from old MAX_PARTY_SIZE)
+	_enforce_party_limits()
 
 	emit_signal("party_changed")
 	emit_signal("roster_changed")

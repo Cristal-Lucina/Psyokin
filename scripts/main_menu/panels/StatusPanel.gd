@@ -5,10 +5,13 @@
 ## PURPOSE:
 ##   Main menu panel displaying party member HP/MP status, general game info
 ##   (money, perk points, date/time), and character appearance customization.
+##   Includes party management with Leader/Active/Bench sections and member swapping.
 ##
 ## RESPONSIBILITIES:
 ##   • Party member HP/MP display (with max values)
 ##   • Party member level and appearance preview
+##   • Party management (Leader + 2 Active + 5 Bench = 8 total slots)
+##   • Active member swapping with bench via switch buttons
 ##   • Money and perk points display
 ##   • Current date/time display
 ##   • Hint/flavor text display
@@ -16,8 +19,11 @@
 ##   • Real-time status updates from combat/progression
 ##
 ## DISPLAY SECTIONS:
-##   Left Panel:
-##   • Party member list (name, level, HP/MP bars)
+##   Left Panel (Party Management):
+##   • LEADER section: Hero (fixed, cannot be swapped)
+##   • ACTIVE section: 2 active party slots with "Switch" buttons
+##   • BENCH section: 5 bench slots for reserve members
+##   • Empty slots shown when positions available
 ##   • Refresh button to update display
 ##
 ##   Right Panel:
@@ -48,10 +54,13 @@
 ##   • res://data/actors/party.csv - Member base data and appearance
 ##
 ## KEY METHODS:
-##   • _refresh_party() - Update party member list display
-##   • _refresh_summary() - Update money/perks/date/time
-##   • _refresh_appearance() - Update appearance color swatches
-##   • _on_color_changed(component, color) - Handle appearance edits
+##   • _rebuild_party() - Update party member list with Leader/Active/Bench sections
+##   • _create_member_card() - Create a member card with HP/MP and optional Switch button
+##   • _create_empty_slot() - Create placeholder for empty party/bench slots
+##   • _show_member_picker() - Show popup to select bench member for swapping
+##   • _perform_swap() - Execute member swap between active and bench
+##   • _update_summary() - Update money/perks/date/time
+##   • _rebuild_appearance() - Update appearance color swatches
 ##
 ## ═══════════════════════════════════════════════════════════════════════════
 
@@ -228,54 +237,352 @@ func _rebuild_party() -> void:
 	if not _party: return
 	for c in _party.get_children(): c.queue_free()
 
-	var members: Array = _get_party_snapshot()
-	for it_v in members:
-		if typeof(it_v) != TYPE_DICTIONARY: continue
-		var it: Dictionary = it_v
+	# Enforce party limits first
+	if _gs and _gs.has_method("_enforce_party_limits"):
+		_gs.call("_enforce_party_limits")
 
-		var row := VBoxContainer.new()
-		row.add_theme_constant_override("separation", 4)
+	# Get party structure from GameState
+	var party_ids: Array = []
+	var bench_ids: Array = []
+	if _gs:
+		if _gs.has_method("get"):
+			var p_v: Variant = _gs.get("party")
+			if typeof(p_v) == TYPE_ARRAY:
+				for id in (p_v as Array):
+					party_ids.append(String(id))
+			var b_v: Variant = _gs.get("bench")
+			if typeof(b_v) == TYPE_ARRAY:
+				for id in (b_v as Array):
+					bench_ids.append(String(id))
 
-		var disp := Label.new()
-		disp.text = String(it.get("name", "Member"))
-		row.add_child(disp)
+	# Debug output
+	print("[StatusPanel] Party IDs: ", party_ids)
+	print("[StatusPanel] Bench IDs: ", bench_ids)
 
-		var hp_box := HBoxContainer.new(); hp_box.add_theme_constant_override("separation", 6)
-		var hp_lbl := Label.new(); hp_lbl.custom_minimum_size.x = 36; hp_lbl.text = "HP"
-		var hp_val := Label.new()
-		var hp_i: int = int(it.get("hp", -1))
-		var hp_max_i: int = int(it.get("hp_max", -1))
-		hp_val.text = _fmt_pair(hp_i, hp_max_i)
-		hp_box.add_child(hp_lbl); hp_box.add_child(hp_val)
-		if hp_i >= 0 and hp_max_i > 0:
-			var hp_bar := ProgressBar.new()
-			hp_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			hp_bar.min_value = 0.0
-			hp_bar.max_value = float(hp_max_i)
-			hp_bar.value     = clamp(float(hp_i), 0.0, float(hp_max_i))
-			row.add_child(hp_bar)
-		row.add_child(hp_box)
+	# Ensure hero is always at index 0
+	if party_ids.is_empty() or party_ids[0] != "hero":
+		party_ids.insert(0, "hero")
 
-		var mp_box := HBoxContainer.new(); mp_box.add_theme_constant_override("separation", 6)
-		var mp_lbl := Label.new(); mp_lbl.custom_minimum_size.x = 36; mp_lbl.text = "MP"
-		var mp_val := Label.new()
-		var mp_i: int = int(it.get("mp", -1))
-		var mp_max_i: int = int(it.get("mp_max", -1))
-		mp_val.text = _fmt_pair(mp_i, mp_max_i)
-		mp_box.add_child(mp_lbl); mp_box.add_child(mp_val)
-		if mp_i >= 0 and mp_max_i > 0:
-			var mp_bar := ProgressBar.new()
-			mp_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			mp_bar.min_value = 0.0
-			mp_bar.max_value = float(mp_max_i)
-			mp_bar.value     = clamp(float(mp_i), 0.0, float(mp_max_i))
-			row.add_child(mp_bar)
-		row.add_child(mp_box)
+	# Handle edge case: if party has more than 3 members, move extras to bench
+	if party_ids.size() > 3:
+		for i in range(3, party_ids.size()):
+			if not bench_ids.has(party_ids[i]):
+				bench_ids.append(party_ids[i])
+		party_ids = party_ids.slice(0, 3)
 
-		_party.add_child(row)
+	# === LEADER SECTION ===
+	var leader_header := Label.new()
+	leader_header.text = "═══ LEADER ═══"
+	leader_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	leader_header.add_theme_font_size_override("font_size", 10)
+	_party.add_child(leader_header)
+
+	if party_ids.size() > 0:
+		var leader_data := _get_member_snapshot(party_ids[0])
+		_party.add_child(_create_member_card(leader_data, false, -1))
+
+	_party.add_child(_create_spacer())
+
+	# === ACTIVE SECTION ===
+	var active_header := Label.new()
+	active_header.text = "═══ ACTIVE ═══"
+	active_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	active_header.add_theme_font_size_override("font_size", 10)
+	_party.add_child(active_header)
+
+	for slot_idx in range(1, 3):  # Slots 1 and 2
+		if party_ids.size() > slot_idx and party_ids[slot_idx] != "":
+			var active_data := _get_member_snapshot(party_ids[slot_idx])
+			_party.add_child(_create_member_card(active_data, true, slot_idx))
+		else:
+			_party.add_child(_create_empty_slot("Active", slot_idx))
+
+	_party.add_child(_create_spacer())
+
+	# === BENCH SECTION ===
+	var bench_header := Label.new()
+	bench_header.text = "═══ BENCH ═══"
+	bench_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	bench_header.add_theme_font_size_override("font_size", 10)
+	_party.add_child(bench_header)
+
+	for bench_idx in range(5):  # 5 bench slots
+		if bench_idx < bench_ids.size():
+			var bench_data := _get_member_snapshot(bench_ids[bench_idx])
+			bench_data["_bench_idx"] = bench_idx
+			bench_data["_member_id"] = bench_ids[bench_idx]
+			_party.add_child(_create_member_card(bench_data, false, -1))
+		else:
+			_party.add_child(_create_empty_slot("Bench", bench_idx))
 
 	await get_tree().process_frame
 	_party.queue_sort()
+
+func _create_spacer() -> Control:
+	var spacer := Control.new()
+	spacer.custom_minimum_size.y = 8
+	return spacer
+
+func _create_empty_slot(slot_type: String, slot_idx: int) -> PanelContainer:
+	var panel := PanelContainer.new()
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 2)
+
+	var label := Label.new()
+	label.text = "[ Empty %s Slot ]" % slot_type
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.add_theme_font_size_override("font_size", 10)
+	vbox.add_child(label)
+
+	panel.add_child(vbox)
+	return panel
+
+func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot: int) -> PanelContainer:
+	var panel := PanelContainer.new()
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 2)
+
+	# Top row: Name + Switch button
+	var top_row := HBoxContainer.new()
+	top_row.add_theme_constant_override("separation", 8)
+
+	var name_lbl := Label.new()
+	name_lbl.text = String(member_data.get("name", "Member"))
+	name_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	name_lbl.add_theme_font_size_override("font_size", 10)
+	top_row.add_child(name_lbl)
+
+	if show_switch:
+		var switch_btn := Button.new()
+		switch_btn.text = "Switch"
+		switch_btn.custom_minimum_size.x = 60
+		switch_btn.add_theme_font_size_override("font_size", 10)
+		switch_btn.set_meta("active_slot", active_slot)
+		switch_btn.pressed.connect(_on_switch_pressed.bind(active_slot))
+		top_row.add_child(switch_btn)
+
+	vbox.add_child(top_row)
+
+	# HP/MP stats row (side by side)
+	var stats_row := HBoxContainer.new()
+	stats_row.add_theme_constant_override("separation", 12)
+	stats_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+
+	# HP Section
+	var hp_section := VBoxContainer.new()
+	hp_section.add_theme_constant_override("separation", 2)
+	hp_section.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+
+	var hp_i: int = int(member_data.get("hp", -1))
+	var hp_max_i: int = int(member_data.get("hp_max", -1))
+
+	var hp_label_box := HBoxContainer.new()
+	hp_label_box.add_theme_constant_override("separation", 4)
+	var hp_lbl := Label.new()
+	hp_lbl.text = "HP"
+	hp_lbl.custom_minimum_size.x = 24
+	hp_lbl.add_theme_font_size_override("font_size", 10)
+	var hp_val := Label.new()
+	hp_val.text = _fmt_pair(hp_i, hp_max_i)
+	hp_val.add_theme_font_size_override("font_size", 10)
+	hp_label_box.add_child(hp_lbl)
+	hp_label_box.add_child(hp_val)
+	hp_section.add_child(hp_label_box)
+
+	if hp_i >= 0 and hp_max_i > 0:
+		var hp_bar := ProgressBar.new()
+		hp_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		hp_bar.custom_minimum_size.y = 8  # Half height (was ~16px default)
+		hp_bar.show_percentage = false  # Remove percentage text
+		hp_bar.modulate = Color(0.5, 0.8, 1.0)  # Light blue
+		hp_bar.min_value = 0.0
+		hp_bar.max_value = float(hp_max_i)
+		hp_bar.value = clamp(float(hp_i), 0.0, float(hp_max_i))
+		hp_section.add_child(hp_bar)
+
+	stats_row.add_child(hp_section)
+
+	# MP Section
+	var mp_section := VBoxContainer.new()
+	mp_section.add_theme_constant_override("separation", 2)
+	mp_section.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+
+	var mp_i: int = int(member_data.get("mp", -1))
+	var mp_max_i: int = int(member_data.get("mp_max", -1))
+
+	var mp_label_box := HBoxContainer.new()
+	mp_label_box.add_theme_constant_override("separation", 4)
+	var mp_lbl := Label.new()
+	mp_lbl.text = "MP"
+	mp_lbl.custom_minimum_size.x = 24
+	mp_lbl.add_theme_font_size_override("font_size", 10)
+	var mp_val := Label.new()
+	mp_val.text = _fmt_pair(mp_i, mp_max_i)
+	mp_val.add_theme_font_size_override("font_size", 10)
+	mp_label_box.add_child(mp_lbl)
+	mp_label_box.add_child(mp_val)
+	mp_section.add_child(mp_label_box)
+
+	if mp_i >= 0 and mp_max_i > 0:
+		var mp_bar := ProgressBar.new()
+		mp_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		mp_bar.custom_minimum_size.y = 8  # Half height (was ~16px default)
+		mp_bar.show_percentage = false  # Remove percentage text
+		mp_bar.modulate = Color(1.0, 0.7, 0.85)  # Light pink
+		mp_bar.min_value = 0.0
+		mp_bar.max_value = float(mp_max_i)
+		mp_bar.value = clamp(float(mp_i), 0.0, float(mp_max_i))
+		mp_section.add_child(mp_bar)
+
+	stats_row.add_child(mp_section)
+	vbox.add_child(stats_row)
+
+	panel.add_child(vbox)
+	return panel
+
+func _get_member_snapshot(member_id: String) -> Dictionary:
+	# Always get display name from _label_for_id as primary source
+	var display_name: String = _label_for_id(member_id)
+
+	# Try to get combat profile for HP/MP/level
+	if _cps and _cps.has_method("get_profile"):
+		var p_v: Variant = _cps.call("get_profile", member_id)
+		if typeof(p_v) == TYPE_DICTIONARY:
+			var p: Dictionary = p_v
+			var lvl: int = int(p.get("level", 1))
+			var hp_cur: int = int(p.get("hp", -1))
+			var hp_max: int = int(p.get("hp_max", -1))
+			var mp_cur: int = int(p.get("mp", -1))
+			var mp_max: int = int(p.get("mp_max", -1))
+
+			# Use label from profile if available, otherwise use our display_name
+			var label: String = String(p.get("label", display_name))
+			if label == "" or label == member_id:
+				label = display_name
+
+			return {
+				"name": "%s  (Lv %d)" % [label, lvl],
+				"hp": hp_cur,
+				"hp_max": hp_max,
+				"mp": mp_cur,
+				"mp_max": mp_max,
+				"_member_id": member_id
+			}
+
+	# Fallback: no profile data, use display name and compute stats
+	var lvl: int = 1
+	var hp_max: int = 150
+	var mp_max: int = 20
+
+	if _gs:
+		lvl = _gs.call("get_member_level", member_id) if _gs.has_method("get_member_level") else 1
+		if _gs.has_method("compute_member_pools"):
+			var pools_v: Variant = _gs.call("compute_member_pools", member_id)
+			if typeof(pools_v) == TYPE_DICTIONARY:
+				var pools: Dictionary = pools_v
+				hp_max = int(pools.get("hp_max", hp_max))
+				mp_max = int(pools.get("mp_max", mp_max))
+
+	return {
+		"name": "%s  (Lv %d)" % [display_name, lvl],
+		"hp": hp_max,
+		"hp_max": hp_max,
+		"mp": mp_max,
+		"mp_max": mp_max,
+		"_member_id": member_id
+	}
+
+func _on_switch_pressed(active_slot: int) -> void:
+	# Show bench member picker popup
+	_show_member_picker(active_slot)
+
+func _show_member_picker(active_slot: int) -> void:
+	if not _gs: return
+
+	# Enforce limits before checking bench
+	if _gs.has_method("_enforce_party_limits"):
+		_gs.call("_enforce_party_limits")
+
+	# Get bench members
+	var bench_ids: Array = []
+	if _gs.has_method("get"):
+		var b_v: Variant = _gs.get("bench")
+		if typeof(b_v) == TYPE_ARRAY:
+			for id in (b_v as Array):
+				bench_ids.append(String(id))
+
+	# Debug output
+	print("[_show_member_picker] Active slot: ", active_slot)
+	print("[_show_member_picker] Bench IDs found: ", bench_ids)
+	print("[_show_member_picker] Bench array from GameState: ", _gs.get("bench") if _gs.has_method("get") else "N/A")
+
+	if bench_ids.is_empty():
+		# Show message: no bench members available
+		var msg_popup := AcceptDialog.new()
+		msg_popup.dialog_text = "No members available on the bench to switch with."
+		msg_popup.title = "No Bench Members"
+		add_child(msg_popup)
+		msg_popup.popup_centered()
+		msg_popup.confirmed.connect(func(): msg_popup.queue_free())
+		return
+
+	# Create picker popup
+	var picker := ConfirmationDialog.new()
+	picker.title = "Select Bench Member"
+
+	# Create content container
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 8)
+
+	# Add instruction text as a separate label
+	var instruction := Label.new()
+	instruction.text = "Choose a member from the bench to swap into this active slot:"
+	instruction.add_theme_font_size_override("font_size", 10)
+	instruction.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	vbox.add_child(instruction)
+
+	# Add member list
+	var item_list := ItemList.new()
+	item_list.custom_minimum_size = Vector2(250, 200)
+
+	for bench_id in bench_ids:
+		var display_name: String = _label_for_id(bench_id)
+		var level: int = 1
+		if _cps and _cps.has_method("get_profile"):
+			var prof_v: Variant = _cps.call("get_profile", bench_id)
+			if typeof(prof_v) == TYPE_DICTIONARY:
+				level = int((prof_v as Dictionary).get("level", 1))
+		item_list.add_item("%s (Lv %d)" % [display_name, level])
+		item_list.set_item_metadata(item_list.item_count - 1, bench_id)
+
+	vbox.add_child(item_list)
+	picker.add_child(vbox)
+	add_child(picker)
+
+	picker.confirmed.connect(func():
+		var selected_idx: int = item_list.get_selected_items()[0] if item_list.get_selected_items().size() > 0 else -1
+		if selected_idx >= 0:
+			var selected_id: String = String(item_list.get_item_metadata(selected_idx))
+			_perform_swap(active_slot, selected_id)
+		picker.queue_free()
+	)
+	picker.canceled.connect(func(): picker.queue_free())
+
+	picker.popup_centered()
+
+func _perform_swap(active_slot: int, bench_member_id: String) -> void:
+	if not _gs or not _gs.has_method("swap_active_bench"): return
+
+	var success: bool = _gs.call("swap_active_bench", active_slot, bench_member_id)
+	if success:
+		_rebuild_party()  # Refresh display
+	else:
+		var error_popup := AcceptDialog.new()
+		error_popup.dialog_text = "Failed to swap party members. Please try again."
+		error_popup.title = "Swap Failed"
+		add_child(error_popup)
+		error_popup.popup_centered()
+		error_popup.confirmed.connect(func(): error_popup.queue_free())
 
 # Prefer CPS for real-time party pools
 func _get_party_snapshot() -> Array:
