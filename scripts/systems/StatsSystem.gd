@@ -172,6 +172,80 @@ func compute_max_hp(level: int, vtl: int) -> int:
 func compute_max_mp(level: int, fcs: int) -> int:
 	return 20 + int(round(float(max(1, fcs)) * float(max(1, level)) * 1.5))
 
+## Preserves HP/MP percentages after leveling up
+## Called after character level or stat level increases to maintain HP/MP percentages
+func _preserve_hp_mp_percentages(member_id: String) -> void:
+	var pid: String = _resolve_id(member_id)
+
+	# Get GameState and CombatProfileSystem
+	var gs: Node = get_node_or_null(GS_PATH)
+	var cps: Node = get_node_or_null("/root/aCombatProfileSystem")
+
+	if not gs or not cps:
+		return
+
+	# Get current HP/MP from CombatProfileSystem
+	if not cps.has_method("get_profile"):
+		return
+
+	var profile_v: Variant = cps.call("get_profile", pid)
+	if typeof(profile_v) != TYPE_DICTIONARY:
+		return
+
+	var profile: Dictionary = profile_v
+	var current_hp: int = int(profile.get("hp", -1))
+	var current_mp: int = int(profile.get("mp", -1))
+	var old_max_hp: int = int(profile.get("hp_max", -1))
+	var old_max_mp: int = int(profile.get("mp_max", -1))
+
+	# Skip if no valid data
+	if old_max_hp <= 0 or old_max_mp <= 0:
+		return
+
+	# Calculate current percentages
+	var hp_percentage: float = float(current_hp) / float(old_max_hp)
+	var mp_percentage: float = float(current_mp) / float(old_max_mp)
+
+	# Get new max values based on current stats
+	var new_level: int = get_member_level(pid)
+	var new_vtl: int = get_member_stat_level(pid, "VTL")
+	var new_fcs: int = get_member_stat_level(pid, "FCS")
+	var new_max_hp: int = compute_max_hp(new_level, new_vtl)
+	var new_max_mp: int = compute_max_mp(new_level, new_fcs)
+
+	# Calculate new current values to preserve percentages
+	var new_current_hp: int = int(round(hp_percentage * float(new_max_hp)))
+	var new_current_mp: int = int(round(mp_percentage * float(new_max_mp)))
+
+	# Clamp to valid ranges
+	new_current_hp = clamp(new_current_hp, 0, new_max_hp)
+	new_current_mp = clamp(new_current_mp, 0, new_max_mp)
+
+	# Update GameState member_data
+	if gs.has_method("get"):
+		var member_data_v: Variant = gs.get("member_data")
+		if typeof(member_data_v) == TYPE_DICTIONARY:
+			var member_data: Dictionary = member_data_v
+			if member_data.has(pid):
+				var data: Dictionary = member_data[pid]
+				data["hp"] = new_current_hp
+				data["mp"] = new_current_mp
+
+	# Update CombatProfileSystem _party_meta directly
+	if cps.has_method("get"):
+		var party_meta_v: Variant = cps.get("_party_meta")
+		if typeof(party_meta_v) == TYPE_DICTIONARY:
+			var party_meta: Dictionary = party_meta_v
+			if not party_meta.has(pid):
+				party_meta[pid] = {}
+			var meta: Dictionary = party_meta[pid]
+			meta["hp"] = new_current_hp
+			meta["mp"] = new_current_mp
+
+	# Force profile refresh to recalculate max values
+	if cps.has_method("refresh_member"):
+		cps.call("refresh_member", pid)
+
 # ───────────────────────── Weekday helpers ─────────────────────────
 ## Calculates day of week using Sakamoto's algorithm (Gregorian calendar). Returns 0=Monday through 6=Sunday
 func _dow_index_gregorian(y: int, m: int, d: int) -> int:
@@ -422,6 +496,9 @@ func add_xp(member_id: String, amount: int) -> void:
 			if delta_pp > 0:
 				add_perk_points(delta_pp)
 
+		# Preserve HP/MP percentages after level up
+		_preserve_hp_mp_percentages(pid)
+
 		emit_signal("stats_changed")
 
 	if pid == "hero":
@@ -597,11 +674,16 @@ func add_sxp(stat: String, base_amount: int) -> int:
 	stat_sxp[k] = int(stat_sxp.get(k, 0)) + gain
 
 	# Level check
-	var level: int = int(stat_level.get(k, 1))
+	var level_before: int = int(stat_level.get(k, 1))
+	var level: int = level_before
 	while level <= sxp_thresholds.size() and int(stat_sxp[k]) >= int(sxp_thresholds[level - 1]):
 		level += 1
 		stat_level[k] = level
 		emit_signal("stat_leveled_up", k, level)
+
+	# Preserve HP/MP percentages if VTL or FCS leveled up
+	if level > level_before and (k == "VTL" or k == "FCS"):
+		_preserve_hp_mp_percentages("hero")
 
 	emit_signal("stats_changed")
 	return gain
@@ -628,12 +710,20 @@ func add_sxp_to_member(member_id: String, stat: String, base_amount: int) -> int
 	if fatigued_now:
 		gain = max(1, int(floor(float(base_amount) * 0.5)))
 
-	sxp[k] = int(sxp.get(k, 0)) + gain
+	var sxp_before: int = int(sxp.get(k, 0))
+	sxp[k] = sxp_before + gain
 	weekly[k] = used_this_week + gain
 
 	info["sxp"] = sxp
 	info["weekly_sxp"] = weekly
 	_party_progress[pid] = info
+
+	# Preserve HP/MP percentages if VTL or FCS gained SXP (stat level may have changed)
+	if gain > 0 and (k == "VTL" or k == "FCS"):
+		var level_before: int = _bonus_levels_from_sxp(sxp_before)
+		var level_after: int = _bonus_levels_from_sxp(int(sxp[k]))
+		if level_after > level_before:
+			_preserve_hp_mp_percentages(pid)
 
 	emit_signal("stats_changed")
 	return gain
