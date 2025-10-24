@@ -110,9 +110,94 @@ unique_name_in_owner = true
 layout_mode = 2
 text = "—"
 
+[node name="EventProgress" type="Label" parent="Root/Frame/Content/Row/Right"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Event: —"
+
+[node name="LayerStage" type="Label" parent="Root/Frame/Content/Row/Right"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Layer: —"
+
+[node name="PointsBank" type="Label" parent="Root/Frame/Content/Row/Right"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Points: —"
+
+[node name="GiftStatus" type="Label" parent="Root/Frame/Content/Row/Right"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Gift: —"
+
 [node name="Notes" type="RichTextLabel" parent="Root/Frame/Content/Row/Right"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 3
 bbcode_enabled = true
 text = "[i]Select a bond to see details.[/i]"
+
+[node name="StoryBtn" type="Button" parent="Root/Frame/Content/Row/Right"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Story Points"
+
+[node name="LikesRow" type="HBoxContainer" parent="Root/Frame/Content/Row/Right"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="LikesLabel" type="Label" parent="Root/Frame/Content/Row/Right/LikesRow"]
+layout_mode = 2
+text = "Likes:"
+
+[node name="LikesValue" type="Label" parent="Root/Frame/Content/Row/Right/LikesRow"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "—"
+
+[node name="DislikesRow" type="HBoxContainer" parent="Root/Frame/Content/Row/Right"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="DislikesLabel" type="Label" parent="Root/Frame/Content/Row/Right/DislikesRow"]
+layout_mode = 2
+text = "Dislikes:"
+
+[node name="DislikesValue" type="Label" parent="Root/Frame/Content/Row/Right/DislikesRow"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "—"
+
+[node name="UnlockHeader" type="Label" parent="Root/Frame/Content/Row/Right"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Layer Transitions:"
+
+[node name="UnlockAcquaintance" type="Button" parent="Root/Frame/Content/Row/Right"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+disabled = true
+text = "Acquaintance → Outer"
+
+[node name="UnlockOuter" type="Button" parent="Root/Frame/Content/Row/Right"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+disabled = true
+text = "Outer → Middle"
+
+[node name="UnlockMiddle" type="Button" parent="Root/Frame/Content/Row/Right"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+disabled = true
+text = "Middle → Inner"
+
+[node name="UnlockInner" type="Button" parent="Root/Frame/Content/Row/Right"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+disabled = true
+text = "Inner → Core"
