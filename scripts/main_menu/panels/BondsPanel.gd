@@ -398,6 +398,8 @@ func _update_detail(id: String) -> void:
 			_desc.visible = true
 			var rec: Dictionary = _bond_def(id)
 			var hint: String = String(rec.get("bond_hint", "")).strip_edges()
+			print("[BondsPanel] Unknown bond '%s' - hint: '%s'" % [id, hint])
+			print("[BondsPanel] Bond def keys: ", rec.keys())
 			if hint != "":
 				_desc.text = hint
 			else:
@@ -531,16 +533,26 @@ func _display_name(id: String) -> String:
 	return (nm if nm != "" else id.capitalize())
 
 func _bond_def(id: String) -> Dictionary:
+	var result: Dictionary = {}
+
+	# Try system first
 	if _sys and _sys.has_method("get_bond_def"):
 		var v: Variant = _sys.call("get_bond_def", id)
 		if typeof(v) == TYPE_DICTIONARY:
-			return (v as Dictionary)
+			result = (v as Dictionary).duplicate()
+
+	# Always check CSV to get bond_hint (and other new fields)
 	var rows: Array[Dictionary] = _read_csv_rows(CSV_FALLBACK)
 	for r in rows:
 		var rec: Dictionary = r
 		if String(rec.get("actor_id","")) == id:
-			return rec
-	return {}
+			# Merge CSV data into result, CSV takes priority for new fields
+			for key in rec.keys():
+				if not result.has(key) or key == "bond_hint":
+					result[key] = rec[key]
+			return result
+
+	return result if not result.is_empty() else {}
 
 # ─────────────────────────────────────────────────────────────
 # Helpers
