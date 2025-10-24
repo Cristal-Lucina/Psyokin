@@ -119,13 +119,6 @@ func _ready() -> void:
 	_eq    = get_node_or_null("/root/aEquipmentSystem")
 	_stats = get_node_or_null("/root/aStatsSystem")
 
-	# Enable BBCode on equipment value labels for formatting empty slots
-	if _w_val: _w_val.bbcode_enabled = true
-	if _a_val: _a_val.bbcode_enabled = true
-	if _h_val: _h_val.bbcode_enabled = true
-	if _f_val: _f_val.bbcode_enabled = true
-	if _b_val: _b_val.bbcode_enabled = true
-
 	if _w_btn: _w_btn.pressed.connect(Callable(self, "_on_slot_button").bind("weapon"))
 	if _a_btn: _a_btn.pressed.connect(Callable(self, "_on_slot_button").bind("armor"))
 	if _h_btn: _h_btn.pressed.connect(Callable(self, "_on_slot_button").bind("head"))
@@ -194,11 +187,11 @@ func _refresh_all_for_current() -> void:
 	if cur == "":
 		return
 	var equip: Dictionary = _fetch_equip_for(cur)
-	_w_val.text = _pretty_item_with_slot(String(equip.get("weapon","")), "weapon")
-	_a_val.text = _pretty_item_with_slot(String(equip.get("armor","")), "armor")
-	_h_val.text = _pretty_item_with_slot(String(equip.get("head","")), "head")
-	_f_val.text = _pretty_item_with_slot(String(equip.get("foot","")), "foot")
-	_b_val.text = _pretty_item_with_slot(String(equip.get("bracelet","")), "bracelet")
+	_set_slot_value(_w_val, String(equip.get("weapon","")), "weapon")
+	_set_slot_value(_a_val, String(equip.get("armor","")), "armor")
+	_set_slot_value(_h_val, String(equip.get("head","")), "head")
+	_set_slot_value(_f_val, String(equip.get("foot","")), "foot")
+	_set_slot_value(_b_val, String(equip.get("bracelet","")), "bracelet")
 	_rebuild_stats_grid(cur, equip)
 	_rebuild_sigils(cur)
 	_refresh_mind_row(cur)
@@ -649,8 +642,12 @@ func _pretty_item(id: String) -> String:
 		if typeof(v) == TYPE_STRING: return String(v)
 	return id
 
-func _pretty_item_with_slot(id: String, slot: String) -> String:
+func _set_slot_value(label: Label, id: String, slot: String) -> void:
+	if label == null:
+		return
+
 	if id == "" or id == "—":
+		# Empty slot - show placeholder with grey color
 		var placeholder: String = ""
 		match slot:
 			"weapon": placeholder = "(Weapon)"
@@ -658,13 +655,21 @@ func _pretty_item_with_slot(id: String, slot: String) -> String:
 			"head": placeholder = "(Headwear)"
 			"foot": placeholder = "(Footwear)"
 			"bracelet": placeholder = "(Bracelet)"
-			_: return "—"
-		# Return greyed out italic text using BBCode
-		return "[color=#888888][i]%s[/i][/color]" % placeholder
-	if _eq and _eq.has_method("get_item_display_name"):
-		var v: Variant = _eq.call("get_item_display_name", id)
-		if typeof(v) == TYPE_STRING: return String(v)
-	return id
+			_: placeholder = "—"
+
+		label.text = placeholder
+		# Set grey color using theme override
+		label.add_theme_color_override("font_color", Color(0.533, 0.533, 0.533))
+	else:
+		# Has equipment - show item name with normal color
+		var item_name: String = id
+		if _eq and _eq.has_method("get_item_display_name"):
+			var v: Variant = _eq.call("get_item_display_name", id)
+			if typeof(v) == TYPE_STRING: item_name = String(v)
+
+		label.text = item_name
+		# Remove color override to use default theme color
+		label.remove_theme_color_override("font_color")
 
 func _list_equippable(member_token: String, slot: String) -> PackedStringArray:
 	if _eq and _eq.has_method("list_equippable"):
