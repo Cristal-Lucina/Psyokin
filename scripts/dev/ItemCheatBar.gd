@@ -162,11 +162,11 @@ func _ready() -> void:
 	_bind_optional_external_ui()
 
 	_ensure_hero_row()
-	_style_option_button(_hero_stat_pick, 11, 300)
+	_style_option_button(_hero_stat_pick, 8, 210)
 	_populate_hero_stat_picker()
 
 	_ensure_party_rows()
-	_style_option_button(_stat_pick, 11, 300)
+	_style_option_button(_stat_pick, 8, 210)
 	_populate_stat_picker()
 
 	# CSV import buttons (before Sigil GXP row)
@@ -213,9 +213,9 @@ func _ready() -> void:
 		_roster_pick.item_selected.connect(_on_roster_pick_selected)
 
 	# Style pickers that exist
-	_style_option_button(_picker, 11, 300)
-	_style_option_button(_sig_inst_pick, 11, 300)
-	_style_option_button(_roster_pick, 11, 300)
+	_style_option_button(_picker, 8, 210)
+	_style_option_button(_sig_inst_pick, 8, 210)
+	_style_option_button(_roster_pick, 8, 210)
 
 	# Populate
 	_refresh_defs()
@@ -276,7 +276,7 @@ func _ensure_party_import_row() -> void:
 	if _party_import_row == null:
 		_party_import_row = HBoxContainer.new()
 		_party_import_row.name = "PartyImportRow"
-		_party_import_row.add_theme_constant_override("separation", 8)
+		_party_import_row.add_theme_constant_override("separation", 6)
 		parent.add_child(_party_import_row)
 
 	if _btn_import_all == null:
@@ -318,7 +318,7 @@ func _ensure_hero_row() -> void:
 
 	_hero_row = HBoxContainer.new()
 	_hero_row.name = "HeroRow"
-	_hero_row.add_theme_constant_override("separation", 8)
+	_hero_row.add_theme_constant_override("separation", 6)
 	parent.add_child(_hero_row)
 
 	var title := Label.new()
@@ -334,7 +334,7 @@ func _ensure_hero_row() -> void:
 	_hero_xp_spin.max_value = 99999
 	_hero_xp_spin.step = 1
 	_hero_xp_spin.value = 100
-	_hero_xp_spin.custom_minimum_size = Vector2(80, 0)
+	_hero_xp_spin.custom_minimum_size = Vector2(56, 0)
 	_hero_row.add_child(_hero_xp_spin)
 
 	_btn_hero_add_xp = Button.new()
@@ -346,7 +346,7 @@ func _ensure_hero_row() -> void:
 	_hero_row.add_child(sxp_lbl)
 
 	_hero_stat_pick = OptionButton.new()
-	_hero_stat_pick.custom_minimum_size = Vector2(120, 0)
+	_hero_stat_pick.custom_minimum_size = Vector2(84, 0)
 	_hero_row.add_child(_hero_stat_pick)
 
 	_hero_sxp_spin = SpinBox.new()
@@ -354,7 +354,7 @@ func _ensure_hero_row() -> void:
 	_hero_sxp_spin.max_value = 9999
 	_hero_sxp_spin.step = 1
 	_hero_sxp_spin.value = 10
-	_hero_sxp_spin.custom_minimum_size = Vector2(70, 0)
+	_hero_sxp_spin.custom_minimum_size = Vector2(49, 0)
 	_hero_row.add_child(_hero_sxp_spin)
 
 	_btn_hero_add_sxp = Button.new()
@@ -386,7 +386,7 @@ func _ensure_party_rows() -> void:
 	if _party_lxp_row == null:
 		_party_lxp_row = HBoxContainer.new()
 		_party_lxp_row.name = "PartyLxpRow"
-		_party_lxp_row.add_theme_constant_override("separation", 8)
+		_party_lxp_row.add_theme_constant_override("separation", 6)
 		parent.add_child(_party_lxp_row)
 
 		var lbl := Label.new()
@@ -398,7 +398,7 @@ func _ensure_party_rows() -> void:
 		_xp_amt.max_value = 99999
 		_xp_amt.value = 100
 		_xp_amt.step = 1
-		_xp_amt.custom_minimum_size = Vector2(80, 0)
+		_xp_amt.custom_minimum_size = Vector2(56, 0)
 		_party_lxp_row.add_child(_xp_amt)
 
 		_btn_add_xp = Button.new()
@@ -412,7 +412,7 @@ func _ensure_party_rows() -> void:
 	if _party_sxp_row == null:
 		_party_sxp_row = HBoxContainer.new()
 		_party_sxp_row.name = "PartySxpRow"
-		_party_sxp_row.add_theme_constant_override("separation", 8)
+		_party_sxp_row.add_theme_constant_override("separation", 6)
 		parent.add_child(_party_sxp_row)
 
 		var sl := Label.new()
@@ -420,7 +420,7 @@ func _ensure_party_rows() -> void:
 		_party_sxp_row.add_child(sl)
 
 		_stat_pick = OptionButton.new()
-		_stat_pick.custom_minimum_size = Vector2(120, 0)
+		_stat_pick.custom_minimum_size = Vector2(84, 0)
 		_party_sxp_row.add_child(_stat_pick)
 
 		_sxp_amt = SpinBox.new()
@@ -428,7 +428,7 @@ func _ensure_party_rows() -> void:
 		_sxp_amt.max_value = 9999
 		_sxp_amt.value = 10
 		_sxp_amt.step = 1
-		_sxp_amt.custom_minimum_size = Vector2(70, 0)
+		_sxp_amt.custom_minimum_size = Vector2(49, 0)
 		_party_sxp_row.add_child(_sxp_amt)
 
 		_btn_add_sxp = Button.new()
@@ -443,7 +443,7 @@ func _ensure_sigil_gxp_row() -> void:
 	if _sigil_gxp_row == null:
 		_sigil_gxp_row = HBoxContainer.new()
 		_sigil_gxp_row.name = "SigilGxpRow"
-		_sigil_gxp_row.add_theme_constant_override("separation", 8)
+		_sigil_gxp_row.add_theme_constant_override("separation", 6)
 		parent.add_child(_sigil_gxp_row)
 
 		var lbl := Label.new()
@@ -451,7 +451,7 @@ func _ensure_sigil_gxp_row() -> void:
 		_sigil_gxp_row.add_child(lbl)
 
 		_sigil_gxp_pick = OptionButton.new()
-		_sigil_gxp_pick.custom_minimum_size = Vector2(200, 0)
+		_sigil_gxp_pick.custom_minimum_size = Vector2(140, 0)
 		_sigil_gxp_row.add_child(_sigil_gxp_pick)
 
 		var gxp_lbl := Label.new()
@@ -463,7 +463,7 @@ func _ensure_sigil_gxp_row() -> void:
 		_sigil_gxp_spin.max_value = 99999
 		_sigil_gxp_spin.step = 1
 		_sigil_gxp_spin.value = 100
-		_sigil_gxp_spin.custom_minimum_size = Vector2(80, 0)
+		_sigil_gxp_spin.custom_minimum_size = Vector2(56, 0)
 		_sigil_gxp_row.add_child(_sigil_gxp_spin)
 
 		_btn_add_gxp = Button.new()
@@ -473,7 +473,7 @@ func _ensure_sigil_gxp_row() -> void:
 			_btn_add_gxp.pressed.connect(_on_add_sigil_gxp)
 
 	# Style the dropdown
-	_style_option_button(_sigil_gxp_pick, 11, 300)
+	_style_option_button(_sigil_gxp_pick, 8, 210)
 
 func _ensure_bond_row() -> void:
 	var parent := _attach_point()
@@ -481,7 +481,7 @@ func _ensure_bond_row() -> void:
 	if _bond_row == null:
 		_bond_row = HBoxContainer.new()
 		_bond_row.name = "BondRow"
-		_bond_row.add_theme_constant_override("separation", 4)
+		_bond_row.add_theme_constant_override("separation", 3)
 		parent.add_child(_bond_row)
 
 		# Character picker
@@ -490,7 +490,7 @@ func _ensure_bond_row() -> void:
 		_bond_row.add_child(lbl)
 
 		_bond_pick = OptionButton.new()
-		_bond_pick.custom_minimum_size = Vector2(100, 0)
+		_bond_pick.custom_minimum_size = Vector2(70, 0)
 		_bond_row.add_child(_bond_pick)
 
 		# Complete Event (with dialogue score)
@@ -503,7 +503,7 @@ func _ensure_bond_row() -> void:
 		_dialogue_score_spin.max_value = 6
 		_dialogue_score_spin.step = 1
 		_dialogue_score_spin.value = 0
-		_dialogue_score_spin.custom_minimum_size = Vector2(50, 0)
+		_dialogue_score_spin.custom_minimum_size = Vector2(35, 0)
 		_dialogue_score_spin.tooltip_text = "Dialogue score: -3 to +6 (3×Best = +6)"
 		_bond_row.add_child(_dialogue_score_spin)
 
@@ -521,7 +521,7 @@ func _ensure_bond_row() -> void:
 		_gift_reaction_pick.set_item_metadata(1, "neutral")
 		_gift_reaction_pick.add_item("Disliked (-2)")
 		_gift_reaction_pick.set_item_metadata(2, "disliked")
-		_gift_reaction_pick.custom_minimum_size = Vector2(80, 0)
+		_gift_reaction_pick.custom_minimum_size = Vector2(56, 0)
 		_bond_row.add_child(_gift_reaction_pick)
 
 		_btn_give_gift = Button.new()
@@ -558,7 +558,7 @@ func _ensure_bond_row() -> void:
 		_points_spin.max_value = 20
 		_points_spin.step = 1
 		_points_spin.value = 1
-		_points_spin.custom_minimum_size = Vector2(50, 0)
+		_points_spin.custom_minimum_size = Vector2(35, 0)
 		_bond_row.add_child(_points_spin)
 
 		_btn_add_points = Button.new()
@@ -568,7 +568,7 @@ func _ensure_bond_row() -> void:
 		_btn_add_points.pressed.connect(_on_add_points)
 
 	# Style the dropdown and populate
-	_style_option_button(_bond_pick, 11, 300)
+	_style_option_button(_bond_pick, 8, 210)
 	_refresh_bond_dropdown()
 
 # --- Items (Row1) --------------------------------------------------------------
