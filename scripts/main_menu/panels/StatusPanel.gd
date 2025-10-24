@@ -255,10 +255,17 @@ func _rebuild_party() -> void:
 	if party_ids.is_empty() or party_ids[0] != "hero":
 		party_ids.insert(0, "hero")
 
+	# Handle edge case: if party has more than 3 members, move extras to bench
+	if party_ids.size() > 3:
+		for i in range(3, party_ids.size()):
+			bench_ids.append(party_ids[i])
+		party_ids = party_ids.slice(0, 3)
+
 	# === LEADER SECTION ===
 	var leader_header := Label.new()
 	leader_header.text = "═══ LEADER ═══"
 	leader_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	leader_header.add_theme_font_size_override("font_size", 10)
 	_party.add_child(leader_header)
 
 	if party_ids.size() > 0:
@@ -271,6 +278,7 @@ func _rebuild_party() -> void:
 	var active_header := Label.new()
 	active_header.text = "═══ ACTIVE ═══"
 	active_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	active_header.add_theme_font_size_override("font_size", 10)
 	_party.add_child(active_header)
 
 	for slot_idx in range(1, 3):  # Slots 1 and 2
@@ -286,6 +294,7 @@ func _rebuild_party() -> void:
 	var bench_header := Label.new()
 	bench_header.text = "═══ BENCH ═══"
 	bench_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	bench_header.add_theme_font_size_override("font_size", 10)
 	_party.add_child(bench_header)
 
 	for bench_idx in range(5):  # 5 bench slots
@@ -313,6 +322,7 @@ func _create_empty_slot(slot_type: String, slot_idx: int) -> PanelContainer:
 	var label := Label.new()
 	label.text = "[ Empty %s Slot ]" % slot_type
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.add_theme_font_size_override("font_size", 10)
 	vbox.add_child(label)
 
 	panel.add_child(vbox)
@@ -330,12 +340,14 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 	var name_lbl := Label.new()
 	name_lbl.text = String(member_data.get("name", "Member"))
 	name_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	name_lbl.add_theme_font_size_override("font_size", 10)
 	top_row.add_child(name_lbl)
 
 	if show_switch:
 		var switch_btn := Button.new()
 		switch_btn.text = "Switch"
 		switch_btn.custom_minimum_size.x = 60
+		switch_btn.add_theme_font_size_override("font_size", 10)
 		switch_btn.set_meta("active_slot", active_slot)
 		switch_btn.pressed.connect(_on_switch_pressed.bind(active_slot))
 		top_row.add_child(switch_btn)
@@ -360,8 +372,10 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 	var hp_lbl := Label.new()
 	hp_lbl.text = "HP"
 	hp_lbl.custom_minimum_size.x = 24
+	hp_lbl.add_theme_font_size_override("font_size", 10)
 	var hp_val := Label.new()
 	hp_val.text = _fmt_pair(hp_i, hp_max_i)
+	hp_val.add_theme_font_size_override("font_size", 10)
 	hp_label_box.add_child(hp_lbl)
 	hp_label_box.add_child(hp_val)
 	hp_section.add_child(hp_label_box)
@@ -369,6 +383,7 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 	if hp_i >= 0 and hp_max_i > 0:
 		var hp_bar := ProgressBar.new()
 		hp_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		hp_bar.custom_minimum_size.y = 8  # Half height (was ~16px default)
 		hp_bar.min_value = 0.0
 		hp_bar.max_value = float(hp_max_i)
 		hp_bar.value = clamp(float(hp_i), 0.0, float(hp_max_i))
@@ -389,8 +404,10 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 	var mp_lbl := Label.new()
 	mp_lbl.text = "MP"
 	mp_lbl.custom_minimum_size.x = 24
+	mp_lbl.add_theme_font_size_override("font_size", 10)
 	var mp_val := Label.new()
 	mp_val.text = _fmt_pair(mp_i, mp_max_i)
+	mp_val.add_theme_font_size_override("font_size", 10)
 	mp_label_box.add_child(mp_lbl)
 	mp_label_box.add_child(mp_val)
 	mp_section.add_child(mp_label_box)
@@ -398,6 +415,7 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 	if mp_i >= 0 and mp_max_i > 0:
 		var mp_bar := ProgressBar.new()
 		mp_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		mp_bar.custom_minimum_size.y = 8  # Half height (was ~16px default)
 		mp_bar.min_value = 0.0
 		mp_bar.max_value = float(mp_max_i)
 		mp_bar.value = clamp(float(mp_i), 0.0, float(mp_max_i))

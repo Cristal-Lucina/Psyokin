@@ -75,7 +75,7 @@ const SIGIL_PATH: String    = "/root/aSigilSystem"
 # Optional CSV with party metadata (names, etc.)
 const PARTY_CSV: String   = "res://data/actors/party.csv"
 
-const MAX_PARTY_SIZE: int = 4
+const MAX_PARTY_SIZE: int = 3  # Hero + 2 active members
 
 # ─── Core state ──────────────────────────────────────────────
 var player_name: String = "Player"
