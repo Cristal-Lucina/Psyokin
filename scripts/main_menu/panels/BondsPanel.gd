@@ -187,7 +187,8 @@ func _build_list() -> void:
 		if f == Filter.MAXED and not maxed:    continue
 
 		var row := Button.new()
-		row.text = disp_name
+		# Show "(Unknown)" for locked bonds instead of actual name
+		row.text = "(Unknown)" if not known else disp_name
 		row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		row.toggle_mode = true
 		row.button_group = _list_group     # ← exclusive selection
@@ -365,7 +366,12 @@ func _on_row_pressed(btn: Button) -> void:
 	_update_detail(_selected)
 
 func _update_detail(id: String) -> void:
-	_name_tv.text = ("—" if id == "" else _display_name(id))
+	if id == "":
+		_name_tv.text = "—"
+	else:
+		var known: bool = _read_known(id)
+		# Show "(Unknown)" for locked bonds in detail panel too
+		_name_tv.text = "(Unknown)" if not known else _display_name(id)
 
 	if id == "":
 		if _event_tv: _event_tv.text = "Event: —"
