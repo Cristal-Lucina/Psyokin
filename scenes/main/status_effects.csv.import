@@ -1,0 +1,17 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://dr6jb4so48s38"
+
+[deps]
+
+files=["res://scenes/main/status_effects.category.translation", "res://scenes/main/status_effects.name.translation", "res://scenes/main/status_effects.default.translation", "res://scenes/main/status_effects.magnitude.translation", "res://scenes/main/status_effects.description.translation"]
+
+source_file="res://scenes/main/status_effects.csv"
+dest_files=["res://scenes/main/status_effects.category.translation", "res://scenes/main/status_effects.name.translation", "res://scenes/main/status_effects.default.translation", "res://scenes/main/status_effects.magnitude.translation", "res://scenes/main/status_effects.description.translation"]
+
+[params]
+
+compress=true
+delimiter=0
