@@ -1,0 +1,6 @@
+effect_id,category,name,default_duration,magnitude,description
+poison,ailment,Poison,0,5,DoT 5% MaxHP/turn
+burn,ailment,Burn,0,5,DoT 5% MaxHP/turn
+attack_up,buff,Attack Up,3,25,+25% ATK damage
+mind_up,buff,Mind Up,3,25,+25% MND damage
+attack_down,debuff,Attack Down,3,25,-25% ATK damage

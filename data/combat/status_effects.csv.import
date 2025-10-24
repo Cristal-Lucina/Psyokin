@@ -1,0 +1,17 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://dl45somuwuvsu"
+
+[deps]
+
+files=["res://data/combat/status_effects.category.translation", "res://data/combat/status_effects.name.translation", "res://data/combat/status_effects.default.translation", "res://data/combat/status_effects.magnitude.translation", "res://data/combat/status_effects.description.translation"]
+
+source_file="res://data/combat/status_effects.csv"
+dest_files=["res://data/combat/status_effects.category.translation", "res://data/combat/status_effects.name.translation", "res://data/combat/status_effects.default.translation", "res://data/combat/status_effects.magnitude.translation", "res://data/combat/status_effects.description.translation"]
+
+[params]
+
+compress=true
+delimiter=0
