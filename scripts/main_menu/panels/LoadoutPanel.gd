@@ -661,15 +661,15 @@ func _set_slot_value(label: Label, id: String, slot: String) -> void:
 		# Set grey color using theme override
 		label.add_theme_color_override("font_color", Color(0.533, 0.533, 0.533))
 	else:
-		# Has equipment - show item name with normal color
+		# Has equipment - show item name with light blue color
 		var item_name: String = id
 		if _eq and _eq.has_method("get_item_display_name"):
 			var v: Variant = _eq.call("get_item_display_name", id)
 			if typeof(v) == TYPE_STRING: item_name = String(v)
 
 		label.text = item_name
-		# Remove color override to use default theme color
-		label.remove_theme_color_override("font_color")
+		# Set light blue color for equipped items
+		label.add_theme_color_override("font_color", Color(0.4, 0.7, 1.0))
 
 func _list_equippable(member_token: String, slot: String) -> PackedStringArray:
 	if _eq and _eq.has_method("list_equippable"):
