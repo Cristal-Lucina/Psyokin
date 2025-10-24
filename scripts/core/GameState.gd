@@ -84,6 +84,7 @@ var money: int = 0
 var perk_points: int = 0
 var pacifist_score: int = 0
 var bloodlust_score: int = 0
+var time_played: float = 0.0  # Total playtime in seconds
 
 var party: Array[String] = []
 var bench: Array[String] = []
@@ -98,6 +99,10 @@ func _ready() -> void:
 	var cal: Node = get_node_or_null(CALENDAR_PATH)
 	if cal and cal.has_signal("advance_blocked") and not cal.is_connected("advance_blocked", Callable(self, "_on_cal_advance_blocked")):
 		cal.connect("advance_blocked", Callable(self, "_on_cal_advance_blocked"))
+
+## Tracks playtime by accumulating delta time each frame
+func _process(delta: float) -> void:
+	time_played += delta
 
 ## Forwards CalendarSystem's advance_blocked signal to GameState listeners
 func _on_cal_advance_blocked(reason: String) -> void:
@@ -454,6 +459,7 @@ func save() -> Dictionary:
 	payload["perk_points"]     = perk_points
 	payload["pacifist_score"]  = pacifist_score
 	payload["bloodlust_score"] = bloodlust_score
+	payload["time_played"]     = int(time_played)  # Save as integer seconds
 
 	payload["party"] = party.duplicate()
 	payload["bench"] = bench.duplicate()
@@ -568,6 +574,7 @@ func load(data: Dictionary) -> void:
 	perk_points     = int(data.get("perk_points", perk_points))
 	pacifist_score  = int(data.get("pacifist_score", pacifist_score))
 	bloodlust_score = int(data.get("bloodlust_score", bloodlust_score))
+	time_played     = float(data.get("time_played", time_played))
 
 	party.clear()
 	var party_v: Variant = data.get("party", [])
