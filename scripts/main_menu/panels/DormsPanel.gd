@@ -462,7 +462,7 @@ func _update_detail(room_id: String) -> void:
 		else:
 			var label_status: String = "Neutral"
 			if ds.has_method("is_pair_hidden") and who != "" and nwho != "" and bool(ds.call("is_pair_hidden", who, nwho)):
-				label_status = "Unknown (reveals Friday)"
+				label_status = "Unknown connection"
 			elif ds.has_method("get_pair_status") and who != "" and nwho != "":
 				label_status = String(ds.call("get_pair_status", who, nwho))
 			lines.append("• %s — %s with [b]%s[/b]" % [nid, label_status, String(ds.call("display_name", nwho))])
