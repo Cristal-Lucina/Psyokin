@@ -969,9 +969,11 @@ func _selected_sigil_gxp() -> String:
 
 func _on_equipped_toggle(_pressed: bool) -> void:
 	_refresh_sig_dropdown()
+	_refresh_sigil_gxp_dropdown()
 
 func _on_loadout_changed(_member: String) -> void:
 	_refresh_sig_dropdown()
+	_refresh_sigil_gxp_dropdown()
 
 func _on_sigil_changed(_arg: Variant = null) -> void:
 	_refresh_sig_dropdown()
