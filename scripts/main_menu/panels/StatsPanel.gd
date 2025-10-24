@@ -18,17 +18,17 @@ const STATS_KEYS: Array[String] = ["BRW","MND","TPO","VTL","FCS"]
 # Fallback only (UI guess) if StatsSystem doesn't give us a 'fatigued' boolean
 const FATIGUE_THRESHOLD_PER_WEEK := 60
 
-@onready var _root_vb : VBoxContainer = %Root
-@onready var _list    : VBoxContainer = %List
-@onready var _refresh : Button        = %RefreshBtn
-@onready var _title   : Label         = %Title
+@onready var _root_vb    : VBoxContainer = %Root
+@onready var _list       : VBoxContainer = %List
+@onready var _refresh    : Button        = %RefreshBtn
+@onready var _title      : Label         = %Title
+@onready var _member_bar : HBoxContainer = %MemberBar
 
 var _stats : Node = null
 var _cal   : Node = null
 var _gs    : Node = null
 var _party : Node = null
 
-var _member_bar : HBoxContainer = null
 var _current_id : String = "hero"
 
 func _ready() -> void:
@@ -65,7 +65,6 @@ func _ready() -> void:
 			n.connect("creation_applied", Callable(self, "_rebuild_all"))
 
 	# build
-	_ensure_member_bar()
 	_rebuild_member_bar()
 	_rebuild_all()
 
@@ -237,23 +236,7 @@ func _get_member_level(pid: String) -> int:
 	return 1
 
 # ---------- Member bar ----------
-func _ensure_member_bar() -> void:
-	if not _root_vb: return
-	# Look for an existing "MemberBar"
-	for c in _root_vb.get_children():
-		if c is HBoxContainer and (c as HBoxContainer).name == "MemberBar":
-			_member_bar = c; break
-	if _member_bar != null:
-		return
-	_member_bar = HBoxContainer.new()
-	_member_bar.name = "MemberBar"
-	_member_bar.add_theme_constant_override("separation", 6)
-	# Insert it between Header and Scroll (index 1)
-	_root_vb.add_child(_member_bar)
-	_root_vb.move_child(_member_bar, 1)
-
 func _rebuild_member_bar() -> void:
-	_ensure_member_bar()
 	if _member_bar == null: return
 	for c in _member_bar.get_children(): c.queue_free()
 
