@@ -63,9 +63,11 @@ enum Filter { ALL, KNOWN, LOCKED, MAXED }
 @onready var _list_box  : VBoxContainer  = %List
 
 @onready var _name_tv   : Label          = %Name
-@onready var _lvl_tv    : Label          = %LevelValue          # old scene label (we hide)
-@onready var _xp_tv     : Label          = %CBXPValue           # old scene label (we hide)
 @onready var _desc      : RichTextLabel  = %Notes               # description block
+
+# Old scene labels (may not exist - optional)
+var _lvl_tv    : Label          = null
+var _xp_tv     : Label          = null
 
 # New/managed widgets
 var _event_tv       : Label          = null   # shows event progress (E1-E9)
@@ -90,6 +92,11 @@ var _list_group: ButtonGroup = null  # exclusive selection group
 
 func _ready() -> void:
 	_sys = get_node_or_null(SYS_PATH)
+
+	# Optional old scene labels (may not exist)
+	_lvl_tv = get_node_or_null("%LevelValue")
+	_xp_tv = get_node_or_null("%CBXPValue")
+
 	_hide_level_cbxp_labels()
 	_ensure_detail_widgets()
 	_wire_system_signals()

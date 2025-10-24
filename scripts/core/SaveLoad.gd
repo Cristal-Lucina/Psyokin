@@ -91,13 +91,13 @@ func _label_from_payload(payload: Dictionary) -> String:
 	return ""
 
 ## Safely retrieves an autoload node by name from the SceneTree root
-func _get_autoload(name: String) -> Node:
+func _get_autoload(autoload_name: String) -> Node:
 	# Safe autoload lookup without requiring this script to extend Node
 	var ml := Engine.get_main_loop()
 	if ml is SceneTree:
 		var root: Node = (ml as SceneTree).root
 		# Autoloads are direct children of /root with their autoload name
-		return root.get_node_or_null(name)
+		return root.get_node_or_null(autoload_name)
 	return null
 
 ## Saves game data to a numbered slot as JSON. Wraps payload with version, timestamp, scene, and label.
