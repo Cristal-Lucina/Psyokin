@@ -76,10 +76,24 @@ func _ready() -> void:
 
 # ───────────────────────── UI Construction ─────────────────────────
 func _build_ui() -> void:
+	# Create dark background panel (90% opacity)
+	var bg_panel := Panel.new()
+	bg_panel.name = "BackgroundPanel"
+	bg_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
+	var style_box := StyleBoxFlat.new()
+	style_box.bg_color = Color(0, 0, 0, 0.9)  # 90% dark background
+	bg_panel.add_theme_stylebox_override("panel", style_box)
+	add_child(bg_panel)
+
 	# Create main container
 	_main_vbox = VBoxContainer.new()
 	_main_vbox.name = "MainVBox"
 	_main_vbox.add_theme_constant_override("separation", 4)
+	_main_vbox.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_main_vbox.offset_left = 10
+	_main_vbox.offset_top = 10
+	_main_vbox.offset_right = -10
+	_main_vbox.offset_bottom = -10
 	add_child(_main_vbox)
 
 	# Title

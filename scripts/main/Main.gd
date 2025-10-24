@@ -365,12 +365,12 @@ func _toggle_status_cheat_bar() -> void:
 	_status_cheat_bar.name = "StatusEffectCheatBar"
 	_status_cheat_bar.mouse_filter = Control.MOUSE_FILTER_STOP
 	_status_cheat_bar.process_mode = Node.PROCESS_MODE_ALWAYS
-	# Position in top-right corner
-	_status_cheat_bar.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	_status_cheat_bar.offset_left = -320
-	_status_cheat_bar.offset_top = 10
-	_status_cheat_bar.offset_right = -10
-	_status_cheat_bar.offset_bottom = 400
+	# Center the panel
+	_status_cheat_bar.set_anchors_preset(Control.PRESET_CENTER)
+	_status_cheat_bar.offset_left = -160
+	_status_cheat_bar.offset_top = -150
+	_status_cheat_bar.offset_right = 160
+	_status_cheat_bar.offset_bottom = 150
 	var parent: Node = get_node_or_null("Overlays")
 	if parent == null: parent = self
 	parent.add_child(_status_cheat_bar)
