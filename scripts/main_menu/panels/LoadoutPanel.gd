@@ -187,11 +187,11 @@ func _refresh_all_for_current() -> void:
 	if cur == "":
 		return
 	var equip: Dictionary = _fetch_equip_for(cur)
-	_w_val.text = _pretty_item(String(equip.get("weapon","")))
-	_a_val.text = _pretty_item(String(equip.get("armor","")))
-	_h_val.text = _pretty_item(String(equip.get("head","")))
-	_f_val.text = _pretty_item(String(equip.get("foot","")))
-	_b_val.text = _pretty_item(String(equip.get("bracelet","")))
+	_set_slot_value(_w_val, String(equip.get("weapon","")), "weapon")
+	_set_slot_value(_a_val, String(equip.get("armor","")), "armor")
+	_set_slot_value(_h_val, String(equip.get("head","")), "head")
+	_set_slot_value(_f_val, String(equip.get("foot","")), "foot")
+	_set_slot_value(_b_val, String(equip.get("bracelet","")), "bracelet")
 	_rebuild_stats_grid(cur, equip)
 	_rebuild_sigils(cur)
 	_refresh_mind_row(cur)
@@ -641,6 +641,35 @@ func _pretty_item(id: String) -> String:
 		var v: Variant = _eq.call("get_item_display_name", id)
 		if typeof(v) == TYPE_STRING: return String(v)
 	return id
+
+func _set_slot_value(label: Label, id: String, slot: String) -> void:
+	if label == null:
+		return
+
+	if id == "" or id == "—":
+		# Empty slot - show placeholder with grey color
+		var placeholder: String = ""
+		match slot:
+			"weapon": placeholder = "(Weapon)"
+			"armor": placeholder = "(Armor)"
+			"head": placeholder = "(Headwear)"
+			"foot": placeholder = "(Footwear)"
+			"bracelet": placeholder = "(Bracelet)"
+			_: placeholder = "—"
+
+		label.text = placeholder
+		# Set grey color using theme override
+		label.add_theme_color_override("font_color", Color(0.533, 0.533, 0.533))
+	else:
+		# Has equipment - show item name with light blue color
+		var item_name: String = id
+		if _eq and _eq.has_method("get_item_display_name"):
+			var v: Variant = _eq.call("get_item_display_name", id)
+			if typeof(v) == TYPE_STRING: item_name = String(v)
+
+		label.text = item_name
+		# Set light blue color for equipped items
+		label.add_theme_color_override("font_color", Color(0.4, 0.7, 1.0))
 
 func _list_equippable(member_token: String, slot: String) -> PackedStringArray:
 	if _eq and _eq.has_method("list_equippable"):

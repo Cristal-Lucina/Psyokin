@@ -54,7 +54,7 @@ columns = 3
 [node name="WValue" type="Label" parent="Row/Right/Grid"]
 custom_minimum_size = Vector2(200, 0)
 layout_mode = 2
-text = "—"
+text = "(Weapon) "
 
 [node name="WBtn" type="Button" parent="Row/Right/Grid"]
 layout_mode = 2
@@ -66,7 +66,7 @@ size_flags_horizontal = 3
 
 [node name="AValue" type="Label" parent="Row/Right/Grid"]
 layout_mode = 2
-text = "—"
+text = "(Armor)"
 
 [node name="ABtn" type="Button" parent="Row/Right/Grid"]
 layout_mode = 2
@@ -78,7 +78,7 @@ size_flags_horizontal = 3
 
 [node name="HValue" type="Label" parent="Row/Right/Grid"]
 layout_mode = 2
-text = "—"
+text = "(Headwear)"
 
 [node name="HBtn" type="Button" parent="Row/Right/Grid"]
 layout_mode = 2
@@ -90,7 +90,7 @@ size_flags_horizontal = 3
 
 [node name="FValue" type="Label" parent="Row/Right/Grid"]
 layout_mode = 2
-text = "—"
+text = "(Footwear)"
 
 [node name="FBtn" type="Button" parent="Row/Right/Grid"]
 layout_mode = 2
@@ -102,7 +102,7 @@ size_flags_horizontal = 3
 
 [node name="BValue" type="Label" parent="Row/Right/Grid"]
 layout_mode = 2
-text = "—"
+text = "(Breacelet)"
 
 [node name="BBtn" type="Button" parent="Row/Right/Grid"]
 layout_mode = 2

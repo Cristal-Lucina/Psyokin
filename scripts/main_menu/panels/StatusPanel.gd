@@ -449,11 +449,24 @@ func _as_color(v: Variant) -> Color:
 		# Try to parse hex color (#RRGGBB or #RRGGBBAA)
 		if s.begins_with("#"):
 			return Color(s)
+		# Try to parse Color string representation "(r, g, b, a)" or "(r, g, b)"
+		if s.contains("(") and s.contains(")"):
+			# Extract the numbers from "(0.227, 0.239, 0.212, 1.0)"
+			var stripped := s.replace("(", "").replace(")", "").strip_edges()
+			var parts: PackedStringArray = stripped.split(",")
+			if parts.size() >= 3:
+				var r_str := parts[0].strip_edges()
+				var g_str := parts[1].strip_edges()
+				var b_str := parts[2].strip_edges()
+				var a_str := parts[3].strip_edges() if parts.size() >= 4 else "1.0"
+				var r_val: float = float(r_str)
+				var g_val: float = float(g_str)
+				var b_val: float = float(b_str)
+				var a_val: float = float(a_str)
+				return Color(r_val, g_val, b_val, a_val)
 		# Try standard Color constructor (works with named colors like "red", "blue")
 		if not s.contains("("):
 			return Color(s)
-		# Can't parse complex string format, return default
-		return Color(1,1,1)
 
 	# Default fallback (white)
 	return Color(1,1,1)

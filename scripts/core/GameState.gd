@@ -118,6 +118,7 @@ func new_game() -> void:
 	perk_points = 0
 	pacifist_score = 0
 	bloodlust_score = 0
+	time_played = 0.0  # Reset playtime for new game
 	party = ["hero"]
 	bench = []
 	flags.clear()

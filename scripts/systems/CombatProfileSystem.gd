@@ -109,13 +109,15 @@ func _compute_for_member(member: String) -> Dictionary:
 	var hp_max: int = int(pools.get("hp_max", 0))
 	var mp_max: int = int(pools.get("mp_max", 0))
 
-	# Current runtime state if provided via apply_save_blob
+	# Current runtime state - check multiple sources for HP/MP persistence
 	var cur_hp: int = hp_max
 	var cur_mp: int = mp_max
 	var ailment: String = ""
 	var buffs: Array = []
 	var debuffs: Array = []
 	var flags: Dictionary = {}
+
+	# First try: _party_meta (populated from apply_save_blob during load)
 	if _party_meta.has(pid):
 		var rec: Dictionary = _party_meta[pid]
 		cur_hp = int(rec.get("hp", hp_max))
@@ -124,6 +126,19 @@ func _compute_for_member(member: String) -> Dictionary:
 		buffs = (rec.get("buffs", []) as Array).duplicate()
 		debuffs = (rec.get("debuffs", []) as Array).duplicate()
 		flags = (rec.get("flags", {}) as Dictionary).duplicate(true)
+	else:
+		# Second try: GameState.member_data (for HP/MP persistence during gameplay)
+		var gs: Node = get_node_or_null(GS_PATH)
+		if gs and gs.has_method("get"):
+			var member_data_v: Variant = gs.get("member_data")
+			if typeof(member_data_v) == TYPE_DICTIONARY:
+				var member_data: Dictionary = member_data_v
+				if member_data.has(pid):
+					var gs_rec: Dictionary = member_data[pid]
+					cur_hp = int(gs_rec.get("hp", hp_max))
+					cur_mp = int(gs_rec.get("mp", mp_max))
+					buffs = (gs_rec.get("buffs", []) as Array).duplicate()
+					debuffs = (gs_rec.get("debuffs", []) as Array).duplicate()
 
 	# Base stats
 	var brw: int = _stat_for(pid, "BRW")
