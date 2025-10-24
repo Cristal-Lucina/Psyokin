@@ -306,14 +306,12 @@ func _rebuild_party() -> void:
 	bench_header.add_theme_font_size_override("font_size", 10)
 	_party.add_child(bench_header)
 
-	for bench_idx in range(5):  # 5 bench slots
-		if bench_idx < bench_ids.size():
-			var bench_data := _get_member_snapshot(bench_ids[bench_idx])
-			bench_data["_bench_idx"] = bench_idx
-			bench_data["_member_id"] = bench_ids[bench_idx]
-			_party.add_child(_create_member_card(bench_data, false, -1))
-		else:
-			_party.add_child(_create_empty_slot("Bench", bench_idx))
+	# Only show bench slots that have members (hide empty slots)
+	for bench_idx in range(bench_ids.size()):
+		var bench_data := _get_member_snapshot(bench_ids[bench_idx])
+		bench_data["_bench_idx"] = bench_idx
+		bench_data["_member_id"] = bench_ids[bench_idx]
+		_party.add_child(_create_member_card(bench_data, false, -1))
 
 	await get_tree().process_frame
 	_party.queue_sort()
