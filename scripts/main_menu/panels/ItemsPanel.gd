@@ -20,10 +20,12 @@ const CATEGORIES : PackedStringArray = [
 	"Bracelets","Sigils","Battle","Materials","Gifts","Key","Other"
 ]
 
-@onready var _filter    : OptionButton  = %Filter
+@onready var _filter_container : HBoxContainer = null  # Will create dynamically
 @onready var _refresh   : Button        = %RefreshBtn
 @onready var _counts_tv : Label         = %CountsValue
-@onready var _list_box  : VBoxContainer = %List
+@onready var _list_box  : GridContainer = null  # Will change to GridContainer
+@onready var _header    : HBoxContainer = %Header
+@onready var _vbox      : VBoxContainer = %VBox
 
 var _inv  : Node = null
 var _csv  : Node = null
@@ -34,6 +36,7 @@ var _sig : Node = null
 var _defs        : Dictionary = {}    # {id -> row dict}
 var _counts_map  : Dictionary = {}    # {id -> int}  (after expansion, per-instance = 1)
 var _equipped_by : Dictionary = {}    # {base_id -> PackedStringArray of member display names}
+var _active_category : String = "All"  # Track currently selected category
 
 # Normalize arbitrary category strings to our canonical set
 const _CAT_MAP := {
@@ -58,6 +61,12 @@ func _ready() -> void:
 	_gs  = get_node_or_null(GS_PATH)
 	_sig = get_node_or_null(SIGIL_SYS_PATH)
 
+	# Setup UI: replace Filter dropdown with category buttons
+	_setup_category_buttons()
+
+	# Setup GridContainer for 2-column item layout
+	_setup_item_grid()
+
 	# Live refresh on inventory
 	if _inv != null and _inv.has_signal("inventory_changed"):
 		if not _inv.is_connected("inventory_changed", Callable(self, "_rebuild")):
@@ -77,14 +86,75 @@ func _ready() -> void:
 				if not _sig.is_connected(s, cb):
 					_sig.connect(s, cb)
 
-	if _filter != null and _filter.item_count == 0:
-		for i in range(CATEGORIES.size()):
-			_filter.add_item(CATEGORIES[i], i)
-	if _filter != null and not _filter.item_selected.is_connected(_on_filter_changed):
-		_filter.item_selected.connect(_on_filter_changed)
-
 	if _refresh != null and not _refresh.pressed.is_connected(_rebuild):
 		_refresh.pressed.connect(_rebuild)
+
+	_rebuild()
+
+func _setup_category_buttons() -> void:
+	# Remove old Filter dropdown if it exists
+	var old_filter: Node = get_node_or_null("%Filter")
+	if old_filter:
+		old_filter.queue_free()
+
+	# Create category buttons container and add it to header
+	_filter_container = HBoxContainer.new()
+	_filter_container.add_theme_constant_override("separation", 4)
+
+	# Find the spacer and insert categories before it
+	var spacer: Node = null
+	for child in _header.get_children():
+		if child.name == "Spacer":
+			spacer = child
+			break
+
+	if spacer:
+		_header.remove_child(spacer)
+		_header.add_child(_filter_container)
+		_header.add_child(spacer)
+	else:
+		_header.add_child(_filter_container)
+
+	# Create button for each category
+	for cat in CATEGORIES:
+		var btn := Button.new()
+		btn.text = cat
+		btn.toggle_mode = true
+		btn.set_meta("category", cat)
+		if cat == "All":
+			btn.button_pressed = true  # Start with "All" selected
+		btn.pressed.connect(_on_category_button_pressed.bind(btn))
+		_filter_container.add_child(btn)
+
+func _setup_item_grid() -> void:
+	# Find and replace the List VBoxContainer with GridContainer
+	var old_list: Node = get_node_or_null("%List")
+	if old_list and old_list.get_parent():
+		var parent: Node = old_list.get_parent()
+		var idx: int = old_list.get_index()
+
+		# Create new GridContainer
+		_list_box = GridContainer.new()
+		_list_box.columns = 2
+		_list_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_list_box.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		_list_box.add_theme_constant_override("h_separation", 16)
+		_list_box.add_theme_constant_override("v_separation", 6)
+
+		# Replace old with new
+		parent.remove_child(old_list)
+		parent.add_child(_list_box)
+		parent.move_child(_list_box, idx)
+		old_list.queue_free()
+
+func _on_category_button_pressed(btn: Button) -> void:
+	var cat: String = String(btn.get_meta("category"))
+	_active_category = cat
+
+	# Unpress all other category buttons
+	for child in _filter_container.get_children():
+		if child is Button and child != btn:
+			child.button_pressed = false
 
 	_rebuild()
 
@@ -471,13 +541,7 @@ func _holders_of_instance(inst_id: String) -> PackedStringArray:
 # --- UI glue ------------------------------------------------------------------
 
 func _current_category() -> String:
-	if _filter == null:
-		return "All"
-	var idx: int = _filter.get_selected()
-	return _filter.get_item_text(idx)
-
-func _on_filter_changed(_i: int) -> void:
-	_rebuild()
+	return _active_category
 
 func _on_inspect_row(btn: Button) -> void:
 	var id_v: Variant = btn.get_meta("id")
