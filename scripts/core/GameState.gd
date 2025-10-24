@@ -514,18 +514,7 @@ func save() -> Dictionary:
 	var meta_keys: PackedStringArray = get_meta_list()
 	for i in range(meta_keys.size()):
 		var key: String = meta_keys[i]
-		var meta_value: Variant = get_meta(key)
-
-		# Debug: Log hero_identity before saving
-		if OS.is_debug_build() and String(key) == "hero_identity" and typeof(meta_value) == TYPE_DICTIONARY:
-			var id: Dictionary = meta_value
-			print("[GameState.save] Saving hero_identity metadata:")
-			print("  body_color type: %s, value: %s" % [typeof(id.get("body_color")), str(id.get("body_color"))])
-			print("  brow_color type: %s, value: %s" % [typeof(id.get("brow_color")), str(id.get("brow_color"))])
-			print("  eye_color type: %s, value: %s" % [typeof(id.get("eye_color")), str(id.get("eye_color"))])
-			print("  hair_color type: %s, value: %s" % [typeof(id.get("hair_color")), str(id.get("hair_color"))])
-
-		meta_dict[key] = meta_value
+		meta_dict[key] = get_meta(key)
 	payload["meta"] = meta_dict
 
 	# Optional systems (if present)
@@ -698,20 +687,7 @@ func load(data: Dictionary) -> void:
 		for mkey in meta_in.keys():
 			# Deep copy dictionary metadata to prevent reference sharing between saves
 			if typeof(meta_in[mkey]) == TYPE_DICTIONARY:
-				var original_dict: Dictionary = meta_in[mkey]
-				var copied_dict: Dictionary = original_dict.duplicate(true)
-
-				# Debug: Log hero_identity metadata loading
-				if OS.is_debug_build() and String(mkey) == "hero_identity":
-					print("[GameState.load] Loading hero_identity metadata:")
-					print("  Original dict keys: %s" % str(original_dict.keys()))
-					if original_dict.has("body_color"):
-						print("  body_color type: %s, value: %s" % [typeof(original_dict.get("body_color")), str(original_dict.get("body_color"))])
-					if original_dict.has("hair_color"):
-						print("  hair_color type: %s, value: %s" % [typeof(original_dict.get("hair_color")), str(original_dict.get("hair_color"))])
-					print("  Copied dict keys: %s" % str(copied_dict.keys()))
-
-				set_meta(String(mkey), copied_dict)
+				set_meta(String(mkey), (meta_in[mkey] as Dictionary).duplicate(true))
 			else:
 				set_meta(String(mkey), meta_in[mkey])
 
