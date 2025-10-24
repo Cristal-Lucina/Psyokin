@@ -110,11 +110,25 @@ func list_equippable(_member: String, slot: String) -> PackedStringArray:
 		if typeof(d_v) == TYPE_DICTIONARY:
 			defs = d_v as Dictionary
 
+	# Build set of equipped items (from ALL members, including benched)
+	var equipped_items: Dictionary = {}
+	for member_id in _equip_by_member.keys():
+		var member_equip: Dictionary = _equip_by_member[member_id]
+		for slot_key in member_equip.keys():
+			var item_id: String = String(member_equip.get(slot_key, ""))
+			if item_id != "" and item_id != "—":
+				equipped_items[item_id] = true
+
 	var want: String = _norm_slot(slot)
 	for id_v in counts.keys():
 		if int(counts.get(id_v, 0)) <= 0:
 			continue
 		var iid: String = String(id_v)
+
+		# Skip if already equipped by anyone
+		if equipped_items.has(iid):
+			continue
+
 		var rec: Dictionary = defs.get(iid, {}) as Dictionary
 		var tag: String = _detect_slot(rec)
 		if _norm_slot(tag) == want:
