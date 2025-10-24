@@ -213,6 +213,11 @@ func _rebuild() -> void:
 		margin.add_theme_constant_override("margin_bottom", 4)
 		panel.add_child(margin)
 
+		# Create a VBox to hold item info and equipped status
+		var item_vbox := VBoxContainer.new()
+		item_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		item_vbox.add_theme_constant_override("separation", 2)
+
 		# Create a clickable button showing item name and quantity
 		var item_btn := Button.new()
 		item_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -225,7 +230,19 @@ func _rebuild() -> void:
 		item_btn.disabled = (qty <= 0)
 		if not item_btn.pressed.is_connected(_on_item_clicked):
 			item_btn.pressed.connect(_on_item_clicked.bind(item_btn))
-		margin.add_child(item_btn)
+		item_vbox.add_child(item_btn)
+
+		# Show equipped info if applicable
+		var equip_txt := _equip_string_for(id, def)
+		if equip_txt != "":
+			var equip_lbl := Label.new()
+			equip_lbl.text = "  " + equip_txt
+			equip_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+			equip_lbl.add_theme_font_size_override("font_size", 10)
+			equip_lbl.modulate = Color(0.7, 0.7, 0.7, 1.0)  # Slightly dimmed
+			item_vbox.add_child(equip_lbl)
+
+		margin.add_child(item_vbox)
 
 		_list_box.add_child(panel)
 
