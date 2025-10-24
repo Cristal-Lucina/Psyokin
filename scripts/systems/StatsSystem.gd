@@ -174,7 +174,7 @@ func compute_max_mp(level: int, fcs: int) -> int:
 
 ## Preserves HP/MP percentages after leveling up
 ## Called after character level or stat level increases to maintain HP/MP percentages
-func _preserve_hp_mp_percentages(member_id: String) -> void:
+func _preserve_hp_mp_percentages(member_id: String, old_level: int = -1, old_vtl: int = -1, old_fcs: int = -1) -> void:
 	var pid: String = _resolve_id(member_id)
 
 	# Get GameState and CombatProfileSystem
@@ -195,23 +195,36 @@ func _preserve_hp_mp_percentages(member_id: String) -> void:
 	var profile: Dictionary = profile_v
 	var current_hp: int = int(profile.get("hp", -1))
 	var current_mp: int = int(profile.get("mp", -1))
-	var old_max_hp: int = int(profile.get("hp_max", -1))
-	var old_max_mp: int = int(profile.get("mp_max", -1))
+
+	# Get NEW stats (after level/stat increase)
+	var new_level: int = get_member_level(pid)
+	var new_vtl: int = get_member_stat_level(pid, "VTL")
+	var new_fcs: int = get_member_stat_level(pid, "FCS")
+
+	# Use OLD stats passed as parameters, or fall back to current stats (no change scenario)
+	var old_level_actual: int = old_level if old_level > 0 else new_level
+	var old_vtl_actual: int = old_vtl if old_vtl > 0 else new_vtl
+	var old_fcs_actual: int = old_fcs if old_fcs > 0 else new_fcs
+
+	# Calculate OLD max HP/MP based on OLD stats
+	var old_max_hp: int = compute_max_hp(old_level_actual, old_vtl_actual)
+	var old_max_mp: int = compute_max_mp(old_level_actual, old_fcs_actual)
+
+	# Calculate NEW max HP/MP based on NEW stats
+	var new_max_hp: int = compute_max_hp(new_level, new_vtl)
+	var new_max_mp: int = compute_max_mp(new_level, new_fcs)
+
+	# Skip if no change in max values
+	if old_max_hp == new_max_hp and old_max_mp == new_max_mp:
+		return
 
 	# Skip if no valid data
 	if old_max_hp <= 0 or old_max_mp <= 0:
 		return
 
-	# Calculate current percentages
+	# Calculate current percentages based on OLD max values
 	var hp_percentage: float = float(current_hp) / float(old_max_hp)
 	var mp_percentage: float = float(current_mp) / float(old_max_mp)
-
-	# Get new max values based on current stats
-	var new_level: int = get_member_level(pid)
-	var new_vtl: int = get_member_stat_level(pid, "VTL")
-	var new_fcs: int = get_member_stat_level(pid, "FCS")
-	var new_max_hp: int = compute_max_hp(new_level, new_vtl)
-	var new_max_mp: int = compute_max_mp(new_level, new_fcs)
 
 	# Calculate new current values to preserve percentages
 	var new_current_hp: int = int(round(hp_percentage * float(new_max_hp)))
@@ -497,7 +510,8 @@ func add_xp(member_id: String, amount: int) -> void:
 				add_perk_points(delta_pp)
 
 		# Preserve HP/MP percentages after level up
-		_preserve_hp_mp_percentages(pid)
+		# Pass old level so we can calculate old max HP/MP correctly
+		_preserve_hp_mp_percentages(pid, level_before)
 
 		emit_signal("stats_changed")
 
@@ -683,7 +697,11 @@ func add_sxp(stat: String, base_amount: int) -> int:
 
 	# Preserve HP/MP percentages if VTL or FCS leveled up
 	if level > level_before and (k == "VTL" or k == "FCS"):
-		_preserve_hp_mp_percentages("hero")
+		# Pass old VTL or FCS level so we can calculate old max HP/MP correctly
+		if k == "VTL":
+			_preserve_hp_mp_percentages("hero", -1, level_before, -1)
+		elif k == "FCS":
+			_preserve_hp_mp_percentages("hero", -1, -1, level_before)
 
 	emit_signal("stats_changed")
 	return gain
@@ -723,7 +741,15 @@ func add_sxp_to_member(member_id: String, stat: String, base_amount: int) -> int
 		var level_before: int = _bonus_levels_from_sxp(sxp_before)
 		var level_after: int = _bonus_levels_from_sxp(int(sxp[k]))
 		if level_after > level_before:
-			_preserve_hp_mp_percentages(pid)
+			# Pass old VTL or FCS level so we can calculate old max HP/MP correctly
+			# Get current stat level and subtract the gained levels to get old level
+			var current_stat_level: int = get_member_stat_level(pid, k)
+			var levels_gained: int = level_after - level_before
+			var old_stat_level: int = current_stat_level - levels_gained
+			if k == "VTL":
+				_preserve_hp_mp_percentages(pid, -1, old_stat_level, -1)
+			elif k == "FCS":
+				_preserve_hp_mp_percentages(pid, -1, -1, old_stat_level)
 
 	emit_signal("stats_changed")
 	return gain
