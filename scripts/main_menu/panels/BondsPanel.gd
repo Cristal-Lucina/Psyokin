@@ -428,11 +428,20 @@ func _update_detail(id: String) -> void:
 		else:
 			_gift_tv.text = "Gift: Available"
 
-	# Description
+	# Description or Hint
 	var rec: Dictionary = _bond_def(id)
-	var desc: String = String(rec.get("bond_description", "")).strip_edges()
 	if _desc:
-		_desc.text = desc
+		if not known:
+			# Show hint for unknown bonds instead of description
+			var hint: String = String(rec.get("bond_hint", "")).strip_edges()
+			if hint != "":
+				_desc.text = "[i]" + hint + "[/i]"
+			else:
+				_desc.text = "[i]This character has not been met yet.[/i]"
+		else:
+			# Show normal description for known bonds
+			var desc: String = String(rec.get("bond_description", "")).strip_edges()
+			_desc.text = desc
 
 	# Likes/Dislikes (only discovered, never show full list)
 	var likes: PackedStringArray = _read_discovered_or_full(id, true)
