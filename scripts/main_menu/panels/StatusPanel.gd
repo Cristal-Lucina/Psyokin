@@ -384,6 +384,8 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 		var hp_bar := ProgressBar.new()
 		hp_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		hp_bar.custom_minimum_size.y = 8  # Half height (was ~16px default)
+		hp_bar.show_percentage = false  # Remove percentage text
+		hp_bar.modulate = Color(0.5, 0.8, 1.0)  # Light blue
 		hp_bar.min_value = 0.0
 		hp_bar.max_value = float(hp_max_i)
 		hp_bar.value = clamp(float(hp_i), 0.0, float(hp_max_i))
@@ -416,6 +418,8 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 		var mp_bar := ProgressBar.new()
 		mp_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		mp_bar.custom_minimum_size.y = 8  # Half height (was ~16px default)
+		mp_bar.show_percentage = false  # Remove percentage text
+		mp_bar.modulate = Color(1.0, 0.7, 0.85)  # Light pink
 		mp_bar.min_value = 0.0
 		mp_bar.max_value = float(mp_max_i)
 		mp_bar.value = clamp(float(mp_i), 0.0, float(mp_max_i))

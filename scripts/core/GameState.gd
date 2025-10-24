@@ -428,12 +428,16 @@ func move_to_bench(member_id: String) -> bool:
 
 ## Swaps an active party member with a bench member. Returns false if invalid.
 func swap_active_bench(active_index: int, bench_member_id: String) -> bool:
-	if active_index < 1 or active_index >= party.size():
+	if active_index < 1 or active_index > 2:
 		return false  # Only allow swapping slots 1-2 (not hero at 0)
 
 	var bench_mem: String = String(bench_member_id).strip_edges()
 	if bench_mem == "" or not bench.has(bench_mem):
 		return false  # Bench member not found
+
+	# Ensure party array has enough slots
+	while party.size() < active_index + 1:
+		party.append("")
 
 	var active_mem: String = party[active_index]
 	if active_mem == "hero":
