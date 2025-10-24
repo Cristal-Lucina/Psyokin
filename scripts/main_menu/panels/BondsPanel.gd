@@ -79,6 +79,10 @@ enum Filter { ALL, KNOWN, LOCKED, MAXED }
 @onready var _unlock_inner   : Button = %UnlockInner
 @onready var _story_btn      : Button = %StoryBtn
 
+# Likes/Dislikes rows (containers with labels)
+var _likes_row      : HBoxContainer = null
+var _dislikes_row   : HBoxContainer = null
+
 # Old scene labels (may not exist - optional)
 var _lvl_tv    : Label          = null
 var _xp_tv     : Label          = null
@@ -97,6 +101,12 @@ func _ready() -> void:
 	# Optional old scene labels (may not exist)
 	_lvl_tv = get_node_or_null("%LevelValue")
 	_xp_tv = get_node_or_null("%CBXPValue")
+
+	# Get likes/dislikes row containers
+	if _likes_tv:
+		_likes_row = _likes_tv.get_parent()
+	if _dislikes_tv:
+		_dislikes_row = _dislikes_tv.get_parent()
 
 	_hide_level_cbxp_labels()
 	_wire_system_signals()
@@ -530,8 +540,9 @@ func _hide_all_detail_widgets() -> void:
 	if _layer_tv: _layer_tv.visible = false
 	if _points_tv: _points_tv.visible = false
 	if _gift_tv: _gift_tv.visible = false
-	if _likes_tv: _likes_tv.visible = false
-	if _dislikes_tv: _dislikes_tv.visible = false
+	# Hide the entire likes/dislikes rows (includes labels and values)
+	if _likes_row: _likes_row.visible = false
+	if _dislikes_row: _dislikes_row.visible = false
 	if _unlock_hdr: _unlock_hdr.visible = false
 	if _unlock_acq: _unlock_acq.visible = false
 	if _unlock_outer: _unlock_outer.visible = false
@@ -546,8 +557,9 @@ func _show_all_detail_widgets() -> void:
 	if _layer_tv: _layer_tv.visible = true
 	if _points_tv: _points_tv.visible = true
 	if _gift_tv: _gift_tv.visible = true
-	if _likes_tv: _likes_tv.visible = true
-	if _dislikes_tv: _dislikes_tv.visible = true
+	# Show the entire likes/dislikes rows (includes labels and values)
+	if _likes_row: _likes_row.visible = true
+	if _dislikes_row: _dislikes_row.visible = true
 	if _unlock_hdr: _unlock_hdr.visible = true
 	if _unlock_acq: _unlock_acq.visible = true
 	if _unlock_outer: _unlock_outer.visible = true
