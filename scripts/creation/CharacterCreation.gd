@@ -320,6 +320,40 @@ func _on_confirm_pressed() -> void:
 			picks_arr.append(_selected_order[i2])
 		st.call("apply_creation_boosts", picks_arr)
 
+	# Update HP/MP to max after stat boosts (if VTL or FCS were chosen)
+	# This ensures character starts at 100% HP/MP with their new max values
+	if gs and st:
+		var new_level: int = 1
+		var new_vtl: int = 1
+		var new_fcs: int = 1
+		if st.has_method("get_member_level"):
+			new_level = int(st.call("get_member_level", "hero"))
+		if st.has_method("get_member_stat_level"):
+			new_vtl = int(st.call("get_member_stat_level", "hero", "VTL"))
+			new_fcs = int(st.call("get_member_stat_level", "hero", "FCS"))
+
+		var new_hp_max: int = 150 + (max(1, new_vtl) * max(1, new_level) * 6)
+		var new_mp_max: int = 20 + int(round(float(max(1, new_fcs)) * float(max(1, new_level)) * 1.5))
+		if st.has_method("compute_max_hp"):
+			new_hp_max = int(st.call("compute_max_hp", new_level, new_vtl))
+		if st.has_method("compute_max_mp"):
+			new_mp_max = int(st.call("compute_max_mp", new_level, new_fcs))
+
+		# Update member_data to set HP/MP to new max
+		if gs.has_method("get"):
+			var member_data_v: Variant = gs.get("member_data")
+			if typeof(member_data_v) == TYPE_DICTIONARY:
+				var member_data: Dictionary = member_data_v
+				if not member_data.has("hero"):
+					member_data["hero"] = {}
+				var hero_data: Dictionary = member_data["hero"]
+				hero_data["hp"] = new_hp_max
+				hero_data["mp"] = new_mp_max
+				if not hero_data.has("buffs"):
+					hero_data["buffs"] = []
+				if not hero_data.has("debuffs"):
+					hero_data["debuffs"] = []
+
 	# unlock chosen starting perk
 	var chosen_perk_id: String = _chosen_perk_id()
 	if chosen_perk_id != "":
