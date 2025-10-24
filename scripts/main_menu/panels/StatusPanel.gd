@@ -441,8 +441,10 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 	return panel
 
 func _get_member_snapshot(member_id: String) -> Dictionary:
+	# Get roster to pass to _label_for_id for accurate name lookup
+	var roster: Dictionary = _read_roster()
 	# Always get display name from _label_for_id as primary source
-	var display_name: String = _label_for_id(member_id)
+	var display_name: String = _label_for_id(member_id, roster)
 
 	# Try to get combat profile for HP/MP/level
 	if _cps and _cps.has_method("get_profile"):
@@ -529,6 +531,7 @@ func _show_member_picker(active_slot: int) -> void:
 	# Create picker popup
 	var picker := ConfirmationDialog.new()
 	picker.title = "Select Bench Member"
+	picker.min_size = Vector2(300, 350)  # Ensure dialog is large enough for buttons
 
 	# Create content container
 	var vbox := VBoxContainer.new()
@@ -545,8 +548,11 @@ func _show_member_picker(active_slot: int) -> void:
 	var item_list := ItemList.new()
 	item_list.custom_minimum_size = Vector2(250, 200)
 
+	# Get roster for accurate name lookup
+	var roster: Dictionary = _read_roster()
+
 	for bench_id in bench_ids:
-		var display_name: String = _label_for_id(bench_id)
+		var display_name: String = _label_for_id(bench_id, roster)
 		var level: int = 1
 		if _cps and _cps.has_method("get_profile"):
 			var prof_v: Variant = _cps.call("get_profile", bench_id)
