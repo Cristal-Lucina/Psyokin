@@ -51,17 +51,17 @@ var _status: Node = null
 
 # ───────────────────────── Data ─────────────────────────
 # From Chapter 7 spec
-const AILMENTS: PackedStringArray = PackedStringArray([
+var AILMENTS: PackedStringArray = PackedStringArray([
 	"Poison", "Burn", "Sleep", "Freeze", "Mind Block",
 	"Confused", "Charm", "Berserk", "Malaise"
 ])
 
-const BUFFS: PackedStringArray = PackedStringArray([
+var BUFFS: PackedStringArray = PackedStringArray([
 	"Attack Up", "Mind Up", "Regen", "Haste",
 	"Protect", "Shell", "Accuracy Up", "Evasion Up", "Skill ACC Boost"
 ])
 
-const DEBUFFS: PackedStringArray = PackedStringArray([
+var DEBUFFS: PackedStringArray = PackedStringArray([
 	"Attack Down", "Defense Down", "Mind Down"
 ])
 
