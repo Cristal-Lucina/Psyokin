@@ -119,6 +119,13 @@ func _ready() -> void:
 	_eq    = get_node_or_null("/root/aEquipmentSystem")
 	_stats = get_node_or_null("/root/aStatsSystem")
 
+	# Enable BBCode on equipment value labels for formatting empty slots
+	if _w_val: _w_val.bbcode_enabled = true
+	if _a_val: _a_val.bbcode_enabled = true
+	if _h_val: _h_val.bbcode_enabled = true
+	if _f_val: _f_val.bbcode_enabled = true
+	if _b_val: _b_val.bbcode_enabled = true
+
 	if _w_btn: _w_btn.pressed.connect(Callable(self, "_on_slot_button").bind("weapon"))
 	if _a_btn: _a_btn.pressed.connect(Callable(self, "_on_slot_button").bind("armor"))
 	if _h_btn: _h_btn.pressed.connect(Callable(self, "_on_slot_button").bind("head"))
@@ -644,13 +651,16 @@ func _pretty_item(id: String) -> String:
 
 func _pretty_item_with_slot(id: String, slot: String) -> String:
 	if id == "" or id == "—":
+		var placeholder: String = ""
 		match slot:
-			"weapon": return "(Weapon)"
-			"armor": return "(Armor)"
-			"head": return "(Headwear)"
-			"foot": return "(Footwear)"
-			"bracelet": return "(Bracelet)"
+			"weapon": placeholder = "(Weapon)"
+			"armor": placeholder = "(Armor)"
+			"head": placeholder = "(Headwear)"
+			"foot": placeholder = "(Footwear)"
+			"bracelet": placeholder = "(Bracelet)"
 			_: return "—"
+		# Return greyed out italic text using BBCode
+		return "[color=#888888][i]%s[/i][/color]" % placeholder
 	if _eq and _eq.has_method("get_item_display_name"):
 		var v: Variant = _eq.call("get_item_display_name", id)
 		if typeof(v) == TYPE_STRING: return String(v)
