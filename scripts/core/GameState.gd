@@ -677,7 +677,11 @@ func load(data: Dictionary) -> void:
 	if typeof(meta_v) == TYPE_DICTIONARY:
 		var meta_in: Dictionary = meta_v
 		for mkey in meta_in.keys():
-			set_meta(String(mkey), meta_in[mkey])
+			# Deep copy dictionary metadata to prevent reference sharing between saves
+			if typeof(meta_in[mkey]) == TYPE_DICTIONARY:
+				set_meta(String(mkey), (meta_in[mkey] as Dictionary).duplicate(true))
+			else:
+				set_meta(String(mkey), meta_in[mkey])
 
 	# Optional systems
 	var cb_v: Variant = data.get("circle_bonds", null)
