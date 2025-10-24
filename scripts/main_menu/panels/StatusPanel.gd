@@ -306,14 +306,12 @@ func _rebuild_party() -> void:
 	bench_header.add_theme_font_size_override("font_size", 10)
 	_party.add_child(bench_header)
 
-	for bench_idx in range(5):  # 5 bench slots
-		if bench_idx < bench_ids.size():
-			var bench_data := _get_member_snapshot(bench_ids[bench_idx])
-			bench_data["_bench_idx"] = bench_idx
-			bench_data["_member_id"] = bench_ids[bench_idx]
-			_party.add_child(_create_member_card(bench_data, false, -1))
-		else:
-			_party.add_child(_create_empty_slot("Bench", bench_idx))
+	# Only show bench slots that have members (hide empty slots)
+	for bench_idx in range(bench_ids.size()):
+		var bench_data := _get_member_snapshot(bench_ids[bench_idx])
+		bench_data["_bench_idx"] = bench_idx
+		bench_data["_member_id"] = bench_ids[bench_idx]
+		_party.add_child(_create_member_card(bench_data, false, -1))
 
 	await get_tree().process_frame
 	_party.queue_sort()
@@ -441,8 +439,10 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 	return panel
 
 func _get_member_snapshot(member_id: String) -> Dictionary:
+	# Get roster to pass to _label_for_id for accurate name lookup
+	var roster: Dictionary = _read_roster()
 	# Always get display name from _label_for_id as primary source
-	var display_name: String = _label_for_id(member_id)
+	var display_name: String = _label_for_id(member_id, roster)
 
 	# Try to get combat profile for HP/MP/level
 	if _cps and _cps.has_method("get_profile"):
@@ -455,13 +455,9 @@ func _get_member_snapshot(member_id: String) -> Dictionary:
 			var mp_cur: int = int(p.get("mp", -1))
 			var mp_max: int = int(p.get("mp_max", -1))
 
-			# Use label from profile if available, otherwise use our display_name
-			var label: String = String(p.get("label", display_name))
-			if label == "" or label == member_id:
-				label = display_name
-
+			# Always use display_name from _label_for_id which has proper CSV/roster fallbacks
 			return {
-				"name": "%s  (Lv %d)" % [label, lvl],
+				"name": "%s  (Lv %d)" % [display_name, lvl],
 				"hp": hp_cur,
 				"hp_max": hp_max,
 				"mp": mp_cur,
@@ -529,6 +525,7 @@ func _show_member_picker(active_slot: int) -> void:
 	# Create picker popup
 	var picker := ConfirmationDialog.new()
 	picker.title = "Select Bench Member"
+	picker.max_size = Vector2(400, 500)  # Max height is 500px
 
 	# Create content container
 	var vbox := VBoxContainer.new()
@@ -541,12 +538,16 @@ func _show_member_picker(active_slot: int) -> void:
 	instruction.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	vbox.add_child(instruction)
 
-	# Add member list
+	# Add member list (scrollable, will fit within max dialog height)
 	var item_list := ItemList.new()
-	item_list.custom_minimum_size = Vector2(250, 200)
+	item_list.custom_minimum_size = Vector2(280, 150)
+	item_list.size_flags_vertical = Control.SIZE_EXPAND_FILL
+
+	# Get roster for accurate name lookup
+	var roster: Dictionary = _read_roster()
 
 	for bench_id in bench_ids:
-		var display_name: String = _label_for_id(bench_id)
+		var display_name: String = _label_for_id(bench_id, roster)
 		var level: int = 1
 		if _cps and _cps.has_method("get_profile"):
 			var prof_v: Variant = _cps.call("get_profile", bench_id)
@@ -568,6 +569,7 @@ func _show_member_picker(active_slot: int) -> void:
 	)
 	picker.canceled.connect(func(): picker.queue_free())
 
+	# Center the dialog (will auto-size within max_size constraint)
 	picker.popup_centered()
 
 func _perform_swap(active_slot: int, bench_member_id: String) -> void:
