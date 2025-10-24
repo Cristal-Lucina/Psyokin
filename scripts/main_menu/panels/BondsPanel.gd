@@ -366,14 +366,9 @@ func _on_row_pressed(btn: Button) -> void:
 	_update_detail(_selected)
 
 func _update_detail(id: String) -> void:
+	# Handle empty selection
 	if id == "":
 		_name_tv.text = "—"
-	else:
-		var known: bool = _read_known(id)
-		# Show "(Unknown)" for locked bonds in detail panel too
-		_name_tv.text = "(Unknown)" if not known else _display_name(id)
-
-	if id == "":
 		if _event_tv: _event_tv.text = "Event: —"
 		if _layer_tv: _layer_tv.text = "Layer: —"
 		if _points_tv: _points_tv.text = "Points: —"
@@ -386,10 +381,35 @@ func _update_detail(id: String) -> void:
 		if _unlock_middle: _unlock_middle.disabled = true
 		if _unlock_inner: _unlock_inner.disabled = true
 		if _story_btn: _story_btn.set_meta("bond_id", "")
+		# Show all widgets
+		_show_all_detail_widgets()
 		return
 
-	# Get event-based progression data
+	# Check if bond is known
 	var known: bool = _read_known(id)
+
+	# If unknown, hide all detail widgets and only show hint
+	if not known:
+		# Hide all detail widgets
+		_hide_all_detail_widgets()
+
+		# Only show the description with hint
+		if _desc:
+			_desc.visible = true
+			var rec: Dictionary = _bond_def(id)
+			var hint: String = String(rec.get("bond_hint", "")).strip_edges()
+			if hint != "":
+				_desc.text = hint
+			else:
+				_desc.text = "[i]This character has not been met yet.[/i]"
+		return
+
+	# Known bond - show all widgets and populate with data
+	_show_all_detail_widgets()
+
+	_name_tv.text = _display_name(id)
+
+	# Get event-based progression data
 	var event_idx: int = _read_event_index(id)
 	var points: int = _read_points_bank(id)
 	var threshold: int = _read_next_threshold(id)
@@ -398,21 +418,18 @@ func _update_detail(id: String) -> void:
 
 	# Event progress
 	if _event_tv:
-		if not known or event_idx == 0:
+		if event_idx == 0:
 			_event_tv.text = "Event: Not Started"
 		else:
 			_event_tv.text = "Event: E%d Complete" % event_idx
 
 	# Layer stage
 	if _layer_tv:
-		if not known:
-			_layer_tv.text = "Layer: Not Met"
-		else:
-			_layer_tv.text = "Layer: %s" % layer_name
+		_layer_tv.text = "Layer: %s" % layer_name
 
 	# Points bank / threshold
 	if _points_tv:
-		if not known or event_idx == 0:
+		if event_idx == 0:
 			_points_tv.text = "Points: —"
 		elif threshold > 0:
 			_points_tv.text = "Points: %d / %d" % [points, threshold]
@@ -421,27 +438,18 @@ func _update_detail(id: String) -> void:
 
 	# Gift status
 	if _gift_tv:
-		if not known or event_idx == 0:
+		if event_idx == 0:
 			_gift_tv.text = "Gift: —"
 		elif gift_used:
 			_gift_tv.text = "Gift: Used this layer"
 		else:
 			_gift_tv.text = "Gift: Available"
 
-	# Description or Hint
+	# Description
 	var rec: Dictionary = _bond_def(id)
 	if _desc:
-		if not known:
-			# Show hint for unknown bonds instead of description
-			var hint: String = String(rec.get("bond_hint", "")).strip_edges()
-			if hint != "":
-				_desc.text = "[i]" + hint + "[/i]"
-			else:
-				_desc.text = "[i]This character has not been met yet.[/i]"
-		else:
-			# Show normal description for known bonds
-			var desc: String = String(rec.get("bond_description", "")).strip_edges()
-			_desc.text = desc
+		var desc: String = String(rec.get("bond_description", "")).strip_edges()
+		_desc.text = desc
 
 	# Likes/Dislikes (only discovered, never show full list)
 	var likes: PackedStringArray = _read_discovered_or_full(id, true)
@@ -480,6 +488,38 @@ func _update_detail(id: String) -> void:
 	# Story points
 	if _story_btn:
 		_story_btn.set_meta("bond_id", id)
+
+func _hide_all_detail_widgets() -> void:
+	if _name_tv: _name_tv.visible = false
+	if _event_tv: _event_tv.visible = false
+	if _layer_tv: _layer_tv.visible = false
+	if _points_tv: _points_tv.visible = false
+	if _gift_tv: _gift_tv.visible = false
+	if _likes_tv: _likes_tv.visible = false
+	if _dislikes_tv: _dislikes_tv.visible = false
+	if _unlock_hdr: _unlock_hdr.visible = false
+	if _unlock_acq: _unlock_acq.visible = false
+	if _unlock_outer: _unlock_outer.visible = false
+	if _unlock_middle: _unlock_middle.visible = false
+	if _unlock_inner: _unlock_inner.visible = false
+	if _story_btn: _story_btn.visible = false
+	if _desc: _desc.visible = false
+
+func _show_all_detail_widgets() -> void:
+	if _name_tv: _name_tv.visible = true
+	if _event_tv: _event_tv.visible = true
+	if _layer_tv: _layer_tv.visible = true
+	if _points_tv: _points_tv.visible = true
+	if _gift_tv: _gift_tv.visible = true
+	if _likes_tv: _likes_tv.visible = true
+	if _dislikes_tv: _dislikes_tv.visible = true
+	if _unlock_hdr: _unlock_hdr.visible = true
+	if _unlock_acq: _unlock_acq.visible = true
+	if _unlock_outer: _unlock_outer.visible = true
+	if _unlock_middle: _unlock_middle.visible = true
+	if _unlock_inner: _unlock_inner.visible = true
+	if _story_btn: _story_btn.visible = true
+	if _desc: _desc.visible = true
 
 func _display_name(id: String) -> String:
 	if _sys and _sys.has_method("get_bond_name"):
