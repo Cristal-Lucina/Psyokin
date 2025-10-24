@@ -234,44 +234,77 @@ func _rebuild_party() -> void:
 		var it: Dictionary = it_v
 
 		var row := VBoxContainer.new()
-		row.add_theme_constant_override("separation", 4)
+		row.add_theme_constant_override("separation", 2)
 
+		# Name label
 		var disp := Label.new()
 		disp.text = String(it.get("name", "Member"))
 		row.add_child(disp)
 
-		var hp_box := HBoxContainer.new(); hp_box.add_theme_constant_override("separation", 6)
-		var hp_lbl := Label.new(); hp_lbl.custom_minimum_size.x = 36; hp_lbl.text = "HP"
-		var hp_val := Label.new()
+		# Horizontal container for HP and MP side by side
+		var stats_row := HBoxContainer.new()
+		stats_row.add_theme_constant_override("separation", 12)
+		stats_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+
+		# HP Section (compact)
+		var hp_section := VBoxContainer.new()
+		hp_section.add_theme_constant_override("separation", 2)
+		hp_section.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+
 		var hp_i: int = int(it.get("hp", -1))
 		var hp_max_i: int = int(it.get("hp_max", -1))
+
+		var hp_label_box := HBoxContainer.new()
+		hp_label_box.add_theme_constant_override("separation", 4)
+		var hp_lbl := Label.new()
+		hp_lbl.text = "HP"
+		hp_lbl.custom_minimum_size.x = 24
+		var hp_val := Label.new()
 		hp_val.text = _fmt_pair(hp_i, hp_max_i)
-		hp_box.add_child(hp_lbl); hp_box.add_child(hp_val)
+		hp_label_box.add_child(hp_lbl)
+		hp_label_box.add_child(hp_val)
+		hp_section.add_child(hp_label_box)
+
 		if hp_i >= 0 and hp_max_i > 0:
 			var hp_bar := ProgressBar.new()
 			hp_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			hp_bar.min_value = 0.0
 			hp_bar.max_value = float(hp_max_i)
-			hp_bar.value     = clamp(float(hp_i), 0.0, float(hp_max_i))
-			row.add_child(hp_bar)
-		row.add_child(hp_box)
+			hp_bar.value = clamp(float(hp_i), 0.0, float(hp_max_i))
+			hp_section.add_child(hp_bar)
 
-		var mp_box := HBoxContainer.new(); mp_box.add_theme_constant_override("separation", 6)
-		var mp_lbl := Label.new(); mp_lbl.custom_minimum_size.x = 36; mp_lbl.text = "MP"
-		var mp_val := Label.new()
+		stats_row.add_child(hp_section)
+
+		# MP Section (compact)
+		var mp_section := VBoxContainer.new()
+		mp_section.add_theme_constant_override("separation", 2)
+		mp_section.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+
 		var mp_i: int = int(it.get("mp", -1))
 		var mp_max_i: int = int(it.get("mp_max", -1))
+
+		var mp_label_box := HBoxContainer.new()
+		mp_label_box.add_theme_constant_override("separation", 4)
+		var mp_lbl := Label.new()
+		mp_lbl.text = "MP"
+		mp_lbl.custom_minimum_size.x = 24
+		var mp_val := Label.new()
 		mp_val.text = _fmt_pair(mp_i, mp_max_i)
-		mp_box.add_child(mp_lbl); mp_box.add_child(mp_val)
+		mp_label_box.add_child(mp_lbl)
+		mp_label_box.add_child(mp_val)
+		mp_section.add_child(mp_label_box)
+
 		if mp_i >= 0 and mp_max_i > 0:
 			var mp_bar := ProgressBar.new()
 			mp_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			mp_bar.min_value = 0.0
 			mp_bar.max_value = float(mp_max_i)
-			mp_bar.value     = clamp(float(mp_i), 0.0, float(mp_max_i))
-			row.add_child(mp_bar)
-		row.add_child(mp_box)
+			mp_bar.value = clamp(float(mp_i), 0.0, float(mp_max_i))
+			mp_section.add_child(mp_bar)
 
+		stats_row.add_child(mp_section)
+
+		row.add_child(stats_row)
 		_party.add_child(row)
 
 	await get_tree().process_frame
