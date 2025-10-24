@@ -194,16 +194,16 @@ func _ensure_detail_widgets() -> void:
 		row2.add_child(title2); row2.add_child(_dislikes_tv)
 		holder.add_child(row2)
 
-	# Unlocks: Header + 4 threshold buttons (10/12/14/16 points)
+	# Unlocks: Header + 4 layer transition buttons
 	if _unlock_hdr == null:
 		_unlock_hdr = Label.new()
-		_unlock_hdr.text = "Event Unlock Thresholds:"
+		_unlock_hdr.text = "Layer Transitions:"
 		holder.add_child(_unlock_hdr)
 
 	if _unlock_acq == null:
 		_unlock_acq = Button.new()
 		_unlock_acq.name = "UnlockAcquaintance"
-		_unlock_acq.text = "E4 Unlock (10 pts)"
+		_unlock_acq.text = "Acquaintance → Outer"
 		_unlock_acq.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		_unlock_acq.disabled = true  # Will be enabled when unlocked
 		holder.add_child(_unlock_acq)
@@ -211,7 +211,7 @@ func _ensure_detail_widgets() -> void:
 	if _unlock_outer == null:
 		_unlock_outer = Button.new()
 		_unlock_outer.name = "UnlockOuter"
-		_unlock_outer.text = "E6 Unlock (12 pts)"
+		_unlock_outer.text = "Outer → Middle"
 		_unlock_outer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		_unlock_outer.disabled = true  # Will be enabled when unlocked
 		holder.add_child(_unlock_outer)
@@ -219,7 +219,7 @@ func _ensure_detail_widgets() -> void:
 	if _unlock_middle == null:
 		_unlock_middle = Button.new()
 		_unlock_middle.name = "UnlockMiddle"
-		_unlock_middle.text = "E8 Unlock (14 pts)"
+		_unlock_middle.text = "Middle → Inner"
 		_unlock_middle.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		_unlock_middle.disabled = true
 		holder.add_child(_unlock_middle)
@@ -227,7 +227,7 @@ func _ensure_detail_widgets() -> void:
 	if _unlock_inner == null:
 		_unlock_inner = Button.new()
 		_unlock_inner.name = "UnlockInner"
-		_unlock_inner.text = "Final Unlock (16 pts)"
+		_unlock_inner.text = "Inner → Core"
 		_unlock_inner.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		_unlock_inner.disabled = true
 		holder.add_child(_unlock_inner)
@@ -533,33 +533,33 @@ func _update_detail(id: String) -> void:
 	if _likes_tv: _likes_tv.text = _pretty_list(likes)
 	if _dislikes_tv: _dislikes_tv.text = _pretty_list(dislikes)
 
-	# Unlock buttons - show if points met thresholds
-	# E4 (Acquaintance → Outer): 10 points
-	# E6 (Outer → Middle): 12 points
-	# E8 (Middle → Inner): 14 points
-	# Final (Inner → Core): 16 points
+	# Unlock buttons - show layer transitions (based on event completions)
+	# With new per-event threshold system (10+10+12+12+14+14+16+16 = 104 total):
+	# - E3 complete → Outer layer unlocked (paid 10+10 thresholds)
+	# - E5 complete → Middle layer unlocked (paid 10+10+12+12 thresholds)
+	# - E7 complete → Inner layer unlocked (paid 10+10+12+12+14+14 thresholds)
+	# - E9 complete → Core layer unlocked (paid all 104 pts thresholds)
 
-	# Check if each threshold has been met (based on highest event unlocked)
-	var e4_unlocked: bool = event_idx >= 4  # E4+ means 10 pts was paid
-	var e6_unlocked: bool = event_idx >= 6  # E6+ means 12 pts was paid
-	var e8_unlocked: bool = event_idx >= 8  # E8+ means 14 pts was paid
-	var final_unlocked: bool = event_idx >= 9 and points >= 16  # E9 complete + 16 pts
+	var outer_unlocked: bool = event_idx >= 3   # E3 complete → transitioned to Outer
+	var middle_unlocked: bool = event_idx >= 5  # E5 complete → transitioned to Middle
+	var inner_unlocked: bool = event_idx >= 7   # E7 complete → transitioned to Inner
+	var core_unlocked: bool = event_idx >= 9    # E9 complete → transitioned to Core
 
 	if _unlock_acq:
-		_unlock_acq.disabled = not e4_unlocked
-		_unlock_acq.text = "E4 Unlock (10 pts)" + (" [UNLOCKED]" if e4_unlocked else " [LOCKED]")
+		_unlock_acq.disabled = not outer_unlocked
+		_unlock_acq.text = "Acquaintance → Outer" + (" [UNLOCKED]" if outer_unlocked else " [LOCKED]")
 
 	if _unlock_outer:
-		_unlock_outer.disabled = not e6_unlocked
-		_unlock_outer.text = "E6 Unlock (12 pts)" + (" [UNLOCKED]" if e6_unlocked else " [LOCKED]")
+		_unlock_outer.disabled = not middle_unlocked
+		_unlock_outer.text = "Outer → Middle" + (" [UNLOCKED]" if middle_unlocked else " [LOCKED]")
 
 	if _unlock_middle:
-		_unlock_middle.disabled = not e8_unlocked
-		_unlock_middle.text = "E8 Unlock (14 pts)" + (" [UNLOCKED]" if e8_unlocked else " [LOCKED]")
+		_unlock_middle.disabled = not inner_unlocked
+		_unlock_middle.text = "Middle → Inner" + (" [UNLOCKED]" if inner_unlocked else " [LOCKED]")
 
 	if _unlock_inner:
-		_unlock_inner.disabled = not final_unlocked
-		_unlock_inner.text = "Final Unlock (16 pts)" + (" [UNLOCKED]" if final_unlocked else " [LOCKED]")
+		_unlock_inner.disabled = not core_unlocked
+		_unlock_inner.text = "Inner → Core" + (" [UNLOCKED]" if core_unlocked else " [LOCKED]")
 
 	# Story points
 	if _story_btn:

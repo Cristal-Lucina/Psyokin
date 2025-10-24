@@ -33,11 +33,16 @@
 ##   - Gift (once per layer): Disliked -2, Neutral +1, Liked +4
 ##   - Side Meetups: +6 points (optional filler scenes)
 ##
-##   Thresholds (cost to unlock next main event):
-##   - Acquaintance → Outer: 10 points (before E4)
-##   - Outer → Middle: 12 points (before E6)
-##   - Middle → Inner: 14 points (before E8)
-##   - Inner → Core: 16 points (before Final/E10)
+##   Thresholds (cost to unlock next event, paid after each event):
+##   - After E2: 10 pts (Acquaintance layer)
+##   - After E3: 10 pts (Acquaintance → Outer transition)
+##   - After E4: 12 pts (Outer layer)
+##   - After E5: 12 pts (Outer → Middle transition)
+##   - After E6: 14 pts (Middle layer)
+##   - After E7: 14 pts (Middle → Inner transition)
+##   - After E8: 16 pts (Inner layer)
+##   - After E9: 16 pts (Inner → Core transition)
+##   Total: 10+10+12+12+14+14+16+16 = 104 pts across E2-E9
 ##
 ##   Points overflow/bank forward to next threshold
 ##
@@ -360,8 +365,19 @@ func complete_event(id: String, dialogue_score: int = 0) -> void:
 	# Add points to bank
 	_add_points(id, total_points)
 
-	# Update layer based on event completion
+	# Update layer based on event completion (layer flips at E1/E3/E5/E7/E9)
 	_update_layer_from_event(id, new_event)
+
+	# After completing event, check if we can pay threshold to unlock next event
+	# (except after E9, which unlocks Final for LIs only)
+	if new_event < 9:
+		var threshold: int = get_next_threshold(id)
+		var bank: int = get_points_bank(id)
+		if bank >= threshold:
+			# Pay the threshold, keep the overflow banked
+			_points_bank[id] = bank - threshold
+			emit_signal("bxp_changed", id, _points_bank[id])
+			print("[CircleBondSystem] %s completed E%d, paid %d pts threshold, %d banked" % [id, new_event, threshold, _points_bank[id]])
 
 	# Mark as known
 	_set_known(id, true)
