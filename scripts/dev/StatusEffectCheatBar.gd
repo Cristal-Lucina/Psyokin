@@ -899,7 +899,20 @@ func _modify_hp(member: String, delta: int) -> void:
 	# Calculate new HP
 	var new_hp: int = clampi(hp + delta, 0, hp_max)
 
-	# Update GameState.member_data
+	# Update CombatProfileSystem._party_meta (runtime cache)
+	if _combat_prof.has_method("get"):
+		var party_meta_v: Variant = _combat_prof.get("_party_meta")
+		if typeof(party_meta_v) == TYPE_DICTIONARY:
+			var party_meta: Dictionary = party_meta_v
+			if not party_meta.has(member):
+				party_meta[member] = {}
+			var meta: Dictionary = party_meta[member]
+			meta["hp"] = new_hp
+			party_meta[member] = meta
+			if _combat_prof.has_method("set"):
+				_combat_prof.set("_party_meta", party_meta)
+
+	# Update GameState.member_data (persistence)
 	if _gs.has_method("get"):
 		var member_data_v: Variant = _gs.get("member_data")
 		if typeof(member_data_v) == TYPE_DICTIONARY:
@@ -912,7 +925,7 @@ func _modify_hp(member: String, delta: int) -> void:
 			if _gs.has_method("set"):
 				_gs.set("member_data", member_data)
 
-	# Refresh combat profile
+	# Refresh combat profile (emits signals for StatusPanel)
 	if _combat_prof.has_method("refresh_member"):
 		_combat_prof.call("refresh_member", member)
 
@@ -931,7 +944,20 @@ func _modify_mp(member: String, delta: int) -> void:
 	# Calculate new MP
 	var new_mp: int = clampi(mp + delta, 0, mp_max)
 
-	# Update GameState.member_data
+	# Update CombatProfileSystem._party_meta (runtime cache)
+	if _combat_prof.has_method("get"):
+		var party_meta_v: Variant = _combat_prof.get("_party_meta")
+		if typeof(party_meta_v) == TYPE_DICTIONARY:
+			var party_meta: Dictionary = party_meta_v
+			if not party_meta.has(member):
+				party_meta[member] = {}
+			var meta: Dictionary = party_meta[member]
+			meta["mp"] = new_mp
+			party_meta[member] = meta
+			if _combat_prof.has_method("set"):
+				_combat_prof.set("_party_meta", party_meta)
+
+	# Update GameState.member_data (persistence)
 	if _gs.has_method("get"):
 		var member_data_v: Variant = _gs.get("member_data")
 		if typeof(member_data_v) == TYPE_DICTIONARY:
@@ -944,7 +970,7 @@ func _modify_mp(member: String, delta: int) -> void:
 			if _gs.has_method("set"):
 				_gs.set("member_data", member_data)
 
-	# Refresh combat profile
+	# Refresh combat profile (emits signals for StatusPanel)
 	if _combat_prof.has_method("refresh_member"):
 		_combat_prof.call("refresh_member", member)
 
