@@ -35,9 +35,24 @@ text = "Name"
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
-placeholder_text = "Player"
+placeholder_text = "First Name"
+max_length = 10
 
 [node name="SpacerRow5" type="Control" parent="Form/Grid"]
+layout_mode = 2
+
+[node name="SurnameLabel" type="Label" parent="Form/Grid"]
+layout_mode = 2
+text = "Surname"
+
+[node name="SurnameInput" type="LineEdit" parent="Form/Grid"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = "Last Name"
+max_length = 10
+
+[node name="SpacerRow5b" type="Control" parent="Form/Grid"]
 layout_mode = 2
 
 [node name="PronounLabel" type="Label" parent="Form/Grid"]

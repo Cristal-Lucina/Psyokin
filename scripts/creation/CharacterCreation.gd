@@ -12,6 +12,7 @@ const ROUTER_PATH  := "/root/aSceneRouter"
 
 # ── UI: unique_name_in_owner nodes from your scene ───────────────────────────
 @onready var _name_in     : LineEdit      = %NameInput
+@onready var _surname_in  : LineEdit      = %SurnameInput
 @onready var _pron_in     : OptionButton  = %PronounInput
 
 @onready var _body_in     : OptionButton  = %BodyIdInput
@@ -105,6 +106,14 @@ func _ready() -> void:
 
 # ── UI fill / wiring ─────────────────────────────────────────────────────────
 func _fill_basics() -> void:
+	# Name fields: max 10 characters each
+	if _name_in:
+		_name_in.max_length = 10
+		_name_in.placeholder_text = "First Name"
+	if _surname_in:
+		_surname_in.max_length = 10
+		_surname_in.placeholder_text = "Last Name"
+
 	# Pronouns
 	if _pron_in and _pron_in.item_count == 0:
 		for p in ["they", "she", "he"]:
@@ -251,14 +260,19 @@ func _on_perk_selected(_index: int) -> void:
 
 # ── confirm ──────────────────────────────────────────────────────────────────
 func _on_confirm_pressed() -> void:
+	# Validate name and surname are filled
+	var name_text: String = (_name_in.text if _name_in else "").strip_edges()
+	var surname_text: String = (_surname_in.text if _surname_in else "").strip_edges()
+
+	if name_text == "" or surname_text == "":
+		OS.alert("Please enter both a first name and last name.", "Character Creation")
+		return
+
 	# Hard gate: must have exactly 3 stats + a chosen perk
 	if _selected_order.size() != 3 or _chosen_perk_id() == "":
 		OS.alert("Pick 3 stats and 1 perk to continue.", "Character Creation")
 		return
 
-	var name_text: String = (_name_in.text if _name_in else "Player").strip_edges()
-	if name_text == "":
-		name_text = "Player"
 	var pron_text: String = _opt_text(_pron_in)
 
 	var body_id: String = _opt_text(_body_in)
@@ -273,10 +287,12 @@ func _on_confirm_pressed() -> void:
 
 	var gs: Node = get_node_or_null(GS_PATH)
 	if gs:
+		# Store full name for display
+		var full_name: String = "%s %s" % [name_text, surname_text]
 		if gs.has_method("set"):
-			gs.set("player_name", name_text)
+			gs.set("player_name", full_name)
 		gs.set_meta("hero_identity", {
-			"name": name_text, "pronoun": pron_text,
+			"name": name_text, "surname": surname_text, "pronoun": pron_text,
 			"body": body_id, "face": face_id, "eyes": eyes_id, "hair": hair_id,
 			"body_color": c_skin, "brow_color": c_brow, "eye_color": c_eye, "hair_color": c_hair
 		})

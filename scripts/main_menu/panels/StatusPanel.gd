@@ -434,8 +434,11 @@ func _read_hero_identity() -> Dictionary:
 			var id_v: Variant = _gs.get_meta("hero_identity")
 			if typeof(id_v) == TYPE_DICTIONARY:
 				var id: Dictionary = id_v
+				var first_name: String = String(id.get("name","Player"))
+				var surname: String = String(id.get("surname",""))
+				var full_name: String = "%s %s" % [first_name, surname] if surname != "" else first_name
 				return {
-					"name": String(id.get("name","Player")),
+					"name": full_name,
 					"pronoun": String(id.get("pronoun","they")),
 					"body": String(id.get("body","1")),
 					"face": String(id.get("face","1")),
