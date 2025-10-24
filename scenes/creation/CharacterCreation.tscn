@@ -36,8 +36,8 @@ text = "Name"
 [node name="NameInput" type="LineEdit" parent="Form/Grid"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 10
 size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 10
 placeholder_text = "First Name"
 max_length = 10
 
@@ -52,8 +52,8 @@ text = "Surname"
 [node name="SurnameInput" type="LineEdit" parent="Form/Grid"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 10
 size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 10
 placeholder_text = "Last Name"
 max_length = 10
 
@@ -68,8 +68,8 @@ text = "Pronoun"
 [node name="PronounInput" type="OptionButton" parent="Form/Grid"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 10
 size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 10
 
 [node name="SpacerRow2" type="Control" parent="Form/Grid"]
 custom_minimum_size = Vector2(10, 30)
@@ -93,8 +93,8 @@ text = "Body"
 [node name="BodyIdInput" type="OptionButton" parent="Form/Grid"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 10
 size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 10
 
 [node name="SpacerRow8" type="Control" parent="Form/Grid"]
 layout_mode = 2
@@ -107,8 +107,8 @@ text = "Face"
 [node name="FaceIdInput" type="OptionButton" parent="Form/Grid"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 10
 size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 10
 
 [node name="SpacerRow9" type="Control" parent="Form/Grid"]
 layout_mode = 2
@@ -121,8 +121,8 @@ text = "Hair"
 [node name="HairIdInput" type="OptionButton" parent="Form/Grid"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 10
 size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 10
 
 [node name="SpacerRow10" type="Control" parent="Form/Grid"]
 layout_mode = 2
@@ -135,8 +135,8 @@ text = "Eyes"
 [node name="EyesIdInput" type="OptionButton" parent="Form/Grid"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 10
 size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 10
 
 [node name="SpacerRow4" type="Control" parent="Form/Grid"]
 custom_minimum_size = Vector2(10, 30)
@@ -154,8 +154,8 @@ text = "Skin Tone"
 [node name="BodyColorInput" type="OptionButton" parent="Form/Grid"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 10
 size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 10
 
 [node name="BodyColorSwatch" type="ColorRect" parent="Form/Grid"]
 unique_name_in_owner = true
@@ -170,8 +170,8 @@ text = "Eyebrow Color"
 [node name="EyebrowColorInput" type="OptionButton" parent="Form/Grid"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 10
 size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 10
 
 [node name="EyebrowColorSwatch" type="ColorRect" parent="Form/Grid"]
 unique_name_in_owner = true
@@ -186,8 +186,8 @@ text = "Eye Color"
 [node name="EyeColorInput" type="OptionButton" parent="Form/Grid"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 10
 size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 10
 
 [node name="EyeColorSwatch" type="ColorRect" parent="Form/Grid"]
 unique_name_in_owner = true
@@ -202,8 +202,8 @@ text = "Hair Color"
 [node name="HairColorInput" type="OptionButton" parent="Form/Grid"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 10
 size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 10
 
 [node name="HairColorSwatch" type="ColorRect" parent="Form/Grid"]
 unique_name_in_owner = true
@@ -248,8 +248,8 @@ text = "Focus"
 unique_name_in_owner = true
 modulate = Color(1, 0.4, 0.4, 1)
 layout_mode = 2
-theme_override_font_sizes/font_size = 10
 size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 10
 
 [node name="Buttons" type="HBoxContainer" parent="Form"]
 layout_mode = 2
