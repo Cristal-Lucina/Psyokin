@@ -2,7 +2,7 @@
 
 ## Overview
 
-This is a standalone experimental scene for testing the Mana Seed character layering system. It allows you to mix and match different character parts (body, outfit, hair, hats) and see them layer correctly in real-time.
+This is a standalone experimental scene for testing the Mana Seed character layering system. It allows you to mix and match different character parts (body, outfit, hair, hats) and see them layer correctly in real-time. The character displays in idle/standing pose for easy customization preview.
 
 ## Location
 
@@ -24,8 +24,8 @@ This is a standalone experimental scene for testing the Mana Seed character laye
 The character creator has two main panels:
 
 #### Left Panel: Preview
-- **Character Display**: Shows the layered character with auto-playing walk animation
-- **Frame Counter**: Shows current animation frame (0-7)
+- **Character Display**: Shows the layered character in idle/standing pose
+- **Pose Label**: Shows "Pose: Idle" (frame 0 of each direction)
 - **Direction Label**: Shows current facing direction
 
 #### Right Panel: Controls
@@ -42,11 +42,14 @@ The character creator has two main panels:
 3. Click **"None"** to remove a layer
 4. Parts automatically **layer correctly** (base → outfit → hair → hat)
 
-### Animation
+### Viewing Directions
 
-- The character **automatically animates** using the walk cycle
-- **8 frames** loop continuously
-- Use **Direction buttons** to see all 4 facing directions
+- The character displays the **idle/standing pose** (frame 0)
+- Use **Direction buttons** to rotate the character
+- See all 4 facing directions: South, West, East, North
+- Animation is **disabled** to focus on customization
+
+**Note**: To enable walk animation, uncomment the `_process()` function in CharacterCreator.gd
 
 ## Character System Details
 
@@ -122,16 +125,24 @@ var cloak_container = parts_container.get_node("CloakSection/CloakOptions")
 populate_layer_options(cloak_container, "cloak")
 ```
 
-### Animation Speed
+### Enabling Animation (Optional)
 
-Current animation timing (CharacterCreator.gd:47):
+Animation is currently **disabled** to show only the idle standing pose. To re-enable the walk animation:
+
+1. Open `scripts/experiments/CharacterCreator.gd`
+2. Uncomment the animation variables (lines 52-53):
 ```gdscript
+var animation_timer = 0.0
 var animation_speed = 0.135  # 135ms per frame (walk speed)
 ```
+3. Uncomment the `_process()` function (lines 64-70)
+4. Change line 206 back to: `frame_label.text = "Frame: " + str(current_frame)`
 
-Change this to adjust animation playback speed:
-- Walk: 0.135 (135ms)
-- Run: See guide for variable frame timing
+Animation speed can be adjusted:
+- Walk: 0.135 (135ms per frame)
+- Run: See original guide for variable frame timing
+- Slower: Increase the value (e.g., 0.200)
+- Faster: Decrease the value (e.g., 0.100)
 
 ### Frame Calculation
 

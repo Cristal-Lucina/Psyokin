@@ -45,11 +45,12 @@ const DIRECTIONS = {
 
 # State
 var current_direction = 0  # South
-var current_frame = 0
+var current_frame = 0  # Always 0 for idle/standing pose
 var available_parts = {}
 var current_selections = {}
-var animation_timer = 0.0
-var animation_speed = 0.135  # 135ms per frame for walk
+# Animation disabled - showing idle frames only
+# var animation_timer = 0.0
+# var animation_speed = 0.135  # 135ms per frame for walk
 
 func _ready():
 	print("Character Creator starting...")
@@ -58,13 +59,15 @@ func _ready():
 	set_default_character()
 	update_preview()
 
-func _process(delta):
-	# Simple animation cycling
-	animation_timer += delta
-	if animation_timer >= animation_speed:
-		animation_timer = 0.0
-		current_frame = (current_frame + 1) % 8
-		update_frame_display()
+# Animation disabled - showing idle standing frames only
+# To re-enable animation, uncomment this function and the animation variables above
+# func _process(delta):
+# 	# Simple animation cycling
+# 	animation_timer += delta
+# 	if animation_timer >= animation_speed:
+# 		animation_timer = 0.0
+# 		current_frame = (current_frame + 1) % 8
+# 		update_frame_display()
 
 func scan_character_assets():
 	"""Scan the character assets folder to find all available parts"""
@@ -197,9 +200,10 @@ func update_frame_display():
 		var sprite = character_layers.get_node(layer.node_name)
 		if sprite.visible and sprite.texture:
 			# Calculate frame index: direction_row * 8 + current_frame
+			# Frame 0 of each row is the idle/standing pose
 			sprite.frame = current_direction * 8 + current_frame
 
-	frame_label.text = "Frame: " + str(current_frame)
+	frame_label.text = "Pose: Idle"
 	direction_label.text = "Direction: " + DIRECTIONS[current_direction]
 
 func _on_direction_changed(direction: int):
