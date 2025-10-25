@@ -17,15 +17,16 @@
 ##   • 8 layers: base, outfit, cloak, face, hair, hat, tool_a, tool_b
 ##   • Sprite sheets: 512x512, 8x8 grid (64x64 per frame)
 ##   • Sprite layout (1-indexed sprite numbers):
-##     Row 1 (1-8):   Idle S(1), Push S(2-3), Pull S(4-5), Crouch S(6), Jump S(7-8)
-##     Row 2 (9-16):  Idle N(9), Push N(10-11), Pull N(12-13), Crouch N(14), Jump N(15-16)
-##     Row 3 (17-24): Idle E(17), Push E(18-19), Pull E(20-21), Crouch E(22), Jump E(23-24)
-##     Row 4 (25-32): Idle W(25), Push W(26-27), Pull W(28-29), Crouch W(30), Jump W(31-32)
-##     Row 5 (33-40): Walk S(33-38), Run S(39-40)
-##     Row 6 (41-48): Walk N(41-46), Run N(47-48)
-##     Row 7 (49-56): Walk E(49-54), Run E(55-56)
-##     Row 8 (57-64): Walk W(57-62), Run W(63-64)
+##     Row 1 (1-8):   Idle S(1), Push S(2-3), Pull S(4-5), Jump S(6-8)
+##     Row 2 (9-16):  Idle N(9), Push N(10-11), Pull N(12-13), Jump N(14-16)
+##     Row 3 (17-24): Idle E(17), Push E(18-19), Pull E(20-21), Jump E(22-24)
+##     Row 4 (25-32): Idle W(25), Push W(26-27), Pull W(28-29), Jump W(30-32)
+##     Row 5 (33-40): Walk S(33-38), Run components S(39-40)
+##     Row 6 (41-48): Walk N(41-46), Run components N(47-48)
+##     Row 7 (49-56): Walk E(49-54), Run components E(55-56)
+##     Row 8 (57-64): Walk W(57-62), Run components W(63-64)
 ##   • Direction mapping: 0=South, 1=North, 2=East, 3=West
+##   • Run uses custom sequence: walk frames 1,2,7,4,5,8 (replaces 3rd and 6th with run frames)
 ##
 ## ═══════════════════════════════════════════════════════════════════════════
 
@@ -56,7 +57,7 @@ enum MovementState {
 	IDLE,
 	WALK,
 	RUN,
-	CROUCH,
+	JUMP,
 	PUSH,
 	PULL
 }
@@ -68,18 +69,23 @@ const PUSH_PULL_SPEED_MULT: float = 0.5
 # Animation constants
 const ANIM_FRAME_TIME: float = 0.135  # 135ms per frame for walk/run
 const WALK_FRAMES: int = 6  # 6 frames per walk cycle
-const RUN_FRAMES: int = 2  # 2 frames per run cycle
+const RUN_FRAMES: int = 6  # 6 frames per run cycle (custom sequence)
+const JUMP_FRAMES: int = 3  # 3 frames per jump animation
 const PUSH_FRAMES: int = 2  # 2 frames per push animation
 const PULL_FRAMES: int = 2  # 2 frames per pull animation
+
+# Run animation uses custom frame sequence: columns 0,1,6,3,4,7
+# This replaces the 3rd walk frame with 7th (first run frame)
+# and 6th walk frame with 8th (second run frame)
+const RUN_FRAME_SEQUENCE: Array[int] = [0, 1, 6, 3, 4, 7]
 
 # Frame layout (0-indexed, rows 0-3 for actions, rows 4-7 for walk/run):
 # Idle: column 0 (frames 0, 8, 16, 24)
 # Push: columns 1-2 (frames 1-2, 9-10, 17-18, 25-26)
 # Pull: columns 3-4 (frames 3-4, 11-12, 19-20, 27-28)
-# Crouch: column 5 (frames 5, 13, 21, 29)
-# Jump: columns 6-7 (frames 6-7, 14-15, 22-23, 30-31)
+# Jump: columns 5-7 (frames 5-7, 13-15, 21-23, 29-31)
 # Walk: row 4-7, columns 0-5 (frames 32-37, 40-45, 48-53, 56-61)
-# Run: row 4-7, columns 6-7 (frames 38-39, 46-47, 54-55, 62-63)
+# Run: row 4-7, custom sequence using columns 0,1,6,3,4,7
 
 # State
 var _current_state: MovementState = MovementState.IDLE
@@ -236,10 +242,9 @@ func _handle_movement(_delta: float) -> void:
 	var speed_mult: float = 1.0
 	var can_move: bool = true
 
-	if Input.is_key_pressed(KEY_C):
-		# Crouch - can't move, only change direction
-		_current_state = MovementState.CROUCH
-		can_move = false
+	if Input.is_key_pressed(KEY_SPACE):
+		# Jump - play jump animation, can still move
+		_current_state = MovementState.JUMP
 	elif Input.is_key_pressed(KEY_COMMA):
 		# Pull - half speed
 		_current_state = MovementState.PULL
@@ -294,19 +299,23 @@ func _update_animation(delta: float) -> void:
 			frame = (4 + _current_direction) * 8 + _anim_frame_index
 
 		MovementState.RUN:
-			# Run: rows 4-7, columns 6-7
-			# South: 38-39, North: 46-47, East: 54-55, West: 62-63
+			# Run: custom sequence using columns 0,1,6,3,4,7
+			# South: 32,33,38,35,36,39 North: 40,41,46,43,44,47
+			# East: 48,49,54,51,52,55 West: 56,57,62,59,60,63
 			_anim_frame_timer += delta
 			if _anim_frame_timer >= ANIM_FRAME_TIME:
 				_anim_frame_timer -= ANIM_FRAME_TIME
 				_anim_frame_index = (_anim_frame_index + 1) % RUN_FRAMES
-			frame = (4 + _current_direction) * 8 + 6 + _anim_frame_index
+			var run_col: int = RUN_FRAME_SEQUENCE[_anim_frame_index]
+			frame = (4 + _current_direction) * 8 + run_col
 
-		MovementState.CROUCH:
-			# Crouch: column 5 (frames 5, 13, 21, 29)
-			frame = _current_direction * 8 + 5
-			_anim_frame_index = 0
-			_anim_frame_timer = 0.0
+		MovementState.JUMP:
+			# Jump: columns 5-7 (frames 5-7, 13-15, 21-23, 29-31)
+			_anim_frame_timer += delta
+			if _anim_frame_timer >= ANIM_FRAME_TIME:
+				_anim_frame_timer -= ANIM_FRAME_TIME
+				_anim_frame_index = (_anim_frame_index + 1) % JUMP_FRAMES
+			frame = _current_direction * 8 + 5 + _anim_frame_index
 
 		MovementState.PUSH:
 			# Push: columns 1-2 (frames 1-2, 9-10, 17-18, 25-26)
