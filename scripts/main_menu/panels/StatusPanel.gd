@@ -732,8 +732,8 @@ func _update_character_preview() -> void:
 				var texture = load(texture_path)
 				sprite.texture = texture
 				sprite.visible = true
-				# Set to idle pose (frame 0 of South direction, row 4)
-				sprite.frame = 4 * 8  # Row 4 (idle south), frame 0
+				# Set to idle pose (south idle = sprite 1 = frame 0)
+				sprite.frame = 0
 				print("[StatusPanel]   -> Loaded successfully, frame set to ", sprite.frame)
 			else:
 				print("[StatusPanel]   -> ERROR: File not found!")

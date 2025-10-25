@@ -51,21 +51,41 @@ const LAYERS = {
 # Movement settings
 @export var move_speed: float = 120.0
 
-# Animation constants
-const WALK_FRAME_TIME: float = 0.135  # 135ms per frame
-const WALK_FRAMES: int = 6  # 6 frames per walk cycle
+# Movement states
+enum MovementState {
+	IDLE,
+	WALK,
+	RUN,
+	CROUCH,
+	PUSH,
+	PULL
+}
 
-# Frame layout (0-indexed):
-# Idle: Row 0-3 (one row per direction), column 0
-# Walk: Row 4-7 (one row per direction), columns 0-5
-const IDLE_ROW_OFFSET: int = 0  # Idle frames in rows 0-3
-const WALK_ROW_OFFSET: int = 4  # Walk frames in rows 4-7
+# Speed multipliers
+const RUN_SPEED_MULT: float = 1.75
+const PUSH_PULL_SPEED_MULT: float = 0.5
+
+# Animation constants
+const ANIM_FRAME_TIME: float = 0.135  # 135ms per frame for walk/run
+const WALK_FRAMES: int = 6  # 6 frames per walk cycle
+const RUN_FRAMES: int = 2  # 2 frames per run cycle
+const PUSH_FRAMES: int = 2  # 2 frames per push animation
+const PULL_FRAMES: int = 2  # 2 frames per pull animation
+
+# Frame layout (0-indexed, rows 0-3 for actions, rows 4-7 for walk/run):
+# Idle: column 0 (frames 0, 8, 16, 24)
+# Push: columns 1-2 (frames 1-2, 9-10, 17-18, 25-26)
+# Pull: columns 3-4 (frames 3-4, 11-12, 19-20, 27-28)
+# Crouch: column 5 (frames 5, 13, 21, 29)
+# Jump: columns 6-7 (frames 6-7, 14-15, 22-23, 30-31)
+# Walk: row 4-7, columns 0-5 (frames 32-37, 40-45, 48-53, 56-61)
+# Run: row 4-7, columns 6-7 (frames 38-39, 46-47, 54-55, 62-63)
 
 # State
+var _current_state: MovementState = MovementState.IDLE
 var _current_direction: int = 0  # 0=South, 1=North, 2=East, 3=West
-var _walk_frame_index: int = 0
-var _walk_frame_timer: float = 0.0
-var _is_walking: bool = false
+var _anim_frame_index: int = 0
+var _anim_frame_timer: float = 0.0
 
 # Nodes
 @onready var character_layers: Node2D = $CharacterLayers
@@ -182,7 +202,7 @@ func _handle_movement(_delta: float) -> void:
 	"""Handle player input and movement"""
 	var input_vector := Vector2.ZERO
 
-	# Get input (WASD and arrow keys)
+	# Get directional input (WASD and arrow keys)
 	if Input.is_action_pressed("ui_right") or Input.is_key_pressed(KEY_D):
 		input_vector.x += 1
 	if Input.is_action_pressed("ui_left") or Input.is_key_pressed(KEY_A):
@@ -195,9 +215,9 @@ func _handle_movement(_delta: float) -> void:
 	# Normalize diagonal movement
 	if input_vector.length() > 0:
 		input_vector = input_vector.normalized()
-		_is_walking = true
 
-		# Update direction based on input
+	# Update direction based on input (even if not moving, for crouch)
+	if input_vector.length() > 0:
 		# Prioritize horizontal movement for 4-directional sprites
 		if abs(input_vector.x) > abs(input_vector.y):
 			# Moving horizontally
@@ -211,48 +231,102 @@ func _handle_movement(_delta: float) -> void:
 				_current_direction = 0  # South
 			else:
 				_current_direction = 1  # North
+
+	# Determine movement state based on modifier keys
+	var speed_mult: float = 1.0
+	var can_move: bool = true
+
+	if Input.is_key_pressed(KEY_C):
+		# Crouch - can't move, only change direction
+		_current_state = MovementState.CROUCH
+		can_move = false
+	elif Input.is_key_pressed(KEY_COMMA):
+		# Pull - half speed
+		_current_state = MovementState.PULL
+		speed_mult = PUSH_PULL_SPEED_MULT
+	elif Input.is_key_pressed(KEY_PERIOD):
+		# Push - half speed
+		_current_state = MovementState.PUSH
+		speed_mult = PUSH_PULL_SPEED_MULT
+	elif Input.is_key_pressed(KEY_SHIFT):
+		# Run - increased speed
+		if input_vector.length() > 0:
+			_current_state = MovementState.RUN
+			speed_mult = RUN_SPEED_MULT
+		else:
+			_current_state = MovementState.IDLE
 	else:
-		_is_walking = false
+		# Walk or Idle
+		if input_vector.length() > 0:
+			_current_state = MovementState.WALK
+		else:
+			_current_state = MovementState.IDLE
 
 	# Apply movement
-	velocity = input_vector * move_speed
+	if can_move:
+		velocity = input_vector * move_speed * speed_mult
+	else:
+		velocity = Vector2.ZERO
+
 	move_and_slide()
 
 func _update_animation(delta: float) -> void:
-	"""Update sprite animation frames"""
+	"""Update sprite animation frames based on current state"""
 	if not character_layers:
 		return
 
-	if _is_walking:
-		# Update walk animation timer
-		_walk_frame_timer += delta
-		if _walk_frame_timer >= WALK_FRAME_TIME:
-			_walk_frame_timer -= WALK_FRAME_TIME
-			_walk_frame_index = (_walk_frame_index + 1) % WALK_FRAMES
+	var frame: int = 0
 
-		# Calculate walk frame: rows 4-7, columns 0-5
-		# South walk: frames 32-37, North: 40-45, East: 48-53, West: 56-61
-		var walk_row: int = WALK_ROW_OFFSET + _current_direction
-		var frame: int = walk_row * 8 + _walk_frame_index
+	match _current_state:
+		MovementState.IDLE:
+			# Idle: column 0 (frames 0, 8, 16, 24)
+			frame = _current_direction * 8
+			_anim_frame_index = 0
+			_anim_frame_timer = 0.0
 
-		# Update all visible sprites
-		for layer_key in LAYERS:
-			var layer = LAYERS[layer_key]
-			var sprite: Sprite2D = character_layers.get_node(layer.node_name)
-			if sprite and sprite.visible and sprite.texture:
-				sprite.frame = frame
-	else:
-		# Calculate idle frame: rows 0-3, column 0
-		# South: 0, North: 8, East: 16, West: 24
-		var idle_frame: int = _current_direction * 8
+		MovementState.WALK:
+			# Walk: rows 4-7, columns 0-5
+			# South: 32-37, North: 40-45, East: 48-53, West: 56-61
+			_anim_frame_timer += delta
+			if _anim_frame_timer >= ANIM_FRAME_TIME:
+				_anim_frame_timer -= ANIM_FRAME_TIME
+				_anim_frame_index = (_anim_frame_index + 1) % WALK_FRAMES
+			frame = (4 + _current_direction) * 8 + _anim_frame_index
 
-		# Reset walk animation when stopping
-		_walk_frame_index = 0
-		_walk_frame_timer = 0.0
+		MovementState.RUN:
+			# Run: rows 4-7, columns 6-7
+			# South: 38-39, North: 46-47, East: 54-55, West: 62-63
+			_anim_frame_timer += delta
+			if _anim_frame_timer >= ANIM_FRAME_TIME:
+				_anim_frame_timer -= ANIM_FRAME_TIME
+				_anim_frame_index = (_anim_frame_index + 1) % RUN_FRAMES
+			frame = (4 + _current_direction) * 8 + 6 + _anim_frame_index
 
-		# Update all visible sprites
-		for layer_key in LAYERS:
-			var layer = LAYERS[layer_key]
-			var sprite: Sprite2D = character_layers.get_node(layer.node_name)
-			if sprite and sprite.visible and sprite.texture:
-				sprite.frame = idle_frame
+		MovementState.CROUCH:
+			# Crouch: column 5 (frames 5, 13, 21, 29)
+			frame = _current_direction * 8 + 5
+			_anim_frame_index = 0
+			_anim_frame_timer = 0.0
+
+		MovementState.PUSH:
+			# Push: columns 1-2 (frames 1-2, 9-10, 17-18, 25-26)
+			_anim_frame_timer += delta
+			if _anim_frame_timer >= ANIM_FRAME_TIME:
+				_anim_frame_timer -= ANIM_FRAME_TIME
+				_anim_frame_index = (_anim_frame_index + 1) % PUSH_FRAMES
+			frame = _current_direction * 8 + 1 + _anim_frame_index
+
+		MovementState.PULL:
+			# Pull: columns 3-4 (frames 3-4, 11-12, 19-20, 27-28)
+			_anim_frame_timer += delta
+			if _anim_frame_timer >= ANIM_FRAME_TIME:
+				_anim_frame_timer -= ANIM_FRAME_TIME
+				_anim_frame_index = (_anim_frame_index + 1) % PULL_FRAMES
+			frame = _current_direction * 8 + 3 + _anim_frame_index
+
+	# Update all visible sprites
+	for layer_key in LAYERS:
+		var layer = LAYERS[layer_key]
+		var sprite: Sprite2D = character_layers.get_node(layer.node_name)
+		if sprite and sprite.visible and sprite.texture:
+			sprite.frame = frame
