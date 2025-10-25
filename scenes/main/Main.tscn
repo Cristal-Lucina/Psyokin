@@ -24,6 +24,8 @@ metadata/_edit_snap_size = Vector2(32, 32)
 tile_set = ExtResource("4")
 rendering_quadrant_size = 32
 format = 2
+metadata/_edit_snap_grid = true
+metadata/_edit_snap_size = Vector2(32, 32)
 
 [node name="Floor" type="TileMapLayer" parent="GameWorld/TileMap"]
 use_parent_material = true
