@@ -194,7 +194,44 @@ func _find_cps() -> Node:
 # --- Dorm hooks (new) ----------------------------------------------------------
 var _prelock_layout: Dictionary = {}  # room_id -> aid (snapshot after Accept Plan)
 
+func _reparent_ui_to_canvas_layers() -> void:
+	"""Reparent UI elements to CanvasLayers so they stay fixed when camera moves"""
+	# Get the UI elements that need to be fixed
+	var margin_container: MarginContainer = get_node_or_null("MarginContainer") as MarginContainer
+	var overlays: Control = get_node_or_null("Overlays") as Control
+
+	if margin_container:
+		# Create CanvasLayer for main UI
+		var ui_layer := CanvasLayer.new()
+		ui_layer.name = "UILayer"
+		ui_layer.process_mode = Node.PROCESS_MODE_ALWAYS  # Continue processing when paused
+		add_child(ui_layer)
+
+		# Reparent MarginContainer to UILayer
+		margin_container.reparent(ui_layer)
+
+	if overlays:
+		# Create CanvasLayer for overlays (menus)
+		var overlays_layer := CanvasLayer.new()
+		overlays_layer.name = "OverlaysLayer"
+		overlays_layer.process_mode = Node.PROCESS_MODE_ALWAYS  # Continue processing when paused
+		add_child(overlays_layer)
+
+		# Reparent Overlays to OverlaysLayer
+		overlays.reparent(overlays_layer)
+
 func _ready() -> void:
+	# Allow input processing even when game is paused (for menu toggle)
+	process_mode = Node.PROCESS_MODE_ALWAYS
+
+	# Fix UI to stay in place with camera movement
+	_reparent_ui_to_canvas_layers()
+
+	# Ensure GameWorld pauses when game is paused
+	var game_world: Node2D = get_node_or_null("GameWorld") as Node2D
+	if game_world:
+		game_world.process_mode = Node.PROCESS_MODE_PAUSABLE
+
 	# Systems
 	calendar = get_node_or_null(CALENDAR_PATH)
 	stats    = get_node_or_null(STATS_PATH)
@@ -219,7 +256,7 @@ func _ready() -> void:
 	_btn_add_sxp    = get_node_or_null("MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot/SxpRow/BtnAddSXP")
 
 	# Overlays shouldn't block input
-	var overlays: Control = get_node_or_null("Overlays") as Control
+	var overlays: Control = get_node_or_null("OverlaysLayer/Overlays") as Control
 	if overlays:
 		overlays.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
@@ -330,6 +367,8 @@ func _toggle_game_menu() -> void:
 		if _game_menu.visible and not _menu_can_close():
 			return
 		_game_menu.visible = not _game_menu.visible
+		# Pause/unpause the game based on menu visibility
+		get_tree().paused = _game_menu.visible
 		return
 	if not ResourceLoader.exists(GAME_MENU_SCENE): return
 	var ps: PackedScene = load(GAME_MENU_SCENE) as PackedScene
@@ -338,15 +377,19 @@ func _toggle_game_menu() -> void:
 	_game_menu.name = "GameMenu"
 	_game_menu.mouse_filter = Control.MOUSE_FILTER_STOP
 	_game_menu.process_mode = Node.PROCESS_MODE_ALWAYS
-	var parent: Node = get_node_or_null("Overlays")
+	var parent: Node = get_node_or_null("OverlaysLayer/Overlays")
 	if parent == null: parent = self
 	parent.add_child(_game_menu)
 	_game_menu.visible = true
 	_game_menu.move_to_front()
+	# Pause the game when menu is opened
+	get_tree().paused = true
 
 func _toggle_phone_menu() -> void:
 	if _phone_menu and is_instance_valid(_phone_menu):
 		_phone_menu.visible = not _phone_menu.visible
+		# Pause/unpause the game based on menu visibility
+		get_tree().paused = _phone_menu.visible
 		return
 	if not ResourceLoader.exists(PHONE_MENU_SCENE): return
 	var ps: PackedScene = load(PHONE_MENU_SCENE) as PackedScene
@@ -357,11 +400,13 @@ func _toggle_phone_menu() -> void:
 	_phone_menu.process_mode = Node.PROCESS_MODE_ALWAYS
 	_phone_menu.top_level = true
 	_phone_menu.set_anchors_preset(Control.PRESET_FULL_RECT)
-	var parent: Node = get_node_or_null("Overlays")
+	var parent: Node = get_node_or_null("OverlaysLayer/Overlays")
 	if parent == null: parent = self
 	parent.add_child(_phone_menu)
 	_phone_menu.visible = true
 	_phone_menu.move_to_front()
+	# Pause the game when menu is opened
+	get_tree().paused = true
 
 func _toggle_status_cheat_bar() -> void:
 	if _status_cheat_bar and is_instance_valid(_status_cheat_bar):
@@ -382,7 +427,7 @@ func _toggle_status_cheat_bar() -> void:
 	_status_cheat_bar.offset_top = -250
 	_status_cheat_bar.offset_right = 200
 	_status_cheat_bar.offset_bottom = 250
-	var parent: Node = get_node_or_null("Overlays")
+	var parent: Node = get_node_or_null("OverlaysLayer/Overlays")
 	if parent == null: parent = self
 	parent.add_child(_status_cheat_bar)
 	_status_cheat_bar.visible = true
