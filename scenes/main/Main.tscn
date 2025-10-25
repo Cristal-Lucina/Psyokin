@@ -13,8 +13,12 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1")
+metadata/_edit_snap_grid = true
+metadata/_edit_snap_size = Vector2(32, 32)
 
 [node name="GameWorld" type="Node2D" parent="."]
+metadata/_edit_snap_grid = true
+metadata/_edit_snap_size = Vector2(32, 32)
 
 [node name="TileMap" type="TileMap" parent="GameWorld"]
 tile_set = ExtResource("4")
