@@ -16,8 +16,15 @@
 ## SPRITE SYSTEM:
 ##   • 8 layers: base, outfit, cloak, face, hair, hat, tool_a, tool_b
 ##   • Sprite sheets: 512x512, 8x8 grid (64x64 per frame)
-##   • Rows 1-4: idle/push/pull/jump animations
-##   • Rows 5-8: walk animations (South/North/East/West)
+##   • Sprite layout (1-indexed sprite numbers):
+##     Row 1 (1-8):   Idle S(1), Push S(2-3), Pull S(4-5), Crouch S(6), Jump S(7-8)
+##     Row 2 (9-16):  Idle N(9), Push N(10-11), Pull N(12-13), Crouch N(14), Jump N(15-16)
+##     Row 3 (17-24): Idle E(17), Push E(18-19), Pull E(20-21), Crouch E(22), Jump E(23-24)
+##     Row 4 (25-32): Idle W(25), Push W(26-27), Pull W(28-29), Crouch W(30), Jump W(31-32)
+##     Row 5 (33-40): Walk S(33-38), Run S(39-40)
+##     Row 6 (41-48): Walk N(41-46), Run N(47-48)
+##     Row 7 (49-56): Walk E(49-54), Run E(55-56)
+##     Row 8 (57-64): Walk W(57-62), Run W(63-64)
 ##   • Direction mapping: 0=South, 1=North, 2=East, 3=West
 ##
 ## ═══════════════════════════════════════════════════════════════════════════
@@ -47,9 +54,12 @@ const LAYERS = {
 # Animation constants
 const WALK_FRAME_TIME: float = 0.135  # 135ms per frame
 const WALK_FRAMES: int = 6  # 6 frames per walk cycle
-const ANIM_ROW_START: int = 4  # Rows 5-8 (indices 4-7) contain all animations
-const IDLE_COLUMN: int = 0  # Column 0 in each row is the idle pose
-const WALK_COLUMN_START: int = 1  # Columns 1-6 are the walk cycle
+
+# Frame layout (0-indexed):
+# Idle: Row 0-3 (one row per direction), column 0
+# Walk: Row 4-7 (one row per direction), columns 0-5
+const IDLE_ROW_OFFSET: int = 0  # Idle frames in rows 0-3
+const WALK_ROW_OFFSET: int = 4  # Walk frames in rows 4-7
 
 # State
 var _current_direction: int = 0  # 0=South, 1=North, 2=East, 3=West
@@ -131,8 +141,9 @@ func _load_character_appearance() -> void:
 				var texture = load(texture_path)
 				sprite.texture = texture
 				sprite.visible = true
-				# Set to idle pose (row for direction + idle column)
-				sprite.frame = (ANIM_ROW_START + _current_direction) * 8 + IDLE_COLUMN
+				# Set to idle pose: rows 0-3, column 0
+				# Frame = direction * 8 (South=0, North=8, East=16, West=24)
+				sprite.frame = _current_direction * 8
 				print("[Player]   -> Loaded successfully, frame set to ", sprite.frame)
 			else:
 				print("[Player]   -> ERROR: File not found!")
@@ -219,10 +230,10 @@ func _update_animation(delta: float) -> void:
 			_walk_frame_timer -= WALK_FRAME_TIME
 			_walk_frame_index = (_walk_frame_index + 1) % WALK_FRAMES
 
-		# Calculate frame: row for direction, column for walk frame
-		# Each direction has its own row (4-7), walk frames are in columns 1-6
-		var anim_row: int = ANIM_ROW_START + _current_direction
-		var frame: int = anim_row * 8 + WALK_COLUMN_START + _walk_frame_index
+		# Calculate walk frame: rows 4-7, columns 0-5
+		# South walk: frames 32-37, North: 40-45, East: 48-53, West: 56-61
+		var walk_row: int = WALK_ROW_OFFSET + _current_direction
+		var frame: int = walk_row * 8 + _walk_frame_index
 
 		# Update all visible sprites
 		for layer_key in LAYERS:
@@ -231,9 +242,9 @@ func _update_animation(delta: float) -> void:
 			if sprite and sprite.visible and sprite.texture:
 				sprite.frame = frame
 	else:
-		# Idle animation: column 0 of the current direction's row
-		var anim_row: int = ANIM_ROW_START + _current_direction
-		var idle_frame: int = anim_row * 8 + IDLE_COLUMN
+		# Calculate idle frame: rows 0-3, column 0
+		# South: 0, North: 8, East: 16, West: 24
+		var idle_frame: int = _current_direction * 8
 
 		# Reset walk animation when stopping
 		_walk_frame_index = 0
