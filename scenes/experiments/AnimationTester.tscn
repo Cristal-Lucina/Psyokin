@@ -1,8 +1,8 @@
-[gd_scene load_steps=2 format=3 uid="uid://bkv7x8y9z0a1b2c3"]
+[gd_scene load_steps=2 format=3 uid="uid://c9d8e7f6g5h4i3j2"]
 
-[ext_resource type="Script" path="res://scripts/experiments/CharacterCreator.gd" id="1_script"]
+[ext_resource type="Script" path="res://scripts/experiments/AnimationTester.gd" id="1_script"]
 
-[node name="CharacterCreatorExperiment" type="Control"]
+[node name="AnimationTester" type="Control"]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -38,7 +38,7 @@ layout_mode = 2
 
 [node name="Title" type="Label" parent="MainContainer/PreviewPanel/PreviewContainer"]
 layout_mode = 2
-text = "Character Preview"
+text = "Animation Preview"
 horizontal_alignment = 1
 
 [node name="CenterContainer" type="CenterContainer" parent="MainContainer/PreviewPanel/PreviewContainer"]
@@ -89,14 +89,18 @@ texture_filter = 1
 hframes = 8
 vframes = 8
 
-[node name="AnimationControls" type="HBoxContainer" parent="MainContainer/PreviewPanel/PreviewContainer"]
+[node name="AnimationInfo" type="HBoxContainer" parent="MainContainer/PreviewPanel/PreviewContainer"]
 layout_mode = 2
 
-[node name="FrameLabel" type="Label" parent="MainContainer/PreviewPanel/PreviewContainer/AnimationControls"]
+[node name="AnimLabel" type="Label" parent="MainContainer/PreviewPanel/PreviewContainer/AnimationInfo"]
+layout_mode = 2
+text = "Animation: Walk"
+
+[node name="FrameLabel" type="Label" parent="MainContainer/PreviewPanel/PreviewContainer/AnimationInfo"]
 layout_mode = 2
 text = "Frame: 0"
 
-[node name="DirectionLabel" type="Label" parent="MainContainer/PreviewPanel/PreviewContainer/AnimationControls"]
+[node name="DirectionLabel" type="Label" parent="MainContainer/PreviewPanel/PreviewContainer/AnimationInfo"]
 layout_mode = 2
 text = "Direction: South"
 
@@ -110,82 +114,53 @@ layout_mode = 2
 
 [node name="Title" type="Label" parent="MainContainer/ControlsPanel/ControlsContainer"]
 layout_mode = 2
-text = "Character Customization"
+text = "Animation Tester"
 horizontal_alignment = 1
 
-[node name="ScrollContainer" type="ScrollContainer" parent="MainContainer/ControlsPanel/ControlsContainer"]
-layout_mode = 2
-size_flags_vertical = 3
-
-[node name="PartsContainer" type="VBoxContainer" parent="MainContainer/ControlsPanel/ControlsContainer/ScrollContainer"]
-layout_mode = 2
-size_flags_horizontal = 3
-size_flags_vertical = 3
-
-[node name="BaseSection" type="VBoxContainer" parent="MainContainer/ControlsPanel/ControlsContainer/ScrollContainer/PartsContainer"]
+[node name="CharacterInfo" type="VBoxContainer" parent="MainContainer/ControlsPanel/ControlsContainer"]
 layout_mode = 2
 
-[node name="BaseLabel" type="Label" parent="MainContainer/ControlsPanel/ControlsContainer/ScrollContainer/PartsContainer/BaseSection"]
+[node name="InfoLabel" type="Label" parent="MainContainer/ControlsPanel/ControlsContainer/CharacterInfo"]
 layout_mode = 2
-text = "Base Body (0bas)"
+text = "Selected Character:"
 
-[node name="BaseOptions" type="VBoxContainer" parent="MainContainer/ControlsPanel/ControlsContainer/ScrollContainer/PartsContainer/BaseSection"]
+[node name="VariantsLabel" type="Label" parent="MainContainer/ControlsPanel/ControlsContainer/CharacterInfo"]
 layout_mode = 2
-
-[node name="Separator1" type="HSeparator" parent="MainContainer/ControlsPanel/ControlsContainer/ScrollContainer/PartsContainer"]
-layout_mode = 2
-
-[node name="OutfitSection" type="VBoxContainer" parent="MainContainer/ControlsPanel/ControlsContainer/ScrollContainer/PartsContainer"]
-layout_mode = 2
-
-[node name="OutfitLabel" type="Label" parent="MainContainer/ControlsPanel/ControlsContainer/ScrollContainer/PartsContainer/OutfitSection"]
-layout_mode = 2
-text = "Outfit (1out)"
-
-[node name="OutfitOptions" type="VBoxContainer" parent="MainContainer/ControlsPanel/ControlsContainer/ScrollContainer/PartsContainer/OutfitSection"]
-layout_mode = 2
-
-[node name="Separator2" type="HSeparator" parent="MainContainer/ControlsPanel/ControlsContainer/ScrollContainer/PartsContainer"]
-layout_mode = 2
-
-[node name="HairSection" type="VBoxContainer" parent="MainContainer/ControlsPanel/ControlsContainer/ScrollContainer/PartsContainer"]
-layout_mode = 2
-
-[node name="HairLabel" type="Label" parent="MainContainer/ControlsPanel/ControlsContainer/ScrollContainer/PartsContainer/HairSection"]
-layout_mode = 2
-text = "Hair (4har)"
-
-[node name="HairOptions" type="VBoxContainer" parent="MainContainer/ControlsPanel/ControlsContainer/ScrollContainer/PartsContainer/HairSection"]
-layout_mode = 2
-
-[node name="Separator3" type="HSeparator" parent="MainContainer/ControlsPanel/ControlsContainer/ScrollContainer/PartsContainer"]
-layout_mode = 2
-
-[node name="HatSection" type="VBoxContainer" parent="MainContainer/ControlsPanel/ControlsContainer/ScrollContainer/PartsContainer"]
-layout_mode = 2
-
-[node name="HatLabel" type="Label" parent="MainContainer/ControlsPanel/ControlsContainer/ScrollContainer/PartsContainer/HatSection"]
-layout_mode = 2
-text = "Hat (5hat)"
-
-[node name="HatOptions" type="VBoxContainer" parent="MainContainer/ControlsPanel/ControlsContainer/ScrollContainer/PartsContainer"]
-layout_mode = 2
-
-[node name="ContinueSection" type="VBoxContainer" parent="MainContainer/ControlsPanel/ControlsContainer"]
-layout_mode = 2
-
-[node name="Separator" type="HSeparator" parent="MainContainer/ControlsPanel/ControlsContainer/ContinueSection"]
-layout_mode = 2
-
-[node name="ContinueBtn" type="Button" parent="MainContainer/ControlsPanel/ControlsContainer/ContinueSection"]
-layout_mode = 2
-text = "Continue to Animation Tester"
-
-[node name="SelectionInfo" type="Label" parent="MainContainer/ControlsPanel/ControlsContainer/ContinueSection"]
-layout_mode = 2
-text = "Select character parts above"
-horizontal_alignment = 1
+text = "Variants will appear here"
 autowrap_mode = 2
+
+[node name="Separator1" type="HSeparator" parent="MainContainer/ControlsPanel/ControlsContainer"]
+layout_mode = 2
+
+[node name="AnimationSelect" type="VBoxContainer" parent="MainContainer/ControlsPanel/ControlsContainer"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="MainContainer/ControlsPanel/ControlsContainer/AnimationSelect"]
+layout_mode = 2
+text = "Select Animation"
+
+[node name="WalkBtn" type="Button" parent="MainContainer/ControlsPanel/ControlsContainer/AnimationSelect"]
+layout_mode = 2
+text = "Walk (p1)"
+
+[node name="RunBtn" type="Button" parent="MainContainer/ControlsPanel/ControlsContainer/AnimationSelect"]
+layout_mode = 2
+text = "Run (p1)"
+
+[node name="JumpBtn" type="Button" parent="MainContainer/ControlsPanel/ControlsContainer/AnimationSelect"]
+layout_mode = 2
+text = "Jump (p1)"
+
+[node name="PushBtn" type="Button" parent="MainContainer/ControlsPanel/ControlsContainer/AnimationSelect"]
+layout_mode = 2
+text = "Push (p1)"
+
+[node name="PullBtn" type="Button" parent="MainContainer/ControlsPanel/ControlsContainer/AnimationSelect"]
+layout_mode = 2
+text = "Pull (p1)"
+
+[node name="Separator2" type="HSeparator" parent="MainContainer/ControlsPanel/ControlsContainer"]
+layout_mode = 2
 
 [node name="DirectionControls" type="VBoxContainer" parent="MainContainer/ControlsPanel/ControlsContainer"]
 layout_mode = 2
@@ -217,8 +192,20 @@ layout_mode = 2
 size_flags_horizontal = 3
 text = "North"
 
-[connection signal="pressed" from="MainContainer/ControlsPanel/ControlsContainer/ContinueSection/ContinueBtn" to="." method="_on_continue_pressed"]
+[node name="Separator3" type="HSeparator" parent="MainContainer/ControlsPanel/ControlsContainer"]
+layout_mode = 2
+
+[node name="BackBtn" type="Button" parent="MainContainer/ControlsPanel/ControlsContainer"]
+layout_mode = 2
+text = "Back to Character Creator"
+
+[connection signal="pressed" from="MainContainer/ControlsPanel/ControlsContainer/AnimationSelect/WalkBtn" to="." method="_on_animation_selected" binds= ["walk"]]
+[connection signal="pressed" from="MainContainer/ControlsPanel/ControlsContainer/AnimationSelect/RunBtn" to="." method="_on_animation_selected" binds= ["run"]]
+[connection signal="pressed" from="MainContainer/ControlsPanel/ControlsContainer/AnimationSelect/JumpBtn" to="." method="_on_animation_selected" binds= ["jump"]]
+[connection signal="pressed" from="MainContainer/ControlsPanel/ControlsContainer/AnimationSelect/PushBtn" to="." method="_on_animation_selected" binds= ["push"]]
+[connection signal="pressed" from="MainContainer/ControlsPanel/ControlsContainer/AnimationSelect/PullBtn" to="." method="_on_animation_selected" binds= ["pull"]]
 [connection signal="pressed" from="MainContainer/ControlsPanel/ControlsContainer/DirectionControls/DirectionButtons/SouthBtn" to="." method="_on_direction_changed" binds= [0]]
 [connection signal="pressed" from="MainContainer/ControlsPanel/ControlsContainer/DirectionControls/DirectionButtons/WestBtn" to="." method="_on_direction_changed" binds= [3]]
 [connection signal="pressed" from="MainContainer/ControlsPanel/ControlsContainer/DirectionControls/DirectionButtons/EastBtn" to="." method="_on_direction_changed" binds= [2]]
 [connection signal="pressed" from="MainContainer/ControlsPanel/ControlsContainer/DirectionControls/DirectionButtons/NorthBtn" to="." method="_on_direction_changed" binds= [1]]
+[connection signal="pressed" from="MainContainer/ControlsPanel/ControlsContainer/BackBtn" to="." method="_on_back_pressed"]
