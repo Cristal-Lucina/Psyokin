@@ -405,6 +405,7 @@ func _on_confirm_pressed() -> void:
 	var pron_text: String = _opt_text(_pron_in)
 
 	# Save character variant data to CharacterData autoload
+	print("[CharacterCreation] Saving character variants: ", selected_variants)
 	aCharacterData.set_character(selected_variants, current_selections)
 
 	var gs: Node = get_node_or_null(GS_PATH)
@@ -413,12 +414,14 @@ func _on_confirm_pressed() -> void:
 		var full_name: String = "%s %s" % [name_text, surname_text]
 		if gs.has_method("set"):
 			gs.set("player_name", full_name)
+		print("[CharacterCreation] Setting hero_identity meta with variants: ", selected_variants)
 		gs.set_meta("hero_identity", {
 			"name": name_text,
 			"surname": surname_text,
 			"pronoun": pron_text,
 			"character_variants": selected_variants.duplicate()
 		})
+		print("[CharacterCreation] Saved to GameState successfully")
 		var picked := PackedStringArray()
 		for i in range(_selected_order.size()):
 			picked.append(_selected_order[i])

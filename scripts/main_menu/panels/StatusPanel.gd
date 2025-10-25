@@ -669,7 +669,10 @@ func _rebuild_appearance() -> void:
 
 func _update_character_preview() -> void:
 	"""Update the character preview with saved variant data"""
+	print("[StatusPanel] Updating character preview...")
+
 	if not character_layers:
+		print("[StatusPanel] ERROR: character_layers is null!")
 		return
 
 	# Get character variants from GameState
@@ -678,18 +681,42 @@ func _update_character_preview() -> void:
 		var id_v: Variant = _gs.get_meta("hero_identity")
 		if typeof(id_v) == TYPE_DICTIONARY:
 			var id: Dictionary = id_v
+			print("[StatusPanel] hero_identity found: ", id.keys())
 			if id.has("character_variants"):
 				var cv: Variant = id.get("character_variants")
 				if typeof(cv) == TYPE_DICTIONARY:
 					variants = cv
+					print("[StatusPanel] Loaded variants from GameState: ", variants)
+			else:
+				print("[StatusPanel] No character_variants in hero_identity")
+		else:
+			print("[StatusPanel] hero_identity is not a dictionary")
+	else:
+		print("[StatusPanel] No hero_identity meta found in GameState")
 
 	# If no variants saved, try to load from CharacterData autoload
 	if variants.is_empty():
+		print("[StatusPanel] Trying CharacterData autoload...")
 		var char_data = get_node_or_null("/root/aCharacterData")
-		if char_data and char_data.has_method("get"):
-			var sv: Variant = char_data.get("selected_variants")
-			if typeof(sv) == TYPE_DICTIONARY:
-				variants = sv
+		if char_data:
+			print("[StatusPanel] CharacterData found")
+			if char_data.has_method("get"):
+				var sv: Variant = char_data.get("selected_variants")
+				print("[StatusPanel] selected_variants type: ", typeof(sv))
+				if typeof(sv) == TYPE_DICTIONARY:
+					variants = sv
+					print("[StatusPanel] Loaded variants from CharacterData: ", variants)
+			elif char_data.get("selected_variants"):
+				var sv2 = char_data.get("selected_variants")
+				if typeof(sv2) == TYPE_DICTIONARY:
+					variants = sv2
+					print("[StatusPanel] Loaded variants from CharacterData (property): ", variants)
+		else:
+			print("[StatusPanel] CharacterData autoload not found")
+
+	if variants.is_empty():
+		print("[StatusPanel] WARNING: No character variants found!")
+		return
 
 	# Update each layer sprite
 	for layer_key in LAYERS:
@@ -698,14 +725,18 @@ func _update_character_preview() -> void:
 
 		if layer_key in variants and variants[layer_key] != "":
 			var variant_code = variants[layer_key]
+			print("[StatusPanel] Loading ", layer_key, " with variant: ", variant_code)
 			var texture_path = _find_character_file(layer_key, variant_code)
+			print("[StatusPanel]   -> Path: ", texture_path)
 			if texture_path != "" and FileAccess.file_exists(texture_path):
 				var texture = load(texture_path)
 				sprite.texture = texture
 				sprite.visible = true
 				# Set to idle pose (frame 0 of South direction, row 4)
 				sprite.frame = 4 * 8  # Row 4 (idle south), frame 0
+				print("[StatusPanel]   -> Loaded successfully, frame set to ", sprite.frame)
 			else:
+				print("[StatusPanel]   -> ERROR: File not found!")
 				sprite.texture = null
 				sprite.visible = false
 		else:
@@ -715,6 +746,7 @@ func _update_character_preview() -> void:
 func _find_character_file(layer_key: String, variant_code: String) -> String:
 	"""Find the character file for a given layer and variant code"""
 	if not LAYERS.has(layer_key):
+		print("[StatusPanel]     Layer key not found: ", layer_key)
 		return ""
 
 	var layer = LAYERS[layer_key]
@@ -724,9 +756,12 @@ func _find_character_file(layer_key: String, variant_code: String) -> String:
 		var filename = "%s_%s_%s.png" % [variant, layer.code, variant_code]
 		var full_path = layer_path + filename
 
+		print("[StatusPanel]     Trying: ", full_path)
 		if FileAccess.file_exists(full_path):
+			print("[StatusPanel]     FOUND!")
 			return full_path
 
+	print("[StatusPanel]     Not found in any variant")
 	return ""
 
 # --------------------- Small helpers -------------------------
