@@ -109,7 +109,7 @@ const LAYERS = {
 @onready var _hint    : RichTextLabel = $Root/Right/HintValue
 
 # Character Preview UI
-@onready var character_layers = $Root/Right/CharacterPreviewBox/CenterContainer/CharacterLayers
+@onready var character_layers = $Root/Right/CharacterPreviewBox/ViewportWrapper/CharacterLayers
 
 var _gs        : Node = null
 var _st        : Node = null
