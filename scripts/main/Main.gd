@@ -194,7 +194,34 @@ func _find_cps() -> Node:
 # --- Dorm hooks (new) ----------------------------------------------------------
 var _prelock_layout: Dictionary = {}  # room_id -> aid (snapshot after Accept Plan)
 
+func _reparent_ui_to_canvas_layers() -> void:
+	"""Reparent UI elements to CanvasLayers so they stay fixed when camera moves"""
+	# Get the UI elements that need to be fixed
+	var margin_container: MarginContainer = get_node_or_null("MarginContainer") as MarginContainer
+	var overlays: Control = get_node_or_null("Overlays") as Control
+
+	if margin_container:
+		# Create CanvasLayer for main UI
+		var ui_layer := CanvasLayer.new()
+		ui_layer.name = "UILayer"
+		add_child(ui_layer)
+
+		# Reparent MarginContainer to UILayer
+		margin_container.reparent(ui_layer)
+
+	if overlays:
+		# Create CanvasLayer for overlays (menus)
+		var overlays_layer := CanvasLayer.new()
+		overlays_layer.name = "OverlaysLayer"
+		add_child(overlays_layer)
+
+		# Reparent Overlays to OverlaysLayer
+		overlays.reparent(overlays_layer)
+
 func _ready() -> void:
+	# Fix UI to stay in place with camera movement
+	_reparent_ui_to_canvas_layers()
+
 	# Systems
 	calendar = get_node_or_null(CALENDAR_PATH)
 	stats    = get_node_or_null(STATS_PATH)
