@@ -29,74 +29,74 @@ offset_top = 24.0
 offset_right = -24.0
 offset_bottom = -24.0
 
-[node name="Root" type="VBoxContainer" parent="MarginContainer"]
+[node name="Root" type="VBoxContainer" parent="UILayer/MarginContainer"]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 theme_override_constants/separation = 8
 
-[node name="DateLabel" type="Label" parent="MarginContainer/Root"]
+[node name="DateLabel" type="Label" parent="UILayer/MarginContainer/Root"]
 layout_mode = 2
 
-[node name="PhaseLabel" type="Label" parent="MarginContainer/Root"]
+[node name="PhaseLabel" type="Label" parent="UILayer/MarginContainer/Root"]
 layout_mode = 2
 
-[node name="CheatContainer" type="VBoxContainer" parent="MarginContainer/Root"]
+[node name="CheatContainer" type="VBoxContainer" parent="UILayer/MarginContainer/Root"]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 theme_override_constants/separation = 8
 
-[node name="HBoxContainer" type="HBoxContainer" parent="MarginContainer/Root/CheatContainer"]
+[node name="HBoxContainer" type="HBoxContainer" parent="UILayer/MarginContainer/Root/CheatContainer"]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="AdvanceBtn" type="Button" parent="MarginContainer/Root/CheatContainer/HBoxContainer"]
+[node name="AdvanceBtn" type="Button" parent="UILayer/MarginContainer/Root/CheatContainer/HBoxContainer"]
 layout_mode = 2
 text = "Advance Phase"
 
-[node name="ResetWeekBtn" type="Button" parent="MarginContainer/Root/CheatContainer/HBoxContainer"]
+[node name="ResetWeekBtn" type="Button" parent="UILayer/MarginContainer/Root/CheatContainer/HBoxContainer"]
 layout_mode = 2
 text = "Reset Week"
 
-[node name="HBoxContainer2" type="HBoxContainer" parent="MarginContainer/Root/CheatContainer"]
+[node name="HBoxContainer2" type="HBoxContainer" parent="UILayer/MarginContainer/Root/CheatContainer"]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="LoadItemsBtn" type="Button" parent="MarginContainer/Root/CheatContainer/HBoxContainer2"]
+[node name="LoadItemsBtn" type="Button" parent="UILayer/MarginContainer/Root/CheatContainer/HBoxContainer2"]
 layout_mode = 2
 text = "Load Items CSV"
 
-[node name="ItemsStatus" type="Label" parent="MarginContainer/Root/CheatContainer/HBoxContainer2"]
+[node name="ItemsStatus" type="Label" parent="UILayer/MarginContainer/Root/CheatContainer/HBoxContainer2"]
 layout_mode = 2
 text = "Items: —"
 
-[node name="HBoxContainer3" type="HBoxContainer" parent="MarginContainer/Root/CheatContainer"]
+[node name="HBoxContainer3" type="HBoxContainer" parent="UILayer/MarginContainer/Root/CheatContainer"]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="OpenTrainingBtn" type="Button" parent="MarginContainer/Root/CheatContainer/HBoxContainer3"]
+[node name="OpenTrainingBtn" type="Button" parent="UILayer/MarginContainer/Root/CheatContainer/HBoxContainer3"]
 layout_mode = 2
 text = "Open Training"
 
-[node name="SpotsStatus" type="Label" parent="MarginContainer/Root/CheatContainer/HBoxContainer3"]
+[node name="SpotsStatus" type="Label" parent="UILayer/MarginContainer/Root/CheatContainer/HBoxContainer3"]
 layout_mode = 2
 text = "Spots: —"
 
-[node name="HBoxContainer4" type="HBoxContainer" parent="MarginContainer/Root/CheatContainer"]
+[node name="HBoxContainer4" type="HBoxContainer" parent="UILayer/MarginContainer/Root/CheatContainer"]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="OpenSaveBtn" type="Button" parent="MarginContainer/Root/CheatContainer/HBoxContainer4"]
+[node name="OpenSaveBtn" type="Button" parent="UILayer/MarginContainer/Root/CheatContainer/HBoxContainer4"]
 layout_mode = 2
 text = "Save"
 
-[node name="ItemsCheatBar" type="Control" parent="MarginContainer/Root/CheatContainer"]
+[node name="ItemsCheatBar" type="Control" parent="UILayer/MarginContainer/Root/CheatContainer"]
 layout_mode = 2
 size_flags_horizontal = 3
 script = ExtResource("2")
 
-[node name="Row" type="HBoxContainer" parent="MarginContainer/Root/CheatContainer/ItemsCheatBar"]
+[node name="Row" type="HBoxContainer" parent="UILayer/MarginContainer/Root/CheatContainer/ItemsCheatBar"]
 layout_mode = 2
 anchor_left = 0.238
 anchor_right = 0.238
@@ -106,42 +106,42 @@ offset_right = 841.248
 offset_bottom = -6.0
 theme_override_constants/separation = 6
 
-[node name="Lbl" type="Label" parent="MarginContainer/Root/CheatContainer/ItemsCheatBar/Row"]
+[node name="Lbl" type="Label" parent="UILayer/MarginContainer/Root/CheatContainer/ItemsCheatBar/Row"]
 layout_mode = 2
 text = "Item:"
 
-[node name="Picker" type="OptionButton" parent="MarginContainer/Root/CheatContainer/ItemsCheatBar/Row"]
+[node name="Picker" type="OptionButton" parent="UILayer/MarginContainer/Root/CheatContainer/ItemsCheatBar/Row"]
 layout_mode = 2
 size_flags_horizontal = 3
 
-[node name="QtyLbl" type="Label" parent="MarginContainer/Root/CheatContainer/ItemsCheatBar/Row"]
+[node name="QtyLbl" type="Label" parent="UILayer/MarginContainer/Root/CheatContainer/ItemsCheatBar/Row"]
 layout_mode = 2
 text = "x"
 
-[node name="Qty" type="SpinBox" parent="MarginContainer/Root/CheatContainer/ItemsCheatBar/Row"]
+[node name="Qty" type="SpinBox" parent="UILayer/MarginContainer/Root/CheatContainer/ItemsCheatBar/Row"]
 custom_minimum_size = Vector2(64, 0)
 layout_mode = 2
 min_value = 1.0
 max_value = 999.0
 value = 1.0
 
-[node name="BtnGive" type="Button" parent="MarginContainer/Root/CheatContainer/ItemsCheatBar/Row"]
+[node name="BtnGive" type="Button" parent="UILayer/MarginContainer/Root/CheatContainer/ItemsCheatBar/Row"]
 layout_mode = 2
 text = "Give"
 
-[node name="BtnRemove" type="Button" parent="MarginContainer/Root/CheatContainer/ItemsCheatBar/Row"]
+[node name="BtnRemove" type="Button" parent="UILayer/MarginContainer/Root/CheatContainer/ItemsCheatBar/Row"]
 layout_mode = 2
 text = "Remove"
 
-[node name="BtnGive10" type="Button" parent="MarginContainer/Root/CheatContainer/ItemsCheatBar/Row"]
+[node name="BtnGive10" type="Button" parent="UILayer/MarginContainer/Root/CheatContainer/ItemsCheatBar/Row"]
 layout_mode = 2
 text = "+10"
 
-[node name="BtnReloadCSV" type="Button" parent="MarginContainer/Root/CheatContainer/ItemsCheatBar/Row"]
+[node name="BtnReloadCSV" type="Button" parent="UILayer/MarginContainer/Root/CheatContainer/ItemsCheatBar/Row"]
 layout_mode = 2
 text = "Reload CSV (defs)"
 
-[node name="CheatRoot" type="VBoxContainer" parent="MarginContainer/Root/CheatContainer/ItemsCheatBar"]
+[node name="CheatRoot" type="VBoxContainer" parent="UILayer/MarginContainer/Root/CheatContainer/ItemsCheatBar"]
 layout_mode = 2
 offset_top = 8.0
 offset_right = 1104.0
@@ -149,73 +149,73 @@ offset_bottom = 382.0
 size_flags_vertical = 3
 theme_override_constants/separation = 6
 
-[node name="PartyRow" type="HBoxContainer" parent="MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot"]
+[node name="PartyRow" type="HBoxContainer" parent="UILayer/MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot"]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="PartyLabel" type="Label" parent="MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot/PartyRow"]
+[node name="PartyLabel" type="Label" parent="UILayer/MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot/PartyRow"]
 layout_mode = 2
 text = "Party:"
 
-[node name="RosterPick" type="OptionButton" parent="MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot/PartyRow"]
+[node name="RosterPick" type="OptionButton" parent="UILayer/MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot/PartyRow"]
 layout_mode = 2
 size_flags_horizontal = 3
 
-[node name="MemberId" type="LineEdit" parent="MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot/PartyRow"]
+[node name="MemberId" type="LineEdit" parent="UILayer/MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot/PartyRow"]
 layout_mode = 2
 placeholder_text = "member id"
 
-[node name="BtnAddParty" type="Button" parent="MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot/PartyRow"]
+[node name="BtnAddParty" type="Button" parent="UILayer/MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot/PartyRow"]
 layout_mode = 2
 text = "Add"
 
-[node name="BtnRemoveParty" type="Button" parent="MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot/PartyRow"]
+[node name="BtnRemoveParty" type="Button" parent="UILayer/MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot/PartyRow"]
 layout_mode = 2
 text = "Remove"
 
-[node name="BtnToBench" type="Button" parent="MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot/PartyRow"]
+[node name="BtnToBench" type="Button" parent="UILayer/MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot/PartyRow"]
 layout_mode = 2
 text = "To Bench"
 
-[node name="LxpRow" type="HBoxContainer" parent="MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot"]
+[node name="LxpRow" type="HBoxContainer" parent="UILayer/MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot"]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="LxpLabel" type="Label" parent="MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot/LxpRow"]
+[node name="LxpLabel" type="Label" parent="UILayer/MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot/LxpRow"]
 layout_mode = 2
 text = "LXP:"
 
-[node name="SpinXP" type="SpinBox" parent="MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot/LxpRow"]
+[node name="SpinXP" type="SpinBox" parent="UILayer/MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot/LxpRow"]
 custom_minimum_size = Vector2(80, 0)
 layout_mode = 2
 min_value = 1.0
 max_value = 9999.0
 value = 100.0
 
-[node name="BtnAddXP" type="Button" parent="MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot/LxpRow"]
+[node name="BtnAddXP" type="Button" parent="UILayer/MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot/LxpRow"]
 layout_mode = 2
 text = "Add XP"
 
-[node name="SxpRow" type="HBoxContainer" parent="MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot"]
+[node name="SxpRow" type="HBoxContainer" parent="UILayer/MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot"]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="SxpLabel" type="Label" parent="MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot/SxpRow"]
+[node name="SxpLabel" type="Label" parent="UILayer/MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot/SxpRow"]
 layout_mode = 2
 text = "SXP:"
 
-[node name="StatPick" type="OptionButton" parent="MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot/SxpRow"]
+[node name="StatPick" type="OptionButton" parent="UILayer/MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot/SxpRow"]
 custom_minimum_size = Vector2(120, 0)
 layout_mode = 2
 
-[node name="SpinSXP" type="SpinBox" parent="MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot/SxpRow"]
+[node name="SpinSXP" type="SpinBox" parent="UILayer/MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot/SxpRow"]
 custom_minimum_size = Vector2(70, 0)
 layout_mode = 2
 min_value = 1.0
 max_value = 999.0
 value = 10.0
 
-[node name="BtnAddSXP" type="Button" parent="MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot/SxpRow"]
+[node name="BtnAddSXP" type="Button" parent="UILayer/MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot/SxpRow"]
 layout_mode = 2
 text = "Add SXP"
 
