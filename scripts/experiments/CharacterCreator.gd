@@ -45,12 +45,12 @@ const DIRECTIONS = {
 
 # State
 var current_direction = 0  # South
-var current_frame = 0  # Always 0 for idle/standing pose
+var current_frame = 0
 var available_parts = {}
 var current_selections = {}
-# Animation disabled - showing idle frames only
-# var animation_timer = 0.0
-# var animation_speed = 0.135  # 135ms per frame for walk
+# Walk animation (6 frames, rows 5-8)
+var animation_timer = 0.0
+var animation_speed = 0.135  # 135ms per frame for walk
 
 func _ready():
 	print("Character Creator starting...")
@@ -59,15 +59,13 @@ func _ready():
 	set_default_character()
 	update_preview()
 
-# Animation disabled - showing idle standing frames only
-# To re-enable animation, uncomment this function and the animation variables above
-# func _process(delta):
-# 	# Simple animation cycling
-# 	animation_timer += delta
-# 	if animation_timer >= animation_speed:
-# 		animation_timer = 0.0
-# 		current_frame = (current_frame + 1) % 8
-# 		update_frame_display()
+func _process(delta):
+	# Walk animation cycling (6 frames)
+	animation_timer += delta
+	if animation_timer >= animation_speed:
+		animation_timer = 0.0
+		current_frame = (current_frame + 1) % 6  # Walk has 6 frames (0-5)
+		update_frame_display()
 
 func scan_character_assets():
 	"""Scan the character assets folder to find all available parts"""
@@ -199,11 +197,13 @@ func update_frame_display():
 		var layer = LAYERS[layer_key]
 		var sprite = character_layers.get_node(layer.node_name)
 		if sprite.visible and sprite.texture:
-			# Calculate frame index: direction_row * 8 + current_frame
-			# Frame 0 of each row is the idle/standing pose
-			sprite.frame = current_direction * 8 + current_frame
+			# Walk animation is on rows 5-8 (direction + 4)
+			# Rows 1-4 have idle/push/pull/jump
+			# Rows 5-8 have walk animation (6 frames: 0-5)
+			var walk_row = current_direction + 4
+			sprite.frame = walk_row * 8 + current_frame
 
-	frame_label.text = "Pose: Idle"
+	frame_label.text = "Walk Frame: " + str(current_frame + 1) + "/6"
 	direction_label.text = "Direction: " + DIRECTIONS[current_direction]
 
 func _on_direction_changed(direction: int):

@@ -2,7 +2,7 @@
 
 ## Overview
 
-This is a standalone experimental scene for testing the Mana Seed character layering system. It allows you to mix and match different character parts (body, outfit, hair, hats) and see them layer correctly in real-time. The character displays in idle/standing pose for easy customization preview.
+This is a standalone experimental scene for testing the Mana Seed character layering system. It allows you to mix and match different character parts (body, outfit, hair, hats) and see them layer correctly in real-time. The character plays the walk animation automatically.
 
 ## Location
 
@@ -24,8 +24,8 @@ This is a standalone experimental scene for testing the Mana Seed character laye
 The character creator has two main panels:
 
 #### Left Panel: Preview
-- **Character Display**: Shows the layered character in idle/standing pose
-- **Pose Label**: Shows "Pose: Idle" (frame 0 of each direction)
+- **Character Display**: Shows the layered character with auto-playing walk animation
+- **Frame Counter**: Shows current walk animation frame (1-6)
 - **Direction Label**: Shows current facing direction
 
 #### Right Panel: Controls
@@ -42,14 +42,12 @@ The character creator has two main panels:
 3. Click **"None"** to remove a layer
 4. Parts automatically **layer correctly** (base → outfit → hair → hat)
 
-### Viewing Directions
+### Animation
 
-- The character displays the **idle/standing pose** (frame 0)
-- Use **Direction buttons** to rotate the character
-- See all 4 facing directions: South, West, East, North
-- Animation is **disabled** to focus on customization
-
-**Note**: To enable walk animation, uncomment the `_process()` function in CharacterCreator.gd
+- The character **automatically animates** using the walk cycle
+- **6 frames** loop continuously (frames 0-5 from rows 5-8)
+- Animation speed: 135ms per frame
+- Use **Direction buttons** to see all 4 facing directions
 
 ## Character System Details
 
@@ -125,36 +123,36 @@ var cloak_container = parts_container.get_node("CloakSection/CloakOptions")
 populate_layer_options(cloak_container, "cloak")
 ```
 
-### Enabling Animation (Optional)
+### Animation Speed
 
-Animation is currently **disabled** to show only the idle standing pose. To re-enable the walk animation:
-
-1. Open `scripts/experiments/CharacterCreator.gd`
-2. Uncomment the animation variables (lines 52-53):
+Current animation timing (CharacterCreator.gd:53):
 ```gdscript
-var animation_timer = 0.0
 var animation_speed = 0.135  # 135ms per frame (walk speed)
 ```
-3. Uncomment the `_process()` function (lines 64-70)
-4. Change line 206 back to: `frame_label.text = "Frame: " + str(current_frame)`
 
-Animation speed can be adjusted:
-- Walk: 0.135 (135ms per frame)
-- Run: See original guide for variable frame timing
+Change this to adjust animation playback speed:
+- Walk: 0.135 (135ms per frame) - **current setting**
 - Slower: Increase the value (e.g., 0.200)
 - Faster: Decrease the value (e.g., 0.100)
+- Run: See original Mana Seed guide for variable frame timing
 
 ### Frame Calculation
 
-Frames are calculated as:
+Frames are calculated for walk animation as:
 ```gdscript
-frame_index = direction_row * 8 + current_frame
+walk_row = current_direction + 4  # Walk is on rows 5-8 (indices 4-7)
+frame_index = walk_row * 8 + current_frame
 ```
 
-- Direction 0 (South): frames 0-7
-- Direction 1 (West): frames 8-15
-- Direction 2 (East): frames 16-23
-- Direction 3 (North): frames 24-31
+**Walk Animation Rows:**
+- Direction 0 (South): row 5 (index 4), frames 32-37
+- Direction 1 (West): row 6 (index 5), frames 40-45
+- Direction 2 (East): row 7 (index 6), frames 48-53
+- Direction 3 (North): row 8 (index 7), frames 56-61
+
+**Sprite Sheet Layout (512x512, 8x8 grid):**
+- Rows 1-4: Idle, push, pull, jump
+- Rows 5-8: Walk animation (6 frames each)
 
 ## Future Enhancements
 
