@@ -202,6 +202,6 @@ size_flags_horizontal = 3
 text = "North"
 
 [connection signal="pressed" from="MainContainer/ControlsPanel/ControlsContainer/DirectionControls/DirectionButtons/SouthBtn" to="." method="_on_direction_changed" binds= [0]]
-[connection signal="pressed" from="MainContainer/ControlsPanel/ControlsContainer/DirectionControls/DirectionButtons/WestBtn" to="." method="_on_direction_changed" binds= [1]]
+[connection signal="pressed" from="MainContainer/ControlsPanel/ControlsContainer/DirectionControls/DirectionButtons/WestBtn" to="." method="_on_direction_changed" binds= [3]]
 [connection signal="pressed" from="MainContainer/ControlsPanel/ControlsContainer/DirectionControls/DirectionButtons/EastBtn" to="." method="_on_direction_changed" binds= [2]]
-[connection signal="pressed" from="MainContainer/ControlsPanel/ControlsContainer/DirectionControls/DirectionButtons/NorthBtn" to="." method="_on_direction_changed" binds= [3]]
+[connection signal="pressed" from="MainContainer/ControlsPanel/ControlsContainer/DirectionControls/DirectionButtons/NorthBtn" to="." method="_on_direction_changed" binds= [1]]
