@@ -120,16 +120,16 @@ const PARTY_ID_KEYS   := ["actor_id","id","actor","member_id"]
 const PARTY_NAME_KEYS := ["name","display_name","disp_name"]
 
 # ---- Header refs ----
-@onready var date_label: Label         = $MarginContainer/Root/DateLabel
-@onready var phase_label: Label        = $MarginContainer/Root/PhaseLabel
-@onready var cheat_container: VBoxContainer = $MarginContainer/Root/CheatContainer
-@onready var advance_btn: Button       = $MarginContainer/Root/CheatContainer/HBoxContainer/AdvanceBtn
-@onready var reset_btn: Button         = $MarginContainer/Root/CheatContainer/HBoxContainer/ResetWeekBtn
-@onready var load_btn: Button          = $MarginContainer/Root/CheatContainer/HBoxContainer2/LoadItemsBtn
-@onready var items_status: Label       = $MarginContainer/Root/CheatContainer/HBoxContainer2/ItemsStatus
-@onready var open_training_btn: Button = $MarginContainer/Root/CheatContainer/HBoxContainer3/OpenTrainingBtn
-@onready var spots_status: Label       = $MarginContainer/Root/CheatContainer/HBoxContainer3/SpotsStatus
-@onready var open_save_btn: Button     = $MarginContainer/Root/CheatContainer/HBoxContainer4/OpenSaveBtn
+@onready var date_label: Label         = $UILayer/MarginContainer/Root/DateLabel
+@onready var phase_label: Label        = $UILayer/MarginContainer/Root/PhaseLabel
+@onready var cheat_container: VBoxContainer = $UILayer/MarginContainer/Root/CheatContainer
+@onready var advance_btn: Button       = $UILayer/MarginContainer/Root/CheatContainer/HBoxContainer/AdvanceBtn
+@onready var reset_btn: Button         = $UILayer/MarginContainer/Root/CheatContainer/HBoxContainer/ResetWeekBtn
+@onready var load_btn: Button          = $UILayer/MarginContainer/Root/CheatContainer/HBoxContainer2/LoadItemsBtn
+@onready var items_status: Label       = $UILayer/MarginContainer/Root/CheatContainer/HBoxContainer2/ItemsStatus
+@onready var open_training_btn: Button = $UILayer/MarginContainer/Root/CheatContainer/HBoxContainer3/OpenTrainingBtn
+@onready var spots_status: Label       = $UILayer/MarginContainer/Root/CheatContainer/HBoxContainer3/SpotsStatus
+@onready var open_save_btn: Button     = $UILayer/MarginContainer/Root/CheatContainer/HBoxContainer4/OpenSaveBtn
 
 # ---- Cheat area container (toggle with C) ----
 var _cheat_root: VBoxContainer = null
@@ -206,20 +206,20 @@ func _ready() -> void:
 	_sig     = get_node_or_null(SIGIL_PATH)
 
 	# Cheat menu nodes (optional - may not exist in scene)
-	_cheat_root     = get_node_or_null("MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot")
-	_roster_pick    = get_node_or_null("MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot/PartyRow/RosterPick")
-	_member_id_le   = get_node_or_null("MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot/PartyRow/MemberId")
-	_btn_add_party  = get_node_or_null("MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot/PartyRow/BtnAddParty")
-	_btn_rem_party  = get_node_or_null("MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot/PartyRow/BtnRemoveParty")
-	_btn_to_bench   = get_node_or_null("MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot/PartyRow/BtnToBench")
-	_spin_xp        = get_node_or_null("MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot/LxpRow/SpinXP")
-	_btn_add_xp     = get_node_or_null("MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot/LxpRow/BtnAddXP")
-	_stat_pick      = get_node_or_null("MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot/SxpRow/StatPick")
-	_spin_sxp       = get_node_or_null("MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot/SxpRow/SpinSXP")
-	_btn_add_sxp    = get_node_or_null("MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot/SxpRow/BtnAddSXP")
+	_cheat_root     = get_node_or_null("UILayer/MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot")
+	_roster_pick    = get_node_or_null("UILayer/MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot/PartyRow/RosterPick")
+	_member_id_le   = get_node_or_null("UILayer/MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot/PartyRow/MemberId")
+	_btn_add_party  = get_node_or_null("UILayer/MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot/PartyRow/BtnAddParty")
+	_btn_rem_party  = get_node_or_null("UILayer/MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot/PartyRow/BtnRemoveParty")
+	_btn_to_bench   = get_node_or_null("UILayer/MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot/PartyRow/BtnToBench")
+	_spin_xp        = get_node_or_null("UILayer/MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot/LxpRow/SpinXP")
+	_btn_add_xp     = get_node_or_null("UILayer/MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot/LxpRow/BtnAddXP")
+	_stat_pick      = get_node_or_null("UILayer/MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot/SxpRow/StatPick")
+	_spin_sxp       = get_node_or_null("UILayer/MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot/SxpRow/SpinSXP")
+	_btn_add_sxp    = get_node_or_null("UILayer/MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot/SxpRow/BtnAddSXP")
 
-	# Overlays shouldn’t block input
-	var overlays: Control = get_node_or_null("Overlays") as Control
+	# Overlays shouldn't block input
+	var overlays: Control = get_node_or_null("UILayer/Overlays") as Control
 	if overlays:
 		overlays.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
@@ -401,8 +401,8 @@ func _refresh_ui() -> void:
 			date_text = String(cal.call("get_date_string"))
 			phase_text = String(cal.call("get_phase_name"))
 
-	$MarginContainer/Root/DateLabel.text  = date_text
-	$MarginContainer/Root/PhaseLabel.text = phase_text
+	date_label.text  = date_text
+	phase_label.text = phase_text
 
 func _refresh_spots_status() -> void:
 	var count: int = 0
