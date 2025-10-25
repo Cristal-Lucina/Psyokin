@@ -10,24 +10,39 @@ const PERK_PATH    := "/root/aPerkSystem"
 const CPS_PATH     := "/root/aCombatProfileSystem"
 const ROUTER_PATH  := "/root/aSceneRouter"
 
+# Character directories
+const CHAR_BASE_PATH = "res://assets/graphics/characters/"
+const CHAR_VARIANTS = ["char_a_p1"]
+
+# Layer configuration
+const LAYERS = {
+	"base": {"code": "0bas", "node_name": "BaseSprite", "path": ""},
+	"outfit": {"code": "1out", "node_name": "OutfitSprite", "path": "1out"},
+	"cloak": {"code": "2clo", "node_name": "CloakSprite", "path": "2clo"},
+	"face": {"code": "3fac", "node_name": "FaceSprite", "path": "3fac"},
+	"hair": {"code": "4har", "node_name": "HairSprite", "path": "4har"},
+	"hat": {"code": "5hat", "node_name": "HatSprite", "path": "5hat"},
+	"tool_a": {"code": "6tla", "node_name": "ToolASprite", "path": "6tla"},
+	"tool_b": {"code": "7tlb", "node_name": "ToolBSprite", "path": "7tlb"}
+}
+
+# Direction mapping
+const DIRECTIONS = {
+	0: "South",
+	1: "North",
+	2: "East",
+	3: "West"
+}
+
 # ── UI: unique_name_in_owner nodes from your scene ───────────────────────────
 @onready var _name_in     : LineEdit      = %NameInput
 @onready var _surname_in  : LineEdit      = %SurnameInput
 @onready var _pron_in     : OptionButton  = %PronounInput
 
 @onready var _body_in     : OptionButton  = %BodyIdInput
-@onready var _face_in     : OptionButton  = %FaceIdInput
+@onready var _outfit_in   : OptionButton  = %OutfitInput
 @onready var _hair_in     : OptionButton  = %HairIdInput
-@onready var _eyes_in     : OptionButton  = %EyesIdInput
-
-@onready var _skin_opt    : OptionButton  = %BodyColorInput
-@onready var _skin_sw     : ColorRect     = %BodyColorSwatch
-@onready var _brow_opt    : OptionButton  = %EyebrowColorInput
-@onready var _brow_sw     : ColorRect     = %EyebrowColorSwatch
-@onready var _eye_opt     : OptionButton  = %EyeColorInput
-@onready var _eye_sw      : ColorRect     = %EyeColorSwatch
-@onready var _hair_opt    : OptionButton  = %HairColorInput
-@onready var _hair_sw     : ColorRect     = %HairColorSwatch
+@onready var _hat_in      : OptionButton  = %HatInput
 
 @onready var _brw_cb      : CheckButton   = %StatBRW
 @onready var _vtl_cb      : CheckButton   = %StatVTL
@@ -37,55 +52,34 @@ const ROUTER_PATH  := "/root/aSceneRouter"
 
 @onready var _perk_in     : OptionButton  = %PerkInput
 @onready var _confirm_btn : Button        = %ConfirmBtn
-@onready var _cancel_btn  : Button        = %CancelBtn   # may exist in .tscn; we’ll hide it
+@onready var _cancel_btn  : Button        = %CancelBtn
+
+# Character preview
+@onready var character_layers = $MainContainer/PreviewPanel/PreviewContainer/CenterContainer/CharacterLayers
+@onready var frame_label = $MainContainer/PreviewPanel/PreviewContainer/AnimationControls/FrameLabel
+@onready var direction_label = $MainContainer/PreviewPanel/PreviewContainer/AnimationControls/DirectionLabel
 
 # ── state ────────────────────────────────────────────────────────────────────
 var _selected_order : Array[String] = []       # keep order of picks (max 3)
 var _perk_id_by_idx : Dictionary = {}          # index -> perk_id
 var _perk_stat_by_idx : Dictionary = {}        # index -> stat_id (help text)
 
-# ── Color palettes ───────────────────────────────────────────────────────────
-# Skin tones: specific discrete options from darkest to lightest
-const SKIN_TONES := {
-	"Tone 1": Color(0.227, 0.239, 0.212),  # #3A3D36 - Darkest
-	"Tone 2": Color(0.400, 0.302, 0.282),  # #664D48 - Dark
-	"Tone 3": Color(0.588, 0.388, 0.306),  # #96634E - Medium-Dark
-	"Tone 4": Color(0.780, 0.553, 0.459),  # #C78D75 - Medium
-	"Tone 5": Color(0.839, 0.667, 0.553),  # #D6AA8D - Light
-	"Tone 6": Color(0.847, 0.733, 0.663)   # #D8BBA9 - Lightest
-}
+# Character state
+var current_direction = 0  # South
+var current_frame = 0
+var available_parts = {}
+var current_selections = {}
+var selected_variants = {}  # Track variant codes for connecting animations
 
-# Hair/Eyebrow: white, ROYGBIV, black
-const HAIR_COLORS := {
-	"White": Color(0.95, 0.95, 0.95),
-	"Red": Color(0.8, 0.2, 0.2),
-	"Orange": Color(0.9, 0.5, 0.2),
-	"Yellow": Color(0.9, 0.85, 0.3),
-	"Green": Color(0.3, 0.6, 0.3),
-	"Blue": Color(0.2, 0.4, 0.7),
-	"Indigo": Color(0.3, 0.2, 0.6),
-	"Violet": Color(0.6, 0.3, 0.7),
-	"Black": Color(0.15, 0.15, 0.15)
-}
-
-# Eye colors: Brown, Blue, Green, Hazel, Grey, White, Black, Yellow, Red, Pink
-const EYE_COLORS := {
-	"Brown": Color(0.4, 0.25, 0.15),
-	"Blue": Color(0.3, 0.5, 0.8),
-	"Green": Color(0.3, 0.6, 0.4),
-	"Hazel": Color(0.5, 0.4, 0.25),
-	"Grey": Color(0.6, 0.6, 0.65),
-	"White": Color(0.9, 0.9, 0.95),
-	"Black": Color(0.1, 0.1, 0.1),
-	"Yellow": Color(0.85, 0.8, 0.3),
-	"Red": Color(0.8, 0.2, 0.2),
-	"Pink": Color(0.9, 0.5, 0.7)
-}
+# Walk animation
+var animation_timer = 0.0
+var animation_speed = 0.135  # 135ms per frame for walk
 
 # ── ready ────────────────────────────────────────────────────────────────────
 func _ready() -> void:
+	print("Character Creation starting...")
+	scan_character_assets()
 	_fill_basics()
-	_wire_colors()
 	_wire_stat_toggles()
 	_rebuild_perk_dropdown() # starts empty until picks
 
@@ -102,7 +96,173 @@ func _ready() -> void:
 	if _confirm_btn and not _confirm_btn.pressed.is_connected(_on_confirm_pressed):
 		_confirm_btn.pressed.connect(_on_confirm_pressed)
 
+	# Wire character part selectors
+	if _body_in and not _body_in.item_selected.is_connected(_on_body_selected):
+		_body_in.item_selected.connect(_on_body_selected)
+	if _outfit_in and not _outfit_in.item_selected.is_connected(_on_outfit_selected):
+		_outfit_in.item_selected.connect(_on_outfit_selected)
+	if _hair_in and not _hair_in.item_selected.is_connected(_on_hair_selected):
+		_hair_in.item_selected.connect(_on_hair_selected)
+	if _hat_in and not _hat_in.item_selected.is_connected(_on_hat_selected):
+		_hat_in.item_selected.connect(_on_hat_selected)
+
+	set_default_character()
+	update_preview()
 	_update_confirm_enabled()
+
+func _process(delta):
+	# Walk animation cycling (6 frames)
+	animation_timer += delta
+	if animation_timer >= animation_speed:
+		animation_timer = 0.0
+		current_frame = (current_frame + 1) % 6  # Walk has 6 frames (0-5)
+		update_frame_display()
+
+# ── Character Asset Scanning ─────────────────────────────────────────────────
+func scan_character_assets():
+	"""Scan the character assets folder to find all available parts"""
+	print("Scanning character assets...")
+
+	for variant in CHAR_VARIANTS:
+		var variant_path = CHAR_BASE_PATH + variant + "/"
+		var dir = DirAccess.open(variant_path)
+
+		if dir == null:
+			print("Could not open directory: ", variant_path)
+			continue
+
+		# Scan each layer
+		for layer_key in LAYERS:
+			var layer = LAYERS[layer_key]
+			var layer_path = variant_path + layer.path
+
+			if layer_key not in available_parts:
+				available_parts[layer_key] = []
+
+			# For base layer, files are directly in variant folder
+			if layer.path == "":
+				dir.list_dir_begin()
+				var file_name = dir.get_next()
+				while file_name != "":
+					if file_name.ends_with(".png") and layer.code in file_name:
+						var full_path = variant_path + file_name
+						var variant_code = extract_variant_code(file_name.get_basename())
+						available_parts[layer_key].append({
+							"name": file_name.get_basename(),
+							"path": full_path,
+							"variant": variant_code
+						})
+					file_name = dir.get_next()
+				dir.list_dir_end()
+			else:
+				# For other layers, check subdirectory
+				var subdir = DirAccess.open(layer_path)
+				if subdir:
+					subdir.list_dir_begin()
+					var file_name = subdir.get_next()
+					while file_name != "":
+						if file_name.ends_with(".png"):
+							var full_path = layer_path + "/" + file_name
+							var variant_code = extract_variant_code(file_name.get_basename())
+							available_parts[layer_key].append({
+								"name": file_name.get_basename(),
+								"path": full_path,
+								"variant": variant_code
+							})
+						file_name = subdir.get_next()
+					subdir.list_dir_end()
+
+	print("Asset scan complete. Found:")
+	for layer_key in available_parts:
+		print("  ", layer_key, ": ", available_parts[layer_key].size(), " items")
+
+func extract_variant_code(filename: String) -> String:
+	"""Extract the variant code from filename
+	Example: 'char_a_p1_0bas_humn_v06' -> 'humn_v06'
+	Example: 'char_a_p1_4har_bob1_v05' -> 'bob1_v05'
+	"""
+	# Split by underscores
+	var parts = filename.split("_")
+
+	# Find the part that contains the item code and variant
+	# Format is usually: char_a_p1_LAYER_ITEM_VARIANT
+	# We want the last two parts (ITEM_VARIANT)
+	if parts.size() >= 2:
+		var item_code = parts[parts.size() - 2]
+		var variant_code = parts[parts.size() - 1]
+		return item_code + "_" + variant_code
+
+	return ""
+
+func set_default_character():
+	"""Set up a default character with base body"""
+	if "base" in available_parts and available_parts["base"].size() > 0:
+		_on_part_selected("base", available_parts["base"][0])
+
+func _on_part_selected(layer_key: String, part):
+	"""Handle part selection"""
+	current_selections[layer_key] = part
+	if part != null:
+		selected_variants[layer_key] = part.variant
+		print("Selected ", layer_key, ": variant = ", part.variant)
+	else:
+		selected_variants.erase(layer_key)
+	update_preview()
+
+func update_preview():
+	"""Update the character preview with current selections"""
+	for layer_key in LAYERS:
+		var layer = LAYERS[layer_key]
+		var sprite = character_layers.get_node(layer.node_name)
+
+		if layer_key in current_selections and current_selections[layer_key] != null:
+			var part = current_selections[layer_key]
+			var texture = load(part.path)
+			sprite.texture = texture
+			sprite.visible = true
+		else:
+			sprite.texture = null
+			sprite.visible = false
+
+	update_frame_display()
+
+func update_frame_display():
+	"""Update the frame and direction display"""
+	for layer_key in LAYERS:
+		var layer = LAYERS[layer_key]
+		var sprite = character_layers.get_node(layer.node_name)
+		if sprite.visible and sprite.texture:
+			# Walk animation is on rows 5-8 (direction + 4)
+			var walk_row = current_direction + 4
+			sprite.frame = walk_row * 8 + current_frame
+
+	frame_label.text = "Walk Frame: " + str(current_frame + 1) + "/6"
+	direction_label.text = "Direction: " + DIRECTIONS[current_direction]
+
+# ── Character Part Selection Callbacks ───────────────────────────────────────
+func _on_body_selected(idx: int):
+	if idx == 0:  # "None" option
+		_on_part_selected("base", null)
+	elif "base" in available_parts and idx - 1 < available_parts["base"].size():
+		_on_part_selected("base", available_parts["base"][idx - 1])
+
+func _on_outfit_selected(idx: int):
+	if idx == 0:  # "None" option
+		_on_part_selected("outfit", null)
+	elif "outfit" in available_parts and idx - 1 < available_parts["outfit"].size():
+		_on_part_selected("outfit", available_parts["outfit"][idx - 1])
+
+func _on_hair_selected(idx: int):
+	if idx == 0:  # "None" option
+		_on_part_selected("hair", null)
+	elif "hair" in available_parts and idx - 1 < available_parts["hair"].size():
+		_on_part_selected("hair", available_parts["hair"][idx - 1])
+
+func _on_hat_selected(idx: int):
+	if idx == 0:  # "None" option
+		_on_part_selected("hat", null)
+	elif "hat" in available_parts and idx - 1 < available_parts["hat"].size():
+		_on_part_selected("hat", available_parts["hat"][idx - 1])
 
 # ── UI fill / wiring ─────────────────────────────────────────────────────────
 func _fill_basics() -> void:
@@ -120,44 +280,25 @@ func _fill_basics() -> void:
 			_pron_in.add_item(p)
 		_pron_in.select(0)
 
-	# Simple placeholder IDs so the dropdowns actually work
-	_fill_opt(_body_in, ["1","2","3","4"])
-	_fill_opt(_face_in, ["1","2","3","4"])
-	_fill_opt(_hair_in, ["1","2","3","4"])
-	_fill_opt(_eyes_in, ["1","2","3","4"])
+	# Fill character part dropdowns
+	_fill_part_dropdown(_body_in, "base")
+	_fill_part_dropdown(_outfit_in, "outfit")
+	_fill_part_dropdown(_hair_in, "hair")
+	_fill_part_dropdown(_hat_in, "hat")
 
-	# Color dropdowns
-	_fill_color_opt(_skin_opt, SKIN_TONES)
-	_fill_color_opt(_eye_opt, EYE_COLORS)
-	_fill_color_opt(_brow_opt, HAIR_COLORS)
-	_fill_color_opt(_hair_opt, HAIR_COLORS)
-
-	# Initial swatches
-	_update_color_swatches()
-
-func _fill_opt(ob: OptionButton, items: Array) -> void:
+func _fill_part_dropdown(ob: OptionButton, layer_key: String) -> void:
 	if ob == null: return
 	if ob.item_count > 0: return
-	for s in items:
-		ob.add_item(String(s))
-	ob.select(0)
 
-func _fill_color_opt(ob: OptionButton, colors: Dictionary) -> void:
-	if ob == null: return
-	if ob.item_count > 0: return
-	for color_name in colors.keys():
-		ob.add_item(String(color_name))
-	ob.select(0)
+	# Add "None" option
+	ob.add_item("None")
 
-func _wire_colors() -> void:
-	if _skin_opt and not _skin_opt.item_selected.is_connected(_on_color_option_changed):
-		_skin_opt.item_selected.connect(_on_color_option_changed)
-	if _brow_opt and not _brow_opt.item_selected.is_connected(_on_color_option_changed):
-		_brow_opt.item_selected.connect(_on_color_option_changed)
-	if _eye_opt and not _eye_opt.item_selected.is_connected(_on_color_option_changed):
-		_eye_opt.item_selected.connect(_on_color_option_changed)
-	if _hair_opt and not _hair_opt.item_selected.is_connected(_on_color_option_changed):
-		_hair_opt.item_selected.connect(_on_color_option_changed)
+	# Add available parts
+	if layer_key in available_parts:
+		for part in available_parts[layer_key]:
+			ob.add_item(part.name)
+
+	ob.select(0)
 
 func _wire_stat_toggles() -> void:
 	_wire_stat_toggle(_brw_cb, "BRW")
@@ -183,23 +324,6 @@ func _on_stat_toggled(pressed: bool, stat_id: String, btn: CheckButton) -> void:
 
 	_rebuild_perk_dropdown()
 	_update_confirm_enabled()
-
-# ── colors ───────────────────────────────────────────────────────────────────
-func _on_color_option_changed(_idx: int) -> void:
-	_update_color_swatches()
-
-func _update_color_swatches() -> void:
-	if _skin_sw: _skin_sw.color = _get_color_from_option(_skin_opt, SKIN_TONES, Color(0.847, 0.733, 0.663))
-	if _brow_sw: _brow_sw.color = _get_color_from_option(_brow_opt, HAIR_COLORS, Color(0.15, 0.15, 0.15))
-	if _eye_sw:  _eye_sw.color  = _get_color_from_option(_eye_opt, EYE_COLORS, Color(0.4, 0.25, 0.15))
-	if _hair_sw: _hair_sw.color = _get_color_from_option(_hair_opt, HAIR_COLORS, Color(0.15, 0.15, 0.15))
-
-func _get_color_from_option(opt: OptionButton, palette: Dictionary, default: Color) -> Color:
-	if opt == null: return default
-	var idx: int = opt.get_selected()
-	if idx < 0 or idx >= opt.item_count: return default
-	var color_name: String = opt.get_item_text(idx)
-	return palette.get(color_name, default)
 
 # ── perks (based on selected stats; only T1 options) ─────────────────────────
 func _rebuild_perk_dropdown() -> void:
@@ -273,17 +397,15 @@ func _on_confirm_pressed() -> void:
 		OS.alert("Pick 3 stats and 1 perk to continue.", "Character Creation")
 		return
 
+	# Validate at least base body is selected
+	if "base" not in selected_variants:
+		OS.alert("Please select at least a body type.", "Character Creation")
+		return
+
 	var pron_text: String = _opt_text(_pron_in)
 
-	var body_id: String = _opt_text(_body_in)
-	var face_id: String = _opt_text(_face_in)
-	var hair_id: String = _opt_text(_hair_in)
-	var eyes_id: String = _opt_text(_eyes_in)
-
-	var c_skin: Color = _get_color_from_option(_skin_opt, SKIN_TONES, Color(0.847, 0.733, 0.663))
-	var c_brow: Color = _get_color_from_option(_brow_opt, HAIR_COLORS, Color(0.15, 0.15, 0.15))
-	var c_eye: Color  = _get_color_from_option(_eye_opt, EYE_COLORS, Color(0.4, 0.25, 0.15))
-	var c_hair: Color = _get_color_from_option(_hair_opt, HAIR_COLORS, Color(0.15, 0.15, 0.15))
+	# Save character variant data to CharacterData autoload
+	aCharacterData.set_character(selected_variants, current_selections)
 
 	var gs: Node = get_node_or_null(GS_PATH)
 	if gs:
@@ -292,9 +414,10 @@ func _on_confirm_pressed() -> void:
 		if gs.has_method("set"):
 			gs.set("player_name", full_name)
 		gs.set_meta("hero_identity", {
-			"name": name_text, "surname": surname_text, "pronoun": pron_text,
-			"body": body_id, "face": face_id, "eyes": eyes_id, "hair": hair_id,
-			"body_color": c_skin, "brow_color": c_brow, "eye_color": c_eye, "hair_color": c_hair
+			"name": name_text,
+			"surname": surname_text,
+			"pronoun": pron_text,
+			"character_variants": selected_variants.duplicate()
 		})
 		var picked := PackedStringArray()
 		for i in range(_selected_order.size()):
@@ -321,7 +444,6 @@ func _on_confirm_pressed() -> void:
 		st.call("apply_creation_boosts", picks_arr)
 
 	# Update HP/MP to max after stat boosts (if VTL or FCS were chosen)
-	# This ensures character starts at 100% HP/MP with their new max values
 	if gs and st:
 		var new_level: int = 1
 		var new_vtl: int = 1
@@ -401,3 +523,7 @@ func _opt_text(ob: OptionButton) -> String:
 	var i: int = ob.get_selected()
 	if i < 0: i = 0
 	return ob.get_item_text(i)
+
+func _on_cancel_pressed() -> void:
+	# Disabled, but kept for scene compatibility
+	pass
