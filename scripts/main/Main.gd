@@ -221,6 +221,9 @@ func _reparent_ui_to_canvas_layers() -> void:
 		overlays.reparent(overlays_layer)
 
 func _ready() -> void:
+	# Allow input processing even when game is paused (for menu toggle)
+	process_mode = Node.PROCESS_MODE_ALWAYS
+
 	# Fix UI to stay in place with camera movement
 	_reparent_ui_to_canvas_layers()
 
