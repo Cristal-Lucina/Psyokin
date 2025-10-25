@@ -31,7 +31,7 @@ const DIRECTIONS = {
 const ANIMATIONS = {
 	"walk": {"page": "p1", "rows": [4, 5, 6, 7], "frames": 6, "speed": 0.135},
 	"run": {"page": "p1", "rows": [4, 5, 6, 7], "frames": 6, "speed": 0.080, "custom_frames": [0, 1, 6, 3, 4, 7]},
-	"jump": {"page": "p1", "rows": [0, 1, 2, 3], "frames": 4, "frame_offset": 5, "speed": 0.200},
+	"jump": {"page": "p1", "rows": [0, 1, 2, 3], "frames": 4, "speed": 0.200, "custom_frames": [5, 6, 7, 5]},
 	"push": {"page": "p1", "rows": [0, 1, 2, 3], "frames": 2, "frame_offset": 1, "speed": 0.300},
 	"pull": {"page": "p1", "rows": [0, 1, 2, 3], "frames": 2, "frame_offset": 3, "speed": 0.400}
 }
