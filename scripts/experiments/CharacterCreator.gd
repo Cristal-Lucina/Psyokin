@@ -15,7 +15,8 @@ extends Control
 
 # Character directories
 const CHAR_BASE_PATH = "res://assets/graphics/characters/"
-const CHAR_VARIANTS = ["char_a_pONE1", "char_a_pONE2", "char_a_pONE3", "char_a_p1"]
+# Only use p1 (page 1: walk/run animations)
+const CHAR_VARIANTS = ["char_a_p1"]
 
 # Layer configuration
 const LAYERS = {
