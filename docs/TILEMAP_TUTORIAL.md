@@ -7,8 +7,8 @@ Your Godot 4.4 project now has a complete TileMap setup ready to use! This guide
 
 1. **TileSet Resource**: `resources/tilesets/environment_tileset.tres`
    - Contains all your tiles from the Tilemap.png spritesheet
-   - Tile size: 48x48 pixels
-   - Grid: 40 columns x 16 rows (640 total tiles)
+   - Tile size: 32x32 pixels
+   - Grid: 60 columns x 24 rows (1440 total tiles)
 
 2. **Game Level Scene**: `scenes/world/GameLevel.tscn`
    - Pre-configured with a TileMapLayer
@@ -142,7 +142,7 @@ You can also add:
 
 ## Tile Organization in Your Spritesheet
 
-Based on the Tilemap.png (1920x768, 40x16 grid at 48px/tile):
+Based on the Tilemap.png (1920x768, 60x24 grid at 32px/tile):
 
 Looking at the preview:
 - **Left side**: Building structures (houses, wooden platforms)
