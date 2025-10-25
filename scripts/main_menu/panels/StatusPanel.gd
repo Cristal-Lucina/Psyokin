@@ -86,6 +86,20 @@ const ALT_MES_PATHS := [
 	"/root/MainEventSystem", "/root/MainEvents", "/root/MainEvent"
 ]
 
+# Character preview constants
+const CHAR_BASE_PATH = "res://assets/graphics/characters/"
+const CHAR_VARIANTS = ["char_a_p1"]
+const LAYERS = {
+	"base": {"code": "0bas", "node_name": "BaseSprite", "path": ""},
+	"outfit": {"code": "1out", "node_name": "OutfitSprite", "path": "1out"},
+	"cloak": {"code": "2clo", "node_name": "CloakSprite", "path": "2clo"},
+	"face": {"code": "3fac", "node_name": "FaceSprite", "path": "3fac"},
+	"hair": {"code": "4har", "node_name": "HairSprite", "path": "4har"},
+	"hat": {"code": "5hat", "node_name": "HatSprite", "path": "5hat"},
+	"tool_a": {"code": "6tla", "node_name": "ToolASprite", "path": "6tla"},
+	"tool_b": {"code": "7tlb", "node_name": "ToolBSprite", "path": "7tlb"}
+}
+
 @onready var _refresh : Button        = $Root/Left/PartyHeader/RefreshBtn
 @onready var _party   : VBoxContainer = $Root/Left/PartyScroll/PartyList
 @onready var _money   : Label         = $Root/Right/InfoGrid/MoneyValue
@@ -94,17 +108,8 @@ const ALT_MES_PATHS := [
 @onready var _phase   : Label         = $Root/Right/InfoGrid/PhaseValue
 @onready var _hint    : RichTextLabel = $Root/Right/HintValue
 
-# Appearance UI (from TSCN)
-@onready var _app_name_value    : Label     = %NameValue
-@onready var _app_pronoun_value : Label     = %PronounValue
-@onready var _app_body_value    : Label     = %BodyValue
-@onready var _app_face_value    : Label     = %FaceValue
-@onready var _app_eyes_value    : Label     = %EyesValue
-@onready var _app_hair_value    : Label     = %HairValue
-@onready var _sw_skin           : ColorRect = %SkinColor
-@onready var _sw_brow           : ColorRect = %BrowColor
-@onready var _sw_eye            : ColorRect = %EyesColor
-@onready var _sw_hair           : ColorRect = %HairColor
+# Character Preview UI
+@onready var character_layers = $Root/Right/CharacterPreviewBox/CenterContainer/CharacterLayers
 
 var _gs        : Node = null
 var _st        : Node = null
@@ -657,128 +662,72 @@ func _update_summary() -> void:
 		var h: String = _read_mission_hint()
 		_hint.text = h if h != "" else "[i]TBD[/i]"
 
-# --------------------- Appearance -----------------------------
+# --------------------- Character Preview ----------------------
 
 func _rebuild_appearance() -> void:
-	_update_appearance_values()
+	_update_character_preview()
 
-func _update_appearance_values() -> void:
-	var snap: Dictionary = _read_hero_identity()
+func _update_character_preview() -> void:
+	"""Update the character preview with saved variant data"""
+	if not character_layers:
+		return
 
-	if _app_name_value:    _app_name_value.text    = String(snap.get("name", "Player"))
-	if _app_pronoun_value: _app_pronoun_value.text = String(snap.get("pronoun", "they"))
-	if _app_body_value:    _app_body_value.text    = String(snap.get("body", "1"))
-	if _app_face_value:    _app_face_value.text    = String(snap.get("face", "1"))
-	if _app_eyes_value:    _app_eyes_value.text    = String(snap.get("eyes", "1"))
-	if _app_hair_value:    _app_hair_value.text    = String(snap.get("hair", "1"))
+	# Get character variants from GameState
+	var variants: Dictionary = {}
+	if _gs and _gs.has_meta("hero_identity"):
+		var id_v: Variant = _gs.get_meta("hero_identity")
+		if typeof(id_v) == TYPE_DICTIONARY:
+			var id: Dictionary = id_v
+			if id.has("character_variants"):
+				var cv: Variant = id.get("character_variants")
+				if typeof(cv) == TYPE_DICTIONARY:
+					variants = cv
 
-	if _sw_skin: _sw_skin.color = _as_color(snap.get("body_color", Color(1.0, 0.9, 0.8)))
-	if _sw_brow: _sw_brow.color = _as_color(snap.get("brow_color", Color(0.2, 0.2, 0.2)))
-	if _sw_eye:  _sw_eye.color  = _as_color(snap.get("eye_color",  Color(0.4, 0.5, 0.6)))
-	if _sw_hair: _sw_hair.color = _as_color(snap.get("hair_color", Color(1, 1, 1)))
+	# If no variants saved, try to load from CharacterData autoload
+	if variants.is_empty():
+		var char_data = get_node_or_null("/root/aCharacterData")
+		if char_data and char_data.has_method("get"):
+			var sv: Variant = char_data.get("selected_variants")
+			if typeof(sv) == TYPE_DICTIONARY:
+				variants = sv
 
-func _read_hero_identity() -> Dictionary:
-	# First: GameState meta blob written by CharacterCreation
-	if _gs:
-		if _gs.has_meta("hero_identity"):
-			var id_v: Variant = _gs.get_meta("hero_identity")
-			if typeof(id_v) == TYPE_DICTIONARY:
-				var id: Dictionary = id_v
-				var first_name: String = String(id.get("name","Player"))
-				var surname: String = String(id.get("surname",""))
-				var full_name: String = "%s %s" % [first_name, surname] if surname != "" else first_name
-				return {
-					"name": full_name,
-					"pronoun": String(id.get("pronoun","they")),
-					"body": String(id.get("body","1")),
-					"face": String(id.get("face","1")),
-					"eyes": String(id.get("eyes","1")),
-					"hair": String(id.get("hair","1")),
-					"body_color": _as_color(id.get("body_color", Color(1.0,0.9,0.8))),
-					"brow_color": _as_color(id.get("brow_color", Color(0.2,0.2,0.2))),
-					"eye_color":  _as_color(id.get("eye_color",  Color(0.4,0.5,0.6))),
-					"hair_color": _as_color(id.get("hair_color", Color(1,1,1))),
-				}
-		# Soft fallback: properties
-		if _gs.has_method("get"):
-			var out: Dictionary = {
-				"name": String(_gs.get("player_name")) if _gs.get("player_name") != null else "Player",
-				"pronoun":"they","body":"1","face":"1","eyes":"1","hair":"1",
-				"body_color": Color(1.0,0.9,0.8),
-				"brow_color": Color(0.2,0.2,0.2),
-				"eye_color":  Color(0.4,0.5,0.6),
-				"hair_color": Color(1,1,1),
-			}
-			return out
-	# Default
-	return {
-		"name":"Player","pronoun":"they","body":"1","face":"1","eyes":"1","hair":"1",
-		"body_color": Color(1.0, 0.9, 0.8),
-		"brow_color": Color(0.2, 0.2, 0.2),
-		"eye_color" : Color(0.4, 0.5, 0.6),
-		"hair_color": Color(1, 1, 1)
-	}
+	# Update each layer sprite
+	for layer_key in LAYERS:
+		var layer = LAYERS[layer_key]
+		var sprite = character_layers.get_node(layer.node_name)
 
-func _as_color(v: Variant) -> Color:
-	# Already a Color object
-	if typeof(v) == TYPE_COLOR:
-		return v as Color
+		if layer_key in variants and variants[layer_key] != "":
+			var variant_code = variants[layer_key]
+			var texture_path = _find_character_file(layer_key, variant_code)
+			if texture_path != "" and FileAccess.file_exists(texture_path):
+				var texture = load(texture_path)
+				sprite.texture = texture
+				sprite.visible = true
+				# Set to idle pose (frame 0 of South direction, row 4)
+				sprite.frame = 4 * 8  # Row 4 (idle south), frame 0
+			else:
+				sprite.texture = null
+				sprite.visible = false
+		else:
+			sprite.texture = null
+			sprite.visible = false
 
-	# Handle dictionary format (Godot JSON serialization of Color)
-	if typeof(v) == TYPE_DICTIONARY:
-		var d: Dictionary = v
-		# Check for r,g,b,a keys (Godot's JSON format for Color)
-		if d.has("r") and d.has("g") and d.has("b"):
-			var r: float = float(d.get("r", 1.0))
-			var g: float = float(d.get("g", 1.0))
-			var b: float = float(d.get("b", 1.0))
-			var a: float = float(d.get("a", 1.0))
-			return Color(r, g, b, a)
-		# Check for x,y,z,w keys (alternate format)
-		if d.has("x") and d.has("y") and d.has("z"):
-			var r2: float = float(d.get("x", 1.0))
-			var g2: float = float(d.get("y", 1.0))
-			var b2: float = float(d.get("z", 1.0))
-			var a2: float = float(d.get("w", 1.0))
-			return Color(r2, g2, b2, a2)
+func _find_character_file(layer_key: String, variant_code: String) -> String:
+	"""Find the character file for a given layer and variant code"""
+	if not LAYERS.has(layer_key):
+		return ""
 
-	# Handle array format [r, g, b] or [r, g, b, a]
-	if typeof(v) == TYPE_ARRAY:
-		var arr: Array = v
-		if arr.size() >= 3:
-			var r3: float = float(arr[0])
-			var g3: float = float(arr[1])
-			var b3: float = float(arr[2])
-			var a3: float = float(arr[3]) if arr.size() >= 4 else 1.0
-			return Color(r3, g3, b3, a3)
+	var layer = LAYERS[layer_key]
+	for variant in CHAR_VARIANTS:
+		var base_path = CHAR_BASE_PATH + variant + "/"
+		var layer_path = base_path + (layer.path + "/" if layer.path != "" else "")
+		var filename = "%s_%s_%s.png" % [variant, layer.code, variant_code]
+		var full_path = layer_path + filename
 
-	# Handle string format
-	if typeof(v) == TYPE_STRING:
-		var s: String = String(v)
-		# Try to parse hex color (#RRGGBB or #RRGGBBAA)
-		if s.begins_with("#"):
-			return Color(s)
-		# Try to parse Color string representation "(r, g, b, a)" or "(r, g, b)"
-		if s.contains("(") and s.contains(")"):
-			# Extract the numbers from "(0.227, 0.239, 0.212, 1.0)"
-			var stripped := s.replace("(", "").replace(")", "").strip_edges()
-			var parts: PackedStringArray = stripped.split(",")
-			if parts.size() >= 3:
-				var r_str := parts[0].strip_edges()
-				var g_str := parts[1].strip_edges()
-				var b_str := parts[2].strip_edges()
-				var a_str := parts[3].strip_edges() if parts.size() >= 4 else "1.0"
-				var r_val: float = float(r_str)
-				var g_val: float = float(g_str)
-				var b_val: float = float(b_str)
-				var a_val: float = float(a_str)
-				return Color(r_val, g_val, b_val, a_val)
-		# Try standard Color constructor (works with named colors like "red", "blue")
-		if not s.contains("("):
-			return Color(s)
+		if FileAccess.file_exists(full_path):
+			return full_path
 
-	# Default fallback (white)
-	return Color(1,1,1)
+	return ""
 
 # --------------------- Small helpers -------------------------
 
