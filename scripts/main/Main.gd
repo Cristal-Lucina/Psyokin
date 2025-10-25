@@ -204,6 +204,7 @@ func _reparent_ui_to_canvas_layers() -> void:
 		# Create CanvasLayer for main UI
 		var ui_layer := CanvasLayer.new()
 		ui_layer.name = "UILayer"
+		ui_layer.process_mode = Node.PROCESS_MODE_ALWAYS  # Continue processing when paused
 		add_child(ui_layer)
 
 		# Reparent MarginContainer to UILayer
@@ -213,6 +214,7 @@ func _reparent_ui_to_canvas_layers() -> void:
 		# Create CanvasLayer for overlays (menus)
 		var overlays_layer := CanvasLayer.new()
 		overlays_layer.name = "OverlaysLayer"
+		overlays_layer.process_mode = Node.PROCESS_MODE_ALWAYS  # Continue processing when paused
 		add_child(overlays_layer)
 
 		# Reparent Overlays to OverlaysLayer
@@ -357,6 +359,8 @@ func _toggle_game_menu() -> void:
 		if _game_menu.visible and not _menu_can_close():
 			return
 		_game_menu.visible = not _game_menu.visible
+		# Pause/unpause the game based on menu visibility
+		get_tree().paused = _game_menu.visible
 		return
 	if not ResourceLoader.exists(GAME_MENU_SCENE): return
 	var ps: PackedScene = load(GAME_MENU_SCENE) as PackedScene
@@ -370,6 +374,8 @@ func _toggle_game_menu() -> void:
 	parent.add_child(_game_menu)
 	_game_menu.visible = true
 	_game_menu.move_to_front()
+	# Pause the game when menu is opened
+	get_tree().paused = true
 
 func _toggle_phone_menu() -> void:
 	if _phone_menu and is_instance_valid(_phone_menu):
