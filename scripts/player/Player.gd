@@ -75,7 +75,9 @@ const RUN_SPEED_MULT: float = 1.75
 const PUSH_PULL_SPEED_MULT: float = 0.5
 
 # Animation constants
-const ANIM_FRAME_TIME: float = 0.135  # 135ms per frame for walk/run
+const WALK_FRAME_TIME: float = 0.135  # 135ms per frame for walk
+const RUN_FRAME_TIME: float = 0.100  # 100ms per frame for run (faster)
+const PUSH_PULL_FRAME_TIME: float = 0.200  # 200ms per frame for push/pull (slower)
 const WALK_FRAMES: int = 6  # 6 frames per walk cycle
 const RUN_FRAMES: int = 6  # 6 frames per run cycle (custom sequence)
 const PUSH_FRAMES: int = 2  # 2 frames per push animation
@@ -85,7 +87,7 @@ const PULL_FRAMES: int = 2  # 2 frames per pull animation
 const JUMP_AIRBORNE_FRAMES: int = 2  # 2 frames while in air (frames 2-3)
 const JUMP_LANDING_HOLD_FRAMES: int = 2  # Hold landing frame for 2 frames
 const JUMP_ARC_DISTANCE: float = 80.0  # Distance to travel during jump
-const JUMP_ARC_DURATION: float = 0.27  # Duration of airborne phase (2 frames * 0.135)
+const JUMP_ARC_DURATION: float = 0.27  # Duration of airborne phase (2 frames)
 const JUMP_ARC_HEIGHT: float = 40.0  # Height of vertical arc for East/West jumps
 
 # Run animation uses custom frame sequence: columns 0,1,6,3,4,7
@@ -275,8 +277,8 @@ func _handle_jump(delta: float) -> void:
 		JumpPhase.LANDING:
 			# Hold landing frame
 			_anim_frame_timer += delta
-			if _anim_frame_timer >= ANIM_FRAME_TIME:
-				_anim_frame_timer -= ANIM_FRAME_TIME
+			if _anim_frame_timer >= WALK_FRAME_TIME:
+				_anim_frame_timer -= WALK_FRAME_TIME
 				_jump_landing_hold_count += 1
 
 				if _jump_landing_hold_count >= JUMP_LANDING_HOLD_FRAMES:
@@ -420,8 +422,8 @@ func _update_animation(delta: float) -> void:
 			# Walk: rows 4-7, columns 0-5
 			# South: 32-37, North: 40-45, East: 48-53, West: 56-61
 			_anim_frame_timer += delta
-			if _anim_frame_timer >= ANIM_FRAME_TIME:
-				_anim_frame_timer -= ANIM_FRAME_TIME
+			if _anim_frame_timer >= WALK_FRAME_TIME:
+				_anim_frame_timer -= WALK_FRAME_TIME
 				_anim_frame_index = (_anim_frame_index + 1) % WALK_FRAMES
 			frame = (4 + _current_direction) * 8 + _anim_frame_index
 
@@ -430,8 +432,8 @@ func _update_animation(delta: float) -> void:
 			# South: 32,33,38,35,36,39 North: 40,41,46,43,44,47
 			# East: 48,49,54,51,52,55 West: 56,57,62,59,60,63
 			_anim_frame_timer += delta
-			if _anim_frame_timer >= ANIM_FRAME_TIME:
-				_anim_frame_timer -= ANIM_FRAME_TIME
+			if _anim_frame_timer >= RUN_FRAME_TIME:
+				_anim_frame_timer -= RUN_FRAME_TIME
 				_anim_frame_index = (_anim_frame_index + 1) % RUN_FRAMES
 			var run_col: int = RUN_FRAME_SEQUENCE[_anim_frame_index]
 			frame = (4 + _current_direction) * 8 + run_col
@@ -446,8 +448,8 @@ func _update_animation(delta: float) -> void:
 				JumpPhase.AIRBORNE:
 					# Cycle through airborne frames (columns 6-7)
 					_anim_frame_timer += delta
-					if _anim_frame_timer >= ANIM_FRAME_TIME:
-						_anim_frame_timer -= ANIM_FRAME_TIME
+					if _anim_frame_timer >= WALK_FRAME_TIME:
+						_anim_frame_timer -= WALK_FRAME_TIME
 						_anim_frame_index = (_anim_frame_index + 1) % JUMP_AIRBORNE_FRAMES
 					frame = _current_direction * 8 + 6 + _anim_frame_index
 
@@ -462,16 +464,16 @@ func _update_animation(delta: float) -> void:
 		MovementState.PUSH:
 			# Push: columns 1-2 (frames 1-2, 9-10, 17-18, 25-26)
 			_anim_frame_timer += delta
-			if _anim_frame_timer >= ANIM_FRAME_TIME:
-				_anim_frame_timer -= ANIM_FRAME_TIME
+			if _anim_frame_timer >= PUSH_PULL_FRAME_TIME:
+				_anim_frame_timer -= PUSH_PULL_FRAME_TIME
 				_anim_frame_index = (_anim_frame_index + 1) % PUSH_FRAMES
 			frame = _current_direction * 8 + 1 + _anim_frame_index
 
 		MovementState.PULL:
 			# Pull: columns 3-4 (frames 3-4, 11-12, 19-20, 27-28)
 			_anim_frame_timer += delta
-			if _anim_frame_timer >= ANIM_FRAME_TIME:
-				_anim_frame_timer -= ANIM_FRAME_TIME
+			if _anim_frame_timer >= PUSH_PULL_FRAME_TIME:
+				_anim_frame_timer -= PUSH_PULL_FRAME_TIME
 				_anim_frame_index = (_anim_frame_index + 1) % PULL_FRAMES
 			frame = _current_direction * 8 + 3 + _anim_frame_index
 
