@@ -86,6 +86,7 @@ const JUMP_AIRBORNE_FRAMES: int = 2  # 2 frames while in air (frames 2-3)
 const JUMP_LANDING_HOLD_FRAMES: int = 2  # Hold landing frame for 2 frames
 const JUMP_ARC_DISTANCE: float = 80.0  # Distance to travel during jump
 const JUMP_ARC_DURATION: float = 0.27  # Duration of airborne phase (2 frames * 0.135)
+const JUMP_ARC_HEIGHT: float = 40.0  # Height of vertical arc for East/West jumps
 
 # Run animation uses custom frame sequence: columns 0,1,6,3,4,7
 # This replaces the 3rd walk frame with 7th (first run frame)
@@ -257,7 +258,16 @@ func _handle_jump(delta: float) -> void:
 				velocity = Vector2.ZERO
 			else:
 				# Interpolate position along arc
-				position = _jump_start_pos.lerp(_jump_target_pos, progress)
+				var base_pos: Vector2 = _jump_start_pos.lerp(_jump_target_pos, progress)
+
+				# Add vertical arc for East/West jumps (parabolic curve)
+				if _current_direction == 2 or _current_direction == 3:  # East or West
+					# Parabolic arc: peaks at progress = 0.5
+					# Formula: -4 * height * (progress - 0.5)^2 + height
+					var arc_offset: float = -4.0 * JUMP_ARC_HEIGHT * pow(progress - 0.5, 2) + JUMP_ARC_HEIGHT
+					base_pos.y -= arc_offset
+
+				position = base_pos
 				velocity = Vector2.ZERO
 
 			move_and_slide()
@@ -325,27 +335,12 @@ func _handle_movement(_delta: float) -> void:
 	if input_vector.length() > 0:
 		input_vector = input_vector.normalized()
 
-	# Update direction based on input (even if not moving, for crouch)
-	if input_vector.length() > 0:
-		# Prioritize horizontal movement for 4-directional sprites
-		if abs(input_vector.x) > abs(input_vector.y):
-			# Moving horizontally
-			if input_vector.x > 0:
-				_current_direction = 2  # East
-			else:
-				_current_direction = 3  # West
-		else:
-			# Moving vertically
-			if input_vector.y > 0:
-				_current_direction = 0  # South
-			else:
-				_current_direction = 1  # North
-
-	# Determine movement state based on modifier keys
+	# Determine movement state based on modifier keys first
 	var speed_mult: float = 1.0
 	var can_move: bool = true
+	var is_pulling: bool = Input.is_key_pressed(KEY_COMMA)
 
-	if Input.is_key_pressed(KEY_COMMA):
+	if is_pulling:
 		# Pull - half speed
 		_current_state = MovementState.PULL
 		speed_mult = PUSH_PULL_SPEED_MULT
@@ -366,6 +361,38 @@ func _handle_movement(_delta: float) -> void:
 			_current_state = MovementState.WALK
 		else:
 			_current_state = MovementState.IDLE
+
+	# Update direction based on input
+	if input_vector.length() > 0:
+		# Prioritize horizontal movement for 4-directional sprites
+		var movement_direction: int = -1
+
+		if abs(input_vector.x) > abs(input_vector.y):
+			# Moving horizontally
+			if input_vector.x > 0:
+				movement_direction = 2  # East
+			else:
+				movement_direction = 3  # West
+		else:
+			# Moving vertically
+			if input_vector.y > 0:
+				movement_direction = 0  # South
+			else:
+				movement_direction = 1  # North
+
+		# For pulling, face the opposite direction (as if pulling something toward you)
+		if is_pulling:
+			match movement_direction:
+				0:  # Moving South, face North
+					_current_direction = 1
+				1:  # Moving North, face South
+					_current_direction = 0
+				2:  # Moving East, face West
+					_current_direction = 3
+				3:  # Moving West, face East
+					_current_direction = 2
+		else:
+			_current_direction = movement_direction
 
 	# Apply movement
 	if can_move:
