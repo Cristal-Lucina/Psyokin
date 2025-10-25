@@ -21,6 +21,7 @@ metadata/_edit_snap_grid = true
 metadata/_edit_snap_size = Vector2(32, 32)
 
 [node name="TileMap" type="TileMap" parent="GameWorld"]
+position = Vector2(-0.751343, 0)
 tile_set = ExtResource("4")
 rendering_quadrant_size = 32
 format = 2
@@ -41,6 +42,11 @@ tile_set = ExtResource("4")
 [node name="Layer1" type="TileMapLayer" parent="GameWorld/TileMap"]
 use_parent_material = true
 tile_map_data = PackedByteArray("AAAiAAsAAAASAAwAAAA=")
+tile_set = ExtResource("4")
+rendering_quadrant_size = 32
+
+[node name="Layer0" type="TileMapLayer" parent="GameWorld/TileMap"]
+use_parent_material = true
 tile_set = ExtResource("4")
 rendering_quadrant_size = 32
 
