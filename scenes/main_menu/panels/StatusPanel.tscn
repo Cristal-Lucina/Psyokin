@@ -112,122 +112,67 @@ bbcode_enabled = true
 text = "[i]TBD[/i]"
 fit_content = true
 
-[node name="AppearanceBox" type="VBoxContainer" parent="Root/Right"]
+[node name="CharacterPreviewBox" type="VBoxContainer" parent="Root/Right"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_constants/separation = 6
 
-[node name="AppearanceHeader" type="Label" parent="Root/Right/AppearanceBox"]
+[node name="PreviewHeader" type="Label" parent="Root/Right/CharacterPreviewBox"]
 layout_mode = 2
-text = "Appearance"
+text = "Character Preview"
+horizontal_alignment = 1
 
-[node name="AppearanceGrid" type="GridContainer" parent="Root/Right/AppearanceBox"]
-unique_name_in_owner = true
+[node name="ViewportWrapper" type="Control" parent="Root/Right/CharacterPreviewBox"]
+custom_minimum_size = Vector2(200, 250)
 layout_mode = 2
-theme_override_constants/h_separation = 8
-theme_override_constants/v_separation = 4
-columns = 2
+size_flags_horizontal = 4
 
-[node name="NameLabel" type="Label" parent="Root/Right/AppearanceBox/AppearanceGrid"]
-layout_mode = 2
-text = "Name"
+[node name="CharacterLayers" type="Node2D" parent="Root/Right/CharacterPreviewBox/ViewportWrapper"]
+position = Vector2(100, 125)
+scale = Vector2(3, 3)
 
-[node name="NameValue" type="Label" parent="Root/Right/AppearanceBox/AppearanceGrid"]
-unique_name_in_owner = true
-layout_mode = 2
+[node name="BaseSprite" type="Sprite2D" parent="Root/Right/CharacterPreviewBox/ViewportWrapper/CharacterLayers"]
+texture_filter = 1
+hframes = 8
+vframes = 8
 
-[node name="PronounLabel" type="Label" parent="Root/Right/AppearanceBox/AppearanceGrid"]
-layout_mode = 2
-text = "Pronoun"
+[node name="OutfitSprite" type="Sprite2D" parent="Root/Right/CharacterPreviewBox/ViewportWrapper/CharacterLayers"]
+texture_filter = 1
+hframes = 8
+vframes = 8
 
-[node name="PronounValue" type="Label" parent="Root/Right/AppearanceBox/AppearanceGrid"]
-unique_name_in_owner = true
-layout_mode = 2
+[node name="CloakSprite" type="Sprite2D" parent="Root/Right/CharacterPreviewBox/ViewportWrapper/CharacterLayers"]
+texture_filter = 1
+hframes = 8
+vframes = 8
 
-[node name="BodyLabel" type="Label" parent="Root/Right/AppearanceBox/AppearanceGrid"]
-layout_mode = 2
-text = "Body ID"
+[node name="FaceSprite" type="Sprite2D" parent="Root/Right/CharacterPreviewBox/ViewportWrapper/CharacterLayers"]
+texture_filter = 1
+hframes = 8
+vframes = 8
 
-[node name="BodyValue" type="Label" parent="Root/Right/AppearanceBox/AppearanceGrid"]
-unique_name_in_owner = true
-layout_mode = 2
+[node name="HairSprite" type="Sprite2D" parent="Root/Right/CharacterPreviewBox/ViewportWrapper/CharacterLayers"]
+texture_filter = 1
+hframes = 8
+vframes = 8
 
-[node name="FaceLabel" type="Label" parent="Root/Right/AppearanceBox/AppearanceGrid"]
-layout_mode = 2
-text = "Face ID"
+[node name="HatSprite" type="Sprite2D" parent="Root/Right/CharacterPreviewBox/ViewportWrapper/CharacterLayers"]
+texture_filter = 1
+hframes = 8
+vframes = 8
 
-[node name="FaceValue" type="Label" parent="Root/Right/AppearanceBox/AppearanceGrid"]
-unique_name_in_owner = true
-layout_mode = 2
+[node name="ToolASprite" type="Sprite2D" parent="Root/Right/CharacterPreviewBox/ViewportWrapper/CharacterLayers"]
+texture_filter = 1
+hframes = 8
+vframes = 8
 
-[node name="EyesLabel" type="Label" parent="Root/Right/AppearanceBox/AppearanceGrid"]
-layout_mode = 2
-text = "Eyes ID"
+[node name="ToolBSprite" type="Sprite2D" parent="Root/Right/CharacterPreviewBox/ViewportWrapper/CharacterLayers"]
+texture_filter = 1
+hframes = 8
+vframes = 8
 
-[node name="EyesValue" type="Label" parent="Root/Right/AppearanceBox/AppearanceGrid"]
-unique_name_in_owner = true
+[node name="InfoLabel" type="Label" parent="Root/Right/CharacterPreviewBox"]
 layout_mode = 2
-
-[node name="HairLabel" type="Label" parent="Root/Right/AppearanceBox/AppearanceGrid"]
-layout_mode = 2
-text = "Hair ID"
-
-[node name="HairValue" type="Label" parent="Root/Right/AppearanceBox/AppearanceGrid"]
-unique_name_in_owner = true
-layout_mode = 2
-
-[node name="SwatchContainer" type="HBoxContainer" parent="Root/Right/AppearanceBox"]
-layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="SkinSwatch" type="VBoxContainer" parent="Root/Right/AppearanceBox/SwatchContainer"]
-layout_mode = 2
-theme_override_constants/separation = 4
-
-[node name="SkinLabel" type="Label" parent="Root/Right/AppearanceBox/SwatchContainer/SkinSwatch"]
-layout_mode = 2
-text = "Skin"
-
-[node name="SkinColor" type="ColorRect" parent="Root/Right/AppearanceBox/SwatchContainer/SkinSwatch"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(42, 14)
-layout_mode = 2
-
-[node name="BrowSwatch" type="VBoxContainer" parent="Root/Right/AppearanceBox/SwatchContainer"]
-layout_mode = 2
-theme_override_constants/separation = 4
-
-[node name="BrowLabel" type="Label" parent="Root/Right/AppearanceBox/SwatchContainer/BrowSwatch"]
-layout_mode = 2
-text = "Brows"
-
-[node name="BrowColor" type="ColorRect" parent="Root/Right/AppearanceBox/SwatchContainer/BrowSwatch"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(42, 14)
-layout_mode = 2
-
-[node name="EyesSwatch" type="VBoxContainer" parent="Root/Right/AppearanceBox/SwatchContainer"]
-layout_mode = 2
-theme_override_constants/separation = 4
-
-[node name="EyesLabel" type="Label" parent="Root/Right/AppearanceBox/SwatchContainer/EyesSwatch"]
-layout_mode = 2
-text = "Eyes"
-
-[node name="EyesColor" type="ColorRect" parent="Root/Right/AppearanceBox/SwatchContainer/EyesSwatch"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(42, 14)
-layout_mode = 2
-
-[node name="HairSwatch" type="VBoxContainer" parent="Root/Right/AppearanceBox/SwatchContainer"]
-layout_mode = 2
-theme_override_constants/separation = 4
-
-[node name="HairLabel" type="Label" parent="Root/Right/AppearanceBox/SwatchContainer/HairSwatch"]
-layout_mode = 2
-text = "Hair"
-
-[node name="HairColor" type="ColorRect" parent="Root/Right/AppearanceBox/SwatchContainer/HairSwatch"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(42, 14)
-layout_mode = 2
+theme_override_font_sizes/font_size = 8
+text = "Idle Pose"
+horizontal_alignment = 1
