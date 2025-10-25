@@ -227,6 +227,11 @@ func _ready() -> void:
 	# Fix UI to stay in place with camera movement
 	_reparent_ui_to_canvas_layers()
 
+	# Ensure GameWorld pauses when game is paused
+	var game_world: Node2D = get_node_or_null("GameWorld") as Node2D
+	if game_world:
+		game_world.process_mode = Node.PROCESS_MODE_PAUSABLE
+
 	# Systems
 	calendar = get_node_or_null(CALENDAR_PATH)
 	stats    = get_node_or_null(STATS_PATH)
