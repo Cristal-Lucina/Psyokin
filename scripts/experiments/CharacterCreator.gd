@@ -33,9 +33,9 @@ const LAYERS = {
 # Direction mapping (row in sprite sheet)
 const DIRECTIONS = {
 	0: "South",
-	1: "West",
+	1: "North",
 	2: "East",
-	3: "North"
+	3: "West"
 }
 
 # References
