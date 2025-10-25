@@ -47,8 +47,9 @@ const LAYERS = {
 # Animation constants
 const WALK_FRAME_TIME: float = 0.135  # 135ms per frame
 const WALK_FRAMES: int = 6  # 6 frames per walk cycle
-const IDLE_ROW: int = 0  # Row 1 (index 0) for idle
-const WALK_ROW_START: int = 4  # Rows 5-8 (indices 4-7) for walking
+const ANIM_ROW_START: int = 4  # Rows 5-8 (indices 4-7) contain all animations
+const IDLE_COLUMN: int = 0  # Column 0 in each row is the idle pose
+const WALK_COLUMN_START: int = 1  # Columns 1-6 are the walk cycle
 
 # State
 var _current_direction: int = 0  # 0=South, 1=North, 2=East, 3=West
@@ -130,8 +131,8 @@ func _load_character_appearance() -> void:
 				var texture = load(texture_path)
 				sprite.texture = texture
 				sprite.visible = true
-				# Set to idle pose (frame 0 of South direction, row 1)
-				sprite.frame = IDLE_ROW * 8 + _current_direction
+				# Set to idle pose (row for direction + idle column)
+				sprite.frame = (ANIM_ROW_START + _current_direction) * 8 + IDLE_COLUMN
 				print("[Player]   -> Loaded successfully, frame set to ", sprite.frame)
 			else:
 				print("[Player]   -> ERROR: File not found!")
@@ -218,9 +219,10 @@ func _update_animation(delta: float) -> void:
 			_walk_frame_timer -= WALK_FRAME_TIME
 			_walk_frame_index = (_walk_frame_index + 1) % WALK_FRAMES
 
-		# Calculate frame: walk row (5-8 = indices 4-7) + direction, column = frame index
-		var walk_row: int = WALK_ROW_START + _current_direction
-		var frame: int = walk_row * 8 + _walk_frame_index
+		# Calculate frame: row for direction, column for walk frame
+		# Each direction has its own row (4-7), walk frames are in columns 1-6
+		var anim_row: int = ANIM_ROW_START + _current_direction
+		var frame: int = anim_row * 8 + WALK_COLUMN_START + _walk_frame_index
 
 		# Update all visible sprites
 		for layer_key in LAYERS:
@@ -229,8 +231,9 @@ func _update_animation(delta: float) -> void:
 			if sprite and sprite.visible and sprite.texture:
 				sprite.frame = frame
 	else:
-		# Idle animation (just show first frame of idle row for current direction)
-		var idle_frame: int = IDLE_ROW * 8 + _current_direction
+		# Idle animation: column 0 of the current direction's row
+		var anim_row: int = ANIM_ROW_START + _current_direction
+		var idle_frame: int = anim_row * 8 + IDLE_COLUMN
 
 		# Reset walk animation when stopping
 		_walk_frame_index = 0
