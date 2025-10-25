@@ -1,4 +1,4 @@
-[gd_scene load_steps=2 format=3 uid="uid://c9d8e7f6g5h4i3j2"]
+[gd_scene load_steps=2 format=3 uid="uid://j640ftkccyin"]
 
 [ext_resource type="Script" path="res://scripts/experiments/AnimationTester.gd" id="1_script"]
 
