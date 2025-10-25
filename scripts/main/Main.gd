@@ -246,7 +246,7 @@ func _ready() -> void:
 	_btn_add_sxp    = get_node_or_null("MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot/SxpRow/BtnAddSXP")
 
 	# Overlays shouldn't block input
-	var overlays: Control = get_node_or_null("Overlays") as Control
+	var overlays: Control = get_node_or_null("OverlaysLayer/Overlays") as Control
 	if overlays:
 		overlays.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
@@ -365,7 +365,7 @@ func _toggle_game_menu() -> void:
 	_game_menu.name = "GameMenu"
 	_game_menu.mouse_filter = Control.MOUSE_FILTER_STOP
 	_game_menu.process_mode = Node.PROCESS_MODE_ALWAYS
-	var parent: Node = get_node_or_null("Overlays")
+	var parent: Node = get_node_or_null("OverlaysLayer/Overlays")
 	if parent == null: parent = self
 	parent.add_child(_game_menu)
 	_game_menu.visible = true
@@ -384,7 +384,7 @@ func _toggle_phone_menu() -> void:
 	_phone_menu.process_mode = Node.PROCESS_MODE_ALWAYS
 	_phone_menu.top_level = true
 	_phone_menu.set_anchors_preset(Control.PRESET_FULL_RECT)
-	var parent: Node = get_node_or_null("Overlays")
+	var parent: Node = get_node_or_null("OverlaysLayer/Overlays")
 	if parent == null: parent = self
 	parent.add_child(_phone_menu)
 	_phone_menu.visible = true
@@ -409,7 +409,7 @@ func _toggle_status_cheat_bar() -> void:
 	_status_cheat_bar.offset_top = -250
 	_status_cheat_bar.offset_right = 200
 	_status_cheat_bar.offset_bottom = 250
-	var parent: Node = get_node_or_null("Overlays")
+	var parent: Node = get_node_or_null("OverlaysLayer/Overlays")
 	if parent == null: parent = self
 	parent.add_child(_status_cheat_bar)
 	_status_cheat_bar.visible = true
