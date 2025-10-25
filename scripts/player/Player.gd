@@ -62,6 +62,14 @@ enum MovementState {
 	PULL
 }
 
+# Jump phases
+enum JumpPhase {
+	NONE,        # Not jumping
+	CHARGING,    # Holding first frame (crouch)
+	AIRBORNE,    # In air (frames 2-3)
+	LANDING      # Landing hold (first frame for 2 frames)
+}
+
 # Speed multipliers
 const RUN_SPEED_MULT: float = 1.75
 const PUSH_PULL_SPEED_MULT: float = 0.5
@@ -70,9 +78,14 @@ const PUSH_PULL_SPEED_MULT: float = 0.5
 const ANIM_FRAME_TIME: float = 0.135  # 135ms per frame for walk/run
 const WALK_FRAMES: int = 6  # 6 frames per walk cycle
 const RUN_FRAMES: int = 6  # 6 frames per run cycle (custom sequence)
-const JUMP_FRAMES: int = 3  # 3 frames per jump animation
 const PUSH_FRAMES: int = 2  # 2 frames per push animation
 const PULL_FRAMES: int = 2  # 2 frames per pull animation
+
+# Jump animation constants
+const JUMP_AIRBORNE_FRAMES: int = 2  # 2 frames while in air (frames 2-3)
+const JUMP_LANDING_HOLD_FRAMES: int = 2  # Hold landing frame for 2 frames
+const JUMP_ARC_DISTANCE: float = 80.0  # Distance to travel during jump
+const JUMP_ARC_DURATION: float = 0.27  # Duration of airborne phase (2 frames * 0.135)
 
 # Run animation uses custom frame sequence: columns 0,1,6,3,4,7
 # This replaces the 3rd walk frame with 7th (first run frame)
@@ -92,6 +105,13 @@ var _current_state: MovementState = MovementState.IDLE
 var _current_direction: int = 0  # 0=South, 1=North, 2=East, 3=West
 var _anim_frame_index: int = 0
 var _anim_frame_timer: float = 0.0
+
+# Jump state
+var _jump_phase: JumpPhase = JumpPhase.NONE
+var _jump_arc_timer: float = 0.0
+var _jump_landing_hold_count: int = 0
+var _jump_start_pos: Vector2 = Vector2.ZERO
+var _jump_target_pos: Vector2 = Vector2.ZERO
 
 # Nodes
 @onready var character_layers: Node2D = $CharacterLayers
@@ -201,8 +221,91 @@ func _find_character_file(layer_key: String, variant_code: String) -> String:
 	return ""
 
 func _physics_process(delta: float) -> void:
-	_handle_movement(delta)
+	_handle_jump(delta)
+	if _jump_phase == JumpPhase.NONE:
+		_handle_movement(delta)
 	_update_animation(delta)
+
+func _handle_jump(delta: float) -> void:
+	"""Handle jump state machine and movement"""
+	match _jump_phase:
+		JumpPhase.NONE:
+			# Check for jump input (spacebar pressed)
+			if Input.is_key_pressed(KEY_SPACE):
+				_start_jump()
+
+		JumpPhase.CHARGING:
+			# Hold crouch frame until spacebar is released
+			if not Input.is_key_pressed(KEY_SPACE):
+				_release_jump()
+			# Stay in place during charge
+			velocity = Vector2.ZERO
+			move_and_slide()
+
+		JumpPhase.AIRBORNE:
+			# Arc movement from start to target
+			_jump_arc_timer += delta
+			var progress: float = _jump_arc_timer / JUMP_ARC_DURATION
+
+			if progress >= 1.0:
+				# Finished arc, land
+				position = _jump_target_pos
+				_jump_phase = JumpPhase.LANDING
+				_jump_landing_hold_count = 0
+				_anim_frame_index = 0
+				_anim_frame_timer = 0.0
+				velocity = Vector2.ZERO
+			else:
+				# Interpolate position along arc
+				position = _jump_start_pos.lerp(_jump_target_pos, progress)
+				velocity = Vector2.ZERO
+
+			move_and_slide()
+
+		JumpPhase.LANDING:
+			# Hold landing frame
+			_anim_frame_timer += delta
+			if _anim_frame_timer >= ANIM_FRAME_TIME:
+				_anim_frame_timer -= ANIM_FRAME_TIME
+				_jump_landing_hold_count += 1
+
+				if _jump_landing_hold_count >= JUMP_LANDING_HOLD_FRAMES:
+					# Finished landing, return to idle
+					_jump_phase = JumpPhase.NONE
+					_current_state = MovementState.IDLE
+
+			velocity = Vector2.ZERO
+			move_and_slide()
+
+func _start_jump() -> void:
+	"""Initialize jump sequence"""
+	_jump_phase = JumpPhase.CHARGING
+	_current_state = MovementState.JUMP
+	_anim_frame_index = 0
+	_anim_frame_timer = 0.0
+
+func _release_jump() -> void:
+	"""Release jump and start arc movement"""
+	_jump_phase = JumpPhase.AIRBORNE
+	_jump_arc_timer = 0.0
+	_anim_frame_index = 0
+	_anim_frame_timer = 0.0
+
+	# Calculate jump arc based on facing direction
+	_jump_start_pos = position
+	var jump_vector: Vector2 = Vector2.ZERO
+
+	match _current_direction:
+		0:  # South
+			jump_vector = Vector2(0, JUMP_ARC_DISTANCE)
+		1:  # North
+			jump_vector = Vector2(0, -JUMP_ARC_DISTANCE)
+		2:  # East
+			jump_vector = Vector2(JUMP_ARC_DISTANCE, 0)
+		3:  # West
+			jump_vector = Vector2(-JUMP_ARC_DISTANCE, 0)
+
+	_jump_target_pos = _jump_start_pos + jump_vector
 
 func _handle_movement(_delta: float) -> void:
 	"""Handle player input and movement"""
@@ -242,10 +345,7 @@ func _handle_movement(_delta: float) -> void:
 	var speed_mult: float = 1.0
 	var can_move: bool = true
 
-	if Input.is_key_pressed(KEY_SPACE):
-		# Jump - play jump animation, can still move
-		_current_state = MovementState.JUMP
-	elif Input.is_key_pressed(KEY_COMMA):
+	if Input.is_key_pressed(KEY_COMMA):
 		# Pull - half speed
 		_current_state = MovementState.PULL
 		speed_mult = PUSH_PULL_SPEED_MULT
@@ -310,12 +410,27 @@ func _update_animation(delta: float) -> void:
 			frame = (4 + _current_direction) * 8 + run_col
 
 		MovementState.JUMP:
-			# Jump: columns 5-7 (frames 5-7, 13-15, 21-23, 29-31)
-			_anim_frame_timer += delta
-			if _anim_frame_timer >= ANIM_FRAME_TIME:
-				_anim_frame_timer -= ANIM_FRAME_TIME
-				_anim_frame_index = (_anim_frame_index + 1) % JUMP_FRAMES
-			frame = _current_direction * 8 + 5 + _anim_frame_index
+			# Jump animation varies by phase
+			match _jump_phase:
+				JumpPhase.CHARGING:
+					# Hold first frame (crouch/windup): column 5
+					frame = _current_direction * 8 + 5
+
+				JumpPhase.AIRBORNE:
+					# Cycle through airborne frames (columns 6-7)
+					_anim_frame_timer += delta
+					if _anim_frame_timer >= ANIM_FRAME_TIME:
+						_anim_frame_timer -= ANIM_FRAME_TIME
+						_anim_frame_index = (_anim_frame_index + 1) % JUMP_AIRBORNE_FRAMES
+					frame = _current_direction * 8 + 6 + _anim_frame_index
+
+				JumpPhase.LANDING:
+					# Hold first frame (crouch): column 5
+					frame = _current_direction * 8 + 5
+
+				_:
+					# Fallback
+					frame = _current_direction * 8 + 5
 
 		MovementState.PUSH:
 			# Push: columns 1-2 (frames 1-2, 9-10, 17-18, 25-26)
