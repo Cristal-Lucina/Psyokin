@@ -12,7 +12,10 @@
 ##   • Phone menu overlay (open/close with ui_phone input)
 ##   • Time advancement controls (Advance Phase, Reset Week)
 ##   • Date/time header display (current day/phase)
-##   • Cheat tool UI (toggle with 'C' key):
+##   • Cheat tool UI:
+##     - Toggle ALL cheats with 'I' key (hides/shows entire cheat container)
+##     - Toggle party/XP/SXP controls with 'C' key
+##     - Toggle status effects cheat bar with 'O' key
 ##     - Party management (add/remove members)
 ##     - XP/Level cheats (hero and allies)
 ##     - SXP cheats (stat experience points)
@@ -119,13 +122,14 @@ const PARTY_NAME_KEYS := ["name","display_name","disp_name"]
 # ---- Header refs ----
 @onready var date_label: Label         = $MarginContainer/Root/DateLabel
 @onready var phase_label: Label        = $MarginContainer/Root/PhaseLabel
-@onready var advance_btn: Button       = $MarginContainer/Root/HBoxContainer/AdvanceBtn
-@onready var reset_btn: Button         = $MarginContainer/Root/HBoxContainer/ResetWeekBtn
-@onready var load_btn: Button          = $MarginContainer/Root/HBoxContainer2/LoadItemsBtn
-@onready var items_status: Label       = $MarginContainer/Root/HBoxContainer2/ItemsStatus
-@onready var open_training_btn: Button = $MarginContainer/Root/HBoxContainer3/OpenTrainingBtn
-@onready var spots_status: Label       = $MarginContainer/Root/HBoxContainer3/SpotsStatus
-@onready var open_save_btn: Button     = $MarginContainer/Root/HBoxContainer4/OpenSaveBtn
+@onready var cheat_container: VBoxContainer = $MarginContainer/Root/CheatContainer
+@onready var advance_btn: Button       = $MarginContainer/Root/CheatContainer/HBoxContainer/AdvanceBtn
+@onready var reset_btn: Button         = $MarginContainer/Root/CheatContainer/HBoxContainer/ResetWeekBtn
+@onready var load_btn: Button          = $MarginContainer/Root/CheatContainer/HBoxContainer2/LoadItemsBtn
+@onready var items_status: Label       = $MarginContainer/Root/CheatContainer/HBoxContainer2/ItemsStatus
+@onready var open_training_btn: Button = $MarginContainer/Root/CheatContainer/HBoxContainer3/OpenTrainingBtn
+@onready var spots_status: Label       = $MarginContainer/Root/CheatContainer/HBoxContainer3/SpotsStatus
+@onready var open_save_btn: Button     = $MarginContainer/Root/CheatContainer/HBoxContainer4/OpenSaveBtn
 
 # ---- Cheat area container (toggle with C) ----
 var _cheat_root: VBoxContainer = null
@@ -202,17 +206,17 @@ func _ready() -> void:
 	_sig     = get_node_or_null(SIGIL_PATH)
 
 	# Cheat menu nodes (optional - may not exist in scene)
-	_cheat_root     = get_node_or_null("MarginContainer/Root/CheatRoot")
-	_roster_pick    = get_node_or_null("MarginContainer/Root/CheatRoot/PartyRow/RosterPick")
-	_member_id_le   = get_node_or_null("MarginContainer/Root/CheatRoot/PartyRow/MemberId")
-	_btn_add_party  = get_node_or_null("MarginContainer/Root/CheatRoot/PartyRow/BtnAddParty")
-	_btn_rem_party  = get_node_or_null("MarginContainer/Root/CheatRoot/PartyRow/BtnRemoveParty")
-	_btn_to_bench   = get_node_or_null("MarginContainer/Root/CheatRoot/PartyRow/BtnToBench")
-	_spin_xp        = get_node_or_null("MarginContainer/Root/CheatRoot/LxpRow/SpinXP")
-	_btn_add_xp     = get_node_or_null("MarginContainer/Root/CheatRoot/LxpRow/BtnAddXP")
-	_stat_pick      = get_node_or_null("MarginContainer/Root/CheatRoot/SxpRow/StatPick")
-	_spin_sxp       = get_node_or_null("MarginContainer/Root/CheatRoot/SxpRow/SpinSXP")
-	_btn_add_sxp    = get_node_or_null("MarginContainer/Root/CheatRoot/SxpRow/BtnAddSXP")
+	_cheat_root     = get_node_or_null("MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot")
+	_roster_pick    = get_node_or_null("MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot/PartyRow/RosterPick")
+	_member_id_le   = get_node_or_null("MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot/PartyRow/MemberId")
+	_btn_add_party  = get_node_or_null("MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot/PartyRow/BtnAddParty")
+	_btn_rem_party  = get_node_or_null("MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot/PartyRow/BtnRemoveParty")
+	_btn_to_bench   = get_node_or_null("MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot/PartyRow/BtnToBench")
+	_spin_xp        = get_node_or_null("MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot/LxpRow/SpinXP")
+	_btn_add_xp     = get_node_or_null("MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot/LxpRow/BtnAddXP")
+	_stat_pick      = get_node_or_null("MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot/SxpRow/StatPick")
+	_spin_sxp       = get_node_or_null("MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot/SxpRow/SpinSXP")
+	_btn_add_sxp    = get_node_or_null("MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot/SxpRow/BtnAddSXP")
 
 	# Overlays shouldn’t block input
 	var overlays: Control = get_node_or_null("Overlays") as Control
@@ -296,10 +300,17 @@ func _ready() -> void:
 # ---------- Input ----------
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_echo(): return
+	# Toggle ALL cheats with "i" key
+	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_I:
+		if cheat_container: cheat_container.visible = not cheat_container.visible
+		get_viewport().set_input_as_handled()
+		return
+	# Toggle CheatRoot (party/XP/SXP controls) with "C" key
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_C:
 		if _cheat_root: _cheat_root.visible = not _cheat_root.visible
 		get_viewport().set_input_as_handled()
 		return
+	# Toggle StatusEffectCheatBar with "O" key
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_O:
 		_toggle_status_cheat_bar()
 		get_viewport().set_input_as_handled()
