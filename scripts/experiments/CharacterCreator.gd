@@ -49,6 +49,7 @@ var current_direction = 0  # South
 var current_frame = 0
 var available_parts = {}
 var current_selections = {}
+var selected_variants = {}  # Track variant codes for connecting animations
 # Walk animation (6 frames, rows 5-8)
 var animation_timer = 0.0
 var animation_speed = 0.135  # 135ms per frame for walk
@@ -95,9 +96,11 @@ func scan_character_assets():
 				while file_name != "":
 					if file_name.ends_with(".png") and layer.code in file_name:
 						var full_path = variant_path + file_name
+						var variant_code = extract_variant_code(file_name.get_basename())
 						available_parts[layer_key].append({
 							"name": file_name.get_basename(),
-							"path": full_path
+							"path": full_path,
+							"variant": variant_code
 						})
 					file_name = dir.get_next()
 				dir.list_dir_end()
@@ -110,9 +113,11 @@ func scan_character_assets():
 					while file_name != "":
 						if file_name.ends_with(".png"):
 							var full_path = layer_path + "/" + file_name
+							var variant_code = extract_variant_code(file_name.get_basename())
 							available_parts[layer_key].append({
 								"name": file_name.get_basename(),
-								"path": full_path
+								"path": full_path,
+								"variant": variant_code
 							})
 						file_name = subdir.get_next()
 					subdir.list_dir_end()
@@ -173,6 +178,11 @@ func set_default_character():
 func _on_part_selected(layer_key: String, part):
 	"""Handle part selection"""
 	current_selections[layer_key] = part
+	if part != null:
+		selected_variants[layer_key] = part.variant
+		print("Selected ", layer_key, ": variant = ", part.variant)
+	else:
+		selected_variants.erase(layer_key)
 	update_preview()
 
 func update_preview():
@@ -211,3 +221,36 @@ func _on_direction_changed(direction: int):
 	"""Handle direction button press"""
 	current_direction = direction
 	update_frame_display()
+
+func extract_variant_code(filename: String) -> String:
+	"""Extract the variant code from filename
+	Example: 'char_a_p1_0bas_humn_v06' -> 'humn_v06'
+	Example: 'char_a_p1_4har_bob1_v05' -> 'bob1_v05'
+	"""
+	# Split by underscores
+	var parts = filename.split("_")
+	
+	# Find the part that contains the item code and variant
+	# Format is usually: char_a_p1_LAYER_ITEM_VARIANT
+	# We want the last two parts (ITEM_VARIANT)
+	if parts.size() >= 2:
+		var item_code = parts[parts.size() - 2]
+		var variant_code = parts[parts.size() - 1]
+		return item_code + "_" + variant_code
+	
+	return ""
+
+func _on_continue_pressed():
+	"""Handle continue button press - go to animation tester"""
+	if "base" not in selected_variants:
+		print("ERROR: Must select at least a base body")
+		return
+
+	# Save selections to global state
+	aCharacterData.set_character(selected_variants, current_selections)
+
+	print("Character ready for animation testing:")
+	print("  Variants: ", selected_variants)
+
+	# Load animation tester scene
+	get_tree().change_scene_to_file("res://scenes/experiments/AnimationTester.tscn")
