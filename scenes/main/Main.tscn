@@ -21,7 +21,7 @@ position = Vector2(576, 324)
 [node name="UILayer" type="CanvasLayer" parent="."]
 
 [node name="MarginContainer" type="MarginContainer" parent="UILayer"]
-layout_mode = 2
+anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 offset_left = 24.0
@@ -29,198 +29,8 @@ offset_top = 24.0
 offset_right = -24.0
 offset_bottom = -24.0
 
-[node name="Root" type="VBoxContainer" parent="MarginContainer"]
-layout_mode = 2
-size_flags_horizontal = 3
-size_flags_vertical = 3
-theme_override_constants/separation = 8
-
-[node name="DateLabel" type="Label" parent="MarginContainer/Root"]
-layout_mode = 2
-
-[node name="PhaseLabel" type="Label" parent="MarginContainer/Root"]
-layout_mode = 2
-
-[node name="CheatContainer" type="VBoxContainer" parent="MarginContainer/Root"]
-layout_mode = 2
-size_flags_horizontal = 3
-size_flags_vertical = 3
-theme_override_constants/separation = 8
-
-[node name="HBoxContainer" type="HBoxContainer" parent="MarginContainer/Root/CheatContainer"]
-layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="AdvanceBtn" type="Button" parent="MarginContainer/Root/CheatContainer/HBoxContainer"]
-layout_mode = 2
-text = "Advance Phase"
-
-[node name="ResetWeekBtn" type="Button" parent="MarginContainer/Root/CheatContainer/HBoxContainer"]
-layout_mode = 2
-text = "Reset Week"
-
-[node name="HBoxContainer2" type="HBoxContainer" parent="MarginContainer/Root/CheatContainer"]
-layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="LoadItemsBtn" type="Button" parent="MarginContainer/Root/CheatContainer/HBoxContainer2"]
-layout_mode = 2
-text = "Load Items CSV"
-
-[node name="ItemsStatus" type="Label" parent="MarginContainer/Root/CheatContainer/HBoxContainer2"]
-layout_mode = 2
-text = "Items: —"
-
-[node name="HBoxContainer3" type="HBoxContainer" parent="MarginContainer/Root/CheatContainer"]
-layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="OpenTrainingBtn" type="Button" parent="MarginContainer/Root/CheatContainer/HBoxContainer3"]
-layout_mode = 2
-text = "Open Training"
-
-[node name="SpotsStatus" type="Label" parent="MarginContainer/Root/CheatContainer/HBoxContainer3"]
-layout_mode = 2
-text = "Spots: —"
-
-[node name="HBoxContainer4" type="HBoxContainer" parent="MarginContainer/Root/CheatContainer"]
-layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="OpenSaveBtn" type="Button" parent="MarginContainer/Root/CheatContainer/HBoxContainer4"]
-layout_mode = 2
-text = "Save"
-
-[node name="ItemsCheatBar" type="Control" parent="MarginContainer/Root/CheatContainer"]
-layout_mode = 2
-size_flags_horizontal = 3
-script = ExtResource("2")
-
-[node name="Row" type="HBoxContainer" parent="MarginContainer/Root/CheatContainer/ItemsCheatBar"]
-layout_mode = 2
-anchor_left = 0.238
-anchor_right = 0.238
-offset_left = -193.752
-offset_top = -41.0
-offset_right = 841.248
-offset_bottom = -6.0
-theme_override_constants/separation = 6
-
-[node name="Lbl" type="Label" parent="MarginContainer/Root/CheatContainer/ItemsCheatBar/Row"]
-layout_mode = 2
-text = "Item:"
-
-[node name="Picker" type="OptionButton" parent="MarginContainer/Root/CheatContainer/ItemsCheatBar/Row"]
-layout_mode = 2
-size_flags_horizontal = 3
-
-[node name="QtyLbl" type="Label" parent="MarginContainer/Root/CheatContainer/ItemsCheatBar/Row"]
-layout_mode = 2
-text = "x"
-
-[node name="Qty" type="SpinBox" parent="MarginContainer/Root/CheatContainer/ItemsCheatBar/Row"]
-custom_minimum_size = Vector2(64, 0)
-layout_mode = 2
-min_value = 1.0
-max_value = 999.0
-value = 1.0
-
-[node name="BtnGive" type="Button" parent="MarginContainer/Root/CheatContainer/ItemsCheatBar/Row"]
-layout_mode = 2
-text = "Give"
-
-[node name="BtnRemove" type="Button" parent="MarginContainer/Root/CheatContainer/ItemsCheatBar/Row"]
-layout_mode = 2
-text = "Remove"
-
-[node name="BtnGive10" type="Button" parent="MarginContainer/Root/CheatContainer/ItemsCheatBar/Row"]
-layout_mode = 2
-text = "+10"
-
-[node name="BtnReloadCSV" type="Button" parent="MarginContainer/Root/CheatContainer/ItemsCheatBar/Row"]
-layout_mode = 2
-text = "Reload CSV (defs)"
-
-[node name="CheatRoot" type="VBoxContainer" parent="MarginContainer/Root/CheatContainer/ItemsCheatBar"]
-layout_mode = 2
-offset_top = 8.0
-offset_right = 1104.0
-offset_bottom = 382.0
-size_flags_vertical = 3
-theme_override_constants/separation = 6
-
-[node name="PartyRow" type="HBoxContainer" parent="MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot"]
-layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="PartyLabel" type="Label" parent="MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot/PartyRow"]
-layout_mode = 2
-text = "Party:"
-
-[node name="RosterPick" type="OptionButton" parent="MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot/PartyRow"]
-layout_mode = 2
-size_flags_horizontal = 3
-
-[node name="MemberId" type="LineEdit" parent="MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot/PartyRow"]
-layout_mode = 2
-placeholder_text = "member id"
-
-[node name="BtnAddParty" type="Button" parent="MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot/PartyRow"]
-layout_mode = 2
-text = "Add"
-
-[node name="BtnRemoveParty" type="Button" parent="MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot/PartyRow"]
-layout_mode = 2
-text = "Remove"
-
-[node name="BtnToBench" type="Button" parent="MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot/PartyRow"]
-layout_mode = 2
-text = "To Bench"
-
-[node name="LxpRow" type="HBoxContainer" parent="MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot"]
-layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="LxpLabel" type="Label" parent="MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot/LxpRow"]
-layout_mode = 2
-text = "LXP:"
-
-[node name="SpinXP" type="SpinBox" parent="MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot/LxpRow"]
-custom_minimum_size = Vector2(80, 0)
-layout_mode = 2
-min_value = 1.0
-max_value = 9999.0
-value = 100.0
-
-[node name="BtnAddXP" type="Button" parent="MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot/LxpRow"]
-layout_mode = 2
-text = "Add XP"
-
-[node name="SxpRow" type="HBoxContainer" parent="MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot"]
-layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="SxpLabel" type="Label" parent="MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot/SxpRow"]
-layout_mode = 2
-text = "SXP:"
-
-[node name="StatPick" type="OptionButton" parent="MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot/SxpRow"]
-custom_minimum_size = Vector2(120, 0)
-layout_mode = 2
-
-[node name="SpinSXP" type="SpinBox" parent="MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot/SxpRow"]
-custom_minimum_size = Vector2(70, 0)
-layout_mode = 2
-min_value = 1.0
-max_value = 999.0
-value = 10.0
-
-[node name="BtnAddSXP" type="Button" parent="MarginContainer/Root/CheatContainer/ItemsCheatBar/CheatRoot/SxpRow"]
-layout_mode = 2
-text = "Add SXP"
-
 [node name="Overlays" type="Control" parent="UILayer"]
-layout_mode = 1
+layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
@@ -231,3 +41,194 @@ offset_bottom = -10.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 1
+
+[node name="MarginContainer#Root" type="VBoxContainer" parent="."]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/separation = 8
+
+[node name="MarginContainer_Root#DateLabel" type="Label" parent="."]
+layout_mode = 2
+
+[node name="MarginContainer_Root#PhaseLabel" type="Label" parent="."]
+layout_mode = 2
+
+[node name="MarginContainer_Root#CheatContainer" type="VBoxContainer" parent="."]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/separation = 8
+
+[node name="MarginContainer_Root_CheatContainer#HBoxContainer" type="HBoxContainer" parent="."]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="MarginContainer_Root_CheatContainer_HBoxContainer#AdvanceBtn" type="Button" parent="."]
+layout_mode = 2
+text = "Advance Phase"
+
+[node name="MarginContainer_Root_CheatContainer_HBoxContainer#ResetWeekBtn" type="Button" parent="."]
+layout_mode = 2
+text = "Reset Week"
+
+[node name="MarginContainer_Root_CheatContainer#HBoxContainer2" type="HBoxContainer" parent="."]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="MarginContainer_Root_CheatContainer_HBoxContainer2#LoadItemsBtn" type="Button" parent="."]
+layout_mode = 2
+text = "Load Items CSV"
+
+[node name="MarginContainer_Root_CheatContainer_HBoxContainer2#ItemsStatus" type="Label" parent="."]
+layout_mode = 2
+text = "Items: —"
+
+[node name="MarginContainer_Root_CheatContainer#HBoxContainer3" type="HBoxContainer" parent="."]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="MarginContainer_Root_CheatContainer_HBoxContainer3#OpenTrainingBtn" type="Button" parent="."]
+layout_mode = 2
+text = "Open Training"
+
+[node name="MarginContainer_Root_CheatContainer_HBoxContainer3#SpotsStatus" type="Label" parent="."]
+layout_mode = 2
+text = "Spots: —"
+
+[node name="MarginContainer_Root_CheatContainer#HBoxContainer4" type="HBoxContainer" parent="."]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="MarginContainer_Root_CheatContainer_HBoxContainer4#OpenSaveBtn" type="Button" parent="."]
+layout_mode = 2
+text = "Save"
+
+[node name="MarginContainer_Root_CheatContainer#ItemsCheatBar" type="Control" parent="."]
+layout_mode = 2
+anchors_preset = 0
+size_flags_horizontal = 3
+script = ExtResource("2")
+
+[node name="MarginContainer_Root_CheatContainer_ItemsCheatBar#Row" type="HBoxContainer" parent="."]
+layout_mode = 2
+anchor_left = 0.238
+anchor_right = 0.238
+offset_left = -193.752
+offset_top = -41.0
+offset_right = 841.248
+offset_bottom = -6.0
+theme_override_constants/separation = 6
+
+[node name="MarginContainer_Root_CheatContainer_ItemsCheatBar_Row#Lbl" type="Label" parent="."]
+layout_mode = 2
+text = "Item:"
+
+[node name="MarginContainer_Root_CheatContainer_ItemsCheatBar_Row#Picker" type="OptionButton" parent="."]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="MarginContainer_Root_CheatContainer_ItemsCheatBar_Row#QtyLbl" type="Label" parent="."]
+layout_mode = 2
+text = "x"
+
+[node name="MarginContainer_Root_CheatContainer_ItemsCheatBar_Row#Qty" type="SpinBox" parent="."]
+custom_minimum_size = Vector2(64, 0)
+layout_mode = 2
+min_value = 1.0
+max_value = 999.0
+value = 1.0
+
+[node name="MarginContainer_Root_CheatContainer_ItemsCheatBar_Row#BtnGive" type="Button" parent="."]
+layout_mode = 2
+text = "Give"
+
+[node name="MarginContainer_Root_CheatContainer_ItemsCheatBar_Row#BtnRemove" type="Button" parent="."]
+layout_mode = 2
+text = "Remove"
+
+[node name="MarginContainer_Root_CheatContainer_ItemsCheatBar_Row#BtnGive10" type="Button" parent="."]
+layout_mode = 2
+text = "+10"
+
+[node name="MarginContainer_Root_CheatContainer_ItemsCheatBar_Row#BtnReloadCSV" type="Button" parent="."]
+layout_mode = 2
+text = "Reload CSV (defs)"
+
+[node name="MarginContainer_Root_CheatContainer_ItemsCheatBar#CheatRoot" type="VBoxContainer" parent="."]
+layout_mode = 2
+offset_top = 8.0
+offset_right = 1104.0
+offset_bottom = 382.0
+size_flags_vertical = 3
+theme_override_constants/separation = 6
+
+[node name="MarginContainer_Root_CheatContainer_ItemsCheatBar_CheatRoot#PartyRow" type="HBoxContainer" parent="."]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="MarginContainer_Root_CheatContainer_ItemsCheatBar_CheatRoot_PartyRow#PartyLabel" type="Label" parent="."]
+layout_mode = 2
+text = "Party:"
+
+[node name="MarginContainer_Root_CheatContainer_ItemsCheatBar_CheatRoot_PartyRow#RosterPick" type="OptionButton" parent="."]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="MarginContainer_Root_CheatContainer_ItemsCheatBar_CheatRoot_PartyRow#MemberId" type="LineEdit" parent="."]
+layout_mode = 2
+placeholder_text = "member id"
+
+[node name="MarginContainer_Root_CheatContainer_ItemsCheatBar_CheatRoot_PartyRow#BtnAddParty" type="Button" parent="."]
+layout_mode = 2
+text = "Add"
+
+[node name="MarginContainer_Root_CheatContainer_ItemsCheatBar_CheatRoot_PartyRow#BtnRemoveParty" type="Button" parent="."]
+layout_mode = 2
+text = "Remove"
+
+[node name="MarginContainer_Root_CheatContainer_ItemsCheatBar_CheatRoot_PartyRow#BtnToBench" type="Button" parent="."]
+layout_mode = 2
+text = "To Bench"
+
+[node name="MarginContainer_Root_CheatContainer_ItemsCheatBar_CheatRoot#LxpRow" type="HBoxContainer" parent="."]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="MarginContainer_Root_CheatContainer_ItemsCheatBar_CheatRoot_LxpRow#LxpLabel" type="Label" parent="."]
+layout_mode = 2
+text = "LXP:"
+
+[node name="MarginContainer_Root_CheatContainer_ItemsCheatBar_CheatRoot_LxpRow#SpinXP" type="SpinBox" parent="."]
+custom_minimum_size = Vector2(80, 0)
+layout_mode = 2
+min_value = 1.0
+max_value = 9999.0
+value = 100.0
+
+[node name="MarginContainer_Root_CheatContainer_ItemsCheatBar_CheatRoot_LxpRow#BtnAddXP" type="Button" parent="."]
+layout_mode = 2
+text = "Add XP"
+
+[node name="MarginContainer_Root_CheatContainer_ItemsCheatBar_CheatRoot#SxpRow" type="HBoxContainer" parent="."]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="MarginContainer_Root_CheatContainer_ItemsCheatBar_CheatRoot_SxpRow#SxpLabel" type="Label" parent="."]
+layout_mode = 2
+text = "SXP:"
+
+[node name="MarginContainer_Root_CheatContainer_ItemsCheatBar_CheatRoot_SxpRow#StatPick" type="OptionButton" parent="."]
+custom_minimum_size = Vector2(120, 0)
+layout_mode = 2
+
+[node name="MarginContainer_Root_CheatContainer_ItemsCheatBar_CheatRoot_SxpRow#SpinSXP" type="SpinBox" parent="."]
+custom_minimum_size = Vector2(70, 0)
+layout_mode = 2
+min_value = 1.0
+max_value = 999.0
+value = 10.0
+
+[node name="MarginContainer_Root_CheatContainer_ItemsCheatBar_CheatRoot_SxpRow#BtnAddSXP" type="Button" parent="."]
+layout_mode = 2
+text = "Add SXP"
