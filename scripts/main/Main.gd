@@ -401,8 +401,8 @@ func _refresh_ui() -> void:
 			date_text = String(cal.call("get_date_string"))
 			phase_text = String(cal.call("get_phase_name"))
 
-	$UILayer/MarginContainer/Root/DateLabel.text  = date_text
-	$UILayer/MarginContainer/Root/PhaseLabel.text = phase_text
+	date_label.text  = date_text
+	phase_label.text = phase_text
 
 func _refresh_spots_status() -> void:
 	var count: int = 0

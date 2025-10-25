@@ -28,6 +28,8 @@ offset_left = 24.0
 offset_top = 24.0
 offset_right = -24.0
 offset_bottom = -24.0
+grow_horizontal = 2
+grow_vertical = 2
 
 [node name="Overlays" type="Control" parent="UILayer"]
 layout_mode = 3
