@@ -2,8 +2,8 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://pm7wlnchlbi1"
-path="res://.godot/imported/Tilemap.png-a72cb3e8c532995ec620b81b761941cc.ctex"
+uid="uid://dxj5xhdfegqxq"
+path="res://.godot/imported/Tilemap.png-8f5f3e2a6b8c9d1e3f4a5b6c7d8e9f0a.ctex"
 metadata={
 "vram_texture": false
 }
@@ -11,7 +11,7 @@ metadata={
 [deps]
 
 source_file="res://assets/graphics/envirnments/Tilemap/Tilemap.png"
-dest_files=["res://.godot/imported/Tilemap.png-a72cb3e8c532995ec620b81b761941cc.ctex"]
+dest_files=["res://.godot/imported/Tilemap.png-8f5f3e2a6b8c9d1e3f4a5b6c7d8e9f0a.ctex"]
 
 [params]
 
@@ -31,4 +31,4 @@ process/normal_map_invert_y=false
 process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0
-detect_3d/compress_to=1
+detect_3d/compress_to=0
