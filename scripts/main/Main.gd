@@ -388,6 +388,8 @@ func _toggle_game_menu() -> void:
 func _toggle_phone_menu() -> void:
 	if _phone_menu and is_instance_valid(_phone_menu):
 		_phone_menu.visible = not _phone_menu.visible
+		# Pause/unpause the game based on menu visibility
+		get_tree().paused = _phone_menu.visible
 		return
 	if not ResourceLoader.exists(PHONE_MENU_SCENE): return
 	var ps: PackedScene = load(PHONE_MENU_SCENE) as PackedScene
@@ -403,6 +405,8 @@ func _toggle_phone_menu() -> void:
 	parent.add_child(_phone_menu)
 	_phone_menu.visible = true
 	_phone_menu.move_to_front()
+	# Pause the game when menu is opened
+	get_tree().paused = true
 
 func _toggle_status_cheat_bar() -> void:
 	if _status_cheat_bar and is_instance_valid(_status_cheat_bar):
