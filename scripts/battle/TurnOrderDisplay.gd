@@ -413,6 +413,10 @@ func animate_ko_fall(combatant_id: String) -> void:
 	# Wait for animation to finish
 	await tween.finished
 
+	# Check if slot is still valid (it may have been freed during turn order rebuild)
+	if not is_instance_valid(target_slot):
+		return
+
 	# Reset rotation and scale (will be rebuilt with greyed style)
 	target_slot.rotation = 0
 	target_slot.scale = Vector2(1.0, 1.0)
