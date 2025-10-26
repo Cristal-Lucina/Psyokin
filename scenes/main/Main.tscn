@@ -45,7 +45,7 @@ tile_map_data = PackedByteArray("AAAiAAsAAAASAAwAAAA=")
 tile_set = ExtResource("4")
 rendering_quadrant_size = 32
 
-[node name="Layer0" type="TileMapLayer" parent="GameWorld/TileMap"]
+[node name="Layer2" type="TileMapLayer" parent="GameWorld/TileMap"]
 use_parent_material = true
 tile_set = ExtResource("4")
 rendering_quadrant_size = 32
@@ -54,7 +54,6 @@ rendering_quadrant_size = 32
 position = Vector2(287, 250)
 
 [node name="MarginContainer" type="MarginContainer" parent="."]
-visible = false
 layout_mode = 2
 anchor_right = 1.0
 anchor_bottom = 1.0
@@ -255,7 +254,6 @@ layout_mode = 2
 text = "Add SXP"
 
 [node name="Overlays" type="Control" parent="."]
-visible = false
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
