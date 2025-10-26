@@ -365,7 +365,9 @@ func _execute_attack(target: Dictionary) -> void:
 
 			# Refresh turn order if combatant was KO'd
 			if target.is_ko:
-				# Re-sort turn order to move KO'd to bottom and animate
+				# Animate falling and then re-sort turn order
+				if turn_order_display:
+					await turn_order_display.animate_ko_fall(target.id)
 				battle_mgr.refresh_turn_order()
 			elif turn_order_display:
 				turn_order_display.update_combatant_hp(target.id)
@@ -677,7 +679,9 @@ func _execute_enemy_ai() -> void:
 
 			# Refresh turn order if combatant was KO'd
 			if target.is_ko:
-				# Re-sort turn order to move KO'd to bottom and animate
+				# Animate falling and then re-sort turn order
+				if turn_order_display:
+					await turn_order_display.animate_ko_fall(target.id)
 				battle_mgr.refresh_turn_order()
 			elif turn_order_display:
 				turn_order_display.update_combatant_hp(target.id)
@@ -1057,7 +1061,9 @@ func _execute_skill_single(target: Dictionary) -> void:
 	# Update displays
 	_update_combatant_displays()
 	if target.is_ko:
-		# Re-sort turn order to move KO'd to bottom and animate
+		# Animate falling and then re-sort turn order
+		if turn_order_display:
+			await turn_order_display.animate_ko_fall(target.id)
 		battle_mgr.refresh_turn_order()
 	elif turn_order_display:
 		turn_order_display.update_combatant_hp(target.id)

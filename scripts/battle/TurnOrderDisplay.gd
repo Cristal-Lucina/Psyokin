@@ -10,13 +10,26 @@ class_name TurnOrderDisplay
 ## UI config
 const SHOW_UPCOMING_TURNS: int = 8  # How many turns to show
 const ANIMATION_DURATION: float = 0.3  # Duration of slide animations
+const REVEAL_DELAY: float = 0.15  # Delay between each combatant reveal
+const KO_FALL_DURATION: float = 0.5  # Duration of KO falling animation
 
 ## Container for turn slots
 var turn_slots: Array[PanelContainer] = []
 var previous_order: Dictionary = {}  # combatant_id -> previous_index
+var round_label: Label = null
+var current_round: int = 0
 
 func _ready() -> void:
 	print("[TurnOrderDisplay] Initializing turn order display")
+
+	# Create round label
+	round_label = Label.new()
+	round_label.text = "Round 1"
+	round_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	round_label.add_theme_font_size_override("font_size", 14)
+	round_label.add_theme_color_override("font_color", Color(0.9, 0.9, 0.5, 1.0))
+	add_child(round_label)
+	move_child(round_label, 0)  # Put it at the top
 
 	# Connect to battle manager signals
 	if battle_mgr:
@@ -29,12 +42,18 @@ func _ready() -> void:
 func _on_battle_started() -> void:
 	"""Called when battle starts - initial display"""
 	print("[TurnOrderDisplay] Battle started, displaying initial turn order")
-	_rebuild_display()
+	current_round = 1
+	if round_label:
+		round_label.text = "Round 1"
+	_rebuild_display_with_reveal()
 
-func _on_round_started(_round_number: int) -> void:
-	"""Called when a new round starts - refresh the display"""
-	print("[TurnOrderDisplay] Round started, refreshing turn order")
-	_rebuild_display()
+func _on_round_started(round_number: int) -> void:
+	"""Called when a new round starts - refresh the display with animation"""
+	print("[TurnOrderDisplay] Round %d started, animating turn order reveal" % round_number)
+	current_round = round_number
+	if round_label:
+		round_label.text = "Round %d" % round_number
+	_rebuild_display_with_reveal()
 
 func _on_turn_started(_combatant_id: String) -> void:
 	"""Called when a turn starts - highlight current combatant"""
@@ -53,6 +72,56 @@ func _on_turn_order_changed() -> void:
 ## DISPLAY BUILDING
 ## ═══════════════════════════════════════════════════════════════
 
+func _rebuild_display_with_reveal() -> void:
+	"""Rebuild display with sequential reveal animation for new rounds"""
+	# Clear existing slots
+	for slot in turn_slots:
+		slot.queue_free()
+	turn_slots.clear()
+
+	# Clear children except round label
+	for child in get_children():
+		if child != round_label:
+			child.queue_free()
+
+	# Get turn order from battle manager
+	if not battle_mgr:
+		return
+
+	var turn_order = battle_mgr.turn_order
+	if turn_order.is_empty():
+		return
+
+	# Create slots for upcoming turns with sequential reveal
+	var turns_to_show = min(SHOW_UPCOMING_TURNS, turn_order.size())
+
+	for i in range(turns_to_show):
+		var combatant = turn_order[i]
+		var slot = _create_turn_slot(combatant, i)
+		turn_slots.append(slot)
+		add_child(slot)
+
+		# Start invisible and off-screen
+		slot.modulate.a = 0.0
+		slot.position.x = -50
+
+		# Animate into position with delay
+		var delay = i * REVEAL_DELAY
+		await get_tree().create_timer(delay).timeout
+
+		var tween = create_tween()
+		tween.set_parallel(true)
+		tween.set_ease(Tween.EASE_OUT)
+		tween.set_trans(Tween.TRANS_CUBIC)
+
+		# Fade in
+		tween.tween_property(slot, "modulate:a", 1.0, 0.3)
+		# Slide in from left
+		tween.tween_property(slot, "position:x", 0, 0.3)
+
+	# Store current order for future animations
+	_store_current_order()
+
 func _rebuild_display() -> void:
 	"""Rebuild the entire turn order display"""
 	# Clear existing slots
@@ -60,9 +129,10 @@ func _rebuild_display() -> void:
 		slot.queue_free()
 	turn_slots.clear()
 
-	# Clear children
+	# Clear children except round label
 	for child in get_children():
-		child.queue_free()
+		if child != round_label:
+			child.queue_free()
 
 	# Get turn order from battle manager
 	if not battle_mgr:
@@ -281,3 +351,36 @@ func update_combatant_hp(_combatant_id: String) -> void:
 	"""Update HP display for a specific combatant (simplified - no HP bars in turn order)"""
 	# HP updates are shown in the main combatant displays, not here
 	pass
+
+func animate_ko_fall(combatant_id: String) -> void:
+	"""Animate a combatant falling when KO'd"""
+	# Find the slot for this combatant
+	var target_slot: PanelContainer = null
+	for slot in turn_slots:
+		if slot.get_meta("combatant_id", "") == combatant_id:
+			target_slot = slot
+			break
+
+	if not target_slot:
+		return
+
+	print("[TurnOrderDisplay] Animating KO fall for %s" % combatant_id)
+
+	# Create falling animation
+	var tween = create_tween()
+	tween.set_ease(Tween.EASE_IN)
+	tween.set_trans(Tween.TRANS_CUBIC)
+
+	# Rotate slightly while falling
+	tween.tween_property(target_slot, "rotation", deg_to_rad(15), KO_FALL_DURATION)
+	# Fade out
+	tween.parallel().tween_property(target_slot, "modulate:a", 0.3, KO_FALL_DURATION)
+	# Scale down
+	tween.parallel().tween_property(target_slot, "scale", Vector2(0.8, 0.8), KO_FALL_DURATION)
+
+	# Wait for animation to finish
+	await tween.finished
+
+	# Reset rotation and scale (will be rebuilt with greyed style)
+	target_slot.rotation = 0
+	target_slot.scale = Vector2(1.0, 1.0)
