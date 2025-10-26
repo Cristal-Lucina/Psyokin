@@ -351,32 +351,47 @@ func _execute_attack(target: Dictionary) -> void:
 	battle_mgr.end_turn()
 
 func _on_skill_pressed() -> void:
-	"""Handle Skill action - show skill menu"""
+	"""Handle Skill action - show sigil/skill menu"""
+	var sigils = current_combatant.get("sigils", [])
 	var skills = current_combatant.get("skills", [])
 
 	if skills.is_empty():
 		log_message("No skills available!")
 		return
 
-	# Build skill menu
-	var skill_list = []
-	for skill_id in skills:
+	# Get SigilSystem for display names
+	var sigil_sys = get_node_or_null("/root/aSigilSystem")
+	if not sigil_sys:
+		log_message("Sigil system not available!")
+		return
+
+	# Build skill menu with sigil info
+	var skill_menu = []
+	for i in range(min(sigils.size(), skills.size())):
+		var sigil_inst = sigils[i]
+		var skill_id = skills[i]
+
 		if skill_definitions.has(skill_id):
 			var skill_data = skill_definitions[skill_id]
 			var mp_cost = int(skill_data.get("cost_mp", 0))
 			var can_afford = current_combatant.mp >= mp_cost
-			skill_list.append({
-				"id": skill_id,
-				"data": skill_data,
+
+			# Get sigil display name
+			var sigil_name = sigil_sys.get_display_name_for(sigil_inst) if sigil_sys.has_method("get_display_name_for") else "Sigil"
+
+			skill_menu.append({
+				"sigil_name": sigil_name,
+				"skill_id": skill_id,
+				"skill_data": skill_data,
 				"can_afford": can_afford
 			})
 
-	if skill_list.is_empty():
+	if skill_menu.is_empty():
 		log_message("No skills available!")
 		return
 
-	# Show skill selection
-	_show_skill_menu(skill_list)
+	# Show skill selection menu
+	_show_skill_menu(skill_menu)
 
 func _on_item_pressed() -> void:
 	"""Handle Item/Type Switch action"""
@@ -608,26 +623,30 @@ func log_message(message: String) -> void:
 ## SKILL MENU & EXECUTION
 ## ═══════════════════════════════════════════════════════════════
 
-func _show_skill_menu(skill_list: Array) -> void:
-	"""Show simple skill selection menu in battle log"""
+func _show_skill_menu(skill_menu: Array) -> void:
+	"""Show skill selection menu with sigils"""
 	log_message("--- Select a Skill ---")
+	log_message("Equipped Sigils and Active Skills:")
 
-	for i in range(skill_list.size()):
-		var skill_entry = skill_list[i]
-		var skill_data = skill_entry.data
+	for i in range(skill_menu.size()):
+		var menu_entry = skill_menu[i]
+		var sigil_name = menu_entry.sigil_name
+		var skill_data = menu_entry.skill_data
 		var skill_name = String(skill_data.get("name", "Unknown"))
+		var skill_element = String(skill_data.get("element", "none")).capitalize()
 		var mp_cost = int(skill_data.get("cost_mp", 0))
-		var can_afford = skill_entry.can_afford
+		var can_afford = menu_entry.can_afford
 
-		var menu_text = "%d. %s (MP: %d)" % [i + 1, skill_name, mp_cost]
+		var menu_text = "%d. [%s] %s (%s, MP: %d)" % [i + 1, sigil_name, skill_name, skill_element, mp_cost]
 		if not can_afford:
 			menu_text += " [Not enough MP]"
 		log_message(menu_text)
 
 	# For now, auto-select first affordable skill
-	for skill_entry in skill_list:
-		if skill_entry.can_afford:
-			_on_skill_selected(skill_entry)
+	# TODO: Implement proper click selection UI
+	for menu_entry in skill_menu:
+		if menu_entry.can_afford:
+			_on_skill_selected(menu_entry)
 			return
 
 	log_message("Not enough MP for any skills!")
@@ -635,7 +654,7 @@ func _show_skill_menu(skill_list: Array) -> void:
 
 func _on_skill_selected(skill_entry: Dictionary) -> void:
 	"""Handle skill selection"""
-	skill_to_use = skill_entry.data
+	skill_to_use = skill_entry.skill_data
 	var skill_name = String(skill_to_use.get("name", "Unknown"))
 	var target_type = String(skill_to_use.get("target", "Enemy")).to_lower()
 
@@ -705,6 +724,7 @@ func _execute_skill_single(target: Dictionary) -> void:
 	var is_crit = crit_check.crit
 
 	# Calculate type effectiveness (use skill's element vs defender's mind type)
+	# Skills ONLY use elemental weakness, NOT weapon triangle
 	var type_bonus = 0.0
 	if element != "none" and element != "":
 		type_bonus = combat_resolver.get_mind_type_bonus(
@@ -713,8 +733,7 @@ func _execute_skill_single(target: Dictionary) -> void:
 			element
 		)
 
-	# Check weapon weakness and crit stumble
-	var weapon_weakness_hit = combat_resolver.check_weapon_weakness(current_combatant, target)
+	# Only crits count as stumbles for skills (no weapon weakness)
 	var crit_weakness_hit = is_crit
 
 	# Calculate skill damage
@@ -739,14 +758,11 @@ func _execute_skill_single(target: Dictionary) -> void:
 		target.hp = 0
 		target.is_ko = true
 
-	# Record weakness hits AFTER damage (only if target still alive)
-	if not target.is_ko and (weapon_weakness_hit or crit_weakness_hit):
+	# Record crit stumbles AFTER damage (only if target still alive)
+	# Skills don't use weapon weaknesses, only elemental type effectiveness
+	if not target.is_ko and crit_weakness_hit:
 		var became_fallen = battle_mgr.record_weapon_weakness_hit(target)
-		if weapon_weakness_hit:
-			var weapon_desc = combat_resolver.get_weapon_type_description(current_combatant, target)
-			log_message("  → WEAPON WEAKNESS! %s" % weapon_desc)
-		elif crit_weakness_hit:
-			log_message("  → CRITICAL STUMBLE!")
+		log_message("  → CRITICAL STUMBLE!")
 		if became_fallen:
 			log_message("  → %s is FALLEN! (will skip next turn)" % target.display_name)
 
