@@ -162,9 +162,13 @@ func _ready() -> void:
 	if _btn_close and not _btn_close.pressed.is_connected(_on_close):
 		_btn_close.pressed.connect(_on_close)
 
+	# Ensure we're visible
+	show()
+	visible = true
+
 	print("[SaveMenu] Rebuilding slot UI")
 	_rebuild()
-	print("[SaveMenu] Ready complete - save menu should be visible")
+	print("[SaveMenu] Ready complete - save menu visible: %s" % visible)
 
 func _unhandled_input(e: InputEvent) -> void:
 	if e.is_action_pressed("ui_cancel"):
