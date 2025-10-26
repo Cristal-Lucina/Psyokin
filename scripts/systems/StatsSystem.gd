@@ -164,9 +164,9 @@ func _to_int(value: Variant) -> int:
 		return String(value).to_int()
 	return 0
 
-## Calculates maximum HP from level and VTL stat. Formula: 150 + (VTL × Level × 6)
+## Calculates maximum HP from level and VTL stat. Formula: 60 + (VTL × Level × 6)
 func compute_max_hp(level: int, vtl: int) -> int:
-	return 150 + (max(1, vtl) * max(1, level) * 6)
+	return 60 + (max(1, vtl) * max(1, level) * 6)
 
 ## Calculates maximum MP from level and FCS stat. Formula: 20 + (FCS × Level × 1.5)
 func compute_max_mp(level: int, fcs: int) -> int:
