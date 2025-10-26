@@ -18,6 +18,7 @@ var turn_slots: Array[PanelContainer] = []
 var previous_order: Dictionary = {}  # combatant_id -> previous_index
 var round_label: Label = null
 var current_round: int = 0
+var is_animating: bool = false  # Prevent overlapping animations
 
 func _ready() -> void:
 	print("[TurnOrderDisplay] Initializing turn order display")
@@ -50,6 +51,10 @@ func _on_battle_started() -> void:
 func _on_round_started(round_number: int) -> void:
 	"""Called when a new round starts - refresh the display with animation"""
 	print("[TurnOrderDisplay] Round %d started, animating turn order reveal" % round_number)
+
+	# Cancel any ongoing animations - new round takes priority
+	is_animating = false
+
 	current_round = round_number
 	if round_label:
 		round_label.text = "Round %d" % round_number
@@ -65,6 +70,11 @@ func _on_turn_ended(_combatant_id: String) -> void:
 
 func _on_turn_order_changed() -> void:
 	"""Called when turn order is re-sorted mid-round (e.g., from weapon weakness)"""
+	# Skip if round reveal is already animating
+	if is_animating:
+		print("[TurnOrderDisplay] Skipping turn order change - round animation in progress")
+		return
+
 	print("[TurnOrderDisplay] Turn order changed, animating positions")
 	_rebuild_display_animated()
 
@@ -74,6 +84,8 @@ func _on_turn_order_changed() -> void:
 
 func _rebuild_display_with_reveal() -> void:
 	"""Rebuild display with sequential reveal animation for new rounds"""
+	is_animating = true
+
 	# Clear existing slots
 	for slot in turn_slots:
 		slot.queue_free()
@@ -86,10 +98,12 @@ func _rebuild_display_with_reveal() -> void:
 
 	# Get turn order from battle manager
 	if not battle_mgr:
+		is_animating = false
 		return
 
 	var turn_order = battle_mgr.turn_order
 	if turn_order.is_empty():
+		is_animating = false
 		return
 
 	# Create slots for upcoming turns with sequential reveal
@@ -121,6 +135,8 @@ func _rebuild_display_with_reveal() -> void:
 
 	# Store current order for future animations
 	_store_current_order()
+
+	is_animating = false
 
 func _rebuild_display() -> void:
 	"""Rebuild the entire turn order display"""
@@ -156,16 +172,21 @@ func _rebuild_display() -> void:
 
 func _rebuild_display_animated() -> void:
 	"""Rebuild display with animations for position changes"""
+	is_animating = true
+
 	if not battle_mgr:
+		is_animating = false
 		return
 
 	var turn_order = battle_mgr.turn_order
 	if turn_order.is_empty():
+		is_animating = false
 		return
 
 	# If no previous order, just rebuild normally
 	if previous_order.is_empty():
 		_rebuild_display()
+		is_animating = false
 		return
 
 	# Build new order mapping
@@ -208,6 +229,8 @@ func _rebuild_display_animated() -> void:
 
 	# Full rebuild to update all content (KO status, initiative, etc.)
 	_rebuild_display()
+
+	is_animating = false
 
 func _store_current_order() -> void:
 	"""Store current turn order for animation reference"""
