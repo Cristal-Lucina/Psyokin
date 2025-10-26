@@ -222,6 +222,9 @@ func _on_attack_pressed() -> void:
 			var crit_check = combat_resolver.check_critical_hit(current_combatant)
 			var is_crit = crit_check.crit
 
+			# Calculate mind type effectiveness
+			var type_bonus = combat_resolver.get_mind_type_bonus(current_combatant, target)
+
 			# Calculate damage
 			var damage_result = combat_resolver.calculate_physical_damage(
 				current_combatant,
@@ -229,7 +232,7 @@ func _on_attack_pressed() -> void:
 				{
 					"potency": 100,
 					"is_crit": is_crit,
-					"type_bonus": 0.0   # TODO: Check type matchup
+					"type_bonus": type_bonus
 				}
 			)
 
@@ -246,8 +249,10 @@ func _on_attack_pressed() -> void:
 			var hit_msg = "  → Hit %s for %d damage! (%d%% chance)" % [target.display_name, damage, int(hit_check.hit_chance)]
 			if is_crit:
 				hit_msg += " (CRITICAL! %d%% chance)" % int(crit_check.crit_chance)
-			if is_stumble:
-				hit_msg += " (Weakness!)"
+			if type_bonus > 0.0:
+				hit_msg += " (Super Effective!)"
+			elif type_bonus < 0.0:
+				hit_msg += " (Not Very Effective...)"
 			log_message(hit_msg)
 
 			# Debug: show hit, crit, and damage breakdown
@@ -260,6 +265,12 @@ func _on_attack_pressed() -> void:
 			print("[Battle] Crit: %s | Chance: %.1f%% (Base %.1f + TPO %.1f + Weapon %d), Roll: %d" % [
 				"YES" if is_crit else "NO", crit_check.crit_chance, crit_breakdown.base,
 				crit_breakdown.tpo_bonus, crit_breakdown.weapon_bonus, crit_check.roll
+			])
+			print("[Battle] Type: %s vs %s = %.2fx (%s)" % [
+				current_combatant.get("mind_type", "none"),
+				target.get("mind_type", "none"),
+				1.0 + type_bonus,
+				"SUPER EFFECTIVE" if type_bonus > 0 else ("NOT VERY EFFECTIVE" if type_bonus < 0 else "neutral")
 			])
 			print("[Battle] Damage: PreMit=%.1f, AtkPower=%.1f, Raw=%.1f, Final=%d (Min=%d)" % [
 				dmg_breakdown.pre_mit, dmg_breakdown.atk_power, dmg_breakdown.raw, damage, dmg_breakdown.min_damage
@@ -353,6 +364,9 @@ func _execute_enemy_ai() -> void:
 			var crit_check = combat_resolver.check_critical_hit(current_combatant)
 			var is_crit = crit_check.crit
 
+			# Calculate mind type effectiveness
+			var type_bonus = combat_resolver.get_mind_type_bonus(current_combatant, target)
+
 			# Calculate damage
 			var damage_result = combat_resolver.calculate_physical_damage(
 				current_combatant,
@@ -360,7 +374,7 @@ func _execute_enemy_ai() -> void:
 				{
 					"potency": 100,
 					"is_crit": is_crit,
-					"type_bonus": 0.0   # TODO: Check type matchup
+					"type_bonus": type_bonus
 				}
 			)
 
@@ -377,8 +391,10 @@ func _execute_enemy_ai() -> void:
 			var hit_msg = "  → Hit %s for %d damage! (%d%% chance)" % [target.display_name, damage, int(hit_check.hit_chance)]
 			if is_crit:
 				hit_msg += " (CRITICAL! %d%% chance)" % int(crit_check.crit_chance)
-			if is_stumble:
-				hit_msg += " (Weakness!)"
+			if type_bonus > 0.0:
+				hit_msg += " (Super Effective!)"
+			elif type_bonus < 0.0:
+				hit_msg += " (Not Very Effective...)"
 			log_message(hit_msg)
 
 			# Debug: show hit, crit, and damage breakdown

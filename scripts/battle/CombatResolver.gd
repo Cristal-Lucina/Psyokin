@@ -32,6 +32,42 @@ const CRIT_MIN: float = 0.0           # Minimum 0% crit chance
 const CRIT_MAX: float = 95.0          # Maximum 95% crit chance
 
 ## ═══════════════════════════════════════════════════════════════
+## MIND TYPE EFFECTIVENESS
+## ═══════════════════════════════════════════════════════════════
+
+func get_mind_type_bonus(attacker: Dictionary, defender: Dictionary, attack_type: String = "") -> float:
+	"""
+	Calculate mind type effectiveness bonus
+
+	Args:
+	- attacker: Attacker combatant dictionary
+	- defender: Defender combatant dictionary
+	- attack_type: Optional override for attack type (for skills with specific types)
+
+	Returns:
+	- 0.25 for weakness (x1.25 damage multiplier becomes 1.0 + 0.25)
+	- -0.25 for resistance (x0.75 multiplier becomes 1.0 - 0.25)
+	- 0.0 for neutral (x1.0 multiplier)
+	"""
+	if not mind_type_system:
+		return 0.0
+
+	# Use override type if provided (e.g., from a skill), otherwise use attacker's mind type
+	var atk_type = attack_type if attack_type != "" else String(attacker.get("mind_type", "none"))
+	var def_type = String(defender.get("mind_type", "none"))
+
+	# Get effectiveness multiplier (1.25, 0.75, or 1.0)
+	var effectiveness = mind_type_system.get_type_effectiveness(atk_type, def_type)
+
+	# Convert multiplier to bonus
+	# 1.25 -> +0.25, 0.75 -> -0.25, 1.0 -> 0.0
+	return effectiveness - 1.0
+
+func is_type_weakness(attacker: Dictionary, defender: Dictionary, attack_type: String = "") -> bool:
+	"""Check if attack hits a type weakness"""
+	return get_mind_type_bonus(attacker, defender, attack_type) > 0.0
+
+## ═══════════════════════════════════════════════════════════════
 ## HIT/EVASION CHECKS (§4.3)
 ## ═══════════════════════════════════════════════════════════════
 
