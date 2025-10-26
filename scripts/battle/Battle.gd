@@ -117,15 +117,19 @@ func _on_battle_ended(victory: bool) -> void:
 	"""Called when battle ends"""
 	if victory:
 		log_message("*** VICTORY ***")
+		log_message("All enemies have been defeated!")
 		# TODO: Show victory screen, award rewards
 		await get_tree().create_timer(2.0).timeout
+		# Return to overworld
+		battle_mgr.return_to_overworld()
 	else:
 		log_message("*** DEFEAT ***")
-		# TODO: Show defeat screen
-		await get_tree().create_timer(2.0).timeout
-
-	# Return to overworld
-	battle_mgr.return_to_overworld()
+		log_message("Your party has been wiped out!")
+		log_message("GAME OVER")
+		# TODO: Show game over screen with retry/load options
+		await get_tree().create_timer(3.0).timeout
+		# For now, return to main menu or reload
+		get_tree().change_scene_to_file("res://scenes/main/Main.tscn")
 
 ## ═══════════════════════════════════════════════════════════════
 ## COMBATANT DISPLAY

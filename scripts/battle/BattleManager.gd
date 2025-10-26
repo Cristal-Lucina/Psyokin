@@ -248,6 +248,10 @@ func end_turn() -> void:
 		var combatant = turn_order[current_turn_index]
 		turn_ended.emit(combatant.id)
 
+	# Check if battle has ended (all enemies or allies defeated)
+	if _check_battle_end():
+		return
+
 	current_turn_index += 1
 	_next_turn()
 
