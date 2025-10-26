@@ -807,8 +807,9 @@ func _execute_skill_single(target: Dictionary) -> void:
 		elif type_bonus < 0.0:
 			log_message("  → TYPE DISADVANTAGE! %s vs %s" % [element.capitalize(), target.mind_type.capitalize()])
 
-	# Only crits count as stumbles for skills (no weapon weakness)
+	# Both crits and type advantages count as stumbles for skills
 	var crit_weakness_hit = is_crit
+	var type_advantage_hit = type_bonus > 0.0
 
 	# Calculate skill damage
 	var damage_result = combat_resolver.calculate_sigil_damage(
@@ -832,11 +833,14 @@ func _execute_skill_single(target: Dictionary) -> void:
 		target.hp = 0
 		target.is_ko = true
 
-	# Record crit stumbles AFTER damage (only if target still alive)
-	# Skills don't use weapon weaknesses, only elemental type effectiveness
-	if not target.is_ko and crit_weakness_hit:
+	# Record weakness hits AFTER damage (only if target still alive)
+	# Skills count crits and type advantages as weakness hits
+	if not target.is_ko and (crit_weakness_hit or type_advantage_hit):
 		var became_fallen = battle_mgr.record_weapon_weakness_hit(target)
-		log_message("  → CRITICAL STUMBLE!")
+		if crit_weakness_hit:
+			log_message("  → CRITICAL STUMBLE!")
+		elif type_advantage_hit:
+			log_message("  → ELEMENTAL STUMBLE!")
 		if became_fallen:
 			log_message("  → %s is FALLEN! (will skip next turn)" % target.display_name)
 
