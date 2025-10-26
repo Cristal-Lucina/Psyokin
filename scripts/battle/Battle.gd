@@ -224,6 +224,9 @@ func _execute_attack(target: Dictionary) -> void:
 	awaiting_target_selection = false
 	_clear_target_highlights()
 
+	# Clear defending status when attacking
+	current_combatant.is_defending = false
+
 	log_message("%s attacks %s!" % [current_combatant.display_name, target.display_name])
 
 	if target:
@@ -405,6 +408,9 @@ func _clear_target_highlights() -> void:
 func _execute_enemy_ai() -> void:
 	"""Execute AI for enemy turn"""
 	await get_tree().create_timer(0.5).timeout  # Brief delay
+
+	# Clear defending status when attacking
+	current_combatant.is_defending = false
 
 	log_message("%s attacks!" % current_combatant.display_name)
 

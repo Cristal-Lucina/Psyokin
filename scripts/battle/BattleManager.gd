@@ -274,6 +274,9 @@ func _process_round_start_effects() -> void:
 		# Reset weapon weakness hit counter at start of each round
 		combatant.weapon_weakness_hits = 0
 
+		# NOTE: is_defending persists across rounds until combatant takes offensive action
+		# This provides multi-round defensive stances
+
 		# TODO: Apply DoT (poison = 5% max HP, burn = 5% max HP)
 		# TODO: Apply HoT (regen)
 		# TODO: Decrement buff/debuff durations
