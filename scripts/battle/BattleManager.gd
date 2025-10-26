@@ -292,10 +292,16 @@ func _next_turn() -> void:
 			current_turn_index += 1
 			continue
 
-		# Check if fallen (skip turn and clear flag)
+		# Check if fallen (skip turn, clear flag only after fallen_round completes)
 		if combatant.is_fallen:
-			print("[BattleManager] %s is Fallen - skipping turn" % combatant.display_name)
-			combatant.is_fallen = false
+			var fallen_round = combatant.get("fallen_round", current_round)
+			if current_round > fallen_round:
+				# We're in the round AFTER they became fallen - clear the flag
+				print("[BattleManager] %s is Fallen - skipping turn and clearing status" % combatant.display_name)
+				combatant.is_fallen = false
+			else:
+				# Same round they became fallen - just skip, don't clear yet
+				print("[BattleManager] %s is Fallen - skipping remaining turn this round" % combatant.display_name)
 			current_turn_index += 1
 			continue
 
@@ -516,6 +522,7 @@ func _create_ally_combatant(member_id: String, slot: int) -> Dictionary:
 		"is_ko": false,
 		"is_fled": false,
 		"is_fallen": false,
+		"fallen_round": 0,  # Track which round they became fallen
 		"is_defending": false,
 		"is_channeling": false,
 		"channel_data": {},
@@ -595,6 +602,7 @@ func _create_enemy_combatant(enemy_id: String, slot: int) -> Dictionary:
 		"is_ko": false,
 		"is_fled": false,
 		"is_fallen": false,
+		"fallen_round": 0,  # Track which round they became fallen
 		"is_defending": false,
 		"is_channeling": false,
 		"channel_data": {},
@@ -671,10 +679,11 @@ func record_weapon_weakness_hit(target: Dictionary) -> bool:
 	# Wait for animation to complete
 	await _wait_for_turn_order_animation()
 
-	# Check if target should become Fallen (lose next turn)
+	# Check if target should become Fallen (lose rest of this turn + next turn)
 	if target.weapon_weakness_hits >= 2:
 		target.is_fallen = true
-		print("[BattleManager] %s is FALLEN! (will skip next turn)" % target.display_name)
+		target.fallen_round = current_round  # Track which round they became fallen
+		print("[BattleManager] %s is FALLEN! (will skip rest of this turn and next turn)" % target.display_name)
 		return true
 
 	return false

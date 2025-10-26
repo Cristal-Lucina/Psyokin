@@ -327,9 +327,11 @@ func _create_turn_slot(combatant: Dictionary, index: int) -> PanelContainer:
 	# Combatant name
 	var name_label = Label.new()
 	var is_fallen = combatant.get("is_fallen", false)
+	var fallen_round = combatant.get("fallen_round", 0)
 
-	# Add "(Fallen)" suffix if fallen
-	if is_fallen:
+	# Add "(Fallen)" suffix only if they became fallen in a PREVIOUS round
+	# (not the current round - in current round they just have red text)
+	if is_fallen and current_round > fallen_round:
 		name_label.text = "%s (Fallen)" % combatant.display_name
 	else:
 		name_label.text = combatant.display_name
@@ -347,7 +349,10 @@ func _create_turn_slot(combatant: Dictionary, index: int) -> PanelContainer:
 		name_label.add_theme_color_override("font_color", Color(1.0, 0.2, 0.2, 1.0))
 	else:
 		var weakness_hits = combatant.get("weapon_weakness_hits", 0)
-		if weakness_hits == 1:
+		if weakness_hits >= 2:
+			# 2+ hits = Red (will be fallen next round)
+			name_label.add_theme_color_override("font_color", Color(1.0, 0.2, 0.2, 1.0))
+		elif weakness_hits == 1:
 			# 1 hit = Yellow warning
 			name_label.add_theme_color_override("font_color", Color(1.0, 0.9, 0.0, 1.0))
 		# else: default white color
