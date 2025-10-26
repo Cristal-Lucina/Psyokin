@@ -512,8 +512,11 @@ func _create_enemy_combatant(enemy_id: String, slot: int) -> Dictionary:
 	# Get mind type
 	var mind_type = String(enemy_def.get("mind_type", "none")).to_lower()
 
+	# Create unique instance ID by appending slot number
+	var instance_id = "%s_%d" % [enemy_id, slot]
+
 	return {
-		"id": enemy_id,
+		"id": instance_id,
 		"display_name": String(enemy_def.get("name", enemy_id.capitalize())),
 		"is_ally": false,
 		"slot": slot,  # 0, 1, 2 for left/center/right
@@ -575,9 +578,21 @@ func record_weapon_weakness_hit(target: Dictionary) -> bool:
 	target.initiative -= INITIATIVE_PENALTY
 	print("[BattleManager] %s initiative reduced by %d (now %d)" % [target.display_name, INITIATIVE_PENALTY, target.initiative])
 
+	# Store current combatant ID before re-sorting
+	var current_combatant_id: String = ""
+	if current_turn_index < turn_order.size():
+		current_combatant_id = turn_order[current_turn_index].id
+
 	# Re-sort turn order to reflect initiative changes
 	turn_order.sort_custom(_sort_by_initiative)
 	print("[BattleManager] Turn order re-sorted after weakness hit")
+
+	# Update current_turn_index to point to the same combatant after re-sort
+	if current_combatant_id != "":
+		for i in range(turn_order.size()):
+			if turn_order[i].id == current_combatant_id:
+				current_turn_index = i
+				break
 
 	# Emit signal so UI can update
 	turn_order_changed.emit()
@@ -592,8 +607,23 @@ func record_weapon_weakness_hit(target: Dictionary) -> bool:
 
 func refresh_turn_order() -> void:
 	"""Re-sort turn order and emit signal (used when combatant state changes like KO)"""
+	# Store current combatant ID before re-sorting
+	var current_combatant_id: String = ""
+	if current_turn_index < turn_order.size():
+		current_combatant_id = turn_order[current_turn_index].id
+
+	# Re-sort the turn order
 	turn_order.sort_custom(_sort_by_initiative)
 	print("[BattleManager] Turn order re-sorted")
+
+	# Update current_turn_index to point to the same combatant after re-sort
+	if current_combatant_id != "":
+		for i in range(turn_order.size()):
+			if turn_order[i].id == current_combatant_id:
+				current_turn_index = i
+				print("[BattleManager] Updated current_turn_index to %d to track %s" % [i, current_combatant_id])
+				break
+
 	turn_order_changed.emit()
 
 ## ═══════════════════════════════════════════════════════════════

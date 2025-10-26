@@ -197,6 +197,15 @@ func _rebuild_display_animated() -> void:
 	if not slots_to_animate.is_empty():
 		await _animate_position_changes(slots_to_animate)
 
+	# Explicitly clear all slots before rebuild to prevent duplicates
+	for slot in turn_slots:
+		if is_instance_valid(slot):
+			slot.queue_free()
+	turn_slots.clear()
+
+	# Wait one frame to ensure nodes are cleared
+	await get_tree().process_frame
+
 	# Full rebuild to update all content (KO status, initiative, etc.)
 	_rebuild_display()
 
