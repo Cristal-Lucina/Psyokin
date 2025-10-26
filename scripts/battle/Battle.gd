@@ -160,6 +160,11 @@ func _create_combatant_slot(combatant: Dictionary, is_ally: bool) -> PanelContai
 	var panel = PanelContainer.new()
 	panel.custom_minimum_size = Vector2(150, 100)
 
+	# Hide KO'd enemies - move off screen and make invisible
+	if not is_ally and combatant.get("is_ko", false):
+		panel.visible = false
+		panel.position = Vector2(-1000, -1000)  # Move off screen
+
 	var vbox = VBoxContainer.new()
 	panel.add_child(vbox)
 

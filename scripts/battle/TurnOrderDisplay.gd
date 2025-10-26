@@ -88,7 +88,12 @@ func _create_turn_slot(combatant: Dictionary, index: int) -> PanelContainer:
 
 	# Style the panel
 	var style = StyleBoxFlat.new()
-	if combatant.is_ally:
+	var is_ko = combatant.get("is_ko", false)
+
+	if is_ko:
+		# Grey out KO'd combatants
+		style.bg_color = Color(0.3, 0.3, 0.3, 0.5)  # Grey for KO'd
+	elif combatant.is_ally:
 		style.bg_color = Color(0.2, 0.3, 0.5, 0.8)  # Blue-ish for allies
 	else:
 		style.bg_color = Color(0.5, 0.2, 0.2, 0.8)  # Red-ish for enemies
@@ -110,6 +115,8 @@ func _create_turn_slot(combatant: Dictionary, index: int) -> PanelContainer:
 	turn_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	turn_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	turn_label.add_theme_font_size_override("font_size", 18)
+	if is_ko:
+		turn_label.modulate = Color(0.5, 0.5, 0.5, 1.0)
 	hbox.add_child(turn_label)
 
 	# Combatant name
@@ -119,23 +126,28 @@ func _create_turn_slot(combatant: Dictionary, index: int) -> PanelContainer:
 	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 
-	# Color name based on weapon weakness hits
-	var weakness_hits = combatant.get("weapon_weakness_hits", 0)
-	if weakness_hits >= 2:
-		# 2+ hits = Fallen = Red
-		name_label.add_theme_color_override("font_color", Color(1.0, 0.2, 0.2, 1.0))
-	elif weakness_hits == 1:
-		# 1 hit = Yellow warning
-		name_label.add_theme_color_override("font_color", Color(1.0, 0.9, 0.0, 1.0))
-	# else: default white color
+	# Color name based on KO or weapon weakness hits
+	if is_ko:
+		# KO'd = Grey
+		name_label.add_theme_color_override("font_color", Color(0.5, 0.5, 0.5, 1.0))
+	else:
+		var weakness_hits = combatant.get("weapon_weakness_hits", 0)
+		if weakness_hits >= 2:
+			# 2+ hits = Fallen = Red
+			name_label.add_theme_color_override("font_color", Color(1.0, 0.2, 0.2, 1.0))
+		elif weakness_hits == 1:
+			# 1 hit = Yellow warning
+			name_label.add_theme_color_override("font_color", Color(1.0, 0.9, 0.0, 1.0))
+		# else: default white color
 
 	hbox.add_child(name_label)
 
 	# Initiative value
 	var init_label = Label.new()
-	init_label.text = str(combatant.initiative)
+	# Show 0 for KO'd combatants
+	init_label.text = "0" if is_ko else str(combatant.initiative)
 	init_label.add_theme_font_size_override("font_size", 12)
-	init_label.modulate = Color(0.8, 0.8, 0.8, 1.0)
+	init_label.modulate = Color(0.5, 0.5, 0.5, 1.0) if is_ko else Color(0.8, 0.8, 0.8, 1.0)
 	init_label.custom_minimum_size = Vector2(28, 0)
 	init_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	init_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
