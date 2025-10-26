@@ -120,8 +120,17 @@ var _jump_target_pos: Vector2 = Vector2.ZERO
 @onready var character_layers: Node2D = $CharacterLayers
 var _gs: Node = null
 
+# Random encounters
+var _encounter_steps: float = 0.0
+var _steps_per_tile: float = 32.0  # Tile size
+const ENCOUNTER_MIN_STEPS: int = 5  # Minimum tiles before encounter can trigger
+const ENCOUNTER_MAX_STEPS: int = 15  # Maximum tiles before guaranteed encounter
+const ENCOUNTER_CHANCE: float = 0.15  # 15% chance per tile after minimum
+var _can_encounter: bool = true  # Can be disabled for safe zones
+
 func _ready() -> void:
 	print("[Player] Initializing player character...")
+	add_to_group("player")  # Add to group for easy finding
 	_gs = get_node_or_null(GS_PATH)
 	_load_character_appearance()
 
@@ -228,6 +237,7 @@ func _physics_process(delta: float) -> void:
 	if _jump_phase == JumpPhase.NONE:
 		_handle_movement(delta)
 	_update_animation(delta)
+	_check_random_encounter(delta)
 
 func _handle_jump(delta: float) -> void:
 	"""Handle jump state machine and movement"""
@@ -483,3 +493,81 @@ func _update_animation(delta: float) -> void:
 		var sprite: Sprite2D = character_layers.get_node(layer.node_name)
 		if sprite and sprite.visible and sprite.texture:
 			sprite.frame = frame
+
+## ═══════════════════════════════════════════════════════════════
+## RANDOM ENCOUNTERS
+## ═══════════════════════════════════════════════════════════════
+
+func _check_random_encounter(delta: float) -> void:
+	"""Check if a random encounter should trigger based on steps taken"""
+	if not _can_encounter:
+		return
+
+	# Only count steps when walking or running (not jumping or idle)
+	if _current_state != MovementState.WALK and _current_state != MovementState.RUN:
+		return
+
+	# Accumulate distance traveled
+	var distance = velocity.length() * delta
+	_encounter_steps += distance
+
+	# Check if we've moved a full tile
+	if _encounter_steps >= _steps_per_tile:
+		_encounter_steps -= _steps_per_tile
+		_check_encounter_roll()
+
+func _check_encounter_roll() -> void:
+	"""Roll for encounter chance"""
+	# Get step counter from metadata or initialize it
+	var steps_taken = 0
+	if has_meta("encounter_step_counter"):
+		steps_taken = get_meta("encounter_step_counter")
+
+	steps_taken += 1
+	set_meta("encounter_step_counter", steps_taken)
+
+	# Guaranteed encounter after max steps
+	if steps_taken >= ENCOUNTER_MAX_STEPS:
+		_trigger_encounter()
+		return
+
+	# Random chance after minimum steps
+	if steps_taken >= ENCOUNTER_MIN_STEPS:
+		if randf() < ENCOUNTER_CHANCE:
+			_trigger_encounter()
+
+func _trigger_encounter() -> void:
+	"""Trigger a random encounter"""
+	print("[Player] Random encounter triggered!")
+
+	# Reset step counter
+	set_meta("encounter_step_counter", 0)
+
+	# Disable movement and encounters during battle
+	_can_encounter = false
+
+	# Get random enemies (1-2 enemies for now)
+	var enemy_count = randi() % 2 + 1  # 1 or 2 enemies
+	var enemies: Array = []
+	var possible_enemies = ["slime", "goblin"]
+
+	for i in range(enemy_count):
+		enemies.append(possible_enemies[randi() % possible_enemies.size()])
+
+	# Get battle manager and start encounter
+	var battle_mgr = get_node_or_null("/root/aBattleManager")
+	if battle_mgr:
+		# Store current scene path to return to
+		var current_scene = get_tree().current_scene.scene_file_path
+		battle_mgr.start_random_encounter(enemies, current_scene)
+	else:
+		push_error("[Player] BattleManager not found!")
+		_can_encounter = true  # Re-enable if battle failed to start
+
+func enable_encounters() -> void:
+	"""Enable random encounters (call after returning from battle)"""
+	_can_encounter = true
+
+func disable_encounters() -> void:
+	"""Disable random encounters (for safe zones, cutscenes, etc)"""
+	_can_encounter = false

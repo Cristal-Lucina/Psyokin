@@ -33,6 +33,7 @@ aAudioBus="*res://scripts/core/AudioBus.gd"
 aCircleBondDB="*res://scripts/circles/CircleBondDB.gd"
 aCircleBondSystem="*res://scripts/circles/CircleBondSystem.gd"
 aMindTypeSystem="*res://scripts/systems/MindTypeSystem.gd"
+aWeaponTypeSystem="*res://scripts/systems/WeaponTypeSystem.gd"
 aDropTables="*res://scripts/battle/DropTables.gd"
 aPerkSystem="*res://scripts/systems/PerkSystem.gd"
 aStatusEffects="*res://scripts/systems/StatusEffects.gd"
@@ -46,6 +47,8 @@ aWorldSystem="*res://scripts/systems/WorldSystem.gd"
 aPhoneHotkeys="*res://scripts/systems/PhoneHotkeys.gd"
 aEquipmentSystem="*res://scripts/systems/EquipmentSystem.gd"
 aStarterLoadout="*res://scripts/systems/StarterLoadout.gd"
+aTransitionManager="*res://scripts/core/TransitionManager.gd"
+aBattleManager="*res://scripts/battle/BattleManager.gd"
 
 [editor]
 

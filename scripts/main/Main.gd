@@ -129,7 +129,6 @@ const PARTY_NAME_KEYS := ["name","display_name","disp_name"]
 @onready var items_status: Label       = $MarginContainer/Root/CheatContainer/HBoxContainer2/ItemsStatus
 @onready var open_training_btn: Button = $MarginContainer/Root/CheatContainer/HBoxContainer3/OpenTrainingBtn
 @onready var spots_status: Label       = $MarginContainer/Root/CheatContainer/HBoxContainer3/SpotsStatus
-@onready var open_save_btn: Button     = $MarginContainer/Root/CheatContainer/HBoxContainer4/OpenSaveBtn
 
 # ---- Cheat area container (toggle with C) ----
 var _cheat_root: VBoxContainer = null
@@ -270,8 +269,6 @@ func _ready() -> void:
 	if reset_btn:         reset_btn.pressed.connect(_on_reset_week_pressed)
 	if load_btn:          load_btn.pressed.connect(_on_load_items_pressed)
 	if open_training_btn: open_training_btn.pressed.connect(_on_open_training)
-	if open_save_btn and not open_save_btn.pressed.is_connected(_on_open_save):
-		open_save_btn.pressed.connect(_on_open_save)
 
 	# Party / LXP / SXP signals
 	if _btn_add_party: _btn_add_party.pressed.connect(_on_add_to_party)
@@ -486,7 +483,6 @@ func _on_load_items_pressed() -> void:
 		items_status.text = "Items: %s" % (str(table.size()) if not table.is_empty() else "(failed)")
 
 func _on_open_training() -> void: pass
-func _on_open_save() -> void:     pass
 
 func _style_option_button(ob: OptionButton) -> void:
 	if ob == null: return
