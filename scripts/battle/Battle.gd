@@ -7,6 +7,7 @@ class_name Battle
 @onready var battle_mgr = get_node("/root/aBattleManager")
 @onready var gs = get_node("/root/aGameState")
 @onready var combat_resolver: CombatResolver = CombatResolver.new()
+@onready var csv_loader = get_node("/root/aCSVLoader")
 
 ## UI References
 @onready var action_menu: VBoxContainer = %ActionMenu
@@ -22,6 +23,9 @@ class_name Battle
 var current_combatant: Dictionary = {}
 var awaiting_target_selection: bool = false
 var target_candidates: Array = []
+var skill_definitions: Dictionary = {}  # skill_id -> skill data
+var awaiting_skill_selection: bool = false
+var skill_to_use: Dictionary = {}  # Selected skill data
 
 func _ready() -> void:
 	print("[Battle] Battle scene loaded")
@@ -31,6 +35,9 @@ func _ready() -> void:
 
 	# Wait for next frame to ensure all autoloads are ready
 	await get_tree().process_frame
+
+	# Load skill definitions
+	_load_skills()
 
 	# Connect to battle manager signals
 	battle_mgr.battle_started.connect(_on_battle_started)
@@ -44,6 +51,14 @@ func _ready() -> void:
 
 	# Initialize battle with party and enemies
 	_initialize_battle()
+
+func _load_skills() -> void:
+	"""Load skill definitions from skills.csv"""
+	skill_definitions = csv_loader.load_csv("res://data/skills/skills.csv", "skill_id")
+	if skill_definitions and not skill_definitions.is_empty():
+		print("[Battle] Loaded %d skill definitions" % skill_definitions.size())
+	else:
+		push_error("[Battle] Failed to load skills.csv")
 
 func _initialize_battle() -> void:
 	"""Initialize the battle from encounter data"""
@@ -336,9 +351,32 @@ func _execute_attack(target: Dictionary) -> void:
 	battle_mgr.end_turn()
 
 func _on_skill_pressed() -> void:
-	"""Handle Skill action"""
-	log_message("Skills not yet implemented")
-	# TODO: Show skill menu
+	"""Handle Skill action - show skill menu"""
+	var skills = current_combatant.get("skills", [])
+
+	if skills.is_empty():
+		log_message("No skills available!")
+		return
+
+	# Build skill menu
+	var skill_list = []
+	for skill_id in skills:
+		if skill_definitions.has(skill_id):
+			var skill_data = skill_definitions[skill_id]
+			var mp_cost = int(skill_data.get("cost_mp", 0))
+			var can_afford = current_combatant.mp >= mp_cost
+			skill_list.append({
+				"id": skill_id,
+				"data": skill_data,
+				"can_afford": can_afford
+			})
+
+	if skill_list.is_empty():
+		log_message("No skills available!")
+		return
+
+	# Show skill selection
+	_show_skill_menu(skill_list)
 
 func _on_item_pressed() -> void:
 	"""Handle Item action"""
@@ -389,7 +427,16 @@ func _on_enemy_panel_input(event: InputEvent, target: Dictionary) -> void:
 			if awaiting_target_selection:
 				# Check if this target is valid
 				if target in target_candidates:
-					_execute_attack(target)
+					if awaiting_skill_selection:
+						# Using a skill
+						_clear_target_highlights()
+						awaiting_target_selection = false
+						awaiting_skill_selection = false
+						_execute_skill_single(target)
+						battle_mgr.end_turn()
+					else:
+						# Regular attack
+						_execute_attack(target)
 
 func _highlight_target_candidates() -> void:
 	"""Highlight valid targets with a visual indicator"""
@@ -552,3 +599,192 @@ func log_message(message: String) -> void:
 		# Auto-scroll to bottom
 		battle_log.scroll_to_line(battle_log.get_line_count() - 1)
 	print("[Battle] " + message)
+
+## ═══════════════════════════════════════════════════════════════
+## SKILL MENU & EXECUTION
+## ═══════════════════════════════════════════════════════════════
+
+func _show_skill_menu(skill_list: Array) -> void:
+	"""Show simple skill selection menu in battle log"""
+	log_message("--- Select a Skill ---")
+
+	for i in range(skill_list.size()):
+		var skill_entry = skill_list[i]
+		var skill_data = skill_entry.data
+		var skill_name = String(skill_data.get("name", "Unknown"))
+		var mp_cost = int(skill_data.get("cost_mp", 0))
+		var can_afford = skill_entry.can_afford
+
+		var menu_text = "%d. %s (MP: %d)" % [i + 1, skill_name, mp_cost]
+		if not can_afford:
+			menu_text += " [Not enough MP]"
+		log_message(menu_text)
+
+	# For now, auto-select first affordable skill
+	for skill_entry in skill_list:
+		if skill_entry.can_afford:
+			_on_skill_selected(skill_entry)
+			return
+
+	log_message("Not enough MP for any skills!")
+	return
+
+func _on_skill_selected(skill_entry: Dictionary) -> void:
+	"""Handle skill selection"""
+	skill_to_use = skill_entry.data
+	var skill_name = String(skill_to_use.get("name", "Unknown"))
+	var target_type = String(skill_to_use.get("target", "Enemy")).to_lower()
+
+	log_message("Selected: %s" % skill_name)
+
+	# Determine targeting
+	if target_type == "enemy" or target_type == "enemies":
+		# Get alive enemies
+		var enemies = battle_mgr.get_enemy_combatants()
+		target_candidates = enemies.filter(func(e): return not e.is_ko)
+
+		if target_candidates.is_empty():
+			log_message("No valid targets!")
+			skill_to_use = {}
+			return
+
+		# Check if AoE
+		var is_aoe = int(skill_to_use.get("aoe", 0)) > 0
+
+		if is_aoe:
+			# AoE skill - hit all enemies
+			_execute_skill_aoe()
+		else:
+			# Single target - need to select
+			log_message("Select a target...")
+			awaiting_target_selection = true
+			awaiting_skill_selection = true
+			_highlight_target_candidates()
+	elif target_type == "ally" or target_type == "allies":
+		# TODO: Implement ally targeting
+		log_message("Ally targeting not yet implemented")
+		skill_to_use = {}
+	else:
+		# Self-target or other
+		log_message("Self-targeting not yet implemented")
+		skill_to_use = {}
+
+func _execute_skill_single(target: Dictionary) -> void:
+	"""Execute a single-target skill"""
+	var skill_name = String(skill_to_use.get("name", "Unknown"))
+	var mp_cost = int(skill_to_use.get("cost_mp", 0))
+	var element = String(skill_to_use.get("element", "none")).to_lower()
+	var power = int(skill_to_use.get("power", 30))
+	var acc = int(skill_to_use.get("acc", 90))
+	var crit_bonus = int(skill_to_use.get("crit_bonus_pct", 0))
+	var mnd_scaling = int(skill_to_use.get("scaling_mnd", 1))
+
+	# Clear defending status when using skill
+	current_combatant.is_defending = false
+
+	# Deduct MP
+	current_combatant.mp -= mp_cost
+	if current_combatant.mp < 0:
+		current_combatant.mp = 0
+
+	log_message("%s uses %s!" % [current_combatant.display_name, skill_name])
+
+	# Check if hit
+	var hit_check = combat_resolver.check_sigil_hit(current_combatant, target, {"skill_acc": acc})
+
+	if not hit_check.hit:
+		log_message("  → Missed! (%d%% chance, rolled %d)" % [int(hit_check.hit_chance), hit_check.roll])
+		return
+
+	# Roll for crit
+	var crit_check = combat_resolver.check_critical_hit(current_combatant, {"skill_crit_bonus": crit_bonus})
+	var is_crit = crit_check.crit
+
+	# Calculate type effectiveness (use skill's element vs defender's mind type)
+	var type_bonus = 0.0
+	if element != "none" and element != "":
+		type_bonus = combat_resolver.get_mind_type_bonus(
+			{"mind_type": element},
+			target,
+			element
+		)
+
+	# Check weapon weakness and crit stumble
+	var weapon_weakness_hit = combat_resolver.check_weapon_weakness(current_combatant, target)
+	var crit_weakness_hit = is_crit
+
+	# Calculate skill damage
+	var damage_result = combat_resolver.calculate_sigil_damage(
+		current_combatant,
+		target,
+		{
+			"potency": 100,
+			"is_crit": is_crit,
+			"type_bonus": type_bonus,
+			"base_sig": power,
+			"mnd_scale": mnd_scaling
+		}
+	)
+
+	var damage = damage_result.damage
+	var is_stumble = damage_result.is_stumble
+
+	# Apply damage
+	target.hp -= damage
+	if target.hp < 0:
+		target.hp = 0
+		target.is_ko = true
+
+	# Record weakness hits AFTER damage (only if target still alive)
+	if not target.is_ko and (weapon_weakness_hit or crit_weakness_hit):
+		var became_fallen = battle_mgr.record_weapon_weakness_hit(target)
+		if weapon_weakness_hit:
+			var weapon_desc = combat_resolver.get_weapon_type_description(current_combatant, target)
+			log_message("  → WEAPON WEAKNESS! %s" % weapon_desc)
+		elif crit_weakness_hit:
+			log_message("  → CRITICAL STUMBLE!")
+		if became_fallen:
+			log_message("  → %s is FALLEN! (will skip next turn)" % target.display_name)
+
+	# Log the hit
+	var hit_msg = "  → Hit %s for %d damage! (%d%% chance)" % [target.display_name, damage, int(hit_check.hit_chance)]
+	if is_crit:
+		hit_msg += " (CRITICAL! %d%% chance)" % int(crit_check.crit_chance)
+	if type_bonus > 0.0:
+		hit_msg += " (Super Effective!)"
+	elif type_bonus < 0.0:
+		hit_msg += " (Not Very Effective...)"
+	if target.get("is_defending", false):
+		var damage_without_defense = int(round(damage / 0.7))
+		var damage_reduced = damage_without_defense - damage
+		hit_msg += " (Defensive: -%d)" % damage_reduced
+	log_message(hit_msg)
+
+	# Update displays
+	_update_combatant_displays()
+	if turn_order_display:
+		turn_order_display.update_combatant_hp(target.id)
+
+func _execute_skill_aoe() -> void:
+	"""Execute an AoE skill on all valid targets"""
+	var skill_name = String(skill_to_use.get("name", "Unknown"))
+	var mp_cost = int(skill_to_use.get("cost_mp", 0))
+
+	# Clear defending status
+	current_combatant.is_defending = false
+
+	# Deduct MP
+	current_combatant.mp -= mp_cost
+	if current_combatant.mp < 0:
+		current_combatant.mp = 0
+
+	log_message("%s uses %s on all enemies!" % [current_combatant.display_name, skill_name])
+
+	# Hit each target
+	for target in target_candidates:
+		if not target.is_ko:
+			await get_tree().create_timer(0.3).timeout
+			_execute_skill_single(target)
+
+	# End turn after AoE
+	battle_mgr.end_turn()
