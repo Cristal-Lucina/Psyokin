@@ -1,9 +1,10 @@
 [gd_scene load_steps=3 format=3 uid="uid://b8qx5y2n3m1k4"]
 
-[ext_resource type="Script" path="res://scripts/player/Player.gd" id="1"]
+[ext_resource type="Script" uid="uid://oq3gvism1icl" path="res://scripts/player/Player.gd" id="1"]
 
-[sub_resource type="RectangleShape2D" id="RectangleShape2D_1"]
-size = Vector2(32, 48)
+[sub_resource type="CapsuleShape2D" id="CapsuleShape2D_wr5hl"]
+radius = 4.53809
+height = 16.5907
 
 [node name="Player" type="CharacterBody2D"]
 script = ExtResource("1")
@@ -52,9 +53,10 @@ hframes = 8
 vframes = 8
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
-position = Vector2(0, 8)
-shape = SubResource("RectangleShape2D_1")
+position = Vector2(0, 8.13513)
+rotation = 1.5708
+shape = SubResource("CapsuleShape2D_wr5hl")
 
 [node name="Camera2D" type="Camera2D" parent="."]
+position = Vector2(0, 1.39952)
 zoom = Vector2(2, 2)
-position_smoothing_enabled = false
