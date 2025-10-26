@@ -166,6 +166,12 @@ func _roll_initiative() -> void:
 			combatant.initiative = -1
 			continue
 
+		# Fallen combatants get 0 initiative (they'll skip their turn)
+		if combatant.is_fallen:
+			combatant.initiative = 0
+			print("[BattleManager] %s is FALLEN - initiative set to 0" % combatant.display_name)
+			continue
+
 		var tpo = combatant.stats.TPO
 		var speed = combatant.stats.get("Speed", 0)
 
