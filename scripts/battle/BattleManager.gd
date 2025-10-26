@@ -192,7 +192,17 @@ func _roll_initiative() -> void:
 		])
 
 func _sort_by_initiative(a: Dictionary, b: Dictionary) -> bool:
-	"""Sort comparator for initiative (higher first)"""
+	"""Sort comparator for initiative (higher first, KO'd to bottom)"""
+	# KO'd combatants always go to the bottom
+	var a_ko = a.get("is_ko", false)
+	var b_ko = b.get("is_ko", false)
+
+	if a_ko and not b_ko:
+		return false  # a is KO'd, b is not - b goes first
+	if not a_ko and b_ko:
+		return true  # a is not KO'd, b is - a goes first
+
+	# Both KO'd or both alive - sort normally by initiative
 	if a.initiative != b.initiative:
 		return a.initiative > b.initiative
 
@@ -579,6 +589,12 @@ func record_weapon_weakness_hit(target: Dictionary) -> bool:
 		return true
 
 	return false
+
+func refresh_turn_order() -> void:
+	"""Re-sort turn order and emit signal (used when combatant state changes like KO)"""
+	turn_order.sort_custom(_sort_by_initiative)
+	print("[BattleManager] Turn order re-sorted")
+	turn_order_changed.emit()
 
 ## ═══════════════════════════════════════════════════════════════
 ## BURST GAUGE

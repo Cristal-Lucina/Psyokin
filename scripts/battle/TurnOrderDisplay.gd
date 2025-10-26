@@ -9,9 +9,11 @@ class_name TurnOrderDisplay
 
 ## UI config
 const SHOW_UPCOMING_TURNS: int = 8  # How many turns to show
+const ANIMATION_DURATION: float = 0.3  # Duration of slide animations
 
 ## Container for turn slots
 var turn_slots: Array[PanelContainer] = []
+var previous_order: Dictionary = {}  # combatant_id -> previous_index
 
 func _ready() -> void:
 	print("[TurnOrderDisplay] Initializing turn order display")
@@ -44,8 +46,8 @@ func _on_turn_ended(_combatant_id: String) -> void:
 
 func _on_turn_order_changed() -> void:
 	"""Called when turn order is re-sorted mid-round (e.g., from weapon weakness)"""
-	print("[TurnOrderDisplay] Turn order changed, rebuilding display")
-	_rebuild_display()
+	print("[TurnOrderDisplay] Turn order changed, animating positions")
+	_rebuild_display_animated()
 
 ## ═══════════════════════════════════════════════════════════════
 ## DISPLAY BUILDING
@@ -78,6 +80,99 @@ func _rebuild_display() -> void:
 		var slot = _create_turn_slot(combatant, i)
 		turn_slots.append(slot)
 		add_child(slot)
+
+	# Store current order for future animations
+	_store_current_order()
+
+func _rebuild_display_animated() -> void:
+	"""Rebuild display with animations for position changes"""
+	if not battle_mgr:
+		return
+
+	var turn_order = battle_mgr.turn_order
+	if turn_order.is_empty():
+		return
+
+	# If no previous order, just rebuild normally
+	if previous_order.is_empty():
+		_rebuild_display()
+		return
+
+	# Build new order mapping
+	var new_order: Dictionary = {}
+	var turns_to_show = min(SHOW_UPCOMING_TURNS, turn_order.size())
+	for i in range(turns_to_show):
+		var combatant = turn_order[i]
+		new_order[combatant.id] = i
+
+	# Animate existing slots to new positions
+	var slots_to_animate: Array[Dictionary] = []
+
+	for slot in turn_slots:
+		var combatant_id = slot.get_meta("combatant_id", "")
+		if combatant_id != "" and new_order.has(combatant_id):
+			var old_index = slot.get_meta("turn_index", -1)
+			var new_index = new_order[combatant_id]
+
+			if old_index != new_index:
+				# This slot needs to move
+				slots_to_animate.append({
+					"slot": slot,
+					"old_index": old_index,
+					"new_index": new_index,
+					"combatant_id": combatant_id
+				})
+
+	# Perform animations
+	if not slots_to_animate.is_empty():
+		await _animate_position_changes(slots_to_animate)
+
+	# Full rebuild to update all content (KO status, initiative, etc.)
+	_rebuild_display()
+
+func _store_current_order() -> void:
+	"""Store current turn order for animation reference"""
+	previous_order.clear()
+	if not battle_mgr:
+		return
+
+	var turn_order = battle_mgr.turn_order
+	for i in range(turn_order.size()):
+		previous_order[turn_order[i].id] = i
+
+func _animate_position_changes(animations: Array[Dictionary]) -> void:
+	"""Animate slots moving to new positions"""
+	var tweens: Array = []
+
+	for anim_data in animations:
+		var slot: PanelContainer = anim_data.slot
+		var old_index: int = anim_data.old_index
+		var new_index: int = anim_data.new_index
+
+		# Calculate vertical offset (each slot is ~40px + spacing)
+		var slot_height = 45.0  # Approximate height including spacing
+		var offset = (new_index - old_index) * slot_height
+
+		# Create tween for this slot
+		var tween = create_tween()
+		tween.set_ease(Tween.EASE_OUT)
+		tween.set_trans(Tween.TRANS_CUBIC)
+
+		# Animate position offset
+		var original_pos = slot.position
+		tween.tween_property(slot, "position:y", original_pos.y + offset, ANIMATION_DURATION)
+
+		# Add a slight scale bounce for stumble effect
+		if new_index > old_index:
+			# Falling down (stumbled)
+			tween.parallel().tween_property(slot, "scale", Vector2(1.05, 1.05), ANIMATION_DURATION * 0.5)
+			tween.tween_property(slot, "scale", Vector2(1.0, 1.0), ANIMATION_DURATION * 0.5)
+
+		tweens.append(tween)
+
+	# Wait for all tweens to finish
+	if not tweens.is_empty():
+		await tweens[0].finished
 
 func _create_turn_slot(combatant: Dictionary, index: int) -> PanelContainer:
 	"""Create a UI slot for a combatant in the turn order"""
