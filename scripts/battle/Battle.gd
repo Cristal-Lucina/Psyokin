@@ -379,9 +379,13 @@ func _on_skill_pressed() -> void:
 	_show_skill_menu(skill_list)
 
 func _on_item_pressed() -> void:
-	"""Handle Item action"""
-	log_message("Items not yet implemented")
-	# TODO: Show item menu
+	"""Handle Item/Type Switch action"""
+	# Check if this is the hero
+	if current_combatant.id == "hero":
+		_show_mind_type_menu()
+	else:
+		log_message("Items not yet implemented")
+		# TODO: Show item menu
 
 func _on_defend_pressed() -> void:
 	"""Handle Defend action"""
@@ -787,4 +791,56 @@ func _execute_skill_aoe() -> void:
 			_execute_skill_single(target)
 
 	# End turn after AoE
+	battle_mgr.end_turn()
+
+## ═══════════════════════════════════════════════════════════════
+## MIND TYPE SWITCHING (HERO ONLY)
+## ═══════════════════════════════════════════════════════════════
+
+func _show_mind_type_menu() -> void:
+	"""Show mind type switching menu for hero"""
+	var available_types = ["Fire", "Water", "Earth", "Air", "Void", "Data", "Omega"]
+	var current_type = String(gs.get_meta("hero_active_type", "Omega"))
+
+	log_message("--- Switch Mind Type ---")
+	log_message("Current: %s" % current_type)
+
+	for i in range(available_types.size()):
+		var type_name = available_types[i]
+		var marker = " [Current]" if type_name == current_type else ""
+		log_message("%d. %s%s" % [i + 1, type_name, marker])
+
+	# For now, auto-select first type that's different from current
+	for type_name in available_types:
+		if type_name != current_type:
+			_switch_mind_type(type_name)
+			return
+
+func _switch_mind_type(new_type: String) -> void:
+	"""Switch hero's mind type and reload skills"""
+	var old_type = String(gs.get_meta("hero_active_type", "Omega"))
+
+	# Update mind type in GameState
+	gs.set_meta("hero_active_type", new_type)
+
+	# Update combatant's mind_type
+	current_combatant.mind_type = new_type.to_lower()
+
+	# Reload sigils and skills for new type
+	if has_node("/root/aSigilSystem"):
+		var sigil_sys = get_node("/root/aSigilSystem")
+		var loadout = sigil_sys.get_loadout("hero")
+
+		var new_skills = []
+		for sigil_inst in loadout:
+			if sigil_inst != "":
+				var skill_id = sigil_sys.get_active_skill_id_for_instance(sigil_inst)
+				if skill_id != "":
+					new_skills.append(skill_id)
+
+		current_combatant.skills = new_skills
+		log_message("%s switched from %s to %s!" % [current_combatant.display_name, old_type, new_type])
+		log_message("  Skills updated: %s" % str(new_skills))
+
+	# End turn after switching
 	battle_mgr.end_turn()
