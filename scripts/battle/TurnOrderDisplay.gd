@@ -4,6 +4,9 @@ class_name TurnOrderDisplay
 ## TurnOrderDisplay - Shows the upcoming turn order in battle
 ## Displays combatant names and initiative in a simplified list
 
+## Signals
+signal animation_completed  # Emitted when any animation finishes
+
 ## References
 @onready var battle_mgr = get_node("/root/aBattleManager")
 
@@ -22,6 +25,9 @@ var is_animating: bool = false  # Prevent overlapping animations
 
 func _ready() -> void:
 	print("[TurnOrderDisplay] Initializing turn order display")
+
+	# Add to group so BattleManager can find us
+	add_to_group("turn_order_display")
 
 	# Create round label
 	round_label = Label.new()
@@ -58,7 +64,8 @@ func _on_round_started(round_number: int) -> void:
 	current_round = round_number
 	if round_label:
 		round_label.text = "Round %d" % round_number
-	_rebuild_display_with_reveal()
+	await _rebuild_display_with_reveal()
+	animation_completed.emit()
 
 func _on_turn_started(_combatant_id: String) -> void:
 	"""Called when a turn starts - highlight current combatant"""
@@ -76,7 +83,8 @@ func _on_turn_order_changed() -> void:
 		return
 
 	print("[TurnOrderDisplay] Turn order changed, animating positions")
-	_rebuild_display_animated()
+	await _rebuild_display_animated()
+	animation_completed.emit()
 
 ## ═══════════════════════════════════════════════════════════════
 ## DISPLAY BUILDING

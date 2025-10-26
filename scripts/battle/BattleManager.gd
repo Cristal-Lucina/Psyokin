@@ -156,6 +156,9 @@ func start_round() -> void:
 	# Emit signal AFTER turn order is calculated so UI can display it
 	round_started.emit(current_round)
 
+	# Wait for turn order animation to complete
+	await _wait_for_turn_order_animation()
+
 	# Start first turn
 	current_turn_index = 0
 	_next_turn()
@@ -244,6 +247,21 @@ func _remove_turn_order_duplicates() -> void:
 	if duplicates_found > 0:
 		print("[BattleManager] Removed %d duplicate(s) from turn order" % duplicates_found)
 		turn_order = deduplicated
+
+func _wait_for_turn_order_animation() -> void:
+	"""Wait for turn order display animation to complete"""
+	# Find TurnOrderDisplay in the scene tree
+	var turn_order_display = get_tree().get_first_node_in_group("turn_order_display")
+	if not turn_order_display:
+		# No display found, just wait a frame
+		await get_tree().process_frame
+		return
+
+	# Wait for animation_completed signal
+	if turn_order_display.has_signal("animation_completed"):
+		await turn_order_display.animation_completed
+	else:
+		await get_tree().process_frame
 
 func _next_turn() -> void:
 	"""Advance to the next combatant's turn"""
@@ -627,6 +645,9 @@ func record_weapon_weakness_hit(target: Dictionary) -> bool:
 	# Emit signal so UI can update
 	turn_order_changed.emit()
 
+	# Wait for animation to complete
+	await _wait_for_turn_order_animation()
+
 	# Check if target should become Fallen (lose next turn)
 	if target.weapon_weakness_hits >= 2:
 		target.is_fallen = true
@@ -656,6 +677,9 @@ func refresh_turn_order() -> void:
 				break
 
 	turn_order_changed.emit()
+
+	# Wait for animation to complete
+	await _wait_for_turn_order_animation()
 
 ## ═══════════════════════════════════════════════════════════════
 ## BURST GAUGE
