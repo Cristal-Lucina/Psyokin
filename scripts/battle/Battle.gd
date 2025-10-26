@@ -225,6 +225,15 @@ func _on_attack_pressed() -> void:
 			# Calculate mind type effectiveness
 			var type_bonus = combat_resolver.get_mind_type_bonus(current_combatant, target)
 
+			# Check weapon type weakness
+			var weapon_weakness_hit = combat_resolver.check_weapon_weakness(current_combatant, target)
+			if weapon_weakness_hit:
+				var became_fallen = battle_mgr.record_weapon_weakness_hit(target)
+				var weapon_desc = combat_resolver.get_weapon_type_description(current_combatant, target)
+				log_message("  → WEAPON WEAKNESS! %s" % weapon_desc)
+				if became_fallen:
+					log_message("  → %s is FALLEN! (will skip next turn)" % target.display_name)
+
 			# Calculate damage
 			var damage_result = combat_resolver.calculate_physical_damage(
 				current_combatant,
@@ -366,6 +375,15 @@ func _execute_enemy_ai() -> void:
 
 			# Calculate mind type effectiveness
 			var type_bonus = combat_resolver.get_mind_type_bonus(current_combatant, target)
+
+			# Check weapon type weakness
+			var weapon_weakness_hit = combat_resolver.check_weapon_weakness(current_combatant, target)
+			if weapon_weakness_hit:
+				var became_fallen = battle_mgr.record_weapon_weakness_hit(target)
+				var weapon_desc = combat_resolver.get_weapon_type_description(current_combatant, target)
+				log_message("  → WEAPON WEAKNESS! %s" % weapon_desc)
+				if became_fallen:
+					log_message("  → %s is FALLEN! (will skip next turn)" % target.display_name)
 
 			# Calculate damage
 			var damage_result = combat_resolver.calculate_physical_damage(

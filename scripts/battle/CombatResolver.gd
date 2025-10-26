@@ -7,6 +7,7 @@ class_name CombatResolver
 ## References to autoloads
 @onready var equipment_system = get_node("/root/aEquipmentSystem")
 @onready var mind_type_system = get_node("/root/aMindTypeSystem")
+@onready var weapon_type_system = get_node("/root/aWeaponTypeSystem")
 
 ## Damage floor percentages (§4.4a)
 const DMG_FLOOR_ENEMY_TO_PLAYER: float = 0.15  # 15% minimum
@@ -66,6 +67,35 @@ func get_mind_type_bonus(attacker: Dictionary, defender: Dictionary, attack_type
 func is_type_weakness(attacker: Dictionary, defender: Dictionary, attack_type: String = "") -> bool:
 	"""Check if attack hits a type weakness"""
 	return get_mind_type_bonus(attacker, defender, attack_type) > 0.0
+
+## ═══════════════════════════════════════════════════════════════
+## WEAPON TYPE EFFECTIVENESS (Triangle System)
+## ═══════════════════════════════════════════════════════════════
+
+func check_weapon_weakness(attacker: Dictionary, defender: Dictionary) -> bool:
+	"""
+	Check if attacker's weapon type beats defender's weapon type
+
+	Returns:
+		true if weapon triangle advantage (Pierce > Slash > Blunt > Pierce)
+	"""
+	if not weapon_type_system:
+		return false
+
+	return weapon_type_system.is_weapon_weakness(
+		weapon_type_system.get_weapon_type_from_equipment(attacker),
+		weapon_type_system.get_weapon_type_from_equipment(defender)
+	)
+
+func get_weapon_type_description(attacker: Dictionary, defender: Dictionary) -> String:
+	"""Get description of weapon type matchup"""
+	if not weapon_type_system:
+		return ""
+
+	var atk_type = weapon_type_system.get_weapon_type_from_equipment(attacker)
+	var def_type = weapon_type_system.get_weapon_type_from_equipment(defender)
+
+	return weapon_type_system.get_weakness_description(atk_type, def_type)
 
 ## ═══════════════════════════════════════════════════════════════
 ## HIT/EVASION CHECKS (§4.3)

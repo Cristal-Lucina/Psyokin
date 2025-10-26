@@ -269,6 +269,9 @@ func _process_round_start_effects() -> void:
 		if combatant.is_ko or combatant.is_fled:
 			continue
 
+		# Reset weapon weakness hit counter at start of each round
+		combatant.weapon_weakness_hits = 0
+
 		# TODO: Apply DoT (poison = 5% max HP, burn = 5% max HP)
 		# TODO: Apply HoT (regen)
 		# TODO: Decrement buff/debuff durations
@@ -371,6 +374,21 @@ func _create_ally_combatant(member_id: String, slot: int) -> Dictionary:
 	elif stats_system and stats_system.has_method("get_member_mind_type"):
 		mind_type = String(stats_system.get_member_mind_type(member_id)).to_lower()
 
+	# Get equipment from EquipmentSystem
+	var equipment_dict = {
+		"weapon": "",
+		"armor": "",
+		"head": "",
+		"foot": "",
+		"bracelet": ""
+	}
+	if has_node("/root/aEquipmentSystem"):
+		var equip_sys = get_node("/root/aEquipmentSystem")
+		if equip_sys.has_method("get_member_equipment"):
+			var member_equip = equip_sys.get_member_equipment(member_id)
+			if member_equip:
+				equipment_dict = member_equip
+
 	return {
 		"id": member_id,
 		"display_name": display_name,
@@ -392,7 +410,9 @@ func _create_ally_combatant(member_id: String, slot: int) -> Dictionary:
 		"buffs": [],
 		"debuffs": [],
 		"ailments": [],
-		"mind_type": mind_type
+		"mind_type": mind_type,
+		"equipment": equipment_dict,
+		"weapon_weakness_hits": 0  # Track weapon triangle weakness hits per round
 	}
 
 func _create_enemy_combatant(enemy_id: String, slot: int) -> Dictionary:
@@ -477,8 +497,34 @@ func _create_enemy_combatant(enemy_id: String, slot: int) -> Dictionary:
 		"is_boss": String(enemy_def.get("boss_tag", "FALSE")).to_upper() == "TRUE",
 		"capture_difficulty": String(enemy_def.get("capture_tag", "None")),
 		"cred_range": String(enemy_def.get("cred_range", "0-0")),
-		"drop_table": String(enemy_def.get("item_drops", ""))
+		"drop_table": String(enemy_def.get("item_drops", "")),
+		"weapon_weakness_hits": 0  # Track weapon triangle weakness hits per round
 	}
+
+## ═══════════════════════════════════════════════════════════════
+## WEAPON WEAKNESS TRACKING
+## ═══════════════════════════════════════════════════════════════
+
+func record_weapon_weakness_hit(target: Dictionary) -> bool:
+	"""
+	Record a weapon weakness hit on a target
+
+	Returns:
+		true if target becomes Fallen (2+ hits this round)
+	"""
+	if not target.has("weapon_weakness_hits"):
+		target.weapon_weakness_hits = 0
+
+	target.weapon_weakness_hits += 1
+	print("[BattleManager] %s weapon weakness hits: %d/2" % [target.display_name, target.weapon_weakness_hits])
+
+	# Check if target should become Fallen (lose next turn)
+	if target.weapon_weakness_hits >= 2:
+		target.is_fallen = true
+		print("[BattleManager] %s is FALLEN! (will skip next turn)" % target.display_name)
+		return true
+
+	return false
 
 ## ═══════════════════════════════════════════════════════════════
 ## BURST GAUGE
