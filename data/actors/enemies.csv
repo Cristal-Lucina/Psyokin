@@ -4,4 +4,7 @@ goblin,Goblin,2,2,1,2,2,1,WEA_001,ARM_001,,,BRA_001,SIG_003,,Earth,,,0.8,0.5,0.8
 bandit,Bandit,3,3,1,3,2,2,WEA_003,ARM_001,HEA_001,FTW_001,BRA_001,SIG_001,,Fire,,,1,0.6,1,0.8,0.8,drop_table_bandit,25-50,FALSE,Medium
 wisp,Wisp,2,1,3,2,1,3,WEA_002,,,,BRA_002,SIG_004;SIG_005,WATER_L1;AIR_L1,Air,,,0.5,1.2,0.8,0.5,1.2,drop_table_wisp,20-40,FALSE,Hard
 dark_knight,Dark Knight,5,4,2,4,4,2,WEA_004,ARM_001,HEA_001,FTW_001,BRA_002,SIG_005;SIG_006,VOID_L2;DATA_L1,Void,,,1.5,0.8,1.5,1.5,0.8,drop_table_dark_knight,50-100,FALSE,Hard
+spearman,Spearman,3,3,1,3,3,1,WEA_003,ARM_001,,,BRA_001,SIG_002,,Water,,,0.9,0.5,1,0.9,0.6,drop_table_spearman,20-35,FALSE,Medium
+brute,Brute,4,4,1,2,4,1,WEA_004,ARM_001,,,BRA_001,SIG_003,,Earth,,,1.2,0.5,0.7,1.2,0.5,drop_table_brute,30-60,FALSE,Medium
+swordsman,Swordsman,4,3,2,3,3,2,WEA_001,ARM_001,HEA_001,FTW_001,BRA_001,SIG_001,,Fire,,,1,0.8,1,1,0.8,drop_table_swordsman,25-45,FALSE,Medium
 mini_boss,Corrupted Guardian,8,5,5,5,6,5,WEA_002,ARM_001,HEA_001,FTW_001,BRA_002,SIG_001;SIG_002;SIG_003,FIRE_L3;WATER_L3,Data,,,2,2,2,2.5,2,drop_table_boss_minor,100-200,TRUE,None

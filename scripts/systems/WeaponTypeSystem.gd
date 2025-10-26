@@ -13,12 +13,13 @@ class_name WeaponTypeSystem
 
 ## Weapon type triangle
 ## Pierce beats Slash (piercing finds gaps in slashing defenses)
-## Slash beats Blunt (cutting through blunt weapon users)
-## Blunt beats Pierce (crushing through piercing defenses)
+## Slash beats Blunt/Impact (cutting through blunt weapon users)
+## Blunt/Impact beats Pierce (crushing through piercing defenses)
 var _weakness_chart: Dictionary = {
 	"pierce": ["slash"],   # Pierce is strong against Slash
-	"slash": ["blunt"],    # Slash is strong against Blunt
-	"blunt": ["pierce"]    # Blunt is strong against Pierce
+	"slash": ["blunt", "impact"],    # Slash is strong against Blunt/Impact
+	"blunt": ["pierce"],    # Blunt is strong against Pierce
+	"impact": ["pierce"]    # Impact (alias for Blunt) is strong against Pierce
 }
 
 ## Initiative penalty when hit by weapon weakness
@@ -57,8 +58,8 @@ func is_weapon_weakness(attacker_weapon_type: String, defender_weapon_type: Stri
 	Check if attacker's weapon type has advantage over defender's weapon type
 
 	Args:
-		attacker_weapon_type: Type of weapon attacking (pierce, slash, blunt)
-		defender_weapon_type: Type of weapon defending (pierce, slash, blunt)
+		attacker_weapon_type: Type of weapon attacking (pierce, slash, blunt/impact)
+		defender_weapon_type: Type of weapon defending (pierce, slash, blunt/impact)
 
 	Returns:
 		true if attacker type beats defender type
