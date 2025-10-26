@@ -662,6 +662,24 @@ func _show_skill_menu(skill_menu: Array) -> void:
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vbox.add_child(title)
 
+	# Show current mind type
+	var current_type = String(current_combatant.get("mind_type", "omega")).capitalize()
+	var type_label = Label.new()
+	type_label.text = "Current Type: %s" % current_type
+	type_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	type_label.add_theme_font_size_override("font_size", 14)
+	vbox.add_child(type_label)
+
+	# Add "Change Type" button (only for player)
+	if current_combatant.get("is_ally", false) and current_combatant.get("id") == "hero":
+		var changed_this_round = current_combatant.get("changed_type_this_round", false)
+		var change_type_btn = Button.new()
+		change_type_btn.text = "Change Mind Type" if not changed_this_round else "Change Mind Type (Used)"
+		change_type_btn.custom_minimum_size = Vector2(380, 40)
+		change_type_btn.disabled = changed_this_round
+		change_type_btn.pressed.connect(_on_change_type_button_pressed)
+		vbox.add_child(change_type_btn)
+
 	# Add separator
 	var sep1 = HSeparator.new()
 	vbox.add_child(sep1)
@@ -672,19 +690,28 @@ func _show_skill_menu(skill_menu: Array) -> void:
 		var sigil_name = menu_entry.sigil_name
 		var skill_data = menu_entry.skill_data
 		var skill_name = String(skill_data.get("name", "Unknown"))
-		var skill_element = String(skill_data.get("element", "none")).capitalize()
+		var skill_element = String(skill_data.get("element", "none"))
+		var skill_element_cap = skill_element.capitalize()
 		var mp_cost = int(skill_data.get("cost_mp", 0))
 		var can_afford = menu_entry.can_afford
 
+		# Check if skill element matches current mind type
+		var current_mind_type = String(current_combatant.get("mind_type", "omega")).to_lower()
+		var type_matches = (skill_element.to_lower() == current_mind_type)
+
 		var button = Button.new()
-		button.text = "[%s] %s\n(%s, MP: %d)" % [sigil_name, skill_name, skill_element, mp_cost]
-		button.disabled = not can_afford
+		button.text = "[%s] %s\n(%s, MP: %d)" % [sigil_name, skill_name, skill_element_cap, mp_cost]
 		button.custom_minimum_size = Vector2(380, 50)
 
-		if can_afford:
-			button.pressed.connect(_on_skill_button_pressed.bind(i))
-		else:
+		# Disable if can't afford OR type doesn't match
+		if not can_afford:
+			button.disabled = true
 			button.text += "\n[Not enough MP]"
+		elif not type_matches:
+			button.disabled = true
+			button.text += "\n[Wrong Type - Need %s]" % skill_element_cap
+		else:
+			button.pressed.connect(_on_skill_button_pressed.bind(i))
 
 		vbox.add_child(button)
 
@@ -713,6 +740,91 @@ func _on_skill_button_pressed(index: int) -> void:
 		var menu_entry = current_skill_menu[index]
 		_close_skill_menu()
 		_on_skill_selected(menu_entry)
+
+func _on_change_type_button_pressed() -> void:
+	"""Handle change type button press - show type selection menu"""
+	# Close current skill menu
+	_close_skill_menu()
+
+	# Create type selection panel
+	var type_panel = PanelContainer.new()
+	type_panel.custom_minimum_size = Vector2(300, 0)
+
+	# Style the panel
+	var style = StyleBoxFlat.new()
+	style.bg_color = Color(0.1, 0.1, 0.15, 0.95)
+	style.border_width_left = 2
+	style.border_width_right = 2
+	style.border_width_top = 2
+	style.border_width_bottom = 2
+	style.border_color = Color(0.5, 0.5, 0.6, 1.0)
+	type_panel.add_theme_stylebox_override("panel", style)
+
+	var vbox = VBoxContainer.new()
+	type_panel.add_child(vbox)
+
+	# Title
+	var title = Label.new()
+	title.text = "Change Mind Type"
+	title.add_theme_font_size_override("font_size", 18)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(title)
+
+	var current_type = String(current_combatant.get("mind_type", "omega")).capitalize()
+	var current_label = Label.new()
+	current_label.text = "Current: %s" % current_type
+	current_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(current_label)
+
+	var sep1 = HSeparator.new()
+	vbox.add_child(sep1)
+
+	# Add type buttons
+	var available_types = ["Fire", "Water", "Earth", "Air", "Void", "Data", "Omega"]
+	for type_name in available_types:
+		if type_name.to_lower() != current_type.to_lower():
+			var btn = Button.new()
+			btn.text = type_name
+			btn.custom_minimum_size = Vector2(280, 40)
+			btn.pressed.connect(_on_type_selected.bind(type_name, type_panel))
+			vbox.add_child(btn)
+
+	# Cancel button
+	var sep2 = HSeparator.new()
+	vbox.add_child(sep2)
+
+	var cancel_btn = Button.new()
+	cancel_btn.text = "Cancel"
+	cancel_btn.custom_minimum_size = Vector2(280, 40)
+	cancel_btn.pressed.connect(_on_type_menu_cancel.bind(type_panel))
+	vbox.add_child(cancel_btn)
+
+	# Add to scene and center
+	add_child(type_panel)
+	type_panel.position = Vector2(
+		(get_viewport_rect().size.x - type_panel.custom_minimum_size.x) / 2,
+		150
+	)
+
+func _on_type_selected(new_type: String, type_panel: PanelContainer) -> void:
+	"""Handle type selection"""
+	# Close type menu
+	if type_panel:
+		type_panel.queue_free()
+
+	# Switch type (don't end turn)
+	_switch_mind_type(new_type, false)
+
+	# Reopen skill menu with new type
+	_on_skill_pressed()
+
+func _on_type_menu_cancel(type_panel: PanelContainer) -> void:
+	"""Cancel type selection and return to skill menu"""
+	if type_panel:
+		type_panel.queue_free()
+
+	# Reopen skill menu
+	_on_skill_pressed()
 
 func _close_skill_menu() -> void:
 	"""Close the skill menu"""
@@ -914,7 +1026,7 @@ func _show_mind_type_menu() -> void:
 			_switch_mind_type(type_name)
 			return
 
-func _switch_mind_type(new_type: String) -> void:
+func _switch_mind_type(new_type: String, end_turn: bool = true) -> void:
 	"""Switch hero's mind type and reload skills"""
 	var old_type = String(gs.get_meta("hero_active_type", "Omega"))
 
@@ -923,6 +1035,9 @@ func _switch_mind_type(new_type: String) -> void:
 
 	# Update combatant's mind_type
 	current_combatant.mind_type = new_type.to_lower()
+
+	# Mark that type was changed this round
+	current_combatant.changed_type_this_round = true
 
 	# Reload sigils and skills for new type
 	if has_node("/root/aSigilSystem"):
@@ -938,7 +1053,7 @@ func _switch_mind_type(new_type: String) -> void:
 
 		current_combatant.skills = new_skills
 		log_message("%s switched from %s to %s!" % [current_combatant.display_name, old_type, new_type])
-		log_message("  Skills updated: %s" % str(new_skills))
 
-	# End turn after switching
-	battle_mgr.end_turn()
+	# End turn if requested (for Item button usage)
+	if end_turn:
+		battle_mgr.end_turn()

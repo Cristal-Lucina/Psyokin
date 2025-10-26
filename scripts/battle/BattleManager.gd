@@ -278,6 +278,9 @@ func _process_round_start_effects() -> void:
 		# Reset weapon weakness hit counter at start of each round
 		combatant.weapon_weakness_hits = 0
 
+		# Reset mind type change flag (player can change type once per round)
+		combatant.changed_type_this_round = false
+
 		# NOTE: is_defending persists across rounds until combatant takes offensive action
 		# This provides multi-round defensive stances
 
@@ -439,6 +442,7 @@ func _create_ally_combatant(member_id: String, slot: int) -> Dictionary:
 		"mind_type": mind_type,
 		"equipment": equipment_dict,
 		"weapon_weakness_hits": 0,  # Track weapon triangle weakness hits per round
+		"changed_type_this_round": false,  # Track if player changed type this round
 		"sigils": sigils,  # Sigil instances equipped
 		"skills": skills   # Active skill IDs for each sigil
 	}
