@@ -562,6 +562,21 @@ func get_member_display_name(member_id: String) -> String:
 		return String(label_v)
 	return pid.capitalize()
 
+## Gets a member's mind type from party.csv
+func get_member_mind_type(member_id: String) -> String:
+	var pid: String = _resolve_id(member_id)
+	if pid == "hero":
+		# Hero's type is stored in GameState metadata
+		if _gs != null and _gs.has_meta("hero_active_type"):
+			return String(_gs.get_meta("hero_active_type")).to_lower()
+		return "omega"  # Default for hero
+	# Get from CSV data
+	if _csv_by_id.has(pid):
+		var row: Dictionary = _csv_by_id[pid]
+		var mind_type_v: Variant = row.get("mind_type", "none")
+		return String(mind_type_v).to_lower()
+	return "none"
+
 # ───────────────────────── Perk points passthrough ─────────────────────────
 ## Internal helper to emit perk_points_changed signal with current value from GameState
 func _emit_pp_changed() -> void:
