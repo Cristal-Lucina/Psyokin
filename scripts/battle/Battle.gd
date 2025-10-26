@@ -450,8 +450,10 @@ func _on_run_pressed() -> void:
 	# Mark that run was attempted
 	battle_mgr.run_attempted_this_round = true
 
-	# TODO: Implement escape formula from design doc
-	var run_chance = 50  # Simplified for now
+	# Calculate run chance based on enemy HP and level difference
+	var run_chance = _calculate_run_chance()
+
+	log_message("Attempting to escape... (%d%% chance)" % int(run_chance))
 
 	if randf() * 100 < run_chance:
 		log_message("Escaped successfully!")
@@ -461,6 +463,56 @@ func _on_run_pressed() -> void:
 	else:
 		log_message("Couldn't escape!")
 		battle_mgr.end_turn()
+
+func _calculate_run_chance() -> float:
+	"""Calculate run chance based on enemy HP percentage and level difference"""
+	const BASE_RUN_CHANCE: float = 50.0
+	const MAX_HP_BONUS: float = 20.0
+	const MAX_LEVEL_BONUS: float = 20.0
+	const LEVEL_BONUS_PER_LEVEL: float = 2.0
+
+	# Calculate enemy HP percentage bonus (0-20%)
+	var enemies = battle_mgr.get_enemy_combatants()
+	var total_enemy_hp_current: float = 0.0
+	var total_enemy_hp_max: float = 0.0
+
+	for enemy in enemies:
+		total_enemy_hp_current += enemy.hp
+		total_enemy_hp_max += enemy.hp_max
+
+	var hp_loss_percent: float = 0.0
+	if total_enemy_hp_max > 0:
+		hp_loss_percent = 1.0 - (total_enemy_hp_current / total_enemy_hp_max)
+
+	var hp_bonus: float = hp_loss_percent * MAX_HP_BONUS
+
+	# Calculate level difference bonus (0-20%, 2% per level up to 10 levels)
+	var allies = battle_mgr.get_ally_combatants()
+	var total_ally_level: int = 0
+	var total_enemy_level: int = 0
+
+	for ally in allies:
+		total_ally_level += ally.level
+
+	for enemy in enemies:
+		total_enemy_level += enemy.level
+
+	var level_difference: int = total_ally_level - total_enemy_level
+	var level_bonus: float = 0.0
+	if level_difference > 0:
+		level_bonus = min(level_difference, 10) * LEVEL_BONUS_PER_LEVEL
+
+	# Calculate final run chance
+	var final_chance: float = BASE_RUN_CHANCE + hp_bonus + level_bonus
+
+	# Log breakdown for debugging
+	log_message("  Base: %d%% | HP Bonus: +%d%% | Level Bonus: +%d%%" % [
+		int(BASE_RUN_CHANCE),
+		int(hp_bonus),
+		int(level_bonus)
+	])
+
+	return final_chance
 
 ## ═══════════════════════════════════════════════════════════════
 ## TARGET SELECTION
