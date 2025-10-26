@@ -49,7 +49,10 @@ func get_weapon_type_from_equipment(combatant: Dictionary) -> String:
 		if items_data and items_data.has(weapon_id):
 			var weapon_data: Dictionary = items_data[weapon_id]
 			var weapon_type: String = String(weapon_data.get("watk_type_tag", "none")).strip_edges().to_lower()
+			print("[WeaponTypeSystem] DEBUG: Weapon %s has type: %s" % [weapon_id, weapon_type])
 			return weapon_type
+		else:
+			print("[WeaponTypeSystem] DEBUG: Weapon %s NOT FOUND in items.csv" % weapon_id)
 
 	return "none"
 
@@ -67,17 +70,23 @@ func is_weapon_weakness(attacker_weapon_type: String, defender_weapon_type: Stri
 	var atk_type = String(attacker_weapon_type).strip_edges().to_lower()
 	var def_type = String(defender_weapon_type).strip_edges().to_lower()
 
+	print("[WeaponTypeSystem] DEBUG: Checking weakness - Attacker: '%s' vs Defender: '%s'" % [atk_type, def_type])
+
 	# No advantage if either has no type or special types
 	if atk_type in ["none", "unarmed", "wand", ""] or def_type in ["none", "unarmed", "wand", ""]:
+		print("[WeaponTypeSystem] DEBUG: One or both weapons are excluded types (none/unarmed/wand)")
 		return false
 
 	# Check if attacker type beats defender type
 	if _weakness_chart.has(atk_type):
 		var beats_types: Array = _weakness_chart[atk_type]
+		print("[WeaponTypeSystem] DEBUG: %s beats: %s" % [atk_type, beats_types])
 		for beats in beats_types:
 			if String(beats).to_lower() == def_type:
+				print("[WeaponTypeSystem] DEBUG: WEAKNESS FOUND! %s beats %s" % [atk_type, def_type])
 				return true
 
+	print("[WeaponTypeSystem] DEBUG: No weakness found")
 	return false
 
 func get_initiative_penalty(attacker: Dictionary, defender: Dictionary) -> int:

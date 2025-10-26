@@ -242,8 +242,13 @@ func _execute_attack(target: Dictionary) -> void:
 			# Calculate mind type effectiveness
 			var type_bonus = combat_resolver.get_mind_type_bonus(current_combatant, target)
 
-			# Check weapon type weakness
+			# Check weapon type weakness - DEBUG
+			print("[Battle] DEBUG: Attacker equipment: ", current_combatant.get("equipment", {}))
+			print("[Battle] DEBUG: Defender equipment: ", target.get("equipment", {}))
+
 			var weapon_weakness_hit = combat_resolver.check_weapon_weakness(current_combatant, target)
+			print("[Battle] DEBUG: Weapon weakness check result: ", weapon_weakness_hit)
+
 			if weapon_weakness_hit:
 				var became_fallen = battle_mgr.record_weapon_weakness_hit(target)
 				var weapon_desc = combat_resolver.get_weapon_type_description(current_combatant, target)
