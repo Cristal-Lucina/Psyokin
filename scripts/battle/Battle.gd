@@ -363,9 +363,13 @@ func _execute_attack(target: Dictionary) -> void:
 			_update_combatant_displays()
 			_update_burst_gauge()
 
-			# Update turn order display
+			# Refresh turn order display if combatant was KO'd
 			if turn_order_display:
-				turn_order_display.update_combatant_hp(target.id)
+				if target.is_ko:
+					# Trigger full rebuild to show greyed out KO'd combatants
+					battle_mgr.turn_order_changed.emit()
+				else:
+					turn_order_display.update_combatant_hp(target.id)
 
 	# End turn
 	battle_mgr.end_turn()
@@ -672,9 +676,13 @@ func _execute_enemy_ai() -> void:
 			_update_combatant_displays()
 			_update_burst_gauge()
 
-			# Update turn order display
+			# Refresh turn order display if combatant was KO'd
 			if turn_order_display:
-				turn_order_display.update_combatant_hp(target.id)
+				if target.is_ko:
+					# Trigger full rebuild to show greyed out KO'd combatants
+					battle_mgr.turn_order_changed.emit()
+				else:
+					turn_order_display.update_combatant_hp(target.id)
 
 	await get_tree().create_timer(1.0).timeout
 
@@ -1051,7 +1059,11 @@ func _execute_skill_single(target: Dictionary) -> void:
 	# Update displays
 	_update_combatant_displays()
 	if turn_order_display:
-		turn_order_display.update_combatant_hp(target.id)
+		if target.is_ko:
+			# Trigger full rebuild to show greyed out KO'd combatants
+			battle_mgr.turn_order_changed.emit()
+		else:
+			turn_order_display.update_combatant_hp(target.id)
 
 func _execute_skill_aoe() -> void:
 	"""Execute an AoE skill on all valid targets"""

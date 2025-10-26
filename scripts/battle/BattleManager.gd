@@ -236,6 +236,10 @@ func _next_turn() -> void:
 
 func _start_turn(combatant: Dictionary) -> void:
 	"""Start a combatant's turn"""
+	# Check if battle has ended before starting this turn
+	if _check_battle_end():
+		return
+
 	current_state = BattleState.TURN_ACTIVE
 	print("[BattleManager] --- Turn: %s ---" % combatant.display_name)
 
