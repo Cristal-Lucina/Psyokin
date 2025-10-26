@@ -13,6 +13,9 @@ class_name CombatResolver
 const DMG_FLOOR_ENEMY_TO_PLAYER: float = 0.15  # 15% minimum
 const DMG_FLOOR_PLAYER_TO_ENEMY: float = 0.20  # 20% minimum
 
+## Enemy damage reduction for balancing
+const ENEMY_DAMAGE_MULT: float = 0.7  # Enemies deal 70% damage (30% reduction)
+
 ## Defend multiplier
 const DEFEND_MULT: float = 0.7  # -30% damage when defending
 
@@ -340,10 +343,14 @@ func calculate_physical_damage(attacker: Dictionary, defender: Dictionary, optio
 
 	var dmg_after_mods: float = raw_damage * defend_mult * shield_mult
 
-	# Step 5: Apply mitigation floor
+	# Step 5: Apply enemy damage reduction (for balancing)
+	var enemy_mult: float = ENEMY_DAMAGE_MULT if not attacker.get("is_ally", false) else 1.0
+	dmg_after_mods = dmg_after_mods * enemy_mult
+
+	# Step 6: Apply mitigation floor
 	# DMG = max(DMG, ceil(ATK_Power × DMG_FLOOR))
 	var dmg_floor: float = DMG_FLOOR_PLAYER_TO_ENEMY if attacker.get("is_ally", false) else DMG_FLOOR_ENEMY_TO_PLAYER
-	var min_damage: int = int(ceil(atk_power * dmg_floor))
+	var min_damage: int = int(ceil(atk_power * dmg_floor * enemy_mult))
 
 	var final_damage: int = int(floor(dmg_after_mods))
 	final_damage = max(final_damage, min_damage)
@@ -434,9 +441,13 @@ func calculate_sigil_damage(attacker: Dictionary, defender: Dictionary, options:
 
 	var dmg_after_mods: float = raw_damage * defend_mult * shield_mult
 
-	# Step 5: Apply mitigation floor
+	# Step 5: Apply enemy damage reduction (for balancing)
+	var enemy_mult: float = ENEMY_DAMAGE_MULT if not attacker.get("is_ally", false) else 1.0
+	dmg_after_mods = dmg_after_mods * enemy_mult
+
+	# Step 6: Apply mitigation floor
 	var dmg_floor: float = DMG_FLOOR_PLAYER_TO_ENEMY if attacker.get("is_ally", false) else DMG_FLOOR_ENEMY_TO_PLAYER
-	var min_damage: int = int(ceil(skill_power * dmg_floor))
+	var min_damage: int = int(ceil(skill_power * dmg_floor * enemy_mult))
 
 	var final_damage: int = int(floor(dmg_after_mods))
 	final_damage = max(final_damage, min_damage)

@@ -445,7 +445,7 @@ func _create_enemy_combatant(enemy_id: String, slot: int) -> Dictionary:
 	}
 
 	# Calculate HP/MP using same formula as allies
-	var hp_max = 150 + (enemy_stats.VTL * level * 6)
+	var hp_max = 30 + (enemy_stats.VTL * level * 6)
 	var mp_max = 20 + int(round(float(enemy_stats.FCS) * float(level) * 1.5))
 
 	# Parse equipment
