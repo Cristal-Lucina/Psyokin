@@ -26,19 +26,24 @@ const WEAKNESS_INITIATIVE_PENALTY: int = 2  # TPO points lost when hit by weakne
 
 func get_weapon_type_from_equipment(combatant: Dictionary) -> String:
 	"""Extract weapon type from combatant's equipment"""
-	if not combatant.has("equipment"):
+	if combatant == null or combatant.is_empty() or not combatant.has("equipment"):
 		return "none"
 
-	var equipment: Dictionary = combatant.equipment
-	if not equipment.has("weapon") or equipment.weapon == null or equipment.weapon == "":
+	var equipment = combatant.get("equipment")
+	if equipment == null or typeof(equipment) != TYPE_DICTIONARY:
+		return "none"
+
+	var equipment_dict: Dictionary = equipment as Dictionary
+	var weapon = equipment_dict.get("weapon", "")
+	if weapon == null or weapon == "":
 		return "unarmed"  # No weapon equipped
 
-	var weapon_id: String = String(equipment.weapon)
+	var weapon_id: String = String(weapon)
 
 	# Get weapon data from items CSV via autoload
 	if has_node("/root/aCSVLoader"):
 		var csv_loader = get_node("/root/aCSVLoader")
-		var items_data = csv_loader.get_cached_data("res://data/items/items.csv", "item_id")
+		var items_data = csv_loader.load_csv("res://data/items/items.csv", "item_id")
 
 		if items_data and items_data.has(weapon_id):
 			var weapon_data: Dictionary = items_data[weapon_id]

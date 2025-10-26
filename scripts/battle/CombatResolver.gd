@@ -5,9 +5,9 @@ class_name CombatResolver
 ## Implements combat formulas from Chapter 4 design doc
 
 ## References to autoloads
-@onready var equipment_system = get_node("/root/aEquipmentSystem")
-@onready var mind_type_system = get_node("/root/aMindTypeSystem")
-@onready var weapon_type_system = get_node("/root/aWeaponTypeSystem")
+@onready var equipment_system = get_node_or_null("/root/aEquipmentSystem")
+@onready var mind_type_system = get_node_or_null("/root/aMindTypeSystem")
+@onready var weapon_type_system = get_node_or_null("/root/aWeaponTypeSystem")
 
 ## Damage floor percentages (§4.4a)
 const DMG_FLOOR_ENEMY_TO_PLAYER: float = 0.15  # 15% minimum
@@ -79,7 +79,7 @@ func check_weapon_weakness(attacker: Dictionary, defender: Dictionary) -> bool:
 	Returns:
 		true if weapon triangle advantage (Pierce > Slash > Blunt > Pierce)
 	"""
-	if not weapon_type_system:
+	if not weapon_type_system or attacker == null or defender == null:
 		return false
 
 	return weapon_type_system.is_weapon_weakness(
@@ -89,7 +89,7 @@ func check_weapon_weakness(attacker: Dictionary, defender: Dictionary) -> bool:
 
 func get_weapon_type_description(attacker: Dictionary, defender: Dictionary) -> String:
 	"""Get description of weapon type matchup"""
-	if not weapon_type_system:
+	if not weapon_type_system or attacker == null or defender == null:
 		return ""
 
 	var atk_type = weapon_type_system.get_weapon_type_from_equipment(attacker)
