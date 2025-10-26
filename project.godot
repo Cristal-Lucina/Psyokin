@@ -47,6 +47,13 @@ aPhoneHotkeys="*res://scripts/systems/PhoneHotkeys.gd"
 aEquipmentSystem="*res://scripts/systems/EquipmentSystem.gd"
 aStarterLoadout="*res://scripts/systems/StarterLoadout.gd"
 
+[editor]
+
+2d/grid_division_level_max=0
+2d/grid_division_level_min=0
+2d/grid_steps_x=32
+2d/grid_steps_y=32
+
 [input]
 
 ui_menu={
@@ -67,4 +74,7 @@ p={
 
 [rendering]
 
+textures/canvas_textures/default_texture_filter=0
 textures/vram_compression/import_etc2_astc=true
+2d/snap/snap_2d_transforms_to_pixel=true
+2d/snap/snap_2d_vertices_to_pixel=true
