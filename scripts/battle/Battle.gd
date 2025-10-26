@@ -226,6 +226,15 @@ func _show_action_menu() -> void:
 	"""Show the action menu for player's turn"""
 	action_menu.visible = true
 
+	# Disable Run button if already attempted this round
+	var run_button = action_menu.get_node_or_null("RunButton")
+	if run_button and run_button is Button:
+		run_button.disabled = battle_mgr.run_attempted_this_round
+		if battle_mgr.run_attempted_this_round:
+			run_button.text = "Run (Used)"
+		else:
+			run_button.text = "Run"
+
 	# TODO: Enable/disable actions based on state
 	# e.g., disable skills if no MP, disable burst if gauge too low
 
@@ -433,6 +442,14 @@ func _on_burst_pressed() -> void:
 
 func _on_run_pressed() -> void:
 	"""Handle Run action"""
+	# Check if run was already attempted this round
+	if battle_mgr.run_attempted_this_round:
+		log_message("Already tried to run this round!")
+		return
+
+	# Mark that run was attempted
+	battle_mgr.run_attempted_this_round = true
+
 	# TODO: Implement escape formula from design doc
 	var run_chance = 50  # Simplified for now
 

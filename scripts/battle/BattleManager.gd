@@ -28,6 +28,7 @@ enum BattleState {
 var current_state: BattleState = BattleState.NONE
 var current_round: int = 0
 var current_turn_index: int = 0
+var run_attempted_this_round: bool = false  # Track if party tried to run this round
 
 ## Combatants (both allies and enemies)
 var combatants: Array[Dictionary] = []  # List of all combatants in battle
@@ -271,6 +272,9 @@ func _end_round() -> void:
 
 func _process_round_start_effects() -> void:
 	"""Process DoT, HoT, buff durations at start of round"""
+	# Reset run attempt flag at start of each round
+	run_attempted_this_round = false
+
 	for combatant in combatants:
 		if combatant.is_ko or combatant.is_fled:
 			continue
