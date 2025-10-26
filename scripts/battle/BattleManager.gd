@@ -136,8 +136,6 @@ func start_round() -> void:
 	current_state = BattleState.ROUND_START
 	print("[BattleManager] === ROUND %d START ===" % current_round)
 
-	round_started.emit(current_round)
-
 	# Roll initiative for all combatants
 	_roll_initiative()
 
@@ -152,6 +150,9 @@ func start_round() -> void:
 
 	# Process start-of-round effects (DoT, HoT, buff/debuff duration)
 	_process_round_start_effects()
+
+	# Emit signal AFTER turn order is calculated so UI can display it
+	round_started.emit(current_round)
 
 	# Start first turn
 	current_turn_index = 0
