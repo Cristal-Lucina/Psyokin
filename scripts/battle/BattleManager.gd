@@ -385,10 +385,11 @@ func _create_ally_combatant(member_id: String, slot: int) -> Dictionary:
 	}
 	if has_node("/root/aEquipmentSystem"):
 		var equip_sys = get_node("/root/aEquipmentSystem")
-		if equip_sys.has_method("get_member_equipment"):
-			var member_equip = equip_sys.get_member_equipment(member_id)
-			if member_equip:
+		if equip_sys.has_method("get_member_equip"):
+			var member_equip = equip_sys.get_member_equip(member_id)
+			if member_equip and not member_equip.is_empty():
 				equipment_dict = member_equip
+				print("[BattleManager] Loaded equipment for %s: %s" % [member_id, equipment_dict])
 
 	return {
 		"id": member_id,
