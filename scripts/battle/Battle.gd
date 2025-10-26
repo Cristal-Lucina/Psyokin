@@ -26,6 +26,8 @@ var target_candidates: Array = []
 var skill_definitions: Dictionary = {}  # skill_id -> skill data
 var awaiting_skill_selection: bool = false
 var skill_to_use: Dictionary = {}  # Selected skill data
+var skill_menu_panel: PanelContainer = null  # Skill selection menu
+var current_skill_menu: Array = []  # Current skills in menu
 
 func _ready() -> void:
 	print("[Battle] Battle scene loaded")
@@ -625,9 +627,42 @@ func log_message(message: String) -> void:
 
 func _show_skill_menu(skill_menu: Array) -> void:
 	"""Show skill selection menu with sigils"""
-	log_message("--- Select a Skill ---")
-	log_message("Equipped Sigils and Active Skills:")
+	# Hide action menu
+	action_menu.visible = false
 
+	# Store current menu
+	current_skill_menu = skill_menu
+
+	# Create skill menu panel
+	skill_menu_panel = PanelContainer.new()
+	skill_menu_panel.custom_minimum_size = Vector2(400, 0)
+
+	# Style the panel
+	var style = StyleBoxFlat.new()
+	style.bg_color = Color(0.1, 0.1, 0.15, 0.95)
+	style.border_width_left = 2
+	style.border_width_right = 2
+	style.border_width_top = 2
+	style.border_width_bottom = 2
+	style.border_color = Color(0.5, 0.5, 0.6, 1.0)
+	skill_menu_panel.add_theme_stylebox_override("panel", style)
+
+	# Create VBox for menu items
+	var vbox = VBoxContainer.new()
+	skill_menu_panel.add_child(vbox)
+
+	# Title
+	var title = Label.new()
+	title.text = "Select a Skill"
+	title.add_theme_font_size_override("font_size", 18)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(title)
+
+	# Add separator
+	var sep1 = HSeparator.new()
+	vbox.add_child(sep1)
+
+	# Add skill buttons
 	for i in range(skill_menu.size()):
 		var menu_entry = skill_menu[i]
 		var sigil_name = menu_entry.sigil_name
@@ -637,20 +672,53 @@ func _show_skill_menu(skill_menu: Array) -> void:
 		var mp_cost = int(skill_data.get("cost_mp", 0))
 		var can_afford = menu_entry.can_afford
 
-		var menu_text = "%d. [%s] %s (%s, MP: %d)" % [i + 1, sigil_name, skill_name, skill_element, mp_cost]
-		if not can_afford:
-			menu_text += " [Not enough MP]"
-		log_message(menu_text)
+		var button = Button.new()
+		button.text = "[%s] %s\n(%s, MP: %d)" % [sigil_name, skill_name, skill_element, mp_cost]
+		button.disabled = not can_afford
+		button.custom_minimum_size = Vector2(380, 50)
 
-	# For now, auto-select first affordable skill
-	# TODO: Implement proper click selection UI
-	for menu_entry in skill_menu:
-		if menu_entry.can_afford:
-			_on_skill_selected(menu_entry)
-			return
+		if can_afford:
+			button.pressed.connect(_on_skill_button_pressed.bind(i))
+		else:
+			button.text += "\n[Not enough MP]"
 
-	log_message("Not enough MP for any skills!")
-	return
+		vbox.add_child(button)
+
+	# Add cancel button
+	var sep2 = HSeparator.new()
+	vbox.add_child(sep2)
+
+	var cancel_btn = Button.new()
+	cancel_btn.text = "Cancel"
+	cancel_btn.custom_minimum_size = Vector2(380, 40)
+	cancel_btn.pressed.connect(_close_skill_menu)
+	vbox.add_child(cancel_btn)
+
+	# Add to scene
+	add_child(skill_menu_panel)
+
+	# Center it
+	skill_menu_panel.position = Vector2(
+		(get_viewport_rect().size.x - skill_menu_panel.custom_minimum_size.x) / 2,
+		100
+	)
+
+func _on_skill_button_pressed(index: int) -> void:
+	"""Handle skill button press"""
+	if index >= 0 and index < current_skill_menu.size():
+		var menu_entry = current_skill_menu[index]
+		_close_skill_menu()
+		_on_skill_selected(menu_entry)
+
+func _close_skill_menu() -> void:
+	"""Close the skill menu"""
+	if skill_menu_panel:
+		skill_menu_panel.queue_free()
+		skill_menu_panel = null
+	current_skill_menu = []
+
+	# Show action menu again
+	action_menu.visible = true
 
 func _on_skill_selected(skill_entry: Dictionary) -> void:
 	"""Handle skill selection"""
