@@ -472,11 +472,11 @@ func _on_run_pressed() -> void:
 func _calculate_run_chance() -> float:
 	"""Calculate run chance based on enemy HP percentage and level difference"""
 	const BASE_RUN_CHANCE: float = 50.0
-	const MAX_HP_BONUS: float = 20.0
+	const MAX_HP_BONUS: float = 40.0
 	const MAX_LEVEL_BONUS: float = 20.0
 	const LEVEL_BONUS_PER_LEVEL: float = 2.0
 
-	# Calculate enemy HP percentage bonus (0-20%)
+	# Calculate enemy HP percentage bonus (0-40%)
 	var enemies = battle_mgr.get_enemy_combatants()
 	var total_enemy_hp_current: float = 0.0
 	var total_enemy_hp_max: float = 0.0

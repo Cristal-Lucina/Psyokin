@@ -574,7 +574,7 @@ func record_weapon_weakness_hit(target: Dictionary) -> bool:
 	print("[BattleManager] %s weapon weakness hits: %d/2" % [target.display_name, target.weapon_weakness_hits])
 
 	# Apply initiative penalty (push back in turn order)
-	const INITIATIVE_PENALTY: int = 3  # Lose 3 initiative per weakness hit
+	const INITIATIVE_PENALTY: int = 5  # Lose 5 initiative per weakness hit
 	target.initiative -= INITIATIVE_PENALTY
 	print("[BattleManager] %s initiative reduced by %d (now %d)" % [target.display_name, INITIATIVE_PENALTY, target.initiative])
 
