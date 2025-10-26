@@ -245,21 +245,11 @@ func _execute_attack(target: Dictionary) -> void:
 			# Calculate mind type effectiveness
 			var type_bonus = combat_resolver.get_mind_type_bonus(current_combatant, target)
 
-			# Check weapon type weakness
+			# Check weapon type weakness (check now, record later after damage)
 			var weapon_weakness_hit = combat_resolver.check_weapon_weakness(current_combatant, target)
 
 			# Critical hits also count as weakness hits for stumbling
 			var crit_weakness_hit = is_crit
-
-			if weapon_weakness_hit or crit_weakness_hit:
-				var became_fallen = battle_mgr.record_weapon_weakness_hit(target)
-				if weapon_weakness_hit:
-					var weapon_desc = combat_resolver.get_weapon_type_description(current_combatant, target)
-					log_message("  → WEAPON WEAKNESS! %s" % weapon_desc)
-				elif crit_weakness_hit:
-					log_message("  → CRITICAL STUMBLE!")
-				if became_fallen:
-					log_message("  → %s is FALLEN! (will skip next turn)" % target.display_name)
 
 			# Calculate damage
 			var damage_result = combat_resolver.calculate_physical_damage(
@@ -280,6 +270,17 @@ func _execute_attack(target: Dictionary) -> void:
 			if target.hp < 0:
 				target.hp = 0
 				target.is_ko = true
+
+			# Record weakness hits AFTER damage (only if target still alive)
+			if not target.is_ko and (weapon_weakness_hit or crit_weakness_hit):
+				var became_fallen = battle_mgr.record_weapon_weakness_hit(target)
+				if weapon_weakness_hit:
+					var weapon_desc = combat_resolver.get_weapon_type_description(current_combatant, target)
+					log_message("  → WEAPON WEAKNESS! %s" % weapon_desc)
+				elif crit_weakness_hit:
+					log_message("  → CRITICAL STUMBLE!")
+				if became_fallen:
+					log_message("  → %s is FALLEN! (will skip next turn)" % target.display_name)
 
 			# Log the hit with details
 			var hit_msg = "  → Hit %s for %d damage! (%d%% chance)" % [target.display_name, damage, int(hit_check.hit_chance)]
@@ -448,21 +449,11 @@ func _execute_enemy_ai() -> void:
 			# Calculate mind type effectiveness
 			var type_bonus = combat_resolver.get_mind_type_bonus(current_combatant, target)
 
-			# Check weapon type weakness
+			# Check weapon type weakness (check now, record later after damage)
 			var weapon_weakness_hit = combat_resolver.check_weapon_weakness(current_combatant, target)
 
 			# Critical hits also count as weakness hits for stumbling
 			var crit_weakness_hit = is_crit
-
-			if weapon_weakness_hit or crit_weakness_hit:
-				var became_fallen = battle_mgr.record_weapon_weakness_hit(target)
-				if weapon_weakness_hit:
-					var weapon_desc = combat_resolver.get_weapon_type_description(current_combatant, target)
-					log_message("  → WEAPON WEAKNESS! %s" % weapon_desc)
-				elif crit_weakness_hit:
-					log_message("  → CRITICAL STUMBLE!")
-				if became_fallen:
-					log_message("  → %s is FALLEN! (will skip next turn)" % target.display_name)
 
 			# Calculate damage
 			var damage_result = combat_resolver.calculate_physical_damage(
@@ -483,6 +474,17 @@ func _execute_enemy_ai() -> void:
 			if target.hp < 0:
 				target.hp = 0
 				target.is_ko = true
+
+			# Record weakness hits AFTER damage (only if target still alive)
+			if not target.is_ko and (weapon_weakness_hit or crit_weakness_hit):
+				var became_fallen = battle_mgr.record_weapon_weakness_hit(target)
+				if weapon_weakness_hit:
+					var weapon_desc = combat_resolver.get_weapon_type_description(current_combatant, target)
+					log_message("  → WEAPON WEAKNESS! %s" % weapon_desc)
+				elif crit_weakness_hit:
+					log_message("  → CRITICAL STUMBLE!")
+				if became_fallen:
+					log_message("  → %s is FALLEN! (will skip next turn)" % target.display_name)
 
 			# Log the hit with details
 			var hit_msg = "  → Hit %s for %d damage! (%d%% chance)" % [target.display_name, damage, int(hit_check.hit_chance)]
