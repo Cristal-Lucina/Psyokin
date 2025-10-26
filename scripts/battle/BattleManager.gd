@@ -202,17 +202,35 @@ func _roll_initiative() -> void:
 		])
 
 func _sort_by_initiative(a: Dictionary, b: Dictionary) -> bool:
-	"""Sort comparator for initiative (higher first, KO'd to bottom)"""
-	# KO'd combatants always go to the bottom
+	"""Sort comparator for initiative (higher first, Fallen above KO'd, KO'd to bottom)"""
 	var a_ko = a.get("is_ko", false)
 	var b_ko = b.get("is_ko", false)
+	var a_fallen = a.get("is_fallen", false)
+	var b_fallen = b.get("is_fallen", false)
 
+	# Priority order (highest to lowest):
+	# 1. Normal combatants (not KO'd, not Fallen)
+	# 2. Fallen combatants (will skip next turn)
+	# 3. KO'd combatants (out of battle)
+
+	# If one is KO'd and the other is not, non-KO'd goes first
 	if a_ko and not b_ko:
 		return false  # a is KO'd, b is not - b goes first
 	if not a_ko and b_ko:
 		return true  # a is not KO'd, b is - a goes first
 
-	# Both KO'd or both alive - sort normally by initiative
+	# Both KO'd - sort by initiative (both should be -1 but just in case)
+	if a_ko and b_ko:
+		return a.initiative > b.initiative
+
+	# Neither KO'd - check fallen status
+	# If one is fallen and the other is not, non-fallen goes first
+	if a_fallen and not b_fallen:
+		return false  # a is Fallen, b is not - b goes first
+	if not a_fallen and b_fallen:
+		return true  # a is not Fallen, b is - a goes first
+
+	# Both alive or both fallen - sort normally by initiative
 	if a.initiative != b.initiative:
 		return a.initiative > b.initiative
 
@@ -614,6 +632,11 @@ func record_weapon_weakness_hit(target: Dictionary) -> bool:
 	Returns:
 		true if target becomes Fallen (2+ hits this round)
 	"""
+	# If already fallen, they can't become fallen again this round
+	if target.get("is_fallen", false):
+		print("[BattleManager] %s is already Fallen - no additional effect" % target.display_name)
+		return false
+
 	if not target.has("weapon_weakness_hits"):
 		target.weapon_weakness_hits = 0
 
