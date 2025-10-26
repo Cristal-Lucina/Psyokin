@@ -801,6 +801,12 @@ func _execute_skill_single(target: Dictionary) -> void:
 			element
 		)
 
+		# Show type matchup explanation
+		if type_bonus > 0.0:
+			log_message("  → TYPE ADVANTAGE! %s vs %s" % [element.capitalize(), target.mind_type.capitalize()])
+		elif type_bonus < 0.0:
+			log_message("  → TYPE DISADVANTAGE! %s vs %s" % [element.capitalize(), target.mind_type.capitalize()])
+
 	# Only crits count as stumbles for skills (no weapon weakness)
 	var crit_weakness_hit = is_crit
 
