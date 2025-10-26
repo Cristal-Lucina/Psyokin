@@ -47,7 +47,12 @@ func _path(slot: int) -> String:
 
 ## Ensures the save directory exists, creating it recursively if needed
 func _ensure_dir() -> void:
-	DirAccess.make_dir_recursive_absolute(SAVE_DIR)
+	# DirAccess.make_dir_recursive_absolute() doesn't work with user:// paths
+	# We need to use the static method that handles virtual paths
+	if not DirAccess.dir_exists_absolute(SAVE_DIR):
+		var err: Error = DirAccess.make_dir_recursive_absolute(SAVE_DIR)
+		if err != OK:
+			push_error("[SaveLoad] Failed to create save directory: %s (error %d)" % [SAVE_DIR, err])
 
 ## Generates a human-readable label from save payload using player name and calendar data.
 ## Format: "FirstName LastName : Mon 5/5 : Time Played"
@@ -104,13 +109,8 @@ func _label_from_payload(payload: Dictionary) -> String:
 
 ## Safely retrieves an autoload node by name from the SceneTree root
 func _get_autoload(autoload_name: String) -> Node:
-	# Safe autoload lookup without requiring this script to extend Node
-	var ml := Engine.get_main_loop()
-	if ml is SceneTree:
-		var root: Node = (ml as SceneTree).root
-		# Autoloads are direct children of /root with their autoload name
-		return root.get_node_or_null(autoload_name)
-	return null
+	# Direct autoload lookup using absolute path
+	return get_node_or_null("/root/" + autoload_name)
 
 ## Saves game data to a numbered slot as JSON. Wraps payload with version, timestamp, scene, and label.
 ## Automatically injects sigil data if missing. Returns true if save successful, false on file error.
@@ -127,8 +127,12 @@ func save_game(slot: int, payload: Dictionary) -> bool:
 			if typeof(sb_v) == TYPE_DICTIONARY:
 				payload2["sigils"] = (sb_v as Dictionary)
 
-	var f := FileAccess.open(_path(slot), FileAccess.WRITE)
-	if f == null: return false
+	var save_path := _path(slot)
+	var f := FileAccess.open(save_path, FileAccess.WRITE)
+	if f == null:
+		var err := FileAccess.get_open_error()
+		push_error("[SaveLoad] Failed to open save file '%s' for writing (error %d)" % [save_path, err])
+		return false
 
 	var data := {
 		"version": 1,
@@ -140,19 +144,34 @@ func save_game(slot: int, payload: Dictionary) -> bool:
 	if String(data["label"]) == "":
 		data["label"] = _label_from_payload(payload2)
 
-	f.store_string(JSON.stringify(data, "\t"))
+	var json_string := JSON.stringify(data, "\t")
+	f.store_string(json_string)
 	f.close()
+
+	print("[SaveLoad] Successfully saved game to slot %d: %s" % [slot, save_path])
 	return true
 
 ## Loads game data from a numbered slot. Returns the payload Dictionary from the save file.
 ## Returns empty Dictionary if slot doesn't exist or file is corrupted.
 func load_game(slot: int) -> Dictionary:
-	if not FileAccess.file_exists(_path(slot)): return {}
-	var f := FileAccess.open(_path(slot), FileAccess.READ)
-	if f == null: return {}
-	var parsed: Variant = JSON.parse_string(f.get_as_text())
+	var load_path := _path(slot)
+	if not FileAccess.file_exists(load_path):
+		push_warning("[SaveLoad] Save file does not exist: %s" % load_path)
+		return {}
+
+	var f := FileAccess.open(load_path, FileAccess.READ)
+	if f == null:
+		var err := FileAccess.get_open_error()
+		push_error("[SaveLoad] Failed to open save file '%s' for reading (error %d)" % [load_path, err])
+		return {}
+
+	var json_text := f.get_as_text()
 	f.close()
-	if typeof(parsed) != TYPE_DICTIONARY: return {}
+
+	var parsed: Variant = JSON.parse_string(json_text)
+	if typeof(parsed) != TYPE_DICTIONARY:
+		push_error("[SaveLoad] Save file '%s' contains invalid JSON or is not a Dictionary" % load_path)
+		return {}
 	var root: Dictionary = parsed
 
 	if root.has("payload") and typeof(root["payload"]) == TYPE_DICTIONARY:
