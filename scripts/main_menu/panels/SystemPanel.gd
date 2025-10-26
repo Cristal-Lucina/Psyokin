@@ -27,6 +27,7 @@ func _open_load() -> void:
 	_open_overlay(LOAD_MENU_SCENE)
 
 func _open_save() -> void:
+	print("[SystemPanel] Save button pressed")
 	_open_overlay(SAVE_MENU_SCENE)
 
 func _open_settings() -> void:
@@ -41,21 +42,41 @@ func _to_title() -> void:
 # --- overlay helper ------------------------------------------------------------
 
 func _open_overlay(scene_path: String) -> void:
+	print("[SystemPanel] Opening overlay: %s" % scene_path)
+
 	if not ResourceLoader.exists(scene_path):
-		push_warning("[SystemPanel] Missing scene: %s" % scene_path)
-		return
-	# Prefer your router if present.
-	if has_node("/root/aSceneRouter") and aSceneRouter.has_method("open_popup"):
-		aSceneRouter.open_popup(scene_path, get_tree().current_scene)
+		push_error("[SystemPanel] Missing scene: %s" % scene_path)
 		return
 
+	# Prefer your router if present.
+	if has_node("/root/aSceneRouter") and aSceneRouter.has_method("open_popup"):
+		print("[SystemPanel] Using SceneRouter to open popup")
+		var result := aSceneRouter.open_popup(scene_path, get_tree().current_scene)
+		if result:
+			print("[SystemPanel] SceneRouter opened popup successfully")
+		else:
+			push_error("[SystemPanel] SceneRouter failed to open popup")
+		return
+
+	print("[SystemPanel] Loading scene directly")
 	var ps := load(scene_path) as PackedScene
 	if ps == null:
+		push_error("[SystemPanel] Failed to load PackedScene: %s" % scene_path)
 		return
+
+	print("[SystemPanel] Instantiating scene")
 	var inst := ps.instantiate()
+	if inst == null:
+		push_error("[SystemPanel] Failed to instantiate scene")
+		return
 
 	# Add to current scene so it renders above GameMenu.
 	var parent := get_tree().current_scene
+	if parent == null:
+		push_error("[SystemPanel] Current scene is null!")
+		return
+
+	print("[SystemPanel] Adding overlay to scene tree (parent: %s)" % parent.name)
 	parent.add_child(inst)
 
 	if inst is Control:
@@ -63,3 +84,6 @@ func _open_overlay(scene_path: String) -> void:
 		c.top_level = true
 		c.set_anchors_preset(Control.PRESET_FULL_RECT)
 		c.z_index = 2000
+		print("[SystemPanel] Configured overlay as full-screen with z_index 2000")
+
+	print("[SystemPanel] Overlay opened successfully!")

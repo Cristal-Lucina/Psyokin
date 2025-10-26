@@ -134,6 +134,7 @@ func _ensure_fallback_layout() -> void:
 # --- lifecycle ----------------------------------------------------------------
 
 func _ready() -> void:
+	print("[SaveMenu] _ready() called - initializing save menu")
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	set_process_unhandled_input(true)
 
@@ -142,6 +143,13 @@ func _ready() -> void:
 	_title     = _lbl_any(PATH_TITLE)
 	_btn_close = _btn_any(PATH_CLOSE)
 	_hint      = _lbl_any(PATH_HINT)
+
+	print("[SaveMenu] Found nodes - slots: %s, title: %s, close: %s, hint: %s" % [
+		"yes" if _slots else "no",
+		"yes" if _title else "no",
+		"yes" if _btn_close else "no",
+		"yes" if _hint else "no"
+	])
 
 	# If anything is missing, build a fallback (safe & centered)
 	_ensure_fallback_layout()
@@ -154,7 +162,9 @@ func _ready() -> void:
 	if _btn_close and not _btn_close.pressed.is_connected(_on_close):
 		_btn_close.pressed.connect(_on_close)
 
+	print("[SaveMenu] Rebuilding slot UI")
 	_rebuild()
+	print("[SaveMenu] Ready complete - save menu should be visible")
 
 func _unhandled_input(e: InputEvent) -> void:
 	if e.is_action_pressed("ui_cancel"):
