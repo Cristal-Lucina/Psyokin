@@ -98,6 +98,7 @@ const CPS_CANDIDATE_PATHS := [
 # ---- Optional overlay scenes ----
 const GAME_MENU_SCENE  := "res://scenes/main_menu/GameMenu.tscn"
 const PHONE_MENU_SCENE := "res://scenes/ui/phone/PhoneMenu.tscn"
+const SAVE_MENU_SCENE  := "res://scenes/ui/save/SaveMenu.tscn"
 
 # ---- Input actions ----
 const INPUT_MENU_ACTION  := "ui_menu"
@@ -486,7 +487,34 @@ func _on_load_items_pressed() -> void:
 		items_status.text = "Items: %s" % (str(table.size()) if not table.is_empty() else "(failed)")
 
 func _on_open_training() -> void: pass
-func _on_open_save() -> void:     pass
+
+func _on_open_save() -> void:
+	# Open the save menu overlay
+	if not ResourceLoader.exists(SAVE_MENU_SCENE):
+		push_warning("[Main] Save menu scene not found: %s" % SAVE_MENU_SCENE)
+		return
+
+	var ps := load(SAVE_MENU_SCENE) as PackedScene
+	if ps == null:
+		push_error("[Main] Failed to load save menu scene")
+		return
+
+	var inst := ps.instantiate()
+	if inst == null:
+		push_error("[Main] Failed to instantiate save menu")
+		return
+
+	# Add to current scene so it renders on top
+	add_child(inst)
+
+	# Ensure it's a full-screen overlay on top
+	if inst is Control:
+		var c := inst as Control
+		c.set_anchors_preset(Control.PRESET_FULL_RECT)
+		c.z_index = 2000
+		c.mouse_filter = Control.MOUSE_FILTER_STOP
+
+	print("[Main] Opened save menu")
 
 func _style_option_button(ob: OptionButton) -> void:
 	if ob == null: return
