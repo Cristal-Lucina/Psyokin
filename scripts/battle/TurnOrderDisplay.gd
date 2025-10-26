@@ -22,6 +22,7 @@ func _ready() -> void:
 		battle_mgr.round_started.connect(_on_round_started)
 		battle_mgr.turn_started.connect(_on_turn_started)
 		battle_mgr.turn_ended.connect(_on_turn_ended)
+		battle_mgr.turn_order_changed.connect(_on_turn_order_changed)
 
 func _on_battle_started() -> void:
 	"""Called when battle starts - initial display"""
@@ -40,6 +41,11 @@ func _on_turn_started(_combatant_id: String) -> void:
 func _on_turn_ended(_combatant_id: String) -> void:
 	"""Called when a turn ends"""
 	pass
+
+func _on_turn_order_changed() -> void:
+	"""Called when turn order is re-sorted mid-round (e.g., from weapon weakness)"""
+	print("[TurnOrderDisplay] Turn order changed, rebuilding display")
+	_rebuild_display()
 
 ## ═══════════════════════════════════════════════════════════════
 ## DISPLAY BUILDING
@@ -112,6 +118,17 @@ func _create_turn_slot(combatant: Dictionary, index: int) -> PanelContainer:
 	name_label.add_theme_font_size_override("font_size", 14)
 	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+
+	# Color name based on weapon weakness hits
+	var weakness_hits = combatant.get("weapon_weakness_hits", 0)
+	if weakness_hits >= 2:
+		# 2+ hits = Fallen = Red
+		name_label.add_theme_color_override("font_color", Color(1.0, 0.2, 0.2, 1.0))
+	elif weakness_hits == 1:
+		# 1 hit = Yellow warning
+		name_label.add_theme_color_override("font_color", Color(1.0, 0.9, 0.0, 1.0))
+	# else: default white color
+
 	hbox.add_child(name_label)
 
 	# Initiative value

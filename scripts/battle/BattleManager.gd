@@ -11,6 +11,7 @@ signal round_started(round_number: int)
 signal round_ended(round_number: int)
 signal battle_ended(victory: bool)
 signal action_executed(action_data: Dictionary)
+signal turn_order_changed  # Emitted when turn order is re-sorted mid-round
 
 ## Battle state
 enum BattleState {
@@ -509,6 +510,8 @@ func record_weapon_weakness_hit(target: Dictionary) -> bool:
 	"""
 	Record a weapon weakness hit on a target
 
+	Applies initiative penalty and re-sorts turn order
+
 	Returns:
 		true if target becomes Fallen (2+ hits this round)
 	"""
@@ -517,6 +520,18 @@ func record_weapon_weakness_hit(target: Dictionary) -> bool:
 
 	target.weapon_weakness_hits += 1
 	print("[BattleManager] %s weapon weakness hits: %d/2" % [target.display_name, target.weapon_weakness_hits])
+
+	# Apply initiative penalty (push back in turn order)
+	const INITIATIVE_PENALTY: int = 3  # Lose 3 initiative per weakness hit
+	target.initiative -= INITIATIVE_PENALTY
+	print("[BattleManager] %s initiative reduced by %d (now %d)" % [target.display_name, INITIATIVE_PENALTY, target.initiative])
+
+	# Re-sort turn order to reflect initiative changes
+	turn_order.sort_custom(_sort_by_initiative)
+	print("[BattleManager] Turn order re-sorted after weakness hit")
+
+	# Emit signal so UI can update
+	turn_order_changed.emit()
 
 	# Check if target should become Fallen (lose next turn)
 	if target.weapon_weakness_hits >= 2:

@@ -178,6 +178,12 @@ func _create_combatant_slot(combatant: Dictionary, is_ally: bool) -> PanelContai
 
 	# Store combatant ID in metadata
 	panel.set_meta("combatant_id", combatant.id)
+	panel.set_meta("is_ally", is_ally)
+
+	# Make enemy panels clickable for targeting
+	if not is_ally:
+		panel.mouse_filter = Control.MOUSE_FILTER_PASS
+		panel.gui_input.connect(_on_enemy_panel_input.bind(combatant))
 
 	return panel
 
@@ -198,16 +204,27 @@ func _show_action_menu() -> void:
 	# e.g., disable skills if no MP, disable burst if gauge too low
 
 func _on_attack_pressed() -> void:
-	"""Handle Attack action"""
-	log_message("%s attacks!" % current_combatant.display_name)
+	"""Handle Attack action - prompt user to select target"""
+	log_message("Select a target...")
 
-	# Select target (first alive enemy for now)
+	# Get alive enemies
 	var enemies = battle_mgr.get_enemy_combatants()
-	var target = null
-	for enemy in enemies:
-		if not enemy.is_ko:
-			target = enemy
-			break
+	target_candidates = enemies.filter(func(e): return not e.is_ko)
+
+	if target_candidates.is_empty():
+		log_message("No valid targets!")
+		return
+
+	# Enable target selection mode
+	awaiting_target_selection = true
+	_highlight_target_candidates()
+
+func _execute_attack(target: Dictionary) -> void:
+	"""Execute attack on selected target"""
+	awaiting_target_selection = false
+	_clear_target_highlights()
+
+	log_message("%s attacks %s!" % [current_combatant.display_name, target.display_name])
 
 	if target:
 		# First, check if the attack hits
@@ -343,6 +360,43 @@ func _on_run_pressed() -> void:
 	else:
 		log_message("Couldn't escape!")
 		battle_mgr.end_turn()
+
+## ═══════════════════════════════════════════════════════════════
+## TARGET SELECTION
+## ═══════════════════════════════════════════════════════════════
+
+func _on_enemy_panel_input(event: InputEvent, target: Dictionary) -> void:
+	"""Handle clicks on enemy panels"""
+	if event is InputEventMouseButton:
+		var mb_event = event as InputEventMouseButton
+		if mb_event.pressed and mb_event.button_index == MOUSE_BUTTON_LEFT:
+			if awaiting_target_selection:
+				# Check if this target is valid
+				if target in target_candidates:
+					_execute_attack(target)
+
+func _highlight_target_candidates() -> void:
+	"""Highlight valid targets with a visual indicator"""
+	for child in enemy_slots.get_children():
+		var combatant_id = child.get_meta("combatant_id", "")
+		var is_candidate = target_candidates.any(func(c): return c.id == combatant_id)
+
+		if is_candidate:
+			# Add yellow border to indicate targetable
+			var style = StyleBoxFlat.new()
+			style.bg_color = Color(0.3, 0.2, 0.2, 0.9)
+			style.border_width_left = 4
+			style.border_width_right = 4
+			style.border_width_top = 4
+			style.border_width_bottom = 4
+			style.border_color = Color(1.0, 1.0, 0.0, 1.0)  # Yellow highlight
+			child.add_theme_stylebox_override("panel", style)
+
+func _clear_target_highlights() -> void:
+	"""Remove targeting highlights from all panels"""
+	for child in enemy_slots.get_children():
+		# Reset to default panel style
+		child.remove_theme_stylebox_override("panel")
 
 ## ═══════════════════════════════════════════════════════════════
 ## ENEMY AI
