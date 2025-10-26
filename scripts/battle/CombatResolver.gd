@@ -21,6 +21,130 @@ const CRIT_MULT: float = 2.0  # x2 damage on crit
 ## Stumble bonus
 const STUMBLE_MULT: float = 1.25  # +25% damage on weakness
 
+## Hit/Eva clamps
+const HIT_EVA_MIN: float = 5.0   # Minimum 5% hit chance
+const HIT_EVA_MAX: float = 95.0  # Maximum 95% hit chance
+
+## ═══════════════════════════════════════════════════════════════
+## HIT/EVASION CHECKS (§4.3)
+## ═══════════════════════════════════════════════════════════════
+
+func check_physical_hit(attacker: Dictionary, defender: Dictionary, options: Dictionary = {}) -> Dictionary:
+	"""
+	Check if a physical attack hits
+
+	Formula: Hit% = WeaponACC + 0.25·TPO + mods
+	         Eva% = FootwearEVA + 0.25·VTL + mods
+	         Final = clamp(Hit − Eva, 5, 95)
+
+	Returns:
+	- hit: bool (did it hit?)
+	- hit_chance: float (final hit %)
+	- roll: int (d100 roll)
+	"""
+
+	# Get attacker weapon stats
+	var weapon = _get_weapon_stats(attacker.id)
+	var base_acc = weapon.get("acc", 75)  # Default 75% base accuracy
+
+	# Get attacker TPO
+	var tpo = attacker.stats.get("TPO", 1)
+
+	# Calculate hit%
+	var hit_percent = base_acc + (0.25 * tpo)
+
+	# Get defender footwear stats
+	var footwear = _get_footwear_stats(defender.id)
+	var base_eva = footwear.get("eva", 0)  # Default 0% base evasion
+
+	# Get defender VTL (for physical evasion)
+	var vtl = defender.stats.get("VTL", 1)
+
+	# Calculate eva%
+	var eva_percent = base_eva + (0.25 * vtl)
+
+	# Final hit chance = Hit - Eva, clamped [5, 95]
+	var final_hit = clamp(hit_percent - eva_percent, HIT_EVA_MIN, HIT_EVA_MAX)
+
+	# Roll d100
+	var roll = randi() % 100 + 1  # 1-100
+
+	var did_hit = roll <= final_hit
+
+	return {
+		"hit": did_hit,
+		"hit_chance": final_hit,
+		"roll": roll,
+		"breakdown": {
+			"hit_percent": hit_percent,
+			"eva_percent": eva_percent,
+			"weapon_acc": base_acc,
+			"tpo": tpo,
+			"footwear_eva": base_eva,
+			"vtl": vtl
+		}
+	}
+
+func check_sigil_hit(attacker: Dictionary, defender: Dictionary, options: Dictionary = {}) -> Dictionary:
+	"""
+	Check if a sigil/skill hits
+
+	Formula: Hit% = SkillACC + WeaponSkillBoost + 0.25·TPO + mods
+	         Eva% = FootwearEVA + 0.25·FCS + mods
+	         Final = clamp(Hit − Eva, 5, 95)
+
+	Returns:
+	- hit: bool
+	- hit_chance: float
+	- roll: int
+	"""
+
+	# Get skill base accuracy
+	var skill_acc = options.get("skill_acc", 85)  # Default 85% for skills
+
+	# Get weapon's skill boost
+	var weapon = _get_weapon_stats(attacker.id)
+	var weapon_skill_boost = weapon.get("skill_acc_bonus", 0)
+
+	# Get attacker TPO
+	var tpo = attacker.stats.get("TPO", 1)
+
+	# Calculate hit%
+	var hit_percent = skill_acc + weapon_skill_boost + (0.25 * tpo)
+
+	# Get defender footwear stats
+	var footwear = _get_footwear_stats(defender.id)
+	var base_eva = footwear.get("eva", 0)
+
+	# Get defender FCS (for sigil evasion)
+	var fcs = defender.stats.get("FCS", 1)
+
+	# Calculate eva%
+	var eva_percent = base_eva + (0.25 * fcs)
+
+	# Final hit chance
+	var final_hit = clamp(hit_percent - eva_percent, HIT_EVA_MIN, HIT_EVA_MAX)
+
+	# Roll d100
+	var roll = randi() % 100 + 1
+
+	var did_hit = roll <= final_hit
+
+	return {
+		"hit": did_hit,
+		"hit_chance": final_hit,
+		"roll": roll,
+		"breakdown": {
+			"hit_percent": hit_percent,
+			"eva_percent": eva_percent,
+			"skill_acc": skill_acc,
+			"weapon_boost": weapon_skill_boost,
+			"tpo": tpo,
+			"footwear_eva": base_eva,
+			"fcs": fcs
+		}
+	}
+
 ## ═══════════════════════════════════════════════════════════════
 ## PHYSICAL DAMAGE (Attack)
 ## ═══════════════════════════════════════════════════════════════
@@ -219,14 +343,18 @@ func _get_weapon_stats(member_id: String) -> Dictionary:
 			return {
 				"watk": weapon.get("watk", 10),
 				"sig": weapon.get("sig", 0),
-				"brw_scale": weapon.get("brw_scale", 0.5)
+				"brw_scale": weapon.get("brw_scale", 0.5),
+				"acc": weapon.get("acc", 75),
+				"skill_acc_bonus": weapon.get("skill_acc_bonus", 0)
 			}
 
 	# Default weapon stats
 	return {
 		"watk": 10,
 		"sig": 0,
-		"brw_scale": 0.5
+		"brw_scale": 0.5,
+		"acc": 75,
+		"skill_acc_bonus": 0
 	}
 
 func _get_armor_stats(member_id: String) -> Dictionary:
@@ -244,6 +372,23 @@ func _get_armor_stats(member_id: String) -> Dictionary:
 	return {
 		"pdef": 5,
 		"mdef": 5
+	}
+
+func _get_footwear_stats(member_id: String) -> Dictionary:
+	"""Get footwear stats for a combatant"""
+	# For allies, check equipment system
+	if equipment_system and equipment_system.has_method("get_equipped_item"):
+		var footwear = equipment_system.call("get_equipped_item", member_id, "foot")
+		if footwear:
+			return {
+				"eva": footwear.get("eva", 0),
+				"speed": footwear.get("speed", 0)
+			}
+
+	# Default footwear stats
+	return {
+		"eva": 0,
+		"speed": 0
 	}
 
 ## ═══════════════════════════════════════════════════════════════
