@@ -46,6 +46,8 @@ aWorldSystem="*res://scripts/systems/WorldSystem.gd"
 aPhoneHotkeys="*res://scripts/systems/PhoneHotkeys.gd"
 aEquipmentSystem="*res://scripts/systems/EquipmentSystem.gd"
 aStarterLoadout="*res://scripts/systems/StarterLoadout.gd"
+aTransitionManager="*res://scripts/core/TransitionManager.gd"
+aBattleManager="*res://scripts/battle/BattleManager.gd"
 
 [editor]
 
