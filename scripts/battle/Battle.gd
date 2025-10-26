@@ -282,6 +282,8 @@ func _execute_attack(target: Dictionary) -> void:
 				hit_msg += " (Super Effective!)"
 			elif type_bonus < 0.0:
 				hit_msg += " (Not Very Effective...)"
+			if target.get("is_defending", false):
+				hit_msg += " (Defensive)"
 			log_message(hit_msg)
 
 			# Debug: show hit, crit, and damage breakdown
@@ -334,7 +336,7 @@ func _on_item_pressed() -> void:
 
 func _on_defend_pressed() -> void:
 	"""Handle Defend action"""
-	log_message("%s defends!" % current_combatant.display_name)
+	log_message("%s moved into a defensive stance." % current_combatant.display_name)
 	current_combatant.is_defending = true
 
 	# End turn
@@ -473,6 +475,8 @@ func _execute_enemy_ai() -> void:
 				hit_msg += " (Super Effective!)"
 			elif type_bonus < 0.0:
 				hit_msg += " (Not Very Effective...)"
+			if target.get("is_defending", false):
+				hit_msg += " (Defensive)"
 			log_message(hit_msg)
 
 			# Debug: show hit, crit, and damage breakdown
