@@ -283,7 +283,10 @@ func _execute_attack(target: Dictionary) -> void:
 			elif type_bonus < 0.0:
 				hit_msg += " (Not Very Effective...)"
 			if target.get("is_defending", false):
-				hit_msg += " (Defensive)"
+				# Calculate damage reduction from defensive stance (0.7 multiplier = 30% reduction)
+				var damage_without_defense = int(round(damage / 0.7))
+				var damage_reduced = damage_without_defense - damage
+				hit_msg += " (Defensive: -%d)" % damage_reduced
 			log_message(hit_msg)
 
 			# Debug: show hit, crit, and damage breakdown
@@ -476,7 +479,10 @@ func _execute_enemy_ai() -> void:
 			elif type_bonus < 0.0:
 				hit_msg += " (Not Very Effective...)"
 			if target.get("is_defending", false):
-				hit_msg += " (Defensive)"
+				# Calculate damage reduction from defensive stance (0.7 multiplier = 30% reduction)
+				var damage_without_defense = int(round(damage / 0.7))
+				var damage_reduced = damage_without_defense - damage
+				hit_msg += " (Defensive: -%d)" % damage_reduced
 			log_message(hit_msg)
 
 			# Debug: show hit, crit, and damage breakdown
