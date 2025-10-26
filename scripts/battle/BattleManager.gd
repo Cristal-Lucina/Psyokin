@@ -318,7 +318,7 @@ func _start_turn(combatant: Dictionary) -> void:
 	_remove_turn_order_duplicates()
 
 	# Check if battle has ended before starting this turn
-	if _check_battle_end():
+	if await _check_battle_end():
 		return
 
 	current_state = BattleState.TURN_ACTIVE
@@ -335,7 +335,7 @@ func end_turn() -> void:
 		turn_ended.emit(combatant.id)
 
 	# Check if battle has ended (all enemies or allies defeated)
-	if _check_battle_end():
+	if await _check_battle_end():
 		return
 
 	current_turn_index += 1
@@ -349,7 +349,7 @@ func _end_round() -> void:
 	round_ended.emit(current_round)
 
 	# Check victory/defeat conditions
-	if _check_battle_end():
+	if await _check_battle_end():
 		return
 
 	# Start next round
@@ -389,11 +389,11 @@ func _check_battle_end() -> bool:
 	var enemies_alive = _count_alive_enemies()
 
 	if allies_alive == 0:
-		_end_battle(false)  # Defeat
+		await _end_battle(false)  # Defeat
 		return true
 
 	if enemies_alive == 0:
-		_end_battle(true)  # Victory
+		await _end_battle(true)  # Victory
 		return true
 
 	return false
@@ -414,6 +414,10 @@ func _count_alive_enemies() -> int:
 
 func _end_battle(victory: bool) -> void:
 	"""End the battle"""
+	# Wait for any ongoing animations to complete before ending
+	print("[BattleManager] Waiting for animations to complete before ending battle...")
+	await _wait_for_turn_order_animation()
+
 	if victory:
 		print("[BattleManager] *** VICTORY ***")
 		current_state = BattleState.VICTORY
