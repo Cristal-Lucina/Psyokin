@@ -218,19 +218,22 @@ func _on_attack_pressed() -> void:
 			log_message("  → Missed! (%d%% chance, rolled %d)" % [int(hit_check.hit_chance), hit_check.roll])
 			print("[Battle] Miss! Hit chance: %.1f%%, Roll: %d" % [hit_check.hit_chance, hit_check.roll])
 		else:
-			# Hit! Calculate damage
+			# Hit! Now roll for critical
+			var crit_check = combat_resolver.check_critical_hit(current_combatant)
+			var is_crit = crit_check.crit
+
+			# Calculate damage
 			var damage_result = combat_resolver.calculate_physical_damage(
 				current_combatant,
 				target,
 				{
 					"potency": 100,
-					"is_crit": false,  # TODO: Roll for crit
+					"is_crit": is_crit,
 					"type_bonus": 0.0   # TODO: Check type matchup
 				}
 			)
 
 			var damage = damage_result.damage
-			var is_crit = damage_result.is_crit
 			var is_stumble = damage_result.is_stumble
 
 			# Apply damage
@@ -242,16 +245,21 @@ func _on_attack_pressed() -> void:
 			# Log the hit with details
 			var hit_msg = "  → Hit %s for %d damage! (%d%% chance)" % [target.display_name, damage, int(hit_check.hit_chance)]
 			if is_crit:
-				hit_msg += " (CRITICAL!)"
+				hit_msg += " (CRITICAL! %d%% chance)" % int(crit_check.crit_chance)
 			if is_stumble:
 				hit_msg += " (Weakness!)"
 			log_message(hit_msg)
 
-			# Debug: show hit and damage breakdown
+			# Debug: show hit, crit, and damage breakdown
 			var hit_breakdown = hit_check.breakdown
+			var crit_breakdown = crit_check.breakdown
 			var dmg_breakdown = damage_result.breakdown
 			print("[Battle] Hit! Chance: %.1f%% (ACC %.1f - EVA %.1f), Roll: %d" % [
 				hit_check.hit_chance, hit_breakdown.hit_percent, hit_breakdown.eva_percent, hit_check.roll
+			])
+			print("[Battle] Crit: %s | Chance: %.1f%% (Base %.1f + TPO %.1f + Weapon %d), Roll: %d" % [
+				"YES" if is_crit else "NO", crit_check.crit_chance, crit_breakdown.base,
+				crit_breakdown.tpo_bonus, crit_breakdown.weapon_bonus, crit_check.roll
 			])
 			print("[Battle] Damage: PreMit=%.1f, AtkPower=%.1f, Raw=%.1f, Final=%d (Min=%d)" % [
 				dmg_breakdown.pre_mit, dmg_breakdown.atk_power, dmg_breakdown.raw, damage, dmg_breakdown.min_damage
@@ -259,6 +267,8 @@ func _on_attack_pressed() -> void:
 
 			# Add burst gauge
 			battle_mgr.add_burst(10)  # +10 for basic attack hit
+			if is_crit:
+				battle_mgr.add_burst(4)  # +4 for crit
 			if is_stumble:
 				battle_mgr.add_burst(8)  # +8 for weakness
 
@@ -339,19 +349,22 @@ func _execute_enemy_ai() -> void:
 			log_message("  → Missed! (%d%% chance, rolled %d)" % [int(hit_check.hit_chance), hit_check.roll])
 			print("[Battle] Enemy Miss! Hit chance: %.1f%%, Roll: %d" % [hit_check.hit_chance, hit_check.roll])
 		else:
-			# Hit! Calculate damage
+			# Hit! Now roll for critical
+			var crit_check = combat_resolver.check_critical_hit(current_combatant)
+			var is_crit = crit_check.crit
+
+			# Calculate damage
 			var damage_result = combat_resolver.calculate_physical_damage(
 				current_combatant,
 				target,
 				{
 					"potency": 100,
-					"is_crit": false,  # TODO: Roll for crit
+					"is_crit": is_crit,
 					"type_bonus": 0.0   # TODO: Check type matchup
 				}
 			)
 
 			var damage = damage_result.damage
-			var is_crit = damage_result.is_crit
 			var is_stumble = damage_result.is_stumble
 
 			# Apply damage
@@ -363,16 +376,21 @@ func _execute_enemy_ai() -> void:
 			# Log the hit with details
 			var hit_msg = "  → Hit %s for %d damage! (%d%% chance)" % [target.display_name, damage, int(hit_check.hit_chance)]
 			if is_crit:
-				hit_msg += " (CRITICAL!)"
+				hit_msg += " (CRITICAL! %d%% chance)" % int(crit_check.crit_chance)
 			if is_stumble:
 				hit_msg += " (Weakness!)"
 			log_message(hit_msg)
 
-			# Debug: show hit and damage breakdown
+			# Debug: show hit, crit, and damage breakdown
 			var hit_breakdown = hit_check.breakdown
+			var crit_breakdown = crit_check.breakdown
 			var dmg_breakdown = damage_result.breakdown
 			print("[Battle] Enemy Hit! Chance: %.1f%% (ACC %.1f - EVA %.1f), Roll: %d" % [
 				hit_check.hit_chance, hit_breakdown.hit_percent, hit_breakdown.eva_percent, hit_check.roll
+			])
+			print("[Battle] Enemy Crit: %s | Chance: %.1f%% (Base %.1f + TPO %.1f + Weapon %d), Roll: %d" % [
+				"YES" if is_crit else "NO", crit_check.crit_chance, crit_breakdown.base,
+				crit_breakdown.tpo_bonus, crit_breakdown.weapon_bonus, crit_check.roll
 			])
 			print("[Battle] Enemy Damage: PreMit=%.1f, AtkPower=%.1f, Raw=%.1f, Final=%d (Min=%d)" % [
 				dmg_breakdown.pre_mit, dmg_breakdown.atk_power, dmg_breakdown.raw, damage, dmg_breakdown.min_damage
@@ -380,6 +398,8 @@ func _execute_enemy_ai() -> void:
 
 			# Add burst gauge (player gains burst when taking damage)
 			battle_mgr.add_burst(6)  # +6 for taking damage
+			if is_crit:
+				battle_mgr.add_burst(4)  # +4 for enemy crit (player gains burst)
 			if is_stumble:
 				battle_mgr.add_burst(8)  # +8 for weakness
 

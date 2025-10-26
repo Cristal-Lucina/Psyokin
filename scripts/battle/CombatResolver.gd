@@ -25,6 +25,12 @@ const STUMBLE_MULT: float = 1.25  # +25% damage on weakness
 const HIT_EVA_MIN: float = 5.0   # Minimum 5% hit chance
 const HIT_EVA_MAX: float = 95.0  # Maximum 95% hit chance
 
+## Crit chance constants
+const BASE_CRIT_CHANCE: float = 5.0   # Base 5% crit chance
+const TPO_CRIT_MODIFIER: float = 0.15 # +0.15% per TPO point
+const CRIT_MIN: float = 0.0           # Minimum 0% crit chance
+const CRIT_MAX: float = 95.0          # Maximum 95% crit chance
+
 ## ═══════════════════════════════════════════════════════════════
 ## HIT/EVASION CHECKS (§4.3)
 ## ═══════════════════════════════════════════════════════════════
@@ -142,6 +148,63 @@ func check_sigil_hit(attacker: Dictionary, defender: Dictionary, options: Dictio
 			"tpo": tpo,
 			"footwear_eva": base_eva,
 			"fcs": fcs
+		}
+	}
+
+## ═══════════════════════════════════════════════════════════════
+## CRITICAL HIT CHECKS
+## ═══════════════════════════════════════════════════════════════
+
+func check_critical_hit(attacker: Dictionary, options: Dictionary = {}) -> Dictionary:
+	"""
+	Check if an attack should critically hit
+
+	Formula:
+	  CritChance = Base(5%) + TPO×0.15% + WeaponCritBonus% + SkillCritBonus%
+	  Clamped to [0%, 95%]
+
+	Args:
+	  - attacker: Combatant dictionary with id and stats
+	  - options:
+	    - weapon_crit_bonus: int = 0 (weapon crit bonus %)
+	    - skill_crit_bonus: int = 0 (skill crit bonus %)
+
+	Returns:
+	  - crit: bool (whether it's a critical hit)
+	  - crit_chance: float (final crit chance %)
+	  - roll: int (d100 roll)
+	  - breakdown: Dictionary (for debugging)
+	"""
+
+	# Get TPO stat
+	var tpo: int = attacker.stats.get("TPO", 1)
+
+	# Get crit bonuses from options
+	var weapon_crit_bonus: int = options.get("weapon_crit_bonus", 0)
+	var skill_crit_bonus: int = options.get("skill_crit_bonus", 0)
+
+	# Calculate crit chance
+	var base_crit: float = BASE_CRIT_CHANCE
+	var tpo_bonus: float = tpo * TPO_CRIT_MODIFIER
+	var total_bonus: float = weapon_crit_bonus + skill_crit_bonus
+
+	var final_crit: float = clamp(base_crit + tpo_bonus + total_bonus, CRIT_MIN, CRIT_MAX)
+
+	# Roll d100
+	var roll: int = randi() % 100 + 1
+	var is_crit: bool = roll <= final_crit
+
+	return {
+		"crit": is_crit,
+		"crit_chance": final_crit,
+		"roll": roll,
+		"breakdown": {
+			"base": base_crit,
+			"tpo_bonus": tpo_bonus,
+			"tpo": tpo,
+			"weapon_bonus": weapon_crit_bonus,
+			"skill_bonus": skill_crit_bonus,
+			"total": final_crit
 		}
 	}
 
@@ -345,7 +408,8 @@ func _get_weapon_stats(member_id: String) -> Dictionary:
 				"sig": weapon.get("sig", 0),
 				"brw_scale": weapon.get("brw_scale", 0.5),
 				"acc": weapon.get("acc", 75),
-				"skill_acc_bonus": weapon.get("skill_acc_bonus", 0)
+				"skill_acc_bonus": weapon.get("skill_acc_bonus", 0),
+				"crit_bonus": weapon.get("crit_bonus_pct", 0)
 			}
 
 	# Default weapon stats
@@ -354,7 +418,8 @@ func _get_weapon_stats(member_id: String) -> Dictionary:
 		"sig": 0,
 		"brw_scale": 0.5,
 		"acc": 75,
-		"skill_acc_bonus": 0
+		"skill_acc_bonus": 0,
+		"crit_bonus": 0
 	}
 
 func _get_armor_stats(member_id: String) -> Dictionary:
