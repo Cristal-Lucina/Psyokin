@@ -143,6 +143,7 @@ func start_round() -> void:
 	# Sort turn order by initiative (highest first)
 	turn_order = combatants.duplicate()
 	turn_order.sort_custom(_sort_by_initiative)
+	_remove_turn_order_duplicates()  # Ensure no duplicates in turn order
 
 	print("[BattleManager] Turn order:")
 	for i in range(turn_order.size()):
@@ -225,6 +226,25 @@ func _sort_by_initiative(a: Dictionary, b: Dictionary) -> bool:
 	# Final tiebreaker: coinflip
 	return randf() > 0.5
 
+func _remove_turn_order_duplicates() -> void:
+	"""Remove duplicate combatants from turn_order (keep first occurrence)"""
+	var seen_ids: Dictionary = {}
+	var deduplicated: Array[Dictionary] = []
+	var duplicates_found: int = 0
+
+	for combatant in turn_order:
+		var id = combatant.id
+		if not seen_ids.has(id):
+			seen_ids[id] = true
+			deduplicated.append(combatant)
+		else:
+			duplicates_found += 1
+			print("[BattleManager] WARNING: Duplicate combatant removed from turn order: %s" % combatant.display_name)
+
+	if duplicates_found > 0:
+		print("[BattleManager] Removed %d duplicate(s) from turn order" % duplicates_found)
+		turn_order = deduplicated
+
 func _next_turn() -> void:
 	"""Advance to the next combatant's turn"""
 	# Find next valid combatant
@@ -252,6 +272,9 @@ func _next_turn() -> void:
 
 func _start_turn(combatant: Dictionary) -> void:
 	"""Start a combatant's turn"""
+	# Check for duplicates before starting turn
+	_remove_turn_order_duplicates()
+
 	# Check if battle has ended before starting this turn
 	if _check_battle_end():
 		return
@@ -591,6 +614,7 @@ func record_weapon_weakness_hit(target: Dictionary) -> bool:
 
 	# Re-sort turn order to reflect initiative changes
 	turn_order.sort_custom(_sort_by_initiative)
+	_remove_turn_order_duplicates()  # Ensure no duplicates in turn order
 	print("[BattleManager] Turn order re-sorted after weakness hit")
 
 	# Update current_turn_index to point to the same combatant after re-sort
@@ -620,6 +644,7 @@ func refresh_turn_order() -> void:
 
 	# Re-sort the turn order
 	turn_order.sort_custom(_sort_by_initiative)
+	_remove_turn_order_duplicates()  # Ensure no duplicates in turn order
 	print("[BattleManager] Turn order re-sorted")
 
 	# Update current_turn_index to point to the same combatant after re-sort
