@@ -395,6 +395,22 @@ func _create_ally_combatant(member_id: String, slot: int) -> Dictionary:
 				equipment_dict = member_equip
 				print("[BattleManager] Loaded equipment for %s: %s" % [member_id, equipment_dict])
 
+	# Get sigils from SigilSystem
+	var sigils: Array = []
+	var skills: Array = []
+	if has_node("/root/aSigilSystem"):
+		var sigil_sys = get_node("/root/aSigilSystem")
+		var loadout = sigil_sys.get_loadout(member_id)
+		for sigil_inst in loadout:
+			if sigil_inst != "":
+				sigils.append(sigil_inst)
+				# Get the active skill for this sigil instance
+				var skill_id = sigil_sys.get_active_skill_id_for_instance(sigil_inst)
+				if skill_id != "":
+					skills.append(skill_id)
+		print("[BattleManager] Loaded sigils for %s: %s" % [member_id, sigils])
+		print("[BattleManager] Loaded skills for %s: %s" % [member_id, skills])
+
 	return {
 		"id": member_id,
 		"display_name": display_name,
@@ -418,7 +434,9 @@ func _create_ally_combatant(member_id: String, slot: int) -> Dictionary:
 		"ailments": [],
 		"mind_type": mind_type,
 		"equipment": equipment_dict,
-		"weapon_weakness_hits": 0  # Track weapon triangle weakness hits per round
+		"weapon_weakness_hits": 0,  # Track weapon triangle weakness hits per round
+		"sigils": sigils,  # Sigil instances equipped
+		"skills": skills   # Active skill IDs for each sigil
 	}
 
 func _create_enemy_combatant(enemy_id: String, slot: int) -> Dictionary:
