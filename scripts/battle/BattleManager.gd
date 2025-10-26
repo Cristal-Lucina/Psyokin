@@ -46,9 +46,32 @@ var return_scene: String = ""  # Scene to return to after battle
 @onready var combat_profiles = get_node("/root/aCombatProfileSystem")
 @onready var stats_system = get_node("/root/aStatsSystem")
 @onready var transition_mgr = get_node("/root/aTransitionManager")
+@onready var csv_loader = get_node("/root/aCSVLoader")
+
+## Enemy data cache
+const ENEMIES_CSV: String = "res://data/actors/enemies.csv"
+var _enemy_defs: Dictionary = {}
 
 func _ready() -> void:
 	print("[BattleManager] Initialized")
+	_load_enemy_definitions()
+
+func _load_enemy_definitions() -> void:
+	"""Load enemy definitions from CSV"""
+	if not csv_loader or not csv_loader.has_method("load_csv"):
+		push_error("[BattleManager] CSV loader not available!")
+		return
+
+	if not ResourceLoader.exists(ENEMIES_CSV):
+		push_error("[BattleManager] Enemies CSV not found: %s" % ENEMIES_CSV)
+		return
+
+	var result = csv_loader.call("load_csv", ENEMIES_CSV, "actor_id")
+	if typeof(result) == TYPE_DICTIONARY:
+		_enemy_defs = result
+		print("[BattleManager] Loaded %d enemy definitions" % _enemy_defs.size())
+	else:
+		push_error("[BattleManager] Failed to load enemies CSV")
 
 ## ═══════════════════════════════════════════════════════════════
 ## ENCOUNTER TRIGGERING
@@ -341,11 +364,19 @@ func _create_ally_combatant(member_id: String, slot: int) -> Dictionary:
 	# Get display name
 	var display_name = stats_system.get_member_display_name(member_id)
 
+	# Get mind type from GameState or default to "none"
+	var mind_type = "none"
+	if member_id == "hero" and gs and gs.has_meta("hero_active_type"):
+		mind_type = String(gs.get_meta("hero_active_type")).to_lower()
+	elif stats_system and stats_system.has_method("get_member_mind_type"):
+		mind_type = String(stats_system.get_member_mind_type(member_id)).to_lower()
+
 	return {
 		"id": member_id,
 		"display_name": display_name,
 		"is_ally": true,
 		"slot": slot,  # 0, 1, 2 for left/center/right
+		"level": stats_system.get_member_level(member_id),
 		"stats": stats,
 		"hp": hp_current,
 		"hp_max": hp_max,
@@ -360,30 +391,63 @@ func _create_ally_combatant(member_id: String, slot: int) -> Dictionary:
 		"channel_data": {},
 		"buffs": [],
 		"debuffs": [],
-		"ailments": []
+		"ailments": [],
+		"mind_type": mind_type
 	}
 
 func _create_enemy_combatant(enemy_id: String, slot: int) -> Dictionary:
-	"""Create a combatant dictionary for an enemy"""
-	# TODO: Load enemy stats from enemy_defs.csv
-	# For now, create basic enemy stats
+	"""Create a combatant dictionary for an enemy using CSV data"""
+	# Load enemy definition from CSV
+	var enemy_def: Dictionary = {}
+	if _enemy_defs.has(enemy_id):
+		enemy_def = _enemy_defs[enemy_id]
+	else:
+		push_error("[BattleManager] Enemy '%s' not found in enemies.csv" % enemy_id)
+		# Return basic fallback
+		enemy_def = {
+			"name": enemy_id.capitalize(),
+			"level_start": 1,
+			"start_brw": 1, "start_mnd": 1, "start_tpo": 1, "start_vtl": 1, "start_fcs": 1,
+			"mind_type": "none"
+		}
+
+	# Parse stats from CSV
+	var level = int(enemy_def.get("level_start", 1))
 	var enemy_stats = {
-		"BRW": 3,
-		"VTL": 3,
-		"TPO": 3,
-		"FCS": 3,
-		"MND": 3,
+		"BRW": int(enemy_def.get("start_brw", 1)),
+		"VTL": int(enemy_def.get("start_vtl", 1)),
+		"TPO": int(enemy_def.get("start_tpo", 1)),
+		"FCS": int(enemy_def.get("start_fcs", 1)),
+		"MND": int(enemy_def.get("start_mnd", 1)),
 		"Speed": 0
 	}
 
-	var hp_max = 20 + enemy_stats.VTL * 5
-	var mp_max = 10 + enemy_stats.MND * 3
+	# Calculate HP/MP using same formula as allies
+	var hp_max = 150 + (enemy_stats.VTL * level * 6)
+	var mp_max = 20 + int(round(float(enemy_stats.FCS) * float(level) * 1.5))
+
+	# Parse equipment
+	var weapon_id = String(enemy_def.get("start_weapon", ""))
+	var armor_id = String(enemy_def.get("start_armor", ""))
+	var head_id = String(enemy_def.get("start_head", ""))
+	var foot_id = String(enemy_def.get("start_foot", ""))
+	var bracelet_id = String(enemy_def.get("start_bracelet", ""))
+
+	# Parse sigils and skills (semicolon-separated lists)
+	var sigils_str = String(enemy_def.get("start_sigils", ""))
+	var skills_str = String(enemy_def.get("start_skills", ""))
+	var sigils = sigils_str.split(";", false) if sigils_str != "" else []
+	var skills = skills_str.split(";", false) if skills_str != "" else []
+
+	# Get mind type
+	var mind_type = String(enemy_def.get("mind_type", "none")).to_lower()
 
 	return {
 		"id": enemy_id,
-		"display_name": enemy_id.capitalize(),
+		"display_name": String(enemy_def.get("name", enemy_id.capitalize())),
 		"is_ally": false,
 		"slot": slot,  # 0, 1, 2 for left/center/right
+		"level": level,
 		"stats": enemy_stats,
 		"hp": hp_max,
 		"hp_max": hp_max,
@@ -398,7 +462,22 @@ func _create_enemy_combatant(enemy_id: String, slot: int) -> Dictionary:
 		"channel_data": {},
 		"buffs": [],
 		"debuffs": [],
-		"ailments": []
+		"ailments": [],
+		# Enemy-specific data
+		"mind_type": mind_type,
+		"equipment": {
+			"weapon": weapon_id,
+			"armor": armor_id,
+			"head": head_id,
+			"foot": foot_id,
+			"bracelet": bracelet_id
+		},
+		"sigils": sigils,
+		"skills": skills,
+		"is_boss": String(enemy_def.get("boss_tag", "FALSE")).to_upper() == "TRUE",
+		"capture_difficulty": String(enemy_def.get("capture_tag", "None")),
+		"cred_range": String(enemy_def.get("cred_range", "0-0")),
+		"drop_table": String(enemy_def.get("item_drops", ""))
 	}
 
 ## ═══════════════════════════════════════════════════════════════
