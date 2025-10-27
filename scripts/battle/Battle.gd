@@ -33,6 +33,7 @@ var item_menu_panel: PanelContainer = null  # Item selection menu
 var capture_menu_panel: PanelContainer = null  # Capture selection menu
 var current_skill_menu: Array = []  # Current skills in menu
 var selected_item: Dictionary = {}  # Selected item data
+var victory_panel: PanelContainer = null  # Victory screen panel
 
 func _ready() -> void:
 	print("[Battle] Battle scene loaded")
@@ -123,10 +124,7 @@ func _on_battle_ended(victory: bool) -> void:
 	if victory:
 		log_message("*** VICTORY ***")
 		log_message("All enemies have been defeated!")
-		# TODO: Show victory screen, award rewards
-		await get_tree().create_timer(2.0).timeout
-		# Return to overworld
-		battle_mgr.return_to_overworld()
+		_show_victory_screen()
 	else:
 		log_message("*** DEFEAT ***")
 		log_message("Your party has been wiped out!")
@@ -135,6 +133,85 @@ func _on_battle_ended(victory: bool) -> void:
 		await get_tree().create_timer(3.0).timeout
 		# For now, return to main menu or reload
 		get_tree().change_scene_to_file("res://scenes/main/Main.tscn")
+
+func _show_victory_screen() -> void:
+	"""Display victory screen with Accept button"""
+	# Create victory panel
+	victory_panel = PanelContainer.new()
+	victory_panel.name = "VictoryPanel"
+
+	# Set up styling
+	var style = StyleBoxFlat.new()
+	style.bg_color = Color(0.1, 0.1, 0.15, 0.95)
+	style.border_width_left = 3
+	style.border_width_top = 3
+	style.border_width_right = 3
+	style.border_width_bottom = 3
+	style.border_color = Color(0.8, 0.7, 0.3, 1.0)  # Gold border
+	victory_panel.add_theme_stylebox_override("panel", style)
+
+	# Position it in center of screen
+	victory_panel.set_anchors_preset(Control.PRESET_CENTER)
+	victory_panel.custom_minimum_size = Vector2(400, 300)
+
+	# Create vertical box for content
+	var vbox = VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 20)
+	victory_panel.add_child(vbox)
+
+	# Add some padding
+	var margin = MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 40)
+	margin.add_theme_constant_override("margin_top", 40)
+	margin.add_theme_constant_override("margin_right", 40)
+	margin.add_theme_constant_override("margin_bottom", 40)
+	vbox.add_child(margin)
+
+	var content_vbox = VBoxContainer.new()
+	content_vbox.add_theme_constant_override("separation", 15)
+	margin.add_child(content_vbox)
+
+	# Title label
+	var title_label = Label.new()
+	title_label.text = "VICTORY!"
+	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title_label.add_theme_font_size_override("font_size", 32)
+	title_label.add_theme_color_override("font_color", Color(0.9, 0.8, 0.3, 1.0))
+	content_vbox.add_child(title_label)
+
+	# Message label
+	var message_label = Label.new()
+	message_label.text = "All enemies have been\ndefeated or captured!"
+	message_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	message_label.add_theme_font_size_override("font_size", 18)
+	content_vbox.add_child(message_label)
+
+	# Spacer
+	var spacer = Control.new()
+	spacer.custom_minimum_size = Vector2(0, 20)
+	content_vbox.add_child(spacer)
+
+	# Accept button
+	var accept_button = Button.new()
+	accept_button.text = "Accept"
+	accept_button.custom_minimum_size = Vector2(200, 50)
+	accept_button.pressed.connect(_on_victory_accept_pressed)
+
+	# Center the button
+	var button_center = CenterContainer.new()
+	button_center.add_child(accept_button)
+	content_vbox.add_child(button_center)
+
+	# Add to scene
+	add_child(victory_panel)
+
+func _on_victory_accept_pressed() -> void:
+	"""Handle Accept button press on victory screen"""
+	print("[Battle] Victory accepted - returning to overworld")
+	if victory_panel:
+		victory_panel.queue_free()
+		victory_panel = null
+	battle_mgr.return_to_overworld()
 
 ## ═══════════════════════════════════════════════════════════════
 ## COMBATANT DISPLAY
