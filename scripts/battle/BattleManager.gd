@@ -30,6 +30,10 @@ var current_round: int = 0
 var current_turn_index: int = 0
 var run_attempted_this_round: bool = false  # Track if party tried to run this round
 
+## Battle outcome tracking (for morality system)
+var battle_kills: Dictionary = {}  # env_tag -> count (e.g., {"Regular": 2, "Elite": 1})
+var battle_captures: Dictionary = {}  # env_tag -> count
+
 ## Combatants (both allies and enemies)
 var combatants: Array[Dictionary] = []  # List of all combatants in battle
 var turn_order: Array[Dictionary] = []  # Sorted by initiative
@@ -108,6 +112,8 @@ func initialize_battle(ally_party: Array, enemy_list: Array) -> void:
 	burst_gauge = 0
 	combatants.clear()
 	turn_order.clear()
+	battle_kills.clear()
+	battle_captures.clear()
 
 	# Add allies to combatants
 	for i in range(ally_party.size()):
@@ -433,6 +439,9 @@ func _end_battle(victory: bool) -> void:
 	if victory:
 		print("[BattleManager] *** VICTORY ***")
 		current_state = BattleState.VICTORY
+
+		# Apply morality deltas for battle outcomes
+		_apply_morality_for_battle()
 	else:
 		print("[BattleManager] *** DEFEAT ***")
 		current_state = BattleState.DEFEAT
@@ -440,7 +449,71 @@ func _end_battle(victory: bool) -> void:
 	battle_ended.emit(victory)
 
 	# TODO: Award rewards (LXP, money, items)
+	# TODO: Apply non-lethal modifiers (×0.30 LXP, ×1.5 Creds) if all captures
 	# TODO: Show victory/defeat screen
+
+func record_enemy_defeat(enemy: Dictionary, was_captured: bool) -> void:
+	"""
+	Record enemy defeat for morality tracking
+
+	Args:
+	  - enemy: Enemy combatant dictionary with env_tag
+	  - was_captured: true if captured, false if killed
+	"""
+	var env_tag: String = enemy.get("env_tag", "Regular")
+
+	if was_captured:
+		battle_captures[env_tag] = battle_captures.get(env_tag, 0) + 1
+		print("[BattleManager] Recorded capture: %s (%s)" % [enemy.display_name, env_tag])
+	else:
+		battle_kills[env_tag] = battle_kills.get(env_tag, 0) + 1
+		print("[BattleManager] Recorded kill: %s (%s)" % [enemy.display_name, env_tag])
+
+func _apply_morality_for_battle() -> void:
+	"""Apply morality deltas based on battle outcomes (kills vs captures)"""
+	var morality_sys = get_node_or_null("/root/aMoralitySystem")
+	if not morality_sys:
+		print("[BattleManager] MoralitySystem not available, skipping morality application")
+		return
+
+	# NOTE: VR battle check will be added here later
+	# For now, apply morality for all battles
+
+	# Apply kill penalties
+	for env_tag in battle_kills:
+		var count: int = battle_kills[env_tag]
+		var delta_per_kill: int = 0
+
+		match env_tag:
+			"Regular":
+				delta_per_kill = morality_sys.DELTA_REGULAR_LETHAL  # -1
+			"Elite":
+				delta_per_kill = morality_sys.DELTA_ELITE_LETHAL    # -3
+			"Boss":
+				delta_per_kill = morality_sys.DELTA_BOSS_LETHAL      # -15
+
+		if delta_per_kill != 0:
+			for i in range(count):
+				morality_sys.apply_delta(delta_per_kill, "Killed %s enemy" % env_tag)
+
+	# Apply capture bonuses
+	for env_tag in battle_captures:
+		var count: int = battle_captures[env_tag]
+		var delta_per_capture: int = 0
+
+		match env_tag:
+			"Regular":
+				delta_per_capture = morality_sys.DELTA_REGULAR_NONLETHAL  # +1
+			"Elite":
+				delta_per_capture = morality_sys.DELTA_ELITE_NONLETHAL    # +3
+			"Boss":
+				delta_per_capture = morality_sys.DELTA_BOSS_NONLETHAL      # +15
+
+		if delta_per_capture != 0:
+			for i in range(count):
+				morality_sys.apply_delta(delta_per_capture, "Captured %s enemy" % env_tag)
+
+	print("[BattleManager] Applied morality: Kills=%s, Captures=%s" % [battle_kills, battle_captures])
 
 func return_to_overworld() -> void:
 	"""Return to the overworld scene"""
@@ -618,6 +691,7 @@ func _create_enemy_combatant(enemy_id: String, slot: int) -> Dictionary:
 		"initiative": 0,
 		"is_ko": false,
 		"is_fled": false,
+		"is_captured": false,  # Captured via Bind
 		"is_fallen": false,
 		"fallen_round": 0,  # Track which round they became fallen
 		"is_defending": false,
@@ -639,6 +713,8 @@ func _create_enemy_combatant(enemy_id: String, slot: int) -> Dictionary:
 		"skills": skills,
 		"is_boss": String(enemy_def.get("boss_tag", "FALSE")).to_upper() == "TRUE",
 		"capture_difficulty": String(enemy_def.get("capture_tag", "None")),
+		"capture_resist": int(enemy_def.get("capture_resist", 25)),  # 0-60 resistance
+		"env_tag": String(enemy_def.get("env_tag", "Regular")),  # Regular/Elite/Boss for morality
 		"cred_range": String(enemy_def.get("cred_range", "0-0")),
 		"drop_table": String(enemy_def.get("item_drops", "")),
 		"weapon_weakness_hits": 0,  # Track weapon triangle weakness hits per round

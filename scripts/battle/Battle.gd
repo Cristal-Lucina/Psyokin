@@ -25,6 +25,7 @@ var awaiting_target_selection: bool = false
 var target_candidates: Array = []
 var skill_definitions: Dictionary = {}  # skill_id -> skill data
 var awaiting_skill_selection: bool = false
+var awaiting_capture_target: bool = false  # True when selecting target for capture
 var skill_to_use: Dictionary = {}  # Selected skill data
 var skill_menu_panel: PanelContainer = null  # Skill selection menu
 var current_skill_menu: Array = []  # Current skills in menu
@@ -306,6 +307,10 @@ func _execute_attack(target: Dictionary) -> void:
 				target.hp = 0
 				target.is_ko = true
 
+				# Record kill for morality system (if enemy)
+				if not target.get("is_ally", false):
+					battle_mgr.record_enemy_defeat(target, false)  # false = kill
+
 			# Record weakness hits AFTER damage (only if target still alive)
 			if not target.is_ko and (weapon_weakness_hit or crit_weakness_hit):
 				var became_fallen = await battle_mgr.record_weapon_weakness_hit(target)
@@ -427,6 +432,109 @@ func _on_item_pressed() -> void:
 		log_message("Items not yet implemented")
 		# TODO: Show item menu
 
+func _on_capture_pressed() -> void:
+	"""Handle Capture action - attempt to capture an enemy with a bind item"""
+	# Get inventory system
+	var inventory = get_node_or_null("/root/aInventorySystem")
+	if not inventory:
+		log_message("Inventory system not available!")
+		return
+
+	# Find available bind items
+	var bind_items: Array = []
+	var bind_ids = ["BIND_001", "BIND_002", "BIND_003", "BIND_004", "BIND_005"]
+
+	for bind_id in bind_ids:
+		var count = inventory.get_count(bind_id)
+		if count > 0:
+			var item_def = inventory.get_item_def(bind_id)
+			bind_items.append({
+				"id": bind_id,
+				"name": item_def.get("display_name", bind_id),
+				"capture_mod": int(item_def.get("capture_mod", 0)),
+				"count": count
+			})
+
+	if bind_items.is_empty():
+		log_message("No bind items available!")
+		return
+
+	# For now, auto-select the first available bind (TODO: show selection menu)
+	var selected_bind = bind_items[0]
+	log_message("Using %s (x%d) - select target..." % [selected_bind.name, selected_bind.count])
+
+	# Get alive enemies
+	var enemies = battle_mgr.get_enemy_combatants()
+	target_candidates = enemies.filter(func(e): return not e.is_ko and not e.get("is_captured", false))
+
+	if target_candidates.is_empty():
+		log_message("No valid targets to capture!")
+		return
+
+	# Store selected bind for use after target selection
+	set_meta("pending_capture_bind", selected_bind)
+
+	# Enable capture target selection mode
+	awaiting_target_selection = true
+	awaiting_capture_target = true
+	_highlight_target_candidates()
+
+func _execute_capture(target: Dictionary) -> void:
+	"""Execute capture attempt on selected target"""
+	awaiting_target_selection = false
+	awaiting_capture_target = false
+	_clear_target_highlights()
+
+	# Get the bind item that was selected
+	var bind_data = get_meta("pending_capture_bind", {})
+	if bind_data.is_empty():
+		log_message("Capture failed - no bind selected!")
+		return
+
+	var bind_id: String = bind_data.id
+	var bind_name: String = bind_data.name
+	var capture_mod: int = bind_data.capture_mod
+
+	# Calculate capture chance
+	var capture_result = combat_resolver.calculate_capture_chance(target, {"item_mod": capture_mod})
+	var capture_chance: float = capture_result.chance
+
+	log_message("%s uses %s on %s!" % [current_combatant.display_name, bind_name, target.display_name])
+	log_message("  Capture chance: %.1f%%" % capture_chance)
+
+	# Attempt capture
+	var success = combat_resolver.attempt_capture(target, capture_chance)
+
+	# Consume the bind item
+	var inventory = get_node("/root/aInventorySystem")
+	inventory.remove_item(bind_id, 1)
+
+	if success:
+		# Capture successful!
+		target.is_captured = true
+		target.is_ko = true  # Remove from battle like KO
+		log_message("  → SUCCESS! %s was captured!" % target.display_name)
+
+		# Record capture for morality system
+		battle_mgr.record_enemy_defeat(target, true)  # true = capture
+
+		# Animate turn cell falling (same as KO)
+		if turn_order_display and turn_order_display.has_method("animate_ko_fall"):
+			turn_order_display.animate_ko_fall(target.id)
+
+		# Update display
+		_update_combatant_displays()
+
+		# Check if battle is over
+		if battle_mgr.check_battle_end():
+			return  # Battle ended
+	else:
+		# Capture failed
+		log_message("  → FAILED! %s broke free!" % target.display_name)
+
+	# End turn
+	battle_mgr.end_turn()
+
 func _on_defend_pressed() -> void:
 	"""Handle Defend action"""
 	log_message("%s moved into a defensive stance." % current_combatant.display_name)
@@ -531,7 +639,10 @@ func _on_enemy_panel_input(event: InputEvent, target: Dictionary) -> void:
 			if awaiting_target_selection:
 				# Check if this target is valid
 				if target in target_candidates:
-					if awaiting_skill_selection:
+					if awaiting_capture_target:
+						# Attempting capture
+						_execute_capture(target)
+					elif awaiting_skill_selection:
 						# Using a skill
 						_clear_target_highlights()
 						awaiting_target_selection = false
@@ -625,6 +736,10 @@ func _execute_enemy_ai() -> void:
 			if target.hp < 0:
 				target.hp = 0
 				target.is_ko = true
+
+				# Record kill for morality system (if enemy)
+				if not target.get("is_ally", false):
+					battle_mgr.record_enemy_defeat(target, false)  # false = kill
 
 			# Record weakness hits AFTER damage (only if target still alive)
 			if not target.is_ko and (weapon_weakness_hit or crit_weakness_hit):
