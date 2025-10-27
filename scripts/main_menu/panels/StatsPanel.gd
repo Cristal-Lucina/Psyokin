@@ -188,6 +188,10 @@ func _rebuild_list_only() -> void:
 		else:
 			_add_row2(String(key).capitalize(), str(level))
 
+	# Add Affinity (AXP) section
+	_add_spacer_row()
+	_add_affinity_section(_current_id)
+
 	await get_tree().process_frame
 	_list.queue_sort()
 
@@ -377,6 +381,60 @@ func _add_row2(label_text: String, val: String) -> void:
 func _add_spacer_row() -> void:
 	var sep := HSeparator.new()
 	_list.add_child(sep)
+
+func _add_affinity_section(member_id: String) -> void:
+	"""Add AXP/Affinity relationships section for the current member"""
+	var affinity_sys = get_node_or_null("/root/aAffinitySystem")
+	if not affinity_sys or not affinity_sys.has_method("get_all_pair_data"):
+		return
+
+	var all_pairs: Array = affinity_sys.call("get_all_pair_data")
+	var relationships: Array = []
+
+	# Find all pairs involving this member
+	for pair_data in all_pairs:
+		if typeof(pair_data) != TYPE_DICTIONARY:
+			continue
+
+		var pair_dict: Dictionary = pair_data
+		var member_a: String = String(pair_dict.get("member_a", ""))
+		var member_b: String = String(pair_dict.get("member_b", ""))
+
+		# Check if this member is in this pair
+		var partner_id: String = ""
+		if member_a == member_id:
+			partner_id = member_b
+		elif member_b == member_id:
+			partner_id = member_a
+		else:
+			continue  # This pair doesn't involve this member
+
+		# Get partner's display name
+		var partner_name: String = _label_for(partner_id)
+
+		relationships.append({
+			"partner_id": partner_id,
+			"partner_name": partner_name,
+			"tier": int(pair_dict.get("tier", 0)),
+			"weekly_axp": int(pair_dict.get("weekly_axp", 0)),
+			"lifetime_axp": int(pair_dict.get("lifetime_axp", 0))
+		})
+
+	# Only show section if there are relationships
+	if relationships.is_empty():
+		return
+
+	# Add header
+	_add_header_row2("Affinity", "Tier (Lifetime)")
+
+	# Add each relationship
+	for rel in relationships:
+		var partner_name: String = String(rel.get("partner_name", "???"))
+		var tier: int = int(rel.get("tier", 0))
+		var lifetime: int = int(rel.get("lifetime_axp", 0))
+
+		var tier_text: String = "AT%d (%d)" % [tier, lifetime]
+		_add_row2(partner_name, tier_text)
 
 # ---------- Radar Chart ----------
 func _create_radar_chart() -> void:
