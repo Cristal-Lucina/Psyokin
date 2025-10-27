@@ -15,7 +15,6 @@ const SHOW_UPCOMING_TURNS: int = 8  # How many turns to show
 const ANIMATION_DURATION: float = 0.3  # Duration of slide animations
 const REVEAL_DELAY: float = 0.15  # Delay between each combatant reveal
 const KO_FALL_DURATION: float = 0.5  # Duration of KO falling animation
-const SLOT_HEIGHT: float = 45.0  # Approximate height of each turn slot including spacing
 
 ## Container for turn slots
 var turn_slots: Array[PanelContainer] = []
@@ -423,14 +422,12 @@ func update_combatant_hp(_combatant_id: String) -> void:
 	pass
 
 func animate_ko_fall(combatant_id: String) -> void:
-	"""Animate a combatant falling when KO'd - drops to bottom of screen and slides others up"""
+	"""Animate a combatant falling when KO'd - drops to bottom of screen"""
 	# Find the slot for this combatant
 	var target_slot: PanelContainer = null
-	var target_index: int = -1
-	for i in range(turn_slots.size()):
-		if turn_slots[i].get_meta("combatant_id", "") == combatant_id:
-			target_slot = turn_slots[i]
-			target_index = i
+	for slot in turn_slots:
+		if slot.get_meta("combatant_id", "") == combatant_id:
+			target_slot = slot
 			break
 
 	if not target_slot:
@@ -441,16 +438,6 @@ func animate_ko_fall(combatant_id: String) -> void:
 	# Store original position of KO'd slot
 	var original_position = target_slot.global_position
 
-	# Find all slots below this one
-	var slots_below: Array[PanelContainer] = []
-	for i in range(target_index + 1, turn_slots.size()):
-		slots_below.append(turn_slots[i])
-
-	# Add temporary downward offset to slots below (one slot height)
-	# This keeps them visually in place when KO'd slot is removed
-	for slot in slots_below:
-		slot.position.y = SLOT_HEIGHT
-
 	# Create canvas layer for KO'd slot animation
 	var canvas_layer = CanvasLayer.new()
 	get_tree().root.add_child(canvas_layer)
@@ -459,40 +446,20 @@ func animate_ko_fall(combatant_id: String) -> void:
 	target_slot.reparent(canvas_layer, false)
 	target_slot.global_position = original_position
 
-	# Remove from turn_slots array (VBoxContainer will reflow)
-	turn_slots.remove_at(target_index)
-
-	# Wait one frame for VBoxContainer to reflow
-	await get_tree().process_frame
-
 	# Calculate drop distance to bottom of screen
 	var viewport_height = get_viewport_rect().size.y
 
-	# Create animations
-	var tweens: Array = []
-
 	# Animate KO'd slot dropping
-	var ko_tween = create_tween()
-	ko_tween.set_ease(Tween.EASE_IN)
-	ko_tween.set_trans(Tween.TRANS_CUBIC)
-	ko_tween.tween_property(target_slot, "global_position:y", viewport_height + 100, KO_FALL_DURATION)
-	ko_tween.parallel().tween_property(target_slot, "rotation", deg_to_rad(25), KO_FALL_DURATION)
-	ko_tween.parallel().tween_property(target_slot, "modulate:a", 0.0, KO_FALL_DURATION)
-	ko_tween.parallel().tween_property(target_slot, "scale", Vector2(0.7, 0.7), KO_FALL_DURATION)
-	tweens.append(ko_tween)
+	var tween = create_tween()
+	tween.set_ease(Tween.EASE_IN)
+	tween.set_trans(Tween.TRANS_CUBIC)
+	tween.tween_property(target_slot, "global_position:y", viewport_height + 100, KO_FALL_DURATION)
+	tween.parallel().tween_property(target_slot, "rotation", deg_to_rad(25), KO_FALL_DURATION)
+	tween.parallel().tween_property(target_slot, "modulate:a", 0.0, KO_FALL_DURATION)
+	tween.parallel().tween_property(target_slot, "scale", Vector2(0.7, 0.7), KO_FALL_DURATION)
 
-	# Animate slots below sliding up by removing their y-offset
-	for slot in slots_below:
-		if is_instance_valid(slot):
-			var slide_tween = create_tween()
-			slide_tween.set_ease(Tween.EASE_OUT)
-			slide_tween.set_trans(Tween.TRANS_CUBIC)
-			slide_tween.tween_property(slot, "position:y", 0.0, KO_FALL_DURATION)
-			tweens.append(slide_tween)
-
-	# Wait for all animations to finish
-	if not tweens.is_empty():
-		await tweens[0].finished
+	# Wait for animation to finish
+	await tween.finished
 
 	# Clean up canvas layer and KO'd slot
 	if is_instance_valid(canvas_layer):
