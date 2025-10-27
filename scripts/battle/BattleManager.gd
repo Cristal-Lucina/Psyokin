@@ -428,8 +428,14 @@ func _count_alive_enemies() -> int:
 	var count = 0
 	for c in combatants:
 		# Count enemy as defeated if KO'd, fled, or captured
-		if not c.is_ally and not c.is_ko and not c.is_fled and not c.get("is_captured", false):
-			count += 1
+		if not c.is_ally:
+			var is_ko = c.is_ko
+			var is_fled = c.is_fled
+			var is_captured = c.get("is_captured", false)
+			print("[BattleManager] Enemy %s: is_ko=%s, is_fled=%s, is_captured=%s" % [c.display_name, is_ko, is_fled, is_captured])
+			if not is_ko and not is_fled and not is_captured:
+				count += 1
+	print("[BattleManager] _count_alive_enemies() = %d" % count)
 	return count
 
 func _calculate_battle_rewards() -> Dictionary:

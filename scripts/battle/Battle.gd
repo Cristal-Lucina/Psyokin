@@ -741,7 +741,11 @@ func _execute_capture(target: Dictionary) -> void:
 		_update_combatant_displays()
 
 		# Check if battle is over (after capture)
-		if await battle_mgr._check_battle_end():
+		print("[Battle] Checking if battle ended after capture...")
+		var battle_ended = await battle_mgr._check_battle_end()
+		print("[Battle] Battle end check result: %s" % battle_ended)
+		if battle_ended:
+			print("[Battle] Battle ended - skipping end turn")
 			return  # Battle ended
 	else:
 		# Capture failed
