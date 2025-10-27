@@ -675,6 +675,9 @@ func _on_item_pressed() -> void:
 			category = ""
 		category = str(category)
 
+		# Debug: Print use_type for all items to see what we're getting
+		print("[Battle] Item %s: use_type='%s', category='%s', count=%d" % [item_id_str, use_type, category, count])
+
 		# Include items that can be used in battle (use_type = "battle" or "both")
 		# Exclude bind items (those are for Capture button)
 		if use_type in ["battle", "both"] and category != "Battle Items":
@@ -703,6 +706,7 @@ func _on_item_pressed() -> void:
 				"item_def": item_def
 			})
 
+	print("[Battle] Found %d usable items for battle" % usable_items.size())
 	if usable_items.is_empty():
 		log_message("No usable items!")
 		return
