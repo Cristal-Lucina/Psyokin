@@ -647,19 +647,21 @@ func _categorize_battle_item(item_id: String, item_name: String, item_def: Dicti
 	if item_id.begins_with("CURE_") or "Cure" in effect:
 		return "Cure"
 
-	# Check for Restore items (HP/MP healing, revival)
+	# Check for Restore items (HP/MP healing, revival, elixirs)
 	if item_id.begins_with("HP_") or item_id.begins_with("MP_") or item_id.begins_with("REV_") or \
-	   item_id.begins_with("HEAL_") or "Heal" in effect or "Revive" in effect:
+	   item_id.begins_with("HEAL_") or item_id.begins_with("ELX_") or \
+	   "Heal" in effect or "Revive" in effect:
 		return "Restore"
 
 	# Check for Combat items (bombs, AOE damage)
 	if "Bomb" in item_name or "AOE dmg" in effect:
 		return "Combat"
 
-	# Check for Tactical items (buffs, mirrors, speed/defense boosts)
-	if item_id.begins_with("BUFF_") or "Reflect" in effect or \
+	# Check for Tactical items (buffs, mirrors, speed/defense boosts, escape items)
+	if item_id.begins_with("BUFF_") or item_id.begins_with("TOOL_") or "Reflect" in effect or \
 	   "Up" in effect or "Shield" in effect or "Regen" in effect or \
-	   "Speed" in effect or "Hit%" in effect or "Evasion%" in effect or "SkillHit%" in effect:
+	   "Speed" in effect or "Hit%" in effect or "Evasion%" in effect or "SkillHit%" in effect or \
+	   "escape" in effect or "Run%" in effect:
 		return "Tactical"
 
 	# Default to Tactical if we can't determine
