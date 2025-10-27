@@ -965,15 +965,28 @@ func _on_manage_sigils() -> void:
 
 	var layer := CanvasLayer.new()
 	layer.layer = 128  # Higher layer to ensure it's on top of pause/menu screens
+	layer.name = "SigilMenuLayer"
+
 	get_tree().root.add_child(layer)
 	layer.add_child(menu)
 	menu.set_anchors_preset(Control.PRESET_FULL_RECT)
 	menu.mouse_filter = Control.MOUSE_FILTER_STOP  # Ensure it captures mouse input
+	menu.z_index = 1000  # Force high z-index
 
 	if not menu.tree_exited.is_connected(Callable(self, "_on_overlay_closed")):
 		menu.tree_exited.connect(Callable(self, "_on_overlay_closed").bind(layer))
 
 	print("[LoadoutPanel] Sigil menu added to tree")
+	print("[LoadoutPanel] Menu visible: %s, position: %s, size: %s" % [menu.visible, menu.global_position, menu.size])
+	print("[LoadoutPanel] Layer: %d, z_index: %d, mouse_filter: %d" % [layer.layer, menu.z_index, menu.mouse_filter])
+
+	# Debug: Check what else is in the scene tree
+	await get_tree().process_frame
+	print("[LoadoutPanel] All CanvasLayers in root:")
+	for child in get_tree().root.get_children():
+		if child is CanvasLayer:
+			var cl := child as CanvasLayer
+			print("  - %s (layer %d)" % [child.name, cl.layer])
 
 func _on_overlay_closed(layer: CanvasLayer) -> void:
 	if is_instance_valid(layer):
