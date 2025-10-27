@@ -882,17 +882,29 @@ func _on_burst_pressed() -> void:
 		log_message("Burst system not available!")
 		return
 
+	if not battle_mgr:
+		log_message("Battle manager not available!")
+		return
+
 	# Get current party IDs (all allies in battle)
 	var party_ids: Array = []
-	for combatant in battle_mgr.get_ally_combatants():
-		if not combatant.get("is_ko", false):
-			party_ids.append(combatant.get("id", ""))
+	var allies = battle_mgr.get_ally_combatants()
+	if allies:
+		for combatant in allies:
+			if combatant and not combatant.get("is_ko", false):
+				var id = combatant.get("id", "")
+				if id != "":
+					party_ids.append(id)
+
+	if party_ids.is_empty():
+		log_message("No active party members!")
+		return
 
 	# Get available burst abilities
 	var available_bursts = burst_system.get_available_bursts(party_ids)
 
 	if available_bursts.is_empty():
-		log_message("No burst abilities available!")
+		log_message("No burst abilities unlocked yet!")
 		return
 
 	# Show burst selection menu

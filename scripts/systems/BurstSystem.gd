@@ -92,13 +92,13 @@ func _is_burst_unlocked(burst_data: Dictionary, party_ids: Array) -> bool:
 		if participants.size() >= 2 and _affinity_system:
 			# For duo bursts, check the single pair
 			if participants.size() == 2:
-				var tier = _affinity_system.get_tier(participants[0], participants[1])
+				var tier = _affinity_system.get_affinity_tier(participants[0], participants[1])
 				return tier >= required_tier
 
 			# For trio+ bursts, check all pairs meet the requirement
 			for i in range(participants.size()):
 				for j in range(i + 1, participants.size()):
-					var tier = _affinity_system.get_tier(participants[i], participants[j])
+					var tier = _affinity_system.get_affinity_tier(participants[i], participants[j])
 					if tier < required_tier:
 						return false  # At least one pair doesn't meet tier requirement
 			return true
