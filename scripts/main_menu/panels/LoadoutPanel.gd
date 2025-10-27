@@ -955,10 +955,11 @@ func _on_manage_sigils() -> void:
 
 	var menu: Control = _instance_sigil_menu_scene()
 	var layer := CanvasLayer.new()
-	layer.layer = 100
+	layer.layer = 128  # Higher layer to ensure it's on top of pause/menu screens
 	get_tree().root.add_child(layer)
 	layer.add_child(menu)
 	menu.set_anchors_preset(Control.PRESET_FULL_RECT)
+	menu.mouse_filter = Control.MOUSE_FILTER_STOP  # Ensure it captures mouse input
 
 	if menu.has_method("set_member"):
 		menu.call("set_member", token)
