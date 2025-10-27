@@ -151,8 +151,10 @@ func _show_victory_screen() -> void:
 	victory_panel.add_theme_stylebox_override("panel", style)
 
 	# Position it in center of screen
-	victory_panel.set_anchors_preset(Control.PRESET_CENTER)
-	victory_panel.custom_minimum_size = Vector2(500, 400)
+	victory_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER, Control.PRESET_MODE_MINSIZE)
+	victory_panel.custom_minimum_size = Vector2(500, 450)
+	victory_panel.size = Vector2(500, 450)
+	victory_panel.position = Vector2(-250, -225)  # Center the 500x450 panel
 
 	# Create vertical box for content
 	var vbox = VBoxContainer.new()
