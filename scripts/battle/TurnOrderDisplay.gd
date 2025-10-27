@@ -147,7 +147,7 @@ func _rebuild_display_with_reveal() -> void:
 	is_animating = false
 
 func _rebuild_display() -> void:
-	"""Rebuild the entire turn order display"""
+	"""Rebuild the entire turn order display with fade-in animation"""
 	# Clear existing slots
 	for slot in turn_slots:
 		slot.queue_free()
@@ -166,7 +166,7 @@ func _rebuild_display() -> void:
 	if turn_order.is_empty():
 		return
 
-	# Create slots for upcoming turns
+	# Create slots for upcoming turns with fade-in animation
 	var turns_to_show = min(SHOW_UPCOMING_TURNS, turn_order.size())
 
 	for i in range(turns_to_show):
@@ -174,6 +174,13 @@ func _rebuild_display() -> void:
 		var slot = _create_turn_slot(combatant, i)
 		turn_slots.append(slot)
 		add_child(slot)
+
+		# Start invisible and fade in
+		slot.modulate.a = 0.0
+		var tween = create_tween()
+		tween.set_ease(Tween.EASE_OUT)
+		tween.set_trans(Tween.TRANS_CUBIC)
+		tween.tween_property(slot, "modulate:a", 1.0, 0.3)
 
 	# Store current order for future animations
 	_store_current_order()
