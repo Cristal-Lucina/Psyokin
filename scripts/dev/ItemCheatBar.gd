@@ -1611,7 +1611,7 @@ func _on_give_test_items() -> void:
 		_inv.emit_signal("items_changed")
 
 	print("[ItemsCheatBar] Added %d test items (x10 each)" % test_items_dict.size())
-	_refresh_defs()
+	# NOTE: _refresh_defs() is already called by the items_loaded signal from set_item_defs()
 
 func _push_to_dorm_common(member_ids: Array[String]) -> void:
 	if member_ids.size() == 0:
