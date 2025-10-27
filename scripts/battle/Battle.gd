@@ -1717,9 +1717,13 @@ func _execute_skill_single(target: Dictionary) -> void:
 
 	# Apply damage
 	target.hp -= damage
-	if target.hp < 0:
+	if target.hp <= 0:
 		target.hp = 0
 		target.is_ko = true
+
+		# Record kill for morality system (if enemy)
+		if not target.get("is_ally", false):
+			battle_mgr.record_enemy_defeat(target, false)  # false = kill
 
 	# Record weakness hits AFTER damage (only if target still alive)
 	# Skills count crits and type advantages as weakness hits
