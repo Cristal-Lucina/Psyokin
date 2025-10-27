@@ -1164,23 +1164,31 @@ func _main_toast(msg: String) -> void:
 	dlg.queue_free()
 
 ## ═══════════════════════════════════════════════════════════════
-## TEST/DEBUG HELPERS - Capture System
+## TEST/DEBUG HELPERS - Battle System
 ## ═══════════════════════════════════════════════════════════════
 
-## DEV: Give player bind items for testing capture system
+## DEV: Give player test items for testing battle systems
 ## Call this from console or add to _ready() for automatic testing
 func _give_test_bind_items() -> void:
-	"""Give player bind items for testing the capture system"""
+	"""Give player test items for testing the capture and item systems"""
 	if not inv:
 		print("[Main] Cannot give test items - inventory system not available")
 		return
 
-	# Give a variety of bind items for testing
+	# Give a variety of bind items for testing capture
 	inv.add_item("BIND_001", 5)  # Weak Bind (+10 capture)
 	inv.add_item("BIND_002", 3)  # Standard Bind (+25 capture)
 	inv.add_item("BIND_003", 2)  # Strong Bind (+40 capture)
 
-	print("[Main] DEBUG: Added test bind items to inventory")
-	print("  - Weak Bind x5")
-	print("  - Standard Bind x3")
-	print("  - Strong Bind x2")
+	# Give consumable items for testing
+	inv.add_item("CON_001", 10)  # Health Drink (50 HP)
+	inv.add_item("CON_002", 10)  # Mind Drink (30 MP)
+
+	print("[Main] DEBUG: Added test items to inventory")
+	print("  Bind Items:")
+	print("    - Weak Bind x5")
+	print("    - Standard Bind x3")
+	print("    - Strong Bind x2")
+	print("  Consumables:")
+	print("    - Health Drink x10")
+	print("    - Mind Drink x10")

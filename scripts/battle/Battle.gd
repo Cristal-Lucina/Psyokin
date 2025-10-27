@@ -26,9 +26,13 @@ var target_candidates: Array = []
 var skill_definitions: Dictionary = {}  # skill_id -> skill data
 var awaiting_skill_selection: bool = false
 var awaiting_capture_target: bool = false  # True when selecting target for capture
+var awaiting_item_target: bool = false  # True when selecting target for item usage
 var skill_to_use: Dictionary = {}  # Selected skill data
 var skill_menu_panel: PanelContainer = null  # Skill selection menu
+var item_menu_panel: PanelContainer = null  # Item selection menu
+var capture_menu_panel: PanelContainer = null  # Capture selection menu
 var current_skill_menu: Array = []  # Current skills in menu
+var selected_item: Dictionary = {}  # Selected item data
 
 func _ready() -> void:
 	print("[Battle] Battle scene loaded")
@@ -207,10 +211,12 @@ func _create_combatant_slot(combatant: Dictionary, is_ally: bool) -> PanelContai
 	panel.set_meta("combatant_id", combatant.id)
 	panel.set_meta("is_ally", is_ally)
 
-	# Make enemy panels clickable for targeting
+	# Make panels clickable for targeting
+	panel.mouse_filter = Control.MOUSE_FILTER_PASS
 	if not is_ally:
-		panel.mouse_filter = Control.MOUSE_FILTER_PASS
 		panel.gui_input.connect(_on_enemy_panel_input.bind(combatant))
+	else:
+		panel.gui_input.connect(_on_ally_panel_input.bind(combatant))
 
 	return panel
 
@@ -424,17 +430,48 @@ func _on_skill_pressed() -> void:
 	_show_skill_menu(skill_menu)
 
 func _on_item_pressed() -> void:
-	"""Handle Item/Type Switch action"""
-	# Check if this is the hero
-	if current_combatant.id == "hero":
-		_show_mind_type_menu()
-	else:
-		log_message("Items not yet implemented")
-		# TODO: Show item menu
+	"""Handle Item action - show usable items menu"""
+	var inventory = get_node_or_null("/root/aInventorySystem")
+	if not inventory:
+		log_message("Inventory system not available!")
+		return
+
+	# Get all consumable items player has
+	var item_counts = inventory.get_counts_dict()
+	var item_defs = inventory.get_item_defs()
+	var usable_items: Array = []
+
+	for item_id in item_counts:
+		var count = item_counts[item_id]
+		if count <= 0:
+			continue
+
+		var item_def = item_defs.get(item_id, {})
+		var use_type = String(item_def.get("use_type", ""))
+		var category = String(item_def.get("category", ""))
+
+		# Include items that can be used in battle (use_type = "battle" or "both")
+		# Exclude bind items (those are for Capture button)
+		if use_type in ["battle", "both"] and category != "Battle Items":
+			usable_items.append({
+				"id": item_id,
+				"name": item_def.get("name", item_id),
+				"display_name": item_def.get("name", item_id),
+				"description": item_def.get("short_description", ""),
+				"count": count,
+				"targeting": item_def.get("targeting", "Ally"),
+				"item_def": item_def
+			})
+
+	if usable_items.is_empty():
+		log_message("No usable items!")
+		return
+
+	# Show item selection menu
+	_show_item_menu(usable_items)
 
 func _on_capture_pressed() -> void:
-	"""Handle Capture action - attempt to capture an enemy with a bind item"""
-	# Get inventory system
+	"""Handle Capture action - show bind item selection menu"""
 	var inventory = get_node_or_null("/root/aInventorySystem")
 	if not inventory:
 		log_message("Inventory system not available!")
@@ -450,34 +487,20 @@ func _on_capture_pressed() -> void:
 			var item_def = inventory.get_item_def(bind_id)
 			bind_items.append({
 				"id": bind_id,
-				"name": item_def.get("display_name", bind_id),
+				"name": item_def.get("name", bind_id),
+				"display_name": item_def.get("name", bind_id),
+				"description": item_def.get("short_description", ""),
 				"capture_mod": int(item_def.get("capture_mod", 0)),
-				"count": count
+				"count": count,
+				"item_def": item_def
 			})
 
 	if bind_items.is_empty():
 		log_message("No bind items available!")
 		return
 
-	# For now, auto-select the first available bind (TODO: show selection menu)
-	var selected_bind = bind_items[0]
-	log_message("Using %s (x%d) - select target..." % [selected_bind.name, selected_bind.count])
-
-	# Get alive enemies
-	var enemies = battle_mgr.get_enemy_combatants()
-	target_candidates = enemies.filter(func(e): return not e.is_ko and not e.get("is_captured", false))
-
-	if target_candidates.is_empty():
-		log_message("No valid targets to capture!")
-		return
-
-	# Store selected bind for use after target selection
-	set_meta("pending_capture_bind", selected_bind)
-
-	# Enable capture target selection mode
-	awaiting_target_selection = true
-	awaiting_capture_target = true
-	_highlight_target_candidates()
+	# Show bind selection menu
+	_show_capture_menu(bind_items)
 
 func _execute_capture(target: Dictionary) -> void:
 	"""Execute capture attempt on selected target"""
@@ -531,6 +554,70 @@ func _execute_capture(target: Dictionary) -> void:
 	else:
 		# Capture failed
 		log_message("  → FAILED! %s broke free!" % target.display_name)
+
+	# End turn
+	battle_mgr.end_turn()
+
+func _execute_item_usage(target: Dictionary) -> void:
+	"""Execute item usage on selected target"""
+	awaiting_target_selection = false
+	awaiting_item_target = false
+	_clear_target_highlights()
+
+	# Get the item that was selected
+	if selected_item.is_empty():
+		log_message("Item usage failed - no item selected!")
+		return
+
+	var item_id: String = selected_item.id
+	var item_name: String = selected_item.name
+	var item_def: Dictionary = selected_item.item_def
+
+	log_message("%s uses %s on %s!" % [current_combatant.display_name, item_name, target.display_name])
+
+	# Apply item effects based on battle_status_effect
+	var effect: String = String(item_def.get("battle_status_effect", ""))
+
+	if "Heal" in effect:
+		# Parse heal amount from effect string (e.g., "Heal 50 HP")
+		var hp_heal = 0
+		var mp_heal = 0
+
+		if "HP" in effect:
+			# Extract number before "HP"
+			var regex = RegEx.new()
+			regex.compile("(\\d+)\\s*HP")
+			var result = regex.search(effect)
+			if result:
+				hp_heal = int(result.get_string(1))
+
+		if "MP" in effect:
+			# Extract number before "MP"
+			var regex = RegEx.new()
+			regex.compile("(\\d+)\\s*MP")
+			var result = regex.search(effect)
+			if result:
+				mp_heal = int(result.get_string(1))
+
+		# Apply healing
+		if hp_heal > 0:
+			var old_hp = target.hp
+			target.hp = min(target.hp + hp_heal, target.hp_max)
+			var actual_heal = target.hp - old_hp
+			log_message("  → Restored %d HP!" % actual_heal)
+
+		if mp_heal > 0:
+			var old_mp = target.mp
+			target.mp = min(target.mp + mp_heal, target.mp_max)
+			var actual_heal = target.mp - old_mp
+			log_message("  → Restored %d MP!" % actual_heal)
+
+		# Update displays
+		_update_combatant_displays()
+
+	# Consume the item
+	var inventory = get_node("/root/aInventorySystem")
+	inventory.remove_item(item_id, 1)
 
 	# End turn
 	battle_mgr.end_turn()
@@ -642,6 +729,9 @@ func _on_enemy_panel_input(event: InputEvent, target: Dictionary) -> void:
 					if awaiting_capture_target:
 						# Attempting capture
 						_execute_capture(target)
+					elif awaiting_item_target:
+						# Using an item
+						_execute_item_usage(target)
 					elif awaiting_skill_selection:
 						# Using a skill
 						_clear_target_highlights()
@@ -653,8 +743,19 @@ func _on_enemy_panel_input(event: InputEvent, target: Dictionary) -> void:
 						# Regular attack
 						_execute_attack(target)
 
+func _on_ally_panel_input(event: InputEvent, target: Dictionary) -> void:
+	"""Handle clicks on ally panels (for item targeting)"""
+	if event is InputEventMouseButton:
+		var mb_event = event as InputEventMouseButton
+		if mb_event.pressed and mb_event.button_index == MOUSE_BUTTON_LEFT:
+			if awaiting_target_selection and awaiting_item_target:
+				# Check if this target is valid
+				if target in target_candidates:
+					_execute_item_usage(target)
+
 func _highlight_target_candidates() -> void:
 	"""Highlight valid targets with a visual indicator"""
+	# Highlight enemies
 	for child in enemy_slots.get_children():
 		var combatant_id = child.get_meta("combatant_id", "")
 		var is_candidate = target_candidates.any(func(c): return c.id == combatant_id)
@@ -670,9 +771,28 @@ func _highlight_target_candidates() -> void:
 			style.border_color = Color(1.0, 1.0, 0.0, 1.0)  # Yellow highlight
 			child.add_theme_stylebox_override("panel", style)
 
+	# Highlight allies (for items)
+	for child in ally_slots.get_children():
+		var combatant_id = child.get_meta("combatant_id", "")
+		var is_candidate = target_candidates.any(func(c): return c.id == combatant_id)
+
+		if is_candidate:
+			# Add green border to indicate targetable ally
+			var style = StyleBoxFlat.new()
+			style.bg_color = Color(0.2, 0.3, 0.2, 0.9)
+			style.border_width_left = 4
+			style.border_width_right = 4
+			style.border_width_top = 4
+			style.border_width_bottom = 4
+			style.border_color = Color(0.0, 1.0, 0.0, 1.0)  # Green highlight
+			child.add_theme_stylebox_override("panel", style)
+
 func _clear_target_highlights() -> void:
 	"""Remove targeting highlights from all panels"""
 	for child in enemy_slots.get_children():
+		# Reset to default panel style
+		child.remove_theme_stylebox_override("panel")
+	for child in ally_slots.get_children():
 		# Reset to default panel style
 		child.remove_theme_stylebox_override("panel")
 
@@ -1034,6 +1154,210 @@ func _close_skill_menu() -> void:
 
 	# Show action menu again
 	action_menu.visible = true
+
+## ═══════════════════════════════════════════════════════════════
+## ITEM MENU
+## ═══════════════════════════════════════════════════════════════
+
+func _show_item_menu(items: Array) -> void:
+	"""Show item selection menu"""
+	# Hide action menu
+	action_menu.visible = false
+
+	# Create item menu panel
+	item_menu_panel = PanelContainer.new()
+	item_menu_panel.custom_minimum_size = Vector2(400, 0)
+
+	# Style the panel
+	var style = StyleBoxFlat.new()
+	style.bg_color = Color(0.1, 0.1, 0.15, 0.95)
+	style.border_width_left = 2
+	style.border_width_right = 2
+	style.border_width_top = 2
+	style.border_width_bottom = 2
+	style.border_color = Color(0.5, 0.5, 0.6, 1.0)
+	item_menu_panel.add_theme_stylebox_override("panel", style)
+
+	# Create VBox for menu items
+	var vbox = VBoxContainer.new()
+	item_menu_panel.add_child(vbox)
+
+	# Title
+	var title = Label.new()
+	title.text = "Select an Item"
+	title.add_theme_font_size_override("font_size", 18)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(title)
+
+	# Add separator
+	var sep1 = HSeparator.new()
+	vbox.add_child(sep1)
+
+	# Add item buttons
+	for i in range(items.size()):
+		var item_data = items[i]
+		var item_name = String(item_data.get("name", "Unknown"))
+		var item_desc = String(item_data.get("description", ""))
+		var item_count = int(item_data.get("count", 0))
+
+		var button = Button.new()
+		button.text = "%s (x%d)\n%s" % [item_name, item_count, item_desc]
+		button.custom_minimum_size = Vector2(380, 50)
+		button.pressed.connect(_on_item_selected.bind(item_data))
+		vbox.add_child(button)
+
+	# Add cancel button
+	var sep2 = HSeparator.new()
+	vbox.add_child(sep2)
+
+	var cancel_btn = Button.new()
+	cancel_btn.text = "Cancel"
+	cancel_btn.custom_minimum_size = Vector2(380, 40)
+	cancel_btn.pressed.connect(_close_item_menu)
+	vbox.add_child(cancel_btn)
+
+	# Add to scene and center
+	add_child(item_menu_panel)
+	item_menu_panel.position = Vector2(
+		(get_viewport_rect().size.x - 400) / 2,
+		(get_viewport_rect().size.y - vbox.size.y) / 2
+	)
+
+func _close_item_menu() -> void:
+	"""Close the item menu"""
+	if item_menu_panel:
+		item_menu_panel.queue_free()
+		item_menu_panel = null
+
+	# Show action menu again
+	action_menu.visible = true
+
+func _on_item_selected(item_data: Dictionary) -> void:
+	"""Handle item selection from menu"""
+	_close_item_menu()
+
+	# Store selected item
+	selected_item = item_data
+
+	var targeting = String(item_data.get("targeting", "Ally"))
+	log_message("Using %s - select target..." % item_data.name)
+
+	# Determine target candidates
+	if targeting == "Ally":
+		var allies = battle_mgr.get_ally_combatants()
+		target_candidates = allies.filter(func(a): return not a.is_ko)
+	else:  # Enemy
+		var enemies = battle_mgr.get_enemy_combatants()
+		target_candidates = enemies.filter(func(e): return not e.is_ko)
+
+	if target_candidates.is_empty():
+		log_message("No valid targets!")
+		return
+
+	# Enable target selection mode
+	awaiting_target_selection = true
+	awaiting_item_target = true
+	_highlight_target_candidates()
+
+## ═══════════════════════════════════════════════════════════════
+## CAPTURE/BIND MENU
+## ═══════════════════════════════════════════════════════════════
+
+func _show_capture_menu(bind_items: Array) -> void:
+	"""Show bind item selection menu for capture"""
+	# Hide action menu
+	action_menu.visible = false
+
+	# Create capture menu panel
+	capture_menu_panel = PanelContainer.new()
+	capture_menu_panel.custom_minimum_size = Vector2(400, 0)
+
+	# Style the panel
+	var style = StyleBoxFlat.new()
+	style.bg_color = Color(0.1, 0.1, 0.15, 0.95)
+	style.border_width_left = 2
+	style.border_width_right = 2
+	style.border_width_top = 2
+	style.border_width_bottom = 2
+	style.border_color = Color(0.5, 0.5, 0.6, 1.0)
+	capture_menu_panel.add_theme_stylebox_override("panel", style)
+
+	# Create VBox for menu items
+	var vbox = VBoxContainer.new()
+	capture_menu_panel.add_child(vbox)
+
+	# Title
+	var title = Label.new()
+	title.text = "Select a Bind Device"
+	title.add_theme_font_size_override("font_size", 18)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(title)
+
+	# Add separator
+	var sep1 = HSeparator.new()
+	vbox.add_child(sep1)
+
+	# Add bind item buttons
+	for i in range(bind_items.size()):
+		var bind_data = bind_items[i]
+		var bind_name = String(bind_data.get("name", "Unknown"))
+		var bind_desc = String(bind_data.get("description", ""))
+		var bind_count = int(bind_data.get("count", 0))
+		var capture_mod = int(bind_data.get("capture_mod", 0))
+
+		var button = Button.new()
+		button.text = "%s (x%d) [+%d%%]\n%s" % [bind_name, bind_count, capture_mod, bind_desc]
+		button.custom_minimum_size = Vector2(380, 50)
+		button.pressed.connect(_on_bind_selected.bind(bind_data))
+		vbox.add_child(button)
+
+	# Add cancel button
+	var sep2 = HSeparator.new()
+	vbox.add_child(sep2)
+
+	var cancel_btn = Button.new()
+	cancel_btn.text = "Cancel"
+	cancel_btn.custom_minimum_size = Vector2(380, 40)
+	cancel_btn.pressed.connect(_close_capture_menu)
+	vbox.add_child(cancel_btn)
+
+	# Add to scene and center
+	add_child(capture_menu_panel)
+	capture_menu_panel.position = Vector2(
+		(get_viewport_rect().size.x - 400) / 2,
+		(get_viewport_rect().size.y - vbox.size.y) / 2
+	)
+
+func _close_capture_menu() -> void:
+	"""Close the capture menu"""
+	if capture_menu_panel:
+		capture_menu_panel.queue_free()
+		capture_menu_panel = null
+
+	# Show action menu again
+	action_menu.visible = true
+
+func _on_bind_selected(bind_data: Dictionary) -> void:
+	"""Handle bind item selection from capture menu"""
+	_close_capture_menu()
+
+	log_message("Using %s (x%d) - select target..." % [bind_data.name, bind_data.count])
+
+	# Get alive enemies
+	var enemies = battle_mgr.get_enemy_combatants()
+	target_candidates = enemies.filter(func(e): return not e.is_ko and not e.get("is_captured", false))
+
+	if target_candidates.is_empty():
+		log_message("No valid targets to capture!")
+		return
+
+	# Store selected bind for use after target selection
+	set_meta("pending_capture_bind", bind_data)
+
+	# Enable capture target selection mode
+	awaiting_target_selection = true
+	awaiting_capture_target = true
+	_highlight_target_candidates()
 
 func _on_skill_selected(skill_entry: Dictionary) -> void:
 	"""Handle skill selection"""
