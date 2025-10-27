@@ -597,7 +597,7 @@ func calculate_capture_chance(enemy: Dictionary, options: Dictionary = {}) -> Di
 
 	# Calculate HP percentage
 	var current_hp: int = enemy.get("hp", 1)
-	var max_hp: int = enemy.get("max_hp", 1)
+	var max_hp: int = enemy.get("hp_max", 1)  # Fixed: field is "hp_max" not "max_hp"
 	var hp_percent: float = (float(current_hp) / float(max_hp)) * 100.0
 
 	# HP penalty (lower HP = better capture chance)
