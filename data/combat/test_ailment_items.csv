@@ -1,14 +1,14 @@
 item_id,name,category,use_type,targeting,battle_status_effect,round_duration,short_description
-TEST_POISON,Test Poison Vial,Test,battle,Enemy,Poison,3,Inflict poison on enemy for testing
-TEST_BURN,Test Fire Brand,Test,battle,Enemy,Burn,3,Inflict burn on enemy for testing
-TEST_SLEEP,Test Sleep Dust,Test,battle,Enemy,Sleep,2,Put enemy to sleep for testing
-TEST_FREEZE,Test Ice Shard,Test,battle,Enemy,Freeze,2,Freeze enemy for testing
-TEST_CONFUSE,Test Confusion Gas,Test,battle,Enemy,Confuse,3,Confuse enemy for testing
-TEST_CHARM,Test Charm Spell,Test,battle,Enemy,Charm,2,Charm enemy for testing
-TEST_BERSERK,Test Rage Potion,Test,battle,Enemy,Berserk,3,Enrage enemy for testing
-TEST_MALAISE,Test Weakness Hex,Test,battle,Enemy,Malaise,3,Inflict malaise on enemy for testing
-TEST_MIND_BLOCK,Test Mind Block,Test,battle,Enemy,Mind Block,3,Block enemy mind skills for testing
-TEST_ATK_DOWN,Test Weaken Strike,Test,battle,Enemy,Attack Down,3,Lower enemy attack for testing
-TEST_DEF_DOWN,Test Armor Break,Test,battle,Enemy,Defense Down,3,Lower enemy defense for testing
-TEST_MND_DOWN,Test Mind Drain,Test,battle,Enemy,Mind Down,3,Lower enemy mind for testing
+TEST_POISON,Test Poison Vial,Test,battle,Ally,Poison,3,Inflict poison on ally for testing
+TEST_BURN,Test Fire Brand,Test,battle,Ally,Burn,3,Inflict burn on ally for testing
+TEST_SLEEP,Test Sleep Dust,Test,battle,Ally,Sleep,2,Put ally to sleep for testing
+TEST_FREEZE,Test Ice Shard,Test,battle,Ally,Freeze,2,Freeze ally for testing
+TEST_CONFUSE,Test Confusion Gas,Test,battle,Ally,Confuse,3,Confuse ally for testing
+TEST_CHARM,Test Charm Spell,Test,battle,Ally,Charm,2,Charm ally for testing
+TEST_BERSERK,Test Rage Potion,Test,battle,Ally,Berserk,3,Enrage ally for testing
+TEST_MALAISE,Test Weakness Hex,Test,battle,Ally,Malaise,3,Inflict malaise on ally for testing
+TEST_MIND_BLOCK,Test Mind Block,Test,battle,Ally,Mind Block,3,Block ally mind skills for testing
+TEST_ATK_DOWN,Test Weaken Strike,Test,battle,Ally,Attack Down,3,Lower ally attack for testing
+TEST_DEF_DOWN,Test Armor Break,Test,battle,Ally,Defense Down,3,Lower ally defense for testing
+TEST_MND_DOWN,Test Mind Drain,Test,battle,Ally,Mind Down,3,Lower ally mind for testing
 TEST_CURE_ALL,Test Panacea,Test,battle,Ally,Cure All,1,Remove all ailments for testing
