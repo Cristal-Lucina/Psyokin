@@ -13,6 +13,9 @@ class_name CombatResolver
 const DMG_FLOOR_ENEMY_TO_PLAYER: float = 0.15  # 15% minimum
 const DMG_FLOOR_PLAYER_TO_ENEMY: float = 0.20  # 20% minimum
 
+## Enemy damage reduction for balancing
+const ENEMY_DAMAGE_MULT: float = 0.7  # Enemies deal 70% damage (30% reduction)
+
 ## Defend multiplier
 const DEFEND_MULT: float = 0.7  # -30% damage when defending
 
@@ -106,8 +109,9 @@ func check_physical_hit(attacker: Dictionary, defender: Dictionary, options: Dic
 	Check if a physical attack hits
 
 	Formula: Hit% = WeaponACC + 0.25·TPO + mods
-	         Eva% = FootwearEVA + 0.25·VTL + mods
+	         Eva% = FootwearEVA + 0.15·VTL + mods
 	         Final = clamp(Hit − Eva, 5, 95)
+	         (Base accuracy increased to 90%, evasion scaling reduced for better hit rates)
 
 	Returns:
 	- hit: bool (did it hit?)
@@ -117,7 +121,7 @@ func check_physical_hit(attacker: Dictionary, defender: Dictionary, options: Dic
 
 	# Get attacker weapon stats
 	var weapon = _get_weapon_stats(attacker.id)
-	var base_acc = weapon.get("acc", 75)  # Default 75% base accuracy
+	var base_acc = weapon.get("acc", 90)  # Default 90% base accuracy
 
 	# Get attacker TPO
 	var tpo = attacker.stats.get("TPO", 1)
@@ -132,8 +136,8 @@ func check_physical_hit(attacker: Dictionary, defender: Dictionary, options: Dic
 	# Get defender VTL (for physical evasion)
 	var vtl = defender.stats.get("VTL", 1)
 
-	# Calculate eva%
-	var eva_percent = base_eva + (0.25 * vtl)
+	# Calculate eva% (reduced from 0.25 to 0.15 for better hit rates)
+	var eva_percent = base_eva + (0.15 * vtl)
 
 	# Final hit chance = Hit - Eva, clamped [5, 95]
 	var final_hit = clamp(hit_percent - eva_percent, HIT_EVA_MIN, HIT_EVA_MAX)
@@ -162,8 +166,9 @@ func check_sigil_hit(attacker: Dictionary, defender: Dictionary, options: Dictio
 	Check if a sigil/skill hits
 
 	Formula: Hit% = SkillACC + WeaponSkillBoost + 0.25·TPO + mods
-	         Eva% = FootwearEVA + 0.25·FCS + mods
+	         Eva% = FootwearEVA + 0.15·FCS + mods
 	         Final = clamp(Hit − Eva, 5, 95)
+	         (Base skill accuracy increased to 95%, evasion scaling reduced for better hit rates)
 
 	Returns:
 	- hit: bool
@@ -172,7 +177,7 @@ func check_sigil_hit(attacker: Dictionary, defender: Dictionary, options: Dictio
 	"""
 
 	# Get skill base accuracy
-	var skill_acc = options.get("skill_acc", 85)  # Default 85% for skills
+	var skill_acc = options.get("skill_acc", 95)  # Default 95% for skills
 
 	# Get weapon's skill boost
 	var weapon = _get_weapon_stats(attacker.id)
@@ -191,8 +196,8 @@ func check_sigil_hit(attacker: Dictionary, defender: Dictionary, options: Dictio
 	# Get defender FCS (for sigil evasion)
 	var fcs = defender.stats.get("FCS", 1)
 
-	# Calculate eva%
-	var eva_percent = base_eva + (0.25 * fcs)
+	# Calculate eva% (reduced from 0.25 to 0.15 for better hit rates)
+	var eva_percent = base_eva + (0.15 * fcs)
 
 	# Final hit chance
 	var final_hit = clamp(hit_percent - eva_percent, HIT_EVA_MIN, HIT_EVA_MAX)
@@ -340,10 +345,14 @@ func calculate_physical_damage(attacker: Dictionary, defender: Dictionary, optio
 
 	var dmg_after_mods: float = raw_damage * defend_mult * shield_mult
 
-	# Step 5: Apply mitigation floor
+	# Step 5: Apply enemy damage reduction (for balancing)
+	var enemy_mult: float = ENEMY_DAMAGE_MULT if not attacker.get("is_ally", false) else 1.0
+	dmg_after_mods = dmg_after_mods * enemy_mult
+
+	# Step 6: Apply mitigation floor
 	# DMG = max(DMG, ceil(ATK_Power × DMG_FLOOR))
 	var dmg_floor: float = DMG_FLOOR_PLAYER_TO_ENEMY if attacker.get("is_ally", false) else DMG_FLOOR_ENEMY_TO_PLAYER
-	var min_damage: int = int(ceil(atk_power * dmg_floor))
+	var min_damage: int = int(ceil(atk_power * dmg_floor * enemy_mult))
 
 	var final_damage: int = int(floor(dmg_after_mods))
 	final_damage = max(final_damage, min_damage)
@@ -434,9 +443,13 @@ func calculate_sigil_damage(attacker: Dictionary, defender: Dictionary, options:
 
 	var dmg_after_mods: float = raw_damage * defend_mult * shield_mult
 
-	# Step 5: Apply mitigation floor
+	# Step 5: Apply enemy damage reduction (for balancing)
+	var enemy_mult: float = ENEMY_DAMAGE_MULT if not attacker.get("is_ally", false) else 1.0
+	dmg_after_mods = dmg_after_mods * enemy_mult
+
+	# Step 6: Apply mitigation floor
 	var dmg_floor: float = DMG_FLOOR_PLAYER_TO_ENEMY if attacker.get("is_ally", false) else DMG_FLOOR_ENEMY_TO_PLAYER
-	var min_damage: int = int(ceil(skill_power * dmg_floor))
+	var min_damage: int = int(ceil(skill_power * dmg_floor * enemy_mult))
 
 	var final_damage: int = int(floor(dmg_after_mods))
 	final_damage = max(final_damage, min_damage)
@@ -473,7 +486,7 @@ func _get_weapon_stats(member_id: String) -> Dictionary:
 				"watk": weapon.get("watk", 10),
 				"sig": weapon.get("sig", 0),
 				"brw_scale": weapon.get("brw_scale", 0.5),
-				"acc": weapon.get("acc", 75),
+				"acc": weapon.get("acc", 90),
 				"skill_acc_bonus": weapon.get("skill_acc_bonus", 0),
 				"crit_bonus": weapon.get("crit_bonus_pct", 0)
 			}
@@ -483,7 +496,7 @@ func _get_weapon_stats(member_id: String) -> Dictionary:
 		"watk": 10,
 		"sig": 0,
 		"brw_scale": 0.5,
-		"acc": 75,
+		"acc": 90,
 		"skill_acc_bonus": 0,
 		"crit_bonus": 0
 	}

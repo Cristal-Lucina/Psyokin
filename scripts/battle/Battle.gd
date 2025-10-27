@@ -7,6 +7,7 @@ class_name Battle
 @onready var battle_mgr = get_node("/root/aBattleManager")
 @onready var gs = get_node("/root/aGameState")
 @onready var combat_resolver: CombatResolver = CombatResolver.new()
+@onready var csv_loader = get_node("/root/aCSVLoader")
 
 ## UI References
 @onready var action_menu: VBoxContainer = %ActionMenu
@@ -22,6 +23,11 @@ class_name Battle
 var current_combatant: Dictionary = {}
 var awaiting_target_selection: bool = false
 var target_candidates: Array = []
+var skill_definitions: Dictionary = {}  # skill_id -> skill data
+var awaiting_skill_selection: bool = false
+var skill_to_use: Dictionary = {}  # Selected skill data
+var skill_menu_panel: PanelContainer = null  # Skill selection menu
+var current_skill_menu: Array = []  # Current skills in menu
 
 func _ready() -> void:
 	print("[Battle] Battle scene loaded")
@@ -31,6 +37,9 @@ func _ready() -> void:
 
 	# Wait for next frame to ensure all autoloads are ready
 	await get_tree().process_frame
+
+	# Load skill definitions
+	_load_skills()
 
 	# Connect to battle manager signals
 	battle_mgr.battle_started.connect(_on_battle_started)
@@ -44,6 +53,14 @@ func _ready() -> void:
 
 	# Initialize battle with party and enemies
 	_initialize_battle()
+
+func _load_skills() -> void:
+	"""Load skill definitions from skills.csv"""
+	skill_definitions = csv_loader.load_csv("res://data/skills/skills.csv", "skill_id")
+	if skill_definitions and not skill_definitions.is_empty():
+		print("[Battle] Loaded %d skill definitions" % skill_definitions.size())
+	else:
+		push_error("[Battle] Failed to load skills.csv")
 
 func _initialize_battle() -> void:
 	"""Initialize the battle from encounter data"""
@@ -100,15 +117,19 @@ func _on_battle_ended(victory: bool) -> void:
 	"""Called when battle ends"""
 	if victory:
 		log_message("*** VICTORY ***")
+		log_message("All enemies have been defeated!")
 		# TODO: Show victory screen, award rewards
 		await get_tree().create_timer(2.0).timeout
+		# Return to overworld
+		battle_mgr.return_to_overworld()
 	else:
 		log_message("*** DEFEAT ***")
-		# TODO: Show defeat screen
-		await get_tree().create_timer(2.0).timeout
-
-	# Return to overworld
-	battle_mgr.return_to_overworld()
+		log_message("Your party has been wiped out!")
+		log_message("GAME OVER")
+		# TODO: Show game over screen with retry/load options
+		await get_tree().create_timer(3.0).timeout
+		# For now, return to main menu or reload
+		get_tree().change_scene_to_file("res://scenes/main/Main.tscn")
 
 ## ═══════════════════════════════════════════════════════════════
 ## COMBATANT DISPLAY
@@ -138,6 +159,11 @@ func _create_combatant_slot(combatant: Dictionary, is_ally: bool) -> PanelContai
 	"""Create a UI slot for a combatant"""
 	var panel = PanelContainer.new()
 	panel.custom_minimum_size = Vector2(150, 100)
+
+	# Hide KO'd enemies - move off screen and make invisible
+	if not is_ally and combatant.get("is_ko", false):
+		panel.visible = false
+		panel.position = Vector2(-1000, -1000)  # Move off screen
 
 	var vbox = VBoxContainer.new()
 	panel.add_child(vbox)
@@ -200,6 +226,15 @@ func _show_action_menu() -> void:
 	"""Show the action menu for player's turn"""
 	action_menu.visible = true
 
+	# Disable Run button if already attempted this round
+	var run_button = action_menu.get_node_or_null("RunButton")
+	if run_button and run_button is Button:
+		run_button.disabled = battle_mgr.run_attempted_this_round
+		if battle_mgr.run_attempted_this_round:
+			run_button.text = "Run (Used)"
+		else:
+			run_button.text = "Run"
+
 	# TODO: Enable/disable actions based on state
 	# e.g., disable skills if no MP, disable burst if gauge too low
 
@@ -224,6 +259,9 @@ func _execute_attack(target: Dictionary) -> void:
 	awaiting_target_selection = false
 	_clear_target_highlights()
 
+	# Clear defending status when attacking
+	current_combatant.is_defending = false
+
 	log_message("%s attacks %s!" % [current_combatant.display_name, target.display_name])
 
 	if target:
@@ -242,14 +280,11 @@ func _execute_attack(target: Dictionary) -> void:
 			# Calculate mind type effectiveness
 			var type_bonus = combat_resolver.get_mind_type_bonus(current_combatant, target)
 
-			# Check weapon type weakness
+			# Check weapon type weakness (check now, record later after damage)
 			var weapon_weakness_hit = combat_resolver.check_weapon_weakness(current_combatant, target)
-			if weapon_weakness_hit:
-				var became_fallen = battle_mgr.record_weapon_weakness_hit(target)
-				var weapon_desc = combat_resolver.get_weapon_type_description(current_combatant, target)
-				log_message("  → WEAPON WEAKNESS! %s" % weapon_desc)
-				if became_fallen:
-					log_message("  → %s is FALLEN! (will skip next turn)" % target.display_name)
+
+			# Critical hits also count as weakness hits for stumbling
+			var crit_weakness_hit = is_crit
 
 			# Calculate damage
 			var damage_result = combat_resolver.calculate_physical_damage(
@@ -271,6 +306,17 @@ func _execute_attack(target: Dictionary) -> void:
 				target.hp = 0
 				target.is_ko = true
 
+			# Record weakness hits AFTER damage (only if target still alive)
+			if not target.is_ko and (weapon_weakness_hit or crit_weakness_hit):
+				var became_fallen = await battle_mgr.record_weapon_weakness_hit(target)
+				if weapon_weakness_hit:
+					var weapon_desc = combat_resolver.get_weapon_type_description(current_combatant, target)
+					log_message("  → WEAPON WEAKNESS! %s" % weapon_desc)
+				elif crit_weakness_hit:
+					log_message("  → CRITICAL STUMBLE!")
+				if became_fallen:
+					log_message("  → %s is FALLEN! (will skip next turn)" % target.display_name)
+
 			# Log the hit with details
 			var hit_msg = "  → Hit %s for %d damage! (%d%% chance)" % [target.display_name, damage, int(hit_check.hit_chance)]
 			if is_crit:
@@ -279,6 +325,11 @@ func _execute_attack(target: Dictionary) -> void:
 				hit_msg += " (Super Effective!)"
 			elif type_bonus < 0.0:
 				hit_msg += " (Not Very Effective...)"
+			if target.get("is_defending", false):
+				# Calculate damage reduction from defensive stance (0.7 multiplier = 30% reduction)
+				var damage_without_defense = int(round(damage / 0.7))
+				var damage_reduced = damage_without_defense - damage
+				hit_msg += " (Defensive: -%d)" % damage_reduced
 			log_message(hit_msg)
 
 			# Debug: show hit, crit, and damage breakdown
@@ -312,26 +363,73 @@ func _execute_attack(target: Dictionary) -> void:
 			_update_combatant_displays()
 			_update_burst_gauge()
 
-			# Update turn order display
-			if turn_order_display:
+			# Refresh turn order if combatant was KO'd
+			if target.is_ko:
+				# Animate falling and then re-sort turn order
+				if turn_order_display:
+					await turn_order_display.animate_ko_fall(target.id)
+				await battle_mgr.refresh_turn_order()
+			elif turn_order_display:
 				turn_order_display.update_combatant_hp(target.id)
 
 	# End turn
 	battle_mgr.end_turn()
 
 func _on_skill_pressed() -> void:
-	"""Handle Skill action"""
-	log_message("Skills not yet implemented")
-	# TODO: Show skill menu
+	"""Handle Skill action - show sigil/skill menu"""
+	var sigils = current_combatant.get("sigils", [])
+	var skills = current_combatant.get("skills", [])
+
+	if skills.is_empty():
+		log_message("No skills available!")
+		return
+
+	# Get SigilSystem for display names
+	var sigil_sys = get_node_or_null("/root/aSigilSystem")
+	if not sigil_sys:
+		log_message("Sigil system not available!")
+		return
+
+	# Build skill menu with sigil info
+	var skill_menu = []
+	for i in range(min(sigils.size(), skills.size())):
+		var sigil_inst = sigils[i]
+		var skill_id = skills[i]
+
+		if skill_definitions.has(skill_id):
+			var skill_data = skill_definitions[skill_id]
+			var mp_cost = int(skill_data.get("cost_mp", 0))
+			var can_afford = current_combatant.mp >= mp_cost
+
+			# Get sigil display name
+			var sigil_name = sigil_sys.get_display_name_for(sigil_inst) if sigil_sys.has_method("get_display_name_for") else "Sigil"
+
+			skill_menu.append({
+				"sigil_name": sigil_name,
+				"skill_id": skill_id,
+				"skill_data": skill_data,
+				"can_afford": can_afford
+			})
+
+	if skill_menu.is_empty():
+		log_message("No skills available!")
+		return
+
+	# Show skill selection menu
+	_show_skill_menu(skill_menu)
 
 func _on_item_pressed() -> void:
-	"""Handle Item action"""
-	log_message("Items not yet implemented")
-	# TODO: Show item menu
+	"""Handle Item/Type Switch action"""
+	# Check if this is the hero
+	if current_combatant.id == "hero":
+		_show_mind_type_menu()
+	else:
+		log_message("Items not yet implemented")
+		# TODO: Show item menu
 
 func _on_defend_pressed() -> void:
 	"""Handle Defend action"""
-	log_message("%s defends!" % current_combatant.display_name)
+	log_message("%s moved into a defensive stance." % current_combatant.display_name)
 	current_combatant.is_defending = true
 
 	# End turn
@@ -349,8 +447,18 @@ func _on_burst_pressed() -> void:
 
 func _on_run_pressed() -> void:
 	"""Handle Run action"""
-	# TODO: Implement escape formula from design doc
-	var run_chance = 50  # Simplified for now
+	# Check if run was already attempted this round
+	if battle_mgr.run_attempted_this_round:
+		log_message("Already tried to run this round!")
+		return
+
+	# Mark that run was attempted
+	battle_mgr.run_attempted_this_round = true
+
+	# Calculate run chance based on enemy HP and level difference
+	var run_chance = _calculate_run_chance()
+
+	log_message("Attempting to escape... (%d%% chance)" % int(run_chance))
 
 	if randf() * 100 < run_chance:
 		log_message("Escaped successfully!")
@@ -360,6 +468,56 @@ func _on_run_pressed() -> void:
 	else:
 		log_message("Couldn't escape!")
 		battle_mgr.end_turn()
+
+func _calculate_run_chance() -> float:
+	"""Calculate run chance based on enemy HP percentage and level difference"""
+	const BASE_RUN_CHANCE: float = 50.0
+	const MAX_HP_BONUS: float = 40.0
+	const MAX_LEVEL_BONUS: float = 20.0
+	const LEVEL_BONUS_PER_LEVEL: float = 2.0
+
+	# Calculate enemy HP percentage bonus (0-40%)
+	var enemies = battle_mgr.get_enemy_combatants()
+	var total_enemy_hp_current: float = 0.0
+	var total_enemy_hp_max: float = 0.0
+
+	for enemy in enemies:
+		total_enemy_hp_current += enemy.hp
+		total_enemy_hp_max += enemy.hp_max
+
+	var hp_loss_percent: float = 0.0
+	if total_enemy_hp_max > 0:
+		hp_loss_percent = 1.0 - (total_enemy_hp_current / total_enemy_hp_max)
+
+	var hp_bonus: float = hp_loss_percent * MAX_HP_BONUS
+
+	# Calculate level difference bonus (0-20%, 2% per level up to 10 levels)
+	var allies = battle_mgr.get_ally_combatants()
+	var total_ally_level: int = 0
+	var total_enemy_level: int = 0
+
+	for ally in allies:
+		total_ally_level += ally.level
+
+	for enemy in enemies:
+		total_enemy_level += enemy.level
+
+	var level_difference: int = total_ally_level - total_enemy_level
+	var level_bonus: float = 0.0
+	if level_difference > 0:
+		level_bonus = min(level_difference, 10) * LEVEL_BONUS_PER_LEVEL
+
+	# Calculate final run chance
+	var final_chance: float = BASE_RUN_CHANCE + hp_bonus + level_bonus
+
+	# Log breakdown for debugging
+	log_message("  Base: %d%% | HP Bonus: +%d%% | Level Bonus: +%d%%" % [
+		int(BASE_RUN_CHANCE),
+		int(hp_bonus),
+		int(level_bonus)
+	])
+
+	return final_chance
 
 ## ═══════════════════════════════════════════════════════════════
 ## TARGET SELECTION
@@ -373,7 +531,16 @@ func _on_enemy_panel_input(event: InputEvent, target: Dictionary) -> void:
 			if awaiting_target_selection:
 				# Check if this target is valid
 				if target in target_candidates:
-					_execute_attack(target)
+					if awaiting_skill_selection:
+						# Using a skill
+						_clear_target_highlights()
+						awaiting_target_selection = false
+						awaiting_skill_selection = false
+						_execute_skill_single(target)
+						battle_mgr.end_turn()
+					else:
+						# Regular attack
+						_execute_attack(target)
 
 func _highlight_target_candidates() -> void:
 	"""Highlight valid targets with a visual indicator"""
@@ -406,6 +573,9 @@ func _execute_enemy_ai() -> void:
 	"""Execute AI for enemy turn"""
 	await get_tree().create_timer(0.5).timeout  # Brief delay
 
+	# Clear defending status when attacking
+	current_combatant.is_defending = false
+
 	log_message("%s attacks!" % current_combatant.display_name)
 
 	# Simple AI: attack random ally
@@ -430,14 +600,11 @@ func _execute_enemy_ai() -> void:
 			# Calculate mind type effectiveness
 			var type_bonus = combat_resolver.get_mind_type_bonus(current_combatant, target)
 
-			# Check weapon type weakness
+			# Check weapon type weakness (check now, record later after damage)
 			var weapon_weakness_hit = combat_resolver.check_weapon_weakness(current_combatant, target)
-			if weapon_weakness_hit:
-				var became_fallen = battle_mgr.record_weapon_weakness_hit(target)
-				var weapon_desc = combat_resolver.get_weapon_type_description(current_combatant, target)
-				log_message("  → WEAPON WEAKNESS! %s" % weapon_desc)
-				if became_fallen:
-					log_message("  → %s is FALLEN! (will skip next turn)" % target.display_name)
+
+			# Critical hits also count as weakness hits for stumbling
+			var crit_weakness_hit = is_crit
 
 			# Calculate damage
 			var damage_result = combat_resolver.calculate_physical_damage(
@@ -459,6 +626,17 @@ func _execute_enemy_ai() -> void:
 				target.hp = 0
 				target.is_ko = true
 
+			# Record weakness hits AFTER damage (only if target still alive)
+			if not target.is_ko and (weapon_weakness_hit or crit_weakness_hit):
+				var became_fallen = await battle_mgr.record_weapon_weakness_hit(target)
+				if weapon_weakness_hit:
+					var weapon_desc = combat_resolver.get_weapon_type_description(current_combatant, target)
+					log_message("  → WEAPON WEAKNESS! %s" % weapon_desc)
+				elif crit_weakness_hit:
+					log_message("  → CRITICAL STUMBLE!")
+				if became_fallen:
+					log_message("  → %s is FALLEN! (will skip next turn)" % target.display_name)
+
 			# Log the hit with details
 			var hit_msg = "  → Hit %s for %d damage! (%d%% chance)" % [target.display_name, damage, int(hit_check.hit_chance)]
 			if is_crit:
@@ -467,6 +645,11 @@ func _execute_enemy_ai() -> void:
 				hit_msg += " (Super Effective!)"
 			elif type_bonus < 0.0:
 				hit_msg += " (Not Very Effective...)"
+			if target.get("is_defending", false):
+				# Calculate damage reduction from defensive stance (0.7 multiplier = 30% reduction)
+				var damage_without_defense = int(round(damage / 0.7))
+				var damage_reduced = damage_without_defense - damage
+				hit_msg += " (Defensive: -%d)" % damage_reduced
 			log_message(hit_msg)
 
 			# Debug: show hit, crit, and damage breakdown
@@ -494,8 +677,13 @@ func _execute_enemy_ai() -> void:
 			_update_combatant_displays()
 			_update_burst_gauge()
 
-			# Update turn order display
-			if turn_order_display:
+			# Refresh turn order if combatant was KO'd
+			if target.is_ko:
+				# Animate falling and then re-sort turn order
+				if turn_order_display:
+					await turn_order_display.animate_ko_fall(target.id)
+				await battle_mgr.refresh_turn_order()
+			elif turn_order_display:
 				turn_order_display.update_combatant_hp(target.id)
 
 	await get_tree().create_timer(1.0).timeout
@@ -520,3 +708,441 @@ func log_message(message: String) -> void:
 		# Auto-scroll to bottom
 		battle_log.scroll_to_line(battle_log.get_line_count() - 1)
 	print("[Battle] " + message)
+
+## ═══════════════════════════════════════════════════════════════
+## SKILL MENU & EXECUTION
+## ═══════════════════════════════════════════════════════════════
+
+func _show_skill_menu(skill_menu: Array) -> void:
+	"""Show skill selection menu with sigils"""
+	# Hide action menu
+	action_menu.visible = false
+
+	# Store current menu
+	current_skill_menu = skill_menu
+
+	# Create skill menu panel
+	skill_menu_panel = PanelContainer.new()
+	skill_menu_panel.custom_minimum_size = Vector2(400, 0)
+
+	# Style the panel
+	var style = StyleBoxFlat.new()
+	style.bg_color = Color(0.1, 0.1, 0.15, 0.95)
+	style.border_width_left = 2
+	style.border_width_right = 2
+	style.border_width_top = 2
+	style.border_width_bottom = 2
+	style.border_color = Color(0.5, 0.5, 0.6, 1.0)
+	skill_menu_panel.add_theme_stylebox_override("panel", style)
+
+	# Create VBox for menu items
+	var vbox = VBoxContainer.new()
+	skill_menu_panel.add_child(vbox)
+
+	# Title
+	var title = Label.new()
+	title.text = "Select a Skill"
+	title.add_theme_font_size_override("font_size", 18)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(title)
+
+	# Show current mind type
+	var current_type = String(current_combatant.get("mind_type", "omega")).capitalize()
+	var type_label = Label.new()
+	type_label.text = "Current Type: %s" % current_type
+	type_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	type_label.add_theme_font_size_override("font_size", 14)
+	vbox.add_child(type_label)
+
+	# Add "Change Type" button (only for player)
+	if current_combatant.get("is_ally", false) and current_combatant.get("id") == "hero":
+		var changed_this_round = current_combatant.get("changed_type_this_round", false)
+		var change_type_btn = Button.new()
+		change_type_btn.text = "Change Mind Type" if not changed_this_round else "Change Mind Type (Used)"
+		change_type_btn.custom_minimum_size = Vector2(380, 40)
+		change_type_btn.disabled = changed_this_round
+		change_type_btn.pressed.connect(_on_change_type_button_pressed)
+		vbox.add_child(change_type_btn)
+
+	# Add separator
+	var sep1 = HSeparator.new()
+	vbox.add_child(sep1)
+
+	# Add skill buttons
+	for i in range(skill_menu.size()):
+		var menu_entry = skill_menu[i]
+		var sigil_name = menu_entry.sigil_name
+		var skill_data = menu_entry.skill_data
+		var skill_name = String(skill_data.get("name", "Unknown"))
+		var skill_element = String(skill_data.get("element", "none"))
+		var skill_element_cap = skill_element.capitalize()
+		var mp_cost = int(skill_data.get("cost_mp", 0))
+		var can_afford = menu_entry.can_afford
+
+		# Check if skill element matches current mind type
+		var current_mind_type = String(current_combatant.get("mind_type", "omega")).to_lower()
+		var type_matches = (skill_element.to_lower() == current_mind_type)
+
+		var button = Button.new()
+		button.text = "[%s] %s\n(%s, MP: %d)" % [sigil_name, skill_name, skill_element_cap, mp_cost]
+		button.custom_minimum_size = Vector2(380, 50)
+
+		# Disable if can't afford OR type doesn't match
+		if not can_afford:
+			button.disabled = true
+			button.text += "\n[Not enough MP]"
+		elif not type_matches:
+			button.disabled = true
+			button.text += "\n[Wrong Type - Need %s]" % skill_element_cap
+		else:
+			button.pressed.connect(_on_skill_button_pressed.bind(i))
+
+		vbox.add_child(button)
+
+	# Add cancel button
+	var sep2 = HSeparator.new()
+	vbox.add_child(sep2)
+
+	var cancel_btn = Button.new()
+	cancel_btn.text = "Cancel"
+	cancel_btn.custom_minimum_size = Vector2(380, 40)
+	cancel_btn.pressed.connect(_close_skill_menu)
+	vbox.add_child(cancel_btn)
+
+	# Add to scene
+	add_child(skill_menu_panel)
+
+	# Center it
+	skill_menu_panel.position = Vector2(
+		(get_viewport_rect().size.x - skill_menu_panel.custom_minimum_size.x) / 2,
+		100
+	)
+
+func _on_skill_button_pressed(index: int) -> void:
+	"""Handle skill button press"""
+	if index >= 0 and index < current_skill_menu.size():
+		var menu_entry = current_skill_menu[index]
+		_close_skill_menu()
+		_on_skill_selected(menu_entry)
+
+func _on_change_type_button_pressed() -> void:
+	"""Handle change type button press - show type selection menu"""
+	# Close current skill menu
+	_close_skill_menu()
+
+	# Create type selection panel
+	var type_panel = PanelContainer.new()
+	type_panel.custom_minimum_size = Vector2(300, 0)
+
+	# Style the panel
+	var style = StyleBoxFlat.new()
+	style.bg_color = Color(0.1, 0.1, 0.15, 0.95)
+	style.border_width_left = 2
+	style.border_width_right = 2
+	style.border_width_top = 2
+	style.border_width_bottom = 2
+	style.border_color = Color(0.5, 0.5, 0.6, 1.0)
+	type_panel.add_theme_stylebox_override("panel", style)
+
+	var vbox = VBoxContainer.new()
+	type_panel.add_child(vbox)
+
+	# Title
+	var title = Label.new()
+	title.text = "Change Mind Type"
+	title.add_theme_font_size_override("font_size", 18)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(title)
+
+	var current_type = String(current_combatant.get("mind_type", "omega")).capitalize()
+	var current_label = Label.new()
+	current_label.text = "Current: %s" % current_type
+	current_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(current_label)
+
+	var sep1 = HSeparator.new()
+	vbox.add_child(sep1)
+
+	# Add type buttons
+	var available_types = ["Fire", "Water", "Earth", "Air", "Void", "Data", "Omega"]
+	for type_name in available_types:
+		if type_name.to_lower() != current_type.to_lower():
+			var btn = Button.new()
+			btn.text = type_name
+			btn.custom_minimum_size = Vector2(280, 40)
+			btn.pressed.connect(_on_type_selected.bind(type_name, type_panel))
+			vbox.add_child(btn)
+
+	# Cancel button
+	var sep2 = HSeparator.new()
+	vbox.add_child(sep2)
+
+	var cancel_btn = Button.new()
+	cancel_btn.text = "Cancel"
+	cancel_btn.custom_minimum_size = Vector2(280, 40)
+	cancel_btn.pressed.connect(_on_type_menu_cancel.bind(type_panel))
+	vbox.add_child(cancel_btn)
+
+	# Add to scene and center
+	add_child(type_panel)
+	type_panel.position = Vector2(
+		(get_viewport_rect().size.x - type_panel.custom_minimum_size.x) / 2,
+		150
+	)
+
+func _on_type_selected(new_type: String, type_panel: PanelContainer) -> void:
+	"""Handle type selection"""
+	# Close type menu
+	if type_panel:
+		type_panel.queue_free()
+
+	# Switch type (don't end turn)
+	_switch_mind_type(new_type, false)
+
+	# Reopen skill menu with new type
+	_on_skill_pressed()
+
+func _on_type_menu_cancel(type_panel: PanelContainer) -> void:
+	"""Cancel type selection and return to skill menu"""
+	if type_panel:
+		type_panel.queue_free()
+
+	# Reopen skill menu
+	_on_skill_pressed()
+
+func _close_skill_menu() -> void:
+	"""Close the skill menu"""
+	if skill_menu_panel:
+		skill_menu_panel.queue_free()
+		skill_menu_panel = null
+	current_skill_menu = []
+
+	# Show action menu again
+	action_menu.visible = true
+
+func _on_skill_selected(skill_entry: Dictionary) -> void:
+	"""Handle skill selection"""
+	skill_to_use = skill_entry.skill_data
+	var skill_name = String(skill_to_use.get("name", "Unknown"))
+	var target_type = String(skill_to_use.get("target", "Enemy")).to_lower()
+
+	log_message("Selected: %s" % skill_name)
+
+	# Determine targeting
+	if target_type == "enemy" or target_type == "enemies":
+		# Get alive enemies
+		var enemies = battle_mgr.get_enemy_combatants()
+		target_candidates = enemies.filter(func(e): return not e.is_ko)
+
+		if target_candidates.is_empty():
+			log_message("No valid targets!")
+			skill_to_use = {}
+			return
+
+		# Check if AoE
+		var is_aoe = int(skill_to_use.get("aoe", 0)) > 0
+
+		if is_aoe:
+			# AoE skill - hit all enemies
+			_execute_skill_aoe()
+		else:
+			# Single target - need to select
+			log_message("Select a target...")
+			awaiting_target_selection = true
+			awaiting_skill_selection = true
+			_highlight_target_candidates()
+	elif target_type == "ally" or target_type == "allies":
+		# TODO: Implement ally targeting
+		log_message("Ally targeting not yet implemented")
+		skill_to_use = {}
+	else:
+		# Self-target or other
+		log_message("Self-targeting not yet implemented")
+		skill_to_use = {}
+
+func _execute_skill_single(target: Dictionary) -> void:
+	"""Execute a single-target skill"""
+	var skill_name = String(skill_to_use.get("name", "Unknown"))
+	var mp_cost = int(skill_to_use.get("cost_mp", 0))
+	var element = String(skill_to_use.get("element", "none")).to_lower()
+	var power = int(skill_to_use.get("power", 30))
+	var acc = int(skill_to_use.get("acc", 90))
+	var crit_bonus = int(skill_to_use.get("crit_bonus_pct", 0))
+	var mnd_scaling = int(skill_to_use.get("scaling_mnd", 1))
+
+	# Clear defending status when using skill
+	current_combatant.is_defending = false
+
+	# Deduct MP
+	current_combatant.mp -= mp_cost
+	if current_combatant.mp < 0:
+		current_combatant.mp = 0
+
+	log_message("%s uses %s!" % [current_combatant.display_name, skill_name])
+
+	# Check if hit
+	var hit_check = combat_resolver.check_sigil_hit(current_combatant, target, {"skill_acc": acc})
+
+	if not hit_check.hit:
+		log_message("  → Missed! (%d%% chance, rolled %d)" % [int(hit_check.hit_chance), hit_check.roll])
+		return
+
+	# Roll for crit
+	var crit_check = combat_resolver.check_critical_hit(current_combatant, {"skill_crit_bonus": crit_bonus})
+	var is_crit = crit_check.crit
+
+	# Calculate type effectiveness (use skill's element vs defender's mind type)
+	# Skills ONLY use elemental weakness, NOT weapon triangle
+	var type_bonus = 0.0
+	if element != "none" and element != "":
+		type_bonus = combat_resolver.get_mind_type_bonus(
+			{"mind_type": element},
+			target,
+			element
+		)
+
+		# Show type matchup explanation
+		if type_bonus > 0.0:
+			log_message("  → TYPE ADVANTAGE! %s vs %s" % [element.capitalize(), target.mind_type.capitalize()])
+		elif type_bonus < 0.0:
+			log_message("  → TYPE DISADVANTAGE! %s vs %s" % [element.capitalize(), target.mind_type.capitalize()])
+
+	# Both crits and type advantages count as stumbles for skills
+	var crit_weakness_hit = is_crit
+	var type_advantage_hit = type_bonus > 0.0
+
+	# Calculate skill damage
+	var damage_result = combat_resolver.calculate_sigil_damage(
+		current_combatant,
+		target,
+		{
+			"potency": 100,
+			"is_crit": is_crit,
+			"type_bonus": type_bonus,
+			"base_sig": power,
+			"mnd_scale": mnd_scaling
+		}
+	)
+
+	var damage = damage_result.damage
+	var is_stumble = damage_result.is_stumble
+
+	# Apply damage
+	target.hp -= damage
+	if target.hp < 0:
+		target.hp = 0
+		target.is_ko = true
+
+	# Record weakness hits AFTER damage (only if target still alive)
+	# Skills count crits and type advantages as weakness hits
+	if not target.is_ko and (crit_weakness_hit or type_advantage_hit):
+		var became_fallen = await battle_mgr.record_weapon_weakness_hit(target)
+		if crit_weakness_hit:
+			log_message("  → CRITICAL STUMBLE!")
+		elif type_advantage_hit:
+			log_message("  → ELEMENTAL STUMBLE!")
+		if became_fallen:
+			log_message("  → %s is FALLEN! (will skip next turn)" % target.display_name)
+
+	# Log the hit
+	var hit_msg = "  → Hit %s for %d damage! (%d%% chance)" % [target.display_name, damage, int(hit_check.hit_chance)]
+	if is_crit:
+		hit_msg += " (CRITICAL! %d%% chance)" % int(crit_check.crit_chance)
+	if type_bonus > 0.0:
+		hit_msg += " (Super Effective!)"
+	elif type_bonus < 0.0:
+		hit_msg += " (Not Very Effective...)"
+	if target.get("is_defending", false):
+		var damage_without_defense = int(round(damage / 0.7))
+		var damage_reduced = damage_without_defense - damage
+		hit_msg += " (Defensive: -%d)" % damage_reduced
+	log_message(hit_msg)
+
+	# Update displays
+	_update_combatant_displays()
+	if target.is_ko:
+		# Animate falling and then re-sort turn order
+		if turn_order_display:
+			await turn_order_display.animate_ko_fall(target.id)
+		battle_mgr.refresh_turn_order()
+	elif turn_order_display:
+		turn_order_display.update_combatant_hp(target.id)
+
+func _execute_skill_aoe() -> void:
+	"""Execute an AoE skill on all valid targets"""
+	var skill_name = String(skill_to_use.get("name", "Unknown"))
+	var mp_cost = int(skill_to_use.get("cost_mp", 0))
+
+	# Clear defending status
+	current_combatant.is_defending = false
+
+	# Deduct MP
+	current_combatant.mp -= mp_cost
+	if current_combatant.mp < 0:
+		current_combatant.mp = 0
+
+	log_message("%s uses %s on all enemies!" % [current_combatant.display_name, skill_name])
+
+	# Hit each target
+	for target in target_candidates:
+		if not target.is_ko:
+			await get_tree().create_timer(0.3).timeout
+			_execute_skill_single(target)
+
+	# End turn after AoE
+	battle_mgr.end_turn()
+
+## ═══════════════════════════════════════════════════════════════
+## MIND TYPE SWITCHING (HERO ONLY)
+## ═══════════════════════════════════════════════════════════════
+
+func _show_mind_type_menu() -> void:
+	"""Show mind type switching menu for hero"""
+	var available_types = ["Fire", "Water", "Earth", "Air", "Void", "Data", "Omega"]
+	var current_type = String(gs.get_meta("hero_active_type", "Omega"))
+
+	log_message("--- Switch Mind Type ---")
+	log_message("Current: %s" % current_type)
+
+	for i in range(available_types.size()):
+		var type_name = available_types[i]
+		var marker = " [Current]" if type_name == current_type else ""
+		log_message("%d. %s%s" % [i + 1, type_name, marker])
+
+	# For now, auto-select first type that's different from current
+	for type_name in available_types:
+		if type_name != current_type:
+			_switch_mind_type(type_name)
+			return
+
+func _switch_mind_type(new_type: String, end_turn: bool = true) -> void:
+	"""Switch hero's mind type and reload skills"""
+	var old_type = String(gs.get_meta("hero_active_type", "Omega"))
+
+	# Update mind type in GameState
+	gs.set_meta("hero_active_type", new_type)
+
+	# Update combatant's mind_type
+	current_combatant.mind_type = new_type.to_lower()
+
+	# Mark that type was changed this round
+	current_combatant.changed_type_this_round = true
+
+	# Reload sigils and skills for new type
+	if has_node("/root/aSigilSystem"):
+		var sigil_sys = get_node("/root/aSigilSystem")
+		var loadout = sigil_sys.get_loadout("hero")
+
+		var new_skills = []
+		for sigil_inst in loadout:
+			if sigil_inst != "":
+				var skill_id = sigil_sys.get_active_skill_id_for_instance(sigil_inst)
+				if skill_id != "":
+					new_skills.append(skill_id)
+
+		current_combatant.skills = new_skills
+		log_message("%s switched from %s to %s!" % [current_combatant.display_name, old_type, new_type])
+
+	# End turn if requested (for Item button usage)
+	if end_turn:
+		battle_mgr.end_turn()

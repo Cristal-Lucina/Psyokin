@@ -164,9 +164,9 @@ func _to_int(value: Variant) -> int:
 		return String(value).to_int()
 	return 0
 
-## Calculates maximum HP from level and VTL stat. Formula: 150 + (VTL × Level × 6)
+## Calculates maximum HP from level and VTL stat. Formula: 60 + (VTL × Level × 6)
 func compute_max_hp(level: int, vtl: int) -> int:
-	return 150 + (max(1, vtl) * max(1, level) * 6)
+	return 60 + (max(1, vtl) * max(1, level) * 6)
 
 ## Calculates maximum MP from level and FCS stat. Formula: 20 + (FCS × Level × 1.5)
 func compute_max_mp(level: int, fcs: int) -> int:
@@ -561,6 +561,21 @@ func get_member_display_name(member_id: String) -> String:
 	if typeof(label_v) == TYPE_STRING and String(label_v).strip_edges() != "":
 		return String(label_v)
 	return pid.capitalize()
+
+## Gets a member's mind type from party.csv
+func get_member_mind_type(member_id: String) -> String:
+	var pid: String = _resolve_id(member_id)
+	if pid == "hero":
+		# Hero's type is stored in GameState metadata
+		if _gs != null and _gs.has_meta("hero_active_type"):
+			return String(_gs.get_meta("hero_active_type")).to_lower()
+		return "omega"  # Default for hero
+	# Get from CSV data
+	if _csv_by_id.has(pid):
+		var row: Dictionary = _csv_by_id[pid]
+		var mind_type_v: Variant = row.get("mind_type", "none")
+		return String(mind_type_v).to_lower()
+	return "none"
 
 # ───────────────────────── Perk points passthrough ─────────────────────────
 ## Internal helper to emit perk_points_changed signal with current value from GameState

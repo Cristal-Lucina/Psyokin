@@ -28,6 +28,7 @@ enum BattleState {
 var current_state: BattleState = BattleState.NONE
 var current_round: int = 0
 var current_turn_index: int = 0
+var run_attempted_this_round: bool = false  # Track if party tried to run this round
 
 ## Combatants (both allies and enemies)
 var combatants: Array[Dictionary] = []  # List of all combatants in battle
@@ -136,14 +137,13 @@ func start_round() -> void:
 	current_state = BattleState.ROUND_START
 	print("[BattleManager] === ROUND %d START ===" % current_round)
 
-	round_started.emit(current_round)
-
 	# Roll initiative for all combatants
 	_roll_initiative()
 
 	# Sort turn order by initiative (highest first)
 	turn_order = combatants.duplicate()
 	turn_order.sort_custom(_sort_by_initiative)
+	_remove_turn_order_duplicates()  # Ensure no duplicates in turn order
 
 	print("[BattleManager] Turn order:")
 	for i in range(turn_order.size()):
@@ -152,6 +152,12 @@ func start_round() -> void:
 
 	# Process start-of-round effects (DoT, HoT, buff/debuff duration)
 	_process_round_start_effects()
+
+	# Emit signal AFTER turn order is calculated so UI can display it
+	round_started.emit(current_round)
+
+	# Wait for turn order animation to complete
+	await _wait_for_turn_order_animation()
 
 	# Start first turn
 	current_turn_index = 0
@@ -162,6 +168,12 @@ func _roll_initiative() -> void:
 	for combatant in combatants:
 		if combatant.is_ko or combatant.is_fled:
 			combatant.initiative = -1
+			continue
+
+		# Fallen combatants get 0 initiative (they'll skip their turn)
+		if combatant.is_fallen:
+			combatant.initiative = 0
+			print("[BattleManager] %s is FALLEN - initiative set to 0" % combatant.display_name)
 			continue
 
 		var tpo = combatant.stats.TPO
@@ -190,7 +202,35 @@ func _roll_initiative() -> void:
 		])
 
 func _sort_by_initiative(a: Dictionary, b: Dictionary) -> bool:
-	"""Sort comparator for initiative (higher first)"""
+	"""Sort comparator for initiative (higher first, Fallen above KO'd, KO'd to bottom)"""
+	var a_ko = a.get("is_ko", false)
+	var b_ko = b.get("is_ko", false)
+	var a_fallen = a.get("is_fallen", false)
+	var b_fallen = b.get("is_fallen", false)
+
+	# Priority order (highest to lowest):
+	# 1. Normal combatants (not KO'd, not Fallen)
+	# 2. Fallen combatants (will skip next turn)
+	# 3. KO'd combatants (out of battle)
+
+	# If one is KO'd and the other is not, non-KO'd goes first
+	if a_ko and not b_ko:
+		return false  # a is KO'd, b is not - b goes first
+	if not a_ko and b_ko:
+		return true  # a is not KO'd, b is - a goes first
+
+	# Both KO'd - sort by initiative (both should be -1 but just in case)
+	if a_ko and b_ko:
+		return a.initiative > b.initiative
+
+	# Neither KO'd - check fallen status
+	# If one is fallen and the other is not, non-fallen goes first
+	if a_fallen and not b_fallen:
+		return false  # a is Fallen, b is not - b goes first
+	if not a_fallen and b_fallen:
+		return true  # a is not Fallen, b is - a goes first
+
+	# Both alive or both fallen - sort normally by initiative
 	if a.initiative != b.initiative:
 		return a.initiative > b.initiative
 
@@ -207,6 +247,40 @@ func _sort_by_initiative(a: Dictionary, b: Dictionary) -> bool:
 	# Final tiebreaker: coinflip
 	return randf() > 0.5
 
+func _remove_turn_order_duplicates() -> void:
+	"""Remove duplicate combatants from turn_order (keep first occurrence)"""
+	var seen_ids: Dictionary = {}
+	var deduplicated: Array[Dictionary] = []
+	var duplicates_found: int = 0
+
+	for combatant in turn_order:
+		var id = combatant.id
+		if not seen_ids.has(id):
+			seen_ids[id] = true
+			deduplicated.append(combatant)
+		else:
+			duplicates_found += 1
+			print("[BattleManager] WARNING: Duplicate combatant removed from turn order: %s" % combatant.display_name)
+
+	if duplicates_found > 0:
+		print("[BattleManager] Removed %d duplicate(s) from turn order" % duplicates_found)
+		turn_order = deduplicated
+
+func _wait_for_turn_order_animation() -> void:
+	"""Wait for turn order display animation to complete"""
+	# Find TurnOrderDisplay in the scene tree
+	var turn_order_display = get_tree().get_first_node_in_group("turn_order_display")
+	if not turn_order_display:
+		# No display found, just wait a frame
+		await get_tree().process_frame
+		return
+
+	# Wait for animation_completed signal
+	if turn_order_display.has_signal("animation_completed"):
+		await turn_order_display.animation_completed
+	else:
+		await get_tree().process_frame
+
 func _next_turn() -> void:
 	"""Advance to the next combatant's turn"""
 	# Find next valid combatant
@@ -218,10 +292,22 @@ func _next_turn() -> void:
 			current_turn_index += 1
 			continue
 
-		# Check if fallen (skip turn and clear flag)
+		# Check if fallen (skip turn, clear flag only after fallen_round completes)
 		if combatant.is_fallen:
-			print("[BattleManager] %s is Fallen - skipping turn" % combatant.display_name)
-			combatant.is_fallen = false
+			var fallen_round = combatant.get("fallen_round", current_round)
+			if current_round > fallen_round:
+				# We're in the round AFTER they became fallen - clear the flag
+				print("[BattleManager] %s is Fallen - skipping turn and clearing status" % combatant.display_name)
+				combatant.is_fallen = false
+			else:
+				# Same round they became fallen - just skip, don't clear yet
+				print("[BattleManager] %s is Fallen - skipping remaining turn this round" % combatant.display_name)
+			current_turn_index += 1
+			continue
+
+		# Skip if they've already acted this round (stumbled but already took their turn)
+		if combatant.get("has_acted_this_round", false):
+			print("[BattleManager] %s has already acted this round - skipping" % combatant.display_name)
 			current_turn_index += 1
 			continue
 
@@ -234,6 +320,16 @@ func _next_turn() -> void:
 
 func _start_turn(combatant: Dictionary) -> void:
 	"""Start a combatant's turn"""
+	# Check for duplicates before starting turn
+	_remove_turn_order_duplicates()
+
+	# Check if battle has ended before starting this turn
+	if await _check_battle_end():
+		return
+
+	# Mark this combatant as having acted this round
+	combatant.has_acted_this_round = true
+
 	current_state = BattleState.TURN_ACTIVE
 	print("[BattleManager] --- Turn: %s ---" % combatant.display_name)
 
@@ -247,6 +343,10 @@ func end_turn() -> void:
 		var combatant = turn_order[current_turn_index]
 		turn_ended.emit(combatant.id)
 
+	# Check if battle has ended (all enemies or allies defeated)
+	if await _check_battle_end():
+		return
+
 	current_turn_index += 1
 	_next_turn()
 
@@ -258,7 +358,7 @@ func _end_round() -> void:
 	round_ended.emit(current_round)
 
 	# Check victory/defeat conditions
-	if _check_battle_end():
+	if await _check_battle_end():
 		return
 
 	# Start next round
@@ -266,12 +366,24 @@ func _end_round() -> void:
 
 func _process_round_start_effects() -> void:
 	"""Process DoT, HoT, buff durations at start of round"""
+	# Reset run attempt flag at start of each round
+	run_attempted_this_round = false
+
 	for combatant in combatants:
 		if combatant.is_ko or combatant.is_fled:
 			continue
 
+		# Reset has_acted flag at start of each round
+		combatant.has_acted_this_round = false
+
 		# Reset weapon weakness hit counter at start of each round
 		combatant.weapon_weakness_hits = 0
+
+		# Reset mind type change flag (player can change type once per round)
+		combatant.changed_type_this_round = false
+
+		# NOTE: is_defending persists across rounds until combatant takes offensive action
+		# This provides multi-round defensive stances
 
 		# TODO: Apply DoT (poison = 5% max HP, burn = 5% max HP)
 		# TODO: Apply HoT (regen)
@@ -289,11 +401,11 @@ func _check_battle_end() -> bool:
 	var enemies_alive = _count_alive_enemies()
 
 	if allies_alive == 0:
-		_end_battle(false)  # Defeat
+		await _end_battle(false)  # Defeat
 		return true
 
 	if enemies_alive == 0:
-		_end_battle(true)  # Victory
+		await _end_battle(true)  # Victory
 		return true
 
 	return false
@@ -314,6 +426,10 @@ func _count_alive_enemies() -> int:
 
 func _end_battle(victory: bool) -> void:
 	"""End the battle"""
+	# Wait for any ongoing animations to complete before ending
+	print("[BattleManager] Waiting for animations to complete before ending battle...")
+	await _wait_for_turn_order_animation()
+
 	if victory:
 		print("[BattleManager] *** VICTORY ***")
 		current_state = BattleState.VICTORY
@@ -391,6 +507,22 @@ func _create_ally_combatant(member_id: String, slot: int) -> Dictionary:
 				equipment_dict = member_equip
 				print("[BattleManager] Loaded equipment for %s: %s" % [member_id, equipment_dict])
 
+	# Get sigils from SigilSystem
+	var sigils: Array = []
+	var skills: Array = []
+	if has_node("/root/aSigilSystem"):
+		var sigil_sys = get_node("/root/aSigilSystem")
+		var loadout = sigil_sys.get_loadout(member_id)
+		for sigil_inst in loadout:
+			if sigil_inst != "":
+				sigils.append(sigil_inst)
+				# Get the active skill for this sigil instance
+				var skill_id = sigil_sys.get_active_skill_id_for_instance(sigil_inst)
+				if skill_id != "":
+					skills.append(skill_id)
+		print("[BattleManager] Loaded sigils for %s: %s" % [member_id, sigils])
+		print("[BattleManager] Loaded skills for %s: %s" % [member_id, skills])
+
 	return {
 		"id": member_id,
 		"display_name": display_name,
@@ -406,6 +538,7 @@ func _create_ally_combatant(member_id: String, slot: int) -> Dictionary:
 		"is_ko": false,
 		"is_fled": false,
 		"is_fallen": false,
+		"fallen_round": 0,  # Track which round they became fallen
 		"is_defending": false,
 		"is_channeling": false,
 		"channel_data": {},
@@ -414,7 +547,11 @@ func _create_ally_combatant(member_id: String, slot: int) -> Dictionary:
 		"ailments": [],
 		"mind_type": mind_type,
 		"equipment": equipment_dict,
-		"weapon_weakness_hits": 0  # Track weapon triangle weakness hits per round
+		"weapon_weakness_hits": 0,  # Track weapon triangle weakness hits per round
+		"changed_type_this_round": false,  # Track if player changed type this round
+		"has_acted_this_round": false,  # Track if combatant has already acted this round
+		"sigils": sigils,  # Sigil instances equipped
+		"skills": skills   # Active skill IDs for each sigil
 	}
 
 func _create_enemy_combatant(enemy_id: String, slot: int) -> Dictionary:
@@ -445,7 +582,7 @@ func _create_enemy_combatant(enemy_id: String, slot: int) -> Dictionary:
 	}
 
 	# Calculate HP/MP using same formula as allies
-	var hp_max = 150 + (enemy_stats.VTL * level * 6)
+	var hp_max = 30 + (enemy_stats.VTL * level * 6)
 	var mp_max = 20 + int(round(float(enemy_stats.FCS) * float(level) * 1.5))
 
 	# Parse equipment
@@ -464,8 +601,11 @@ func _create_enemy_combatant(enemy_id: String, slot: int) -> Dictionary:
 	# Get mind type
 	var mind_type = String(enemy_def.get("mind_type", "none")).to_lower()
 
+	# Create unique instance ID by appending slot number
+	var instance_id = "%s_%d" % [enemy_id, slot]
+
 	return {
-		"id": enemy_id,
+		"id": instance_id,
 		"display_name": String(enemy_def.get("name", enemy_id.capitalize())),
 		"is_ally": false,
 		"slot": slot,  # 0, 1, 2 for left/center/right
@@ -479,6 +619,7 @@ func _create_enemy_combatant(enemy_id: String, slot: int) -> Dictionary:
 		"is_ko": false,
 		"is_fled": false,
 		"is_fallen": false,
+		"fallen_round": 0,  # Track which round they became fallen
 		"is_defending": false,
 		"is_channeling": false,
 		"channel_data": {},
@@ -500,7 +641,8 @@ func _create_enemy_combatant(enemy_id: String, slot: int) -> Dictionary:
 		"capture_difficulty": String(enemy_def.get("capture_tag", "None")),
 		"cred_range": String(enemy_def.get("cred_range", "0-0")),
 		"drop_table": String(enemy_def.get("item_drops", "")),
-		"weapon_weakness_hits": 0  # Track weapon triangle weakness hits per round
+		"weapon_weakness_hits": 0,  # Track weapon triangle weakness hits per round
+		"has_acted_this_round": false  # Track if combatant has already acted this round
 	}
 
 ## ═══════════════════════════════════════════════════════════════
@@ -516,6 +658,11 @@ func record_weapon_weakness_hit(target: Dictionary) -> bool:
 	Returns:
 		true if target becomes Fallen (2+ hits this round)
 	"""
+	# If already fallen, they can't become fallen again this round
+	if target.get("is_fallen", false):
+		print("[BattleManager] %s is already Fallen - no additional effect" % target.display_name)
+		return false
+
 	if not target.has("weapon_weakness_hits"):
 		target.weapon_weakness_hits = 0
 
@@ -523,24 +670,66 @@ func record_weapon_weakness_hit(target: Dictionary) -> bool:
 	print("[BattleManager] %s weapon weakness hits: %d/2" % [target.display_name, target.weapon_weakness_hits])
 
 	# Apply initiative penalty (push back in turn order)
-	const INITIATIVE_PENALTY: int = 3  # Lose 3 initiative per weakness hit
+	const INITIATIVE_PENALTY: int = 5  # Lose 5 initiative per weakness hit
 	target.initiative -= INITIATIVE_PENALTY
 	print("[BattleManager] %s initiative reduced by %d (now %d)" % [target.display_name, INITIATIVE_PENALTY, target.initiative])
 
+	# Store current combatant ID before re-sorting
+	var current_combatant_id: String = ""
+	if current_turn_index < turn_order.size():
+		current_combatant_id = turn_order[current_turn_index].id
+
 	# Re-sort turn order to reflect initiative changes
 	turn_order.sort_custom(_sort_by_initiative)
+	_remove_turn_order_duplicates()  # Ensure no duplicates in turn order
 	print("[BattleManager] Turn order re-sorted after weakness hit")
+
+	# Update current_turn_index to point to the same combatant after re-sort
+	if current_combatant_id != "":
+		for i in range(turn_order.size()):
+			if turn_order[i].id == current_combatant_id:
+				current_turn_index = i
+				break
 
 	# Emit signal so UI can update
 	turn_order_changed.emit()
 
-	# Check if target should become Fallen (lose next turn)
+	# Wait for animation to complete
+	await _wait_for_turn_order_animation()
+
+	# Check if target should become Fallen (lose rest of this turn + next turn)
 	if target.weapon_weakness_hits >= 2:
 		target.is_fallen = true
-		print("[BattleManager] %s is FALLEN! (will skip next turn)" % target.display_name)
+		target.fallen_round = current_round  # Track which round they became fallen
+		print("[BattleManager] %s is FALLEN! (will skip rest of this turn and next turn)" % target.display_name)
 		return true
 
 	return false
+
+func refresh_turn_order() -> void:
+	"""Re-sort turn order and emit signal (used when combatant state changes like KO)"""
+	# Store current combatant ID before re-sorting
+	var current_combatant_id: String = ""
+	if current_turn_index < turn_order.size():
+		current_combatant_id = turn_order[current_turn_index].id
+
+	# Re-sort the turn order
+	turn_order.sort_custom(_sort_by_initiative)
+	_remove_turn_order_duplicates()  # Ensure no duplicates in turn order
+	print("[BattleManager] Turn order re-sorted")
+
+	# Update current_turn_index to point to the same combatant after re-sort
+	if current_combatant_id != "":
+		for i in range(turn_order.size()):
+			if turn_order[i].id == current_combatant_id:
+				current_turn_index = i
+				print("[BattleManager] Updated current_turn_index to %d to track %s" % [i, current_combatant_id])
+				break
+
+	turn_order_changed.emit()
+
+	# Wait for animation to complete
+	await _wait_for_turn_order_animation()
 
 ## ═══════════════════════════════════════════════════════════════
 ## BURST GAUGE
