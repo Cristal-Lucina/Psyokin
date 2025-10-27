@@ -933,11 +933,12 @@ func _execute_item_usage(target: Dictionary) -> void:
 
 		_update_combatant_displays()
 
-		# Animate KO fall for all defeated enemies
-		if ko_list.size() > 0 and turn_order_display:
+		# Animate KO fall for each defeated enemy (refresh after each one)
+		if ko_list.size() > 0:
 			for ko_enemy in ko_list:
-				await turn_order_display.animate_ko_fall(ko_enemy.id)
-			battle_mgr.refresh_turn_order()
+				if turn_order_display:
+					await turn_order_display.animate_ko_fall(ko_enemy.id)
+				battle_mgr.refresh_turn_order()
 
 	# ═══════ BUFF ITEMS (ATK Up, MND Up, Shield, etc.) ═══════
 	elif "Up" in effect or "Shield" in effect or "Regen" in effect or "Speed" in effect or "Hit%" in effect or "Evasion%" in effect or "SkillHit%" in effect:
