@@ -1197,9 +1197,15 @@ func _on_run_pressed() -> void:
 		log_message("Escaped successfully!")
 		await get_tree().create_timer(1.0).timeout
 		battle_mgr.current_state = battle_mgr.BattleState.ESCAPED
+		# Reset run bonus before leaving
+		if battle_mgr.has("run_chance_bonus"):
+			battle_mgr.run_chance_bonus = 0.0
 		battle_mgr.return_to_overworld()
 	else:
 		log_message("Couldn't escape!")
+		# Reset run bonus after failed attempt
+		if battle_mgr.has("run_chance_bonus"):
+			battle_mgr.run_chance_bonus = 0.0
 		battle_mgr.end_turn()
 
 func _calculate_run_chance() -> float:
@@ -1240,15 +1246,28 @@ func _calculate_run_chance() -> float:
 	if level_difference > 0:
 		level_bonus = min(level_difference, 10) * LEVEL_BONUS_PER_LEVEL
 
+	# Check for run chance bonus from items (Flash Pop, etc.)
+	var item_bonus: float = 0.0
+	if battle_mgr.has("run_chance_bonus"):
+		item_bonus = battle_mgr.run_chance_bonus
+
 	# Calculate final run chance
-	var final_chance: float = BASE_RUN_CHANCE + hp_bonus + level_bonus
+	var final_chance: float = BASE_RUN_CHANCE + hp_bonus + level_bonus + item_bonus
 
 	# Log breakdown for debugging
-	log_message("  Base: %d%% | HP Bonus: +%d%% | Level Bonus: +%d%%" % [
-		int(BASE_RUN_CHANCE),
-		int(hp_bonus),
-		int(level_bonus)
-	])
+	if item_bonus > 0:
+		log_message("  Base: %d%% | HP Bonus: +%d%% | Level Bonus: +%d%% | Item Bonus: +%d%%" % [
+			int(BASE_RUN_CHANCE),
+			int(hp_bonus),
+			int(level_bonus),
+			int(item_bonus)
+		])
+	else:
+		log_message("  Base: %d%% | HP Bonus: +%d%% | Level Bonus: +%d%%" % [
+			int(BASE_RUN_CHANCE),
+			int(hp_bonus),
+			int(level_bonus)
+		])
 
 	return final_chance
 
@@ -1827,6 +1846,65 @@ func _close_item_menu() -> void:
 	# Show action menu again
 	action_menu.visible = true
 
+func _execute_escape_item(item_data: Dictionary) -> void:
+	"""Execute escape items (Smoke Grenade, Flash Pop)"""
+	var item_id: String = item_data.get("id", "")
+	var item_name: String = item_data.get("name", "Unknown")
+	var item_def = item_data.get("item_def", {})
+	var effect = str(item_def.get("battle_status_effect", ""))
+
+	log_message("%s uses %s!" % [current_combatant.display_name, item_name])
+
+	# Consume the item
+	var inventory = get_node_or_null("/root/aInventorySystem")
+	if inventory:
+		inventory.remove_item(item_id, 1)
+	else:
+		push_error("Inventory system not available!")
+
+	# Check if this is an auto-escape item (Smoke Grenade)
+	if "Auto-escape" in effect:
+		log_message("  → Smoke fills the battlefield!")
+		await get_tree().create_timer(1.0).timeout
+		log_message("The party escapes successfully!")
+		await get_tree().create_timer(1.0).timeout
+		battle_mgr.current_state = battle_mgr.BattleState.ESCAPED
+		battle_mgr.return_to_overworld()
+		return
+
+	# Check if this is a run boost item (Flash Pop)
+	if "Run%" in effect:
+		# Extract run% bonus from effect (e.g., "Run% +20%")
+		var run_bonus = 20.0  # Default bonus
+		var regex = RegEx.new()
+		regex.compile("Run%\\s*\\+?(\\d+)%?")
+		var result = regex.search(effect)
+		if result:
+			run_bonus = float(result.get_string(1))
+
+		# Store run bonus (we'll check this in _calculate_run_chance)
+		if not battle_mgr.has("run_chance_bonus"):
+			battle_mgr.set("run_chance_bonus", 0.0)
+		battle_mgr.run_chance_bonus = run_bonus
+
+		log_message("  → A blinding flash! The party's escape chance increased by %d%%!" % int(run_bonus))
+
+		# Also apply evasion buff if present
+		if "Evasion Up" in effect:
+			var allies = battle_mgr.get_ally_combatants()
+			for ally in allies:
+				if not ally.has("buffs"):
+					ally.buffs = []
+				ally.buffs.append({
+					"type": "evasion",
+					"value": 10,
+					"duration": 1,
+					"source": item_name
+				})
+			log_message("  → All allies gain +10% Evasion for 1 round!")
+
+	battle_mgr.end_turn()
+
 func _on_item_selected(item_data: Dictionary) -> void:
 	"""Handle item selection from menu"""
 	_close_item_menu()
@@ -1835,6 +1913,15 @@ func _on_item_selected(item_data: Dictionary) -> void:
 	selected_item = item_data
 
 	var targeting = str(item_data.get("targeting", "Ally"))
+	var item_def = item_data.get("item_def", {})
+	var effect = str(item_def.get("battle_status_effect", ""))
+
+	# Special handling for escape items (Party targeting)
+	if targeting == "Party" or "Auto-escape" in effect:
+		# Execute escape item immediately without target selection
+		_execute_escape_item(item_data)
+		return
+
 	log_message("Using %s - select target..." % str(item_data.get("name", "item")))
 
 	# Determine target candidates
