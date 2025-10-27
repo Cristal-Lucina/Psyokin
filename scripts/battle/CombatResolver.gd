@@ -104,7 +104,7 @@ func get_weapon_type_description(attacker: Dictionary, defender: Dictionary) -> 
 ## HIT/EVASION CHECKS (§4.3)
 ## ═══════════════════════════════════════════════════════════════
 
-func check_physical_hit(attacker: Dictionary, defender: Dictionary, options: Dictionary = {}) -> Dictionary:
+func check_physical_hit(attacker: Dictionary, defender: Dictionary, _options: Dictionary = {}) -> Dictionary:
 	"""
 	Check if a physical attack hits
 
@@ -539,7 +539,7 @@ func _get_footwear_stats(member_id: String) -> Dictionary:
 ## TYPE SYSTEM
 ## ═══════════════════════════════════════════════════════════════
 
-func get_type_modifier(attacker_element: String, defender_element: String) -> float:
+func get_type_modifier(_attacker_element: String, _defender_element: String) -> float:
 	"""
 	Get TYPE modifier based on elemental matchup
 	Returns: -0.5 (resist), 0.0 (neutral), 0.25 (weakness), etc.
@@ -547,7 +547,7 @@ func get_type_modifier(attacker_element: String, defender_element: String) -> fl
 	if not mind_type_system:
 		return 0.0
 
-	# TODO: Implement type system lookup
+	# TODO: Implement type system lookup using attacker_element and defender_element
 	# For now, return neutral
 	return 0.0
 
@@ -630,12 +630,12 @@ func calculate_capture_chance(enemy: Dictionary, options: Dictionary = {}) -> Di
 		}
 	}
 
-func attempt_capture(enemy: Dictionary, capture_chance: float) -> bool:
+func attempt_capture(_enemy: Dictionary, capture_chance: float) -> bool:
 	"""
 	Roll to see if capture succeeds
 
 	Args:
-	  - enemy: Enemy combatant dictionary
+	  - _enemy: Enemy combatant dictionary (reserved for future use)
 	  - capture_chance: Capture chance % (0-100)
 
 	Returns:

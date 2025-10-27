@@ -113,7 +113,7 @@ func _on_turn_started(combatant_id: String) -> void:
 		# Enemy turn - execute AI
 		_execute_enemy_ai()
 
-func _on_turn_ended(combatant_id: String) -> void:
+func _on_turn_ended(_combatant_id: String) -> void:
 	"""Called when a combatant's turn ends"""
 	# Hide action menu
 	action_menu.visible = false
@@ -446,6 +446,10 @@ func _on_item_pressed() -> void:
 		if count <= 0:
 			continue
 
+		# Skip if item_id is invalid
+		if item_id == null or String(item_id) == "":
+			continue
+
 		var item_def = item_defs.get(item_id, {})
 		var use_type = item_def.get("use_type", "")
 		if use_type == null:
@@ -466,14 +470,14 @@ func _on_item_pressed() -> void:
 
 			var item_name = item_def.get("name", item_id)
 			if item_name == null:
-				item_name = item_id
+				item_name = String(item_id)
 
 			var targeting = item_def.get("targeting", "Ally")
 			if targeting == null:
 				targeting = "Ally"
 
 			usable_items.append({
-				"id": item_id,
+				"id": String(item_id),
 				"name": String(item_name),
 				"display_name": String(item_name),
 				"description": String(desc),
@@ -698,7 +702,7 @@ func _calculate_run_chance() -> float:
 	"""Calculate run chance based on enemy HP percentage and level difference"""
 	const BASE_RUN_CHANCE: float = 50.0
 	const MAX_HP_BONUS: float = 40.0
-	const MAX_LEVEL_BONUS: float = 20.0
+	const _MAX_LEVEL_BONUS: float = 20.0  # Reserved for future level-based calculations
 	const LEVEL_BONUS_PER_LEVEL: float = 2.0
 
 	# Calculate enemy HP percentage bonus (0-40%)
@@ -1500,7 +1504,7 @@ func _execute_skill_single(target: Dictionary) -> void:
 	)
 
 	var damage = damage_result.damage
-	var is_stumble = damage_result.is_stumble
+	var _is_stumble = damage_result.is_stumble  # Reserved for future stumble mechanics
 
 	# Apply damage
 	target.hp -= damage
