@@ -36,6 +36,10 @@ func _ready() -> void:
 
 	print("[SigilSkillMenu] _ready() called, member=%s" % _member)
 
+	# Debug: Add gui_input handler to track ANY mouse input
+	if not gui_input.is_connected(Callable(self, "_on_gui_input")):
+		gui_input.connect(Callable(self, "_on_gui_input"))
+
 	# Wire signals
 	if _sockets and not _sockets.item_selected.is_connected(Callable(self, "_on_socket_pick")):
 		_sockets.item_selected.connect(Callable(self, "_on_socket_pick"))
@@ -54,6 +58,7 @@ func _ready() -> void:
 		_btn_close.pressed.connect(Callable(self, "_on_close"))
 		print("[SigilSkillMenu] Connected btn_close.pressed")
 
+	set_process_input(true)
 	set_process_unhandled_input(true)
 
 	# Only refresh if member is already set (via set_member before adding to tree)
@@ -63,7 +68,23 @@ func _ready() -> void:
 	else:
 		print("[SigilSkillMenu] Member not set yet, waiting for set_member() call")
 
+func _on_gui_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton:
+		var mb := event as InputEventMouseButton
+		if mb.pressed:
+			print("[SigilSkillMenu] GUI INPUT: Mouse button %d at (%d, %d)" % [mb.button_index, mb.position.x, mb.position.y])
+
+func _input(event: InputEvent) -> void:
+	if event is InputEventMouseButton:
+		var mb := event as InputEventMouseButton
+		if mb.pressed:
+			print("[SigilSkillMenu] _input: Mouse button %d at (%d, %d)" % [mb.button_index, mb.position.x, mb.position.y])
+
 func _unhandled_input(e: InputEvent) -> void:
+	if e is InputEventMouseButton:
+		var mb := e as InputEventMouseButton
+		if mb.pressed:
+			print("[SigilSkillMenu] _unhandled_input: Mouse button %d at (%d, %d)" % [mb.button_index, mb.position.x, mb.position.y])
 	if e is InputEventKey and e.is_pressed() and e.keycode == KEY_ESCAPE:
 		_on_close()
 
