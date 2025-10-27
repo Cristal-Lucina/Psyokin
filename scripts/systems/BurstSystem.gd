@@ -58,7 +58,7 @@ func get_available_bursts(party_ids: Array) -> Array:
 	"""
 	var available: Array = []
 
-	print("[BurstSystem] Checking available bursts for party: %s" % party_ids)
+	print("[BurstSystem] Checking available bursts for party: ", party_ids)
 	print("[BurstSystem] Total burst abilities loaded: %d" % burst_abilities.size())
 
 	for burst_id in burst_abilities.keys():
