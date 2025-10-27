@@ -100,13 +100,14 @@ const LAYERS = {
 	"tool_b": {"code": "7tlb", "node_name": "ToolBSprite", "path": "7tlb"}
 }
 
-@onready var _refresh : Button        = $Root/Left/PartyHeader/RefreshBtn
-@onready var _party   : VBoxContainer = $Root/Left/PartyScroll/PartyList
-@onready var _creds   : Label         = $Root/Right/InfoGrid/MoneyValue
-@onready var _perk    : Label         = $Root/Right/InfoGrid/PerkValue
-@onready var _date    : Label         = $Root/Right/InfoGrid/DateValue
-@onready var _phase   : Label         = $Root/Right/InfoGrid/PhaseValue
-@onready var _hint    : RichTextLabel = $Root/Right/HintValue
+@onready var _refresh   : Button        = $Root/Left/PartyHeader/RefreshBtn
+@onready var _party     : VBoxContainer = $Root/Left/PartyScroll/PartyList
+@onready var _creds     : Label         = $Root/Right/InfoGrid/MoneyValue
+@onready var _perk      : Label         = $Root/Right/InfoGrid/PerkValue
+@onready var _morality  : Label         = $Root/Right/InfoGrid/MoralityValue
+@onready var _date      : Label         = $Root/Right/InfoGrid/DateValue
+@onready var _phase     : Label         = $Root/Right/InfoGrid/PhaseValue
+@onready var _hint      : RichTextLabel = $Root/Right/HintValue
 
 # Character Preview UI
 @onready var character_layers = $Root/Right/CharacterPreviewBox/ViewportWrapper/CharacterLayers
@@ -654,6 +655,14 @@ func _update_summary() -> void:
 	if _creds: _creds.text = _read_creds()
 	if _perk:  _perk.text  = _read_perk_points()
 
+	if _morality:
+		_morality.text = _read_morality()
+		# Color the morality text based on tier
+		var morality_sys = get_node_or_null("/root/aMoralitySystem")
+		if morality_sys and morality_sys.has_method("get_tier_color"):
+			var color: Color = morality_sys.call("get_tier_color")
+			_morality.add_theme_color_override("font_color", color)
+
 	var dp: Dictionary = _read_date_phase()
 	if _date:  _date.text  = String(dp.get("date_text", "—"))
 	if _phase: _phase.text = String(dp.get("phase_text", "—"))
@@ -784,6 +793,25 @@ func _read_perk_points() -> String:
 		var gv: Variant = _gs.get("perk_points")
 		if typeof(gv) in [TYPE_INT, TYPE_FLOAT]: return str(int(gv))
 	return "0"
+
+func _read_morality() -> String:
+	var morality_sys = get_node_or_null("/root/aMoralitySystem")
+	if morality_sys:
+		var meter: int = 0
+		var tier_name: String = "Neutral"
+
+		# Get morality meter value
+		if morality_sys.has_method("get"):
+			var m_v: Variant = morality_sys.get("morality_meter")
+			if typeof(m_v) in [TYPE_INT, TYPE_FLOAT]:
+				meter = int(m_v)
+
+		# Get tier name
+		if morality_sys.has_method("get_tier_name"):
+			tier_name = String(morality_sys.call("get_tier_name"))
+
+		return "%s (%+d)" % [tier_name, meter]
+	return "Neutral (0)"
 
 func _read_date_phase() -> Dictionary:
 	var out: Dictionary = {}

@@ -84,6 +84,14 @@ text = "Perk Pts"
 layout_mode = 2
 text = "0"
 
+[node name="MoralityLabel" type="Label" parent="Root/Right/InfoGrid"]
+layout_mode = 2
+text = "Morality"
+
+[node name="MoralityValue" type="Label" parent="Root/Right/InfoGrid"]
+layout_mode = 2
+text = "Neutral (0)"
+
 [node name="DateLabel" type="Label" parent="Root/Right/InfoGrid"]
 layout_mode = 2
 text = "Date"
