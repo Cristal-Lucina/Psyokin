@@ -19,6 +19,7 @@ const BONDS_PATH := "/root/aCircleBondSystem"
 
 # --- CSV paths / keys ----------------------------------------------------------
 const ITEMS_CSV := "res://data/items/items.csv"
+const TEST_AILMENT_ITEMS_CSV := "res://data/combat/test_ailment_items.csv"
 const KEY_ID    := "item_id"
 
 const PARTY_CSV_CANDIDATES: Array[String] = [
@@ -72,6 +73,10 @@ var _btn_add_sxp : Button       = null
 var _party_import_row : HBoxContainer = null
 var _btn_import_all      : Button = null
 var _btn_import_starters : Button = null
+
+# Runtime-added test items button
+var _test_items_row  : HBoxContainer = null
+var _btn_test_items  : Button = null
 
 # -------- Hero cheat widgets (runtime-built if missing) --------
 var _hero_row         : HBoxContainer = null
@@ -171,6 +176,9 @@ func _ready() -> void:
 
 	# CSV import buttons (before Sigil GXP row)
 	_ensure_party_import_row()
+
+	# Test ailment items button
+	_ensure_test_items_row()
 
 	# Sigil GXP row
 	_ensure_sigil_gxp_row()
@@ -310,6 +318,24 @@ func _ensure_party_import_row() -> void:
 		_btn_import_starters.add_theme_font_size_override("font_size", 8)
 		_party_import_row.add_child(_btn_import_starters)
 		_btn_import_starters.pressed.connect(_on_import_starters)
+
+# Test ailment items button
+func _ensure_test_items_row() -> void:
+	var parent := _attach_point()
+	_test_items_row = parent.get_node_or_null("TestItemsRow") as HBoxContainer
+	if _test_items_row == null:
+		_test_items_row = HBoxContainer.new()
+		_test_items_row.name = "TestItemsRow"
+		_test_items_row.add_theme_constant_override("separation", 6)
+		parent.add_child(_test_items_row)
+
+	if _btn_test_items == null:
+		_btn_test_items = Button.new()
+		_btn_test_items.name = "BtnGiveTestItems"
+		_btn_test_items.text = "Give Test Ailment Items (x10)"
+		_btn_test_items.add_theme_font_size_override("font_size", 8)
+		_test_items_row.add_child(_btn_test_items)
+		_btn_test_items.pressed.connect(_on_give_test_items)
 
 # --- OptionButton UX tweaks ----------------------------------------------------
 func _style_option_button(ob: OptionButton, font_px: int, popup_max_h: int, popup_max_w: int = 300) -> void:
@@ -1533,6 +1559,34 @@ func _on_import_starters() -> void:
 	_push_to_dorm_common(ids)
 	_apply_relationships_from_csv(ids)
 	print("[ItemsCheatBar] Imported starters (%d) to Dorm Common." % ids.size())
+
+func _on_give_test_items() -> void:
+	if _csv == null or _inv == null:
+		print("[ItemsCheatBar] CSV or Inventory system not available")
+		return
+
+	var test_items: Variant = _csv.call("load_csv", TEST_AILMENT_ITEMS_CSV, KEY_ID)
+	if typeof(test_items) != TYPE_DICTIONARY:
+		print("[ItemsCheatBar] Failed to load test items from %s" % TEST_AILMENT_ITEMS_CSV)
+		return
+
+	var test_items_dict: Dictionary = test_items as Dictionary
+	if test_items_dict.is_empty():
+		print("[ItemsCheatBar] No test items found in CSV")
+		return
+
+	# Register each test item in inventory definitions and add 10 to inventory
+	for item_id in test_items_dict.keys():
+		var item_data: Dictionary = test_items_dict[item_id] as Dictionary
+		_inv.item_defs[item_id] = item_data
+		_inv.call("add_item", item_id, 10)
+
+	# Emit signal to refresh inventory UI
+	if _inv.has_signal("items_changed"):
+		_inv.emit_signal("items_changed")
+
+	print("[ItemsCheatBar] Added %d test items (x10 each)" % test_items_dict.size())
+	_refresh_defs()
 
 func _push_to_dorm_common(member_ids: Array[String]) -> void:
 	if member_ids.size() == 0:
