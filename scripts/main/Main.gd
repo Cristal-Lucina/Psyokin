@@ -1179,6 +1179,15 @@ func _give_test_bind_items() -> void:
 	print("[Main] Force reloading inventory definitions...")
 	inv.load_definitions()
 
+	# Debug: Check if definitions were loaded
+	var defs = inv.get_item_defs()
+	print("[Main] Loaded %d item definitions" % defs.size())
+	if defs.has("BIND_001"):
+		print("[Main] BIND_001 definition: %s" % defs["BIND_001"])
+	else:
+		print("[Main] WARNING: BIND_001 not found in definitions!")
+		print("[Main] Available item IDs starting with 'BIND': %s" % [defs.keys().filter(func(k): return k.begins_with("BIND"))])
+
 	# Give a variety of bind items for testing capture
 	inv.add_item("BIND_001", 5)  # Weak Bind (+10 capture)
 	inv.add_item("BIND_002", 3)  # Standard Bind (+25 capture)
