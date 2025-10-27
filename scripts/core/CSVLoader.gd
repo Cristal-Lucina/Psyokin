@@ -6,6 +6,19 @@ class_name CSVLoader
 var _cache: Dictionary = {}   # path -> { key -> row_dict }
 var _mru_key: Dictionary = {} # path -> key column used
 
+## Clears the entire cache, forcing fresh reads on next load_csv calls
+func clear_cache() -> void:
+	_cache.clear()
+	_mru_key.clear()
+	print("[CSVLoader] Cache cleared")
+
+## Clears cache for a specific path
+func clear_cache_for_path(path: String) -> void:
+	if _cache.has(path):
+		_cache.erase(path)
+		_mru_key.erase(path)
+		print("[CSVLoader] Cache cleared for path: %s" % path)
+
 func load_csv(path: String, key_column: String = "id") -> Dictionary:
 	# Return cached if available and matching key.
 	if _cache.has(path) and _mru_key.get(path, "") == key_column:

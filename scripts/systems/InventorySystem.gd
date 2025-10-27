@@ -214,6 +214,11 @@ func _try_load_defs_from_csv(force: bool=false) -> void:
 		if force: print("[InventorySystem] CSV loader missing at %s" % CSV_LOADER_PATH)
 		return
 
+	# Clear CSVLoader cache if force reloading
+	if force and loader.has_method("clear_cache"):
+		print("[InventorySystem] Clearing CSVLoader cache for force reload")
+		loader.clear_cache()
+
 	print("[InventorySystem] Attempting to load CSV from paths: %s" % str(CSV_PATHS))
 	for path in CSV_PATHS:
 		print("[InventorySystem] Checking path: %s" % path)
