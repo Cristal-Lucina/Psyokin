@@ -314,6 +314,10 @@ func _on_victory_accept_pressed() -> void:
 
 func _get_member_display_name(member_id: String) -> String:
 	"""Get display name for a party member"""
+	# Special case for hero - get player name
+	if member_id == "hero":
+		return _get_hero_display_name()
+
 	# Check combatants first for display names from battle
 	for combatant in battle_mgr.combatants:
 		if combatant.get("id", "") == member_id:
@@ -321,6 +325,25 @@ func _get_member_display_name(member_id: String) -> String:
 
 	# Fallback to member_id
 	return member_id
+
+func _get_hero_display_name() -> String:
+	"""Get the hero/player character's display name"""
+	# Try to get from GameState
+	if gs and gs.has_method("get"):
+		var player_name_var = gs.get("player_name")
+		if player_name_var and typeof(player_name_var) == TYPE_STRING:
+			var player_name = String(player_name_var).strip_edges()
+			if player_name != "":
+				return player_name
+
+	# Try current combatant
+	if current_combatant.get("id", "") == "hero":
+		var display = current_combatant.get("display_name", "")
+		if display != "":
+			return display
+
+	# Fallback
+	return "Hero"
 
 ## ═══════════════════════════════════════════════════════════════
 ## COMBATANT DISPLAY
@@ -878,6 +901,11 @@ func _on_defend_pressed() -> void:
 
 func _on_burst_pressed() -> void:
 	"""Handle Burst action - show burst abilities menu"""
+	# Only hero can use burst abilities
+	if current_combatant.get("id", "") != "hero":
+		log_message("Only %s can use Burst abilities!" % _get_hero_display_name())
+		return
+
 	if not burst_system:
 		log_message("Burst system not available!")
 		return
@@ -1713,12 +1741,14 @@ func _show_burst_menu(burst_abilities: Array) -> void:
 		var participants_str = String(participants_raw) if participants_raw != null else ""
 		var participants = participants_str.split(";", false) if participants_str != "" else []
 
-		# Build participants text safely
+		# Build participants text safely with display names
 		var participants_text = "Solo"
 		if participants.size() > 0:
 			var participant_names: PackedStringArray = PackedStringArray()
 			for p in participants:
-				participant_names.append(String(p))
+				var participant_id = String(p).strip_edges()
+				var display_name = _get_member_display_name(participant_id)
+				participant_names.append(display_name)
 			participants_text = ", ".join(participant_names)
 
 		var can_afford = battle_mgr.burst_gauge >= burst_cost
@@ -1818,7 +1848,8 @@ func _execute_burst_aoe() -> void:
 	battle_mgr.burst_gauge -= burst_cost
 	_update_burst_gauge()
 
-	log_message("%s unleashes %s!" % [current_combatant.display_name, burst_name])
+	var hero_name = _get_hero_display_name()
+	log_message("%s unleashes %s!" % [hero_name, burst_name])
 	log_message("  (Spent %d Burst Gauge)" % burst_cost)
 
 	# Hit all enemies
