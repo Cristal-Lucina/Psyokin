@@ -447,8 +447,15 @@ func _on_item_pressed() -> void:
 			continue
 
 		var item_def = item_defs.get(item_id, {})
-		var use_type = String(item_def.get("use_type", ""))
-		var category = String(item_def.get("category", ""))
+		var use_type = item_def.get("use_type", "")
+		if use_type == null:
+			use_type = ""
+		use_type = String(use_type)
+
+		var category = item_def.get("category", "")
+		if category == null:
+			category = ""
+		category = String(category)
 
 		# Include items that can be used in battle (use_type = "battle" or "both")
 		# Exclude bind items (those are for Capture button)
@@ -456,13 +463,22 @@ func _on_item_pressed() -> void:
 			var desc = item_def.get("short_description", "")
 			if desc == null:
 				desc = ""
+
+			var item_name = item_def.get("name", item_id)
+			if item_name == null:
+				item_name = item_id
+
+			var targeting = item_def.get("targeting", "Ally")
+			if targeting == null:
+				targeting = "Ally"
+
 			usable_items.append({
 				"id": item_id,
-				"name": item_def.get("name", item_id),
-				"display_name": item_def.get("name", item_id),
+				"name": String(item_name),
+				"display_name": String(item_name),
 				"description": String(desc),
 				"count": count,
-				"targeting": item_def.get("targeting", "Ally"),
+				"targeting": String(targeting),
 				"item_def": item_def
 			})
 
@@ -491,10 +507,15 @@ func _on_capture_pressed() -> void:
 			var desc = item_def.get("short_description", "")
 			if desc == null:
 				desc = ""
+
+			var bind_name = item_def.get("name", bind_id)
+			if bind_name == null:
+				bind_name = bind_id
+
 			bind_items.append({
 				"id": bind_id,
-				"name": item_def.get("name", bind_id),
-				"display_name": item_def.get("name", bind_id),
+				"name": String(bind_name),
+				"display_name": String(bind_name),
 				"description": String(desc),
 				"capture_mod": int(item_def.get("capture_mod", 0)),
 				"count": count,
