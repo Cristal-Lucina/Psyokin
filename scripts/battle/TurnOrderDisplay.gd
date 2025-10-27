@@ -409,7 +409,7 @@ func update_combatant_hp(_combatant_id: String) -> void:
 	pass
 
 func animate_ko_fall(combatant_id: String) -> void:
-	"""Animate a combatant falling when KO'd"""
+	"""Animate a combatant falling when KO'd - drops to bottom of screen"""
 	# Find the slot for this combatant
 	var target_slot: PanelContainer = null
 	for slot in turn_slots:
@@ -422,25 +422,57 @@ func animate_ko_fall(combatant_id: String) -> void:
 
 	print("[TurnOrderDisplay] Animating KO fall for %s" % combatant_id)
 
+	# Store original position in the VBoxContainer
+	var original_position = target_slot.global_position
+
+	# Temporarily remove from layout system so we can animate freely
+	# Reparent to a CanvasLayer to keep it visible during animation
+	var canvas_layer = CanvasLayer.new()
+	get_tree().root.add_child(canvas_layer)
+
+	# Store parent and index for later
+	var original_parent = target_slot.get_parent()
+	var original_index = target_slot.get_index()
+
+	# Reparent to canvas layer
+	target_slot.reparent(canvas_layer, false)
+	target_slot.global_position = original_position
+
+	# Calculate drop distance to bottom of screen
+	var viewport_height = get_viewport_rect().size.y
+	var distance_to_bottom = viewport_height - original_position.y + 100  # Extra 100 to go off-screen
+
 	# Create falling animation
 	var tween = create_tween()
 	tween.set_ease(Tween.EASE_IN)
 	tween.set_trans(Tween.TRANS_CUBIC)
 
-	# Rotate slightly while falling
-	tween.tween_property(target_slot, "rotation", deg_to_rad(15), KO_FALL_DURATION)
+	# Drop to bottom of screen
+	tween.tween_property(target_slot, "global_position:y", viewport_height + 100, KO_FALL_DURATION)
+	# Rotate while falling
+	tween.parallel().tween_property(target_slot, "rotation", deg_to_rad(25), KO_FALL_DURATION)
 	# Fade out
-	tween.parallel().tween_property(target_slot, "modulate:a", 0.3, KO_FALL_DURATION)
-	# Scale down
-	tween.parallel().tween_property(target_slot, "scale", Vector2(0.8, 0.8), KO_FALL_DURATION)
+	tween.parallel().tween_property(target_slot, "modulate:a", 0.0, KO_FALL_DURATION)
+	# Scale down slightly
+	tween.parallel().tween_property(target_slot, "scale", Vector2(0.7, 0.7), KO_FALL_DURATION)
 
 	# Wait for animation to finish
 	await tween.finished
+
+	# Clean up canvas layer
+	if is_instance_valid(canvas_layer):
+		canvas_layer.queue_free()
 
 	# Check if slot is still valid (it may have been freed during turn order rebuild)
 	if not is_instance_valid(target_slot):
 		return
 
-	# Reset rotation and scale (will be rebuilt with greyed style)
+	# Reset properties and reparent back
 	target_slot.rotation = 0
 	target_slot.scale = Vector2(1.0, 1.0)
+	target_slot.modulate.a = 1.0
+
+	# Reparent back to original parent if still valid
+	if is_instance_valid(original_parent):
+		target_slot.reparent(original_parent, false)
+		original_parent.move_child(target_slot, original_index)
