@@ -513,4 +513,3 @@ func animate_capture(combatant_id: String) -> void:
 		vbox.add_child(captured_label)
 
 	await tween.finished
-
