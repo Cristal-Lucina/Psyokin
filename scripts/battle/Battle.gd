@@ -1707,6 +1707,14 @@ func _show_burst_menu(burst_abilities: Array) -> void:
 		var participants_str = String(participants_raw) if participants_raw != null else ""
 		var participants = participants_str.split(";", false) if participants_str != "" else []
 
+		# Build participants text safely
+		var participants_text = "Solo"
+		if participants.size() > 0:
+			var participant_names: PackedStringArray = PackedStringArray()
+			for p in participants:
+				participant_names.append(String(p))
+			participants_text = ", ".join(participant_names)
+
 		var can_afford = battle_mgr.burst_gauge >= burst_cost
 
 		var button = Button.new()
@@ -1714,7 +1722,7 @@ func _show_burst_menu(burst_abilities: Array) -> void:
 			burst_name,
 			burst_cost,
 			description,
-			", ".join(participants) if participants.size() > 0 else "Solo"
+			participants_text
 		]
 		button.custom_minimum_size = Vector2(430, 70)
 
