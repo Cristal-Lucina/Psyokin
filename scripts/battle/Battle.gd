@@ -447,19 +447,23 @@ func _on_item_pressed() -> void:
 			continue
 
 		# Skip if item_id is invalid
-		if item_id == null or String(item_id) == "":
+		if item_id == null:
+			continue
+
+		var item_id_str = str(item_id)  # Use str() which is safer than String()
+		if item_id_str == "":
 			continue
 
 		var item_def = item_defs.get(item_id, {})
 		var use_type = item_def.get("use_type", "")
 		if use_type == null:
 			use_type = ""
-		use_type = String(use_type)
+		use_type = str(use_type)
 
 		var category = item_def.get("category", "")
 		if category == null:
 			category = ""
-		category = String(category)
+		category = str(category)
 
 		# Include items that can be used in battle (use_type = "battle" or "both")
 		# Exclude bind items (those are for Capture button)
@@ -467,22 +471,25 @@ func _on_item_pressed() -> void:
 			var desc = item_def.get("short_description", "")
 			if desc == null:
 				desc = ""
+			desc = str(desc)
 
-			var item_name = item_def.get("name", item_id)
-			if item_name == null:
-				item_name = String(item_id)
+			var item_name = item_def.get("name", "")
+			if item_name == null or item_name == "":
+				item_name = item_id_str
+			item_name = str(item_name)
 
 			var targeting = item_def.get("targeting", "Ally")
 			if targeting == null:
 				targeting = "Ally"
+			targeting = str(targeting)
 
 			usable_items.append({
-				"id": String(item_id),
-				"name": String(item_name),
-				"display_name": String(item_name),
-				"description": String(desc),
+				"id": item_id_str,
+				"name": item_name,
+				"display_name": item_name,
+				"description": desc,
 				"count": count,
-				"targeting": String(targeting),
+				"targeting": targeting,
 				"item_def": item_def
 			})
 
@@ -508,19 +515,22 @@ func _on_capture_pressed() -> void:
 		var count = inventory.get_count(bind_id)
 		if count > 0:
 			var item_def = inventory.get_item_def(bind_id)
+
 			var desc = item_def.get("short_description", "")
 			if desc == null:
 				desc = ""
+			desc = str(desc)
 
-			var bind_name = item_def.get("name", bind_id)
-			if bind_name == null:
+			var bind_name = item_def.get("name", "")
+			if bind_name == null or bind_name == "":
 				bind_name = bind_id
+			bind_name = str(bind_name)
 
 			bind_items.append({
-				"id": bind_id,
-				"name": String(bind_name),
-				"display_name": String(bind_name),
-				"description": String(desc),
+				"id": str(bind_id),
+				"name": bind_name,
+				"display_name": bind_name,
+				"description": desc,
 				"capture_mod": int(item_def.get("capture_mod", 0)),
 				"count": count,
 				"item_def": item_def
@@ -1230,11 +1240,8 @@ func _show_item_menu(items: Array) -> void:
 	# Add item buttons
 	for i in range(items.size()):
 		var item_data = items[i]
-		var item_name = String(item_data.get("name", "Unknown"))
-		var item_desc = item_data.get("description", "")
-		if item_desc == null:
-			item_desc = ""
-		item_desc = String(item_desc)
+		var item_name = str(item_data.get("name", "Unknown"))
+		var item_desc = str(item_data.get("description", ""))
 		var item_count = int(item_data.get("count", 0))
 
 		var button = Button.new()
@@ -1276,8 +1283,8 @@ func _on_item_selected(item_data: Dictionary) -> void:
 	# Store selected item
 	selected_item = item_data
 
-	var targeting = String(item_data.get("targeting", "Ally"))
-	log_message("Using %s - select target..." % item_data.name)
+	var targeting = str(item_data.get("targeting", "Ally"))
+	log_message("Using %s - select target..." % str(item_data.get("name", "item")))
 
 	# Determine target candidates
 	if targeting == "Ally":
@@ -1337,11 +1344,8 @@ func _show_capture_menu(bind_items: Array) -> void:
 	# Add bind item buttons
 	for i in range(bind_items.size()):
 		var bind_data = bind_items[i]
-		var bind_name = String(bind_data.get("name", "Unknown"))
-		var bind_desc = bind_data.get("description", "")
-		if bind_desc == null:
-			bind_desc = ""
-		bind_desc = String(bind_desc)
+		var bind_name = str(bind_data.get("name", "Unknown"))
+		var bind_desc = str(bind_data.get("description", ""))
 		var bind_count = int(bind_data.get("count", 0))
 		var capture_mod = int(bind_data.get("capture_mod", 0))
 
