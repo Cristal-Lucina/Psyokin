@@ -61,12 +61,27 @@ func _ready() -> void:
 	set_process_input(true)
 	set_process_unhandled_input(true)
 
+	print("[SigilSkillMenu] Input processing enabled:")
+	print("  - is_processing_input: %s" % is_processing_input())
+	print("  - is_processing_unhandled_input: %s" % is_processing_unhandled_input())
+	print("  - is_inside_tree: %s" % is_inside_tree())
+	print("  - is_visible_in_tree: %s" % is_visible_in_tree())
+
 	# Only refresh if member is already set (via set_member before adding to tree)
 	if _member != "":
 		print("[SigilSkillMenu] Member already set, refreshing...")
 		_refresh_all()
 	else:
 		print("[SigilSkillMenu] Member not set yet, waiting for set_member() call")
+
+	# Force test after next frame to ensure everything is set up
+	await get_tree().process_frame
+	print("[SigilSkillMenu] After process_frame:")
+	print("  - is_processing_input: %s" % is_processing_input())
+	print("  - is_processing_unhandled_input: %s" % is_processing_unhandled_input())
+	print("  - is_visible_in_tree: %s" % is_visible_in_tree())
+	print("  - mouse_filter: %d" % mouse_filter)
+	print("  - Clicking anywhere should now show input logs...")
 
 func _on_gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
