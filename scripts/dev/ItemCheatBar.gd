@@ -1565,6 +1565,20 @@ func _on_give_test_items() -> void:
 		print("[ItemsCheatBar] CSV or Inventory system not available")
 		return
 
+	# Load main items CSV fresh (force reload)
+	print("[ItemsCheatBar] Loading main items CSV...")
+	var main_items: Variant = _csv.call("load_csv", ITEMS_CSV, KEY_ID)
+	if typeof(main_items) != TYPE_DICTIONARY:
+		print("[ItemsCheatBar] Failed to load main items from %s" % ITEMS_CSV)
+		return
+
+	var main_items_dict: Dictionary = main_items as Dictionary
+	if main_items_dict.is_empty():
+		print("[ItemsCheatBar] Main items CSV is empty!")
+		return
+
+	# Load test items CSV
+	print("[ItemsCheatBar] Loading test items CSV...")
 	var test_items: Variant = _csv.call("load_csv", TEST_AILMENT_ITEMS_CSV, KEY_ID)
 	if typeof(test_items) != TYPE_DICTIONARY:
 		print("[ItemsCheatBar] Failed to load test items from %s" % TEST_AILMENT_ITEMS_CSV)
@@ -1575,23 +1589,20 @@ func _on_give_test_items() -> void:
 		print("[ItemsCheatBar] No test items found in CSV")
 		return
 
-	# Get current item definitions
-	var current_defs: Dictionary = {}
-	if _inv.has_method("get_item_defs"):
-		var defs_v: Variant = _inv.call("get_item_defs")
-		if typeof(defs_v) == TYPE_DICTIONARY:
-			current_defs = defs_v as Dictionary
-
-	# Add test items to definitions
+	# Merge main items and test items
+	var merged_defs: Dictionary = main_items_dict.duplicate(true)
 	for item_id in test_items_dict.keys():
-		var item_data: Dictionary = test_items_dict[item_id] as Dictionary
-		current_defs[item_id] = item_data
+		merged_defs[item_id] = test_items_dict[item_id]
 
-	# Set the updated definitions back
+	print("[ItemsCheatBar] Merged %d main items + %d test items = %d total" % [
+		main_items_dict.size(), test_items_dict.size(), merged_defs.size()
+	])
+
+	# Set the merged definitions
 	if _inv.has_method("set_item_defs"):
-		_inv.call("set_item_defs", current_defs)
+		_inv.call("set_item_defs", merged_defs)
 
-	# Add items to inventory
+	# Add test items to inventory
 	for item_id in test_items_dict.keys():
 		_inv.call("add_item", item_id, 10)
 
