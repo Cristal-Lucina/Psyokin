@@ -15,6 +15,7 @@ const SHOW_UPCOMING_TURNS: int = 8  # How many turns to show
 const ANIMATION_DURATION: float = 0.3  # Duration of slide animations
 const REVEAL_DELAY: float = 0.15  # Delay between each combatant reveal
 const KO_FALL_DURATION: float = 0.5  # Duration of KO falling animation
+const SLOT_HEIGHT: float = 45.0  # Approximate height of each turn slot including spacing
 
 ## Container for turn slots
 var turn_slots: Array[PanelContainer] = []
@@ -440,14 +441,15 @@ func animate_ko_fall(combatant_id: String) -> void:
 	# Store original position of KO'd slot
 	var original_position = target_slot.global_position
 
-	# Find all slots below this one and store their positions
-	var slots_below: Array[Dictionary] = []
+	# Find all slots below this one
+	var slots_below: Array[PanelContainer] = []
 	for i in range(target_index + 1, turn_slots.size()):
-		var slot = turn_slots[i]
-		slots_below.append({
-			"slot": slot,
-			"old_position": slot.global_position
-		})
+		slots_below.append(turn_slots[i])
+
+	# Add temporary downward offset to slots below (one slot height)
+	# This keeps them visually in place when KO'd slot is removed
+	for slot in slots_below:
+		slot.position.y = SLOT_HEIGHT
 
 	# Create canvas layer for KO'd slot animation
 	var canvas_layer = CanvasLayer.new()
@@ -457,7 +459,7 @@ func animate_ko_fall(combatant_id: String) -> void:
 	target_slot.reparent(canvas_layer, false)
 	target_slot.global_position = original_position
 
-	# Remove from turn_slots array
+	# Remove from turn_slots array (VBoxContainer will reflow)
 	turn_slots.remove_at(target_index)
 
 	# Wait one frame for VBoxContainer to reflow
@@ -479,21 +481,14 @@ func animate_ko_fall(combatant_id: String) -> void:
 	ko_tween.parallel().tween_property(target_slot, "scale", Vector2(0.7, 0.7), KO_FALL_DURATION)
 	tweens.append(ko_tween)
 
-	# Animate slots below moving up to fill the gap
-	for slot_data in slots_below:
-		var slot: PanelContainer = slot_data.slot
-		var old_pos: Vector2 = slot_data.old_position
-		var new_pos = slot.global_position
-
-		# Temporarily set to old position
-		slot.global_position = old_pos
-
-		# Animate to new position
-		var slide_tween = create_tween()
-		slide_tween.set_ease(Tween.EASE_OUT)
-		slide_tween.set_trans(Tween.TRANS_CUBIC)
-		slide_tween.tween_property(slot, "global_position:y", new_pos.y, KO_FALL_DURATION)
-		tweens.append(slide_tween)
+	# Animate slots below sliding up by removing their y-offset
+	for slot in slots_below:
+		if is_instance_valid(slot):
+			var slide_tween = create_tween()
+			slide_tween.set_ease(Tween.EASE_OUT)
+			slide_tween.set_trans(Tween.TRANS_CUBIC)
+			slide_tween.tween_property(slot, "position:y", 0.0, KO_FALL_DURATION)
+			tweens.append(slide_tween)
 
 	# Wait for all animations to finish
 	if not tweens.is_empty():
@@ -502,9 +497,3 @@ func animate_ko_fall(combatant_id: String) -> void:
 	# Clean up canvas layer and KO'd slot
 	if is_instance_valid(canvas_layer):
 		canvas_layer.queue_free()
-
-	# Reset global positions back to layout control (VBox will handle positioning)
-	for slot_data in slots_below:
-		var slot: PanelContainer = slot_data.slot
-		if is_instance_valid(slot):
-			slot.position = Vector2.ZERO  # Let VBox control position again
