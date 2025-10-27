@@ -1578,7 +1578,19 @@ func _on_give_test_items() -> void:
 	# Register each test item in inventory definitions and add 10 to inventory
 	for item_id in test_items_dict.keys():
 		var item_data: Dictionary = test_items_dict[item_id] as Dictionary
-		_inv.item_defs[item_id] = item_data
+
+		# Try to register in item_defs if the property is accessible
+		if "item_defs" in _inv:
+			var defs: Variant = _inv.get("item_defs")
+			if typeof(defs) == TYPE_DICTIONARY:
+				var defs_dict: Dictionary = defs as Dictionary
+				defs_dict[item_id] = item_data
+		elif _inv.has_method("register_item_def"):
+			_inv.call("register_item_def", item_id, item_data)
+		elif _inv.has_method("add_item_def"):
+			_inv.call("add_item_def", item_id, item_data)
+
+		# Add to inventory
 		_inv.call("add_item", item_id, 10)
 
 	# Emit signal to refresh inventory UI
