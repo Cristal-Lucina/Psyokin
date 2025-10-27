@@ -283,10 +283,16 @@ func _wait_for_turn_order_animation() -> void:
 		await get_tree().process_frame
 		return
 
-	# Wait for animation_completed signal
-	if turn_order_display.has_signal("animation_completed"):
-		await turn_order_display.animation_completed
+	# Only wait for animation if one is actually playing
+	if turn_order_display.has("is_animating") and turn_order_display.is_animating:
+		print("[BattleManager] Animation in progress, waiting for completion...")
+		if turn_order_display.has_signal("animation_completed"):
+			await turn_order_display.animation_completed
+		else:
+			await get_tree().process_frame
 	else:
+		# No animation playing, just proceed
+		print("[BattleManager] No animation in progress, proceeding immediately")
 		await get_tree().process_frame
 
 func _next_turn() -> void:
