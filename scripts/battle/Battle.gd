@@ -563,13 +563,16 @@ func _execute_capture(target: Dictionary) -> void:
 		log_message("Capture failed - no bind selected!")
 		return
 
+	print("[Battle] bind_data contents: %s" % bind_data)
 	var bind_id: String = bind_data.id
 	var bind_name: String = bind_data.name
 	var capture_mod: int = bind_data.capture_mod
+	print("[Battle] Extracted capture_mod value: %d" % capture_mod)
 
 	# Calculate capture chance
 	var capture_result = combat_resolver.calculate_capture_chance(target, {"item_mod": capture_mod})
 	var capture_chance: float = capture_result.chance
+	print("[Battle] Capture calculation result: %s" % capture_result)
 
 	log_message("%s uses %s on %s!" % [current_combatant.display_name, bind_name, target.display_name])
 	log_message("  Capture chance: %.1f%%" % capture_chance)

@@ -589,6 +589,8 @@ func calculate_capture_chance(enemy: Dictionary, options: Dictionary = {}) -> Di
 
 	# Item modifier from bind
 	var item_mod: int = options.get("item_mod", 0)
+	print("[CombatResolver] Capture calculation - options: %s" % options)
+	print("[CombatResolver] Item mod from options: %d" % item_mod)
 
 	# Enemy resistance
 	var enemy_resist: int = enemy.get("capture_resist", 25)
@@ -615,6 +617,9 @@ func calculate_capture_chance(enemy: Dictionary, options: Dictionary = {}) -> Di
 	# Calculate final chance
 	var raw_chance: float = float(base_chance) + float(item_mod) - float(enemy_resist) - hp_penalty + float(state_bonus)
 	var final_chance: float = clamp(raw_chance, 0.0, 100.0)
+
+	print("[CombatResolver] Capture breakdown: base=%d, item_mod=%d, enemy_resist=%d, hp_percent=%.1f, hp_penalty=%.1f, state_bonus=%d" % [base_chance, item_mod, enemy_resist, hp_percent, hp_penalty, state_bonus])
+	print("[CombatResolver] Raw chance: %.1f, Final chance: %.1f" % [raw_chance, final_chance])
 
 	return {
 		"chance": final_chance,
