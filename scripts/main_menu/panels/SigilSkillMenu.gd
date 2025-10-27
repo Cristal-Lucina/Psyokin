@@ -31,10 +31,14 @@ func _ready() -> void:
 		_backdrop.color = Color(0, 0, 0, 0.35)
 		_backdrop.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
+	# CRITICAL: Process even when tree is paused!
+	process_mode = Node.PROCESS_MODE_ALWAYS
+
 	# Ensure root stops input
 	mouse_filter = Control.MOUSE_FILTER_STOP
 
 	print("[SigilSkillMenu] _ready() called, member=%s" % _member)
+	print("[SigilSkillMenu] Tree paused: %s, process_mode: %d" % [get_tree().paused, process_mode])
 
 	# Debug: Add gui_input handler to track ANY mouse input
 	if not gui_input.is_connected(Callable(self, "_on_gui_input")):
