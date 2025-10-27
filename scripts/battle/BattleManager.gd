@@ -393,11 +393,92 @@ func _process_round_start_effects() -> void:
 		# NOTE: is_defending persists across rounds until combatant takes offensive action
 		# This provides multi-round defensive stances
 
-		# TODO: Apply DoT (poison = 5% max HP, burn = 5% max HP)
-		# TODO: Apply HoT (regen)
-		# TODO: Decrement buff/debuff durations
+		# ═══════ Apply DoT (Damage over Time) ═══════
+		if combatant.has("ailments"):
+			var ailments_to_remove = []
+			for ailment_key in combatant.ailments:
+				var ailment = combatant.ailments[ailment_key]
+				if typeof(ailment) == TYPE_STRING:
+					# Legacy string format - convert to dict
+					ailment = {"type": ailment, "duration": 0}
+
+				var ailment_type = ailment.get("type", "")
+
+				# Apply DoT damage
+				if ailment_type in ["poison", "burn"]:
+					var damage = int(ceil(combatant.hp_max * 0.05))  # 5% max HP
+					combatant.hp = max(0, combatant.hp - damage)
+					print("[BattleManager] %s takes %d %s damage" % [combatant.display_name, damage, ailment_type.capitalize()])
+
+					if combatant.hp <= 0:
+						combatant.is_ko = true
+						print("[BattleManager] %s was KO'd by %s!" % [combatant.display_name, ailment_type.capitalize()])
+
+				# Decrement duration (0 = infinite)
+				var duration = ailment.get("duration", 0)
+				if duration > 0:
+					duration -= 1
+					if duration <= 0:
+						ailments_to_remove.append(ailment_key)
+					else:
+						ailment["duration"] = duration
+
+			# Remove expired ailments
+			for key in ailments_to_remove:
+				combatant.ailments.erase(key)
+
+		# ═══════ Apply HoT (Heal over Time) and process buffs ═══════
+		if combatant.has("buffs"):
+			var buffs_to_remove = []
+			for i in range(combatant.buffs.size()):
+				var buff = combatant.buffs[i]
+				var buff_type = buff.get("type", "")
+
+				# Apply Regen healing
+				if buff_type == "regen":
+					var heal = int(ceil(combatant.hp_max * 0.05))  # 5% max HP
+					var old_hp = combatant.hp
+					combatant.hp = min(combatant.hp + heal, combatant.hp_max)
+					var actual_heal = combatant.hp - old_hp
+					print("[BattleManager] %s regenerates %d HP" % [combatant.display_name, actual_heal])
+
+				# Decrement duration
+				var duration = buff.get("duration", 0)
+				if duration > 0:
+					duration -= 1
+					if duration <= 0:
+						buffs_to_remove.append(i)
+						print("[BattleManager] %s's %s buff expired" % [combatant.display_name, buff_type])
+					else:
+						buff["duration"] = duration
+
+			# Remove expired buffs (in reverse order to avoid index issues)
+			buffs_to_remove.reverse()
+			for idx in buffs_to_remove:
+				combatant.buffs.remove_at(idx)
+
+		# ═══════ Process debuffs ═══════
+		if combatant.has("debuffs"):
+			var debuffs_to_remove = []
+			for i in range(combatant.debuffs.size()):
+				var debuff = combatant.debuffs[i]
+
+				# Decrement duration
+				var duration = debuff.get("duration", 0)
+				if duration > 0:
+					duration -= 1
+					if duration <= 0:
+						debuffs_to_remove.append(i)
+						print("[BattleManager] %s's %s debuff expired" % [combatant.display_name, debuff.get("type", "unknown")])
+					else:
+						debuff["duration"] = duration
+
+			# Remove expired debuffs (in reverse order)
+			debuffs_to_remove.reverse()
+			for idx in debuffs_to_remove:
+				combatant.debuffs.remove_at(idx)
+
 		# TODO: Resolve channeling (CH1/CH2)
-		pass
 
 ## ═══════════════════════════════════════════════════════════════
 ## BATTLE END CONDITIONS
@@ -722,9 +803,81 @@ func _end_battle(victory: bool) -> void:
 		print("[BattleManager] *** DEFEAT ***")
 		current_state = BattleState.DEFEAT
 
+	# Save HP/MP for all party members and clear status effects
+	_save_party_hp_mp_and_clear_status(victory)
+
 	print("[BattleManager] Emitting battle_ended signal...")
 	battle_ended.emit(victory)
 	print("[BattleManager] Battle ended signal emitted")
+
+func _save_party_hp_mp_and_clear_status(victory: bool) -> void:
+	"""
+	Save HP/MP for all party members after battle and clear status effects
+
+	HP/MP Persistence Rules:
+	- HP and MP values persist from battle to field
+	- If a party member was KO'd in battle but won, they revive with 1 HP
+	- Status effects (burn, poison, buffs, debuffs) do NOT persist to field
+	"""
+	print("[BattleManager] Saving party HP/MP and clearing status effects...")
+
+	# Get all ally combatants
+	var ally_combatants = get_ally_combatants()
+
+	# Ensure GameState.member_data exists
+	if not gs.has("member_data"):
+		gs.set("member_data", {})
+
+	var member_data: Dictionary = gs.get("member_data")
+	if typeof(member_data) != TYPE_DICTIONARY:
+		member_data = {}
+
+	# Save HP/MP for each party member
+	for combatant in ally_combatants:
+		var member_id: String = combatant.get("id", "")
+		if member_id == "":
+			continue
+
+		# Ensure member record exists
+		if not member_data.has(member_id):
+			member_data[member_id] = {}
+
+		var member_rec: Dictionary = member_data[member_id]
+
+		# Handle HP persistence
+		if victory:
+			# Victory: Save current HP, but revive KO'd members with 1 HP
+			if combatant.get("is_ko", false):
+				member_rec["hp"] = 1
+				print("[BattleManager] %s was KO'd but won - reviving with 1 HP" % combatant.display_name)
+			else:
+				member_rec["hp"] = max(1, combatant.get("hp", combatant.get("hp_max", 100)))
+				print("[BattleManager] %s HP saved: %d/%d" % [combatant.display_name, member_rec["hp"], combatant.get("hp_max", 100)])
+		else:
+			# Defeat: Save current HP (including 0 if KO'd)
+			member_rec["hp"] = max(0, combatant.get("hp", combatant.get("hp_max", 100)))
+			print("[BattleManager] %s HP saved after defeat: %d/%d" % [combatant.display_name, member_rec["hp"], combatant.get("hp_max", 100)])
+
+		# Save MP persistence (always save current MP)
+		member_rec["mp"] = max(0, combatant.get("mp", combatant.get("mp_max", 20)))
+		print("[BattleManager] %s MP saved: %d/%d" % [combatant.display_name, member_rec["mp"], combatant.get("mp_max", 20)])
+
+		# Clear all status effects (they do NOT persist to field)
+		member_rec["buffs"] = []
+		member_rec["debuffs"] = []
+		member_rec["ailment"] = ""
+
+		# Save back to member_data
+		member_data[member_id] = member_rec
+
+	# Update GameState with the modified member_data
+	gs.set("member_data", member_data)
+
+	# Update CombatProfileSystem so it reflects the new HP/MP values
+	if combat_profiles and combat_profiles.has_method("refresh_all"):
+		combat_profiles.refresh_all()
+
+	print("[BattleManager] HP/MP persistence and status clearing completed")
 
 func _is_all_captures() -> bool:
 	"""Check if all enemies were captured (none were killed)"""

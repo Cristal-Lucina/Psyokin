@@ -842,31 +842,206 @@ func _execute_item_usage(target: Dictionary) -> void:
 	var item_name: String = selected_item.name
 	var item_def: Dictionary = selected_item.item_def
 
+	# Get item properties
+	var effect: String = String(item_def.get("battle_status_effect", ""))
+	var duration: int = int(item_def.get("round_duration", 1))
+	var mind_type_tag: String = String(item_def.get("mind_type_tag", "none")).to_lower()
+	var targeting: String = String(item_def.get("targeting", "Ally"))
+
 	log_message("%s uses %s on %s!" % [current_combatant.display_name, item_name, target.display_name])
 
-	# Apply item effects based on battle_status_effect
-	var effect: String = String(item_def.get("battle_status_effect", ""))
+	# ═══════ MIRROR ITEMS (Reflect) ═══════
+	if "Reflect" in effect:
+		# Extract element type from effect (e.g., "Reflect: Fire (1 hit)")
+		var reflect_type = mind_type_tag  # Use mind_type_tag from item
+		if reflect_type == "none" or reflect_type == "":
+			# Try to extract from effect string
+			var lower_effect = effect.to_lower()
+			if "fire" in lower_effect:
+				reflect_type = "fire"
+			elif "water" in lower_effect:
+				reflect_type = "water"
+			elif "earth" in lower_effect:
+				reflect_type = "earth"
+			elif "air" in lower_effect:
+				reflect_type = "air"
+			elif "data" in lower_effect:
+				reflect_type = "data"
+			elif "void" in lower_effect:
+				reflect_type = "void"
+			elif "any" in lower_effect or "mind" in lower_effect:
+				reflect_type = "any"
 
-	if "Heal" in effect:
+		# Add reflect buff
+		if not target.has("buffs"):
+			target.buffs = []
+
+		target.buffs.append({
+			"type": "reflect",
+			"element": reflect_type,
+			"duration": duration,
+			"source": item_name
+		})
+
+		log_message("  → %s is protected by a %s Mirror! (Duration: %d rounds)" % [target.display_name, reflect_type.capitalize(), duration])
+
+	# ═══════ BOMB ITEMS (AOE Damage) ═══════
+	elif "AOE" in effect or "Bomb" in item_name:
+		# Get bomb element from mind_type_tag
+		var bomb_element = mind_type_tag
+
+		# Calculate bomb damage (fixed potency for now, can be adjusted)
+		var base_damage = 40  # Base bomb damage
+		var bomb_targets = battle_mgr.get_enemy_combatants()
+
+		log_message("  → %s explodes, hitting all enemies!" % item_name)
+
+		for enemy in bomb_targets:
+			if enemy.is_ko:
+				continue
+
+			# Apply type effectiveness
+			var type_bonus = 0.0
+			if bomb_element != "none" and combat_resolver:
+				# Create a temp attacker dict with the bomb's element
+				var temp_attacker = {"mind_type": bomb_element}
+				type_bonus = combat_resolver.get_mind_type_bonus(temp_attacker, enemy)
+
+			var damage = int(base_damage * (1.0 + type_bonus))
+			enemy.hp = max(0, enemy.hp - damage)
+
+			var type_msg = ""
+			if type_bonus > 0:
+				type_msg = " (Weakness!)"
+			elif type_bonus < 0:
+				type_msg = " (Resisted)"
+
+			log_message("    %s takes %d damage%s!" % [enemy.display_name, damage, type_msg])
+
+			# Check for KO
+			if enemy.hp <= 0:
+				enemy.is_ko = true
+				log_message("    %s was defeated!" % enemy.display_name)
+				battle_mgr.record_enemy_defeat(enemy, false)
+
+		_update_combatant_displays()
+
+	# ═══════ BUFF ITEMS (ATK Up, MND Up, Shield, etc.) ═══════
+	elif "Up" in effect or "Shield" in effect or "Regen" in effect or "Speed" in effect or "Hit%" in effect or "Evasion%" in effect or "SkillHit%" in effect:
+		if not target.has("buffs"):
+			target.buffs = []
+
+		# Determine buff type and magnitude
+		var buff_type = ""
+		var buff_value = 0
+
+		if "ATK Up" in effect:
+			buff_type = "attack_up"
+			buff_value = 25  # +25% ATK
+		elif "MND Up" in effect:
+			buff_type = "mind_up"
+			buff_value = 25  # +25% MND
+		elif "Shield" in effect or "-20% dmg" in effect:
+			buff_type = "shield"
+			buff_value = 20  # -20% damage taken
+		elif "Regen" in effect:
+			buff_type = "regen"
+			buff_value = 5  # 5% HP per round
+		elif "+10 Speed" in effect:
+			buff_type = "speed"
+			buff_value = 10  # +10 Speed
+		elif "+10 Hit%" in effect:
+			buff_type = "accuracy"
+			buff_value = 10  # +10 Hit%
+		elif "+10 Evasion%" in effect:
+			buff_type = "evasion"
+			buff_value = 10  # +10 Eva%
+		elif "+10 SkillHit%" in effect:
+			buff_type = "skill_acc"
+			buff_value = 10  # +10 Skill Hit%
+
+		target.buffs.append({
+			"type": buff_type,
+			"value": buff_value,
+			"duration": duration,
+			"source": item_name
+		})
+
+		log_message("  → %s gained %s! (Duration: %d rounds)" % [target.display_name, buff_type.replace("_", " ").capitalize(), duration])
+
+	# ═══════ CURE ITEMS (Remove ailments) ═══════
+	elif "Cure" in effect:
+		var cured_ailment = ""
+		if "Poison" in effect:
+			cured_ailment = "poison"
+		elif "Burn" in effect:
+			cured_ailment = "burn"
+		elif "Sleep" in effect:
+			cured_ailment = "sleep"
+		elif "Freeze" in effect:
+			cured_ailment = "freeze"
+		elif "Confuse" in effect:
+			cured_ailment = "confused"
+		elif "Charm" in effect:
+			cured_ailment = "charm"
+		elif "Berserk" in effect:
+			cured_ailment = "berserk"
+		elif "Malaise" in effect:
+			cured_ailment = "malaise"
+		elif "Attack Down" in effect:
+			# Remove attack down debuff
+			if target.has("debuffs"):
+				target.debuffs = target.debuffs.filter(func(d): return d.get("type", "") != "attack_down")
+			log_message("  → Cured Attack Down!")
+		elif "Defense Down" in effect:
+			if target.has("debuffs"):
+				target.debuffs = target.debuffs.filter(func(d): return d.get("type", "") != "defense_down")
+			log_message("  → Cured Defense Down!")
+		elif "Mind Down" in effect:
+			if target.has("debuffs"):
+				target.debuffs = target.debuffs.filter(func(d): return d.get("type", "") != "mind_down")
+			log_message("  → Cured Mind Down!")
+
+		if cured_ailment != "":
+			if target.has("ailments") and cured_ailment in target.ailments:
+				target.ailments.erase(cured_ailment)
+			log_message("  → Cured %s!" % cured_ailment.capitalize())
+
+	# ═══════ HEAL ITEMS ═══════
+	elif "Heal" in effect:
 		# Parse heal amount from effect string (e.g., "Heal 50 HP")
 		var hp_heal = 0
 		var mp_heal = 0
 
 		if "HP" in effect:
-			# Extract number before "HP"
+			# Extract number or percentage before "HP"
 			var regex = RegEx.new()
-			regex.compile("(\\d+)\\s*HP")
+			regex.compile("(\\d+)\\s*%?\\s*[HM]")  # Match "50 HP" or "25% HP" or "50% MaxHP"
 			var result = regex.search(effect)
 			if result:
-				hp_heal = int(result.get_string(1))
+				var value_str = result.get_string(1)
+				var heal_value = int(value_str)
+
+				# Check if it's a percentage heal
+				if "%" in effect:
+					hp_heal = int(target.hp_max * heal_value / 100.0)
+				else:
+					hp_heal = heal_value
 
 		if "MP" in effect:
-			# Extract number before "MP"
+			# Extract number or percentage before "MP"
 			var regex = RegEx.new()
-			regex.compile("(\\d+)\\s*MP")
+			regex.compile("(\\d+)\\s*%?\\s*[HM]")
 			var result = regex.search(effect)
 			if result:
-				mp_heal = int(result.get_string(1))
+				var value_str = result.get_string(1)
+				var heal_value = int(value_str)
+
+				# Check if it's a percentage heal
+				if "%" in effect:
+					mp_heal = int(target.mp_max * heal_value / 100.0)
+				else:
+					mp_heal = heal_value
 
 		# Apply healing
 		if hp_heal > 0:
@@ -883,6 +1058,24 @@ func _execute_item_usage(target: Dictionary) -> void:
 
 		# Update displays
 		_update_combatant_displays()
+
+	# ═══════ REVIVE ITEMS ═══════
+	elif "Revive" in effect:
+		if target.is_ko:
+			# Extract revive percentage
+			var revive_percent = 25  # Default 25%
+			var regex = RegEx.new()
+			regex.compile("(\\d+)\\s*%")
+			var result = regex.search(effect)
+			if result:
+				revive_percent = int(result.get_string(1))
+
+			target.is_ko = false
+			target.hp = max(1, int(target.hp_max * revive_percent / 100.0))
+			log_message("  → %s was revived with %d HP!" % [target.display_name, target.hp])
+			_update_combatant_displays()
+		else:
+			log_message("  → %s is not KO'd!" % target.display_name)
 
 	# Consume the item
 	var inventory = get_node("/root/aInventorySystem")
@@ -2011,6 +2204,68 @@ func _execute_skill_single(target: Dictionary) -> void:
 	if not hit_check.hit:
 		log_message("  → Missed! (%d%% chance, rolled %d)" % [int(hit_check.hit_chance), hit_check.roll])
 		return
+
+	# ═══════ CHECK FOR REFLECT (MIRROR) ═══════
+	if target.has("buffs") and element != "none" and element != "":
+		for i in range(target.buffs.size()):
+			var buff = target.buffs[i]
+			if buff.get("type", "") == "reflect":
+				var reflect_element = buff.get("element", "")
+
+				# Check if this mirror reflects this element
+				var should_reflect = false
+				if reflect_element == "any":
+					should_reflect = true  # Mind Mirror reflects any element
+				elif reflect_element == element:
+					should_reflect = true  # Element-specific mirror
+
+				if should_reflect:
+					# REFLECT! The skill bounces back to the attacker
+					log_message("  → %s's Mirror reflects the attack!" % target.display_name)
+
+					# Remove the reflect buff (it's consumed)
+					target.buffs.remove_at(i)
+
+					# Redirect the skill to the attacker
+					var original_attacker = current_combatant
+					var new_target = current_combatant  # The attacker becomes the target
+
+					# Calculate damage for reflected skill
+					var reflect_type_bonus = 0.0
+					if element != "none" and element != "":
+						reflect_type_bonus = combat_resolver.get_mind_type_bonus(
+							{"mind_type": element},
+							new_target,
+							element
+						)
+
+					# Calculate reflected damage (no crit on reflect)
+					var reflect_damage_result = combat_resolver.calculate_sigil_damage(
+						original_attacker,  # Still uses attacker's stats
+						new_target,
+						{
+							"potency": 100,
+							"is_crit": false,  # Reflected attacks don't crit
+							"type_bonus": reflect_type_bonus,
+							"base_sig": power,
+							"mnd_scale": mnd_scaling
+						}
+					)
+
+					var reflect_damage = reflect_damage_result.damage
+
+					# Apply reflected damage
+					new_target.hp -= reflect_damage
+					if new_target.hp <= 0:
+						new_target.hp = 0
+						new_target.is_ko = true
+						log_message("  → %s was defeated by the reflection!" % new_target.display_name)
+					else:
+						log_message("  → %s takes %d reflected damage!" % [new_target.display_name, reflect_damage])
+
+					# Update displays and end skill
+					_update_combatant_displays()
+					return  # Skill ends here, original target takes no damage
 
 	# Roll for crit
 	var crit_check = combat_resolver.check_critical_hit(current_combatant, {"skill_crit_bonus": crit_bonus})
