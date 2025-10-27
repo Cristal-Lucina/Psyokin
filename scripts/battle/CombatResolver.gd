@@ -109,9 +109,9 @@ func check_physical_hit(attacker: Dictionary, defender: Dictionary, _options: Di
 	Check if a physical attack hits
 
 	Formula: Hit% = WeaponACC + 0.25·TPO + mods
-	         Eva% = FootwearEVA + 0.15·VTL + mods
-	         Final = clamp(Hit − Eva, 5, 95)
-	         (Base accuracy increased to 90%, evasion scaling reduced for better hit rates)
+			 Eva% = FootwearEVA + 0.15·VTL + mods
+			 Final = clamp(Hit − Eva, 5, 95)
+			 (Base accuracy increased to 90%, evasion scaling reduced for better hit rates)
 
 	Returns:
 	- hit: bool (did it hit?)
@@ -166,9 +166,9 @@ func check_sigil_hit(attacker: Dictionary, defender: Dictionary, options: Dictio
 	Check if a sigil/skill hits
 
 	Formula: Hit% = SkillACC + WeaponSkillBoost + 0.25·TPO + mods
-	         Eva% = FootwearEVA + 0.15·FCS + mods
-	         Final = clamp(Hit − Eva, 5, 95)
-	         (Base skill accuracy increased to 95%, evasion scaling reduced for better hit rates)
+			 Eva% = FootwearEVA + 0.15·FCS + mods
+			 Final = clamp(Hit − Eva, 5, 95)
+			 (Base skill accuracy increased to 95%, evasion scaling reduced for better hit rates)
 
 	Returns:
 	- hit: bool
@@ -237,8 +237,8 @@ func check_critical_hit(attacker: Dictionary, options: Dictionary = {}) -> Dicti
 	Args:
 	  - attacker: Combatant dictionary with id and stats
 	  - options:
-	    - weapon_crit_bonus: int = 0 (weapon crit bonus %)
-	    - skill_crit_bonus: int = 0 (skill crit bonus %)
+		- weapon_crit_bonus: int = 0 (weapon crit bonus %)
+		- skill_crit_bonus: int = 0 (skill crit bonus %)
 
 	Returns:
 	  - crit: bool (whether it's a critical hit)
@@ -577,7 +577,7 @@ func calculate_capture_chance(enemy: Dictionary, options: Dictionary = {}) -> Di
 	Args:
 	  - enemy: Enemy combatant dictionary
 	  - options:
-	    - item_mod: int = 0 (bind item's capture modifier)
+		- item_mod: int = 0 (bind item's capture modifier)
 
 	Returns:
 	  - chance: float (final capture chance, 0-100)
