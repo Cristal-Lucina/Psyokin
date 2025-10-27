@@ -506,14 +506,19 @@ func _calculate_battle_rewards() -> Dictionary:
 			print("[BattleManager] Dropped item: %s" % item_id)
 
 	# Distribute LXP to party members
+	print("[BattleManager] Starting LXP distribution, base_xp: %d" % base_xp)
 	var party_sys = get_node_or_null("/root/aPartySystem")
+	print("[BattleManager] party_sys: %s" % ("found" if party_sys else "null"))
 	if party_sys and base_xp > 0:
 		var all_members = party_sys.get_roster()
 		if all_members == null:
 			all_members = []
+		print("[BattleManager] all_members: %s" % all_members)
 		var active_members = gs.party if gs.party != null else []
+		print("[BattleManager] active_members: %s" % active_members)
 
 		for member_id in all_members:
+			print("[BattleManager] Processing member: %s" % member_id)
 			var xp_amount: int = 0
 			var combatant = _find_combatant_by_id(member_id)
 
@@ -529,10 +534,17 @@ func _calculate_battle_rewards() -> Dictionary:
 				# Benched party member - 50% XP
 				xp_amount = int(base_xp * 0.5)
 
+			print("[BattleManager] Calculated xp_amount: %d for %s" % [xp_amount, member_id])
+			print("[BattleManager] stats_system exists: %s, has add_xp: %s" % [stats_system != null, stats_system.has_method("add_xp") if stats_system else false])
+
 			if xp_amount > 0 and stats_system and stats_system.has_method("add_xp"):
 				stats_system.add_xp(member_id, xp_amount)
 				rewards.lxp_awarded[member_id] = xp_amount
 				print("[BattleManager] Awarded %d LXP to %s" % [xp_amount, member_id])
+			else:
+				print("[BattleManager] SKIPPED awarding LXP (xp_amount=%d, stats_system=%s)" % [xp_amount, "exists" if stats_system else "null"])
+	else:
+		print("[BattleManager] SKIPPED entire LXP section (party_sys=%s, base_xp=%d)" % ["exists" if party_sys else "null", base_xp])
 
 	# Award GXP to all equipped sigils
 	var sigil_sys = get_node_or_null("/root/aSigilSystem")
