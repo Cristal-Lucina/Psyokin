@@ -237,16 +237,16 @@ func _show_victory_screen() -> void:
 			sigil_label.text = "  %s: +%d GXP" % [sigil_name, gxp_amount]
 			rewards_vbox.add_child(sigil_label)
 
-	# Affinity Growth - Show BAXP for each pair
-	var baxp_awarded = rewards.get("baxp_awarded", {})
-	if not baxp_awarded.is_empty():
-		var baxp_header = Label.new()
-		baxp_header.text = "\nAffinity Growth:"
-		baxp_header.add_theme_color_override("font_color", Color(0.9, 0.7, 0.7, 1.0))
-		rewards_vbox.add_child(baxp_header)
+	# Affinity Growth - Show AXP for each pair
+	var axp_awarded = rewards.get("axp_awarded", {})
+	if not axp_awarded.is_empty():
+		var axp_header = Label.new()
+		axp_header.text = "\nAffinity Growth:"
+		axp_header.add_theme_color_override("font_color", Color(0.9, 0.7, 0.7, 1.0))
+		rewards_vbox.add_child(axp_header)
 
-		for pair_key in baxp_awarded.keys():
-			var baxp_amount = baxp_awarded[pair_key]
+		for pair_key in axp_awarded.keys():
+			var axp_amount = axp_awarded[pair_key]
 
 			# Split pair key back into member IDs
 			var members = pair_key.split("|")
@@ -256,9 +256,9 @@ func _show_victory_screen() -> void:
 			var name_a = _get_member_display_name(members[0])
 			var name_b = _get_member_display_name(members[1])
 
-			var baxp_label = Label.new()
-			baxp_label.text = "  %s ↔ %s: +%d BAXP" % [name_a, name_b, baxp_amount]
-			rewards_vbox.add_child(baxp_label)
+			var axp_label = Label.new()
+			axp_label.text = "  %s ↔ %s: +%d AXP" % [name_a, name_b, axp_amount]
+			rewards_vbox.add_child(axp_label)
 
 	# Items
 	var items = rewards.get("items", [])
