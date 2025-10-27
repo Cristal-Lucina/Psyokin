@@ -453,11 +453,14 @@ func _on_item_pressed() -> void:
 		# Include items that can be used in battle (use_type = "battle" or "both")
 		# Exclude bind items (those are for Capture button)
 		if use_type in ["battle", "both"] and category != "Battle Items":
+			var desc = item_def.get("short_description", "")
+			if desc == null:
+				desc = ""
 			usable_items.append({
 				"id": item_id,
 				"name": item_def.get("name", item_id),
 				"display_name": item_def.get("name", item_id),
-				"description": item_def.get("short_description", ""),
+				"description": String(desc),
 				"count": count,
 				"targeting": item_def.get("targeting", "Ally"),
 				"item_def": item_def
@@ -485,11 +488,14 @@ func _on_capture_pressed() -> void:
 		var count = inventory.get_count(bind_id)
 		if count > 0:
 			var item_def = inventory.get_item_def(bind_id)
+			var desc = item_def.get("short_description", "")
+			if desc == null:
+				desc = ""
 			bind_items.append({
 				"id": bind_id,
 				"name": item_def.get("name", bind_id),
 				"display_name": item_def.get("name", bind_id),
-				"description": item_def.get("short_description", ""),
+				"description": String(desc),
 				"capture_mod": int(item_def.get("capture_mod", 0)),
 				"count": count,
 				"item_def": item_def
@@ -1200,7 +1206,10 @@ func _show_item_menu(items: Array) -> void:
 	for i in range(items.size()):
 		var item_data = items[i]
 		var item_name = String(item_data.get("name", "Unknown"))
-		var item_desc = String(item_data.get("description", ""))
+		var item_desc = item_data.get("description", "")
+		if item_desc == null:
+			item_desc = ""
+		item_desc = String(item_desc)
 		var item_count = int(item_data.get("count", 0))
 
 		var button = Button.new()
@@ -1304,7 +1313,10 @@ func _show_capture_menu(bind_items: Array) -> void:
 	for i in range(bind_items.size()):
 		var bind_data = bind_items[i]
 		var bind_name = String(bind_data.get("name", "Unknown"))
-		var bind_desc = String(bind_data.get("description", ""))
+		var bind_desc = bind_data.get("description", "")
+		if bind_desc == null:
+			bind_desc = ""
+		bind_desc = String(bind_desc)
 		var bind_count = int(bind_data.get("count", 0))
 		var capture_mod = int(bind_data.get("capture_mod", 0))
 
