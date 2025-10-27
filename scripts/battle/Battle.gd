@@ -639,6 +639,29 @@ func _on_skill_pressed() -> void:
 	# Show skill selection menu
 	_show_skill_menu(skill_menu)
 
+func _categorize_battle_item(item_id: String, item_name: String, item_def: Dictionary) -> String:
+	"""Categorize an item into Restore, Tactical, or Combat"""
+	var effect = str(item_def.get("battle_status_effect", ""))
+
+	# Check for Restore items (HP/MP healing, revival, status cures)
+	if item_id.begins_with("HP_") or item_id.begins_with("MP_") or item_id.begins_with("REV_") or \
+	   item_id.begins_with("HEAL_") or item_id.begins_with("CURE_") or \
+	   "Heal" in effect or "Revive" in effect or "Cure" in effect:
+		return "Restore"
+
+	# Check for Combat items (bombs, AOE damage)
+	if "Bomb" in item_name or "AOE dmg" in effect:
+		return "Combat"
+
+	# Check for Tactical items (buffs, mirrors, speed/defense boosts)
+	if item_id.begins_with("BUFF_") or "Reflect" in effect or \
+	   "Up" in effect or "Shield" in effect or "Regen" in effect or \
+	   "Speed" in effect or "Hit%" in effect or "Evasion%" in effect or "SkillHit%" in effect:
+		return "Tactical"
+
+	# Default to Tactical if we can't determine
+	return "Tactical"
+
 func _on_item_pressed() -> void:
 	"""Handle Item action - show usable items menu"""
 	var inventory = get_node_or_null("/root/aInventorySystem")
@@ -680,7 +703,8 @@ func _on_item_pressed() -> void:
 
 		# Include items that can be used in battle (use_type = "battle" or "both")
 		# Exclude bind items (those are for Capture button)
-		if use_type in ["battle", "both"] and category != "Battle Items":
+		# Exclude Sigils (those are equipment, not consumables)
+		if use_type in ["battle", "both"] and category != "Battle Items" and category != "Sigils":
 			var desc = item_def.get("short_description", "")
 			if desc == null:
 				desc = ""
@@ -696,6 +720,9 @@ func _on_item_pressed() -> void:
 				targeting = "Ally"
 			targeting = str(targeting)
 
+			# Categorize the item
+			var item_category = _categorize_battle_item(item_id_str, item_name, item_def)
+
 			usable_items.append({
 				"id": item_id_str,
 				"name": item_name,
@@ -703,7 +730,8 @@ func _on_item_pressed() -> void:
 				"description": desc,
 				"count": count,
 				"targeting": targeting,
-				"item_def": item_def
+				"item_def": item_def,
+				"battle_category": item_category
 			})
 
 	print("[Battle] Found %d usable items for battle" % usable_items.size())
@@ -1671,13 +1699,27 @@ func _close_skill_menu() -> void:
 ## ═══════════════════════════════════════════════════════════════
 
 func _show_item_menu(items: Array) -> void:
-	"""Show item selection menu"""
+	"""Show item selection menu with categorized tabs"""
 	# Hide action menu
 	action_menu.visible = false
 
+	# Categorize items
+	var restore_items = []
+	var tactical_items = []
+	var combat_items = []
+
+	for item in items:
+		var category = item.get("battle_category", "Tactical")
+		if category == "Restore":
+			restore_items.append(item)
+		elif category == "Tactical":
+			tactical_items.append(item)
+		elif category == "Combat":
+			combat_items.append(item)
+
 	# Create item menu panel
 	item_menu_panel = PanelContainer.new()
-	item_menu_panel.custom_minimum_size = Vector2(400, 0)
+	item_menu_panel.custom_minimum_size = Vector2(450, 0)
 
 	# Style the panel
 	var style = StyleBoxFlat.new()
@@ -1704,29 +1746,15 @@ func _show_item_menu(items: Array) -> void:
 	var sep1 = HSeparator.new()
 	vbox.add_child(sep1)
 
-	# Create scroll container for items (show max 5 items at a time)
-	var scroll = ScrollContainer.new()
-	scroll.custom_minimum_size = Vector2(380, min(items.size(), 5) * 55)  # 55px per item (50px button + 5px spacing)
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
-	vbox.add_child(scroll)
+	# Create tab container
+	var tab_container = TabContainer.new()
+	tab_container.custom_minimum_size = Vector2(430, 300)
+	vbox.add_child(tab_container)
 
-	# Create VBox for scrollable item buttons
-	var items_vbox = VBoxContainer.new()
-	scroll.add_child(items_vbox)
-
-	# Add item buttons
-	for i in range(items.size()):
-		var item_data = items[i]
-		var item_name = str(item_data.get("name", "Unknown"))
-		var item_desc = str(item_data.get("description", ""))
-		var item_count = int(item_data.get("count", 0))
-
-		var button = Button.new()
-		button.text = "%s (x%d)\n%s" % [item_name, item_count, item_desc]
-		button.custom_minimum_size = Vector2(360, 50)  # Slightly smaller to account for scrollbar
-		button.pressed.connect(_on_item_selected.bind(item_data))
-		items_vbox.add_child(button)
+	# Add category tabs
+	_add_category_tab(tab_container, "Restore", restore_items)
+	_add_category_tab(tab_container, "Tactical", tactical_items)
+	_add_category_tab(tab_container, "Combat", combat_items)
 
 	# Add cancel button
 	var sep2 = HSeparator.new()
@@ -1734,16 +1762,50 @@ func _show_item_menu(items: Array) -> void:
 
 	var cancel_btn = Button.new()
 	cancel_btn.text = "Cancel"
-	cancel_btn.custom_minimum_size = Vector2(380, 40)
+	cancel_btn.custom_minimum_size = Vector2(430, 40)
 	cancel_btn.pressed.connect(_close_item_menu)
 	vbox.add_child(cancel_btn)
 
 	# Add to scene and center
 	add_child(item_menu_panel)
 	item_menu_panel.position = Vector2(
-		(get_viewport_rect().size.x - 400) / 2,
-		(get_viewport_rect().size.y - vbox.size.y) / 2
+		(get_viewport_rect().size.x - 450) / 2,
+		(get_viewport_rect().size.y - 400) / 2
 	)
+
+func _add_category_tab(tab_container: TabContainer, category_name: String, category_items: Array) -> void:
+	"""Add a tab for a specific item category"""
+	# Create scroll container for items
+	var scroll = ScrollContainer.new()
+	scroll.name = category_name
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	tab_container.add_child(scroll)
+
+	# Create VBox for scrollable item buttons
+	var items_vbox = VBoxContainer.new()
+	scroll.add_child(items_vbox)
+
+	# Show message if no items in this category
+	if category_items.is_empty():
+		var empty_label = Label.new()
+		empty_label.text = "No items in this category"
+		empty_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		empty_label.add_theme_font_size_override("font_size", 14)
+		items_vbox.add_child(empty_label)
+		return
+
+	# Add item buttons
+	for item_data in category_items:
+		var item_name = str(item_data.get("name", "Unknown"))
+		var item_desc = str(item_data.get("description", ""))
+		var item_count = int(item_data.get("count", 0))
+
+		var button = Button.new()
+		button.text = "%s (x%d)\n%s" % [item_name, item_count, item_desc]
+		button.custom_minimum_size = Vector2(400, 50)
+		button.pressed.connect(_on_item_selected.bind(item_data))
+		items_vbox.add_child(button)
 
 func _close_item_menu() -> void:
 	"""Close the item menu"""
