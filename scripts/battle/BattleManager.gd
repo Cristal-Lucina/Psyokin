@@ -426,7 +426,8 @@ func _count_alive_allies() -> int:
 func _count_alive_enemies() -> int:
 	var count = 0
 	for c in combatants:
-		if not c.is_ally and not c.is_ko and not c.is_fled:
+		# Count enemy as defeated if KO'd, fled, or captured
+		if not c.is_ally and not c.is_ko and not c.is_fled and not c.get("is_captured", false):
 			count += 1
 	return count
 

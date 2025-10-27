@@ -464,3 +464,53 @@ func animate_ko_fall(combatant_id: String) -> void:
 	# Clean up canvas layer and KO'd slot
 	if is_instance_valid(canvas_layer):
 		canvas_layer.queue_free()
+
+func animate_capture(combatant_id: String) -> void:
+	"""Animate a combatant being captured - turns cell green"""
+	# Find the slot for this combatant
+	var target_slot: PanelContainer = null
+	for slot in turn_slots:
+		if slot.get_meta("combatant_id", "") == combatant_id:
+			target_slot = slot
+			break
+
+	if not target_slot:
+		return
+
+	print("[TurnOrderDisplay] Animating capture for %s" % combatant_id)
+
+	# Create green style for captured enemy
+	var captured_style = StyleBoxFlat.new()
+	captured_style.bg_color = Color(0.2, 0.6, 0.2, 0.9)  # Green background
+	captured_style.border_width_left = 3
+	captured_style.border_width_right = 3
+	captured_style.border_width_top = 3
+	captured_style.border_width_bottom = 3
+	captured_style.border_color = Color(0.3, 1.0, 0.3, 1.0)  # Bright green border
+
+	# Animate color transition to green
+	var tween = create_tween()
+	tween.set_ease(Tween.EASE_OUT)
+	tween.set_trans(Tween.TRANS_CUBIC)
+
+	# Pulse effect - scale up slightly then back
+	tween.tween_property(target_slot, "scale", Vector2(1.15, 1.15), 0.2)
+	tween.tween_property(target_slot, "scale", Vector2(1.0, 1.0), 0.2)
+
+	# Apply green style
+	target_slot.add_theme_stylebox_override("panel", captured_style)
+
+	# Add "CAPTURED" label
+	var captured_label = Label.new()
+	captured_label.text = "CAPTURED"
+	captured_label.add_theme_font_size_override("font_size", 10)
+	captured_label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 1.0))
+	captured_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+
+	# Find the VBox inside the slot and add label
+	var vbox = target_slot.get_child(0) as VBoxContainer
+	if vbox:
+		vbox.add_child(captured_label)
+
+	await tween.finished
+

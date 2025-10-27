@@ -585,9 +585,9 @@ func _execute_capture(target: Dictionary) -> void:
 		# Add captured enemy to collection
 		_add_captured_enemy(target)
 
-		# Animate turn cell falling (same as KO)
-		if turn_order_display and turn_order_display.has_method("animate_ko_fall"):
-			turn_order_display.animate_ko_fall(target.id)
+		# Animate turn cell - turn it green
+		if turn_order_display and turn_order_display.has_method("animate_capture"):
+			turn_order_display.animate_capture(target.id)
 
 		# Update display
 		_update_combatant_displays()
