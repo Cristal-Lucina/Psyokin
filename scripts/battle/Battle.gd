@@ -8,6 +8,7 @@ class_name Battle
 @onready var gs = get_node("/root/aGameState")
 @onready var combat_resolver: CombatResolver = CombatResolver.new()
 @onready var csv_loader = get_node("/root/aCSVLoader")
+@onready var burst_system = get_node("/root/aBurstSystem")
 
 ## UI References
 @onready var action_menu: VBoxContainer = %ActionMenu
@@ -31,8 +32,10 @@ var skill_to_use: Dictionary = {}  # Selected skill data
 var skill_menu_panel: PanelContainer = null  # Skill selection menu
 var item_menu_panel: PanelContainer = null  # Item selection menu
 var capture_menu_panel: PanelContainer = null  # Capture selection menu
+var burst_menu_panel: PanelContainer = null  # Burst selection menu
 var current_skill_menu: Array = []  # Current skills in menu
 var selected_item: Dictionary = {}  # Selected item data
+var selected_burst: Dictionary = {}  # Selected burst ability data
 var victory_panel: PanelContainer = null  # Victory screen panel
 
 func _ready() -> void:
@@ -874,14 +877,26 @@ func _on_defend_pressed() -> void:
 	battle_mgr.end_turn()
 
 func _on_burst_pressed() -> void:
-	"""Handle Burst action"""
-	if battle_mgr.can_use_burst(1):
-		log_message("Burst attack!")
-		# TODO: Show burst menu
-		battle_mgr.spend_burst(1)
-		_update_burst_gauge()
-	else:
-		log_message("Not enough Burst Gauge!")
+	"""Handle Burst action - show burst abilities menu"""
+	if not burst_system:
+		log_message("Burst system not available!")
+		return
+
+	# Get current party IDs (all allies in battle)
+	var party_ids: Array = []
+	for combatant in battle_mgr.get_ally_combatants():
+		if not combatant.get("is_ko", false):
+			party_ids.append(combatant.get("id", ""))
+
+	# Get available burst abilities
+	var available_bursts = burst_system.get_available_bursts(party_ids)
+
+	if available_bursts.is_empty():
+		log_message("No burst abilities available!")
+		return
+
+	# Show burst selection menu
+	_show_burst_menu(available_bursts)
 
 func _on_run_pressed() -> void:
 	"""Handle Run action"""
@@ -981,6 +996,12 @@ func _on_enemy_panel_input(event: InputEvent, target: Dictionary) -> void:
 						awaiting_target_selection = false
 						awaiting_skill_selection = false
 						_execute_skill_single(target)
+						battle_mgr.end_turn()
+					elif not selected_burst.is_empty():
+						# Using a burst ability (single target)
+						_clear_target_highlights()
+						awaiting_target_selection = false
+						_execute_burst_on_target(target)
 						battle_mgr.end_turn()
 					else:
 						# Regular attack
@@ -1601,6 +1622,242 @@ func _on_bind_selected(bind_data: Dictionary) -> void:
 	awaiting_target_selection = true
 	awaiting_capture_target = true
 	_highlight_target_candidates()
+
+## ═══════════════════════════════════════════════════════════════
+## BURST MENU & EXECUTION
+## ═══════════════════════════════════════════════════════════════
+
+func _show_burst_menu(burst_abilities: Array) -> void:
+	"""Show burst ability selection menu"""
+	# Hide action menu
+	action_menu.visible = false
+
+	# Create burst menu panel
+	burst_menu_panel = PanelContainer.new()
+	burst_menu_panel.custom_minimum_size = Vector2(450, 0)
+
+	# Style the panel
+	var style = StyleBoxFlat.new()
+	style.bg_color = Color(0.1, 0.1, 0.15, 0.95)
+	style.border_width_left = 2
+	style.border_width_right = 2
+	style.border_width_top = 2
+	style.border_width_bottom = 2
+	style.border_color = Color(0.8, 0.3, 0.3, 1.0)  # Red border for bursts
+	burst_menu_panel.add_theme_stylebox_override("panel", style)
+
+	# Create VBox for menu items
+	var vbox = VBoxContainer.new()
+	burst_menu_panel.add_child(vbox)
+
+	# Title
+	var title = Label.new()
+	title.text = "Select Burst Ability"
+	title.add_theme_font_size_override("font_size", 18)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(title)
+
+	# Show current burst gauge
+	var gauge_label = Label.new()
+	gauge_label.text = "Burst Gauge: %d / %d" % [battle_mgr.burst_gauge, battle_mgr.BURST_GAUGE_MAX]
+	gauge_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	gauge_label.add_theme_font_size_override("font_size", 14)
+	vbox.add_child(gauge_label)
+
+	# Add separator
+	var sep1 = HSeparator.new()
+	vbox.add_child(sep1)
+
+	# Add burst ability buttons
+	for i in range(burst_abilities.size()):
+		var burst_data = burst_abilities[i]
+		var burst_name = String(burst_data.get("name", "Unknown"))
+		var burst_cost = int(burst_data.get("burst_cost", 50))
+		var description = String(burst_data.get("description", ""))
+		var participants = String(burst_data.get("participants", "")).split(";", false)
+		var can_afford = battle_mgr.burst_gauge >= burst_cost
+
+		var button = Button.new()
+		button.text = "%s [Cost: %d]\n%s\nWith: %s" % [
+			burst_name,
+			burst_cost,
+			description,
+			", ".join(participants)
+		]
+		button.custom_minimum_size = Vector2(430, 70)
+
+		# Disable if can't afford
+		if not can_afford:
+			button.disabled = true
+			button.text += "\n[Not enough Burst Gauge]"
+		else:
+			button.pressed.connect(_on_burst_selected.bind(burst_data))
+
+		vbox.add_child(button)
+
+	# Add cancel button
+	var sep2 = HSeparator.new()
+	vbox.add_child(sep2)
+
+	var cancel_btn = Button.new()
+	cancel_btn.text = "Cancel"
+	cancel_btn.custom_minimum_size = Vector2(430, 40)
+	cancel_btn.pressed.connect(_close_burst_menu)
+	vbox.add_child(cancel_btn)
+
+	# Add to scene and center
+	add_child(burst_menu_panel)
+	burst_menu_panel.position = Vector2(
+		(get_viewport_rect().size.x - 450) / 2,
+		100
+	)
+
+func _close_burst_menu() -> void:
+	"""Close the burst menu"""
+	if burst_menu_panel:
+		burst_menu_panel.queue_free()
+		burst_menu_panel = null
+
+	# Show action menu again
+	action_menu.visible = true
+
+func _on_burst_selected(burst_data: Dictionary) -> void:
+	"""Handle burst ability selection"""
+	_close_burst_menu()
+
+	selected_burst = burst_data
+	var burst_name = String(burst_data.get("name", "Unknown"))
+	var target_type = String(burst_data.get("target", "Enemies")).to_lower()
+
+	log_message("Selected: %s" % burst_name)
+
+	# Determine targeting
+	if "enemies" in target_type or "all enemies" in target_type:
+		# AoE burst - hit all enemies
+		_execute_burst_aoe()
+	elif "enemy" in target_type:
+		# Single target - need to select
+		var enemies = battle_mgr.get_enemy_combatants()
+		target_candidates = enemies.filter(func(e): return not e.is_ko)
+
+		if target_candidates.is_empty():
+			log_message("No valid targets!")
+			selected_burst = {}
+			return
+
+		log_message("Select a target...")
+		awaiting_target_selection = true
+		_highlight_target_candidates()
+	else:
+		# Self/Ally targeting not implemented yet
+		log_message("This burst targeting not yet implemented")
+		selected_burst = {}
+
+func _execute_burst_aoe() -> void:
+	"""Execute an AoE burst ability on all enemies"""
+	var burst_name = String(selected_burst.get("name", "Unknown"))
+	var burst_cost = int(selected_burst.get("burst_cost", 50))
+	var power = int(selected_burst.get("power", 120))
+	var element = String(selected_burst.get("element", "none")).to_lower()
+
+	# Check and spend burst gauge
+	if not battle_mgr.burst_gauge >= burst_cost:
+		log_message("Not enough Burst Gauge!")
+		selected_burst = {}
+		return
+
+	battle_mgr.burst_gauge -= burst_cost
+	_update_burst_gauge()
+
+	log_message("%s unleashes %s!" % [current_combatant.display_name, burst_name])
+	log_message("  (Spent %d Burst Gauge)" % burst_cost)
+
+	# Hit all enemies
+	var enemies = battle_mgr.get_enemy_combatants()
+	var alive_enemies = enemies.filter(func(e): return not e.is_ko)
+
+	for target in alive_enemies:
+		await get_tree().create_timer(0.3).timeout
+		_execute_burst_on_target(target)
+
+	# End turn after burst
+	battle_mgr.end_turn()
+
+func _execute_burst_on_target(target: Dictionary) -> void:
+	"""Execute burst ability on a single target"""
+	var power = int(selected_burst.get("power", 120))
+	var acc = int(selected_burst.get("acc", 95))
+	var element = String(selected_burst.get("element", "none")).to_lower()
+	var crit_bonus = int(selected_burst.get("crit_bonus_pct", 20))
+	var scaling_brw = float(selected_burst.get("scaling_brw", 0.5))
+	var scaling_mnd = float(selected_burst.get("scaling_mnd", 1.0))
+	var scaling_fcs = float(selected_burst.get("scaling_fcs", 0.5))
+
+	# Check if hit (bursts have high accuracy)
+	var hit_check = combat_resolver.check_sigil_hit(current_combatant, target, {"skill_acc": acc})
+
+	if not hit_check.hit:
+		log_message("  → Missed %s! (%d%% chance)" % [target.display_name, int(hit_check.hit_chance)])
+		return
+
+	# Roll for crit
+	var crit_check = combat_resolver.check_critical_hit(current_combatant, {"skill_crit_bonus": crit_bonus})
+	var is_crit = crit_check.crit
+
+	# Calculate type effectiveness
+	var type_bonus = 0.0
+	if element != "none" and element != "":
+		type_bonus = combat_resolver.get_mind_type_bonus(
+			{"mind_type": element},
+			target,
+			element
+		)
+
+	# Calculate burst damage (higher than regular skills)
+	var damage_result = combat_resolver.calculate_sigil_damage(
+		current_combatant,
+		target,
+		{
+			"potency": 150,  # Bursts are more powerful
+			"is_crit": is_crit,
+			"type_bonus": type_bonus,
+			"base_sig": power,
+			"mnd_scale": scaling_mnd,
+			"brw_scale": scaling_brw,
+			"fcs_scale": scaling_fcs
+		}
+	)
+
+	var damage = damage_result.damage
+
+	# Apply damage
+	target.hp -= damage
+	if target.hp <= 0:
+		target.hp = 0
+		target.is_ko = true
+
+		# Record kill
+		if not target.get("is_ally", false):
+			battle_mgr.record_enemy_defeat(target, false)
+
+	# Log the hit
+	var hit_msg = "  → BURST HIT %s for %d damage!" % [target.display_name, damage]
+	if is_crit:
+		hit_msg += " (CRITICAL!)"
+	if type_bonus > 0.0:
+		hit_msg += " (Super Effective!)"
+	elif type_bonus < 0.0:
+		hit_msg += " (Not Very Effective...)"
+	log_message(hit_msg)
+
+	# Update displays
+	_update_combatant_displays()
+	if target.is_ko:
+		if turn_order_display:
+			await turn_order_display.animate_ko_fall(target.id)
+		battle_mgr.refresh_turn_order()
+	elif turn_order_display:
+		turn_order_display.update_combatant_hp(target.id)
 
 func _on_skill_selected(skill_entry: Dictionary) -> void:
 	"""Handle skill selection"""
