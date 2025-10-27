@@ -603,8 +603,8 @@ func _execute_capture(target: Dictionary) -> void:
 		# Update display
 		_update_combatant_displays()
 
-		# Check if battle is over
-		if battle_mgr.check_battle_end():
+		# Check if battle is over (after capture)
+		if await battle_mgr._check_battle_end():
 			return  # Battle ended
 	else:
 		# Capture failed
@@ -783,7 +783,7 @@ func _on_enemy_panel_input(event: InputEvent, target: Dictionary) -> void:
 				if target in target_candidates:
 					if awaiting_capture_target:
 						# Attempting capture
-						_execute_capture(target)
+						await _execute_capture(target)
 					elif awaiting_item_target:
 						# Using an item
 						_execute_item_usage(target)
