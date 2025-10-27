@@ -31,6 +31,7 @@ var awaiting_item_target: bool = false  # True when selecting target for item us
 var skill_to_use: Dictionary = {}  # Selected skill data
 var skill_menu_panel: PanelContainer = null  # Skill selection menu
 var item_menu_panel: PanelContainer = null  # Item selection menu
+var item_description_label: Label = null  # Item description display
 var capture_menu_panel: PanelContainer = null  # Capture selection menu
 var burst_menu_panel: PanelContainer = null  # Burst selection menu
 var current_skill_menu: Array = []  # Current skills in menu
@@ -1837,10 +1838,24 @@ func _show_item_menu(items: Array) -> void:
 	_add_category_tab(tab_container, "Tactical", tactical_items)
 	_add_category_tab(tab_container, "Combat", combat_items)
 
-	# Add cancel button
+	# Add separator
 	var sep2 = HSeparator.new()
 	vbox.add_child(sep2)
 
+	# Add description label
+	item_description_label = Label.new()
+	item_description_label.text = "Hover over an item to see its description"
+	item_description_label.add_theme_font_size_override("font_size", 14)
+	item_description_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	item_description_label.custom_minimum_size = Vector2(530, 60)
+	item_description_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	vbox.add_child(item_description_label)
+
+	# Add separator
+	var sep3 = HSeparator.new()
+	vbox.add_child(sep3)
+
+	# Add cancel button
 	var cancel_btn = Button.new()
 	cancel_btn.text = "Cancel"
 	cancel_btn.custom_minimum_size = Vector2(530, 40)
@@ -1883,11 +1898,14 @@ func _add_category_tab(tab_container: TabContainer, category_name: String, categ
 	for item_data in category_items:
 		var item_name = str(item_data.get("name", "Unknown"))
 		var item_count = int(item_data.get("count", 0))
+		var item_desc = str(item_data.get("description", ""))
 
 		var button = Button.new()
 		button.text = "%s (x%d)" % [item_name, item_count]
 		button.custom_minimum_size = Vector2(250, 40)
 		button.pressed.connect(_on_item_selected.bind(item_data))
+		button.mouse_entered.connect(_on_item_hover.bind(item_name, item_desc))
+		button.mouse_exited.connect(_on_item_unhover)
 		grid.add_child(button)
 
 func _close_item_menu() -> void:
@@ -1896,8 +1914,23 @@ func _close_item_menu() -> void:
 		item_menu_panel.queue_free()
 		item_menu_panel = null
 
+	item_description_label = null
+
 	# Show action menu again
 	action_menu.visible = true
+
+func _on_item_hover(item_name: String, item_desc: String) -> void:
+	"""Show item description when hovering over button"""
+	if item_description_label:
+		if item_desc != "":
+			item_description_label.text = "%s: %s" % [item_name, item_desc]
+		else:
+			item_description_label.text = "%s" % item_name
+
+func _on_item_unhover() -> void:
+	"""Reset item description when mouse leaves button"""
+	if item_description_label:
+		item_description_label.text = "Hover over an item to see its description"
 
 func _execute_auto_escape_item(item_data: Dictionary) -> void:
 	"""Execute auto-escape item (Smoke Grenade only)"""
