@@ -492,7 +492,7 @@ func _execute_attack(target: Dictionary) -> void:
 
 			# Apply damage
 			target.hp -= damage
-			if target.hp < 0:
+			if target.hp <= 0:
 				target.hp = 0
 				target.is_ko = true
 
@@ -1096,7 +1096,7 @@ func _execute_enemy_ai() -> void:
 
 			# Apply damage
 			target.hp -= damage
-			if target.hp < 0:
+			if target.hp <= 0:
 				target.hp = 0
 				target.is_ko = true
 
