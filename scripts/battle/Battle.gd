@@ -885,10 +885,11 @@ func _execute_item_usage(target: Dictionary) -> void:
 	var mind_type_tag: String = String(item_def.get("mind_type_tag", "none")).to_lower()
 	var targeting: String = String(item_def.get("targeting", "Ally"))
 
-	log_message("%s uses %s on %s!" % [current_combatant.display_name, item_name, target.display_name])
-
 	# ═══════ MIRROR ITEMS (Reflect) ═══════
 	if "Reflect" in effect:
+		# Log item usage with target
+		log_message("%s uses %s on %s!" % [current_combatant.display_name, item_name, target.display_name])
+
 		# Extract element type from effect (e.g., "Reflect: Fire (1 hit)")
 		var reflect_type = mind_type_tag  # Use mind_type_tag from item
 		if reflect_type == "none" or reflect_type == "":
@@ -975,6 +976,9 @@ func _execute_item_usage(target: Dictionary) -> void:
 
 	# ═══════ FLASH POP (Evasion + Run Boost) ═══════
 	elif "Run%" in effect:
+		# Log item usage with target
+		log_message("%s uses %s on %s!" % [current_combatant.display_name, item_name, target.display_name])
+
 		if not target.has("buffs"):
 			target.buffs = []
 
@@ -1015,6 +1019,9 @@ func _execute_item_usage(target: Dictionary) -> void:
 
 	# ═══════ BUFF ITEMS (ATK Up, MND Up, Shield, etc.) ═══════
 	elif "Up" in effect or "Shield" in effect or "Regen" in effect or "Speed" in effect or "Hit%" in effect or "Evasion%" in effect or "SkillHit%" in effect:
+		# Log item usage with target
+		log_message("%s uses %s on %s!" % [current_combatant.display_name, item_name, target.display_name])
+
 		if not target.has("buffs"):
 			target.buffs = []
 
@@ -1058,6 +1065,9 @@ func _execute_item_usage(target: Dictionary) -> void:
 
 	# ═══════ CURE ITEMS (Remove ailments) ═══════
 	elif "Cure" in effect:
+		# Log item usage with target
+		log_message("%s uses %s on %s!" % [current_combatant.display_name, item_name, target.display_name])
+
 		var cured_ailment = ""
 		if "Poison" in effect:
 			cured_ailment = "poison"
@@ -1096,6 +1106,9 @@ func _execute_item_usage(target: Dictionary) -> void:
 
 	# ═══════ HEAL ITEMS ═══════
 	elif "Heal" in effect:
+		# Log item usage with target
+		log_message("%s uses %s on %s!" % [current_combatant.display_name, item_name, target.display_name])
+
 		# Parse heal amount from effect string (e.g., "Heal 50 HP")
 		var hp_heal = 0
 		var mp_heal = 0
@@ -1148,6 +1161,9 @@ func _execute_item_usage(target: Dictionary) -> void:
 
 	# ═══════ REVIVE ITEMS ═══════
 	elif "Revive" in effect:
+		# Log item usage with target
+		log_message("%s uses %s on %s!" % [current_combatant.display_name, item_name, target.display_name])
+
 		if target.is_ko:
 			# Extract revive percentage
 			var revive_percent = 25  # Default 25%
@@ -1922,13 +1938,20 @@ func _on_item_selected(item_data: Dictionary) -> void:
 		_execute_auto_escape_item(item_data)
 		return
 
+	# Special handling for AllEnemies targeting (Bombs)
+	if targeting == "AllEnemies":
+		# Bombs hit all enemies, no target selection needed
+		log_message("%s uses %s!" % [current_combatant.display_name, str(item_data.get("name", "item"))])
+		_execute_item_usage({})  # Pass empty dict since bombs hit all enemies
+		return
+
 	log_message("Using %s - select target..." % str(item_data.get("name", "item")))
 
 	# Determine target candidates
 	if targeting == "Ally":
 		var allies = battle_mgr.get_ally_combatants()
 		target_candidates = allies.filter(func(a): return not a.is_ko)
-	else:  # Enemy
+	else:  # Enemy (single target)
 		var enemies = battle_mgr.get_enemy_combatants()
 		target_candidates = enemies.filter(func(e): return not e.is_ko)
 
