@@ -640,13 +640,16 @@ func _on_skill_pressed() -> void:
 	_show_skill_menu(skill_menu)
 
 func _categorize_battle_item(item_id: String, item_name: String, item_def: Dictionary) -> String:
-	"""Categorize an item into Restore, Tactical, or Combat"""
+	"""Categorize an item into Restore, Cure, Tactical, or Combat"""
 	var effect = str(item_def.get("battle_status_effect", ""))
 
-	# Check for Restore items (HP/MP healing, revival, status cures)
+	# Check for Cure items (status ailment cures)
+	if item_id.begins_with("CURE_") or "Cure" in effect:
+		return "Cure"
+
+	# Check for Restore items (HP/MP healing, revival)
 	if item_id.begins_with("HP_") or item_id.begins_with("MP_") or item_id.begins_with("REV_") or \
-	   item_id.begins_with("HEAL_") or item_id.begins_with("CURE_") or \
-	   "Heal" in effect or "Revive" in effect or "Cure" in effect:
+	   item_id.begins_with("HEAL_") or "Heal" in effect or "Revive" in effect:
 		return "Restore"
 
 	# Check for Combat items (bombs, AOE damage)
@@ -1705,6 +1708,7 @@ func _show_item_menu(items: Array) -> void:
 
 	# Categorize items
 	var restore_items = []
+	var cure_items = []
 	var tactical_items = []
 	var combat_items = []
 
@@ -1712,6 +1716,8 @@ func _show_item_menu(items: Array) -> void:
 		var category = item.get("battle_category", "Tactical")
 		if category == "Restore":
 			restore_items.append(item)
+		elif category == "Cure":
+			cure_items.append(item)
 		elif category == "Tactical":
 			tactical_items.append(item)
 		elif category == "Combat":
@@ -1719,7 +1725,7 @@ func _show_item_menu(items: Array) -> void:
 
 	# Create item menu panel
 	item_menu_panel = PanelContainer.new()
-	item_menu_panel.custom_minimum_size = Vector2(450, 0)
+	item_menu_panel.custom_minimum_size = Vector2(550, 0)
 
 	# Style the panel
 	var style = StyleBoxFlat.new()
@@ -1748,11 +1754,12 @@ func _show_item_menu(items: Array) -> void:
 
 	# Create tab container
 	var tab_container = TabContainer.new()
-	tab_container.custom_minimum_size = Vector2(430, 300)
+	tab_container.custom_minimum_size = Vector2(530, 300)
 	vbox.add_child(tab_container)
 
-	# Add category tabs
+	# Add category tabs (Restore, Cure, Tactical, Combat)
 	_add_category_tab(tab_container, "Restore", restore_items)
+	_add_category_tab(tab_container, "Cure", cure_items)
 	_add_category_tab(tab_container, "Tactical", tactical_items)
 	_add_category_tab(tab_container, "Combat", combat_items)
 
@@ -1762,19 +1769,19 @@ func _show_item_menu(items: Array) -> void:
 
 	var cancel_btn = Button.new()
 	cancel_btn.text = "Cancel"
-	cancel_btn.custom_minimum_size = Vector2(430, 40)
+	cancel_btn.custom_minimum_size = Vector2(530, 40)
 	cancel_btn.pressed.connect(_close_item_menu)
 	vbox.add_child(cancel_btn)
 
 	# Add to scene and center
 	add_child(item_menu_panel)
 	item_menu_panel.position = Vector2(
-		(get_viewport_rect().size.x - 450) / 2,
+		(get_viewport_rect().size.x - 550) / 2,
 		(get_viewport_rect().size.y - 400) / 2
 	)
 
 func _add_category_tab(tab_container: TabContainer, category_name: String, category_items: Array) -> void:
-	"""Add a tab for a specific item category"""
+	"""Add a tab for a specific item category with two-column layout"""
 	# Create scroll container for items
 	var scroll = ScrollContainer.new()
 	scroll.name = category_name
@@ -1782,9 +1789,12 @@ func _add_category_tab(tab_container: TabContainer, category_name: String, categ
 	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 	tab_container.add_child(scroll)
 
-	# Create VBox for scrollable item buttons
-	var items_vbox = VBoxContainer.new()
-	scroll.add_child(items_vbox)
+	# Create GridContainer for two-column layout
+	var grid = GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", 10)
+	grid.add_theme_constant_override("v_separation", 5)
+	scroll.add_child(grid)
 
 	# Show message if no items in this category
 	if category_items.is_empty():
@@ -1792,20 +1802,19 @@ func _add_category_tab(tab_container: TabContainer, category_name: String, categ
 		empty_label.text = "No items in this category"
 		empty_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		empty_label.add_theme_font_size_override("font_size", 14)
-		items_vbox.add_child(empty_label)
+		grid.add_child(empty_label)
 		return
 
-	# Add item buttons
+	# Add item buttons in two columns
 	for item_data in category_items:
 		var item_name = str(item_data.get("name", "Unknown"))
-		var item_desc = str(item_data.get("description", ""))
 		var item_count = int(item_data.get("count", 0))
 
 		var button = Button.new()
-		button.text = "%s (x%d)\n%s" % [item_name, item_count, item_desc]
-		button.custom_minimum_size = Vector2(400, 50)
+		button.text = "%s (x%d)" % [item_name, item_count]
+		button.custom_minimum_size = Vector2(250, 40)
 		button.pressed.connect(_on_item_selected.bind(item_data))
-		items_vbox.add_child(button)
+		grid.add_child(button)
 
 func _close_item_menu() -> void:
 	"""Close the item menu"""
