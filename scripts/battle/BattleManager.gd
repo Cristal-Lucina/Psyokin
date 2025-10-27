@@ -46,6 +46,7 @@ const BURST_GAUGE_PER_ROUND_CAP: int = 25
 ## Encounter data
 var encounter_data: Dictionary = {}
 var return_scene: String = ""  # Scene to return to after battle
+var battle_rewards: Dictionary = {}  # Rewards calculated at end of battle
 
 ## References
 @onready var gs = get_node("/root/aGameState")
@@ -431,6 +432,154 @@ func _count_alive_enemies() -> int:
 			count += 1
 	return count
 
+func _calculate_battle_rewards() -> Dictionary:
+	"""
+	Calculate all battle rewards: LXP, GXP, Creds, Items
+	Returns Dictionary with reward breakdown for display
+	"""
+	var rewards = {
+		"lxp_awarded": {},  # member_id -> xp_amount
+		"gxp_awarded": {},  # sigil_instance_id -> gxp_amount
+		"creds": 0,
+		"items": [],  # Array of item_ids dropped
+		"captured_count": 0,
+		"killed_count": 0
+	}
+
+	# Count captures vs kills
+	for count in battle_captures.values():
+		rewards.captured_count += count
+	for count in battle_kills.values():
+		rewards.killed_count += count
+
+	# Calculate base XP from all defeated enemies
+	var base_xp: int = 0
+	var total_creds: int = 0
+	var dropped_items: Array = []
+
+	for enemy in combatants:
+		if enemy.is_ally:
+			continue
+		if not enemy.get("is_ko", false) and not enemy.get("is_captured", false):
+			continue  # Enemy wasn't defeated
+
+		# XP based on enemy level
+		var enemy_level: int = enemy.get("level", 1)
+		var enemy_xp: int = enemy_level * 10  # Base formula: 10 XP per level
+		base_xp += enemy_xp
+
+		# Creds calculation
+		var cred_range: String = enemy.get("cred_range", "10-20")
+		var was_captured: bool = enemy.get("is_captured", false)
+		var cred_multiplier: float = 1.5 if was_captured else 1.0
+		var creds_from_enemy: int = _roll_creds_from_range(cred_range, cred_multiplier)
+		total_creds += creds_from_enemy
+
+		# Item drops
+		var drop_table: String = enemy.get("drop_table", "")
+		if drop_table != "":
+			var drop_multiplier: float = 1.5 if was_captured else 1.0
+			var dropped_item: String = _roll_item_drop(drop_table, drop_multiplier)
+			if dropped_item != "":
+				dropped_items.append(dropped_item)
+
+	rewards.creds = total_creds
+	rewards.items = dropped_items
+
+	# Award Creds to GameState
+	if total_creds > 0:
+		gs.add_creds(total_creds)
+		print("[BattleManager] Awarded %d creds" % total_creds)
+
+	# Award Items to Inventory
+	var inv_sys = get_node_or_null("/root/aInventorySystem")
+	if inv_sys:
+		for item_id in dropped_items:
+			inv_sys.add_item(item_id, 1)
+			print("[BattleManager] Dropped item: %s" % item_id)
+
+	# Distribute LXP to party members
+	var party_sys = get_node_or_null("/root/aPartySystem")
+	if party_sys and base_xp > 0:
+		var all_members = party_sys.get_roster()
+		var active_members = gs.party  # Members in battle
+
+		for member_id in all_members:
+			var xp_amount: int = 0
+			var combatant = _find_combatant_by_id(member_id)
+
+			if member_id in active_members:
+				# Active party member
+				if combatant and combatant.get("is_ko", false):
+					# Fainted - 50% XP
+					xp_amount = int(base_xp * 0.5)
+				else:
+					# Active and not KO'd - 100% XP
+					xp_amount = base_xp
+			else:
+				# Benched party member - 50% XP
+				xp_amount = int(base_xp * 0.5)
+
+			if xp_amount > 0:
+				stats_system.add_xp(member_id, xp_amount)
+				rewards.lxp_awarded[member_id] = xp_amount
+				print("[BattleManager] Awarded %d LXP to %s" % [xp_amount, member_id])
+
+	# Award GXP to all equipped sigils
+	var sigil_sys = get_node_or_null("/root/aSigilSystem")
+	if sigil_sys and base_xp > 0:
+		var gxp_per_sigil: int = int(base_xp * 0.5)  # Sigils get 50% of base XP
+
+		# Find all equipped sigils for active party members
+		for combatant in combatants:
+			if not combatant.is_ally:
+				continue
+
+			var member_id: String = combatant.get("id", "")
+			var sigils: Array = combatant.get("sigils", [])
+
+			for sigil_inst_id in sigils:
+				if sigil_inst_id == "":
+					continue
+				# Award GXP to this sigil instance
+				sigil_sys.add_xp_to_instance(sigil_inst_id, gxp_per_sigil, false, "battle_reward")
+				rewards.gxp_awarded[sigil_inst_id] = gxp_per_sigil
+				print("[BattleManager] Awarded %d GXP to sigil %s" % [gxp_per_sigil, sigil_inst_id])
+
+	return rewards
+
+func _find_combatant_by_id(member_id: String) -> Dictionary:
+	"""Find a combatant by their member ID"""
+	for c in combatants:
+		if c.get("id", "") == member_id:
+			return c
+	return {}
+
+func _roll_creds_from_range(cred_range: String, multiplier: float = 1.0) -> int:
+	"""Roll credits from a range string like '10-20'"""
+	var parts = cred_range.split("-")
+	if parts.size() != 2:
+		return 0
+
+	var min_cred: int = parts[0].to_int()
+	var max_cred: int = parts[1].to_int()
+	var rolled: int = randi_range(min_cred, max_cred)
+	return int(rolled * multiplier)
+
+func _roll_item_drop(drop_table: String, multiplier: float = 1.0) -> String:
+	"""Roll for an item drop from a drop table (placeholder implementation)"""
+	# TODO: Implement proper drop table system
+	# For now, return empty string (no drop)
+	# In a full implementation, this would look up the drop_table in a CSV
+	# and roll against drop rates
+
+	# Placeholder: 30% base chance, increased by multiplier
+	var drop_chance: float = 0.3 * multiplier
+	if randf() < drop_chance:
+		# Return a placeholder item (you'll need to implement proper drop tables)
+		return ""  # No drop for now
+	return ""
+
 func _end_battle(victory: bool) -> void:
 	"""End the battle"""
 	# Wait for any ongoing animations to complete before ending
@@ -441,6 +590,9 @@ func _end_battle(victory: bool) -> void:
 		print("[BattleManager] *** VICTORY ***")
 		current_state = BattleState.VICTORY
 
+		# Calculate and award battle rewards
+		battle_rewards = _calculate_battle_rewards()
+
 		# Apply morality deltas for battle outcomes
 		_apply_morality_for_battle()
 	else:
@@ -448,14 +600,6 @@ func _end_battle(victory: bool) -> void:
 		current_state = BattleState.DEFEAT
 
 	battle_ended.emit(victory)
-
-	# TODO: Award rewards (LXP, money, items)
-	# NOTE: Apply non-lethal modifiers when awarding rewards:
-	#   if _is_all_captures():
-	#     LXP_reward *= 0.30
-	#     Credits_reward *= 1.5
-	#     Drop_rate *= 1.5
-	# TODO: Show victory/defeat screen
 
 func _is_all_captures() -> bool:
 	"""Check if all enemies were captured (none were killed)"""

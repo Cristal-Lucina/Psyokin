@@ -152,7 +152,7 @@ func _show_victory_screen() -> void:
 
 	# Position it in center of screen
 	victory_panel.set_anchors_preset(Control.PRESET_CENTER)
-	victory_panel.custom_minimum_size = Vector2(400, 300)
+	victory_panel.custom_minimum_size = Vector2(500, 400)
 
 	# Create vertical box for content
 	var vbox = VBoxContainer.new()
@@ -179,16 +179,76 @@ func _show_victory_screen() -> void:
 	title_label.add_theme_color_override("font_color", Color(0.9, 0.8, 0.3, 1.0))
 	content_vbox.add_child(title_label)
 
-	# Message label
-	var message_label = Label.new()
-	message_label.text = "All enemies have been\ndefeated or captured!"
-	message_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	message_label.add_theme_font_size_override("font_size", 18)
-	content_vbox.add_child(message_label)
+	# Get rewards data from battle manager
+	var rewards = battle_mgr.battle_rewards
+
+	# Rewards display
+	var rewards_scroll = ScrollContainer.new()
+	rewards_scroll.custom_minimum_size = Vector2(400, 200)
+	content_vbox.add_child(rewards_scroll)
+
+	var rewards_vbox = VBoxContainer.new()
+	rewards_vbox.add_theme_constant_override("separation", 5)
+	rewards_scroll.add_child(rewards_vbox)
+
+	# Creds
+	if rewards.get("creds", 0) > 0:
+		var creds_label = Label.new()
+		creds_label.text = "Credits: +%d" % rewards.creds
+		creds_label.add_theme_color_override("font_color", Color(0.9, 0.9, 0.5, 1.0))
+		rewards_vbox.add_child(creds_label)
+
+	# LXP
+	var lxp_awarded = rewards.get("lxp_awarded", {})
+	if not lxp_awarded.is_empty():
+		var lxp_header = Label.new()
+		lxp_header.text = "\nLevel XP:"
+		lxp_header.add_theme_color_override("font_color", Color(0.7, 0.9, 0.7, 1.0))
+		rewards_vbox.add_child(lxp_header)
+
+		for member_id in lxp_awarded.keys():
+			var xp_amount = lxp_awarded[member_id]
+			var member_label = Label.new()
+			member_label.text = "  %s: +%d XP" % [member_id, xp_amount]
+			rewards_vbox.add_child(member_label)
+
+	# GXP
+	var gxp_awarded = rewards.get("gxp_awarded", {})
+	if not gxp_awarded.is_empty():
+		var gxp_header = Label.new()
+		gxp_header.text = "\nSigil Growth:"
+		gxp_header.add_theme_color_override("font_color", Color(0.7, 0.7, 0.9, 1.0))
+		rewards_vbox.add_child(gxp_header)
+
+		var gxp_label = Label.new()
+		gxp_label.text = "  %d sigils gained +%d GXP" % [gxp_awarded.size(), gxp_awarded.values()[0] if not gxp_awarded.is_empty() else 0]
+		rewards_vbox.add_child(gxp_label)
+
+	# Items
+	var items = rewards.get("items", [])
+	if not items.is_empty():
+		var items_header = Label.new()
+		items_header.text = "\nItems Dropped:"
+		items_header.add_theme_color_override("font_color", Color(0.9, 0.7, 0.9, 1.0))
+		rewards_vbox.add_child(items_header)
+
+		for item_id in items:
+			var item_label = Label.new()
+			item_label.text = "  %s" % item_id
+			rewards_vbox.add_child(item_label)
+
+	# Battle stats
+	var stats_label = Label.new()
+	var captured = rewards.get("captured_count", 0)
+	var killed = rewards.get("killed_count", 0)
+	stats_label.text = "\nEnemies: %d captured, %d defeated" % [captured, killed]
+	stats_label.add_theme_font_size_override("font_size", 14)
+	stats_label.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7, 1.0))
+	rewards_vbox.add_child(stats_label)
 
 	# Spacer
 	var spacer = Control.new()
-	spacer.custom_minimum_size = Vector2(0, 20)
+	spacer.custom_minimum_size = Vector2(0, 10)
 	content_vbox.add_child(spacer)
 
 	# Accept button
