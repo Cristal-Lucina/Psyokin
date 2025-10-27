@@ -55,7 +55,13 @@ func _ready() -> void:
 		print("[SigilSkillMenu] Connected btn_close.pressed")
 
 	set_process_unhandled_input(true)
-	_refresh_all()
+
+	# Only refresh if member is already set (via set_member before adding to tree)
+	if _member != "":
+		print("[SigilSkillMenu] Member already set, refreshing...")
+		_refresh_all()
+	else:
+		print("[SigilSkillMenu] Member not set yet, waiting for set_member() call")
 
 func _unhandled_input(e: InputEvent) -> void:
 	if e is InputEventKey and e.is_pressed() and e.keycode == KEY_ESCAPE:
@@ -63,12 +69,18 @@ func _unhandled_input(e: InputEvent) -> void:
 
 # Public
 func set_member(member: String) -> void:
+	print("[SigilSkillMenu] set_member(%s) called" % member)
 	_member = member
-	_refresh_all()
+	if is_inside_tree():
+		_refresh_all()
+	else:
+		print("[SigilSkillMenu] Not in tree yet, deferring refresh")
 
 # ───────────────── data refresh ─────────────────
 func _refresh_all() -> void:
+	print("[SigilSkillMenu] _refresh_all() started for member=%s" % _member)
 	_refresh_capacity_and_loadout()
+	print("[SigilSkillMenu] Capacity=%d, Loadout size=%d" % [_capacity, _loadout.size()])
 	_refresh_sockets()
 
 	if _selected_socket < 0:
@@ -79,11 +91,15 @@ func _refresh_all() -> void:
 	if _selected_socket < 0 and _capacity > 0:
 		_selected_socket = 0
 
+	print("[SigilSkillMenu] Selected socket: %d" % _selected_socket)
+
 	if _sockets and _selected_socket >= 0 and _selected_socket < _sockets.item_count:
 		_sockets.select(_selected_socket)
 		_on_socket_pick(_selected_socket)
 	else:
 		_refresh_detail("")
+
+	print("[SigilSkillMenu] _refresh_all() completed")
 
 func _refresh_capacity_and_loadout() -> void:
 	_capacity = 0
@@ -285,6 +301,10 @@ func _on_set_active() -> void:
 
 func _on_close() -> void:
 	print("[SigilSkillMenu] _on_close() called - closing menu")
+	print("[SigilSkillMenu] Call stack trace:")
+	var stack = get_stack()
+	for frame in stack:
+		print("  -> %s:%d in %s()" % [frame.source, frame.line, frame.function])
 	queue_free()
 
 # ───────────────── helpers ─────────────────

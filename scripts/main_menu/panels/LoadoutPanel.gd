@@ -951,9 +951,18 @@ func _instance_sigil_menu_scene() -> Control:
 
 func _on_manage_sigils() -> void:
 	var token: String = _current_token()
-	if token == "": return
+	if token == "":
+		print("[LoadoutPanel] ERROR: Cannot open sigil menu - no member selected")
+		return
 
+	print("[LoadoutPanel] Opening sigil menu for member: %s" % token)
 	var menu: Control = _instance_sigil_menu_scene()
+
+	# IMPORTANT: Set member BEFORE adding to tree so _ready() has the member set
+	if menu.has_method("set_member"):
+		menu.call("set_member", token)
+		print("[LoadoutPanel] Set member to: %s" % token)
+
 	var layer := CanvasLayer.new()
 	layer.layer = 128  # Higher layer to ensure it's on top of pause/menu screens
 	get_tree().root.add_child(layer)
@@ -961,11 +970,10 @@ func _on_manage_sigils() -> void:
 	menu.set_anchors_preset(Control.PRESET_FULL_RECT)
 	menu.mouse_filter = Control.MOUSE_FILTER_STOP  # Ensure it captures mouse input
 
-	if menu.has_method("set_member"):
-		menu.call("set_member", token)
-
 	if not menu.tree_exited.is_connected(Callable(self, "_on_overlay_closed")):
 		menu.tree_exited.connect(Callable(self, "_on_overlay_closed").bind(layer))
+
+	print("[LoadoutPanel] Sigil menu added to tree")
 
 func _on_overlay_closed(layer: CanvasLayer) -> void:
 	if is_instance_valid(layer):
