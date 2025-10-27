@@ -541,6 +541,9 @@ func _execute_capture(target: Dictionary) -> void:
 		# Record capture for morality system
 		battle_mgr.record_enemy_defeat(target, true)  # true = capture
 
+		# Add captured enemy to collection
+		_add_captured_enemy(target)
+
 		# Animate turn cell falling (same as KO)
 		if turn_order_display and turn_order_display.has_method("animate_ko_fall"):
 			turn_order_display.animate_ko_fall(target.id)
@@ -1585,3 +1588,39 @@ func _switch_mind_type(new_type: String, end_turn: bool = true) -> void:
 	# End turn if requested (for Item button usage)
 	if end_turn:
 		battle_mgr.end_turn()
+
+## ═══════════════════════════════════════════════════════════════
+## CAPTURE COLLECTION
+## ═══════════════════════════════════════════════════════════════
+
+func _add_captured_enemy(enemy: Dictionary) -> void:
+	"""Add a captured enemy to the player's collection"""
+	if not gs:
+		return
+
+	# Get enemy actor_id (the base enemy type, not the battle instance id)
+	var actor_id = String(enemy.get("actor_id", ""))
+	if actor_id == "":
+		print("[Battle] Warning: Captured enemy has no actor_id!")
+		return
+
+	# Get current captured enemies list from GameState
+	var captured: Array = []
+	if gs.has_meta("captured_enemies"):
+		var meta = gs.get_meta("captured_enemies")
+		if typeof(meta) == TYPE_ARRAY:
+			captured = meta.duplicate()
+
+	# Add this enemy to the list (allows duplicates for counting)
+	captured.append({
+		"actor_id": actor_id,
+		"display_name": enemy.get("display_name", actor_id),
+		"captured_at": Time.get_datetime_string_from_system(),
+		"mind_type": enemy.get("mind_type", "none"),
+		"env_tag": enemy.get("env_tag", "Regular")
+	})
+
+	# Save back to GameState
+	gs.set_meta("captured_enemies", captured)
+
+	print("[Battle] Captured enemy added to collection: %s (Total captures: %d)" % [actor_id, captured.size()])
