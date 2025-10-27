@@ -18,11 +18,12 @@ const STATS_KEYS: Array[String] = ["BRW","MND","TPO","VTL","FCS"]
 # Fallback only (UI guess) if StatsSystem doesn't give us a 'fatigued' boolean
 const FATIGUE_THRESHOLD_PER_WEEK := 60
 
-@onready var _root_vb    : VBoxContainer = %Root
-@onready var _list       : VBoxContainer = %List
-@onready var _refresh    : Button        = %RefreshBtn
-@onready var _title      : Label         = %Title
-@onready var _member_bar : HBoxContainer = %MemberBar
+@onready var _root_vb         : VBoxContainer = %Root
+@onready var _list            : VBoxContainer = %List
+@onready var _refresh         : Button        = %RefreshBtn
+@onready var _title           : Label         = %Title
+@onready var _member_bar      : HBoxContainer = %MemberBar
+@onready var _radar_container : VBoxContainer = %RadarContainer
 
 # Radar chart for stat visualization
 var _radar_chart : Control = null
@@ -187,6 +188,10 @@ func _rebuild_list_only() -> void:
 			_add_row3(String(key).capitalize(), str(level), right)
 		else:
 			_add_row2(String(key).capitalize(), str(level))
+
+	# Add Affinity (AXP) section
+	_add_spacer_row()
+	_add_affinity_section(_current_id)
 
 	await get_tree().process_frame
 	_list.queue_sort()
@@ -378,17 +383,73 @@ func _add_spacer_row() -> void:
 	var sep := HSeparator.new()
 	_list.add_child(sep)
 
+func _add_affinity_section(member_id: String) -> void:
+	"""Add AXP/Affinity relationships section for the current member"""
+	var affinity_sys = get_node_or_null("/root/aAffinitySystem")
+	if not affinity_sys or not affinity_sys.has_method("get_all_pair_data"):
+		return
+
+	var all_pairs: Array = affinity_sys.call("get_all_pair_data")
+	var relationships: Array = []
+
+	# Find all pairs involving this member
+	for pair_data in all_pairs:
+		if typeof(pair_data) != TYPE_DICTIONARY:
+			continue
+
+		var pair_dict: Dictionary = pair_data
+		var member_a: String = String(pair_dict.get("member_a", ""))
+		var member_b: String = String(pair_dict.get("member_b", ""))
+
+		# Check if this member is in this pair
+		var partner_id: String = ""
+		if member_a == member_id:
+			partner_id = member_b
+		elif member_b == member_id:
+			partner_id = member_a
+		else:
+			continue  # This pair doesn't involve this member
+
+		# Get partner's display name
+		var partner_name: String = _label_for(partner_id)
+
+		relationships.append({
+			"partner_id": partner_id,
+			"partner_name": partner_name,
+			"tier": int(pair_dict.get("tier", 0)),
+			"weekly_axp": int(pair_dict.get("weekly_axp", 0)),
+			"lifetime_axp": int(pair_dict.get("lifetime_axp", 0))
+		})
+
+	# Only show section if there are relationships
+	if relationships.is_empty():
+		return
+
+	# Add header
+	_add_header_row2("Affinity", "Tier (Lifetime)")
+
+	# Add each relationship
+	for rel in relationships:
+		var partner_name: String = String(rel.get("partner_name", "???"))
+		var tier: int = int(rel.get("tier", 0))
+		var lifetime: int = int(rel.get("lifetime_axp", 0))
+
+		var tier_text: String = "AT%d (%d)" % [tier, lifetime]
+		_add_row2(partner_name, tier_text)
+
 # ---------- Radar Chart ----------
 func _create_radar_chart() -> void:
+	if not _radar_container:
+		return
+
 	_radar_chart = Control.new()
 	_radar_chart.custom_minimum_size = Vector2(300, 300)
-	_radar_chart.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	_radar_chart.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_radar_chart.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_radar_chart.set_process(false)  # No need for _process, we'll redraw manually
 
-	# Insert chart after MemberBar, before Scroll
-	var member_bar_idx := _member_bar.get_index()
-	_root_vb.add_child(_radar_chart)
-	_root_vb.move_child(_radar_chart, member_bar_idx + 1)
+	# Add chart to the radar container on the right side
+	_radar_container.add_child(_radar_chart)
 
 	# Connect draw callback
 	_radar_chart.draw.connect(_on_radar_draw)

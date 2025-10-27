@@ -147,7 +147,7 @@ func _rebuild_display_with_reveal() -> void:
 	is_animating = false
 
 func _rebuild_display() -> void:
-	"""Rebuild the entire turn order display"""
+	"""Rebuild the entire turn order display with fade-in animation"""
 	# Clear existing slots
 	for slot in turn_slots:
 		slot.queue_free()
@@ -174,6 +174,19 @@ func _rebuild_display() -> void:
 		var slot = _create_turn_slot(combatant, i)
 		turn_slots.append(slot)
 		add_child(slot)
+
+		# Start invisible
+		slot.modulate.a = 0.0
+
+	# Wait one frame for layout to settle, then fade in all slots
+	await get_tree().process_frame
+
+	for slot in turn_slots:
+		if is_instance_valid(slot):
+			var tween = create_tween()
+			tween.set_ease(Tween.EASE_OUT)
+			tween.set_trans(Tween.TRANS_CUBIC)
+			tween.tween_property(slot, "modulate:a", 1.0, 0.3)
 
 	# Store current order for future animations
 	_store_current_order()
@@ -409,7 +422,7 @@ func update_combatant_hp(_combatant_id: String) -> void:
 	pass
 
 func animate_ko_fall(combatant_id: String) -> void:
-	"""Animate a combatant falling when KO'd"""
+	"""Animate a combatant falling when KO'd - drops to bottom of screen"""
 	# Find the slot for this combatant
 	var target_slot: PanelContainer = null
 	for slot in turn_slots:
@@ -422,25 +435,84 @@ func animate_ko_fall(combatant_id: String) -> void:
 
 	print("[TurnOrderDisplay] Animating KO fall for %s" % combatant_id)
 
-	# Create falling animation
+	# Store original position of KO'd slot
+	var original_position = target_slot.global_position
+
+	# Create canvas layer for KO'd slot animation
+	var canvas_layer = CanvasLayer.new()
+	get_tree().root.add_child(canvas_layer)
+
+	# Reparent KO'd slot to canvas layer so it can drop freely
+	target_slot.reparent(canvas_layer, false)
+	target_slot.global_position = original_position
+
+	# Calculate drop distance to bottom of screen
+	var viewport_height = get_viewport_rect().size.y
+
+	# Animate KO'd slot dropping
 	var tween = create_tween()
 	tween.set_ease(Tween.EASE_IN)
 	tween.set_trans(Tween.TRANS_CUBIC)
-
-	# Rotate slightly while falling
-	tween.tween_property(target_slot, "rotation", deg_to_rad(15), KO_FALL_DURATION)
-	# Fade out
-	tween.parallel().tween_property(target_slot, "modulate:a", 0.3, KO_FALL_DURATION)
-	# Scale down
-	tween.parallel().tween_property(target_slot, "scale", Vector2(0.8, 0.8), KO_FALL_DURATION)
+	tween.tween_property(target_slot, "global_position:y", viewport_height + 100, KO_FALL_DURATION)
+	tween.parallel().tween_property(target_slot, "rotation", deg_to_rad(25), KO_FALL_DURATION)
+	tween.parallel().tween_property(target_slot, "modulate:a", 0.0, KO_FALL_DURATION)
+	tween.parallel().tween_property(target_slot, "scale", Vector2(0.7, 0.7), KO_FALL_DURATION)
 
 	# Wait for animation to finish
 	await tween.finished
 
-	# Check if slot is still valid (it may have been freed during turn order rebuild)
-	if not is_instance_valid(target_slot):
+	# Clean up canvas layer and KO'd slot
+	if is_instance_valid(canvas_layer):
+		canvas_layer.queue_free()
+
+func animate_capture(combatant_id: String) -> void:
+	"""Animate a combatant being captured - turns cell green"""
+	# Find the slot for this combatant
+	var target_slot: PanelContainer = null
+	for slot in turn_slots:
+		if slot.get_meta("combatant_id", "") == combatant_id:
+			target_slot = slot
+			break
+
+	if not target_slot:
 		return
 
-	# Reset rotation and scale (will be rebuilt with greyed style)
-	target_slot.rotation = 0
-	target_slot.scale = Vector2(1.0, 1.0)
+	print("[TurnOrderDisplay] Animating capture for %s" % combatant_id)
+
+	# Create green style for captured enemy
+	var captured_style = StyleBoxFlat.new()
+	captured_style.bg_color = Color(0.2, 0.6, 0.2, 0.9)  # Green background
+	captured_style.border_width_left = 3
+	captured_style.border_width_right = 3
+	captured_style.border_width_top = 3
+	captured_style.border_width_bottom = 3
+	captured_style.border_color = Color(0.3, 1.0, 0.3, 1.0)  # Bright green border
+
+	# Animate color transition to green
+	var tween = create_tween()
+	tween.set_ease(Tween.EASE_OUT)
+	tween.set_trans(Tween.TRANS_CUBIC)
+
+	# Pulse effect - scale up slightly then back
+	tween.tween_property(target_slot, "scale", Vector2(1.15, 1.15), 0.2)
+	tween.tween_property(target_slot, "scale", Vector2(1.0, 1.0), 0.2)
+
+	# Apply green style
+	target_slot.add_theme_stylebox_override("panel", captured_style)
+
+	# Add "CAPTURED" label
+	var captured_label = Label.new()
+	captured_label.text = "CAPTURED"
+	captured_label.add_theme_font_size_override("font_size", 10)
+	captured_label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 1.0))
+	captured_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+
+	# Find the VBox inside the slot and add label
+	var vbox = target_slot.get_child(0) as VBoxContainer
+	if vbox:
+		vbox.add_child(captured_label)
+
+	await tween.finished
+
+	# Emit animation completed signal so BattleManager can continue
+	animation_completed.emit()

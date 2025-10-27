@@ -30,6 +30,11 @@ var current_round: int = 0
 var current_turn_index: int = 0
 var run_attempted_this_round: bool = false  # Track if party tried to run this round
 
+## Battle outcome tracking (for morality system)
+var battle_kills: Dictionary = {}  # env_tag -> count (e.g., {"Regular": 2, "Elite": 1})
+var battle_captures: Dictionary = {}  # env_tag -> count
+var sigils_used_in_battle: Dictionary = {}  # sigil_instance_id -> true (tracks which sigils had skills used)
+
 ## Combatants (both allies and enemies)
 var combatants: Array[Dictionary] = []  # List of all combatants in battle
 var turn_order: Array[Dictionary] = []  # Sorted by initiative
@@ -42,6 +47,7 @@ const BURST_GAUGE_PER_ROUND_CAP: int = 25
 ## Encounter data
 var encounter_data: Dictionary = {}
 var return_scene: String = ""  # Scene to return to after battle
+var battle_rewards: Dictionary = {}  # Rewards calculated at end of battle
 
 ## References
 @onready var gs = get_node("/root/aGameState")
@@ -108,6 +114,8 @@ func initialize_battle(ally_party: Array, enemy_list: Array) -> void:
 	burst_gauge = 0
 	combatants.clear()
 	turn_order.clear()
+	battle_kills.clear()
+	battle_captures.clear()
 
 	# Add allies to combatants
 	for i in range(ally_party.size()):
@@ -270,7 +278,7 @@ func _wait_for_turn_order_animation() -> void:
 	"""Wait for turn order display animation to complete"""
 	# Find TurnOrderDisplay in the scene tree
 	var turn_order_display = get_tree().get_first_node_in_group("turn_order_display")
-	if not turn_order_display:
+	if not turn_order_display or not is_instance_valid(turn_order_display):
 		# No display found, just wait a frame
 		await get_tree().process_frame
 		return
@@ -420,9 +428,276 @@ func _count_alive_allies() -> int:
 func _count_alive_enemies() -> int:
 	var count = 0
 	for c in combatants:
-		if not c.is_ally and not c.is_ko and not c.is_fled:
-			count += 1
+		# Count enemy as defeated if KO'd, fled, or captured
+		if not c.is_ally:
+			var is_ko = c.is_ko
+			var is_fled = c.is_fled
+			var is_captured = c.get("is_captured", false)
+			print("[BattleManager] Enemy %s: is_ko=%s, is_fled=%s, is_captured=%s" % [c.display_name, is_ko, is_fled, is_captured])
+			if not is_ko and not is_fled and not is_captured:
+				count += 1
+	print("[BattleManager] _count_alive_enemies() = %d" % count)
 	return count
+
+func _calculate_battle_rewards() -> Dictionary:
+	"""
+	Calculate all battle rewards: LXP, GXP, AXP, Creds, Items
+	Returns Dictionary with reward breakdown for display
+	"""
+	var rewards = {
+		"lxp_awarded": {},  # member_id -> xp_amount
+		"gxp_awarded": {},  # sigil_instance_id -> gxp_amount
+		"axp_awarded": {},  # "memberA|memberB" -> axp_amount
+		"creds": 0,
+		"items": [],  # Array of item_ids dropped
+		"captured_count": 0,
+		"killed_count": 0
+	}
+
+	# Count captures vs kills
+	for count in battle_captures.values():
+		rewards.captured_count += count
+	for count in battle_kills.values():
+		rewards.killed_count += count
+
+	# Calculate base XP from all defeated enemies
+	var base_xp: int = 0
+	var total_creds: int = 0
+	var dropped_items: Array = []
+
+	for enemy in combatants:
+		if enemy.is_ally:
+			continue
+		if not enemy.get("is_ko", false) and not enemy.get("is_captured", false):
+			continue  # Enemy wasn't defeated
+
+		# XP based on enemy level
+		var enemy_level: int = enemy.get("level", 1)
+		var enemy_xp: int = enemy_level * 10  # Base formula: 10 XP per level
+		base_xp += enemy_xp
+
+		# Creds calculation
+		var cred_range: String = enemy.get("cred_range", "10-20")
+		var was_captured: bool = enemy.get("is_captured", false)
+		var cred_multiplier: float = 1.5 if was_captured else 1.0
+		var creds_from_enemy: int = _roll_creds_from_range(cred_range, cred_multiplier)
+		total_creds += creds_from_enemy
+
+		# Item drops
+		var drop_table: String = enemy.get("drop_table", "")
+		if drop_table != "":
+			var drop_multiplier: float = 1.5 if was_captured else 1.0
+			var dropped_item: String = _roll_item_drop(drop_table, drop_multiplier)
+			if dropped_item != "":
+				dropped_items.append(dropped_item)
+
+	rewards.creds = total_creds
+	rewards.items = dropped_items
+
+	# Award Creds to GameState
+	if total_creds > 0 and gs and gs.has_method("add_creds"):
+		gs.add_creds(total_creds)
+		print("[BattleManager] Awarded %d creds" % total_creds)
+
+	# Award Items to Inventory
+	var inv_sys = get_node_or_null("/root/aInventorySystem")
+	if inv_sys:
+		for item_id in dropped_items:
+			inv_sys.add_item(item_id, 1)
+			print("[BattleManager] Dropped item: %s" % item_id)
+
+	# Distribute LXP to party members
+	print("[BattleManager] Starting LXP distribution, base_xp: %d" % base_xp)
+
+	if base_xp > 0:
+		# Award LXP to all ally combatants (they're already in the battle)
+		for combatant in combatants:
+			if not combatant.is_ally:
+				continue
+
+			var member_id = combatant.get("id", "")
+			if member_id == "":
+				continue
+
+			print("[BattleManager] Processing member: %s" % member_id)
+			var xp_amount: int = 0
+
+			# Check if KO'd for 50% XP penalty
+			if combatant.get("is_ko", false):
+				# Fainted - 50% XP
+				xp_amount = int(base_xp * 0.5)
+				print("[BattleManager] Member is KO'd, awarding 50%% XP")
+			else:
+				# Active and not KO'd - 100% XP
+				xp_amount = base_xp
+				print("[BattleManager] Member is active, awarding 100%% XP")
+
+			print("[BattleManager] Calculated xp_amount: %d for %s" % [xp_amount, member_id])
+			print("[BattleManager] stats_system exists: %s, has add_xp: %s" % [stats_system != null, stats_system.has_method("add_xp") if stats_system else false])
+
+			if xp_amount > 0 and stats_system and stats_system.has_method("add_xp"):
+				stats_system.add_xp(member_id, xp_amount)
+				rewards.lxp_awarded[member_id] = xp_amount
+				print("[BattleManager] Awarded %d LXP to %s" % [xp_amount, member_id])
+			else:
+				print("[BattleManager] SKIPPED awarding LXP (xp_amount=%d, stats_system=%s)" % [xp_amount, "exists" if stats_system else "null"])
+	else:
+		print("[BattleManager] SKIPPED entire LXP section (base_xp=%d)" % base_xp)
+
+	# Award GXP to all equipped sigils
+	var sigil_sys = get_node_or_null("/root/aSigilSystem")
+	if sigil_sys and base_xp > 0:
+		var gxp_per_sigil: int = int(base_xp * 0.5)  # Sigils get 50% of base XP
+
+		# Find all equipped sigils for active party members
+		for combatant in combatants:
+			if not combatant.is_ally:
+				continue
+
+			var member_id: String = combatant.get("id", "")
+			var sigils: Array = combatant.get("sigils", [])
+
+			for sigil_inst_id in sigils:
+				if sigil_inst_id == "":
+					continue
+
+				# Base GXP for equipped sigils
+				var gxp_to_award = gxp_per_sigil
+
+				# Bonus +5 GXP if sigil's skill was actually used in battle
+				if sigils_used_in_battle.has(sigil_inst_id):
+					gxp_to_award += 5
+					print("[BattleManager] +5 GXP bonus for sigil usage: %s" % sigil_inst_id)
+
+				# Award GXP to this sigil instance
+				sigil_sys.add_xp_to_instance(sigil_inst_id, gxp_to_award, false, "battle_reward")
+				rewards.gxp_awarded[sigil_inst_id] = gxp_to_award
+				print("[BattleManager] Awarded %d GXP to sigil %s" % [gxp_to_award, sigil_inst_id])
+
+	# Award AXP (Affinity XP) for co-presence
+	var affinity_sys = get_node_or_null("/root/aAffinitySystem")
+	if affinity_sys:
+		print("[BattleManager] Calculating AXP for co-presence...")
+
+		# Get all ally combatants who participated
+		var ally_combatants: Array = []
+		for combatant in combatants:
+			if combatant.is_ally:
+				ally_combatants.append(combatant)
+
+		# Calculate AXP for each pair
+		for i in range(ally_combatants.size()):
+			for j in range(i + 1, ally_combatants.size()):
+				var member_a = ally_combatants[i].get("id", "")
+				var member_b = ally_combatants[j].get("id", "")
+
+				if member_a == "" or member_b == "":
+					continue
+
+				# Check KO status
+				var a_ko = ally_combatants[i].get("is_ko", false)
+				var b_ko = ally_combatants[j].get("is_ko", false)
+
+				var axp_amount = 0
+				var status_desc = ""
+
+				if not a_ko and not b_ko:
+					# Both active at battle end: +2 AXP
+					axp_amount = 2
+					status_desc = "both active"
+				elif a_ko != b_ko:
+					# One KO'd, one standing: +1 AXP
+					axp_amount = 1
+					status_desc = "one KO'd"
+				else:
+					# Both KO'd: +0 AXP (no co-presence)
+					axp_amount = 0
+					status_desc = "both KO'd"
+
+				if axp_amount > 0:
+					var actual = affinity_sys.add_copresence_axp(member_a, member_b, axp_amount)
+					if actual > 0:
+						# Create pair key for display (alphabetically sorted)
+						var pair_key = affinity_sys._make_pair_key(member_a, member_b)
+						rewards.axp_awarded[pair_key] = actual
+						print("[BattleManager] Awarded %d AXP to %s (%s)" % [actual, pair_key, status_desc])
+					else:
+						print("[BattleManager] Daily cap reached for %s|%s, no AXP awarded" % [member_a, member_b])
+				else:
+					print("[BattleManager] No AXP for %s|%s (%s)" % [member_a, member_b, status_desc])
+
+	return rewards
+
+func _find_combatant_by_id(member_id: String) -> Dictionary:
+	"""Find a combatant by their member ID"""
+	for c in combatants:
+		if c.get("id", "") == member_id:
+			return c
+	return {}
+
+func _roll_creds_from_range(cred_range: String, multiplier: float = 1.0) -> int:
+	"""Roll credits from a range string like '10-20'"""
+	var parts = cred_range.split("-")
+	if parts.size() != 2:
+		return 0
+
+	var min_cred: int = parts[0].to_int()
+	var max_cred: int = parts[1].to_int()
+	var rolled: int = randi_range(min_cred, max_cred)
+	return int(rolled * multiplier)
+
+func _roll_item_drop(drop_table: String, multiplier: float = 1.0) -> String:
+	"""Roll for an item drop from a drop table"""
+	if drop_table == "" or drop_table == "None":
+		return ""
+
+	# Load drop table data from CSV
+	var drop_table_path = "res://data/items/drop_tables.csv"
+
+	# Check if drop tables file exists
+	if not ResourceLoader.exists(drop_table_path):
+		print("[BattleManager] Drop tables CSV not found at %s" % drop_table_path)
+		return ""
+
+	# Load the drop table CSV
+	var drop_data = csv_loader.load_csv(drop_table_path, "drop_table_id")
+	if drop_data.is_empty():
+		print("[BattleManager] Failed to load drop tables")
+		return ""
+
+	# Collect all entries for this drop table
+	var table_entries: Array = []
+	for row_key in drop_data.keys():
+		var row = drop_data[row_key]
+		var table_id = str(row.get("drop_table_id", ""))
+		if table_id == drop_table:
+			table_entries.append(row)
+
+	if table_entries.is_empty():
+		print("[BattleManager] No entries found for drop table: %s" % drop_table)
+		return ""
+
+	# Roll for each possible drop in the table
+	for entry in table_entries:
+		var item_id = str(entry.get("item_id", ""))
+		var drop_rate = float(entry.get("drop_rate", 0.0))
+		var min_qty = int(entry.get("min_qty", 1))
+		var max_qty = int(entry.get("max_qty", 1))
+
+		# Apply multiplier to drop rate (captures get better drops)
+		var final_rate = drop_rate * multiplier
+
+		# Roll for this item
+		if randf() < final_rate:
+			# Success! This item dropped
+			var qty = randi_range(min_qty, max_qty)
+			print("[BattleManager] Item drop: %s x%d (rate: %.1f%%)" % [item_id, qty, final_rate * 100])
+
+			# For now, return just the item_id (quantity handling can be added later)
+			return item_id
+
+	# No items dropped
+	return ""
 
 func _end_battle(victory: bool) -> void:
 	"""End the battle"""
@@ -433,14 +708,100 @@ func _end_battle(victory: bool) -> void:
 	if victory:
 		print("[BattleManager] *** VICTORY ***")
 		current_state = BattleState.VICTORY
+
+		# Calculate and award battle rewards
+		print("[BattleManager] Calculating battle rewards...")
+		battle_rewards = _calculate_battle_rewards()
+		print("[BattleManager] Rewards calculated successfully")
+
+		# Apply morality deltas for battle outcomes
+		print("[BattleManager] Applying morality...")
+		_apply_morality_for_battle()
+		print("[BattleManager] Morality applied")
 	else:
 		print("[BattleManager] *** DEFEAT ***")
 		current_state = BattleState.DEFEAT
 
+	print("[BattleManager] Emitting battle_ended signal...")
 	battle_ended.emit(victory)
+	print("[BattleManager] Battle ended signal emitted")
 
-	# TODO: Award rewards (LXP, money, items)
-	# TODO: Show victory/defeat screen
+func _is_all_captures() -> bool:
+	"""Check if all enemies were captured (none were killed)"""
+	# Count total defeats
+	var total_kills = 0
+	for count in battle_kills.values():
+		total_kills += count
+
+	var total_captures = 0
+	for count in battle_captures.values():
+		total_captures += count
+
+	# All captures means: at least 1 capture AND zero kills
+	return total_captures > 0 and total_kills == 0
+
+func record_enemy_defeat(enemy: Dictionary, was_captured: bool) -> void:
+	"""
+	Record enemy defeat for morality tracking
+
+	Args:
+	  - enemy: Enemy combatant dictionary with env_tag
+	  - was_captured: true if captured, false if killed
+	"""
+	var env_tag: String = enemy.get("env_tag", "Regular")
+
+	if was_captured:
+		battle_captures[env_tag] = battle_captures.get(env_tag, 0) + 1
+		print("[BattleManager] Recorded capture: %s (%s)" % [enemy.display_name, env_tag])
+	else:
+		battle_kills[env_tag] = battle_kills.get(env_tag, 0) + 1
+		print("[BattleManager] Recorded kill: %s (%s)" % [enemy.display_name, env_tag])
+
+func _apply_morality_for_battle() -> void:
+	"""Apply morality deltas based on battle outcomes (kills vs captures)"""
+	var morality_sys = get_node_or_null("/root/aMoralitySystem")
+	if not morality_sys:
+		print("[BattleManager] MoralitySystem not available, skipping morality application")
+		return
+
+	# NOTE: VR battle check will be added here later
+	# For now, apply morality for all battles
+
+	# Apply kill penalties
+	for env_tag in battle_kills:
+		var count: int = battle_kills[env_tag]
+		var delta_per_kill: int = 0
+
+		match env_tag:
+			"Regular":
+				delta_per_kill = morality_sys.DELTA_REGULAR_LETHAL  # -1
+			"Elite":
+				delta_per_kill = morality_sys.DELTA_ELITE_LETHAL    # -3
+			"Boss":
+				delta_per_kill = morality_sys.DELTA_BOSS_LETHAL      # -15
+
+		if delta_per_kill != 0:
+			for i in range(count):
+				morality_sys.apply_delta(delta_per_kill, "Killed %s enemy" % env_tag)
+
+	# Apply capture bonuses
+	for env_tag in battle_captures:
+		var count: int = battle_captures[env_tag]
+		var delta_per_capture: int = 0
+
+		match env_tag:
+			"Regular":
+				delta_per_capture = morality_sys.DELTA_REGULAR_NONLETHAL  # +1
+			"Elite":
+				delta_per_capture = morality_sys.DELTA_ELITE_NONLETHAL    # +3
+			"Boss":
+				delta_per_capture = morality_sys.DELTA_BOSS_NONLETHAL      # +15
+
+		if delta_per_capture != 0:
+			for i in range(count):
+				morality_sys.apply_delta(delta_per_capture, "Captured %s enemy" % env_tag)
+
+	print("[BattleManager] Applied morality: Kills=%s, Captures=%s" % [battle_kills, battle_captures])
 
 func return_to_overworld() -> void:
 	"""Return to the overworld scene"""
@@ -618,6 +979,7 @@ func _create_enemy_combatant(enemy_id: String, slot: int) -> Dictionary:
 		"initiative": 0,
 		"is_ko": false,
 		"is_fled": false,
+		"is_captured": false,  # Captured via Bind
 		"is_fallen": false,
 		"fallen_round": 0,  # Track which round they became fallen
 		"is_defending": false,
@@ -639,6 +1001,8 @@ func _create_enemy_combatant(enemy_id: String, slot: int) -> Dictionary:
 		"skills": skills,
 		"is_boss": String(enemy_def.get("boss_tag", "FALSE")).to_upper() == "TRUE",
 		"capture_difficulty": String(enemy_def.get("capture_tag", "None")),
+		"capture_resist": int(enemy_def.get("capture_resist", 25)),  # 0-60 resistance
+		"env_tag": String(enemy_def.get("env_tag", "Regular")),  # Regular/Elite/Boss for morality
 		"cred_range": String(enemy_def.get("cred_range", "0-0")),
 		"drop_table": String(enemy_def.get("item_drops", "")),
 		"weapon_weakness_hits": 0,  # Track weapon triangle weakness hits per round

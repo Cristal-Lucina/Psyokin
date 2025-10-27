@@ -70,7 +70,7 @@ columns = 2
 
 [node name="MoneyLabel" type="Label" parent="Root/Right/InfoGrid"]
 layout_mode = 2
-text = "Money"
+text = "CREDS"
 
 [node name="MoneyValue" type="Label" parent="Root/Right/InfoGrid"]
 layout_mode = 2
@@ -83,6 +83,14 @@ text = "Perk Pts"
 [node name="PerkValue" type="Label" parent="Root/Right/InfoGrid"]
 layout_mode = 2
 text = "0"
+
+[node name="MoralityLabel" type="Label" parent="Root/Right/InfoGrid"]
+layout_mode = 2
+text = "Morality"
+
+[node name="MoralityValue" type="Label" parent="Root/Right/InfoGrid"]
+layout_mode = 2
+text = "Neutral (0)"
 
 [node name="DateLabel" type="Label" parent="Root/Right/InfoGrid"]
 layout_mode = 2

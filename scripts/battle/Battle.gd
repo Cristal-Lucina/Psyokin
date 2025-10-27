@@ -25,9 +25,15 @@ var awaiting_target_selection: bool = false
 var target_candidates: Array = []
 var skill_definitions: Dictionary = {}  # skill_id -> skill data
 var awaiting_skill_selection: bool = false
+var awaiting_capture_target: bool = false  # True when selecting target for capture
+var awaiting_item_target: bool = false  # True when selecting target for item usage
 var skill_to_use: Dictionary = {}  # Selected skill data
 var skill_menu_panel: PanelContainer = null  # Skill selection menu
+var item_menu_panel: PanelContainer = null  # Item selection menu
+var capture_menu_panel: PanelContainer = null  # Capture selection menu
 var current_skill_menu: Array = []  # Current skills in menu
+var selected_item: Dictionary = {}  # Selected item data
+var victory_panel: PanelContainer = null  # Victory screen panel
 
 func _ready() -> void:
 	print("[Battle] Battle scene loaded")
@@ -108,7 +114,7 @@ func _on_turn_started(combatant_id: String) -> void:
 		# Enemy turn - execute AI
 		_execute_enemy_ai()
 
-func _on_turn_ended(combatant_id: String) -> void:
+func _on_turn_ended(_combatant_id: String) -> void:
 	"""Called when a combatant's turn ends"""
 	# Hide action menu
 	action_menu.visible = false
@@ -118,10 +124,7 @@ func _on_battle_ended(victory: bool) -> void:
 	if victory:
 		log_message("*** VICTORY ***")
 		log_message("All enemies have been defeated!")
-		# TODO: Show victory screen, award rewards
-		await get_tree().create_timer(2.0).timeout
-		# Return to overworld
-		battle_mgr.return_to_overworld()
+		_show_victory_screen()
 	else:
 		log_message("*** DEFEAT ***")
 		log_message("Your party has been wiped out!")
@@ -130,6 +133,191 @@ func _on_battle_ended(victory: bool) -> void:
 		await get_tree().create_timer(3.0).timeout
 		# For now, return to main menu or reload
 		get_tree().change_scene_to_file("res://scenes/main/Main.tscn")
+
+func _show_victory_screen() -> void:
+	"""Display victory screen with Accept button"""
+	# Create victory panel
+	victory_panel = PanelContainer.new()
+	victory_panel.name = "VictoryPanel"
+
+	# Set up styling
+	var style = StyleBoxFlat.new()
+	style.bg_color = Color(0.1, 0.1, 0.15, 0.95)
+	style.border_width_left = 3
+	style.border_width_top = 3
+	style.border_width_right = 3
+	style.border_width_bottom = 3
+	style.border_color = Color(0.8, 0.7, 0.3, 1.0)  # Gold border
+	victory_panel.add_theme_stylebox_override("panel", style)
+
+	# Position it in center of screen
+	victory_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER, Control.PRESET_MODE_MINSIZE)
+	victory_panel.custom_minimum_size = Vector2(500, 450)
+	victory_panel.size = Vector2(500, 450)
+	victory_panel.position = Vector2(-250, -225)  # Center the 500x450 panel
+
+	# Create vertical box for content
+	var vbox = VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 20)
+	victory_panel.add_child(vbox)
+
+	# Add some padding
+	var margin = MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 40)
+	margin.add_theme_constant_override("margin_top", 40)
+	margin.add_theme_constant_override("margin_right", 40)
+	margin.add_theme_constant_override("margin_bottom", 40)
+	vbox.add_child(margin)
+
+	var content_vbox = VBoxContainer.new()
+	content_vbox.add_theme_constant_override("separation", 15)
+	margin.add_child(content_vbox)
+
+	# Title label
+	var title_label = Label.new()
+	title_label.text = "VICTORY!"
+	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title_label.add_theme_font_size_override("font_size", 32)
+	title_label.add_theme_color_override("font_color", Color(0.9, 0.8, 0.3, 1.0))
+	content_vbox.add_child(title_label)
+
+	# Get rewards data from battle manager
+	var rewards = battle_mgr.battle_rewards
+
+	# Rewards display
+	var rewards_scroll = ScrollContainer.new()
+	rewards_scroll.custom_minimum_size = Vector2(400, 200)
+	content_vbox.add_child(rewards_scroll)
+
+	var rewards_vbox = VBoxContainer.new()
+	rewards_vbox.add_theme_constant_override("separation", 5)
+	rewards_scroll.add_child(rewards_vbox)
+
+	# CREDS (changed from Credits)
+	if rewards.get("creds", 0) > 0:
+		var creds_label = Label.new()
+		creds_label.text = "CREDS: +%d" % rewards.creds
+		creds_label.add_theme_color_override("font_color", Color(0.9, 0.9, 0.5, 1.0))
+		rewards_vbox.add_child(creds_label)
+
+	# Level Growth - Show LXP for all members who received it
+	var lxp_awarded = rewards.get("lxp_awarded", {})
+	print("[Battle] lxp_awarded: %s" % lxp_awarded)
+
+	if not lxp_awarded.is_empty():
+		var lxp_header = Label.new()
+		lxp_header.text = "\nLevel Growth:"
+		lxp_header.add_theme_color_override("font_color", Color(0.7, 0.9, 0.7, 1.0))
+		rewards_vbox.add_child(lxp_header)
+
+		# Show all members who got XP (they were in the battle)
+		for member_id in lxp_awarded.keys():
+			var xp_amount = lxp_awarded[member_id]
+			var display_name = _get_member_display_name(member_id)
+			var member_label = Label.new()
+			member_label.text = "  %s: +%d LXP" % [display_name, xp_amount]
+			rewards_vbox.add_child(member_label)
+
+	# Sigil Growth - Show each sigil individually with names
+	var gxp_awarded = rewards.get("gxp_awarded", {})
+	if not gxp_awarded.is_empty():
+		var gxp_header = Label.new()
+		gxp_header.text = "\nSigil Growth:"
+		gxp_header.add_theme_color_override("font_color", Color(0.7, 0.7, 0.9, 1.0))
+		rewards_vbox.add_child(gxp_header)
+
+		var sigil_sys = get_node_or_null("/root/aSigilSystem")
+		for sigil_inst_id in gxp_awarded.keys():
+			var gxp_amount = gxp_awarded[sigil_inst_id]
+			var sigil_name = "Unknown Sigil"
+			if sigil_sys and sigil_sys.has_method("get_display_name_for"):
+				sigil_name = sigil_sys.get_display_name_for(sigil_inst_id)
+
+			var sigil_label = Label.new()
+			sigil_label.text = "  %s: +%d GXP" % [sigil_name, gxp_amount]
+			rewards_vbox.add_child(sigil_label)
+
+	# Affinity Growth - Show AXP for each pair
+	var axp_awarded = rewards.get("axp_awarded", {})
+	if not axp_awarded.is_empty():
+		var axp_header = Label.new()
+		axp_header.text = "\nAffinity Growth:"
+		axp_header.add_theme_color_override("font_color", Color(0.9, 0.7, 0.7, 1.0))
+		rewards_vbox.add_child(axp_header)
+
+		for pair_key in axp_awarded.keys():
+			var axp_amount = axp_awarded[pair_key]
+
+			# Split pair key back into member IDs
+			var members = pair_key.split("|")
+			if members.size() != 2:
+				continue
+
+			var name_a = _get_member_display_name(members[0])
+			var name_b = _get_member_display_name(members[1])
+
+			var axp_label = Label.new()
+			axp_label.text = "  %s ↔ %s: +%d AXP" % [name_a, name_b, axp_amount]
+			rewards_vbox.add_child(axp_label)
+
+	# Items
+	var items = rewards.get("items", [])
+	if not items.is_empty():
+		var items_header = Label.new()
+		items_header.text = "\nItems Dropped:"
+		items_header.add_theme_color_override("font_color", Color(0.9, 0.7, 0.9, 1.0))
+		rewards_vbox.add_child(items_header)
+
+		for item_id in items:
+			var item_label = Label.new()
+			item_label.text = "  %s" % item_id
+			rewards_vbox.add_child(item_label)
+
+	# Battle stats
+	var stats_label = Label.new()
+	var captured = rewards.get("captured_count", 0)
+	var killed = rewards.get("killed_count", 0)
+	stats_label.text = "\nEnemies: %d captured, %d defeated" % [captured, killed]
+	stats_label.add_theme_font_size_override("font_size", 14)
+	stats_label.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7, 1.0))
+	rewards_vbox.add_child(stats_label)
+
+	# Spacer
+	var spacer = Control.new()
+	spacer.custom_minimum_size = Vector2(0, 10)
+	content_vbox.add_child(spacer)
+
+	# Accept button
+	var accept_button = Button.new()
+	accept_button.text = "Accept"
+	accept_button.custom_minimum_size = Vector2(200, 50)
+	accept_button.pressed.connect(_on_victory_accept_pressed)
+
+	# Center the button
+	var button_center = CenterContainer.new()
+	button_center.add_child(accept_button)
+	content_vbox.add_child(button_center)
+
+	# Add to scene
+	add_child(victory_panel)
+
+func _on_victory_accept_pressed() -> void:
+	"""Handle Accept button press on victory screen"""
+	print("[Battle] Victory accepted - returning to overworld")
+	if victory_panel:
+		victory_panel.queue_free()
+		victory_panel = null
+	battle_mgr.return_to_overworld()
+
+func _get_member_display_name(member_id: String) -> String:
+	"""Get display name for a party member"""
+	# Check combatants first for display names from battle
+	for combatant in battle_mgr.combatants:
+		if combatant.get("id", "") == member_id:
+			return combatant.get("display_name", member_id)
+
+	# Fallback to member_id
+	return member_id
 
 ## ═══════════════════════════════════════════════════════════════
 ## COMBATANT DISPLAY
@@ -206,10 +394,12 @@ func _create_combatant_slot(combatant: Dictionary, is_ally: bool) -> PanelContai
 	panel.set_meta("combatant_id", combatant.id)
 	panel.set_meta("is_ally", is_ally)
 
-	# Make enemy panels clickable for targeting
+	# Make panels clickable for targeting
+	panel.mouse_filter = Control.MOUSE_FILTER_PASS
 	if not is_ally:
-		panel.mouse_filter = Control.MOUSE_FILTER_PASS
 		panel.gui_input.connect(_on_enemy_panel_input.bind(combatant))
+	else:
+		panel.gui_input.connect(_on_ally_panel_input.bind(combatant))
 
 	return panel
 
@@ -302,9 +492,13 @@ func _execute_attack(target: Dictionary) -> void:
 
 			# Apply damage
 			target.hp -= damage
-			if target.hp < 0:
+			if target.hp <= 0:
 				target.hp = 0
 				target.is_ko = true
+
+				# Record kill for morality system (if enemy)
+				if not target.get("is_ally", false):
+					battle_mgr.record_enemy_defeat(target, false)  # false = kill
 
 			# Record weakness hits AFTER damage (only if target still alive)
 			if not target.is_ko and (weapon_weakness_hit or crit_weakness_hit):
@@ -406,6 +600,7 @@ func _on_skill_pressed() -> void:
 
 			skill_menu.append({
 				"sigil_name": sigil_name,
+				"sigil_inst_id": sigil_inst,  # Track which sigil this skill comes from
 				"skill_id": skill_id,
 				"skill_data": skill_data,
 				"can_afford": can_afford
@@ -419,13 +614,256 @@ func _on_skill_pressed() -> void:
 	_show_skill_menu(skill_menu)
 
 func _on_item_pressed() -> void:
-	"""Handle Item/Type Switch action"""
-	# Check if this is the hero
-	if current_combatant.id == "hero":
-		_show_mind_type_menu()
+	"""Handle Item action - show usable items menu"""
+	var inventory = get_node_or_null("/root/aInventorySystem")
+	if not inventory:
+		log_message("Inventory system not available!")
+		return
+
+	# Get all consumable items player has
+	var item_counts = inventory.get_counts_dict()
+	var item_defs = inventory.get_item_defs()
+	var usable_items: Array = []
+
+	for item_id in item_counts:
+		var count = item_counts[item_id]
+		if count <= 0:
+			continue
+
+		# Skip if item_id is invalid
+		if item_id == null:
+			continue
+
+		var item_id_str = str(item_id)  # Use str() which is safer than String()
+		if item_id_str == "":
+			continue
+
+		var item_def = item_defs.get(item_id, {})
+		var use_type = item_def.get("use_type", "")
+		if use_type == null:
+			use_type = ""
+		use_type = str(use_type)
+
+		var category = item_def.get("category", "")
+		if category == null:
+			category = ""
+		category = str(category)
+
+		# Include items that can be used in battle (use_type = "battle" or "both")
+		# Exclude bind items (those are for Capture button)
+		if use_type in ["battle", "both"] and category != "Battle Items":
+			var desc = item_def.get("short_description", "")
+			if desc == null:
+				desc = ""
+			desc = str(desc)
+
+			var item_name = item_def.get("name", "")
+			if item_name == null or item_name == "":
+				item_name = item_id_str
+			item_name = str(item_name)
+
+			var targeting = item_def.get("targeting", "Ally")
+			if targeting == null:
+				targeting = "Ally"
+			targeting = str(targeting)
+
+			usable_items.append({
+				"id": item_id_str,
+				"name": item_name,
+				"display_name": item_name,
+				"description": desc,
+				"count": count,
+				"targeting": targeting,
+				"item_def": item_def
+			})
+
+	if usable_items.is_empty():
+		log_message("No usable items!")
+		return
+
+	# Show item selection menu
+	_show_item_menu(usable_items)
+
+func _on_capture_pressed() -> void:
+	"""Handle Capture action - show bind item selection menu"""
+	var inventory = get_node_or_null("/root/aInventorySystem")
+	if not inventory:
+		log_message("Inventory system not available!")
+		return
+
+	# Find available bind items
+	var bind_items: Array = []
+	var bind_ids = ["BIND_001", "BIND_002", "BIND_003", "BIND_004", "BIND_005"]
+
+	for bind_id in bind_ids:
+		var count = inventory.get_count(bind_id)
+		if count > 0:
+			var item_def = inventory.get_item_def(bind_id)
+
+			# Debug: Check what fields are available in item_def
+			print("[Battle] Bind item %s fields: %s" % [bind_id, item_def.keys()])
+			print("[Battle] Bind item %s capture_mod raw value: %s" % [bind_id, item_def.get("capture_mod", "NOT_FOUND")])
+
+			var desc = item_def.get("short_description", "")
+			if desc == null:
+				desc = ""
+			desc = str(desc)
+
+			var bind_name = item_def.get("name", "")
+			if bind_name == null or bind_name == "":
+				bind_name = bind_id
+			bind_name = str(bind_name)
+
+			var capture_mod_raw = item_def.get("capture_mod", 0)
+			var capture_mod_val = int(capture_mod_raw) if capture_mod_raw != null else 0
+			print("[Battle] Bind item %s final capture_mod: %d" % [bind_id, capture_mod_val])
+
+			bind_items.append({
+				"id": str(bind_id),
+				"name": bind_name,
+				"display_name": bind_name,
+				"description": desc,
+				"capture_mod": capture_mod_val,
+				"count": count,
+				"item_def": item_def
+			})
+
+	if bind_items.is_empty():
+		log_message("No bind items available!")
+		return
+
+	# Show bind selection menu
+	_show_capture_menu(bind_items)
+
+func _execute_capture(target: Dictionary) -> void:
+	"""Execute capture attempt on selected target"""
+	awaiting_target_selection = false
+	awaiting_capture_target = false
+	_clear_target_highlights()
+
+	# Get the bind item that was selected
+	var bind_data = get_meta("pending_capture_bind", {})
+	if bind_data.is_empty():
+		log_message("Capture failed - no bind selected!")
+		return
+
+	print("[Battle] bind_data contents: %s" % bind_data)
+	var bind_id: String = bind_data.id
+	var bind_name: String = bind_data.name
+	var capture_mod: int = bind_data.capture_mod
+	print("[Battle] Extracted capture_mod value: %d" % capture_mod)
+
+	# Calculate capture chance
+	var capture_result = combat_resolver.calculate_capture_chance(target, {"item_mod": capture_mod})
+	var capture_chance: float = capture_result.chance
+	print("[Battle] Capture calculation result: %s" % capture_result)
+
+	log_message("%s uses %s on %s!" % [current_combatant.display_name, bind_name, target.display_name])
+	log_message("  Capture chance: %.1f%%" % capture_chance)
+
+	# Attempt capture
+	var success = combat_resolver.attempt_capture(target, capture_chance)
+
+	# Consume the bind item
+	var inventory = get_node("/root/aInventorySystem")
+	inventory.remove_item(bind_id, 1)
+
+	if success:
+		# Capture successful!
+		target.is_captured = true
+		target.is_ko = true  # Remove from battle like KO
+		log_message("  → SUCCESS! %s was captured!" % target.display_name)
+
+		# Record capture for morality system
+		battle_mgr.record_enemy_defeat(target, true)  # true = capture
+
+		# Add captured enemy to collection
+		_add_captured_enemy(target)
+
+		# Animate turn cell - turn it green
+		if turn_order_display and turn_order_display.has_method("animate_capture"):
+			turn_order_display.animate_capture(target.id)
+
+		# Update display
+		_update_combatant_displays()
+
+		# Check if battle is over (after capture)
+		print("[Battle] Checking if battle ended after capture...")
+		var battle_ended = await battle_mgr._check_battle_end()
+		print("[Battle] Battle end check result: %s" % battle_ended)
+		if battle_ended:
+			print("[Battle] Battle ended - skipping end turn")
+			return  # Battle ended
 	else:
-		log_message("Items not yet implemented")
-		# TODO: Show item menu
+		# Capture failed
+		log_message("  → FAILED! %s broke free!" % target.display_name)
+
+	# End turn
+	battle_mgr.end_turn()
+
+func _execute_item_usage(target: Dictionary) -> void:
+	"""Execute item usage on selected target"""
+	awaiting_target_selection = false
+	awaiting_item_target = false
+	_clear_target_highlights()
+
+	# Get the item that was selected
+	if selected_item.is_empty():
+		log_message("Item usage failed - no item selected!")
+		return
+
+	var item_id: String = selected_item.id
+	var item_name: String = selected_item.name
+	var item_def: Dictionary = selected_item.item_def
+
+	log_message("%s uses %s on %s!" % [current_combatant.display_name, item_name, target.display_name])
+
+	# Apply item effects based on battle_status_effect
+	var effect: String = String(item_def.get("battle_status_effect", ""))
+
+	if "Heal" in effect:
+		# Parse heal amount from effect string (e.g., "Heal 50 HP")
+		var hp_heal = 0
+		var mp_heal = 0
+
+		if "HP" in effect:
+			# Extract number before "HP"
+			var regex = RegEx.new()
+			regex.compile("(\\d+)\\s*HP")
+			var result = regex.search(effect)
+			if result:
+				hp_heal = int(result.get_string(1))
+
+		if "MP" in effect:
+			# Extract number before "MP"
+			var regex = RegEx.new()
+			regex.compile("(\\d+)\\s*MP")
+			var result = regex.search(effect)
+			if result:
+				mp_heal = int(result.get_string(1))
+
+		# Apply healing
+		if hp_heal > 0:
+			var old_hp = target.hp
+			target.hp = min(target.hp + hp_heal, target.hp_max)
+			var actual_heal = target.hp - old_hp
+			log_message("  → Restored %d HP!" % actual_heal)
+
+		if mp_heal > 0:
+			var old_mp = target.mp
+			target.mp = min(target.mp + mp_heal, target.mp_max)
+			var actual_heal = target.mp - old_mp
+			log_message("  → Restored %d MP!" % actual_heal)
+
+		# Update displays
+		_update_combatant_displays()
+
+	# Consume the item
+	var inventory = get_node("/root/aInventorySystem")
+	inventory.remove_item(item_id, 1)
+
+	# End turn
+	battle_mgr.end_turn()
 
 func _on_defend_pressed() -> void:
 	"""Handle Defend action"""
@@ -473,7 +911,7 @@ func _calculate_run_chance() -> float:
 	"""Calculate run chance based on enemy HP percentage and level difference"""
 	const BASE_RUN_CHANCE: float = 50.0
 	const MAX_HP_BONUS: float = 40.0
-	const MAX_LEVEL_BONUS: float = 20.0
+	const _MAX_LEVEL_BONUS: float = 20.0  # Reserved for future level-based calculations
 	const LEVEL_BONUS_PER_LEVEL: float = 2.0
 
 	# Calculate enemy HP percentage bonus (0-40%)
@@ -531,7 +969,13 @@ func _on_enemy_panel_input(event: InputEvent, target: Dictionary) -> void:
 			if awaiting_target_selection:
 				# Check if this target is valid
 				if target in target_candidates:
-					if awaiting_skill_selection:
+					if awaiting_capture_target:
+						# Attempting capture
+						await _execute_capture(target)
+					elif awaiting_item_target:
+						# Using an item
+						_execute_item_usage(target)
+					elif awaiting_skill_selection:
 						# Using a skill
 						_clear_target_highlights()
 						awaiting_target_selection = false
@@ -542,8 +986,19 @@ func _on_enemy_panel_input(event: InputEvent, target: Dictionary) -> void:
 						# Regular attack
 						_execute_attack(target)
 
+func _on_ally_panel_input(event: InputEvent, target: Dictionary) -> void:
+	"""Handle clicks on ally panels (for item targeting)"""
+	if event is InputEventMouseButton:
+		var mb_event = event as InputEventMouseButton
+		if mb_event.pressed and mb_event.button_index == MOUSE_BUTTON_LEFT:
+			if awaiting_target_selection and awaiting_item_target:
+				# Check if this target is valid
+				if target in target_candidates:
+					_execute_item_usage(target)
+
 func _highlight_target_candidates() -> void:
 	"""Highlight valid targets with a visual indicator"""
+	# Highlight enemies
 	for child in enemy_slots.get_children():
 		var combatant_id = child.get_meta("combatant_id", "")
 		var is_candidate = target_candidates.any(func(c): return c.id == combatant_id)
@@ -559,9 +1014,28 @@ func _highlight_target_candidates() -> void:
 			style.border_color = Color(1.0, 1.0, 0.0, 1.0)  # Yellow highlight
 			child.add_theme_stylebox_override("panel", style)
 
+	# Highlight allies (for items)
+	for child in ally_slots.get_children():
+		var combatant_id = child.get_meta("combatant_id", "")
+		var is_candidate = target_candidates.any(func(c): return c.id == combatant_id)
+
+		if is_candidate:
+			# Add green border to indicate targetable ally
+			var style = StyleBoxFlat.new()
+			style.bg_color = Color(0.2, 0.3, 0.2, 0.9)
+			style.border_width_left = 4
+			style.border_width_right = 4
+			style.border_width_top = 4
+			style.border_width_bottom = 4
+			style.border_color = Color(0.0, 1.0, 0.0, 1.0)  # Green highlight
+			child.add_theme_stylebox_override("panel", style)
+
 func _clear_target_highlights() -> void:
 	"""Remove targeting highlights from all panels"""
 	for child in enemy_slots.get_children():
+		# Reset to default panel style
+		child.remove_theme_stylebox_override("panel")
+	for child in ally_slots.get_children():
 		# Reset to default panel style
 		child.remove_theme_stylebox_override("panel")
 
@@ -622,9 +1096,13 @@ func _execute_enemy_ai() -> void:
 
 			# Apply damage
 			target.hp -= damage
-			if target.hp < 0:
+			if target.hp <= 0:
 				target.hp = 0
 				target.is_ko = true
+
+				# Record kill for morality system (if enemy)
+				if not target.get("is_ally", false):
+					battle_mgr.record_enemy_defeat(target, false)  # false = kill
 
 			# Record weakness hits AFTER damage (only if target still alive)
 			if not target.is_ko and (weapon_weakness_hit or crit_weakness_hit):
@@ -920,9 +1398,214 @@ func _close_skill_menu() -> void:
 	# Show action menu again
 	action_menu.visible = true
 
+## ═══════════════════════════════════════════════════════════════
+## ITEM MENU
+## ═══════════════════════════════════════════════════════════════
+
+func _show_item_menu(items: Array) -> void:
+	"""Show item selection menu"""
+	# Hide action menu
+	action_menu.visible = false
+
+	# Create item menu panel
+	item_menu_panel = PanelContainer.new()
+	item_menu_panel.custom_minimum_size = Vector2(400, 0)
+
+	# Style the panel
+	var style = StyleBoxFlat.new()
+	style.bg_color = Color(0.1, 0.1, 0.15, 0.95)
+	style.border_width_left = 2
+	style.border_width_right = 2
+	style.border_width_top = 2
+	style.border_width_bottom = 2
+	style.border_color = Color(0.5, 0.5, 0.6, 1.0)
+	item_menu_panel.add_theme_stylebox_override("panel", style)
+
+	# Create VBox for menu items
+	var vbox = VBoxContainer.new()
+	item_menu_panel.add_child(vbox)
+
+	# Title
+	var title = Label.new()
+	title.text = "Select an Item"
+	title.add_theme_font_size_override("font_size", 18)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(title)
+
+	# Add separator
+	var sep1 = HSeparator.new()
+	vbox.add_child(sep1)
+
+	# Add item buttons
+	for i in range(items.size()):
+		var item_data = items[i]
+		var item_name = str(item_data.get("name", "Unknown"))
+		var item_desc = str(item_data.get("description", ""))
+		var item_count = int(item_data.get("count", 0))
+
+		var button = Button.new()
+		button.text = "%s (x%d)\n%s" % [item_name, item_count, item_desc]
+		button.custom_minimum_size = Vector2(380, 50)
+		button.pressed.connect(_on_item_selected.bind(item_data))
+		vbox.add_child(button)
+
+	# Add cancel button
+	var sep2 = HSeparator.new()
+	vbox.add_child(sep2)
+
+	var cancel_btn = Button.new()
+	cancel_btn.text = "Cancel"
+	cancel_btn.custom_minimum_size = Vector2(380, 40)
+	cancel_btn.pressed.connect(_close_item_menu)
+	vbox.add_child(cancel_btn)
+
+	# Add to scene and center
+	add_child(item_menu_panel)
+	item_menu_panel.position = Vector2(
+		(get_viewport_rect().size.x - 400) / 2,
+		(get_viewport_rect().size.y - vbox.size.y) / 2
+	)
+
+func _close_item_menu() -> void:
+	"""Close the item menu"""
+	if item_menu_panel:
+		item_menu_panel.queue_free()
+		item_menu_panel = null
+
+	# Show action menu again
+	action_menu.visible = true
+
+func _on_item_selected(item_data: Dictionary) -> void:
+	"""Handle item selection from menu"""
+	_close_item_menu()
+
+	# Store selected item
+	selected_item = item_data
+
+	var targeting = str(item_data.get("targeting", "Ally"))
+	log_message("Using %s - select target..." % str(item_data.get("name", "item")))
+
+	# Determine target candidates
+	if targeting == "Ally":
+		var allies = battle_mgr.get_ally_combatants()
+		target_candidates = allies.filter(func(a): return not a.is_ko)
+	else:  # Enemy
+		var enemies = battle_mgr.get_enemy_combatants()
+		target_candidates = enemies.filter(func(e): return not e.is_ko)
+
+	if target_candidates.is_empty():
+		log_message("No valid targets!")
+		return
+
+	# Enable target selection mode
+	awaiting_target_selection = true
+	awaiting_item_target = true
+	_highlight_target_candidates()
+
+## ═══════════════════════════════════════════════════════════════
+## CAPTURE/BIND MENU
+## ═══════════════════════════════════════════════════════════════
+
+func _show_capture_menu(bind_items: Array) -> void:
+	"""Show bind item selection menu for capture"""
+	# Hide action menu
+	action_menu.visible = false
+
+	# Create capture menu panel
+	capture_menu_panel = PanelContainer.new()
+	capture_menu_panel.custom_minimum_size = Vector2(400, 0)
+
+	# Style the panel
+	var style = StyleBoxFlat.new()
+	style.bg_color = Color(0.1, 0.1, 0.15, 0.95)
+	style.border_width_left = 2
+	style.border_width_right = 2
+	style.border_width_top = 2
+	style.border_width_bottom = 2
+	style.border_color = Color(0.5, 0.5, 0.6, 1.0)
+	capture_menu_panel.add_theme_stylebox_override("panel", style)
+
+	# Create VBox for menu items
+	var vbox = VBoxContainer.new()
+	capture_menu_panel.add_child(vbox)
+
+	# Title
+	var title = Label.new()
+	title.text = "Select a Bind Device"
+	title.add_theme_font_size_override("font_size", 18)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(title)
+
+	# Add separator
+	var sep1 = HSeparator.new()
+	vbox.add_child(sep1)
+
+	# Add bind item buttons
+	for i in range(bind_items.size()):
+		var bind_data = bind_items[i]
+		var bind_name = str(bind_data.get("name", "Unknown"))
+		var bind_desc = str(bind_data.get("description", ""))
+		var bind_count = int(bind_data.get("count", 0))
+		var capture_mod = int(bind_data.get("capture_mod", 0))
+
+		var button = Button.new()
+		button.text = "%s (x%d) [+%d%%]\n%s" % [bind_name, bind_count, capture_mod, bind_desc]
+		button.custom_minimum_size = Vector2(380, 50)
+		button.pressed.connect(_on_bind_selected.bind(bind_data))
+		vbox.add_child(button)
+
+	# Add cancel button
+	var sep2 = HSeparator.new()
+	vbox.add_child(sep2)
+
+	var cancel_btn = Button.new()
+	cancel_btn.text = "Cancel"
+	cancel_btn.custom_minimum_size = Vector2(380, 40)
+	cancel_btn.pressed.connect(_close_capture_menu)
+	vbox.add_child(cancel_btn)
+
+	# Add to scene and center
+	add_child(capture_menu_panel)
+	capture_menu_panel.position = Vector2(
+		(get_viewport_rect().size.x - 400) / 2,
+		(get_viewport_rect().size.y - vbox.size.y) / 2
+	)
+
+func _close_capture_menu() -> void:
+	"""Close the capture menu"""
+	if capture_menu_panel:
+		capture_menu_panel.queue_free()
+		capture_menu_panel = null
+
+	# Show action menu again
+	action_menu.visible = true
+
+func _on_bind_selected(bind_data: Dictionary) -> void:
+	"""Handle bind item selection from capture menu"""
+	_close_capture_menu()
+
+	log_message("Using %s (x%d) - select target..." % [bind_data.name, bind_data.count])
+
+	# Get alive enemies
+	var enemies = battle_mgr.get_enemy_combatants()
+	target_candidates = enemies.filter(func(e): return not e.is_ko and not e.get("is_captured", false))
+
+	if target_candidates.is_empty():
+		log_message("No valid targets to capture!")
+		return
+
+	# Store selected bind for use after target selection
+	set_meta("pending_capture_bind", bind_data)
+
+	# Enable capture target selection mode
+	awaiting_target_selection = true
+	awaiting_capture_target = true
+	_highlight_target_candidates()
+
 func _on_skill_selected(skill_entry: Dictionary) -> void:
 	"""Handle skill selection"""
-	skill_to_use = skill_entry.skill_data
+	skill_to_use = skill_entry.skill_data.duplicate()
+	skill_to_use["_sigil_inst_id"] = skill_entry.get("sigil_inst_id", "")  # Store sigil ID for tracking
 	var skill_name = String(skill_to_use.get("name", "Unknown"))
 	var target_type = String(skill_to_use.get("target", "Enemy")).to_lower()
 
@@ -978,6 +1661,11 @@ func _execute_skill_single(target: Dictionary) -> void:
 	if current_combatant.mp < 0:
 		current_combatant.mp = 0
 
+	# Track sigil usage for bonus GXP
+	var sigil_inst_id = skill_to_use.get("_sigil_inst_id", "")
+	if sigil_inst_id != "":
+		battle_mgr.sigils_used_in_battle[sigil_inst_id] = true
+
 	log_message("%s uses %s!" % [current_combatant.display_name, skill_name])
 
 	# Check if hit
@@ -1025,13 +1713,17 @@ func _execute_skill_single(target: Dictionary) -> void:
 	)
 
 	var damage = damage_result.damage
-	var is_stumble = damage_result.is_stumble
+	var _is_stumble = damage_result.is_stumble  # Reserved for future stumble mechanics
 
 	# Apply damage
 	target.hp -= damage
-	if target.hp < 0:
+	if target.hp <= 0:
 		target.hp = 0
 		target.is_ko = true
+
+		# Record kill for morality system (if enemy)
+		if not target.get("is_ally", false):
+			battle_mgr.record_enemy_defeat(target, false)  # false = kill
 
 	# Record weakness hits AFTER damage (only if target still alive)
 	# Skills count crits and type advantages as weakness hits
@@ -1146,3 +1838,39 @@ func _switch_mind_type(new_type: String, end_turn: bool = true) -> void:
 	# End turn if requested (for Item button usage)
 	if end_turn:
 		battle_mgr.end_turn()
+
+## ═══════════════════════════════════════════════════════════════
+## CAPTURE COLLECTION
+## ═══════════════════════════════════════════════════════════════
+
+func _add_captured_enemy(enemy: Dictionary) -> void:
+	"""Add a captured enemy to the player's collection"""
+	if not gs:
+		return
+
+	# Get enemy actor_id (the base enemy type, not the battle instance id)
+	var actor_id = String(enemy.get("actor_id", ""))
+	if actor_id == "":
+		print("[Battle] Warning: Captured enemy has no actor_id!")
+		return
+
+	# Get current captured enemies list from GameState
+	var captured: Array = []
+	if gs.has_meta("captured_enemies"):
+		var meta = gs.get_meta("captured_enemies")
+		if typeof(meta) == TYPE_ARRAY:
+			captured = meta.duplicate()
+
+	# Add this enemy to the list (allows duplicates for counting)
+	captured.append({
+		"actor_id": actor_id,
+		"display_name": enemy.get("display_name", actor_id),
+		"captured_at": Time.get_datetime_string_from_system(),
+		"mind_type": enemy.get("mind_type", "none"),
+		"env_tag": enemy.get("env_tag", "Regular")
+	})
+
+	# Save back to GameState
+	gs.set_meta("captured_enemies", captured)
+
+	print("[Battle] Captured enemy added to collection: %s (Total captures: %d)" % [actor_id, captured.size()])

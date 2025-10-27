@@ -26,34 +26,101 @@ var _skill_ids: Array[String] = []
 
 func _ready() -> void:
 	_sig = get_node_or_null("/root/aSigilSystem")
-	# Softer dimmer so the game behind isn’t shouting
+	# Softer dimmer so the game behind isn't shouting
 	if _backdrop:
 		_backdrop.color = Color(0, 0, 0, 0.35)
+		_backdrop.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	# CRITICAL: Process even when tree is paused!
+	process_mode = Node.PROCESS_MODE_ALWAYS
+
+	# Ensure root stops input
 	mouse_filter = Control.MOUSE_FILTER_STOP
+
+	print("[SigilSkillMenu] _ready() called, member=%s" % _member)
+	print("[SigilSkillMenu] Tree paused: %s, process_mode: %d" % [get_tree().paused, process_mode])
+
+	# Debug: Add gui_input handler to track ANY mouse input
+	if not gui_input.is_connected(Callable(self, "_on_gui_input")):
+		gui_input.connect(Callable(self, "_on_gui_input"))
 
 	# Wire signals
 	if _sockets and not _sockets.item_selected.is_connected(Callable(self, "_on_socket_pick")):
 		_sockets.item_selected.connect(Callable(self, "_on_socket_pick"))
+		print("[SigilSkillMenu] Connected sockets.item_selected")
+
+	# IMPORTANT: Connect skills list item selection!
+	if _skills and not _skills.item_selected.is_connected(Callable(self, "_on_skill_pick")):
+		_skills.item_selected.connect(Callable(self, "_on_skill_pick"))
+		print("[SigilSkillMenu] Connected skills.item_selected")
+
 	if _btn_set and not _btn_set.pressed.is_connected(Callable(self, "_on_set_active")):
 		_btn_set.pressed.connect(Callable(self, "_on_set_active"))
+		print("[SigilSkillMenu] Connected btn_set.pressed")
+
 	if _btn_close and not _btn_close.pressed.is_connected(Callable(self, "_on_close")):
 		_btn_close.pressed.connect(Callable(self, "_on_close"))
+		print("[SigilSkillMenu] Connected btn_close.pressed")
 
+	set_process_input(true)
 	set_process_unhandled_input(true)
-	_refresh_all()
+
+	print("[SigilSkillMenu] Input processing enabled:")
+	print("  - is_processing_input: %s" % is_processing_input())
+	print("  - is_processing_unhandled_input: %s" % is_processing_unhandled_input())
+	print("  - is_inside_tree: %s" % is_inside_tree())
+	print("  - is_visible_in_tree: %s" % is_visible_in_tree())
+
+	# Only refresh if member is already set (via set_member before adding to tree)
+	if _member != "":
+		print("[SigilSkillMenu] Member already set, refreshing...")
+		_refresh_all()
+	else:
+		print("[SigilSkillMenu] Member not set yet, waiting for set_member() call")
+
+	# Force test after next frame to ensure everything is set up
+	await get_tree().process_frame
+	print("[SigilSkillMenu] After process_frame:")
+	print("  - is_processing_input: %s" % is_processing_input())
+	print("  - is_processing_unhandled_input: %s" % is_processing_unhandled_input())
+	print("  - is_visible_in_tree: %s" % is_visible_in_tree())
+	print("  - mouse_filter: %d" % mouse_filter)
+	print("  - Clicking anywhere should now show input logs...")
+
+func _on_gui_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton:
+		var mb := event as InputEventMouseButton
+		if mb.pressed:
+			print("[SigilSkillMenu] GUI INPUT: Mouse button %d at (%d, %d)" % [mb.button_index, mb.position.x, mb.position.y])
+
+func _input(event: InputEvent) -> void:
+	if event is InputEventMouseButton:
+		var mb := event as InputEventMouseButton
+		if mb.pressed:
+			print("[SigilSkillMenu] _input: Mouse button %d at (%d, %d)" % [mb.button_index, mb.position.x, mb.position.y])
 
 func _unhandled_input(e: InputEvent) -> void:
+	if e is InputEventMouseButton:
+		var mb := e as InputEventMouseButton
+		if mb.pressed:
+			print("[SigilSkillMenu] _unhandled_input: Mouse button %d at (%d, %d)" % [mb.button_index, mb.position.x, mb.position.y])
 	if e is InputEventKey and e.is_pressed() and e.keycode == KEY_ESCAPE:
 		_on_close()
 
 # Public
 func set_member(member: String) -> void:
+	print("[SigilSkillMenu] set_member(%s) called" % member)
 	_member = member
-	_refresh_all()
+	if is_inside_tree():
+		_refresh_all()
+	else:
+		print("[SigilSkillMenu] Not in tree yet, deferring refresh")
 
 # ───────────────── data refresh ─────────────────
 func _refresh_all() -> void:
+	print("[SigilSkillMenu] _refresh_all() started for member=%s" % _member)
 	_refresh_capacity_and_loadout()
+	print("[SigilSkillMenu] Capacity=%d, Loadout size=%d" % [_capacity, _loadout.size()])
 	_refresh_sockets()
 
 	if _selected_socket < 0:
@@ -64,11 +131,15 @@ func _refresh_all() -> void:
 	if _selected_socket < 0 and _capacity > 0:
 		_selected_socket = 0
 
+	print("[SigilSkillMenu] Selected socket: %d" % _selected_socket)
+
 	if _sockets and _selected_socket >= 0 and _selected_socket < _sockets.item_count:
 		_sockets.select(_selected_socket)
 		_on_socket_pick(_selected_socket)
 	else:
 		_refresh_detail("")
+
+	print("[SigilSkillMenu] _refresh_all() completed")
 
 func _refresh_capacity_and_loadout() -> void:
 	_capacity = 0
@@ -136,11 +207,18 @@ func _sigil_label(inst_id: String) -> String:
 
 
 func _on_socket_pick(index: int) -> void:
+	print("[SigilSkillMenu] _on_socket_pick(%d)" % index)
 	_selected_socket = index
 	_selected_inst = ""
 	if index >= 0 and index < _loadout.size():
 		_selected_inst = String(_loadout[index])
+	print("[SigilSkillMenu] Selected sigil instance: %s" % _selected_inst)
 	_refresh_detail(_selected_inst)
+
+func _on_skill_pick(index: int) -> void:
+	print("[SigilSkillMenu] _on_skill_pick(%d)" % index)
+	if index >= 0 and index < _skill_ids.size():
+		print("[SigilSkillMenu] Selected skill: %s" % _skill_ids[index])
 
 func _refresh_detail(inst_id: String) -> void:
 	if _skills:
@@ -230,23 +308,31 @@ func _fallback_unlocked_for_level(level: int) -> PackedStringArray:
 
 # ───────────────── actions ─────────────────
 func _on_set_active() -> void:
+	print("[SigilSkillMenu] _on_set_active() called")
 	if _skills == null or _selected_inst == "" or _sig == null:
+		print("[SigilSkillMenu] Validation failed: skills=%s, inst=%s, sig=%s" % [_skills != null, _selected_inst, _sig != null])
 		return
 	var picks: PackedInt32Array = _skills.get_selected_items()
 	if picks.size() == 0:
+		print("[SigilSkillMenu] No skill selected")
 		return
 	var idx: int = picks[0]
 	if idx < 0 or idx >= _skill_ids.size():
+		print("[SigilSkillMenu] Invalid skill index: %d" % idx)
 		return
 	var chosen: String = _skill_ids[idx]
+	print("[SigilSkillMenu] Setting active skill: %s for instance: %s" % [chosen, _selected_inst])
 
 	var ok: bool = false
 	if _sig.has_method("set_active_skill_for_instance"):
 		ok = bool(_sig.call("set_active_skill_for_instance", _selected_inst, chosen))
+		print("[SigilSkillMenu] set_active_skill_for_instance result: %s" % ok)
 	elif _sig.has_method("set_active_skill"):
 		ok = bool(_sig.call("set_active_skill", _selected_inst, chosen))
+		print("[SigilSkillMenu] set_active_skill result: %s" % ok)
 	if not ok and _sig.has_method("set_active_skill_member") and _member != "" and _selected_socket >= 0:
 		ok = bool(_sig.call("set_active_skill_member", _member, _selected_socket, chosen))
+		print("[SigilSkillMenu] set_active_skill_member result: %s" % ok)
 
 	_refresh_detail(_selected_inst)
 
@@ -254,6 +340,11 @@ func _on_set_active() -> void:
 		_sig.emit_signal("loadout_changed", _member)
 
 func _on_close() -> void:
+	print("[SigilSkillMenu] _on_close() called - closing menu")
+	print("[SigilSkillMenu] Call stack trace:")
+	var stack = get_stack()
+	for frame in stack:
+		print("  -> %s:%d in %s()" % [frame.source, frame.line, frame.function])
 	queue_free()
 
 # ───────────────── helpers ─────────────────

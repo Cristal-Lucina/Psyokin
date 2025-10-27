@@ -8,7 +8,7 @@
 ##   game systems. Acts as the central hub for save/load operations.
 ##
 ## RESPONSIBILITIES:
-##   • Player data (name, difficulty, money, perk points, alignment scores)
+##   • Player data (name, difficulty, CREDS, perk points, alignment scores)
 ##   • Party/bench roster management (max 4 active party members)
 ##   • Global flags and index tracking (tutorials, enemies, locations, lore)
 ##   • Member runtime data (HP, MP, ailments, buffs, custom fields)
@@ -80,7 +80,7 @@ const MAX_PARTY_SIZE: int = 3  # Hero + 2 active members
 # ─── Core state ──────────────────────────────────────────────
 var player_name: String = "Player"
 var difficulty: String = "Normal"
-var money: int = 0
+var creds: int = 0
 var perk_points: int = 0
 var pacifist_score: int = 0
 var bloodlust_score: int = 0
@@ -117,7 +117,7 @@ func _on_cal_advance_blocked(reason: String) -> void:
 func new_game() -> void:
 	player_name = "Player"
 	difficulty = "Normal"
-	money = 500
+	creds = 500
 	perk_points = 0
 	pacifist_score = 0
 	bloodlust_score = 0
@@ -500,6 +500,18 @@ func add_perk_points(points: int) -> void:
 	perk_points = max(0, perk_points + points)
 	emit_signal("perk_points_changed", perk_points)
 
+# ─── CREDS (currency) ─────────────────────────────────────────
+## Returns the current amount of CREDS (game currency)
+func get_creds() -> int:
+	return creds
+
+## Adds (or subtracts if negative) CREDS. Cannot go below 0
+func add_creds(amount: int) -> void:
+	if amount == 0:
+		return
+	creds = max(0, creds + amount)
+	print("[GameState] add_creds(%+d) -> total=%d" % [amount, creds])
+
 # ─── Hero start picks (for DormsSystem) ──────────────────────
 ## Stores the hero's starting class picks as metadata for DormsSystem
 func set_hero_start_picks(picks: PackedStringArray) -> void:
@@ -547,7 +559,7 @@ func save() -> Dictionary:
 
 	payload["player_name"]     = player_name
 	payload["difficulty"]      = difficulty
-	payload["money"]           = money
+	payload["creds"]           = creds
 	payload["perk_points"]     = perk_points
 	payload["pacifist_score"]  = pacifist_score
 	payload["bloodlust_score"] = bloodlust_score
@@ -662,7 +674,8 @@ func load(data: Dictionary) -> void:
 
 	player_name     = String(data.get("player_name", player_name))
 	difficulty      = String(data.get("difficulty", difficulty))
-	money           = int(data.get("money", money))
+	# Support both "creds" (new) and "money" (legacy) for backward compatibility
+	creds           = int(data.get("creds", data.get("money", creds)))
 	perk_points     = int(data.get("perk_points", perk_points))
 	pacifist_score  = int(data.get("pacifist_score", pacifist_score))
 	bloodlust_score = int(data.get("bloodlust_score", bloodlust_score))

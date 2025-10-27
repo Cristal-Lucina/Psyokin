@@ -118,6 +118,10 @@ text = "Skill"
 layout_mode = 2
 text = "Item"
 
+[node name="CaptureButton" type="Button" parent="MainLayout/BattleArena/BottomPanel/ActionMenu"]
+layout_mode = 2
+text = "Capture"
+
 [node name="DefendButton" type="Button" parent="MainLayout/BattleArena/BottomPanel/ActionMenu"]
 layout_mode = 2
 text = "Defend"
@@ -160,6 +164,7 @@ script = ExtResource("2_turn_order")
 [connection signal="pressed" from="MainLayout/BattleArena/BottomPanel/ActionMenu/AttackButton" to="." method="_on_attack_pressed"]
 [connection signal="pressed" from="MainLayout/BattleArena/BottomPanel/ActionMenu/SkillButton" to="." method="_on_skill_pressed"]
 [connection signal="pressed" from="MainLayout/BattleArena/BottomPanel/ActionMenu/ItemButton" to="." method="_on_item_pressed"]
+[connection signal="pressed" from="MainLayout/BattleArena/BottomPanel/ActionMenu/CaptureButton" to="." method="_on_capture_pressed"]
 [connection signal="pressed" from="MainLayout/BattleArena/BottomPanel/ActionMenu/DefendButton" to="." method="_on_defend_pressed"]
 [connection signal="pressed" from="MainLayout/BattleArena/BottomPanel/ActionMenu/BurstButton" to="." method="_on_burst_pressed"]
 [connection signal="pressed" from="MainLayout/BattleArena/BottomPanel/ActionMenu/RunButton" to="." method="_on_run_pressed"]

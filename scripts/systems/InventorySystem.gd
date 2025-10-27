@@ -205,22 +205,38 @@ func apply_save_blob(blob: Dictionary) -> void:
 
 ## Internal: Attempts to load item definitions from CSV files using CSVLoader
 func _try_load_defs_from_csv(force: bool=false) -> void:
+	print("[InventorySystem] _try_load_defs_from_csv(force=%s), current defs size: %d" % [force, _defs.size()])
 	if not force and not _defs.is_empty():
+		print("[InventorySystem] Skipping load - definitions already exist and force=false")
 		return
 	var loader: Node = get_node_or_null(CSV_LOADER_PATH)
 	if loader == null or not loader.has_method("load_csv"):
 		if force: print("[InventorySystem] CSV loader missing at %s" % CSV_LOADER_PATH)
 		return
 
+	# Clear CSVLoader cache if force reloading
+	if force and loader.has_method("clear_cache"):
+		print("[InventorySystem] Clearing CSVLoader cache for force reload")
+		loader.clear_cache()
+
+	print("[InventorySystem] Attempting to load CSV from paths: %s" % str(CSV_PATHS))
 	for path in CSV_PATHS:
+		print("[InventorySystem] Checking path: %s" % path)
 		if not ResourceLoader.exists(path):
+			print("[InventorySystem]   Path does not exist, skipping")
 			continue
+		print("[InventorySystem]   Path exists! Trying keys: %s" % str(CSV_ID_KEYS))
 		for key in CSV_ID_KEYS:
+			print("[InventorySystem]     Trying key: %s" % key)
 			var defs_v: Variant = loader.call("load_csv", path, key)
+			print("[InventorySystem]     Result type: %s, size: %d" % [typeof(defs_v), (defs_v as Dictionary).size() if typeof(defs_v) == TYPE_DICTIONARY else 0])
 			if typeof(defs_v) == TYPE_DICTIONARY and not (defs_v as Dictionary).is_empty():
 				_defs = defs_v as Dictionary
-				print("[InventorySystem] loaded defs from %s (key=%s) -> %d rows" % [path, key, _defs.size()])
+				print("[InventorySystem] ✓ Loaded defs from %s (key=%s) -> %d rows" % [path, key, _defs.size()])
+				# Debug: Print first few item IDs
+				var sample_ids = _defs.keys().slice(0, 5)
+				print("[InventorySystem]   Sample IDs: %s" % str(sample_ids))
 				emit_signal("items_loaded")
 				return
 	if force:
-		print("[InventorySystem] failed to load defs from CSV (tried %s)" % [", ".join(CSV_PATHS)])
+		print("[InventorySystem] ✗ Failed to load defs from CSV (tried %s)" % [", ".join(CSV_PATHS)])

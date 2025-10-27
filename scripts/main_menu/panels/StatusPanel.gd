@@ -4,7 +4,7 @@
 ##
 ## PURPOSE:
 ##   Main menu panel displaying party member HP/MP status, general game info
-##   (money, perk points, date/time), and character appearance customization.
+##   (CREDS, perk points, date/time), and character appearance customization.
 ##   Includes party management with Leader/Active/Bench sections and member swapping.
 ##
 ## RESPONSIBILITIES:
@@ -27,7 +27,7 @@
 ##   • Refresh button to update display
 ##
 ##   Right Panel:
-##   • Money counter
+##   • CREDS counter
 ##   • Perk points available
 ##   • Current date (calendar)
 ##   • Current time phase (Morning/Afternoon/Evening)
@@ -59,7 +59,7 @@
 ##   • _create_empty_slot() - Create placeholder for empty party/bench slots
 ##   • _show_member_picker() - Show popup to select bench member for swapping
 ##   • _perform_swap() - Execute member swap between active and bench
-##   • _update_summary() - Update money/perks/date/time
+##   • _update_summary() - Update CREDS/perks/date/time
 ##   • _rebuild_appearance() - Update appearance color swatches
 ##
 ## ═══════════════════════════════════════════════════════════════════════════
@@ -100,13 +100,14 @@ const LAYERS = {
 	"tool_b": {"code": "7tlb", "node_name": "ToolBSprite", "path": "7tlb"}
 }
 
-@onready var _refresh : Button        = $Root/Left/PartyHeader/RefreshBtn
-@onready var _party   : VBoxContainer = $Root/Left/PartyScroll/PartyList
-@onready var _money   : Label         = $Root/Right/InfoGrid/MoneyValue
-@onready var _perk    : Label         = $Root/Right/InfoGrid/PerkValue
-@onready var _date    : Label         = $Root/Right/InfoGrid/DateValue
-@onready var _phase   : Label         = $Root/Right/InfoGrid/PhaseValue
-@onready var _hint    : RichTextLabel = $Root/Right/HintValue
+@onready var _refresh   : Button        = $Root/Left/PartyHeader/RefreshBtn
+@onready var _party     : VBoxContainer = $Root/Left/PartyScroll/PartyList
+@onready var _creds     : Label         = $Root/Right/InfoGrid/MoneyValue
+@onready var _perk      : Label         = $Root/Right/InfoGrid/PerkValue
+@onready var _morality  : Label         = $Root/Right/InfoGrid/MoralityValue
+@onready var _date      : Label         = $Root/Right/InfoGrid/DateValue
+@onready var _phase     : Label         = $Root/Right/InfoGrid/PhaseValue
+@onready var _hint      : RichTextLabel = $Root/Right/HintValue
 
 # Character Preview UI
 @onready var character_layers = $Root/Right/CharacterPreviewBox/ViewportWrapper/CharacterLayers
@@ -651,8 +652,16 @@ func _get_party_snapshot() -> Array:
 # --------------------- Right column summary -------------------
 
 func _update_summary() -> void:
-	if _money: _money.text = _read_money()
+	if _creds: _creds.text = _read_creds()
 	if _perk:  _perk.text  = _read_perk_points()
+
+	if _morality:
+		_morality.text = _read_morality()
+		# Color the morality text based on tier
+		var morality_sys = get_node_or_null("/root/aMoralitySystem")
+		if morality_sys and morality_sys.has_method("get_tier_color"):
+			var color: Color = morality_sys.call("get_tier_color")
+			_morality.add_theme_color_override("font_color", color)
 
 	var dp: Dictionary = _read_date_phase()
 	if _date:  _date.text  = String(dp.get("date_text", "—"))
@@ -766,11 +775,11 @@ func _find_character_file(layer_key: String, variant_code: String) -> String:
 
 # --------------------- Small helpers -------------------------
 
-func _read_money() -> String:
+func _read_creds() -> String:
 	if _gs:
-		if _gs.has_method("get_money"): return str(int(_gs.call("get_money")))
+		if _gs.has_method("get_creds"): return str(int(_gs.call("get_creds")))
 		if _gs.has_method("get"):
-			var v: Variant = _gs.get("money")
+			var v: Variant = _gs.get("creds")
 			if typeof(v) in [TYPE_INT, TYPE_FLOAT]: return str(int(v))
 	return "0"
 
@@ -784,6 +793,25 @@ func _read_perk_points() -> String:
 		var gv: Variant = _gs.get("perk_points")
 		if typeof(gv) in [TYPE_INT, TYPE_FLOAT]: return str(int(gv))
 	return "0"
+
+func _read_morality() -> String:
+	var morality_sys = get_node_or_null("/root/aMoralitySystem")
+	if morality_sys:
+		var meter: int = 0
+		var tier_name: String = "Neutral"
+
+		# Get morality meter value
+		if morality_sys.has_method("get"):
+			var m_v: Variant = morality_sys.get("morality_meter")
+			if typeof(m_v) in [TYPE_INT, TYPE_FLOAT]:
+				meter = int(m_v)
+
+		# Get tier name
+		if morality_sys.has_method("get_tier_name"):
+			tier_name = String(morality_sys.call("get_tier_name"))
+
+		return "%s (%+d)" % [tier_name, meter]
+	return "Neutral (0)"
 
 func _read_date_phase() -> Dictionary:
 	var out: Dictionary = {}

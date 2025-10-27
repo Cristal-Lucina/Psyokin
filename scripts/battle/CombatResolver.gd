@@ -104,14 +104,14 @@ func get_weapon_type_description(attacker: Dictionary, defender: Dictionary) -> 
 ## HIT/EVASION CHECKS (§4.3)
 ## ═══════════════════════════════════════════════════════════════
 
-func check_physical_hit(attacker: Dictionary, defender: Dictionary, options: Dictionary = {}) -> Dictionary:
+func check_physical_hit(attacker: Dictionary, defender: Dictionary, _options: Dictionary = {}) -> Dictionary:
 	"""
 	Check if a physical attack hits
 
 	Formula: Hit% = WeaponACC + 0.25·TPO + mods
-	         Eva% = FootwearEVA + 0.15·VTL + mods
-	         Final = clamp(Hit − Eva, 5, 95)
-	         (Base accuracy increased to 90%, evasion scaling reduced for better hit rates)
+			 Eva% = FootwearEVA + 0.15·VTL + mods
+			 Final = clamp(Hit − Eva, 5, 95)
+			 (Base accuracy increased to 90%, evasion scaling reduced for better hit rates)
 
 	Returns:
 	- hit: bool (did it hit?)
@@ -166,9 +166,9 @@ func check_sigil_hit(attacker: Dictionary, defender: Dictionary, options: Dictio
 	Check if a sigil/skill hits
 
 	Formula: Hit% = SkillACC + WeaponSkillBoost + 0.25·TPO + mods
-	         Eva% = FootwearEVA + 0.15·FCS + mods
-	         Final = clamp(Hit − Eva, 5, 95)
-	         (Base skill accuracy increased to 95%, evasion scaling reduced for better hit rates)
+			 Eva% = FootwearEVA + 0.15·FCS + mods
+			 Final = clamp(Hit − Eva, 5, 95)
+			 (Base skill accuracy increased to 95%, evasion scaling reduced for better hit rates)
 
 	Returns:
 	- hit: bool
@@ -237,8 +237,8 @@ func check_critical_hit(attacker: Dictionary, options: Dictionary = {}) -> Dicti
 	Args:
 	  - attacker: Combatant dictionary with id and stats
 	  - options:
-	    - weapon_crit_bonus: int = 0 (weapon crit bonus %)
-	    - skill_crit_bonus: int = 0 (skill crit bonus %)
+		- weapon_crit_bonus: int = 0 (weapon crit bonus %)
+		- skill_crit_bonus: int = 0 (skill crit bonus %)
 
 	Returns:
 	  - crit: bool (whether it's a critical hit)
@@ -539,7 +539,7 @@ func _get_footwear_stats(member_id: String) -> Dictionary:
 ## TYPE SYSTEM
 ## ═══════════════════════════════════════════════════════════════
 
-func get_type_modifier(attacker_element: String, defender_element: String) -> float:
+func get_type_modifier(_attacker_element: String, _defender_element: String) -> float:
 	"""
 	Get TYPE modifier based on elemental matchup
 	Returns: -0.5 (resist), 0.0 (neutral), 0.25 (weakness), etc.
@@ -547,6 +547,104 @@ func get_type_modifier(attacker_element: String, defender_element: String) -> fl
 	if not mind_type_system:
 		return 0.0
 
-	# TODO: Implement type system lookup
+	# TODO: Implement type system lookup using attacker_element and defender_element
 	# For now, return neutral
 	return 0.0
+
+## ═══════════════════════════════════════════════════════════════
+## CAPTURE MECHANICS (§4.8)
+## ═══════════════════════════════════════════════════════════════
+
+const CAPTURE_HP_COEFFICIENT: float = 0.4  # k value for HP% penalty
+const STATE_BONUS_HIGH: int = 15  # Sleep, Freeze, Bound
+const STATE_BONUS_MED: int = 10   # Stunned, Fallen
+
+func calculate_capture_chance(enemy: Dictionary, options: Dictionary = {}) -> Dictionary:
+	"""
+	Calculate chance to capture an enemy
+
+	Formula (§4.8):
+	  Catch% = clamp(Base + ItemMod − EnemyResist − k·HP% + StateBonus, 0, 100)
+
+	Where:
+	  - Base = 35 (encounter default)
+	  - ItemMod = bind item modifier (+10/+25/+40/+60/+100)
+	  - EnemyResist = enemy's capture_resist value (0-60)
+	  - k = 0.4
+	  - HP% = enemy's current HP as percentage (0-100)
+	  - StateBonus = +15 for Sleep/Freeze/Bound, +10 for Stunned/Fallen
+
+	Args:
+	  - enemy: Enemy combatant dictionary
+	  - options:
+		- item_mod: int = 0 (bind item's capture modifier)
+
+	Returns:
+	  - chance: float (final capture chance, 0-100)
+	  - breakdown: Dictionary (for display/debugging)
+	"""
+
+	# Base capture chance
+	var base_chance: int = aMoralitySystem.BASE_CAPTURE_CHANCE if aMoralitySystem else 35
+
+	# Item modifier from bind
+	var item_mod: int = options.get("item_mod", 0)
+	print("[CombatResolver] Capture calculation - options: %s" % options)
+	print("[CombatResolver] Item mod from options: %d" % item_mod)
+
+	# Enemy resistance
+	var enemy_resist: int = enemy.get("capture_resist", 25)
+
+	# Calculate HP percentage
+	var current_hp: int = enemy.get("hp", 1)
+	var max_hp: int = enemy.get("hp_max", 1)  # Fixed: field is "hp_max" not "max_hp"
+	var hp_percent: float = (float(current_hp) / float(max_hp)) * 100.0
+
+	# HP penalty (lower HP = better capture chance)
+	var hp_penalty: float = CAPTURE_HP_COEFFICIENT * hp_percent
+
+	# State bonus
+	var state_bonus: int = 0
+	var status: String = enemy.get("status", "")
+
+	# High bonus states (+15)
+	if status in ["Sleep", "Freeze", "Bound"]:
+		state_bonus = STATE_BONUS_HIGH
+	# Medium bonus states (+10)
+	elif status in ["Stunned", "Fallen"]:
+		state_bonus = STATE_BONUS_MED
+
+	# Calculate final chance
+	var raw_chance: float = float(base_chance) + float(item_mod) - float(enemy_resist) - hp_penalty + float(state_bonus)
+	var final_chance: float = clamp(raw_chance, 0.0, 100.0)
+
+	print("[CombatResolver] Capture breakdown: base=%d, item_mod=%d, enemy_resist=%d, hp_percent=%.1f, hp_penalty=%.1f, state_bonus=%d" % [base_chance, item_mod, enemy_resist, hp_percent, hp_penalty, state_bonus])
+	print("[CombatResolver] Raw chance: %.1f, Final chance: %.1f" % [raw_chance, final_chance])
+
+	return {
+		"chance": final_chance,
+		"breakdown": {
+			"base": base_chance,
+			"item_mod": item_mod,
+			"enemy_resist": enemy_resist,
+			"hp_percent": hp_percent,
+			"hp_penalty": hp_penalty,
+			"state_bonus": state_bonus,
+			"status": status,
+			"raw_chance": raw_chance
+		}
+	}
+
+func attempt_capture(_enemy: Dictionary, capture_chance: float) -> bool:
+	"""
+	Roll to see if capture succeeds
+
+	Args:
+	  - _enemy: Enemy combatant dictionary (reserved for future use)
+	  - capture_chance: Capture chance % (0-100)
+
+	Returns:
+	  - bool: true if capture succeeded
+	"""
+	var roll: float = randf() * 100.0  # 0.0 - 100.0
+	return roll <= capture_chance

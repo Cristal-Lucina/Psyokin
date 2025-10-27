@@ -43,14 +43,28 @@ unique_name_in_owner = true
 layout_mode = 2
 theme_override_constants/separation = 6
 
-[node name="Scroll" type="ScrollContainer" parent="Root"]
+[node name="ContentHBox" type="HBoxContainer" parent="Root"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 280)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/separation = 20
+
+[node name="Scroll" type="ScrollContainer" parent="Root/ContentHBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(300, 280)
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 
-[node name="List" type="VBoxContainer" parent="Root/Scroll"]
+[node name="List" type="VBoxContainer" parent="Root/ContentHBox/Scroll"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_constants/separation = 6
+
+[node name="RadarContainer" type="VBoxContainer" parent="Root/ContentHBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(300, 300)
+layout_mode = 2
+size_flags_horizontal = 4
+size_flags_vertical = 4
