@@ -305,6 +305,12 @@ func _next_turn() -> void:
 			current_turn_index += 1
 			continue
 
+		# Skip if they've already acted this round (stumbled but already took their turn)
+		if combatant.get("has_acted_this_round", false):
+			print("[BattleManager] %s has already acted this round - skipping" % combatant.display_name)
+			current_turn_index += 1
+			continue
+
 		# Valid combatant found
 		_start_turn(combatant)
 		return
@@ -320,6 +326,9 @@ func _start_turn(combatant: Dictionary) -> void:
 	# Check if battle has ended before starting this turn
 	if await _check_battle_end():
 		return
+
+	# Mark this combatant as having acted this round
+	combatant.has_acted_this_round = true
 
 	current_state = BattleState.TURN_ACTIVE
 	print("[BattleManager] --- Turn: %s ---" % combatant.display_name)
@@ -363,6 +372,9 @@ func _process_round_start_effects() -> void:
 	for combatant in combatants:
 		if combatant.is_ko or combatant.is_fled:
 			continue
+
+		# Reset has_acted flag at start of each round
+		combatant.has_acted_this_round = false
 
 		# Reset weapon weakness hit counter at start of each round
 		combatant.weapon_weakness_hits = 0
@@ -537,6 +549,7 @@ func _create_ally_combatant(member_id: String, slot: int) -> Dictionary:
 		"equipment": equipment_dict,
 		"weapon_weakness_hits": 0,  # Track weapon triangle weakness hits per round
 		"changed_type_this_round": false,  # Track if player changed type this round
+		"has_acted_this_round": false,  # Track if combatant has already acted this round
 		"sigils": sigils,  # Sigil instances equipped
 		"skills": skills   # Active skill IDs for each sigil
 	}
@@ -628,7 +641,8 @@ func _create_enemy_combatant(enemy_id: String, slot: int) -> Dictionary:
 		"capture_difficulty": String(enemy_def.get("capture_tag", "None")),
 		"cred_range": String(enemy_def.get("cred_range", "0-0")),
 		"drop_table": String(enemy_def.get("item_drops", "")),
-		"weapon_weakness_hits": 0  # Track weapon triangle weakness hits per round
+		"weapon_weakness_hits": 0,  # Track weapon triangle weakness hits per round
+		"has_acted_this_round": false  # Track if combatant has already acted this round
 	}
 
 ## ═══════════════════════════════════════════════════════════════
