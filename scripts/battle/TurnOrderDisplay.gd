@@ -166,7 +166,7 @@ func _rebuild_display() -> void:
 	if turn_order.is_empty():
 		return
 
-	# Create slots for upcoming turns with fade-in animation
+	# Create slots for upcoming turns
 	var turns_to_show = min(SHOW_UPCOMING_TURNS, turn_order.size())
 
 	for i in range(turns_to_show):
@@ -175,12 +175,18 @@ func _rebuild_display() -> void:
 		turn_slots.append(slot)
 		add_child(slot)
 
-		# Start invisible and fade in
+		# Start invisible
 		slot.modulate.a = 0.0
-		var tween = create_tween()
-		tween.set_ease(Tween.EASE_OUT)
-		tween.set_trans(Tween.TRANS_CUBIC)
-		tween.tween_property(slot, "modulate:a", 1.0, 0.3)
+
+	# Wait one frame for layout to settle, then fade in all slots
+	await get_tree().process_frame
+
+	for slot in turn_slots:
+		if is_instance_valid(slot):
+			var tween = create_tween()
+			tween.set_ease(Tween.EASE_OUT)
+			tween.set_trans(Tween.TRANS_CUBIC)
+			tween.tween_property(slot, "modulate:a", 1.0, 0.3)
 
 	# Store current order for future animations
 	_store_current_order()
@@ -416,12 +422,14 @@ func update_combatant_hp(_combatant_id: String) -> void:
 	pass
 
 func animate_ko_fall(combatant_id: String) -> void:
-	"""Animate a combatant falling when KO'd - drops to bottom of screen"""
+	"""Animate a combatant falling when KO'd - drops to bottom of screen and slides others up"""
 	# Find the slot for this combatant
 	var target_slot: PanelContainer = null
-	for slot in turn_slots:
-		if slot.get_meta("combatant_id", "") == combatant_id:
-			target_slot = slot
+	var target_index: int = -1
+	for i in range(turn_slots.size()):
+		if turn_slots[i].get_meta("combatant_id", "") == combatant_id:
+			target_slot = turn_slots[i]
+			target_index = i
 			break
 
 	if not target_slot:
@@ -429,57 +437,74 @@ func animate_ko_fall(combatant_id: String) -> void:
 
 	print("[TurnOrderDisplay] Animating KO fall for %s" % combatant_id)
 
-	# Store original position in the VBoxContainer
+	# Store original position of KO'd slot
 	var original_position = target_slot.global_position
 
-	# Temporarily remove from layout system so we can animate freely
-	# Reparent to a CanvasLayer to keep it visible during animation
+	# Find all slots below this one and store their positions
+	var slots_below: Array[Dictionary] = []
+	for i in range(target_index + 1, turn_slots.size()):
+		var slot = turn_slots[i]
+		slots_below.append({
+			"slot": slot,
+			"old_position": slot.global_position
+		})
+
+	# Create canvas layer for KO'd slot animation
 	var canvas_layer = CanvasLayer.new()
 	get_tree().root.add_child(canvas_layer)
 
-	# Store parent and index for later
-	var original_parent = target_slot.get_parent()
-	var original_index = target_slot.get_index()
-
-	# Reparent to canvas layer
+	# Reparent KO'd slot to canvas layer so it can drop freely
 	target_slot.reparent(canvas_layer, false)
 	target_slot.global_position = original_position
 
+	# Remove from turn_slots array
+	turn_slots.remove_at(target_index)
+
+	# Wait one frame for VBoxContainer to reflow
+	await get_tree().process_frame
+
 	# Calculate drop distance to bottom of screen
 	var viewport_height = get_viewport_rect().size.y
-	var distance_to_bottom = viewport_height - original_position.y + 100  # Extra 100 to go off-screen
 
-	# Create falling animation
-	var tween = create_tween()
-	tween.set_ease(Tween.EASE_IN)
-	tween.set_trans(Tween.TRANS_CUBIC)
+	# Create animations
+	var tweens: Array = []
 
-	# Drop to bottom of screen
-	tween.tween_property(target_slot, "global_position:y", viewport_height + 100, KO_FALL_DURATION)
-	# Rotate while falling
-	tween.parallel().tween_property(target_slot, "rotation", deg_to_rad(25), KO_FALL_DURATION)
-	# Fade out
-	tween.parallel().tween_property(target_slot, "modulate:a", 0.0, KO_FALL_DURATION)
-	# Scale down slightly
-	tween.parallel().tween_property(target_slot, "scale", Vector2(0.7, 0.7), KO_FALL_DURATION)
+	# Animate KO'd slot dropping
+	var ko_tween = create_tween()
+	ko_tween.set_ease(Tween.EASE_IN)
+	ko_tween.set_trans(Tween.TRANS_CUBIC)
+	ko_tween.tween_property(target_slot, "global_position:y", viewport_height + 100, KO_FALL_DURATION)
+	ko_tween.parallel().tween_property(target_slot, "rotation", deg_to_rad(25), KO_FALL_DURATION)
+	ko_tween.parallel().tween_property(target_slot, "modulate:a", 0.0, KO_FALL_DURATION)
+	ko_tween.parallel().tween_property(target_slot, "scale", Vector2(0.7, 0.7), KO_FALL_DURATION)
+	tweens.append(ko_tween)
 
-	# Wait for animation to finish
-	await tween.finished
+	# Animate slots below moving up to fill the gap
+	for slot_data in slots_below:
+		var slot: PanelContainer = slot_data.slot
+		var old_pos: Vector2 = slot_data.old_position
+		var new_pos = slot.global_position
 
-	# Clean up canvas layer
+		# Temporarily set to old position
+		slot.global_position = old_pos
+
+		# Animate to new position
+		var slide_tween = create_tween()
+		slide_tween.set_ease(Tween.EASE_OUT)
+		slide_tween.set_trans(Tween.TRANS_CUBIC)
+		slide_tween.tween_property(slot, "global_position:y", new_pos.y, KO_FALL_DURATION)
+		tweens.append(slide_tween)
+
+	# Wait for all animations to finish
+	if not tweens.is_empty():
+		await tweens[0].finished
+
+	# Clean up canvas layer and KO'd slot
 	if is_instance_valid(canvas_layer):
 		canvas_layer.queue_free()
 
-	# Check if slot is still valid (it may have been freed during turn order rebuild)
-	if not is_instance_valid(target_slot):
-		return
-
-	# Reset properties and reparent back
-	target_slot.rotation = 0
-	target_slot.scale = Vector2(1.0, 1.0)
-	target_slot.modulate.a = 1.0
-
-	# Reparent back to original parent if still valid
-	if is_instance_valid(original_parent):
-		target_slot.reparent(original_parent, false)
-		original_parent.move_child(target_slot, original_index)
+	# Reset global positions back to layout control (VBox will handle positioning)
+	for slot_data in slots_below:
+		var slot: PanelContainer = slot_data.slot
+		if is_instance_valid(slot):
+			slot.position = Vector2.ZERO  # Let VBox control position again
