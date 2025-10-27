@@ -277,7 +277,7 @@ func _wait_for_turn_order_animation() -> void:
 	"""Wait for turn order display animation to complete"""
 	# Find TurnOrderDisplay in the scene tree
 	var turn_order_display = get_tree().get_first_node_in_group("turn_order_display")
-	if not turn_order_display:
+	if not turn_order_display or not is_instance_valid(turn_order_display):
 		# No display found, just wait a frame
 		await get_tree().process_frame
 		return
@@ -493,7 +493,7 @@ func _calculate_battle_rewards() -> Dictionary:
 	rewards.items = dropped_items
 
 	# Award Creds to GameState
-	if total_creds > 0:
+	if total_creds > 0 and gs and gs.has_method("add_creds"):
 		gs.add_creds(total_creds)
 		print("[BattleManager] Awarded %d creds" % total_creds)
 
@@ -508,13 +508,15 @@ func _calculate_battle_rewards() -> Dictionary:
 	var party_sys = get_node_or_null("/root/aPartySystem")
 	if party_sys and base_xp > 0:
 		var all_members = party_sys.get_roster()
-		var active_members = gs.party  # Members in battle
+		if all_members == null:
+			all_members = []
+		var active_members = gs.party if gs.party != null else []
 
 		for member_id in all_members:
 			var xp_amount: int = 0
 			var combatant = _find_combatant_by_id(member_id)
 
-			if member_id in active_members:
+			if active_members != null and member_id in active_members:
 				# Active party member
 				if combatant and combatant.get("is_ko", false):
 					# Fainted - 50% XP
@@ -526,7 +528,7 @@ func _calculate_battle_rewards() -> Dictionary:
 				# Benched party member - 50% XP
 				xp_amount = int(base_xp * 0.5)
 
-			if xp_amount > 0:
+			if xp_amount > 0 and stats_system and stats_system.has_method("add_xp"):
 				stats_system.add_xp(member_id, xp_amount)
 				rewards.lxp_awarded[member_id] = xp_amount
 				print("[BattleManager] Awarded %d LXP to %s" % [xp_amount, member_id])
@@ -597,15 +599,21 @@ func _end_battle(victory: bool) -> void:
 		current_state = BattleState.VICTORY
 
 		# Calculate and award battle rewards
+		print("[BattleManager] Calculating battle rewards...")
 		battle_rewards = _calculate_battle_rewards()
+		print("[BattleManager] Rewards calculated successfully")
 
 		# Apply morality deltas for battle outcomes
+		print("[BattleManager] Applying morality...")
 		_apply_morality_for_battle()
+		print("[BattleManager] Morality applied")
 	else:
 		print("[BattleManager] *** DEFEAT ***")
 		current_state = BattleState.DEFEAT
 
+	print("[BattleManager] Emitting battle_ended signal...")
 	battle_ended.emit(victory)
+	print("[BattleManager] Battle ended signal emitted")
 
 func _is_all_captures() -> bool:
 	"""Check if all enemies were captured (none were killed)"""
