@@ -4,7 +4,7 @@
 ##
 ## PURPOSE:
 ##   Main menu panel displaying party member HP/MP status, general game info
-##   (money, perk points, date/time), and character appearance customization.
+##   (CREDS, perk points, date/time), and character appearance customization.
 ##   Includes party management with Leader/Active/Bench sections and member swapping.
 ##
 ## RESPONSIBILITIES:
@@ -27,7 +27,7 @@
 ##   • Refresh button to update display
 ##
 ##   Right Panel:
-##   • Money counter
+##   • CREDS counter
 ##   • Perk points available
 ##   • Current date (calendar)
 ##   • Current time phase (Morning/Afternoon/Evening)
@@ -59,7 +59,7 @@
 ##   • _create_empty_slot() - Create placeholder for empty party/bench slots
 ##   • _show_member_picker() - Show popup to select bench member for swapping
 ##   • _perform_swap() - Execute member swap between active and bench
-##   • _update_summary() - Update money/perks/date/time
+##   • _update_summary() - Update CREDS/perks/date/time
 ##   • _rebuild_appearance() - Update appearance color swatches
 ##
 ## ═══════════════════════════════════════════════════════════════════════════
@@ -102,7 +102,7 @@ const LAYERS = {
 
 @onready var _refresh : Button        = $Root/Left/PartyHeader/RefreshBtn
 @onready var _party   : VBoxContainer = $Root/Left/PartyScroll/PartyList
-@onready var _money   : Label         = $Root/Right/InfoGrid/MoneyValue
+@onready var _creds   : Label         = $Root/Right/InfoGrid/MoneyValue
 @onready var _perk    : Label         = $Root/Right/InfoGrid/PerkValue
 @onready var _date    : Label         = $Root/Right/InfoGrid/DateValue
 @onready var _phase   : Label         = $Root/Right/InfoGrid/PhaseValue
@@ -651,7 +651,7 @@ func _get_party_snapshot() -> Array:
 # --------------------- Right column summary -------------------
 
 func _update_summary() -> void:
-	if _money: _money.text = _read_money()
+	if _creds: _creds.text = _read_creds()
 	if _perk:  _perk.text  = _read_perk_points()
 
 	var dp: Dictionary = _read_date_phase()
@@ -766,11 +766,11 @@ func _find_character_file(layer_key: String, variant_code: String) -> String:
 
 # --------------------- Small helpers -------------------------
 
-func _read_money() -> String:
+func _read_creds() -> String:
 	if _gs:
-		if _gs.has_method("get_money"): return str(int(_gs.call("get_money")))
+		if _gs.has_method("get_creds"): return str(int(_gs.call("get_creds")))
 		if _gs.has_method("get"):
-			var v: Variant = _gs.get("money")
+			var v: Variant = _gs.get("creds")
 			if typeof(v) in [TYPE_INT, TYPE_FLOAT]: return str(int(v))
 	return "0"
 
