@@ -1175,6 +1175,10 @@ func _give_test_bind_items() -> void:
 		print("[Main] Cannot give test items - inventory system not available")
 		return
 
+	# Force reload inventory definitions to ensure latest CSV data
+	print("[Main] Force reloading inventory definitions...")
+	inv.load_definitions()
+
 	# Give a variety of bind items for testing capture
 	inv.add_item("BIND_001", 5)  # Weak Bind (+10 capture)
 	inv.add_item("BIND_002", 3)  # Standard Bind (+25 capture)
