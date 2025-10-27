@@ -585,17 +585,56 @@ func _roll_creds_from_range(cred_range: String, multiplier: float = 1.0) -> int:
 	return int(rolled * multiplier)
 
 func _roll_item_drop(drop_table: String, multiplier: float = 1.0) -> String:
-	"""Roll for an item drop from a drop table (placeholder implementation)"""
-	# TODO: Implement proper drop table system
-	# For now, return empty string (no drop)
-	# In a full implementation, this would look up the drop_table in a CSV
-	# and roll against drop rates
+	"""Roll for an item drop from a drop table"""
+	if drop_table == "" or drop_table == "None":
+		return ""
 
-	# Placeholder: 30% base chance, increased by multiplier
-	var drop_chance: float = 0.3 * multiplier
-	if randf() < drop_chance:
-		# Return a placeholder item (you'll need to implement proper drop tables)
-		return ""  # No drop for now
+	# Load drop table data from CSV
+	var drop_table_path = "res://data/items/drop_tables.csv"
+
+	# Check if drop tables file exists
+	if not ResourceLoader.exists(drop_table_path):
+		print("[BattleManager] Drop tables CSV not found at %s" % drop_table_path)
+		return ""
+
+	# Load the drop table CSV
+	var drop_data = csv_loader.load_csv(drop_table_path, "drop_table_id")
+	if drop_data.is_empty():
+		print("[BattleManager] Failed to load drop tables")
+		return ""
+
+	# Collect all entries for this drop table
+	var table_entries: Array = []
+	for row_key in drop_data.keys():
+		var row = drop_data[row_key]
+		var table_id = str(row.get("drop_table_id", ""))
+		if table_id == drop_table:
+			table_entries.append(row)
+
+	if table_entries.is_empty():
+		print("[BattleManager] No entries found for drop table: %s" % drop_table)
+		return ""
+
+	# Roll for each possible drop in the table
+	for entry in table_entries:
+		var item_id = str(entry.get("item_id", ""))
+		var drop_rate = float(entry.get("drop_rate", 0.0))
+		var min_qty = int(entry.get("min_qty", 1))
+		var max_qty = int(entry.get("max_qty", 1))
+
+		# Apply multiplier to drop rate (captures get better drops)
+		var final_rate = drop_rate * multiplier
+
+		# Roll for this item
+		if randf() < final_rate:
+			# Success! This item dropped
+			var qty = randi_range(min_qty, max_qty)
+			print("[BattleManager] Item drop: %s x%d (rate: %.1f%%)" % [item_id, qty, final_rate * 100])
+
+			# For now, return just the item_id (quantity handling can be added later)
+			return item_id
+
+	# No items dropped
 	return ""
 
 func _end_battle(victory: bool) -> void:

@@ -202,11 +202,18 @@ func _show_victory_screen() -> void:
 
 	# Level Growth - Show LXP for active party members only
 	var lxp_awarded = rewards.get("lxp_awarded", {})
+	print("[Battle] lxp_awarded: %s" % lxp_awarded)
 	var active_party = gs.party if gs and gs.party else []
+	print("[Battle] active_party: %s" % active_party)
 	var active_lxp = {}
 	for member_id in lxp_awarded.keys():
+		print("[Battle] Checking member_id '%s' in active_party" % member_id)
 		if member_id in active_party:
 			active_lxp[member_id] = lxp_awarded[member_id]
+			print("[Battle] Added to active_lxp")
+		else:
+			print("[Battle] NOT in active party, skipping")
+	print("[Battle] active_lxp result: %s" % active_lxp)
 
 	if not active_lxp.is_empty():
 		var lxp_header = Label.new()
