@@ -1690,6 +1690,17 @@ func _show_item_menu(items: Array) -> void:
 	var sep1 = HSeparator.new()
 	vbox.add_child(sep1)
 
+	# Create scroll container for items (show max 5 items at a time)
+	var scroll = ScrollContainer.new()
+	scroll.custom_minimum_size = Vector2(380, min(items.size(), 5) * 55)  # 55px per item (50px button + 5px spacing)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	vbox.add_child(scroll)
+
+	# Create VBox for scrollable item buttons
+	var items_vbox = VBoxContainer.new()
+	scroll.add_child(items_vbox)
+
 	# Add item buttons
 	for i in range(items.size()):
 		var item_data = items[i]
@@ -1699,9 +1710,9 @@ func _show_item_menu(items: Array) -> void:
 
 		var button = Button.new()
 		button.text = "%s (x%d)\n%s" % [item_name, item_count, item_desc]
-		button.custom_minimum_size = Vector2(380, 50)
+		button.custom_minimum_size = Vector2(360, 50)  # Slightly smaller to account for scrollbar
 		button.pressed.connect(_on_item_selected.bind(item_data))
-		vbox.add_child(button)
+		items_vbox.add_child(button)
 
 	# Add cancel button
 	var sep2 = HSeparator.new()
@@ -1794,6 +1805,17 @@ func _show_capture_menu(bind_items: Array) -> void:
 	var sep1 = HSeparator.new()
 	vbox.add_child(sep1)
 
+	# Create scroll container for bind items (show max 5 items at a time)
+	var scroll = ScrollContainer.new()
+	scroll.custom_minimum_size = Vector2(380, min(bind_items.size(), 5) * 55)  # 55px per item (50px button + 5px spacing)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	vbox.add_child(scroll)
+
+	# Create VBox for scrollable bind item buttons
+	var items_vbox = VBoxContainer.new()
+	scroll.add_child(items_vbox)
+
 	# Add bind item buttons
 	for i in range(bind_items.size()):
 		var bind_data = bind_items[i]
@@ -1804,9 +1826,9 @@ func _show_capture_menu(bind_items: Array) -> void:
 
 		var button = Button.new()
 		button.text = "%s (x%d) [+%d%%]\n%s" % [bind_name, bind_count, capture_mod, bind_desc]
-		button.custom_minimum_size = Vector2(380, 50)
+		button.custom_minimum_size = Vector2(360, 50)  # Slightly smaller to account for scrollbar
 		button.pressed.connect(_on_bind_selected.bind(bind_data))
-		vbox.add_child(button)
+		items_vbox.add_child(button)
 
 	# Add cancel button
 	var sep2 = HSeparator.new()
