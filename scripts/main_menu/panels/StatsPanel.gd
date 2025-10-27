@@ -143,10 +143,7 @@ func _rebuild_list_only() -> void:
 	_add_spacer_row()
 
 	# Stats header + rows
-	if is_hero:
-		_add_header_row3("Stat", "Level", "SXP / Fatigued")
-	else:
-		_add_header_row2("Stat", "Level")
+	_add_header_row2("Stat", "Level")
 
 	var keys: Array[String] = []
 	for k in data.keys(): keys.append(String(k))
@@ -155,39 +152,14 @@ func _rebuild_list_only() -> void:
 	for key in keys:
 		var entry_v: Variant = data.get(key)
 		var level: int = 0
-		var sxp: int = 0
-		var fatigue_txt := "false"  # default
 
 		if typeof(entry_v) == TYPE_DICTIONARY:
 			var entry: Dictionary = entry_v
 			level = int(entry.get("level", entry.get("lvl", 0)))
-
-			if is_hero:
-				# Prefer the true boolean when present
-				if entry.has("fatigued"):
-					var fb: Variant = entry["fatigued"]
-					fatigue_txt = "true" if (typeof(fb) == TYPE_BOOL and fb) else "false"
-				elif entry.has("fatigue"):
-					# Legacy alias is a number: weekly SXP (not the boolean state). Fall back to threshold.
-					var fv: Variant = entry["fatigue"]
-					if typeof(fv) in [TYPE_INT, TYPE_FLOAT]:
-						fatigue_txt = "true" if int(fv) >= FATIGUE_THRESHOLD_PER_WEEK else "false"
-				elif entry.has("weekly"):
-					var wv: Variant = entry["weekly"]
-					if typeof(wv) in [TYPE_INT, TYPE_FLOAT]:
-						fatigue_txt = "true" if int(wv) >= FATIGUE_THRESHOLD_PER_WEEK else "false"
-
-				# SXP for display (best-effort)
-				sxp = int(entry.get("sxp", entry.get("xp", 0)))
-
 		elif typeof(entry_v) in [TYPE_INT, TYPE_FLOAT]:
 			level = int(entry_v)
 
-		if is_hero:
-			var right := "%d / %s" % [sxp, fatigue_txt]
-			_add_row3(String(key).capitalize(), str(level), right)
-		else:
-			_add_row2(String(key).capitalize(), str(level))
+		_add_row2(String(key).capitalize(), str(level))
 
 	# Add Affinity (AXP) section
 	_add_spacer_row()
@@ -477,7 +449,7 @@ func _on_radar_draw() -> void:
 
 func _draw_pentagon_radar(control: Control, stat_levels: Array[float]) -> void:
 	var chart_size: Vector2 = control.size
-	var center: Vector2 = chart_size / 2.0
+	var center: Vector2 = Vector2(chart_size.x / 2.0 - 50.0, chart_size.y / 2.0)  # Shifted 50px left
 	var max_radius: float = min(chart_size.x, chart_size.y) / 2.0 - 20.0  # Padding
 
 	# Draw 10 concentric pentagons (grid layers)
