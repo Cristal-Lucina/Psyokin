@@ -1644,6 +1644,11 @@ func _show_burst_menu(burst_abilities: Array) -> void:
 	# Hide action menu
 	action_menu.visible = false
 
+	# Debug: print burst abilities
+	print("[Battle] Showing burst menu with %d abilities" % burst_abilities.size())
+	for i in range(burst_abilities.size()):
+		print("[Battle] Burst %d: %s" % [i, burst_abilities[i]])
+
 	# Create burst menu panel
 	burst_menu_panel = PanelContainer.new()
 	burst_menu_panel.custom_minimum_size = Vector2(450, 0)
@@ -1683,10 +1688,25 @@ func _show_burst_menu(burst_abilities: Array) -> void:
 	# Add burst ability buttons
 	for i in range(burst_abilities.size()):
 		var burst_data = burst_abilities[i]
-		var burst_name = String(burst_data.get("name", "Unknown"))
-		var burst_cost = int(burst_data.get("burst_cost", 50))
-		var description = String(burst_data.get("description", ""))
-		var participants = String(burst_data.get("participants", "")).split(";", false)
+
+		# Validate burst_data
+		if typeof(burst_data) != TYPE_DICTIONARY:
+			print("[Battle] ERROR: Burst data %d is not a dictionary: %s" % [i, burst_data])
+			continue
+
+		var burst_name_raw = burst_data.get("name", "Unknown")
+		var burst_name = String(burst_name_raw) if burst_name_raw != null else "Unknown"
+
+		var burst_cost_raw = burst_data.get("burst_cost", 50)
+		var burst_cost = int(burst_cost_raw) if burst_cost_raw != null else 50
+
+		var description_raw = burst_data.get("description", "")
+		var description = String(description_raw) if description_raw != null else ""
+
+		var participants_raw = burst_data.get("participants", "")
+		var participants_str = String(participants_raw) if participants_raw != null else ""
+		var participants = participants_str.split(";", false) if participants_str != "" else []
+
 		var can_afford = battle_mgr.burst_gauge >= burst_cost
 
 		var button = Button.new()
@@ -1694,7 +1714,7 @@ func _show_burst_menu(burst_abilities: Array) -> void:
 			burst_name,
 			burst_cost,
 			description,
-			", ".join(participants)
+			", ".join(participants) if participants.size() > 0 else "Solo"
 		]
 		button.custom_minimum_size = Vector2(430, 70)
 

@@ -58,13 +58,27 @@ func get_available_bursts(party_ids: Array) -> Array:
 	"""
 	var available: Array = []
 
+	print("[BurstSystem] Checking available bursts for party: %s" % party_ids)
+	print("[BurstSystem] Total burst abilities loaded: %d" % burst_abilities.size())
+
 	for burst_id in burst_abilities.keys():
 		var burst_data = burst_abilities[burst_id]
 
+		print("[BurstSystem] Checking burst: %s (data type: %s)" % [burst_id, typeof(burst_data)])
+
+		# Validate burst_data
+		if typeof(burst_data) != TYPE_DICTIONARY:
+			print("[BurstSystem] ERROR: Burst data for %s is not a dictionary!" % burst_id)
+			continue
+
 		# Check if this burst is unlocked
 		if _is_burst_unlocked(burst_data, party_ids):
+			print("[BurstSystem] Burst %s is UNLOCKED" % burst_id)
 			available.append(burst_data)
+		else:
+			print("[BurstSystem] Burst %s is LOCKED" % burst_id)
 
+	print("[BurstSystem] Total available bursts: %d" % available.size())
 	return available
 
 func _is_burst_unlocked(burst_data: Dictionary, party_ids: Array) -> bool:
