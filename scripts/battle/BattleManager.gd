@@ -1001,6 +1001,14 @@ func return_to_overworld() -> void:
 
 func _create_ally_combatant(member_id: String, slot: int) -> Dictionary:
 	"""Create a combatant dictionary for an ally"""
+	# DEBUG: Check what's in GameState.member_data before creating combatant
+	if gs and "member_data" in gs:
+		var md = gs.get("member_data")
+		if typeof(md) == TYPE_DICTIONARY and md.has(member_id):
+			print("[BattleManager] GameState.member_data[%s] BEFORE profile: %s" % [member_id, md[member_id]])
+		else:
+			print("[BattleManager] GameState.member_data does NOT have %s" % member_id)
+
 	# Build stats dictionary manually
 	var stats = {
 		"BRW": stats_system.get_member_stat_level(member_id, "BRW"),
