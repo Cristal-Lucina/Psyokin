@@ -18,11 +18,12 @@ const STATS_KEYS: Array[String] = ["BRW","MND","TPO","VTL","FCS"]
 # Fallback only (UI guess) if StatsSystem doesn't give us a 'fatigued' boolean
 const FATIGUE_THRESHOLD_PER_WEEK := 60
 
-@onready var _root_vb    : VBoxContainer = %Root
-@onready var _list       : VBoxContainer = %List
-@onready var _refresh    : Button        = %RefreshBtn
-@onready var _title      : Label         = %Title
-@onready var _member_bar : HBoxContainer = %MemberBar
+@onready var _root_vb         : VBoxContainer = %Root
+@onready var _list            : VBoxContainer = %List
+@onready var _refresh         : Button        = %RefreshBtn
+@onready var _title           : Label         = %Title
+@onready var _member_bar      : HBoxContainer = %MemberBar
+@onready var _radar_container : VBoxContainer = %RadarContainer
 
 # Radar chart for stat visualization
 var _radar_chart : Control = null
@@ -438,15 +439,17 @@ func _add_affinity_section(member_id: String) -> void:
 
 # ---------- Radar Chart ----------
 func _create_radar_chart() -> void:
+	if not _radar_container:
+		return
+
 	_radar_chart = Control.new()
 	_radar_chart.custom_minimum_size = Vector2(300, 300)
-	_radar_chart.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	_radar_chart.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_radar_chart.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_radar_chart.set_process(false)  # No need for _process, we'll redraw manually
 
-	# Insert chart after MemberBar, before Scroll
-	var member_bar_idx := _member_bar.get_index()
-	_root_vb.add_child(_radar_chart)
-	_root_vb.move_child(_radar_chart, member_bar_idx + 1)
+	# Add chart to the radar container on the right side
+	_radar_container.add_child(_radar_chart)
 
 	# Connect draw callback
 	_radar_chart.draw.connect(_on_radar_draw)

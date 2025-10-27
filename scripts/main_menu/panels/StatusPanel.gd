@@ -441,38 +441,6 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 	stats_row.add_child(mp_section)
 	vbox.add_child(stats_row)
 
-	# AXP (Affinity) Section - Show relationships with other party members
-	var member_id: String = String(member_data.get("_member_id", ""))
-	if member_id != "":
-		var affinity_relationships = _get_member_affinities(member_id)
-		if not affinity_relationships.is_empty():
-			# Add separator
-			var separator := Control.new()
-			separator.custom_minimum_size.y = 4
-			vbox.add_child(separator)
-
-			# AXP header
-			var axp_header := Label.new()
-			axp_header.text = "Affinity:"
-			axp_header.add_theme_font_size_override("font_size", 9)
-			axp_header.add_theme_color_override("font_color", Color(0.9, 0.7, 0.7, 1.0))
-			vbox.add_child(axp_header)
-
-			# List each relationship
-			for rel in affinity_relationships:
-				var rel_label := Label.new()
-				var partner_name: String = String(rel.get("partner_name", "???"))
-				var tier: int = int(rel.get("tier", 0))
-				var lifetime: int = int(rel.get("lifetime_axp", 0))
-
-				var tier_text: String = "AT%d" % tier
-				var tier_color: Color = _get_tier_color(tier)
-
-				rel_label.text = "  %s: %s (%d)" % [partner_name, tier_text, lifetime]
-				rel_label.add_theme_font_size_override("font_size", 8)
-				rel_label.add_theme_color_override("font_color", tier_color)
-				vbox.add_child(rel_label)
-
 	panel.add_child(vbox)
 	return panel
 
@@ -876,58 +844,6 @@ func _on_event_changed(_id: String) -> void:
 
 func _fmt_pair(a: int, b: int) -> String:
 	return "%d / %d" % [a, b] if a >= 0 and b > 0 else "—"
-
-func _get_member_affinities(member_id: String) -> Array:
-	"""Get all affinity relationships for a specific member"""
-	var relationships: Array = []
-	var affinity_sys = get_node_or_null("/root/aAffinitySystem")
-
-	if not affinity_sys or not affinity_sys.has_method("get_all_pair_data"):
-		return relationships
-
-	var all_pairs: Array = affinity_sys.call("get_all_pair_data")
-
-	# Get roster for name lookups
-	var roster: Dictionary = _read_roster()
-
-	for pair_data in all_pairs:
-		if typeof(pair_data) != TYPE_DICTIONARY:
-			continue
-
-		var pair_dict: Dictionary = pair_data
-		var member_a: String = String(pair_dict.get("member_a", ""))
-		var member_b: String = String(pair_dict.get("member_b", ""))
-
-		# Check if this member is in this pair
-		var partner_id: String = ""
-		if member_a == member_id:
-			partner_id = member_b
-		elif member_b == member_id:
-			partner_id = member_a
-		else:
-			continue  # This pair doesn't involve this member
-
-		# Get partner's display name
-		var partner_name: String = _label_for_id(partner_id, roster)
-
-		relationships.append({
-			"partner_id": partner_id,
-			"partner_name": partner_name,
-			"tier": int(pair_dict.get("tier", 0)),
-			"weekly_axp": int(pair_dict.get("weekly_axp", 0)),
-			"lifetime_axp": int(pair_dict.get("lifetime_axp", 0))
-		})
-
-	return relationships
-
-func _get_tier_color(tier: int) -> Color:
-	"""Get display color for affinity tier"""
-	match tier:
-		0: return Color(0.6, 0.6, 0.6)  # AT0: Gray
-		1: return Color(0.7, 0.9, 0.7)  # AT1: Light green
-		2: return Color(0.7, 0.7, 1.0)  # AT2: Light blue
-		3: return Color(1.0, 0.8, 0.3)  # AT3: Gold
-		_: return Color(0.6, 0.6, 0.6)  # Default: Gray
 
 # --------------------- Party snapshot fallbacks -------------------
 
