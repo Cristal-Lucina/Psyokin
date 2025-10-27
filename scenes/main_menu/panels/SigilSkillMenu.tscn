@@ -33,7 +33,6 @@ mouse_filter = 2
 [node name="Card" type="Panel" parent="Center"]
 custom_minimum_size = Vector2(820, 480)
 layout_mode = 2
-mouse_filter = 0
 
 [node name="CardPad" type="MarginContainer" parent="Center/Card"]
 layout_mode = 2
