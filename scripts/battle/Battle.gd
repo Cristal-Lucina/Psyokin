@@ -516,6 +516,10 @@ func _on_capture_pressed() -> void:
 		if count > 0:
 			var item_def = inventory.get_item_def(bind_id)
 
+			# Debug: Check what fields are available in item_def
+			print("[Battle] Bind item %s fields: %s" % [bind_id, item_def.keys()])
+			print("[Battle] Bind item %s capture_mod raw value: %s" % [bind_id, item_def.get("capture_mod", "NOT_FOUND")])
+
 			var desc = item_def.get("short_description", "")
 			if desc == null:
 				desc = ""
@@ -526,12 +530,16 @@ func _on_capture_pressed() -> void:
 				bind_name = bind_id
 			bind_name = str(bind_name)
 
+			var capture_mod_raw = item_def.get("capture_mod", 0)
+			var capture_mod_val = int(capture_mod_raw) if capture_mod_raw != null else 0
+			print("[Battle] Bind item %s final capture_mod: %d" % [bind_id, capture_mod_val])
+
 			bind_items.append({
 				"id": str(bind_id),
 				"name": bind_name,
 				"display_name": bind_name,
 				"description": desc,
-				"capture_mod": int(item_def.get("capture_mod", 0)),
+				"capture_mod": capture_mod_val,
 				"count": count,
 				"item_def": item_def
 			})
