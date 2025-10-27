@@ -193,28 +193,36 @@ func _show_victory_screen() -> void:
 	rewards_vbox.add_theme_constant_override("separation", 5)
 	rewards_scroll.add_child(rewards_vbox)
 
-	# Creds
+	# CREDS (changed from Credits)
 	if rewards.get("creds", 0) > 0:
 		var creds_label = Label.new()
-		creds_label.text = "Credits: +%d" % rewards.creds
+		creds_label.text = "CREDS: +%d" % rewards.creds
 		creds_label.add_theme_color_override("font_color", Color(0.9, 0.9, 0.5, 1.0))
 		rewards_vbox.add_child(creds_label)
 
-	# LXP
+	# Level Growth - Show LXP for active party members only
 	var lxp_awarded = rewards.get("lxp_awarded", {})
-	if not lxp_awarded.is_empty():
+	var active_party = gs.party if gs and gs.party else []
+	var active_lxp = {}
+	for member_id in lxp_awarded.keys():
+		if member_id in active_party:
+			active_lxp[member_id] = lxp_awarded[member_id]
+
+	if not active_lxp.is_empty():
 		var lxp_header = Label.new()
-		lxp_header.text = "\nLevel XP:"
+		lxp_header.text = "\nLevel Growth:"
 		lxp_header.add_theme_color_override("font_color", Color(0.7, 0.9, 0.7, 1.0))
 		rewards_vbox.add_child(lxp_header)
 
-		for member_id in lxp_awarded.keys():
-			var xp_amount = lxp_awarded[member_id]
+		# Get member display names
+		for member_id in active_lxp.keys():
+			var xp_amount = active_lxp[member_id]
+			var display_name = _get_member_display_name(member_id)
 			var member_label = Label.new()
-			member_label.text = "  %s: +%d XP" % [member_id, xp_amount]
+			member_label.text = "  %s: +%d LXP" % [display_name, xp_amount]
 			rewards_vbox.add_child(member_label)
 
-	# GXP
+	# Sigil Growth - Show each sigil individually with names
 	var gxp_awarded = rewards.get("gxp_awarded", {})
 	if not gxp_awarded.is_empty():
 		var gxp_header = Label.new()
@@ -222,9 +230,16 @@ func _show_victory_screen() -> void:
 		gxp_header.add_theme_color_override("font_color", Color(0.7, 0.7, 0.9, 1.0))
 		rewards_vbox.add_child(gxp_header)
 
-		var gxp_label = Label.new()
-		gxp_label.text = "  %d sigils gained +%d GXP" % [gxp_awarded.size(), gxp_awarded.values()[0] if not gxp_awarded.is_empty() else 0]
-		rewards_vbox.add_child(gxp_label)
+		var sigil_sys = get_node_or_null("/root/aSigilSystem")
+		for sigil_inst_id in gxp_awarded.keys():
+			var gxp_amount = gxp_awarded[sigil_inst_id]
+			var sigil_name = "Unknown Sigil"
+			if sigil_sys and sigil_sys.has_method("get_display_name_for"):
+				sigil_name = sigil_sys.get_display_name_for(sigil_inst_id)
+
+			var sigil_label = Label.new()
+			sigil_label.text = "  %s: +%d GXP" % [sigil_name, gxp_amount]
+			rewards_vbox.add_child(sigil_label)
 
 	# Items
 	var items = rewards.get("items", [])
@@ -274,6 +289,16 @@ func _on_victory_accept_pressed() -> void:
 		victory_panel.queue_free()
 		victory_panel = null
 	battle_mgr.return_to_overworld()
+
+func _get_member_display_name(member_id: String) -> String:
+	"""Get display name for a party member"""
+	# Check combatants first for display names from battle
+	for combatant in battle_mgr.combatants:
+		if combatant.get("id", "") == member_id:
+			return combatant.get("display_name", member_id)
+
+	# Fallback to member_id
+	return member_id
 
 ## ═══════════════════════════════════════════════════════════════
 ## COMBATANT DISPLAY
@@ -556,6 +581,7 @@ func _on_skill_pressed() -> void:
 
 			skill_menu.append({
 				"sigil_name": sigil_name,
+				"sigil_inst_id": sigil_inst,  # Track which sigil this skill comes from
 				"skill_id": skill_id,
 				"skill_data": skill_data,
 				"can_afford": can_afford
@@ -1559,7 +1585,8 @@ func _on_bind_selected(bind_data: Dictionary) -> void:
 
 func _on_skill_selected(skill_entry: Dictionary) -> void:
 	"""Handle skill selection"""
-	skill_to_use = skill_entry.skill_data
+	skill_to_use = skill_entry.skill_data.duplicate()
+	skill_to_use["_sigil_inst_id"] = skill_entry.get("sigil_inst_id", "")  # Store sigil ID for tracking
 	var skill_name = String(skill_to_use.get("name", "Unknown"))
 	var target_type = String(skill_to_use.get("target", "Enemy")).to_lower()
 
@@ -1614,6 +1641,11 @@ func _execute_skill_single(target: Dictionary) -> void:
 	current_combatant.mp -= mp_cost
 	if current_combatant.mp < 0:
 		current_combatant.mp = 0
+
+	# Track sigil usage for bonus GXP
+	var sigil_inst_id = skill_to_use.get("_sigil_inst_id", "")
+	if sigil_inst_id != "":
+		battle_mgr.sigils_used_in_battle[sigil_inst_id] = true
 
 	log_message("%s uses %s!" % [current_combatant.display_name, skill_name])
 

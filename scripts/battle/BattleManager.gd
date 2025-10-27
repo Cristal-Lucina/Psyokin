@@ -33,6 +33,7 @@ var run_attempted_this_round: bool = false  # Track if party tried to run this r
 ## Battle outcome tracking (for morality system)
 var battle_kills: Dictionary = {}  # env_tag -> count (e.g., {"Regular": 2, "Elite": 1})
 var battle_captures: Dictionary = {}  # env_tag -> count
+var sigils_used_in_battle: Dictionary = {}  # sigil_instance_id -> true (tracks which sigils had skills used)
 
 ## Combatants (both allies and enemies)
 var combatants: Array[Dictionary] = []  # List of all combatants in battle
@@ -549,10 +550,19 @@ func _calculate_battle_rewards() -> Dictionary:
 			for sigil_inst_id in sigils:
 				if sigil_inst_id == "":
 					continue
+
+				# Base GXP for equipped sigils
+				var gxp_to_award = gxp_per_sigil
+
+				# Bonus +5 GXP if sigil's skill was actually used in battle
+				if sigils_used_in_battle.has(sigil_inst_id):
+					gxp_to_award += 5
+					print("[BattleManager] +5 GXP bonus for sigil usage: %s" % sigil_inst_id)
+
 				# Award GXP to this sigil instance
-				sigil_sys.add_xp_to_instance(sigil_inst_id, gxp_per_sigil, false, "battle_reward")
-				rewards.gxp_awarded[sigil_inst_id] = gxp_per_sigil
-				print("[BattleManager] Awarded %d GXP to sigil %s" % [gxp_per_sigil, sigil_inst_id])
+				sigil_sys.add_xp_to_instance(sigil_inst_id, gxp_to_award, false, "battle_reward")
+				rewards.gxp_awarded[sigil_inst_id] = gxp_to_award
+				print("[BattleManager] Awarded %d GXP to sigil %s" % [gxp_to_award, sigil_inst_id])
 
 	return rewards
 
