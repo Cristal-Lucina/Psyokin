@@ -200,30 +200,19 @@ func _show_victory_screen() -> void:
 		creds_label.add_theme_color_override("font_color", Color(0.9, 0.9, 0.5, 1.0))
 		rewards_vbox.add_child(creds_label)
 
-	# Level Growth - Show LXP for active party members only
+	# Level Growth - Show LXP for all members who received it
 	var lxp_awarded = rewards.get("lxp_awarded", {})
 	print("[Battle] lxp_awarded: %s" % lxp_awarded)
-	var active_party = gs.party if gs and gs.party else []
-	print("[Battle] active_party: %s" % active_party)
-	var active_lxp = {}
-	for member_id in lxp_awarded.keys():
-		print("[Battle] Checking member_id '%s' in active_party" % member_id)
-		if member_id in active_party:
-			active_lxp[member_id] = lxp_awarded[member_id]
-			print("[Battle] Added to active_lxp")
-		else:
-			print("[Battle] NOT in active party, skipping")
-	print("[Battle] active_lxp result: %s" % active_lxp)
 
-	if not active_lxp.is_empty():
+	if not lxp_awarded.is_empty():
 		var lxp_header = Label.new()
 		lxp_header.text = "\nLevel Growth:"
 		lxp_header.add_theme_color_override("font_color", Color(0.7, 0.9, 0.7, 1.0))
 		rewards_vbox.add_child(lxp_header)
 
-		# Get member display names
-		for member_id in active_lxp.keys():
-			var xp_amount = active_lxp[member_id]
+		# Show all members who got XP (they were in the battle)
+		for member_id in lxp_awarded.keys():
+			var xp_amount = lxp_awarded[member_id]
 			var display_name = _get_member_display_name(member_id)
 			var member_label = Label.new()
 			member_label.text = "  %s: +%d LXP" % [display_name, xp_amount]

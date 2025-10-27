@@ -507,32 +507,29 @@ func _calculate_battle_rewards() -> Dictionary:
 
 	# Distribute LXP to party members
 	print("[BattleManager] Starting LXP distribution, base_xp: %d" % base_xp)
-	var party_sys = get_node_or_null("/root/aPartySystem")
-	print("[BattleManager] party_sys: %s" % ("found" if party_sys else "null"))
-	if party_sys and base_xp > 0:
-		var all_members = party_sys.get_roster()
-		if all_members == null:
-			all_members = []
-		print("[BattleManager] all_members: %s" % all_members)
-		var active_members = gs.party if gs.party != null else []
-		print("[BattleManager] active_members: %s" % active_members)
 
-		for member_id in all_members:
+	if base_xp > 0:
+		# Award LXP to all ally combatants (they're already in the battle)
+		for combatant in combatants:
+			if not combatant.is_ally:
+				continue
+
+			var member_id = combatant.get("id", "")
+			if member_id == "":
+				continue
+
 			print("[BattleManager] Processing member: %s" % member_id)
 			var xp_amount: int = 0
-			var combatant = _find_combatant_by_id(member_id)
 
-			if active_members != null and member_id in active_members:
-				# Active party member
-				if combatant and combatant.get("is_ko", false):
-					# Fainted - 50% XP
-					xp_amount = int(base_xp * 0.5)
-				else:
-					# Active and not KO'd - 100% XP
-					xp_amount = base_xp
-			else:
-				# Benched party member - 50% XP
+			# Check if KO'd for 50% XP penalty
+			if combatant.get("is_ko", false):
+				# Fainted - 50% XP
 				xp_amount = int(base_xp * 0.5)
+				print("[BattleManager] Member is KO'd, awarding 50%% XP")
+			else:
+				# Active and not KO'd - 100% XP
+				xp_amount = base_xp
+				print("[BattleManager] Member is active, awarding 100%% XP")
 
 			print("[BattleManager] Calculated xp_amount: %d for %s" % [xp_amount, member_id])
 			print("[BattleManager] stats_system exists: %s, has add_xp: %s" % [stats_system != null, stats_system.has_method("add_xp") if stats_system else false])
@@ -544,7 +541,7 @@ func _calculate_battle_rewards() -> Dictionary:
 			else:
 				print("[BattleManager] SKIPPED awarding LXP (xp_amount=%d, stats_system=%s)" % [xp_amount, "exists" if stats_system else "null"])
 	else:
-		print("[BattleManager] SKIPPED entire LXP section (party_sys=%s, base_xp=%d)" % ["exists" if party_sys else "null", base_xp])
+		print("[BattleManager] SKIPPED entire LXP section (base_xp=%d)" % base_xp)
 
 	# Award GXP to all equipped sigils
 	var sigil_sys = get_node_or_null("/root/aSigilSystem")
