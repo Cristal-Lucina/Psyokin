@@ -824,13 +824,21 @@ func _save_party_hp_mp_and_clear_status(victory: bool) -> void:
 	# Get all ally combatants
 	var ally_combatants = get_ally_combatants()
 
-	# Ensure GameState.member_data exists
-	if not gs.has("member_data"):
-		gs.set("member_data", {})
+	# Check if GameState is available
+	if not gs:
+		push_error("[BattleManager] GameState not available - cannot save HP/MP!")
+		return
 
-	var member_data: Dictionary = gs.get("member_data")
-	if typeof(member_data) != TYPE_DICTIONARY:
-		member_data = {}
+	# Get or create member_data
+	var member_data: Dictionary = {}
+	if "member_data" in gs:
+		var existing_data = gs.get("member_data")
+		if typeof(existing_data) == TYPE_DICTIONARY:
+			member_data = existing_data
+
+	# If member_data doesn't exist or is invalid, initialize it
+	if member_data.is_empty() and not ("member_data" in gs):
+		gs.set("member_data", {})
 
 	# Save HP/MP for each party member
 	for combatant in ally_combatants:
