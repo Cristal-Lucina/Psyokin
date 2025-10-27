@@ -441,12 +441,13 @@ func _count_alive_enemies() -> int:
 
 func _calculate_battle_rewards() -> Dictionary:
 	"""
-	Calculate all battle rewards: LXP, GXP, Creds, Items
+	Calculate all battle rewards: LXP, GXP, BAXP, Creds, Items
 	Returns Dictionary with reward breakdown for display
 	"""
 	var rewards = {
 		"lxp_awarded": {},  # member_id -> xp_amount
 		"gxp_awarded": {},  # sigil_instance_id -> gxp_amount
+		"baxp_awarded": {},  # "memberA|memberB" -> baxp_amount
 		"creds": 0,
 		"items": [],  # Array of item_ids dropped
 		"captured_count": 0,
@@ -572,6 +573,58 @@ func _calculate_battle_rewards() -> Dictionary:
 				sigil_sys.add_xp_to_instance(sigil_inst_id, gxp_to_award, false, "battle_reward")
 				rewards.gxp_awarded[sigil_inst_id] = gxp_to_award
 				print("[BattleManager] Awarded %d GXP to sigil %s" % [gxp_to_award, sigil_inst_id])
+
+	# Award BAXP (Battle Affinity XP) for co-presence
+	var affinity_sys = get_node_or_null("/root/aAffinitySystem")
+	if affinity_sys:
+		print("[BattleManager] Calculating BAXP for co-presence...")
+
+		# Get all ally combatants who participated
+		var ally_combatants: Array = []
+		for combatant in combatants:
+			if combatant.is_ally:
+				ally_combatants.append(combatant)
+
+		# Calculate BAXP for each pair
+		for i in range(ally_combatants.size()):
+			for j in range(i + 1, ally_combatants.size()):
+				var member_a = ally_combatants[i].get("id", "")
+				var member_b = ally_combatants[j].get("id", "")
+
+				if member_a == "" or member_b == "":
+					continue
+
+				# Check KO status
+				var a_ko = ally_combatants[i].get("is_ko", false)
+				var b_ko = ally_combatants[j].get("is_ko", false)
+
+				var baxp_amount = 0
+				var status_desc = ""
+
+				if not a_ko and not b_ko:
+					# Both active at battle end: +2 BAXP
+					baxp_amount = 2
+					status_desc = "both active"
+				elif a_ko != b_ko:
+					# One KO'd, one standing: +1 BAXP
+					baxp_amount = 1
+					status_desc = "one KO'd"
+				else:
+					# Both KO'd: +0 BAXP (no co-presence)
+					baxp_amount = 0
+					status_desc = "both KO'd"
+
+				if baxp_amount > 0:
+					var actual = affinity_sys.add_copresence_baxp(member_a, member_b, baxp_amount)
+					if actual > 0:
+						# Create pair key for display (alphabetically sorted)
+						var pair_key = affinity_sys._make_pair_key(member_a, member_b)
+						rewards.baxp_awarded[pair_key] = actual
+						print("[BattleManager] Awarded %d BAXP to %s (%s)" % [actual, pair_key, status_desc])
+					else:
+						print("[BattleManager] Daily cap reached for %s|%s, no BAXP awarded" % [member_a, member_b])
+				else:
+					print("[BattleManager] No BAXP for %s|%s (%s)" % [member_a, member_b, status_desc])
 
 	return rewards
 
