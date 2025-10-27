@@ -217,6 +217,7 @@ func _compute_for_member(member: String) -> Dictionary:
 		buffs = (rec.get("buffs", []) as Array).duplicate()
 		debuffs = (rec.get("debuffs", []) as Array).duplicate()
 		flags = (rec.get("flags", {}) as Dictionary).duplicate(true)
+		print("[CombatProfileSystem] %s: Using _party_meta HP=%d/%d, MP=%d/%d" % [pid, cur_hp, hp_max, cur_mp, mp_max])
 	else:
 		# Second try: GameState.member_data (for HP/MP persistence during gameplay)
 		var gs: Node = get_node_or_null(GS_PATH)
@@ -230,6 +231,11 @@ func _compute_for_member(member: String) -> Dictionary:
 					cur_mp = int(gs_rec.get("mp", mp_max))
 					buffs = (gs_rec.get("buffs", []) as Array).duplicate()
 					debuffs = (gs_rec.get("debuffs", []) as Array).duplicate()
+					print("[CombatProfileSystem] %s: Using GameState.member_data HP=%d/%d, MP=%d/%d" % [pid, cur_hp, hp_max, cur_mp, mp_max])
+				else:
+					print("[CombatProfileSystem] %s: No saved data found, using defaults HP=%d/%d, MP=%d/%d" % [pid, cur_hp, hp_max, cur_mp, mp_max])
+			else:
+				print("[CombatProfileSystem] %s: member_data is not a Dictionary, using defaults" % pid)
 
 	# Base stats
 	var brw: int = _stat_for(pid, "BRW")

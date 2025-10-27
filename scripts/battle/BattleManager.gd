@@ -829,16 +829,22 @@ func _save_party_hp_mp_and_clear_status(victory: bool) -> void:
 		push_error("[BattleManager] GameState not available - cannot save HP/MP!")
 		return
 
-	# Get or create member_data
+	# Get or create member_data - ensure it exists in GameState FIRST
 	var member_data: Dictionary = {}
 	if "member_data" in gs:
 		var existing_data = gs.get("member_data")
 		if typeof(existing_data) == TYPE_DICTIONARY:
 			member_data = existing_data
-
-	# If member_data doesn't exist or is invalid, initialize it
-	if member_data.is_empty() and not ("member_data" in gs):
+		else:
+			# member_data exists but is wrong type, reset it
+			print("[BattleManager] WARNING: member_data exists but is not a Dictionary, resetting")
+			gs.set("member_data", {})
+			member_data = {}
+	else:
+		# member_data doesn't exist, create it
+		print("[BattleManager] Creating new member_data in GameState")
 		gs.set("member_data", {})
+		member_data = {}
 
 	# Save HP/MP for each party member
 	for combatant in ally_combatants:
@@ -880,10 +886,19 @@ func _save_party_hp_mp_and_clear_status(victory: bool) -> void:
 
 	# Update GameState with the modified member_data
 	gs.set("member_data", member_data)
+	print("[BattleManager] Updated GameState.member_data with HP/MP values")
+
+	# Verify the data was saved correctly
+	var verify_data = gs.get("member_data")
+	if typeof(verify_data) == TYPE_DICTIONARY:
+		print("[BattleManager] Verification - member_data in GameState: %s" % verify_data)
+	else:
+		push_error("[BattleManager] ERROR: member_data was not saved correctly!")
 
 	# Update CombatProfileSystem so it reflects the new HP/MP values
 	if combat_profiles and combat_profiles.has_method("refresh_all"):
 		combat_profiles.refresh_all()
+		print("[BattleManager] Refreshed CombatProfileSystem")
 
 	print("[BattleManager] HP/MP persistence and status clearing completed")
 
@@ -1002,6 +1017,8 @@ func _create_ally_combatant(member_id: String, slot: int) -> Dictionary:
 	var hp_max = int(profile.get("hp_max", 100))
 	var mp_current = int(profile.get("mp", profile.get("mp_max", 20)))
 	var mp_max = int(profile.get("mp_max", 20))
+
+	print("[BattleManager] Creating ally combatant %s: HP=%d/%d, MP=%d/%d (from profile)" % [member_id, hp_current, hp_max, mp_current, mp_max])
 
 	# Get display name
 	var display_name = stats_system.get_member_display_name(member_id)
