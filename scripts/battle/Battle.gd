@@ -1701,7 +1701,13 @@ func _show_burst_menu(burst_abilities: Array) -> void:
 		var burst_cost = int(burst_cost_raw) if burst_cost_raw != null else 50
 
 		var description_raw = burst_data.get("description", "")
-		var description = String(description_raw) if description_raw != null else ""
+		var description = ""
+		if description_raw != null:
+			if typeof(description_raw) == TYPE_FLOAT or typeof(description_raw) == TYPE_INT:
+				description = str(description_raw)  # Use str() for numbers
+			else:
+				description = String(description_raw)
+		print("[Battle] Description for burst: '%s' (type: %d)" % [description, typeof(description_raw)])
 
 		var participants_raw = burst_data.get("participants", "")
 		var participants_str = String(participants_raw) if participants_raw != null else ""
@@ -1717,13 +1723,16 @@ func _show_burst_menu(burst_abilities: Array) -> void:
 
 		var can_afford = battle_mgr.burst_gauge >= burst_cost
 
+		# Build button text safely
+		var button_text = ""
+		button_text += str(burst_name) + " [Cost: " + str(burst_cost) + "]\n"
+		button_text += str(description) + "\n"
+		button_text += "With: " + str(participants_text)
+
+		print("[Battle] Creating button with text: %s" % button_text)
+
 		var button = Button.new()
-		button.text = "%s [Cost: %d]\n%s\nWith: %s" % [
-			burst_name,
-			burst_cost,
-			description,
-			participants_text
-		]
+		button.text = button_text
 		button.custom_minimum_size = Vector2(430, 70)
 
 		# Disable if can't afford
