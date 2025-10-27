@@ -331,6 +331,9 @@ func _ready() -> void:
 			if not ds.is_connected("saturday_applied", Callable(self, "_on_dorms_saturday_applied")):
 				ds.connect("saturday_applied", Callable(self, "_on_dorms_saturday_applied"))
 
+	# DEBUG: Auto-give bind items for testing capture system
+	_give_test_bind_items()
+
 # ---------- Input ----------
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_echo(): return
@@ -1159,3 +1162,25 @@ func _main_toast(msg: String) -> void:
 	dlg.popup_centered()
 	await dlg.confirmed
 	dlg.queue_free()
+
+## ═══════════════════════════════════════════════════════════════
+## TEST/DEBUG HELPERS - Capture System
+## ═══════════════════════════════════════════════════════════════
+
+## DEV: Give player bind items for testing capture system
+## Call this from console or add to _ready() for automatic testing
+func _give_test_bind_items() -> void:
+	"""Give player bind items for testing the capture system"""
+	if not inv:
+		print("[Main] Cannot give test items - inventory system not available")
+		return
+
+	# Give a variety of bind items for testing
+	inv.add_item("BIND_001", 5)  # Weak Bind (+10 capture)
+	inv.add_item("BIND_002", 3)  # Standard Bind (+25 capture)
+	inv.add_item("BIND_003", 2)  # Strong Bind (+40 capture)
+
+	print("[Main] DEBUG: Added test bind items to inventory")
+	print("  - Weak Bind x5")
+	print("  - Standard Bind x3")
+	print("  - Strong Bind x2")

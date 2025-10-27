@@ -449,8 +449,26 @@ func _end_battle(victory: bool) -> void:
 	battle_ended.emit(victory)
 
 	# TODO: Award rewards (LXP, money, items)
-	# TODO: Apply non-lethal modifiers (×0.30 LXP, ×1.5 Creds) if all captures
+	# NOTE: Apply non-lethal modifiers when awarding rewards:
+	#   if _is_all_captures():
+	#     LXP_reward *= 0.30
+	#     Credits_reward *= 1.5
+	#     Drop_rate *= 1.5
 	# TODO: Show victory/defeat screen
+
+func _is_all_captures() -> bool:
+	"""Check if all enemies were captured (none were killed)"""
+	# Count total defeats
+	var total_kills = 0
+	for count in battle_kills.values():
+		total_kills += count
+
+	var total_captures = 0
+	for count in battle_captures.values():
+		total_captures += count
+
+	# All captures means: at least 1 capture AND zero kills
+	return total_captures > 0 and total_kills == 0
 
 func record_enemy_defeat(enemy: Dictionary, was_captured: bool) -> void:
 	"""
