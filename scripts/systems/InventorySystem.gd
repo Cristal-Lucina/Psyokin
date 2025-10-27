@@ -214,13 +214,13 @@ func _try_load_defs_from_csv(force: bool=false) -> void:
 		if force: print("[InventorySystem] CSV loader missing at %s" % CSV_LOADER_PATH)
 		return
 
-	print("[InventorySystem] Attempting to load CSV from paths: %s" % CSV_PATHS)
+	print("[InventorySystem] Attempting to load CSV from paths: %s" % str(CSV_PATHS))
 	for path in CSV_PATHS:
 		print("[InventorySystem] Checking path: %s" % path)
 		if not ResourceLoader.exists(path):
 			print("[InventorySystem]   Path does not exist, skipping")
 			continue
-		print("[InventorySystem]   Path exists! Trying keys: %s" % CSV_ID_KEYS)
+		print("[InventorySystem]   Path exists! Trying keys: %s" % str(CSV_ID_KEYS))
 		for key in CSV_ID_KEYS:
 			print("[InventorySystem]     Trying key: %s" % key)
 			var defs_v: Variant = loader.call("load_csv", path, key)
@@ -230,7 +230,7 @@ func _try_load_defs_from_csv(force: bool=false) -> void:
 				print("[InventorySystem] ✓ Loaded defs from %s (key=%s) -> %d rows" % [path, key, _defs.size()])
 				# Debug: Print first few item IDs
 				var sample_ids = _defs.keys().slice(0, 5)
-				print("[InventorySystem]   Sample IDs: %s" % sample_ids)
+				print("[InventorySystem]   Sample IDs: %s" % str(sample_ids))
 				emit_signal("items_loaded")
 				return
 	if force:
