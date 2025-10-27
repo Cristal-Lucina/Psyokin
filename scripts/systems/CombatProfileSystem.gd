@@ -208,20 +208,12 @@ func _compute_for_member(member: String) -> Dictionary:
 	var debuffs: Array = []
 	var flags: Dictionary = {}
 
-	# First try: _party_meta (populated from apply_save_blob during load)
-	if _party_meta.has(pid):
-		var rec: Dictionary = _party_meta[pid]
-		cur_hp = int(rec.get("hp", hp_max))
-		cur_mp = int(rec.get("mp", mp_max))
-		ailment = String(rec.get("ailment", ""))
-		buffs = (rec.get("buffs", []) as Array).duplicate()
-		debuffs = (rec.get("debuffs", []) as Array).duplicate()
-		flags = (rec.get("flags", {}) as Dictionary).duplicate(true)
-		print("[CombatProfileSystem] %s: Using _party_meta HP=%d/%d, MP=%d/%d" % [pid, cur_hp, hp_max, cur_mp, mp_max])
-	else:
-		# Second try: GameState.member_data (for HP/MP persistence during gameplay)
-		var gs: Node = get_node_or_null(GS_PATH)
-		if gs and gs.has_method("get"):
+	# Priority 1: GameState.member_data (for HP/MP persistence during gameplay)
+	# This takes priority because it's updated after every battle
+	var gs: Node = get_node_or_null(GS_PATH)
+	var found_in_member_data = false
+	if gs and gs.has_method("get"):
+		if "member_data" in gs:
 			var member_data_v: Variant = gs.get("member_data")
 			if typeof(member_data_v) == TYPE_DICTIONARY:
 				var member_data: Dictionary = member_data_v
@@ -231,11 +223,22 @@ func _compute_for_member(member: String) -> Dictionary:
 					cur_mp = int(gs_rec.get("mp", mp_max))
 					buffs = (gs_rec.get("buffs", []) as Array).duplicate()
 					debuffs = (gs_rec.get("debuffs", []) as Array).duplicate()
+					found_in_member_data = true
 					print("[CombatProfileSystem] %s: Using GameState.member_data HP=%d/%d, MP=%d/%d" % [pid, cur_hp, hp_max, cur_mp, mp_max])
-				else:
-					print("[CombatProfileSystem] %s: No saved data found, using defaults HP=%d/%d, MP=%d/%d" % [pid, cur_hp, hp_max, cur_mp, mp_max])
-			else:
-				print("[CombatProfileSystem] %s: member_data is not a Dictionary, using defaults" % pid)
+
+	# Priority 2: _party_meta (populated from apply_save_blob during load)
+	# Only use this if member_data didn't have the data (e.g., fresh load from save)
+	if not found_in_member_data and _party_meta.has(pid):
+		var rec: Dictionary = _party_meta[pid]
+		cur_hp = int(rec.get("hp", hp_max))
+		cur_mp = int(rec.get("mp", mp_max))
+		ailment = String(rec.get("ailment", ""))
+		buffs = (rec.get("buffs", []) as Array).duplicate()
+		debuffs = (rec.get("debuffs", []) as Array).duplicate()
+		flags = (rec.get("flags", {}) as Dictionary).duplicate(true)
+		print("[CombatProfileSystem] %s: Using _party_meta HP=%d/%d, MP=%d/%d" % [pid, cur_hp, hp_max, cur_mp, mp_max])
+	elif not found_in_member_data:
+		print("[CombatProfileSystem] %s: No saved data found, using defaults HP=%d/%d, MP=%d/%d" % [pid, cur_hp, hp_max, cur_mp, mp_max])
 
 	# Base stats
 	var brw: int = _stat_for(pid, "BRW")
