@@ -1,0 +1,16 @@
+burst_id,name,participants,unlock_condition,burst_cost,type,element,target,power,acc,aoe,crit_bonus_pct,description,tags,scaling_brw,scaling_mnd,scaling_fcs,status_apply,status_chance,duration
+BURST_HERO_SOLO,Psychic Pulse,hero,always,50,Attack,Void,Enemies,120,95,1,15,Unleash raw psychic energy in all directions.,Burst;AoE,0.5,1,0.5,Stagger,40,2
+BURST_HERO_TESSA,Dual Mind Storm,hero;secret_girl,affinity_tier:2,75,Attack,Air,Enemies,160,92,1,20,Hero and Tessa combine minds for a devastating air strike.,Burst;Duo;AoE,0.3,1.2,0.5,Confuse,50,3
+BURST_HERO_KAI,Earthbreaker Fist,hero;best_friend,affinity_tier:2,75,Attack,Earth,Enemy,200,98,0,25,Hero channels power through Kai's fist for a single devastating blow.,Burst;Duo;Single,1.5,0.5,0.5,Defense Down,60,4
+BURST_HERO_SKYE,Tidal Acceleration,hero;blue_girl,affinity_tier:2,70,Attack,Water,Enemies,140,95,1,18,Skye's speed and Hero's power create a rushing water assault.,Burst;Duo;AoE,0.4,0.8,1,Slow,55,3
+BURST_HERO_RISA,Flames of Resolve,hero;red_girl,affinity_tier:2,80,Attack,Fire,Enemies,175,90,1,22,Hero and Risa's determination ignites a blazing inferno.,Burst;Duo;AoE,0.6,0.9,0.5,Burn,65,4
+BURST_HERO_MATCHA,Nature's Wrath,hero;green_friend,affinity_tier:2,75,Attack,Earth,Enemies,165,93,1,20,Channel the earth's fury through Matcha's connection.,Burst;Duo;AoE,0.7,0.8,0.5,Defense Down,50,3
+BURST_HERO_DOUGLAS,Void Experiment,hero;scientist,affinity_tier:2,85,Attack,Void,Enemies,180,88,1,25,Douglas and Hero unleash experimental void energy.,Burst;Duo;AoE,0.4,1.3,0.3,Malaise,60,4
+BURST_HERO_SEV,Data Overload,hero;ai_friend,affinity_tier:2,80,Attack,Data,Enemies,170,94,1,20,Sev and Hero overwhelm enemies with pure data streams.,Burst;Duo;AoE,0.3,1.1,0.6,Mind Block,55,3
+BURST_TRIO_ELEMENTS,Elemental Trinity,hero;secret_girl;best_friend,affinity_tier:4,100,Attack,Void,Enemies,250,92,1,30,Hero channels Air and Earth through perfect synchronization.,Burst;Trio;Ultimate,0.8,1.2,0.8,Stagger;Confuse,70,3
+BURST_TRIO_BALANCE,Balanced Assault,hero;blue_girl;red_girl,affinity_tier:4,100,Attack,Void,Enemies,240,94,1,28,Water and Fire merge through Hero's psychic balance.,Burst;Trio;Ultimate,0.7,1,1,Burn;Slow,65,4
+BURST_TRIO_NATURE,Gaia Force,hero;green_friend;best_friend,affinity_tier:5,100,Attack,Earth,Enemies,280,90,1,35,Dual earth wielders unite through Hero's mind link.,Burst;Trio;Ultimate,1.5,0.8,0.5,Defense Down;Stagger,75,4
+BURST_TRIO_SCIENCE,Reality Breach,hero;scientist;ai_friend,affinity_tier:5,100,Attack,Void,Enemies,260,88,1,32,Science and AI merge to tear through reality itself.,Burst;Trio;Ultimate,0.5,1.5,0.8,Malaise;Mind Block,80,5
+BURST_TRIO_SPEED,Temporal Rush,hero;blue_girl;secret_girl,affinity_tier:4,95,Attack,Air,Enemies,245,96,1,30,Speed and wind combine for a time-bending assault.,Burst;Trio;Ultimate,0.4,0.9,1.3,Confuse;Slow,70,3
+BURST_TRIO_POWER,Inferno Quake,hero;red_girl;best_friend,affinity_tier:5,100,Attack,Fire,Enemies,275,89,1,35,Fire and Earth create an apocalyptic combination.,Burst;Trio;Ultimate,1.2,0.7,0.6,Burn;Stagger,75,4
+BURST_FINAL_ALL,Unity Overdrive,hero;secret_girl;best_friend;blue_girl,affinity_tier:6,150,Attack,Void,All Enemies,400,85,1,50,The ultimate burst - Hero unites with three allies as one.,Burst;Ultimate;Legendary,1,1.2,1,Stagger;Confuse;Defense Down,90,5

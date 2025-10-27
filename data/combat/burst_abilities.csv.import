@@ -1,0 +1,17 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://btrsc758usgof"
+
+[deps]
+
+files=["res://data/combat/burst_abilities.name.translation", "res://data/combat/burst_abilities.participants.translation", "res://data/combat/burst_abilities.unlock.translation", "res://data/combat/burst_abilities.burst.translation", "res://data/combat/burst_abilities.type.translation", "res://data/combat/burst_abilities.element.translation", "res://data/combat/burst_abilities.target.translation", "res://data/combat/burst_abilities.power.translation", "res://data/combat/burst_abilities.acc.translation", "res://data/combat/burst_abilities.aoe.translation", "res://data/combat/burst_abilities.crit.translation", "res://data/combat/burst_abilities.description.translation", "res://data/combat/burst_abilities.tags.translation", "res://data/combat/burst_abilities.scaling.translation", "res://data/combat/burst_abilities.scaling.translation", "res://data/combat/burst_abilities.scaling.translation", "res://data/combat/burst_abilities.status.translation", "res://data/combat/burst_abilities.status.translation", "res://data/combat/burst_abilities.duration.translation"]
+
+source_file="res://data/combat/burst_abilities.csv"
+dest_files=["res://data/combat/burst_abilities.name.translation", "res://data/combat/burst_abilities.participants.translation", "res://data/combat/burst_abilities.unlock.translation", "res://data/combat/burst_abilities.burst.translation", "res://data/combat/burst_abilities.type.translation", "res://data/combat/burst_abilities.element.translation", "res://data/combat/burst_abilities.target.translation", "res://data/combat/burst_abilities.power.translation", "res://data/combat/burst_abilities.acc.translation", "res://data/combat/burst_abilities.aoe.translation", "res://data/combat/burst_abilities.crit.translation", "res://data/combat/burst_abilities.description.translation", "res://data/combat/burst_abilities.tags.translation", "res://data/combat/burst_abilities.scaling.translation", "res://data/combat/burst_abilities.scaling.translation", "res://data/combat/burst_abilities.scaling.translation", "res://data/combat/burst_abilities.status.translation", "res://data/combat/burst_abilities.status.translation", "res://data/combat/burst_abilities.duration.translation"]
+
+[params]
+
+compress=true
+delimiter=0
