@@ -712,9 +712,13 @@ func _on_item_pressed() -> void:
 		# Exclude Sigils (those are equipment, not consumables)
 		if use_type in ["battle", "both"] and category != "Battle Items" and category != "Sigils":
 			var desc = item_def.get("short_description", "")
-			if desc == null:
+			if desc == null or desc == "null":
 				desc = ""
 			desc = str(desc)
+
+			# Debug: Check what description we're getting
+			if item_id_str.begins_with("BUFF_") or item_id_str.begins_with("BAT_"):
+				print("[Battle] Item %s description: '%s'" % [item_id_str, desc])
 
 			var item_name = item_def.get("name", "")
 			if item_name == null or item_name == "":
