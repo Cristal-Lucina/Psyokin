@@ -1907,6 +1907,11 @@ func _add_category_tab(tab_container: TabContainer, category_name: String, categ
 		var item_count = int(item_data.get("count", 0))
 		var item_desc = str(item_data.get("description", ""))
 
+		# Debug: Check what description we have in item_data
+		var item_id = str(item_data.get("id", ""))
+		if item_id.begins_with("BUFF_") or item_id.begins_with("BAT_") or item_id.begins_with("HP_"):
+			print("[Battle] Creating button for %s: description in item_data = '%s'" % [item_id, item_desc])
+
 		var button = Button.new()
 		button.text = "%s (x%d)" % [item_name, item_count]
 		button.custom_minimum_size = Vector2(250, 40)
