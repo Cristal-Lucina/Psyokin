@@ -284,7 +284,12 @@ func _wait_for_turn_order_animation() -> void:
 		return
 
 	# Only wait for animation if one is actually playing
-	if turn_order_display.has("is_animating") and turn_order_display.is_animating:
+	# Use 'in' operator which works with typed properties in GDScript
+	var is_animating = false
+	if "is_animating" in turn_order_display:
+		is_animating = turn_order_display.is_animating
+
+	if is_animating:
 		print("[BattleManager] Animation in progress, waiting for completion...")
 		if turn_order_display.has_signal("animation_completed"):
 			await turn_order_display.animation_completed
