@@ -283,10 +283,21 @@ func _wait_for_turn_order_animation() -> void:
 		await get_tree().process_frame
 		return
 
-	# Wait for animation_completed signal
-	if turn_order_display.has_signal("animation_completed"):
-		await turn_order_display.animation_completed
+	# Only wait for animation if one is actually playing
+	# Use 'in' operator which works with typed properties in GDScript
+	var is_animating = false
+	if "is_animating" in turn_order_display:
+		is_animating = turn_order_display.is_animating
+
+	if is_animating:
+		print("[BattleManager] Animation in progress, waiting for completion...")
+		if turn_order_display.has_signal("animation_completed"):
+			await turn_order_display.animation_completed
+		else:
+			await get_tree().process_frame
 	else:
+		# No animation playing, just proceed
+		print("[BattleManager] No animation in progress, proceeding immediately")
 		await get_tree().process_frame
 
 func _next_turn() -> void:
@@ -337,6 +348,24 @@ func _start_turn(combatant: Dictionary) -> void:
 
 	# Mark this combatant as having acted this round
 	combatant.has_acted_this_round = true
+
+	# Process turn-start ailment effects (poison/burn damage, auto-cure rolls, etc.)
+	await _process_turn_start_ailments(combatant)
+
+	# Check if combatant was KO'd by ailment damage
+	if combatant.is_ko:
+		print("[BattleManager] %s was KO'd by ailment - skipping turn" % combatant.display_name)
+		# Refresh turn order to show KO
+		refresh_turn_order()
+		# Skip to end turn
+		end_turn()
+		return
+
+	# Process buff/debuff durations
+	process_buff_durations(combatant)
+
+	# Process regeneration
+	await process_regen(combatant)
 
 	current_state = BattleState.TURN_ACTIVE
 	print("[BattleManager] --- Turn: %s ---" % combatant.display_name)
@@ -393,11 +422,323 @@ func _process_round_start_effects() -> void:
 		# NOTE: is_defending persists across rounds until combatant takes offensive action
 		# This provides multi-round defensive stances
 
-		# TODO: Apply DoT (poison = 5% max HP, burn = 5% max HP)
-		# TODO: Apply HoT (regen)
-		# TODO: Decrement buff/debuff durations
+		# ═══════ Apply DoT (Damage over Time) ═══════
+		if combatant.has("ailments"):
+			var ailments_to_remove = []
+			for ailment_key in combatant.ailments:
+				var ailment = combatant.ailments[ailment_key]
+				if typeof(ailment) == TYPE_STRING:
+					# Legacy string format - convert to dict
+					ailment = {"type": ailment, "duration": 0}
+
+				var ailment_type = ailment.get("type", "")
+
+				# Apply DoT damage
+				if ailment_type in ["poison", "burn"]:
+					var damage = int(ceil(combatant.hp_max * 0.05))  # 5% max HP
+					combatant.hp = max(0, combatant.hp - damage)
+					print("[BattleManager] %s takes %d %s damage" % [combatant.display_name, damage, ailment_type.capitalize()])
+
+					if combatant.hp <= 0:
+						combatant.is_ko = true
+						print("[BattleManager] %s was KO'd by %s!" % [combatant.display_name, ailment_type.capitalize()])
+
+				# Decrement duration (0 = infinite)
+				var duration = ailment.get("duration", 0)
+				if duration > 0:
+					duration -= 1
+					if duration <= 0:
+						ailments_to_remove.append(ailment_key)
+					else:
+						ailment["duration"] = duration
+
+			# Remove expired ailments
+			for key in ailments_to_remove:
+				combatant.ailments.erase(key)
+
+		# ═══════ Apply HoT (Heal over Time) and process buffs ═══════
+		if combatant.has("buffs"):
+			var buffs_to_remove = []
+			for i in range(combatant.buffs.size()):
+				var buff = combatant.buffs[i]
+				var buff_type = buff.get("type", "")
+
+				# Apply Regen healing
+				if buff_type == "regen":
+					var heal = int(ceil(combatant.hp_max * 0.05))  # 5% max HP
+					var old_hp = combatant.hp
+					combatant.hp = min(combatant.hp + heal, combatant.hp_max)
+					var actual_heal = combatant.hp - old_hp
+					print("[BattleManager] %s regenerates %d HP" % [combatant.display_name, actual_heal])
+
+				# Decrement duration
+				var duration = buff.get("duration", 0)
+				if duration > 0:
+					duration -= 1
+					if duration <= 0:
+						buffs_to_remove.append(i)
+						print("[BattleManager] %s's %s buff expired" % [combatant.display_name, buff_type])
+					else:
+						buff["duration"] = duration
+
+			# Remove expired buffs (in reverse order to avoid index issues)
+			buffs_to_remove.reverse()
+			for idx in buffs_to_remove:
+				combatant.buffs.remove_at(idx)
+
+		# ═══════ Process debuffs ═══════
+		if combatant.has("debuffs"):
+			var debuffs_to_remove = []
+			for i in range(combatant.debuffs.size()):
+				var debuff = combatant.debuffs[i]
+
+				# Decrement duration
+				var duration = debuff.get("duration", 0)
+				if duration > 0:
+					duration -= 1
+					if duration <= 0:
+						debuffs_to_remove.append(i)
+						print("[BattleManager] %s's %s debuff expired" % [combatant.display_name, debuff.get("type", "unknown")])
+					else:
+						debuff["duration"] = duration
+
+			# Remove expired debuffs (in reverse order)
+			debuffs_to_remove.reverse()
+			for idx in debuffs_to_remove:
+				combatant.debuffs.remove_at(idx)
+
 		# TODO: Resolve channeling (CH1/CH2)
-		pass
+
+func _process_turn_start_ailments(combatant: Dictionary) -> void:
+	"""Process ailment effects at the start of a combatant's turn"""
+	var ailment = str(combatant.get("ailment", ""))
+
+	if ailment == "" or ailment == "null":
+		return
+
+	# Initialize turn counter if not present
+	if not combatant.has("ailment_turn_count"):
+		combatant.ailment_turn_count = 0
+
+	# Increment turn counter
+	combatant.ailment_turn_count += 1
+	var turn_count = combatant.ailment_turn_count
+
+	# ═══════ POISON & BURN - Tick damage ═══════
+	if ailment in ["poison", "burn"]:
+		var damage = int(ceil(combatant.hp_max * 0.08))  # 8% max HP
+		combatant.hp = max(0, combatant.hp - damage)
+		print("[BattleManager] %s takes %d %s damage (Turn %d)" % [
+			combatant.display_name, damage, ailment.capitalize(), turn_count
+		])
+
+		# Check for KO from ailment damage
+		if combatant.hp <= 0:
+			combatant.is_ko = true
+			print("[BattleManager] %s was KO'd by %s!" % [combatant.display_name, ailment.capitalize()])
+			return  # Don't process auto-cure if they died
+
+		# Auto-cure chance: 30% base + 10% per turn (max 90%)
+		var cure_chance = min(30 + (turn_count - 1) * 10, 90)
+		var roll = randi() % 100
+
+		if roll < cure_chance:
+			combatant.ailment = ""
+			combatant.ailment_turn_count = 0
+			print("[BattleManager] %s recovered from %s! (%d%% chance, rolled %d)" % [
+				combatant.display_name, ailment.capitalize(), cure_chance, roll
+			])
+			refresh_turn_order()
+		else:
+			print("[BattleManager] %s is still %s (%d%% cure chance, rolled %d)" % [
+				combatant.display_name, ailment.capitalize(), cure_chance, roll
+			])
+
+	# ═══════ SLEEP - 20% auto-cure (also wakes when hit or item used) ═══════
+	elif ailment == "sleep":
+		# 20% chance to wake up naturally at start of turn
+		var wake_chance = 20
+		var roll = randi() % 100
+
+		if roll < wake_chance:
+			combatant.ailment = ""
+			combatant.ailment_turn_count = 0
+			print("[BattleManager] %s woke up naturally! (%d%% chance, rolled %d)" % [
+				combatant.display_name, wake_chance, roll
+			])
+			refresh_turn_order()
+		else:
+			print("[BattleManager] %s is asleep (%d%% wake chance, rolled %d - skipping turn)" % [
+				combatant.display_name, wake_chance, roll
+			])
+			# Sleep causes the turn to be skipped - handled by Battle.gd
+
+	# ═══════ FREEZE - 20% auto-cure (also cures with Heated Blanket item) ═══════
+	elif ailment == "freeze":
+		# 20% chance to break free from freeze
+		var cure_chance = 20
+		var roll = randi() % 100
+
+		if roll < cure_chance:
+			combatant.ailment = ""
+			combatant.ailment_turn_count = 0
+			print("[BattleManager] %s broke free from freeze! (%d%% chance, rolled %d)" % [
+				combatant.display_name, cure_chance, roll
+			])
+			refresh_turn_order()
+		else:
+			print("[BattleManager] %s is frozen (30%% action chance, %d%% cure chance, rolled %d)" % [
+				combatant.display_name, cure_chance, roll
+			])
+			# Freeze allows acting with 30% success - handled by Battle.gd
+
+	# ═══════ MALAISE - 30% action chance, auto-cure escalates ═══════
+	elif ailment == "malaise":
+		# Auto-cure chance: 30% base + 10% per turn (max 90%)
+		var cure_chance = min(30 + (turn_count - 1) * 10, 90)
+		var roll = randi() % 100
+
+		if roll < cure_chance:
+			combatant.ailment = ""
+			combatant.ailment_turn_count = 0
+			print("[BattleManager] %s recovered from malaise! (%d%% chance, rolled %d)" % [
+				combatant.display_name, cure_chance, roll
+			])
+			refresh_turn_order()
+		else:
+			print("[BattleManager] %s is suffering from malaise (30%% action chance, %d%% cure chance, rolled %d)" % [
+				combatant.display_name, cure_chance, roll
+			])
+			# Malaise allows acting with 30% success - handled by Battle.gd
+
+	# ═══════ BERSERK - Attacks random target, auto-cure escalates ═══════
+	elif ailment == "berserk":
+		# Auto-cure chance: 30% base + 10% per turn (max 90%)
+		var cure_chance = min(30 + (turn_count - 1) * 10, 90)
+		var roll = randi() % 100
+
+		if roll < cure_chance:
+			combatant.ailment = ""
+			combatant.ailment_turn_count = 0
+			print("[BattleManager] %s calmed down from berserk! (%d%% chance, rolled %d)" % [
+				combatant.display_name, cure_chance, roll
+			])
+			refresh_turn_order()
+		else:
+			print("[BattleManager] %s is berserk! (will attack random target, %d%% cure chance, rolled %d)" % [
+				combatant.display_name, cure_chance, roll
+			])
+			# Berserk behavior (attack random target) handled by Battle.gd
+
+	# ═══════ CHARM - Uses healing/buff items on enemy, auto-cure escalates ═══════
+	elif ailment == "charm":
+		# Auto-cure chance: 30% base + 10% per turn (max 90%)
+		var cure_chance = min(30 + (turn_count - 1) * 10, 90)
+		var roll = randi() % 100
+
+		if roll < cure_chance:
+			combatant.ailment = ""
+			combatant.ailment_turn_count = 0
+			print("[BattleManager] %s broke free from charm! (%d%% chance, rolled %d)" % [
+				combatant.display_name, cure_chance, roll
+			])
+			refresh_turn_order()
+		else:
+			print("[BattleManager] %s is charmed! (will aid enemy, %d%% cure chance, rolled %d)" % [
+				combatant.display_name, cure_chance, roll
+			])
+			# Charm behavior (use heal/buff items on enemy) handled by Battle.gd
+
+	# Small delay for readability
+	await get_tree().create_timer(0.3).timeout
+
+## ═══════════════════════════════════════════════════════════════
+## BUFF/DEBUFF SYSTEM
+## ═══════════════════════════════════════════════════════════════
+
+func apply_buff(combatant: Dictionary, buff_type: String, value: float, duration: int) -> void:
+	"""Apply a buff or debuff to a combatant
+
+	Args:
+		combatant: Target combatant dictionary
+		buff_type: Type of buff (atk_up, atk_down, def_up, def_down, skl_up, skl_down, spd_up, regen, phys_acc, mind_acc, evasion)
+		value: Modifier value (e.g., 0.15 for 15% increase, 10 for +10 speed)
+		duration: Number of turns the buff lasts
+	"""
+	# Initialize buffs array if not present
+	if not combatant.has("buffs"):
+		combatant.buffs = []
+
+	# Check if this buff type already exists - replace it
+	for i in range(combatant.buffs.size()):
+		if combatant.buffs[i].type == buff_type:
+			combatant.buffs[i].duration = duration
+			combatant.buffs[i].value = value
+			print("[BattleManager] Refreshed %s on %s (%d turns)" % [buff_type, combatant.display_name, duration])
+			return
+
+	# Add new buff
+	combatant.buffs.append({
+		"type": buff_type,
+		"value": value,
+		"duration": duration
+	})
+	print("[BattleManager] Applied %s to %s (value: %.2f, duration: %d turns)" % [
+		buff_type, combatant.display_name, value, duration
+	])
+
+func process_buff_durations(combatant: Dictionary) -> void:
+	"""Decrement buff durations at turn start and remove expired buffs"""
+	if not combatant.has("buffs"):
+		return
+
+	var expired_buffs = []
+
+	# Process each buff
+	for i in range(combatant.buffs.size()):
+		var buff = combatant.buffs[i]
+		buff.duration -= 1
+
+		if buff.duration <= 0:
+			expired_buffs.append(i)
+			print("[BattleManager] %s on %s expired!" % [buff.type, combatant.display_name])
+
+	# Remove expired buffs (in reverse order to preserve indices)
+	for i in range(expired_buffs.size() - 1, -1, -1):
+		combatant.buffs.remove_at(expired_buffs[i])
+
+	# Clean up empty array
+	if combatant.buffs.is_empty():
+		combatant.erase("buffs")
+
+func get_buff_modifier(combatant: Dictionary, buff_type: String) -> float:
+	"""Get the total modifier for a specific buff type
+
+	Returns the sum of all matching buffs (e.g., multiple atk_up buffs stack)
+	"""
+	if not combatant.has("buffs"):
+		return 0.0
+
+	var total_mod = 0.0
+	for buff in combatant.buffs:
+		if buff.type == buff_type:
+			total_mod += buff.value
+
+	return total_mod
+
+func process_regen(combatant: Dictionary) -> void:
+	"""Process health regeneration buffs at turn start"""
+	if not combatant.has("buffs"):
+		return
+
+	for buff in combatant.buffs:
+		if buff.type == "regen":
+			var heal_amount = int(ceil(combatant.hp_max * buff.value))  # buff.value is 0.10 for 10%
+			combatant.hp = min(combatant.hp_max, combatant.hp + heal_amount)
+			print("[BattleManager] %s regenerates %d HP! (%d turns left)" % [
+				combatant.display_name, heal_amount, buff.duration
+			])
+			await get_tree().create_timer(0.2).timeout
 
 ## ═══════════════════════════════════════════════════════════════
 ## BATTLE END CONDITIONS
@@ -722,9 +1063,104 @@ func _end_battle(victory: bool) -> void:
 		print("[BattleManager] *** DEFEAT ***")
 		current_state = BattleState.DEFEAT
 
+	# Save HP/MP for all party members and clear status effects
+	_save_party_hp_mp_and_clear_status(victory)
+
 	print("[BattleManager] Emitting battle_ended signal...")
 	battle_ended.emit(victory)
 	print("[BattleManager] Battle ended signal emitted")
+
+func _save_party_hp_mp_and_clear_status(victory: bool) -> void:
+	"""
+	Save HP/MP for all party members after battle and clear status effects
+
+	HP/MP Persistence Rules:
+	- HP and MP values persist from battle to field
+	- If a party member was KO'd in battle but won, they revive with 1 HP
+	- Status effects (burn, poison, buffs, debuffs) do NOT persist to field
+	"""
+	print("[BattleManager] Saving party HP/MP and clearing status effects...")
+
+	# Get all ally combatants
+	var ally_combatants = get_ally_combatants()
+
+	# Check if GameState is available
+	if not gs:
+		push_error("[BattleManager] GameState not available - cannot save HP/MP!")
+		return
+
+	# Get or create member_data - ensure it exists in GameState FIRST
+	var member_data: Dictionary = {}
+	if "member_data" in gs:
+		var existing_data = gs.get("member_data")
+		if typeof(existing_data) == TYPE_DICTIONARY:
+			member_data = existing_data
+		else:
+			# member_data exists but is wrong type, reset it
+			print("[BattleManager] WARNING: member_data exists but is not a Dictionary, resetting")
+			gs.set("member_data", {})
+			member_data = {}
+	else:
+		# member_data doesn't exist, create it
+		print("[BattleManager] Creating new member_data in GameState")
+		gs.set("member_data", {})
+		member_data = {}
+
+	# Save HP/MP for each party member
+	for combatant in ally_combatants:
+		var member_id: String = combatant.get("id", "")
+		if member_id == "":
+			continue
+
+		# Ensure member record exists
+		if not member_data.has(member_id):
+			member_data[member_id] = {}
+
+		var member_rec: Dictionary = member_data[member_id]
+
+		# Handle HP persistence
+		if victory:
+			# Victory: Save current HP, but revive KO'd members with 1 HP
+			if combatant.get("is_ko", false):
+				member_rec["hp"] = 1
+				print("[BattleManager] %s was KO'd but won - reviving with 1 HP" % combatant.display_name)
+			else:
+				member_rec["hp"] = max(1, combatant.get("hp", combatant.get("hp_max", 100)))
+				print("[BattleManager] %s HP saved: %d/%d" % [combatant.display_name, member_rec["hp"], combatant.get("hp_max", 100)])
+		else:
+			# Defeat: Save current HP (including 0 if KO'd)
+			member_rec["hp"] = max(0, combatant.get("hp", combatant.get("hp_max", 100)))
+			print("[BattleManager] %s HP saved after defeat: %d/%d" % [combatant.display_name, member_rec["hp"], combatant.get("hp_max", 100)])
+
+		# Save MP persistence (always save current MP)
+		member_rec["mp"] = max(0, combatant.get("mp", combatant.get("mp_max", 20)))
+		print("[BattleManager] %s MP saved: %d/%d" % [combatant.display_name, member_rec["mp"], combatant.get("mp_max", 20)])
+
+		# Clear all status effects (they do NOT persist to field)
+		member_rec["buffs"] = []
+		member_rec["debuffs"] = []
+		member_rec["ailment"] = ""
+
+		# Save back to member_data
+		member_data[member_id] = member_rec
+
+	# Update GameState with the modified member_data
+	gs.set("member_data", member_data)
+	print("[BattleManager] Updated GameState.member_data with HP/MP values")
+
+	# Verify the data was saved correctly
+	var verify_data = gs.get("member_data")
+	if typeof(verify_data) == TYPE_DICTIONARY:
+		print("[BattleManager] Verification - member_data in GameState: %s" % verify_data)
+	else:
+		push_error("[BattleManager] ERROR: member_data was not saved correctly!")
+
+	# Update CombatProfileSystem so it reflects the new HP/MP values
+	if combat_profiles and combat_profiles.has_method("refresh_all"):
+		combat_profiles.refresh_all()
+		print("[BattleManager] Refreshed CombatProfileSystem")
+
+	print("[BattleManager] HP/MP persistence and status clearing completed")
 
 func _is_all_captures() -> bool:
 	"""Check if all enemies were captured (none were killed)"""
@@ -825,6 +1261,14 @@ func return_to_overworld() -> void:
 
 func _create_ally_combatant(member_id: String, slot: int) -> Dictionary:
 	"""Create a combatant dictionary for an ally"""
+	# DEBUG: Check what's in GameState.member_data before creating combatant
+	if gs and "member_data" in gs:
+		var md = gs.get("member_data")
+		if typeof(md) == TYPE_DICTIONARY and md.has(member_id):
+			print("[BattleManager] GameState.member_data[%s] BEFORE profile: %s" % [member_id, md[member_id]])
+		else:
+			print("[BattleManager] GameState.member_data does NOT have %s" % member_id)
+
 	# Build stats dictionary manually
 	var stats = {
 		"BRW": stats_system.get_member_stat_level(member_id, "BRW"),
@@ -841,6 +1285,8 @@ func _create_ally_combatant(member_id: String, slot: int) -> Dictionary:
 	var hp_max = int(profile.get("hp_max", 100))
 	var mp_current = int(profile.get("mp", profile.get("mp_max", 20)))
 	var mp_max = int(profile.get("mp_max", 20))
+
+	print("[BattleManager] Creating ally combatant %s: HP=%d/%d, MP=%d/%d (from profile)" % [member_id, hp_current, hp_max, mp_current, mp_max])
 
 	# Get display name
 	var display_name = stats_system.get_member_display_name(member_id)

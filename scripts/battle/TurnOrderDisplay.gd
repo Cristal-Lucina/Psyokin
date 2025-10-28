@@ -342,12 +342,37 @@ func _create_turn_slot(combatant: Dictionary, index: int) -> PanelContainer:
 	var is_fallen = combatant.get("is_fallen", false)
 	var fallen_round = combatant.get("fallen_round", 0)
 
+	# Build base name
+	var display_text = combatant.display_name
+	var status_parts: Array[String] = []
+
+	# Add status ailment indicators
+	var ailment = str(combatant.get("ailment", ""))
+	if ailment != "" and ailment != "null":
+		var ailment_text = _get_ailment_display(ailment)
+		status_parts.append(ailment_text)
+
+	# Add first debuff if present
+	if combatant.has("debuffs"):
+		var debuffs = combatant.get("debuffs", [])
+		if typeof(debuffs) == TYPE_ARRAY and debuffs.size() > 0:
+			var first_debuff = debuffs[0]
+			if typeof(first_debuff) == TYPE_DICTIONARY:
+				var debuff_type = str(first_debuff.get("type", ""))
+				if debuff_type != "":
+					var debuff_text = _get_debuff_display(debuff_type)
+					status_parts.append(debuff_text)
+
+	# Add status indicators
+	if status_parts.size() > 0:
+		display_text += " (%s)" % ", ".join(status_parts)
+
 	# Add "(Fallen)" suffix only if they became fallen in a PREVIOUS round
 	# (not the current round - in current round they just have red text)
 	if is_fallen and current_round > fallen_round:
-		name_label.text = "%s (Fallen)" % combatant.display_name
-	else:
-		name_label.text = combatant.display_name
+		display_text += " (Fallen)"
+
+	name_label.text = display_text
 
 	name_label.add_theme_font_size_override("font_size", 14)
 	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -516,3 +541,45 @@ func animate_capture(combatant_id: String) -> void:
 
 	# Emit animation completed signal so BattleManager can continue
 	animation_completed.emit()
+
+func _get_ailment_display(ailment: String) -> String:
+	"""Convert ailment name to display text"""
+	match ailment.to_lower():
+		"poison", "poisoned":
+			return "Poisoned"
+		"burn", "burned", "burning":
+			return "Burned"
+		"freeze", "frozen":
+			return "Frozen"
+		"sleep", "asleep", "sleeping":
+			return "Asleep"
+		"confuse", "confused":
+			return "Confused"
+		"charm", "charmed":
+			return "Charmed"
+		"berserk", "berserked":
+			return "Berserk"
+		"malaise":
+			return "Malaise"
+		"mind block", "mind_block", "mindblock":
+			return "Mind Block"
+		"stun", "stunned":
+			return "Stunned"
+		_:
+			return ailment.capitalize()
+
+func _get_debuff_display(debuff_type: String) -> String:
+	"""Convert debuff type to display text"""
+	match debuff_type.to_lower():
+		"attack_down", "attack down":
+			return "ATK↓"
+		"defense_down", "defense down", "def_down":
+			return "DEF↓"
+		"mind_down", "mind down", "mnd_down":
+			return "MND↓"
+		"speed_down", "speed down":
+			return "SPD↓"
+		"accuracy_down", "accuracy down", "acc_down":
+			return "ACC↓"
+		_:
+			return debuff_type.replace("_", " ").capitalize()

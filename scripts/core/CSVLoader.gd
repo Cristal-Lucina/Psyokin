@@ -87,11 +87,12 @@ func _auto(s: String) -> Variant:
 	var i_val: int = t.to_int()
 	if str(i_val) == t:
 		return i_val
-	# Float?
-	var f_val: float = t.to_float()
-	if str(f_val) == t or t.find(".") >= 0:
-		# Godot prints floats without forcing decimals, that's fine.
-		# We just ensure it's a number if it parsed.
+	# Float? Only if it actually looks like a number
+	# Check if string matches numeric pattern (optional sign, digits, optional decimal point and more digits)
+	var numeric_pattern = RegEx.new()
+	numeric_pattern.compile("^[+-]?\\d+\\.?\\d*$")
+	if numeric_pattern.search(t):
+		var f_val: float = t.to_float()
 		if not is_nan(f_val):
 			return f_val
 	return t

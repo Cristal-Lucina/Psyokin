@@ -31,6 +31,7 @@ var awaiting_item_target: bool = false  # True when selecting target for item us
 var skill_to_use: Dictionary = {}  # Selected skill data
 var skill_menu_panel: PanelContainer = null  # Skill selection menu
 var item_menu_panel: PanelContainer = null  # Item selection menu
+var item_description_label: Label = null  # Item description display
 var capture_menu_panel: PanelContainer = null  # Capture selection menu
 var burst_menu_panel: PanelContainer = null  # Burst selection menu
 var current_skill_menu: Array = []  # Current skills in menu
@@ -109,6 +110,40 @@ func _on_turn_started(combatant_id: String) -> void:
 		return
 
 	log_message("%s's turn!" % current_combatant.display_name)
+
+	# Check if combatant is asleep - skip turn entirely
+	var ailment = str(current_combatant.get("ailment", ""))
+	if ailment == "sleep":
+		log_message("  → %s is fast asleep... (turn skipped)" % current_combatant.display_name)
+		# Wait a moment for readability
+		await get_tree().create_timer(1.0).timeout
+		# End turn immediately
+		battle_mgr.end_turn()
+		return
+
+	# Check for Berserk - attack random target (including allies)
+	if ailment == "berserk":
+		if current_combatant.is_ally:
+			log_message("  → %s is berserk and attacks wildly!" % current_combatant.display_name)
+			await _execute_berserk_action()
+			return
+		else:
+			# Enemies with berserk just attack normally (already random)
+			_execute_enemy_ai()
+			return
+
+	# Check for Charm - use heal/buff items on enemy
+	if ailment == "charm":
+		if current_combatant.is_ally:
+			log_message("  → %s is charmed and aids the enemy!" % current_combatant.display_name)
+			await _execute_charm_action()
+			return
+		else:
+			# Enemies with charm do nothing (have no heal items to use on player)
+			log_message("  → %s is charmed but has no way to help!" % current_combatant.display_name)
+			await get_tree().create_timer(1.0).timeout
+			battle_mgr.end_turn()
+			return
 
 	if current_combatant.is_ally:
 		# Player's turn - show action menu
@@ -345,6 +380,44 @@ func _get_hero_display_name() -> String:
 	# Fallback
 	return "Hero"
 
+func _check_freeze_action_allowed() -> bool:
+	"""Check if a frozen/malaise combatant's action can proceed (30% chance)"""
+	var ailment = str(current_combatant.get("ailment", ""))
+
+	if ailment not in ["freeze", "malaise"]:
+		return true  # Not frozen or malaise, action always allowed
+
+	# Frozen/Malaise: 30% chance to act
+	var success_chance = 30
+	var roll = randi() % 100
+
+	var ailment_name = "freeze" if ailment == "freeze" else "malaise"
+
+	if roll < success_chance:
+		log_message("  → %s struggles through the %s! (%d%% chance, rolled %d)" % [
+			current_combatant.display_name, ailment_name, success_chance, roll
+		])
+		return true
+	else:
+		log_message("  → %s is unable to act due to %s! (%d%% chance, rolled %d)" % [
+			current_combatant.display_name, ailment_name, success_chance, roll
+		])
+		# End turn without acting
+		battle_mgr.end_turn()
+		return false
+
+func _wake_if_asleep(target: Dictionary) -> void:
+	"""Wake up a target if they're asleep (called when taking damage)"""
+	var ailment = str(target.get("ailment", ""))
+
+	if ailment == "sleep":
+		target.ailment = ""
+		target.ailment_turn_count = 0
+		log_message("  → %s woke up from the hit!" % target.display_name)
+		# Refresh turn order to remove sleep indicator
+		if battle_mgr:
+			battle_mgr.refresh_turn_order()
+
 ## ═══════════════════════════════════════════════════════════════
 ## COMBATANT DISPLAY
 ## ═══════════════════════════════════════════════════════════════
@@ -475,6 +548,10 @@ func _execute_attack(target: Dictionary) -> void:
 	awaiting_target_selection = false
 	_clear_target_highlights()
 
+	# Check if frozen combatant can act
+	if not _check_freeze_action_allowed():
+		return
+
 	# Clear defending status when attacking
 	current_combatant.is_defending = false
 
@@ -518,6 +595,10 @@ func _execute_attack(target: Dictionary) -> void:
 
 			# Apply damage
 			target.hp -= damage
+
+			# Wake up if asleep
+			_wake_if_asleep(target)
+
 			if target.hp <= 0:
 				target.hp = 0
 				target.is_ko = true
@@ -639,6 +720,34 @@ func _on_skill_pressed() -> void:
 	# Show skill selection menu
 	_show_skill_menu(skill_menu)
 
+func _categorize_battle_item(item_id: String, item_name: String, item_def: Dictionary) -> String:
+	"""Categorize an item into Restore, Cure, Tactical, or Combat"""
+	var effect = str(item_def.get("battle_status_effect", ""))
+
+	# Check for Cure items (status ailment cures)
+	if item_id.begins_with("CURE_") or "Cure" in effect:
+		return "Cure"
+
+	# Check for Restore items (HP/MP healing, revival, elixirs)
+	if item_id.begins_with("HP_") or item_id.begins_with("MP_") or item_id.begins_with("REV_") or \
+	   item_id.begins_with("HEAL_") or item_id.begins_with("ELX_") or \
+	   "Heal" in effect or "Revive" in effect:
+		return "Restore"
+
+	# Check for Combat items (bombs, AOE damage)
+	if "Bomb" in item_name or "AOE dmg" in effect:
+		return "Combat"
+
+	# Check for Tactical items (buffs, mirrors, speed/defense boosts, escape items)
+	if item_id.begins_with("BUFF_") or item_id.begins_with("TOOL_") or "Reflect" in effect or \
+	   "Up" in effect or "Shield" in effect or "Regen" in effect or \
+	   "Speed" in effect or "Hit%" in effect or "Evasion%" in effect or "SkillHit%" in effect or \
+	   "escape" in effect or "Run%" in effect:
+		return "Tactical"
+
+	# Default to Tactical if we can't determine
+	return "Tactical"
+
 func _on_item_pressed() -> void:
 	"""Handle Item action - show usable items menu"""
 	var inventory = get_node_or_null("/root/aInventorySystem")
@@ -675,13 +784,24 @@ func _on_item_pressed() -> void:
 			category = ""
 		category = str(category)
 
+		# Debug: Print use_type for all items to see what we're getting
+		print("[Battle] Item %s: use_type='%s', category='%s', count=%d" % [item_id_str, use_type, category, count])
+
 		# Include items that can be used in battle (use_type = "battle" or "both")
 		# Exclude bind items (those are for Capture button)
-		if use_type in ["battle", "both"] and category != "Battle Items":
+		# Exclude Sigils (those are equipment, not consumables)
+		if use_type in ["battle", "both"] and category != "Battle Items" and category != "Sigils":
 			var desc = item_def.get("short_description", "")
 			if desc == null:
 				desc = ""
-			desc = str(desc)
+			else:
+				desc = str(desc)
+				if desc == "null":
+					desc = ""
+
+			# Debug: Check what description we're getting
+			if item_id_str.begins_with("BUFF_") or item_id_str.begins_with("BAT_"):
+				print("[Battle] Item %s description: '%s'" % [item_id_str, desc])
 
 			var item_name = item_def.get("name", "")
 			if item_name == null or item_name == "":
@@ -693,6 +813,9 @@ func _on_item_pressed() -> void:
 				targeting = "Ally"
 			targeting = str(targeting)
 
+			# Categorize the item
+			var item_category = _categorize_battle_item(item_id_str, item_name, item_def)
+
 			usable_items.append({
 				"id": item_id_str,
 				"name": item_name,
@@ -700,9 +823,11 @@ func _on_item_pressed() -> void:
 				"description": desc,
 				"count": count,
 				"targeting": targeting,
-				"item_def": item_def
+				"item_def": item_def,
+				"battle_category": item_category
 			})
 
+	print("[Battle] Found %d usable items for battle" % usable_items.size())
 	if usable_items.is_empty():
 		log_message("No usable items!")
 		return
@@ -833,6 +958,10 @@ func _execute_item_usage(target: Dictionary) -> void:
 	awaiting_item_target = false
 	_clear_target_highlights()
 
+	# Check if frozen combatant can act
+	if not _check_freeze_action_allowed():
+		return
+
 	# Get the item that was selected
 	if selected_item.is_empty():
 		log_message("Item usage failed - no item selected!")
@@ -842,31 +971,268 @@ func _execute_item_usage(target: Dictionary) -> void:
 	var item_name: String = selected_item.name
 	var item_def: Dictionary = selected_item.item_def
 
-	log_message("%s uses %s on %s!" % [current_combatant.display_name, item_name, target.display_name])
-
-	# Apply item effects based on battle_status_effect
+	# Get item properties
 	var effect: String = String(item_def.get("battle_status_effect", ""))
+	var duration: int = int(item_def.get("round_duration", 1))
+	var mind_type_tag: String = String(item_def.get("mind_type_tag", "none")).to_lower()
+	var targeting: String = String(item_def.get("targeting", "Ally"))
 
-	if "Heal" in effect:
+	# ═══════ MIRROR ITEMS (Reflect) ═══════
+	if "Reflect" in effect:
+		# Log item usage with target
+		log_message("%s uses %s on %s!" % [current_combatant.display_name, item_name, target.display_name])
+
+		# Extract element type from effect (e.g., "Reflect: Fire (1 hit)")
+		var reflect_type = mind_type_tag  # Use mind_type_tag from item
+		if reflect_type == "none" or reflect_type == "":
+			# Try to extract from effect string
+			var lower_effect = effect.to_lower()
+			if "fire" in lower_effect:
+				reflect_type = "fire"
+			elif "water" in lower_effect:
+				reflect_type = "water"
+			elif "earth" in lower_effect:
+				reflect_type = "earth"
+			elif "air" in lower_effect:
+				reflect_type = "air"
+			elif "data" in lower_effect:
+				reflect_type = "data"
+			elif "void" in lower_effect:
+				reflect_type = "void"
+			elif "any" in lower_effect or "mind" in lower_effect:
+				reflect_type = "any"
+
+		# Add reflect buff
+		if not target.has("buffs"):
+			target.buffs = []
+
+		target.buffs.append({
+			"type": "reflect",
+			"element": reflect_type,
+			"duration": duration,
+			"source": item_name
+		})
+
+		log_message("  → %s is protected by a %s Mirror! (Duration: %d rounds)" % [target.display_name, reflect_type.capitalize(), duration])
+
+	# ═══════ BOMB ITEMS (AOE Damage) ═══════
+	elif "AOE" in effect or "Bomb" in item_name:
+		# Get bomb element from mind_type_tag
+		var bomb_element = mind_type_tag
+
+		# Calculate bomb damage (fixed potency for now, can be adjusted)
+		var base_damage = 50  # Base bomb damage (50 direct AOE damage)
+		var bomb_targets = battle_mgr.get_enemy_combatants()
+
+		log_message("  → %s explodes, hitting all enemies!" % item_name)
+
+		var ko_list = []  # Track defeated enemies for animation
+
+		for enemy in bomb_targets:
+			if enemy.is_ko:
+				continue
+
+			# Apply type effectiveness
+			var type_bonus = 0.0
+			if bomb_element != "none" and combat_resolver:
+				# Create a temp attacker dict with the bomb's element
+				var temp_attacker = {"mind_type": bomb_element}
+				type_bonus = combat_resolver.get_mind_type_bonus(temp_attacker, enemy)
+
+			var damage = int(base_damage * (1.0 + type_bonus))
+			enemy.hp = max(0, enemy.hp - damage)
+
+			var type_msg = ""
+			if type_bonus > 0:
+				type_msg = " (Weakness!)"
+			elif type_bonus < 0:
+				type_msg = " (Resisted)"
+
+			log_message("    %s takes %d damage%s!" % [enemy.display_name, damage, type_msg])
+
+			# Check for KO
+			if enemy.hp <= 0:
+				enemy.is_ko = true
+				log_message("    %s was defeated!" % enemy.display_name)
+				battle_mgr.record_enemy_defeat(enemy, false)
+				ko_list.append(enemy)
+
+		_update_combatant_displays()
+
+		# Animate KO fall for each defeated enemy (refresh after each one)
+		if ko_list.size() > 0:
+			for ko_enemy in ko_list:
+				if turn_order_display:
+					await turn_order_display.animate_ko_fall(ko_enemy.id)
+				battle_mgr.refresh_turn_order()
+
+	# ═══════ FLASH POP (Evasion + Run Boost) ═══════
+	elif "Run%" in effect:
+		# Log item usage with target
+		log_message("%s uses %s on %s!" % [current_combatant.display_name, item_name, target.display_name])
+
+		if not target.has("buffs"):
+			target.buffs = []
+
+		# Extract run% bonus from effect (e.g., "Run% +20%")
+		var run_bonus = 20.0  # Default bonus
+		var regex = RegEx.new()
+		regex.compile("Run%\\s*\\+?(\\d+)%?")
+		var result = regex.search(effect)
+		if result:
+			run_bonus = float(result.get_string(1))
+
+		# Add run boost buff
+		target.buffs.append({
+			"type": "run_boost",
+			"value": run_bonus,
+			"duration": duration,
+			"source": item_name
+		})
+
+		log_message("  → %s's escape chance increased by %d%%!" % [target.display_name, int(run_bonus)])
+
+		# Also apply evasion buff if present
+		if "Evasion Up" in effect:
+			var evasion_value = 10  # Default +10% evasion
+			var evasion_regex = RegEx.new()
+			evasion_regex.compile("Evasion Up \\+?(\\d+)%")
+			var evasion_result = evasion_regex.search(effect)
+			if evasion_result:
+				evasion_value = int(evasion_result.get_string(1))
+
+			target.buffs.append({
+				"type": "evasion",
+				"value": evasion_value,
+				"duration": duration,
+				"source": item_name
+			})
+			log_message("  → %s's evasion increased by %d%% for %d round(s)!" % [target.display_name, evasion_value, duration])
+
+	# ═══════ BUFF ITEMS (ATK Up, MND Up, Shield, etc.) ═══════
+	elif "Up" in effect or "Shield" in effect or "Regen" in effect or "Speed" in effect or "Hit%" in effect or "Evasion%" in effect or "SkillHit%" in effect:
+		# Log item usage with target
+		log_message("%s uses %s on %s!" % [current_combatant.display_name, item_name, target.display_name])
+
+		# Determine buff type and magnitude
+		var buff_type = ""
+		var buff_value = 0.0
+
+		if "ATK Up" in effect or "Attack Up" in effect:
+			buff_type = "atk_up"
+			buff_value = 0.15  # +15% ATK
+		elif "SKL Up" in effect or "Skill Up" in effect or "MND Up" in effect:
+			buff_type = "skl_up"
+			buff_value = 0.15  # +15% SKL
+		elif "DEF Up" in effect or "Defense Up" in effect or "Shield" in effect or "-20% dmg" in effect:
+			buff_type = "def_up"
+			buff_value = 0.20  # -20% damage taken
+		elif "Regen" in effect or "Health Up" in effect:
+			buff_type = "regen"
+			buff_value = 0.10  # 10% HP per round
+		elif "+10 Speed" in effect or "Speed Up" in effect:
+			buff_type = "spd_up"
+			buff_value = 10.0  # +10 Speed (flat bonus)
+		elif "+10 Hit%" in effect or "Hit% Up" in effect:
+			buff_type = "phys_acc"
+			buff_value = 0.10  # +10% physical Hit%
+		elif "+10 Evasion%" in effect or "Evasion% Up" in effect:
+			buff_type = "evasion"
+			buff_value = 0.10  # +10% Eva%
+		elif "+10 SkillHit%" in effect or "SkillHit% Up" in effect:
+			buff_type = "mind_acc"
+			buff_value = 0.10  # +10% Skill Hit%
+
+		if buff_type != "":
+			battle_mgr.apply_buff(target, buff_type, buff_value, duration)
+			log_message("  → %s gained %s for %d turns!" % [target.display_name, buff_type.replace("_", " ").capitalize(), duration])
+
+	# ═══════ CURE ITEMS (Remove ailments) ═══════
+	elif "Cure" in effect:
+		# Log item usage with target
+		log_message("%s uses %s on %s!" % [current_combatant.display_name, item_name, target.display_name])
+
+		var cured_ailment = ""
+		if "Poison" in effect:
+			cured_ailment = "poison"
+		elif "Burn" in effect:
+			cured_ailment = "burn"
+		elif "Sleep" in effect:
+			cured_ailment = "sleep"
+		elif "Freeze" in effect:
+			cured_ailment = "freeze"
+		elif "Confuse" in effect:
+			cured_ailment = "confused"
+		elif "Charm" in effect:
+			cured_ailment = "charm"
+		elif "Berserk" in effect:
+			cured_ailment = "berserk"
+		elif "Malaise" in effect:
+			cured_ailment = "malaise"
+		elif "Attack Down" in effect:
+			# Remove attack down debuff
+			if target.has("debuffs"):
+				target.debuffs = target.debuffs.filter(func(d): return d.get("type", "") != "attack_down")
+			log_message("  → Cured Attack Down!")
+		elif "Defense Down" in effect:
+			if target.has("debuffs"):
+				target.debuffs = target.debuffs.filter(func(d): return d.get("type", "") != "defense_down")
+			log_message("  → Cured Defense Down!")
+		elif "Mind Down" in effect:
+			if target.has("debuffs"):
+				target.debuffs = target.debuffs.filter(func(d): return d.get("type", "") != "mind_down")
+			log_message("  → Cured Mind Down!")
+
+		if cured_ailment != "":
+			var current_ailment = str(target.get("ailment", ""))
+			if current_ailment == cured_ailment:
+				target.ailment = ""
+				target.ailment_turn_count = 0
+				log_message("  → Cured %s!" % cured_ailment.capitalize())
+				# Refresh turn order to remove status indicator
+				if battle_mgr:
+					battle_mgr.refresh_turn_order()
+			else:
+				log_message("  → %s doesn't have %s!" % [target.display_name, cured_ailment.capitalize()])
+
+	# ═══════ HEAL ITEMS ═══════
+	elif "Heal" in effect:
+		# Log item usage with target
+		log_message("%s uses %s on %s!" % [current_combatant.display_name, item_name, target.display_name])
+
 		# Parse heal amount from effect string (e.g., "Heal 50 HP")
 		var hp_heal = 0
 		var mp_heal = 0
 
 		if "HP" in effect:
-			# Extract number before "HP"
+			# Extract number or percentage before "HP"
 			var regex = RegEx.new()
-			regex.compile("(\\d+)\\s*HP")
+			regex.compile("(\\d+)\\s*%?\\s*[HM]")  # Match "50 HP" or "25% HP" or "50% MaxHP"
 			var result = regex.search(effect)
 			if result:
-				hp_heal = int(result.get_string(1))
+				var value_str = result.get_string(1)
+				var heal_value = int(value_str)
+
+				# Check if it's a percentage heal
+				if "%" in effect:
+					hp_heal = int(target.hp_max * heal_value / 100.0)
+				else:
+					hp_heal = heal_value
 
 		if "MP" in effect:
-			# Extract number before "MP"
+			# Extract number or percentage before "MP"
 			var regex = RegEx.new()
-			regex.compile("(\\d+)\\s*MP")
+			regex.compile("(\\d+)\\s*%?\\s*[HM]")
 			var result = regex.search(effect)
 			if result:
-				mp_heal = int(result.get_string(1))
+				var value_str = result.get_string(1)
+				var heal_value = int(value_str)
+
+				# Check if it's a percentage heal
+				if "%" in effect:
+					mp_heal = int(target.mp_max * heal_value / 100.0)
+				else:
+					mp_heal = heal_value
 
 		# Apply healing
 		if hp_heal > 0:
@@ -884,6 +1250,86 @@ func _execute_item_usage(target: Dictionary) -> void:
 		# Update displays
 		_update_combatant_displays()
 
+	# ═══════ REVIVE ITEMS ═══════
+	elif "Revive" in effect:
+		# Log item usage with target
+		log_message("%s uses %s on %s!" % [current_combatant.display_name, item_name, target.display_name])
+
+		if target.is_ko:
+			# Extract revive percentage
+			var revive_percent = 25  # Default 25%
+			var regex = RegEx.new()
+			regex.compile("(\\d+)\\s*%")
+			var result = regex.search(effect)
+			if result:
+				revive_percent = int(result.get_string(1))
+
+			target.is_ko = false
+			target.hp = max(1, int(target.hp_max * revive_percent / 100.0))
+			log_message("  → %s was revived with %d HP!" % [target.display_name, target.hp])
+			_update_combatant_displays()
+		else:
+			log_message("  → %s is not KO'd!" % target.display_name)
+
+	# ═══════ AILMENT/DEBUFF ITEMS (Inflict Status) ═══════
+	# Check if this item inflicts an ailment or debuff
+	var ailment_to_apply = ""
+	var debuff_to_apply = ""
+
+	# Match ailments
+	if "Poison" in effect and "Cure" not in effect:
+		ailment_to_apply = "poison"
+	elif "Burn" in effect and "Cure" not in effect:
+		ailment_to_apply = "burn"
+	elif "Sleep" in effect and "Cure" not in effect:
+		ailment_to_apply = "sleep"
+	elif "Freeze" in effect and "Cure" not in effect:
+		ailment_to_apply = "freeze"
+	elif "Confuse" in effect and "Cure" not in effect:
+		ailment_to_apply = "confuse"
+	elif "Charm" in effect and "Cure" not in effect:
+		ailment_to_apply = "charm"
+	elif "Berserk" in effect and "Cure" not in effect:
+		ailment_to_apply = "berserk"
+	elif "Malaise" in effect and "Cure" not in effect:
+		ailment_to_apply = "malaise"
+	elif "Mind Block" in effect and "Cure" not in effect:
+		ailment_to_apply = "mind_block"
+
+	# Match debuffs
+	if "Attack Down" in effect and "Cure" not in effect:
+		debuff_to_apply = "atk_down"
+	elif "Defense Down" in effect and "Cure" not in effect:
+		debuff_to_apply = "def_down"
+	elif "Skill Down" in effect and "Cure" not in effect:
+		debuff_to_apply = "skl_down"
+	elif "Mind Down" in effect and "Cure" not in effect:
+		debuff_to_apply = "skl_down"  # Mind Down same as Skill Down
+
+	# Apply ailment if found
+	if ailment_to_apply != "":
+		log_message("%s uses %s on %s!" % [current_combatant.display_name, item_name, target.display_name])
+		target.ailment = ailment_to_apply
+		target.ailment_turn_count = 0  # Track how many turns they've had this ailment
+		log_message("  → %s is now %s!" % [target.display_name, ailment_to_apply.capitalize()])
+		# Refresh turn order to show status
+		if battle_mgr:
+			battle_mgr.refresh_turn_order()
+
+	# Apply debuff if found
+	if debuff_to_apply != "":
+		if ailment_to_apply == "":  # Only log if we didn't already log for ailment
+			log_message("%s uses %s on %s!" % [current_combatant.display_name, item_name, target.display_name])
+
+		# Debuffs are negative buffs (-15% for stat debuffs)
+		battle_mgr.apply_buff(target, debuff_to_apply, -0.15, duration)
+
+		var debuff_name = debuff_to_apply.replace("_", " ").capitalize()
+		log_message("  → %s's %s reduced by 15%% for %d turns!" % [target.display_name, debuff_name, duration])
+		# Refresh turn order to show debuff
+		if battle_mgr:
+			battle_mgr.refresh_turn_order()
+
 	# Consume the item
 	var inventory = get_node("/root/aInventorySystem")
 	inventory.remove_item(item_id, 1)
@@ -893,6 +1339,10 @@ func _execute_item_usage(target: Dictionary) -> void:
 
 func _on_defend_pressed() -> void:
 	"""Handle Defend action"""
+	# Check if frozen combatant can act
+	if not _check_freeze_action_allowed():
+		return
+
 	log_message("%s moved into a defensive stance." % current_combatant.display_name)
 	current_combatant.is_defending = true
 
@@ -901,6 +1351,10 @@ func _on_defend_pressed() -> void:
 
 func _on_burst_pressed() -> void:
 	"""Handle Burst action - show burst abilities menu"""
+	# Check if frozen combatant can act
+	if not _check_freeze_action_allowed():
+		return
+
 	# Only hero can use burst abilities
 	if current_combatant.get("id", "") != "hero":
 		log_message("Only %s can use Burst abilities!" % _get_hero_display_name())
@@ -940,6 +1394,10 @@ func _on_burst_pressed() -> void:
 
 func _on_run_pressed() -> void:
 	"""Handle Run action"""
+	# Check if frozen combatant can act
+	if not _check_freeze_action_allowed():
+		return
+
 	# Check if run was already attempted this round
 	if battle_mgr.run_attempted_this_round:
 		log_message("Already tried to run this round!")
@@ -1000,15 +1458,31 @@ func _calculate_run_chance() -> float:
 	if level_difference > 0:
 		level_bonus = min(level_difference, 10) * LEVEL_BONUS_PER_LEVEL
 
+	# Check for run chance bonus from items (Flash Pop buff on current combatant)
+	var item_bonus: float = 0.0
+	if current_combatant and current_combatant.has("buffs"):
+		for buff in current_combatant.buffs:
+			if buff.get("type", "") == "run_boost":
+				item_bonus = buff.get("value", 0.0)
+				break
+
 	# Calculate final run chance
-	var final_chance: float = BASE_RUN_CHANCE + hp_bonus + level_bonus
+	var final_chance: float = BASE_RUN_CHANCE + hp_bonus + level_bonus + item_bonus
 
 	# Log breakdown for debugging
-	log_message("  Base: %d%% | HP Bonus: +%d%% | Level Bonus: +%d%%" % [
-		int(BASE_RUN_CHANCE),
-		int(hp_bonus),
-		int(level_bonus)
-	])
+	if item_bonus > 0:
+		log_message("  Base: %d%% | HP Bonus: +%d%% | Level Bonus: +%d%% | Item Bonus: +%d%%" % [
+			int(BASE_RUN_CHANCE),
+			int(hp_bonus),
+			int(level_bonus),
+			int(item_bonus)
+		])
+	else:
+		log_message("  Base: %d%% | HP Bonus: +%d%% | Level Bonus: +%d%%" % [
+			int(BASE_RUN_CHANCE),
+			int(hp_bonus),
+			int(level_bonus)
+		])
 
 	return final_chance
 
@@ -1157,6 +1631,10 @@ func _execute_enemy_ai() -> void:
 
 			# Apply damage
 			target.hp -= damage
+
+			# Wake up if asleep
+			_wake_if_asleep(target)
+
 			if target.hp <= 0:
 				target.hp = 0
 				target.is_ko = true
@@ -1228,6 +1706,79 @@ func _execute_enemy_ai() -> void:
 	await get_tree().create_timer(1.0).timeout
 
 	# End turn
+	battle_mgr.end_turn()
+
+func _execute_berserk_action() -> void:
+	"""Execute berserk behavior - attack random target including allies"""
+	await get_tree().create_timer(0.5).timeout
+
+	# Clear defending status
+	current_combatant.is_defending = false
+
+	# Get all alive combatants (allies and enemies)
+	var all_targets = []
+	for c in battle_mgr.combatants:
+		if not c.is_ko and c.id != current_combatant.id:  # Don't target self
+			all_targets.append(c)
+
+	if all_targets.size() > 0:
+		var target = all_targets[randi() % all_targets.size()]
+		log_message("  → %s attacks %s in a berserk rage!" % [current_combatant.display_name, target.display_name])
+
+		# Execute attack (same as normal attack)
+		await _execute_attack(target)
+	else:
+		log_message("  → No one to attack!")
+		await get_tree().create_timer(1.0).timeout
+
+	battle_mgr.end_turn()
+
+func _execute_charm_action() -> void:
+	"""Execute charm behavior - use heal/buff items on enemies"""
+	await get_tree().create_timer(0.5).timeout
+
+	# Get inventory system
+	var inventory = get_node("/root/aInventorySystem")
+	var item_counts = inventory.get_counts_dict()
+	var item_defs = inventory.get_item_defs()
+
+	# Get heal/buff items from inventory
+	var heal_buff_items = []
+	for item_id in item_counts.keys():
+		var quantity = item_counts[item_id]
+		if quantity > 0:
+			var item_def = item_defs.get(item_id, {})
+			var category = _categorize_battle_item(item_id, item_def.get("name", ""), item_def)
+			if category in ["Healing", "Buffs"]:
+				heal_buff_items.append({"id": item_id, "def": item_def})
+
+	if heal_buff_items.size() > 0:
+		# Pick random item
+		var item_data = heal_buff_items[randi() % heal_buff_items.size()]
+		var item_id = item_data.id
+		var item_def = item_data.def
+
+		# Pick random alive enemy as target
+		var enemies = battle_mgr.get_enemy_combatants()
+		var alive_enemies = enemies.filter(func(e): return not e.is_ko)
+
+		if alive_enemies.size() > 0:
+			var target = alive_enemies[randi() % alive_enemies.size()]
+			log_message("  → %s uses %s on %s!" % [
+				current_combatant.display_name,
+				item_def.get("name", item_id),
+				target.display_name
+			])
+
+			# Use the item
+			inventory.remove_item(item_id, 1)
+			await _execute_item_usage(target)
+		else:
+			log_message("  → No enemies to help!")
+	else:
+		log_message("  → No healing or buff items to use!")
+
+	await get_tree().create_timer(1.0).timeout
 	battle_mgr.end_turn()
 
 ## ═══════════════════════════════════════════════════════════════
@@ -1464,13 +2015,30 @@ func _close_skill_menu() -> void:
 ## ═══════════════════════════════════════════════════════════════
 
 func _show_item_menu(items: Array) -> void:
-	"""Show item selection menu"""
+	"""Show item selection menu with categorized tabs"""
 	# Hide action menu
 	action_menu.visible = false
 
+	# Categorize items
+	var restore_items = []
+	var cure_items = []
+	var tactical_items = []
+	var combat_items = []
+
+	for item in items:
+		var category = item.get("battle_category", "Tactical")
+		if category == "Restore":
+			restore_items.append(item)
+		elif category == "Cure":
+			cure_items.append(item)
+		elif category == "Tactical":
+			tactical_items.append(item)
+		elif category == "Combat":
+			combat_items.append(item)
+
 	# Create item menu panel
 	item_menu_panel = PanelContainer.new()
-	item_menu_panel.custom_minimum_size = Vector2(400, 0)
+	item_menu_panel.custom_minimum_size = Vector2(550, 0)
 
 	# Style the panel
 	var style = StyleBoxFlat.new()
@@ -1497,35 +2065,91 @@ func _show_item_menu(items: Array) -> void:
 	var sep1 = HSeparator.new()
 	vbox.add_child(sep1)
 
-	# Add item buttons
-	for i in range(items.size()):
-		var item_data = items[i]
-		var item_name = str(item_data.get("name", "Unknown"))
-		var item_desc = str(item_data.get("description", ""))
-		var item_count = int(item_data.get("count", 0))
+	# Create tab container
+	var tab_container = TabContainer.new()
+	tab_container.custom_minimum_size = Vector2(530, 300)
+	vbox.add_child(tab_container)
 
-		var button = Button.new()
-		button.text = "%s (x%d)\n%s" % [item_name, item_count, item_desc]
-		button.custom_minimum_size = Vector2(380, 50)
-		button.pressed.connect(_on_item_selected.bind(item_data))
-		vbox.add_child(button)
+	# Add category tabs (Restore, Cure, Tactical, Combat)
+	_add_category_tab(tab_container, "Restore", restore_items)
+	_add_category_tab(tab_container, "Cure", cure_items)
+	_add_category_tab(tab_container, "Tactical", tactical_items)
+	_add_category_tab(tab_container, "Combat", combat_items)
 
-	# Add cancel button
+	# Add separator
 	var sep2 = HSeparator.new()
 	vbox.add_child(sep2)
 
+	# Add description label
+	item_description_label = Label.new()
+	item_description_label.text = "Hover over an item to see its description"
+	item_description_label.add_theme_font_size_override("font_size", 14)
+	item_description_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	item_description_label.custom_minimum_size = Vector2(530, 60)
+	item_description_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	vbox.add_child(item_description_label)
+
+	# Add separator
+	var sep3 = HSeparator.new()
+	vbox.add_child(sep3)
+
+	# Add cancel button
 	var cancel_btn = Button.new()
 	cancel_btn.text = "Cancel"
-	cancel_btn.custom_minimum_size = Vector2(380, 40)
+	cancel_btn.custom_minimum_size = Vector2(530, 40)
 	cancel_btn.pressed.connect(_close_item_menu)
 	vbox.add_child(cancel_btn)
 
 	# Add to scene and center
 	add_child(item_menu_panel)
 	item_menu_panel.position = Vector2(
-		(get_viewport_rect().size.x - 400) / 2,
-		(get_viewport_rect().size.y - vbox.size.y) / 2
+		(get_viewport_rect().size.x - 550) / 2,
+		(get_viewport_rect().size.y - 400) / 2
 	)
+
+func _add_category_tab(tab_container: TabContainer, category_name: String, category_items: Array) -> void:
+	"""Add a tab for a specific item category with two-column layout"""
+	# Create scroll container for items
+	var scroll = ScrollContainer.new()
+	scroll.name = category_name
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	tab_container.add_child(scroll)
+
+	# Create GridContainer for two-column layout
+	var grid = GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", 10)
+	grid.add_theme_constant_override("v_separation", 5)
+	scroll.add_child(grid)
+
+	# Show message if no items in this category
+	if category_items.is_empty():
+		var empty_label = Label.new()
+		empty_label.text = "No items in this category"
+		empty_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		empty_label.add_theme_font_size_override("font_size", 14)
+		grid.add_child(empty_label)
+		return
+
+	# Add item buttons in two columns
+	for item_data in category_items:
+		var item_name = str(item_data.get("name", "Unknown"))
+		var item_count = int(item_data.get("count", 0))
+		var item_desc = str(item_data.get("description", ""))
+
+		# Debug: Check what description we have in item_data
+		var item_id = str(item_data.get("id", ""))
+		if item_id.begins_with("BUFF_") or item_id.begins_with("BAT_") or item_id.begins_with("HP_"):
+			print("[Battle] Creating button for %s: description in item_data = '%s'" % [item_id, item_desc])
+
+		var button = Button.new()
+		button.text = "%s (x%d)" % [item_name, item_count]
+		button.custom_minimum_size = Vector2(250, 40)
+		button.pressed.connect(_on_item_selected.bind(item_data))
+		button.mouse_entered.connect(_on_item_hover.bind(item_name, item_desc))
+		button.mouse_exited.connect(_on_item_unhover)
+		grid.add_child(button)
 
 func _close_item_menu() -> void:
 	"""Close the item menu"""
@@ -1533,8 +2157,45 @@ func _close_item_menu() -> void:
 		item_menu_panel.queue_free()
 		item_menu_panel = null
 
+	item_description_label = null
+
 	# Show action menu again
 	action_menu.visible = true
+
+func _on_item_hover(item_name: String, item_desc: String) -> void:
+	"""Show item description when hovering over button"""
+	if item_description_label:
+		if item_desc != "":
+			item_description_label.text = "%s: %s" % [item_name, item_desc]
+		else:
+			item_description_label.text = "%s" % item_name
+
+func _on_item_unhover() -> void:
+	"""Reset item description when mouse leaves button"""
+	if item_description_label:
+		item_description_label.text = "Hover over an item to see its description"
+
+func _execute_auto_escape_item(item_data: Dictionary) -> void:
+	"""Execute auto-escape item (Smoke Grenade only)"""
+	var item_id: String = item_data.get("id", "")
+	var item_name: String = item_data.get("name", "Unknown")
+
+	log_message("%s uses %s!" % [current_combatant.display_name, item_name])
+
+	# Consume the item
+	var inventory = get_node_or_null("/root/aInventorySystem")
+	if inventory:
+		inventory.remove_item(item_id, 1)
+	else:
+		push_error("Inventory system not available!")
+
+	# Auto-escape effect
+	log_message("  → Smoke fills the battlefield!")
+	await get_tree().create_timer(1.0).timeout
+	log_message("The party escapes successfully!")
+	await get_tree().create_timer(1.0).timeout
+	battle_mgr.current_state = battle_mgr.BattleState.ESCAPED
+	battle_mgr.return_to_overworld()
 
 func _on_item_selected(item_data: Dictionary) -> void:
 	"""Handle item selection from menu"""
@@ -1544,13 +2205,29 @@ func _on_item_selected(item_data: Dictionary) -> void:
 	selected_item = item_data
 
 	var targeting = str(item_data.get("targeting", "Ally"))
+	var item_def = item_data.get("item_def", {})
+	var effect = str(item_def.get("battle_status_effect", ""))
+
+	# Special handling for auto-escape items (Smoke Grenade only)
+	if "Auto-escape" in effect:
+		# Execute auto-escape immediately without target selection
+		_execute_auto_escape_item(item_data)
+		return
+
+	# Special handling for AllEnemies targeting (Bombs)
+	if targeting == "AllEnemies":
+		# Bombs hit all enemies, no target selection needed
+		log_message("%s uses %s!" % [current_combatant.display_name, str(item_data.get("name", "item"))])
+		_execute_item_usage({})  # Pass empty dict since bombs hit all enemies
+		return
+
 	log_message("Using %s - select target..." % str(item_data.get("name", "item")))
 
 	# Determine target candidates
 	if targeting == "Ally":
 		var allies = battle_mgr.get_ally_combatants()
 		target_candidates = allies.filter(func(a): return not a.is_ko)
-	else:  # Enemy
+	else:  # Enemy (single target)
 		var enemies = battle_mgr.get_enemy_combatants()
 		target_candidates = enemies.filter(func(e): return not e.is_ko)
 
@@ -1601,6 +2278,17 @@ func _show_capture_menu(bind_items: Array) -> void:
 	var sep1 = HSeparator.new()
 	vbox.add_child(sep1)
 
+	# Create scroll container for bind items (show max 5 items at a time)
+	var scroll = ScrollContainer.new()
+	scroll.custom_minimum_size = Vector2(380, min(bind_items.size(), 5) * 55)  # 55px per item (50px button + 5px spacing)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	vbox.add_child(scroll)
+
+	# Create VBox for scrollable bind item buttons
+	var items_vbox = VBoxContainer.new()
+	scroll.add_child(items_vbox)
+
 	# Add bind item buttons
 	for i in range(bind_items.size()):
 		var bind_data = bind_items[i]
@@ -1611,9 +2299,9 @@ func _show_capture_menu(bind_items: Array) -> void:
 
 		var button = Button.new()
 		button.text = "%s (x%d) [+%d%%]\n%s" % [bind_name, bind_count, capture_mod, bind_desc]
-		button.custom_minimum_size = Vector2(380, 50)
+		button.custom_minimum_size = Vector2(360, 50)  # Slightly smaller to account for scrollbar
 		button.pressed.connect(_on_bind_selected.bind(bind_data))
-		vbox.add_child(button)
+		items_vbox.add_child(button)
 
 	# Add cancel button
 	var sep2 = HSeparator.new()
@@ -1912,6 +2600,10 @@ func _execute_burst_on_target(target: Dictionary) -> void:
 
 	# Apply damage
 	target.hp -= damage
+
+	# Wake up if asleep
+	_wake_if_asleep(target)
+
 	if target.hp <= 0:
 		target.hp = 0
 		target.is_ko = true
@@ -1982,6 +2674,10 @@ func _on_skill_selected(skill_entry: Dictionary) -> void:
 
 func _execute_skill_single(target: Dictionary) -> void:
 	"""Execute a single-target skill"""
+	# Check if frozen combatant can act
+	if not _check_freeze_action_allowed():
+		return
+
 	var skill_name = String(skill_to_use.get("name", "Unknown"))
 	var mp_cost = int(skill_to_use.get("cost_mp", 0))
 	var element = String(skill_to_use.get("element", "none")).to_lower()
@@ -2011,6 +2707,68 @@ func _execute_skill_single(target: Dictionary) -> void:
 	if not hit_check.hit:
 		log_message("  → Missed! (%d%% chance, rolled %d)" % [int(hit_check.hit_chance), hit_check.roll])
 		return
+
+	# ═══════ CHECK FOR REFLECT (MIRROR) ═══════
+	if target.has("buffs") and element != "none" and element != "":
+		for i in range(target.buffs.size()):
+			var buff = target.buffs[i]
+			if buff.get("type", "") == "reflect":
+				var reflect_element = buff.get("element", "")
+
+				# Check if this mirror reflects this element
+				var should_reflect = false
+				if reflect_element == "any":
+					should_reflect = true  # Mind Mirror reflects any element
+				elif reflect_element == element:
+					should_reflect = true  # Element-specific mirror
+
+				if should_reflect:
+					# REFLECT! The skill bounces back to the attacker
+					log_message("  → %s's Mirror reflects the attack!" % target.display_name)
+
+					# Remove the reflect buff (it's consumed)
+					target.buffs.remove_at(i)
+
+					# Redirect the skill to the attacker
+					var original_attacker = current_combatant
+					var new_target = current_combatant  # The attacker becomes the target
+
+					# Calculate damage for reflected skill
+					var reflect_type_bonus = 0.0
+					if element != "none" and element != "":
+						reflect_type_bonus = combat_resolver.get_mind_type_bonus(
+							{"mind_type": element},
+							new_target,
+							element
+						)
+
+					# Calculate reflected damage (no crit on reflect)
+					var reflect_damage_result = combat_resolver.calculate_sigil_damage(
+						original_attacker,  # Still uses attacker's stats
+						new_target,
+						{
+							"potency": 100,
+							"is_crit": false,  # Reflected attacks don't crit
+							"type_bonus": reflect_type_bonus,
+							"base_sig": power,
+							"mnd_scale": mnd_scaling
+						}
+					)
+
+					var reflect_damage = reflect_damage_result.damage
+
+					# Apply reflected damage
+					new_target.hp -= reflect_damage
+					if new_target.hp <= 0:
+						new_target.hp = 0
+						new_target.is_ko = true
+						log_message("  → %s was defeated by the reflection!" % new_target.display_name)
+					else:
+						log_message("  → %s takes %d reflected damage!" % [new_target.display_name, reflect_damage])
+
+					# Update displays and end skill
+					_update_combatant_displays()
+					return  # Skill ends here, original target takes no damage
 
 	# Roll for crit
 	var crit_check = combat_resolver.check_critical_hit(current_combatant, {"skill_crit_bonus": crit_bonus})
@@ -2054,6 +2812,10 @@ func _execute_skill_single(target: Dictionary) -> void:
 
 	# Apply damage
 	target.hp -= damage
+
+	# Wake up if asleep
+	_wake_if_asleep(target)
+
 	if target.hp <= 0:
 		target.hp = 0
 		target.is_ko = true
@@ -2099,6 +2861,10 @@ func _execute_skill_single(target: Dictionary) -> void:
 
 func _execute_skill_aoe() -> void:
 	"""Execute an AoE skill on all valid targets"""
+	# Check if frozen combatant can act
+	if not _check_freeze_action_allowed():
+		return
+
 	var skill_name = String(skill_to_use.get("name", "Unknown"))
 	var mp_cost = int(skill_to_use.get("cost_mp", 0))
 

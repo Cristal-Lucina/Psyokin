@@ -1197,6 +1197,36 @@ func _give_test_bind_items() -> void:
 	inv.add_item("CON_001", 10)  # Health Drink (50 HP)
 	inv.add_item("CON_002", 10)  # Mind Drink (30 MP)
 
+	# Give buff items for testing
+	inv.add_item("BUFF_001", 5)  # Protein Shake (ATK Up +25%, 3r)
+	inv.add_item("BUFF_002", 5)  # Espresso Shot (MND Up +25%, 3r)
+	inv.add_item("BUFF_003", 3)  # Regen Orb (HoT 5%/turn, 5r)
+	inv.add_item("BUFF_004", 3)  # Speed Orb (+10 Speed, 3r)
+	inv.add_item("BUFF_005", 3)  # Shield Orb (-20% dmg taken, 3r)
+	inv.add_item("BUFF_006", 5)  # Eye Drops (+10 Hit%, 3r)
+	inv.add_item("BUFF_007", 5)  # Hyper Chews (+10 Eva%, 3r)
+	inv.add_item("BUFF_008", 3)  # Focus Tonic (+10 SkillHit%, 3r)
+
+	# Give cure/vitamin items for testing
+	inv.add_item("CURE_009", 3)  # Vitamin D (Cure ATK Down)
+	inv.add_item("CURE_010", 3)  # Vitamin C (Cure DEF Down)
+	inv.add_item("CURE_011", 3)  # Vitamin B (Cure MND Down)
+
+	# Give mirror items for testing
+	inv.add_item("BAT_001", 2)  # Fire Mirror (Reflect next Fire hit)
+	inv.add_item("BAT_002", 2)  # Water Mirror (Reflect next Water hit)
+	inv.add_item("BAT_003", 2)  # Earth Mirror (Reflect next Earth hit)
+	inv.add_item("BAT_004", 2)  # Air Mirror (Reflect next Air hit)
+	inv.add_item("BAT_005", 1)  # Data Mirror (Reflect next Data hit)
+	inv.add_item("BAT_006", 1)  # Void Mirror (Reflect next Void hit)
+	inv.add_item("BAT_007", 1)  # Mind Mirror (Reflect any element)
+
+	# Give bomb items for testing
+	inv.add_item("BAT_008", 3)  # Fire Bomb (AOE Fire damage)
+	inv.add_item("BAT_009", 3)  # Water Bomb (AOE Water damage)
+	inv.add_item("BAT_010", 3)  # Earth Bomb (AOE Earth damage)
+	inv.add_item("BAT_011", 3)  # Air Bomb (AOE Air damage)
+
 	print("[Main] DEBUG: Added test items to inventory")
 	print("  Bind Items:")
 	print("    - Weak Bind x5")
@@ -1205,3 +1235,16 @@ func _give_test_bind_items() -> void:
 	print("  Consumables:")
 	print("    - Health Drink x10")
 	print("    - Mind Drink x10")
+	print("  Buff Items:")
+	print("    - Protein Shake x5 (ATK Up)")
+	print("    - Espresso Shot x5 (MND Up)")
+	print("    - Regen/Speed/Shield Orbs x3 each")
+	print("    - Eye Drops/Hyper Chews x5 each")
+	print("  Cure Items:")
+	print("    - Vitamins D/C/B x3 each")
+	print("  Mirror Items:")
+	print("    - Fire/Water/Earth/Air Mirrors x2 each")
+	print("    - Data/Void Mirrors x1 each")
+	print("    - Mind Mirror x1 (reflects any element!)")
+	print("  Bomb Items:")
+	print("    - Fire/Water/Earth/Air Bombs x3 each")
