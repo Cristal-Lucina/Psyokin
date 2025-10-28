@@ -1308,13 +1308,19 @@ func _execute_item_usage(target: Dictionary) -> void:
 
 	# Apply ailment if found
 	if ailment_to_apply != "":
-		log_message("%s uses %s on %s!" % [current_combatant.display_name, item_name, target.display_name])
-		target.ailment = ailment_to_apply
-		target.ailment_turn_count = 0  # Track how many turns they've had this ailment
-		log_message("  → %s is now %s!" % [target.display_name, ailment_to_apply.capitalize()])
-		# Refresh turn order to show status
-		if battle_mgr:
-			battle_mgr.refresh_turn_order()
+		# Check if target already has an ailment (only one independent ailment allowed)
+		var current_ailment = str(target.get("ailment", ""))
+		if current_ailment != "" and current_ailment != "null":
+			log_message("%s uses %s on %s!" % [current_combatant.display_name, item_name, target.display_name])
+			log_message("  → But %s already has %s! (Ailment blocked)" % [target.display_name, current_ailment.capitalize()])
+		else:
+			log_message("%s uses %s on %s!" % [current_combatant.display_name, item_name, target.display_name])
+			target.ailment = ailment_to_apply
+			target.ailment_turn_count = 0  # Track how many turns they've had this ailment
+			log_message("  → %s is now %s!" % [target.display_name, ailment_to_apply.capitalize()])
+			# Refresh turn order to show status
+			if battle_mgr:
+				battle_mgr.refresh_turn_order()
 
 	# Apply debuff if found
 	if debuff_to_apply != "":
@@ -2834,6 +2840,47 @@ func _execute_skill_single(target: Dictionary) -> void:
 			log_message("  → ELEMENTAL STUMBLE!")
 		if became_fallen:
 			log_message("  → %s is FALLEN! (will skip next turn)" % target.display_name)
+
+	# Apply status effect if skill has one (only if target still alive)
+	if not target.is_ko:
+		var status_to_apply = str(skill_to_use.get("status_apply", "")).to_lower()
+		var status_chance_pct = int(skill_to_use.get("status_chance", 0))
+
+		if status_to_apply != "" and status_to_apply != "null" and status_chance_pct > 0:
+			var roll = randi() % 100
+			if roll < status_chance_pct:
+				# List of independent ailments (only one can exist at a time)
+				var independent_ailments = ["burn", "burned", "freeze", "frozen", "sleep", "asleep", "poison", "poisoned", "malaise", "berserk", "charm", "charmed", "confuse", "confused"]
+
+				if status_to_apply in independent_ailments:
+					# Check if target already has an ailment
+					var current_ailment = str(target.get("ailment", ""))
+					if current_ailment != "" and current_ailment != "null":
+						log_message("  → Failed to inflict %s! (%s already has %s)" % [status_to_apply.capitalize(), target.display_name, current_ailment.capitalize()])
+					else:
+						# Apply the ailment
+						target.ailment = status_to_apply
+						target.ailment_turn_count = 0
+						log_message("  → %s is now %s! (%d%% chance, rolled %d)" % [target.display_name, status_to_apply.capitalize(), status_chance_pct, roll])
+						battle_mgr.refresh_turn_order()
+				else:
+					# It's a debuff (not an independent ailment)
+					var duration = int(skill_to_use.get("duration", 3))
+					# Map status names to debuff types
+					var debuff_type = ""
+					if "attack down" in status_to_apply or "atk down" in status_to_apply:
+						debuff_type = "attack_down"
+					elif "defense down" in status_to_apply or "def down" in status_to_apply:
+						debuff_type = "defense_down"
+					elif "skill down" in status_to_apply or "mind down" in status_to_apply:
+						debuff_type = "skill_down"
+					elif "speed down" in status_to_apply or "slow" in status_to_apply:
+						debuff_type = "speed_down"
+
+					if debuff_type != "":
+						battle_mgr.apply_buff(target, debuff_type, -0.15, duration)
+						log_message("  → %s's %s reduced! (%d%% chance, rolled %d)" % [target.display_name, status_to_apply.replace("_", " ").capitalize(), status_chance_pct, roll])
+						battle_mgr.refresh_turn_order()
 
 	# Log the hit
 	var hit_msg = "  → Hit %s for %d damage! (%d%% chance)" % [target.display_name, damage, int(hit_check.hit_chance)]

@@ -104,6 +104,9 @@ func _rebuild_display_with_reveal() -> void:
 		if child != round_label:
 			child.queue_free()
 
+	# Wait for nodes to be fully removed before creating new ones
+	await get_tree().process_frame
+
 	# Get turn order from battle manager
 	if not battle_mgr:
 		is_animating = false
@@ -116,6 +119,7 @@ func _rebuild_display_with_reveal() -> void:
 
 	# Create slots for upcoming turns with sequential reveal
 	var turns_to_show = min(SHOW_UPCOMING_TURNS, turn_order.size())
+	var last_tween = null
 
 	for i in range(turns_to_show):
 		var combatant = turn_order[i]
@@ -141,6 +145,13 @@ func _rebuild_display_with_reveal() -> void:
 		# Slide in from left
 		tween.tween_property(slot, "position:x", 0, 0.3)
 
+		# Track the last tween so we can wait for it
+		last_tween = tween
+
+	# Wait for the last animation to complete
+	if last_tween:
+		await last_tween.finished
+
 	# Store current order for future animations
 	_store_current_order()
 
@@ -157,6 +168,9 @@ func _rebuild_display() -> void:
 	for child in get_children():
 		if child != round_label:
 			child.queue_free()
+
+	# Wait for nodes to be fully removed before creating new ones
+	await get_tree().process_frame
 
 	# Get turn order from battle manager
 	if not battle_mgr:
@@ -181,12 +195,18 @@ func _rebuild_display() -> void:
 	# Wait one frame for layout to settle, then fade in all slots
 	await get_tree().process_frame
 
+	var last_tween = null
 	for slot in turn_slots:
 		if is_instance_valid(slot):
 			var tween = create_tween()
 			tween.set_ease(Tween.EASE_OUT)
 			tween.set_trans(Tween.TRANS_CUBIC)
 			tween.tween_property(slot, "modulate:a", 1.0, 0.3)
+			last_tween = tween
+
+	# Wait for animations to complete
+	if last_tween:
+		await last_tween.finished
 
 	# Store current order for future animations
 	_store_current_order()
