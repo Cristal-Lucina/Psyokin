@@ -128,6 +128,10 @@ func initialize_battle(ally_party: Array, enemy_list: Array) -> void:
 		var enemy_id = enemy_list[i]
 		var enemy_data = _create_enemy_combatant(enemy_id, i)
 		combatants.append(enemy_data)
+		print("[BattleManager] Added enemy: %s [ID: %s]" % [enemy_data.display_name, enemy_data.id])
+
+	# ULTRA FIX: Validate immediately after adding all combatants
+	_validate_and_fix_combatants()
 
 	battle_started.emit()
 	print("[BattleManager] Battle initialized with %d combatants" % combatants.size())
@@ -163,7 +167,7 @@ func start_round() -> void:
 	print("[BattleManager] Turn order:")
 	for i in range(turn_order.size()):
 		var c = turn_order[i]
-		print("  %d. %s (Initiative: %d)" % [i + 1, c.display_name, c.initiative])
+		print("  %d. %s [ID: %s] (Initiative: %d)" % [i + 1, c.display_name, c.id, c.initiative])
 
 	# Process start-of-round effects (DoT, HoT, buff/debuff duration)
 	_process_round_start_effects()
@@ -180,6 +184,7 @@ func start_round() -> void:
 
 func _roll_initiative() -> void:
 	"""Roll initiative for all combatants based on TPO"""
+	print("[BattleManager] Rolling initiative for %d combatants" % combatants.size())
 	for combatant in combatants:
 		if combatant.is_ko or combatant.is_fled:
 			combatant.initiative = -1
@@ -188,7 +193,7 @@ func _roll_initiative() -> void:
 		# Fallen combatants get 0 initiative (they'll skip their turn)
 		if combatant.is_fallen:
 			combatant.initiative = 0
-			print("[BattleManager] %s is FALLEN - initiative set to 0" % combatant.display_name)
+			print("[BattleManager] %s [ID: %s] is FALLEN - initiative set to 0" % [combatant.display_name, combatant.id])
 			continue
 
 		var tpo = combatant.stats.TPO
@@ -212,8 +217,8 @@ func _roll_initiative() -> void:
 				best_roll = roll
 
 		combatant.initiative = best_roll + speed
-		print("[BattleManager] %s initiative: %dd20(H) = %d + Speed %d = %d" % [
-			combatant.display_name, dice_count, best_roll, speed, combatant.initiative
+		print("[BattleManager] %s [ID: %s] initiative: %dd20(H) = %d + Speed %d = %d" % [
+			combatant.display_name, combatant.id, dice_count, best_roll, speed, combatant.initiative
 		])
 
 func _sort_by_initiative(a: Dictionary, b: Dictionary) -> bool:
@@ -264,22 +269,28 @@ func _sort_by_initiative(a: Dictionary, b: Dictionary) -> bool:
 
 func _validate_and_fix_combatants() -> void:
 	"""ULTRA FIX: Validate combatants array has no duplicates and fix if found"""
+	print("[BattleManager] Validating %d combatants..." % combatants.size())
 	var seen_ids: Dictionary = {}
 	var cleaned: Array[Dictionary] = []
 	var duplicates_found: int = 0
 
 	for combatant in combatants:
 		var id = combatant.id
+		var name = combatant.display_name
 		if not seen_ids.has(id):
 			seen_ids[id] = true
 			cleaned.append(combatant)
+			print("[BattleManager]   ✓ %s [ID: %s]" % [name, id])
 		else:
 			duplicates_found += 1
-			push_error("[BattleManager] CRITICAL: Duplicate combatant in combatants array: %s (id: %s)" % [combatant.display_name, id])
+			push_error("[BattleManager] CRITICAL: Duplicate combatant in combatants array: %s (id: %s)" % [name, id])
+			print("[BattleManager]   ✗ DUPLICATE FOUND: %s [ID: %s] - REMOVING!" % [name, id])
 
 	if duplicates_found > 0:
 		print("[BattleManager] ULTRA FIX: Removed %d duplicate(s) from combatants array!" % duplicates_found)
 		combatants = cleaned
+	else:
+		print("[BattleManager] Validation complete - no duplicates found")
 
 func _remove_turn_order_duplicates() -> void:
 	"""Remove duplicate combatants from turn_order (keep first occurrence)"""
