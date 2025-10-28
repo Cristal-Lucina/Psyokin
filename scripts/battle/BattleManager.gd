@@ -145,6 +145,9 @@ func start_round() -> void:
 	current_state = BattleState.ROUND_START
 	print("[BattleManager] === ROUND %d START ===" % current_round)
 
+	# ULTRA FIX: Validate combatants array has no duplicates BEFORE creating turn order
+	_validate_and_fix_combatants()
+
 	# Roll initiative for all combatants
 	_roll_initiative()
 
@@ -152,6 +155,10 @@ func start_round() -> void:
 	turn_order = combatants.duplicate()
 	turn_order.sort_custom(_sort_by_initiative)
 	_remove_turn_order_duplicates()  # Ensure no duplicates in turn order
+
+	# ULTRA FIX: Final validation
+	if turn_order.size() != combatants.size():
+		push_error("[BattleManager] CRITICAL: turn_order size (%d) != combatants size (%d) after duplicate removal!" % [turn_order.size(), combatants.size()])
 
 	print("[BattleManager] Turn order:")
 	for i in range(turn_order.size()):
@@ -254,6 +261,25 @@ func _sort_by_initiative(a: Dictionary, b: Dictionary) -> bool:
 
 	# Final tiebreaker: coinflip
 	return randf() > 0.5
+
+func _validate_and_fix_combatants() -> void:
+	"""ULTRA FIX: Validate combatants array has no duplicates and fix if found"""
+	var seen_ids: Dictionary = {}
+	var cleaned: Array[Dictionary] = []
+	var duplicates_found: int = 0
+
+	for combatant in combatants:
+		var id = combatant.id
+		if not seen_ids.has(id):
+			seen_ids[id] = true
+			cleaned.append(combatant)
+		else:
+			duplicates_found += 1
+			push_error("[BattleManager] CRITICAL: Duplicate combatant in combatants array: %s (id: %s)" % [combatant.display_name, id])
+
+	if duplicates_found > 0:
+		print("[BattleManager] ULTRA FIX: Removed %d duplicate(s) from combatants array!" % duplicates_found)
+		combatants = cleaned
 
 func _remove_turn_order_duplicates() -> void:
 	"""Remove duplicate combatants from turn_order (keep first occurrence)"""
@@ -1522,6 +1548,9 @@ func record_weapon_weakness_hit(target: Dictionary) -> bool:
 
 func refresh_turn_order() -> void:
 	"""Re-sort turn order and emit signal (used when combatant state changes like KO)"""
+	# ULTRA FIX: Validate combatants array first
+	_validate_and_fix_combatants()
+
 	# Store current combatant ID before re-sorting
 	var current_combatant_id: String = ""
 	if current_turn_index < turn_order.size():

@@ -22,6 +22,7 @@ var previous_order: Dictionary = {}  # combatant_id -> previous_index
 var round_label: Label = null
 var current_round: int = 0
 var is_animating: bool = false  # Prevent overlapping animations
+var is_rebuilding: bool = false  # ULTRA FIX: Mutex to prevent concurrent rebuilds
 
 func _ready() -> void:
 	print("[TurnOrderDisplay] Initializing turn order display")
@@ -62,6 +63,11 @@ func _on_round_started(round_number: int) -> void:
 	"""Called when a new round starts - refresh the display with animation"""
 	print("[TurnOrderDisplay] Round %d started, animating turn order reveal" % round_number)
 
+	# ULTRA FIX: Block if already rebuilding
+	if is_rebuilding:
+		print("[TurnOrderDisplay] BLOCKED: Already rebuilding, ignoring round_started signal")
+		return
+
 	# Wait for any ongoing animations to complete before starting new one
 	if is_animating:
 		print("[TurnOrderDisplay] Waiting for ongoing animation to complete...")
@@ -100,29 +106,32 @@ func _on_turn_order_changed() -> void:
 
 func _rebuild_display_with_reveal() -> void:
 	"""Rebuild display with sequential reveal animation for new rounds"""
+	# ULTRA FIX: Set rebuild lock
+	is_rebuilding = true
 	is_animating = true
 
-	# Clear existing slots
-	for slot in turn_slots:
-		slot.queue_free()
-	turn_slots.clear()
-
-	# Clear children except round label
+	# ULTRA FIX: Aggressive cleanup - clear ALL children immediately
 	for child in get_children():
-		if child != round_label:
+		if child != round_label and is_instance_valid(child):
 			child.queue_free()
+
+	# Clear tracking arrays
+	turn_slots.clear()
 
 	# Wait for nodes to be fully removed before creating new ones
 	await get_tree().process_frame
+	await get_tree().process_frame  # ULTRA FIX: Wait extra frame for safety
 
 	# Get turn order from battle manager
 	if not battle_mgr:
 		is_animating = false
+		is_rebuilding = false  # ULTRA FIX: Clear rebuild lock on early return
 		return
 
 	var turn_order = battle_mgr.turn_order
 	if turn_order.is_empty():
 		is_animating = false
+		is_rebuilding = false  # ULTRA FIX: Clear rebuild lock on early return
 		return
 
 	# Create slots for upcoming turns with sequential reveal
@@ -175,6 +184,7 @@ func _rebuild_display_with_reveal() -> void:
 	_store_current_order()
 
 	is_animating = false
+	is_rebuilding = false  # ULTRA FIX: Clear rebuild lock
 
 func _rebuild_display() -> void:
 	"""Rebuild the entire turn order display with fade-in animation"""
@@ -441,29 +451,42 @@ func _create_turn_slot(combatant: Dictionary, index: int) -> PanelContainer:
 		var buffs = combatant.get("buffs", [])
 		if typeof(buffs) == TYPE_ARRAY and buffs.size() > 0:
 			var buff_container = HBoxContainer.new()
-			buff_container.add_theme_constant_override("separation", 2)
+			buff_container.add_theme_constant_override("separation", 1)
 
-			# Show up to 4 buffs/debuffs
-			var max_to_show = min(4, buffs.size())
-			for i in range(max_to_show):
-				var buff = buffs[i]
+			# Group buffs by type to show multiples
+			var buff_groups: Dictionary = {}  # type -> {display_info, count}
+			for buff in buffs:
 				if typeof(buff) == TYPE_DICTIONARY:
-					var display_info = _get_buff_debuff_display(buff)
-					var buff_label = Label.new()
-					buff_label.text = display_info.symbol
-					buff_label.add_theme_font_size_override("font_size", 14)
-					buff_label.add_theme_color_override("font_color", display_info.color)
-					buff_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-					buff_container.add_child(buff_label)
+					var buff_type = str(buff.get("type", ""))
+					if buff_type != "":
+						if not buff_groups.has(buff_type):
+							var display_info = _get_buff_debuff_display(buff)
+							buff_groups[buff_type] = {"info": display_info, "count": 0}
+						buff_groups[buff_type].count += 1
 
-			# Add "+" if more buffs exist
-			if buffs.size() > max_to_show:
-				var more_label = Label.new()
-				more_label.text = "+%d" % (buffs.size() - max_to_show)
-				more_label.add_theme_font_size_override("font_size", 10)
-				more_label.modulate = Color(0.7, 0.7, 0.7, 1.0)
-				more_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-				buff_container.add_child(more_label)
+			# Display grouped buffs
+			var shown_count = 0
+			var max_groups = 6  # Show up to 6 different buff types
+			for buff_type in buff_groups:
+				if shown_count >= max_groups:
+					break
+
+				var group_data = buff_groups[buff_type]
+				var display_info = group_data.info
+				var count = group_data.count
+
+				var buff_label = Label.new()
+				# Show symbol multiple times if stacked (up to 3x)
+				var symbol_repeat = min(count, 3)
+				buff_label.text = display_info.symbol.repeat(symbol_repeat)
+				if count > 3:
+					buff_label.text += "+"  # Add + if more than 3 stacks
+
+				buff_label.add_theme_font_size_override("font_size", 12)
+				buff_label.add_theme_color_override("font_color", display_info.color)
+				buff_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+				buff_container.add_child(buff_label)
+				shown_count += 1
 
 			hbox.add_child(buff_container)
 
@@ -644,16 +667,17 @@ func _get_buff_debuff_display(buff: Dictionary) -> Dictionary:
 	"""Convert buff/debuff to display symbol and color
 	Returns {symbol: String, color: Color}"""
 	var buff_type = str(buff.get("type", "")).to_lower()
-	var magnitude = float(buff.get("magnitude", 0.0))
-	var is_positive = magnitude > 0
+	var value = float(buff.get("value", 0.0))
+	var is_positive = value > 0
 
+	# Match the actual buff type names used in the game
 	match buff_type:
-		"attack_up", "attack_down", "attack", "atk":
+		"atk_up", "atk_down", "atk":
 			return {
 				"symbol": "↑" if is_positive else "↓",
 				"color": Color(1.0, 0.2, 0.2, 1.0)  # Red
 			}
-		"skill_up", "skill_down", "mind_up", "mind_down", "skill", "mind", "mnd":
+		"skl_up", "skl_down", "skl", "mnd_up", "mnd_down", "mnd":
 			return {
 				"symbol": "↑" if is_positive else "↓",
 				"color": Color(0.3, 0.5, 1.0, 1.0)  # Blue
@@ -663,33 +687,40 @@ func _get_buff_debuff_display(buff: Dictionary) -> Dictionary:
 				"symbol": "●",
 				"color": Color(0.2, 1.0, 0.2, 1.0)  # Green
 			}
-		"defense_up", "defense_down", "defense", "def":
+		"def_up", "def_down", "def":
 			return {
 				"symbol": "↑" if is_positive else "↓",
 				"color": Color(1.0, 0.6, 0.2, 1.0)  # Orange
 			}
-		"accuracy_up", "accuracy_down", "accuracy", "acc", "hit_chance":
+		"phys_acc", "hit_chance", "acc_up", "acc_down", "acc":
 			return {
 				"symbol": "↑" if is_positive else "↓",
 				"color": Color(1.0, 0.7, 0.8, 1.0)  # Pink
 			}
-		"skill_accuracy_up", "skill_accuracy_down", "sigil_accuracy", "skill_acc":
+		"mind_acc", "sigil_accuracy", "skill_acc":
 			return {
 				"symbol": "↑" if is_positive else "↓",
 				"color": Color(0.7, 0.3, 1.0, 1.0)  # Purple
 			}
-		"speed_up", "speed_down", "speed", "spd":
+		"spd_up", "spd_down", "spd", "speed":
 			return {
 				"symbol": "↑" if is_positive else "↓",
 				"color": Color(1.0, 1.0, 0.2, 1.0)  # Yellow
 			}
-		"evasion_up", "evasion_down", "evasion", "evade":
+		"evasion", "evade", "eva_up", "eva_down":
 			return {
 				"symbol": "↑" if is_positive else "↓",
 				"color": Color(0.3, 0.9, 0.9, 1.0)  # Teal
 			}
-		_:
+		"reflect":
 			return {
-				"symbol": "?" if is_positive else "?",
+				"symbol": "◆",
+				"color": Color(0.9, 0.9, 0.9, 1.0)  # White/silver
+			}
+		_:
+			# Unknown buff type - log it for debugging
+			print("[TurnOrderDisplay] Unknown buff type: %s" % buff_type)
+			return {
+				"symbol": "?",
 				"color": Color(0.7, 0.7, 0.7, 1.0)  # Gray
 			}
