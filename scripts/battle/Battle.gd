@@ -39,6 +39,7 @@ var selected_item: Dictionary = {}  # Selected item data
 var selected_burst: Dictionary = {}  # Selected burst ability data
 var victory_panel: PanelContainer = null  # Victory screen panel
 var is_in_round_transition: bool = false  # True during round transition animations
+var combatant_panels: Dictionary = {}  # combatant_id -> PanelContainer for shake animations
 
 func _ready() -> void:
 	print("[Battle] Battle scene loaded")
@@ -463,17 +464,22 @@ func _display_combatants() -> void:
 	for child in enemy_slots.get_children():
 		child.queue_free()
 
+	# Clear panel references
+	combatant_panels.clear()
+
 	# Display allies
 	var allies = battle_mgr.get_ally_combatants()
 	for ally in allies:
 		var slot = _create_combatant_slot(ally, true)
 		ally_slots.add_child(slot)
+		combatant_panels[ally.id] = slot
 
 	# Display enemies
 	var enemies = battle_mgr.get_enemy_combatants()
 	for enemy in enemies:
 		var slot = _create_combatant_slot(enemy, false)
 		enemy_slots.add_child(slot)
+		combatant_panels[enemy.id] = slot
 
 func _create_combatant_slot(combatant: Dictionary, is_ally: bool) -> PanelContainer:
 	"""Create a UI slot for a combatant"""
@@ -546,6 +552,29 @@ func _update_combatant_displays() -> void:
 	"""Update all combatant HP/MP displays"""
 	# TODO: Update HP/MP bars without recreating everything
 	_display_combatants()
+
+func _shake_combatant_panel(combatant_id: String) -> void:
+	"""Shake a combatant's panel when they take damage"""
+	if not combatant_panels.has(combatant_id):
+		return
+
+	var panel = combatant_panels[combatant_id]
+	var original_position = panel.position
+
+	# Create shake animation using Tween
+	var tween = create_tween()
+	tween.set_trans(Tween.TRANS_SINE)
+	tween.set_ease(Tween.EASE_IN_OUT)
+
+	# Shake sequence: left, right, left, right, center
+	var shake_intensity = 8.0
+	var shake_duration = 0.05
+
+	tween.tween_property(panel, "position", original_position + Vector2(-shake_intensity, 0), shake_duration)
+	tween.tween_property(panel, "position", original_position + Vector2(shake_intensity, 0), shake_duration)
+	tween.tween_property(panel, "position", original_position + Vector2(-shake_intensity * 0.5, 0), shake_duration)
+	tween.tween_property(panel, "position", original_position + Vector2(shake_intensity * 0.5, 0), shake_duration)
+	tween.tween_property(panel, "position", original_position, shake_duration)
 
 func _show_status_details(combatant: Dictionary) -> void:
 	"""Show detailed status information popup for a combatant"""
@@ -2859,6 +2888,9 @@ func _execute_burst_on_target(target: Dictionary) -> void:
 	# Apply damage
 	target.hp -= damage
 
+	# Shake the target's panel for visual feedback
+	_shake_combatant_panel(target.id)
+
 	# Wake up if asleep
 	_wake_if_asleep(target)
 
@@ -3070,6 +3102,9 @@ func _execute_skill_single(target: Dictionary) -> void:
 
 	# Apply damage
 	target.hp -= damage
+
+	# Shake the target's panel for visual feedback
+	_shake_combatant_panel(target.id)
 
 	# Wake up if asleep
 	_wake_if_asleep(target)
