@@ -110,17 +110,26 @@ func _rebuild_display_with_reveal() -> void:
 	is_rebuilding = true
 	is_animating = true
 
-	# ULTRA FIX: Aggressive cleanup - clear ALL children immediately
+	print("[TurnOrderDisplay] Starting rebuild - current children: %d" % get_child_count())
+
+	# ULTRA FIX: IMMEDIATE deletion - no queue_free, use remove_child + free
+	var children_to_delete = []
 	for child in get_children():
 		if child != round_label and is_instance_valid(child):
-			child.queue_free()
+			children_to_delete.append(child)
+
+	# Remove and free immediately (not queued)
+	for child in children_to_delete:
+		remove_child(child)
+		child.free()  # Immediate deletion, not queue_free
 
 	# Clear tracking arrays
 	turn_slots.clear()
 
-	# Wait for nodes to be fully removed before creating new ones
+	print("[TurnOrderDisplay] After cleanup - current children: %d" % get_child_count())
+
+	# Wait one frame for any pending operations to complete
 	await get_tree().process_frame
-	await get_tree().process_frame  # ULTRA FIX: Wait extra frame for safety
 
 	# Get turn order from battle manager
 	if not battle_mgr:
@@ -154,6 +163,7 @@ func _rebuild_display_with_reveal() -> void:
 		var slot = _create_turn_slot(combatant, i)
 		turn_slots.append(slot)
 		add_child(slot)
+		print("[TurnOrderDisplay] Created slot for %s [ID: %s] - total children now: %d" % [combatant.display_name, combatant_id, get_child_count()])
 
 		# Start invisible and off-screen
 		slot.modulate.a = 0.0
@@ -183,22 +193,32 @@ func _rebuild_display_with_reveal() -> void:
 	# Store current order for future animations
 	_store_current_order()
 
+	print("[TurnOrderDisplay] Rebuild complete - final child count: %d, turn_slots: %d" % [get_child_count(), turn_slots.size()])
+
 	is_animating = false
 	is_rebuilding = false  # ULTRA FIX: Clear rebuild lock
 
 func _rebuild_display() -> void:
 	"""Rebuild the entire turn order display with fade-in animation"""
-	# Clear existing slots
-	for slot in turn_slots:
-		slot.queue_free()
+	print("[TurnOrderDisplay] Starting rebuild (no reveal) - current children: %d" % get_child_count())
+
+	# ULTRA FIX: IMMEDIATE deletion - no queue_free, use remove_child + free
+	var children_to_delete = []
+	for child in get_children():
+		if child != round_label and is_instance_valid(child):
+			children_to_delete.append(child)
+
+	# Remove and free immediately (not queued)
+	for child in children_to_delete:
+		remove_child(child)
+		child.free()  # Immediate deletion, not queue_free
+
+	# Clear tracking arrays
 	turn_slots.clear()
 
-	# Clear children except round label
-	for child in get_children():
-		if child != round_label:
-			child.queue_free()
+	print("[TurnOrderDisplay] After cleanup - current children: %d" % get_child_count())
 
-	# Wait for nodes to be fully removed before creating new ones
+	# Wait one frame for any pending operations to complete
 	await get_tree().process_frame
 
 	# Get turn order from battle manager
@@ -228,9 +248,12 @@ func _rebuild_display() -> void:
 		var slot = _create_turn_slot(combatant, i)
 		turn_slots.append(slot)
 		add_child(slot)
+		print("[TurnOrderDisplay] Created slot for %s [ID: %s] - total children now: %d" % [combatant.display_name, combatant_id, get_child_count()])
 
 		# Start invisible
 		slot.modulate.a = 0.0
+
+	print("[TurnOrderDisplay] Finished creating %d slots - final child count: %d" % [turns_to_show, get_child_count()])
 
 	# Wait one frame for layout to settle, then fade in all slots
 	await get_tree().process_frame
