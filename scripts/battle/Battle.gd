@@ -547,10 +547,10 @@ func _show_status_details(combatant: Dictionary) -> void:
 	modal_bg.mouse_filter = Control.MOUSE_FILTER_STOP  # Block all clicks
 	add_child(modal_bg)
 
-	# Create popup panel with 95% transparency
+	# Create popup panel with 95% opacity (only 5% transparent)
 	var popup = PanelContainer.new()
 	popup.custom_minimum_size = Vector2(400, 300)
-	popup.modulate.a = 0.05  # 95% transparent
+	popup.modulate.a = 0.95  # 95% visible, 5% transparent
 
 	# Center it on screen
 	popup.position = get_viewport_rect().size / 2 - popup.custom_minimum_size / 2
