@@ -197,7 +197,15 @@ func _roll_initiative() -> void:
 			continue
 
 		var tpo = combatant.stats.TPO
-		var speed = combatant.stats.get("Speed", 0)
+		var base_speed = combatant.stats.get("Speed", 0)
+
+		# Add speed buffs/debuffs to speed
+		var speed_modifier = get_buff_modifier(combatant, "spd_up")
+		speed_modifier += get_buff_modifier(combatant, "spd_down")
+		speed_modifier += get_buff_modifier(combatant, "spd")
+		speed_modifier += get_buff_modifier(combatant, "speed")
+
+		var total_speed = base_speed + int(speed_modifier)
 
 		# Roll dice based on TPO tier (keep highest)
 		var dice_count = 1
@@ -216,10 +224,15 @@ func _roll_initiative() -> void:
 			if roll > best_roll:
 				best_roll = roll
 
-		combatant.initiative = best_roll + speed
-		print("[BattleManager] %s [ID: %s] initiative: %dd20(H) = %d + Speed %d = %d" % [
-			combatant.display_name, combatant.id, dice_count, best_roll, speed, combatant.initiative
-		])
+		combatant.initiative = best_roll + total_speed
+		if speed_modifier != 0:
+			print("[BattleManager] %s [ID: %s] initiative: %dd20(H) = %d + Speed %d (base %d + buff %+d) = %d" % [
+				combatant.display_name, combatant.id, dice_count, best_roll, total_speed, base_speed, int(speed_modifier), combatant.initiative
+			])
+		else:
+			print("[BattleManager] %s [ID: %s] initiative: %dd20(H) = %d + Speed %d = %d" % [
+				combatant.display_name, combatant.id, dice_count, best_roll, total_speed, combatant.initiative
+			])
 
 func _sort_by_initiative(a: Dictionary, b: Dictionary) -> bool:
 	"""Sort comparator for initiative (higher first, Fallen above KO'd, KO'd to bottom)"""

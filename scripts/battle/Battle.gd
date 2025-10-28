@@ -525,13 +525,23 @@ func _update_combatant_displays() -> void:
 
 func _show_status_details(combatant: Dictionary) -> void:
 	"""Show detailed status information popup for a combatant"""
-	# Create popup panel
+	# Create modal background (blocks clicks)
+	var modal_bg = ColorRect.new()
+	modal_bg.color = Color(0, 0, 0, 0.5)  # Semi-transparent black overlay
+	modal_bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	modal_bg.z_index = 99
+	modal_bg.mouse_filter = Control.MOUSE_FILTER_STOP  # Block all clicks
+	add_child(modal_bg)
+
+	# Create popup panel with 95% transparency
 	var popup = PanelContainer.new()
 	popup.custom_minimum_size = Vector2(400, 300)
+	popup.modulate.a = 0.05  # 95% transparent
 
 	# Center it on screen
 	popup.position = get_viewport_rect().size / 2 - popup.custom_minimum_size / 2
 	popup.z_index = 100
+	popup.mouse_filter = Control.MOUSE_FILTER_STOP  # Prevent clicking through
 
 	var vbox = VBoxContainer.new()
 	popup.add_child(vbox)
@@ -596,7 +606,10 @@ func _show_status_details(combatant: Dictionary) -> void:
 	# Close button
 	var close_btn = Button.new()
 	close_btn.text = "Close"
-	close_btn.pressed.connect(func(): popup.queue_free())
+	close_btn.pressed.connect(func():
+		popup.queue_free()
+		modal_bg.queue_free()  # Remove modal background too
+	)
 	vbox.add_child(close_btn)
 
 	add_child(popup)
@@ -978,7 +991,6 @@ func _on_capture_pressed() -> void:
 
 			# Debug: Check what fields are available in item_def
 			print("[Battle] Bind item %s fields: %s" % [bind_id, item_def.keys()])
-			print("[Battle] Bind item %s capture_mod raw value: %s" % [bind_id, item_def.get("capture_mod", "NOT_FOUND")])
 
 			var desc = item_def.get("short_description", "")
 			if desc == null:
@@ -990,9 +1002,10 @@ func _on_capture_pressed() -> void:
 				bind_name = bind_id
 			bind_name = str(bind_name)
 
-			var capture_mod_raw = item_def.get("capture_mod", 0)
+			# Read capture modifier from stat_boost field (since capture_mod doesn't exist in CSV)
+			var capture_mod_raw = item_def.get("stat_boost", 0)
 			var capture_mod_val = int(capture_mod_raw) if capture_mod_raw != null else 0
-			print("[Battle] Bind item %s final capture_mod: %d" % [bind_id, capture_mod_val])
+			print("[Battle] Bind item %s (%s) capture modifier: %d%%" % [bind_id, bind_name, capture_mod_val])
 
 			bind_items.append({
 				"id": str(bind_id),
