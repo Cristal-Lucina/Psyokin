@@ -38,6 +38,7 @@ var current_skill_menu: Array = []  # Current skills in menu
 var selected_item: Dictionary = {}  # Selected item data
 var selected_burst: Dictionary = {}  # Selected burst ability data
 var victory_panel: PanelContainer = null  # Victory screen panel
+var is_in_round_transition: bool = false  # True during round transition animations
 
 func _ready() -> void:
 	print("[Battle] Battle scene loaded")
@@ -57,6 +58,10 @@ func _ready() -> void:
 	battle_mgr.turn_ended.connect(_on_turn_ended)
 	battle_mgr.round_started.connect(_on_round_started)
 	battle_mgr.battle_ended.connect(_on_battle_ended)
+
+	# Connect to turn order display signals
+	if turn_order_display and turn_order_display.has_signal("animation_completed"):
+		turn_order_display.animation_completed.connect(_on_turn_order_animation_completed)
 
 	# Hide action menu initially
 	action_menu.visible = false
@@ -101,6 +106,9 @@ func _on_battle_started() -> void:
 func _on_round_started(round_number: int) -> void:
 	"""Called at start of each round"""
 	log_message("=== Round %d ===" % round_number)
+
+	# Disable all input during round transition
+	_disable_all_input()
 
 func _on_turn_started(combatant_id: String) -> void:
 	"""Called when a combatant's turn starts"""
@@ -156,6 +164,12 @@ func _on_turn_ended(_combatant_id: String) -> void:
 	"""Called when a combatant's turn ends"""
 	# Hide action menu
 	action_menu.visible = false
+
+func _on_turn_order_animation_completed() -> void:
+	"""Called when turn order display animation completes (e.g., round transitions)"""
+	# Re-enable input after round transition animation completes
+	if is_in_round_transition:
+		_enable_all_input()
 
 func _on_battle_ended(victory: bool) -> void:
 	"""Called when battle ends"""
@@ -665,8 +679,48 @@ func _show_action_menu() -> void:
 	# TODO: Enable/disable actions based on state
 	# e.g., disable skills if no MP, disable burst if gauge too low
 
+func _disable_all_input() -> void:
+	"""Disable all input during round transitions to prevent glitches"""
+	is_in_round_transition = true
+
+	# Disable action menu (blocks all button clicks)
+	if action_menu:
+		action_menu.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	# Disable ally slots (prevent clicking on characters)
+	if ally_slots:
+		ally_slots.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	# Disable enemy slots (prevent clicking on enemies)
+	if enemy_slots:
+		enemy_slots.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	print("[Battle] Input disabled during round transition")
+
+func _enable_all_input() -> void:
+	"""Re-enable all input after round transition completes"""
+	is_in_round_transition = false
+
+	# Re-enable action menu
+	if action_menu:
+		action_menu.mouse_filter = Control.MOUSE_FILTER_STOP
+
+	# Re-enable ally slots
+	if ally_slots:
+		ally_slots.mouse_filter = Control.MOUSE_FILTER_STOP
+
+	# Re-enable enemy slots
+	if enemy_slots:
+		enemy_slots.mouse_filter = Control.MOUSE_FILTER_STOP
+
+	print("[Battle] Input re-enabled after round transition")
+
 func _on_attack_pressed() -> void:
 	"""Handle Attack action - prompt user to select target"""
+	# Block input during round transitions
+	if is_in_round_transition:
+		return
+
 	log_message("Select a target...")
 
 	# Get alive enemies
@@ -816,6 +870,10 @@ func _execute_attack(target: Dictionary) -> void:
 
 func _on_skill_pressed() -> void:
 	"""Handle Skill action - show sigil/skill menu"""
+	# Block input during round transitions
+	if is_in_round_transition:
+		return
+
 	var sigils = current_combatant.get("sigils", [])
 	var skills = current_combatant.get("skills", [])
 
@@ -888,6 +946,10 @@ func _categorize_battle_item(item_id: String, item_name: String, item_def: Dicti
 
 func _on_item_pressed() -> void:
 	"""Handle Item action - show usable items menu"""
+	# Block input during round transitions
+	if is_in_round_transition:
+		return
+
 	var inventory = get_node_or_null("/root/aInventorySystem")
 	if not inventory:
 		log_message("Inventory system not available!")
@@ -975,6 +1037,10 @@ func _on_item_pressed() -> void:
 
 func _on_capture_pressed() -> void:
 	"""Handle Capture action - show bind item selection menu"""
+	# Block input during round transitions
+	if is_in_round_transition:
+		return
+
 	var inventory = get_node_or_null("/root/aInventorySystem")
 	if not inventory:
 		log_message("Inventory system not available!")
@@ -1491,6 +1557,10 @@ func _execute_item_usage(target: Dictionary) -> void:
 
 func _on_defend_pressed() -> void:
 	"""Handle Defend action"""
+	# Block input during round transitions
+	if is_in_round_transition:
+		return
+
 	# Check if frozen combatant can act
 	if not _check_freeze_action_allowed():
 		return
@@ -1503,6 +1573,10 @@ func _on_defend_pressed() -> void:
 
 func _on_burst_pressed() -> void:
 	"""Handle Burst action - show burst abilities menu"""
+	# Block input during round transitions
+	if is_in_round_transition:
+		return
+
 	# Check if frozen combatant can act
 	if not _check_freeze_action_allowed():
 		return
@@ -1546,6 +1620,10 @@ func _on_burst_pressed() -> void:
 
 func _on_run_pressed() -> void:
 	"""Handle Run action"""
+	# Block input during round transitions
+	if is_in_round_transition:
+		return
+
 	# Check if frozen combatant can act
 	if not _check_freeze_action_allowed():
 		return
