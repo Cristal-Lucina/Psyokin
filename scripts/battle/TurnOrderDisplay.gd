@@ -47,19 +47,27 @@ func _ready() -> void:
 		battle_mgr.turn_order_changed.connect(_on_turn_order_changed)
 
 func _on_battle_started() -> void:
-	"""Called when battle starts - initial display"""
-	print("[TurnOrderDisplay] Battle started, displaying initial turn order")
-	current_round = 1
-	if round_label:
-		round_label.text = "Round 1"
-	_rebuild_display_with_reveal()
+	"""Called when battle starts - initial setup"""
+	print("[TurnOrderDisplay] Battle started, ready for turn order")
+	# Don't rebuild here - turn order isn't calculated yet
+	# Round 1 will trigger _on_round_started() which will do the initial display
+	current_round = 0
+	# Clear any previous battle's data
+	for slot in turn_slots:
+		slot.queue_free()
+	turn_slots.clear()
+	previous_order.clear()
 
 func _on_round_started(round_number: int) -> void:
 	"""Called when a new round starts - refresh the display with animation"""
 	print("[TurnOrderDisplay] Round %d started, animating turn order reveal" % round_number)
 
-	# Cancel any ongoing animations - new round takes priority
-	is_animating = false
+	# Wait for any ongoing animations to complete before starting new one
+	if is_animating:
+		print("[TurnOrderDisplay] Waiting for ongoing animation to complete...")
+		# Wait for the animation to finish
+		while is_animating:
+			await get_tree().process_frame
 
 	current_round = round_number
 	if round_label:
