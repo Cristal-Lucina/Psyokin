@@ -435,6 +435,10 @@ func _end_round() -> void:
 	if await _check_battle_end():
 		return
 
+	# Pause between rounds to let UI settle and give player time to read
+	print("[BattleManager] Pausing 1 second before next round...")
+	await get_tree().create_timer(1.0).timeout
+
 	# Start next round
 	start_round()
 

@@ -75,6 +75,9 @@ func _on_round_started(round_number: int) -> void:
 		while is_animating:
 			await get_tree().process_frame
 
+	# Extra safety pause - let everything settle before rebuilding
+	await get_tree().create_timer(0.1).timeout
+
 	current_round = round_number
 	if round_label:
 		round_label.text = "Round %d" % round_number
