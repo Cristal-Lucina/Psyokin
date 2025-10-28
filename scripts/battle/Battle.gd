@@ -418,6 +418,15 @@ func _wake_if_asleep(target: Dictionary) -> void:
 		if battle_mgr:
 			battle_mgr.refresh_turn_order()
 
+func _set_fainted(target: Dictionary) -> void:
+	"""Mark a combatant as fainted (KO'd) and set Fainted status ailment"""
+	target.is_ko = true
+	target.ailment = "fainted"
+	target.ailment_turn_count = 0
+	# Refresh turn order to show fainted status
+	if battle_mgr:
+		battle_mgr.refresh_turn_order()
+
 ## ═══════════════════════════════════════════════════════════════
 ## COMBATANT DISPLAY
 ## ═══════════════════════════════════════════════════════════════
@@ -601,7 +610,7 @@ func _execute_attack(target: Dictionary) -> void:
 
 			if target.hp <= 0:
 				target.hp = 0
-				target.is_ko = true
+				_set_fainted(target)
 
 				# Record kill for morality system (if enemy)
 				if not target.get("is_ally", false):
@@ -922,7 +931,7 @@ func _execute_capture(target: Dictionary) -> void:
 	if success:
 		# Capture successful!
 		target.is_captured = true
-		target.is_ko = true  # Remove from battle like KO
+		_set_fainted(target)  # Remove from battle like KO
 		log_message("  → SUCCESS! %s was captured!" % target.display_name)
 
 		# Record capture for morality system
@@ -1052,7 +1061,7 @@ func _execute_item_usage(target: Dictionary) -> void:
 
 			# Check for KO
 			if enemy.hp <= 0:
-				enemy.is_ko = true
+				_set_fainted(enemy)
 				log_message("    %s was defeated!" % enemy.display_name)
 				battle_mgr.record_enemy_defeat(enemy, false)
 				ko_list.append(enemy)
@@ -1265,8 +1274,13 @@ func _execute_item_usage(target: Dictionary) -> void:
 				revive_percent = int(result.get_string(1))
 
 			target.is_ko = false
+			target.ailment = ""  # Clear Fainted status
+			target.ailment_turn_count = 0
 			target.hp = max(1, int(target.hp_max * revive_percent / 100.0))
 			log_message("  → %s was revived with %d HP!" % [target.display_name, target.hp])
+			# Refresh turn order to show revive
+			if battle_mgr:
+				battle_mgr.refresh_turn_order()
 			_update_combatant_displays()
 		else:
 			log_message("  → %s is not KO'd!" % target.display_name)
@@ -1643,7 +1657,7 @@ func _execute_enemy_ai() -> void:
 
 			if target.hp <= 0:
 				target.hp = 0
-				target.is_ko = true
+				_set_fainted(target)
 
 				# Record kill for morality system (if enemy)
 				if not target.get("is_ally", false):
@@ -2232,7 +2246,16 @@ func _on_item_selected(item_data: Dictionary) -> void:
 	# Determine target candidates
 	if targeting == "Ally":
 		var allies = battle_mgr.get_ally_combatants()
-		target_candidates = allies.filter(func(a): return not a.is_ko)
+		# Check if this is a revive item - if so, allow targeting KO'd allies
+		var effect = str(item_data.get("effect_field", ""))
+		var is_revive_item = "Revive" in effect or item_id.begins_with("REV_")
+
+		if is_revive_item:
+			# Revive items can only target KO'd (fainted) allies
+			target_candidates = allies.filter(func(a): return a.is_ko)
+		else:
+			# Other items can only target alive allies
+			target_candidates = allies.filter(func(a): return not a.is_ko)
 	else:  # Enemy (single target)
 		var enemies = battle_mgr.get_enemy_combatants()
 		target_candidates = enemies.filter(func(e): return not e.is_ko)
@@ -2612,7 +2635,7 @@ func _execute_burst_on_target(target: Dictionary) -> void:
 
 	if target.hp <= 0:
 		target.hp = 0
-		target.is_ko = true
+		_set_fainted(target)
 
 		# Record kill
 		if not target.get("is_ally", false):
@@ -2767,7 +2790,7 @@ func _execute_skill_single(target: Dictionary) -> void:
 					new_target.hp -= reflect_damage
 					if new_target.hp <= 0:
 						new_target.hp = 0
-						new_target.is_ko = true
+						_set_fainted(new_target)
 						log_message("  → %s was defeated by the reflection!" % new_target.display_name)
 					else:
 						log_message("  → %s takes %d reflected damage!" % [new_target.display_name, reflect_damage])

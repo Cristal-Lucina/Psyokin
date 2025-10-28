@@ -129,8 +129,19 @@ func _rebuild_display_with_reveal() -> void:
 	var turns_to_show = min(SHOW_UPCOMING_TURNS, turn_order.size())
 	var last_tween = null
 
+	# Extra safeguard: Track combatant IDs to prevent duplicates
+	var seen_ids: Dictionary = {}
+
 	for i in range(turns_to_show):
 		var combatant = turn_order[i]
+		var combatant_id = combatant.get("id", "")
+
+		# Skip if we've already created a slot for this combatant ID
+		if combatant_id != "" and seen_ids.has(combatant_id):
+			print("[TurnOrderDisplay] WARNING: Duplicate combatant %s detected at index %d, skipping!" % [combatant.get("display_name", "Unknown"), i])
+			continue
+
+		seen_ids[combatant_id] = true
 		var slot = _create_turn_slot(combatant, i)
 		turn_slots.append(slot)
 		add_child(slot)
@@ -191,8 +202,19 @@ func _rebuild_display() -> void:
 	# Create slots for upcoming turns
 	var turns_to_show = min(SHOW_UPCOMING_TURNS, turn_order.size())
 
+	# Extra safeguard: Track combatant IDs to prevent duplicates
+	var seen_ids: Dictionary = {}
+
 	for i in range(turns_to_show):
 		var combatant = turn_order[i]
+		var combatant_id = combatant.get("id", "")
+
+		# Skip if we've already created a slot for this combatant ID
+		if combatant_id != "" and seen_ids.has(combatant_id):
+			print("[TurnOrderDisplay] WARNING: Duplicate combatant %s detected at index %d, skipping!" % [combatant.get("display_name", "Unknown"), i])
+			continue
+
+		seen_ids[combatant_id] = true
 		var slot = _create_turn_slot(combatant, i)
 		turn_slots.append(slot)
 		add_child(slot)
@@ -380,17 +402,6 @@ func _create_turn_slot(combatant: Dictionary, index: int) -> PanelContainer:
 		var ailment_text = _get_ailment_display(ailment)
 		status_parts.append(ailment_text)
 
-	# Add first debuff if present
-	if combatant.has("debuffs"):
-		var debuffs = combatant.get("debuffs", [])
-		if typeof(debuffs) == TYPE_ARRAY and debuffs.size() > 0:
-			var first_debuff = debuffs[0]
-			if typeof(first_debuff) == TYPE_DICTIONARY:
-				var debuff_type = str(first_debuff.get("type", ""))
-				if debuff_type != "":
-					var debuff_text = _get_debuff_display(debuff_type)
-					status_parts.append(debuff_text)
-
 	# Add status indicators
 	if status_parts.size() > 0:
 		display_text += " (%s)" % ", ".join(status_parts)
@@ -424,6 +435,37 @@ func _create_turn_slot(combatant: Dictionary, index: int) -> PanelContainer:
 		# else: default white color
 
 	hbox.add_child(name_label)
+
+	# Buff/Debuff indicators (colored arrows/circles)
+	if combatant.has("buffs"):
+		var buffs = combatant.get("buffs", [])
+		if typeof(buffs) == TYPE_ARRAY and buffs.size() > 0:
+			var buff_container = HBoxContainer.new()
+			buff_container.add_theme_constant_override("separation", 2)
+
+			# Show up to 4 buffs/debuffs
+			var max_to_show = min(4, buffs.size())
+			for i in range(max_to_show):
+				var buff = buffs[i]
+				if typeof(buff) == TYPE_DICTIONARY:
+					var display_info = _get_buff_debuff_display(buff)
+					var buff_label = Label.new()
+					buff_label.text = display_info.symbol
+					buff_label.add_theme_font_size_override("font_size", 14)
+					buff_label.add_theme_color_override("font_color", display_info.color)
+					buff_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+					buff_container.add_child(buff_label)
+
+			# Add "+" if more buffs exist
+			if buffs.size() > max_to_show:
+				var more_label = Label.new()
+				more_label.text = "+%d" % (buffs.size() - max_to_show)
+				more_label.add_theme_font_size_override("font_size", 10)
+				more_label.modulate = Color(0.7, 0.7, 0.7, 1.0)
+				more_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+				buff_container.add_child(more_label)
+
+			hbox.add_child(buff_container)
 
 	# Initiative value
 	var init_label = Label.new()
@@ -573,6 +615,8 @@ func animate_capture(combatant_id: String) -> void:
 func _get_ailment_display(ailment: String) -> String:
 	"""Convert ailment name to display text"""
 	match ailment.to_lower():
+		"fainted":
+			return "Fainted"
 		"poison", "poisoned":
 			return "Poisoned"
 		"burn", "burned", "burning":
@@ -596,18 +640,56 @@ func _get_ailment_display(ailment: String) -> String:
 		_:
 			return ailment.capitalize()
 
-func _get_debuff_display(debuff_type: String) -> String:
-	"""Convert debuff type to display text"""
-	match debuff_type.to_lower():
-		"attack_down", "attack down":
-			return "ATK↓"
-		"defense_down", "defense down", "def_down":
-			return "DEF↓"
-		"mind_down", "mind down", "mnd_down":
-			return "MND↓"
-		"speed_down", "speed down":
-			return "SPD↓"
-		"accuracy_down", "accuracy down", "acc_down":
-			return "ACC↓"
+func _get_buff_debuff_display(buff: Dictionary) -> Dictionary:
+	"""Convert buff/debuff to display symbol and color
+	Returns {symbol: String, color: Color}"""
+	var buff_type = str(buff.get("type", "")).to_lower()
+	var magnitude = float(buff.get("magnitude", 0.0))
+	var is_positive = magnitude > 0
+
+	match buff_type:
+		"attack_up", "attack_down", "attack", "atk":
+			return {
+				"symbol": "↑" if is_positive else "↓",
+				"color": Color(1.0, 0.2, 0.2, 1.0)  # Red
+			}
+		"skill_up", "skill_down", "mind_up", "mind_down", "skill", "mind", "mnd":
+			return {
+				"symbol": "↑" if is_positive else "↓",
+				"color": Color(0.3, 0.5, 1.0, 1.0)  # Blue
+			}
+		"regen":
+			return {
+				"symbol": "●",
+				"color": Color(0.2, 1.0, 0.2, 1.0)  # Green
+			}
+		"defense_up", "defense_down", "defense", "def":
+			return {
+				"symbol": "↑" if is_positive else "↓",
+				"color": Color(1.0, 0.6, 0.2, 1.0)  # Orange
+			}
+		"accuracy_up", "accuracy_down", "accuracy", "acc", "hit_chance":
+			return {
+				"symbol": "↑" if is_positive else "↓",
+				"color": Color(1.0, 0.7, 0.8, 1.0)  # Pink
+			}
+		"skill_accuracy_up", "skill_accuracy_down", "sigil_accuracy", "skill_acc":
+			return {
+				"symbol": "↑" if is_positive else "↓",
+				"color": Color(0.7, 0.3, 1.0, 1.0)  # Purple
+			}
+		"speed_up", "speed_down", "speed", "spd":
+			return {
+				"symbol": "↑" if is_positive else "↓",
+				"color": Color(1.0, 1.0, 0.2, 1.0)  # Yellow
+			}
+		"evasion_up", "evasion_down", "evasion", "evade":
+			return {
+				"symbol": "↑" if is_positive else "↓",
+				"color": Color(0.3, 0.9, 0.9, 1.0)  # Teal
+			}
 		_:
-			return debuff_type.replace("_", " ").capitalize()
+			return {
+				"symbol": "?" if is_positive else "?",
+				"color": Color(0.7, 0.7, 0.7, 1.0)  # Gray
+			}

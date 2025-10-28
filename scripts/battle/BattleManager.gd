@@ -441,6 +441,8 @@ func _process_round_start_effects() -> void:
 
 					if combatant.hp <= 0:
 						combatant.is_ko = true
+						combatant.ailment = "fainted"
+						combatant.ailment_turn_count = 0
 						print("[BattleManager] %s was KO'd by %s!" % [combatant.display_name, ailment_type.capitalize()])
 
 				# Decrement duration (0 = infinite)
@@ -535,6 +537,8 @@ func _process_turn_start_ailments(combatant: Dictionary) -> void:
 		# Check for KO from ailment damage
 		if combatant.hp <= 0:
 			combatant.is_ko = true
+			combatant.ailment = "fainted"
+			combatant.ailment_turn_count = 0
 			print("[BattleManager] %s was KO'd by %s!" % [combatant.display_name, ailment.capitalize()])
 			return  # Don't process auto-cure if they died
 
