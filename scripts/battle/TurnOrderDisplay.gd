@@ -20,8 +20,10 @@ const KO_FALL_DURATION: float = 0.5  # Duration of KO falling animation
 var turn_slots: Array[PanelContainer] = []
 var previous_order: Dictionary = {}  # combatant_id -> previous_index
 var round_label: Label = null
+var round_announcement: Label = null  # Current round announcement label (protected from cleanup)
 var current_round: int = 0
 var is_animating: bool = false  # Prevent overlapping animations
+var is_rebuilding: bool = false  # ULTRA FIX: Mutex to prevent concurrent rebuilds
 
 func _ready() -> void:
 	print("[TurnOrderDisplay] Initializing turn order display")
@@ -47,23 +49,46 @@ func _ready() -> void:
 		battle_mgr.turn_order_changed.connect(_on_turn_order_changed)
 
 func _on_battle_started() -> void:
-	"""Called when battle starts - initial display"""
-	print("[TurnOrderDisplay] Battle started, displaying initial turn order")
-	current_round = 1
-	if round_label:
-		round_label.text = "Round 1"
-	_rebuild_display_with_reveal()
+	"""Called when battle starts - initial setup"""
+	print("[TurnOrderDisplay] Battle started, ready for turn order")
+	# Don't rebuild here - turn order isn't calculated yet
+	# Round 1 will trigger _on_round_started() which will do the initial display
+	current_round = 0
+	# Clear any previous battle's data
+	for slot in turn_slots:
+		slot.queue_free()
+	turn_slots.clear()
+	previous_order.clear()
 
 func _on_round_started(round_number: int) -> void:
 	"""Called when a new round starts - refresh the display with animation"""
 	print("[TurnOrderDisplay] Round %d started, animating turn order reveal" % round_number)
 
-	# Cancel any ongoing animations - new round takes priority
-	is_animating = false
+	# ULTRA FIX: Block if already rebuilding
+	if is_rebuilding:
+		print("[TurnOrderDisplay] BLOCKED: Already rebuilding, ignoring round_started signal")
+		return
+
+	# Wait for any ongoing animations to complete before starting new one
+	if is_animating:
+		print("[TurnOrderDisplay] Waiting for ongoing animation to complete...")
+		# Wait for the animation to finish
+		while is_animating:
+			await get_tree().process_frame
 
 	current_round = round_number
+
+	# Step 1: Fade out current turn order
+	await _fade_out_turn_order()
+
+	# Step 2: Show big "Round X" announcement
+	await _show_round_announcement(round_number)
+
+	# Step 3: Update round label
 	if round_label:
 		round_label.text = "Round %d" % round_number
+
+	# Step 4: Rebuild and fade in new turn order
 	await _rebuild_display_with_reveal()
 	animation_completed.emit()
 
@@ -90,38 +115,131 @@ func _on_turn_order_changed() -> void:
 ## DISPLAY BUILDING
 ## ═══════════════════════════════════════════════════════════════
 
+func _fade_out_turn_order() -> void:
+	"""Fade out current turn order slots"""
+	if turn_slots.is_empty():
+		print("[TurnOrderDisplay] No slots to fade out (probably first round)")
+		return
+
+	print("[TurnOrderDisplay] Fading out %d turn order slots..." % turn_slots.size())
+
+	var tweens = []
+	for slot in turn_slots:
+		if is_instance_valid(slot):
+			var tween = create_tween()
+			tween.set_ease(Tween.EASE_IN)
+			tween.set_trans(Tween.TRANS_CUBIC)
+			tween.tween_property(slot, "modulate:a", 0.0, 0.3)
+			tweens.append(tween)
+
+	# Wait for fade out to complete
+	if not tweens.is_empty():
+		await tweens[0].finished
+
+	print("[TurnOrderDisplay] Fade out complete")
+
+func _show_round_announcement(round_num: int) -> void:
+	"""Show big 'Round X' announcement that fades in and out"""
+	print("[TurnOrderDisplay] Showing Round %d announcement..." % round_num)
+
+	# Create large announcement label
+	round_announcement = Label.new()
+	round_announcement.text = "=== ROUND %d ===" % round_num
+	round_announcement.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	round_announcement.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	round_announcement.add_theme_font_size_override("font_size", 32)
+	round_announcement.add_theme_color_override("font_color", Color(1.0, 0.9, 0.3, 1.0))  # Gold color
+	round_announcement.custom_minimum_size = Vector2(200, 60)
+	round_announcement.modulate.a = 0.0  # Start invisible
+
+	add_child(round_announcement)
+	move_child(round_announcement, 1)  # Put after round label
+
+	# Fade in
+	var fade_in = create_tween()
+	fade_in.set_ease(Tween.EASE_OUT)
+	fade_in.set_trans(Tween.TRANS_CUBIC)
+	fade_in.tween_property(round_announcement, "modulate:a", 1.0, 0.4)
+	await fade_in.finished
+
+	# Hold for a moment
+	await get_tree().create_timer(0.6).timeout
+
+	# Fade out
+	var fade_out = create_tween()
+	fade_out.set_ease(Tween.EASE_IN)
+	fade_out.set_trans(Tween.TRANS_CUBIC)
+	fade_out.tween_property(round_announcement, "modulate:a", 0.0, 0.4)
+	await fade_out.finished
+
+	# Remove announcement (check if still valid first)
+	if is_instance_valid(round_announcement):
+		remove_child(round_announcement)
+		round_announcement.free()
+	round_announcement = null
+
+	print("[TurnOrderDisplay] Round announcement complete")
+
 func _rebuild_display_with_reveal() -> void:
 	"""Rebuild display with sequential reveal animation for new rounds"""
+	# ULTRA FIX: Set rebuild lock
+	is_rebuilding = true
 	is_animating = true
 
-	# Clear existing slots
-	for slot in turn_slots:
-		slot.queue_free()
+	print("[TurnOrderDisplay] Starting rebuild - current children: %d" % get_child_count())
+
+	# ULTRA FIX: IMMEDIATE deletion - no queue_free, use remove_child + free
+	var children_to_delete = []
+	for child in get_children():
+		if child != round_label and child != round_announcement and is_instance_valid(child):
+			children_to_delete.append(child)
+
+	# Remove and free immediately (not queued)
+	for child in children_to_delete:
+		remove_child(child)
+		child.free()  # Immediate deletion, not queue_free
+
+	# Clear tracking arrays
 	turn_slots.clear()
 
-	# Clear children except round label
-	for child in get_children():
-		if child != round_label:
-			child.queue_free()
+	print("[TurnOrderDisplay] After cleanup - current children: %d" % get_child_count())
+
+	# Wait one frame for any pending operations to complete
+	await get_tree().process_frame
 
 	# Get turn order from battle manager
 	if not battle_mgr:
 		is_animating = false
+		is_rebuilding = false  # ULTRA FIX: Clear rebuild lock on early return
 		return
 
 	var turn_order = battle_mgr.turn_order
 	if turn_order.is_empty():
 		is_animating = false
+		is_rebuilding = false  # ULTRA FIX: Clear rebuild lock on early return
 		return
 
 	# Create slots for upcoming turns with sequential reveal
 	var turns_to_show = min(SHOW_UPCOMING_TURNS, turn_order.size())
+	var last_tween = null
+
+	# Extra safeguard: Track combatant IDs to prevent duplicates
+	var seen_ids: Dictionary = {}
 
 	for i in range(turns_to_show):
 		var combatant = turn_order[i]
+		var combatant_id = combatant.get("id", "")
+
+		# Skip if we've already created a slot for this combatant ID
+		if combatant_id != "" and seen_ids.has(combatant_id):
+			print("[TurnOrderDisplay] WARNING: Duplicate combatant %s detected at index %d, skipping!" % [combatant.get("display_name", "Unknown"), i])
+			continue
+
+		seen_ids[combatant_id] = true
 		var slot = _create_turn_slot(combatant, i)
 		turn_slots.append(slot)
 		add_child(slot)
+		print("[TurnOrderDisplay] Created slot for %s [ID: %s] - total children now: %d" % [combatant.display_name, combatant_id, get_child_count()])
 
 		# Start invisible and off-screen
 		slot.modulate.a = 0.0
@@ -141,22 +259,43 @@ func _rebuild_display_with_reveal() -> void:
 		# Slide in from left
 		tween.tween_property(slot, "position:x", 0, 0.3)
 
+		# Track the last tween so we can wait for it
+		last_tween = tween
+
+	# Wait for the last animation to complete
+	if last_tween:
+		await last_tween.finished
+
 	# Store current order for future animations
 	_store_current_order()
 
+	print("[TurnOrderDisplay] Rebuild complete - final child count: %d, turn_slots: %d" % [get_child_count(), turn_slots.size()])
+
 	is_animating = false
+	is_rebuilding = false  # ULTRA FIX: Clear rebuild lock
 
 func _rebuild_display() -> void:
 	"""Rebuild the entire turn order display with fade-in animation"""
-	# Clear existing slots
-	for slot in turn_slots:
-		slot.queue_free()
+	print("[TurnOrderDisplay] Starting rebuild (no reveal) - current children: %d" % get_child_count())
+
+	# ULTRA FIX: IMMEDIATE deletion - no queue_free, use remove_child + free
+	var children_to_delete = []
+	for child in get_children():
+		if child != round_label and child != round_announcement and is_instance_valid(child):
+			children_to_delete.append(child)
+
+	# Remove and free immediately (not queued)
+	for child in children_to_delete:
+		remove_child(child)
+		child.free()  # Immediate deletion, not queue_free
+
+	# Clear tracking arrays
 	turn_slots.clear()
 
-	# Clear children except round label
-	for child in get_children():
-		if child != round_label:
-			child.queue_free()
+	print("[TurnOrderDisplay] After cleanup - current children: %d" % get_child_count())
+
+	# Wait one frame for any pending operations to complete
+	await get_tree().process_frame
 
 	# Get turn order from battle manager
 	if not battle_mgr:
@@ -169,24 +308,44 @@ func _rebuild_display() -> void:
 	# Create slots for upcoming turns
 	var turns_to_show = min(SHOW_UPCOMING_TURNS, turn_order.size())
 
+	# Extra safeguard: Track combatant IDs to prevent duplicates
+	var seen_ids: Dictionary = {}
+
 	for i in range(turns_to_show):
 		var combatant = turn_order[i]
+		var combatant_id = combatant.get("id", "")
+
+		# Skip if we've already created a slot for this combatant ID
+		if combatant_id != "" and seen_ids.has(combatant_id):
+			print("[TurnOrderDisplay] WARNING: Duplicate combatant %s detected at index %d, skipping!" % [combatant.get("display_name", "Unknown"), i])
+			continue
+
+		seen_ids[combatant_id] = true
 		var slot = _create_turn_slot(combatant, i)
 		turn_slots.append(slot)
 		add_child(slot)
+		print("[TurnOrderDisplay] Created slot for %s [ID: %s] - total children now: %d" % [combatant.display_name, combatant_id, get_child_count()])
 
 		# Start invisible
 		slot.modulate.a = 0.0
 
+	print("[TurnOrderDisplay] Finished creating %d slots - final child count: %d" % [turns_to_show, get_child_count()])
+
 	# Wait one frame for layout to settle, then fade in all slots
 	await get_tree().process_frame
 
+	var last_tween = null
 	for slot in turn_slots:
 		if is_instance_valid(slot):
 			var tween = create_tween()
 			tween.set_ease(Tween.EASE_OUT)
 			tween.set_trans(Tween.TRANS_CUBIC)
 			tween.tween_property(slot, "modulate:a", 1.0, 0.3)
+			last_tween = tween
+
+	# Wait for animations to complete
+	if last_tween:
+		await last_tween.finished
 
 	# Store current order for future animations
 	_store_current_order()
@@ -352,17 +511,6 @@ func _create_turn_slot(combatant: Dictionary, index: int) -> PanelContainer:
 		var ailment_text = _get_ailment_display(ailment)
 		status_parts.append(ailment_text)
 
-	# Add first debuff if present
-	if combatant.has("debuffs"):
-		var debuffs = combatant.get("debuffs", [])
-		if typeof(debuffs) == TYPE_ARRAY and debuffs.size() > 0:
-			var first_debuff = debuffs[0]
-			if typeof(first_debuff) == TYPE_DICTIONARY:
-				var debuff_type = str(first_debuff.get("type", ""))
-				if debuff_type != "":
-					var debuff_text = _get_debuff_display(debuff_type)
-					status_parts.append(debuff_text)
-
 	# Add status indicators
 	if status_parts.size() > 0:
 		display_text += " (%s)" % ", ".join(status_parts)
@@ -396,6 +544,50 @@ func _create_turn_slot(combatant: Dictionary, index: int) -> PanelContainer:
 		# else: default white color
 
 	hbox.add_child(name_label)
+
+	# Buff/Debuff indicators (colored arrows/circles)
+	if combatant.has("buffs"):
+		var buffs = combatant.get("buffs", [])
+		if typeof(buffs) == TYPE_ARRAY and buffs.size() > 0:
+			var buff_container = HBoxContainer.new()
+			buff_container.add_theme_constant_override("separation", 1)
+
+			# Group buffs by type to show multiples
+			var buff_groups: Dictionary = {}  # type -> {display_info, count}
+			for buff in buffs:
+				if typeof(buff) == TYPE_DICTIONARY:
+					var buff_type = str(buff.get("type", ""))
+					if buff_type != "":
+						if not buff_groups.has(buff_type):
+							var display_info = _get_buff_debuff_display(buff)
+							buff_groups[buff_type] = {"info": display_info, "count": 0}
+						buff_groups[buff_type].count += 1
+
+			# Display grouped buffs
+			var shown_count = 0
+			var max_groups = 6  # Show up to 6 different buff types
+			for buff_type in buff_groups:
+				if shown_count >= max_groups:
+					break
+
+				var group_data = buff_groups[buff_type]
+				var display_info = group_data.info
+				var count = group_data.count
+
+				var buff_label = Label.new()
+				# Show symbol multiple times if stacked (up to 3x)
+				var symbol_repeat = min(count, 3)
+				buff_label.text = display_info.symbol.repeat(symbol_repeat)
+				if count > 3:
+					buff_label.text += "+"  # Add + if more than 3 stacks
+
+				buff_label.add_theme_font_size_override("font_size", 12)
+				buff_label.add_theme_color_override("font_color", display_info.color)
+				buff_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+				buff_container.add_child(buff_label)
+				shown_count += 1
+
+			hbox.add_child(buff_container)
 
 	# Initiative value
 	var init_label = Label.new()
@@ -545,6 +737,10 @@ func animate_capture(combatant_id: String) -> void:
 func _get_ailment_display(ailment: String) -> String:
 	"""Convert ailment name to display text"""
 	match ailment.to_lower():
+		"fainted":
+			return "Fainted"
+		"captured":
+			return "Captured"
 		"poison", "poisoned":
 			return "Poisoned"
 		"burn", "burned", "burning":
@@ -568,18 +764,64 @@ func _get_ailment_display(ailment: String) -> String:
 		_:
 			return ailment.capitalize()
 
-func _get_debuff_display(debuff_type: String) -> String:
-	"""Convert debuff type to display text"""
-	match debuff_type.to_lower():
-		"attack_down", "attack down":
-			return "ATK↓"
-		"defense_down", "defense down", "def_down":
-			return "DEF↓"
-		"mind_down", "mind down", "mnd_down":
-			return "MND↓"
-		"speed_down", "speed down":
-			return "SPD↓"
-		"accuracy_down", "accuracy down", "acc_down":
-			return "ACC↓"
+func _get_buff_debuff_display(buff: Dictionary) -> Dictionary:
+	"""Convert buff/debuff to display symbol and color
+	Returns {symbol: String, color: Color}"""
+	var buff_type = str(buff.get("type", "")).to_lower()
+	var value = float(buff.get("value", 0.0))
+	var is_positive = value > 0
+
+	# Match the actual buff type names used in the game
+	match buff_type:
+		"atk_up", "atk_down", "atk":
+			return {
+				"symbol": "↑" if is_positive else "↓",
+				"color": Color(1.0, 0.2, 0.2, 1.0)  # Red
+			}
+		"skl_up", "skl_down", "skl", "mnd_up", "mnd_down", "mnd":
+			return {
+				"symbol": "↑" if is_positive else "↓",
+				"color": Color(0.3, 0.5, 1.0, 1.0)  # Blue
+			}
+		"regen":
+			return {
+				"symbol": "●",
+				"color": Color(0.2, 1.0, 0.2, 1.0)  # Green
+			}
+		"def_up", "def_down", "def":
+			return {
+				"symbol": "↑" if is_positive else "↓",
+				"color": Color(1.0, 0.6, 0.2, 1.0)  # Orange
+			}
+		"phys_acc", "hit_chance", "acc_up", "acc_down", "acc":
+			return {
+				"symbol": "↑" if is_positive else "↓",
+				"color": Color(1.0, 0.7, 0.8, 1.0)  # Pink
+			}
+		"mind_acc", "sigil_accuracy", "skill_acc":
+			return {
+				"symbol": "↑" if is_positive else "↓",
+				"color": Color(0.7, 0.3, 1.0, 1.0)  # Purple
+			}
+		"spd_up", "spd_down", "spd", "speed":
+			return {
+				"symbol": "↑" if is_positive else "↓",
+				"color": Color(1.0, 1.0, 0.2, 1.0)  # Yellow
+			}
+		"evasion", "evade", "eva_up", "eva_down":
+			return {
+				"symbol": "↑" if is_positive else "↓",
+				"color": Color(0.3, 0.9, 0.9, 1.0)  # Teal
+			}
+		"reflect":
+			return {
+				"symbol": "◆",
+				"color": Color(0.9, 0.9, 0.9, 1.0)  # White/silver
+			}
 		_:
-			return debuff_type.replace("_", " ").capitalize()
+			# Unknown buff type - log it for debugging
+			print("[TurnOrderDisplay] Unknown buff type: %s" % buff_type)
+			return {
+				"symbol": "?",
+				"color": Color(0.7, 0.7, 0.7, 1.0)  # Gray
+			}

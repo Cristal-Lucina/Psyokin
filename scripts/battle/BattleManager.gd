@@ -128,6 +128,10 @@ func initialize_battle(ally_party: Array, enemy_list: Array) -> void:
 		var enemy_id = enemy_list[i]
 		var enemy_data = _create_enemy_combatant(enemy_id, i)
 		combatants.append(enemy_data)
+		print("[BattleManager] Added enemy: %s [ID: %s]" % [enemy_data.display_name, enemy_data.id])
+
+	# ULTRA FIX: Validate immediately after adding all combatants
+	_validate_and_fix_combatants()
 
 	battle_started.emit()
 	print("[BattleManager] Battle initialized with %d combatants" % combatants.size())
@@ -145,6 +149,9 @@ func start_round() -> void:
 	current_state = BattleState.ROUND_START
 	print("[BattleManager] === ROUND %d START ===" % current_round)
 
+	# ULTRA FIX: Validate combatants array has no duplicates BEFORE creating turn order
+	_validate_and_fix_combatants()
+
 	# Roll initiative for all combatants
 	_roll_initiative()
 
@@ -153,10 +160,14 @@ func start_round() -> void:
 	turn_order.sort_custom(_sort_by_initiative)
 	_remove_turn_order_duplicates()  # Ensure no duplicates in turn order
 
+	# ULTRA FIX: Final validation
+	if turn_order.size() != combatants.size():
+		push_error("[BattleManager] CRITICAL: turn_order size (%d) != combatants size (%d) after duplicate removal!" % [turn_order.size(), combatants.size()])
+
 	print("[BattleManager] Turn order:")
 	for i in range(turn_order.size()):
 		var c = turn_order[i]
-		print("  %d. %s (Initiative: %d)" % [i + 1, c.display_name, c.initiative])
+		print("  %d. %s [ID: %s] (Initiative: %d)" % [i + 1, c.display_name, c.id, c.initiative])
 
 	# Process start-of-round effects (DoT, HoT, buff/debuff duration)
 	_process_round_start_effects()
@@ -173,6 +184,7 @@ func start_round() -> void:
 
 func _roll_initiative() -> void:
 	"""Roll initiative for all combatants based on TPO"""
+	print("[BattleManager] Rolling initiative for %d combatants" % combatants.size())
 	for combatant in combatants:
 		if combatant.is_ko or combatant.is_fled:
 			combatant.initiative = -1
@@ -181,11 +193,19 @@ func _roll_initiative() -> void:
 		# Fallen combatants get 0 initiative (they'll skip their turn)
 		if combatant.is_fallen:
 			combatant.initiative = 0
-			print("[BattleManager] %s is FALLEN - initiative set to 0" % combatant.display_name)
+			print("[BattleManager] %s [ID: %s] is FALLEN - initiative set to 0" % [combatant.display_name, combatant.id])
 			continue
 
 		var tpo = combatant.stats.TPO
-		var speed = combatant.stats.get("Speed", 0)
+		var base_speed = combatant.stats.get("Speed", 0)
+
+		# Add speed buffs/debuffs to speed
+		var speed_modifier = get_buff_modifier(combatant, "spd_up")
+		speed_modifier += get_buff_modifier(combatant, "spd_down")
+		speed_modifier += get_buff_modifier(combatant, "spd")
+		speed_modifier += get_buff_modifier(combatant, "speed")
+
+		var total_speed = base_speed + int(speed_modifier)
 
 		# Roll dice based on TPO tier (keep highest)
 		var dice_count = 1
@@ -204,10 +224,15 @@ func _roll_initiative() -> void:
 			if roll > best_roll:
 				best_roll = roll
 
-		combatant.initiative = best_roll + speed
-		print("[BattleManager] %s initiative: %dd20(H) = %d + Speed %d = %d" % [
-			combatant.display_name, dice_count, best_roll, speed, combatant.initiative
-		])
+		combatant.initiative = best_roll + total_speed
+		if speed_modifier != 0:
+			print("[BattleManager] %s [ID: %s] initiative: %dd20(H) = %d + Speed %d (base %d + buff %+d) = %d" % [
+				combatant.display_name, combatant.id, dice_count, best_roll, total_speed, base_speed, int(speed_modifier), combatant.initiative
+			])
+		else:
+			print("[BattleManager] %s [ID: %s] initiative: %dd20(H) = %d + Speed %d = %d" % [
+				combatant.display_name, combatant.id, dice_count, best_roll, total_speed, combatant.initiative
+			])
 
 func _sort_by_initiative(a: Dictionary, b: Dictionary) -> bool:
 	"""Sort comparator for initiative (higher first, Fallen above KO'd, KO'd to bottom)"""
@@ -254,6 +279,31 @@ func _sort_by_initiative(a: Dictionary, b: Dictionary) -> bool:
 
 	# Final tiebreaker: coinflip
 	return randf() > 0.5
+
+func _validate_and_fix_combatants() -> void:
+	"""ULTRA FIX: Validate combatants array has no duplicates and fix if found"""
+	print("[BattleManager] Validating %d combatants..." % combatants.size())
+	var seen_ids: Dictionary = {}
+	var cleaned: Array[Dictionary] = []
+	var duplicates_found: int = 0
+
+	for combatant in combatants:
+		var id = combatant.id
+		var name = combatant.display_name
+		if not seen_ids.has(id):
+			seen_ids[id] = true
+			cleaned.append(combatant)
+			print("[BattleManager]   ✓ %s [ID: %s]" % [name, id])
+		else:
+			duplicates_found += 1
+			push_error("[BattleManager] CRITICAL: Duplicate combatant in combatants array: %s (id: %s)" % [name, id])
+			print("[BattleManager]   ✗ DUPLICATE FOUND: %s [ID: %s] - REMOVING!" % [name, id])
+
+	if duplicates_found > 0:
+		print("[BattleManager] ULTRA FIX: Removed %d duplicate(s) from combatants array!" % duplicates_found)
+		combatants = cleaned
+	else:
+		print("[BattleManager] Validation complete - no duplicates found")
 
 func _remove_turn_order_duplicates() -> void:
 	"""Remove duplicate combatants from turn_order (keep first occurrence)"""
@@ -398,6 +448,10 @@ func _end_round() -> void:
 	if await _check_battle_end():
 		return
 
+	# Brief pause between rounds (UI will show round transition animation)
+	print("[BattleManager] Pausing 0.5 seconds before next round...")
+	await get_tree().create_timer(0.5).timeout
+
 	# Start next round
 	start_round()
 
@@ -422,7 +476,9 @@ func _process_round_start_effects() -> void:
 		# NOTE: is_defending persists across rounds until combatant takes offensive action
 		# This provides multi-round defensive stances
 
-		# ═══════ Apply DoT (Damage over Time) ═══════
+		# ═══════ Apply DoT (Damage over Time) - REMOVED ═══════
+		# NOTE: Burn/Poison damage moved to _process_turn_start_ailments()
+		# DoT now applies at START OF EACH TURN, not at round start
 		if combatant.has("ailments"):
 			var ailments_to_remove = []
 			for ailment_key in combatant.ailments:
@@ -432,16 +488,6 @@ func _process_round_start_effects() -> void:
 					ailment = {"type": ailment, "duration": 0}
 
 				var ailment_type = ailment.get("type", "")
-
-				# Apply DoT damage
-				if ailment_type in ["poison", "burn"]:
-					var damage = int(ceil(combatant.hp_max * 0.05))  # 5% max HP
-					combatant.hp = max(0, combatant.hp - damage)
-					print("[BattleManager] %s takes %d %s damage" % [combatant.display_name, damage, ailment_type.capitalize()])
-
-					if combatant.hp <= 0:
-						combatant.is_ko = true
-						print("[BattleManager] %s was KO'd by %s!" % [combatant.display_name, ailment_type.capitalize()])
 
 				# Decrement duration (0 = infinite)
 				var duration = ailment.get("duration", 0)
@@ -535,6 +581,8 @@ func _process_turn_start_ailments(combatant: Dictionary) -> void:
 		# Check for KO from ailment damage
 		if combatant.hp <= 0:
 			combatant.is_ko = true
+			combatant.ailment = "fainted"
+			combatant.ailment_turn_count = 0
 			print("[BattleManager] %s was KO'd by %s!" % [combatant.display_name, ailment.capitalize()])
 			return  # Don't process auto-cure if they died
 
@@ -688,16 +736,15 @@ func apply_buff(combatant: Dictionary, buff_type: String, value: float, duration
 	])
 
 func process_buff_durations(combatant: Dictionary) -> void:
-	"""Decrement buff durations at turn start and remove expired buffs"""
+	"""Check for expired buffs (duration is decremented at round start, not turn start)"""
 	if not combatant.has("buffs"):
 		return
 
 	var expired_buffs = []
 
-	# Process each buff
+	# Check each buff for expiration (but don't decrement - that happens at round start)
 	for i in range(combatant.buffs.size()):
 		var buff = combatant.buffs[i]
-		buff.duration -= 1
 
 		if buff.duration <= 0:
 			expired_buffs.append(i)
@@ -1518,6 +1565,9 @@ func record_weapon_weakness_hit(target: Dictionary) -> bool:
 
 func refresh_turn_order() -> void:
 	"""Re-sort turn order and emit signal (used when combatant state changes like KO)"""
+	# ULTRA FIX: Validate combatants array first
+	_validate_and_fix_combatants()
+
 	# Store current combatant ID before re-sorting
 	var current_combatant_id: String = ""
 	if current_turn_index < turn_order.size():

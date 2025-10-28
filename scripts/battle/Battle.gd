@@ -38,6 +38,7 @@ var current_skill_menu: Array = []  # Current skills in menu
 var selected_item: Dictionary = {}  # Selected item data
 var selected_burst: Dictionary = {}  # Selected burst ability data
 var victory_panel: PanelContainer = null  # Victory screen panel
+var is_in_round_transition: bool = false  # True during round transition animations
 
 func _ready() -> void:
 	print("[Battle] Battle scene loaded")
@@ -57,6 +58,10 @@ func _ready() -> void:
 	battle_mgr.turn_ended.connect(_on_turn_ended)
 	battle_mgr.round_started.connect(_on_round_started)
 	battle_mgr.battle_ended.connect(_on_battle_ended)
+
+	# Connect to turn order display signals
+	if turn_order_display and turn_order_display.has_signal("animation_completed"):
+		turn_order_display.animation_completed.connect(_on_turn_order_animation_completed)
 
 	# Hide action menu initially
 	action_menu.visible = false
@@ -101,6 +106,9 @@ func _on_battle_started() -> void:
 func _on_round_started(round_number: int) -> void:
 	"""Called at start of each round"""
 	log_message("=== Round %d ===" % round_number)
+
+	# Disable all input during round transition
+	_disable_all_input()
 
 func _on_turn_started(combatant_id: String) -> void:
 	"""Called when a combatant's turn starts"""
@@ -156,6 +164,12 @@ func _on_turn_ended(_combatant_id: String) -> void:
 	"""Called when a combatant's turn ends"""
 	# Hide action menu
 	action_menu.visible = false
+
+func _on_turn_order_animation_completed() -> void:
+	"""Called when turn order display animation completes (e.g., round transitions)"""
+	# Re-enable input after round transition animation completes
+	if is_in_round_transition:
+		_enable_all_input()
 
 func _on_battle_ended(victory: bool) -> void:
 	"""Called when battle ends"""
@@ -418,6 +432,25 @@ func _wake_if_asleep(target: Dictionary) -> void:
 		if battle_mgr:
 			battle_mgr.refresh_turn_order()
 
+func _set_fainted(target: Dictionary) -> void:
+	"""Mark a combatant as fainted (KO'd) and set Fainted status ailment"""
+	target.is_ko = true
+	target.ailment = "fainted"
+	target.ailment_turn_count = 0
+	# Refresh turn order to show fainted status
+	if battle_mgr:
+		battle_mgr.refresh_turn_order()
+
+func _set_captured(target: Dictionary) -> void:
+	"""Mark a combatant as captured and set Captured status ailment"""
+	target.is_ko = true
+	target.is_captured = true
+	target.ailment = "captured"
+	target.ailment_turn_count = 0
+	# Refresh turn order to show captured status
+	if battle_mgr:
+		battle_mgr.refresh_turn_order()
+
 ## ═══════════════════════════════════════════════════════════════
 ## COMBATANT DISPLAY
 ## ═══════════════════════════════════════════════════════════════
@@ -489,6 +522,13 @@ func _create_combatant_slot(combatant: Dictionary, is_ally: bool) -> PanelContai
 		mp_label.add_theme_font_size_override("font_size", 10)
 		vbox.add_child(mp_label)
 
+	# Status button to show detailed status effects
+	var status_button = Button.new()
+	status_button.text = "Status"
+	status_button.custom_minimum_size = Vector2(120, 25)
+	status_button.pressed.connect(_show_status_details.bind(combatant))
+	vbox.add_child(status_button)
+
 	# Store combatant ID in metadata
 	panel.set_meta("combatant_id", combatant.id)
 	panel.set_meta("is_ally", is_ally)
@@ -506,6 +546,138 @@ func _update_combatant_displays() -> void:
 	"""Update all combatant HP/MP displays"""
 	# TODO: Update HP/MP bars without recreating everything
 	_display_combatants()
+
+func _show_status_details(combatant: Dictionary) -> void:
+	"""Show detailed status information popup for a combatant"""
+	# Create modal background (blocks clicks)
+	var modal_bg = ColorRect.new()
+	modal_bg.color = Color(0, 0, 0, 0.5)  # Semi-transparent black overlay
+	modal_bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	modal_bg.z_index = 99
+	modal_bg.mouse_filter = Control.MOUSE_FILTER_STOP  # Block all clicks
+	add_child(modal_bg)
+
+	# Create popup panel - fully opaque, no transparency
+	var popup = PanelContainer.new()
+	popup.custom_minimum_size = Vector2(400, 300)
+	popup.modulate.a = 1.0  # 100% solid, no transparency
+
+	# Add solid dark background style
+	var panel_style = StyleBoxFlat.new()
+	panel_style.bg_color = Color(0.15, 0.15, 0.2, 1.0)  # Solid dark blue-gray
+	panel_style.border_width_left = 3
+	panel_style.border_width_right = 3
+	panel_style.border_width_top = 3
+	panel_style.border_width_bottom = 3
+	panel_style.border_color = Color(0.4, 0.6, 0.8, 1.0)  # Light blue border
+	popup.add_theme_stylebox_override("panel", panel_style)
+
+	# Center it on screen
+	popup.position = get_viewport_rect().size / 2 - popup.custom_minimum_size / 2
+	popup.z_index = 100
+	popup.mouse_filter = Control.MOUSE_FILTER_STOP  # Prevent clicking through
+
+	var vbox = VBoxContainer.new()
+	popup.add_child(vbox)
+
+	# Title
+	var title = Label.new()
+	title.text = "=== %s Status ===" % combatant.display_name
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 16)
+	vbox.add_child(title)
+
+	var scroll = ScrollContainer.new()
+	scroll.custom_minimum_size = Vector2(380, 220)
+	vbox.add_child(scroll)
+
+	var content = VBoxContainer.new()
+	scroll.add_child(content)
+
+	# Ailment
+	var ailment = str(combatant.get("ailment", ""))
+	if ailment != "" and ailment != "null":
+		var ailment_label = Label.new()
+		ailment_label.text = "❌ Ailment: %s" % ailment.capitalize()
+		ailment_label.add_theme_color_override("font_color", Color(1.0, 0.3, 0.3, 1.0))
+		content.add_child(ailment_label)
+
+	# Buffs/Debuffs
+	if combatant.has("buffs"):
+		var buffs = combatant.get("buffs", [])
+		if buffs.size() > 0:
+			var buff_title = Label.new()
+			buff_title.text = "\n--- Active Effects (%d) ---" % buffs.size()
+			buff_title.add_theme_font_size_override("font_size", 14)
+			content.add_child(buff_title)
+
+			for buff in buffs:
+				if typeof(buff) == TYPE_DICTIONARY:
+					var buff_type = str(buff.get("type", ""))
+					var value = float(buff.get("value", 0.0))
+					var duration = int(buff.get("duration", 0))
+
+					var buff_text = _format_buff_description(buff_type, value, duration)
+					var buff_label = Label.new()
+					buff_label.text = buff_text
+
+					# Color based on positive/negative
+					if value > 0:
+						buff_label.add_theme_color_override("font_color", Color(0.3, 1.0, 0.3, 1.0))
+					else:
+						buff_label.add_theme_color_override("font_color", Color(1.0, 0.5, 0.3, 1.0))
+
+					content.add_child(buff_label)
+
+	# If no effects
+	if ailment == "" or ailment == "null":
+		if not combatant.has("buffs") or combatant.buffs.size() == 0:
+			var none_label = Label.new()
+			none_label.text = "\n✓ No status effects"
+			none_label.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7, 1.0))
+			content.add_child(none_label)
+
+	# Close button
+	var close_btn = Button.new()
+	close_btn.text = "Close"
+	close_btn.pressed.connect(func():
+		popup.queue_free()
+		modal_bg.queue_free()  # Remove modal background too
+	)
+	vbox.add_child(close_btn)
+
+	add_child(popup)
+
+func _format_buff_description(buff_type: String, value: float, duration: int) -> String:
+	"""Format buff/debuff into readable description"""
+	var type_name = ""
+	var symbol = "↑" if value > 0 else "↓"
+
+	match buff_type.to_lower():
+		"atk_up", "atk_down", "atk":
+			type_name = "Attack"
+		"skl_up", "skl_down", "skl", "mnd_up", "mnd_down", "mnd":
+			type_name = "Skill/Mind"
+		"def_up", "def_down", "def":
+			type_name = "Defense"
+		"spd_up", "spd_down", "spd", "speed":
+			type_name = "Speed"
+		"phys_acc", "acc_up", "acc_down", "acc":
+			type_name = "Physical Accuracy"
+		"mind_acc", "skill_acc":
+			type_name = "Skill Accuracy"
+		"evasion", "evade", "eva_up", "eva_down":
+			type_name = "Evasion"
+		"regen":
+			return "● Regen (%d%% per round, %d rounds left)" % [int(value * 100), duration]
+		"reflect":
+			var element = ""
+			return "◆ Reflect (%d rounds left)" % duration
+		_:
+			type_name = buff_type.replace("_", " ").capitalize()
+
+	var percent = int(abs(value) * 100)
+	return "%s %s %s%d%% (%d rounds left)" % [symbol, type_name, "+" if value > 0 else "-", percent, duration]
 
 ## ═══════════════════════════════════════════════════════════════
 ## ACTION MENU
@@ -527,8 +699,48 @@ func _show_action_menu() -> void:
 	# TODO: Enable/disable actions based on state
 	# e.g., disable skills if no MP, disable burst if gauge too low
 
+func _disable_all_input() -> void:
+	"""Disable all input during round transitions to prevent glitches"""
+	is_in_round_transition = true
+
+	# Disable action menu (blocks all button clicks)
+	if action_menu:
+		action_menu.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	# Disable ally slots (prevent clicking on characters)
+	if ally_slots:
+		ally_slots.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	# Disable enemy slots (prevent clicking on enemies)
+	if enemy_slots:
+		enemy_slots.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	print("[Battle] Input disabled during round transition")
+
+func _enable_all_input() -> void:
+	"""Re-enable all input after round transition completes"""
+	is_in_round_transition = false
+
+	# Re-enable action menu
+	if action_menu:
+		action_menu.mouse_filter = Control.MOUSE_FILTER_STOP
+
+	# Re-enable ally slots
+	if ally_slots:
+		ally_slots.mouse_filter = Control.MOUSE_FILTER_STOP
+
+	# Re-enable enemy slots
+	if enemy_slots:
+		enemy_slots.mouse_filter = Control.MOUSE_FILTER_STOP
+
+	print("[Battle] Input re-enabled after round transition")
+
 func _on_attack_pressed() -> void:
 	"""Handle Attack action - prompt user to select target"""
+	# Block input during round transitions
+	if is_in_round_transition:
+		return
+
 	log_message("Select a target...")
 
 	# Get alive enemies
@@ -601,7 +813,7 @@ func _execute_attack(target: Dictionary) -> void:
 
 			if target.hp <= 0:
 				target.hp = 0
-				target.is_ko = true
+				_set_fainted(target)
 
 				# Record kill for morality system (if enemy)
 				if not target.get("is_ally", false):
@@ -678,6 +890,10 @@ func _execute_attack(target: Dictionary) -> void:
 
 func _on_skill_pressed() -> void:
 	"""Handle Skill action - show sigil/skill menu"""
+	# Block input during round transitions
+	if is_in_round_transition:
+		return
+
 	var sigils = current_combatant.get("sigils", [])
 	var skills = current_combatant.get("skills", [])
 
@@ -750,6 +966,10 @@ func _categorize_battle_item(item_id: String, item_name: String, item_def: Dicti
 
 func _on_item_pressed() -> void:
 	"""Handle Item action - show usable items menu"""
+	# Block input during round transitions
+	if is_in_round_transition:
+		return
+
 	var inventory = get_node_or_null("/root/aInventorySystem")
 	if not inventory:
 		log_message("Inventory system not available!")
@@ -837,6 +1057,10 @@ func _on_item_pressed() -> void:
 
 func _on_capture_pressed() -> void:
 	"""Handle Capture action - show bind item selection menu"""
+	# Block input during round transitions
+	if is_in_round_transition:
+		return
+
 	var inventory = get_node_or_null("/root/aInventorySystem")
 	if not inventory:
 		log_message("Inventory system not available!")
@@ -853,7 +1077,6 @@ func _on_capture_pressed() -> void:
 
 			# Debug: Check what fields are available in item_def
 			print("[Battle] Bind item %s fields: %s" % [bind_id, item_def.keys()])
-			print("[Battle] Bind item %s capture_mod raw value: %s" % [bind_id, item_def.get("capture_mod", "NOT_FOUND")])
 
 			var desc = item_def.get("short_description", "")
 			if desc == null:
@@ -865,9 +1088,10 @@ func _on_capture_pressed() -> void:
 				bind_name = bind_id
 			bind_name = str(bind_name)
 
-			var capture_mod_raw = item_def.get("capture_mod", 0)
+			# Read capture modifier from stat_boost field (since capture_mod doesn't exist in CSV)
+			var capture_mod_raw = item_def.get("stat_boost", 0)
 			var capture_mod_val = int(capture_mod_raw) if capture_mod_raw != null else 0
-			print("[Battle] Bind item %s final capture_mod: %d" % [bind_id, capture_mod_val])
+			print("[Battle] Bind item %s (%s) capture modifier: %d%%" % [bind_id, bind_name, capture_mod_val])
 
 			bind_items.append({
 				"id": str(bind_id),
@@ -921,8 +1145,7 @@ func _execute_capture(target: Dictionary) -> void:
 
 	if success:
 		# Capture successful!
-		target.is_captured = true
-		target.is_ko = true  # Remove from battle like KO
+		_set_captured(target)  # Remove from battle and mark as captured
 		log_message("  → SUCCESS! %s was captured!" % target.display_name)
 
 		# Record capture for morality system
@@ -1052,7 +1275,7 @@ func _execute_item_usage(target: Dictionary) -> void:
 
 			# Check for KO
 			if enemy.hp <= 0:
-				enemy.is_ko = true
+				_set_fainted(enemy)
 				log_message("    %s was defeated!" % enemy.display_name)
 				battle_mgr.record_enemy_defeat(enemy, false)
 				ko_list.append(enemy)
@@ -1146,6 +1369,9 @@ func _execute_item_usage(target: Dictionary) -> void:
 		if buff_type != "":
 			battle_mgr.apply_buff(target, buff_type, buff_value, duration)
 			log_message("  → %s gained %s for %d turns!" % [target.display_name, buff_type.replace("_", " ").capitalize(), duration])
+			# Refresh turn order to show buff immediately
+			if battle_mgr:
+				battle_mgr.refresh_turn_order()
 
 	# ═══════ CURE ITEMS (Remove ailments) ═══════
 	elif "Cure" in effect:
@@ -1265,8 +1491,13 @@ func _execute_item_usage(target: Dictionary) -> void:
 				revive_percent = int(result.get_string(1))
 
 			target.is_ko = false
+			target.ailment = ""  # Clear Fainted status
+			target.ailment_turn_count = 0
 			target.hp = max(1, int(target.hp_max * revive_percent / 100.0))
 			log_message("  → %s was revived with %d HP!" % [target.display_name, target.hp])
+			# Refresh turn order to show revive
+			if battle_mgr:
+				battle_mgr.refresh_turn_order()
 			_update_combatant_displays()
 		else:
 			log_message("  → %s is not KO'd!" % target.display_name)
@@ -1308,13 +1539,19 @@ func _execute_item_usage(target: Dictionary) -> void:
 
 	# Apply ailment if found
 	if ailment_to_apply != "":
-		log_message("%s uses %s on %s!" % [current_combatant.display_name, item_name, target.display_name])
-		target.ailment = ailment_to_apply
-		target.ailment_turn_count = 0  # Track how many turns they've had this ailment
-		log_message("  → %s is now %s!" % [target.display_name, ailment_to_apply.capitalize()])
-		# Refresh turn order to show status
-		if battle_mgr:
-			battle_mgr.refresh_turn_order()
+		# Check if target already has an ailment (only one independent ailment allowed)
+		var current_ailment = str(target.get("ailment", ""))
+		if current_ailment != "" and current_ailment != "null":
+			log_message("%s uses %s on %s!" % [current_combatant.display_name, item_name, target.display_name])
+			log_message("  → But %s already has %s! (Ailment blocked)" % [target.display_name, current_ailment.capitalize()])
+		else:
+			log_message("%s uses %s on %s!" % [current_combatant.display_name, item_name, target.display_name])
+			target.ailment = ailment_to_apply
+			target.ailment_turn_count = 0  # Track how many turns they've had this ailment
+			log_message("  → %s is now %s!" % [target.display_name, ailment_to_apply.capitalize()])
+			# Refresh turn order to show status
+			if battle_mgr:
+				battle_mgr.refresh_turn_order()
 
 	# Apply debuff if found
 	if debuff_to_apply != "":
@@ -1339,6 +1576,10 @@ func _execute_item_usage(target: Dictionary) -> void:
 
 func _on_defend_pressed() -> void:
 	"""Handle Defend action"""
+	# Block input during round transitions
+	if is_in_round_transition:
+		return
+
 	# Check if frozen combatant can act
 	if not _check_freeze_action_allowed():
 		return
@@ -1351,6 +1592,10 @@ func _on_defend_pressed() -> void:
 
 func _on_burst_pressed() -> void:
 	"""Handle Burst action - show burst abilities menu"""
+	# Block input during round transitions
+	if is_in_round_transition:
+		return
+
 	# Check if frozen combatant can act
 	if not _check_freeze_action_allowed():
 		return
@@ -1394,6 +1639,10 @@ func _on_burst_pressed() -> void:
 
 func _on_run_pressed() -> void:
 	"""Handle Run action"""
+	# Block input during round transitions
+	if is_in_round_transition:
+		return
+
 	# Check if frozen combatant can act
 	if not _check_freeze_action_allowed():
 		return
@@ -1637,7 +1886,7 @@ func _execute_enemy_ai() -> void:
 
 			if target.hp <= 0:
 				target.hp = 0
-				target.is_ko = true
+				_set_fainted(target)
 
 				# Record kill for morality system (if enemy)
 				if not target.get("is_ally", false):
@@ -2226,7 +2475,16 @@ func _on_item_selected(item_data: Dictionary) -> void:
 	# Determine target candidates
 	if targeting == "Ally":
 		var allies = battle_mgr.get_ally_combatants()
-		target_candidates = allies.filter(func(a): return not a.is_ko)
+		# Check if this is a revive item - if so, allow targeting KO'd allies
+		var item_id = str(item_data.get("item_id", ""))
+		var is_revive_item = "Revive" in effect or item_id.begins_with("REV_")
+
+		if is_revive_item:
+			# Revive items can only target KO'd (fainted) allies
+			target_candidates = allies.filter(func(a): return a.is_ko)
+		else:
+			# Other items can only target alive allies
+			target_candidates = allies.filter(func(a): return not a.is_ko)
 	else:  # Enemy (single target)
 		var enemies = battle_mgr.get_enemy_combatants()
 		target_candidates = enemies.filter(func(e): return not e.is_ko)
@@ -2606,7 +2864,7 @@ func _execute_burst_on_target(target: Dictionary) -> void:
 
 	if target.hp <= 0:
 		target.hp = 0
-		target.is_ko = true
+		_set_fainted(target)
 
 		# Record kill
 		if not target.get("is_ally", false):
@@ -2761,7 +3019,7 @@ func _execute_skill_single(target: Dictionary) -> void:
 					new_target.hp -= reflect_damage
 					if new_target.hp <= 0:
 						new_target.hp = 0
-						new_target.is_ko = true
+						_set_fainted(new_target)
 						log_message("  → %s was defeated by the reflection!" % new_target.display_name)
 					else:
 						log_message("  → %s takes %d reflected damage!" % [new_target.display_name, reflect_damage])
@@ -2834,6 +3092,47 @@ func _execute_skill_single(target: Dictionary) -> void:
 			log_message("  → ELEMENTAL STUMBLE!")
 		if became_fallen:
 			log_message("  → %s is FALLEN! (will skip next turn)" % target.display_name)
+
+	# Apply status effect if skill has one (only if target still alive)
+	if not target.is_ko:
+		var status_to_apply = str(skill_to_use.get("status_apply", "")).to_lower()
+		var status_chance_pct = int(skill_to_use.get("status_chance", 0))
+
+		if status_to_apply != "" and status_to_apply != "null" and status_chance_pct > 0:
+			var roll = randi() % 100
+			if roll < status_chance_pct:
+				# List of independent ailments (only one can exist at a time)
+				var independent_ailments = ["burn", "burned", "freeze", "frozen", "sleep", "asleep", "poison", "poisoned", "malaise", "berserk", "charm", "charmed", "confuse", "confused"]
+
+				if status_to_apply in independent_ailments:
+					# Check if target already has an ailment
+					var current_ailment = str(target.get("ailment", ""))
+					if current_ailment != "" and current_ailment != "null":
+						log_message("  → Failed to inflict %s! (%s already has %s)" % [status_to_apply.capitalize(), target.display_name, current_ailment.capitalize()])
+					else:
+						# Apply the ailment
+						target.ailment = status_to_apply
+						target.ailment_turn_count = 0
+						log_message("  → %s is now %s! (%d%% chance, rolled %d)" % [target.display_name, status_to_apply.capitalize(), status_chance_pct, roll])
+						battle_mgr.refresh_turn_order()
+				else:
+					# It's a debuff (not an independent ailment)
+					var duration = int(skill_to_use.get("duration", 3))
+					# Map status names to debuff types
+					var debuff_type = ""
+					if "attack down" in status_to_apply or "atk down" in status_to_apply:
+						debuff_type = "attack_down"
+					elif "defense down" in status_to_apply or "def down" in status_to_apply:
+						debuff_type = "defense_down"
+					elif "skill down" in status_to_apply or "mind down" in status_to_apply:
+						debuff_type = "skill_down"
+					elif "speed down" in status_to_apply or "slow" in status_to_apply:
+						debuff_type = "speed_down"
+
+					if debuff_type != "":
+						battle_mgr.apply_buff(target, debuff_type, -0.15, duration)
+						log_message("  → %s's %s reduced! (%d%% chance, rolled %d)" % [target.display_name, status_to_apply.replace("_", " ").capitalize(), status_chance_pct, roll])
+						battle_mgr.refresh_turn_order()
 
 	# Log the hit
 	var hit_msg = "  → Hit %s for %d damage! (%d%% chance)" % [target.display_name, damage, int(hit_check.hit_chance)]

@@ -603,7 +603,7 @@ func get_type_modifier(_attacker_element: String, _defender_element: String) -> 
 ## CAPTURE MECHANICS (§4.8)
 ## ═══════════════════════════════════════════════════════════════
 
-const CAPTURE_HP_COEFFICIENT: float = 0.4  # k value for HP% penalty
+const CAPTURE_HP_COEFFICIENT: float = 0.15  # k value for HP% penalty (reduced from 0.4 to make captures more viable)
 const STATE_BONUS_HIGH: int = 15  # Sleep, Freeze, Bound
 const STATE_BONUS_MED: int = 10   # Stunned, Fallen
 
