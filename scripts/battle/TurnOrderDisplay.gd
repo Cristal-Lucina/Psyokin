@@ -75,12 +75,19 @@ func _on_round_started(round_number: int) -> void:
 		while is_animating:
 			await get_tree().process_frame
 
-	# Extra safety pause - let everything settle before rebuilding
-	await get_tree().create_timer(0.1).timeout
-
 	current_round = round_number
+
+	# Step 1: Fade out current turn order
+	await _fade_out_turn_order()
+
+	# Step 2: Show big "Round X" announcement
+	await _show_round_announcement(round_number)
+
+	# Step 3: Update round label
 	if round_label:
 		round_label.text = "Round %d" % round_number
+
+	# Step 4: Rebuild and fade in new turn order
 	await _rebuild_display_with_reveal()
 	animation_completed.emit()
 
@@ -106,6 +113,69 @@ func _on_turn_order_changed() -> void:
 ## ═══════════════════════════════════════════════════════════════
 ## DISPLAY BUILDING
 ## ═══════════════════════════════════════════════════════════════
+
+func _fade_out_turn_order() -> void:
+	"""Fade out current turn order slots"""
+	if turn_slots.is_empty():
+		print("[TurnOrderDisplay] No slots to fade out (probably first round)")
+		return
+
+	print("[TurnOrderDisplay] Fading out %d turn order slots..." % turn_slots.size())
+
+	var tweens = []
+	for slot in turn_slots:
+		if is_instance_valid(slot):
+			var tween = create_tween()
+			tween.set_ease(Tween.EASE_IN)
+			tween.set_trans(Tween.TRANS_CUBIC)
+			tween.tween_property(slot, "modulate:a", 0.0, 0.3)
+			tweens.append(tween)
+
+	# Wait for fade out to complete
+	if not tweens.is_empty():
+		await tweens[0].finished
+
+	print("[TurnOrderDisplay] Fade out complete")
+
+func _show_round_announcement(round_num: int) -> void:
+	"""Show big 'Round X' announcement that fades in and out"""
+	print("[TurnOrderDisplay] Showing Round %d announcement..." % round_num)
+
+	# Create large announcement label
+	var announcement = Label.new()
+	announcement.text = "=== ROUND %d ===" % round_num
+	announcement.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	announcement.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	announcement.add_theme_font_size_override("font_size", 32)
+	announcement.add_theme_color_override("font_color", Color(1.0, 0.9, 0.3, 1.0))  # Gold color
+	announcement.custom_minimum_size = Vector2(200, 60)
+	announcement.modulate.a = 0.0  # Start invisible
+
+	add_child(announcement)
+	move_child(announcement, 1)  # Put after round label
+
+	# Fade in
+	var fade_in = create_tween()
+	fade_in.set_ease(Tween.EASE_OUT)
+	fade_in.set_trans(Tween.TRANS_CUBIC)
+	fade_in.tween_property(announcement, "modulate:a", 1.0, 0.4)
+	await fade_in.finished
+
+	# Hold for a moment
+	await get_tree().create_timer(0.6).timeout
+
+	# Fade out
+	var fade_out = create_tween()
+	fade_out.set_ease(Tween.EASE_IN)
+	fade_out.set_trans(Tween.TRANS_CUBIC)
+	fade_out.tween_property(announcement, "modulate:a", 0.0, 0.4)
+	await fade_out.finished
+
+	# Remove announcement
+	remove_child(announcement)
+	announcement.free()
+
+	print("[TurnOrderDisplay] Round announcement complete")
 
 func _rebuild_display_with_reveal() -> void:
 	"""Rebuild display with sequential reveal animation for new rounds"""
