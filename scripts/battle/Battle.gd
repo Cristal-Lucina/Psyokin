@@ -1737,10 +1737,15 @@ func _execute_charm_action() -> void:
 	"""Execute charm behavior - use heal/buff items on enemies"""
 	await get_tree().create_timer(0.5).timeout
 
+	# Get inventory system
+	var inventory = get_node("/root/aInventorySystem")
+	var item_counts = inventory.get_counts_dict()
+	var item_defs = inventory.get_item_defs()
+
 	# Get heal/buff items from inventory
 	var heal_buff_items = []
-	for item_id in party_inventory.inventory.keys():
-		var quantity = party_inventory.inventory[item_id]
+	for item_id in item_counts.keys():
+		var quantity = item_counts[item_id]
 		if quantity > 0:
 			var item_def = item_defs.get(item_id, {})
 			var category = _categorize_battle_item(item_id, item_def.get("name", ""), item_def)
@@ -1766,7 +1771,7 @@ func _execute_charm_action() -> void:
 			])
 
 			# Use the item
-			party_inventory.remove_item(item_id, 1)
+			inventory.remove_item(item_id, 1)
 			await _execute_item_usage(target)
 		else:
 			log_message("  → No enemies to help!")
