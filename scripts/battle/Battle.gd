@@ -441,6 +441,16 @@ func _set_fainted(target: Dictionary) -> void:
 	if battle_mgr:
 		battle_mgr.refresh_turn_order()
 
+func _set_captured(target: Dictionary) -> void:
+	"""Mark a combatant as captured and set Captured status ailment"""
+	target.is_ko = true
+	target.is_captured = true
+	target.ailment = "captured"
+	target.ailment_turn_count = 0
+	# Refresh turn order to show captured status
+	if battle_mgr:
+		battle_mgr.refresh_turn_order()
+
 ## ═══════════════════════════════════════════════════════════════
 ## COMBATANT DISPLAY
 ## ═══════════════════════════════════════════════════════════════
@@ -1135,8 +1145,7 @@ func _execute_capture(target: Dictionary) -> void:
 
 	if success:
 		# Capture successful!
-		target.is_captured = true
-		_set_fainted(target)  # Remove from battle like KO
+		_set_captured(target)  # Remove from battle and mark as captured
 		log_message("  → SUCCESS! %s was captured!" % target.display_name)
 
 		# Record capture for morality system

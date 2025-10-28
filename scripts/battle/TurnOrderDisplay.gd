@@ -739,6 +739,8 @@ func _get_ailment_display(ailment: String) -> String:
 	match ailment.to_lower():
 		"fainted":
 			return "Fainted"
+		"captured":
+			return "Captured"
 		"poison", "poisoned":
 			return "Poisoned"
 		"burn", "burned", "burning":
