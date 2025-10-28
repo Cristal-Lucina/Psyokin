@@ -552,6 +552,16 @@ func _show_status_details(combatant: Dictionary) -> void:
 	popup.custom_minimum_size = Vector2(400, 300)
 	popup.modulate.a = 1.0  # 100% solid, no transparency
 
+	# Add solid dark background style
+	var panel_style = StyleBoxFlat.new()
+	panel_style.bg_color = Color(0.15, 0.15, 0.2, 1.0)  # Solid dark blue-gray
+	panel_style.border_width_left = 3
+	panel_style.border_width_right = 3
+	panel_style.border_width_top = 3
+	panel_style.border_width_bottom = 3
+	panel_style.border_color = Color(0.4, 0.6, 0.8, 1.0)  # Light blue border
+	popup.add_theme_stylebox_override("panel", panel_style)
+
 	# Center it on screen
 	popup.position = get_viewport_rect().size / 2 - popup.custom_minimum_size / 2
 	popup.z_index = 100
