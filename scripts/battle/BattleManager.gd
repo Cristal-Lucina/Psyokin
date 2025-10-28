@@ -476,7 +476,9 @@ func _process_round_start_effects() -> void:
 		# NOTE: is_defending persists across rounds until combatant takes offensive action
 		# This provides multi-round defensive stances
 
-		# ═══════ Apply DoT (Damage over Time) ═══════
+		# ═══════ Apply DoT (Damage over Time) - REMOVED ═══════
+		# NOTE: Burn/Poison damage moved to _process_turn_start_ailments()
+		# DoT now applies at START OF EACH TURN, not at round start
 		if combatant.has("ailments"):
 			var ailments_to_remove = []
 			for ailment_key in combatant.ailments:
@@ -486,18 +488,6 @@ func _process_round_start_effects() -> void:
 					ailment = {"type": ailment, "duration": 0}
 
 				var ailment_type = ailment.get("type", "")
-
-				# Apply DoT damage
-				if ailment_type in ["poison", "burn"]:
-					var damage = int(ceil(combatant.hp_max * 0.05))  # 5% max HP
-					combatant.hp = max(0, combatant.hp - damage)
-					print("[BattleManager] %s takes %d %s damage" % [combatant.display_name, damage, ailment_type.capitalize()])
-
-					if combatant.hp <= 0:
-						combatant.is_ko = true
-						combatant.ailment = "fainted"
-						combatant.ailment_turn_count = 0
-						print("[BattleManager] %s was KO'd by %s!" % [combatant.display_name, ailment_type.capitalize()])
 
 				# Decrement duration (0 = infinite)
 				var duration = ailment.get("duration", 0)
