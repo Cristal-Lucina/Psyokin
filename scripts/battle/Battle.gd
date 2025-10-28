@@ -498,6 +498,13 @@ func _create_combatant_slot(combatant: Dictionary, is_ally: bool) -> PanelContai
 		mp_label.add_theme_font_size_override("font_size", 10)
 		vbox.add_child(mp_label)
 
+	# Status button to show detailed status effects
+	var status_button = Button.new()
+	status_button.text = "Status"
+	status_button.custom_minimum_size = Vector2(120, 25)
+	status_button.pressed.connect(_show_status_details.bind(combatant))
+	vbox.add_child(status_button)
+
 	# Store combatant ID in metadata
 	panel.set_meta("combatant_id", combatant.id)
 	panel.set_meta("is_ally", is_ally)
@@ -515,6 +522,115 @@ func _update_combatant_displays() -> void:
 	"""Update all combatant HP/MP displays"""
 	# TODO: Update HP/MP bars without recreating everything
 	_display_combatants()
+
+func _show_status_details(combatant: Dictionary) -> void:
+	"""Show detailed status information popup for a combatant"""
+	# Create popup panel
+	var popup = PanelContainer.new()
+	popup.custom_minimum_size = Vector2(400, 300)
+
+	# Center it on screen
+	popup.position = get_viewport_rect().size / 2 - popup.custom_minimum_size / 2
+	popup.z_index = 100
+
+	var vbox = VBoxContainer.new()
+	popup.add_child(vbox)
+
+	# Title
+	var title = Label.new()
+	title.text = "=== %s Status ===" % combatant.display_name
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 16)
+	vbox.add_child(title)
+
+	var scroll = ScrollContainer.new()
+	scroll.custom_minimum_size = Vector2(380, 220)
+	vbox.add_child(scroll)
+
+	var content = VBoxContainer.new()
+	scroll.add_child(content)
+
+	# Ailment
+	var ailment = str(combatant.get("ailment", ""))
+	if ailment != "" and ailment != "null":
+		var ailment_label = Label.new()
+		ailment_label.text = "❌ Ailment: %s" % ailment.capitalize()
+		ailment_label.add_theme_color_override("font_color", Color(1.0, 0.3, 0.3, 1.0))
+		content.add_child(ailment_label)
+
+	# Buffs/Debuffs
+	if combatant.has("buffs"):
+		var buffs = combatant.get("buffs", [])
+		if buffs.size() > 0:
+			var buff_title = Label.new()
+			buff_title.text = "\n--- Active Effects (%d) ---" % buffs.size()
+			buff_title.add_theme_font_size_override("font_size", 14)
+			content.add_child(buff_title)
+
+			for buff in buffs:
+				if typeof(buff) == TYPE_DICTIONARY:
+					var buff_type = str(buff.get("type", ""))
+					var value = float(buff.get("value", 0.0))
+					var duration = int(buff.get("duration", 0))
+
+					var buff_text = _format_buff_description(buff_type, value, duration)
+					var buff_label = Label.new()
+					buff_label.text = buff_text
+
+					# Color based on positive/negative
+					if value > 0:
+						buff_label.add_theme_color_override("font_color", Color(0.3, 1.0, 0.3, 1.0))
+					else:
+						buff_label.add_theme_color_override("font_color", Color(1.0, 0.5, 0.3, 1.0))
+
+					content.add_child(buff_label)
+
+	# If no effects
+	if ailment == "" or ailment == "null":
+		if not combatant.has("buffs") or combatant.buffs.size() == 0:
+			var none_label = Label.new()
+			none_label.text = "\n✓ No status effects"
+			none_label.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7, 1.0))
+			content.add_child(none_label)
+
+	# Close button
+	var close_btn = Button.new()
+	close_btn.text = "Close"
+	close_btn.pressed.connect(func(): popup.queue_free())
+	vbox.add_child(close_btn)
+
+	add_child(popup)
+
+func _format_buff_description(buff_type: String, value: float, duration: int) -> String:
+	"""Format buff/debuff into readable description"""
+	var type_name = ""
+	var symbol = "↑" if value > 0 else "↓"
+
+	match buff_type.to_lower():
+		"atk_up", "atk_down", "atk":
+			type_name = "Attack"
+		"skl_up", "skl_down", "skl", "mnd_up", "mnd_down", "mnd":
+			type_name = "Skill/Mind"
+		"def_up", "def_down", "def":
+			type_name = "Defense"
+		"spd_up", "spd_down", "spd", "speed":
+			type_name = "Speed"
+		"phys_acc", "acc_up", "acc_down", "acc":
+			type_name = "Physical Accuracy"
+		"mind_acc", "skill_acc":
+			type_name = "Skill Accuracy"
+		"evasion", "evade", "eva_up", "eva_down":
+			type_name = "Evasion"
+		"regen":
+			return "● Regen (%d%% per round, %d rounds left)" % [int(value * 100), duration]
+		"reflect":
+			var element = ""
+			return "◆ Reflect (%d rounds left)" % duration
+		_:
+			type_name = buff_type.replace("_", " ").capitalize()
+
+	var percent = int(abs(value) * 100)
+	return "%s %s %s%d%% (%d rounds left)" % [symbol, type_name, "+" if value > 0 else "-", percent, duration]
 
 ## ═══════════════════════════════════════════════════════════════
 ## ACTION MENU
@@ -1155,6 +1271,9 @@ func _execute_item_usage(target: Dictionary) -> void:
 		if buff_type != "":
 			battle_mgr.apply_buff(target, buff_type, buff_value, duration)
 			log_message("  → %s gained %s for %d turns!" % [target.display_name, buff_type.replace("_", " ").capitalize(), duration])
+			# Refresh turn order to show buff immediately
+			if battle_mgr:
+				battle_mgr.refresh_turn_order()
 
 	# ═══════ CURE ITEMS (Remove ailments) ═══════
 	elif "Cure" in effect:

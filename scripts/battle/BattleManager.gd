@@ -718,16 +718,15 @@ func apply_buff(combatant: Dictionary, buff_type: String, value: float, duration
 	])
 
 func process_buff_durations(combatant: Dictionary) -> void:
-	"""Decrement buff durations at turn start and remove expired buffs"""
+	"""Check for expired buffs (duration is decremented at round start, not turn start)"""
 	if not combatant.has("buffs"):
 		return
 
 	var expired_buffs = []
 
-	# Process each buff
+	# Check each buff for expiration (but don't decrement - that happens at round start)
 	for i in range(combatant.buffs.size()):
 		var buff = combatant.buffs[i]
-		buff.duration -= 1
 
 		if buff.duration <= 0:
 			expired_buffs.append(i)
