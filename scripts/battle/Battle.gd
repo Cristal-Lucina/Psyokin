@@ -2247,7 +2247,7 @@ func _on_item_selected(item_data: Dictionary) -> void:
 	if targeting == "Ally":
 		var allies = battle_mgr.get_ally_combatants()
 		# Check if this is a revive item - if so, allow targeting KO'd allies
-		var effect = str(item_data.get("effect_field", ""))
+		var item_id = str(item_data.get("item_id", ""))
 		var is_revive_item = "Revive" in effect or item_id.begins_with("REV_")
 
 		if is_revive_item:
