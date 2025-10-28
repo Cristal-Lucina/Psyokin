@@ -1188,6 +1188,69 @@ func _execute_item_usage(target: Dictionary) -> void:
 		else:
 			log_message("  → %s is not KO'd!" % target.display_name)
 
+	# ═══════ AILMENT/DEBUFF ITEMS (Inflict Status) ═══════
+	# Check if this item inflicts an ailment or debuff
+	var ailment_to_apply = ""
+	var debuff_to_apply = ""
+
+	# Match ailments
+	if "Poison" in effect and "Cure" not in effect:
+		ailment_to_apply = "poison"
+	elif "Burn" in effect and "Cure" not in effect:
+		ailment_to_apply = "burn"
+	elif "Sleep" in effect and "Cure" not in effect:
+		ailment_to_apply = "sleep"
+	elif "Freeze" in effect and "Cure" not in effect:
+		ailment_to_apply = "freeze"
+	elif "Confuse" in effect and "Cure" not in effect:
+		ailment_to_apply = "confuse"
+	elif "Charm" in effect and "Cure" not in effect:
+		ailment_to_apply = "charm"
+	elif "Berserk" in effect and "Cure" not in effect:
+		ailment_to_apply = "berserk"
+	elif "Malaise" in effect and "Cure" not in effect:
+		ailment_to_apply = "malaise"
+	elif "Mind Block" in effect and "Cure" not in effect:
+		ailment_to_apply = "mind_block"
+
+	# Match debuffs
+	if "Attack Down" in effect and "Cure" not in effect:
+		debuff_to_apply = "attack_down"
+	elif "Defense Down" in effect and "Cure" not in effect:
+		debuff_to_apply = "defense_down"
+	elif "Mind Down" in effect and "Cure" not in effect:
+		debuff_to_apply = "mind_down"
+
+	# Apply ailment if found
+	if ailment_to_apply != "":
+		log_message("%s uses %s on %s!" % [current_combatant.display_name, item_name, target.display_name])
+		target.ailment = ailment_to_apply
+		log_message("  → %s is now %s! (Duration: %d rounds)" % [target.display_name, ailment_to_apply.capitalize(), duration])
+		# Refresh turn order to show status
+		if battle_mgr:
+			battle_mgr.refresh_turn_order()
+
+	# Apply debuff if found
+	if debuff_to_apply != "":
+		if ailment_to_apply == "":  # Only log if we didn't already log for ailment
+			log_message("%s uses %s on %s!" % [current_combatant.display_name, item_name, target.display_name])
+
+		if not target.has("debuffs"):
+			target.debuffs = []
+
+		target.debuffs.append({
+			"type": debuff_to_apply,
+			"value": 20,  # 20% penalty
+			"duration": duration,
+			"source": item_name
+		})
+
+		var debuff_name = debuff_to_apply.replace("_", " ").capitalize()
+		log_message("  → %s's %s reduced! (Duration: %d rounds)" % [target.display_name, debuff_name, duration])
+		# Refresh turn order to show debuff
+		if battle_mgr:
+			battle_mgr.refresh_turn_order()
+
 	# Consume the item
 	var inventory = get_node("/root/aInventorySystem")
 	inventory.remove_item(item_id, 1)
