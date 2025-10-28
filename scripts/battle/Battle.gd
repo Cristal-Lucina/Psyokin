@@ -111,6 +111,16 @@ func _on_turn_started(combatant_id: String) -> void:
 
 	log_message("%s's turn!" % current_combatant.display_name)
 
+	# Check if combatant is asleep - skip turn entirely
+	var ailment = str(current_combatant.get("ailment", ""))
+	if ailment == "sleep":
+		log_message("  → %s is fast asleep... (turn skipped)" % current_combatant.display_name)
+		# Wait a moment for readability
+		await get_tree().create_timer(1.0).timeout
+		# End turn immediately
+		battle_mgr.end_turn()
+		return
+
 	if current_combatant.is_ally:
 		# Player's turn - show action menu
 		_show_action_menu()
@@ -346,6 +356,42 @@ func _get_hero_display_name() -> String:
 	# Fallback
 	return "Hero"
 
+func _check_freeze_action_allowed() -> bool:
+	"""Check if a frozen combatant's action can proceed (30% chance)"""
+	var ailment = str(current_combatant.get("ailment", ""))
+
+	if ailment != "freeze":
+		return true  # Not frozen, action always allowed
+
+	# Frozen: 30% chance to act
+	var success_chance = 30
+	var roll = randi() % 100
+
+	if roll < success_chance:
+		log_message("  → %s struggles through the freeze! (%d%% chance, rolled %d)" % [
+			current_combatant.display_name, success_chance, roll
+		])
+		return true
+	else:
+		log_message("  → %s is frozen solid and can't act! (%d%% chance, rolled %d)" % [
+			current_combatant.display_name, success_chance, roll
+		])
+		# End turn without acting
+		battle_mgr.end_turn()
+		return false
+
+func _wake_if_asleep(target: Dictionary) -> void:
+	"""Wake up a target if they're asleep (called when taking damage)"""
+	var ailment = str(target.get("ailment", ""))
+
+	if ailment == "sleep":
+		target.ailment = ""
+		target.ailment_turn_count = 0
+		log_message("  → %s woke up from the hit!" % target.display_name)
+		# Refresh turn order to remove sleep indicator
+		if battle_mgr:
+			battle_mgr.refresh_turn_order()
+
 ## ═══════════════════════════════════════════════════════════════
 ## COMBATANT DISPLAY
 ## ═══════════════════════════════════════════════════════════════
@@ -476,6 +522,10 @@ func _execute_attack(target: Dictionary) -> void:
 	awaiting_target_selection = false
 	_clear_target_highlights()
 
+	# Check if frozen combatant can act
+	if not _check_freeze_action_allowed():
+		return
+
 	# Clear defending status when attacking
 	current_combatant.is_defending = false
 
@@ -519,6 +569,10 @@ func _execute_attack(target: Dictionary) -> void:
 
 			# Apply damage
 			target.hp -= damage
+
+			# Wake up if asleep
+			_wake_if_asleep(target)
+
 			if target.hp <= 0:
 				target.hp = 0
 				target.is_ko = true
@@ -878,6 +932,10 @@ func _execute_item_usage(target: Dictionary) -> void:
 	awaiting_item_target = false
 	_clear_target_highlights()
 
+	# Check if frozen combatant can act
+	if not _check_freeze_action_allowed():
+		return
+
 	# Get the item that was selected
 	if selected_item.is_empty():
 		log_message("Item usage failed - no item selected!")
@@ -1225,7 +1283,8 @@ func _execute_item_usage(target: Dictionary) -> void:
 	if ailment_to_apply != "":
 		log_message("%s uses %s on %s!" % [current_combatant.display_name, item_name, target.display_name])
 		target.ailment = ailment_to_apply
-		log_message("  → %s is now %s! (Duration: %d rounds)" % [target.display_name, ailment_to_apply.capitalize(), duration])
+		target.ailment_turn_count = 0  # Track how many turns they've had this ailment
+		log_message("  → %s is now %s!" % [target.display_name, ailment_to_apply.capitalize()])
 		# Refresh turn order to show status
 		if battle_mgr:
 			battle_mgr.refresh_turn_order()
@@ -1260,6 +1319,10 @@ func _execute_item_usage(target: Dictionary) -> void:
 
 func _on_defend_pressed() -> void:
 	"""Handle Defend action"""
+	# Check if frozen combatant can act
+	if not _check_freeze_action_allowed():
+		return
+
 	log_message("%s moved into a defensive stance." % current_combatant.display_name)
 	current_combatant.is_defending = true
 
@@ -1268,6 +1331,10 @@ func _on_defend_pressed() -> void:
 
 func _on_burst_pressed() -> void:
 	"""Handle Burst action - show burst abilities menu"""
+	# Check if frozen combatant can act
+	if not _check_freeze_action_allowed():
+		return
+
 	# Only hero can use burst abilities
 	if current_combatant.get("id", "") != "hero":
 		log_message("Only %s can use Burst abilities!" % _get_hero_display_name())
@@ -1307,6 +1374,10 @@ func _on_burst_pressed() -> void:
 
 func _on_run_pressed() -> void:
 	"""Handle Run action"""
+	# Check if frozen combatant can act
+	if not _check_freeze_action_allowed():
+		return
+
 	# Check if run was already attempted this round
 	if battle_mgr.run_attempted_this_round:
 		log_message("Already tried to run this round!")
@@ -1540,6 +1611,10 @@ func _execute_enemy_ai() -> void:
 
 			# Apply damage
 			target.hp -= damage
+
+			# Wake up if asleep
+			_wake_if_asleep(target)
+
 			if target.hp <= 0:
 				target.hp = 0
 				target.is_ko = true
@@ -2432,6 +2507,10 @@ func _execute_burst_on_target(target: Dictionary) -> void:
 
 	# Apply damage
 	target.hp -= damage
+
+	# Wake up if asleep
+	_wake_if_asleep(target)
+
 	if target.hp <= 0:
 		target.hp = 0
 		target.is_ko = true
@@ -2502,6 +2581,10 @@ func _on_skill_selected(skill_entry: Dictionary) -> void:
 
 func _execute_skill_single(target: Dictionary) -> void:
 	"""Execute a single-target skill"""
+	# Check if frozen combatant can act
+	if not _check_freeze_action_allowed():
+		return
+
 	var skill_name = String(skill_to_use.get("name", "Unknown"))
 	var mp_cost = int(skill_to_use.get("cost_mp", 0))
 	var element = String(skill_to_use.get("element", "none")).to_lower()
@@ -2636,6 +2719,10 @@ func _execute_skill_single(target: Dictionary) -> void:
 
 	# Apply damage
 	target.hp -= damage
+
+	# Wake up if asleep
+	_wake_if_asleep(target)
+
 	if target.hp <= 0:
 		target.hp = 0
 		target.is_ko = true
@@ -2681,6 +2768,10 @@ func _execute_skill_single(target: Dictionary) -> void:
 
 func _execute_skill_aoe() -> void:
 	"""Execute an AoE skill on all valid targets"""
+	# Check if frozen combatant can act
+	if not _check_freeze_action_allowed():
+		return
+
 	var skill_name = String(skill_to_use.get("name", "Unknown"))
 	var mp_cost = int(skill_to_use.get("cost_mp", 0))
 

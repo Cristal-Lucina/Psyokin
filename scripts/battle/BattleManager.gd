@@ -349,6 +349,18 @@ func _start_turn(combatant: Dictionary) -> void:
 	# Mark this combatant as having acted this round
 	combatant.has_acted_this_round = true
 
+	# Process turn-start ailment effects (poison/burn damage, auto-cure rolls, etc.)
+	await _process_turn_start_ailments(combatant)
+
+	# Check if combatant was KO'd by ailment damage
+	if combatant.is_ko:
+		print("[BattleManager] %s was KO'd by ailment - skipping turn" % combatant.display_name)
+		# Refresh turn order to show KO
+		refresh_turn_order()
+		# Skip to end turn
+		end_turn()
+		return
+
 	current_state = BattleState.TURN_ACTIVE
 	print("[BattleManager] --- Turn: %s ---" % combatant.display_name)
 
@@ -490,6 +502,95 @@ func _process_round_start_effects() -> void:
 				combatant.debuffs.remove_at(idx)
 
 		# TODO: Resolve channeling (CH1/CH2)
+
+func _process_turn_start_ailments(combatant: Dictionary) -> void:
+	"""Process ailment effects at the start of a combatant's turn"""
+	var ailment = str(combatant.get("ailment", ""))
+
+	if ailment == "" or ailment == "null":
+		return
+
+	# Initialize turn counter if not present
+	if not combatant.has("ailment_turn_count"):
+		combatant.ailment_turn_count = 0
+
+	# Increment turn counter
+	combatant.ailment_turn_count += 1
+	var turn_count = combatant.ailment_turn_count
+
+	# ═══════ POISON & BURN - Tick damage ═══════
+	if ailment in ["poison", "burn"]:
+		var damage = int(ceil(combatant.hp_max * 0.03))  # 3% max HP
+		combatant.hp = max(0, combatant.hp - damage)
+		print("[BattleManager] %s takes %d %s damage (Turn %d)" % [
+			combatant.display_name, damage, ailment.capitalize(), turn_count
+		])
+
+		# Check for KO from ailment damage
+		if combatant.hp <= 0:
+			combatant.is_ko = true
+			print("[BattleManager] %s was KO'd by %s!" % [combatant.display_name, ailment.capitalize()])
+			return  # Don't process auto-cure if they died
+
+		# Auto-cure chance: 30% base + 10% per turn (max 90%)
+		var cure_chance = min(30 + (turn_count - 1) * 10, 90)
+		var roll = randi() % 100
+
+		if roll < cure_chance:
+			combatant.ailment = ""
+			combatant.ailment_turn_count = 0
+			print("[BattleManager] %s recovered from %s! (%d%% chance, rolled %d)" % [
+				combatant.display_name, ailment.capitalize(), cure_chance, roll
+			])
+			refresh_turn_order()
+		else:
+			print("[BattleManager] %s is still %s (%d%% cure chance, rolled %d)" % [
+				combatant.display_name, ailment.capitalize(), cure_chance, roll
+			])
+
+	# ═══════ SLEEP - Wake up roll ═══════
+	elif ailment == "sleep":
+		# 30% chance to wake up naturally at start of turn (unless hit - handled elsewhere)
+		var wake_chance = 30
+		var roll = randi() % 100
+
+		if roll < wake_chance:
+			combatant.ailment = ""
+			combatant.ailment_turn_count = 0
+			print("[BattleManager] %s woke up naturally! (%d%% chance, rolled %d)" % [
+				combatant.display_name, wake_chance, roll
+			])
+			refresh_turn_order()
+		else:
+			print("[BattleManager] %s is still asleep (%d%% wake chance, rolled %d - skipping turn)" % [
+				combatant.display_name, wake_chance, roll
+			])
+			# Sleep causes the turn to be skipped - handled by Battle.gd
+
+	# ═══════ FREEZE - No auto-cure (only by item or 10% base chance) ═══════
+	elif ailment == "freeze":
+		# Only 10% base chance to auto-cure
+		var cure_chance = 10
+		var roll = randi() % 100
+
+		if roll < cure_chance:
+			combatant.ailment = ""
+			combatant.ailment_turn_count = 0
+			print("[BattleManager] %s broke free from freeze! (%d%% chance, rolled %d)" % [
+				combatant.display_name, cure_chance, roll
+			])
+			refresh_turn_order()
+		else:
+			print("[BattleManager] %s is frozen (30%% action chance, %d%% cure chance, rolled %d)" % [
+				combatant.display_name, cure_chance, roll
+			])
+			# Freeze allows acting with 30% success - handled by Battle.gd
+
+	# ═══════ OTHER AILMENTS (Confuse, Charm, Berserk, etc.) ═══════
+	# These can be extended later with their own mechanics
+
+	# Small delay for readability
+	await get_tree().create_timer(0.3).timeout
 
 ## ═══════════════════════════════════════════════════════════════
 ## BATTLE END CONDITIONS
