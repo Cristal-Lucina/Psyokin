@@ -36,6 +36,22 @@ const CRIT_MIN: float = 0.0           # Minimum 0% crit chance
 const CRIT_MAX: float = 95.0          # Maximum 95% crit chance
 
 ## ═══════════════════════════════════════════════════════════════
+## BUFF/DEBUFF HELPERS
+## ═══════════════════════════════════════════════════════════════
+
+func _get_buff_modifier(combatant: Dictionary, buff_type: String) -> float:
+	"""Get the total modifier for a specific buff type from combatant's buffs"""
+	if not combatant.has("buffs"):
+		return 0.0
+
+	var total_mod = 0.0
+	for buff in combatant.buffs:
+		if buff.type == buff_type:
+			total_mod += buff.value
+
+	return total_mod
+
+## ═══════════════════════════════════════════════════════════════
 ## MIND TYPE EFFECTIVENESS
 ## ═══════════════════════════════════════════════════════════════
 
@@ -129,6 +145,10 @@ func check_physical_hit(attacker: Dictionary, defender: Dictionary, _options: Di
 	# Calculate hit%
 	var hit_percent = base_acc + (0.25 * tpo)
 
+	# Apply physical accuracy buffs (Eye Drops, etc.)
+	var acc_buff = _get_buff_modifier(attacker, "phys_acc")
+	hit_percent += (acc_buff * 100.0)  # Convert 0.10 to 10%
+
 	# Get defender footwear stats
 	var footwear = _get_footwear_stats(defender.id)
 	var base_eva = footwear.get("eva", 0)  # Default 0% base evasion
@@ -138,6 +158,10 @@ func check_physical_hit(attacker: Dictionary, defender: Dictionary, _options: Di
 
 	# Calculate eva% (reduced from 0.25 to 0.15 for better hit rates)
 	var eva_percent = base_eva + (0.15 * vtl)
+
+	# Apply evasion buffs (Hyper Chews, etc.)
+	var eva_buff = _get_buff_modifier(defender, "evasion")
+	eva_percent += (eva_buff * 100.0)  # Convert 0.10 to 10%
 
 	# Final hit chance = Hit - Eva, clamped [5, 95]
 	var final_hit = clamp(hit_percent - eva_percent, HIT_EVA_MIN, HIT_EVA_MAX)
@@ -189,6 +213,10 @@ func check_sigil_hit(attacker: Dictionary, defender: Dictionary, options: Dictio
 	# Calculate hit%
 	var hit_percent = skill_acc + weapon_skill_boost + (0.25 * tpo)
 
+	# Apply mind/skill accuracy buffs (Focus Tonic, etc.)
+	var mind_acc_buff = _get_buff_modifier(attacker, "mind_acc")
+	hit_percent += (mind_acc_buff * 100.0)  # Convert 0.10 to 10%
+
 	# Get defender footwear stats
 	var footwear = _get_footwear_stats(defender.id)
 	var base_eva = footwear.get("eva", 0)
@@ -198,6 +226,10 @@ func check_sigil_hit(attacker: Dictionary, defender: Dictionary, options: Dictio
 
 	# Calculate eva% (reduced from 0.25 to 0.15 for better hit rates)
 	var eva_percent = base_eva + (0.15 * fcs)
+
+	# Apply evasion buffs (Hyper Chews, etc.)
+	var eva_buff = _get_buff_modifier(defender, "evasion")
+	eva_percent += (eva_buff * 100.0)  # Convert 0.10 to 10%
 
 	# Final hit chance
 	var final_hit = clamp(hit_percent - eva_percent, HIT_EVA_MIN, HIT_EVA_MAX)
@@ -323,10 +355,14 @@ func calculate_physical_damage(attacker: Dictionary, defender: Dictionary, optio
 	var pre_mit: float = (base_watk + brw * brw_scale) * (potency / 100.0)
 
 	# Step 2: Apply TYPE, Crit, and buffs
-	# ATK_Power = Pre × (1+TYPE) × (Crit?2:1) × (1+buffs−debuffs)
+	# ATK_Power = Pre × (1+TYPE) × (Crit?2:1) × (1+ATK_buffs−ATK_debuffs)
 	var type_mult: float = 1.0 + type_bonus
 	var crit_mult: float = CRIT_MULT if is_crit else 1.0
-	var buff_mult: float = 1.0  # TODO: Add buff/debuff system
+
+	# Get ATK buffs/debuffs from attacker
+	var atk_buff = _get_buff_modifier(attacker, "atk_up")
+	var atk_debuff = _get_buff_modifier(attacker, "atk_down")
+	var buff_mult: float = 1.0 + atk_buff + atk_debuff  # debuffs are negative
 
 	var atk_power: float = pre_mit * type_mult * crit_mult * buff_mult
 
@@ -339,9 +375,13 @@ func calculate_physical_damage(attacker: Dictionary, defender: Dictionary, optio
 	# Raw = max(ATK_Power − PDEF_perHit, 0)
 	var raw_damage: float = max(atk_power - pdef_per_hit, 0.0)
 
-	# Step 4: Apply defensive modifiers (Defend, Shield, etc)
+	# Step 4: Apply defensive modifiers (Defend, Shield/DEF Up, etc)
 	var defend_mult: float = DEFEND_MULT if defender.get("is_defending", false) else 1.0
-	var shield_mult: float = 1.0  # TODO: Add shield orb system
+
+	# Get DEF buffs (Shield Orb / DEF Up reduces damage taken)
+	var def_buff = _get_buff_modifier(defender, "def_up")
+	var def_debuff = _get_buff_modifier(defender, "def_down")
+	var shield_mult: float = 1.0 - (def_buff + def_debuff)  # def_up reduces damage, def_down increases it
 
 	var dmg_after_mods: float = raw_damage * defend_mult * shield_mult
 
@@ -426,7 +466,11 @@ func calculate_sigil_damage(attacker: Dictionary, defender: Dictionary, options:
 	# Step 2: Apply TYPE, Crit, and buffs
 	var type_mult: float = 1.0 + type_bonus
 	var crit_mult: float = CRIT_MULT if is_crit else 1.0
-	var buff_mult: float = 1.0  # TODO: Add buff/debuff system
+
+	# Get SKL buffs/debuffs from attacker (skills use SKL/MND buffs)
+	var skl_buff = _get_buff_modifier(attacker, "skl_up")
+	var skl_debuff = _get_buff_modifier(attacker, "skl_down")
+	var buff_mult: float = 1.0 + skl_buff + skl_debuff  # debuffs are negative
 
 	var skill_power: float = pre_mit * type_mult * crit_mult * buff_mult
 
@@ -439,7 +483,11 @@ func calculate_sigil_damage(attacker: Dictionary, defender: Dictionary, options:
 
 	# Step 4: Apply defensive modifiers
 	var defend_mult: float = DEFEND_MULT if defender.get("is_defending", false) else 1.0
-	var shield_mult: float = 1.0
+
+	# Get DEF buffs (Shield Orb / DEF Up reduces damage taken)
+	var def_buff = _get_buff_modifier(defender, "def_up")
+	var def_debuff = _get_buff_modifier(defender, "def_down")
+	var shield_mult: float = 1.0 - (def_buff + def_debuff)  # def_up reduces damage, def_down increases it
 
 	var dmg_after_mods: float = raw_damage * defend_mult * shield_mult
 

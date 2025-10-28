@@ -361,6 +361,12 @@ func _start_turn(combatant: Dictionary) -> void:
 		end_turn()
 		return
 
+	# Process buff/debuff durations
+	process_buff_durations(combatant)
+
+	# Process regeneration
+	await process_regen(combatant)
+
 	current_state = BattleState.TURN_ACTIVE
 	print("[BattleManager] --- Turn: %s ---" % combatant.display_name)
 
@@ -520,7 +526,7 @@ func _process_turn_start_ailments(combatant: Dictionary) -> void:
 
 	# ═══════ POISON & BURN - Tick damage ═══════
 	if ailment in ["poison", "burn"]:
-		var damage = int(ceil(combatant.hp_max * 0.03))  # 3% max HP
+		var damage = int(ceil(combatant.hp_max * 0.08))  # 8% max HP
 		combatant.hp = max(0, combatant.hp - damage)
 		print("[BattleManager] %s takes %d %s damage (Turn %d)" % [
 			combatant.display_name, damage, ailment.capitalize(), turn_count
@@ -548,49 +554,165 @@ func _process_turn_start_ailments(combatant: Dictionary) -> void:
 				combatant.display_name, ailment.capitalize(), cure_chance, roll
 			])
 
-	# ═══════ SLEEP - Wake up roll ═══════
+	# ═══════ SLEEP - No auto-cure (only wakes when hit or item used) ═══════
 	elif ailment == "sleep":
-		# 30% chance to wake up naturally at start of turn (unless hit - handled elsewhere)
-		var wake_chance = 30
-		var roll = randi() % 100
+		print("[BattleManager] %s is asleep (skipping turn - will wake if hit or item used)" % combatant.display_name)
+		# Sleep causes the turn to be skipped - handled by Battle.gd
+		# No auto-cure roll - only wakes from damage or Smelling Salts
 
-		if roll < wake_chance:
-			combatant.ailment = ""
-			combatant.ailment_turn_count = 0
-			print("[BattleManager] %s woke up naturally! (%d%% chance, rolled %d)" % [
-				combatant.display_name, wake_chance, roll
-			])
-			refresh_turn_order()
-		else:
-			print("[BattleManager] %s is still asleep (%d%% wake chance, rolled %d - skipping turn)" % [
-				combatant.display_name, wake_chance, roll
-			])
-			# Sleep causes the turn to be skipped - handled by Battle.gd
-
-	# ═══════ FREEZE - No auto-cure (only by item or 10% base chance) ═══════
+	# ═══════ FREEZE - No auto-cure (only cures with Heated Blanket item) ═══════
 	elif ailment == "freeze":
-		# Only 10% base chance to auto-cure
-		var cure_chance = 10
+		print("[BattleManager] %s is frozen (30%% action chance - cures only with Heated Blanket)" % combatant.display_name)
+		# Freeze allows acting with 30% success - handled by Battle.gd
+		# No auto-cure roll - only cures with Heated Blanket item
+
+	# ═══════ MALAISE - 30% action chance, auto-cure escalates ═══════
+	elif ailment == "malaise":
+		# Auto-cure chance: 30% base + 10% per turn (max 90%)
+		var cure_chance = min(30 + (turn_count - 1) * 10, 90)
 		var roll = randi() % 100
 
 		if roll < cure_chance:
 			combatant.ailment = ""
 			combatant.ailment_turn_count = 0
-			print("[BattleManager] %s broke free from freeze! (%d%% chance, rolled %d)" % [
+			print("[BattleManager] %s recovered from malaise! (%d%% chance, rolled %d)" % [
 				combatant.display_name, cure_chance, roll
 			])
 			refresh_turn_order()
 		else:
-			print("[BattleManager] %s is frozen (30%% action chance, %d%% cure chance, rolled %d)" % [
+			print("[BattleManager] %s is suffering from malaise (30%% action chance, %d%% cure chance, rolled %d)" % [
 				combatant.display_name, cure_chance, roll
 			])
-			# Freeze allows acting with 30% success - handled by Battle.gd
+			# Malaise allows acting with 30% success - handled by Battle.gd
 
-	# ═══════ OTHER AILMENTS (Confuse, Charm, Berserk, etc.) ═══════
-	# These can be extended later with their own mechanics
+	# ═══════ BERSERK - Attacks random target, auto-cure escalates ═══════
+	elif ailment == "berserk":
+		# Auto-cure chance: 30% base + 10% per turn (max 90%)
+		var cure_chance = min(30 + (turn_count - 1) * 10, 90)
+		var roll = randi() % 100
+
+		if roll < cure_chance:
+			combatant.ailment = ""
+			combatant.ailment_turn_count = 0
+			print("[BattleManager] %s calmed down from berserk! (%d%% chance, rolled %d)" % [
+				combatant.display_name, cure_chance, roll
+			])
+			refresh_turn_order()
+		else:
+			print("[BattleManager] %s is berserk! (will attack random target, %d%% cure chance, rolled %d)" % [
+				combatant.display_name, cure_chance, roll
+			])
+			# Berserk behavior (attack random target) handled by Battle.gd
+
+	# ═══════ CHARM - Uses healing/buff items on enemy, auto-cure escalates ═══════
+	elif ailment == "charm":
+		# Auto-cure chance: 30% base + 10% per turn (max 90%)
+		var cure_chance = min(30 + (turn_count - 1) * 10, 90)
+		var roll = randi() % 100
+
+		if roll < cure_chance:
+			combatant.ailment = ""
+			combatant.ailment_turn_count = 0
+			print("[BattleManager] %s broke free from charm! (%d%% chance, rolled %d)" % [
+				combatant.display_name, cure_chance, roll
+			])
+			refresh_turn_order()
+		else:
+			print("[BattleManager] %s is charmed! (will aid enemy, %d%% cure chance, rolled %d)" % [
+				combatant.display_name, cure_chance, roll
+			])
+			# Charm behavior (use heal/buff items on enemy) handled by Battle.gd
 
 	# Small delay for readability
 	await get_tree().create_timer(0.3).timeout
+
+## ═══════════════════════════════════════════════════════════════
+## BUFF/DEBUFF SYSTEM
+## ═══════════════════════════════════════════════════════════════
+
+func apply_buff(combatant: Dictionary, buff_type: String, value: float, duration: int) -> void:
+	"""Apply a buff or debuff to a combatant
+
+	Args:
+		combatant: Target combatant dictionary
+		buff_type: Type of buff (atk_up, atk_down, def_up, def_down, skl_up, skl_down, spd_up, regen, phys_acc, mind_acc, evasion)
+		value: Modifier value (e.g., 0.15 for 15% increase, 10 for +10 speed)
+		duration: Number of turns the buff lasts
+	"""
+	# Initialize buffs array if not present
+	if not combatant.has("buffs"):
+		combatant.buffs = []
+
+	# Check if this buff type already exists - replace it
+	for i in range(combatant.buffs.size()):
+		if combatant.buffs[i].type == buff_type:
+			combatant.buffs[i].duration = duration
+			combatant.buffs[i].value = value
+			print("[BattleManager] Refreshed %s on %s (%d turns)" % [buff_type, combatant.display_name, duration])
+			return
+
+	# Add new buff
+	combatant.buffs.append({
+		"type": buff_type,
+		"value": value,
+		"duration": duration
+	})
+	print("[BattleManager] Applied %s to %s (value: %.2f, duration: %d turns)" % [
+		buff_type, combatant.display_name, value, duration
+	])
+
+func process_buff_durations(combatant: Dictionary) -> void:
+	"""Decrement buff durations at turn start and remove expired buffs"""
+	if not combatant.has("buffs"):
+		return
+
+	var expired_buffs = []
+
+	# Process each buff
+	for i in range(combatant.buffs.size()):
+		var buff = combatant.buffs[i]
+		buff.duration -= 1
+
+		if buff.duration <= 0:
+			expired_buffs.append(i)
+			print("[BattleManager] %s on %s expired!" % [buff.type, combatant.display_name])
+
+	# Remove expired buffs (in reverse order to preserve indices)
+	for i in range(expired_buffs.size() - 1, -1, -1):
+		combatant.buffs.remove_at(expired_buffs[i])
+
+	# Clean up empty array
+	if combatant.buffs.is_empty():
+		combatant.erase("buffs")
+
+func get_buff_modifier(combatant: Dictionary, buff_type: String) -> float:
+	"""Get the total modifier for a specific buff type
+
+	Returns the sum of all matching buffs (e.g., multiple atk_up buffs stack)
+	"""
+	if not combatant.has("buffs"):
+		return 0.0
+
+	var total_mod = 0.0
+	for buff in combatant.buffs:
+		if buff.type == buff_type:
+			total_mod += buff.value
+
+	return total_mod
+
+func process_regen(combatant: Dictionary) -> void:
+	"""Process health regeneration buffs at turn start"""
+	if not combatant.has("buffs"):
+		return
+
+	for buff in combatant.buffs:
+		if buff.type == "regen":
+			var heal_amount = int(ceil(combatant.hp_max * buff.value))  # buff.value is 0.10 for 10%
+			combatant.hp = min(combatant.hp_max, combatant.hp + heal_amount)
+			print("[BattleManager] %s regenerates %d HP! (%d turns left)" % [
+				combatant.display_name, heal_amount, buff.duration
+			])
+			await get_tree().create_timer(0.2).timeout
 
 ## ═══════════════════════════════════════════════════════════════
 ## BATTLE END CONDITIONS

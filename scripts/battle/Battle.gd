@@ -121,6 +121,30 @@ func _on_turn_started(combatant_id: String) -> void:
 		battle_mgr.end_turn()
 		return
 
+	# Check for Berserk - attack random target (including allies)
+	if ailment == "berserk":
+		if current_combatant.is_ally:
+			log_message("  → %s is berserk and attacks wildly!" % current_combatant.display_name)
+			await _execute_berserk_action()
+			return
+		else:
+			# Enemies with berserk just attack normally (already random)
+			_execute_enemy_ai()
+			return
+
+	# Check for Charm - use heal/buff items on enemy
+	if ailment == "charm":
+		if current_combatant.is_ally:
+			log_message("  → %s is charmed and aids the enemy!" % current_combatant.display_name)
+			await _execute_charm_action()
+			return
+		else:
+			# Enemies with charm do nothing (have no heal items to use on player)
+			log_message("  → %s is charmed but has no way to help!" % current_combatant.display_name)
+			await get_tree().create_timer(1.0).timeout
+			battle_mgr.end_turn()
+			return
+
 	if current_combatant.is_ally:
 		# Player's turn - show action menu
 		_show_action_menu()
@@ -357,24 +381,26 @@ func _get_hero_display_name() -> String:
 	return "Hero"
 
 func _check_freeze_action_allowed() -> bool:
-	"""Check if a frozen combatant's action can proceed (30% chance)"""
+	"""Check if a frozen/malaise combatant's action can proceed (30% chance)"""
 	var ailment = str(current_combatant.get("ailment", ""))
 
-	if ailment != "freeze":
-		return true  # Not frozen, action always allowed
+	if ailment not in ["freeze", "malaise"]:
+		return true  # Not frozen or malaise, action always allowed
 
-	# Frozen: 30% chance to act
+	# Frozen/Malaise: 30% chance to act
 	var success_chance = 30
 	var roll = randi() % 100
 
+	var ailment_name = "freeze" if ailment == "freeze" else "malaise"
+
 	if roll < success_chance:
-		log_message("  → %s struggles through the freeze! (%d%% chance, rolled %d)" % [
-			current_combatant.display_name, success_chance, roll
+		log_message("  → %s struggles through the %s! (%d%% chance, rolled %d)" % [
+			current_combatant.display_name, ailment_name, success_chance, roll
 		])
 		return true
 	else:
-		log_message("  → %s is frozen solid and can't act! (%d%% chance, rolled %d)" % [
-			current_combatant.display_name, success_chance, roll
+		log_message("  → %s is unable to act due to %s! (%d%% chance, rolled %d)" % [
+			current_combatant.display_name, ailment_name, success_chance, roll
 		])
 		# End turn without acting
 		battle_mgr.end_turn()
@@ -995,7 +1021,7 @@ func _execute_item_usage(target: Dictionary) -> void:
 		var bomb_element = mind_type_tag
 
 		# Calculate bomb damage (fixed potency for now, can be adjusted)
-		var base_damage = 40  # Base bomb damage
+		var base_damage = 50  # Base bomb damage (50 direct AOE damage)
 		var bomb_targets = battle_mgr.get_enemy_combatants()
 
 		log_message("  → %s explodes, hitting all enemies!" % item_name)
@@ -1088,46 +1114,38 @@ func _execute_item_usage(target: Dictionary) -> void:
 		# Log item usage with target
 		log_message("%s uses %s on %s!" % [current_combatant.display_name, item_name, target.display_name])
 
-		if not target.has("buffs"):
-			target.buffs = []
-
 		# Determine buff type and magnitude
 		var buff_type = ""
-		var buff_value = 0
+		var buff_value = 0.0
 
-		if "ATK Up" in effect:
-			buff_type = "attack_up"
-			buff_value = 25  # +25% ATK
-		elif "MND Up" in effect:
-			buff_type = "mind_up"
-			buff_value = 25  # +25% MND
-		elif "Shield" in effect or "-20% dmg" in effect:
-			buff_type = "shield"
-			buff_value = 20  # -20% damage taken
-		elif "Regen" in effect:
+		if "ATK Up" in effect or "Attack Up" in effect:
+			buff_type = "atk_up"
+			buff_value = 0.15  # +15% ATK
+		elif "SKL Up" in effect or "Skill Up" in effect or "MND Up" in effect:
+			buff_type = "skl_up"
+			buff_value = 0.15  # +15% SKL
+		elif "DEF Up" in effect or "Defense Up" in effect or "Shield" in effect or "-20% dmg" in effect:
+			buff_type = "def_up"
+			buff_value = 0.20  # -20% damage taken
+		elif "Regen" in effect or "Health Up" in effect:
 			buff_type = "regen"
-			buff_value = 5  # 5% HP per round
-		elif "+10 Speed" in effect:
-			buff_type = "speed"
-			buff_value = 10  # +10 Speed
-		elif "+10 Hit%" in effect:
-			buff_type = "accuracy"
-			buff_value = 10  # +10 Hit%
-		elif "+10 Evasion%" in effect:
+			buff_value = 0.10  # 10% HP per round
+		elif "+10 Speed" in effect or "Speed Up" in effect:
+			buff_type = "spd_up"
+			buff_value = 10.0  # +10 Speed (flat bonus)
+		elif "+10 Hit%" in effect or "Hit% Up" in effect:
+			buff_type = "phys_acc"
+			buff_value = 0.10  # +10% physical Hit%
+		elif "+10 Evasion%" in effect or "Evasion% Up" in effect:
 			buff_type = "evasion"
-			buff_value = 10  # +10 Eva%
-		elif "+10 SkillHit%" in effect:
-			buff_type = "skill_acc"
-			buff_value = 10  # +10 Skill Hit%
+			buff_value = 0.10  # +10% Eva%
+		elif "+10 SkillHit%" in effect or "SkillHit% Up" in effect:
+			buff_type = "mind_acc"
+			buff_value = 0.10  # +10% Skill Hit%
 
-		target.buffs.append({
-			"type": buff_type,
-			"value": buff_value,
-			"duration": duration,
-			"source": item_name
-		})
-
-		log_message("  → %s gained %s! (Duration: %d rounds)" % [target.display_name, buff_type.replace("_", " ").capitalize(), duration])
+		if buff_type != "":
+			battle_mgr.apply_buff(target, buff_type, buff_value, duration)
+			log_message("  → %s gained %s for %d turns!" % [target.display_name, buff_type.replace("_", " ").capitalize(), duration])
 
 	# ═══════ CURE ITEMS (Remove ailments) ═══════
 	elif "Cure" in effect:
@@ -1166,9 +1184,16 @@ func _execute_item_usage(target: Dictionary) -> void:
 			log_message("  → Cured Mind Down!")
 
 		if cured_ailment != "":
-			if target.has("ailments") and cured_ailment in target.ailments:
-				target.ailments.erase(cured_ailment)
-			log_message("  → Cured %s!" % cured_ailment.capitalize())
+			var current_ailment = str(target.get("ailment", ""))
+			if current_ailment == cured_ailment:
+				target.ailment = ""
+				target.ailment_turn_count = 0
+				log_message("  → Cured %s!" % cured_ailment.capitalize())
+				# Refresh turn order to remove status indicator
+				if battle_mgr:
+					battle_mgr.refresh_turn_order()
+			else:
+				log_message("  → %s doesn't have %s!" % [target.display_name, cured_ailment.capitalize()])
 
 	# ═══════ HEAL ITEMS ═══════
 	elif "Heal" in effect:
@@ -1273,11 +1298,13 @@ func _execute_item_usage(target: Dictionary) -> void:
 
 	# Match debuffs
 	if "Attack Down" in effect and "Cure" not in effect:
-		debuff_to_apply = "attack_down"
+		debuff_to_apply = "atk_down"
 	elif "Defense Down" in effect and "Cure" not in effect:
-		debuff_to_apply = "defense_down"
+		debuff_to_apply = "def_down"
+	elif "Skill Down" in effect and "Cure" not in effect:
+		debuff_to_apply = "skl_down"
 	elif "Mind Down" in effect and "Cure" not in effect:
-		debuff_to_apply = "mind_down"
+		debuff_to_apply = "skl_down"  # Mind Down same as Skill Down
 
 	# Apply ailment if found
 	if ailment_to_apply != "":
@@ -1294,18 +1321,11 @@ func _execute_item_usage(target: Dictionary) -> void:
 		if ailment_to_apply == "":  # Only log if we didn't already log for ailment
 			log_message("%s uses %s on %s!" % [current_combatant.display_name, item_name, target.display_name])
 
-		if not target.has("debuffs"):
-			target.debuffs = []
-
-		target.debuffs.append({
-			"type": debuff_to_apply,
-			"value": 20,  # 20% penalty
-			"duration": duration,
-			"source": item_name
-		})
+		# Debuffs are negative buffs (-15% for stat debuffs)
+		battle_mgr.apply_buff(target, debuff_to_apply, -0.15, duration)
 
 		var debuff_name = debuff_to_apply.replace("_", " ").capitalize()
-		log_message("  → %s's %s reduced! (Duration: %d rounds)" % [target.display_name, debuff_name, duration])
+		log_message("  → %s's %s reduced by 15%% for %d turns!" % [target.display_name, debuff_name, duration])
 		# Refresh turn order to show debuff
 		if battle_mgr:
 			battle_mgr.refresh_turn_order()
@@ -1686,6 +1706,74 @@ func _execute_enemy_ai() -> void:
 	await get_tree().create_timer(1.0).timeout
 
 	# End turn
+	battle_mgr.end_turn()
+
+func _execute_berserk_action() -> void:
+	"""Execute berserk behavior - attack random target including allies"""
+	await get_tree().create_timer(0.5).timeout
+
+	# Clear defending status
+	current_combatant.is_defending = false
+
+	# Get all alive combatants (allies and enemies)
+	var all_targets = []
+	for c in battle_mgr.combatants:
+		if not c.is_ko and c.id != current_combatant.id:  # Don't target self
+			all_targets.append(c)
+
+	if all_targets.size() > 0:
+		var target = all_targets[randi() % all_targets.size()]
+		log_message("  → %s attacks %s in a berserk rage!" % [current_combatant.display_name, target.display_name])
+
+		# Execute attack (same as normal attack)
+		await _execute_attack(target)
+	else:
+		log_message("  → No one to attack!")
+		await get_tree().create_timer(1.0).timeout
+
+	battle_mgr.end_turn()
+
+func _execute_charm_action() -> void:
+	"""Execute charm behavior - use heal/buff items on enemies"""
+	await get_tree().create_timer(0.5).timeout
+
+	# Get heal/buff items from inventory
+	var heal_buff_items = []
+	for item_id in party_inventory.inventory.keys():
+		var quantity = party_inventory.inventory[item_id]
+		if quantity > 0:
+			var item_def = item_defs.get(item_id, {})
+			var category = _categorize_battle_item(item_id, item_def.get("name", ""), item_def)
+			if category in ["Healing", "Buffs"]:
+				heal_buff_items.append({"id": item_id, "def": item_def})
+
+	if heal_buff_items.size() > 0:
+		# Pick random item
+		var item_data = heal_buff_items[randi() % heal_buff_items.size()]
+		var item_id = item_data.id
+		var item_def = item_data.def
+
+		# Pick random alive enemy as target
+		var enemies = battle_mgr.get_enemy_combatants()
+		var alive_enemies = enemies.filter(func(e): return not e.is_ko)
+
+		if alive_enemies.size() > 0:
+			var target = alive_enemies[randi() % alive_enemies.size()]
+			log_message("  → %s uses %s on %s!" % [
+				current_combatant.display_name,
+				item_def.get("name", item_id),
+				target.display_name
+			])
+
+			# Use the item
+			party_inventory.remove_item(item_id, 1)
+			await _execute_item_usage(target)
+		else:
+			log_message("  → No enemies to help!")
+	else:
+		log_message("  → No healing or buff items to use!")
+
+	await get_tree().create_timer(1.0).timeout
 	battle_mgr.end_turn()
 
 ## ═══════════════════════════════════════════════════════════════
