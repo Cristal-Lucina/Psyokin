@@ -20,6 +20,7 @@ const KO_FALL_DURATION: float = 0.5  # Duration of KO falling animation
 var turn_slots: Array[PanelContainer] = []
 var previous_order: Dictionary = {}  # combatant_id -> previous_index
 var round_label: Label = null
+var round_announcement: Label = null  # Current round announcement label (protected from cleanup)
 var current_round: int = 0
 var is_animating: bool = false  # Prevent overlapping animations
 var is_rebuilding: bool = false  # ULTRA FIX: Mutex to prevent concurrent rebuilds
@@ -142,23 +143,23 @@ func _show_round_announcement(round_num: int) -> void:
 	print("[TurnOrderDisplay] Showing Round %d announcement..." % round_num)
 
 	# Create large announcement label
-	var announcement = Label.new()
-	announcement.text = "=== ROUND %d ===" % round_num
-	announcement.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	announcement.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	announcement.add_theme_font_size_override("font_size", 32)
-	announcement.add_theme_color_override("font_color", Color(1.0, 0.9, 0.3, 1.0))  # Gold color
-	announcement.custom_minimum_size = Vector2(200, 60)
-	announcement.modulate.a = 0.0  # Start invisible
+	round_announcement = Label.new()
+	round_announcement.text = "=== ROUND %d ===" % round_num
+	round_announcement.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	round_announcement.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	round_announcement.add_theme_font_size_override("font_size", 32)
+	round_announcement.add_theme_color_override("font_color", Color(1.0, 0.9, 0.3, 1.0))  # Gold color
+	round_announcement.custom_minimum_size = Vector2(200, 60)
+	round_announcement.modulate.a = 0.0  # Start invisible
 
-	add_child(announcement)
-	move_child(announcement, 1)  # Put after round label
+	add_child(round_announcement)
+	move_child(round_announcement, 1)  # Put after round label
 
 	# Fade in
 	var fade_in = create_tween()
 	fade_in.set_ease(Tween.EASE_OUT)
 	fade_in.set_trans(Tween.TRANS_CUBIC)
-	fade_in.tween_property(announcement, "modulate:a", 1.0, 0.4)
+	fade_in.tween_property(round_announcement, "modulate:a", 1.0, 0.4)
 	await fade_in.finished
 
 	# Hold for a moment
@@ -168,12 +169,14 @@ func _show_round_announcement(round_num: int) -> void:
 	var fade_out = create_tween()
 	fade_out.set_ease(Tween.EASE_IN)
 	fade_out.set_trans(Tween.TRANS_CUBIC)
-	fade_out.tween_property(announcement, "modulate:a", 0.0, 0.4)
+	fade_out.tween_property(round_announcement, "modulate:a", 0.0, 0.4)
 	await fade_out.finished
 
-	# Remove announcement
-	remove_child(announcement)
-	announcement.free()
+	# Remove announcement (check if still valid first)
+	if is_instance_valid(round_announcement):
+		remove_child(round_announcement)
+		round_announcement.free()
+	round_announcement = null
 
 	print("[TurnOrderDisplay] Round announcement complete")
 
@@ -188,7 +191,7 @@ func _rebuild_display_with_reveal() -> void:
 	# ULTRA FIX: IMMEDIATE deletion - no queue_free, use remove_child + free
 	var children_to_delete = []
 	for child in get_children():
-		if child != round_label and is_instance_valid(child):
+		if child != round_label and child != round_announcement and is_instance_valid(child):
 			children_to_delete.append(child)
 
 	# Remove and free immediately (not queued)
@@ -278,7 +281,7 @@ func _rebuild_display() -> void:
 	# ULTRA FIX: IMMEDIATE deletion - no queue_free, use remove_child + free
 	var children_to_delete = []
 	for child in get_children():
-		if child != round_label and is_instance_valid(child):
+		if child != round_label and child != round_announcement and is_instance_valid(child):
 			children_to_delete.append(child)
 
 	# Remove and free immediately (not queued)
