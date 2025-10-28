@@ -554,17 +554,43 @@ func _process_turn_start_ailments(combatant: Dictionary) -> void:
 				combatant.display_name, ailment.capitalize(), cure_chance, roll
 			])
 
-	# ═══════ SLEEP - No auto-cure (only wakes when hit or item used) ═══════
+	# ═══════ SLEEP - 20% auto-cure (also wakes when hit or item used) ═══════
 	elif ailment == "sleep":
-		print("[BattleManager] %s is asleep (skipping turn - will wake if hit or item used)" % combatant.display_name)
-		# Sleep causes the turn to be skipped - handled by Battle.gd
-		# No auto-cure roll - only wakes from damage or Smelling Salts
+		# 20% chance to wake up naturally at start of turn
+		var wake_chance = 20
+		var roll = randi() % 100
 
-	# ═══════ FREEZE - No auto-cure (only cures with Heated Blanket item) ═══════
+		if roll < wake_chance:
+			combatant.ailment = ""
+			combatant.ailment_turn_count = 0
+			print("[BattleManager] %s woke up naturally! (%d%% chance, rolled %d)" % [
+				combatant.display_name, wake_chance, roll
+			])
+			refresh_turn_order()
+		else:
+			print("[BattleManager] %s is asleep (%d%% wake chance, rolled %d - skipping turn)" % [
+				combatant.display_name, wake_chance, roll
+			])
+			# Sleep causes the turn to be skipped - handled by Battle.gd
+
+	# ═══════ FREEZE - 20% auto-cure (also cures with Heated Blanket item) ═══════
 	elif ailment == "freeze":
-		print("[BattleManager] %s is frozen (30%% action chance - cures only with Heated Blanket)" % combatant.display_name)
-		# Freeze allows acting with 30% success - handled by Battle.gd
-		# No auto-cure roll - only cures with Heated Blanket item
+		# 20% chance to break free from freeze
+		var cure_chance = 20
+		var roll = randi() % 100
+
+		if roll < cure_chance:
+			combatant.ailment = ""
+			combatant.ailment_turn_count = 0
+			print("[BattleManager] %s broke free from freeze! (%d%% chance, rolled %d)" % [
+				combatant.display_name, cure_chance, roll
+			])
+			refresh_turn_order()
+		else:
+			print("[BattleManager] %s is frozen (30%% action chance, %d%% cure chance, rolled %d)" % [
+				combatant.display_name, cure_chance, roll
+			])
+			# Freeze allows acting with 30% success - handled by Battle.gd
 
 	# ═══════ MALAISE - 30% action chance, auto-cure escalates ═══════
 	elif ailment == "malaise":
