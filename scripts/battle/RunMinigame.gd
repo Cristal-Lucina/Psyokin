@@ -10,12 +10,16 @@ var tempo_diff: int = 0  # Party tempo - enemy tempo (affects speed)
 var focus: int = 1  # Focus stat (adds magnet effect)
 
 ## Internal state
-var circle_radius: float = 100.0  # Current catch circle radius (closes in)
+var circle_radius: float = 100.0  # Current catch circle radius (closes in, rotating)
+var circle2_radius: float = 100.0  # Second catch circle radius (closes in, non-rotating)
+var circle2_delay: float = 1.0  # Delay before second circle starts (seconds)
+var circle2_active: bool = false  # Whether second circle has started
+var elapsed_time: float = 0.0  # Time since minigame started
 var max_radius: float = 100.0  # Maximum radius (outer escape boundary)
 var circle_close_speed: float = 20.0  # pixels per second
 var circle_rotation_speed: float = 0.3  # radians per second (slow rotation)
 var player_pos: Vector2 = Vector2.ZERO
-var circle_angle: float = 0.0  # Current rotation of catch circle
+var circle_angle: float = 0.0  # Current rotation of catch circle (first one only)
 var escape_gap_start: float = 0.0  # Start angle of the ONE continuous gap
 var escape_gap_end: float = 0.0  # End angle of the ONE continuous gap
 var arena_center: Vector2 = Vector2(100, 100)  # Center of arena
@@ -99,6 +103,9 @@ func _start_minigame() -> void:
 	print("[RunMinigame] Starting escape")
 	player_pos = Vector2.ZERO
 	circle_radius = max_radius
+	circle2_radius = max_radius
+	circle2_active = false
+	elapsed_time = 0.0
 
 func _draw_arena() -> void:
 	"""Draw the circles and player"""
@@ -126,7 +133,7 @@ func _draw_arena() -> void:
 			# RED for blocked area
 			arena.draw_line(p1, p2, Color(0.8, 0.2, 0.2, 1.0), 6.0)
 
-	# Draw the CATCH CIRCLE (red, rotating, closing in)
+	# Draw FIRST CATCH CIRCLE (red, rotating, closing in)
 	# The gap rotates WITH the circle
 	for i in range(segment_count):
 		var local_angle = (float(i) / segment_count) * TAU
@@ -142,6 +149,20 @@ func _draw_arena() -> void:
 			var p1 = arena_center + Vector2(cos(world_angle), sin(world_angle)) * circle_radius
 			var p2 = arena_center + Vector2(cos(world_angle + (TAU / segment_count)), sin(world_angle + (TAU / segment_count))) * circle_radius
 			arena.draw_line(p1, p2, Color(1.0, 0.3, 0.3, 1.0), 4.0)
+
+	# Draw SECOND CATCH CIRCLE (orange, non-rotating, delayed start)
+	if circle2_active:
+		for i in range(segment_count):
+			var angle = (float(i) / segment_count) * TAU
+
+			# Check gap without rotation (static gap)
+			var in_gap = _angle_in_gap(angle)
+
+			# Only draw if NOT in gap
+			if not in_gap:
+				var p1 = arena_center + Vector2(cos(angle), sin(angle)) * circle2_radius
+				var p2 = arena_center + Vector2(cos(angle + (TAU / segment_count)), sin(angle + (TAU / segment_count))) * circle2_radius
+				arena.draw_line(p1, p2, Color(1.0, 0.6, 0.2, 1.0), 4.0)  # Orange color
 
 	# Draw player dot (green with white outline)
 	var player_screen_pos = arena_center + player_pos
@@ -165,11 +186,21 @@ func _process(delta: float) -> void:
 			move_dir = move_dir.normalized()
 			player_pos += move_dir * 100.0 * delta
 
-	# Close circle (even when caught, for visual feedback)
+	# Track elapsed time
+	elapsed_time += delta
+
+	# Close first circle (even when caught, for visual feedback)
 	circle_radius -= circle_close_speed * delta
 
-	# Rotate circle
+	# Rotate first circle
 	circle_angle += circle_rotation_speed * delta
+
+	# Activate and close second circle after delay
+	if elapsed_time >= circle2_delay:
+		if not circle2_active:
+			circle2_active = true
+			print("[RunMinigame] Second catch circle activated!")
+		circle2_radius -= circle_close_speed * delta
 
 	# Redraw arena
 	arena.queue_redraw()
@@ -182,19 +213,27 @@ func _process(delta: float) -> void:
 		if distance_from_center > max_radius - 3.0:
 			# Player at escape boundary - check if they're in the escape gap
 			_check_escape()
-		# Check if player hit the catch circle
+		# Check if player hit the FIRST catch circle (rotating)
 		elif distance_from_center > circle_radius - 3.0:
-			# Player is touching the catch circle
+			# Player is touching the first catch circle
 			# Check if they're in the gap (accounting for rotation)
 			var player_angle = atan2(player_pos.y, player_pos.x)
 			# Remove rotation from player angle to check against static gap
 			var relative_angle = player_angle - circle_angle
 			if not _angle_in_gap(relative_angle):
-				# Hit the catch circle! Caught
+				# Hit the first catch circle! Caught
+				_on_caught()
+		# Check if player hit the SECOND catch circle (non-rotating)
+		elif circle2_active and distance_from_center > circle2_radius - 3.0:
+			# Player is touching the second catch circle
+			# Check if they're in the gap (no rotation for this one)
+			var player_angle = atan2(player_pos.y, player_pos.x)
+			if not _angle_in_gap(player_angle):
+				# Hit the second catch circle! Caught
 				_on_caught()
 
-		# Check if circle closed completely
-		if circle_radius <= 3:
+		# Check if either circle closed completely
+		if circle_radius <= 3 or (circle2_active and circle2_radius <= 3):
 			# Circle fully closed - caught!
 			_on_caught()
 
