@@ -243,13 +243,13 @@ func _handle_jump(delta: float) -> void:
 	"""Handle jump state machine and movement"""
 	match _jump_phase:
 		JumpPhase.NONE:
-			# Check for jump input (spacebar pressed)
-			if Input.is_key_pressed(KEY_SPACE):
+			# Check for jump input (spacebar or A button pressed)
+			if aInputManager.is_action_pressed(aInputManager.ACTION_JUMP):
 				_start_jump()
 
 		JumpPhase.CHARGING:
-			# Hold crouch frame until spacebar is released
-			if not Input.is_key_pressed(KEY_SPACE):
+			# Hold crouch frame until jump button is released
+			if not aInputManager.is_action_pressed(aInputManager.ACTION_JUMP):
 				_release_jump()
 			# Stay in place during charge
 			velocity = Vector2.ZERO
@@ -331,36 +331,23 @@ func _release_jump() -> void:
 
 func _handle_movement(_delta: float) -> void:
 	"""Handle player input and movement"""
-	var input_vector := Vector2.ZERO
-
-	# Get directional input (WASD and arrow keys)
-	if Input.is_action_pressed("ui_right") or Input.is_key_pressed(KEY_D):
-		input_vector.x += 1
-	if Input.is_action_pressed("ui_left") or Input.is_key_pressed(KEY_A):
-		input_vector.x -= 1
-	if Input.is_action_pressed("ui_down") or Input.is_key_pressed(KEY_S):
-		input_vector.y += 1
-	if Input.is_action_pressed("ui_up") or Input.is_key_pressed(KEY_W):
-		input_vector.y -= 1
-
-	# Normalize diagonal movement
-	if input_vector.length() > 0:
-		input_vector = input_vector.normalized()
+	# Use InputManager for unified keyboard/controller support
+	var input_vector := aInputManager.get_movement_vector()
 
 	# Determine movement state based on modifier keys first
 	var speed_mult: float = 1.0
 	var can_move: bool = true
-	var is_pulling: bool = Input.is_key_pressed(KEY_COMMA)
+	var is_pulling: bool = aInputManager.is_action_pressed(aInputManager.ACTION_PULL)
 
 	if is_pulling:
 		# Pull - half speed
 		_current_state = MovementState.PULL
 		speed_mult = PUSH_PULL_SPEED_MULT
-	elif Input.is_key_pressed(KEY_PERIOD):
+	elif aInputManager.is_action_pressed(aInputManager.ACTION_PUSH):
 		# Push - half speed
 		_current_state = MovementState.PUSH
 		speed_mult = PUSH_PULL_SPEED_MULT
-	elif Input.is_key_pressed(KEY_SHIFT):
+	elif aInputManager.is_action_pressed(aInputManager.ACTION_RUN):
 		# Run - increased speed
 		if input_vector.length() > 0:
 			_current_state = MovementState.RUN

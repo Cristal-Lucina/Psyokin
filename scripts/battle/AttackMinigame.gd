@@ -230,12 +230,8 @@ func _process_watching(delta: float) -> void:
 				randf_range(-8.0, 8.0)
 			)
 
-	# Handle WASD view movement
-	var move_dir = Vector2.ZERO
-	if Input.is_key_pressed(KEY_W): move_dir.y -= 1
-	if Input.is_key_pressed(KEY_S): move_dir.y += 1
-	if Input.is_key_pressed(KEY_A): move_dir.x -= 1
-	if Input.is_key_pressed(KEY_D): move_dir.x += 1
+	# Handle movement input (WASD or analog stick)
+	var move_dir = aInputManager.get_movement_vector()
 
 	if move_dir.length() > 0:
 		if not has_started:
@@ -281,8 +277,8 @@ func _process_watching(delta: float) -> void:
 	else:
 		timer_label.text = "Move to start timer..."
 
-	# Check for Space HELD to start charging
-	if Input.is_key_pressed(KEY_SPACE):
+	# Check for jump/confirm button HELD to start charging
+	if aInputManager.is_action_pressed(aInputManager.ACTION_JUMP):
 		if not is_charging:
 			if not has_started:
 				has_started = true
@@ -320,12 +316,8 @@ func _process_charging(delta: float) -> void:
 				randf_range(-8.0, 8.0)
 			)
 
-	# Handle WASD view movement WHILE charging (allows slide-to-crit!)
-	var move_dir = Vector2.ZERO
-	if Input.is_key_pressed(KEY_W): move_dir.y -= 1
-	if Input.is_key_pressed(KEY_S): move_dir.y += 1
-	if Input.is_key_pressed(KEY_A): move_dir.x -= 1
-	if Input.is_key_pressed(KEY_D): move_dir.x += 1
+	# Handle movement WHILE charging (allows slide-to-crit!)
+	var move_dir = aInputManager.get_movement_vector()
 
 	if move_dir.length() > 0:
 		move_dir = move_dir.normalized()
@@ -364,8 +356,8 @@ func _process_charging(delta: float) -> void:
 		_release_attack()
 		return
 
-	# Increase charge while Space is held
-	if Input.is_key_pressed(KEY_SPACE):
+	# Increase charge while button is held
+	if aInputManager.is_action_pressed(aInputManager.ACTION_JUMP):
 		# Always charge, regardless of visibility
 		charge_progress += delta * charge_speed
 		charge_progress = min(charge_progress, 1.2)  # Cap at 1.2 (past blue, into red)

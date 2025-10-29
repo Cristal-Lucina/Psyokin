@@ -43,12 +43,12 @@ var drop_offset: float = 0.0
 var drop_velocity: float = 0.0
 var drop_gravity: float = 800.0  # Pixels per second squared
 
-## Button mapping
+## Button mapping (action names to button labels)
 const BUTTON_MAP = {
-	KEY_SPACE: "A",
-	KEY_COMMA: "B",
-	KEY_PERIOD: "Y",
-	KEY_SLASH: "X"
+	"minigame_1": "A",  # Space/A button
+	"minigame_2": "B",  # Comma/X button
+	"minigame_3": "Y",  # Period/B button
+	"minigame_4": "X"   # Slash/Y button
 }
 
 ## Focus charge speeds (seconds per level)
@@ -261,10 +261,10 @@ func _process_charging(delta: float) -> void:
 			focus_level_label.modulate = Color(1.0, 0.3, 0.3, 1.0)
 			print("[SkillMinigame] Charge halted at %.2fs" % halt_timer)
 
-	# Track Space key state
-	var space_is_pressed = Input.is_key_pressed(KEY_SPACE)
+	# Track jump/confirm button state (Space or A button)
+	var space_is_pressed = aInputManager.is_action_pressed(aInputManager.ACTION_MINIGAME_1)
 
-	# Check if Space is held
+	# Check if button is held
 	if space_is_pressed:
 		# Start the timer on first press
 		if not has_started_charging:
@@ -309,8 +309,8 @@ func _process_charging(delta: float) -> void:
 			_finish_minigame_incomplete()
 			return
 
-	# Check if Space was released
-	if Input.is_action_just_released("ui_accept") or (not Input.is_key_pressed(KEY_SPACE) and charge_time > 0):
+	# Check if button was released
+	if aInputManager.is_action_just_released(aInputManager.ACTION_MINIGAME_1) and charge_time > 0:
 		_start_input_phase()
 
 func _update_focus_visuals() -> void:
@@ -367,9 +367,9 @@ func _process_inputting(delta: float) -> void:
 
 	# Check for button input (single press detection)
 	var current_button = ""
-	for key in BUTTON_MAP.keys():
-		if Input.is_key_pressed(key):
-			current_button = BUTTON_MAP[key]
+	for action in BUTTON_MAP.keys():
+		if aInputManager.is_action_pressed(action):
+			current_button = BUTTON_MAP[action]
 			break
 
 	# Only process if a button is pressed AND it's different from last frame
