@@ -35,7 +35,7 @@ var view_pos: Vector2 = Vector2.ZERO  # View center offset from arena center
 
 ## Charging phase
 var charge_progress: float = 0.0
-var charge_speed: float = 1.0  # Takes 1 second to go from red to blue (faster!)
+var charge_speed: float = 1.5  # Takes 0.67 seconds to go from red to blue (even faster!)
 var is_charging: bool = false
 var charge_zone: String = "red"
 
@@ -371,19 +371,20 @@ func _release_attack() -> void:
 	var grade: String = charge_zone
 	var got_crit: bool = false
 
-	match charge_zone:
+	# If weak spot not visible, cap max tier at green (no crit possible)
+	if not weak_spot_is_visible and charge_zone == "blue":
+		grade = "green"
+		print("[AttackMinigame] Blue capped to green - weak spot not visible")
+
+	match grade:
 		"red":
 			damage_modifier = 0.9
-			grade = "red"
 		"yellow":
 			damage_modifier = 1.0
-			grade = "yellow"
 		"green":
 			damage_modifier = 1.1
-			grade = "green"
 		"blue":
 			damage_modifier = 1.1
-			grade = "blue"
 			got_crit = true
 
 	# Set final results
@@ -399,10 +400,14 @@ func _release_attack() -> void:
 	else:
 		result_text = "✗ Weak spot not visible! "
 
-	match charge_zone:
+	match grade:
 		"red": result_text += "OK (-10% damage)"
 		"yellow": result_text += "GOOD (Normal damage)"
-		"green": result_text += "GREAT (+10% damage)"
+		"green":
+			if charge_zone == "blue" and not weak_spot_is_visible:
+				result_text += "GREAT (+10% damage) [Capped from CRIT]"
+			else:
+				result_text += "GREAT (+10% damage)"
 		"blue": result_text += "CRIT! (+10% damage + CRITICAL)"
 
 	charge_label.text = result_text
