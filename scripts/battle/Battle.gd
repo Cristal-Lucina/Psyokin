@@ -12,7 +12,7 @@ class_name Battle
 @onready var minigame_mgr = get_node("/root/aMinigameManager")
 
 ## UI References
-@onready var action_menu: VBoxContainer = %ActionMenu
+@onready var action_menu: GridContainer = %ActionMenu
 @onready var battle_log: RichTextLabel = %BattleLog
 @onready var burst_gauge_bar: ProgressBar = %BurstGauge
 @onready var turn_order_display: VBoxContainer = %TurnOrderDisplay
