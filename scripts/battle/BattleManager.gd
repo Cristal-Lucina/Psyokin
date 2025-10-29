@@ -161,14 +161,32 @@ func start_round() -> void:
 	turn_order.sort_custom(_sort_by_initiative)
 	_remove_turn_order_duplicates()  # Ensure no duplicates in turn order
 
+	# Add cleanup turn at the end (invisible, ensures round always ends properly)
+	var cleanup_turn = {
+		"id": "__cleanup__",
+		"display_name": "__CLEANUP__",
+		"is_ally": true,
+		"is_ko": false,
+		"is_fled": false,
+		"is_fallen": false,
+		"has_acted_this_round": false,
+		"initiative": -999,  # Always last
+		"is_cleanup_turn": true  # Special flag
+	}
+	turn_order.append(cleanup_turn)
+	print("[BattleManager] Added cleanup turn at end of round")
+
 	# ULTRA FIX: Final validation
-	if turn_order.size() != combatants.size():
-		push_error("[BattleManager] CRITICAL: turn_order size (%d) != combatants size (%d) after duplicate removal!" % [turn_order.size(), combatants.size()])
+	if turn_order.size() != (combatants.size() + 1):  # +1 for cleanup turn
+		push_error("[BattleManager] CRITICAL: turn_order size (%d) != expected size (%d)!" % [turn_order.size(), combatants.size() + 1])
 
 	print("[BattleManager] Turn order:")
 	for i in range(turn_order.size()):
 		var c = turn_order[i]
-		print("  %d. %s [ID: %s] (Initiative: %d)" % [i + 1, c.display_name, c.id, c.initiative])
+		if c.get("is_cleanup_turn", false):
+			print("  %d. [CLEANUP TURN]" % [i + 1])
+		else:
+			print("  %d. %s [ID: %s] (Initiative: %d)" % [i + 1, c.display_name, c.id, c.initiative])
 
 	# Process start-of-round effects (DoT, HoT, buff/debuff duration)
 	_process_round_start_effects()
@@ -390,6 +408,12 @@ func _next_turn() -> void:
 
 func _start_turn(combatant: Dictionary) -> void:
 	"""Start a combatant's turn"""
+	# Check for cleanup turn (special invisible turn that ends the round)
+	if combatant.get("is_cleanup_turn", false):
+		print("[BattleManager] Cleanup turn reached - ending round")
+		_end_round()
+		return
+
 	# Check for duplicates before starting turn
 	_remove_turn_order_duplicates()
 
@@ -421,6 +445,11 @@ func _start_turn(combatant: Dictionary) -> void:
 		print("[BattleManager] %s was KO'd by ailment - skipping turn" % combatant.display_name)
 		# Refresh turn order to show KO
 		refresh_turn_order()
+
+		# Check if battle has ended due to ailment death
+		if await _check_battle_end():
+			return
+
 		# Skip to end turn
 		end_turn()
 		return
@@ -617,10 +646,15 @@ func _process_turn_start_ailments(combatant: Dictionary) -> void:
 			print("[BattleManager] %s recovered from %s! (%d%% chance, rolled %d)" % [
 				combatant.display_name, ailment.capitalize(), cure_chance, roll
 			])
-			log_message_requested.emit("  → %s recovered from %s!" % [combatant.display_name, ailment.capitalize()])
+			log_message_requested.emit("  → %s recovered from %s! (%d%% chance, rolled %d)" % [
+				combatant.display_name, ailment.capitalize(), cure_chance, roll
+			])
 			refresh_turn_order()
 		else:
 			print("[BattleManager] %s is still %s (%d%% cure chance, rolled %d)" % [
+				combatant.display_name, ailment.capitalize(), cure_chance, roll
+			])
+			log_message_requested.emit("  → %s is still %s (%d%% cure chance, rolled %d)" % [
 				combatant.display_name, ailment.capitalize(), cure_chance, roll
 			])
 
@@ -636,9 +670,15 @@ func _process_turn_start_ailments(combatant: Dictionary) -> void:
 			print("[BattleManager] %s woke up naturally! (%d%% chance, rolled %d)" % [
 				combatant.display_name, wake_chance, roll
 			])
+			log_message_requested.emit("  → %s woke up! (%d%% chance, rolled %d)" % [
+				combatant.display_name, wake_chance, roll
+			])
 			refresh_turn_order()
 		else:
 			print("[BattleManager] %s is asleep (%d%% wake chance, rolled %d - skipping turn)" % [
+				combatant.display_name, wake_chance, roll
+			])
+			log_message_requested.emit("  → %s is still asleep (%d%% wake chance, rolled %d)" % [
 				combatant.display_name, wake_chance, roll
 			])
 			# Sleep causes the turn to be skipped - handled by Battle.gd
@@ -655,9 +695,15 @@ func _process_turn_start_ailments(combatant: Dictionary) -> void:
 			print("[BattleManager] %s broke free from freeze! (%d%% chance, rolled %d)" % [
 				combatant.display_name, cure_chance, roll
 			])
+			log_message_requested.emit("  → %s broke free from freeze! (%d%% chance, rolled %d)" % [
+				combatant.display_name, cure_chance, roll
+			])
 			refresh_turn_order()
 		else:
 			print("[BattleManager] %s is frozen (30%% action chance, %d%% cure chance, rolled %d)" % [
+				combatant.display_name, cure_chance, roll
+			])
+			log_message_requested.emit("  → %s is frozen (%d%% cure chance, rolled %d)" % [
 				combatant.display_name, cure_chance, roll
 			])
 			# Freeze allows acting with 30% success - handled by Battle.gd
@@ -674,9 +720,15 @@ func _process_turn_start_ailments(combatant: Dictionary) -> void:
 			print("[BattleManager] %s recovered from malaise! (%d%% chance, rolled %d)" % [
 				combatant.display_name, cure_chance, roll
 			])
+			log_message_requested.emit("  → %s recovered from malaise! (%d%% chance, rolled %d)" % [
+				combatant.display_name, cure_chance, roll
+			])
 			refresh_turn_order()
 		else:
 			print("[BattleManager] %s is suffering from malaise (30%% action chance, %d%% cure chance, rolled %d)" % [
+				combatant.display_name, cure_chance, roll
+			])
+			log_message_requested.emit("  → %s is suffering from malaise (%d%% cure chance, rolled %d)" % [
 				combatant.display_name, cure_chance, roll
 			])
 			# Malaise allows acting with 30% success - handled by Battle.gd
@@ -693,9 +745,15 @@ func _process_turn_start_ailments(combatant: Dictionary) -> void:
 			print("[BattleManager] %s calmed down from berserk! (%d%% chance, rolled %d)" % [
 				combatant.display_name, cure_chance, roll
 			])
+			log_message_requested.emit("  → %s calmed down from berserk! (%d%% chance, rolled %d)" % [
+				combatant.display_name, cure_chance, roll
+			])
 			refresh_turn_order()
 		else:
 			print("[BattleManager] %s is berserk! (will attack random target, %d%% cure chance, rolled %d)" % [
+				combatant.display_name, cure_chance, roll
+			])
+			log_message_requested.emit("  → %s is berserk! (%d%% cure chance, rolled %d)" % [
 				combatant.display_name, cure_chance, roll
 			])
 			# Berserk behavior (attack random target) handled by Battle.gd
@@ -712,9 +770,15 @@ func _process_turn_start_ailments(combatant: Dictionary) -> void:
 			print("[BattleManager] %s broke free from charm! (%d%% chance, rolled %d)" % [
 				combatant.display_name, cure_chance, roll
 			])
+			log_message_requested.emit("  → %s broke free from charm! (%d%% chance, rolled %d)" % [
+				combatant.display_name, cure_chance, roll
+			])
 			refresh_turn_order()
 		else:
 			print("[BattleManager] %s is charmed! (will aid enemy, %d%% cure chance, rolled %d)" % [
+				combatant.display_name, cure_chance, roll
+			])
+			log_message_requested.emit("  → %s is charmed! (%d%% cure chance, rolled %d)" % [
 				combatant.display_name, cure_chance, roll
 			])
 			# Charm behavior (use heal/buff items on enemy) handled by Battle.gd

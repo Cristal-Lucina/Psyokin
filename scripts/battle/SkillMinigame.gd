@@ -9,6 +9,7 @@ class_name SkillMinigame
 var focus_stat: int = 1  # Focus stat value (affects charge speed)
 var skill_sequence: Array = []  # Button sequence ["A", "B", "X", "Y"]
 var skill_tier: int = 1  # Skill tier (1-3)
+var mind_type: String = "none"  # Mind type for color (fire, water, earth, air, data, void, omega)
 
 ## Internal state
 enum Phase { CHARGING, INPUTTING, COMPLETE }
@@ -30,11 +31,17 @@ var title_label: Label
 var instruction_label: Label
 var focus_bar: ProgressBar
 var focus_level_label: Label
-var party_icon: ColorRect
-var aura_effect: ColorRect
+var party_icon: Control  # Changed to Control for custom drawing
+var focus_number_label: Label  # Focus number in center of circle
 var sequence_display: HBoxContainer
 var timer_bar: ProgressBar  # For input phase
 var overall_timer_bar: ProgressBar  # For entire minigame
+
+## Number drop animation
+var is_number_dropping: bool = false
+var drop_offset: float = 0.0
+var drop_velocity: float = 0.0
+var drop_gravity: float = 800.0  # Pixels per second squared
 
 ## Button mapping
 const BUTTON_MAP = {
@@ -48,19 +55,82 @@ const BUTTON_MAP = {
 const BASE_CHARGE_TIME_PER_LEVEL: float = 0.8
 var charge_time_per_level: float = 0.8
 
+## Status effect charge halt (for poison/burned)
+var has_halt_status: bool = false
+var is_charge_halted: bool = false
+var halt_timer: float = 0.0
+var next_halt_time: float = 0.0
+var was_space_pressed: bool = false  # Track key state for halt recovery
+
+## Mind type colors
+func _get_mind_type_color(type: String) -> Color:
+	"""Get color for mind type"""
+	match type.to_lower():
+		"fire":
+			return Color(1.0, 0.3, 0.1, 1.0)  # Bright orange-red
+		"water":
+			return Color(0.2, 0.5, 1.0, 1.0)  # Blue
+		"earth":
+			return Color(0.6, 0.4, 0.2, 1.0)  # Brown/tan
+		"air":
+			return Color(0.8, 1.0, 0.9, 1.0)  # Light cyan/white
+		"data":
+			return Color(0.3, 1.0, 0.3, 1.0)  # Bright green
+		"void":
+			return Color(0.5, 0.2, 0.6, 1.0)  # Purple
+		"omega":
+			return Color(1.0, 0.9, 0.2, 1.0)  # Golden yellow
+		_:
+			return Color(0.5, 0.5, 0.5, 1.0)  # Gray for unknown
+
+func _draw_party_icon() -> void:
+	"""Draw the party icon as a circle with mind type color"""
+	var center = Vector2(60, 60)  # Center of 120x120 control
+	var base_radius = 50.0
+
+	# Increase size based on focus level
+	var radius = base_radius + (focus_level * 5.0)
+
+	# Get color based on mind type
+	var base_color = _get_mind_type_color(mind_type)
+
+	# Draw outer glow (increases with focus level)
+	if focus_level > 0:
+		var glow_alpha = 0.2 + (focus_level * 0.15)
+		var glow_radius = radius + 10.0 + (focus_level * 3.0)
+		party_icon.draw_circle(center, glow_radius, Color(base_color.r, base_color.g, base_color.b, glow_alpha))
+
+	# Draw main circle
+	party_icon.draw_circle(center, radius, base_color)
+
+	# Draw highlight (gives it dimension)
+	var highlight_offset = Vector2(-radius * 0.3, -radius * 0.3)
+	var highlight_radius = radius * 0.4
+	var highlight_color = Color(1, 1, 1, 0.3)
+	party_icon.draw_circle(center + highlight_offset, highlight_radius, highlight_color)
+
 func _setup_minigame() -> void:
 	base_duration = 10.0
 	current_duration = base_duration
 
 	# Calculate charge speed based on Focus stat
-	charge_time_per_level = BASE_CHARGE_TIME_PER_LEVEL / (1.0 + (focus_stat * 0.1))
-	print("[SkillMinigame] Charge time per level: %.2fs (Focus: %d)" % [charge_time_per_level, focus_stat])
+	# Each focus level gives 15% speed increase (scales well for 10 levels)
+	var speed_multiplier = 1.0 + (focus_stat * 0.15)
+	charge_time_per_level = BASE_CHARGE_TIME_PER_LEVEL / speed_multiplier
+	print("[SkillMinigame] Charge time per level: %.2fs (Focus: %d, Speed: %.0f%%)" % [charge_time_per_level, focus_stat, speed_multiplier * 100])
 
-	# Title
+	# Check for halt-inducing status effects
+	has_halt_status = status_effects.has("burn") or status_effects.has("poison") or status_effects.has("sleep")
+	if has_halt_status:
+		print("[SkillMinigame] Halt status detected: %s" % str(status_effects))
+		# Schedule first halt at a random time (0.5 to 1.5 seconds)
+		next_halt_time = randf_range(0.5, 1.5)
+
+	# Title (show focus stat for debugging)
 	title_label = Label.new()
-	title_label.text = "SKILL!"
+	title_label.text = "SKILL! (Focus: %d - %d%% Speed)" % [focus_stat, int(speed_multiplier * 100)]
 	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title_label.add_theme_font_size_override("font_size", 32)
+	title_label.add_theme_font_size_override("font_size", 28)
 	content_container.add_child(title_label)
 
 	# Overall timer bar (starts when Space is first pressed)
@@ -73,21 +143,25 @@ func _setup_minigame() -> void:
 	overall_timer_container.add_child(overall_timer_bar)
 	content_container.add_child(overall_timer_container)
 
-	# Party icon with aura
+	# Party icon (circle) with focus number
 	var icon_container = CenterContainer.new()
 	content_container.add_child(icon_container)
 
-	party_icon = ColorRect.new()
-	party_icon.custom_minimum_size = Vector2(100, 100)
-	party_icon.color = Color(0.3, 0.6, 0.8, 1.0)
+	party_icon = Control.new()
+	party_icon.custom_minimum_size = Vector2(120, 120)
+	party_icon.draw.connect(_draw_party_icon)
 	icon_container.add_child(party_icon)
 
-	# Aura effect (grows with focus level)
-	aura_effect = ColorRect.new()
-	aura_effect.custom_minimum_size = Vector2(100, 100)
-	aura_effect.color = Color(0.8, 0.9, 1.0, 0.0)  # Start transparent
-	aura_effect.position = Vector2.ZERO
-	party_icon.add_child(aura_effect)
+	# Focus number label in center of circle
+	focus_number_label = Label.new()
+	focus_number_label.text = "0"
+	focus_number_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	focus_number_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	focus_number_label.add_theme_font_size_override("font_size", 48)
+	focus_number_label.add_theme_color_override("font_color", Color(1, 1, 1, 1))
+	focus_number_label.position = Vector2(0, 0)
+	focus_number_label.size = Vector2(120, 120)
+	party_icon.add_child(focus_number_label)
 
 	# Focus bar
 	focus_bar = ProgressBar.new()
@@ -146,9 +220,29 @@ func _setup_sequence_display() -> void:
 		sequence_display.add_child(btn_label)
 
 func _process(delta: float) -> void:
+	# Call parent to update status effect animations
+	super._process(delta)
+
 	# Stop all processing if minigame is complete
 	if minigame_complete:
 		return
+
+	# Update number drop animation
+	if is_number_dropping:
+		drop_velocity += drop_gravity * delta
+		drop_offset += drop_velocity * delta
+
+		# Update label position
+		if focus_number_label:
+			focus_number_label.position.y = drop_offset
+
+		# Stop dropping after falling off screen
+		if drop_offset > 200:
+			is_number_dropping = false
+			drop_offset = 0.0
+			drop_velocity = 0.0
+			if focus_number_label:
+				focus_number_label.position.y = 0
 
 	match current_phase:
 		Phase.CHARGING:
@@ -157,22 +251,52 @@ func _process(delta: float) -> void:
 			_process_inputting(delta)
 
 func _process_charging(delta: float) -> void:
+	# Update halt timer if status effect is active
+	if has_halt_status and not is_charge_halted:
+		halt_timer += delta
+		if halt_timer >= next_halt_time:
+			# Trigger halt!
+			is_charge_halted = true
+			focus_level_label.text = "INTERRUPTED! Click again to continue!"
+			focus_level_label.modulate = Color(1.0, 0.3, 0.3, 1.0)
+			print("[SkillMinigame] Charge halted at %.2fs" % halt_timer)
+
+	# Track Space key state
+	var space_is_pressed = Input.is_key_pressed(KEY_SPACE)
+
 	# Check if Space is held
-	if Input.is_key_pressed(KEY_SPACE):
+	if space_is_pressed:
 		# Start the timer on first press
 		if not has_started_charging:
 			has_started_charging = true
 			print("[SkillMinigame] Timer started!")
 
-		charge_time += delta
+		# If halted, don't charge until player releases and presses again
+		if is_charge_halted:
+			# Check if this is a new press (was released before)
+			if not was_space_pressed:
+				# Player pressed again! Resume charging
+				is_charge_halted = false
+				focus_level_label.text = "Focus Level: %d" % focus_level
+				focus_level_label.modulate = Color(1.0, 1.0, 1.0, 1.0)
+				# Schedule next halt
+				halt_timer = 0.0
+				next_halt_time = randf_range(0.8, 2.0)
+				print("[SkillMinigame] Charging resumed!")
+		else:
+			# Normal charging
+			charge_time += delta
 
-		# Calculate focus level
-		var new_level = min(3, int(charge_time / charge_time_per_level))
-		if new_level != focus_level:
-			focus_level = new_level
-			_update_focus_visuals()
+			# Calculate focus level
+			var new_level = min(3, int(charge_time / charge_time_per_level))
+			if new_level != focus_level:
+				focus_level = new_level
+				_update_focus_visuals()
+				print("[SkillMinigame] Focus level %d reached at %.2fs (charge_time_per_level: %.2fs)" % [focus_level, charge_time, charge_time_per_level])
 
-		focus_bar.value = charge_time / charge_time_per_level
+			focus_bar.value = charge_time / charge_time_per_level
+
+	was_space_pressed = space_is_pressed
 
 	# Update overall timer (only if charging has started)
 	if has_started_charging:
@@ -190,26 +314,18 @@ func _process_charging(delta: float) -> void:
 		_start_input_phase()
 
 func _update_focus_visuals() -> void:
-	"""Update aura effect based on focus level"""
+	"""Update focus number and redraw circle"""
 	focus_level_label.text = "Focus Level: %d" % focus_level
+	focus_number_label.text = str(focus_level)
 
-	# Update aura
-	match focus_level:
-		0:
-			aura_effect.color = Color(0.8, 0.9, 1.0, 0.0)
-		1:
-			aura_effect.color = Color(0.8, 0.9, 1.0, 0.3)
-			aura_effect.custom_minimum_size = Vector2(110, 110)
-		2:
-			aura_effect.color = Color(0.7, 0.9, 1.0, 0.5)
-			aura_effect.custom_minimum_size = Vector2(120, 120)
-		3:
-			aura_effect.color = Color(0.5, 1.0, 1.0, 0.7)
-			aura_effect.custom_minimum_size = Vector2(130, 130)
+	# Reset drop animation when focus increases
+	drop_offset = 0.0
+	drop_velocity = 0.0
+	is_number_dropping = false
 
-	# Center aura
-	var offset = (aura_effect.custom_minimum_size.x - 100) / 2.0
-	aura_effect.position = Vector2(-offset, -offset)
+	# Redraw the circle with new focus level (affects size/glow)
+	if party_icon:
+		party_icon.queue_redraw()
 
 func _start_input_phase() -> void:
 	"""Transition to button sequence input phase"""
@@ -286,6 +402,12 @@ func _on_button_input(button: String) -> void:
 		misclick_count += 1
 		focus_level = max(0, focus_level - 1)
 		sequence_index = 0
+
+		# Trigger number drop animation
+		is_number_dropping = true
+		drop_offset = 0.0
+		drop_velocity = 0.0
+
 		_update_focus_visuals()
 		_update_sequence_display()
 

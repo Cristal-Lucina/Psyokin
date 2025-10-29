@@ -1,12 +1,12 @@
 item_id,name,category,use_type,targeting,battle_status_effect,round_duration,mind_type_tag,short_description
 # ═══════ STATUS AILMENT TEST ITEMS ═══════
-TEST_POISON,Test Poison Vial,Test,battle,Ally,Poison,99,none,Inflict poison (8% HP/turn 30%+10%/turn cure)
-TEST_BURN,Test Fire Brand,Test,battle,Ally,Burn,99,none,Inflict burn (8% HP/turn 30%+10%/turn cure)
-TEST_SLEEP,Test Sleep Dust,Test,battle,Ally,Sleep,99,none,Put to sleep (wakes when hit or item used)
-TEST_FREEZE,Test Ice Shard,Test,battle,Ally,Freeze,99,none,Freeze target (30% action chance item cure only)
-TEST_MALAISE,Test Weakness Hex,Test,battle,Ally,Malaise,99,none,Inflict malaise (30% action 30%+10%/turn cure)
-TEST_BERSERK,Test Rage Potion,Test,battle,Ally,Berserk,99,none,Berserk rage (attack random 30%+10%/turn cure)
-TEST_CHARM,Test Charm Spell,Test,battle,Ally,Charm,99,none,Charm target (aid enemy 30%+10%/turn cure)
+TEST_POISON,Test Poison Vial,Test,battle,Any,Poison,99,none,Inflict poison (8% HP/turn 30%+10%/turn cure)
+TEST_BURN,Test Fire Brand,Test,battle,Any,Burn,99,none,Inflict burn (8% HP/turn 30%+10%/turn cure)
+TEST_SLEEP,Test Sleep Dust,Test,battle,Any,Sleep,99,none,Put to sleep (wakes when hit or item used)
+TEST_FREEZE,Test Ice Shard,Test,battle,Any,Freeze,99,none,Freeze target (30% action chance item cure only)
+TEST_MALAISE,Test Weakness Hex,Test,battle,Any,Malaise,99,none,Inflict malaise (30% action 30%+10%/turn cure)
+TEST_BERSERK,Test Rage Potion,Test,battle,Any,Berserk,99,none,Berserk rage (attack random 30%+10%/turn cure)
+TEST_CHARM,Test Charm Spell,Test,battle,Any,Charm,99,none,Charm target (aid enemy 30%+10%/turn cure)
 # ═══════ CURE ITEMS ═══════
 ANTIDOTE,Antidote,Cure,battle,Ally,Cure Poison,1,none,Cures poison status ailment
 OINTMENT,Ointment,Cure,battle,Ally,Cure Burn,1,none,Cures burn status ailment
@@ -25,9 +25,9 @@ EYE_DROPS,Eye Drops,Buff,battle,Ally,Hit% Up,3,none,Increases physical hit chanc
 HYPER_CHEWS,Hyper Chews,Buff,battle,Ally,Evasion% Up,3,none,Increases evasion by 10% for 3 turns
 FOCUS_TONIC,Focus Tonic,Buff,battle,Ally,SkillHit% Up,3,none,Increases skill hit chance by 10% for 3 turns
 # ═══════ DEBUFF TEST ITEMS (3 rounds) ═══════
-TEST_ATK_DOWN,Test Weaken Strike,Test,battle,Ally,Attack Down,3,none,Lower attack by 15% for testing
-TEST_SKL_DOWN,Test Mind Drain,Test,battle,Ally,Skill Down,3,none,Lower skill power by 15% for testing
-TEST_DEF_DOWN,Test Armor Break,Test,battle,Ally,Defense Down,3,none,Lower defense by 15% for testing
+TEST_ATK_DOWN,Test Weaken Strike,Test,battle,Any,Attack Down,3,none,Lower attack by 15% for testing
+TEST_SKL_DOWN,Test Mind Drain,Test,battle,Any,Skill Down,3,none,Lower skill power by 15% for testing
+TEST_DEF_DOWN,Test Armor Break,Test,battle,Any,Defense Down,3,none,Lower defense by 15% for testing
 # ═══════ BOMB ITEMS (50 AOE damage) ═══════
 FIRE_BOMB,Fire Bomb,Bomb,battle,Enemy,AOE,1,fire,Deals 50 fire AOE damage to all enemies
 WATER_BOMB,Water Bomb,Bomb,battle,Enemy,AOE,1,water,Deals 50 water AOE damage to all enemies

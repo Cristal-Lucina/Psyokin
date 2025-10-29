@@ -50,14 +50,16 @@ func launch_attack_minigame(tempo: int, brawn: int, status_effects: Array = []) 
 ## focus_stat: Focus stat value (affects charge speed)
 ## skill_sequence: Array of button inputs ["A", "B", "X", "Y"]
 ## skill_tier: Skill tier (1-3)
+## mind_type: Mind type for color (fire, water, earth, air, data, void, omega)
 ## status_effects: Array of active status effect names
-func launch_skill_minigame(focus_stat: int, skill_sequence: Array, skill_tier: int, status_effects: Array = []) -> Dictionary:
-	print("[MinigameManager] Launching skill minigame (focus: %d, tier: %d)" % [focus_stat, skill_tier])
+func launch_skill_minigame(focus_stat: int, skill_sequence: Array, skill_tier: int, mind_type: String = "none", status_effects: Array = []) -> Dictionary:
+	print("[MinigameManager] Launching skill minigame (focus: %d, tier: %d, type: %s)" % [focus_stat, skill_tier, mind_type])
 
 	var minigame = SKILL_MINIGAME.instantiate()
 	minigame.focus_stat = focus_stat
 	minigame.skill_sequence = skill_sequence
 	minigame.skill_tier = skill_tier
+	minigame.mind_type = mind_type
 	minigame.status_effects = status_effects
 
 	var result = await _run_minigame(minigame)

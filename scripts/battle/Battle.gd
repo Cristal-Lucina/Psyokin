@@ -12,7 +12,7 @@ class_name Battle
 @onready var minigame_mgr = get_node("/root/aMinigameManager")
 
 ## UI References
-@onready var action_menu: VBoxContainer = %ActionMenu
+@onready var action_menu: GridContainer = %ActionMenu
 @onready var battle_log: RichTextLabel = %BattleLog
 @onready var burst_gauge_bar: ProgressBar = %BurstGauge
 @onready var turn_order_display: VBoxContainer = %TurnOrderDisplay
@@ -1282,12 +1282,13 @@ func _execute_capture(target: Dictionary) -> void:
 		"TPO": target.stats.get("TPO", 1),
 		"actor_id": target.get("actor_id", ""),
 		"display_name": target.get("display_name", "Enemy"),
-		"break_rating": target.break_rating
+		"break_rating": target.break_rating,
+		"ailment": target.get("ailment", "")  # Add enemy ailment
 	}
 
 	# Build party member data for minigame
 	var party_member_data = {
-		"FOC": current_combatant.stats.get("FOC", 1)
+		"FOC": current_combatant.stats.get("FCS", 1)
 	}
 
 	# Get status effects
@@ -1849,7 +1850,7 @@ func _on_run_pressed() -> void:
 	var tempo_diff = party_tpo - avg_enemy_tpo
 
 	# Get focus stat
-	var focus_stat = current_combatant.stats.get("FOC", 1)
+	var focus_stat = current_combatant.stats.get("FCS", 1)
 
 	# Get status effects
 	var status_effects = []
@@ -2697,6 +2698,13 @@ func _on_item_selected(item_data: Dictionary) -> void:
 		else:
 			# Other items can only target alive allies
 			target_candidates = allies.filter(func(a): return not a.is_ko)
+	elif targeting == "Any":
+		# "Any" targeting allows selecting from all combatants (allies and enemies)
+		var all_combatants = []
+		all_combatants.append_array(battle_mgr.get_ally_combatants())
+		all_combatants.append_array(battle_mgr.get_enemy_combatants())
+		# Allow targeting any non-KO'd character
+		target_candidates = all_combatants.filter(func(c): return not c.is_ko)
 	else:  # Enemy (single target)
 		var enemies = battle_mgr.get_enemy_combatants()
 		target_candidates = enemies.filter(func(e): return not e.is_ko)
@@ -3200,15 +3208,16 @@ func _execute_skill_single(target: Dictionary) -> void:
 		skill_tier = int(parts[1]) if parts.size() > 1 else 1
 
 	# Launch skill minigame
-	var focus_stat = current_combatant.stats.get("FOC", 1)
+	var focus_stat = current_combatant.stats.get("FCS", 1)
 	var skill_sequence = _get_skill_button_sequence(skill_id)
+	var mind_type = element  # Use the element as the mind type
 	var status_effects = []
 	var ailment = str(current_combatant.get("ailment", ""))
 	if ailment != "":
 		status_effects.append(ailment)
 
 	log_message("  → %s prepares the skill..." % [current_combatant.display_name])
-	var minigame_result = await minigame_mgr.launch_skill_minigame(focus_stat, skill_sequence, skill_tier, status_effects)
+	var minigame_result = await minigame_mgr.launch_skill_minigame(focus_stat, skill_sequence, skill_tier, mind_type, status_effects)
 
 	# Apply minigame modifiers
 	var damage_modifier = minigame_result.get("damage_modifier", 1.0)

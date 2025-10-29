@@ -29,7 +29,7 @@ anchor_bottom = 1.0
 offset_left = 20.0
 offset_top = 20.0
 offset_right = -20.0
-offset_bottom = -20.0
+offset_bottom = -220.0
 grow_horizontal = 2
 grow_vertical = 2
 
@@ -74,66 +74,6 @@ size_flags_vertical = 3
 size_flags_stretch_ratio = 3.0
 alignment = 1
 
-[node name="BottomPanel" type="HBoxContainer" parent="MainLayout/BattleArena"]
-layout_mode = 2
-size_flags_vertical = 3
-size_flags_stretch_ratio = 2.0
-
-[node name="BattleLogPanel" type="PanelContainer" parent="MainLayout/BattleArena/BottomPanel"]
-layout_mode = 2
-size_flags_horizontal = 3
-size_flags_stretch_ratio = 2.0
-
-[node name="ScrollContainer" type="ScrollContainer" parent="MainLayout/BattleArena/BottomPanel/BattleLogPanel"]
-layout_mode = 2
-
-[node name="BattleLog" type="RichTextLabel" parent="MainLayout/BattleArena/BottomPanel/BattleLogPanel/ScrollContainer"]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_horizontal = 3
-size_flags_vertical = 3
-bbcode_enabled = true
-fit_content = true
-scroll_following = true
-
-[node name="ActionMenu" type="VBoxContainer" parent="MainLayout/BattleArena/BottomPanel"]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_horizontal = 3
-
-[node name="Title" type="Label" parent="MainLayout/BattleArena/BottomPanel/ActionMenu"]
-layout_mode = 2
-text = "Actions"
-horizontal_alignment = 1
-
-[node name="AttackButton" type="Button" parent="MainLayout/BattleArena/BottomPanel/ActionMenu"]
-layout_mode = 2
-text = "Attack"
-
-[node name="SkillButton" type="Button" parent="MainLayout/BattleArena/BottomPanel/ActionMenu"]
-layout_mode = 2
-text = "Skill"
-
-[node name="ItemButton" type="Button" parent="MainLayout/BattleArena/BottomPanel/ActionMenu"]
-layout_mode = 2
-text = "Item"
-
-[node name="CaptureButton" type="Button" parent="MainLayout/BattleArena/BottomPanel/ActionMenu"]
-layout_mode = 2
-text = "Capture"
-
-[node name="DefendButton" type="Button" parent="MainLayout/BattleArena/BottomPanel/ActionMenu"]
-layout_mode = 2
-text = "Defend"
-
-[node name="BurstButton" type="Button" parent="MainLayout/BattleArena/BottomPanel/ActionMenu"]
-layout_mode = 2
-text = "Burst"
-
-[node name="RunButton" type="Button" parent="MainLayout/BattleArena/BottomPanel/ActionMenu"]
-layout_mode = 2
-text = "Run"
-
 [node name="TurnOrderPanel" type="PanelContainer" parent="MainLayout"]
 layout_mode = 2
 size_flags_horizontal = 3
@@ -161,10 +101,91 @@ size_flags_horizontal = 3
 size_flags_vertical = 3
 script = ExtResource("2_turn_order")
 
-[connection signal="pressed" from="MainLayout/BattleArena/BottomPanel/ActionMenu/AttackButton" to="." method="_on_attack_pressed"]
-[connection signal="pressed" from="MainLayout/BattleArena/BottomPanel/ActionMenu/SkillButton" to="." method="_on_skill_pressed"]
-[connection signal="pressed" from="MainLayout/BattleArena/BottomPanel/ActionMenu/ItemButton" to="." method="_on_item_pressed"]
-[connection signal="pressed" from="MainLayout/BattleArena/BottomPanel/ActionMenu/CaptureButton" to="." method="_on_capture_pressed"]
-[connection signal="pressed" from="MainLayout/BattleArena/BottomPanel/ActionMenu/DefendButton" to="." method="_on_defend_pressed"]
-[connection signal="pressed" from="MainLayout/BattleArena/BottomPanel/ActionMenu/BurstButton" to="." method="_on_burst_pressed"]
-[connection signal="pressed" from="MainLayout/BattleArena/BottomPanel/ActionMenu/RunButton" to="." method="_on_run_pressed"]
+[node name="ActionMenu" type="GridContainer" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 0
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 30.0
+offset_top = -250.0
+offset_right = 330.0
+offset_bottom = -50.0
+grow_vertical = 0
+columns = 2
+theme_override_constants/h_separation = 10
+theme_override_constants/v_separation = 5
+
+[node name="BurstButton" type="Button" parent="ActionMenu"]
+custom_minimum_size = Vector2(140, 45)
+layout_mode = 2
+text = "(;) BURST"
+
+[node name="RunButton" type="Button" parent="ActionMenu"]
+custom_minimum_size = Vector2(140, 45)
+layout_mode = 2
+text = "(') RUN"
+
+[node name="DefendButton" type="Button" parent="ActionMenu"]
+custom_minimum_size = Vector2(140, 45)
+layout_mode = 2
+text = "(Y) DEFEND"
+
+[node name="SkillButton" type="Button" parent="ActionMenu"]
+custom_minimum_size = Vector2(140, 45)
+layout_mode = 2
+text = "(X) SKILL"
+
+[node name="CaptureButton" type="Button" parent="ActionMenu"]
+custom_minimum_size = Vector2(140, 45)
+layout_mode = 2
+text = "(B) CAPTURE"
+
+[node name="AttackButton" type="Button" parent="ActionMenu"]
+custom_minimum_size = Vector2(140, 45)
+layout_mode = 2
+text = "(A) ATTACK"
+
+[node name="ItemButton" type="Button" parent="ActionMenu"]
+custom_minimum_size = Vector2(140, 45)
+layout_mode = 2
+text = "(z) ITEMS"
+
+[node name="StatusButton" type="Button" parent="ActionMenu"]
+custom_minimum_size = Vector2(140, 45)
+layout_mode = 2
+text = "(x) STATUS"
+
+[node name="BattleLogPanel" type="PanelContainer" parent="."]
+layout_mode = 1
+anchors_preset = 0
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 360.0
+offset_top = -200.0
+offset_right = 920.0
+offset_bottom = -50.0
+grow_vertical = 0
+
+[node name="ScrollContainer" type="ScrollContainer" parent="BattleLogPanel"]
+layout_mode = 2
+follow_focus = true
+scroll_vertical_enabled = true
+
+[node name="BattleLog" type="RichTextLabel" parent="BattleLogPanel/ScrollContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+bbcode_enabled = true
+fit_content = true
+scroll_following = true
+
+[connection signal="pressed" from="ActionMenu/BurstButton" to="." method="_on_burst_pressed"]
+[connection signal="pressed" from="ActionMenu/RunButton" to="." method="_on_run_pressed"]
+[connection signal="pressed" from="ActionMenu/DefendButton" to="." method="_on_defend_pressed"]
+[connection signal="pressed" from="ActionMenu/SkillButton" to="." method="_on_skill_pressed"]
+[connection signal="pressed" from="ActionMenu/CaptureButton" to="." method="_on_capture_pressed"]
+[connection signal="pressed" from="ActionMenu/AttackButton" to="." method="_on_attack_pressed"]
+[connection signal="pressed" from="ActionMenu/ItemButton" to="." method="_on_item_pressed"]
+[connection signal="pressed" from="ActionMenu/StatusButton" to="." method="_on_status_pressed"]

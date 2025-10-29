@@ -35,6 +35,12 @@ var view_pos: Vector2 = Vector2.ZERO  # View center offset from arena center
 var red_dot_radius: float = 12.0  # Red aiming reticle size
 var weak_spot_in_red_dot: bool = false  # True if weak spot overlaps red dot
 
+## Status effect shake (for poison/burned)
+var shake_timer: float = 0.0
+var shake_interval: float = 0.3  # Shake every 0.3 seconds
+var shake_offset: Vector2 = Vector2.ZERO
+var has_shake_status: bool = false
+
 ## Charging phase
 var charge_progress: float = 0.0
 var charge_speed: float = 1.5  # Takes 0.67 seconds to go from red to blue (even faster!)
@@ -58,6 +64,11 @@ func _setup_minigame() -> void:
 	# Calculate view size from BRW (higher BRW = bigger view window)
 	view_radius = 40.0 + (brawn * 5.0)
 	print("[AttackMinigame] View radius: %.1f (BRW: %d)" % [view_radius, brawn])
+
+	# Check for shake-inducing status effects
+	has_shake_status = status_effects.has("burn") or status_effects.has("poison")
+	if has_shake_status:
+		print("[AttackMinigame] Shake status detected: %s" % str(status_effects))
 
 	# Randomize starting position for weak spot
 	_randomize_weak_spot_target()
@@ -123,11 +134,14 @@ func _update_weak_spot_visibility() -> void:
 
 func _draw_arena() -> void:
 	"""Draw the circular arena with moving weak spot"""
-	# Draw outer dark circle (full arena)
-	arena.draw_circle(arena_center, arena_radius, Color(0.2, 0.2, 0.2, 0.5))
+	# Apply shake offset to entire arena if status effect is active
+	var draw_offset = shake_offset if has_shake_status else Vector2.ZERO
 
-	# Calculate view center position (arena center + view offset)
-	var view_center = arena_center + view_pos
+	# Draw outer dark circle (full arena)
+	arena.draw_circle(arena_center + draw_offset, arena_radius, Color(0.2, 0.2, 0.2, 0.5))
+
+	# Calculate view center position (arena center + view offset + shake)
+	var view_center = arena_center + view_pos + draw_offset
 
 	# Draw visible view circle (lighter)
 	arena.draw_circle(view_center, view_radius, Color(0.3, 0.3, 0.4, 0.8))
@@ -141,7 +155,7 @@ func _draw_arena() -> void:
 
 	# ONLY draw weak spot if it's visible in the view
 	if weak_spot_is_visible:
-		var weak_spot_screen_pos = arena_center + weak_spot_pos
+		var weak_spot_screen_pos = arena_center + weak_spot_pos + draw_offset
 		arena.draw_circle(weak_spot_screen_pos, 5.0, Color(1.0, 1.0, 0.0, 1.0))  # Reduced from 8.0
 
 func _draw_circle_outline(center: Vector2, radius: float, color: Color, width: float) -> void:
@@ -191,6 +205,9 @@ func _start_minigame() -> void:
 	instruction_label.text = "WASD: Move view | HOLD SPACE: Charge when visible!"
 
 func _process(delta: float) -> void:
+	# Call parent to update status effect animations
+	super._process(delta)
+
 	# Stop all processing if minigame is complete
 	if minigame_complete:
 		return
@@ -202,6 +219,17 @@ func _process(delta: float) -> void:
 			_process_charging(delta)
 
 func _process_watching(delta: float) -> void:
+	# Update shake effect if poisoned/burned
+	if has_shake_status:
+		shake_timer += delta
+		if shake_timer >= shake_interval:
+			shake_timer = 0.0
+			# Random shake offset
+			shake_offset = Vector2(
+				randf_range(-8.0, 8.0),
+				randf_range(-8.0, 8.0)
+			)
+
 	# Handle WASD view movement
 	var move_dir = Vector2.ZERO
 	if Input.is_key_pressed(KEY_W): move_dir.y -= 1
@@ -281,6 +309,17 @@ func _start_charging() -> void:
 		charge_label.text = "Weak spot not visible! Automatic OK hit!"
 
 func _process_charging(delta: float) -> void:
+	# Update shake effect if poisoned/burned
+	if has_shake_status:
+		shake_timer += delta
+		if shake_timer >= shake_interval:
+			shake_timer = 0.0
+			# Random shake offset
+			shake_offset = Vector2(
+				randf_range(-8.0, 8.0),
+				randf_range(-8.0, 8.0)
+			)
+
 	# Handle WASD view movement WHILE charging (allows slide-to-crit!)
 	var move_dir = Vector2.ZERO
 	if Input.is_key_pressed(KEY_W): move_dir.y -= 1

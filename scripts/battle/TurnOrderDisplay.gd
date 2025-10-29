@@ -69,12 +69,8 @@ func _on_round_started(round_number: int) -> void:
 		print("[TurnOrderDisplay] BLOCKED: Already rebuilding, ignoring round_started signal")
 		return
 
-	# Wait for any ongoing animations to complete before starting new one
-	if is_animating:
-		print("[TurnOrderDisplay] Waiting for ongoing animation to complete...")
-		# Wait for the animation to finish
-		while is_animating:
-			await get_tree().process_frame
+	# Set animation flag immediately so BattleManager knows to wait
+	is_animating = true
 
 	current_round = round_number
 
@@ -230,6 +226,11 @@ func _rebuild_display_with_reveal() -> void:
 		var combatant = turn_order[i]
 		var combatant_id = combatant.get("id", "")
 
+		# Skip cleanup turn (invisible system turn)
+		if combatant.get("is_cleanup_turn", false):
+			print("[TurnOrderDisplay] Skipping cleanup turn at index %d" % i)
+			continue
+
 		# Skip if we've already created a slot for this combatant ID
 		if combatant_id != "" and seen_ids.has(combatant_id):
 			print("[TurnOrderDisplay] WARNING: Duplicate combatant %s detected at index %d, skipping!" % [combatant.get("display_name", "Unknown"), i])
@@ -268,6 +269,9 @@ func _rebuild_display_with_reveal() -> void:
 
 	# Store current order for future animations
 	_store_current_order()
+
+	# Update highlight to show current turn
+	_update_highlight()
 
 	print("[TurnOrderDisplay] Rebuild complete - final child count: %d, turn_slots: %d" % [get_child_count(), turn_slots.size()])
 
@@ -323,6 +327,11 @@ func _rebuild_display() -> void:
 		var combatant = turn_order[i]
 		var combatant_id = combatant.get("id", "")
 
+		# Skip cleanup turn (invisible system turn)
+		if combatant.get("is_cleanup_turn", false):
+			print("[TurnOrderDisplay] Skipping cleanup turn at index %d" % i)
+			continue
+
 		# Skip if we've already created a slot for this combatant ID
 		if combatant_id != "" and seen_ids.has(combatant_id):
 			print("[TurnOrderDisplay] WARNING: Duplicate combatant %s detected at index %d, skipping!" % [combatant.get("display_name", "Unknown"), i])
@@ -357,6 +366,9 @@ func _rebuild_display() -> void:
 
 	# Store current order for future animations
 	_store_current_order()
+
+	# Update highlight to show current turn
+	_update_highlight()
 
 	is_rebuilding = false  # ULTRA FIX: Clear rebuild lock
 
