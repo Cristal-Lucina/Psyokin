@@ -1224,6 +1224,25 @@ func _execute_capture(target: Dictionary) -> void:
 	log_message("  Capture chance: %.1f%%" % capture_chance)
 
 	# ═══════ CAPTURE MINIGAME ═══════
+	# Initialize or get persistent break rating
+	if not target.has("break_rating"):
+		# First capture attempt - calculate initial break rating
+		var enemy_hp_percent = float(target.hp) / float(target.hp_max)
+		var base_rating = target.get("level", 1)
+
+		if enemy_hp_percent <= 0.1:
+			target.break_rating = max(1, int(base_rating / 2))
+		elif enemy_hp_percent >= 1.0:
+			target.break_rating = base_rating * 2
+		elif enemy_hp_percent > 0.5:
+			target.break_rating = int(base_rating * 1.25)
+		else:
+			target.break_rating = int(base_rating * 0.75)
+
+		log_message("  → First capture attempt! Break rating: %d" % target.break_rating)
+	else:
+		log_message("  → Continued capture! Break rating: %d" % target.break_rating)
+
 	# Map bind item to bind type
 	var bind_type = "basic"
 	match bind_id:
@@ -1239,7 +1258,8 @@ func _execute_capture(target: Dictionary) -> void:
 		"level": target.get("level", 1),
 		"TPO": target.stats.get("TPO", 1),
 		"actor_id": target.get("actor_id", ""),
-		"display_name": target.get("display_name", "Enemy")
+		"display_name": target.get("display_name", "Enemy"),
+		"break_rating": target.break_rating
 	}
 
 	# Build party member data for minigame
@@ -1257,12 +1277,22 @@ func _execute_capture(target: Dictionary) -> void:
 	log_message("  → Starting capture minigame...")
 	var minigame_result = await minigame_mgr.launch_capture_minigame([bind_type], enemy_data, party_member_data, status_effects)
 
-	# Get success from minigame
-	var success = minigame_result.get("success", false)
+	# Update break rating based on minigame result
+	var break_rating_reduced = minigame_result.get("break_rating_reduced", 0)
+	var wraps_completed = minigame_result.get("wraps_completed", 0)
+
+	target.break_rating -= break_rating_reduced
+	if target.break_rating < 0:
+		target.break_rating = 0
+
+	log_message("  → Completed %d wraps! Break rating: %d → %d" % [wraps_completed, target.break_rating + break_rating_reduced, target.break_rating])
 
 	# Consume the bind item
 	var inventory = get_node("/root/aInventorySystem")
 	inventory.remove_item(bind_id, 1)
+
+	# Check if break rating hit 0 (capture success)
+	var success = target.break_rating <= 0
 
 	if success:
 		# Capture successful!
@@ -1290,8 +1320,11 @@ func _execute_capture(target: Dictionary) -> void:
 			print("[Battle] Battle ended - skipping end turn")
 			return  # Battle ended
 	else:
-		# Capture failed
-		log_message("  → FAILED! %s broke free!" % target.display_name)
+		# Capture failed but progress made
+		if break_rating_reduced > 0:
+			log_message("  → Progress made! %s resists but is weakening..." % target.display_name)
+		else:
+			log_message("  → FAILED! %s broke free with no progress!" % target.display_name)
 
 	# End turn
 	battle_mgr.end_turn()

@@ -27,6 +27,7 @@ var drag_start_angle: float = 0.0
 var drag_current_angle: float = 0.0
 var wrap_progress: float = 0.0  # 0.0 to TAU (full circle)
 var wrap_trails: Array = []  # Visual trails showing wraps
+var wraps_per_point: int = 3  # How many wraps needed per break rating point
 
 ## Visual elements
 var title_label: Label
@@ -124,27 +125,23 @@ func _calculate_break_rating() -> void:
 	print("[CaptureMinigame] Break rating: %d (HP: %.1f%%)" % [break_rating, enemy_hp_percent * 100])
 
 func _calculate_wraps_needed() -> int:
-	"""Calculate wraps needed based on enemy type"""
-	var actor_id = enemy_data.get("actor_id", "").to_lower()
-	var display_name = enemy_data.get("display_name", "").to_lower()
+	"""Calculate wraps needed based on break rating and bind quality"""
+	var current_break_rating = enemy_data.get("break_rating", 6)
 
-	# Check for slime (3 wraps)
-	if "slime" in actor_id or "slime" in display_name:
-		return 3
-
-	# Check for goblin (6 wraps)
-	if "goblin" in actor_id or "goblin" in display_name:
-		return 6
-
-	# Default based on bind quality as fallback
-	var wraps = 0
+	# Determine wraps per break rating point based on bind quality
+	wraps_per_point = 3  # Default to basic
 	for bind in landed_binds:
 		match bind:
-			"basic": wraps += 3
-			"standard": wraps += 2
-			"advanced": wraps += 1
+			"basic": wraps_per_point = 3
+			"standard": wraps_per_point = 2
+			"advanced": wraps_per_point = 1
 
-	return max(1, wraps)
+	# Total wraps needed = break rating × wraps per point
+	var total_wraps = current_break_rating * wraps_per_point
+
+	print("[CaptureMinigame] Break rating: %d × %d wraps/point = %d total wraps needed" % [current_break_rating, wraps_per_point, total_wraps])
+
+	return max(1, total_wraps)
 
 func _start_minigame() -> void:
 	print("[CaptureMinigame] Starting - Binds: %s" % str(binds))
@@ -375,16 +372,22 @@ func _get_direction_angle(direction: BindDirection) -> float:
 	return 0.0
 
 func _finish_capture_success() -> void:
-	print("[CaptureMinigame] Capture successful!")
+	print("[CaptureMinigame] Capture successful! Completed all wraps.")
 	title_label.text = "GREAT!"
 	phase_label.text = "Success!"
-	instruction_label.text = "Enemy captured successfully!"
+	instruction_label.text = "Break rating reduced to 0!"
 
 	await get_tree().create_timer(1.5).timeout
+
+	# Calculate how much break rating we reduced
+	var current_break_rating = enemy_data.get("break_rating", 6)
+	var break_rating_reduced = current_break_rating  # Reduced all of it!
 
 	var result = {
 		"success": true,
 		"grade": "capture",
+		"break_rating_reduced": break_rating_reduced,
+		"wraps_completed": knots_made,
 		"damage_modifier": 1.0,
 		"is_crit": false,
 		"mp_modifier": 1.0,
@@ -395,22 +398,30 @@ func _finish_capture_success() -> void:
 	_complete_minigame(result)
 
 func _finish_capture_failed() -> void:
-	print("[CaptureMinigame] Capture failed!")
+	print("[CaptureMinigame] Capture failed! Wraps completed: %d/%d" % [knots_made, knots_needed])
+
+	# Calculate partial break rating reduction based on wraps completed
+	var break_rating_reduced = int(knots_made / wraps_per_point)
+
 	title_label.text = "OK"
 	phase_label.text = "Failed"
-	instruction_label.text = "Enemy broke free!"
+	if break_rating_reduced > 0:
+		instruction_label.text = "Made progress! -%d break rating" % break_rating_reduced
+	else:
+		instruction_label.text = "Enemy broke free!"
 
 	await get_tree().create_timer(1.5).timeout
 
 	var result = {
 		"success": false,
 		"grade": "failed",
+		"break_rating_reduced": break_rating_reduced,
+		"wraps_completed": knots_made,
 		"damage_modifier": 1.0,
 		"is_crit": false,
 		"mp_modifier": 1.0,
 		"tier_downgrade": 0,
-		"focus_level": 0,
-		"partial_progress": knots_made
+		"focus_level": 0
 	}
 
 	_complete_minigame(result)
