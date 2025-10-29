@@ -218,6 +218,9 @@ func _setup_sequence_display() -> void:
 		sequence_display.add_child(btn_label)
 
 func _process(delta: float) -> void:
+	# Call parent to update status effect animations
+	super._process(delta)
+
 	# Stop all processing if minigame is complete
 	if minigame_complete:
 		return

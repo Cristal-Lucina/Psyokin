@@ -193,6 +193,9 @@ func _draw_arena() -> void:
 	arena.draw_circle(player_screen_pos, 4.0, Color(0.2, 1.0, 0.2, 1.0))
 
 func _process(delta: float) -> void:
+	# Call parent to update status effect animations
+	super._process(delta)
+
 	# Stop all processing if minigame is complete
 	if minigame_complete:
 		return

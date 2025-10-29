@@ -205,6 +205,9 @@ func _start_minigame() -> void:
 	instruction_label.text = "WASD: Move view | HOLD SPACE: Charge when visible!"
 
 func _process(delta: float) -> void:
+	# Call parent to update status effect animations
+	super._process(delta)
+
 	# Stop all processing if minigame is complete
 	if minigame_complete:
 		return

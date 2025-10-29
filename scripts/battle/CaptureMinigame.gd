@@ -398,6 +398,9 @@ func _spawn_bind_point() -> void:
 	print("[CaptureMinigame] Bind point spawned at: %s" % BindDirection.keys()[current_bind_direction])
 
 func _process(delta: float) -> void:
+	# Call parent to update status effect animations
+	super._process(delta)
+
 	# Update charm effect animation
 	if charm_effect_overlay and is_instance_valid(charm_effect_overlay):
 		charm_anim_time += delta
