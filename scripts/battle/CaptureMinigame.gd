@@ -42,6 +42,8 @@ var break_timer_bar: ProgressBar  # Shows time remaining
 var instruction_label: Label
 var charm_effect_overlay: Control  # For pink wavy border when enemy is charmed
 var charm_anim_time: float = 0.0
+var sleep_effect_overlay: Control  # For white wavy border when enemy is asleep
+var sleep_anim_time: float = 0.0
 
 # Bind phase visuals
 var bind_arena: Control  # Container for dragging mechanic
@@ -127,6 +129,16 @@ func _setup_minigame() -> void:
 		add_child(charm_effect_overlay)
 		print("[CaptureMinigame] Enemy is charmed - adding pink wavy border!")
 
+	# Sleep effect overlay (white wavy border when enemy is asleep)
+	if enemy_ailment == "sleep" or enemy_ailment == "asleep":
+		sleep_effect_overlay = Control.new()
+		sleep_effect_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+		sleep_effect_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		sleep_effect_overlay.z_index = 102
+		sleep_effect_overlay.draw.connect(_draw_sleep_effect)
+		add_child(sleep_effect_overlay)
+		print("[CaptureMinigame] Enemy is asleep - adding white wavy border!")
+
 func _draw_enemy_circle() -> void:
 	"""Draw the enemy as a circular shape"""
 	var center = Vector2(50, 50)  # Center of 100x100 control
@@ -203,6 +215,77 @@ func _draw_charm_effect() -> void:
 		var color = Color(1.0, 0.4, 0.8, intensity)
 
 		charm_effect_overlay.draw_line(Vector2(x1, y1), Vector2(x2, y2), color, line_thickness)
+
+func _draw_sleep_effect() -> void:
+	"""Draw animated white wavy lines around the minigame panel (enemy is asleep!)"""
+	if not overlay_panel:
+		return
+
+	var panel_pos = overlay_panel.position
+	var panel_size = overlay_panel.size
+	var wave_segments = 20
+	var line_thickness = 3.0
+
+	# Draw smooth wavy white lines along each edge
+	# Top edge
+	for i in range(wave_segments):
+		var progress = float(i) / wave_segments
+		var next_progress = float(i + 1) / wave_segments
+
+		var x1 = panel_pos.x + panel_size.x * progress
+		var x2 = panel_pos.x + panel_size.x * next_progress
+		var y1 = panel_pos.y + sin((sleep_anim_time * 2.0) + (progress * TAU * 2)) * 6.0
+		var y2 = panel_pos.y + sin((sleep_anim_time * 2.0) + (next_progress * TAU * 2)) * 6.0
+
+		var intensity = 0.6 + sin(sleep_anim_time * 3.0 + progress * TAU) * 0.4
+		var color = Color(1.0, 1.0, 1.0, intensity)  # White!
+
+		sleep_effect_overlay.draw_line(Vector2(x1, y1), Vector2(x2, y2), color, line_thickness)
+
+	# Bottom edge
+	for i in range(wave_segments):
+		var progress = float(i) / wave_segments
+		var next_progress = float(i + 1) / wave_segments
+
+		var x1 = panel_pos.x + panel_size.x * progress
+		var x2 = panel_pos.x + panel_size.x * next_progress
+		var y1 = panel_pos.y + panel_size.y + sin((sleep_anim_time * 2.0) + (progress * TAU * 2) + PI) * 6.0
+		var y2 = panel_pos.y + panel_size.y + sin((sleep_anim_time * 2.0) + (next_progress * TAU * 2) + PI) * 6.0
+
+		var intensity = 0.6 + sin(sleep_anim_time * 3.0 + progress * TAU) * 0.4
+		var color = Color(1.0, 1.0, 1.0, intensity)
+
+		sleep_effect_overlay.draw_line(Vector2(x1, y1), Vector2(x2, y2), color, line_thickness)
+
+	# Left edge
+	for i in range(wave_segments):
+		var progress = float(i) / wave_segments
+		var next_progress = float(i + 1) / wave_segments
+
+		var y1 = panel_pos.y + panel_size.y * progress
+		var y2 = panel_pos.y + panel_size.y * next_progress
+		var x1 = panel_pos.x + sin((sleep_anim_time * 2.0) + (progress * TAU * 2)) * 6.0
+		var x2 = panel_pos.x + sin((sleep_anim_time * 2.0) + (next_progress * TAU * 2)) * 6.0
+
+		var intensity = 0.6 + sin(sleep_anim_time * 3.0 + progress * TAU) * 0.4
+		var color = Color(1.0, 1.0, 1.0, intensity)
+
+		sleep_effect_overlay.draw_line(Vector2(x1, y1), Vector2(x2, y2), color, line_thickness)
+
+	# Right edge
+	for i in range(wave_segments):
+		var progress = float(i) / wave_segments
+		var next_progress = float(i + 1) / wave_segments
+
+		var y1 = panel_pos.y + panel_size.y * progress
+		var y2 = panel_pos.y + panel_size.y * next_progress
+		var x1 = panel_pos.x + panel_size.x + sin((sleep_anim_time * 2.0) + (progress * TAU * 2) + PI) * 6.0
+		var x2 = panel_pos.x + panel_size.x + sin((sleep_anim_time * 2.0) + (next_progress * TAU * 2) + PI) * 6.0
+
+		var intensity = 0.6 + sin(sleep_anim_time * 3.0 + progress * TAU) * 0.4
+		var color = Color(1.0, 1.0, 1.0, intensity)
+
+		sleep_effect_overlay.draw_line(Vector2(x1, y1), Vector2(x2, y2), color, line_thickness)
 
 func _calculate_break_rating() -> void:
 	"""Calculate enemy break rating from HP and stats"""
@@ -405,6 +488,11 @@ func _process(delta: float) -> void:
 	if charm_effect_overlay and is_instance_valid(charm_effect_overlay):
 		charm_anim_time += delta
 		charm_effect_overlay.queue_redraw()
+
+	# Update sleep effect animation
+	if sleep_effect_overlay and is_instance_valid(sleep_effect_overlay):
+		sleep_anim_time += delta
+		sleep_effect_overlay.queue_redraw()
 
 	# Stop all processing if minigame is complete
 	if minigame_complete:
