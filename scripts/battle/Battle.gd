@@ -3023,9 +3023,22 @@ func _execute_burst_on_target(target: Dictionary) -> void:
 		log_message("  → Missed %s! (%d%% chance)" % [target.display_name, int(hit_check.hit_chance)])
 		return
 
-	# Roll for crit
+	# ═══════ BURST MINIGAME ═══════
+	var affinity = current_combatant.stats.get("affinity", 1)
+	var status_effects = []
+	var ailment = str(current_combatant.get("ailment", ""))
+	if ailment != "":
+		status_effects.append(ailment)
+
+	log_message("  → Syncing burst energy...")
+	var minigame_result = await minigame_mgr.launch_burst_minigame(affinity, status_effects)
+
+	var damage_modifier = minigame_result.get("damage_modifier", 1.0)
+	var minigame_crit = minigame_result.get("is_crit", false)
+
+	# Roll for crit (or use minigame crit)
 	var crit_check = combat_resolver.check_critical_hit(current_combatant, {"skill_crit_bonus": crit_bonus})
-	var is_crit = crit_check.crit
+	var is_crit = crit_check.crit or minigame_crit
 
 	# Calculate type effectiveness
 	var type_bonus = 0.0
@@ -3052,6 +3065,9 @@ func _execute_burst_on_target(target: Dictionary) -> void:
 	)
 
 	var damage = damage_result.damage
+
+	# Apply minigame damage modifier
+	damage = int(damage * damage_modifier)
 
 	# Apply damage
 	target.hp -= damage
