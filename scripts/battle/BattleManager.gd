@@ -412,7 +412,8 @@ func _start_turn(combatant: Dictionary) -> void:
 		return
 
 	# Check if combatant has "Revived" status (can't act this turn)
-	if combatant.ailment == "Revived":
+	var current_ailment = str(combatant.get("ailment", ""))
+	if current_ailment == "Revived":
 		print("[BattleManager] %s is still recovering from revival - skipping turn" % combatant.display_name)
 		# Skip to end turn
 		end_turn()
