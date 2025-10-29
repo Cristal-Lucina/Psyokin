@@ -177,34 +177,10 @@ func _draw_arena() -> void:
 				var p2 = arena_center + Vector2(cos(next_world_angle), sin(next_world_angle)) * circle2_radius
 				arena.draw_line(p1, p2, Color(1.0, 0.6, 0.2, 1.0), 4.0)  # Orange color
 
-	# DEBUG: Draw collision detection radius for catch circle (cyan outline)
-	var collision_radius = circle_radius - 1.0
-	for i in range(72):  # Lower detail for debug circle
-		var angle = (float(i) / 72) * TAU
-		var next_angle = (float(i + 1) / 72) * TAU
-		var p1 = arena_center + Vector2(cos(angle), sin(angle)) * collision_radius
-		var p2 = arena_center + Vector2(cos(next_angle), sin(next_angle)) * collision_radius
-		arena.draw_line(p1, p2, Color(0.0, 1.0, 1.0, 0.5), 1.0)  # Cyan, semi-transparent
-
-	# DEBUG: Draw distance line from center to player (yellow)
-	var distance_from_center = player_pos.length()
-	arena.draw_line(arena_center, arena_center + player_pos, Color(1.0, 1.0, 0.0, 0.6), 1.0)
-
-	# DEBUG: Show player distance as text
-	var distance_text = "Dist: %.1f / Collision: %.1f" % [distance_from_center, collision_radius]
-
 	# Draw player dot (green with white outline)
 	var player_screen_pos = arena_center + player_pos
 	arena.draw_circle(player_screen_pos, 6.0, Color(1.0, 1.0, 1.0, 1.0))
 	arena.draw_circle(player_screen_pos, 4.0, Color(0.2, 1.0, 0.2, 1.0))
-
-	# DEBUG: Draw player local angle indicator on catch circle
-	if distance_from_center > collision_radius:
-		var player_angle = atan2(player_pos.y, player_pos.x)
-		var local_angle = player_angle - circle_angle
-		var world_angle = local_angle + circle_angle  # Convert back to world for drawing
-		var indicator_pos = arena_center + Vector2(cos(world_angle), sin(world_angle)) * circle_radius
-		arena.draw_circle(indicator_pos, 4.0, Color(1.0, 0.0, 1.0, 1.0))  # Magenta marker
 
 func _process(delta: float) -> void:
 	# Stop all processing if minigame is complete
@@ -262,17 +238,8 @@ func _process(delta: float) -> void:
 				var local_angle = player_angle - circle_angle
 				var in_gap = _angle_in_gap(local_angle)
 
-				print("[RunMinigame] Catch circle collision check:")
-				print("  Player distance: %.1f (circle radius: %.1f)" % [distance_from_center, circle_radius])
-				print("  Player world angle: %.1f°" % rad_to_deg(player_angle))
-				print("  Circle rotation: %.1f°" % rad_to_deg(circle_angle))
-				print("  Player local angle: %.1f°" % rad_to_deg(local_angle))
-				print("  Gap: %.1f° to %.1f°" % [rad_to_deg(escape_gap_start), rad_to_deg(escape_gap_end)])
-				print("  In gap: %s" % in_gap)
-
 				if not in_gap:
 					# Hit the catch circle! Caught
-					print("  → CAUGHT!")
 					_on_caught()
 
 			# Check if player hit the SECOND catch circle (static but different rotation)
@@ -284,17 +251,8 @@ func _process(delta: float) -> void:
 				var local_angle = player_angle - circle2_start_angle
 				var in_gap = _angle_in_gap(local_angle)
 
-				print("[RunMinigame] Circle 2 collision check:")
-				print("  Player distance: %.1f (circle2 radius: %.1f)" % [distance_from_center, circle2_radius])
-				print("  Player world angle: %.1f°" % rad_to_deg(player_angle))
-				print("  Circle2 start angle: %.1f°" % rad_to_deg(circle2_start_angle))
-				print("  Player local angle: %.1f°" % rad_to_deg(local_angle))
-				print("  Gap: %.1f° to %.1f°" % [rad_to_deg(escape_gap_start), rad_to_deg(escape_gap_end)])
-				print("  In gap: %s" % in_gap)
-
 				if not in_gap:
 					# Hit the second catch circle! Caught
-					print("  → CAUGHT by circle 2!")
 					_on_caught()
 
 		# Check if either circle closed completely
