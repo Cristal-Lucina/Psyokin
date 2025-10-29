@@ -270,6 +270,9 @@ func _rebuild_display_with_reveal() -> void:
 	# Store current order for future animations
 	_store_current_order()
 
+	# Update highlight to show current turn
+	_update_highlight()
+
 	print("[TurnOrderDisplay] Rebuild complete - final child count: %d, turn_slots: %d" % [get_child_count(), turn_slots.size()])
 
 	is_animating = false
@@ -363,6 +366,9 @@ func _rebuild_display() -> void:
 
 	# Store current order for future animations
 	_store_current_order()
+
+	# Update highlight to show current turn
+	_update_highlight()
 
 	is_rebuilding = false  # ULTRA FIX: Clear rebuild lock
 

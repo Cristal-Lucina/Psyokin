@@ -153,57 +153,75 @@ func _process(delta: float) -> void:
 			status_effect_overlay.queue_redraw()
 
 func _draw_burned_effect() -> void:
-	"""Draw animated fiery orange lines around the panel"""
+	"""Draw animated wavy fiery orange lines around the panel"""
 	if not overlay_panel:
 		return
 
 	var panel_pos = overlay_panel.position
 	var panel_size = overlay_panel.size
-	var line_count = 8
+	var wave_segments = 20
 	var line_thickness = 3.0
 
-	# Draw flame-like wavy lines around the border
-	for i in range(line_count):
-		var progress = float(i) / line_count
-		var offset = sin((status_anim_time * 3.0) + (progress * TAU)) * 5.0
+	# Draw smooth wavy lines along each edge (fiery orange)
+	# Top edge
+	for i in range(wave_segments):
+		var progress = float(i) / wave_segments
+		var next_progress = float(i + 1) / wave_segments
 
-		# Animate color intensity
-		var intensity = 0.7 + sin(status_anim_time * 4.0 + progress * TAU) * 0.3
-		var color = Color(1.0, 0.4 + intensity * 0.2, 0.0, intensity)
+		var x1 = panel_pos.x + panel_size.x * progress
+		var x2 = panel_pos.x + panel_size.x * next_progress
+		var y1 = panel_pos.y + sin((status_anim_time * 2.0) + (progress * TAU * 2)) * 6.0
+		var y2 = panel_pos.y + sin((status_anim_time * 2.0) + (next_progress * TAU * 2)) * 6.0
 
-		# Top edge
-		var start_x = panel_pos.x + (panel_size.x * progress)
-		var top_y = panel_pos.y + offset
-		status_effect_overlay.draw_line(
-			Vector2(start_x, top_y),
-			Vector2(start_x + 20, top_y),
-			color, line_thickness
-		)
+		var intensity = 0.6 + sin(status_anim_time * 3.0 + progress * TAU) * 0.4
+		var color = Color(1.0, 0.4, 0.0, intensity)  # Fiery orange
 
-		# Bottom edge
-		var bottom_y = panel_pos.y + panel_size.y - offset
-		status_effect_overlay.draw_line(
-			Vector2(start_x, bottom_y),
-			Vector2(start_x + 20, bottom_y),
-			color, line_thickness
-		)
+		status_effect_overlay.draw_line(Vector2(x1, y1), Vector2(x2, y2), color, line_thickness)
 
-		# Left edge
-		var start_y = panel_pos.y + (panel_size.y * progress)
-		var left_x = panel_pos.x + offset
-		status_effect_overlay.draw_line(
-			Vector2(left_x, start_y),
-			Vector2(left_x, start_y + 20),
-			color, line_thickness
-		)
+	# Bottom edge
+	for i in range(wave_segments):
+		var progress = float(i) / wave_segments
+		var next_progress = float(i + 1) / wave_segments
 
-		# Right edge
-		var right_x = panel_pos.x + panel_size.x - offset
-		status_effect_overlay.draw_line(
-			Vector2(right_x, start_y),
-			Vector2(right_x, start_y + 20),
-			color, line_thickness
-		)
+		var x1 = panel_pos.x + panel_size.x * progress
+		var x2 = panel_pos.x + panel_size.x * next_progress
+		var y1 = panel_pos.y + panel_size.y + sin((status_anim_time * 2.0) + (progress * TAU * 2) + PI) * 6.0
+		var y2 = panel_pos.y + panel_size.y + sin((status_anim_time * 2.0) + (next_progress * TAU * 2) + PI) * 6.0
+
+		var intensity = 0.6 + sin(status_anim_time * 3.0 + progress * TAU) * 0.4
+		var color = Color(1.0, 0.4, 0.0, intensity)
+
+		status_effect_overlay.draw_line(Vector2(x1, y1), Vector2(x2, y2), color, line_thickness)
+
+	# Left edge
+	for i in range(wave_segments):
+		var progress = float(i) / wave_segments
+		var next_progress = float(i + 1) / wave_segments
+
+		var y1 = panel_pos.y + panel_size.y * progress
+		var y2 = panel_pos.y + panel_size.y * next_progress
+		var x1 = panel_pos.x + sin((status_anim_time * 2.0) + (progress * TAU * 2)) * 6.0
+		var x2 = panel_pos.x + sin((status_anim_time * 2.0) + (next_progress * TAU * 2)) * 6.0
+
+		var intensity = 0.6 + sin(status_anim_time * 3.0 + progress * TAU) * 0.4
+		var color = Color(1.0, 0.4, 0.0, intensity)
+
+		status_effect_overlay.draw_line(Vector2(x1, y1), Vector2(x2, y2), color, line_thickness)
+
+	# Right edge
+	for i in range(wave_segments):
+		var progress = float(i) / wave_segments
+		var next_progress = float(i + 1) / wave_segments
+
+		var y1 = panel_pos.y + panel_size.y * progress
+		var y2 = panel_pos.y + panel_size.y * next_progress
+		var x1 = panel_pos.x + panel_size.x + sin((status_anim_time * 2.0) + (progress * TAU * 2) + PI) * 6.0
+		var x2 = panel_pos.x + panel_size.x + sin((status_anim_time * 2.0) + (next_progress * TAU * 2) + PI) * 6.0
+
+		var intensity = 0.6 + sin(status_anim_time * 3.0 + progress * TAU) * 0.4
+		var color = Color(1.0, 0.4, 0.0, intensity)
+
+		status_effect_overlay.draw_line(Vector2(x1, y1), Vector2(x2, y2), color, line_thickness)
 
 func _draw_poison_effect() -> void:
 	"""Draw animated wavy purple lines around the panel"""
@@ -419,99 +437,73 @@ func _draw_malaise_effect() -> void:
 		status_effect_overlay.draw_line(Vector2(x1, y1), Vector2(x2, y2), color, line_thickness)
 
 func _draw_freeze_effect() -> void:
-	"""Draw animated jagged light blue lines around the panel"""
+	"""Draw animated wavy light blue lines around the panel"""
 	if not overlay_panel:
 		return
 
 	var panel_pos = overlay_panel.position
 	var panel_size = overlay_panel.size
-	var spike_count = 30
+	var wave_segments = 20
 	var line_thickness = 3.0
-	var spike_size = 8.0
 
-	# Draw jagged/spiky lines along each edge (light blue)
+	# Draw smooth wavy lines along each edge (light blue)
 	# Top edge
-	for i in range(spike_count):
-		var progress = float(i) / spike_count
-		var next_progress = float(i + 1) / spike_count
+	for i in range(wave_segments):
+		var progress = float(i) / wave_segments
+		var next_progress = float(i + 1) / wave_segments
 
 		var x1 = panel_pos.x + panel_size.x * progress
 		var x2 = panel_pos.x + panel_size.x * next_progress
+		var y1 = panel_pos.y + sin((status_anim_time * 2.0) + (progress * TAU * 2)) * 6.0
+		var y2 = panel_pos.y + sin((status_anim_time * 2.0) + (next_progress * TAU * 2)) * 6.0
 
-		# Alternate inward and outward spikes, with animation
-		var offset1 = spike_size if (i % 2 == 0) else -spike_size
-		var offset2 = -spike_size if (i % 2 == 0) else spike_size
-		offset1 += sin(status_anim_time * 3.0 + i) * 2.0  # Subtle animation
-		offset2 += sin(status_anim_time * 3.0 + i + 0.5) * 2.0
-
-		var y1 = panel_pos.y + offset1
-		var y2 = panel_pos.y + offset2
-
-		var intensity = 0.7 + sin(status_anim_time * 2.5 + progress * TAU) * 0.3
+		var intensity = 0.6 + sin(status_anim_time * 3.0 + progress * TAU) * 0.4
 		var color = Color(0.6, 0.8, 1.0, intensity)  # Light blue
 
 		status_effect_overlay.draw_line(Vector2(x1, y1), Vector2(x2, y2), color, line_thickness)
 
 	# Bottom edge
-	for i in range(spike_count):
-		var progress = float(i) / spike_count
-		var next_progress = float(i + 1) / spike_count
+	for i in range(wave_segments):
+		var progress = float(i) / wave_segments
+		var next_progress = float(i + 1) / wave_segments
 
 		var x1 = panel_pos.x + panel_size.x * progress
 		var x2 = panel_pos.x + panel_size.x * next_progress
+		var y1 = panel_pos.y + panel_size.y + sin((status_anim_time * 2.0) + (progress * TAU * 2) + PI) * 6.0
+		var y2 = panel_pos.y + panel_size.y + sin((status_anim_time * 2.0) + (next_progress * TAU * 2) + PI) * 6.0
 
-		var offset1 = spike_size if (i % 2 == 0) else -spike_size
-		var offset2 = -spike_size if (i % 2 == 0) else spike_size
-		offset1 += sin(status_anim_time * 3.0 + i) * 2.0
-		offset2 += sin(status_anim_time * 3.0 + i + 0.5) * 2.0
-
-		var y1 = panel_pos.y + panel_size.y + offset1
-		var y2 = panel_pos.y + panel_size.y + offset2
-
-		var intensity = 0.7 + sin(status_anim_time * 2.5 + progress * TAU) * 0.3
-		var color = Color(0.6, 0.8, 1.0, intensity)  # Light blue
+		var intensity = 0.6 + sin(status_anim_time * 3.0 + progress * TAU) * 0.4
+		var color = Color(0.6, 0.8, 1.0, intensity)
 
 		status_effect_overlay.draw_line(Vector2(x1, y1), Vector2(x2, y2), color, line_thickness)
 
 	# Left edge
-	for i in range(spike_count):
-		var progress = float(i) / spike_count
-		var next_progress = float(i + 1) / spike_count
+	for i in range(wave_segments):
+		var progress = float(i) / wave_segments
+		var next_progress = float(i + 1) / wave_segments
 
 		var y1 = panel_pos.y + panel_size.y * progress
 		var y2 = panel_pos.y + panel_size.y * next_progress
+		var x1 = panel_pos.x + sin((status_anim_time * 2.0) + (progress * TAU * 2)) * 6.0
+		var x2 = panel_pos.x + sin((status_anim_time * 2.0) + (next_progress * TAU * 2)) * 6.0
 
-		var offset1 = spike_size if (i % 2 == 0) else -spike_size
-		var offset2 = -spike_size if (i % 2 == 0) else spike_size
-		offset1 += sin(status_anim_time * 3.0 + i) * 2.0
-		offset2 += sin(status_anim_time * 3.0 + i + 0.5) * 2.0
-
-		var x1 = panel_pos.x + offset1
-		var x2 = panel_pos.x + offset2
-
-		var intensity = 0.7 + sin(status_anim_time * 2.5 + progress * TAU) * 0.3
-		var color = Color(0.6, 0.8, 1.0, intensity)  # Light blue
+		var intensity = 0.6 + sin(status_anim_time * 3.0 + progress * TAU) * 0.4
+		var color = Color(0.6, 0.8, 1.0, intensity)
 
 		status_effect_overlay.draw_line(Vector2(x1, y1), Vector2(x2, y2), color, line_thickness)
 
 	# Right edge
-	for i in range(spike_count):
-		var progress = float(i) / spike_count
-		var next_progress = float(i + 1) / spike_count
+	for i in range(wave_segments):
+		var progress = float(i) / wave_segments
+		var next_progress = float(i + 1) / wave_segments
 
 		var y1 = panel_pos.y + panel_size.y * progress
 		var y2 = panel_pos.y + panel_size.y * next_progress
+		var x1 = panel_pos.x + panel_size.x + sin((status_anim_time * 2.0) + (progress * TAU * 2) + PI) * 6.0
+		var x2 = panel_pos.x + panel_size.x + sin((status_anim_time * 2.0) + (next_progress * TAU * 2) + PI) * 6.0
 
-		var offset1 = spike_size if (i % 2 == 0) else -spike_size
-		var offset2 = -spike_size if (i % 2 == 0) else spike_size
-		offset1 += sin(status_anim_time * 3.0 + i) * 2.0
-		offset2 += sin(status_anim_time * 3.0 + i + 0.5) * 2.0
-
-		var x1 = panel_pos.x + panel_size.x + offset1
-		var x2 = panel_pos.x + panel_size.x + offset2
-
-		var intensity = 0.7 + sin(status_anim_time * 2.5 + progress * TAU) * 0.3
-		var color = Color(0.6, 0.8, 1.0, intensity)  # Light blue
+		var intensity = 0.6 + sin(status_anim_time * 3.0 + progress * TAU) * 0.4
+		var color = Color(0.6, 0.8, 1.0, intensity)
 
 		status_effect_overlay.draw_line(Vector2(x1, y1), Vector2(x2, y2), color, line_thickness)
 
