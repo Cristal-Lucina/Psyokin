@@ -21,6 +21,7 @@ var rotation_progress: float = 0.0
 var last_input_angle: float = 0.0
 
 ## Visual elements
+var title_label: Label
 var phase_label: Label
 var enemy_icon: ColorRect
 var bind_result_label: Label
@@ -36,7 +37,7 @@ func _setup_minigame() -> void:
 	_calculate_break_rating()
 
 	# Title
-	var title_label = Label.new()
+	title_label = Label.new()
 	title_label.text = "CAPTURE!"
 	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title_label.add_theme_font_size_override("font_size", 32)
@@ -221,9 +222,11 @@ func _process(delta: float) -> void:
 
 func _finish_capture_success() -> void:
 	print("[CaptureMinigame] Capture successful!")
-	instruction_label.text = "CAPTURED!"
+	title_label.text = "GREAT!"
+	phase_label.text = "Success!"
+	instruction_label.text = "Enemy captured successfully!"
 
-	await get_tree().create_timer(0.5).timeout
+	await get_tree().create_timer(1.5).timeout
 
 	var result = {
 		"success": true,
@@ -239,9 +242,11 @@ func _finish_capture_success() -> void:
 
 func _finish_capture_failed() -> void:
 	print("[CaptureMinigame] Capture failed!")
-	instruction_label.text = "Capture failed!"
+	title_label.text = "OK"
+	phase_label.text = "Failed"
+	instruction_label.text = "Enemy broke free!"
 
-	await get_tree().create_timer(0.5).timeout
+	await get_tree().create_timer(1.5).timeout
 
 	var result = {
 		"success": false,

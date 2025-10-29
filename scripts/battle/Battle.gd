@@ -1223,8 +1223,40 @@ func _execute_capture(target: Dictionary) -> void:
 	log_message("%s uses %s on %s!" % [current_combatant.display_name, bind_name, target.display_name])
 	log_message("  Capture chance: %.1f%%" % capture_chance)
 
-	# Attempt capture
-	var success = combat_resolver.attempt_capture(target, capture_chance)
+	# ═══════ CAPTURE MINIGAME ═══════
+	# Map bind item to bind type
+	var bind_type = "basic"
+	match bind_id:
+		"BIND_001": bind_type = "basic"
+		"BIND_002": bind_type = "standard"
+		"BIND_003": bind_type = "advanced"
+		"BIND_004": bind_type = "advanced"  # Superior uses advanced mechanics
+
+	# Build enemy data for minigame
+	var enemy_data = {
+		"hp": target.hp,
+		"hp_max": target.hp_max,
+		"level": target.get("level", 1),
+		"TPO": target.stats.get("TPO", 1)
+	}
+
+	# Build party member data for minigame
+	var party_member_data = {
+		"FOC": current_combatant.stats.get("FOC", 1)
+	}
+
+	# Get status effects
+	var status_effects = []
+	var ailment = str(current_combatant.get("ailment", ""))
+	if ailment != "":
+		status_effects.append(ailment)
+
+	# Launch capture minigame
+	log_message("  → Starting capture minigame...")
+	var minigame_result = await minigame_mgr.launch_capture_minigame([bind_type], enemy_data, party_member_data, status_effects)
+
+	# Get success from minigame
+	var success = minigame_result.get("success", false)
 
 	# Consume the bind item
 	var inventory = get_node("/root/aInventorySystem")
