@@ -18,6 +18,7 @@ var player_pos: Vector2 = Vector2.ZERO
 var circle_angle: float = 0.0
 var gaps: Array = []  # Array of {start_angle, end_angle}
 var arena_center: Vector2 = Vector2(100, 100)  # Center of arena
+var is_caught: bool = false  # Flag to freeze movement when caught
 
 ## Visual elements
 var arena: Control  # Custom control for drawing circles
@@ -138,24 +139,25 @@ func _draw_arena() -> void:
 	arena.draw_circle(player_screen_pos, 5.0, Color(0.2, 1.0, 0.2, 1.0))
 
 func _process(delta: float) -> void:
-	# Handle player movement
-	var move_dir = Vector2.ZERO
-	if Input.is_key_pressed(KEY_W): move_dir.y -= 1
-	if Input.is_key_pressed(KEY_S): move_dir.y += 1
-	if Input.is_key_pressed(KEY_A): move_dir.x -= 1
-	if Input.is_key_pressed(KEY_D): move_dir.x += 1
+	# Handle player movement (only if not caught)
+	if not is_caught:
+		var move_dir = Vector2.ZERO
+		if Input.is_key_pressed(KEY_W): move_dir.y -= 1
+		if Input.is_key_pressed(KEY_S): move_dir.y += 1
+		if Input.is_key_pressed(KEY_A): move_dir.x -= 1
+		if Input.is_key_pressed(KEY_D): move_dir.x += 1
 
-	if move_dir.length() > 0:
-		move_dir = move_dir.normalized()
-		player_pos += move_dir * 75.0 * delta  # Reduced speed for smaller arena
+		if move_dir.length() > 0:
+			move_dir = move_dir.normalized()
+			player_pos += move_dir * 75.0 * delta  # Reduced speed for smaller arena
 
-		# Focus magnet effect (pulls slightly toward nearest gap)
-		if focus > 0:
-			var nearest_gap = _find_nearest_gap()
-			if nearest_gap:
-				var gap_angle = (nearest_gap.start_angle + nearest_gap.end_angle) / 2.0
-				var gap_dir = Vector2(cos(gap_angle + circle_angle), sin(gap_angle + circle_angle))
-				player_pos += gap_dir * (focus * 2.5) * delta  # Reduced magnet effect
+			# Focus magnet effect (pulls slightly toward nearest gap)
+			if focus > 0:
+				var nearest_gap = _find_nearest_gap()
+				if nearest_gap:
+					var gap_angle = (nearest_gap.start_angle + nearest_gap.end_angle) / 2.0
+					var gap_dir = Vector2(cos(gap_angle + circle_angle), sin(gap_angle + circle_angle))
+					player_pos += gap_dir * (focus * 2.5) * delta  # Reduced magnet effect
 
 	# Close circle
 	circle_radius -= circle_close_speed * delta
@@ -166,22 +168,23 @@ func _process(delta: float) -> void:
 	# Redraw arena
 	arena.queue_redraw()
 
-	# Check win/lose conditions
-	var distance_from_center = player_pos.length()
+	# Check win/lose conditions (only if not already caught)
+	if not is_caught:
+		var distance_from_center = player_pos.length()
 
-	if distance_from_center > max_radius:
-		# Player escaped outer boundary!
-		_check_escape()
-	elif distance_from_center > circle_radius - 5.0:  # 5 pixel buffer for player radius
-		# Player is touching or outside the closing circle
-		# Check if they're in a gap
-		if not _is_in_gap(player_pos):
-			# Hit the circle!
-			_finish_failed()
+		if distance_from_center > max_radius:
+			# Player escaped outer boundary!
+			_check_escape()
+		elif distance_from_center > circle_radius - 5.0:  # 5 pixel buffer for player radius
+			# Player is touching or outside the closing circle
+			# Check if they're in a gap
+			if not _is_in_gap(player_pos):
+				# Hit the circle! Freeze and then fail
+				_on_caught()
 
-	if circle_radius <= 5:
-		# Circle fully closed - caught!
-		_finish_failed()
+		if circle_radius <= 5:
+			# Circle fully closed - caught!
+			_on_caught()
 
 func _find_nearest_gap() -> Dictionary:
 	"""Find the nearest gap to player's current angle"""
@@ -216,7 +219,20 @@ func _check_escape() -> void:
 	if _is_in_gap(player_pos):
 		_finish_success()
 	else:
-		_finish_failed()
+		_on_caught()
+
+func _on_caught() -> void:
+	"""Called when player is caught by the circle"""
+	if is_caught:
+		return  # Already caught, don't trigger again
+
+	is_caught = true
+	print("[RunMinigame] Player caught! Freezing movement...")
+	instruction_label.text = "Caught!"
+
+	# Wait a moment while frozen, then finish
+	await get_tree().create_timer(0.8).timeout
+	_finish_failed()
 
 func _finish_success() -> void:
 	print("[RunMinigame] Escaped!")
