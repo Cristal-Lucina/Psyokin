@@ -10,13 +10,14 @@ var tempo_diff: int = 0  # Party tempo - enemy tempo (affects speed)
 var focus: int = 1  # Focus stat (adds magnet effect)
 
 ## Internal state
-var circle_radius: float = 100.0  # Current circle radius
-var max_radius: float = 100.0  # Maximum radius (outer boundary)
-var circle_close_speed: float = 20.0  # pixels per second (reduced from 25)
-var circle_rotation_speed: float = 0.5  # radians per second (reduced from 1.0)
+var circle_radius: float = 100.0  # Current catch circle radius (closes in)
+var max_radius: float = 100.0  # Maximum radius (outer escape boundary)
+var circle_close_speed: float = 20.0  # pixels per second
+var circle_rotation_speed: float = 0.3  # radians per second (slow rotation)
 var player_pos: Vector2 = Vector2.ZERO
-var circle_angle: float = 0.0
-var gaps: Array = []  # Array of {start_angle, end_angle}
+var circle_angle: float = 0.0  # Current rotation of catch circle
+var escape_gap_start: float = 0.0  # Start angle of the ONE continuous gap
+var escape_gap_end: float = 0.0  # End angle of the ONE continuous gap
 var arena_center: Vector2 = Vector2(100, 100)  # Center of arena
 var is_caught: bool = false  # Flag to freeze movement when caught
 var minigame_complete: bool = false  # Flag to stop all processing
@@ -29,29 +30,24 @@ func _setup_minigame() -> void:
 	base_duration = 8.0
 	current_duration = base_duration
 
-	# Calculate circle properties based on run chance
-	var gap_count = _calculate_gap_count(run_chance)
-	var has_spin = _should_spin(run_chance)
-
-	# Adjust speed based on tempo difference (much slower base speed)
+	# Adjust speed based on tempo difference
 	circle_close_speed = 20.0 * (1.0 - (tempo_diff * 0.02))
 	if tempo_diff < 0:
 		circle_close_speed *= 1.15  # Enemy faster = circle closes slightly faster
 
-	if has_spin:
-		circle_rotation_speed = 0.5 * (1.0 - (tempo_diff * 0.02))
-	else:
-		circle_rotation_speed = 0.0
+	# Always rotate slowly
+	circle_rotation_speed = 0.3 * (1.0 - (tempo_diff * 0.02))
 
-	print("[RunMinigame] Gaps: %d, Spin: %s, Speed: %.1f" % [gap_count, has_spin, circle_close_speed])
+	# Generate ONE continuous gap based on escape percentage
+	_generate_escape_gap()
 
-	# Generate random gaps
-	_generate_gaps(gap_count)
+	print("[RunMinigame] Escape chance: %.1f%%, Gap size: %.1f°, Speed: %.1f px/s, Rotation: %.2f rad/s" %
+		[run_chance, rad_to_deg(escape_gap_end - escape_gap_start), circle_close_speed, circle_rotation_speed])
 
 	# Title
 	var title_label = Label.new()
 	title_label.set_name("TitleLabel")
-	title_label.text = "RUN!"
+	title_label.text = "RUN! (%.0f%% Escape Chance)" % run_chance
 	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title_label.add_theme_font_size_override("font_size", 32)
 	content_container.add_child(title_label)
@@ -66,36 +62,25 @@ func _setup_minigame() -> void:
 
 	# Instructions
 	instruction_label = Label.new()
-	instruction_label.text = "Use WASD to escape through the gaps!"
+	instruction_label.text = "Use WASD to escape through the GREEN gap!"
 	instruction_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	instruction_label.add_theme_font_size_override("font_size", 16)
 	content_container.add_child(instruction_label)
 
-func _calculate_gap_count(chance: float) -> int:
-	"""Calculate number of gaps based on run chance"""
-	if chance <= 10: return 2  # Was 1, now minimum 2
-	elif chance <= 30: return 3  # Was 2
-	elif chance <= 50: return 4  # Unchanged
-	elif chance <= 70: return 6  # Was 8
-	else: return 8  # Was 10
+func _generate_escape_gap() -> void:
+	"""Generate ONE continuous escape gap based on run_chance percentage"""
+	# Gap size = run_chance percentage of the full circle
+	# E.g., 10% escape = 10% of circle is gap (0.1 * TAU radians)
+	var gap_size_radians = (run_chance / 100.0) * TAU
 
-func _should_spin(chance: float) -> bool:
-	"""Determine if circle should spin"""
-	return chance < 50
+	# Random starting position for the gap (0 to TAU)
+	var random_start = randf() * TAU
 
-func _generate_gaps(count: int) -> void:
-	"""Generate random gap positions"""
-	gaps.clear()
-	var gap_size = TAU / (count * 1.5)  # Larger gaps (was count * 2)
+	escape_gap_start = random_start
+	escape_gap_end = random_start + gap_size_radians
 
-	for i in range(count):
-		var base_angle = (TAU / count) * i + randf_range(-0.3, 0.3)
-		gaps.append({
-			"start_angle": base_angle - gap_size / 2,
-			"end_angle": base_angle + gap_size / 2
-		})
-
-	print("[RunMinigame] Generated %d gaps with size %.2f radians" % [gaps.size(), gap_size])
+	print("[RunMinigame] Gap: %.1f° to %.1f° (%.1f%% of circle)" %
+		[rad_to_deg(escape_gap_start), rad_to_deg(escape_gap_end), run_chance])
 
 func _start_minigame() -> void:
 	print("[RunMinigame] Starting escape")
@@ -104,47 +89,52 @@ func _start_minigame() -> void:
 
 func _draw_arena() -> void:
 	"""Draw the circles and player"""
-	# Draw outer boundary circle (light gray)
+	# Draw outer boundary circle background (light gray)
 	arena.draw_circle(arena_center, max_radius, Color(0.3, 0.3, 0.3, 0.3))
 
-	# First, draw gap indicators (green arcs at max radius)
-	for gap in gaps:
-		var gap_start_angle = gap.start_angle + circle_angle
-		var gap_end_angle = gap.end_angle + circle_angle
-		var arc_segments = 20
-		for i in range(arc_segments):
-			var t1 = float(i) / arc_segments
-			var t2 = float(i + 1) / arc_segments
-			var a1 = lerp(gap_start_angle, gap_end_angle, t1)
-			var a2 = lerp(gap_start_angle, gap_end_angle, t2)
-			var p1 = arena_center + Vector2(cos(a1), sin(a1)) * max_radius
-			var p2 = arena_center + Vector2(cos(a2), sin(a2)) * max_radius
-			arena.draw_line(p1, p2, Color(0.2, 1.0, 0.2, 0.6), 4.0)
-
-	# Draw closing circle with gaps (red)
-	# We'll draw the circle in segments, skipping the gaps
+	# Draw the OUTER ESCAPE CIRCLE boundary
+	# The BLOCKED portions (red) - this is (100 - run_chance)% of the circle
+	# The OPEN portions (green) - this is run_chance% of the circle
 	var segment_count = 360
+
+	# Draw the blocked portion (red outer ring)
+	for i in range(segment_count):
+		var angle = (float(i) / segment_count) * TAU
+		var next_angle = (float(i + 1) / segment_count) * TAU
+
+		# Check if this segment is in the escape gap
+		var in_gap = _angle_in_gap(angle)
+
+		var p1 = arena_center + Vector2(cos(angle), sin(angle)) * max_radius
+		var p2 = arena_center + Vector2(cos(next_angle), sin(next_angle)) * max_radius
+
+		if in_gap:
+			# Draw green for escapable area
+			arena.draw_line(p1, p2, Color(0.2, 1.0, 0.2, 0.8), 6.0)
+		else:
+			# Draw red for blocked area
+			arena.draw_line(p1, p2, Color(0.8, 0.2, 0.2, 0.8), 6.0)
+
+	# Draw the CATCH CIRCLE (red, rotating, closing in)
+	# This circle has the same gap cut out of it
 	var prev_point = Vector2.ZERO
 	var is_first = true
 
 	for i in range(segment_count + 1):
 		var angle = (float(i) / segment_count) * TAU + circle_angle
-		var normalized_angle = fmod(angle, TAU)
 
-		# Check if this angle is in a gap
-		var in_gap = false
-		for gap in gaps:
-			var gap_start = fmod(gap.start_angle, TAU)
-			var gap_end = fmod(gap.end_angle, TAU)
-			if normalized_angle >= gap_start and normalized_angle <= gap_end:
-				in_gap = true
-				break
+		# Check if this angle (relative to rotation) is in the escape gap
+		var relative_angle = fmod(angle, TAU)
+		if relative_angle < 0:
+			relative_angle += TAU
+
+		var in_gap = _angle_in_gap(relative_angle)
 
 		var point = arena_center + Vector2(cos(angle), sin(angle)) * circle_radius
 
 		if not in_gap and not is_first:
-			# Draw line segment (makes a circle)
-			arena.draw_line(prev_point, point, Color(0.8, 0.2, 0.2, 0.8), 3.0)
+			# Draw the catch circle (red, solid)
+			arena.draw_line(prev_point, point, Color(1.0, 0.3, 0.3, 1.0), 4.0)
 
 		prev_point = point
 		is_first = in_gap
@@ -168,15 +158,7 @@ func _process(delta: float) -> void:
 
 		if move_dir.length() > 0:
 			move_dir = move_dir.normalized()
-			player_pos += move_dir * 100.0 * delta  # Increased speed for better escape chance
-
-			# Focus magnet effect (pulls slightly toward nearest gap)
-			if focus > 0:
-				var nearest_gap = _find_nearest_gap()
-				if nearest_gap:
-					var gap_angle = (nearest_gap.start_angle + nearest_gap.end_angle) / 2.0
-					var gap_dir = Vector2(cos(gap_angle + circle_angle), sin(gap_angle + circle_angle))
-					player_pos += gap_dir * (focus * 1.5) * delta  # Subtle magnet effect
+			player_pos += move_dir * 100.0 * delta
 
 	# Close circle (even when caught, for visual feedback)
 	circle_radius -= circle_close_speed * delta
@@ -191,72 +173,65 @@ func _process(delta: float) -> void:
 	if not is_caught and not minigame_complete:
 		var distance_from_center = player_pos.length()
 
-		if distance_from_center > max_radius - 3.0:  # Escape when near edge (3px buffer)
-			# Player escaped outer boundary!
+		# Check if player reached the outer escape boundary
+		if distance_from_center > max_radius - 3.0:
+			# Player at escape boundary - check if they're in the escape gap
 			_check_escape()
-		elif distance_from_center > circle_radius - 3.0:  # Reduced collision buffer (was 5)
-			# Player is touching or outside the closing circle
-			# Check if they're in a gap
-			if not _is_in_gap(player_pos):
-				# Hit the circle! Freeze and then fail
+		# Check if player hit the catch circle
+		elif distance_from_center > circle_radius - 3.0:
+			# Player is touching the catch circle
+			# Check if they're in the gap (accounting for rotation)
+			var player_angle = atan2(player_pos.y, player_pos.x)
+			# Remove rotation from player angle to check against static gap
+			var relative_angle = player_angle - circle_angle
+			if not _angle_in_gap(relative_angle):
+				# Hit the catch circle! Caught
 				_on_caught()
 
-		if circle_radius <= 3:  # Give more time (was 5)
+		# Check if circle closed completely
+		if circle_radius <= 3:
 			# Circle fully closed - caught!
 			_on_caught()
 
-func _find_nearest_gap() -> Dictionary:
-	"""Find the nearest gap to player's current angle"""
-	if gaps.is_empty():
-		return {}
+func _angle_in_gap(angle: float) -> bool:
+	"""Check if an angle is within the escape gap (doesn't account for rotation)"""
+	# Normalize angle to 0-TAU
+	var normalized_angle = fmod(angle, TAU)
+	if normalized_angle < 0:
+		normalized_angle += TAU
 
-	var player_angle = atan2(player_pos.y, player_pos.x)
-	var nearest_gap = gaps[0]
-	var nearest_dist = 999.0
+	var gap_start = fmod(escape_gap_start, TAU)
+	var gap_end = fmod(escape_gap_end, TAU)
 
-	for gap in gaps:
-		var gap_center = (gap.start_angle + gap.end_angle) / 2.0 + circle_angle
-		var dist = abs(angle_difference(player_angle, gap_center))
-		if dist < nearest_dist:
-			nearest_dist = dist
-			nearest_gap = gap
+	if gap_start < 0:
+		gap_start += TAU
+	if gap_end < 0:
+		gap_end += TAU
 
-	return nearest_gap
-
-func _is_in_gap(pos: Vector2) -> bool:
-	"""Check if position is within a gap"""
-	var angle = atan2(pos.y, pos.x) - circle_angle
-	# Normalize angle to 0-TAU range
-	angle = fmod(angle, TAU)
-	if angle < 0:
-		angle += TAU
-
-	for gap in gaps:
-		var gap_start = fmod(gap.start_angle, TAU)
-		var gap_end = fmod(gap.end_angle, TAU)
-
-		if gap_start < 0:
-			gap_start += TAU
-		if gap_end < 0:
-			gap_end += TAU
-
-		# Handle wrapping around 0
-		if gap_start <= gap_end:
-			if angle >= gap_start and angle <= gap_end:
-				return true
-		else:
-			# Gap wraps around 0
-			if angle >= gap_start or angle <= gap_end:
-				return true
+	# Handle gap wrapping around 0/TAU
+	if gap_end > TAU:
+		# Gap wraps around: e.g., start=5.5, end=6.5 where TAU=6.28
+		var wrapped_end = gap_end - TAU
+		if normalized_angle >= gap_start or normalized_angle <= wrapped_end:
+			return true
+	else:
+		# Normal gap
+		if normalized_angle >= gap_start and normalized_angle <= gap_end:
+			return true
 
 	return false
+
+func _is_player_in_escape_gap() -> bool:
+	"""Check if player position is within the escape gap"""
+	var player_angle = atan2(player_pos.y, player_pos.x)
+	return _angle_in_gap(player_angle)
 
 func _check_escape() -> void:
 	"""Check if player successfully escaped"""
 	if minigame_complete:
 		return  # Already complete, don't check again
 
-	if _is_in_gap(player_pos):
+	if _is_player_in_escape_gap():
 		_finish_success()
 	else:
 		_on_caught()
