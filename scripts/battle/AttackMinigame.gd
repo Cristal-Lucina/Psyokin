@@ -269,7 +269,7 @@ func _start_charging() -> void:
 	print("[AttackMinigame] Started charging (weak spot visible: %s, in red dot: %s)" % [weak_spot_is_visible, weak_spot_in_red_dot])
 
 	if weak_spot_in_red_dot:
-		charge_label.text = "In red dot! GOOD → GREAT → CRIT (Stop before 100%!)"
+		charge_label.text = "In red dot! GREAT → CRIT at 90% (Stop before 100%!)"
 	elif weak_spot_is_visible:
 		charge_label.text = "In view only! Max: GOOD (Stop before 100%!)"
 	else:
@@ -349,15 +349,13 @@ func _get_charge_zone(progress: float, is_weak_spot_visible: bool) -> String:
 			return "red"  # Overcharged (100%+)
 	else:
 		# Weak spot in red dot - green and blue available
-		# 1-49% = yellow, 50-89% = green, 90-99% = blue, 100%+ = red
+		# 1-89% = green, 90-99% = blue, 100%+ = red
 		if progress <= 0.0:
 			return "red"
-		elif progress < 0.50:
-			return "yellow"
 		elif progress < 0.90:
-			return "green"
+			return "green"  # Anything below 90% is green when in red dot
 		elif progress < 1.0:
-			return "blue"
+			return "blue"  # 90-99% is blue (crit)
 		else:
 			return "red"  # Overcharged (100%+)
 
