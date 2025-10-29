@@ -79,8 +79,14 @@ func _generate_escape_gap() -> void:
 	escape_gap_start = random_start
 	escape_gap_end = random_start + gap_size_radians
 
-	print("[RunMinigame] Gap: %.1f° to %.1f° (%.1f%% of circle)" %
-		[rad_to_deg(escape_gap_start), rad_to_deg(escape_gap_end), run_chance])
+	var wraps = escape_gap_end > TAU
+	print("[RunMinigame] Escape gap: %.1f° to %.1f° (%.1f%% of circle, wraps=%s)" %
+		[rad_to_deg(escape_gap_start), rad_to_deg(escape_gap_end), run_chance, wraps])
+
+	if wraps:
+		var wrapped_end = escape_gap_end - TAU
+		print("[RunMinigame]   Wrapped: [%.1f° to 360°] + [0° to %.1f°]" %
+			[rad_to_deg(escape_gap_start), rad_to_deg(wrapped_end)])
 
 func _start_minigame() -> void:
 	print("[RunMinigame] Starting escape")
@@ -92,12 +98,10 @@ func _draw_arena() -> void:
 	# Draw outer boundary circle background (light gray)
 	arena.draw_circle(arena_center, max_radius, Color(0.3, 0.3, 0.3, 0.3))
 
-	# Draw the OUTER ESCAPE CIRCLE boundary
-	# The BLOCKED portions (red) - this is (100 - run_chance)% of the circle
-	# The OPEN portions (green) - this is run_chance% of the circle
+	# Draw the OUTER ESCAPE CIRCLE boundary (static, doesn't rotate)
+	# Green = escapable (run_chance %), Red = blocked (100-run_chance %)
 	var segment_count = 360
 
-	# Draw the blocked portion (red outer ring)
 	for i in range(segment_count):
 		var angle = (float(i) / segment_count) * TAU
 		var next_angle = (float(i + 1) / segment_count) * TAU
@@ -109,39 +113,34 @@ func _draw_arena() -> void:
 		var p2 = arena_center + Vector2(cos(next_angle), sin(next_angle)) * max_radius
 
 		if in_gap:
-			# Draw green for escapable area
-			arena.draw_line(p1, p2, Color(0.2, 1.0, 0.2, 0.8), 6.0)
+			# GREEN for escapable area
+			arena.draw_line(p1, p2, Color(0.2, 1.0, 0.2, 1.0), 6.0)
 		else:
-			# Draw red for blocked area
-			arena.draw_line(p1, p2, Color(0.8, 0.2, 0.2, 0.8), 6.0)
+			# RED for blocked area
+			arena.draw_line(p1, p2, Color(0.8, 0.2, 0.2, 1.0), 6.0)
 
 	# Draw the CATCH CIRCLE (red, rotating, closing in)
-	# This circle has the same gap cut out of it
-	var prev_point = Vector2.ZERO
-	var is_first = true
+	# This has the same gap pattern but rotates
+	for i in range(segment_count):
+		var local_angle = (float(i) / segment_count) * TAU
+		var next_local_angle = (float(i + 1) / segment_count) * TAU
 
-	for i in range(segment_count + 1):
-		var angle = (float(i) / segment_count) * TAU + circle_angle
+		# World angle includes rotation
+		var world_angle = local_angle + circle_angle
 
-		# Check if this angle (relative to rotation) is in the escape gap
-		var relative_angle = fmod(angle, TAU)
-		if relative_angle < 0:
-			relative_angle += TAU
+		# Check if this world position overlaps with the static gap
+		var in_gap = _angle_in_gap(world_angle)
 
-		var in_gap = _angle_in_gap(relative_angle)
+		# Only draw if NOT in gap
+		if not in_gap:
+			var p1 = arena_center + Vector2(cos(world_angle), sin(world_angle)) * circle_radius
+			var p2 = arena_center + Vector2(cos(world_angle + (TAU / segment_count)), sin(world_angle + (TAU / segment_count))) * circle_radius
+			arena.draw_line(p1, p2, Color(1.0, 0.3, 0.3, 1.0), 4.0)
 
-		var point = arena_center + Vector2(cos(angle), sin(angle)) * circle_radius
-
-		if not in_gap and not is_first:
-			# Draw the catch circle (red, solid)
-			arena.draw_line(prev_point, point, Color(1.0, 0.3, 0.3, 1.0), 4.0)
-
-		prev_point = point
-		is_first = in_gap
-
-	# Draw player dot (green)
+	# Draw player dot (green with white outline)
 	var player_screen_pos = arena_center + player_pos
-	arena.draw_circle(player_screen_pos, 5.0, Color(0.2, 1.0, 0.2, 1.0))
+	arena.draw_circle(player_screen_pos, 6.0, Color(1.0, 1.0, 1.0, 1.0))
+	arena.draw_circle(player_screen_pos, 4.0, Color(0.2, 1.0, 0.2, 1.0))
 
 func _process(delta: float) -> void:
 	# Stop all processing if minigame is complete
@@ -194,29 +193,23 @@ func _process(delta: float) -> void:
 			_on_caught()
 
 func _angle_in_gap(angle: float) -> bool:
-	"""Check if an angle is within the escape gap (doesn't account for rotation)"""
+	"""Check if an angle is within the escape gap"""
 	# Normalize angle to 0-TAU
 	var normalized_angle = fmod(angle, TAU)
 	if normalized_angle < 0:
 		normalized_angle += TAU
 
-	var gap_start = fmod(escape_gap_start, TAU)
-	var gap_end = fmod(escape_gap_end, TAU)
-
-	if gap_start < 0:
-		gap_start += TAU
-	if gap_end < 0:
-		gap_end += TAU
-
-	# Handle gap wrapping around 0/TAU
-	if gap_end > TAU:
-		# Gap wraps around: e.g., start=5.5, end=6.5 where TAU=6.28
-		var wrapped_end = gap_end - TAU
-		if normalized_angle >= gap_start or normalized_angle <= wrapped_end:
+	# Check if gap wraps around TAU boundary
+	# If escape_gap_end > TAU, the gap wraps
+	if escape_gap_end > TAU:
+		# Gap wraps around: e.g., start=5.5, end=7.0 (wraps at TAU=6.28)
+		# This means angles from [5.5 to TAU] OR [0 to (7.0-TAU)] are in the gap
+		var wrapped_end = escape_gap_end - TAU
+		if normalized_angle >= escape_gap_start or normalized_angle <= wrapped_end:
 			return true
 	else:
-		# Normal gap
-		if normalized_angle >= gap_start and normalized_angle <= gap_end:
+		# Normal gap that doesn't wrap
+		if normalized_angle >= escape_gap_start and normalized_angle <= escape_gap_end:
 			return true
 
 	return false
