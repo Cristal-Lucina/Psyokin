@@ -131,13 +131,12 @@ func _draw_arena() -> void:
 			# RED for blocked area
 			arena.draw_line(p1, p2, Color(0.8, 0.2, 0.2, 1.0), 6.0)
 
-	# Draw FIRST CATCH CIRCLE (red, rotating, closing in)
-	# The gap rotates WITH the circle
+	# Draw CATCH CIRCLE (red, rotating, closing in)
+	# The gap is defined in LOCAL circle coordinates and rotates WITH the circle
 	for i in range(segment_count):
 		var local_angle = (float(i) / segment_count) * TAU
 
-		# Check if this LOCAL position (on the circle) has a gap
-		# The gap is fixed relative to the circle, so it rotates with it
+		# Check if this LOCAL angle (relative to circle) has a gap
 		var in_gap = _angle_in_gap(local_angle)
 
 		# Only draw if NOT in gap
@@ -145,7 +144,8 @@ func _draw_arena() -> void:
 			# World angle includes rotation for drawing position
 			var world_angle = local_angle + circle_angle
 			var p1 = arena_center + Vector2(cos(world_angle), sin(world_angle)) * circle_radius
-			var p2 = arena_center + Vector2(cos(world_angle + (TAU / segment_count)), sin(world_angle + (TAU / segment_count))) * circle_radius
+			var next_world_angle = world_angle + (TAU / segment_count)
+			var p2 = arena_center + Vector2(cos(next_world_angle), sin(next_world_angle)) * circle_radius
 			arena.draw_line(p1, p2, Color(1.0, 0.3, 0.3, 1.0), 4.0)
 
 	# Draw player dot (green with white outline)
@@ -191,12 +191,21 @@ func _process(delta: float) -> void:
 			# Check if player hit the catch circle (rotating)
 			if distance_from_center > circle_radius - 3.0:
 				# Player is touching the catch circle
-				# Check if they're in the gap (accounting for rotation)
+				# Check if they're in the gap (using local angle relative to circle rotation)
 				var player_angle = atan2(player_pos.y, player_pos.x)
-				# Remove rotation from player angle to check against static gap
-				var relative_angle = player_angle - circle_angle
-				if not _angle_in_gap(relative_angle):
+				var local_angle = player_angle - circle_angle
+				var in_gap = _angle_in_gap(local_angle)
+
+				print("[RunMinigame] Catch circle collision check:")
+				print("  Player world angle: %.1f°" % rad_to_deg(player_angle))
+				print("  Circle rotation: %.1f°" % rad_to_deg(circle_angle))
+				print("  Player local angle: %.1f°" % rad_to_deg(local_angle))
+				print("  Gap: %.1f° to %.1f°" % [rad_to_deg(escape_gap_start), rad_to_deg(escape_gap_end)])
+				print("  In gap: %s" % in_gap)
+
+				if not in_gap:
 					# Hit the catch circle! Caught
+					print("  → CAUGHT!")
 					_on_caught()
 
 		# Check if circle closed completely
