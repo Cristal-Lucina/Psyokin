@@ -421,6 +421,11 @@ func _start_turn(combatant: Dictionary) -> void:
 		print("[BattleManager] %s was KO'd by ailment - skipping turn" % combatant.display_name)
 		# Refresh turn order to show KO
 		refresh_turn_order()
+
+		# Check if battle has ended due to ailment death
+		if await _check_battle_end():
+			return
+
 		# Skip to end turn
 		end_turn()
 		return

@@ -66,7 +66,7 @@ func _setup_minigame() -> void:
 	print("[AttackMinigame] View radius: %.1f (BRW: %d)" % [view_radius, brawn])
 
 	# Check for shake-inducing status effects
-	has_shake_status = status_effects.has("burned") or status_effects.has("poison")
+	has_shake_status = status_effects.has("burn") or status_effects.has("poison")
 	if has_shake_status:
 		print("[AttackMinigame] Shake status detected: %s" % str(status_effects))
 

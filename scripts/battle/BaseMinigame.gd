@@ -91,7 +91,7 @@ func _apply_status_effects() -> void:
 				# Visual effect handled by subclasses
 				_apply_frozen_border()
 
-			"burned":
+			"burn":
 				_apply_burned_border()
 				# Connect drawing for animated effect
 				status_effect_overlay.draw.connect(_draw_burned_effect)
@@ -131,7 +131,7 @@ func _apply_malaise_border() -> void:
 
 func _process(delta: float) -> void:
 	"""Update status effect animations"""
-	if status_effects.has("burned") or status_effects.has("poison"):
+	if status_effects.has("burn") or status_effects.has("poison"):
 		status_anim_time += delta
 		if status_effect_overlay:
 			status_effect_overlay.queue_redraw()

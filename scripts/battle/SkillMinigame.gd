@@ -64,7 +64,7 @@ func _setup_minigame() -> void:
 	print("[SkillMinigame] Charge time per level: %.2fs (Focus: %d)" % [charge_time_per_level, focus_stat])
 
 	# Check for halt-inducing status effects
-	has_halt_status = status_effects.has("burned") or status_effects.has("poison")
+	has_halt_status = status_effects.has("burn") or status_effects.has("poison")
 	if has_halt_status:
 		print("[SkillMinigame] Halt status detected: %s" % str(status_effects))
 		# Schedule first halt at a random time (0.5 to 1.5 seconds)
