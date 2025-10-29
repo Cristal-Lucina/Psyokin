@@ -3169,9 +3169,30 @@ func _execute_skill_single(target: Dictionary) -> void:
 	if not _check_freeze_action_allowed():
 		return
 
-	# ═══════ SKILL MINIGAME ═══════
-	# Get skill info for minigame
+	# Get skill info
 	var skill_id = String(skill_to_use.get("skill_id", ""))
+	var skill_name = String(skill_to_use.get("name", "Unknown"))
+	var mp_cost = int(skill_to_use.get("cost_mp", 0))
+	var element = String(skill_to_use.get("element", "none")).to_lower()
+	var power = int(skill_to_use.get("power", 30))
+	var acc = int(skill_to_use.get("acc", 90))
+	var crit_bonus = int(skill_to_use.get("crit_bonus_pct", 0))
+	var mnd_scaling = int(skill_to_use.get("scaling_mnd", 1))
+
+	# ═══════ HIT CHECK FIRST ═══════
+	log_message("%s uses %s!" % [current_combatant.display_name, skill_name])
+	var hit_check = combat_resolver.check_sigil_hit(current_combatant, target, {"skill_acc": acc})
+
+	if not hit_check.hit:
+		log_message("  → Missed! (%d%% chance, rolled %d)" % [int(hit_check.hit_chance), hit_check.roll])
+		# Still deduct MP even on miss
+		current_combatant.mp -= mp_cost
+		if current_combatant.mp < 0:
+			current_combatant.mp = 0
+		return
+
+	# ═══════ SKILL MINIGAME ═══════
+	# Get skill tier for minigame
 	var skill_tier = 1
 	if "_L" in skill_id:
 		var parts = skill_id.split("_L")
@@ -3185,7 +3206,7 @@ func _execute_skill_single(target: Dictionary) -> void:
 	if ailment != "":
 		status_effects.append(ailment)
 
-	log_message("%s prepares %s..." % [current_combatant.display_name, skill_to_use.get("name", "skill")])
+	log_message("  → %s prepares the skill..." % [current_combatant.display_name])
 	var minigame_result = await minigame_mgr.launch_skill_minigame(focus_stat, skill_sequence, skill_tier, status_effects)
 
 	# Apply minigame modifiers
@@ -3194,14 +3215,6 @@ func _execute_skill_single(target: Dictionary) -> void:
 	var tier_downgrade = minigame_result.get("tier_downgrade", 0)
 
 	print("[Battle] Skill minigame - Damage: %.2fx, MP: %.2fx, Downgrade: %d" % [damage_modifier, mp_modifier, tier_downgrade])
-
-	var skill_name = String(skill_to_use.get("name", "Unknown"))
-	var mp_cost = int(skill_to_use.get("cost_mp", 0))
-	var element = String(skill_to_use.get("element", "none")).to_lower()
-	var power = int(skill_to_use.get("power", 30))
-	var acc = int(skill_to_use.get("acc", 90))
-	var crit_bonus = int(skill_to_use.get("crit_bonus_pct", 0))
-	var mnd_scaling = int(skill_to_use.get("scaling_mnd", 1))
 
 	# Clear defending status when using skill
 	current_combatant.is_defending = false
@@ -3221,15 +3234,6 @@ func _execute_skill_single(target: Dictionary) -> void:
 	var sigil_inst_id = skill_to_use.get("_sigil_inst_id", "")
 	if sigil_inst_id != "":
 		battle_mgr.sigils_used_in_battle[sigil_inst_id] = true
-
-	log_message("%s uses %s!" % [current_combatant.display_name, skill_name])
-
-	# Check if hit
-	var hit_check = combat_resolver.check_sigil_hit(current_combatant, target, {"skill_acc": acc})
-
-	if not hit_check.hit:
-		log_message("  → Missed! (%d%% chance, rolled %d)" % [int(hit_check.hit_chance), hit_check.roll])
-		return
 
 	# ═══════ CHECK FOR REFLECT (MIRROR) ═══════
 	if target.has("buffs") and element != "none" and element != "":
