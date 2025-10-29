@@ -344,9 +344,14 @@ func _process_charging(delta: float) -> void:
 func _get_charge_zone(progress: float, is_weak_spot_visible: bool) -> String:
 	"""Get current charge zone"""
 	if not is_weak_spot_visible:
-		# Weak spot not visible - always red
-		print("[AttackMinigame] Weak spot NOT VISIBLE - returning red (progress: %.2f)" % progress)
-		return "red"
+		# Weak spot not visible - can't get bonuses, but only penalized if overcharged
+		# 0-99.9% = yellow (normal damage), 100%+ = red (penalty)
+		if progress >= 1.0:
+			print("[AttackMinigame] Weak spot NOT VISIBLE - overcharged, returning red")
+			return "red"
+		else:
+			print("[AttackMinigame] Weak spot NOT VISIBLE - normal charge, returning yellow (progress: %.2f)" % progress)
+			return "yellow"
 	elif not weak_spot_in_red_dot:
 		# Weak spot visible but not in red dot - ONLY yellow (no green/blue)
 		# 0-99.9% = yellow, 100%+ = red
