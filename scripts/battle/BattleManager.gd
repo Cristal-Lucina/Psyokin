@@ -412,8 +412,8 @@ func _start_turn(combatant: Dictionary) -> void:
 		return
 
 	# Check if combatant has "Revived" status (can't act this turn)
-	var current_ailment = str(combatant.get("ailment", ""))
-	if current_ailment == "Revived":
+	var current_ailment = str(combatant.get("ailment", "")).to_lower()
+	if current_ailment == "revived":
 		print("[BattleManager] %s is still recovering from revival - skipping turn" % combatant.display_name)
 		# Skip to end turn
 		end_turn()
@@ -565,7 +565,9 @@ func _process_round_start_effects() -> void:
 
 func _process_turn_start_ailments(combatant: Dictionary) -> void:
 	"""Process ailment effects at the start of a combatant's turn"""
-	var ailment = str(combatant.get("ailment", ""))
+	var ailment = str(combatant.get("ailment", "")).to_lower()  # Convert to lowercase for consistency
+
+	print("[BattleManager] Processing ailment for %s: '%s'" % [combatant.display_name, ailment])
 
 	if ailment == "" or ailment == "null":
 		return
@@ -704,6 +706,14 @@ func _process_turn_start_ailments(combatant: Dictionary) -> void:
 				combatant.display_name, cure_chance, roll
 			])
 			# Charm behavior (use heal/buff items on enemy) handled by Battle.gd
+
+	# ═══════ REVIVED - Automatically clears after 1 turn ═══════
+	elif ailment == "revived":
+		# Revived status prevents action for 1 turn, then automatically clears
+		combatant.ailment = ""
+		combatant.ailment_turn_count = 0
+		print("[BattleManager] %s has recovered from revival! (can act next turn)" % combatant.display_name)
+		refresh_turn_order()
 
 	# Small delay for readability
 	await get_tree().create_timer(0.3).timeout
