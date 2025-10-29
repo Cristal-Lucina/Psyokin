@@ -114,8 +114,8 @@ func _start_minigame() -> void:
 	circle2_start_angle = randf() * TAU
 
 	print("[RunMinigame] Circle 1 (red, rotating) starting rotation: %.1f°" % rad_to_deg(circle_angle))
-	print("[RunMinigame] Circle 2 (orange, static, flipped) starting rotation: %.1f°" % rad_to_deg(circle2_start_angle))
-	print("[RunMinigame] Note: Circle 2 has INVERTED gap pattern")
+	print("[RunMinigame] Circle 2 (orange, static) starting rotation: %.1f°" % rad_to_deg(circle2_start_angle))
+	print("[RunMinigame] Note: Both circles have same gap pattern, different rotations")
 
 func _draw_arena() -> void:
 	"""Draw the circles and player"""
@@ -160,17 +160,16 @@ func _draw_arena() -> void:
 			var p2 = arena_center + Vector2(cos(next_world_angle), sin(next_world_angle)) * circle_radius
 			arena.draw_line(p1, p2, Color(1.0, 0.3, 0.3, 1.0), 4.0)
 
-	# Draw SECOND CATCH CIRCLE (orange, static but offset, FLIPPED gap)
+	# Draw SECOND CATCH CIRCLE (orange, static but different rotation)
 	if circle2_active:
 		for i in range(segment_count):
 			var local_angle = (float(i) / segment_count) * TAU
 
-			# Check gap in LOCAL space, then FLIP it for second circle
+			# Check gap in LOCAL space - same pattern as first circle
 			var in_gap = _angle_in_gap(local_angle)
-			var in_flipped_gap = not in_gap  # Invert the gap pattern
 
-			# Only draw if NOT in the flipped gap (i.e., draw where first circle has gap)
-			if not in_flipped_gap:
+			# Only draw if NOT in gap (same as first circle)
+			if not in_gap:
 				# World angle includes static starting rotation offset
 				var world_angle = local_angle + circle2_start_angle
 				var p1 = arena_center + Vector2(cos(world_angle), sin(world_angle)) * circle2_radius
@@ -276,25 +275,24 @@ func _process(delta: float) -> void:
 					print("  → CAUGHT!")
 					_on_caught()
 
-			# Check if player hit the SECOND catch circle (static but offset, FLIPPED gap)
+			# Check if player hit the SECOND catch circle (static but different rotation)
 			var near_circle2 = circle2_active and distance_from_center > circle2_radius - 1.0 and distance_from_center < circle2_radius + 5.0
 			if near_circle2:
 				# Player is touching the second catch circle
-				# Check if they're in the FLIPPED gap (accounting for static rotation offset)
+				# Check if they're in the gap (same pattern as first circle, different rotation)
 				var player_angle = atan2(player_pos.y, player_pos.x)
 				var local_angle = player_angle - circle2_start_angle
 				var in_gap = _angle_in_gap(local_angle)
-				var in_flipped_gap = not in_gap  # Second circle has inverted gap
 
 				print("[RunMinigame] Circle 2 collision check:")
 				print("  Player distance: %.1f (circle2 radius: %.1f)" % [distance_from_center, circle2_radius])
 				print("  Player world angle: %.1f°" % rad_to_deg(player_angle))
 				print("  Circle2 start angle: %.1f°" % rad_to_deg(circle2_start_angle))
 				print("  Player local angle: %.1f°" % rad_to_deg(local_angle))
-				print("  Gap (original): %.1f° to %.1f°" % [rad_to_deg(escape_gap_start), rad_to_deg(escape_gap_end)])
-				print("  In original gap: %s, In flipped gap: %s" % [in_gap, in_flipped_gap])
+				print("  Gap: %.1f° to %.1f°" % [rad_to_deg(escape_gap_start), rad_to_deg(escape_gap_end)])
+				print("  In gap: %s" % in_gap)
 
-				if not in_flipped_gap:
+				if not in_gap:
 					# Hit the second catch circle! Caught
 					print("  → CAUGHT by circle 2!")
 					_on_caught()
