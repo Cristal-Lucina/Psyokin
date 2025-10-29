@@ -1667,10 +1667,10 @@ func _execute_item_usage(target: Dictionary) -> void:
 				revive_percent = int(result.get_string(1))
 
 			target.is_ko = false
-			target.ailment = ""  # Clear Fainted status
-			target.ailment_turn_count = 0
+			target.ailment = "Revived"  # Set Revived status (prevents action this turn)
+			target.ailment_turn_count = 1  # Lasts 1 turn
 			target.hp = max(1, int(target.hp_max * revive_percent / 100.0))
-			log_message("  → %s was revived with %d HP!" % [target.display_name, target.hp])
+			log_message("  → %s was revived with %d HP! (Can't act this turn)" % [target.display_name, target.hp])
 			# Refresh turn order to show revive
 			if battle_mgr:
 				battle_mgr.refresh_turn_order()

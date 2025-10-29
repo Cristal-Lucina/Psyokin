@@ -411,6 +411,13 @@ func _start_turn(combatant: Dictionary) -> void:
 		end_turn()
 		return
 
+	# Check if combatant has "Revived" status (can't act this turn)
+	if combatant.ailment == "Revived":
+		print("[BattleManager] %s is still recovering from revival - skipping turn" % combatant.display_name)
+		# Skip to end turn
+		end_turn()
+		return
+
 	# Process buff/debuff durations
 	process_buff_durations(combatant)
 
