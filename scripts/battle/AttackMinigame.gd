@@ -128,12 +128,12 @@ func _draw_arena() -> void:
 	var distance_from_view_center = (weak_spot_screen_pos - view_center).length()
 	weak_spot_is_visible = distance_from_view_center <= view_radius
 
-	# Draw weak spot (bright yellow if visible, dim if not)
-	var weak_spot_color = Color(1.0, 1.0, 0.0, 1.0) if weak_spot_is_visible else Color(0.5, 0.5, 0.0, 0.3)
-	arena.draw_circle(weak_spot_screen_pos, 8.0, weak_spot_color)
-
 	# Draw view circle border
 	_draw_circle_outline(view_center, view_radius, Color(0.5, 0.7, 1.0, 0.8), 2.0)
+
+	# ONLY draw weak spot if it's visible in the view
+	if weak_spot_is_visible:
+		arena.draw_circle(weak_spot_screen_pos, 8.0, Color(1.0, 1.0, 0.0, 1.0))
 
 func _draw_circle_outline(center: Vector2, radius: float, color: Color, width: float) -> void:
 	"""Helper to draw a circle outline"""
