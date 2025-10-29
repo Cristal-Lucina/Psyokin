@@ -32,6 +32,8 @@ var weak_spot_change_interval: float = 1.5  # Change direction every 1.5s
 ## View circle
 var view_radius: float = 60.0  # Size of visible area (scales with BRW)
 var view_pos: Vector2 = Vector2.ZERO  # View center offset from arena center
+var red_dot_radius: float = 12.0  # Red aiming reticle size
+var weak_spot_in_red_dot: bool = false  # True if weak spot overlaps red dot
 
 ## Charging phase
 var charge_progress: float = 0.0
@@ -128,8 +130,16 @@ func _draw_arena() -> void:
 	var distance_from_view_center = (weak_spot_screen_pos - view_center).length()
 	weak_spot_is_visible = distance_from_view_center <= view_radius
 
+	# Check if weak spot overlaps with red aiming dot
+	var distance_from_red_dot = (weak_spot_screen_pos - view_center).length()
+	weak_spot_in_red_dot = distance_from_red_dot <= red_dot_radius
+
 	# Draw view circle border
 	_draw_circle_outline(view_center, view_radius, Color(0.5, 0.7, 1.0, 0.8), 2.0)
+
+	# Draw red aiming reticle in center of view
+	arena.draw_circle(view_center, red_dot_radius, Color(1.0, 0.2, 0.2, 0.6))
+	_draw_circle_outline(view_center, red_dot_radius, Color(1.0, 0.3, 0.3, 1.0), 2.0)
 
 	# ONLY draw weak spot if it's visible in the view
 	if weak_spot_is_visible:
@@ -259,10 +269,12 @@ func _start_charging() -> void:
 	"""Start charging the attack gauge"""
 	current_phase = Phase.CHARGING
 	charge_progress = 0.0
-	print("[AttackMinigame] Started charging (weak spot visible: %s)" % weak_spot_is_visible)
+	print("[AttackMinigame] Started charging (weak spot visible: %s, in red dot: %s)" % [weak_spot_is_visible, weak_spot_in_red_dot])
 
-	if weak_spot_is_visible:
+	if weak_spot_in_red_dot:
 		charge_label.text = "Charging... Release for: OK → GOOD → GREAT → CRIT"
+	elif weak_spot_is_visible:
+		charge_label.text = "Not in red dot! Max tier: GREAT"
 	else:
 		charge_label.text = "Weak spot not visible! Automatic RED hit!"
 
@@ -329,8 +341,16 @@ func _get_charge_zone(progress: float, is_weak_spot_visible: bool) -> String:
 	if not is_weak_spot_visible:
 		# Weak spot not visible - always red
 		return "red"
+	elif not weak_spot_in_red_dot:
+		# Weak spot visible but not in red dot - cap at green
+		if progress < 0.25:
+			return "red"
+		elif progress < 0.5:
+			return "yellow"
+		else:
+			return "green"  # Cap at green
 	else:
-		# Full charge available: Red → Yellow → Green → Blue → Red (stays)
+		# Weak spot in red dot - full charge available: Red → Yellow → Green → Blue → Red (stays)
 		if progress < 0.25:
 			return "red"
 		elif progress < 0.5:
@@ -360,7 +380,7 @@ func _update_charge_visuals(zone: String) -> void:
 
 func _release_attack() -> void:
 	"""Release attack at current charge level"""
-	print("[AttackMinigame] Released attack at zone: %s (progress: %.2f, visible: %s)" % [charge_zone, charge_progress, weak_spot_is_visible])
+	print("[AttackMinigame] Released attack at zone: %s (progress: %.2f, visible: %s, in red dot: %s)" % [charge_zone, charge_progress, weak_spot_is_visible, weak_spot_in_red_dot])
 
 	# Reset charging state immediately
 	is_charging = false
@@ -371,10 +391,15 @@ func _release_attack() -> void:
 	var grade: String = charge_zone
 	var got_crit: bool = false
 
-	# If weak spot not visible, cap max tier at green (no crit possible)
-	if not weak_spot_is_visible and charge_zone == "blue":
+	# Crit (blue) ONLY possible if weak spot is in the red aiming dot
+	if charge_zone == "blue" and not weak_spot_in_red_dot:
 		grade = "green"
-		print("[AttackMinigame] Blue capped to green - weak spot not visible")
+		print("[AttackMinigame] Blue capped to green - weak spot not in red dot")
+
+	# If weak spot not even visible, cap at red
+	if not weak_spot_is_visible:
+		grade = "red"
+		print("[AttackMinigame] Capped to red - weak spot not visible")
 
 	match grade:
 		"red":
@@ -395,8 +420,10 @@ func _release_attack() -> void:
 	# Show result feedback
 	var result_text = ""
 
-	if weak_spot_is_visible:
-		result_text = "✓ Good timing! "
+	if weak_spot_in_red_dot:
+		result_text = "✓ PERFECT AIM! "
+	elif weak_spot_is_visible:
+		result_text = "✓ In view... "
 	else:
 		result_text = "✗ Weak spot not visible! "
 
@@ -404,8 +431,8 @@ func _release_attack() -> void:
 		"red": result_text += "OK (-10% damage)"
 		"yellow": result_text += "GOOD (Normal damage)"
 		"green":
-			if charge_zone == "blue" and not weak_spot_is_visible:
-				result_text += "GREAT (+10% damage) [Capped from CRIT]"
+			if charge_zone == "blue" and not weak_spot_in_red_dot:
+				result_text += "GREAT (+10% damage) [Not in red dot]"
 			else:
 				result_text += "GREAT (+10% damage)"
 		"blue": result_text += "CRIT! (+10% damage + CRITICAL)"
