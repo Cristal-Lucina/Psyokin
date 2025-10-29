@@ -276,6 +276,12 @@ func _rebuild_display_with_reveal() -> void:
 
 func _rebuild_display() -> void:
 	"""Rebuild the entire turn order display with fade-in animation"""
+	# ULTRA FIX: Check rebuild lock
+	if is_rebuilding:
+		print("[TurnOrderDisplay] BLOCKED: Already rebuilding, ignoring rebuild request")
+		return
+
+	is_rebuilding = true
 	print("[TurnOrderDisplay] Starting rebuild (no reveal) - current children: %d" % get_child_count())
 
 	# ULTRA FIX: IMMEDIATE deletion - no queue_free, use remove_child + free
@@ -299,10 +305,12 @@ func _rebuild_display() -> void:
 
 	# Get turn order from battle manager
 	if not battle_mgr:
+		is_rebuilding = false  # ULTRA FIX: Clear rebuild lock on early return
 		return
 
 	var turn_order = battle_mgr.turn_order
 	if turn_order.is_empty():
+		is_rebuilding = false  # ULTRA FIX: Clear rebuild lock on early return
 		return
 
 	# Create slots for upcoming turns
@@ -349,6 +357,8 @@ func _rebuild_display() -> void:
 
 	# Store current order for future animations
 	_store_current_order()
+
+	is_rebuilding = false  # ULTRA FIX: Clear rebuild lock
 
 func _rebuild_display_animated() -> void:
 	"""Rebuild display with animations for position changes"""
