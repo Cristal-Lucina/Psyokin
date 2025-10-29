@@ -576,6 +576,44 @@ func _shake_combatant_panel(combatant_id: String) -> void:
 	tween.tween_property(panel, "position", original_position + Vector2(-shake_intensity * 0.5, 0), shake_duration)
 	tween.tween_property(panel, "position", original_position + Vector2(shake_intensity * 0.5, 0), shake_duration)
 	tween.tween_property(panel, "position", original_position, shake_duration)
+func _get_skill_button_sequence(skill_id: String) -> Array:
+	"""Generate button sequence for a skill based on its ID"""
+	var element = ""
+	var tier = 1
+	
+	if "_L" in skill_id:
+		var parts = skill_id.split("_L")
+		element = parts[0].to_lower()
+		tier = int(parts[1]) if parts.size() > 1 else 1
+	
+	var length = 3
+	if tier == 2: length = 5
+	elif tier >= 3: length = 8
+	
+	var sequence = []
+	match element:
+		"fire":
+			var pattern = ["A", "X", "A", "Y", "A", "B", "A", "X"]
+			for i in range(length): sequence.append(pattern[i])
+		"water":
+			var pattern = ["B", "A", "B", "X", "B", "Y", "B", "A"]
+			for i in range(length): sequence.append(pattern[i])
+		"earth":
+			var pattern = ["X", "Y", "X", "A", "X", "B", "X", "Y"]
+			for i in range(length): sequence.append(pattern[i])
+		"air":
+			var pattern = ["Y", "B", "Y", "A", "Y", "X", "Y", "B"]
+			for i in range(length): sequence.append(pattern[i])
+		"void":
+			var pattern = ["A", "B", "A", "B", "X", "Y", "A", "B"]
+			for i in range(length): sequence.append(pattern[i])
+		_:
+			var pattern = ["A", "B", "X", "Y", "A", "B", "X", "Y"]
+			for i in range(length): sequence.append(pattern[i])
+	
+	return sequence
+
+
 
 func _show_status_details(combatant: Dictionary) -> void:
 	"""Show detailed status information popup for a combatant"""
@@ -2988,6 +3026,32 @@ func _execute_skill_single(target: Dictionary) -> void:
 	if not _check_freeze_action_allowed():
 		return
 
+	# ═══════ SKILL MINIGAME ═══════
+	# Get skill info for minigame
+	var skill_id = String(skill_to_use.get("skill_id", ""))
+	var skill_tier = 1
+	if "_L" in skill_id:
+		var parts = skill_id.split("_L")
+		skill_tier = int(parts[1]) if parts.size() > 1 else 1
+
+	# Launch skill minigame
+	var focus_stat = current_combatant.stats.get("FOC", 1)
+	var skill_sequence = _get_skill_button_sequence(skill_id)
+	var status_effects = []
+	var ailment = str(current_combatant.get("ailment", ""))
+	if ailment != "":
+		status_effects.append(ailment)
+
+	log_message("%s prepares %s..." % [current_combatant.display_name, skill_to_use.get("name", "skill")])
+	var minigame_result = await minigame_mgr.launch_skill_minigame(focus_stat, skill_sequence, skill_tier, status_effects)
+
+	# Apply minigame modifiers
+	var damage_modifier = minigame_result.get("damage_modifier", 1.0)
+	var mp_modifier = minigame_result.get("mp_modifier", 1.0)
+	var tier_downgrade = minigame_result.get("tier_downgrade", 0)
+
+	print("[Battle] Skill minigame - Damage: %.2fx, MP: %.2fx, Downgrade: %d" % [damage_modifier, mp_modifier, tier_downgrade])
+
 	var skill_name = String(skill_to_use.get("name", "Unknown"))
 	var mp_cost = int(skill_to_use.get("cost_mp", 0))
 	var element = String(skill_to_use.get("element", "none")).to_lower()
@@ -2999,10 +3063,16 @@ func _execute_skill_single(target: Dictionary) -> void:
 	# Clear defending status when using skill
 	current_combatant.is_defending = false
 
-	# Deduct MP
-	current_combatant.mp -= mp_cost
+	# Deduct MP (with minigame modifier)
+	var final_mp_cost = int(mp_cost * mp_modifier)
+	current_combatant.mp -= final_mp_cost
 	if current_combatant.mp < 0:
 		current_combatant.mp = 0
+
+	# Log MP savings if applicable
+	if mp_modifier < 1.0:
+		var saved_mp = mp_cost - final_mp_cost
+		log_message("  → High Focus! Saved %d MP (%d → %d)" % [saved_mp, mp_cost, final_mp_cost])
 
 	# Track sigil usage for bonus GXP
 	var sigil_inst_id = skill_to_use.get("_sigil_inst_id", "")
@@ -3119,6 +3189,17 @@ func _execute_skill_single(target: Dictionary) -> void:
 
 	var damage = damage_result.damage
 	var _is_stumble = damage_result.is_stumble  # Reserved for future stumble mechanics
+
+	# Apply minigame damage modifier
+	var base_damage = damage
+	damage = int(damage * damage_modifier)
+
+	# Log damage modification if applicable
+	if damage_modifier != 1.0:
+		if damage_modifier > 1.0:
+			log_message("  → Button sequence bonus! Damage: %d → %d (%.0f%%)" % [base_damage, damage, damage_modifier * 100])
+		else:
+			log_message("  → Missed buttons! Damage: %d → %d (%.0f%%)" % [base_damage, damage, damage_modifier * 100])
 
 	# Apply damage
 	target.hp -= damage
