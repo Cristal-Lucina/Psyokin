@@ -293,6 +293,21 @@ func _start_charging() -> void:
 		charge_label.text = "Weak spot not visible! Automatic RED hit!"
 
 func _process_charging(delta: float) -> void:
+	# Handle WASD view movement WHILE charging (allows slide-to-crit!)
+	var move_dir = Vector2.ZERO
+	if Input.is_key_pressed(KEY_W): move_dir.y -= 1
+	if Input.is_key_pressed(KEY_S): move_dir.y += 1
+	if Input.is_key_pressed(KEY_A): move_dir.x -= 1
+	if Input.is_key_pressed(KEY_D): move_dir.x += 1
+
+	if move_dir.length() > 0:
+		move_dir = move_dir.normalized()
+		view_pos += move_dir * 80.0 * delta
+
+		# Clamp view position to stay within reasonable bounds
+		view_pos.x = clampf(view_pos.x, -60.0, 60.0)
+		view_pos.y = clampf(view_pos.y, -60.0, 60.0)
+
 	# Continue moving weak spot towards target
 	var direction_to_target = (weak_spot_target - weak_spot_pos).normalized()
 	weak_spot_pos += direction_to_target * weak_spot_speed * delta
@@ -306,7 +321,7 @@ func _process_charging(delta: float) -> void:
 	if weak_spot_change_timer >= weak_spot_change_interval:
 		_randomize_weak_spot_target()
 
-	# Redraw arena to update weak spot position
+	# Redraw arena to update positions
 	arena.queue_redraw()
 
 	# Increase charge while Space is held
@@ -367,6 +382,10 @@ func _release_attack() -> void:
 	"""Release attack at current charge level"""
 	print("[AttackMinigame] Released attack at zone: %s (progress: %.2f, visible: %s)" % [charge_zone, charge_progress, weak_spot_is_visible])
 
+	# Reset charging state immediately
+	is_charging = false
+	current_phase = Phase.COMPLETE  # Temporarily complete to stop input processing
+
 	# Determine damage modifier
 	var damage_modifier: float = 0.9
 	var grade: String = charge_zone
@@ -412,7 +431,12 @@ func _release_attack() -> void:
 
 	# Wait then move to next attempt
 	await get_tree().create_timer(1.5).timeout
-	_start_next_attempt()
+
+	# Only start next attempt if not already finished
+	if current_attempt < tempo:
+		_start_next_attempt()
+	else:
+		_finish_minigame()
 
 func _force_attack() -> void:
 	"""Time ran out, attack at current position"""
@@ -421,10 +445,19 @@ func _force_attack() -> void:
 	best_grade = "red"
 	best_damage_modifier = 0.9
 
+	# Reset charging state
+	is_charging = false
+	current_phase = Phase.COMPLETE  # Temporarily complete to stop input processing
+
 	charge_label.text = "Time's up! OK (-10% damage)"
 
 	await get_tree().create_timer(1.5).timeout
-	_start_next_attempt()
+
+	# Only start next attempt if not already finished
+	if current_attempt < tempo:
+		_start_next_attempt()
+	else:
+		_finish_minigame()
 
 func _is_better_grade(new_grade: String, old_grade: String) -> bool:
 	var grade_values = {"red": 0, "yellow": 1, "green": 2, "blue": 3}
