@@ -9,6 +9,7 @@ class_name Battle
 @onready var combat_resolver: CombatResolver = CombatResolver.new()
 @onready var csv_loader = get_node("/root/aCSVLoader")
 @onready var burst_system = get_node("/root/aBurstSystem")
+@onready var minigame_mgr = get_node("/root/aMinigameManager")
 
 ## UI References
 @onready var action_menu: VBoxContainer = %ActionMenu
@@ -807,9 +808,23 @@ func _execute_attack(target: Dictionary) -> void:
 			log_message("  → Missed! (%d%% chance, rolled %d)" % [int(hit_check.hit_chance), hit_check.roll])
 			print("[Battle] Miss! Hit chance: %.1f%%, Roll: %d" % [hit_check.hit_chance, hit_check.roll])
 		else:
-			# Hit! Now roll for critical
+			# Hit! Launch attack minigame
+			var tpo = current_combatant.stats.get("TPO", 1)
+			var status_effects = []
+			var ailment = str(current_combatant.get("ailment", ""))
+			if ailment != "":
+				status_effects.append(ailment)
+
+			log_message("  → Hit! Starting attack minigame...")
+			var minigame_result = await minigame_mgr.launch_attack_minigame(tpo, status_effects)
+
+			# Apply minigame result modifiers
+			var damage_modifier = minigame_result.get("damage_modifier", 1.0)
+			var minigame_crit = minigame_result.get("is_crit", false)
+
+			# Now roll for critical (or use minigame crit)
 			var crit_check = combat_resolver.check_critical_hit(current_combatant)
-			var is_crit = crit_check.crit
+			var is_crit = crit_check.crit or minigame_crit
 
 			# Calculate mind type effectiveness
 			var type_bonus = combat_resolver.get_mind_type_bonus(current_combatant, target)
@@ -834,6 +849,10 @@ func _execute_attack(target: Dictionary) -> void:
 			var damage = damage_result.damage
 			var is_stumble = damage_result.is_stumble
 
+			
+			# Apply minigame damage modifier
+			damage = int(round(damage * damage_modifier))
+			print("[Battle] Minigame modifier: %.2fx | Final damage: %d" % [damage_modifier, damage])
 			# Apply damage
 			target.hp -= damage
 
