@@ -189,7 +189,7 @@ func _process(delta: float) -> void:
 			_check_escape()
 		else:
 			# Check if player hit the catch circle (rotating)
-			if distance_from_center > circle_radius - 3.0:
+			if distance_from_center > circle_radius - 1.0:
 				# Player is touching the catch circle
 				# Check if they're in the gap (using local angle relative to circle rotation)
 				var player_angle = atan2(player_pos.y, player_pos.x)
