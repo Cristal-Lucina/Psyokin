@@ -20,6 +20,7 @@ var circle_close_speed: float = 20.0  # pixels per second
 var circle_rotation_speed: float = 0.3  # radians per second (slow rotation)
 var player_pos: Vector2 = Vector2.ZERO
 var circle_angle: float = 0.0  # Current rotation of catch circle (first one only)
+var circle2_start_angle: float = 0.0  # Starting rotation offset for second circle (static)
 var escape_gap_start: float = 0.0  # Start angle of the ONE continuous gap
 var escape_gap_end: float = 0.0  # End angle of the ONE continuous gap
 var arena_center: Vector2 = Vector2(100, 100)  # Center of arena
@@ -107,6 +108,13 @@ func _start_minigame() -> void:
 	circle2_active = false
 	elapsed_time = 0.0
 
+	# Randomize starting rotation positions for both catch circles
+	circle_angle = randf() * TAU
+	circle2_start_angle = randf() * TAU
+
+	print("[RunMinigame] Circle 1 starting rotation: %.1f°" % rad_to_deg(circle_angle))
+	print("[RunMinigame] Circle 2 starting rotation: %.1f°" % rad_to_deg(circle2_start_angle))
+
 func _draw_arena() -> void:
 	"""Draw the circles and player"""
 	# Draw outer boundary circle background (light gray)
@@ -150,18 +158,20 @@ func _draw_arena() -> void:
 			var p2 = arena_center + Vector2(cos(world_angle + (TAU / segment_count)), sin(world_angle + (TAU / segment_count))) * circle_radius
 			arena.draw_line(p1, p2, Color(1.0, 0.3, 0.3, 1.0), 4.0)
 
-	# Draw SECOND CATCH CIRCLE (orange, non-rotating, delayed start)
+	# Draw SECOND CATCH CIRCLE (orange, non-rotating but starts at random angle)
 	if circle2_active:
 		for i in range(segment_count):
-			var angle = (float(i) / segment_count) * TAU
+			var local_angle = (float(i) / segment_count) * TAU
 
-			# Check gap without rotation (static gap)
-			var in_gap = _angle_in_gap(angle)
+			# Check gap in local space (gap is fixed relative to this circle)
+			var in_gap = _angle_in_gap(local_angle)
 
 			# Only draw if NOT in gap
 			if not in_gap:
-				var p1 = arena_center + Vector2(cos(angle), sin(angle)) * circle2_radius
-				var p2 = arena_center + Vector2(cos(angle + (TAU / segment_count)), sin(angle + (TAU / segment_count))) * circle2_radius
+				# World angle includes starting rotation offset (but doesn't change over time)
+				var world_angle = local_angle + circle2_start_angle
+				var p1 = arena_center + Vector2(cos(world_angle), sin(world_angle)) * circle2_radius
+				var p2 = arena_center + Vector2(cos(world_angle + (TAU / segment_count)), sin(world_angle + (TAU / segment_count))) * circle2_radius
 				arena.draw_line(p1, p2, Color(1.0, 0.6, 0.2, 1.0), 4.0)  # Orange color
 
 	# Draw player dot (green with white outline)
@@ -223,12 +233,14 @@ func _process(delta: float) -> void:
 			if not _angle_in_gap(relative_angle):
 				# Hit the first catch circle! Caught
 				_on_caught()
-		# Check if player hit the SECOND catch circle (non-rotating)
+		# Check if player hit the SECOND catch circle (non-rotating but offset)
 		elif circle2_active and distance_from_center > circle2_radius - 3.0:
 			# Player is touching the second catch circle
-			# Check if they're in the gap (no rotation for this one)
+			# Check if they're in the gap (accounting for starting rotation offset)
 			var player_angle = atan2(player_pos.y, player_pos.x)
-			if not _angle_in_gap(player_angle):
+			# Remove starting offset from player angle to check against static gap
+			var relative_angle = player_angle - circle2_start_angle
+			if not _angle_in_gap(relative_angle):
 				# Hit the second catch circle! Caught
 				_on_caught()
 
