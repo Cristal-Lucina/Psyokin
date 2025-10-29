@@ -9,6 +9,7 @@ class_name Battle
 @onready var combat_resolver: CombatResolver = CombatResolver.new()
 @onready var csv_loader = get_node("/root/aCSVLoader")
 @onready var burst_system = get_node("/root/aBurstSystem")
+@onready var minigame_mgr = get_node("/root/aMinigameManager")
 
 ## UI References
 @onready var action_menu: VBoxContainer = %ActionMenu
@@ -39,6 +40,7 @@ var selected_item: Dictionary = {}  # Selected item data
 var selected_burst: Dictionary = {}  # Selected burst ability data
 var victory_panel: PanelContainer = null  # Victory screen panel
 var is_in_round_transition: bool = false  # True during round transition animations
+var combatant_panels: Dictionary = {}  # combatant_id -> PanelContainer for shake animations
 
 func _ready() -> void:
 	print("[Battle] Battle scene loaded")
@@ -58,6 +60,7 @@ func _ready() -> void:
 	battle_mgr.turn_ended.connect(_on_turn_ended)
 	battle_mgr.round_started.connect(_on_round_started)
 	battle_mgr.battle_ended.connect(_on_battle_ended)
+	battle_mgr.log_message_requested.connect(log_message)
 
 	# Connect to turn order display signals
 	if turn_order_display and turn_order_display.has_signal("animation_completed"):
@@ -463,17 +466,22 @@ func _display_combatants() -> void:
 	for child in enemy_slots.get_children():
 		child.queue_free()
 
+	# Clear panel references
+	combatant_panels.clear()
+
 	# Display allies
 	var allies = battle_mgr.get_ally_combatants()
 	for ally in allies:
 		var slot = _create_combatant_slot(ally, true)
 		ally_slots.add_child(slot)
+		combatant_panels[ally.id] = slot
 
 	# Display enemies
 	var enemies = battle_mgr.get_enemy_combatants()
 	for enemy in enemies:
 		var slot = _create_combatant_slot(enemy, false)
 		enemy_slots.add_child(slot)
+		combatant_panels[enemy.id] = slot
 
 func _create_combatant_slot(combatant: Dictionary, is_ally: bool) -> PanelContainer:
 	"""Create a UI slot for a combatant"""
@@ -546,6 +554,67 @@ func _update_combatant_displays() -> void:
 	"""Update all combatant HP/MP displays"""
 	# TODO: Update HP/MP bars without recreating everything
 	_display_combatants()
+
+func _shake_combatant_panel(combatant_id: String) -> void:
+	"""Shake a combatant's panel when they take damage"""
+	if not combatant_panels.has(combatant_id):
+		return
+
+	var panel = combatant_panels[combatant_id]
+	var original_position = panel.position
+
+	# Create shake animation using Tween
+	var tween = create_tween()
+	tween.set_trans(Tween.TRANS_SINE)
+	tween.set_ease(Tween.EASE_IN_OUT)
+
+	# Shake sequence: left, right, left, right, center
+	var shake_intensity = 8.0
+	var shake_duration = 0.05
+
+	tween.tween_property(panel, "position", original_position + Vector2(-shake_intensity, 0), shake_duration)
+	tween.tween_property(panel, "position", original_position + Vector2(shake_intensity, 0), shake_duration)
+	tween.tween_property(panel, "position", original_position + Vector2(-shake_intensity * 0.5, 0), shake_duration)
+	tween.tween_property(panel, "position", original_position + Vector2(shake_intensity * 0.5, 0), shake_duration)
+	tween.tween_property(panel, "position", original_position, shake_duration)
+func _get_skill_button_sequence(skill_id: String) -> Array:
+	"""Generate button sequence for a skill based on its ID"""
+	var element = ""
+	var tier = 1
+	
+	if "_L" in skill_id:
+		var parts = skill_id.split("_L")
+		element = parts[0].to_lower()
+		tier = int(parts[1]) if parts.size() > 1 else 1
+	
+	var length = 3
+	if tier == 2: length = 5
+	elif tier >= 3: length = 8
+	
+	var sequence = []
+	match element:
+		"fire":
+			var pattern = ["A", "X", "A", "Y", "A", "B", "A", "X"]
+			for i in range(length): sequence.append(pattern[i])
+		"water":
+			var pattern = ["B", "A", "B", "X", "B", "Y", "B", "A"]
+			for i in range(length): sequence.append(pattern[i])
+		"earth":
+			var pattern = ["X", "Y", "X", "A", "X", "B", "X", "Y"]
+			for i in range(length): sequence.append(pattern[i])
+		"air":
+			var pattern = ["Y", "B", "Y", "A", "Y", "X", "Y", "B"]
+			for i in range(length): sequence.append(pattern[i])
+		"void":
+			var pattern = ["A", "B", "A", "B", "X", "Y", "A", "B"]
+			for i in range(length): sequence.append(pattern[i])
+		_:
+			var pattern = ["A", "B", "X", "Y", "A", "B", "X", "Y"]
+			for i in range(length): sequence.append(pattern[i])
+	
+	return sequence
+
+
 
 func _show_status_details(combatant: Dictionary) -> void:
 	"""Show detailed status information popup for a combatant"""
@@ -778,9 +847,24 @@ func _execute_attack(target: Dictionary) -> void:
 			log_message("  → Missed! (%d%% chance, rolled %d)" % [int(hit_check.hit_chance), hit_check.roll])
 			print("[Battle] Miss! Hit chance: %.1f%%, Roll: %d" % [hit_check.hit_chance, hit_check.roll])
 		else:
-			# Hit! Now roll for critical
+			# Hit! Launch attack minigame
+			var tpo = current_combatant.stats.get("TPO", 1)
+			var brw = current_combatant.stats.get("BRW", 1)
+			var status_effects = []
+			var ailment = str(current_combatant.get("ailment", ""))
+			if ailment != "":
+				status_effects.append(ailment)
+
+			log_message("  → Hit! Starting attack minigame...")
+			var minigame_result = await minigame_mgr.launch_attack_minigame(tpo, brw, status_effects)
+
+			# Apply minigame result modifiers
+			var damage_modifier = minigame_result.get("damage_modifier", 1.0)
+			var minigame_crit = minigame_result.get("is_crit", false)
+
+			# Now roll for critical (or use minigame crit)
 			var crit_check = combat_resolver.check_critical_hit(current_combatant)
-			var is_crit = crit_check.crit
+			var is_crit = crit_check.crit or minigame_crit
 
 			# Calculate mind type effectiveness
 			var type_bonus = combat_resolver.get_mind_type_bonus(current_combatant, target)
@@ -805,6 +889,10 @@ func _execute_attack(target: Dictionary) -> void:
 			var damage = damage_result.damage
 			var is_stumble = damage_result.is_stumble
 
+			
+			# Apply minigame damage modifier
+			damage = int(round(damage * damage_modifier))
+			print("[Battle] Minigame modifier: %.2fx | Final damage: %d" % [damage_modifier, damage])
 			# Apply damage
 			target.hp -= damage
 
@@ -884,6 +972,12 @@ func _execute_attack(target: Dictionary) -> void:
 				await battle_mgr.refresh_turn_order()
 			elif turn_order_display:
 				turn_order_display.update_combatant_hp(target.id)
+
+	# Check if battle is over (all enemies defeated/captured)
+	var battle_ended = await battle_mgr._check_battle_end()
+	if battle_ended:
+		print("[Battle] Battle ended after attack - skipping end turn")
+		return  # Battle ended
 
 	# End turn
 	battle_mgr.end_turn()
@@ -1136,12 +1230,92 @@ func _execute_capture(target: Dictionary) -> void:
 	log_message("%s uses %s on %s!" % [current_combatant.display_name, bind_name, target.display_name])
 	log_message("  Capture chance: %.1f%%" % capture_chance)
 
-	# Attempt capture
-	var success = combat_resolver.attempt_capture(target, capture_chance)
+	# ═══════ CAPTURE MINIGAME ═══════
+	# Initialize or get persistent break rating
+	if not target.has("break_rating"):
+		# First capture attempt - calculate initial break rating
+		var base_rating = target.get("level", 1)
+		var enemy_hp = target.hp
+		var enemy_hp_max = target.hp_max
+		var enemy_hp_percent = float(enemy_hp) / float(enemy_hp_max)
+		var party_hp = current_combatant.hp
+
+		# Start with base rating
+		var calculated_rating = float(base_rating)
+
+		# Apply modifiers based on HP comparison
+		if enemy_hp_percent >= 1.0:
+			# Enemy at 100% HP: +50%
+			calculated_rating *= 1.5
+			log_message("  → Enemy at full health! (+50% break rating)")
+		elif enemy_hp > party_hp:
+			# Enemy has more HP than party member: +25%
+			calculated_rating *= 1.25
+			log_message("  → Enemy stronger than you! (+25% break rating)")
+		elif enemy_hp_percent <= 0.1:
+			# Enemy below 10% HP: -50%
+			calculated_rating *= 0.5
+			log_message("  → Enemy critically weak! (-50% break rating)")
+		elif enemy_hp < party_hp:
+			# Enemy has less HP than party member: -25%
+			calculated_rating *= 0.75
+			log_message("  → Enemy weaker than you! (-25% break rating)")
+
+		target.break_rating = max(1, int(calculated_rating))
+		log_message("  → First capture attempt! Break rating: %d" % target.break_rating)
+	else:
+		log_message("  → Continued capture! Break rating: %d" % target.break_rating)
+
+	# Map bind item to bind type
+	var bind_type = "basic"
+	match bind_id:
+		"BIND_001": bind_type = "basic"
+		"BIND_002": bind_type = "standard"
+		"BIND_003": bind_type = "advanced"
+		"BIND_004": bind_type = "advanced"  # Superior uses advanced mechanics
+
+	# Build enemy data for minigame
+	var enemy_data = {
+		"hp": target.hp,
+		"hp_max": target.hp_max,
+		"level": target.get("level", 1),
+		"TPO": target.stats.get("TPO", 1),
+		"actor_id": target.get("actor_id", ""),
+		"display_name": target.get("display_name", "Enemy"),
+		"break_rating": target.break_rating
+	}
+
+	# Build party member data for minigame
+	var party_member_data = {
+		"FOC": current_combatant.stats.get("FOC", 1)
+	}
+
+	# Get status effects
+	var status_effects = []
+	var ailment = str(current_combatant.get("ailment", ""))
+	if ailment != "":
+		status_effects.append(ailment)
+
+	# Launch capture minigame
+	log_message("  → Starting capture minigame...")
+	var minigame_result = await minigame_mgr.launch_capture_minigame([bind_type], enemy_data, party_member_data, status_effects)
+
+	# Update break rating based on minigame result
+	var break_rating_reduced = minigame_result.get("break_rating_reduced", 0)
+	var wraps_completed = minigame_result.get("wraps_completed", 0)
+
+	target.break_rating -= break_rating_reduced
+	if target.break_rating < 0:
+		target.break_rating = 0
+
+	log_message("  → Completed %d wraps! Break rating: %d → %d" % [wraps_completed, target.break_rating + break_rating_reduced, target.break_rating])
 
 	# Consume the bind item
 	var inventory = get_node("/root/aInventorySystem")
 	inventory.remove_item(bind_id, 1)
+
+	# Check if break rating hit 0 (capture success)
+	var success = target.break_rating <= 0
 
 	if success:
 		# Capture successful!
@@ -1169,8 +1343,11 @@ func _execute_capture(target: Dictionary) -> void:
 			print("[Battle] Battle ended - skipping end turn")
 			return  # Battle ended
 	else:
-		# Capture failed
-		log_message("  → FAILED! %s broke free!" % target.display_name)
+		# Capture failed but progress made
+		if break_rating_reduced > 0:
+			log_message("  → Progress made! %s resists but is weakening..." % target.display_name)
+		else:
+			log_message("  → FAILED! %s broke free with no progress!" % target.display_name)
 
 	# End turn
 	battle_mgr.end_turn()
@@ -1491,10 +1668,10 @@ func _execute_item_usage(target: Dictionary) -> void:
 				revive_percent = int(result.get_string(1))
 
 			target.is_ko = false
-			target.ailment = ""  # Clear Fainted status
-			target.ailment_turn_count = 0
+			target.ailment = "Revived"  # Set Revived status (prevents action this turn)
+			target.ailment_turn_count = 1  # Lasts 1 turn
 			target.hp = max(1, int(target.hp_max * revive_percent / 100.0))
-			log_message("  → %s was revived with %d HP!" % [target.display_name, target.hp])
+			log_message("  → %s was revived with %d HP! (Can't act this turn)" % [target.display_name, target.hp])
 			# Refresh turn order to show revive
 			if battle_mgr:
 				battle_mgr.refresh_turn_order()
@@ -1658,9 +1835,36 @@ func _on_run_pressed() -> void:
 	# Calculate run chance based on enemy HP and level difference
 	var run_chance = _calculate_run_chance()
 
-	log_message("Attempting to escape... (%d%% chance)" % int(run_chance))
+	log_message("%s attempts to escape... (%d%% base chance)" % [current_combatant.display_name, int(run_chance)])
 
-	if randf() * 100 < run_chance:
+	# ═══════ RUN MINIGAME ═══════
+	# Calculate tempo difference (party TPO - enemy TPO)
+	var party_tpo = current_combatant.stats.get("TPO", 1)
+	var enemies = battle_mgr.get_enemy_combatants()
+	var avg_enemy_tpo = 0
+	for enemy in enemies:
+		avg_enemy_tpo += enemy.stats.get("TPO", 1)
+	if enemies.size() > 0:
+		avg_enemy_tpo = int(avg_enemy_tpo / enemies.size())
+	var tempo_diff = party_tpo - avg_enemy_tpo
+
+	# Get focus stat
+	var focus_stat = current_combatant.stats.get("FOC", 1)
+
+	# Get status effects
+	var status_effects = []
+	var ailment = str(current_combatant.get("ailment", ""))
+	if ailment != "":
+		status_effects.append(ailment)
+
+	# Launch run minigame
+	log_message("  → Navigate through the gaps to escape!")
+	var minigame_result = await minigame_mgr.launch_run_minigame(run_chance, tempo_diff, focus_stat, status_effects)
+
+	# Get success from minigame
+	var success = minigame_result.get("success", false)
+
+	if success:
 		log_message("Escaped successfully!")
 		await get_tree().create_timer(1.0).timeout
 		battle_mgr.current_state = battle_mgr.BattleState.ESCAPED
@@ -1671,7 +1875,7 @@ func _on_run_pressed() -> void:
 
 func _calculate_run_chance() -> float:
 	"""Calculate run chance based on enemy HP percentage and level difference"""
-	const BASE_RUN_CHANCE: float = 50.0
+	const BASE_RUN_CHANCE: float = 5.0  # Base 5% escape chance (18° gap)
 	const MAX_HP_BONUS: float = 40.0
 	const _MAX_LEVEL_BONUS: float = 20.0  # Reserved for future level-based calculations
 	const LEVEL_BONUS_PER_LEVEL: float = 2.0
@@ -1758,14 +1962,22 @@ func _on_enemy_panel_input(event: InputEvent, target: Dictionary) -> void:
 						_clear_target_highlights()
 						awaiting_target_selection = false
 						awaiting_skill_selection = false
-						_execute_skill_single(target)
-						battle_mgr.end_turn()
+						await _execute_skill_single(target)
+
+						# Check if battle is over
+						var battle_ended = await battle_mgr._check_battle_end()
+						if not battle_ended:
+							battle_mgr.end_turn()
 					elif not selected_burst.is_empty():
 						# Using a burst ability (single target)
 						_clear_target_highlights()
 						awaiting_target_selection = false
-						_execute_burst_on_target(target)
-						battle_mgr.end_turn()
+						await _execute_burst_on_target(target)
+
+						# Check if battle is over
+						var battle_ended = await battle_mgr._check_battle_end()
+						if not battle_ended:
+							battle_mgr.end_turn()
 					else:
 						# Regular attack
 						_execute_attack(target)
@@ -2804,10 +3016,13 @@ func _execute_burst_aoe() -> void:
 
 	for target in alive_enemies:
 		await get_tree().create_timer(0.3).timeout
-		_execute_burst_on_target(target)
+		await _execute_burst_on_target(target)
 
-	# End turn after burst
-	battle_mgr.end_turn()
+	# Check if battle is over
+	var battle_ended = await battle_mgr._check_battle_end()
+	if not battle_ended:
+		# End turn after burst
+		battle_mgr.end_turn()
 
 func _execute_burst_on_target(target: Dictionary) -> void:
 	"""Execute burst ability on a single target"""
@@ -2826,9 +3041,22 @@ func _execute_burst_on_target(target: Dictionary) -> void:
 		log_message("  → Missed %s! (%d%% chance)" % [target.display_name, int(hit_check.hit_chance)])
 		return
 
-	# Roll for crit
+	# ═══════ BURST MINIGAME ═══════
+	var affinity = current_combatant.stats.get("affinity", 1)
+	var status_effects = []
+	var ailment = str(current_combatant.get("ailment", ""))
+	if ailment != "":
+		status_effects.append(ailment)
+
+	log_message("  → Syncing burst energy...")
+	var minigame_result = await minigame_mgr.launch_burst_minigame(affinity, status_effects)
+
+	var damage_modifier = minigame_result.get("damage_modifier", 1.0)
+	var minigame_crit = minigame_result.get("is_crit", false)
+
+	# Roll for crit (or use minigame crit)
 	var crit_check = combat_resolver.check_critical_hit(current_combatant, {"skill_crit_bonus": crit_bonus})
-	var is_crit = crit_check.crit
+	var is_crit = crit_check.crit or minigame_crit
 
 	# Calculate type effectiveness
 	var type_bonus = 0.0
@@ -2856,8 +3084,14 @@ func _execute_burst_on_target(target: Dictionary) -> void:
 
 	var damage = damage_result.damage
 
+	# Apply minigame damage modifier
+	damage = int(damage * damage_modifier)
+
 	# Apply damage
 	target.hp -= damage
+
+	# Shake the target's panel for visual feedback
+	_shake_combatant_panel(target.id)
 
 	# Wake up if asleep
 	_wake_if_asleep(target)
@@ -2936,6 +3170,8 @@ func _execute_skill_single(target: Dictionary) -> void:
 	if not _check_freeze_action_allowed():
 		return
 
+	# Get skill info
+	var skill_id = String(skill_to_use.get("skill_id", ""))
 	var skill_name = String(skill_to_use.get("name", "Unknown"))
 	var mp_cost = int(skill_to_use.get("cost_mp", 0))
 	var element = String(skill_to_use.get("element", "none")).to_lower()
@@ -2944,27 +3180,61 @@ func _execute_skill_single(target: Dictionary) -> void:
 	var crit_bonus = int(skill_to_use.get("crit_bonus_pct", 0))
 	var mnd_scaling = int(skill_to_use.get("scaling_mnd", 1))
 
+	# ═══════ HIT CHECK FIRST ═══════
+	log_message("%s uses %s!" % [current_combatant.display_name, skill_name])
+	var hit_check = combat_resolver.check_sigil_hit(current_combatant, target, {"skill_acc": acc})
+
+	if not hit_check.hit:
+		log_message("  → Missed! (%d%% chance, rolled %d)" % [int(hit_check.hit_chance), hit_check.roll])
+		# Still deduct MP even on miss
+		current_combatant.mp -= mp_cost
+		if current_combatant.mp < 0:
+			current_combatant.mp = 0
+		return
+
+	# ═══════ SKILL MINIGAME ═══════
+	# Get skill tier for minigame
+	var skill_tier = 1
+	if "_L" in skill_id:
+		var parts = skill_id.split("_L")
+		skill_tier = int(parts[1]) if parts.size() > 1 else 1
+
+	# Launch skill minigame
+	var focus_stat = current_combatant.stats.get("FOC", 1)
+	var skill_sequence = _get_skill_button_sequence(skill_id)
+	var status_effects = []
+	var ailment = str(current_combatant.get("ailment", ""))
+	if ailment != "":
+		status_effects.append(ailment)
+
+	log_message("  → %s prepares the skill..." % [current_combatant.display_name])
+	var minigame_result = await minigame_mgr.launch_skill_minigame(focus_stat, skill_sequence, skill_tier, status_effects)
+
+	# Apply minigame modifiers
+	var damage_modifier = minigame_result.get("damage_modifier", 1.0)
+	var mp_modifier = minigame_result.get("mp_modifier", 1.0)
+	var tier_downgrade = minigame_result.get("tier_downgrade", 0)
+
+	print("[Battle] Skill minigame - Damage: %.2fx, MP: %.2fx, Downgrade: %d" % [damage_modifier, mp_modifier, tier_downgrade])
+
 	# Clear defending status when using skill
 	current_combatant.is_defending = false
 
-	# Deduct MP
-	current_combatant.mp -= mp_cost
+	# Deduct MP (with minigame modifier)
+	var final_mp_cost = int(mp_cost * mp_modifier)
+	current_combatant.mp -= final_mp_cost
 	if current_combatant.mp < 0:
 		current_combatant.mp = 0
+
+	# Log MP savings if applicable
+	if mp_modifier < 1.0:
+		var saved_mp = mp_cost - final_mp_cost
+		log_message("  → High Focus! Saved %d MP (%d → %d)" % [saved_mp, mp_cost, final_mp_cost])
 
 	# Track sigil usage for bonus GXP
 	var sigil_inst_id = skill_to_use.get("_sigil_inst_id", "")
 	if sigil_inst_id != "":
 		battle_mgr.sigils_used_in_battle[sigil_inst_id] = true
-
-	log_message("%s uses %s!" % [current_combatant.display_name, skill_name])
-
-	# Check if hit
-	var hit_check = combat_resolver.check_sigil_hit(current_combatant, target, {"skill_acc": acc})
-
-	if not hit_check.hit:
-		log_message("  → Missed! (%d%% chance, rolled %d)" % [int(hit_check.hit_chance), hit_check.roll])
-		return
 
 	# ═══════ CHECK FOR REFLECT (MIRROR) ═══════
 	if target.has("buffs") and element != "none" and element != "":
@@ -3068,8 +3338,22 @@ func _execute_skill_single(target: Dictionary) -> void:
 	var damage = damage_result.damage
 	var _is_stumble = damage_result.is_stumble  # Reserved for future stumble mechanics
 
+	# Apply minigame damage modifier
+	var base_damage = damage
+	damage = int(damage * damage_modifier)
+
+	# Log damage modification if applicable
+	if damage_modifier != 1.0:
+		if damage_modifier > 1.0:
+			log_message("  → Button sequence bonus! Damage: %d → %d (%.0f%%)" % [base_damage, damage, damage_modifier * 100])
+		else:
+			log_message("  → Missed buttons! Damage: %d → %d (%.0f%%)" % [base_damage, damage, damage_modifier * 100])
+
 	# Apply damage
 	target.hp -= damage
+
+	# Shake the target's panel for visual feedback
+	_shake_combatant_panel(target.id)
 
 	# Wake up if asleep
 	_wake_if_asleep(target)
@@ -3181,10 +3465,13 @@ func _execute_skill_aoe() -> void:
 	for target in target_candidates:
 		if not target.is_ko:
 			await get_tree().create_timer(0.3).timeout
-			_execute_skill_single(target)
+			await _execute_skill_single(target)
 
-	# End turn after AoE
-	battle_mgr.end_turn()
+	# Check if battle is over
+	var battle_ended = await battle_mgr._check_battle_end()
+	if not battle_ended:
+		# End turn after AoE
+		battle_mgr.end_turn()
 
 ## ═══════════════════════════════════════════════════════════════
 ## MIND TYPE SWITCHING (HERO ONLY)

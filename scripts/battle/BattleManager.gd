@@ -12,6 +12,7 @@ signal round_ended(round_number: int)
 signal battle_ended(victory: bool)
 signal action_executed(action_data: Dictionary)
 signal turn_order_changed  # Emitted when turn order is re-sorted mid-round
+signal log_message_requested(message: String)  # Request Battle.gd to log a message
 
 ## Battle state
 enum BattleState {
@@ -399,6 +400,19 @@ func _start_turn(combatant: Dictionary) -> void:
 	# Mark this combatant as having acted this round
 	combatant.has_acted_this_round = true
 
+	# Check if combatant has "Revived" status BEFORE processing ailments (can't act this turn)
+	var current_ailment = str(combatant.get("ailment", "")).to_lower()
+	if current_ailment == "revived":
+		print("[BattleManager] %s is still recovering from revival - skipping turn" % combatant.display_name)
+		# Clear the revived status so they can act next round
+		combatant.ailment = ""
+		combatant.ailment_turn_count = 0
+		print("[BattleManager] %s has recovered from revival! (can act next turn)" % combatant.display_name)
+		refresh_turn_order()
+		# Skip to end turn
+		end_turn()
+		return
+
 	# Process turn-start ailment effects (poison/burn damage, auto-cure rolls, etc.)
 	await _process_turn_start_ailments(combatant)
 
@@ -557,7 +571,9 @@ func _process_round_start_effects() -> void:
 
 func _process_turn_start_ailments(combatant: Dictionary) -> void:
 	"""Process ailment effects at the start of a combatant's turn"""
-	var ailment = str(combatant.get("ailment", ""))
+	var ailment = str(combatant.get("ailment", "")).to_lower()  # Convert to lowercase for consistency
+
+	print("[BattleManager] Processing ailment for %s: '%s'" % [combatant.display_name, ailment])
 
 	if ailment == "" or ailment == "null":
 		return
@@ -577,6 +593,10 @@ func _process_turn_start_ailments(combatant: Dictionary) -> void:
 		print("[BattleManager] %s takes %d %s damage (Turn %d)" % [
 			combatant.display_name, damage, ailment.capitalize(), turn_count
 		])
+		# Log to battle log
+		log_message_requested.emit("  → %s takes %d %s damage!" % [
+			combatant.display_name, damage, ailment.capitalize()
+		])
 
 		# Check for KO from ailment damage
 		if combatant.hp <= 0:
@@ -584,6 +604,7 @@ func _process_turn_start_ailments(combatant: Dictionary) -> void:
 			combatant.ailment = "fainted"
 			combatant.ailment_turn_count = 0
 			print("[BattleManager] %s was KO'd by %s!" % [combatant.display_name, ailment.capitalize()])
+			log_message_requested.emit("  → %s was KO'd by %s!" % [combatant.display_name, ailment.capitalize()])
 			return  # Don't process auto-cure if they died
 
 		# Auto-cure chance: 30% base + 10% per turn (max 90%)
@@ -596,6 +617,7 @@ func _process_turn_start_ailments(combatant: Dictionary) -> void:
 			print("[BattleManager] %s recovered from %s! (%d%% chance, rolled %d)" % [
 				combatant.display_name, ailment.capitalize(), cure_chance, roll
 			])
+			log_message_requested.emit("  → %s recovered from %s!" % [combatant.display_name, ailment.capitalize()])
 			refresh_turn_order()
 		else:
 			print("[BattleManager] %s is still %s (%d%% cure chance, rolled %d)" % [
@@ -696,6 +718,10 @@ func _process_turn_start_ailments(combatant: Dictionary) -> void:
 				combatant.display_name, cure_chance, roll
 			])
 			# Charm behavior (use heal/buff items on enemy) handled by Battle.gd
+
+	# ═══════ REVIVED - Handled before ailment processing (see _start_turn) ═══════
+	# Note: Revived status is checked and cleared in _start_turn() BEFORE this function is called,
+	# so we should never reach this point with a "revived" ailment.
 
 	# Small delay for readability
 	await get_tree().create_timer(0.3).timeout

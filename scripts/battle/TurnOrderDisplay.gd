@@ -276,6 +276,12 @@ func _rebuild_display_with_reveal() -> void:
 
 func _rebuild_display() -> void:
 	"""Rebuild the entire turn order display with fade-in animation"""
+	# ULTRA FIX: Check rebuild lock
+	if is_rebuilding:
+		print("[TurnOrderDisplay] BLOCKED: Already rebuilding, ignoring rebuild request")
+		return
+
+	is_rebuilding = true
 	print("[TurnOrderDisplay] Starting rebuild (no reveal) - current children: %d" % get_child_count())
 
 	# ULTRA FIX: IMMEDIATE deletion - no queue_free, use remove_child + free
@@ -299,10 +305,12 @@ func _rebuild_display() -> void:
 
 	# Get turn order from battle manager
 	if not battle_mgr:
+		is_rebuilding = false  # ULTRA FIX: Clear rebuild lock on early return
 		return
 
 	var turn_order = battle_mgr.turn_order
 	if turn_order.is_empty():
+		is_rebuilding = false  # ULTRA FIX: Clear rebuild lock on early return
 		return
 
 	# Create slots for upcoming turns
@@ -349,6 +357,8 @@ func _rebuild_display() -> void:
 
 	# Store current order for future animations
 	_store_current_order()
+
+	is_rebuilding = false  # ULTRA FIX: Clear rebuild lock
 
 func _rebuild_display_animated() -> void:
 	"""Rebuild display with animations for position changes"""
@@ -492,7 +502,12 @@ func _create_turn_slot(combatant: Dictionary, index: int) -> PanelContainer:
 	turn_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	turn_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	turn_label.add_theme_font_size_override("font_size", 18)
-	if is_ko:
+
+	# Check if combatant has "Revived" ailment
+	var ailment_check = str(combatant.get("ailment", ""))
+	var is_revived_check = (ailment_check == "Revived")
+
+	if is_ko or is_revived_check:
 		turn_label.modulate = Color(0.5, 0.5, 0.5, 1.0)
 	hbox.add_child(turn_label)
 
@@ -527,8 +542,11 @@ func _create_turn_slot(combatant: Dictionary, index: int) -> PanelContainer:
 	name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 
 	# Color name based on status
-	if is_ko:
-		# KO'd = Grey
+	# Check if combatant has "Revived" ailment
+	var is_revived = (ailment == "Revived")
+
+	if is_ko or is_revived:
+		# KO'd or Revived = Grey
 		name_label.add_theme_color_override("font_color", Color(0.5, 0.5, 0.5, 1.0))
 	elif is_fallen:
 		# Fallen = Red
@@ -591,8 +609,8 @@ func _create_turn_slot(combatant: Dictionary, index: int) -> PanelContainer:
 
 	# Initiative value
 	var init_label = Label.new()
-	# Show 0 for KO'd or Fallen combatants (Fallen should already be 0)
-	if is_ko or is_fallen:
+	# Show 0 for KO'd, Revived, or Fallen combatants (Fallen should already be 0)
+	if is_ko or is_revived or is_fallen:
 		init_label.text = "0"
 		init_label.modulate = Color(0.5, 0.5, 0.5, 1.0)
 	else:
