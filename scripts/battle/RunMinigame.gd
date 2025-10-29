@@ -72,6 +72,7 @@ func _generate_escape_gap() -> void:
 	# Gap size = run_chance percentage of the full circle
 	# E.g., 10% escape = 10% of circle is gap (0.1 * TAU radians)
 	var gap_size_radians = (run_chance / 100.0) * TAU
+	var gap_size_degrees = rad_to_deg(gap_size_radians)
 
 	# Random starting position for the gap (0 to TAU)
 	var random_start = randf() * TAU
@@ -80,13 +81,19 @@ func _generate_escape_gap() -> void:
 	escape_gap_end = random_start + gap_size_radians
 
 	var wraps = escape_gap_end > TAU
-	print("[RunMinigame] Escape gap: %.1f° to %.1f° (%.1f%% of circle, wraps=%s)" %
-		[rad_to_deg(escape_gap_start), rad_to_deg(escape_gap_end), run_chance, wraps])
+
+	print("[RunMinigame] ===== GAP GENERATION =====")
+	print("[RunMinigame] Run chance: %.1f%%" % run_chance)
+	print("[RunMinigame] Gap size: %.2f radians = %.1f degrees (%.1f%% of 360°)" %
+		[gap_size_radians, gap_size_degrees, (gap_size_degrees / 360.0) * 100.0])
+	print("[RunMinigame] Gap range: %.1f° to %.1f° (wraps=%s)" %
+		[rad_to_deg(escape_gap_start), rad_to_deg(escape_gap_end), wraps])
 
 	if wraps:
 		var wrapped_end = escape_gap_end - TAU
 		print("[RunMinigame]   Wrapped: [%.1f° to 360°] + [0° to %.1f°]" %
 			[rad_to_deg(escape_gap_start), rad_to_deg(wrapped_end)])
+	print("[RunMinigame] ==========================")
 
 func _start_minigame() -> void:
 	print("[RunMinigame] Starting escape")

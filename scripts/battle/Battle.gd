@@ -1874,7 +1874,7 @@ func _on_run_pressed() -> void:
 
 func _calculate_run_chance() -> float:
 	"""Calculate run chance based on enemy HP percentage and level difference"""
-	const BASE_RUN_CHANCE: float = 10.0  # Base 10% escape chance
+	const BASE_RUN_CHANCE: float = 5.0  # Base 5% escape chance (18° gap)
 	const MAX_HP_BONUS: float = 40.0
 	const _MAX_LEVEL_BONUS: float = 20.0  # Reserved for future level-based calculations
 	const LEVEL_BONUS_PER_LEVEL: float = 2.0
