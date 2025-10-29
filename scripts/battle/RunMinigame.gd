@@ -11,17 +11,11 @@ var focus: int = 1  # Focus stat (adds magnet effect)
 
 ## Internal state
 var circle_radius: float = 100.0  # Current catch circle radius (closes in, rotating)
-var circle2_radius: float = 100.0  # Second catch circle radius (closes in, non-rotating)
-var circle2_delay: float = 1.5  # Delay before second circle starts (seconds)
-var circle2_close_speed: float = 15.0  # pixels per second (slower than first circle)
-var circle2_active: bool = false  # Whether second circle has started
-var elapsed_time: float = 0.0  # Time since minigame started
 var max_radius: float = 100.0  # Maximum radius (outer escape boundary)
-var circle_close_speed: float = 20.0  # pixels per second (first circle)
+var circle_close_speed: float = 20.0  # pixels per second
 var circle_rotation_speed: float = 0.3  # radians per second (slow rotation)
 var player_pos: Vector2 = Vector2.ZERO
-var circle_angle: float = 0.0  # Current rotation of catch circle (first one only)
-var circle2_start_angle: float = 0.0  # Starting rotation offset for second circle (static)
+var circle_angle: float = 0.0  # Current rotation of catch circle
 var escape_gap_start: float = 0.0  # Start angle of the ONE continuous gap
 var escape_gap_end: float = 0.0  # End angle of the ONE continuous gap
 var arena_center: Vector2 = Vector2(100, 100)  # Center of arena
@@ -105,17 +99,11 @@ func _start_minigame() -> void:
 	print("[RunMinigame] Starting escape")
 	player_pos = Vector2.ZERO
 	circle_radius = max_radius
-	circle2_radius = max_radius
-	circle2_active = false
-	elapsed_time = 0.0
 
-	# Randomize starting rotation positions for both catch circles
+	# Randomize starting rotation position for catch circle
 	circle_angle = randf() * TAU
-	circle2_start_angle = randf() * TAU
 
-	print("[RunMinigame] Circle 1 (red, rotating) starting rotation: %.1f°" % rad_to_deg(circle_angle))
-	print("[RunMinigame] Circle 2 (orange, flipped) starting rotation: %.1f°" % rad_to_deg(circle2_start_angle))
-	print("[RunMinigame] Note: Circle 2 has INVERTED gap pattern (where circle 1 is solid, circle 2 has gap)")
+	print("[RunMinigame] Catch circle starting rotation: %.1f°" % rad_to_deg(circle_angle))
 
 func _draw_arena() -> void:
 	"""Draw the circles and player"""
@@ -160,23 +148,6 @@ func _draw_arena() -> void:
 			var p2 = arena_center + Vector2(cos(world_angle + (TAU / segment_count)), sin(world_angle + (TAU / segment_count))) * circle_radius
 			arena.draw_line(p1, p2, Color(1.0, 0.3, 0.3, 1.0), 4.0)
 
-	# Draw SECOND CATCH CIRCLE (orange, non-rotating but starts at random angle, FLIPPED gap)
-	if circle2_active:
-		for i in range(segment_count):
-			var local_angle = (float(i) / segment_count) * TAU
-
-			# Check gap in local space - INVERTED for second circle (gap becomes solid, solid becomes gap)
-			var in_gap = _angle_in_gap(local_angle)
-			var in_flipped_gap = not in_gap  # Flip the gap pattern
-
-			# Only draw if NOT in the flipped gap
-			if not in_flipped_gap:
-				# World angle includes starting rotation offset (but doesn't change over time)
-				var world_angle = local_angle + circle2_start_angle
-				var p1 = arena_center + Vector2(cos(world_angle), sin(world_angle)) * circle2_radius
-				var p2 = arena_center + Vector2(cos(world_angle + (TAU / segment_count)), sin(world_angle + (TAU / segment_count))) * circle2_radius
-				arena.draw_line(p1, p2, Color(1.0, 0.6, 0.2, 1.0), 4.0)  # Orange color
-
 	# Draw player dot (green with white outline)
 	var player_screen_pos = arena_center + player_pos
 	arena.draw_circle(player_screen_pos, 6.0, Color(1.0, 1.0, 1.0, 1.0))
@@ -202,18 +173,11 @@ func _process(delta: float) -> void:
 	# Track elapsed time
 	elapsed_time += delta
 
-	# Close first circle (even when caught, for visual feedback)
+	# Close catch circle (even when caught, for visual feedback)
 	circle_radius -= circle_close_speed * delta
 
-	# Rotate first circle
+	# Rotate catch circle
 	circle_angle += circle_rotation_speed * delta
-
-	# Activate and close second circle after delay
-	if elapsed_time >= circle2_delay:
-		if not circle2_active:
-			circle2_active = true
-			print("[RunMinigame] Second catch circle activated!")
-		circle2_radius -= circle2_close_speed * delta  # Slower speed for second circle
 
 	# Redraw arena
 	arena.queue_redraw()
@@ -227,43 +191,19 @@ func _process(delta: float) -> void:
 			# Player at escape boundary - check if they're in the escape gap
 			_check_escape()
 		else:
-			# Check if player hit the FIRST catch circle (rotating)
-			# Note: Check both circles independently (not elif) since they can overlap
+			# Check if player hit the catch circle (rotating)
 			if distance_from_center > circle_radius - 3.0:
-				# Player is touching the first catch circle
+				# Player is touching the catch circle
 				# Check if they're in the gap (accounting for rotation)
 				var player_angle = atan2(player_pos.y, player_pos.x)
 				# Remove rotation from player angle to check against static gap
 				var relative_angle = player_angle - circle_angle
 				if not _angle_in_gap(relative_angle):
-					# Hit the first catch circle! Caught
+					# Hit the catch circle! Caught
 					_on_caught()
 
-			# Check if player hit the SECOND catch circle (non-rotating but offset, FLIPPED gap)
-			if circle2_active and distance_from_center > circle2_radius - 3.0:
-				# Player is touching the second catch circle
-				# Check if they're in the FLIPPED gap (accounting for starting rotation offset)
-				var player_angle = atan2(player_pos.y, player_pos.x)
-				# Remove starting offset from player angle to check against static gap
-				var relative_angle = player_angle - circle2_start_angle
-				var in_gap = _angle_in_gap(relative_angle)
-				var in_flipped_gap = not in_gap  # Second circle has flipped gap
-
-				print("[RunMinigame] Circle2 collision check:")
-				print("  Player angle: %.1f°" % rad_to_deg(player_angle))
-				print("  Circle2 start angle: %.1f°" % rad_to_deg(circle2_start_angle))
-				print("  Relative angle: %.1f°" % rad_to_deg(relative_angle))
-				print("  In original gap: %s" % in_gap)
-				print("  In flipped gap: %s" % in_flipped_gap)
-				print("  Should catch: %s" % (not in_flipped_gap))
-
-				if not in_flipped_gap:
-					# Hit the second catch circle! Caught
-					print("  → CAUGHT by circle2!")
-					_on_caught()
-
-		# Check if either circle closed completely
-		if circle_radius <= 3 or (circle2_active and circle2_radius <= 3):
+		# Check if circle closed completely
+		if circle_radius <= 3:
 			# Circle fully closed - caught!
 			_on_caught()
 
