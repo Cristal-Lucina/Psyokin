@@ -354,14 +354,14 @@ func _get_charge_zone(progress: float, is_weak_spot_visible: bool) -> String:
 		else:
 			return "yellow"  # Any charge from 0-99.9%
 	else:
-		# Weak spot in red dot - green and blue available
-		# 1-89% = green, 90-99% = blue, 100%+ = red
-		if progress <= 0.0:
-			return "red"
-		elif progress < 0.90:
-			return "green"  # Anything below 90% is green when in red dot
+		# Weak spot in red dot - full tier range available
+		# 1-9% = yellow (GOOD), 10-80% = green (GREAT), 81-99% = blue (CRIT), 100%+ = red (OK)
+		if progress < 0.10:
+			return "yellow"  # 1-9% - low charge
+		elif progress < 0.81:
+			return "green"  # 10-80% - GREAT
 		elif progress < 1.0:
-			return "blue"  # 90-99% is blue (crit)
+			return "blue"  # 81-99% - CRIT
 		else:
 			return "red"  # Overcharged (100%+)
 
