@@ -23,13 +23,16 @@ var watch_time_limit: float = 8.0
 var minigame_complete: bool = false  # Lock out all input when complete
 
 ## Weak spot movement
-var weak_spot_angle: float = 0.0  # Angle around the circle
-var weak_spot_orbit_radius: float = 100.0  # How far from center it orbits
-var weak_spot_speed: float = 2.0  # Radians per second
+var weak_spot_pos: Vector2 = Vector2.ZERO  # Current position
+var weak_spot_target: Vector2 = Vector2.ZERO  # Target position
+var weak_spot_speed: float = 80.0  # Pixels per second
 var weak_spot_is_visible: bool = false
+var weak_spot_change_timer: float = 0.0
+var weak_spot_change_interval: float = 1.5  # Change direction every 1.5s
 
 ## View circle
-var view_radius: float = 80.0  # Size of visible area (scales with BRW)
+var view_radius: float = 60.0  # Size of visible area (scales with BRW)
+var view_pos: Vector2 = Vector2.ZERO  # View center offset from arena center
 
 ## Charging phase
 var charge_progress: float = 0.0
@@ -39,7 +42,9 @@ var charge_zone: String = "red"
 
 ## Visual elements
 var arena: Control  # For custom drawing
-var arena_center: Vector2 = Vector2(140, 140)  # Center point for 280x280 arena
+var arena_size: float = 200.0  # Smaller arena
+var arena_center: Vector2 = Vector2(100, 100)  # Center point for 200x200 arena
+var arena_radius: float = 90.0  # Arena bounds
 var charge_bar: ProgressBar
 var charge_label: Label
 var instruction_label: Label
@@ -51,11 +56,12 @@ func _setup_minigame() -> void:
 	current_duration = base_duration
 
 	# Calculate view size from BRW (higher BRW = bigger view window)
-	view_radius = 60.0 + (brawn * 8.0)
+	view_radius = 40.0 + (brawn * 5.0)
 	print("[AttackMinigame] View radius: %.1f (BRW: %d)" % [view_radius, brawn])
 
-	# Randomize starting angle for weak spot
-	weak_spot_angle = randf() * TAU
+	# Randomize starting position for weak spot
+	_randomize_weak_spot_target()
+	weak_spot_pos = _get_random_position_in_arena()
 
 	# Title
 	var title_label = Label.new()
@@ -64,9 +70,9 @@ func _setup_minigame() -> void:
 	title_label.add_theme_font_size_override("font_size", 28)
 	content_container.add_child(title_label)
 
-	# Arena (280x280 - circular view)
+	# Arena (200x200 - circular view)
 	arena = Control.new()
-	arena.custom_minimum_size = Vector2(280, 280)
+	arena.custom_minimum_size = Vector2(arena_size, arena_size)
 	arena.draw.connect(_draw_arena)
 	var arena_center_container = CenterContainer.new()
 	arena_center_container.add_child(arena)
@@ -77,7 +83,7 @@ func _setup_minigame() -> void:
 	charge_bar.max_value = 1.0
 	charge_bar.value = 0.0
 	charge_bar.show_percentage = false
-	charge_bar.custom_minimum_size = Vector2(280, 30)
+	charge_bar.custom_minimum_size = Vector2(200, 25)
 	var bar_container = CenterContainer.new()
 	bar_container.add_child(charge_bar)
 	content_container.add_child(bar_container)
@@ -110,7 +116,7 @@ func _setup_minigame() -> void:
 
 	# Instructions
 	instruction_label = Label.new()
-	instruction_label.text = "HOLD SPACE when weak spot is visible!"
+	instruction_label.text = "WASD: Move view | HOLD SPACE: Charge when visible!"
 	instruction_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	instruction_label.add_theme_font_size_override("font_size", 11)
 	content_container.add_child(instruction_label)
@@ -118,30 +124,30 @@ func _setup_minigame() -> void:
 func _draw_arena() -> void:
 	"""Draw the circular arena with moving weak spot"""
 	# Draw outer dark circle (full arena)
-	arena.draw_circle(arena_center, 130.0, Color(0.2, 0.2, 0.2, 0.5))
+	arena.draw_circle(arena_center, arena_radius, Color(0.2, 0.2, 0.2, 0.5))
+
+	# Calculate view center position (arena center + view offset)
+	var view_center = arena_center + view_pos
 
 	# Draw visible view circle (lighter)
-	arena.draw_circle(arena_center, view_radius, Color(0.3, 0.3, 0.4, 0.8))
+	arena.draw_circle(view_center, view_radius, Color(0.3, 0.3, 0.4, 0.8))
 
 	# Draw enemy icon in center
-	arena.draw_circle(arena_center, 25.0, Color(0.8, 0.3, 0.3, 1.0))
+	arena.draw_circle(arena_center, 20.0, Color(0.8, 0.3, 0.3, 1.0))
 
-	# Calculate weak spot position based on angle
-	var weak_spot_pos = arena_center + Vector2(
-		cos(weak_spot_angle) * weak_spot_orbit_radius,
-		sin(weak_spot_angle) * weak_spot_orbit_radius
-	)
+	# Calculate weak spot screen position
+	var weak_spot_screen_pos = arena_center + weak_spot_pos
 
 	# Check if weak spot is visible (inside view circle)
-	var distance_from_center = (weak_spot_pos - arena_center).length()
-	weak_spot_is_visible = distance_from_center <= view_radius
+	var distance_from_view_center = (weak_spot_screen_pos - view_center).length()
+	weak_spot_is_visible = distance_from_view_center <= view_radius
 
 	# Draw weak spot (bright yellow if visible, dim if not)
 	var weak_spot_color = Color(1.0, 1.0, 0.0, 1.0) if weak_spot_is_visible else Color(0.5, 0.5, 0.0, 0.3)
-	arena.draw_circle(weak_spot_pos, 10.0, weak_spot_color)
+	arena.draw_circle(weak_spot_screen_pos, 8.0, weak_spot_color)
 
 	# Draw view circle border
-	_draw_circle_outline(arena_center, view_radius, Color(0.5, 0.7, 1.0, 0.8), 2.0)
+	_draw_circle_outline(view_center, view_radius, Color(0.5, 0.7, 1.0, 0.8), 2.0)
 
 func _draw_circle_outline(center: Vector2, radius: float, color: Color, width: float) -> void:
 	"""Helper to draw a circle outline"""
@@ -152,6 +158,17 @@ func _draw_circle_outline(center: Vector2, radius: float, color: Color, width: f
 		var point_from = center + Vector2(cos(angle_from), sin(angle_from)) * radius
 		var point_to = center + Vector2(cos(angle_to), sin(angle_to)) * radius
 		arena.draw_line(point_from, point_to, color, width)
+
+func _get_random_position_in_arena() -> Vector2:
+	"""Get a random position within the arena bounds, not too close to center"""
+	var angle = randf() * TAU
+	var distance = randf_range(30.0, arena_radius - 15.0)
+	return Vector2(cos(angle), sin(angle)) * distance
+
+func _randomize_weak_spot_target() -> void:
+	"""Pick a new random target for the weak spot"""
+	weak_spot_target = _get_random_position_in_arena()
+	weak_spot_change_timer = 0.0
 
 func _start_minigame() -> void:
 	print("[AttackMinigame] Starting timing attack (attempts: %d, BRW: %d)" % [tempo, brawn])
@@ -175,16 +192,20 @@ func _start_next_attempt() -> void:
 	charge_progress = 0.0
 	is_charging = false
 
-	# Randomize weak spot starting position
-	weak_spot_angle = randf() * TAU
+	# Reset view position to center
+	view_pos = Vector2.ZERO
+
+	# Randomize weak spot starting position and target
+	weak_spot_pos = _get_random_position_in_arena()
+	_randomize_weak_spot_target()
 
 	# Reset visuals
 	charge_bar.value = 0.0
 	arena.queue_redraw()
 
-	timer_label.text = "Watch for the weak spot..."
+	timer_label.text = "Move view to find weak spot..."
 	charge_label.text = "HOLD SPACE when it's visible!"
-	instruction_label.text = "HOLD SPACE when weak spot is visible!"
+	instruction_label.text = "WASD: Move view | HOLD SPACE: Charge when visible!"
 
 func _process(delta: float) -> void:
 	# Stop all processing if minigame is complete
@@ -198,17 +219,44 @@ func _process(delta: float) -> void:
 			_process_charging(delta)
 
 func _process_watching(delta: float) -> void:
-	# Move weak spot around the orbit
-	weak_spot_angle += weak_spot_speed * delta
-	if weak_spot_angle > TAU:
-		weak_spot_angle -= TAU
+	# Handle WASD view movement
+	var move_dir = Vector2.ZERO
+	if Input.is_key_pressed(KEY_W): move_dir.y -= 1
+	if Input.is_key_pressed(KEY_S): move_dir.y += 1
+	if Input.is_key_pressed(KEY_A): move_dir.x -= 1
+	if Input.is_key_pressed(KEY_D): move_dir.x += 1
 
-	# Redraw arena to update weak spot position
+	if move_dir.length() > 0:
+		if not has_started:
+			has_started = true
+			print("[AttackMinigame] Timer started!")
+
+		move_dir = move_dir.normalized()
+		view_pos += move_dir * 80.0 * delta
+
+		# Clamp view position to stay within reasonable bounds
+		view_pos.x = clampf(view_pos.x, -60.0, 60.0)
+		view_pos.y = clampf(view_pos.y, -60.0, 60.0)
+
+	# Move weak spot towards target randomly
+	var direction_to_target = (weak_spot_target - weak_spot_pos).normalized()
+	weak_spot_pos += direction_to_target * weak_spot_speed * delta
+
+	# Check if reached target
+	if weak_spot_pos.distance_to(weak_spot_target) < 5.0:
+		_randomize_weak_spot_target()
+
+	# Also change target periodically
+	weak_spot_change_timer += delta
+	if weak_spot_change_timer >= weak_spot_change_interval:
+		_randomize_weak_spot_target()
+
+	# Redraw arena to update positions
 	arena.queue_redraw()
 
 	# Update timer
 	if not has_started:
-		timer_label.text = "Watch for the weak spot..."
+		timer_label.text = "Move view to find weak spot..."
 	else:
 		watch_timer += delta
 		timer_label.text = "Time: %.1fs" % (watch_time_limit - watch_timer)
@@ -245,10 +293,20 @@ func _start_charging() -> void:
 		charge_label.text = "Weak spot not visible! Automatic RED hit!"
 
 func _process_charging(delta: float) -> void:
-	# Continue moving weak spot and redrawing
-	weak_spot_angle += weak_spot_speed * delta
-	if weak_spot_angle > TAU:
-		weak_spot_angle -= TAU
+	# Continue moving weak spot towards target
+	var direction_to_target = (weak_spot_target - weak_spot_pos).normalized()
+	weak_spot_pos += direction_to_target * weak_spot_speed * delta
+
+	# Check if reached target
+	if weak_spot_pos.distance_to(weak_spot_target) < 5.0:
+		_randomize_weak_spot_target()
+
+	# Also change target periodically
+	weak_spot_change_timer += delta
+	if weak_spot_change_timer >= weak_spot_change_interval:
+		_randomize_weak_spot_target()
+
+	# Redraw arena to update weak spot position
 	arena.queue_redraw()
 
 	# Increase charge while Space is held
