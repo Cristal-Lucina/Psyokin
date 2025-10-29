@@ -170,9 +170,6 @@ func _process(delta: float) -> void:
 			move_dir = move_dir.normalized()
 			player_pos += move_dir * 100.0 * delta
 
-	# Track elapsed time
-	elapsed_time += delta
-
 	# Close catch circle (even when caught, for visual feedback)
 	circle_radius -= circle_close_speed * delta
 
