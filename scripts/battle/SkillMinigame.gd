@@ -303,9 +303,10 @@ func _finish_minigame_success() -> void:
 	"""Complete minigame successfully"""
 	print("[SkillMinigame] Success! Focus: %d, Misclicks: %d" % [focus_level, misclick_count])
 
-	instruction_label.text = "Success! Focus Level: %d" % focus_level
+	instruction_label.text = "Great! Focus Level: %d" % focus_level
+	title_label.text = "GREAT!"
 
-	await get_tree().create_timer(0.5).timeout
+	await get_tree().create_timer(1.0).timeout
 
 	# Calculate bonuses
 	var damage_modifier = 1.0
@@ -341,9 +342,10 @@ func _finish_minigame_incomplete() -> void:
 	"""Complete minigame with timeout/failure"""
 	print("[SkillMinigame] Incomplete! Sequence progress: %d/%d" % [sequence_index, skill_sequence.size()])
 
-	instruction_label.text = "Time's up!"
+	instruction_label.text = "Skill cast anyway..."
+	title_label.text = "OK"
 
-	await get_tree().create_timer(0.5).timeout
+	await get_tree().create_timer(1.0).timeout
 
 	# Determine tier downgrade based on how much was completed
 	var completion_ratio = float(sequence_index) / float(skill_sequence.size())
