@@ -48,6 +48,13 @@ const BUTTON_MAP = {
 const BASE_CHARGE_TIME_PER_LEVEL: float = 0.8
 var charge_time_per_level: float = 0.8
 
+## Status effect charge halt (for poison/burned)
+var has_halt_status: bool = false
+var is_charge_halted: bool = false
+var halt_timer: float = 0.0
+var next_halt_time: float = 0.0
+var was_space_pressed: bool = false  # Track key state for halt recovery
+
 func _setup_minigame() -> void:
 	base_duration = 10.0
 	current_duration = base_duration
@@ -55,6 +62,13 @@ func _setup_minigame() -> void:
 	# Calculate charge speed based on Focus stat
 	charge_time_per_level = BASE_CHARGE_TIME_PER_LEVEL / (1.0 + (focus_stat * 0.1))
 	print("[SkillMinigame] Charge time per level: %.2fs (Focus: %d)" % [charge_time_per_level, focus_stat])
+
+	# Check for halt-inducing status effects
+	has_halt_status = status_effects.has("burned") or status_effects.has("poison")
+	if has_halt_status:
+		print("[SkillMinigame] Halt status detected: %s" % str(status_effects))
+		# Schedule first halt at a random time (0.5 to 1.5 seconds)
+		next_halt_time = randf_range(0.5, 1.5)
 
 	# Title
 	title_label = Label.new()
@@ -157,22 +171,51 @@ func _process(delta: float) -> void:
 			_process_inputting(delta)
 
 func _process_charging(delta: float) -> void:
+	# Update halt timer if status effect is active
+	if has_halt_status and not is_charge_halted:
+		halt_timer += delta
+		if halt_timer >= next_halt_time:
+			# Trigger halt!
+			is_charge_halted = true
+			focus_level_label.text = "INTERRUPTED! Click again to continue!"
+			focus_level_label.modulate = Color(1.0, 0.3, 0.3, 1.0)
+			print("[SkillMinigame] Charge halted at %.2fs" % halt_timer)
+
+	# Track Space key state
+	var space_is_pressed = Input.is_key_pressed(KEY_SPACE)
+
 	# Check if Space is held
-	if Input.is_key_pressed(KEY_SPACE):
+	if space_is_pressed:
 		# Start the timer on first press
 		if not has_started_charging:
 			has_started_charging = true
 			print("[SkillMinigame] Timer started!")
 
-		charge_time += delta
+		# If halted, don't charge until player releases and presses again
+		if is_charge_halted:
+			# Check if this is a new press (was released before)
+			if not was_space_pressed:
+				# Player pressed again! Resume charging
+				is_charge_halted = false
+				focus_level_label.text = "Focus Level: %d" % focus_level
+				focus_level_label.modulate = Color(1.0, 1.0, 1.0, 1.0)
+				# Schedule next halt
+				halt_timer = 0.0
+				next_halt_time = randf_range(0.8, 2.0)
+				print("[SkillMinigame] Charging resumed!")
+		else:
+			# Normal charging
+			charge_time += delta
 
-		# Calculate focus level
-		var new_level = min(3, int(charge_time / charge_time_per_level))
-		if new_level != focus_level:
-			focus_level = new_level
-			_update_focus_visuals()
+			# Calculate focus level
+			var new_level = min(3, int(charge_time / charge_time_per_level))
+			if new_level != focus_level:
+				focus_level = new_level
+				_update_focus_visuals()
 
-		focus_bar.value = charge_time / charge_time_per_level
+			focus_bar.value = charge_time / charge_time_per_level
+
+	was_space_pressed = space_is_pressed
 
 	# Update overall timer (only if charging has started)
 	if has_started_charging:
