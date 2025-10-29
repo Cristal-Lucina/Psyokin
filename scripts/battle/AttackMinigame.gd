@@ -20,6 +20,7 @@ var is_crit: bool = false
 var has_moved: bool = false
 var hunt_timer: float = 0.0
 var hunt_time_limit: float = 8.0
+var minigame_complete: bool = false  # Lock out all input when complete
 
 ## Weak spot
 var weak_spot_pos: Vector2 = Vector2.ZERO
@@ -185,6 +186,10 @@ func _start_next_attempt() -> void:
 	instruction_label.text = "WASD: Find weak spot | HOLD SPACE: Charge attack!"
 
 func _process(delta: float) -> void:
+	# Stop all processing if minigame is complete
+	if minigame_complete:
+		return
+
 	match current_phase:
 		Phase.HUNTING:
 			_process_hunting(delta)
@@ -396,6 +401,10 @@ func _is_better_grade(new_grade: String, old_grade: String) -> bool:
 
 func _finish_minigame() -> void:
 	print("[AttackMinigame] Finishing - Best: %s, Modifier: %.2f, Crit: %s" % [best_grade, best_damage_modifier, is_crit])
+
+	# Lock out all input immediately
+	minigame_complete = true
+	current_phase = Phase.COMPLETE
 
 	var result = {
 		"success": true,

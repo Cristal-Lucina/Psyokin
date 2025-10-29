@@ -18,6 +18,7 @@ var breaks_completed: int = 0  # Number of breaks achieved
 var breaks_needed: int = 0  # Total breaks needed (= break rating)
 var break_rating: int = 6
 var break_timer: float = 0.0  # Time until enemy breaks free
+var minigame_complete: bool = false  # Lock out all input when complete
 
 # Bind point system
 enum BindDirection { UP, DOWN, LEFT, RIGHT }
@@ -291,6 +292,10 @@ func _spawn_bind_point() -> void:
 	print("[CaptureMinigame] Bind point spawned at: %s" % BindDirection.keys()[current_bind_direction])
 
 func _process(delta: float) -> void:
+	# Stop all processing if minigame is complete
+	if minigame_complete:
+		return
+
 	if current_phase != Phase.BIND:
 		return
 
@@ -411,6 +416,11 @@ func _get_direction_angle(direction: BindDirection) -> float:
 
 func _finish_capture_success() -> void:
 	print("[CaptureMinigame] Capture successful! Completed all breaks.")
+
+	# Lock out all input immediately
+	minigame_complete = true
+	current_phase = Phase.COMPLETE
+
 	title_label.text = "GREAT!"
 	phase_label.text = "Success!"
 	instruction_label.text = "Break rating reduced to 0!"
@@ -437,6 +447,10 @@ func _finish_capture_success() -> void:
 
 func _finish_capture_failed() -> void:
 	print("[CaptureMinigame] Capture failed! Breaks completed: %d/%d" % [breaks_completed, breaks_needed])
+
+	# Lock out all input immediately
+	minigame_complete = true
+	current_phase = Phase.COMPLETE
 
 	# Break rating reduction is the number of breaks completed
 	var break_rating_reduced = breaks_completed

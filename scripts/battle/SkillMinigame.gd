@@ -23,6 +23,7 @@ var has_started_charging: bool = false  # Track if player has pressed Space yet
 var overall_timer: float = 0.0  # Overall countdown timer
 var max_overall_time: float = 8.0  # Total time for entire minigame
 var last_input_button: String = ""  # Track last button to prevent double-input
+var minigame_complete: bool = false  # Lock out all input when complete
 
 ## Visual elements
 var title_label: Label
@@ -145,6 +146,10 @@ func _setup_sequence_display() -> void:
 		sequence_display.add_child(btn_label)
 
 func _process(delta: float) -> void:
+	# Stop all processing if minigame is complete
+	if minigame_complete:
+		return
+
 	match current_phase:
 		Phase.CHARGING:
 			_process_charging(delta)
@@ -260,6 +265,10 @@ func _process_inputting(delta: float) -> void:
 
 func _on_button_input(button: String) -> void:
 	"""Handle button press during input phase"""
+	# Safety check: don't process if complete or out of bounds
+	if minigame_complete or sequence_index >= skill_sequence.size():
+		return
+
 	var expected_button = skill_sequence[sequence_index]
 
 	if button == expected_button:
@@ -303,6 +312,10 @@ func _finish_minigame_success() -> void:
 	"""Complete minigame successfully"""
 	print("[SkillMinigame] Success! Focus: %d, Misclicks: %d" % [focus_level, misclick_count])
 
+	# Lock out all input immediately
+	minigame_complete = true
+	current_phase = Phase.COMPLETE
+
 	instruction_label.text = "Great! Focus Level: %d" % focus_level
 	title_label.text = "GREAT!"
 
@@ -341,6 +354,10 @@ func _finish_minigame_success() -> void:
 func _finish_minigame_incomplete() -> void:
 	"""Complete minigame with timeout/failure"""
 	print("[SkillMinigame] Incomplete! Sequence progress: %d/%d" % [sequence_index, skill_sequence.size()])
+
+	# Lock out all input immediately
+	minigame_complete = true
+	current_phase = Phase.COMPLETE
 
 	instruction_label.text = "Skill cast anyway..."
 	title_label.text = "OK"
