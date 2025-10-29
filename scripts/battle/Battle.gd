@@ -972,6 +972,12 @@ func _execute_attack(target: Dictionary) -> void:
 			elif turn_order_display:
 				turn_order_display.update_combatant_hp(target.id)
 
+	# Check if battle is over (all enemies defeated/captured)
+	var battle_ended = await battle_mgr._check_battle_end()
+	if battle_ended:
+		print("[Battle] Battle ended after attack - skipping end turn")
+		return  # Battle ended
+
 	# End turn
 	battle_mgr.end_turn()
 
@@ -1955,14 +1961,22 @@ func _on_enemy_panel_input(event: InputEvent, target: Dictionary) -> void:
 						_clear_target_highlights()
 						awaiting_target_selection = false
 						awaiting_skill_selection = false
-						_execute_skill_single(target)
-						battle_mgr.end_turn()
+						await _execute_skill_single(target)
+
+						# Check if battle is over
+						var battle_ended = await battle_mgr._check_battle_end()
+						if not battle_ended:
+							battle_mgr.end_turn()
 					elif not selected_burst.is_empty():
 						# Using a burst ability (single target)
 						_clear_target_highlights()
 						awaiting_target_selection = false
-						_execute_burst_on_target(target)
-						battle_mgr.end_turn()
+						await _execute_burst_on_target(target)
+
+						# Check if battle is over
+						var battle_ended = await battle_mgr._check_battle_end()
+						if not battle_ended:
+							battle_mgr.end_turn()
 					else:
 						# Regular attack
 						_execute_attack(target)
@@ -3001,10 +3015,13 @@ func _execute_burst_aoe() -> void:
 
 	for target in alive_enemies:
 		await get_tree().create_timer(0.3).timeout
-		_execute_burst_on_target(target)
+		await _execute_burst_on_target(target)
 
-	# End turn after burst
-	battle_mgr.end_turn()
+	# Check if battle is over
+	var battle_ended = await battle_mgr._check_battle_end()
+	if not battle_ended:
+		# End turn after burst
+		battle_mgr.end_turn()
 
 func _execute_burst_on_target(target: Dictionary) -> void:
 	"""Execute burst ability on a single target"""
@@ -3443,10 +3460,13 @@ func _execute_skill_aoe() -> void:
 	for target in target_candidates:
 		if not target.is_ko:
 			await get_tree().create_timer(0.3).timeout
-			_execute_skill_single(target)
+			await _execute_skill_single(target)
 
-	# End turn after AoE
-	battle_mgr.end_turn()
+	# Check if battle is over
+	var battle_ended = await battle_mgr._check_battle_end()
+	if not battle_ended:
+		# End turn after AoE
+		battle_mgr.end_turn()
 
 ## ═══════════════════════════════════════════════════════════════
 ## MIND TYPE SWITCHING (HERO ONLY)
