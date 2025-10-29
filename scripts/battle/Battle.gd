@@ -1227,18 +1227,34 @@ func _execute_capture(target: Dictionary) -> void:
 	# Initialize or get persistent break rating
 	if not target.has("break_rating"):
 		# First capture attempt - calculate initial break rating
-		var enemy_hp_percent = float(target.hp) / float(target.hp_max)
 		var base_rating = target.get("level", 1)
+		var enemy_hp = target.hp
+		var enemy_hp_max = target.hp_max
+		var enemy_hp_percent = float(enemy_hp) / float(enemy_hp_max)
+		var party_hp = current_combatant.hp
 
-		if enemy_hp_percent <= 0.1:
-			target.break_rating = max(1, int(base_rating / 2))
-		elif enemy_hp_percent >= 1.0:
-			target.break_rating = base_rating * 2
-		elif enemy_hp_percent > 0.5:
-			target.break_rating = int(base_rating * 1.25)
-		else:
-			target.break_rating = int(base_rating * 0.75)
+		# Start with base rating
+		var calculated_rating = float(base_rating)
 
+		# Apply modifiers based on HP comparison
+		if enemy_hp_percent >= 1.0:
+			# Enemy at 100% HP: +50%
+			calculated_rating *= 1.5
+			log_message("  → Enemy at full health! (+50% break rating)")
+		elif enemy_hp > party_hp:
+			# Enemy has more HP than party member: +25%
+			calculated_rating *= 1.25
+			log_message("  → Enemy stronger than you! (+25% break rating)")
+		elif enemy_hp_percent <= 0.1:
+			# Enemy below 10% HP: -50%
+			calculated_rating *= 0.5
+			log_message("  → Enemy critically weak! (-50% break rating)")
+		elif enemy_hp < party_hp:
+			# Enemy has less HP than party member: -25%
+			calculated_rating *= 0.75
+			log_message("  → Enemy weaker than you! (-25% break rating)")
+
+		target.break_rating = max(1, int(calculated_rating))
 		log_message("  → First capture attempt! Break rating: %d" % target.break_rating)
 	else:
 		log_message("  → Continued capture! Break rating: %d" % target.break_rating)
