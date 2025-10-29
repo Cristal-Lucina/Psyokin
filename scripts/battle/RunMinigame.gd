@@ -10,17 +10,17 @@ var tempo_diff: int = 0  # Party tempo - enemy tempo (affects speed)
 var focus: int = 1  # Focus stat (adds magnet effect)
 
 ## Internal state
-var circle_radius: float = 200.0
-var circle_close_speed: float = 50.0  # pixels per second
+var circle_radius: float = 100.0  # Current circle radius
+var max_radius: float = 100.0  # Maximum radius (outer boundary)
+var circle_close_speed: float = 25.0  # pixels per second
 var circle_rotation_speed: float = 1.0  # radians per second
 var player_pos: Vector2 = Vector2.ZERO
 var circle_angle: float = 0.0
 var gaps: Array = []  # Array of {start_angle, end_angle}
+var arena_center: Vector2 = Vector2(100, 100)  # Center of arena
 
 ## Visual elements
-var circle_outer: ColorRect
-var circle_inner: ColorRect
-var player_dot: ColorRect
+var arena: Control  # Custom control for drawing circles
 var instruction_label: Label
 
 func _setup_minigame() -> void:
@@ -54,34 +54,17 @@ func _setup_minigame() -> void:
 	title_label.add_theme_font_size_override("font_size", 32)
 	content_container.add_child(title_label)
 
-	# Circle area
-	var circle_container = CenterContainer.new()
-	circle_container.custom_minimum_size = Vector2(450, 450)
-	content_container.add_child(circle_container)
-
-	# Outer circle (fixed)
-	circle_outer = ColorRect.new()
-	circle_outer.custom_minimum_size = Vector2(400, 400)
-	circle_outer.color = Color(0.3, 0.3, 0.3, 0.5)
-	circle_container.add_child(circle_outer)
-
-	# Inner circle (closing)
-	circle_inner = ColorRect.new()
-	circle_inner.custom_minimum_size = Vector2(400, 400)
-	circle_inner.color = Color(0.8, 0.2, 0.2, 0.7)
-	circle_inner.position = Vector2.ZERO
-	circle_outer.add_child(circle_inner)
-
-	# Player dot
-	player_dot = ColorRect.new()
-	player_dot.custom_minimum_size = Vector2(20, 20)
-	player_dot.color = Color(0.2, 0.8, 0.2, 1.0)
-	player_dot.position = Vector2(190, 190)  # Center
-	circle_outer.add_child(player_dot)
+	# Arena for drawing circles
+	arena = Control.new()
+	arena.custom_minimum_size = Vector2(200, 200)
+	arena.draw.connect(_draw_arena)
+	var arena_container = CenterContainer.new()
+	arena_container.add_child(arena)
+	content_container.add_child(arena_container)
 
 	# Instructions
 	instruction_label = Label.new()
-	instruction_label.text = "Use WASD to move! Escape through the gaps!"
+	instruction_label.text = "Use WASD to escape through the gaps!"
 	instruction_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	instruction_label.add_theme_font_size_override("font_size", 16)
 	content_container.add_child(instruction_label)
@@ -115,6 +98,44 @@ func _generate_gaps(count: int) -> void:
 func _start_minigame() -> void:
 	print("[RunMinigame] Starting escape")
 	player_pos = Vector2.ZERO
+	circle_radius = max_radius
+
+func _draw_arena() -> void:
+	"""Draw the circles and player"""
+	# Draw outer boundary circle (light gray)
+	arena.draw_circle(arena_center, max_radius, Color(0.3, 0.3, 0.3, 0.3))
+
+	# Draw closing circle with gaps (red)
+	# We'll draw the circle in segments, skipping the gaps
+	var segment_count = 360
+	var prev_point = Vector2.ZERO
+	var is_first = true
+
+	for i in range(segment_count + 1):
+		var angle = (float(i) / segment_count) * TAU + circle_angle
+		var normalized_angle = fmod(angle, TAU)
+
+		# Check if this angle is in a gap
+		var in_gap = false
+		for gap in gaps:
+			var gap_start = fmod(gap.start_angle, TAU)
+			var gap_end = fmod(gap.end_angle, TAU)
+			if normalized_angle >= gap_start and normalized_angle <= gap_end:
+				in_gap = true
+				break
+
+		var point = arena_center + Vector2(cos(angle), sin(angle)) * circle_radius
+
+		if not in_gap and not is_first:
+			# Draw line segment (makes a circle)
+			arena.draw_line(prev_point, point, Color(0.8, 0.2, 0.2, 0.8), 3.0)
+
+		prev_point = point
+		is_first = in_gap
+
+	# Draw player dot (green)
+	var player_screen_pos = arena_center + player_pos
+	arena.draw_circle(player_screen_pos, 5.0, Color(0.2, 1.0, 0.2, 1.0))
 
 func _process(delta: float) -> void:
 	# Handle player movement
@@ -126,7 +147,7 @@ func _process(delta: float) -> void:
 
 	if move_dir.length() > 0:
 		move_dir = move_dir.normalized()
-		player_pos += move_dir * 150.0 * delta
+		player_pos += move_dir * 75.0 * delta  # Reduced speed for smaller arena
 
 		# Focus magnet effect (pulls slightly toward nearest gap)
 		if focus > 0:
@@ -134,37 +155,32 @@ func _process(delta: float) -> void:
 			if nearest_gap:
 				var gap_angle = (nearest_gap.start_angle + nearest_gap.end_angle) / 2.0
 				var gap_dir = Vector2(cos(gap_angle + circle_angle), sin(gap_angle + circle_angle))
-				player_pos += gap_dir * (focus * 5.0) * delta
-
-	# Update player visual position
-	player_dot.position = Vector2(190, 190) + player_pos
+				player_pos += gap_dir * (focus * 2.5) * delta  # Reduced magnet effect
 
 	# Close circle
 	circle_radius -= circle_close_speed * delta
-	var size = circle_radius * 2
-	circle_inner.custom_minimum_size = Vector2(size, size)
-	circle_inner.size = Vector2(size, size)
-	var offset = (400 - size) / 2.0
-	circle_inner.position = Vector2(offset, offset)
 
 	# Rotate circle
 	circle_angle += circle_rotation_speed * delta
 
+	# Redraw arena
+	arena.queue_redraw()
+
 	# Check win/lose conditions
 	var distance_from_center = player_pos.length()
 
-	if distance_from_center > 200:
+	if distance_from_center > max_radius:
 		# Player escaped outer boundary!
 		_check_escape()
-	elif distance_from_center > circle_radius:
-		# Player is between inner and outer circle
+	elif distance_from_center > circle_radius - 5.0:  # 5 pixel buffer for player radius
+		# Player is touching or outside the closing circle
 		# Check if they're in a gap
 		if not _is_in_gap(player_pos):
 			# Hit the circle!
 			_finish_failed()
 
-	if circle_radius <= 10:
-		# Circle fully closed
+	if circle_radius <= 5:
+		# Circle fully closed - caught!
 		_finish_failed()
 
 func _find_nearest_gap() -> Dictionary:
