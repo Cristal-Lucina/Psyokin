@@ -184,7 +184,7 @@ func _process(delta: float) -> void:
 		var distance_from_center = player_pos.length()
 
 		# Check if player reached the outer escape boundary
-		if distance_from_center > max_radius - 3.0:
+		if distance_from_center > max_radius - 1.0:
 			# Player at escape boundary - check if they're in the escape gap
 			_check_escape()
 		else:
