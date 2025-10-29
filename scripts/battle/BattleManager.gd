@@ -646,10 +646,15 @@ func _process_turn_start_ailments(combatant: Dictionary) -> void:
 			print("[BattleManager] %s recovered from %s! (%d%% chance, rolled %d)" % [
 				combatant.display_name, ailment.capitalize(), cure_chance, roll
 			])
-			log_message_requested.emit("  → %s recovered from %s!" % [combatant.display_name, ailment.capitalize()])
+			log_message_requested.emit("  → %s recovered from %s! (%d%% chance, rolled %d)" % [
+				combatant.display_name, ailment.capitalize(), cure_chance, roll
+			])
 			refresh_turn_order()
 		else:
 			print("[BattleManager] %s is still %s (%d%% cure chance, rolled %d)" % [
+				combatant.display_name, ailment.capitalize(), cure_chance, roll
+			])
+			log_message_requested.emit("  → %s is still %s (%d%% cure chance, rolled %d)" % [
 				combatant.display_name, ailment.capitalize(), cure_chance, roll
 			])
 
@@ -665,9 +670,15 @@ func _process_turn_start_ailments(combatant: Dictionary) -> void:
 			print("[BattleManager] %s woke up naturally! (%d%% chance, rolled %d)" % [
 				combatant.display_name, wake_chance, roll
 			])
+			log_message_requested.emit("  → %s woke up! (%d%% chance, rolled %d)" % [
+				combatant.display_name, wake_chance, roll
+			])
 			refresh_turn_order()
 		else:
 			print("[BattleManager] %s is asleep (%d%% wake chance, rolled %d - skipping turn)" % [
+				combatant.display_name, wake_chance, roll
+			])
+			log_message_requested.emit("  → %s is still asleep (%d%% wake chance, rolled %d)" % [
 				combatant.display_name, wake_chance, roll
 			])
 			# Sleep causes the turn to be skipped - handled by Battle.gd
@@ -684,9 +695,15 @@ func _process_turn_start_ailments(combatant: Dictionary) -> void:
 			print("[BattleManager] %s broke free from freeze! (%d%% chance, rolled %d)" % [
 				combatant.display_name, cure_chance, roll
 			])
+			log_message_requested.emit("  → %s broke free from freeze! (%d%% chance, rolled %d)" % [
+				combatant.display_name, cure_chance, roll
+			])
 			refresh_turn_order()
 		else:
 			print("[BattleManager] %s is frozen (30%% action chance, %d%% cure chance, rolled %d)" % [
+				combatant.display_name, cure_chance, roll
+			])
+			log_message_requested.emit("  → %s is frozen (%d%% cure chance, rolled %d)" % [
 				combatant.display_name, cure_chance, roll
 			])
 			# Freeze allows acting with 30% success - handled by Battle.gd
@@ -703,9 +720,15 @@ func _process_turn_start_ailments(combatant: Dictionary) -> void:
 			print("[BattleManager] %s recovered from malaise! (%d%% chance, rolled %d)" % [
 				combatant.display_name, cure_chance, roll
 			])
+			log_message_requested.emit("  → %s recovered from malaise! (%d%% chance, rolled %d)" % [
+				combatant.display_name, cure_chance, roll
+			])
 			refresh_turn_order()
 		else:
 			print("[BattleManager] %s is suffering from malaise (30%% action chance, %d%% cure chance, rolled %d)" % [
+				combatant.display_name, cure_chance, roll
+			])
+			log_message_requested.emit("  → %s is suffering from malaise (%d%% cure chance, rolled %d)" % [
 				combatant.display_name, cure_chance, roll
 			])
 			# Malaise allows acting with 30% success - handled by Battle.gd
@@ -722,9 +745,15 @@ func _process_turn_start_ailments(combatant: Dictionary) -> void:
 			print("[BattleManager] %s calmed down from berserk! (%d%% chance, rolled %d)" % [
 				combatant.display_name, cure_chance, roll
 			])
+			log_message_requested.emit("  → %s calmed down from berserk! (%d%% chance, rolled %d)" % [
+				combatant.display_name, cure_chance, roll
+			])
 			refresh_turn_order()
 		else:
 			print("[BattleManager] %s is berserk! (will attack random target, %d%% cure chance, rolled %d)" % [
+				combatant.display_name, cure_chance, roll
+			])
+			log_message_requested.emit("  → %s is berserk! (%d%% cure chance, rolled %d)" % [
 				combatant.display_name, cure_chance, roll
 			])
 			# Berserk behavior (attack random target) handled by Battle.gd
@@ -741,9 +770,15 @@ func _process_turn_start_ailments(combatant: Dictionary) -> void:
 			print("[BattleManager] %s broke free from charm! (%d%% chance, rolled %d)" % [
 				combatant.display_name, cure_chance, roll
 			])
+			log_message_requested.emit("  → %s broke free from charm! (%d%% chance, rolled %d)" % [
+				combatant.display_name, cure_chance, roll
+			])
 			refresh_turn_order()
 		else:
 			print("[BattleManager] %s is charmed! (will aid enemy, %d%% cure chance, rolled %d)" % [
+				combatant.display_name, cure_chance, roll
+			])
+			log_message_requested.emit("  → %s is charmed! (%d%% cure chance, rolled %d)" % [
 				combatant.display_name, cure_chance, roll
 			])
 			# Charm behavior (use heal/buff items on enemy) handled by Battle.gd
