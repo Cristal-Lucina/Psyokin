@@ -10,8 +10,9 @@ var tempo_diff: int = 0  # Party tempo - enemy tempo (affects speed)
 var focus: int = 1  # Focus stat (adds magnet effect)
 
 ## Internal state
-var circle_radius: float = 100.0  # First catch circle radius (closes in, rotating)
-var circle2_radius: float = 100.0  # Second catch circle radius (closes in, static)
+var circle_radius: float = 150.0  # First catch circle radius (closes in, rotating)
+var circle2_radius: float = 150.0  # Second catch circle radius (closes in, static)
+var circle_start_radius: float = 150.0  # Starting radius for catch circles
 var circle2_delay: float = 1.5  # Delay before second circle starts (seconds)
 var circle2_close_speed: float = 15.0  # pixels per second (slower than first)
 var circle2_active: bool = false  # Whether second circle has started
@@ -24,7 +25,7 @@ var circle_angle: float = 0.0  # Current rotation of first catch circle
 var circle2_start_angle: float = 0.0  # Starting rotation offset for second circle (static)
 var escape_gap_start: float = 0.0  # Start angle of the ONE continuous gap
 var escape_gap_end: float = 0.0  # End angle of the ONE continuous gap
-var arena_center: Vector2 = Vector2(100, 100)  # Center of arena
+var arena_center: Vector2 = Vector2(160, 160)  # Center of arena (320x320 arena)
 var is_caught: bool = false  # Flag to freeze movement when caught
 var minigame_complete: bool = false  # Flag to stop all processing
 
@@ -58,9 +59,9 @@ func _setup_minigame() -> void:
 	title_label.add_theme_font_size_override("font_size", 32)
 	content_container.add_child(title_label)
 
-	# Arena for drawing circles
+	# Arena for drawing circles (larger to show catch circles approaching)
 	arena = Control.new()
-	arena.custom_minimum_size = Vector2(200, 200)
+	arena.custom_minimum_size = Vector2(320, 320)
 	arena.draw.connect(_draw_arena)
 	var arena_container = CenterContainer.new()
 	arena_container.add_child(arena)
@@ -104,8 +105,8 @@ func _generate_escape_gap() -> void:
 func _start_minigame() -> void:
 	print("[RunMinigame] Starting escape")
 	player_pos = Vector2.ZERO
-	circle_radius = max_radius
-	circle2_radius = max_radius
+	circle_radius = circle_start_radius  # Start from further away
+	circle2_radius = circle_start_radius  # Start from further away
 	circle2_active = false
 	elapsed_time = 0.0
 
