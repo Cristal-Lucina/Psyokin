@@ -42,10 +42,10 @@ func _setup_visuals() -> void:
 	background_dim.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(background_dim)
 
-	# Central panel (50% of screen)
+	# Central panel (35% of screen - smaller for better visibility)
 	overlay_panel = PanelContainer.new()
-	overlay_panel.custom_minimum_size = get_viewport_rect().size * 0.5
-	overlay_panel.position = get_viewport_rect().size * 0.25
+	overlay_panel.custom_minimum_size = get_viewport_rect().size * 0.35
+	overlay_panel.position = get_viewport_rect().size * 0.325
 	overlay_panel.z_index = 101
 
 	# Panel style

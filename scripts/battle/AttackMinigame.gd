@@ -63,13 +63,13 @@ func _setup_minigame() -> void:
 	reticle_radius = 40.0 + (brawn * 5.0)
 	print("[AttackMinigame] Reticle radius: %.1f (BRW: %d)" % [reticle_radius, brawn])
 
-	# Generate random weak spot position (not in center)
+	# Generate random weak spot position (not in center) - scaled for smaller arena
 	weak_spot_pos = Vector2(
-		randf_range(-150.0, 150.0),
-		randf_range(-150.0, 150.0)
+		randf_range(-100.0, 100.0),
+		randf_range(-100.0, 100.0)
 	)
-	if weak_spot_pos.length() < 50.0:
-		weak_spot_pos = weak_spot_pos.normalized() * 100.0  # Push away from center
+	if weak_spot_pos.length() < 35.0:
+		weak_spot_pos = weak_spot_pos.normalized() * 70.0  # Push away from center
 
 	# Title
 	var title_label = Label.new()
@@ -78,25 +78,25 @@ func _setup_minigame() -> void:
 	title_label.add_theme_font_size_override("font_size", 32)
 	content_container.add_child(title_label)
 
-	# Enemy area (400x400)
+	# Enemy area (280x280 - smaller to fit in 35% panel)
 	enemy_container = Control.new()
-	enemy_container.custom_minimum_size = Vector2(400, 400)
+	enemy_container.custom_minimum_size = Vector2(280, 280)
 	var enemy_center = CenterContainer.new()
 	enemy_center.add_child(enemy_container)
 	content_container.add_child(enemy_center)
 
 	# Enemy icon (center)
 	enemy_icon = ColorRect.new()
-	enemy_icon.custom_minimum_size = Vector2(80, 80)
+	enemy_icon.custom_minimum_size = Vector2(60, 60)
 	enemy_icon.color = Color(0.8, 0.3, 0.3, 1.0)
-	enemy_icon.position = Vector2(160, 160)
+	enemy_icon.position = Vector2(110, 110)
 	enemy_container.add_child(enemy_icon)
 
 	# Weak spot indicator (hidden at start, shows when found)
 	weak_spot_indicator = ColorRect.new()
-	weak_spot_indicator.custom_minimum_size = Vector2(20, 20)
+	weak_spot_indicator.custom_minimum_size = Vector2(16, 16)
 	weak_spot_indicator.color = Color(1.0, 1.0, 0.0, 0.0)  # Transparent yellow
-	weak_spot_indicator.position = Vector2(200, 200) + weak_spot_pos - Vector2(10, 10)
+	weak_spot_indicator.position = Vector2(140, 140) + weak_spot_pos - Vector2(8, 8)
 	enemy_container.add_child(weak_spot_indicator)
 
 	# Player reticle (starts at center)
@@ -104,7 +104,7 @@ func _setup_minigame() -> void:
 	var reticle_size = reticle_radius * 2
 	reticle_outer.custom_minimum_size = Vector2(reticle_size, reticle_size)
 	reticle_outer.color = Color(0.3, 0.8, 0.3, 0.3)
-	reticle_outer.position = Vector2(200, 200) - Vector2(reticle_radius, reticle_radius)
+	reticle_outer.position = Vector2(140, 140) - Vector2(reticle_radius, reticle_radius)
 	enemy_container.add_child(reticle_outer)
 
 	# Crosshair in center of reticle
@@ -148,9 +148,9 @@ func _setup_minigame() -> void:
 
 	# Instructions
 	instruction_label = Label.new()
-	instruction_label.text = "WASD: Move reticle to find weak spot | SPACE: Lock in & attack!"
+	instruction_label.text = "WASD: Find weak spot | SPACE: Attack!"
 	instruction_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	instruction_label.add_theme_font_size_override("font_size", 14)
+	instruction_label.add_theme_font_size_override("font_size", 12)
 	content_container.add_child(instruction_label)
 
 func _start_minigame() -> void:
@@ -176,7 +176,7 @@ func _start_next_attempt() -> void:
 	reticle_pos = Vector2.ZERO
 
 	# Reset visuals
-	reticle_outer.position = Vector2(200, 200) - Vector2(reticle_radius, reticle_radius)
+	reticle_outer.position = Vector2(140, 140) - Vector2(reticle_radius, reticle_radius)
 	reticle_outer.color = Color(0.3, 0.8, 0.3, 0.3)
 	reticle_outer.visible = true
 	weak_spot_indicator.color = Color(1.0, 1.0, 0.0, 0.0)
@@ -184,7 +184,7 @@ func _start_next_attempt() -> void:
 	timing_display.visible = false
 
 	timer_label.text = "Move to start!"
-	instruction_label.text = "WASD: Move reticle | SPACE: Lock in & attack!"
+	instruction_label.text = "WASD: Find weak spot | SPACE: Attack!"
 
 func _process(delta: float) -> void:
 	match current_phase:
@@ -209,14 +209,14 @@ func _process_hunting(delta: float) -> void:
 			print("[AttackMinigame] Timer started!")
 
 		move_dir = move_dir.normalized()
-		reticle_pos += move_dir * 200.0 * delta
+		reticle_pos += move_dir * 150.0 * delta
 
-		# Clamp to arena bounds
-		reticle_pos.x = clampf(reticle_pos.x, -180.0, 180.0)
-		reticle_pos.y = clampf(reticle_pos.y, -180.0, 180.0)
+		# Clamp to arena bounds (smaller arena = 280x280, center at 140)
+		reticle_pos.x = clampf(reticle_pos.x, -125.0, 125.0)
+		reticle_pos.y = clampf(reticle_pos.y, -125.0, 125.0)
 
 		# Update reticle position
-		reticle_outer.position = Vector2(200, 200) + reticle_pos - Vector2(reticle_radius, reticle_radius)
+		reticle_outer.position = Vector2(140, 140) + reticle_pos - Vector2(reticle_radius, reticle_radius)
 
 	# Check if reticle overlaps weak spot
 	var distance = reticle_pos.distance_to(weak_spot_pos)
@@ -330,7 +330,7 @@ func _update_timing_bar(progress: float, zone: String) -> void:
 
 func _on_timing_press(zone: String) -> void:
 	"""Handle first timing press"""
-	print("[AttackMinigame] First press on zone: %s" % zone)
+	print("[AttackMinigame] First press on zone: %s (weak spot: %s)" % [zone, locked_on_weak_spot])
 	first_hit_grade = zone
 
 	# Determine damage modifier
@@ -350,13 +350,33 @@ func _on_timing_press(zone: String) -> void:
 		best_grade = zone
 		best_damage_modifier = damage_modifier
 
-	# If hit Green or Blue, offer crit attempt
-	if zone == "green" or zone == "blue":
+	# Show result feedback
+	timing_display.visible = false
+	var result_text = ""
+
+	if locked_on_weak_spot:
+		result_text = "✓ WEAK SPOT FOUND!\n"
+	else:
+		result_text = "✗ Weak spot missed\n"
+
+	result_text += "Hit: " + zone.to_upper() + " | "
+
+	if damage_modifier < 1.0:
+		result_text += "Damage: -10%"
+	elif damage_modifier > 1.0:
+		result_text += "Damage: +10%"
+	else:
+		result_text += "Damage: Normal"
+
+	instruction_label.text = result_text
+
+	# If hit Green or Blue on weak spot, offer crit attempt
+	if (zone == "green" or zone == "blue") and locked_on_weak_spot:
+		await get_tree().create_timer(1.0).timeout
 		_start_crit_attempt()
 	else:
-		# No crit attempt, move to next
-		instruction_label.text = "Hit: %s" % zone.to_upper()
-		await get_tree().create_timer(0.5).timeout
+		# No crit attempt, show result then move to next
+		await get_tree().create_timer(1.5).timeout
 		_start_next_attempt()
 
 func _start_crit_attempt() -> void:
@@ -387,16 +407,18 @@ func _process_crit_attempt(delta: float) -> void:
 
 	# Check for Space press
 	if waiting_for_input and (Input.is_action_just_pressed("ui_accept") or Input.is_key_pressed(KEY_SPACE)):
+		timing_display.visible = false
+
 		if zone == "blue":
 			is_crit = true
 			print("[AttackMinigame] CRIT SUCCESS!")
-			instruction_label.text = "CRITICAL HIT!"
+			instruction_label.text = "★ CRITICAL HIT! ★\nDouble damage!"
 		else:
 			print("[AttackMinigame] Crit missed")
-			instruction_label.text = "Crit missed"
+			instruction_label.text = "Crit missed\nStill a good hit though!"
 
 		waiting_for_input = false
-		await get_tree().create_timer(0.5).timeout
+		await get_tree().create_timer(1.5).timeout
 		_start_next_attempt()
 
 func _is_better_grade(new_grade: String, old_grade: String) -> bool:
