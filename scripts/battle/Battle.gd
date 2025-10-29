@@ -2698,6 +2698,13 @@ func _on_item_selected(item_data: Dictionary) -> void:
 		else:
 			# Other items can only target alive allies
 			target_candidates = allies.filter(func(a): return not a.is_ko)
+	elif targeting == "Any":
+		# "Any" targeting allows selecting from all combatants (allies and enemies)
+		var all_combatants = []
+		all_combatants.append_array(battle_mgr.get_ally_combatants())
+		all_combatants.append_array(battle_mgr.get_enemy_combatants())
+		# Allow targeting any non-KO'd character
+		target_candidates = all_combatants.filter(func(c): return not c.is_ko)
 	else:  # Enemy (single target)
 		var enemies = battle_mgr.get_enemy_combatants()
 		target_candidates = enemies.filter(func(e): return not e.is_ko)
