@@ -1288,7 +1288,7 @@ func _execute_capture(target: Dictionary) -> void:
 
 	# Build party member data for minigame
 	var party_member_data = {
-		"FOC": current_combatant.stats.get("FOC", 1)
+		"FOC": current_combatant.stats.get("FCS", 1)
 	}
 
 	# Get status effects
@@ -1850,7 +1850,7 @@ func _on_run_pressed() -> void:
 	var tempo_diff = party_tpo - avg_enemy_tpo
 
 	# Get focus stat
-	var focus_stat = current_combatant.stats.get("FOC", 1)
+	var focus_stat = current_combatant.stats.get("FCS", 1)
 
 	# Get status effects
 	var status_effects = []
@@ -3208,7 +3208,7 @@ func _execute_skill_single(target: Dictionary) -> void:
 		skill_tier = int(parts[1]) if parts.size() > 1 else 1
 
 	# Launch skill minigame
-	var focus_stat = current_combatant.stats.get("FOC", 1)
+	var focus_stat = current_combatant.stats.get("FCS", 1)
 	var skill_sequence = _get_skill_button_sequence(skill_id)
 	var mind_type = element  # Use the element as the mind type
 	var status_effects = []
