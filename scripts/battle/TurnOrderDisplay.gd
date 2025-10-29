@@ -230,6 +230,11 @@ func _rebuild_display_with_reveal() -> void:
 		var combatant = turn_order[i]
 		var combatant_id = combatant.get("id", "")
 
+		# Skip cleanup turn (invisible system turn)
+		if combatant.get("is_cleanup_turn", false):
+			print("[TurnOrderDisplay] Skipping cleanup turn at index %d" % i)
+			continue
+
 		# Skip if we've already created a slot for this combatant ID
 		if combatant_id != "" and seen_ids.has(combatant_id):
 			print("[TurnOrderDisplay] WARNING: Duplicate combatant %s detected at index %d, skipping!" % [combatant.get("display_name", "Unknown"), i])
@@ -322,6 +327,11 @@ func _rebuild_display() -> void:
 	for i in range(turns_to_show):
 		var combatant = turn_order[i]
 		var combatant_id = combatant.get("id", "")
+
+		# Skip cleanup turn (invisible system turn)
+		if combatant.get("is_cleanup_turn", false):
+			print("[TurnOrderDisplay] Skipping cleanup turn at index %d" % i)
+			continue
 
 		# Skip if we've already created a slot for this combatant ID
 		if combatant_id != "" and seen_ids.has(combatant_id):

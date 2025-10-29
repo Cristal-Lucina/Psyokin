@@ -161,14 +161,32 @@ func start_round() -> void:
 	turn_order.sort_custom(_sort_by_initiative)
 	_remove_turn_order_duplicates()  # Ensure no duplicates in turn order
 
+	# Add cleanup turn at the end (invisible, ensures round always ends properly)
+	var cleanup_turn = {
+		"id": "__cleanup__",
+		"display_name": "__CLEANUP__",
+		"is_ally": true,
+		"is_ko": false,
+		"is_fled": false,
+		"is_fallen": false,
+		"has_acted_this_round": false,
+		"initiative": -999,  # Always last
+		"is_cleanup_turn": true  # Special flag
+	}
+	turn_order.append(cleanup_turn)
+	print("[BattleManager] Added cleanup turn at end of round")
+
 	# ULTRA FIX: Final validation
-	if turn_order.size() != combatants.size():
-		push_error("[BattleManager] CRITICAL: turn_order size (%d) != combatants size (%d) after duplicate removal!" % [turn_order.size(), combatants.size()])
+	if turn_order.size() != (combatants.size() + 1):  # +1 for cleanup turn
+		push_error("[BattleManager] CRITICAL: turn_order size (%d) != expected size (%d)!" % [turn_order.size(), combatants.size() + 1])
 
 	print("[BattleManager] Turn order:")
 	for i in range(turn_order.size()):
 		var c = turn_order[i]
-		print("  %d. %s [ID: %s] (Initiative: %d)" % [i + 1, c.display_name, c.id, c.initiative])
+		if c.get("is_cleanup_turn", false):
+			print("  %d. [CLEANUP TURN]" % [i + 1])
+		else:
+			print("  %d. %s [ID: %s] (Initiative: %d)" % [i + 1, c.display_name, c.id, c.initiative])
 
 	# Process start-of-round effects (DoT, HoT, buff/debuff duration)
 	_process_round_start_effects()
@@ -390,6 +408,12 @@ func _next_turn() -> void:
 
 func _start_turn(combatant: Dictionary) -> void:
 	"""Start a combatant's turn"""
+	# Check for cleanup turn (special invisible turn that ends the round)
+	if combatant.get("is_cleanup_turn", false):
+		print("[BattleManager] Cleanup turn reached - ending round")
+		_end_round()
+		return
+
 	# Check for duplicates before starting turn
 	_remove_turn_order_duplicates()
 
