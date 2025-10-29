@@ -399,6 +399,19 @@ func _start_turn(combatant: Dictionary) -> void:
 	# Mark this combatant as having acted this round
 	combatant.has_acted_this_round = true
 
+	# Check if combatant has "Revived" status BEFORE processing ailments (can't act this turn)
+	var current_ailment = str(combatant.get("ailment", "")).to_lower()
+	if current_ailment == "revived":
+		print("[BattleManager] %s is still recovering from revival - skipping turn" % combatant.display_name)
+		# Clear the revived status so they can act next round
+		combatant.ailment = ""
+		combatant.ailment_turn_count = 0
+		print("[BattleManager] %s has recovered from revival! (can act next turn)" % combatant.display_name)
+		refresh_turn_order()
+		# Skip to end turn
+		end_turn()
+		return
+
 	# Process turn-start ailment effects (poison/burn damage, auto-cure rolls, etc.)
 	await _process_turn_start_ailments(combatant)
 
@@ -407,14 +420,6 @@ func _start_turn(combatant: Dictionary) -> void:
 		print("[BattleManager] %s was KO'd by ailment - skipping turn" % combatant.display_name)
 		# Refresh turn order to show KO
 		refresh_turn_order()
-		# Skip to end turn
-		end_turn()
-		return
-
-	# Check if combatant has "Revived" status (can't act this turn)
-	var current_ailment = str(combatant.get("ailment", "")).to_lower()
-	if current_ailment == "revived":
-		print("[BattleManager] %s is still recovering from revival - skipping turn" % combatant.display_name)
 		# Skip to end turn
 		end_turn()
 		return
@@ -707,13 +712,9 @@ func _process_turn_start_ailments(combatant: Dictionary) -> void:
 			])
 			# Charm behavior (use heal/buff items on enemy) handled by Battle.gd
 
-	# ═══════ REVIVED - Automatically clears after 1 turn ═══════
-	elif ailment == "revived":
-		# Revived status prevents action for 1 turn, then automatically clears
-		combatant.ailment = ""
-		combatant.ailment_turn_count = 0
-		print("[BattleManager] %s has recovered from revival! (can act next turn)" % combatant.display_name)
-		refresh_turn_order()
+	# ═══════ REVIVED - Handled before ailment processing (see _start_turn) ═══════
+	# Note: Revived status is checked and cleared in _start_turn() BEFORE this function is called,
+	# so we should never reach this point with a "revived" ailment.
 
 	# Small delay for readability
 	await get_tree().create_timer(0.3).timeout
