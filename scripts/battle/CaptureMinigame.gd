@@ -123,6 +123,29 @@ func _calculate_break_rating() -> void:
 
 	print("[CaptureMinigame] Break rating: %d (HP: %.1f%%)" % [break_rating, enemy_hp_percent * 100])
 
+func _calculate_wraps_needed() -> int:
+	"""Calculate wraps needed based on enemy type"""
+	var actor_id = enemy_data.get("actor_id", "").to_lower()
+	var display_name = enemy_data.get("display_name", "").to_lower()
+
+	# Check for slime (3 wraps)
+	if "slime" in actor_id or "slime" in display_name:
+		return 3
+
+	# Check for goblin (6 wraps)
+	if "goblin" in actor_id or "goblin" in display_name:
+		return 6
+
+	# Default based on bind quality as fallback
+	var wraps = 0
+	for bind in landed_binds:
+		match bind:
+			"basic": wraps += 3
+			"standard": wraps += 2
+			"advanced": wraps += 1
+
+	return max(1, wraps)
+
 func _start_minigame() -> void:
 	print("[CaptureMinigame] Starting - Binds: %s" % str(binds))
 	current_phase = Phase.TOSS
@@ -184,13 +207,10 @@ func _start_bind_phase() -> void:
 	phase_label.text = "Phase: BIND"
 	bind_result_label.text = "%d binds landed!" % landed_binds.size()
 
-	# Calculate knots needed per bind type
-	knots_needed = 0
-	for bind in landed_binds:
-		match bind:
-			"basic": knots_needed += 3  # Made easier - was 5
-			"standard": knots_needed += 2  # Made easier - was 3
-			"advanced": knots_needed += 1
+	# Calculate knots needed based on enemy type
+	knots_needed = _calculate_wraps_needed()
+
+	print("[CaptureMinigame] Enemy: %s requires %d wraps" % [enemy_data.get("display_name", ""), knots_needed])
 
 	# Set break timer based on break rating (seconds)
 	break_timer = float(break_rating) * 2.0  # 2 seconds per break rating point
