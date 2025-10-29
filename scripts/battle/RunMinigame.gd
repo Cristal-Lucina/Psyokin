@@ -28,6 +28,8 @@ var escape_gap_end: float = 0.0  # End angle of the ONE continuous gap
 var arena_center: Vector2 = Vector2(160, 160)  # Center of arena (320x320 arena)
 var is_caught: bool = false  # Flag to freeze movement when caught
 var minigame_complete: bool = false  # Flag to stop all processing
+var player_speed: float = 100.0  # Base player movement speed (pixels per second)
+var speed_modifier: float = 1.0  # Speed modifier (affected by status effects)
 
 ## Visual elements
 var arena: Control  # Custom control for drawing circles
@@ -36,6 +38,13 @@ var instruction_label: Label
 func _setup_minigame() -> void:
 	base_duration = 8.0
 	current_duration = base_duration
+
+	# Check for status effects that slow movement
+	if status_effects.has("malaise") or status_effects.has("frozen"):
+		speed_modifier = 0.6  # 40% slower movement
+		print("[RunMinigame] Movement slowed by status effect: %s" % str(status_effects))
+	else:
+		speed_modifier = 1.0
 
 	# Adjust speed based on tempo difference
 	circle_close_speed = 20.0 * (1.0 - (tempo_diff * 0.02))
@@ -198,7 +207,7 @@ func _process(delta: float) -> void:
 
 		if move_dir.length() > 0:
 			move_dir = move_dir.normalized()
-			player_pos += move_dir * 100.0 * delta
+			player_pos += move_dir * player_speed * speed_modifier * delta
 
 	# Close catch circle (even when caught, for visual feedback)
 	circle_radius -= circle_close_speed * delta
