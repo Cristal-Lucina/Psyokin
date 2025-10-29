@@ -12,6 +12,7 @@ signal round_ended(round_number: int)
 signal battle_ended(victory: bool)
 signal action_executed(action_data: Dictionary)
 signal turn_order_changed  # Emitted when turn order is re-sorted mid-round
+signal log_message_requested(message: String)  # Request Battle.gd to log a message
 
 ## Battle state
 enum BattleState {
@@ -592,6 +593,10 @@ func _process_turn_start_ailments(combatant: Dictionary) -> void:
 		print("[BattleManager] %s takes %d %s damage (Turn %d)" % [
 			combatant.display_name, damage, ailment.capitalize(), turn_count
 		])
+		# Log to battle log
+		log_message_requested.emit("  → %s takes %d %s damage!" % [
+			combatant.display_name, damage, ailment.capitalize()
+		])
 
 		# Check for KO from ailment damage
 		if combatant.hp <= 0:
@@ -599,6 +604,7 @@ func _process_turn_start_ailments(combatant: Dictionary) -> void:
 			combatant.ailment = "fainted"
 			combatant.ailment_turn_count = 0
 			print("[BattleManager] %s was KO'd by %s!" % [combatant.display_name, ailment.capitalize()])
+			log_message_requested.emit("  → %s was KO'd by %s!" % [combatant.display_name, ailment.capitalize()])
 			return  # Don't process auto-cure if they died
 
 		# Auto-cure chance: 30% base + 10% per turn (max 90%)
@@ -611,6 +617,7 @@ func _process_turn_start_ailments(combatant: Dictionary) -> void:
 			print("[BattleManager] %s recovered from %s! (%d%% chance, rolled %d)" % [
 				combatant.display_name, ailment.capitalize(), cure_chance, roll
 			])
+			log_message_requested.emit("  → %s recovered from %s!" % [combatant.display_name, ailment.capitalize()])
 			refresh_turn_order()
 		else:
 			print("[BattleManager] %s is still %s (%d%% cure chance, rolled %d)" % [

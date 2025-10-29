@@ -60,6 +60,7 @@ func _ready() -> void:
 	battle_mgr.turn_ended.connect(_on_turn_ended)
 	battle_mgr.round_started.connect(_on_round_started)
 	battle_mgr.battle_ended.connect(_on_battle_ended)
+	battle_mgr.log_message_requested.connect(log_message)
 
 	# Connect to turn order display signals
 	if turn_order_display and turn_order_display.has_signal("animation_completed"):
