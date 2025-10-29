@@ -24,7 +24,7 @@ var minigame_complete: bool = false  # Lock out all input when complete
 ## Weak spot movement
 var weak_spot_pos: Vector2 = Vector2.ZERO  # Current position
 var weak_spot_target: Vector2 = Vector2.ZERO  # Target position
-var weak_spot_speed: float = 80.0  # Pixels per second
+var weak_spot_speed: float = 50.0  # Pixels per second (reduced from 80.0)
 var weak_spot_is_visible: bool = false
 var weak_spot_change_timer: float = 0.0
 var weak_spot_change_interval: float = 1.5  # Change direction every 1.5s
@@ -142,7 +142,7 @@ func _draw_arena() -> void:
 	# ONLY draw weak spot if it's visible in the view
 	if weak_spot_is_visible:
 		var weak_spot_screen_pos = arena_center + weak_spot_pos
-		arena.draw_circle(weak_spot_screen_pos, 8.0, Color(1.0, 1.0, 0.0, 1.0))
+		arena.draw_circle(weak_spot_screen_pos, 5.0, Color(1.0, 1.0, 0.0, 1.0))  # Reduced from 8.0
 
 func _draw_circle_outline(center: Vector2, radius: float, color: Color, width: float) -> void:
 	"""Helper to draw a circle outline"""
