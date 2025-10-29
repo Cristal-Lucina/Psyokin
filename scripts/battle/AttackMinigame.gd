@@ -424,7 +424,10 @@ func _release_attack() -> void:
 	var result_text = ""
 
 	if weak_spot_in_red_dot:
-		result_text = "✓ PERFECT AIM! "
+		if grade == "red":
+			result_text = "✗ Slipped! "
+		else:
+			result_text = "✓ PERFECT AIM! "
 	elif weak_spot_is_visible:
 		result_text = "✓ In view... "
 	else:

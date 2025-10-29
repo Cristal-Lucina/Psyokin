@@ -117,18 +117,16 @@ func _finish_minigame() -> void:
 	minigame_complete = true
 
 	# Determine grade based on sync level
-	var grade = "poor"
+	# Note: Bursts are unmissable - minimum grade is "good" with normal damage
+	var grade = "good"
 	if sync_level >= 80:
 		grade = "perfect"
 	elif sync_level >= 60:
 		grade = "great"
-	elif sync_level >= 40:
-		grade = "good"
 
 	# Show result
 	var result_text = ""
 	match grade:
-		"poor": result_text = "Low sync... (-10% damage)"
 		"good": result_text = "Good sync! (Normal damage)"
 		"great": result_text = "Great sync! (+15% damage)"
 		"perfect": result_text = "PERFECT SYNC! (+25% damage)"
@@ -138,7 +136,6 @@ func _finish_minigame() -> void:
 	# Calculate damage modifier based on grade
 	var damage_modifier = 1.0
 	match grade:
-		"poor": damage_modifier = 0.9
 		"good": damage_modifier = 1.0
 		"great": damage_modifier = 1.15
 		"perfect": damage_modifier = 1.25
