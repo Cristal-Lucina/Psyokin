@@ -1,6 +1,6 @@
 [gd_scene load_steps=2 format=3 uid="uid://bhq8yvp7qjl5x"]
 
-[ext_resource type="Script" path="res://scripts/battle/BaseMinigame.gd" id="1_skill"]
+[ext_resource type="Script" path="res://scripts/battle/SkillMinigame.gd" id="1_skill"]
 
 [node name="SkillMinigame" type="Control"]
 layout_mode = 3

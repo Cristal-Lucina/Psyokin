@@ -1,6 +1,6 @@
 [gd_scene load_steps=2 format=3 uid="uid://dhq8yvp7qjl5z"]
 
-[ext_resource type="Script" path="res://scripts/battle/BaseMinigame.gd" id="1_capture"]
+[ext_resource type="Script" path="res://scripts/battle/CaptureMinigame.gd" id="1_capture"]
 
 [node name="CaptureMinigame" type="Control"]
 layout_mode = 3

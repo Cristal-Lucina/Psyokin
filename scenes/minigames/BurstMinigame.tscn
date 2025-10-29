@@ -1,6 +1,6 @@
 [gd_scene load_steps=2 format=3 uid="uid://ehq8yvp7qjl50"]
 
-[ext_resource type="Script" path="res://scripts/battle/BaseMinigame.gd" id="1_burst"]
+[ext_resource type="Script" path="res://scripts/battle/BurstMinigame.gd" id="1_burst"]
 
 [node name="BurstMinigame" type="Control"]
 layout_mode = 3
