@@ -19,6 +19,10 @@ var sequence_index: int = 0
 var input_timeout: float = 5.0  # Time limit for sequence input
 var input_timer: float = 0.0
 var misclick_count: int = 0
+var has_started_charging: bool = false  # Track if player has pressed Space yet
+var overall_timer: float = 0.0  # Overall countdown timer
+var max_overall_time: float = 8.0  # Total time for entire minigame
+var last_input_button: String = ""  # Track last button to prevent double-input
 
 ## Visual elements
 var title_label: Label
@@ -28,7 +32,8 @@ var focus_level_label: Label
 var party_icon: ColorRect
 var aura_effect: ColorRect
 var sequence_display: HBoxContainer
-var timer_bar: ProgressBar
+var timer_bar: ProgressBar  # For input phase
+var overall_timer_bar: ProgressBar  # For entire minigame
 
 ## Button mapping
 const BUTTON_MAP = {
@@ -56,6 +61,16 @@ func _setup_minigame() -> void:
 	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title_label.add_theme_font_size_override("font_size", 32)
 	content_container.add_child(title_label)
+
+	# Overall timer bar (starts when Space is first pressed)
+	overall_timer_bar = ProgressBar.new()
+	overall_timer_bar.max_value = max_overall_time
+	overall_timer_bar.value = max_overall_time
+	overall_timer_bar.show_percentage = false
+	overall_timer_bar.custom_minimum_size = Vector2(300, 15)
+	var overall_timer_container = CenterContainer.new()
+	overall_timer_container.add_child(overall_timer_bar)
+	content_container.add_child(overall_timer_container)
 
 	# Party icon with aura
 	var icon_container = CenterContainer.new()
@@ -117,6 +132,7 @@ func _setup_minigame() -> void:
 func _start_minigame() -> void:
 	print("[SkillMinigame] Starting - Focus: %d, Tier: %d, Sequence: %s" % [focus_stat, skill_tier, str(skill_sequence)])
 	current_phase = Phase.CHARGING
+	overall_timer = max_overall_time  # Initialize timer (will start counting when Space is pressed)
 	_setup_sequence_display()
 
 func _setup_sequence_display() -> void:
@@ -138,6 +154,11 @@ func _process(delta: float) -> void:
 func _process_charging(delta: float) -> void:
 	# Check if Space is held
 	if Input.is_key_pressed(KEY_SPACE):
+		# Start the timer on first press
+		if not has_started_charging:
+			has_started_charging = true
+			print("[SkillMinigame] Timer started!")
+
 		charge_time += delta
 
 		# Calculate focus level
@@ -147,6 +168,17 @@ func _process_charging(delta: float) -> void:
 			_update_focus_visuals()
 
 		focus_bar.value = charge_time / charge_time_per_level
+
+	# Update overall timer (only if charging has started)
+	if has_started_charging:
+		overall_timer -= delta
+		overall_timer_bar.value = overall_timer
+
+		# Check for timeout
+		if overall_timer <= 0:
+			print("[SkillMinigame] Overall timeout during charging!")
+			_finish_minigame_incomplete()
+			return
 
 	# Check if Space was released
 	if Input.is_action_just_released("ui_accept") or (not Input.is_key_pressed(KEY_SPACE) and charge_time > 0):
@@ -193,20 +225,38 @@ func _start_input_phase() -> void:
 	_update_sequence_display()
 
 func _process_inputting(delta: float) -> void:
-	# Update timer
+	# Update overall timer
+	overall_timer -= delta
+	overall_timer_bar.value = overall_timer
+
+	# Update input phase timer
 	input_timer -= delta
 	timer_bar.value = input_timer
 
-	if input_timer <= 0:
-		# Timeout!
+	# Check for overall timeout
+	if overall_timer <= 0:
+		print("[SkillMinigame] Overall timeout during input!")
 		_finish_minigame_incomplete()
 		return
 
-	# Check for button input
+	if input_timer <= 0:
+		# Phase timeout!
+		_finish_minigame_incomplete()
+		return
+
+	# Check for button input (single press detection)
+	var current_button = ""
 	for key in BUTTON_MAP.keys():
 		if Input.is_key_pressed(key):
-			_on_button_input(BUTTON_MAP[key])
+			current_button = BUTTON_MAP[key]
 			break
+
+	# Only process if a button is pressed AND it's different from last frame
+	if current_button != "" and current_button != last_input_button:
+		_on_button_input(current_button)
+
+	# Update last button state
+	last_input_button = current_button
 
 func _on_button_input(button: String) -> void:
 	"""Handle button press during input phase"""
@@ -231,9 +281,6 @@ func _on_button_input(button: String) -> void:
 		_update_sequence_display()
 
 		instruction_label.text = "Misclick! Restarting sequence... Focus: %d" % focus_level
-
-	# Small delay to prevent double-input
-	await get_tree().create_timer(0.2).timeout
 
 func _update_sequence_display() -> void:
 	"""Update sequence display to show progress"""
