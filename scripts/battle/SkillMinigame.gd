@@ -114,8 +114,10 @@ func _setup_minigame() -> void:
 	current_duration = base_duration
 
 	# Calculate charge speed based on Focus stat
-	charge_time_per_level = BASE_CHARGE_TIME_PER_LEVEL / (1.0 + (focus_stat * 0.1))
-	print("[SkillMinigame] Charge time per level: %.2fs (Focus: %d)" % [charge_time_per_level, focus_stat])
+	# Each focus level gives 15% speed increase (scales well for 10 levels)
+	var speed_multiplier = 1.0 + (focus_stat * 0.15)
+	charge_time_per_level = BASE_CHARGE_TIME_PER_LEVEL / speed_multiplier
+	print("[SkillMinigame] Charge time per level: %.2fs (Focus: %d, Speed: %.0f%%)" % [charge_time_per_level, focus_stat, speed_multiplier * 100])
 
 	# Check for halt-inducing status effects
 	has_halt_status = status_effects.has("burn") or status_effects.has("poison") or status_effects.has("sleep")
