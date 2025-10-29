@@ -19,6 +19,7 @@ var circle_angle: float = 0.0
 var gaps: Array = []  # Array of {start_angle, end_angle}
 var arena_center: Vector2 = Vector2(100, 100)  # Center of arena
 var is_caught: bool = false  # Flag to freeze movement when caught
+var minigame_complete: bool = false  # Flag to stop all processing
 
 ## Visual elements
 var arena: Control  # Custom control for drawing circles
@@ -139,6 +140,10 @@ func _draw_arena() -> void:
 	arena.draw_circle(player_screen_pos, 5.0, Color(0.2, 1.0, 0.2, 1.0))
 
 func _process(delta: float) -> void:
+	# Stop all processing if minigame is complete
+	if minigame_complete:
+		return
+
 	# Handle player movement (only if not caught)
 	if not is_caught:
 		var move_dir = Vector2.ZERO
@@ -159,7 +164,7 @@ func _process(delta: float) -> void:
 					var gap_dir = Vector2(cos(gap_angle + circle_angle), sin(gap_angle + circle_angle))
 					player_pos += gap_dir * (focus * 2.5) * delta  # Reduced magnet effect
 
-	# Close circle
+	# Close circle (even when caught, for visual feedback)
 	circle_radius -= circle_close_speed * delta
 
 	# Rotate circle
@@ -168,8 +173,8 @@ func _process(delta: float) -> void:
 	# Redraw arena
 	arena.queue_redraw()
 
-	# Check win/lose conditions (only if not already caught)
-	if not is_caught:
+	# Check win/lose conditions (only if not already caught and not complete)
+	if not is_caught and not minigame_complete:
 		var distance_from_center = player_pos.length()
 
 		if distance_from_center > max_radius:
@@ -216,6 +221,9 @@ func _is_in_gap(pos: Vector2) -> bool:
 
 func _check_escape() -> void:
 	"""Check if player successfully escaped"""
+	if minigame_complete:
+		return  # Already complete, don't check again
+
 	if _is_in_gap(player_pos):
 		_finish_success()
 	else:
@@ -223,10 +231,11 @@ func _check_escape() -> void:
 
 func _on_caught() -> void:
 	"""Called when player is caught by the circle"""
-	if is_caught:
-		return  # Already caught, don't trigger again
+	if is_caught or minigame_complete:
+		return  # Already caught or complete, don't trigger again
 
 	is_caught = true
+	minigame_complete = true  # Stop all processing
 	print("[RunMinigame] Player caught! Freezing movement...")
 	instruction_label.text = "Caught!"
 
@@ -236,6 +245,8 @@ func _on_caught() -> void:
 
 func _finish_success() -> void:
 	print("[RunMinigame] Escaped!")
+
+	minigame_complete = true  # Stop all processing immediately
 
 	# Update title and instruction
 	var title_label = content_container.get_node_or_null("TitleLabel")
