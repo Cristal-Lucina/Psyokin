@@ -213,7 +213,10 @@ func _process(delta: float) -> void:
 			_check_escape()
 		else:
 			# Check if player hit the catch circle (rotating)
-			if distance_from_center > circle_radius - 1.0:
+			# IMPORTANT: Only check if player is NEAR the circle (within a small range)
+			# Not just anywhere beyond it!
+			var near_circle = distance_from_center > circle_radius - 1.0 and distance_from_center < circle_radius + 5.0
+			if near_circle:
 				# Player is touching the catch circle
 				# Check if they're in the gap (using local angle relative to circle rotation)
 				var player_angle = atan2(player_pos.y, player_pos.x)
@@ -221,6 +224,7 @@ func _process(delta: float) -> void:
 				var in_gap = _angle_in_gap(local_angle)
 
 				print("[RunMinigame] Catch circle collision check:")
+				print("  Player distance: %.1f (circle radius: %.1f)" % [distance_from_center, circle_radius])
 				print("  Player world angle: %.1f°" % rad_to_deg(player_angle))
 				print("  Circle rotation: %.1f°" % rad_to_deg(circle_angle))
 				print("  Player local angle: %.1f°" % rad_to_deg(local_angle))
