@@ -1282,7 +1282,8 @@ func _execute_capture(target: Dictionary) -> void:
 		"TPO": target.stats.get("TPO", 1),
 		"actor_id": target.get("actor_id", ""),
 		"display_name": target.get("display_name", "Enemy"),
-		"break_rating": target.break_rating
+		"break_rating": target.break_rating,
+		"ailment": target.get("ailment", "")  # Add enemy ailment
 	}
 
 	# Build party member data for minigame

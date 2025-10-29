@@ -40,6 +40,8 @@ var bind_result_label: Label
 var break_progress_bar: ProgressBar  # Shows breaks completed
 var break_timer_bar: ProgressBar  # Shows time remaining
 var instruction_label: Label
+var charm_effect_overlay: Control  # For pink wavy border when enemy is charmed
+var charm_anim_time: float = 0.0
 
 # Bind phase visuals
 var bind_arena: Control  # Container for dragging mechanic
@@ -114,11 +116,93 @@ func _setup_minigame() -> void:
 	instruction_label.add_theme_font_size_override("font_size", 16)
 	content_container.add_child(instruction_label)
 
+	# Charm effect overlay (pink wavy border when enemy is charmed)
+	var enemy_ailment = str(enemy_data.get("ailment", "")).to_lower()
+	if enemy_ailment == "charm" or enemy_ailment == "charmed":
+		charm_effect_overlay = Control.new()
+		charm_effect_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+		charm_effect_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		charm_effect_overlay.z_index = 102
+		charm_effect_overlay.draw.connect(_draw_charm_effect)
+		add_child(charm_effect_overlay)
+		print("[CaptureMinigame] Enemy is charmed - adding pink wavy border!")
+
 func _draw_enemy_circle() -> void:
 	"""Draw the enemy as a circular shape"""
 	var center = Vector2(50, 50)  # Center of 100x100 control
 	var radius = 40.0
 	enemy_icon.draw_circle(center, radius, Color(0.8, 0.3, 0.3, 1.0))
+
+func _draw_charm_effect() -> void:
+	"""Draw animated pink wavy lines around the minigame panel (enemy is charmed!)"""
+	if not overlay_panel:
+		return
+
+	var panel_pos = overlay_panel.position
+	var panel_size = overlay_panel.size
+	var wave_segments = 20
+	var line_thickness = 3.0
+
+	# Draw smooth wavy pink lines along each edge
+	# Top edge
+	for i in range(wave_segments):
+		var progress = float(i) / wave_segments
+		var next_progress = float(i + 1) / wave_segments
+
+		var x1 = panel_pos.x + panel_size.x * progress
+		var x2 = panel_pos.x + panel_size.x * next_progress
+		var y1 = panel_pos.y + sin((charm_anim_time * 2.0) + (progress * TAU * 2)) * 6.0
+		var y2 = panel_pos.y + sin((charm_anim_time * 2.0) + (next_progress * TAU * 2)) * 6.0
+
+		var intensity = 0.6 + sin(charm_anim_time * 3.0 + progress * TAU) * 0.4
+		var color = Color(1.0, 0.4, 0.8, intensity)  # Pink!
+
+		charm_effect_overlay.draw_line(Vector2(x1, y1), Vector2(x2, y2), color, line_thickness)
+
+	# Bottom edge
+	for i in range(wave_segments):
+		var progress = float(i) / wave_segments
+		var next_progress = float(i + 1) / wave_segments
+
+		var x1 = panel_pos.x + panel_size.x * progress
+		var x2 = panel_pos.x + panel_size.x * next_progress
+		var y1 = panel_pos.y + panel_size.y + sin((charm_anim_time * 2.0) + (progress * TAU * 2) + PI) * 6.0
+		var y2 = panel_pos.y + panel_size.y + sin((charm_anim_time * 2.0) + (next_progress * TAU * 2) + PI) * 6.0
+
+		var intensity = 0.6 + sin(charm_anim_time * 3.0 + progress * TAU) * 0.4
+		var color = Color(1.0, 0.4, 0.8, intensity)
+
+		charm_effect_overlay.draw_line(Vector2(x1, y1), Vector2(x2, y2), color, line_thickness)
+
+	# Left edge
+	for i in range(wave_segments):
+		var progress = float(i) / wave_segments
+		var next_progress = float(i + 1) / wave_segments
+
+		var y1 = panel_pos.y + panel_size.y * progress
+		var y2 = panel_pos.y + panel_size.y * next_progress
+		var x1 = panel_pos.x + sin((charm_anim_time * 2.0) + (progress * TAU * 2)) * 6.0
+		var x2 = panel_pos.x + sin((charm_anim_time * 2.0) + (next_progress * TAU * 2)) * 6.0
+
+		var intensity = 0.6 + sin(charm_anim_time * 3.0 + progress * TAU) * 0.4
+		var color = Color(1.0, 0.4, 0.8, intensity)
+
+		charm_effect_overlay.draw_line(Vector2(x1, y1), Vector2(x2, y2), color, line_thickness)
+
+	# Right edge
+	for i in range(wave_segments):
+		var progress = float(i) / wave_segments
+		var next_progress = float(i + 1) / wave_segments
+
+		var y1 = panel_pos.y + panel_size.y * progress
+		var y2 = panel_pos.y + panel_size.y * next_progress
+		var x1 = panel_pos.x + panel_size.x + sin((charm_anim_time * 2.0) + (progress * TAU * 2) + PI) * 6.0
+		var x2 = panel_pos.x + panel_size.x + sin((charm_anim_time * 2.0) + (next_progress * TAU * 2) + PI) * 6.0
+
+		var intensity = 0.6 + sin(charm_anim_time * 3.0 + progress * TAU) * 0.4
+		var color = Color(1.0, 0.4, 0.8, intensity)
+
+		charm_effect_overlay.draw_line(Vector2(x1, y1), Vector2(x2, y2), color, line_thickness)
 
 func _calculate_break_rating() -> void:
 	"""Calculate enemy break rating from HP and stats"""
@@ -185,6 +269,12 @@ func _execute_toss_phase() -> void:
 
 func _calculate_bind_chance(bind_type: String) -> float:
 	"""Calculate chance for bind to land"""
+	# Check if enemy is charmed - massive bonus!
+	var enemy_ailment = str(enemy_data.get("ailment", "")).to_lower()
+	if enemy_ailment == "charm" or enemy_ailment == "charmed":
+		print("[CaptureMinigame] Enemy is CHARMED - boosting hit chance to 90%%!")
+		return 90.0  # Charmed enemies are much easier to catch
+
 	var base_chance = 50.0
 	match bind_type:
 		"basic": base_chance = 50.0
@@ -218,6 +308,13 @@ func _start_bind_phase() -> void:
 
 	# Set break timer based on break rating (seconds)
 	break_timer = float(break_rating) * 2.0  # 2 seconds per break rating point
+
+	# Check if enemy is charmed - they break free 50% slower (more time for player)!
+	var enemy_ailment = str(enemy_data.get("ailment", "")).to_lower()
+	if enemy_ailment == "charm" or enemy_ailment == "charmed":
+		var original_time = break_timer
+		break_timer *= 1.5  # Charmed enemies take 50% longer to break free
+		print("[CaptureMinigame] Enemy is CHARMED - 50%% slower break! (%.1fs -> %.1fs)" % [original_time, break_timer])
 
 	# Start with clockwise direction
 	current_wrap_direction = WrapDirection.CLOCKWISE
@@ -301,6 +398,11 @@ func _spawn_bind_point() -> void:
 	print("[CaptureMinigame] Bind point spawned at: %s" % BindDirection.keys()[current_bind_direction])
 
 func _process(delta: float) -> void:
+	# Update charm effect animation
+	if charm_effect_overlay and is_instance_valid(charm_effect_overlay):
+		charm_anim_time += delta
+		charm_effect_overlay.queue_redraw()
+
 	# Stop all processing if minigame is complete
 	if minigame_complete:
 		return
