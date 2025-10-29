@@ -69,12 +69,8 @@ func _on_round_started(round_number: int) -> void:
 		print("[TurnOrderDisplay] BLOCKED: Already rebuilding, ignoring round_started signal")
 		return
 
-	# Wait for any ongoing animations to complete before starting new one
-	if is_animating:
-		print("[TurnOrderDisplay] Waiting for ongoing animation to complete...")
-		# Wait for the animation to finish
-		while is_animating:
-			await get_tree().process_frame
+	# Set animation flag immediately so BattleManager knows to wait
+	is_animating = true
 
 	current_round = round_number
 
