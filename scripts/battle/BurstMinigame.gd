@@ -12,6 +12,8 @@ var sync_level: float = 0.0
 var max_sync_level: float = 100.0
 var button_presses: int = 0
 var last_press_time: float = 0.0
+var last_space_state: bool = false  # For single-press detection
+var minigame_complete: bool = false  # Lock out all input when complete
 
 ## Visual elements
 var sync_bar: ProgressBar
@@ -71,12 +73,17 @@ func _start_minigame() -> void:
 	_finish_minigame()
 
 func _process(delta: float) -> void:
-	# Check for Space press
-	if Input.is_action_just_pressed("ui_accept") or Input.is_key_pressed(KEY_SPACE):
-		var current_time = Time.get_ticks_msec() / 1000.0
-		if current_time - last_press_time > 0.1:  # Debounce
-			_on_button_press()
-			last_press_time = current_time
+	# Stop all processing if minigame is complete
+	if minigame_complete:
+		return
+
+	# Check for Space press (single-press detection)
+	var space_pressed = Input.is_key_pressed(KEY_SPACE)
+
+	if space_pressed and not last_space_state:
+		_on_button_press()
+
+	last_space_state = space_pressed
 
 	# Decay sync level slightly over time (encourages fast mashing)
 	sync_level = max(0, sync_level - (5.0 * delta))
@@ -95,24 +102,46 @@ func _on_button_press() -> void:
 
 	press_count_label.text = "Presses: %d" % button_presses
 
-	# Visual feedback
-	sync_bar.modulate = Color(1.5, 1.5, 1.5, 1.0)
-	await get_tree().create_timer(0.05).timeout
-	sync_bar.modulate = Color(1.0, 1.0, 1.0, 1.0)
+	# Update sync bar color based on level
+	if sync_level >= 80:
+		sync_bar.modulate = Color(1.0, 0.8, 0.0, 1.0)  # Gold
+	elif sync_level >= 50:
+		sync_bar.modulate = Color(0.3, 1.0, 0.3, 1.0)  # Green
+	else:
+		sync_bar.modulate = Color(0.8, 0.3, 0.3, 1.0)  # Red
 
 func _finish_minigame() -> void:
 	print("[BurstMinigame] Finished - Sync: %.1f%%, Presses: %d" % [sync_level, button_presses])
 
-	instruction_label.text = "Sync Complete!"
+	# Lock out all input immediately
+	minigame_complete = true
 
-	# Calculate damage modifier based on sync level
-	var damage_modifier = 1.0 + (sync_level / 100.0)  # 100% sync = 2.0x damage
-
-	var grade = "low"
+	# Determine grade based on sync level
+	var grade = "poor"
 	if sync_level >= 80:
 		grade = "perfect"
-	elif sync_level >= 50:
+	elif sync_level >= 60:
+		grade = "great"
+	elif sync_level >= 40:
 		grade = "good"
+
+	# Show result
+	var result_text = ""
+	match grade:
+		"poor": result_text = "Low sync... (-10% damage)"
+		"good": result_text = "Good sync! (Normal damage)"
+		"great": result_text = "Great sync! (+15% damage)"
+		"perfect": result_text = "PERFECT SYNC! (+25% damage)"
+
+	instruction_label.text = result_text
+
+	# Calculate damage modifier based on grade
+	var damage_modifier = 1.0
+	match grade:
+		"poor": damage_modifier = 0.9
+		"good": damage_modifier = 1.0
+		"great": damage_modifier = 1.15
+		"perfect": damage_modifier = 1.25
 
 	var result = {
 		"success": true,
