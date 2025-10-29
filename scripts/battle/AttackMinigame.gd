@@ -18,7 +18,7 @@ var final_damage_modifier: float = 0.9
 var is_crit: bool = false
 var has_started: bool = false
 var timer: float = 0.0
-var time_limit: float = 4.0
+var time_limit: float = 3.0  # Reduced to 3 seconds
 var minigame_complete: bool = false  # Lock out all input when complete
 
 ## Weak spot movement
@@ -269,11 +269,11 @@ func _start_charging() -> void:
 	print("[AttackMinigame] Started charging (weak spot visible: %s, in red dot: %s)" % [weak_spot_is_visible, weak_spot_in_red_dot])
 
 	if weak_spot_in_red_dot:
-		charge_label.text = "Charging... Release for: OK → GOOD → GREAT → CRIT"
+		charge_label.text = "Charging... GOOD → GREAT → CRIT (Stop before 100%!)"
 	elif weak_spot_is_visible:
-		charge_label.text = "Not in red dot! Max tier: GREAT"
+		charge_label.text = "Not in red dot! GOOD → GREAT (Stop before 100%!)"
 	else:
-		charge_label.text = "Weak spot not visible! Automatic RED hit!"
+		charge_label.text = "Weak spot not visible! Automatic OK hit!"
 
 func _process_charging(delta: float) -> void:
 	# Handle WASD view movement WHILE charging (allows slide-to-crit!)
@@ -340,24 +340,28 @@ func _get_charge_zone(progress: float, is_weak_spot_visible: bool) -> String:
 		return "red"
 	elif not weak_spot_in_red_dot:
 		# Weak spot visible but not in red dot - cap at green
-		if progress < 0.25:
+		# 1-70% = yellow, 71-99% = green, 100%+ = red
+		if progress <= 0.0:
 			return "red"
-		elif progress < 0.5:
+		elif progress <= 0.70:
 			return "yellow"
+		elif progress < 1.0:
+			return "green"
 		else:
-			return "green"  # Cap at green
+			return "red"  # Overcharged (100%+)
 	else:
-		# Weak spot in red dot - full charge available: Red → Yellow → Green → Blue → Red (stays)
-		if progress < 0.25:
+		# Weak spot in red dot - full charge available
+		# 1-70% = yellow, 71-90% = green, 91-99% = blue, 100%+ = red
+		if progress <= 0.0:
 			return "red"
-		elif progress < 0.5:
+		elif progress <= 0.70:
 			return "yellow"
-		elif progress < 0.75:
+		elif progress <= 0.90:
 			return "green"
 		elif progress < 1.0:
 			return "blue"
 		else:
-			return "red"  # Overcharged, back to red
+			return "red"  # Overcharged (100%+)
 
 func _update_charge_visuals(zone: String) -> void:
 	"""Update charge bar color and label"""
