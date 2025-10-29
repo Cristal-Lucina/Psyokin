@@ -248,7 +248,7 @@ func _finish_failed() -> void:
 	var title_label = content_container.get_node_or_null("TitleLabel")
 	if title_label:
 		title_label.text = "OK"
-	instruction_label.text = "Caught! Can't escape!"
+	instruction_label.text = "Enemy caught you!"
 
 	await get_tree().create_timer(1.5).timeout
 
