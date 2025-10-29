@@ -109,6 +109,18 @@ func _setup_minigame() -> void:
 	instruction_label.add_theme_font_size_override("font_size", 11)
 	content_container.add_child(instruction_label)
 
+func _update_weak_spot_visibility() -> void:
+	"""Update weak spot visibility flags based on current positions"""
+	var view_center = arena_center + view_pos
+	var weak_spot_screen_pos = arena_center + weak_spot_pos
+
+	# Check if weak spot is visible (inside view circle)
+	var distance_from_view_center = (weak_spot_screen_pos - view_center).length()
+	weak_spot_is_visible = distance_from_view_center <= view_radius
+
+	# Check if weak spot overlaps with red aiming dot
+	weak_spot_in_red_dot = distance_from_view_center <= red_dot_radius
+
 func _draw_arena() -> void:
 	"""Draw the circular arena with moving weak spot"""
 	# Draw outer dark circle (full arena)
@@ -120,17 +132,6 @@ func _draw_arena() -> void:
 	# Draw visible view circle (lighter)
 	arena.draw_circle(view_center, view_radius, Color(0.3, 0.3, 0.4, 0.8))
 
-	# Calculate weak spot screen position
-	var weak_spot_screen_pos = arena_center + weak_spot_pos
-
-	# Check if weak spot is visible (inside view circle)
-	var distance_from_view_center = (weak_spot_screen_pos - view_center).length()
-	weak_spot_is_visible = distance_from_view_center <= view_radius
-
-	# Check if weak spot overlaps with red aiming dot
-	var distance_from_red_dot = (weak_spot_screen_pos - view_center).length()
-	weak_spot_in_red_dot = distance_from_red_dot <= red_dot_radius
-
 	# Draw view circle border
 	_draw_circle_outline(view_center, view_radius, Color(0.5, 0.7, 1.0, 0.8), 2.0)
 
@@ -140,6 +141,7 @@ func _draw_arena() -> void:
 
 	# ONLY draw weak spot if it's visible in the view
 	if weak_spot_is_visible:
+		var weak_spot_screen_pos = arena_center + weak_spot_pos
 		arena.draw_circle(weak_spot_screen_pos, 8.0, Color(1.0, 1.0, 0.0, 1.0))
 
 func _draw_circle_outline(center: Vector2, radius: float, color: Color, width: float) -> void:
@@ -232,6 +234,9 @@ func _process_watching(delta: float) -> void:
 	if weak_spot_change_timer >= weak_spot_change_interval:
 		_randomize_weak_spot_target()
 
+	# Update weak spot visibility flags based on new positions
+	_update_weak_spot_visibility()
+
 	# Redraw arena to update positions
 	arena.queue_redraw()
 
@@ -303,6 +308,9 @@ func _process_charging(delta: float) -> void:
 	weak_spot_change_timer += delta
 	if weak_spot_change_timer >= weak_spot_change_interval:
 		_randomize_weak_spot_target()
+
+	# Update weak spot visibility flags based on new positions
+	_update_weak_spot_visibility()
 
 	# Redraw arena to update positions
 	arena.queue_redraw()
