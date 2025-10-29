@@ -304,7 +304,7 @@ func _draw_sleep_effect() -> void:
 	var wave_segments = 20
 	var line_thickness = 3.0
 
-	# Draw smooth wavy lines along each edge (similar to poison but white)
+	# Draw smooth wavy lines along each edge (white, matches charm animation)
 	# Top edge
 	for i in range(wave_segments):
 		var progress = float(i) / wave_segments
@@ -312,10 +312,10 @@ func _draw_sleep_effect() -> void:
 
 		var x1 = panel_pos.x + panel_size.x * progress
 		var x2 = panel_pos.x + panel_size.x * next_progress
-		var y1 = panel_pos.y + sin((status_anim_time * 1.5) + (progress * TAU * 2)) * 6.0
-		var y2 = panel_pos.y + sin((status_anim_time * 1.5) + (next_progress * TAU * 2)) * 6.0
+		var y1 = panel_pos.y + sin((status_anim_time * 2.0) + (progress * TAU * 2)) * 6.0
+		var y2 = panel_pos.y + sin((status_anim_time * 2.0) + (next_progress * TAU * 2)) * 6.0
 
-		var intensity = 0.7 + sin(status_anim_time * 2.0 + progress * TAU) * 0.3
+		var intensity = 0.6 + sin(status_anim_time * 3.0 + progress * TAU) * 0.4
 		var color = Color(1.0, 1.0, 1.0, intensity)
 
 		status_effect_overlay.draw_line(Vector2(x1, y1), Vector2(x2, y2), color, line_thickness)
@@ -327,10 +327,10 @@ func _draw_sleep_effect() -> void:
 
 		var x1 = panel_pos.x + panel_size.x * progress
 		var x2 = panel_pos.x + panel_size.x * next_progress
-		var y1 = panel_pos.y + panel_size.y + sin((status_anim_time * 1.5) + (progress * TAU * 2) + PI) * 6.0
-		var y2 = panel_pos.y + panel_size.y + sin((status_anim_time * 1.5) + (next_progress * TAU * 2) + PI) * 6.0
+		var y1 = panel_pos.y + panel_size.y + sin((status_anim_time * 2.0) + (progress * TAU * 2) + PI) * 6.0
+		var y2 = panel_pos.y + panel_size.y + sin((status_anim_time * 2.0) + (next_progress * TAU * 2) + PI) * 6.0
 
-		var intensity = 0.7 + sin(status_anim_time * 2.0 + progress * TAU) * 0.3
+		var intensity = 0.6 + sin(status_anim_time * 3.0 + progress * TAU) * 0.4
 		var color = Color(1.0, 1.0, 1.0, intensity)
 
 		status_effect_overlay.draw_line(Vector2(x1, y1), Vector2(x2, y2), color, line_thickness)
@@ -342,10 +342,10 @@ func _draw_sleep_effect() -> void:
 
 		var y1 = panel_pos.y + panel_size.y * progress
 		var y2 = panel_pos.y + panel_size.y * next_progress
-		var x1 = panel_pos.x + sin((status_anim_time * 1.5) + (progress * TAU * 2)) * 6.0
-		var x2 = panel_pos.x + sin((status_anim_time * 1.5) + (next_progress * TAU * 2)) * 6.0
+		var x1 = panel_pos.x + sin((status_anim_time * 2.0) + (progress * TAU * 2)) * 6.0
+		var x2 = panel_pos.x + sin((status_anim_time * 2.0) + (next_progress * TAU * 2)) * 6.0
 
-		var intensity = 0.7 + sin(status_anim_time * 2.0 + progress * TAU) * 0.3
+		var intensity = 0.6 + sin(status_anim_time * 3.0 + progress * TAU) * 0.4
 		var color = Color(1.0, 1.0, 1.0, intensity)
 
 		status_effect_overlay.draw_line(Vector2(x1, y1), Vector2(x2, y2), color, line_thickness)
@@ -357,10 +357,10 @@ func _draw_sleep_effect() -> void:
 
 		var y1 = panel_pos.y + panel_size.y * progress
 		var y2 = panel_pos.y + panel_size.y * next_progress
-		var x1 = panel_pos.x + panel_size.x + sin((status_anim_time * 1.5) + (progress * TAU * 2) + PI) * 6.0
-		var x2 = panel_pos.x + panel_size.x + sin((status_anim_time * 1.5) + (next_progress * TAU * 2) + PI) * 6.0
+		var x1 = panel_pos.x + panel_size.x + sin((status_anim_time * 2.0) + (progress * TAU * 2) + PI) * 6.0
+		var x2 = panel_pos.x + panel_size.x + sin((status_anim_time * 2.0) + (next_progress * TAU * 2) + PI) * 6.0
 
-		var intensity = 0.7 + sin(status_anim_time * 2.0 + progress * TAU) * 0.3
+		var intensity = 0.6 + sin(status_anim_time * 3.0 + progress * TAU) * 0.4
 		var color = Color(1.0, 1.0, 1.0, intensity)
 
 		status_effect_overlay.draw_line(Vector2(x1, y1), Vector2(x2, y2), color, line_thickness)
