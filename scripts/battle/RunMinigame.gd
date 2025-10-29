@@ -10,9 +10,9 @@ var tempo_diff: int = 0  # Party tempo - enemy tempo (affects speed)
 var focus: int = 1  # Focus stat (adds magnet effect)
 
 ## Internal state
-var circle_radius: float = 150.0  # First catch circle radius (closes in, rotating)
-var circle2_radius: float = 150.0  # Second catch circle radius (closes in, static)
-var circle_start_radius: float = 150.0  # Starting radius for catch circles
+var circle_radius: float = 100.0  # First catch circle radius (starts at escape boundary)
+var circle2_radius: float = 150.0  # Second catch circle radius (starts further out)
+var circle2_start_radius: float = 150.0  # Starting radius for second circle
 var circle2_delay: float = 1.5  # Delay before second circle starts (seconds)
 var circle2_close_speed: float = 15.0  # pixels per second (slower than first)
 var circle2_active: bool = false  # Whether second circle has started
@@ -105,8 +105,8 @@ func _generate_escape_gap() -> void:
 func _start_minigame() -> void:
 	print("[RunMinigame] Starting escape")
 	player_pos = Vector2.ZERO
-	circle_radius = circle_start_radius  # Start from further away
-	circle2_radius = circle_start_radius  # Start from further away
+	circle_radius = max_radius  # First circle starts at escape boundary
+	circle2_radius = circle2_start_radius  # Second circle starts further out
 	circle2_active = false
 	elapsed_time = 0.0
 
@@ -114,9 +114,9 @@ func _start_minigame() -> void:
 	circle_angle = randf() * TAU
 	circle2_start_angle = randf() * TAU
 
-	print("[RunMinigame] Circle 1 (red, rotating) starting rotation: %.1f°" % rad_to_deg(circle_angle))
-	print("[RunMinigame] Circle 2 (orange, static) starting rotation: %.1f°" % rad_to_deg(circle2_start_angle))
-	print("[RunMinigame] Note: Both circles have same gap pattern, different rotations")
+	print("[RunMinigame] Circle 1 (red, rotating) starting at escape boundary")
+	print("[RunMinigame] Circle 2 (orange, static) starts further out - visible approach")
+	print("[RunMinigame] Both circles have same gap pattern, different rotations")
 
 func _draw_arena() -> void:
 	"""Draw the circles and player"""
