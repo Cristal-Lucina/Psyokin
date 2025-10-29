@@ -19,7 +19,7 @@ var best_damage_modifier: float = 0.9
 var is_crit: bool = false
 var has_started: bool = false
 var watch_timer: float = 0.0
-var watch_time_limit: float = 8.0
+var watch_time_limit: float = 4.0
 var minigame_complete: bool = false  # Lock out all input when complete
 
 ## Weak spot movement
@@ -36,7 +36,7 @@ var view_pos: Vector2 = Vector2.ZERO  # View center offset from arena center
 
 ## Charging phase
 var charge_progress: float = 0.0
-var charge_speed: float = 0.5  # Takes 2 seconds to go from red to blue
+var charge_speed: float = 1.0  # Takes 1 second to go from red to blue (faster!)
 var is_charging: bool = false
 var charge_zone: String = "red"
 
@@ -52,7 +52,7 @@ var timer_label: Label
 var attempt_label: Label
 
 func _setup_minigame() -> void:
-	base_duration = watch_time_limit + 5.0
+	base_duration = watch_time_limit + 3.0  # Shorter overall duration
 	current_duration = base_duration
 
 	# Calculate view size from BRW (higher BRW = bigger view window)
