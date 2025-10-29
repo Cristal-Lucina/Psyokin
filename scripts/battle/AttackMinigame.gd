@@ -80,7 +80,7 @@ func _setup_minigame() -> void:
 
 	# Charge bar
 	charge_bar = ProgressBar.new()
-	charge_bar.max_value = 1.0
+	charge_bar.max_value = 1.2  # Allow overcharge to show
 	charge_bar.value = 0.0
 	charge_bar.show_percentage = false
 	charge_bar.custom_minimum_size = Vector2(200, 25)
@@ -119,9 +119,6 @@ func _draw_arena() -> void:
 
 	# Draw visible view circle (lighter)
 	arena.draw_circle(view_center, view_radius, Color(0.3, 0.3, 0.4, 0.8))
-
-	# Draw enemy icon in center
-	arena.draw_circle(arena_center, 20.0, Color(0.8, 0.3, 0.3, 1.0))
 
 	# Calculate weak spot screen position
 	var weak_spot_screen_pos = arena_center + weak_spot_pos
@@ -326,8 +323,8 @@ func _process_charging(delta: float) -> void:
 		charge_progress += delta * charge_speed
 		charge_progress = min(charge_progress, 1.2)  # Cap at 1.2 (past blue, into red)
 
-		# Update charge bar
-		charge_bar.value = min(charge_progress, 1.0)
+		# Update charge bar (allow it to show overcharge)
+		charge_bar.value = charge_progress
 
 		# Determine current zone based on visibility
 		charge_zone = _get_charge_zone(charge_progress, weak_spot_is_visible)

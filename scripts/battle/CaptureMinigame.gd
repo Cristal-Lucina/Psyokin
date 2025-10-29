@@ -35,7 +35,7 @@ var wraps_per_point: int = 3  # How many wraps needed per break rating point
 ## Visual elements
 var title_label: Label
 var phase_label: Label
-var enemy_icon: ColorRect
+var enemy_icon: Control  # Changed to Control for circular drawing
 var bind_result_label: Label
 var break_progress_bar: ProgressBar  # Shows breaks completed
 var break_timer_bar: ProgressBar  # Shows time remaining
@@ -67,13 +67,16 @@ func _setup_minigame() -> void:
 	phase_label.add_theme_font_size_override("font_size", 20)
 	content_container.add_child(phase_label)
 
-	# Enemy icon
-	enemy_icon = ColorRect.new()
+	# Enemy icon (circular)
+	enemy_icon = Control.new()
 	enemy_icon.custom_minimum_size = Vector2(100, 100)
-	enemy_icon.color = Color(0.8, 0.3, 0.3, 1.0)
+	enemy_icon.draw.connect(_draw_enemy_circle)
 	var icon_container = CenterContainer.new()
 	icon_container.add_child(enemy_icon)
 	content_container.add_child(icon_container)
+
+	# Need to defer queue_redraw until after the node is in the tree
+	enemy_icon.ready.connect(func(): enemy_icon.queue_redraw())
 
 	# Bind result label
 	bind_result_label = Label.new()
@@ -110,6 +113,12 @@ func _setup_minigame() -> void:
 	instruction_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	instruction_label.add_theme_font_size_override("font_size", 16)
 	content_container.add_child(instruction_label)
+
+func _draw_enemy_circle() -> void:
+	"""Draw the enemy as a circular shape"""
+	var center = Vector2(50, 50)  # Center of 100x100 control
+	var radius = 40.0
+	enemy_icon.draw_circle(center, radius, Color(0.8, 0.3, 0.3, 1.0))
 
 func _calculate_break_rating() -> void:
 	"""Calculate enemy break rating from HP and stats"""
