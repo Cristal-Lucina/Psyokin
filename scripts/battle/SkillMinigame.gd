@@ -126,11 +126,11 @@ func _setup_minigame() -> void:
 		# Schedule first halt at a random time (0.5 to 1.5 seconds)
 		next_halt_time = randf_range(0.5, 1.5)
 
-	# Title
+	# Title (show focus stat for debugging)
 	title_label = Label.new()
-	title_label.text = "SKILL!"
+	title_label.text = "SKILL! (Focus: %d - %d%% Speed)" % [focus_stat, int(speed_multiplier * 100)]
 	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title_label.add_theme_font_size_override("font_size", 32)
+	title_label.add_theme_font_size_override("font_size", 28)
 	content_container.add_child(title_label)
 
 	# Overall timer bar (starts when Space is first pressed)
@@ -292,6 +292,7 @@ func _process_charging(delta: float) -> void:
 			if new_level != focus_level:
 				focus_level = new_level
 				_update_focus_visuals()
+				print("[SkillMinigame] Focus level %d reached at %.2fs (charge_time_per_level: %.2fs)" % [focus_level, charge_time, charge_time_per_level])
 
 			focus_bar.value = charge_time / charge_time_per_level
 
