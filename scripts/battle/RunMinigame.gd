@@ -48,6 +48,7 @@ func _setup_minigame() -> void:
 
 	# Title
 	var title_label = Label.new()
+	title_label.set_name("TitleLabel")
 	title_label.text = "RUN!"
 	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title_label.add_theme_font_size_override("font_size", 32)
@@ -203,9 +204,14 @@ func _check_escape() -> void:
 
 func _finish_success() -> void:
 	print("[RunMinigame] Escaped!")
-	instruction_label.text = "ESCAPED!"
 
-	await get_tree().create_timer(0.5).timeout
+	# Update title and instruction
+	var title_label = content_container.get_node_or_null("TitleLabel")
+	if title_label:
+		title_label.text = "GREAT!"
+	instruction_label.text = "Successfully escaped!"
+
+	await get_tree().create_timer(1.5).timeout
 
 	var result = {
 		"success": true,
@@ -221,9 +227,14 @@ func _finish_success() -> void:
 
 func _finish_failed() -> void:
 	print("[RunMinigame] Failed to escape!")
-	instruction_label.text = "Failed to escape!"
 
-	await get_tree().create_timer(0.5).timeout
+	# Update title and instruction
+	var title_label = content_container.get_node_or_null("TitleLabel")
+	if title_label:
+		title_label.text = "OK"
+	instruction_label.text = "Caught! Can't escape!"
+
+	await get_tree().create_timer(1.5).timeout
 
 	var result = {
 		"success": false,

@@ -1828,9 +1828,36 @@ func _on_run_pressed() -> void:
 	# Calculate run chance based on enemy HP and level difference
 	var run_chance = _calculate_run_chance()
 
-	log_message("Attempting to escape... (%d%% chance)" % int(run_chance))
+	log_message("%s attempts to escape... (%d%% base chance)" % [current_combatant.display_name, int(run_chance)])
 
-	if randf() * 100 < run_chance:
+	# ═══════ RUN MINIGAME ═══════
+	# Calculate tempo difference (party TPO - enemy TPO)
+	var party_tpo = current_combatant.stats.get("TPO", 1)
+	var enemies = battle_mgr.get_enemy_combatants()
+	var avg_enemy_tpo = 0
+	for enemy in enemies:
+		avg_enemy_tpo += enemy.stats.get("TPO", 1)
+	if enemies.size() > 0:
+		avg_enemy_tpo = int(avg_enemy_tpo / enemies.size())
+	var tempo_diff = party_tpo - avg_enemy_tpo
+
+	# Get focus stat
+	var focus_stat = current_combatant.stats.get("FOC", 1)
+
+	# Get status effects
+	var status_effects = []
+	var ailment = str(current_combatant.get("ailment", ""))
+	if ailment != "":
+		status_effects.append(ailment)
+
+	# Launch run minigame
+	log_message("  → Navigate through the gaps to escape!")
+	var minigame_result = await minigame_mgr.launch_run_minigame(run_chance, tempo_diff, focus_stat, status_effects)
+
+	# Get success from minigame
+	var success = minigame_result.get("success", false)
+
+	if success:
 		log_message("Escaped successfully!")
 		await get_tree().create_timer(1.0).timeout
 		battle_mgr.current_state = battle_mgr.BattleState.ESCAPED
