@@ -3202,13 +3202,14 @@ func _execute_skill_single(target: Dictionary) -> void:
 	# Launch skill minigame
 	var focus_stat = current_combatant.stats.get("FOC", 1)
 	var skill_sequence = _get_skill_button_sequence(skill_id)
+	var mind_type = element  # Use the element as the mind type
 	var status_effects = []
 	var ailment = str(current_combatant.get("ailment", ""))
 	if ailment != "":
 		status_effects.append(ailment)
 
 	log_message("  → %s prepares the skill..." % [current_combatant.display_name])
-	var minigame_result = await minigame_mgr.launch_skill_minigame(focus_stat, skill_sequence, skill_tier, status_effects)
+	var minigame_result = await minigame_mgr.launch_skill_minigame(focus_stat, skill_sequence, skill_tier, mind_type, status_effects)
 
 	# Apply minigame modifiers
 	var damage_modifier = minigame_result.get("damage_modifier", 1.0)
