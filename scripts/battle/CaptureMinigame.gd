@@ -14,19 +14,21 @@ var party_member_data: Dictionary = {}
 enum Phase { TOSS, BIND, COMPLETE }
 var current_phase: Phase = Phase.TOSS
 var landed_binds: Array = []
-var knots_made: int = 0
-var knots_needed: int = 0
+var breaks_completed: int = 0  # Number of breaks achieved
+var breaks_needed: int = 0  # Total breaks needed (= break rating)
 var break_rating: int = 6
 var break_timer: float = 0.0  # Time until enemy breaks free
 
 # Bind point system
 enum BindDirection { UP, DOWN, LEFT, RIGHT }
+enum WrapDirection { CLOCKWISE, COUNTERCLOCKWISE }
 var current_bind_direction: BindDirection = BindDirection.UP
+var current_wrap_direction: WrapDirection = WrapDirection.CLOCKWISE
 var bind_point_grabbed: bool = false
 var drag_start_angle: float = 0.0
 var drag_current_angle: float = 0.0
 var wrap_progress: float = 0.0  # 0.0 to TAU (full circle)
-var wrap_trails: Array = []  # Visual trails showing wraps
+var wraps_in_current_break: int = 0  # Wraps completed for current break
 var wraps_per_point: int = 3  # How many wraps needed per break rating point
 
 ## Visual elements
@@ -34,8 +36,8 @@ var title_label: Label
 var phase_label: Label
 var enemy_icon: ColorRect
 var bind_result_label: Label
-var knot_progress_bar: ProgressBar
-var break_bar: ProgressBar
+var break_progress_bar: ProgressBar  # Shows breaks completed
+var break_timer_bar: ProgressBar  # Shows time remaining
 var instruction_label: Label
 
 # Bind phase visuals
@@ -79,27 +81,27 @@ func _setup_minigame() -> void:
 	bind_result_label.add_theme_font_size_override("font_size", 18)
 	content_container.add_child(bind_result_label)
 
-	# Knot progress bar
-	knot_progress_bar = ProgressBar.new()
-	knot_progress_bar.max_value = 1.0
-	knot_progress_bar.value = 0.0
-	knot_progress_bar.show_percentage = false
-	knot_progress_bar.custom_minimum_size = Vector2(300, 30)
-	knot_progress_bar.visible = false
-	var knot_container = CenterContainer.new()
-	knot_container.add_child(knot_progress_bar)
-	content_container.add_child(knot_container)
+	# Break progress bar (shows breaks completed)
+	break_progress_bar = ProgressBar.new()
+	break_progress_bar.max_value = 1.0
+	break_progress_bar.value = 0.0
+	break_progress_bar.show_percentage = false
+	break_progress_bar.custom_minimum_size = Vector2(300, 30)
+	break_progress_bar.visible = false
+	var progress_container = CenterContainer.new()
+	progress_container.add_child(break_progress_bar)
+	content_container.add_child(progress_container)
 
-	# Break bar
-	break_bar = ProgressBar.new()
-	break_bar.max_value = float(break_rating)
-	break_bar.value = float(break_rating)
-	break_bar.show_percentage = false
-	break_bar.custom_minimum_size = Vector2(300, 30)
-	break_bar.visible = false
-	var break_container = CenterContainer.new()
-	break_container.add_child(break_bar)
-	content_container.add_child(break_container)
+	# Break timer bar (shows time remaining)
+	break_timer_bar = ProgressBar.new()
+	break_timer_bar.max_value = float(break_rating)
+	break_timer_bar.value = float(break_rating)
+	break_timer_bar.show_percentage = false
+	break_timer_bar.custom_minimum_size = Vector2(300, 30)
+	break_timer_bar.visible = false
+	var timer_container = CenterContainer.new()
+	timer_container.add_child(break_timer_bar)
+	content_container.add_child(timer_container)
 
 	# Instructions
 	instruction_label = Label.new()
@@ -124,11 +126,11 @@ func _calculate_break_rating() -> void:
 
 	print("[CaptureMinigame] Break rating: %d (HP: %.1f%%)" % [break_rating, enemy_hp_percent * 100])
 
-func _calculate_wraps_needed() -> int:
-	"""Calculate wraps needed based on break rating and bind quality"""
-	var current_break_rating = enemy_data.get("break_rating", 6)
+func _calculate_breaks_needed() -> void:
+	"""Calculate breaks needed based on break rating"""
+	breaks_needed = enemy_data.get("break_rating", 6)
 
-	# Determine wraps per break rating point based on bind quality
+	# Determine wraps per break based on bind quality
 	wraps_per_point = 3  # Default to basic
 	for bind in landed_binds:
 		match bind:
@@ -136,12 +138,7 @@ func _calculate_wraps_needed() -> int:
 			"standard": wraps_per_point = 2
 			"advanced": wraps_per_point = 1
 
-	# Total wraps needed = break rating × wraps per point
-	var total_wraps = current_break_rating * wraps_per_point
-
-	print("[CaptureMinigame] Break rating: %d × %d wraps/point = %d total wraps needed" % [current_break_rating, wraps_per_point, total_wraps])
-
-	return max(1, total_wraps)
+	print("[CaptureMinigame] Break rating: %d, wraps per break: %d" % [breaks_needed, wraps_per_point])
 
 func _start_minigame() -> void:
 	print("[CaptureMinigame] Starting - Binds: %s" % str(binds))
@@ -204,21 +201,27 @@ func _start_bind_phase() -> void:
 	phase_label.text = "Phase: BIND"
 	bind_result_label.text = "%d binds landed!" % landed_binds.size()
 
-	# Calculate knots needed based on enemy type
-	knots_needed = _calculate_wraps_needed()
+	# Calculate breaks needed
+	_calculate_breaks_needed()
 
-	print("[CaptureMinigame] Enemy: %s requires %d wraps" % [enemy_data.get("display_name", ""), knots_needed])
+	print("[CaptureMinigame] Enemy: %s requires %d breaks" % [enemy_data.get("display_name", ""), breaks_needed])
 
 	# Set break timer based on break rating (seconds)
 	break_timer = float(break_rating) * 2.0  # 2 seconds per break rating point
 
-	instruction_label.text = "Grab bind points and drag in circles! (%d wraps needed)" % knots_needed
+	# Start with clockwise direction
+	current_wrap_direction = WrapDirection.CLOCKWISE
+	wraps_in_current_break = 0
+	breaks_completed = 0
 
-	knot_progress_bar.visible = true
-	knot_progress_bar.max_value = knots_needed
-	break_bar.visible = true
-	break_bar.max_value = break_timer
-	break_bar.value = break_timer
+	_update_instruction_label()
+
+	break_progress_bar.visible = true
+	break_progress_bar.max_value = breaks_needed
+	break_progress_bar.value = 0
+	break_timer_bar.visible = true
+	break_timer_bar.max_value = break_timer
+	break_timer_bar.value = break_timer
 
 	# Hide toss phase elements
 	bind_result_label.visible = false
@@ -228,6 +231,11 @@ func _start_bind_phase() -> void:
 
 	# Spawn first bind point
 	_spawn_bind_point()
+
+func _update_instruction_label() -> void:
+	"""Update instruction label with current direction and progress"""
+	var direction_text = "CLOCKWISE →" if current_wrap_direction == WrapDirection.CLOCKWISE else "← COUNTERCLOCKWISE"
+	instruction_label.text = "Wrap %s! (%d/%d breaks)" % [direction_text, breaks_completed, breaks_needed]
 
 func _setup_bind_arena() -> void:
 	"""Create the visual arena for bind dragging"""
@@ -288,7 +296,7 @@ func _process(delta: float) -> void:
 
 	# Update break timer
 	break_timer -= delta
-	break_bar.value = break_timer
+	break_timer_bar.value = break_timer
 
 	if break_timer <= 0:
 		_finish_capture_failed()
@@ -332,30 +340,60 @@ func _process(delta: float) -> void:
 			var angle_diff = angle_difference(drag_current_angle, current_angle)
 
 			if abs(angle_diff) > 0.1:
-				wrap_progress += abs(angle_diff)
-				drag_current_angle = current_angle
+				# Check if wrapping in correct direction
+				var is_correct_direction = false
+				if current_wrap_direction == WrapDirection.CLOCKWISE and angle_diff > 0:
+					is_correct_direction = true
+				elif current_wrap_direction == WrapDirection.COUNTERCLOCKWISE and angle_diff < 0:
+					is_correct_direction = true
 
-				# Add point to trail
-				var arena_center = Vector2(100, 100)
-				var radius = 60.0
-				var trail_point = arena_center + Vector2(cos(current_angle), sin(current_angle)) * radius
-				bind_trail.add_point(trail_point)
+				if is_correct_direction:
+					wrap_progress += abs(angle_diff)
+					drag_current_angle = current_angle
 
-				# Update bind point position
-				bind_point.position = trail_point - Vector2(10, 10)
+					# Add point to trail
+					var arena_center = Vector2(100, 100)
+					var radius = 60.0
+					var trail_point = arena_center + Vector2(cos(current_angle), sin(current_angle)) * radius
+					bind_trail.add_point(trail_point)
 
-				# Check if completed a full wrap (360 degrees)
-				if wrap_progress >= TAU:
-					knots_made += 1
-					knot_progress_bar.value = knots_made
-					print("[CaptureMinigame] Wrap complete! (%d/%d)" % [knots_made, knots_needed])
+					# Update bind point position
+					bind_point.position = trail_point - Vector2(10, 10)
 
-					if knots_made >= knots_needed:
-						_finish_capture_success()
-						return
-					else:
-						# Spawn next bind point
-						_spawn_bind_point()
+					# Check if completed a full wrap (360 degrees)
+					if wrap_progress >= TAU:
+						wraps_in_current_break += 1
+						wrap_progress = 0.0
+						print("[CaptureMinigame] Wrap complete! (%d/%d for current break)" % [wraps_in_current_break, wraps_per_point])
+
+						# Check if completed enough wraps for one break
+						if wraps_in_current_break >= wraps_per_point:
+							breaks_completed += 1
+							wraps_in_current_break = 0
+							break_progress_bar.value = breaks_completed
+							_update_instruction_label()
+							print("[CaptureMinigame] BREAK! (%d/%d)" % [breaks_completed, breaks_needed])
+
+							if breaks_completed >= breaks_needed:
+								_finish_capture_success()
+								return
+							else:
+								# Switch direction for next break
+								if current_wrap_direction == WrapDirection.CLOCKWISE:
+									current_wrap_direction = WrapDirection.COUNTERCLOCKWISE
+								else:
+									current_wrap_direction = WrapDirection.CLOCKWISE
+								_update_instruction_label()
+								# Spawn next bind point
+								_spawn_bind_point()
+						else:
+							# More wraps needed for this break
+							_spawn_bind_point()
+				else:
+					# Wrong direction! Flash red and reset wrap progress
+					bind_point.color = Color(1.0, 0.0, 0.0, 1.0)
+					wrap_progress = 0.0
+					bind_trail.clear_points()
 		else:
 			# Player let go - fail this wrap attempt
 			if bind_trail.get_point_count() > 5:
@@ -372,7 +410,7 @@ func _get_direction_angle(direction: BindDirection) -> float:
 	return 0.0
 
 func _finish_capture_success() -> void:
-	print("[CaptureMinigame] Capture successful! Completed all wraps.")
+	print("[CaptureMinigame] Capture successful! Completed all breaks.")
 	title_label.text = "GREAT!"
 	phase_label.text = "Success!"
 	instruction_label.text = "Break rating reduced to 0!"
@@ -387,7 +425,7 @@ func _finish_capture_success() -> void:
 		"success": true,
 		"grade": "capture",
 		"break_rating_reduced": break_rating_reduced,
-		"wraps_completed": knots_made,
+		"wraps_completed": breaks_completed * wraps_per_point,  # Total wraps
 		"damage_modifier": 1.0,
 		"is_crit": false,
 		"mp_modifier": 1.0,
@@ -398,10 +436,10 @@ func _finish_capture_success() -> void:
 	_complete_minigame(result)
 
 func _finish_capture_failed() -> void:
-	print("[CaptureMinigame] Capture failed! Wraps completed: %d/%d" % [knots_made, knots_needed])
+	print("[CaptureMinigame] Capture failed! Breaks completed: %d/%d" % [breaks_completed, breaks_needed])
 
-	# Calculate partial break rating reduction based on wraps completed
-	var break_rating_reduced = int(knots_made / wraps_per_point)
+	# Break rating reduction is the number of breaks completed
+	var break_rating_reduced = breaks_completed
 
 	title_label.text = "OK"
 	phase_label.text = "Failed"
@@ -412,11 +450,13 @@ func _finish_capture_failed() -> void:
 
 	await get_tree().create_timer(1.5).timeout
 
+	var total_wraps = (breaks_completed * wraps_per_point) + wraps_in_current_break
+
 	var result = {
 		"success": false,
 		"grade": "failed",
 		"break_rating_reduced": break_rating_reduced,
-		"wraps_completed": knots_made,
+		"wraps_completed": total_wraps,
 		"damage_modifier": 1.0,
 		"is_crit": false,
 		"mp_modifier": 1.0,
