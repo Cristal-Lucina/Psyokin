@@ -13,13 +13,12 @@ var brawn: int = 1  # Brawn stat (affects view radius)
 ## Internal state
 enum Phase { WATCHING, CHARGING, COMPLETE }
 var current_phase: Phase = Phase.WATCHING
-var current_attempt: int = 0
-var best_grade: String = "red"
-var best_damage_modifier: float = 0.9
+var final_grade: String = "red"
+var final_damage_modifier: float = 0.9
 var is_crit: bool = false
 var has_started: bool = false
-var watch_timer: float = 0.0
-var watch_time_limit: float = 4.0
+var timer: float = 0.0
+var time_limit: float = 4.0
 var minigame_complete: bool = false  # Lock out all input when complete
 
 ## Weak spot movement
@@ -49,10 +48,9 @@ var charge_bar: ProgressBar
 var charge_label: Label
 var instruction_label: Label
 var timer_label: Label
-var attempt_label: Label
 
 func _setup_minigame() -> void:
-	base_duration = watch_time_limit + 3.0  # Shorter overall duration
+	base_duration = time_limit + 3.0  # Shorter overall duration
 	current_duration = base_duration
 
 	# Calculate view size from BRW (higher BRW = bigger view window)
@@ -95,24 +93,12 @@ func _setup_minigame() -> void:
 	charge_label.add_theme_font_size_override("font_size", 14)
 	content_container.add_child(charge_label)
 
-	# Labels
-	var label_container = HBoxContainer.new()
-	label_container.alignment = BoxContainer.ALIGNMENT_CENTER
-	content_container.add_child(label_container)
-
+	# Timer label
 	timer_label = Label.new()
 	timer_label.text = "Move to start!"
 	timer_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	timer_label.add_theme_font_size_override("font_size", 16)
-	label_container.add_child(timer_label)
-
-	label_container.add_child(Control.new())  # Spacer
-
-	attempt_label = Label.new()
-	attempt_label.text = "Attempt: 1/%d" % tempo
-	attempt_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	attempt_label.add_theme_font_size_override("font_size", 16)
-	label_container.add_child(attempt_label)
+	content_container.add_child(timer_label)
 
 	# Instructions
 	instruction_label = Label.new()
@@ -171,23 +157,10 @@ func _randomize_weak_spot_target() -> void:
 	weak_spot_change_timer = 0.0
 
 func _start_minigame() -> void:
-	print("[AttackMinigame] Starting timing attack (attempts: %d, BRW: %d)" % [tempo, brawn])
-	current_phase = Phase.WATCHING
-	current_attempt = 0
-	_start_next_attempt()
-
-func _start_next_attempt() -> void:
-	current_attempt += 1
-	attempt_label.text = "Attempt: %d/%d" % [current_attempt, tempo]
-
-	if current_attempt > tempo:
-		_finish_minigame()
-		return
-
-	# Reset for new attempt
+	print("[AttackMinigame] Starting timing attack (BRW: %d)" % brawn)
 	current_phase = Phase.WATCHING
 	has_started = false
-	watch_timer = 0.0
+	timer = 0.0
 	weak_spot_is_visible = false
 	charge_progress = 0.0
 	is_charging = false
@@ -195,7 +168,8 @@ func _start_next_attempt() -> void:
 	# Reset view position to center
 	view_pos = Vector2.ZERO
 
-	# Randomize weak spot starting position and target
+	# Randomize weak spot starting position and target (already done in _setup_minigame)
+	# But randomize again for good measure
 	weak_spot_pos = _get_random_position_in_arena()
 	_randomize_weak_spot_target()
 
@@ -254,18 +228,18 @@ func _process_watching(delta: float) -> void:
 	# Redraw arena to update positions
 	arena.queue_redraw()
 
-	# Update timer
-	if not has_started:
-		timer_label.text = "Move view to find weak spot..."
-	else:
-		watch_timer += delta
-		timer_label.text = "Time: %.1fs" % (watch_time_limit - watch_timer)
+	# Update timer (always, even before started)
+	if has_started:
+		timer += delta
+		timer_label.text = "Time: %.1fs" % (time_limit - timer)
 
-		if watch_timer >= watch_time_limit:
+		if timer >= time_limit:
 			# Time's up! Force attack
 			print("[AttackMinigame] Time's up! Auto-attacking")
 			_force_attack()
 			return
+	else:
+		timer_label.text = "Move to start timer..."
 
 	# Check for Space HELD to start charging
 	if Input.is_key_pressed(KEY_SPACE):
@@ -324,20 +298,26 @@ func _process_charging(delta: float) -> void:
 	# Redraw arena to update positions
 	arena.queue_redraw()
 
+	# Update timer (continues during charging!)
+	timer += delta
+	timer_label.text = "Time: %.1fs" % (time_limit - timer)
+
+	if timer >= time_limit:
+		# Time's up! Force release at current charge
+		print("[AttackMinigame] Time's up during charging!")
+		_release_attack()
+		return
+
 	# Increase charge while Space is held
 	if Input.is_key_pressed(KEY_SPACE):
-		if weak_spot_is_visible:
-			# Full charge available: Red → Yellow → Green → Blue → stays at Red
-			charge_progress += delta * charge_speed
-			charge_progress = min(charge_progress, 1.2)  # Cap at 1.2 (past blue, into red)
-		else:
-			# No charge - locked at red
-			charge_progress = 0.0
+		# Always charge, regardless of visibility
+		charge_progress += delta * charge_speed
+		charge_progress = min(charge_progress, 1.2)  # Cap at 1.2 (past blue, into red)
 
 		# Update charge bar
 		charge_bar.value = min(charge_progress, 1.0)
 
-		# Determine current zone
+		# Determine current zone based on visibility
 		charge_zone = _get_charge_zone(charge_progress, weak_spot_is_visible)
 		_update_charge_visuals(charge_zone)
 	else:
@@ -384,7 +364,7 @@ func _release_attack() -> void:
 
 	# Reset charging state immediately
 	is_charging = false
-	current_phase = Phase.COMPLETE  # Temporarily complete to stop input processing
+	current_phase = Phase.COMPLETE  # Stop input processing
 
 	# Determine damage modifier
 	var damage_modifier: float = 0.9
@@ -406,12 +386,10 @@ func _release_attack() -> void:
 			grade = "blue"
 			got_crit = true
 
-	# Update best if better
-	if _is_better_grade(grade, best_grade):
-		best_grade = grade
-		best_damage_modifier = damage_modifier
-		if got_crit:
-			is_crit = true
+	# Set final results
+	final_grade = grade
+	final_damage_modifier = damage_modifier
+	is_crit = got_crit
 
 	# Show result feedback
 	var result_text = ""
@@ -429,42 +407,29 @@ func _release_attack() -> void:
 
 	charge_label.text = result_text
 
-	# Wait then move to next attempt
+	# Wait then finish minigame
 	await get_tree().create_timer(1.5).timeout
-
-	# Only start next attempt if not already finished
-	if current_attempt < tempo:
-		_start_next_attempt()
-	else:
-		_finish_minigame()
+	_finish_minigame()
 
 func _force_attack() -> void:
 	"""Time ran out, attack at current position"""
 	# Auto-attack at red zone (worst)
 	charge_zone = "red"
-	best_grade = "red"
-	best_damage_modifier = 0.9
+	final_grade = "red"
+	final_damage_modifier = 0.9
+	is_crit = false
 
 	# Reset charging state
 	is_charging = false
-	current_phase = Phase.COMPLETE  # Temporarily complete to stop input processing
+	current_phase = Phase.COMPLETE  # Stop input processing
 
 	charge_label.text = "Time's up! OK (-10% damage)"
 
 	await get_tree().create_timer(1.5).timeout
-
-	# Only start next attempt if not already finished
-	if current_attempt < tempo:
-		_start_next_attempt()
-	else:
-		_finish_minigame()
-
-func _is_better_grade(new_grade: String, old_grade: String) -> bool:
-	var grade_values = {"red": 0, "yellow": 1, "green": 2, "blue": 3}
-	return grade_values.get(new_grade, 0) > grade_values.get(old_grade, 0)
+	_finish_minigame()
 
 func _finish_minigame() -> void:
-	print("[AttackMinigame] Finishing - Best: %s, Modifier: %.2f, Crit: %s" % [best_grade, best_damage_modifier, is_crit])
+	print("[AttackMinigame] Finishing - Grade: %s, Modifier: %.2f, Crit: %s" % [final_grade, final_damage_modifier, is_crit])
 
 	# Lock out all input immediately
 	minigame_complete = true
@@ -472,8 +437,8 @@ func _finish_minigame() -> void:
 
 	var result = {
 		"success": true,
-		"grade": best_grade,
-		"damage_modifier": best_damage_modifier,
+		"grade": final_grade,
+		"damage_modifier": final_damage_modifier,
 		"is_crit": is_crit,
 		"mp_modifier": 1.0,
 		"tier_downgrade": 0,
