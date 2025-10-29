@@ -12,8 +12,8 @@ var focus: int = 1  # Focus stat (adds magnet effect)
 ## Internal state
 var circle_radius: float = 100.0  # Current circle radius
 var max_radius: float = 100.0  # Maximum radius (outer boundary)
-var circle_close_speed: float = 25.0  # pixels per second
-var circle_rotation_speed: float = 1.0  # radians per second
+var circle_close_speed: float = 20.0  # pixels per second (reduced from 25)
+var circle_rotation_speed: float = 0.5  # radians per second (reduced from 1.0)
 var player_pos: Vector2 = Vector2.ZERO
 var circle_angle: float = 0.0
 var gaps: Array = []  # Array of {start_angle, end_angle}
@@ -33,13 +33,13 @@ func _setup_minigame() -> void:
 	var gap_count = _calculate_gap_count(run_chance)
 	var has_spin = _should_spin(run_chance)
 
-	# Adjust speed based on tempo difference
-	circle_close_speed = 50.0 * (1.0 - (tempo_diff * 0.02))
+	# Adjust speed based on tempo difference (much slower base speed)
+	circle_close_speed = 20.0 * (1.0 - (tempo_diff * 0.02))
 	if tempo_diff < 0:
-		circle_close_speed *= 1.2  # Enemy faster = circle closes faster
+		circle_close_speed *= 1.15  # Enemy faster = circle closes slightly faster
 
 	if has_spin:
-		circle_rotation_speed = 1.0 * (1.0 - (tempo_diff * 0.02))
+		circle_rotation_speed = 0.5 * (1.0 - (tempo_diff * 0.02))
 	else:
 		circle_rotation_speed = 0.0
 
@@ -73,11 +73,11 @@ func _setup_minigame() -> void:
 
 func _calculate_gap_count(chance: float) -> int:
 	"""Calculate number of gaps based on run chance"""
-	if chance <= 10: return 1
-	elif chance <= 30: return 2
-	elif chance <= 50: return 4
-	elif chance <= 70: return 8
-	else: return 10
+	if chance <= 10: return 2  # Was 1, now minimum 2
+	elif chance <= 30: return 3  # Was 2
+	elif chance <= 50: return 4  # Unchanged
+	elif chance <= 70: return 6  # Was 8
+	else: return 8  # Was 10
 
 func _should_spin(chance: float) -> bool:
 	"""Determine if circle should spin"""
@@ -86,7 +86,7 @@ func _should_spin(chance: float) -> bool:
 func _generate_gaps(count: int) -> void:
 	"""Generate random gap positions"""
 	gaps.clear()
-	var gap_size = TAU / (count * 2)  # Each gap takes up some angle
+	var gap_size = TAU / (count * 1.5)  # Larger gaps (was count * 2)
 
 	for i in range(count):
 		var base_angle = (TAU / count) * i + randf_range(-0.3, 0.3)
@@ -95,7 +95,7 @@ func _generate_gaps(count: int) -> void:
 			"end_angle": base_angle + gap_size / 2
 		})
 
-	print("[RunMinigame] Generated %d gaps" % gaps.size())
+	print("[RunMinigame] Generated %d gaps with size %.2f radians" % [gaps.size(), gap_size])
 
 func _start_minigame() -> void:
 	print("[RunMinigame] Starting escape")
@@ -106,6 +106,20 @@ func _draw_arena() -> void:
 	"""Draw the circles and player"""
 	# Draw outer boundary circle (light gray)
 	arena.draw_circle(arena_center, max_radius, Color(0.3, 0.3, 0.3, 0.3))
+
+	# First, draw gap indicators (green arcs at max radius)
+	for gap in gaps:
+		var gap_start_angle = gap.start_angle + circle_angle
+		var gap_end_angle = gap.end_angle + circle_angle
+		var arc_segments = 20
+		for i in range(arc_segments):
+			var t1 = float(i) / arc_segments
+			var t2 = float(i + 1) / arc_segments
+			var a1 = lerp(gap_start_angle, gap_end_angle, t1)
+			var a2 = lerp(gap_start_angle, gap_end_angle, t2)
+			var p1 = arena_center + Vector2(cos(a1), sin(a1)) * max_radius
+			var p2 = arena_center + Vector2(cos(a2), sin(a2)) * max_radius
+			arena.draw_line(p1, p2, Color(0.2, 1.0, 0.2, 0.6), 4.0)
 
 	# Draw closing circle with gaps (red)
 	# We'll draw the circle in segments, skipping the gaps
@@ -154,7 +168,7 @@ func _process(delta: float) -> void:
 
 		if move_dir.length() > 0:
 			move_dir = move_dir.normalized()
-			player_pos += move_dir * 75.0 * delta  # Reduced speed for smaller arena
+			player_pos += move_dir * 100.0 * delta  # Increased speed for better escape chance
 
 			# Focus magnet effect (pulls slightly toward nearest gap)
 			if focus > 0:
@@ -162,7 +176,7 @@ func _process(delta: float) -> void:
 				if nearest_gap:
 					var gap_angle = (nearest_gap.start_angle + nearest_gap.end_angle) / 2.0
 					var gap_dir = Vector2(cos(gap_angle + circle_angle), sin(gap_angle + circle_angle))
-					player_pos += gap_dir * (focus * 2.5) * delta  # Reduced magnet effect
+					player_pos += gap_dir * (focus * 1.5) * delta  # Subtle magnet effect
 
 	# Close circle (even when caught, for visual feedback)
 	circle_radius -= circle_close_speed * delta
@@ -177,17 +191,17 @@ func _process(delta: float) -> void:
 	if not is_caught and not minigame_complete:
 		var distance_from_center = player_pos.length()
 
-		if distance_from_center > max_radius:
+		if distance_from_center > max_radius - 3.0:  # Escape when near edge (3px buffer)
 			# Player escaped outer boundary!
 			_check_escape()
-		elif distance_from_center > circle_radius - 5.0:  # 5 pixel buffer for player radius
+		elif distance_from_center > circle_radius - 3.0:  # Reduced collision buffer (was 5)
 			# Player is touching or outside the closing circle
 			# Check if they're in a gap
 			if not _is_in_gap(player_pos):
 				# Hit the circle! Freeze and then fail
 				_on_caught()
 
-		if circle_radius <= 5:
+		if circle_radius <= 3:  # Give more time (was 5)
 			# Circle fully closed - caught!
 			_on_caught()
 
@@ -212,10 +226,28 @@ func _find_nearest_gap() -> Dictionary:
 func _is_in_gap(pos: Vector2) -> bool:
 	"""Check if position is within a gap"""
 	var angle = atan2(pos.y, pos.x) - circle_angle
+	# Normalize angle to 0-TAU range
+	angle = fmod(angle, TAU)
+	if angle < 0:
+		angle += TAU
 
 	for gap in gaps:
-		if angle >= gap.start_angle and angle <= gap.end_angle:
-			return true
+		var gap_start = fmod(gap.start_angle, TAU)
+		var gap_end = fmod(gap.end_angle, TAU)
+
+		if gap_start < 0:
+			gap_start += TAU
+		if gap_end < 0:
+			gap_end += TAU
+
+		# Handle wrapping around 0
+		if gap_start <= gap_end:
+			if angle >= gap_start and angle <= gap_end:
+				return true
+		else:
+			# Gap wraps around 0
+			if angle >= gap_start or angle <= gap_end:
+				return true
 
 	return false
 
