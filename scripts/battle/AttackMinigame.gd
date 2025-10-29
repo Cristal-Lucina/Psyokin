@@ -1,17 +1,17 @@
 extends BaseMinigame
 class_name AttackMinigame
 
-## AttackMinigame - Weak spot hunting with WASD movement + timing
+## AttackMinigame - Weak spot hunting with hold-to-charge attack
 ## Phase 1: Move reticle with WASD to find enemy weak spot
-## Phase 2: Press Space to lock in and do timing challenge
-## Phase 3: If hit Green/Blue, press Space again for crit attempt
+## Phase 2: HOLD Space when on weak spot, gauge charges through colors
+## Phase 3: RELEASE Space at desired color to attack
 
 ## Configuration
 var tempo: int = 1  # Number of attempts (based on TPO)
 var brawn: int = 1  # Brawn stat (affects reticle size)
 
 ## Internal state
-enum Phase { HUNTING, TIMING, CRIT_ATTEMPT, COMPLETE }
+enum Phase { HUNTING, CHARGING, COMPLETE }
 var current_phase: Phase = Phase.HUNTING
 var current_attempt: int = 0
 var best_grade: String = "red"
@@ -24,17 +24,16 @@ var hunt_time_limit: float = 8.0
 ## Weak spot
 var weak_spot_pos: Vector2 = Vector2.ZERO
 var weak_spot_found: bool = false
-var locked_on_weak_spot: bool = false
 
 ## Reticle
 var reticle_pos: Vector2 = Vector2.ZERO
 var reticle_radius: float = 50.0  # Base size, scales with BRW
 
-## Timing phase
-var timing_progress: float = 0.0
-var timing_cycle_duration: float = 1.0
-var waiting_for_input: bool = false
-var first_hit_grade: String = ""
+## Charging phase
+var charge_progress: float = 0.0
+var charge_speed: float = 0.5  # Takes 2 seconds to go from red to blue
+var is_charging: bool = false
+var charge_zone: String = "red"
 
 ## Visual elements
 var enemy_container: Control
@@ -42,18 +41,11 @@ var enemy_icon: ColorRect
 var weak_spot_indicator: ColorRect
 var reticle_outer: ColorRect
 var reticle_crosshair: ColorRect
-var timing_display: Control
-var timing_bar: ColorRect
+var charge_bar: ProgressBar
+var charge_label: Label
 var instruction_label: Label
 var timer_label: Label
 var attempt_label: Label
-
-## Zone thresholds
-const ZONE_RED_1: float = 0.0
-const ZONE_YELLOW: float = 0.3
-const ZONE_GREEN: float = 0.55
-const ZONE_BLUE: float = 0.7
-const ZONE_RED_2: float = 0.85
 
 func _setup_minigame() -> void:
 	base_duration = hunt_time_limit + 5.0
@@ -75,7 +67,7 @@ func _setup_minigame() -> void:
 	var title_label = Label.new()
 	title_label.text = "ATTACK!"
 	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title_label.add_theme_font_size_override("font_size", 32)
+	title_label.add_theme_font_size_override("font_size", 28)
 	content_container.add_child(title_label)
 
 	# Enemy area (280x280 - smaller to fit in 35% panel)
@@ -114,18 +106,22 @@ func _setup_minigame() -> void:
 	reticle_crosshair.position = Vector2(reticle_radius - 2, reticle_radius - 2)
 	reticle_outer.add_child(reticle_crosshair)
 
-	# Timing display (hidden until locked in)
-	timing_display = Control.new()
-	timing_display.visible = false
-	content_container.add_child(timing_display)
+	# Charge bar
+	charge_bar = ProgressBar.new()
+	charge_bar.max_value = 1.0
+	charge_bar.value = 0.0
+	charge_bar.show_percentage = false
+	charge_bar.custom_minimum_size = Vector2(280, 30)
+	var bar_container = CenterContainer.new()
+	bar_container.add_child(charge_bar)
+	content_container.add_child(bar_container)
 
-	var timing_container = CenterContainer.new()
-	timing_display.add_child(timing_container)
-
-	timing_bar = ColorRect.new()
-	timing_bar.custom_minimum_size = Vector2(300, 40)
-	timing_bar.color = Color(1.0, 0.0, 0.0, 0.8)
-	timing_container.add_child(timing_bar)
+	# Charge label
+	charge_label = Label.new()
+	charge_label.text = "Find weak spot, then HOLD SPACE to charge!"
+	charge_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	charge_label.add_theme_font_size_override("font_size", 14)
+	content_container.add_child(charge_label)
 
 	# Labels
 	var label_container = HBoxContainer.new()
@@ -135,7 +131,7 @@ func _setup_minigame() -> void:
 	timer_label = Label.new()
 	timer_label.text = "Move to start!"
 	timer_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	timer_label.add_theme_font_size_override("font_size", 18)
+	timer_label.add_theme_font_size_override("font_size", 16)
 	label_container.add_child(timer_label)
 
 	label_container.add_child(Control.new())  # Spacer
@@ -143,14 +139,14 @@ func _setup_minigame() -> void:
 	attempt_label = Label.new()
 	attempt_label.text = "Attempt: 1/%d" % tempo
 	attempt_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	attempt_label.add_theme_font_size_override("font_size", 18)
+	attempt_label.add_theme_font_size_override("font_size", 16)
 	label_container.add_child(attempt_label)
 
 	# Instructions
 	instruction_label = Label.new()
-	instruction_label.text = "WASD: Find weak spot | SPACE: Attack!"
+	instruction_label.text = "WASD: Find weak spot | HOLD SPACE: Charge attack!"
 	instruction_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	instruction_label.add_theme_font_size_override("font_size", 12)
+	instruction_label.add_theme_font_size_override("font_size", 11)
 	content_container.add_child(instruction_label)
 
 func _start_minigame() -> void:
@@ -172,8 +168,9 @@ func _start_next_attempt() -> void:
 	has_moved = false
 	hunt_timer = 0.0
 	weak_spot_found = false
-	locked_on_weak_spot = false
 	reticle_pos = Vector2.ZERO
+	charge_progress = 0.0
+	is_charging = false
 
 	# Reset visuals
 	reticle_outer.position = Vector2(140, 140) - Vector2(reticle_radius, reticle_radius)
@@ -181,19 +178,18 @@ func _start_next_attempt() -> void:
 	reticle_outer.visible = true
 	weak_spot_indicator.color = Color(1.0, 1.0, 0.0, 0.0)
 	weak_spot_indicator.visible = true
-	timing_display.visible = false
+	charge_bar.value = 0.0
 
 	timer_label.text = "Move to start!"
-	instruction_label.text = "WASD: Find weak spot | SPACE: Attack!"
+	charge_label.text = "Find weak spot, then HOLD SPACE to charge!"
+	instruction_label.text = "WASD: Find weak spot | HOLD SPACE: Charge attack!"
 
 func _process(delta: float) -> void:
 	match current_phase:
 		Phase.HUNTING:
 			_process_hunting(delta)
-		Phase.TIMING:
-			_process_timing(delta)
-		Phase.CRIT_ATTEMPT:
-			_process_crit_attempt(delta)
+		Phase.CHARGING:
+			_process_charging(delta)
 
 func _process_hunting(delta: float) -> void:
 	# Handle WASD movement
@@ -240,186 +236,159 @@ func _process_hunting(delta: float) -> void:
 		timer_label.text = "Time: %.1fs" % (hunt_time_limit - hunt_timer)
 
 		if hunt_timer >= hunt_time_limit:
-			# Time's up! Auto-lock current position
-			print("[AttackMinigame] Time's up! Auto-locking position")
-			_lock_position()
+			# Time's up! Force attack at current position
+			print("[AttackMinigame] Time's up! Auto-attacking")
+			_force_attack()
 
-	# Check for Space press to lock in
-	if Input.is_action_just_pressed("ui_accept") or (Input.is_key_pressed(KEY_SPACE) and not waiting_for_input):
-		_lock_position()
-		waiting_for_input = true
-		await get_tree().create_timer(0.2).timeout
-		waiting_for_input = false
-
-func _lock_position() -> void:
-	"""Lock reticle position and start timing phase"""
-	locked_on_weak_spot = weak_spot_found
-	current_phase = Phase.TIMING
-	timing_progress = 0.0
-	waiting_for_input = false
-
-	# Hide hunting UI
-	reticle_outer.visible = false
-	weak_spot_indicator.visible = false
-
-	# Show timing UI
-	timing_display.visible = true
-
-	if locked_on_weak_spot:
-		instruction_label.text = "WEAK SPOT! Press SPACE for Green/Blue!"
-		print("[AttackMinigame] Locked on WEAK SPOT - full zones available")
+	# Check for Space HELD to start charging
+	if Input.is_key_pressed(KEY_SPACE):
+		if not is_charging:
+			_start_charging()
+			is_charging = true
 	else:
-		instruction_label.text = "Press SPACE for Yellow (no weak spot found)"
-		print("[AttackMinigame] Locked on empty area - limited zones only")
+		if is_charging:
+			# Released! Attack at current charge
+			_release_attack()
+			is_charging = false
 
-	# Small delay before accepting input
-	await get_tree().create_timer(0.3).timeout
-	waiting_for_input = true
+func _start_charging() -> void:
+	"""Start charging the attack gauge"""
+	current_phase = Phase.CHARGING
+	charge_progress = 0.0
+	print("[AttackMinigame] Started charging (weak spot: %s)" % weak_spot_found)
 
-func _process_timing(delta: float) -> void:
-	# Cycle timing bar
-	timing_progress += delta
-	var cycle_progress = fmod(timing_progress, timing_cycle_duration) / timing_cycle_duration
+	if weak_spot_found:
+		charge_label.text = "Charging... Release for: OK → GOOD → GREAT → CRIT"
+	else:
+		charge_label.text = "No weak spot! Limited charge: OK → GOOD"
 
-	# Determine current zone
-	var zone = _get_zone(cycle_progress, locked_on_weak_spot)
-	_update_timing_bar(cycle_progress, zone)
+func _process_charging(delta: float) -> void:
+	# Increase charge while Space is held
+	if Input.is_key_pressed(KEY_SPACE):
+		if weak_spot_found:
+			# Full charge available: Red → Yellow → Green → Blue → stays at Red
+			charge_progress += delta * charge_speed
+			charge_progress = min(charge_progress, 1.2)  # Cap at 1.2 (past blue, into red)
+		else:
+			# Limited charge: Red → Yellow only
+			charge_progress += delta * charge_speed
+			charge_progress = min(charge_progress, 0.5)  # Cap at yellow
 
-	# Check for Space press
-	if waiting_for_input and (Input.is_action_just_pressed("ui_accept") or Input.is_key_pressed(KEY_SPACE)):
-		_on_timing_press(zone)
-		waiting_for_input = false
+		# Update charge bar
+		charge_bar.value = min(charge_progress, 1.0)
 
-func _get_zone(progress: float, has_weak_spot: bool) -> String:
-	"""Get current zone - limited zones if no weak spot"""
+		# Determine current zone
+		charge_zone = _get_charge_zone(charge_progress, weak_spot_found)
+		_update_charge_visuals(charge_zone)
+	else:
+		# Released!
+		_release_attack()
+
+func _get_charge_zone(progress: float, has_weak_spot: bool) -> String:
+	"""Get current charge zone"""
 	if not has_weak_spot:
-		# Only Red and Yellow available
-		if progress < 0.5:
+		# Limited: Red (0-0.25) → Yellow (0.25-0.5)
+		if progress < 0.25:
 			return "red"
 		else:
 			return "yellow"
 	else:
-		# Full zones available
-		if progress < ZONE_YELLOW:
+		# Full: Red → Yellow → Green → Blue → Red (stays)
+		if progress < 0.25:
 			return "red"
-		elif progress < ZONE_GREEN:
+		elif progress < 0.5:
 			return "yellow"
-		elif progress < ZONE_BLUE:
+		elif progress < 0.75:
 			return "green"
-		elif progress < ZONE_RED_2:
+		elif progress < 1.0:
 			return "blue"
 		else:
-			return "red"
+			return "red"  # Overcharged, back to red
 
-func _update_timing_bar(progress: float, zone: String) -> void:
-	"""Update timing bar color"""
+func _update_charge_visuals(zone: String) -> void:
+	"""Update charge bar color and label"""
 	match zone:
 		"red":
-			timing_bar.color = Color(1.0, 0.0, 0.0, 0.8)
+			charge_bar.modulate = Color(1.0, 0.3, 0.3, 1.0)
+			charge_label.text = "OK"
 		"yellow":
-			timing_bar.color = Color(1.0, 1.0, 0.0, 0.8)
+			charge_bar.modulate = Color(1.0, 1.0, 0.3, 1.0)
+			charge_label.text = "GOOD"
 		"green":
-			timing_bar.color = Color(0.0, 1.0, 0.0, 0.8)
+			charge_bar.modulate = Color(0.3, 1.0, 0.3, 1.0)
+			charge_label.text = "GREAT"
 		"blue":
-			timing_bar.color = Color(0.0, 0.5, 1.0, 0.8)
+			charge_bar.modulate = Color(0.3, 0.6, 1.0, 1.0)
+			charge_label.text = "CRIT!"
 
-	# Shrink bar to show progress
-	var shrink = abs(sin(progress * PI * 2))
-	var width = lerp(100.0, 300.0, shrink)
-	timing_bar.custom_minimum_size.x = width
-
-func _on_timing_press(zone: String) -> void:
-	"""Handle first timing press"""
-	print("[AttackMinigame] First press on zone: %s (weak spot: %s)" % [zone, locked_on_weak_spot])
-	first_hit_grade = zone
+func _release_attack() -> void:
+	"""Release attack at current charge level"""
+	print("[AttackMinigame] Released attack at zone: %s (progress: %.2f)" % [charge_zone, charge_progress])
 
 	# Determine damage modifier
 	var damage_modifier: float = 0.9
-	match zone:
+	var grade: String = charge_zone
+	var got_crit: bool = false
+
+	match charge_zone:
 		"red":
 			damage_modifier = 0.9
+			grade = "red"
 		"yellow":
 			damage_modifier = 1.0
+			grade = "yellow"
 		"green":
 			damage_modifier = 1.1
+			grade = "green"
 		"blue":
 			damage_modifier = 1.1
+			grade = "blue"
+			got_crit = true
 
 	# Update best if better
-	if _is_better_grade(zone, best_grade):
-		best_grade = zone
+	if _is_better_grade(grade, best_grade):
+		best_grade = grade
 		best_damage_modifier = damage_modifier
+		if got_crit:
+			is_crit = true
 
 	# Show result feedback
-	timing_display.visible = false
 	var result_text = ""
 
-	if locked_on_weak_spot:
-		result_text = "✓ WEAK SPOT FOUND!\n"
+	if weak_spot_found:
+		result_text = "✓ WEAK SPOT! "
 	else:
-		result_text = "✗ Weak spot missed\n"
+		result_text = "✗ Missed weak spot | "
 
-	result_text += "Hit: " + zone.to_upper() + " | "
+	match charge_zone:
+		"red": result_text += "OK (-10% damage)"
+		"yellow": result_text += "GOOD (Normal damage)"
+		"green": result_text += "GREAT (+10% damage)"
+		"blue": result_text += "CRIT! (+10% damage + CRITICAL)"
 
-	if damage_modifier < 1.0:
-		result_text += "Damage: -10%"
-	elif damage_modifier > 1.0:
-		result_text += "Damage: +10%"
-	else:
-		result_text += "Damage: Normal"
+	charge_label.text = result_text
 
-	instruction_label.text = result_text
+	# Hide visuals
+	reticle_outer.visible = false
+	weak_spot_indicator.visible = false
 
-	# If hit Green or Blue on weak spot, offer crit attempt
-	if (zone == "green" or zone == "blue") and locked_on_weak_spot:
-		await get_tree().create_timer(1.0).timeout
-		_start_crit_attempt()
-	else:
-		# No crit attempt, show result then move to next
-		await get_tree().create_timer(1.5).timeout
-		_start_next_attempt()
+	# Wait then move to next attempt
+	await get_tree().create_timer(1.5).timeout
+	_start_next_attempt()
 
-func _start_crit_attempt() -> void:
-	"""Start crit timing phase (faster!)"""
-	current_phase = Phase.CRIT_ATTEMPT
-	timing_progress = 0.0
-	waiting_for_input = false
-	timing_cycle_duration = 0.6  # Faster for crit!
+func _force_attack() -> void:
+	"""Time ran out, attack at current position"""
+	# Auto-attack at red zone (worst)
+	charge_zone = "red"
+	best_grade = "red"
+	best_damage_modifier = 0.9
 
-	instruction_label.text = "CRIT CHANCE! Press SPACE on BLUE!"
-	print("[AttackMinigame] Crit attempt started (faster timing)")
+	charge_label.text = "Time's up! OK (-10% damage)"
+	reticle_outer.visible = false
+	weak_spot_indicator.visible = false
 
-	# Small delay before accepting input
-	await get_tree().create_timer(0.3).timeout
-	waiting_for_input = true
-
-func _process_crit_attempt(delta: float) -> void:
-	# Faster cycling
-	timing_progress += delta
-	var cycle_progress = fmod(timing_progress, timing_cycle_duration) / timing_cycle_duration
-
-	# Only Blue zone matters for crit
-	var zone = "red"
-	if cycle_progress >= 0.4 and cycle_progress < 0.6:
-		zone = "blue"
-
-	_update_timing_bar(cycle_progress, zone)
-
-	# Check for Space press
-	if waiting_for_input and (Input.is_action_just_pressed("ui_accept") or Input.is_key_pressed(KEY_SPACE)):
-		timing_display.visible = false
-
-		if zone == "blue":
-			is_crit = true
-			print("[AttackMinigame] CRIT SUCCESS!")
-			instruction_label.text = "★ CRITICAL HIT! ★\nDouble damage!"
-		else:
-			print("[AttackMinigame] Crit missed")
-			instruction_label.text = "Crit missed\nStill a good hit though!"
-
-		waiting_for_input = false
-		await get_tree().create_timer(1.5).timeout
-		_start_next_attempt()
+	await get_tree().create_timer(1.5).timeout
+	_start_next_attempt()
 
 func _is_better_grade(new_grade: String, old_grade: String) -> bool:
 	var grade_values = {"red": 0, "yellow": 1, "green": 2, "blue": 3}
