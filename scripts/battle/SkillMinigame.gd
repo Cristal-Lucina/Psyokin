@@ -21,7 +21,7 @@ var input_timer: float = 0.0
 var misclick_count: int = 0
 var has_started_charging: bool = false  # Track if player has pressed Space yet
 var overall_timer: float = 0.0  # Overall countdown timer
-var max_overall_time: float = 8.0  # Total time for entire minigame
+var max_overall_time: float = 3.0  # Total time for entire minigame (reduced to 3 seconds)
 var last_input_button: String = ""  # Track last button to prevent double-input
 var minigame_complete: bool = false  # Lock out all input when complete
 
