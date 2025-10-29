@@ -32,13 +32,15 @@ func _ready() -> void:
 	print("[MinigameManager] Initialized")
 
 ## Launch attack minigame
-## tempo: Number of reticles (1-4)
+## tempo: Number of attempts (1-4) based on TPO stat
+## brawn: Brawn stat (affects reticle size)
 ## status_effects: Array of active status effect names
-func launch_attack_minigame(tempo: int, status_effects: Array = []) -> Dictionary:
-	print("[MinigameManager] Launching attack minigame (tempo: %d)" % tempo)
+func launch_attack_minigame(tempo: int, brawn: int, status_effects: Array = []) -> Dictionary:
+	print("[MinigameManager] Launching attack minigame (tempo: %d, brawn: %d)" % [tempo, brawn])
 
 	var minigame = ATTACK_MINIGAME.instantiate()
 	minigame.tempo = tempo
+	minigame.brawn = brawn
 	minigame.status_effects = status_effects
 
 	var result = await _run_minigame(minigame)

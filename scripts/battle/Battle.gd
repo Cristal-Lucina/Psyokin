@@ -810,13 +810,14 @@ func _execute_attack(target: Dictionary) -> void:
 		else:
 			# Hit! Launch attack minigame
 			var tpo = current_combatant.stats.get("TPO", 1)
+			var brw = current_combatant.stats.get("BRW", 1)
 			var status_effects = []
 			var ailment = str(current_combatant.get("ailment", ""))
 			if ailment != "":
 				status_effects.append(ailment)
 
 			log_message("  → Hit! Starting attack minigame...")
-			var minigame_result = await minigame_mgr.launch_attack_minigame(tpo, status_effects)
+			var minigame_result = await minigame_mgr.launch_attack_minigame(tpo, brw, status_effects)
 
 			# Apply minigame result modifiers
 			var damage_modifier = minigame_result.get("damage_modifier", 1.0)
