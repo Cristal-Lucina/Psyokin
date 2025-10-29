@@ -120,19 +120,18 @@ func _draw_arena() -> void:
 			arena.draw_line(p1, p2, Color(0.8, 0.2, 0.2, 1.0), 6.0)
 
 	# Draw the CATCH CIRCLE (red, rotating, closing in)
-	# This has the same gap pattern but rotates
+	# The gap rotates WITH the circle
 	for i in range(segment_count):
 		var local_angle = (float(i) / segment_count) * TAU
-		var next_local_angle = (float(i + 1) / segment_count) * TAU
 
-		# World angle includes rotation
-		var world_angle = local_angle + circle_angle
-
-		# Check if this world position overlaps with the static gap
-		var in_gap = _angle_in_gap(world_angle)
+		# Check if this LOCAL position (on the circle) has a gap
+		# The gap is fixed relative to the circle, so it rotates with it
+		var in_gap = _angle_in_gap(local_angle)
 
 		# Only draw if NOT in gap
 		if not in_gap:
+			# World angle includes rotation for drawing position
+			var world_angle = local_angle + circle_angle
 			var p1 = arena_center + Vector2(cos(world_angle), sin(world_angle)) * circle_radius
 			var p2 = arena_center + Vector2(cos(world_angle + (TAU / segment_count)), sin(world_angle + (TAU / segment_count))) * circle_radius
 			arena.draw_line(p1, p2, Color(1.0, 0.3, 0.3, 1.0), 4.0)
