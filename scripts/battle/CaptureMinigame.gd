@@ -17,8 +17,16 @@ var landed_binds: Array = []
 var knots_made: int = 0
 var knots_needed: int = 0
 var break_rating: int = 6
-var rotation_progress: float = 0.0
-var last_input_angle: float = 0.0
+var break_timer: float = 0.0  # Time until enemy breaks free
+
+# Bind point system
+enum BindDirection { UP, DOWN, LEFT, RIGHT }
+var current_bind_direction: BindDirection = BindDirection.UP
+var bind_point_grabbed: bool = false
+var drag_start_angle: float = 0.0
+var drag_current_angle: float = 0.0
+var wrap_progress: float = 0.0  # 0.0 to TAU (full circle)
+var wrap_trails: Array = []  # Visual trails showing wraps
 
 ## Visual elements
 var title_label: Label
@@ -28,6 +36,11 @@ var bind_result_label: Label
 var knot_progress_bar: ProgressBar
 var break_bar: ProgressBar
 var instruction_label: Label
+
+# Bind phase visuals
+var bind_arena: Control  # Container for dragging mechanic
+var bind_point: ColorRect  # The point to grab and drag
+var bind_trail: Line2D  # Trail showing wrap around enemy
 
 func _setup_minigame() -> void:
 	base_duration = 10.0
@@ -166,7 +179,7 @@ func _calculate_bind_chance(bind_type: String) -> float:
 	return base_chance
 
 func _start_bind_phase() -> void:
-	"""Phase 2: Rotate to make knots"""
+	"""Phase 2: Grab and drag bind points to wrap enemy"""
 	current_phase = Phase.BIND
 	phase_label.text = "Phase: BIND"
 	bind_result_label.text = "%d binds landed!" % landed_binds.size()
@@ -175,50 +188,171 @@ func _start_bind_phase() -> void:
 	knots_needed = 0
 	for bind in landed_binds:
 		match bind:
-			"basic": knots_needed += 5
-			"standard": knots_needed += 3
+			"basic": knots_needed += 3  # Made easier - was 5
+			"standard": knots_needed += 2  # Made easier - was 3
 			"advanced": knots_needed += 1
 
-	instruction_label.text = "Rotate WASD to make %d knots! (Break: %d)" % [knots_needed, break_rating]
+	# Set break timer based on break rating (seconds)
+	break_timer = float(break_rating) * 2.0  # 2 seconds per break rating point
+
+	instruction_label.text = "Grab bind points and drag in circles! (%d wraps needed)" % knots_needed
 
 	knot_progress_bar.visible = true
 	knot_progress_bar.max_value = knots_needed
 	break_bar.visible = true
+	break_bar.max_value = break_timer
+	break_bar.value = break_timer
+
+	# Hide toss phase elements
+	bind_result_label.visible = false
+
+	# Create bind arena
+	_setup_bind_arena()
+
+	# Spawn first bind point
+	_spawn_bind_point()
+
+func _setup_bind_arena() -> void:
+	"""Create the visual arena for bind dragging"""
+	bind_arena = Control.new()
+	bind_arena.custom_minimum_size = Vector2(200, 200)
+	bind_arena.position = Vector2.ZERO
+	var arena_container = CenterContainer.new()
+	arena_container.add_child(bind_arena)
+	content_container.add_child(arena_container)
+
+	# Move enemy icon into arena
+	if enemy_icon.get_parent():
+		enemy_icon.get_parent().remove_child(enemy_icon)
+	bind_arena.add_child(enemy_icon)
+	enemy_icon.position = Vector2(50, 50)
+
+	# Add bind trail (Line2D to show wrapping)
+	bind_trail = Line2D.new()
+	bind_trail.width = 3.0
+	bind_trail.default_color = Color(0.2, 0.8, 1.0, 0.8)
+	bind_arena.add_child(bind_trail)
+
+func _spawn_bind_point() -> void:
+	"""Spawn a new bind point at a random direction"""
+	# Pick random direction
+	current_bind_direction = randi() % 4 as BindDirection
+
+	# Create or reposition bind point
+	if bind_point == null:
+		bind_point = ColorRect.new()
+		bind_point.custom_minimum_size = Vector2(20, 20)
+		bind_point.color = Color(1.0, 1.0, 0.0, 1.0)  # Yellow
+		bind_arena.add_child(bind_point)
+
+	# Position based on direction (around 100x100 center)
+	var arena_center = Vector2(100, 100)
+	var offset_distance = 80.0
+
+	match current_bind_direction:
+		BindDirection.UP:
+			bind_point.position = arena_center + Vector2(-10, -offset_distance)
+		BindDirection.DOWN:
+			bind_point.position = arena_center + Vector2(-10, offset_distance - 20)
+		BindDirection.LEFT:
+			bind_point.position = arena_center + Vector2(-offset_distance, -10)
+		BindDirection.RIGHT:
+			bind_point.position = arena_center + Vector2(offset_distance - 20, -10)
+
+	bind_point.visible = true
+	bind_point_grabbed = false
+	wrap_progress = 0.0
+
+	print("[CaptureMinigame] Bind point spawned at: %s" % BindDirection.keys()[current_bind_direction])
 
 func _process(delta: float) -> void:
 	if current_phase != Phase.BIND:
 		return
 
-	# Detect rotation input (WASD circular motion)
-	var input_vec = Vector2.ZERO
-	if Input.is_key_pressed(KEY_W): input_vec.y -= 1
-	if Input.is_key_pressed(KEY_S): input_vec.y += 1
-	if Input.is_key_pressed(KEY_A): input_vec.x -= 1
-	if Input.is_key_pressed(KEY_D): input_vec.x += 1
+	# Update break timer
+	break_timer -= delta
+	break_bar.value = break_timer
 
-	if input_vec.length() > 0.5:
-		var current_angle = atan2(input_vec.y, input_vec.x)
-		var angle_diff = angle_difference(last_input_angle, current_angle)
-
-		if abs(angle_diff) > 0.1:
-			rotation_progress += abs(angle_diff)
-			last_input_angle = current_angle
-
-			# Check if completed a full rotation
-			if rotation_progress >= TAU:
-				rotation_progress = 0.0
-				knots_made += 1
-				knot_progress_bar.value = knots_made
-
-				print("[CaptureMinigame] Knot made! (%d/%d)" % [knots_made, knots_needed])
-
-				if knots_made >= knots_needed:
-					_finish_capture_success()
-
-	# Enemy tries to break
-	break_bar.value -= delta * 0.5
-	if break_bar.value <= 0:
+	if break_timer <= 0:
 		_finish_capture_failed()
+		return
+
+	# Check if player is trying to grab the bind point
+	if not bind_point_grabbed:
+		var grabbed = false
+		match current_bind_direction:
+			BindDirection.UP:
+				if Input.is_key_pressed(KEY_W):
+					grabbed = true
+			BindDirection.DOWN:
+				if Input.is_key_pressed(KEY_S):
+					grabbed = true
+			BindDirection.LEFT:
+				if Input.is_key_pressed(KEY_A):
+					grabbed = true
+			BindDirection.RIGHT:
+				if Input.is_key_pressed(KEY_D):
+					grabbed = true
+
+		if grabbed:
+			bind_point_grabbed = true
+			bind_point.color = Color(0.0, 1.0, 0.0, 1.0)  # Green when grabbed
+			drag_start_angle = _get_direction_angle(current_bind_direction)
+			drag_current_angle = drag_start_angle
+			bind_trail.clear_points()
+			print("[CaptureMinigame] Bind point grabbed!")
+	else:
+		# Player is dragging - track circular motion
+		var input_vec = Vector2.ZERO
+		if Input.is_key_pressed(KEY_W): input_vec.y -= 1
+		if Input.is_key_pressed(KEY_S): input_vec.y += 1
+		if Input.is_key_pressed(KEY_A): input_vec.x -= 1
+		if Input.is_key_pressed(KEY_D): input_vec.x += 1
+
+		if input_vec.length() > 0.5:
+			# Calculate angle from enemy center
+			var current_angle = atan2(input_vec.y, input_vec.x)
+			var angle_diff = angle_difference(drag_current_angle, current_angle)
+
+			if abs(angle_diff) > 0.1:
+				wrap_progress += abs(angle_diff)
+				drag_current_angle = current_angle
+
+				# Add point to trail
+				var arena_center = Vector2(100, 100)
+				var radius = 60.0
+				var trail_point = arena_center + Vector2(cos(current_angle), sin(current_angle)) * radius
+				bind_trail.add_point(trail_point)
+
+				# Update bind point position
+				bind_point.position = trail_point - Vector2(10, 10)
+
+				# Check if completed a full wrap (360 degrees)
+				if wrap_progress >= TAU:
+					knots_made += 1
+					knot_progress_bar.value = knots_made
+					print("[CaptureMinigame] Wrap complete! (%d/%d)" % [knots_made, knots_needed])
+
+					if knots_made >= knots_needed:
+						_finish_capture_success()
+						return
+					else:
+						# Spawn next bind point
+						_spawn_bind_point()
+		else:
+			# Player let go - fail this wrap attempt
+			if bind_trail.get_point_count() > 5:
+				print("[CaptureMinigame] Released too early!")
+				_spawn_bind_point()  # Reset
+
+func _get_direction_angle(direction: BindDirection) -> float:
+	"""Get starting angle for a direction"""
+	match direction:
+		BindDirection.UP: return -PI / 2.0
+		BindDirection.DOWN: return PI / 2.0
+		BindDirection.LEFT: return PI
+		BindDirection.RIGHT: return 0.0
+	return 0.0
 
 func _finish_capture_success() -> void:
 	print("[CaptureMinigame] Capture successful!")
