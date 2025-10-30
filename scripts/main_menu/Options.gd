@@ -491,22 +491,9 @@ func _remap_action(action_name: String, new_event: InputEvent, is_controller: bo
 
 func _refresh_bindings() -> void:
 	"""Update all binding button labels"""
-	var all_actions = [
-		"move_up", "move_down", "move_left", "move_right",
-		"action", "jump", "run", "phone", "menu", "save",
-		"battle_attack", "battle_skill", "battle_capture", "battle_defend",
-		"battle_burst", "battle_run", "battle_items", "battle_status",
-		"menu_accept", "menu_back"
-	]
-
-	for i in range(min(_action_buttons.size(), all_actions.size())):
-		var buttons = _action_buttons[i]
-		var kb_btn = buttons[0] as Button
-		var ctrl_btn = buttons[1] as Button
-		var action_name = all_actions[i]
-
-		kb_btn.text = _get_keyboard_binding_text(action_name)
-		ctrl_btn.text = _get_controller_binding_text(action_name)
+	for action in _action_data:
+		action.kb_button.text = _get_keyboard_binding_text(action.name)
+		action.ctrl_button.text = _get_controller_binding_text(action.name)
 
 func _on_reset_pressed() -> void:
 	"""Reset all controls to defaults"""
