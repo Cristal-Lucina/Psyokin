@@ -25,6 +25,8 @@ var overall_timer: float = 0.0  # Overall countdown timer
 var max_overall_time: float = 3.0  # Total time for entire minigame (reduced to 3 seconds)
 var last_input_button: String = ""  # Track last button to prevent double-input
 var minigame_complete: bool = false  # Lock out all input when complete
+var input_grace_timer: float = 0.0  # Prevent button carryover from target selection
+var input_grace_period: float = 0.3  # 0.3 second grace period
 
 ## Visual elements
 var title_label: Label
@@ -253,6 +255,13 @@ func _process(delta: float) -> void:
 			_process_inputting(delta)
 
 func _process_charging(delta: float) -> void:
+	# Update input grace timer
+	if input_grace_timer < input_grace_period:
+		input_grace_timer += delta
+		# During grace period, show waiting message
+		focus_level_label.text = "Get ready..."
+		return
+
 	# Update halt timer if status effect is active
 	if has_halt_status and not is_charge_halted:
 		halt_timer += delta
