@@ -53,6 +53,10 @@ var victory_panel: PanelContainer = null  # Victory screen panel
 var is_in_round_transition: bool = false  # True during round transition animations
 var combatant_panels: Dictionary = {}  # combatant_id -> PanelContainer for shake animations
 
+# Input debouncing for joystick sensitivity
+var input_cooldown: float = 0.0  # Current cooldown timer
+var input_cooldown_duration: float = 0.15  # 150ms between inputs
+
 func _ready() -> void:
 	print("[Battle] Battle scene loaded")
 
@@ -157,6 +161,12 @@ func _load_skills() -> void:
 	else:
 		push_error("[Battle] Failed to load skills.csv")
 
+func _process(delta: float) -> void:
+	"""Update battle state each frame"""
+	# Update input cooldown timer
+	if input_cooldown > 0:
+		input_cooldown -= delta
+
 func _input(event: InputEvent) -> void:
 	"""Handle keyboard/controller input for battle actions and target selection"""
 	# Note: Input processing is disabled until battle is fully initialized
@@ -242,24 +252,43 @@ func _input(event: InputEvent) -> void:
 
 	# If item menu is open, handle controller navigation
 	if item_menu_panel != null:
+		# Check cooldown to prevent rapid inputs
+		if input_cooldown > 0:
+			return
+
 		if event.is_action_pressed(aInputManager.ACTION_MOVE_UP):
 			_navigate_item_menu(-1)
+			input_cooldown = input_cooldown_duration
 			get_viewport().set_input_as_handled()
 			return
 		elif event.is_action_pressed(aInputManager.ACTION_MOVE_DOWN):
 			_navigate_item_menu(1)
+			input_cooldown = input_cooldown_duration
 			get_viewport().set_input_as_handled()
 			return
 		elif event.is_action_pressed(aInputManager.ACTION_MOVE_LEFT):
-			_switch_item_tab(-1)
+			_navigate_item_menu_horizontal(-1)
+			input_cooldown = input_cooldown_duration
 			get_viewport().set_input_as_handled()
 			return
 		elif event.is_action_pressed(aInputManager.ACTION_MOVE_RIGHT):
+			_navigate_item_menu_horizontal(1)
+			input_cooldown = input_cooldown_duration
+			get_viewport().set_input_as_handled()
+			return
+		elif event.is_action_pressed(aInputManager.ACTION_BURST):  # L bumper
+			_switch_item_tab(-1)
+			input_cooldown = input_cooldown_duration
+			get_viewport().set_input_as_handled()
+			return
+		elif event.is_action_pressed(aInputManager.ACTION_BATTLE_RUN):  # R bumper
 			_switch_item_tab(1)
+			input_cooldown = input_cooldown_duration
 			get_viewport().set_input_as_handled()
 			return
 		elif event.is_action_pressed(aInputManager.ACTION_ACCEPT):
 			_confirm_item_selection()
+			input_cooldown = input_cooldown_duration
 			get_viewport().set_input_as_handled()
 			return
 
@@ -3060,16 +3089,44 @@ func _rebuild_item_button_list() -> void:
 			_on_item_hover(first_button.get_meta("item_name"), first_button.get_meta("item_desc"))
 
 func _navigate_item_menu(direction: int) -> void:
-	"""Navigate item menu with controller (direction: -1 for up, 1 for down)"""
+	"""Navigate item menu vertically (direction: -1 for up, 1 for down)"""
 	if item_menu_buttons.is_empty():
 		return
 
 	# Remove highlight from current button
 	_unhighlight_item_button(selected_item_index)
 
-	# Move selection (by 2 since it's a two-column grid)
-	# Up/down moves by 2 positions (one row)
+	# Move selection by 2 (one row in 2-column grid)
 	selected_item_index += direction * 2
+
+	# Wrap around
+	if selected_item_index < 0:
+		# Wrapped past top - go to last row
+		selected_item_index = item_menu_buttons.size() - 1
+	elif selected_item_index >= item_menu_buttons.size():
+		# Wrapped past bottom - go to first row, same column
+		# Check if we were on left or right column
+		var was_right_column = (selected_item_index - direction * 2) % 2 == 1
+		selected_item_index = was_right_column ? 1 : 0
+
+	# Highlight new button
+	_highlight_item_button(selected_item_index)
+
+	# Update description
+	var button = item_menu_buttons[selected_item_index]
+	if button.has_meta("item_name") and button.has_meta("item_desc"):
+		_on_item_hover(button.get_meta("item_name"), button.get_meta("item_desc"))
+
+func _navigate_item_menu_horizontal(direction: int) -> void:
+	"""Navigate item menu horizontally (direction: -1 for left, 1 for right)"""
+	if item_menu_buttons.is_empty():
+		return
+
+	# Remove highlight from current button
+	_unhighlight_item_button(selected_item_index)
+
+	# Move selection by 1 (left/right within same row)
+	selected_item_index += direction
 
 	# Wrap around
 	if selected_item_index < 0:
