@@ -328,11 +328,12 @@ func _setup_controller_navigation(new_btn: Button, continue_btn: Button, load_bt
 	"""Setup controller navigation for menu buttons"""
 	navigable_buttons.clear()
 
-	# Add buttons in order (skip hidden ones)
-	if new_btn:
-		navigable_buttons.append(new_btn)
+	# Add buttons in VISUAL order (top to bottom)
+	# Continue should be first if it exists
 	if continue_btn and has_save:
 		navigable_buttons.append(continue_btn)
+	if new_btn:
+		navigable_buttons.append(new_btn)
 	if load_btn and has_save:
 		navigable_buttons.append(load_btn)
 	if options_btn:
@@ -340,9 +341,14 @@ func _setup_controller_navigation(new_btn: Button, continue_btn: Button, load_bt
 	if quit_btn:
 		navigable_buttons.append(quit_btn)
 
-	# Highlight first button
+	# Start at Continue if save exists, else New Game
 	if navigable_buttons.size() > 0:
-		selected_button_index = 0
+		if has_save and continue_btn:
+			# Continue is now at index 0
+			selected_button_index = 0
+		else:
+			# New Game is at index 0 (no save)
+			selected_button_index = 0
 		_highlight_button(selected_button_index)
 
 func _process(delta: float) -> void:
