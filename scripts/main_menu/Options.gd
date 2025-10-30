@@ -102,6 +102,12 @@ func _build_controls_ui() -> void:
 		{"name": "battle_status", "display": "Status (Select)"},
 	]
 
+	# Menu actions
+	var menu_actions = [
+		{"name": "menu_accept", "display": "Accept (A)"},
+		{"name": "menu_back", "display": "Back (B)"},
+	]
+
 	# ========== OVERWORLD SECTION ==========
 
 	# Overworld section header
@@ -257,6 +263,86 @@ func _build_controls_ui() -> void:
 
 		_action_buttons.append([kb_btn, ctrl_btn])
 
+	# ========== MENUS SECTION ==========
+
+	# Menus section spacer
+	var spacer_menu_top = Control.new()
+	spacer_menu_top.custom_minimum_size = Vector2(0, 20)
+	main_vbox.add_child(spacer_menu_top)
+
+	# Menus section header
+	var menu_header = Label.new()
+	menu_header.text = "━━━ MENUS ━━━"
+	menu_header.add_theme_font_size_override("font_size", 16)
+	menu_header.add_theme_color_override("font_color", Color(0.3, 0.8, 1.0))
+	var menu_center = CenterContainer.new()
+	menu_center.add_child(menu_header)
+	main_vbox.add_child(menu_center)
+
+	# Spacer
+	var spacer_m = Control.new()
+	spacer_m.custom_minimum_size = Vector2(0, 5)
+	main_vbox.add_child(spacer_m)
+
+	# Menus grid header
+	var menu_header_grid = GridContainer.new()
+	menu_header_grid.columns = 3
+	menu_header_grid.add_theme_constant_override("h_separation", 30)
+	main_vbox.add_child(menu_header_grid)
+
+	var menu_header_action = Label.new()
+	menu_header_action.text = "Action"
+	menu_header_action.add_theme_font_size_override("font_size", 14)
+	menu_header_action.custom_minimum_size.x = 200
+	menu_header_grid.add_child(menu_header_action)
+
+	var menu_header_keyboard = Label.new()
+	menu_header_keyboard.text = "Keyboard"
+	menu_header_keyboard.add_theme_font_size_override("font_size", 14)
+	menu_header_keyboard.custom_minimum_size.x = 200
+	menu_header_grid.add_child(menu_header_keyboard)
+
+	var menu_header_controller = Label.new()
+	menu_header_controller.text = "Controller"
+	menu_header_controller.add_theme_font_size_override("font_size", 14)
+	menu_header_controller.custom_minimum_size.x = 200
+	menu_header_grid.add_child(menu_header_controller)
+
+	# Menus controls grid
+	var menu_grid = GridContainer.new()
+	menu_grid.columns = 3
+	menu_grid.add_theme_constant_override("h_separation", 30)
+	menu_grid.add_theme_constant_override("v_separation", 5)
+	main_vbox.add_child(menu_grid)
+
+	# Create menu controls
+	for action_def in menu_actions:
+		var action_name = action_def["name"]
+		var display_name = action_def["display"]
+
+		# Action label
+		var label = Label.new()
+		label.text = display_name
+		label.custom_minimum_size.x = 200
+		label.add_theme_font_size_override("font_size", 13)
+		menu_grid.add_child(label)
+
+		# Keyboard binding button
+		var kb_btn = Button.new()
+		kb_btn.text = _get_keyboard_binding_text(action_name)
+		kb_btn.custom_minimum_size = Vector2(200, 28)
+		kb_btn.pressed.connect(_on_remap_pressed.bind(action_name, kb_btn, false))
+		menu_grid.add_child(kb_btn)
+
+		# Controller binding button
+		var ctrl_btn = Button.new()
+		ctrl_btn.text = _get_controller_binding_text(action_name)
+		ctrl_btn.custom_minimum_size = Vector2(200, 28)
+		ctrl_btn.pressed.connect(_on_remap_pressed.bind(action_name, ctrl_btn, true))
+		menu_grid.add_child(ctrl_btn)
+
+		_action_buttons.append([kb_btn, ctrl_btn])
+
 	# ========== FOOTER ==========
 
 	# Spacer
@@ -386,7 +472,8 @@ func _refresh_bindings() -> void:
 		"move_up", "move_down", "move_left", "move_right",
 		"action", "jump", "run", "phone", "menu", "save",
 		"battle_attack", "battle_skill", "battle_capture", "battle_defend",
-		"battle_burst", "battle_run", "battle_items", "battle_status"
+		"battle_burst", "battle_run", "battle_items", "battle_status",
+		"menu_accept", "menu_back"
 	]
 
 	for i in range(min(_action_buttons.size(), all_actions.size())):
@@ -405,7 +492,8 @@ func _on_reset_pressed() -> void:
 		"move_up", "move_down", "move_left", "move_right",
 		"action", "jump", "run", "phone", "menu", "save",
 		"battle_attack", "battle_skill", "battle_capture", "battle_defend",
-		"battle_burst", "battle_run", "battle_items", "battle_status"
+		"battle_burst", "battle_run", "battle_items", "battle_status",
+		"menu_accept", "menu_back"
 	]
 
 	for action_name in actions:
