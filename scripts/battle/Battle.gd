@@ -33,6 +33,8 @@ var awaiting_capture_target: bool = false  # True when selecting target for capt
 var awaiting_item_target: bool = false  # True when selecting target for item usage
 var skill_to_use: Dictionary = {}  # Selected skill data
 var skill_menu_panel: PanelContainer = null  # Skill selection menu
+var skill_menu_buttons: Array = []  # Buttons in skill menu for controller navigation
+var selected_skill_index: int = 0  # Currently selected skill in menu
 var item_menu_panel: PanelContainer = null  # Item selection menu
 var item_description_label: Label = null  # Item description display
 var capture_menu_panel: PanelContainer = null  # Capture selection menu
@@ -179,6 +181,21 @@ func _input(event: InputEvent) -> void:
 		# If in target selection, cancel it
 		elif awaiting_target_selection and not target_candidates.is_empty():
 			_cancel_target_selection()
+			get_viewport().set_input_as_handled()
+			return
+
+	# If skill menu is open, handle controller navigation
+	if skill_menu_panel != null and not skill_menu_buttons.is_empty():
+		if event.is_action_pressed(aInputManager.ACTION_MOVE_UP):
+			_navigate_skill_menu(-1)
+			get_viewport().set_input_as_handled()
+			return
+		elif event.is_action_pressed(aInputManager.ACTION_MOVE_DOWN):
+			_navigate_skill_menu(1)
+			get_viewport().set_input_as_handled()
+			return
+		elif event.is_action_pressed(aInputManager.ACTION_ACCEPT):
+			_confirm_skill_selection()
 			get_viewport().set_input_as_handled()
 			return
 
@@ -2513,6 +2530,8 @@ func _show_skill_menu(skill_menu: Array) -> void:
 
 	# Store current menu
 	current_skill_menu = skill_menu
+	skill_menu_buttons = []
+	selected_skill_index = 0
 
 	# Create skill menu panel
 	skill_menu_panel = PanelContainer.new()
@@ -2589,6 +2608,8 @@ func _show_skill_menu(skill_menu: Array) -> void:
 			button.text += "\n[Wrong Type - Need %s]" % skill_element_cap
 		else:
 			button.pressed.connect(_on_skill_button_pressed.bind(i))
+			# Only add enabled buttons to navigation list
+			skill_menu_buttons.append(button)
 
 		vbox.add_child(button)
 
@@ -2610,6 +2631,10 @@ func _show_skill_menu(skill_menu: Array) -> void:
 		(get_viewport_rect().size.x - skill_menu_panel.custom_minimum_size.x) / 2,
 		100
 	)
+
+	# Highlight first skill if available
+	if not skill_menu_buttons.is_empty():
+		_highlight_skill_button(0)
 
 func _on_skill_button_pressed(index: int) -> void:
 	"""Handle skill button press"""
@@ -2709,9 +2734,60 @@ func _close_skill_menu() -> void:
 		skill_menu_panel.queue_free()
 		skill_menu_panel = null
 	current_skill_menu = []
+	skill_menu_buttons = []
+	selected_skill_index = 0
 
 	# Show action menu again
 	action_menu.visible = true
+
+func _navigate_skill_menu(direction: int) -> void:
+	"""Navigate skill menu with controller (direction: -1 for up, 1 for down)"""
+	if skill_menu_buttons.is_empty():
+		return
+
+	# Remove highlight from current button
+	_unhighlight_skill_button(selected_skill_index)
+
+	# Move selection
+	selected_skill_index += direction
+
+	# Wrap around
+	if selected_skill_index < 0:
+		selected_skill_index = skill_menu_buttons.size() - 1
+	elif selected_skill_index >= skill_menu_buttons.size():
+		selected_skill_index = 0
+
+	# Highlight new button
+	_highlight_skill_button(selected_skill_index)
+
+func _confirm_skill_selection() -> void:
+	"""Confirm skill selection with A button"""
+	if selected_skill_index >= 0 and selected_skill_index < skill_menu_buttons.size():
+		# Find the actual skill index in current_skill_menu
+		var button = skill_menu_buttons[selected_skill_index]
+		# Simulate button press - need to find the index
+		for i in range(current_skill_menu.size()):
+			var menu_entry = current_skill_menu[i]
+			var skill_data = menu_entry.skill_data
+			var skill_name = String(skill_data.get("name", "Unknown"))
+			var sigil_name = menu_entry.sigil_name
+
+			# Check if this matches the selected button text
+			if button.text.contains(skill_name) and button.text.contains(sigil_name):
+				_on_skill_button_pressed(i)
+				return
+
+func _highlight_skill_button(index: int) -> void:
+	"""Highlight a skill button for controller navigation"""
+	if index >= 0 and index < skill_menu_buttons.size():
+		var button = skill_menu_buttons[index]
+		button.modulate = Color(1.2, 1.2, 0.8, 1.0)  # Yellowish tint
+
+func _unhighlight_skill_button(index: int) -> void:
+	"""Remove highlight from a skill button"""
+	if index >= 0 and index < skill_menu_buttons.size():
+		var button = skill_menu_buttons[index]
+		button.modulate = Color(1.0, 1.0, 1.0, 1.0)  # Normal color
 
 ## ═══════════════════════════════════════════════════════════════
 ## ITEM MENU

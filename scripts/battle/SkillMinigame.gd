@@ -43,13 +43,14 @@ var drop_offset: float = 0.0
 var drop_velocity: float = 0.0
 var drop_gravity: float = 800.0  # Pixels per second squared
 
-## Button mapping (InputManager action names to button labels)
-## Using InputManager constants for proper controller support
+## Button mapping (InputManager action strings to button labels)
+## Using InputManager action strings for proper controller support
+## These match the face buttons on Xbox/PlayStation controllers
 const BUTTON_MAP = {
-	"action": "A",           # A button (Accept)
-	"battle_defend": "X",    # X button (Defend)
-	"battle_attack": "B",    # B button (Attack)
-	"battle_skill": "Y"      # Y button (Skill)
+	"menu_accept": "A",      # A button (Xbox A / PS Cross)
+	"battle_defend": "X",    # X button (Xbox X / PS Square)
+	"battle_attack": "B",    # B button (Xbox B / PS Circle)
+	"battle_skill": "Y"      # Y button (Xbox Y / PS Triangle)
 }
 
 ## Focus charge speeds (seconds per level)
