@@ -294,16 +294,24 @@ func _process_watching(delta: float) -> void:
 	# Check for Accept button HELD to start charging (A button or Space)
 	# Only accept input after grace period
 	if input_grace_timer >= input_grace_period:
-		if aInputManager.is_action_pressed(aInputManager.ACTION_ACCEPT):
+		var accept_pressed = aInputManager.is_action_pressed(aInputManager.ACTION_ACCEPT)
+
+		# DEBUG: Show button state every frame when it changes
+		if accept_pressed != is_charging:
+			print("[AttackMinigame DEBUG] Accept button: ", accept_pressed, " | is_charging: ", is_charging, " | charge: ", charge_progress)
+
+		if accept_pressed:
 			if not is_charging:
 				if not has_started:
 					has_started = true
 					print("[AttackMinigame] Timer started!")
 				_start_charging()
 				is_charging = true
+				print("[AttackMinigame DEBUG] Started charging!")
 		else:
 			if is_charging:
 				# Released! Attack at current charge
+				print("[AttackMinigame DEBUG] Button released, firing at charge: ", charge_progress)
 				_release_attack()
 				is_charging = false
 
