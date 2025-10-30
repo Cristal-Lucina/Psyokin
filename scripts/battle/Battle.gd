@@ -2236,9 +2236,192 @@ func _on_status_pressed() -> void:
 	if is_in_round_transition:
 		return
 
-	# TODO: Implement status screen showing party and enemy details
-	log_message("Status screen not yet implemented!")
-	print("[Battle] Status button pressed - feature not yet implemented")
+	# Show character picker for status viewing
+	_show_status_character_picker()
+
+func _show_status_character_picker() -> void:
+	"""Show a character picker to select whose status to view"""
+	# Create modal background
+	var modal_bg = ColorRect.new()
+	modal_bg.color = Color(0, 0, 0, 0.7)
+	modal_bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	modal_bg.z_index = 99
+	modal_bg.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(modal_bg)
+
+	# Create picker panel
+	var picker_panel = PanelContainer.new()
+	picker_panel.custom_minimum_size = Vector2(500, 400)
+
+	var panel_style = StyleBoxFlat.new()
+	panel_style.bg_color = Color(0.15, 0.15, 0.2, 1.0)
+	panel_style.border_width_left = 3
+	panel_style.border_width_right = 3
+	panel_style.border_width_top = 3
+	panel_style.border_width_bottom = 3
+	panel_style.border_color = Color(0.4, 0.6, 0.8, 1.0)
+	picker_panel.add_theme_stylebox_override("panel", panel_style)
+
+	picker_panel.position = get_viewport_rect().size / 2 - picker_panel.custom_minimum_size / 2
+	picker_panel.z_index = 100
+	picker_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+
+	var vbox = VBoxContainer.new()
+	picker_panel.add_child(vbox)
+
+	# Title
+	var title = Label.new()
+	title.text = "=== View Character Status ==="
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 18)
+	vbox.add_child(title)
+
+	# Instructions
+	var instructions = Label.new()
+	instructions.text = "Select a character to view their detailed status"
+	instructions.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	instructions.add_theme_font_size_override("font_size", 12)
+	instructions.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7, 1.0))
+	vbox.add_child(instructions)
+
+	# Scroll container for character list
+	var scroll = ScrollContainer.new()
+	scroll.custom_minimum_size = Vector2(480, 280)
+	vbox.add_child(scroll)
+
+	var character_list = VBoxContainer.new()
+	scroll.add_child(character_list)
+
+	# Storage for navigation
+	var character_buttons: Array[Button] = []
+	var character_data: Array[Dictionary] = []
+
+	# Add allies
+	var allies = battle_mgr.get_ally_combatants()
+	if allies.size() > 0:
+		var ally_header = Label.new()
+		ally_header.text = "\n--- Party Members ---"
+		ally_header.add_theme_font_size_override("font_size", 14)
+		ally_header.add_theme_color_override("font_color", Color(0.3, 1.0, 0.3, 1.0))
+		character_list.add_child(ally_header)
+
+		for ally in allies:
+			var btn = Button.new()
+			var hp_text = "%d/%d HP" % [ally.hp, ally.hp_max]
+			var mp_text = "%d/%d MP" % [ally.mp, ally.mp_max]
+			var status_text = ""
+			if ally.is_ko:
+				status_text = " [KO]"
+			elif ally.get("ailment", "") != "":
+				status_text = " [%s]" % String(ally.ailment).capitalize()
+
+			btn.text = "%s - %s | %s%s" % [ally.display_name, hp_text, mp_text, status_text]
+			btn.custom_minimum_size = Vector2(460, 30)
+			character_list.add_child(btn)
+			character_buttons.append(btn)
+			character_data.append(ally)
+
+	# Add enemies
+	var enemies = battle_mgr.get_enemy_combatants()
+	if enemies.size() > 0:
+		var enemy_header = Label.new()
+		enemy_header.text = "\n--- Enemies ---"
+		enemy_header.add_theme_font_size_override("font_size", 14)
+		enemy_header.add_theme_color_override("font_color", Color(1.0, 0.3, 0.3, 1.0))
+		character_list.add_child(enemy_header)
+
+		for enemy in enemies:
+			var btn = Button.new()
+			var hp_text = "%d/%d HP" % [enemy.hp, enemy.hp_max]
+			var status_text = ""
+			if enemy.is_ko:
+				status_text = " [KO]"
+			elif enemy.get("ailment", "") != "":
+				status_text = " [%s]" % String(enemy.ailment).capitalize()
+
+			btn.text = "%s - %s%s" % [enemy.display_name, hp_text, status_text]
+			btn.custom_minimum_size = Vector2(460, 30)
+			character_list.add_child(btn)
+			character_buttons.append(btn)
+			character_data.append(enemy)
+
+	# Close button
+	var close_btn = Button.new()
+	close_btn.text = "Close (B)"
+	close_btn.custom_minimum_size = Vector2(120, 30)
+	vbox.add_child(close_btn)
+
+	# Controller navigation state
+	var selected_index: int = 0
+	var input_cooldown: float = 0.0
+	var input_cooldown_duration: float = 0.15
+
+	# Connect button signals
+	for i in range(character_buttons.size()):
+		var idx = i  # Capture index
+		character_buttons[i].pressed.connect(func():
+			# Show status for this character
+			_show_status_details(character_data[idx])
+		)
+
+	close_btn.pressed.connect(func():
+		picker_panel.queue_free()
+		modal_bg.queue_free()
+	)
+
+	# Highlight first character
+	var _highlight_status_button = func(index: int) -> void:
+		for i in range(character_buttons.size()):
+			character_buttons[i].modulate = Color(1.0, 1.0, 1.0, 1.0)
+		if index >= 0 and index < character_buttons.size():
+			character_buttons[index].modulate = Color(1.2, 1.2, 0.8, 1.0)
+			character_buttons[index].grab_focus()
+			if scroll:
+				scroll.ensure_control_visible(character_buttons[index])
+
+	if character_buttons.size() > 0:
+		_highlight_status_button.call(0)
+
+	# Controller input handling
+	var input_handler = func(event: InputEvent) -> void:
+		if input_cooldown > 0:
+			return
+
+		if event.is_action_pressed(aInputManager.ACTION_MOVE_UP):
+			selected_index -= 1
+			if selected_index < 0:
+				selected_index = character_buttons.size() - 1
+			_highlight_status_button.call(selected_index)
+			input_cooldown = input_cooldown_duration
+			get_viewport().set_input_as_handled()
+		elif event.is_action_pressed(aInputManager.ACTION_MOVE_DOWN):
+			selected_index += 1
+			if selected_index >= character_buttons.size():
+				selected_index = 0
+			_highlight_status_button.call(selected_index)
+			input_cooldown = input_cooldown_duration
+			get_viewport().set_input_as_handled()
+		elif event.is_action_pressed(aInputManager.ACTION_ACCEPT):
+			if selected_index >= 0 and selected_index < character_buttons.size():
+				get_viewport().set_input_as_handled()
+				_show_status_details(character_data[selected_index])
+		elif event.is_action_pressed(aInputManager.ACTION_BACK):
+			get_viewport().set_input_as_handled()
+			picker_panel.queue_free()
+			modal_bg.queue_free()
+
+	# Process function for cooldown
+	var process_handler = func(delta: float) -> void:
+		if input_cooldown > 0:
+			input_cooldown -= delta
+
+	# Connect input and process
+	picker_panel.set_process_input(true)
+	picker_panel.input_event.connect(input_handler)
+	picker_panel.set_process(true)
+	picker_panel.process.connect(process_handler)
+
+	add_child(picker_panel)
 
 func _calculate_run_chance() -> float:
 	"""Calculate run chance based on enemy HP percentage and level difference"""
