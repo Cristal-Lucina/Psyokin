@@ -38,6 +38,7 @@ var navigable_buttons: Array[Button] = []
 var selected_button_index: int = 0
 var input_cooldown: float = 0.0
 var input_cooldown_duration: float = 0.15  # 150ms between inputs
+var overlay_active: bool = false  # Track if overlay menu is open
 
 # ------------------------------------------------------------------------------
 
@@ -141,6 +142,12 @@ func _on_quit_pressed() -> void:
 	"""Quit the game/app."""
 	get_tree().quit()
 
+func _on_overlay_closed() -> void:
+	"""Resume title screen when overlay closes."""
+	overlay_active = false
+	set_process_input(true)
+	set_process_unhandled_input(true)
+
 # ------------------------------------------------------------------------------
 # Overlay helper
 # ------------------------------------------------------------------------------
@@ -150,6 +157,11 @@ func _open_popup_overlay(scene_path: String) -> void:
 	if not ResourceLoader.exists(scene_path):
 		push_error("[Title] Missing scene: %s" % scene_path)
 		return
+
+	# Pause title screen interaction
+	overlay_active = true
+	set_process_input(false)
+	set_process_unhandled_input(false)
 
 	# Router preferred if present
 	if has_node("/root/aSceneRouter") and aSceneRouter.has_method("open_popup"):
@@ -165,11 +177,17 @@ func _open_popup_overlay(scene_path: String) -> void:
 	var layer: CanvasLayer = _find_or_make_overlay_layer()
 	layer.add_child(inst)
 
+	# Connect to resume when overlay closes
+	if inst:
+		inst.tree_exited.connect(_on_overlay_closed)
+
 	if inst is Control:
 		var c: Control = inst
 		c.top_level = true
 		c.set_anchors_preset(Control.PRESET_FULL_RECT)
 		c.z_index = 2000
+		# Ensure overlay processes even when title is "paused"
+		c.process_mode = Node.PROCESS_MODE_ALWAYS
 
 func _find_or_make_overlay_layer() -> CanvasLayer:
 	"""Return the highest CanvasLayer in the current scene, or create one."""
@@ -353,11 +371,17 @@ func _setup_controller_navigation(new_btn: Button, continue_btn: Button, load_bt
 
 func _process(delta: float) -> void:
 	"""Handle input cooldown"""
+	if overlay_active:
+		return
+
 	if input_cooldown > 0:
 		input_cooldown -= delta
 
 func _input(event: InputEvent) -> void:
 	"""Handle controller input for menu navigation"""
+	if overlay_active:
+		return
+
 	if navigable_buttons.is_empty():
 		return
 

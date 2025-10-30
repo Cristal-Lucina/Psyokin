@@ -15,6 +15,9 @@ const TITLE_SCENE: String = "res://scenes/main_menu/Title.tscn"
 var _slots : VBoxContainer = null
 
 func _ready() -> void:
+	# Ensure this overlay continues to process even when title is "paused"
+	process_mode = Node.PROCESS_MODE_ALWAYS
+
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	if _backdrop:
 		_backdrop.mouse_filter = Control.MOUSE_FILTER_STOP

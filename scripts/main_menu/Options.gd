@@ -18,6 +18,9 @@ func _ready() -> void:
 	print("[Options] Close button: ", _close_btn)
 	print("[Options] Controls panel: ", _controls_panel)
 
+	# Ensure this overlay continues to process even when title is "paused"
+	process_mode = Node.PROCESS_MODE_ALWAYS
+
 	# Block all input from reaching the title screen behind this menu
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	if _background:
