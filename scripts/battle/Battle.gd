@@ -47,6 +47,11 @@ var selected_capture_index: int = 0  # Currently selected capture item in menu
 var burst_menu_panel: PanelContainer = null  # Burst selection menu
 var burst_menu_buttons: Array = []  # Buttons in burst menu for controller navigation
 var selected_burst_index: int = 0  # Currently selected burst ability in menu
+var status_picker_panel: PanelContainer = null  # Status character picker panel
+var status_picker_modal: ColorRect = null  # Status picker modal background
+var status_picker_buttons: Array = []  # Buttons in status picker for controller navigation
+var status_picker_data: Array = []  # Character data for status picker
+var selected_status_index: int = 0  # Currently selected character in status picker
 var current_skill_menu: Array = []  # Current skills in menu
 var selected_item: Dictionary = {}  # Selected item data
 var selected_burst: Dictionary = {}  # Selected burst ability data
@@ -223,6 +228,10 @@ func _input(event: InputEvent) -> void:
 			_close_burst_menu()
 			get_viewport().set_input_as_handled()
 			return
+		elif status_picker_panel != null:
+			_close_status_picker()
+			get_viewport().set_input_as_handled()
+			return
 		# If in target selection, cancel it
 		elif awaiting_target_selection and not target_candidates.is_empty():
 			_cancel_target_selection()
@@ -313,6 +322,25 @@ func _input(event: InputEvent) -> void:
 		elif event.is_action_pressed(aInputManager.ACTION_ACCEPT):
 			_confirm_item_selection()
 			input_cooldown = input_cooldown_duration
+			get_viewport().set_input_as_handled()
+			return
+
+	# If status picker is open, handle controller navigation
+	if status_picker_panel != null and not status_picker_buttons.is_empty():
+		if event.is_action_pressed(aInputManager.ACTION_MOVE_UP):
+			_navigate_status_picker(-1)
+			get_viewport().set_input_as_handled()
+			return
+		elif event.is_action_pressed(aInputManager.ACTION_MOVE_DOWN):
+			_navigate_status_picker(1)
+			get_viewport().set_input_as_handled()
+			return
+		elif event.is_action_pressed(aInputManager.ACTION_ACCEPT):
+			_confirm_status_selection()
+			get_viewport().set_input_as_handled()
+			return
+		elif event.is_action_pressed(aInputManager.ACTION_BACK):
+			_close_status_picker()
 			get_viewport().set_input_as_handled()
 			return
 
@@ -2241,17 +2269,22 @@ func _on_status_pressed() -> void:
 
 func _show_status_character_picker() -> void:
 	"""Show a character picker to select whose status to view"""
+	# Initialize arrays
+	status_picker_buttons = []
+	status_picker_data = []
+	selected_status_index = 0
+
 	# Create modal background
-	var modal_bg = ColorRect.new()
-	modal_bg.color = Color(0, 0, 0, 0.7)
-	modal_bg.set_anchors_preset(Control.PRESET_FULL_RECT)
-	modal_bg.z_index = 99
-	modal_bg.mouse_filter = Control.MOUSE_FILTER_STOP
-	add_child(modal_bg)
+	status_picker_modal = ColorRect.new()
+	status_picker_modal.color = Color(0, 0, 0, 0.7)
+	status_picker_modal.set_anchors_preset(Control.PRESET_FULL_RECT)
+	status_picker_modal.z_index = 99
+	status_picker_modal.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(status_picker_modal)
 
 	# Create picker panel
-	var picker_panel = PanelContainer.new()
-	picker_panel.custom_minimum_size = Vector2(500, 400)
+	status_picker_panel = PanelContainer.new()
+	status_picker_panel.custom_minimum_size = Vector2(500, 400)
 
 	var panel_style = StyleBoxFlat.new()
 	panel_style.bg_color = Color(0.15, 0.15, 0.2, 1.0)
@@ -2260,14 +2293,14 @@ func _show_status_character_picker() -> void:
 	panel_style.border_width_top = 3
 	panel_style.border_width_bottom = 3
 	panel_style.border_color = Color(0.4, 0.6, 0.8, 1.0)
-	picker_panel.add_theme_stylebox_override("panel", panel_style)
+	status_picker_panel.add_theme_stylebox_override("panel", panel_style)
 
-	picker_panel.position = get_viewport_rect().size / 2 - picker_panel.custom_minimum_size / 2
-	picker_panel.z_index = 100
-	picker_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	status_picker_panel.position = get_viewport_rect().size / 2 - status_picker_panel.custom_minimum_size / 2
+	status_picker_panel.z_index = 100
+	status_picker_panel.mouse_filter = Control.MOUSE_FILTER_STOP
 
 	var vbox = VBoxContainer.new()
-	picker_panel.add_child(vbox)
+	status_picker_panel.add_child(vbox)
 
 	# Title
 	var title = Label.new()
@@ -2278,7 +2311,7 @@ func _show_status_character_picker() -> void:
 
 	# Instructions
 	var instructions = Label.new()
-	instructions.text = "Select a character to view their detailed status"
+	instructions.text = "Use ↑↓ to navigate, A to select, B to cancel"
 	instructions.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	instructions.add_theme_font_size_override("font_size", 12)
 	instructions.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7, 1.0))
@@ -2291,10 +2324,6 @@ func _show_status_character_picker() -> void:
 
 	var character_list = VBoxContainer.new()
 	scroll.add_child(character_list)
-
-	# Storage for navigation
-	var character_buttons: Array[Button] = []
-	var character_data: Array[Dictionary] = []
 
 	# Add allies
 	var allies = battle_mgr.get_ally_combatants()
@@ -2317,9 +2346,10 @@ func _show_status_character_picker() -> void:
 
 			btn.text = "%s - %s | %s%s" % [ally.display_name, hp_text, mp_text, status_text]
 			btn.custom_minimum_size = Vector2(460, 30)
+			btn.pressed.connect(_confirm_status_selection)
 			character_list.add_child(btn)
-			character_buttons.append(btn)
-			character_data.append(ally)
+			status_picker_buttons.append(btn)
+			status_picker_data.append(ally)
 
 	# Add enemies
 	var enemies = battle_mgr.get_enemy_combatants()
@@ -2341,85 +2371,23 @@ func _show_status_character_picker() -> void:
 
 			btn.text = "%s - %s%s" % [enemy.display_name, hp_text, status_text]
 			btn.custom_minimum_size = Vector2(460, 30)
+			btn.pressed.connect(_confirm_status_selection)
 			character_list.add_child(btn)
-			character_buttons.append(btn)
-			character_data.append(enemy)
+			status_picker_buttons.append(btn)
+			status_picker_data.append(enemy)
 
 	# Close button
 	var close_btn = Button.new()
 	close_btn.text = "Close (B)"
 	close_btn.custom_minimum_size = Vector2(120, 30)
+	close_btn.pressed.connect(_close_status_picker)
 	vbox.add_child(close_btn)
 
-	# Controller navigation state
-	var selected_index: int = 0
-	var input_cooldown: float = 0.0
-	var input_cooldown_duration: float = 0.15
-
-	# Connect button signals
-	for i in range(character_buttons.size()):
-		var idx = i  # Capture index
-		character_buttons[i].pressed.connect(func():
-			# Show status for this character
-			_show_status_details(character_data[idx])
-		)
-
-	close_btn.pressed.connect(func():
-		picker_panel.queue_free()
-		modal_bg.queue_free()
-	)
-
 	# Highlight first character
-	var _highlight_status_button = func(index: int) -> void:
-		for i in range(character_buttons.size()):
-			character_buttons[i].modulate = Color(1.0, 1.0, 1.0, 1.0)
-		if index >= 0 and index < character_buttons.size():
-			character_buttons[index].modulate = Color(1.2, 1.2, 0.8, 1.0)
-			character_buttons[index].grab_focus()
-			if scroll:
-				scroll.ensure_control_visible(character_buttons[index])
+	if status_picker_buttons.size() > 0:
+		_highlight_status_button(0)
 
-	if character_buttons.size() > 0:
-		_highlight_status_button.call(0)
-
-	# Create cooldown timer for input navigation
-	var cooldown_timer = Timer.new()
-	cooldown_timer.wait_time = input_cooldown_duration
-	cooldown_timer.one_shot = true
-	picker_panel.add_child(cooldown_timer)
-
-	# Controller input handling
-	var input_handler = func(event: InputEvent) -> void:
-		if not cooldown_timer.is_stopped():
-			return
-
-		if event.is_action_pressed(aInputManager.ACTION_MOVE_UP):
-			selected_index -= 1
-			if selected_index < 0:
-				selected_index = character_buttons.size() - 1
-			_highlight_status_button.call(selected_index)
-			cooldown_timer.start()
-			get_viewport().set_input_as_handled()
-		elif event.is_action_pressed(aInputManager.ACTION_MOVE_DOWN):
-			selected_index += 1
-			if selected_index >= character_buttons.size():
-				selected_index = 0
-			_highlight_status_button.call(selected_index)
-			cooldown_timer.start()
-			get_viewport().set_input_as_handled()
-		elif event.is_action_pressed(aInputManager.ACTION_ACCEPT):
-			if selected_index >= 0 and selected_index < character_buttons.size():
-				get_viewport().set_input_as_handled()
-				_show_status_details(character_data[selected_index])
-		elif event.is_action_pressed(aInputManager.ACTION_BACK):
-			get_viewport().set_input_as_handled()
-			picker_panel.queue_free()
-			modal_bg.queue_free()
-
-	# Connect input handler
-	picker_panel.gui_input.connect(input_handler)
-
-	add_child(picker_panel)
+	add_child(status_picker_panel)
 
 func _calculate_run_chance() -> float:
 	"""Calculate run chance based on enemy HP percentage and level difference"""
@@ -3091,6 +3059,61 @@ func _unhighlight_skill_button(index: int) -> void:
 	"""Remove highlight from a skill button"""
 	if index >= 0 and index < skill_menu_buttons.size():
 		var button = skill_menu_buttons[index]
+		button.modulate = Color(1.0, 1.0, 1.0, 1.0)  # Normal color
+
+## ═══════════════════════════════════════════════════════════════
+## STATUS PICKER NAVIGATION
+## ═══════════════════════════════════════════════════════════════
+
+func _navigate_status_picker(direction: int) -> void:
+	"""Navigate status picker with controller (direction: -1 for up, 1 for down)"""
+	if status_picker_buttons.is_empty():
+		return
+
+	# Remove highlight from current button
+	_unhighlight_status_button(selected_status_index)
+
+	# Move selection
+	selected_status_index += direction
+
+	# Wrap around
+	if selected_status_index < 0:
+		selected_status_index = status_picker_buttons.size() - 1
+	elif selected_status_index >= status_picker_buttons.size():
+		selected_status_index = 0
+
+	# Highlight new button
+	_highlight_status_button(selected_status_index)
+
+func _confirm_status_selection() -> void:
+	"""Confirm status selection with A button"""
+	if selected_status_index >= 0 and selected_status_index < status_picker_data.size():
+		# Show status details for selected character
+		_show_status_details(status_picker_data[selected_status_index])
+
+func _close_status_picker() -> void:
+	"""Close the status picker"""
+	if status_picker_panel:
+		status_picker_panel.queue_free()
+		status_picker_panel = null
+	if status_picker_modal:
+		status_picker_modal.queue_free()
+		status_picker_modal = null
+	status_picker_buttons = []
+	status_picker_data = []
+	selected_status_index = 0
+
+func _highlight_status_button(index: int) -> void:
+	"""Highlight a status picker button"""
+	if index >= 0 and index < status_picker_buttons.size():
+		var button = status_picker_buttons[index]
+		button.modulate = Color(1.2, 1.2, 0.8, 1.0)  # Yellow tint
+		button.grab_focus()
+
+func _unhighlight_status_button(index: int) -> void:
+	"""Remove highlight from a status picker button"""
+	if index >= 0 and index < status_picker_buttons.size():
+		var button = status_picker_buttons[index]
 		button.modulate = Color(1.0, 1.0, 1.0, 1.0)  # Normal color
 
 ## ═══════════════════════════════════════════════════════════════
