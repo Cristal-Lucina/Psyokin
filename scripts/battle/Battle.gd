@@ -47,6 +47,9 @@ var combatant_panels: Dictionary = {}  # combatant_id -> PanelContainer for shak
 func _ready() -> void:
 	print("[Battle] Battle scene loaded")
 
+	# CRITICAL: Disable input processing until fully initialized
+	set_process_input(false)
+
 	# Add combat resolver to scene tree
 	add_child(combat_resolver)
 
@@ -80,27 +83,21 @@ func _ready() -> void:
 	# Mark battle as ready for input
 	is_battle_ready = true
 
+	# CRITICAL: Now enable input processing
+	set_process_input(true)
+	print("[Battle] Input processing enabled")
+
 func _update_action_button_labels() -> void:
 	"""Update action button labels to show action name + mapped key/button"""
-	# Safety check: ensure aInputManager exists
-	if not has_node("/root/aInputManager"):
-		push_warning("[Battle] aInputManager not found, using default button labels")
-		return
-
-	var input_mgr = get_node("/root/aInputManager")
-	if not is_instance_valid(input_mgr):
-		push_warning("[Battle] aInputManager not valid, using default button labels")
-		return
-
 	var button_mappings = [
-		{"button": "AttackButton", "name": "Attack", "action": input_mgr.ACTION_ATTACK},
-		{"button": "SkillButton", "name": "Skill", "action": input_mgr.ACTION_SKILL},
-		{"button": "CaptureButton", "name": "Capture", "action": input_mgr.ACTION_CAPTURE},
-		{"button": "DefendButton", "name": "Defend", "action": input_mgr.ACTION_DEFEND},
-		{"button": "BurstButton", "name": "Burst", "action": input_mgr.ACTION_BURST},
-		{"button": "RunButton", "name": "Run", "action": input_mgr.ACTION_BATTLE_RUN},
-		{"button": "ItemButton", "name": "Items", "action": input_mgr.ACTION_ITEMS},
-		{"button": "StatusButton", "name": "Status", "action": input_mgr.ACTION_STATUS},
+		{"button": "AttackButton", "name": "Attack", "action": aInputManager.ACTION_ATTACK},
+		{"button": "SkillButton", "name": "Skill", "action": aInputManager.ACTION_SKILL},
+		{"button": "CaptureButton", "name": "Capture", "action": aInputManager.ACTION_CAPTURE},
+		{"button": "DefendButton", "name": "Defend", "action": aInputManager.ACTION_DEFEND},
+		{"button": "BurstButton", "name": "Burst", "action": aInputManager.ACTION_BURST},
+		{"button": "RunButton", "name": "Run", "action": aInputManager.ACTION_BATTLE_RUN},
+		{"button": "ItemButton", "name": "Items", "action": aInputManager.ACTION_ITEMS},
+		{"button": "StatusButton", "name": "Status", "action": aInputManager.ACTION_STATUS},
 	]
 
 	for mapping in button_mappings:
@@ -115,13 +112,7 @@ func _get_primary_binding_text(action_name: String) -> String:
 		return "?"
 
 	var events = InputMap.action_get_events(action_name)
-
-	# Check if controller is connected (with safety check)
-	var is_controller_connected = false
-	if has_node("/root/aInputManager"):
-		var input_mgr = get_node("/root/aInputManager")
-		if is_instance_valid(input_mgr):
-			is_controller_connected = input_mgr.is_controller_connected()
+	var is_controller_connected = aInputManager.is_controller_connected()
 
 	# Prefer controller button if controller is connected
 	if is_controller_connected:
@@ -159,58 +150,49 @@ func _load_skills() -> void:
 
 func _input(event: InputEvent) -> void:
 	"""Handle keyboard/controller input for battle actions and target selection"""
-	# Safety check: only handle input if battle is ready and aInputManager exists
-	if not is_battle_ready:
-		return
-
-	# Verify aInputManager exists before using it
-	if not has_node("/root/aInputManager"):
-		return
-
-	var input_mgr = get_node("/root/aInputManager")
-	if not is_instance_valid(input_mgr):
-		return
+	# Note: Input processing is disabled until battle is fully initialized
+	# This function only runs after set_process_input(true) is called in _ready()
 
 	# If awaiting target selection, handle navigation
 	if awaiting_target_selection and not target_candidates.is_empty():
-		if event.is_action_pressed(input_mgr.ACTION_MOVE_LEFT):
+		if event.is_action_pressed(aInputManager.ACTION_MOVE_LEFT):
 			_navigate_targets(-1)
 			get_viewport().set_input_as_handled()
-		elif event.is_action_pressed(input_mgr.ACTION_MOVE_RIGHT):
+		elif event.is_action_pressed(aInputManager.ACTION_MOVE_RIGHT):
 			_navigate_targets(1)
 			get_viewport().set_input_as_handled()
-		elif event.is_action_pressed(input_mgr.ACTION_ACCEPT):
+		elif event.is_action_pressed(aInputManager.ACTION_ACCEPT):
 			_confirm_target_selection()
 			get_viewport().set_input_as_handled()
-		elif event.is_action_pressed(input_mgr.ACTION_BACK):
+		elif event.is_action_pressed(aInputManager.ACTION_BACK):
 			_cancel_target_selection()
 			get_viewport().set_input_as_handled()
 		return
 
 	# If action menu is visible, handle direct button presses
 	if action_menu and action_menu.visible and not is_in_round_transition:
-		if event.is_action_pressed(input_mgr.ACTION_ATTACK):
+		if event.is_action_pressed(aInputManager.ACTION_ATTACK):
 			_on_attack_pressed()
 			get_viewport().set_input_as_handled()
-		elif event.is_action_pressed(input_mgr.ACTION_SKILL):
+		elif event.is_action_pressed(aInputManager.ACTION_SKILL):
 			_on_skill_pressed()
 			get_viewport().set_input_as_handled()
-		elif event.is_action_pressed(input_mgr.ACTION_CAPTURE):
+		elif event.is_action_pressed(aInputManager.ACTION_CAPTURE):
 			_on_capture_pressed()
 			get_viewport().set_input_as_handled()
-		elif event.is_action_pressed(input_mgr.ACTION_DEFEND):
+		elif event.is_action_pressed(aInputManager.ACTION_DEFEND):
 			_on_defend_pressed()
 			get_viewport().set_input_as_handled()
-		elif event.is_action_pressed(input_mgr.ACTION_BURST):
+		elif event.is_action_pressed(aInputManager.ACTION_BURST):
 			_on_burst_pressed()
 			get_viewport().set_input_as_handled()
-		elif event.is_action_pressed(input_mgr.ACTION_BATTLE_RUN):
+		elif event.is_action_pressed(aInputManager.ACTION_BATTLE_RUN):
 			_on_run_pressed()
 			get_viewport().set_input_as_handled()
-		elif event.is_action_pressed(input_mgr.ACTION_ITEMS):
+		elif event.is_action_pressed(aInputManager.ACTION_ITEMS):
 			_on_item_pressed()
 			get_viewport().set_input_as_handled()
-		elif event.is_action_pressed(input_mgr.ACTION_STATUS):
+		elif event.is_action_pressed(aInputManager.ACTION_STATUS):
 			_on_status_pressed()
 			get_viewport().set_input_as_handled()
 
