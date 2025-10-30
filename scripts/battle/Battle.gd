@@ -38,6 +38,8 @@ var selected_skill_index: int = 0  # Currently selected skill in menu
 var item_menu_panel: PanelContainer = null  # Item selection menu
 var item_description_label: Label = null  # Item description display
 var capture_menu_panel: PanelContainer = null  # Capture selection menu
+var capture_menu_buttons: Array = []  # Buttons in capture menu for controller navigation
+var selected_capture_index: int = 0  # Currently selected capture item in menu
 var burst_menu_panel: PanelContainer = null  # Burst selection menu
 var current_skill_menu: Array = []  # Current skills in menu
 var selected_item: Dictionary = {}  # Selected item data
@@ -200,6 +202,21 @@ func _input(event: InputEvent) -> void:
 			return
 		elif event.is_action_pressed(aInputManager.ACTION_ACCEPT):
 			_confirm_skill_selection()
+			get_viewport().set_input_as_handled()
+			return
+
+	# If capture menu is open, handle controller navigation
+	if capture_menu_panel != null and not capture_menu_buttons.is_empty():
+		if event.is_action_pressed(aInputManager.ACTION_MOVE_UP):
+			_navigate_capture_menu(-1)
+			get_viewport().set_input_as_handled()
+			return
+		elif event.is_action_pressed(aInputManager.ACTION_MOVE_DOWN):
+			_navigate_capture_menu(1)
+			get_viewport().set_input_as_handled()
+			return
+		elif event.is_action_pressed(aInputManager.ACTION_ACCEPT):
+			_confirm_capture_selection()
 			get_viewport().set_input_as_handled()
 			return
 
@@ -3053,6 +3070,10 @@ func _show_capture_menu(bind_items: Array) -> void:
 	# Hide action menu
 	action_menu.visible = false
 
+	# Reset navigation
+	capture_menu_buttons = []
+	selected_capture_index = 0
+
 	# Create capture menu panel
 	capture_menu_panel = PanelContainer.new()
 	capture_menu_panel.custom_minimum_size = Vector2(400, 0)
@@ -3107,6 +3128,9 @@ func _show_capture_menu(bind_items: Array) -> void:
 		button.pressed.connect(_on_bind_selected.bind(bind_data))
 		items_vbox.add_child(button)
 
+		# Add to navigation list
+		capture_menu_buttons.append(button)
+
 	# Add cancel button
 	var sep2 = HSeparator.new()
 	vbox.add_child(sep2)
@@ -3124,14 +3148,59 @@ func _show_capture_menu(bind_items: Array) -> void:
 		(get_viewport_rect().size.y - vbox.size.y) / 2
 	)
 
+	# Highlight first item if available
+	if not capture_menu_buttons.is_empty():
+		_highlight_capture_button(0)
+
 func _close_capture_menu() -> void:
 	"""Close the capture menu"""
 	if capture_menu_panel:
 		capture_menu_panel.queue_free()
 		capture_menu_panel = null
+	capture_menu_buttons = []
+	selected_capture_index = 0
 
 	# Show action menu again
 	action_menu.visible = true
+
+func _navigate_capture_menu(direction: int) -> void:
+	"""Navigate capture menu with controller (direction: -1 for up, 1 for down)"""
+	if capture_menu_buttons.is_empty():
+		return
+
+	# Remove highlight from current button
+	_unhighlight_capture_button(selected_capture_index)
+
+	# Move selection
+	selected_capture_index += direction
+
+	# Wrap around
+	if selected_capture_index < 0:
+		selected_capture_index = capture_menu_buttons.size() - 1
+	elif selected_capture_index >= capture_menu_buttons.size():
+		selected_capture_index = 0
+
+	# Highlight new button
+	_highlight_capture_button(selected_capture_index)
+
+func _confirm_capture_selection() -> void:
+	"""Confirm capture item selection with A button"""
+	if selected_capture_index >= 0 and selected_capture_index < capture_menu_buttons.size():
+		var button = capture_menu_buttons[selected_capture_index]
+		# Trigger the button press
+		button.emit_signal("pressed")
+
+func _highlight_capture_button(index: int) -> void:
+	"""Highlight a capture button for controller navigation"""
+	if index >= 0 and index < capture_menu_buttons.size():
+		var button = capture_menu_buttons[index]
+		button.modulate = Color(1.2, 1.2, 0.8, 1.0)  # Yellowish tint
+
+func _unhighlight_capture_button(index: int) -> void:
+	"""Remove highlight from a capture button"""
+	if index >= 0 and index < capture_menu_buttons.size():
+		var button = capture_menu_buttons[index]
+		button.modulate = Color(1.0, 1.0, 1.0, 1.0)  # Normal color
 
 func _on_bind_selected(bind_data: Dictionary) -> void:
 	"""Handle bind item selection from capture menu"""
