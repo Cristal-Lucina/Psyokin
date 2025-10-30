@@ -24,6 +24,13 @@ grow_horizontal = 2
 grow_vertical = 2
 theme_override_constants/separation = 16
 
+[node name="TabButtons" type="VBoxContainer" parent="Root"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(180, 0)
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 6
+
 [node name="Left" type="VBoxContainer" parent="Root"]
 custom_minimum_size = Vector2(280, 0)
 layout_mode = 2

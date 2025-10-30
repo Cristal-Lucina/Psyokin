@@ -70,6 +70,9 @@ class_name StatusPanel
 ## Shows party HP/MP, summary info, and appearance.
 ## Prefers GameState meta + CombatProfileSystem; falls back to Stats/CSV.
 
+# Signal emitted when a menu tab button is clicked
+signal tab_selected(tab_id: String)
+
 const GS_PATH        := "/root/aGameState"
 const STATS_PATH     := "/root/aStatsSystem"
 const CAL_PATH       := "/root/aCalendarSystem"
@@ -86,6 +89,24 @@ const ALT_MES_PATHS := [
 	"/root/MainEventSystem", "/root/MainEvents", "/root/MainEvent"
 ]
 
+# Tab button definitions
+const TAB_DEFS: Dictionary = {
+	"stats":   {"title": "Stats"},
+	"perks":   {"title": "Perks"},
+	"items":   {"title": "Items"},
+	"loadout": {"title": "Loadout"},
+	"bonds":   {"title": "Bonds"},
+	"outreach":{"title": "Outreach"},
+	"dorms":   {"title": "Dorms"},
+	"calendar":{"title": "Calendar"},
+	"index":   {"title": "Index"},
+	"system":  {"title": "System"},
+}
+
+const TAB_ORDER: PackedStringArray = [
+	"stats","perks","items","loadout","bonds","outreach","dorms","calendar","index","system"
+]
+
 # Character preview constants
 const CHAR_BASE_PATH = "res://assets/graphics/characters/"
 const CHAR_VARIANTS = ["char_a_p1"]
@@ -100,6 +121,7 @@ const LAYERS = {
 	"tool_b": {"code": "7tlb", "node_name": "ToolBSprite", "path": "7tlb"}
 }
 
+@onready var _tab_buttons_container: VBoxContainer = %TabButtons
 @onready var _refresh   : Button        = $Root/Left/PartyHeader/RefreshBtn
 @onready var _party     : VBoxContainer = $Root/Left/PartyScroll/PartyList
 @onready var _creds     : Label         = $Root/Right/InfoGrid/MoneyValue
@@ -144,6 +166,7 @@ func _ready() -> void:
 	_normalize_scroll_children()
 	_connect_signals()
 	_load_party_csv_cache()
+	_build_tab_buttons()
 
 	if _refresh and not _refresh.pressed.is_connected(_rebuild_all):
 		_refresh.pressed.connect(_rebuild_all)
@@ -165,6 +188,35 @@ func _first_fill() -> void:
 	if _cps == null:       _cps       = get_node_or_null(CPS_PATH)
 	_load_party_csv_cache()
 	_rebuild_all()
+
+func _build_tab_buttons() -> void:
+	"""Build the menu tab buttons"""
+	if not _tab_buttons_container:
+		return
+
+	# Clear existing buttons
+	for child in _tab_buttons_container.get_children():
+		child.queue_free()
+
+	# Create buttons for each tab
+	var ids: Array = Array(TAB_ORDER)
+	for tab_id_any in ids:
+		var tab_id: String = String(tab_id_any)
+		if not TAB_DEFS.has(tab_id):
+			continue
+		var meta: Dictionary = TAB_DEFS[tab_id]
+
+		var btn := Button.new()
+		btn.text = String(meta["title"])
+		btn.focus_mode = Control.FOCUS_ALL
+		btn.size_flags_horizontal = Control.SIZE_FILL
+		btn.set_meta("tab_id", tab_id)
+		btn.pressed.connect(_on_tab_button_pressed.bind(tab_id))
+		_tab_buttons_container.add_child(btn)
+
+func _on_tab_button_pressed(tab_id: String) -> void:
+	"""Handle tab button press - emit signal for GameMenu to handle"""
+	tab_selected.emit(tab_id)
 
 func _connect_signals() -> void:
 	# Calendar
