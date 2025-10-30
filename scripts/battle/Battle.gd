@@ -25,6 +25,7 @@ class_name Battle
 var current_combatant: Dictionary = {}
 var awaiting_target_selection: bool = false
 var target_candidates: Array = []
+var selected_target_index: int = 0  # Currently selected target in navigation
 var skill_definitions: Dictionary = {}  # skill_id -> skill data
 var awaiting_skill_selection: bool = false
 var awaiting_capture_target: bool = false  # True when selecting target for capture
@@ -51,6 +52,9 @@ func _ready() -> void:
 	# Wait for next frame to ensure all autoloads are ready
 	await get_tree().process_frame
 
+	# Update action button labels with mapped keys/buttons
+	_update_action_button_labels()
+
 	# Load skill definitions
 	_load_skills()
 
@@ -72,6 +76,59 @@ func _ready() -> void:
 	# Initialize battle with party and enemies
 	_initialize_battle()
 
+func _update_action_button_labels() -> void:
+	"""Update action button labels to show action name + mapped key/button"""
+	var button_mappings = [
+		{"button": "AttackButton", "name": "Attack", "action": aInputManager.ACTION_ATTACK},
+		{"button": "SkillButton", "name": "Skill", "action": aInputManager.ACTION_SKILL},
+		{"button": "CaptureButton", "name": "Capture", "action": aInputManager.ACTION_CAPTURE},
+		{"button": "DefendButton", "name": "Defend", "action": aInputManager.ACTION_DEFEND},
+		{"button": "BurstButton", "name": "Burst", "action": aInputManager.ACTION_BURST},
+		{"button": "RunButton", "name": "Run", "action": aInputManager.ACTION_BATTLE_RUN},
+		{"button": "ItemButton", "name": "Items", "action": aInputManager.ACTION_ITEMS},
+		{"button": "StatusButton", "name": "Status", "action": aInputManager.ACTION_STATUS},
+	]
+
+	for mapping in button_mappings:
+		var btn = action_menu.get_node_or_null(mapping["button"])
+		if btn:
+			var key_text = _get_primary_binding_text(mapping["action"])
+			btn.text = "%s (%s)" % [mapping["name"], key_text]
+
+func _get_primary_binding_text(action_name: String) -> String:
+	"""Get the primary binding text for an action (controller preferred if connected)"""
+	if not InputMap.has_action(action_name):
+		return "?"
+
+	var events = InputMap.action_get_events(action_name)
+	var is_controller_connected = aInputManager.is_controller_connected()
+
+	# Prefer controller button if controller is connected
+	if is_controller_connected:
+		for event in events:
+			if event is InputEventJoypadButton:
+				return _get_joypad_button_short_name(event.button_index)
+
+	# Otherwise use keyboard
+	for event in events:
+		if event is InputEventKey:
+			return OS.get_keycode_string(event.keycode)
+
+	return "?"
+
+func _get_joypad_button_short_name(button_index: int) -> String:
+	"""Get short name for joypad button"""
+	match button_index:
+		JOY_BUTTON_A: return "A"
+		JOY_BUTTON_B: return "B"
+		JOY_BUTTON_X: return "X"
+		JOY_BUTTON_Y: return "Y"
+		JOY_BUTTON_LEFT_SHOULDER: return "LB"
+		JOY_BUTTON_RIGHT_SHOULDER: return "RB"
+		JOY_BUTTON_START: return "Start"
+		JOY_BUTTON_BACK: return "Select"
+		_: return "Btn%d" % button_index
+
 func _load_skills() -> void:
 	"""Load skill definitions from skills.csv"""
 	skill_definitions = csv_loader.load_csv("res://data/skills/skills.csv", "skill_id")
@@ -79,6 +136,120 @@ func _load_skills() -> void:
 		print("[Battle] Loaded %d skill definitions" % skill_definitions.size())
 	else:
 		push_error("[Battle] Failed to load skills.csv")
+
+func _input(event: InputEvent) -> void:
+	"""Handle keyboard/controller input for battle actions and target selection"""
+	# If awaiting target selection, handle navigation
+	if awaiting_target_selection and not target_candidates.is_empty():
+		if event.is_action_pressed(aInputManager.ACTION_MOVE_LEFT):
+			_navigate_targets(-1)
+			get_viewport().set_input_as_handled()
+		elif event.is_action_pressed(aInputManager.ACTION_MOVE_RIGHT):
+			_navigate_targets(1)
+			get_viewport().set_input_as_handled()
+		elif event.is_action_pressed(aInputManager.ACTION_ACCEPT):
+			_confirm_target_selection()
+			get_viewport().set_input_as_handled()
+		elif event.is_action_pressed(aInputManager.ACTION_BACK):
+			_cancel_target_selection()
+			get_viewport().set_input_as_handled()
+		return
+
+	# If action menu is visible, handle direct button presses
+	if action_menu and action_menu.visible and not is_in_round_transition:
+		if event.is_action_pressed(aInputManager.ACTION_ATTACK):
+			_on_attack_pressed()
+			get_viewport().set_input_as_handled()
+		elif event.is_action_pressed(aInputManager.ACTION_SKILL):
+			_on_skill_pressed()
+			get_viewport().set_input_as_handled()
+		elif event.is_action_pressed(aInputManager.ACTION_CAPTURE):
+			_on_capture_pressed()
+			get_viewport().set_input_as_handled()
+		elif event.is_action_pressed(aInputManager.ACTION_DEFEND):
+			_on_defend_pressed()
+			get_viewport().set_input_as_handled()
+		elif event.is_action_pressed(aInputManager.ACTION_BURST):
+			_on_burst_pressed()
+			get_viewport().set_input_as_handled()
+		elif event.is_action_pressed(aInputManager.ACTION_BATTLE_RUN):
+			_on_run_pressed()
+			get_viewport().set_input_as_handled()
+		elif event.is_action_pressed(aInputManager.ACTION_ITEMS):
+			_on_item_pressed()
+			get_viewport().set_input_as_handled()
+		elif event.is_action_pressed(aInputManager.ACTION_STATUS):
+			_on_status_pressed()
+			get_viewport().set_input_as_handled()
+
+func _navigate_targets(direction: int) -> void:
+	"""Navigate through target candidates"""
+	if target_candidates.is_empty():
+		return
+
+	# Update selected index
+	selected_target_index += direction
+
+	# Wrap around
+	if selected_target_index < 0:
+		selected_target_index = target_candidates.size() - 1
+	elif selected_target_index >= target_candidates.size():
+		selected_target_index = 0
+
+	# Update visual highlights
+	_highlight_target_candidates()
+
+	# Log current target
+	var target = target_candidates[selected_target_index]
+	log_message("→ %s" % target.display_name)
+
+func _confirm_target_selection() -> void:
+	"""Confirm the currently selected target"""
+	if target_candidates.is_empty() or selected_target_index < 0 or selected_target_index >= target_candidates.size():
+		return
+
+	var target = target_candidates[selected_target_index]
+
+	# Determine what action to execute based on state
+	if awaiting_capture_target:
+		# Attempting capture
+		await _execute_capture(target)
+	elif awaiting_item_target:
+		# Using an item
+		_execute_item_usage(target)
+	elif awaiting_skill_selection:
+		# Using a skill
+		_clear_target_highlights()
+		awaiting_target_selection = false
+		awaiting_skill_selection = false
+		await _execute_skill_single(target)
+
+		# Check if battle is over
+		var battle_ended = await battle_mgr._check_battle_end()
+		if not battle_ended:
+			battle_mgr.end_turn()
+	elif not selected_burst.is_empty():
+		# Using a burst ability (single target)
+		_clear_target_highlights()
+		awaiting_target_selection = false
+		await _execute_burst_on_target(target)
+
+		# Check if battle is over
+		var battle_ended = await battle_mgr._check_battle_end()
+		if not battle_ended:
+			battle_mgr.end_turn()
+	else:
+		# Regular attack
+		_execute_attack(target)
+
+func _cancel_target_selection() -> void:
+	"""Cancel target selection and return to action menu"""
+	awaiting_target_selection = false
+	awaiting_capture_target = false
+	awaiting_item_target = false
+	selected_target_index = 0
+	_clear_target_highlights()
+	log_message("Target selection cancelled.")
 
 func _initialize_battle() -> void:
 	"""Initialize the battle from encounter data"""
@@ -822,7 +993,12 @@ func _on_attack_pressed() -> void:
 
 	# Enable target selection mode
 	awaiting_target_selection = true
+	selected_target_index = 0  # Start with first target
 	_highlight_target_candidates()
+
+	# Show currently selected target
+	if not target_candidates.is_empty():
+		log_message("→ %s" % target_candidates[0].display_name)
 
 func _execute_attack(target: Dictionary) -> void:
 	"""Execute attack on selected target"""
@@ -1995,20 +2171,30 @@ func _on_ally_panel_input(event: InputEvent, target: Dictionary) -> void:
 
 func _highlight_target_candidates() -> void:
 	"""Highlight valid targets with a visual indicator"""
+	# Get currently selected target ID
+	var selected_target_id = ""
+	if selected_target_index >= 0 and selected_target_index < target_candidates.size():
+		selected_target_id = target_candidates[selected_target_index].id
+
 	# Highlight enemies
 	for child in enemy_slots.get_children():
 		var combatant_id = child.get_meta("combatant_id", "")
 		var is_candidate = target_candidates.any(func(c): return c.id == combatant_id)
 
 		if is_candidate:
-			# Add yellow border to indicate targetable
 			var style = StyleBoxFlat.new()
 			style.bg_color = Color(0.3, 0.2, 0.2, 0.9)
 			style.border_width_left = 4
 			style.border_width_right = 4
 			style.border_width_top = 4
 			style.border_width_bottom = 4
-			style.border_color = Color(1.0, 1.0, 0.0, 1.0)  # Yellow highlight
+
+			# Red border for currently selected, yellow for others
+			if combatant_id == selected_target_id:
+				style.border_color = Color(1.0, 0.2, 0.2, 1.0)  # Red - currently selected
+			else:
+				style.border_color = Color(1.0, 1.0, 0.0, 1.0)  # Yellow - targetable
+
 			child.add_theme_stylebox_override("panel", style)
 
 	# Highlight allies (for items)
@@ -2017,14 +2203,19 @@ func _highlight_target_candidates() -> void:
 		var is_candidate = target_candidates.any(func(c): return c.id == combatant_id)
 
 		if is_candidate:
-			# Add green border to indicate targetable ally
 			var style = StyleBoxFlat.new()
 			style.bg_color = Color(0.2, 0.3, 0.2, 0.9)
 			style.border_width_left = 4
 			style.border_width_right = 4
 			style.border_width_top = 4
 			style.border_width_bottom = 4
-			style.border_color = Color(0.0, 1.0, 0.0, 1.0)  # Green highlight
+
+			# Red border for currently selected, green for others
+			if combatant_id == selected_target_id:
+				style.border_color = Color(1.0, 0.2, 0.2, 1.0)  # Red - currently selected
+			else:
+				style.border_color = Color(0.0, 1.0, 0.0, 1.0)  # Green - targetable
+
 			child.add_theme_stylebox_override("panel", style)
 
 func _clear_target_highlights() -> void:
@@ -2716,7 +2907,12 @@ func _on_item_selected(item_data: Dictionary) -> void:
 	# Enable target selection mode
 	awaiting_target_selection = true
 	awaiting_item_target = true
+	selected_target_index = 0  # Start with first target
 	_highlight_target_candidates()
+
+	# Show currently selected target
+	if not target_candidates.is_empty():
+		log_message("→ %s" % target_candidates[0].display_name)
 
 ## ═══════════════════════════════════════════════════════════════
 ## CAPTURE/BIND MENU
@@ -2827,7 +3023,12 @@ func _on_bind_selected(bind_data: Dictionary) -> void:
 	# Enable capture target selection mode
 	awaiting_target_selection = true
 	awaiting_capture_target = true
+	selected_target_index = 0  # Start with first target
 	_highlight_target_candidates()
+
+	# Show currently selected target
+	if not target_candidates.is_empty():
+		log_message("→ %s" % target_candidates[0].display_name)
 
 ## ═══════════════════════════════════════════════════════════════
 ## BURST MENU & EXECUTION
@@ -2992,7 +3193,12 @@ func _on_burst_selected(burst_data: Dictionary) -> void:
 
 		log_message("Select a target...")
 		awaiting_target_selection = true
+		selected_target_index = 0  # Start with first target
 		_highlight_target_candidates()
+
+		# Show currently selected target
+		if not target_candidates.is_empty():
+			log_message("→ %s" % target_candidates[0].display_name)
 	else:
 		# Self/Ally targeting not implemented yet
 		log_message("This burst targeting not yet implemented")
@@ -3162,7 +3368,12 @@ func _on_skill_selected(skill_entry: Dictionary) -> void:
 			log_message("Select a target...")
 			awaiting_target_selection = true
 			awaiting_skill_selection = true
+			selected_target_index = 0  # Start with first target
 			_highlight_target_candidates()
+
+			# Show currently selected target
+			if not target_candidates.is_empty():
+				log_message("→ %s" % target_candidates[0].display_name)
 	elif target_type == "ally" or target_type == "allies":
 		# TODO: Implement ally targeting
 		log_message("Ally targeting not yet implemented")
