@@ -1,6 +1,6 @@
-## ═══════════════════════════════════════════════════════════════════════════
+## ============================================================================
 ## StatusPanel - Party Status & Appearance Display
-## ═══════════════════════════════════════════════════════════════════════════
+## ============================================================================
 ##
 ## PURPOSE:
 ##   Main menu panel displaying party member HP/MP status, general game info
@@ -62,7 +62,7 @@
 ##   • _update_summary() - Update CREDS/perks/date/time
 ##   • _rebuild_appearance() - Update appearance color swatches
 ##
-## ═══════════════════════════════════════════════════════════════════════════
+## ============================================================================
 
 extends Control
 class_name StatusPanel
@@ -278,7 +278,7 @@ func _rebuild_party() -> void:
 
 	# === LEADER SECTION ===
 	var leader_header := Label.new()
-	leader_header.text = "═══ LEADER ═══"
+	leader_header.text = "=== LEADER ==="
 	leader_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	leader_header.add_theme_font_size_override("font_size", 10)
 	_party.add_child(leader_header)
@@ -291,7 +291,7 @@ func _rebuild_party() -> void:
 
 	# === ACTIVE SECTION ===
 	var active_header := Label.new()
-	active_header.text = "═══ ACTIVE ═══"
+	active_header.text = "=== ACTIVE ==="
 	active_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	active_header.add_theme_font_size_override("font_size", 10)
 	_party.add_child(active_header)
@@ -307,7 +307,7 @@ func _rebuild_party() -> void:
 
 	# === BENCH SECTION ===
 	var bench_header := Label.new()
-	bench_header.text = "═══ BENCH ═══"
+	bench_header.text = "=== BENCH ==="
 	bench_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	bench_header.add_theme_font_size_override("font_size", 10)
 	_party.add_child(bench_header)

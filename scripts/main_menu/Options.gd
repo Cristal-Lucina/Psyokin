@@ -5,17 +5,31 @@ extends Control
 
 @onready var _close_btn: Button = %CloseBtn
 @onready var _controls_panel: Control = %ControlsContent
+@onready var _background: ColorRect = $Background
 
 # Remapping state
-var _action_buttons: Array[Array] = []  # Array of [keyboard_button, controller_button]
-var _waiting_for_input: Button = null
+var _action_data: Array[Dictionary] = []  # Array of {name: String, kb_button: Button, ctrl_button: Button}
+var _waiting_for_input: bool = false
 var _waiting_action: String = ""
-var _waiting_is_controller: bool = false
+
+# Controller navigation - action-based
+var _selected_action_index: int = 0
+var _input_cooldown: float = 0.0
+var _input_cooldown_duration: float = 0.2
+var _scroll_container: ScrollContainer = null  # Reference for auto-scrolling
 
 func _ready() -> void:
 	print("[Options] _ready() called")
 	print("[Options] Close button: ", _close_btn)
 	print("[Options] Controls panel: ", _controls_panel)
+
+	# Ensure this overlay continues to process even when title is "paused"
+	process_mode = Node.PROCESS_MODE_ALWAYS
+
+	# Block all input from reaching the title screen behind this menu
+	mouse_filter = Control.MOUSE_FILTER_STOP
+	if _background:
+		_background.mouse_filter = Control.MOUSE_FILTER_STOP
 
 	if _close_btn:
 		_close_btn.pressed.connect(_on_close_pressed)
@@ -30,6 +44,7 @@ func _ready() -> void:
 		push_error("[Options] Controls panel not found!")
 
 func _on_close_pressed() -> void:
+	print("[Options] Closing options menu")
 	queue_free()
 
 func _build_controls_ui() -> void:
@@ -46,6 +61,7 @@ func _build_controls_ui() -> void:
 	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_controls_panel.add_child(scroll)
+	_scroll_container = scroll  # Store reference for auto-scrolling
 	print("[Options] Added scroll container")
 
 	var main_vbox = VBoxContainer.new()
@@ -171,17 +187,16 @@ func _build_controls_ui() -> void:
 		var kb_btn = Button.new()
 		kb_btn.text = _get_keyboard_binding_text(action_name)
 		kb_btn.custom_minimum_size = Vector2(200, 28)
-		kb_btn.pressed.connect(_on_remap_pressed.bind(action_name, kb_btn, false))
 		ow_grid.add_child(kb_btn)
 
 		# Controller binding button
 		var ctrl_btn = Button.new()
 		ctrl_btn.text = _get_controller_binding_text(action_name)
 		ctrl_btn.custom_minimum_size = Vector2(200, 28)
-		ctrl_btn.pressed.connect(_on_remap_pressed.bind(action_name, ctrl_btn, true))
 		ow_grid.add_child(ctrl_btn)
 
-		_action_buttons.append([kb_btn, ctrl_btn])
+		# Store action data for navigation
+		_action_data.append({"name": action_name, "kb_button": kb_btn, "ctrl_button": ctrl_btn})
 
 	# ========== BATTLE SECTION ==========
 
@@ -251,17 +266,16 @@ func _build_controls_ui() -> void:
 		var kb_btn = Button.new()
 		kb_btn.text = _get_keyboard_binding_text(action_name)
 		kb_btn.custom_minimum_size = Vector2(200, 28)
-		kb_btn.pressed.connect(_on_remap_pressed.bind(action_name, kb_btn, false))
 		battle_grid.add_child(kb_btn)
 
 		# Controller binding button
 		var ctrl_btn = Button.new()
 		ctrl_btn.text = _get_controller_binding_text(action_name)
 		ctrl_btn.custom_minimum_size = Vector2(200, 28)
-		ctrl_btn.pressed.connect(_on_remap_pressed.bind(action_name, ctrl_btn, true))
 		battle_grid.add_child(ctrl_btn)
 
-		_action_buttons.append([kb_btn, ctrl_btn])
+		# Store action data for navigation
+		_action_data.append({"name": action_name, "kb_button": kb_btn, "ctrl_button": ctrl_btn})
 
 	# ========== MENUS SECTION ==========
 
@@ -331,17 +345,16 @@ func _build_controls_ui() -> void:
 		var kb_btn = Button.new()
 		kb_btn.text = _get_keyboard_binding_text(action_name)
 		kb_btn.custom_minimum_size = Vector2(200, 28)
-		kb_btn.pressed.connect(_on_remap_pressed.bind(action_name, kb_btn, false))
 		menu_grid.add_child(kb_btn)
 
 		# Controller binding button
 		var ctrl_btn = Button.new()
 		ctrl_btn.text = _get_controller_binding_text(action_name)
 		ctrl_btn.custom_minimum_size = Vector2(200, 28)
-		ctrl_btn.pressed.connect(_on_remap_pressed.bind(action_name, ctrl_btn, true))
 		menu_grid.add_child(ctrl_btn)
 
-		_action_buttons.append([kb_btn, ctrl_btn])
+		# Store action data for navigation
+		_action_data.append({"name": action_name, "kb_button": kb_btn, "ctrl_button": ctrl_btn})
 
 	# ========== FOOTER ==========
 
@@ -380,65 +393,84 @@ func _build_controls_ui() -> void:
 
 	print("[Options] Controls UI built successfully!")
 
-func _on_remap_pressed(action_name: String, button: Button, is_controller: bool) -> void:
-	"""Start waiting for input to remap an action"""
-	if _waiting_for_input != null:
-		# Cancel previous remap
-		_waiting_for_input.text = _get_current_binding_text(_waiting_action, _waiting_is_controller)
+	# Setup controller navigation
+	_setup_controller_navigation()
 
-	_waiting_for_input = button
-	_waiting_action = action_name
-	_waiting_is_controller = is_controller
+func _setup_controller_navigation() -> void:
+	"""Setup controller navigation for action rows"""
+	# Start with first action selected
+	if _action_data.size() > 0:
+		_selected_action_index = 0
+		_highlight_action(_selected_action_index)
 
-	if is_controller:
-		button.text = "Press controller button..."
-	else:
-		button.text = "Press any key..."
+	print("[Options] Navigation setup complete. ", _action_data.size(), " actions")
 
-	button.grab_focus()
+func _process(delta: float) -> void:
+	"""Handle input cooldown and right stick scrolling"""
+	if _input_cooldown > 0:
+		_input_cooldown -= delta
 
-func _get_current_binding_text(action_name: String, is_controller: bool) -> String:
-	"""Get the current binding text for an action"""
-	if is_controller:
-		return _get_controller_binding_text(action_name)
-	else:
-		return _get_keyboard_binding_text(action_name)
+	# Right stick controls scroll wheel
+	if _scroll_container:
+		var right_stick_y = Input.get_joy_axis(0, JOY_AXIS_RIGHT_Y)
+		if abs(right_stick_y) > 0.2:  # Deadzone
+			var scroll_speed = 500.0  # Pixels per second
+			_scroll_container.scroll_vertical += int(right_stick_y * scroll_speed * delta)
 
 func _input(event: InputEvent) -> void:
-	if _waiting_for_input == null:
+	# Handle controller navigation and actions when not remapping
+	if not _waiting_for_input:
+		# Back button closes menu
+		if event.is_action_pressed("menu_back") or (event is InputEventKey and event.keycode == KEY_ESCAPE and event.pressed):
+			_on_close_pressed()
+			get_viewport().set_input_as_handled()
+			return
+
+		# Controller navigation through ACTIONS (not individual buttons)
+		if _input_cooldown <= 0 and _action_data.size() > 0:
+			if event.is_action_pressed("move_up"):
+				_navigate_actions(-1)
+				_input_cooldown = _input_cooldown_duration
+				get_viewport().set_input_as_handled()
+				return
+			elif event.is_action_pressed("move_down"):
+				_navigate_actions(1)
+				_input_cooldown = _input_cooldown_duration
+				get_viewport().set_input_as_handled()
+				return
+			elif event.is_action_pressed("menu_accept"):
+				# Start remapping for selected action
+				_start_remapping()
+				get_viewport().set_input_as_handled()
+				return
 		return
 
+	# In remapping mode - auto-detect keyboard vs controller
 	# Allow ESC to cancel remapping
 	if event is InputEventKey and event.keycode == KEY_ESCAPE and event.pressed:
-		_waiting_for_input.text = _get_current_binding_text(_waiting_action, _waiting_is_controller)
-		_waiting_for_input = null
-		_waiting_action = ""
-		_waiting_is_controller = false
+		_cancel_remapping()
 		get_viewport().set_input_as_handled()
 		return
 
-	var should_remap = false
+	var is_controller = false
 	var new_event: InputEvent = null
 
-	if _waiting_is_controller:
-		# Waiting for controller input
-		if event is InputEventJoypadButton and event.pressed:
-			new_event = event
-			should_remap = true
-		elif event is InputEventJoypadMotion and abs(event.axis_value) > 0.5:
-			new_event = event
-			should_remap = true
-	else:
-		# Waiting for keyboard input (but not ESC since we handle that above)
-		if event is InputEventKey and event.pressed and event.keycode != KEY_ESCAPE:
-			new_event = event
-			should_remap = true
+	# Auto-detect: controller input
+	if event is InputEventJoypadButton and event.pressed:
+		new_event = event
+		is_controller = true
+	elif event is InputEventJoypadMotion and abs(event.axis_value) > 0.5:
+		new_event = event
+		is_controller = true
+	# Auto-detect: keyboard input (but not ESC since we handle that above)
+	elif event is InputEventKey and event.pressed and event.keycode != KEY_ESCAPE:
+		new_event = event
+		is_controller = false
 
-	if should_remap and new_event != null:
-		_remap_action(_waiting_action, new_event, _waiting_is_controller)
-		_waiting_for_input = null
-		_waiting_action = ""
-		_waiting_is_controller = false
+	# Remap if we got valid input
+	if new_event != null:
+		_remap_action(_waiting_action, new_event, is_controller)
+		_complete_remapping(is_controller)
 		get_viewport().set_input_as_handled()
 
 func _remap_action(action_name: String, new_event: InputEvent, is_controller: bool) -> void:
@@ -468,22 +500,9 @@ func _remap_action(action_name: String, new_event: InputEvent, is_controller: bo
 
 func _refresh_bindings() -> void:
 	"""Update all binding button labels"""
-	var all_actions = [
-		"move_up", "move_down", "move_left", "move_right",
-		"action", "jump", "run", "phone", "menu", "save",
-		"battle_attack", "battle_skill", "battle_capture", "battle_defend",
-		"battle_burst", "battle_run", "battle_items", "battle_status",
-		"menu_accept", "menu_back"
-	]
-
-	for i in range(min(_action_buttons.size(), all_actions.size())):
-		var buttons = _action_buttons[i]
-		var kb_btn = buttons[0] as Button
-		var ctrl_btn = buttons[1] as Button
-		var action_name = all_actions[i]
-
-		kb_btn.text = _get_keyboard_binding_text(action_name)
-		ctrl_btn.text = _get_controller_binding_text(action_name)
+	for action in _action_data:
+		action.kb_button.text = _get_keyboard_binding_text(action.name)
+		action.ctrl_button.text = _get_controller_binding_text(action.name)
 
 func _on_reset_pressed() -> void:
 	"""Reset all controls to defaults"""
@@ -566,3 +585,102 @@ func _get_joypad_axis_name(axis: int, value: float) -> String:
 		JOY_AXIS_TRIGGER_LEFT: return "LT"
 		JOY_AXIS_TRIGGER_RIGHT: return "RT"
 		_: return "Axis %d" % axis
+
+# ------------------------------------------------------------------------------
+# Controller Navigation Helpers
+# ------------------------------------------------------------------------------
+
+# ------------------------------------------------------------------------------
+# Action Navigation Helpers
+# ------------------------------------------------------------------------------
+
+func _navigate_actions(direction: int) -> void:
+	"""Navigate through action rows with controller"""
+	if _action_data.is_empty():
+		return
+
+	_unhighlight_action(_selected_action_index)
+
+	_selected_action_index += direction
+	if _selected_action_index < 0:
+		_selected_action_index = _action_data.size() - 1
+	elif _selected_action_index >= _action_data.size():
+		_selected_action_index = 0
+
+	_highlight_action(_selected_action_index)
+
+func _highlight_action(index: int) -> void:
+	"""Highlight both keyboard and controller buttons for an action"""
+	if index >= 0 and index < _action_data.size():
+		var action = _action_data[index]
+		action.kb_button.modulate = Color(1.2, 1.2, 0.8, 1.0)
+		action.ctrl_button.modulate = Color(1.2, 1.2, 0.8, 1.0)
+		action.kb_button.grab_focus()
+
+		# Auto-scroll to keep selected action visible
+		if _scroll_container:
+			await get_tree().process_frame  # Wait for layout update
+			var button_pos = action.kb_button.global_position.y - _scroll_container.global_position.y
+			var button_height = action.kb_button.size.y
+			var scroll_height = _scroll_container.size.y
+			var current_scroll = _scroll_container.scroll_vertical
+
+			# Calculate if we need to scroll
+			var visible_top = current_scroll
+			var visible_bottom = current_scroll + scroll_height
+
+			# If button is above visible area, scroll up to it
+			if button_pos < visible_top:
+				_scroll_container.scroll_vertical = int(button_pos)
+			# If button is below visible area, scroll down to it
+			elif button_pos + button_height > visible_bottom:
+				_scroll_container.scroll_vertical = int(button_pos + button_height - scroll_height)
+
+func _unhighlight_action(index: int) -> void:
+	"""Remove highlight from an action row"""
+	if index >= 0 and index < _action_data.size():
+		var action = _action_data[index]
+		action.kb_button.modulate = Color(1.0, 1.0, 1.0, 1.0)
+		action.ctrl_button.modulate = Color(1.0, 1.0, 1.0, 1.0)
+
+# ------------------------------------------------------------------------------
+# Remapping Helpers
+# ------------------------------------------------------------------------------
+
+func _start_remapping() -> void:
+	"""Start remapping mode for selected action"""
+	if _selected_action_index < 0 or _selected_action_index >= _action_data.size():
+		return
+
+	var action = _action_data[_selected_action_index]
+	_waiting_for_input = true
+	_waiting_action = action.name
+
+	# Update both buttons to show waiting state
+	action.kb_button.text = "Press key/button..."
+	action.ctrl_button.text = "Press key/button..."
+
+	print("[Options] Waiting for input to remap: ", action.name)
+
+func _cancel_remapping() -> void:
+	"""Cancel remapping and restore button text"""
+	if _selected_action_index >= 0 and _selected_action_index < _action_data.size():
+		var action = _action_data[_selected_action_index]
+		action.kb_button.text = _get_keyboard_binding_text(action.name)
+		action.ctrl_button.text = _get_controller_binding_text(action.name)
+
+	_waiting_for_input = false
+	_waiting_action = ""
+	print("[Options] Remapping cancelled")
+
+func _complete_remapping(is_controller: bool) -> void:
+	"""Complete remapping and update button text"""
+	if _selected_action_index >= 0 and _selected_action_index < _action_data.size():
+		var action = _action_data[_selected_action_index]
+		# Update button text to show new binding
+		action.kb_button.text = _get_keyboard_binding_text(action.name)
+		action.ctrl_button.text = _get_controller_binding_text(action.name)
+
+	_waiting_for_input = false
+	_waiting_action = ""
+	print("[Options] Remapping complete (", "controller" if is_controller else "keyboard", ")")

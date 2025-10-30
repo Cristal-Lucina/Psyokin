@@ -35,7 +35,15 @@ var _party : Node = null
 
 var _current_id : String = "hero"
 
+# Controller navigation
+var _member_buttons: Array[Button] = []
+var _panel_has_focus: bool = false
+var _back_label: Label = null
+
 func _ready() -> void:
+	# Add "Back (B)" indicator in bottom right
+	_add_back_indicator()
+
 	_stats = get_node_or_null(STATS_AUTOLOAD_PATH)
 	_cal   = get_node_or_null(CAL_AUTOLOAD_PATH)
 	_gs    = get_node_or_null(GS_PATH)
@@ -74,6 +82,72 @@ func _ready() -> void:
 	# build
 	_rebuild_member_bar()
 	_rebuild_all()
+
+func _input(event: InputEvent) -> void:
+	if not _panel_has_focus or not visible:
+		return
+
+	# L bumper - previous member
+	if event.is_action_pressed(aInputManager.ACTION_BURST):
+		_navigate_members(-1)
+		get_viewport().set_input_as_handled()
+	# R bumper - next member
+	elif event.is_action_pressed(aInputManager.ACTION_BATTLE_RUN):
+		_navigate_members(1)
+		get_viewport().set_input_as_handled()
+
+func _navigate_members(direction: int) -> void:
+	"""Navigate through party members with L/R bumpers"""
+	var party_ids := _active_party_ids()
+	if party_ids.is_empty():
+		return
+
+	# Find current index
+	var current_index := 0
+	for i in range(party_ids.size()):
+		if String(party_ids[i]) == _current_id:
+			current_index = i
+			break
+
+	# Calculate new index with wrap-around
+	current_index += direction
+	if current_index < 0:
+		current_index = party_ids.size() - 1
+	elif current_index >= party_ids.size():
+		current_index = 0
+
+	# Switch to new member
+	var new_id := String(party_ids[current_index])
+	_on_pick_member(new_id)
+	_highlight_member_button(current_index)
+
+func _highlight_member_button(index: int) -> void:
+	"""Highlight the member button at the given index"""
+	# Unhighlight all buttons first
+	for btn in _member_buttons:
+		btn.modulate = Color(1.0, 1.0, 1.0, 1.0)
+
+	# Highlight selected button
+	if index >= 0 and index < _member_buttons.size():
+		_member_buttons[index].modulate = Color(1.2, 1.2, 0.8, 1.0)  # Yellow tint
+		_member_buttons[index].button_pressed = true
+
+func panel_gained_focus() -> void:
+	"""Called by GameMenu when this panel gains focus"""
+	_panel_has_focus = true
+	# Highlight the current member button
+	var party_ids := _active_party_ids()
+	for i in range(party_ids.size()):
+		if String(party_ids[i]) == _current_id:
+			_highlight_member_button(i)
+			break
+
+func panel_lost_focus() -> void:
+	"""Called by GameMenu when this panel loses focus"""
+	_panel_has_focus = false
+	# Remove highlights
+	for btn in _member_buttons:
+		btn.modulate = Color(1.0, 1.0, 1.0, 1.0)
 
 # ---------- Calendar weekday debug ----------
 func _on_cal_day_advanced(date: Dictionary) -> void:
@@ -227,6 +301,9 @@ func _rebuild_member_bar() -> void:
 	if _member_bar == null: return
 	for c in _member_bar.get_children(): c.queue_free()
 
+	# Clear button array
+	_member_buttons.clear()
+
 	var group := ButtonGroup.new()
 	for id_any in _active_party_ids():
 		var pid := String(id_any)
@@ -237,8 +314,9 @@ func _rebuild_member_bar() -> void:
 		btn.pressed.connect(_on_pick_member.bind(pid))
 		if pid == _current_id: btn.button_pressed = true
 		_member_bar.add_child(btn)
+		_member_buttons.append(btn)
 
-	# Fallback “hero” if no party
+	# Fallback "hero" if no party
 	if _member_bar.get_child_count() == 0:
 		var b := Button.new()
 		b.toggle_mode = true
@@ -247,6 +325,7 @@ func _rebuild_member_bar() -> void:
 		b.button_pressed = true
 		b.pressed.connect(_on_pick_member.bind("hero"))
 		_member_bar.add_child(b)
+		_member_buttons.append(b)
 
 func _on_pick_member(pid: String) -> void:
 	_current_id = pid
@@ -509,3 +588,24 @@ func _draw_pentagon_outline(control: Control, points: PackedVector2Array, color:
 		var start := points[i]
 		var end := points[(i + 1) % points.size()]
 		control.draw_line(start, end, color, width)
+
+# --- Back Button Indicator ---
+func _add_back_indicator() -> void:
+	"""Add 'Back (B)' text in bottom right corner"""
+	_back_label = Label.new()
+	_back_label.text = "Back (B)"
+	_back_label.add_theme_font_size_override("font_size", 14)
+	_back_label.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7, 1.0))
+
+	# Position in bottom right
+	_back_label.anchor_right = 1.0
+	_back_label.anchor_bottom = 1.0
+	_back_label.anchor_left = 1.0
+	_back_label.anchor_top = 1.0
+	_back_label.offset_right = -20
+	_back_label.offset_bottom = -10
+	_back_label.offset_left = -100
+	_back_label.offset_top = -30
+	_back_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+
+	add_child(_back_label)

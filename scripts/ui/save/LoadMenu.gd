@@ -10,11 +10,23 @@ const TITLE_SCENE: String = "res://scenes/main_menu/Title.tscn"
 @onready var _btn_close : Button          = get_node("Center/Window/Root/Header/CloseBtn") as Button
 @onready var _hint      : Label           = get_node("Center/Window/Root/Hint") as Label
 @onready var _scroll    : ScrollContainer = get_node("Center/Window/Root/Scroll") as ScrollContainer
+@onready var _backdrop  : ColorRect       = $Backdrop
 
 var _slots : VBoxContainer = null
 
+# Controller navigation
+var _all_buttons: Array[Button] = []
+var _selected_button_index: int = 0
+var _input_cooldown: float = 0.0
+var _input_cooldown_duration: float = 0.2
+
 func _ready() -> void:
+	# Ensure this overlay continues to process even when title is "paused"
+	process_mode = Node.PROCESS_MODE_ALWAYS
+
 	mouse_filter = Control.MOUSE_FILTER_STOP
+	if _backdrop:
+		_backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
 
 	_slots = _scroll.get_node_or_null("Slots") as VBoxContainer
 	if _slots == null:
@@ -33,13 +45,42 @@ func _ready() -> void:
 	if not _btn_close.pressed.is_connected(_on_close):
 		_btn_close.pressed.connect(_on_close)
 
-	set_process_unhandled_input(true)
 	_rebuild()
 
-func _unhandled_input(e: InputEvent) -> void:
-	if e.is_action_pressed("ui_cancel"):
+func _process(delta: float) -> void:
+	"""Handle input cooldown and right stick scrolling"""
+	if _input_cooldown > 0:
+		_input_cooldown -= delta
+
+	# Right stick controls scroll wheel
+	if _scroll:
+		var right_stick_y = Input.get_joy_axis(0, JOY_AXIS_RIGHT_Y)
+		if abs(right_stick_y) > 0.2:  # Deadzone
+			var scroll_speed = 500.0  # Pixels per second
+			_scroll.scroll_vertical += int(right_stick_y * scroll_speed * delta)
+
+func _input(e: InputEvent) -> void:
+	# Back button closes menu
+	if e.is_action_pressed("ui_cancel") or e.is_action_pressed("menu_back"):
 		_on_close()
 		get_viewport().set_input_as_handled()
+		return
+
+	# Controller navigation through save slots
+	if _input_cooldown <= 0 and _all_buttons.size() > 0:
+		if e.is_action_pressed("move_up"):
+			_navigate_buttons(-1)
+			_input_cooldown = _input_cooldown_duration
+			get_viewport().set_input_as_handled()
+		elif e.is_action_pressed("move_down"):
+			_navigate_buttons(1)
+			_input_cooldown = _input_cooldown_duration
+			get_viewport().set_input_as_handled()
+		elif e.is_action_pressed("menu_accept"):
+			# Activate selected button (load the save)
+			if _selected_button_index >= 0 and _selected_button_index < _all_buttons.size():
+				_all_buttons[_selected_button_index].emit_signal("pressed")
+			get_viewport().set_input_as_handled()
 
 func _rebuild() -> void:
 	for c in _slots.get_children():
@@ -55,6 +96,9 @@ func _rebuild() -> void:
 
 	await get_tree().process_frame
 	_slots.queue_sort()
+
+	# Setup controller navigation after slots are created
+	_setup_controller_navigation()
 
 func _collect_slots() -> Array[int]:
 	var out: Array[int] = []
@@ -168,6 +212,7 @@ func _on_delete_pressed(slot: int) -> void:
 	_rebuild()
 
 func _on_close() -> void:
+	print("[LoadMenu] Closing load menu")
 	queue_free()
 
 func _on_to_title() -> void:
@@ -175,3 +220,59 @@ func _on_to_title() -> void:
 		aSceneRouter.goto_title()
 	elif ResourceLoader.exists(TITLE_SCENE):
 		get_tree().change_scene_to_file(TITLE_SCENE)
+
+# ------------------------------------------------------------------------------
+# Controller Navigation Helpers
+# ------------------------------------------------------------------------------
+
+func _setup_controller_navigation() -> void:
+	"""Setup controller navigation for all save slot buttons"""
+	_all_buttons.clear()
+
+	# Collect all load buttons from each slot row
+	for row in _slots.get_children():
+		if row is HBoxContainer:
+			for child in row.get_children():
+				if child is Button:
+					_all_buttons.append(child)
+
+	# Add header buttons
+	if _btn_close:
+		_all_buttons.append(_btn_close)
+	if _btn_title:
+		_all_buttons.append(_btn_title)
+
+	# Start with first button selected
+	if _all_buttons.size() > 0:
+		_selected_button_index = 0
+		_highlight_button(_selected_button_index)
+
+	print("[LoadMenu] Navigation setup complete. ", _all_buttons.size(), " buttons")
+
+func _navigate_buttons(direction: int) -> void:
+	"""Navigate through buttons with controller"""
+	if _all_buttons.is_empty():
+		return
+
+	_unhighlight_button(_selected_button_index)
+
+	_selected_button_index += direction
+	if _selected_button_index < 0:
+		_selected_button_index = _all_buttons.size() - 1
+	elif _selected_button_index >= _all_buttons.size():
+		_selected_button_index = 0
+
+	_highlight_button(_selected_button_index)
+
+func _highlight_button(index: int) -> void:
+	"""Highlight a button"""
+	if index >= 0 and index < _all_buttons.size():
+		var button = _all_buttons[index]
+		button.modulate = Color(1.2, 1.2, 0.8, 1.0)
+		button.grab_focus()
+
+func _unhighlight_button(index: int) -> void:
+	"""Remove highlight from a button"""
+	if index >= 0 and index < _all_buttons.size():
+		var button = _all_buttons[index]
+		button.modulate = Color(1.0, 1.0, 1.0, 1.0)

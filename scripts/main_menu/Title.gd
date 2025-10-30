@@ -141,6 +141,12 @@ func _on_quit_pressed() -> void:
 	"""Quit the game/app."""
 	get_tree().quit()
 
+func _on_overlay_closed() -> void:
+	"""Resume title screen when overlay closes."""
+	print("[Title] Overlay closed, resuming title screen")
+	process_mode = Node.PROCESS_MODE_INHERIT
+	mouse_filter = Control.MOUSE_FILTER_STOP
+
 # ------------------------------------------------------------------------------
 # Overlay helper
 # ------------------------------------------------------------------------------
@@ -151,25 +157,43 @@ func _open_popup_overlay(scene_path: String) -> void:
 		push_error("[Title] Missing scene: %s" % scene_path)
 		return
 
-	# Router preferred if present
-	if has_node("/root/aSceneRouter") and aSceneRouter.has_method("open_popup"):
-		aSceneRouter.open_popup(scene_path, get_tree().current_scene)
-		return
+	print("[Title] Opening overlay: ", scene_path)
+
+	# Completely block all Title input - this is the KEY fix!
+	# IGNORE blocks ALL mouse events from reaching Title and its children
+	mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	# Release focus from any Title button so controller input doesn't reach them
+	for btn in navigable_buttons:
+		if btn.has_focus():
+			btn.release_focus()
+
+	# Disable processing (stops _process, _input, etc)
+	process_mode = Node.PROCESS_MODE_DISABLED
 
 	var ps: PackedScene = load(scene_path) as PackedScene
 	if ps == null:
 		push_error("[Title] Could not load scene: %s" % scene_path)
+		process_mode = Node.PROCESS_MODE_INHERIT  # Resume on error
+		mouse_filter = Control.MOUSE_FILTER_STOP  # Restore mouse filter
 		return
 
 	var inst: Node = ps.instantiate()
 	var layer: CanvasLayer = _find_or_make_overlay_layer()
 	layer.add_child(inst)
 
+	# Connect to resume when overlay closes
+	if inst:
+		inst.tree_exited.connect(_on_overlay_closed)
+		print("[Title] Connected to overlay tree_exited signal")
+
 	if inst is Control:
 		var c: Control = inst
 		c.top_level = true
 		c.set_anchors_preset(Control.PRESET_FULL_RECT)
 		c.z_index = 2000
+		# Ensure overlay processes even when title is disabled
+		c.process_mode = Node.PROCESS_MODE_ALWAYS
 
 func _find_or_make_overlay_layer() -> CanvasLayer:
 	"""Return the highest CanvasLayer in the current scene, or create one."""
@@ -328,11 +352,12 @@ func _setup_controller_navigation(new_btn: Button, continue_btn: Button, load_bt
 	"""Setup controller navigation for menu buttons"""
 	navigable_buttons.clear()
 
-	# Add buttons in order (skip hidden ones)
-	if new_btn:
-		navigable_buttons.append(new_btn)
+	# Add buttons in VISUAL order (top to bottom)
+	# Continue should be first if it exists
 	if continue_btn and has_save:
 		navigable_buttons.append(continue_btn)
+	if new_btn:
+		navigable_buttons.append(new_btn)
 	if load_btn and has_save:
 		navigable_buttons.append(load_btn)
 	if options_btn:
@@ -340,9 +365,14 @@ func _setup_controller_navigation(new_btn: Button, continue_btn: Button, load_bt
 	if quit_btn:
 		navigable_buttons.append(quit_btn)
 
-	# Highlight first button
+	# Start at Continue if save exists, else New Game
 	if navigable_buttons.size() > 0:
-		selected_button_index = 0
+		if has_save and continue_btn:
+			# Continue is now at index 0
+			selected_button_index = 0
+		else:
+			# New Game is at index 0 (no save)
+			selected_button_index = 0
 		_highlight_button(selected_button_index)
 
 func _process(delta: float) -> void:

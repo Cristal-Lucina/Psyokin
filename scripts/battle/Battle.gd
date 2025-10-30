@@ -230,12 +230,12 @@ func _input(event: InputEvent) -> void:
 			_close_burst_menu()
 			get_viewport().set_input_as_handled()
 			return
-		elif status_picker_panel != null:
-			_close_status_picker()
-			get_viewport().set_input_as_handled()
-			return
 		elif status_details_popup != null:
 			_close_status_details()
+			get_viewport().set_input_as_handled()
+			return
+		elif status_picker_panel != null:
+			_close_status_picker()
 			get_viewport().set_input_as_handled()
 			return
 		# If in target selection, cancel it
@@ -259,14 +259,22 @@ func _input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 			return
 
-	# If capture menu is open, handle controller navigation
+	# If capture menu is open, handle controller navigation (2D grid)
 	if capture_menu_panel != null and not capture_menu_buttons.is_empty():
 		if event.is_action_pressed(aInputManager.ACTION_MOVE_UP):
-			_navigate_capture_menu(-1)
+			_navigate_capture_menu_vertical(-2)  # Move up one row (2 columns)
 			get_viewport().set_input_as_handled()
 			return
 		elif event.is_action_pressed(aInputManager.ACTION_MOVE_DOWN):
-			_navigate_capture_menu(1)
+			_navigate_capture_menu_vertical(2)  # Move down one row (2 columns)
+			get_viewport().set_input_as_handled()
+			return
+		elif event.is_action_pressed(aInputManager.ACTION_MOVE_LEFT):
+			_navigate_capture_menu_horizontal(-1)  # Move left one column
+			get_viewport().set_input_as_handled()
+			return
+		elif event.is_action_pressed(aInputManager.ACTION_MOVE_RIGHT):
+			_navigate_capture_menu_horizontal(1)  # Move right one column
 			get_viewport().set_input_as_handled()
 			return
 		elif event.is_action_pressed(aInputManager.ACTION_ACCEPT):
@@ -331,6 +339,20 @@ func _input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 			return
 
+	# If status details popup is open, handle B button to close (PRIORITY CHECK - must come before status picker)
+	if status_details_popup != null:
+		if event.is_action_pressed(aInputManager.ACTION_BACK):
+			_close_status_details()
+			get_viewport().set_input_as_handled()
+			return
+		elif event.is_action_pressed(aInputManager.ACTION_ACCEPT):
+			_close_status_details()
+			get_viewport().set_input_as_handled()
+			return
+		# Block ALL other input when status details are open
+		get_viewport().set_input_as_handled()
+		return
+
 	# If status picker is open, handle controller navigation
 	if status_picker_panel != null and not status_picker_buttons.is_empty():
 		if event.is_action_pressed(aInputManager.ACTION_MOVE_UP):
@@ -347,17 +369,6 @@ func _input(event: InputEvent) -> void:
 			return
 		elif event.is_action_pressed(aInputManager.ACTION_BACK):
 			_close_status_picker()
-			get_viewport().set_input_as_handled()
-			return
-
-	# If status details popup is open, handle B button to close
-	if status_details_popup != null:
-		if event.is_action_pressed(aInputManager.ACTION_BACK):
-			_close_status_details()
-			get_viewport().set_input_as_handled()
-			return
-		elif event.is_action_pressed(aInputManager.ACTION_ACCEPT):
-			_close_status_details()
 			get_viewport().set_input_as_handled()
 			return
 
@@ -1110,6 +1121,16 @@ func _show_status_details(combatant: Dictionary) -> void:
 
 	add_child(status_details_popup)
 
+	# Pause the status picker panel while status details are open
+	if status_picker_panel:
+		# Block all input to status picker
+		status_picker_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		status_picker_panel.process_mode = Node.PROCESS_MODE_DISABLED
+		# Release focus from any buttons
+		for btn in status_picker_buttons:
+			if btn.has_focus():
+				btn.release_focus()
+
 func _format_buff_description(buff_type: String, value: float, duration: int) -> String:
 	"""Format buff/debuff into readable description"""
 	var type_name = ""
@@ -1500,9 +1521,9 @@ func _on_item_pressed() -> void:
 		print("[Battle] Item %s: use_type='%s', category='%s', count=%d" % [item_id_str, use_type, category, count])
 
 		# Include items that can be used in battle (use_type = "battle" or "both")
-		# Exclude bind items (those are for Capture button)
+		# Exclude bind items (those are for Capture button) - BIND_ items
 		# Exclude Sigils (those are equipment, not consumables)
-		if use_type in ["battle", "both"] and category != "Battle Items" and category != "Sigils":
+		if use_type in ["battle", "both"] and category != "Battle Items" and category != "Sigils" and not item_id_str.begins_with("BIND_"):
 			var desc = item_def.get("short_description", "")
 			if desc == null:
 				desc = ""
@@ -3139,6 +3160,14 @@ func _close_status_details() -> void:
 		status_details_modal.queue_free()
 		status_details_modal = null
 
+	# Resume the status picker panel
+	if status_picker_panel:
+		status_picker_panel.process_mode = Node.PROCESS_MODE_INHERIT
+		status_picker_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+		# Re-highlight the selected button
+		if selected_status_index >= 0 and selected_status_index < status_picker_buttons.size():
+			_highlight_status_button(selected_status_index)
+
 ## ═══════════════════════════════════════════════════════════════
 ## ITEM MENU
 ## ═══════════════════════════════════════════════════════════════
@@ -3560,9 +3589,9 @@ func _show_capture_menu(bind_items: Array) -> void:
 	capture_menu_buttons = []
 	selected_capture_index = 0
 
-	# Create capture menu panel
+	# Create capture menu panel (wider for 2 columns)
 	capture_menu_panel = PanelContainer.new()
-	capture_menu_panel.custom_minimum_size = Vector2(400, 0)
+	capture_menu_panel.custom_minimum_size = Vector2(800, 0)
 
 	# Style the panel
 	var style = StyleBoxFlat.new()
@@ -3589,18 +3618,22 @@ func _show_capture_menu(bind_items: Array) -> void:
 	var sep1 = HSeparator.new()
 	vbox.add_child(sep1)
 
-	# Create scroll container for bind items (show max 5 items at a time)
+	# Create scroll container for bind items (2 columns, show max 3 rows at a time)
 	var scroll = ScrollContainer.new()
-	scroll.custom_minimum_size = Vector2(380, min(bind_items.size(), 5) * 55)  # 55px per item (50px button + 5px spacing)
+	var rows_to_show = min(ceili(bind_items.size() / 2.0), 3)  # Show up to 3 rows (6 items)
+	scroll.custom_minimum_size = Vector2(780, rows_to_show * 55)  # 55px per row (50px button + 5px spacing)
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 	vbox.add_child(scroll)
 
-	# Create VBox for scrollable bind item buttons
-	var items_vbox = VBoxContainer.new()
-	scroll.add_child(items_vbox)
+	# Create GridContainer for scrollable bind item buttons (2 columns)
+	var items_grid = GridContainer.new()
+	items_grid.columns = 2
+	items_grid.add_theme_constant_override("h_separation", 10)
+	items_grid.add_theme_constant_override("v_separation", 5)
+	scroll.add_child(items_grid)
 
-	# Add bind item buttons
+	# Add bind item buttons (2 columns)
 	for i in range(bind_items.size()):
 		var bind_data = bind_items[i]
 		var bind_name = str(bind_data.get("name", "Unknown"))
@@ -3610,9 +3643,9 @@ func _show_capture_menu(bind_items: Array) -> void:
 
 		var button = Button.new()
 		button.text = "%s (x%d) [+%d%%]\n%s" % [bind_name, bind_count, capture_mod, bind_desc]
-		button.custom_minimum_size = Vector2(360, 50)  # Slightly smaller to account for scrollbar
+		button.custom_minimum_size = Vector2(375, 50)  # Width for 2 columns (780 - 10 spacing) / 2
 		button.pressed.connect(_on_bind_selected.bind(bind_data))
-		items_vbox.add_child(button)
+		items_grid.add_child(button)
 
 		# Add to navigation list
 		capture_menu_buttons.append(button)
@@ -3623,14 +3656,14 @@ func _show_capture_menu(bind_items: Array) -> void:
 
 	var cancel_btn = Button.new()
 	cancel_btn.text = "Cancel"
-	cancel_btn.custom_minimum_size = Vector2(380, 40)
+	cancel_btn.custom_minimum_size = Vector2(780, 40)
 	cancel_btn.pressed.connect(_close_capture_menu)
 	vbox.add_child(cancel_btn)
 
 	# Add to scene and center
 	add_child(capture_menu_panel)
 	capture_menu_panel.position = Vector2(
-		(get_viewport_rect().size.x - 400) / 2,
+		(get_viewport_rect().size.x - 800) / 2,
 		(get_viewport_rect().size.y - vbox.size.y) / 2
 	)
 
@@ -3649,22 +3682,55 @@ func _close_capture_menu() -> void:
 	# Show action menu again
 	action_menu.visible = true
 
-func _navigate_capture_menu(direction: int) -> void:
-	"""Navigate capture menu with controller (direction: -1 for up, 1 for down)"""
+func _navigate_capture_menu_vertical(direction: int) -> void:
+	"""Navigate capture menu vertically (direction: -2 for up, 2 for down in 2-column grid)"""
 	if capture_menu_buttons.is_empty():
 		return
 
 	# Remove highlight from current button
 	_unhighlight_capture_button(selected_capture_index)
 
-	# Move selection
-	selected_capture_index += direction
+	# Move selection vertically
+	var new_index = selected_capture_index + direction
 
-	# Wrap around
-	if selected_capture_index < 0:
-		selected_capture_index = capture_menu_buttons.size() - 1
-	elif selected_capture_index >= capture_menu_buttons.size():
-		selected_capture_index = 0
+	# Wrap around vertically
+	if new_index < 0:
+		# If going up from top row, wrap to bottom
+		# Find last item in same column
+		var column = selected_capture_index % 2
+		var last_row = (capture_menu_buttons.size() - 1) / 2
+		new_index = last_row * 2 + column
+		# Make sure it doesn't exceed array size
+		if new_index >= capture_menu_buttons.size():
+			new_index = capture_menu_buttons.size() - 1
+	elif new_index >= capture_menu_buttons.size():
+		# If going down from bottom row, wrap to top
+		var column = selected_capture_index % 2
+		new_index = column
+
+	selected_capture_index = new_index
+
+	# Highlight new button
+	_highlight_capture_button(selected_capture_index)
+
+func _navigate_capture_menu_horizontal(direction: int) -> void:
+	"""Navigate capture menu horizontally (direction: -1 for left, 1 for right in 2-column grid)"""
+	if capture_menu_buttons.is_empty():
+		return
+
+	# Remove highlight from current button
+	_unhighlight_capture_button(selected_capture_index)
+
+	# Move selection horizontally
+	var new_index = selected_capture_index + direction
+
+	# Wrap around horizontally
+	if new_index < 0:
+		new_index = capture_menu_buttons.size() - 1
+	elif new_index >= capture_menu_buttons.size():
+		new_index = 0
+
+	selected_capture_index = new_index
 
 	# Highlight new button
 	_highlight_capture_button(selected_capture_index)

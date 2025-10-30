@@ -100,7 +100,7 @@ const GAME_MENU_SCENE  := "res://scenes/main_menu/GameMenu.tscn"
 const PHONE_MENU_SCENE := "res://scenes/ui/phone/PhoneMenu.tscn"
 
 # ---- Input actions ----
-const INPUT_MENU_ACTION  := "ui_menu"
+const INPUT_MENU_ACTION  := "menu"  # Start button (matches aInputManager.ACTION_MENU)
 const INPUT_PHONE_ACTION := "ui_phone"
 
 # ---- Data paths ----
