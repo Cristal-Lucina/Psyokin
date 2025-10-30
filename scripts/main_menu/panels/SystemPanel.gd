@@ -60,6 +60,12 @@ func _open_overlay(scene_path: String) -> void:
 		push_error("[SystemPanel] Failed to instantiate scene")
 		return
 
+	print("[SystemPanel] Instantiated node type: ", inst.get_class())
+	print("[SystemPanel] Node name: ", inst.name)
+	print("[SystemPanel] Has script: ", inst.get_script() != null)
+	if inst.get_script():
+		print("[SystemPanel] Script path: ", inst.get_script().resource_path)
+
 	# Find the GameMenu to add the overlay on top of it
 	var game_menu := get_tree().current_scene.find_child("GameMenu", true, false)
 	var parent: Node = null
@@ -80,6 +86,9 @@ func _open_overlay(scene_path: String) -> void:
 	print("[SystemPanel] Adding overlay to parent: %s" % parent.name)
 	parent.add_child(inst)
 
+	print("[SystemPanel] Added to tree, is_inside_tree: ", inst.is_inside_tree())
+	print("[SystemPanel] Node ready status: ", inst.is_node_ready())
+
 	if inst is Control:
 		var c := inst as Control
 		# Don't use top_level - it breaks the coordinate system
@@ -88,5 +97,21 @@ func _open_overlay(scene_path: String) -> void:
 		c.mouse_filter = Control.MOUSE_FILTER_STOP
 		c.show()  # Ensure it's visible
 		print("[SystemPanel] Configured overlay: z_index=3000, visible=true, mouse_filter=STOP")
+		print("[SystemPanel] Overlay visible: ", c.visible)
+		print("[SystemPanel] Overlay position: ", c.position)
+		print("[SystemPanel] Overlay size: ", c.size)
+		print("[SystemPanel] Overlay global_position: ", c.global_position)
+
+		# Print tree structure
+		print("[SystemPanel] Overlay children count: ", c.get_child_count())
+		_print_node_tree(c, 0)
 
 	print("[SystemPanel] Overlay opened successfully!")
+
+func _print_node_tree(node: Node, indent: int) -> void:
+	var prefix = ""
+	for i in range(indent):
+		prefix += "  "
+	print("%s- %s (%s) visible=%s" % [prefix, node.name, node.get_class(), node.visible if node is Control else "N/A"])
+	for child in node.get_children():
+		_print_node_tree(child, indent + 1)
