@@ -41,6 +41,8 @@ var capture_menu_panel: PanelContainer = null  # Capture selection menu
 var capture_menu_buttons: Array = []  # Buttons in capture menu for controller navigation
 var selected_capture_index: int = 0  # Currently selected capture item in menu
 var burst_menu_panel: PanelContainer = null  # Burst selection menu
+var burst_menu_buttons: Array = []  # Buttons in burst menu for controller navigation
+var selected_burst_index: int = 0  # Currently selected burst ability in menu
 var current_skill_menu: Array = []  # Current skills in menu
 var selected_item: Dictionary = {}  # Selected item data
 var selected_burst: Dictionary = {}  # Selected burst ability data
@@ -217,6 +219,21 @@ func _input(event: InputEvent) -> void:
 			return
 		elif event.is_action_pressed(aInputManager.ACTION_ACCEPT):
 			_confirm_capture_selection()
+			get_viewport().set_input_as_handled()
+			return
+
+	# If burst menu is open, handle controller navigation
+	if burst_menu_panel != null and not burst_menu_buttons.is_empty():
+		if event.is_action_pressed(aInputManager.ACTION_MOVE_UP):
+			_navigate_burst_menu(-1)
+			get_viewport().set_input_as_handled()
+			return
+		elif event.is_action_pressed(aInputManager.ACTION_MOVE_DOWN):
+			_navigate_burst_menu(1)
+			get_viewport().set_input_as_handled()
+			return
+		elif event.is_action_pressed(aInputManager.ACTION_ACCEPT):
+			_confirm_burst_selection()
 			get_viewport().set_input_as_handled()
 			return
 
@@ -3238,6 +3255,10 @@ func _show_burst_menu(burst_abilities: Array) -> void:
 	# Hide action menu
 	action_menu.visible = false
 
+	# Reset navigation
+	burst_menu_buttons = []
+	selected_burst_index = 0
+
 	# Debug: print burst abilities
 	print("[Battle] Showing burst menu with %d abilities" % burst_abilities.size())
 	for i in range(burst_abilities.size()):
@@ -3337,6 +3358,8 @@ func _show_burst_menu(burst_abilities: Array) -> void:
 			button.text += "\n[Not enough Burst Gauge]"
 		else:
 			button.pressed.connect(_on_burst_selected.bind(burst_data))
+			# Only add enabled buttons to navigation list
+			burst_menu_buttons.append(button)
 
 		vbox.add_child(button)
 
@@ -3357,14 +3380,59 @@ func _show_burst_menu(burst_abilities: Array) -> void:
 		100
 	)
 
+	# Highlight first burst if available
+	if not burst_menu_buttons.is_empty():
+		_highlight_burst_button(0)
+
 func _close_burst_menu() -> void:
 	"""Close the burst menu"""
 	if burst_menu_panel:
 		burst_menu_panel.queue_free()
 		burst_menu_panel = null
+	burst_menu_buttons = []
+	selected_burst_index = 0
 
 	# Show action menu again
 	action_menu.visible = true
+
+func _navigate_burst_menu(direction: int) -> void:
+	"""Navigate burst menu with controller (direction: -1 for up, 1 for down)"""
+	if burst_menu_buttons.is_empty():
+		return
+
+	# Remove highlight from current button
+	_unhighlight_burst_button(selected_burst_index)
+
+	# Move selection
+	selected_burst_index += direction
+
+	# Wrap around
+	if selected_burst_index < 0:
+		selected_burst_index = burst_menu_buttons.size() - 1
+	elif selected_burst_index >= burst_menu_buttons.size():
+		selected_burst_index = 0
+
+	# Highlight new button
+	_highlight_burst_button(selected_burst_index)
+
+func _confirm_burst_selection() -> void:
+	"""Confirm burst ability selection with A button"""
+	if selected_burst_index >= 0 and selected_burst_index < burst_menu_buttons.size():
+		var button = burst_menu_buttons[selected_burst_index]
+		# Trigger the button press
+		button.emit_signal("pressed")
+
+func _highlight_burst_button(index: int) -> void:
+	"""Highlight a burst button for controller navigation"""
+	if index >= 0 and index < burst_menu_buttons.size():
+		var button = burst_menu_buttons[index]
+		button.modulate = Color(1.2, 1.2, 0.8, 1.0)  # Yellowish tint
+
+func _unhighlight_burst_button(index: int) -> void:
+	"""Remove highlight from a burst button"""
+	if index >= 0 and index < burst_menu_buttons.size():
+		var button = burst_menu_buttons[index]
+		button.modulate = Color(1.0, 1.0, 1.0, 1.0)  # Normal color
 
 func _on_burst_selected(burst_data: Dictionary) -> void:
 	"""Handle burst ability selection"""
