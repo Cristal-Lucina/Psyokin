@@ -79,32 +79,32 @@ func _build_controls_ui() -> void:
 	# Grid header
 	var header_grid = GridContainer.new()
 	header_grid.columns = 3
-	header_grid.add_theme_constant_override("h_separation", 20)
+	header_grid.add_theme_constant_override("h_separation", 30)
 	main_vbox.add_child(header_grid)
 
 	var header_action = Label.new()
 	header_action.text = "Action"
-	header_action.add_theme_font_size_override("font_size", 16)
-	header_action.custom_minimum_size.x = 180
+	header_action.add_theme_font_size_override("font_size", 14)
+	header_action.custom_minimum_size.x = 200
 	header_grid.add_child(header_action)
 
 	var header_keyboard = Label.new()
 	header_keyboard.text = "Keyboard"
-	header_keyboard.add_theme_font_size_override("font_size", 16)
-	header_keyboard.custom_minimum_size.x = 180
+	header_keyboard.add_theme_font_size_override("font_size", 14)
+	header_keyboard.custom_minimum_size.x = 200
 	header_grid.add_child(header_keyboard)
 
 	var header_controller = Label.new()
 	header_controller.text = "Controller"
-	header_controller.add_theme_font_size_override("font_size", 16)
-	header_controller.custom_minimum_size.x = 180
+	header_controller.add_theme_font_size_override("font_size", 14)
+	header_controller.custom_minimum_size.x = 200
 	header_grid.add_child(header_controller)
 
 	# Controls grid
 	var grid = GridContainer.new()
 	grid.columns = 3
-	grid.add_theme_constant_override("h_separation", 20)
-	grid.add_theme_constant_override("v_separation", 8)
+	grid.add_theme_constant_override("h_separation", 30)
+	grid.add_theme_constant_override("v_separation", 5)
 	main_vbox.add_child(grid)
 
 	# Action definitions - Overworld
@@ -135,8 +135,8 @@ func _build_controls_ui() -> void:
 
 	# Overworld section header
 	var overworld_header = Label.new()
-	overworld_header.text = "OVERWORLD CONTROLS"
-	overworld_header.add_theme_font_size_override("font_size", 18)
+	overworld_header.text = "━━━ OVERWORLD ━━━"
+	overworld_header.add_theme_font_size_override("font_size", 16)
 	overworld_header.add_theme_color_override("font_color", Color(1.0, 0.8, 0.3))
 	var overworld_center = CenterContainer.new()
 	overworld_center.add_child(overworld_header)
@@ -144,7 +144,7 @@ func _build_controls_ui() -> void:
 
 	# Spacer
 	var spacer_ow = Control.new()
-	spacer_ow.custom_minimum_size = Vector2(0, 10)
+	spacer_ow.custom_minimum_size = Vector2(0, 5)
 	main_vbox.add_child(spacer_ow)
 
 	# Create overworld controls
@@ -155,20 +155,21 @@ func _build_controls_ui() -> void:
 		# Action label
 		var label = Label.new()
 		label.text = display_name
-		label.custom_minimum_size.x = 180
+		label.custom_minimum_size.x = 200
+		label.add_theme_font_size_override("font_size", 13)
 		grid.add_child(label)
 
 		# Keyboard binding button
 		var kb_btn = Button.new()
 		kb_btn.text = _get_keyboard_binding_text(action_name)
-		kb_btn.custom_minimum_size = Vector2(180, 30)
+		kb_btn.custom_minimum_size = Vector2(200, 28)
 		kb_btn.pressed.connect(_on_remap_pressed.bind(action_name, kb_btn, false))
 		grid.add_child(kb_btn)
 
 		# Controller binding button
 		var ctrl_btn = Button.new()
 		ctrl_btn.text = _get_controller_binding_text(action_name)
-		ctrl_btn.custom_minimum_size = Vector2(180, 30)
+		ctrl_btn.custom_minimum_size = Vector2(200, 28)
 		ctrl_btn.pressed.connect(_on_remap_pressed.bind(action_name, ctrl_btn, true))
 		grid.add_child(ctrl_btn)
 
@@ -176,13 +177,13 @@ func _build_controls_ui() -> void:
 
 	# Battle section spacer
 	var spacer_battle_top = Control.new()
-	spacer_battle_top.custom_minimum_size = Vector2(0, 20)
+	spacer_battle_top.custom_minimum_size = Vector2(0, 15)
 	main_vbox.add_child(spacer_battle_top)
 
 	# Battle section header
 	var battle_header = Label.new()
-	battle_header.text = "BATTLE CONTROLS"
-	battle_header.add_theme_font_size_override("font_size", 18)
+	battle_header.text = "━━━ BATTLE ━━━"
+	battle_header.add_theme_font_size_override("font_size", 16)
 	battle_header.add_theme_color_override("font_color", Color(1.0, 0.3, 0.3))
 	var battle_center = CenterContainer.new()
 	battle_center.add_child(battle_header)
@@ -190,7 +191,7 @@ func _build_controls_ui() -> void:
 
 	# Spacer
 	var spacer_b = Control.new()
-	spacer_b.custom_minimum_size = Vector2(0, 10)
+	spacer_b.custom_minimum_size = Vector2(0, 5)
 	main_vbox.add_child(spacer_b)
 
 	# Create battle controls
@@ -201,20 +202,21 @@ func _build_controls_ui() -> void:
 		# Action label
 		var label = Label.new()
 		label.text = display_name
-		label.custom_minimum_size.x = 180
+		label.custom_minimum_size.x = 200
+		label.add_theme_font_size_override("font_size", 13)
 		grid.add_child(label)
 
 		# Keyboard binding button
 		var kb_btn = Button.new()
 		kb_btn.text = _get_keyboard_binding_text(action_name)
-		kb_btn.custom_minimum_size = Vector2(180, 30)
+		kb_btn.custom_minimum_size = Vector2(200, 28)
 		kb_btn.pressed.connect(_on_remap_pressed.bind(action_name, kb_btn, false))
 		grid.add_child(kb_btn)
 
 		# Controller binding button
 		var ctrl_btn = Button.new()
 		ctrl_btn.text = _get_controller_binding_text(action_name)
-		ctrl_btn.custom_minimum_size = Vector2(180, 30)
+		ctrl_btn.custom_minimum_size = Vector2(200, 28)
 		ctrl_btn.pressed.connect(_on_remap_pressed.bind(action_name, ctrl_btn, true))
 		grid.add_child(ctrl_btn)
 
@@ -222,7 +224,7 @@ func _build_controls_ui() -> void:
 
 	# Spacer
 	var spacer3 = Control.new()
-	spacer3.custom_minimum_size = Vector2(0, 20)
+	spacer3.custom_minimum_size = Vector2(0, 15)
 	main_vbox.add_child(spacer3)
 
 	# Reset button
@@ -232,22 +234,23 @@ func _build_controls_ui() -> void:
 
 	var reset_btn = Button.new()
 	reset_btn.text = "Reset to Defaults"
-	reset_btn.custom_minimum_size = Vector2(200, 40)
+	reset_btn.custom_minimum_size = Vector2(180, 35)
 	reset_btn.pressed.connect(_on_reset_pressed)
 	reset_hbox.add_child(reset_btn)
 
 	# Spacer
 	var spacer4 = Control.new()
-	spacer4.custom_minimum_size = Vector2(0, 10)
+	spacer4.custom_minimum_size = Vector2(0, 5)
 	main_vbox.add_child(spacer4)
 
 	# Info text
 	var info_label = Label.new()
-	info_label.text = "Click any button to remap. Press ESC to cancel remapping."
+	info_label.text = "Click any button to remap • Press ESC to cancel"
 	info_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	info_label.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))
+	info_label.add_theme_color_override("font_color", Color(0.6, 0.6, 0.6))
+	info_label.add_theme_font_size_override("font_size", 12)
 	info_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	info_label.custom_minimum_size.x = 540
+	info_label.custom_minimum_size.x = 600
 	var info_center = CenterContainer.new()
 	info_center.add_child(info_label)
 	main_vbox.add_child(info_center)
