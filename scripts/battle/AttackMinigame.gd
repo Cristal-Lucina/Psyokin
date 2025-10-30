@@ -376,7 +376,7 @@ func _process_charging(delta: float) -> void:
 		return
 
 	# Increase charge while button is held
-	if aInputManager.is_action_pressed(aInputManager.ACTION_JUMP):
+	if aInputManager.is_action_pressed(aInputManager.ACTION_ACCEPT):
 		# Always charge, regardless of visibility
 		charge_progress += delta * charge_speed
 		charge_progress = min(charge_progress, 1.2)  # Cap at 1.2 (past blue, into red)
@@ -387,8 +387,13 @@ func _process_charging(delta: float) -> void:
 		# Determine current zone based on visibility
 		charge_zone = _get_charge_zone(charge_progress, weak_spot_is_visible)
 		_update_charge_visuals(charge_zone)
+
+		# DEBUG: Show charge progress while holding
+		if int(charge_progress * 100) % 10 == 0:  # Print every 10%
+			print("[AttackMinigame DEBUG] Charging: %.2f" % charge_progress)
 	else:
 		# Released!
+		print("[AttackMinigame DEBUG] Button released in charging, firing at: %.2f" % charge_progress)
 		_release_attack()
 
 func _get_charge_zone(progress: float, is_weak_spot_visible: bool) -> String:
