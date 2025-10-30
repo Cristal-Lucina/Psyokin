@@ -371,13 +371,8 @@ func _input(event: InputEvent) -> void:
 	elif event.is_action_pressed(aInputManager.ACTION_ACCEPT):
 		if selected_button_index >= 0 and selected_button_index < navigable_buttons.size():
 			var button = navigable_buttons[selected_button_index]
-			# Simulate a button click by calling emit_signal instead of pressed.emit()
-			if button.pressed.get_connections().size() > 0:
-				# Get the first connected callable and call it
-				var connections = button.pressed.get_connections()
-				if connections.size() > 0:
-					var callable = connections[0]["callable"]
-					callable.call()
+			# Trigger the button's pressed signal by emitting it
+			button.emit_signal("pressed")
 			get_viewport().set_input_as_handled()
 
 func _navigate_menu(direction: int) -> void:
