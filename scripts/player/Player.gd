@@ -337,17 +337,12 @@ func _handle_movement(_delta: float) -> void:
 	# Determine movement state based on modifier keys first
 	var speed_mult: float = 1.0
 	var can_move: bool = true
-	var is_pulling: bool = aInputManager.is_action_pressed(aInputManager.ACTION_PULL)
+	var is_pulling: bool = false  # Disabled automatic push/pull to prevent interference with interactions
 
-	if is_pulling:
-		# Pull - half speed
-		_current_state = MovementState.PULL
-		speed_mult = PUSH_PULL_SPEED_MULT
-	elif aInputManager.is_action_pressed(aInputManager.ACTION_PUSH):
-		# Push - half speed
-		_current_state = MovementState.PUSH
-		speed_mult = PUSH_PULL_SPEED_MULT
-	elif aInputManager.is_action_pressed(aInputManager.ACTION_RUN):
+	# Note: Push/pull animations disabled to prevent conflict with ACTION_ACCEPT (A button)
+	# They can be re-enabled with context-sensitive logic when near pushable/pullable objects
+
+	if aInputManager.is_action_pressed(aInputManager.ACTION_RUN):
 		# Run - increased speed
 		if input_vector.length() > 0:
 			_current_state = MovementState.RUN
