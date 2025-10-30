@@ -32,6 +32,7 @@ var _current_tab: String = ""
 # --- Controller navigation ---
 var _tab_buttons: Array[Button] = []
 var _selected_tab_index: int = 0
+var _panel_has_focus: bool = false  # true when navigating inside a panel, false when navigating tabs
 
 # --- Dorm hooks ---
 var _ds: Node = null
@@ -59,7 +60,15 @@ func _input(event: InputEvent) -> void:
 	if not visible:
 		return
 
-	# Handle controller navigation
+	# If panel has focus, only handle B to return to tab navigation
+	if _panel_has_focus:
+		if event.is_action_pressed(aInputManager.ACTION_BACK):
+			_exit_panel_focus()
+			get_viewport().set_input_as_handled()
+		# Let panel handle all other input
+		return
+
+	# Tab navigation mode
 	if event.is_action_pressed(aInputManager.ACTION_MOVE_UP):
 		_navigate_tabs(-1)
 		get_viewport().set_input_as_handled()
@@ -67,7 +76,7 @@ func _input(event: InputEvent) -> void:
 		_navigate_tabs(1)
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed(aInputManager.ACTION_ACCEPT):
-		_confirm_tab_selection()
+		_enter_panel_focus()
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed(aInputManager.ACTION_BACK):
 		_close_menu()
@@ -217,8 +226,13 @@ func _navigate_tabs(direction: int) -> void:
 	elif _selected_tab_index >= _tab_buttons.size():
 		_selected_tab_index = 0
 
-	# Highlight new selection
+	# Highlight new selection and switch to that tab immediately
 	_highlight_tab(_selected_tab_index)
+
+	# Auto-switch to the highlighted tab
+	var button = _tab_buttons[_selected_tab_index]
+	button.button_pressed = true
+	_on_tab_pressed(button)
 
 func _confirm_tab_selection() -> void:
 	"""Confirm the currently highlighted tab"""
@@ -251,3 +265,23 @@ func _unhighlight_tab(index: int) -> void:
 	if index >= 0 and index < _tab_buttons.size():
 		var button = _tab_buttons[index]
 		button.modulate = Color(1.0, 1.0, 1.0, 1.0)  # Normal color
+
+func _enter_panel_focus() -> void:
+	"""Enter panel focus mode - give focus to the current panel"""
+	_panel_has_focus = true
+	_unhighlight_tab(_selected_tab_index)
+
+	# Call panel_gained_focus on the current panel if it has the method
+	var panel = _panels.get(_current_tab)
+	if panel and panel.has_method("panel_gained_focus"):
+		panel.call("panel_gained_focus")
+
+func _exit_panel_focus() -> void:
+	"""Exit panel focus mode - return to tab navigation"""
+	# Call panel_lost_focus on the current panel if it has the method
+	var panel = _panels.get(_current_tab)
+	if panel and panel.has_method("panel_lost_focus"):
+		panel.call("panel_lost_focus")
+
+	_panel_has_focus = false
+	_highlight_tab(_selected_tab_index)
