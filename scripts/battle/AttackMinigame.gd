@@ -233,6 +233,10 @@ func _process_watching(delta: float) -> void:
 	# Handle movement input (WASD or analog stick)
 	var move_dir = aInputManager.get_movement_vector()
 
+	# DEBUG: Check if input is being received
+	if move_dir.length() > 0:
+		print("[AttackMinigame DEBUG] Move vector: ", move_dir)
+
 	if move_dir.length() > 0:
 		if not has_started:
 			has_started = true
