@@ -2028,6 +2028,16 @@ func _on_run_pressed() -> void:
 
 	log_message("%s attempts to escape... (%d%% base chance)" % [current_combatant.display_name, int(run_chance)])
 
+func _on_status_pressed() -> void:
+	"""Handle Status action - view party/enemy information"""
+	# Block input during round transitions
+	if is_in_round_transition:
+		return
+
+	# TODO: Implement status screen showing party and enemy details
+	log_message("Status screen not yet implemented!")
+	print("[Battle] Status button pressed - feature not yet implemented")
+
 	# ═══════ RUN MINIGAME ═══════
 	# Calculate tempo difference (party TPO - enemy TPO)
 	var party_tpo = current_combatant.stats.get("TPO", 1)
