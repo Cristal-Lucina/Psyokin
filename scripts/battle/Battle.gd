@@ -339,6 +339,20 @@ func _input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 			return
 
+	# If status details popup is open, handle B button to close (PRIORITY CHECK - must come before status picker)
+	if status_details_popup != null:
+		if event.is_action_pressed(aInputManager.ACTION_BACK):
+			_close_status_details()
+			get_viewport().set_input_as_handled()
+			return
+		elif event.is_action_pressed(aInputManager.ACTION_ACCEPT):
+			_close_status_details()
+			get_viewport().set_input_as_handled()
+			return
+		# Block ALL other input when status details are open
+		get_viewport().set_input_as_handled()
+		return
+
 	# If status picker is open, handle controller navigation
 	if status_picker_panel != null and not status_picker_buttons.is_empty():
 		if event.is_action_pressed(aInputManager.ACTION_MOVE_UP):
@@ -355,17 +369,6 @@ func _input(event: InputEvent) -> void:
 			return
 		elif event.is_action_pressed(aInputManager.ACTION_BACK):
 			_close_status_picker()
-			get_viewport().set_input_as_handled()
-			return
-
-	# If status details popup is open, handle B button to close
-	if status_details_popup != null:
-		if event.is_action_pressed(aInputManager.ACTION_BACK):
-			_close_status_details()
-			get_viewport().set_input_as_handled()
-			return
-		elif event.is_action_pressed(aInputManager.ACTION_ACCEPT):
-			_close_status_details()
 			get_viewport().set_input_as_handled()
 			return
 
