@@ -406,9 +406,16 @@ func _setup_controller_navigation() -> void:
 	print("[Options] Navigation setup complete. ", _action_data.size(), " actions")
 
 func _process(delta: float) -> void:
-	"""Handle input cooldown"""
+	"""Handle input cooldown and right stick scrolling"""
 	if _input_cooldown > 0:
 		_input_cooldown -= delta
+
+	# Right stick controls scroll wheel
+	if _scroll_container:
+		var right_stick_y = Input.get_joy_axis(0, JOY_AXIS_RIGHT_Y)
+		if abs(right_stick_y) > 0.2:  # Deadzone
+			var scroll_speed = 500.0  # Pixels per second
+			_scroll_container.scroll_vertical += int(right_stick_y * scroll_speed * delta)
 
 func _input(event: InputEvent) -> void:
 	# Handle controller navigation and actions when not remapping

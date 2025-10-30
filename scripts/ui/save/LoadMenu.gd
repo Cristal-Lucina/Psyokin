@@ -48,9 +48,16 @@ func _ready() -> void:
 	_rebuild()
 
 func _process(delta: float) -> void:
-	"""Handle input cooldown"""
+	"""Handle input cooldown and right stick scrolling"""
 	if _input_cooldown > 0:
 		_input_cooldown -= delta
+
+	# Right stick controls scroll wheel
+	if _scroll:
+		var right_stick_y = Input.get_joy_axis(0, JOY_AXIS_RIGHT_Y)
+		if abs(right_stick_y) > 0.2:  # Deadzone
+			var scroll_speed = 500.0  # Pixels per second
+			_scroll.scroll_vertical += int(right_stick_y * scroll_speed * delta)
 
 func _input(e: InputEvent) -> void:
 	# Back button closes menu
