@@ -29,6 +29,10 @@ const ACTION_BATTLE_RUN = "battle_run"  # R bumper
 const ACTION_ITEMS = "battle_items"     # Start button
 const ACTION_STATUS = "battle_status"   # Select button
 
+# Menu actions
+const ACTION_ACCEPT = "menu_accept"  # A button
+const ACTION_BACK = "menu_back"      # B button
+
 # Legacy action names (for compatibility)
 const ACTION_PULL = "action"  # Now maps to ACTION_ACTION
 const ACTION_PUSH = "action"  # Now maps to ACTION_ACTION
@@ -78,6 +82,10 @@ func _ensure_input_actions() -> void:
 		ACTION_BATTLE_RUN: [KEY_F, JOY_BUTTON_RIGHT_SHOULDER], # R bumper
 		ACTION_ITEMS: [KEY_I, JOY_BUTTON_START],           # Start button
 		ACTION_STATUS: [KEY_TAB, JOY_BUTTON_BACK],         # Select/Back button
+
+		# Menus
+		ACTION_ACCEPT: [KEY_ENTER, KEY_SPACE, JOY_BUTTON_A],
+		ACTION_BACK: [KEY_ESCAPE, JOY_BUTTON_B],
 	}
 
 	for action_name in actions:
@@ -210,7 +218,8 @@ func save_input_mapping() -> Dictionary:
 		ACTION_MOVE_UP, ACTION_MOVE_DOWN, ACTION_MOVE_LEFT, ACTION_MOVE_RIGHT,
 		ACTION_ACTION, ACTION_JUMP, ACTION_RUN, ACTION_PHONE, ACTION_MENU, ACTION_SAVE,
 		ACTION_ATTACK, ACTION_SKILL, ACTION_CAPTURE, ACTION_DEFEND,
-		ACTION_BURST, ACTION_BATTLE_RUN, ACTION_ITEMS, ACTION_STATUS
+		ACTION_BURST, ACTION_BATTLE_RUN, ACTION_ITEMS, ACTION_STATUS,
+		ACTION_ACCEPT, ACTION_BACK
 	]
 
 	for action in actions:
