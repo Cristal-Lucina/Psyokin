@@ -145,6 +145,7 @@ func _on_overlay_closed() -> void:
 	"""Resume title screen when overlay closes."""
 	print("[Title] Overlay closed, resuming title screen")
 	process_mode = Node.PROCESS_MODE_INHERIT
+	mouse_filter = Control.MOUSE_FILTER_STOP
 
 # ------------------------------------------------------------------------------
 # Overlay helper
@@ -158,13 +159,23 @@ func _open_popup_overlay(scene_path: String) -> void:
 
 	print("[Title] Opening overlay: ", scene_path)
 
-	# Completely freeze title screen by disabling processing
+	# Completely block all Title input - this is the KEY fix!
+	# IGNORE blocks ALL mouse events from reaching Title and its children
+	mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	# Release focus from any Title button so controller input doesn't reach them
+	for btn in navigable_buttons:
+		if btn.has_focus():
+			btn.release_focus()
+
+	# Disable processing (stops _process, _input, etc)
 	process_mode = Node.PROCESS_MODE_DISABLED
 
 	var ps: PackedScene = load(scene_path) as PackedScene
 	if ps == null:
 		push_error("[Title] Could not load scene: %s" % scene_path)
 		process_mode = Node.PROCESS_MODE_INHERIT  # Resume on error
+		mouse_filter = Control.MOUSE_FILTER_STOP  # Restore mouse filter
 		return
 
 	var inst: Node = ps.instantiate()
