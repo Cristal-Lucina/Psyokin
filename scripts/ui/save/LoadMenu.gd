@@ -10,11 +10,14 @@ const TITLE_SCENE: String = "res://scenes/main_menu/Title.tscn"
 @onready var _btn_close : Button          = get_node("Center/Window/Root/Header/CloseBtn") as Button
 @onready var _hint      : Label           = get_node("Center/Window/Root/Hint") as Label
 @onready var _scroll    : ScrollContainer = get_node("Center/Window/Root/Scroll") as ScrollContainer
+@onready var _backdrop  : ColorRect       = $Backdrop
 
 var _slots : VBoxContainer = null
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
+	if _backdrop:
+		_backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
 
 	_slots = _scroll.get_node_or_null("Slots") as VBoxContainer
 	if _slots == null:

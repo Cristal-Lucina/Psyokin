@@ -5,6 +5,7 @@ extends Control
 
 @onready var _close_btn: Button = %CloseBtn
 @onready var _controls_panel: Control = %ControlsContent
+@onready var _background: ColorRect = $Background
 
 # Remapping state
 var _action_buttons: Array[Array] = []  # Array of [keyboard_button, controller_button]
@@ -19,6 +20,8 @@ func _ready() -> void:
 
 	# Block all input from reaching the title screen behind this menu
 	mouse_filter = Control.MOUSE_FILTER_STOP
+	if _background:
+		_background.mouse_filter = Control.MOUSE_FILTER_STOP
 
 	if _close_btn:
 		_close_btn.pressed.connect(_on_close_pressed)
