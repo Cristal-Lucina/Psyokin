@@ -37,7 +37,7 @@ func _ready() -> void:
 	_rebuild()
 
 func _unhandled_input(e: InputEvent) -> void:
-	if e.is_action_pressed("ui_cancel"):
+	if e.is_action_pressed("ui_cancel") or e.is_action_pressed("menu_back"):
 		_on_close()
 		get_viewport().set_input_as_handled()
 

@@ -17,6 +17,9 @@ func _ready() -> void:
 	print("[Options] Close button: ", _close_btn)
 	print("[Options] Controls panel: ", _controls_panel)
 
+	# Block all input from reaching the title screen behind this menu
+	mouse_filter = Control.MOUSE_FILTER_STOP
+
 	if _close_btn:
 		_close_btn.pressed.connect(_on_close_pressed)
 		print("[Options] Close button connected")
@@ -405,7 +408,12 @@ func _get_current_binding_text(action_name: String, is_controller: bool) -> Stri
 		return _get_keyboard_binding_text(action_name)
 
 func _input(event: InputEvent) -> void:
+	# Handle back button to close options menu (when not remapping)
 	if _waiting_for_input == null:
+		if event.is_action_pressed("menu_back") or (event is InputEventKey and event.keycode == KEY_ESCAPE and event.pressed):
+			_on_close_pressed()
+			get_viewport().set_input_as_handled()
+			return
 		return
 
 	# Allow ESC to cancel remapping
