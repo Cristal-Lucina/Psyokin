@@ -7,27 +7,40 @@ extends Control
 @onready var _controls_panel: Control = %ControlsContent
 
 func _ready() -> void:
-	_close_btn.pressed.connect(_on_close_pressed)
+	print("[Options] _ready() called")
+	print("[Options] Close button: ", _close_btn)
+	print("[Options] Controls panel: ", _controls_panel)
 
-	# Create the controls UI
-	_build_controls_ui()
+	if _close_btn:
+		_close_btn.pressed.connect(_on_close_pressed)
+		print("[Options] Close button connected")
+	else:
+		push_error("[Options] Close button not found!")
+
+	if _controls_panel:
+		# Create the controls UI
+		_build_controls_ui()
+	else:
+		push_error("[Options] Controls panel not found!")
 
 func _on_close_pressed() -> void:
 	queue_free()
 
 func _build_controls_ui() -> void:
 	"""Build the controls configuration UI"""
+	print("[Options] Building controls UI...")
+
 	# Clear existing content
 	for child in _controls_panel.get_children():
 		child.queue_free()
 
-	# Main scroll container
+	# Main scroll container - use proper container sizing, not anchors
 	var scroll = ScrollContainer.new()
-	scroll.anchor_right = 1.0
-	scroll.anchor_bottom = 1.0
+	scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
 	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_controls_panel.add_child(scroll)
+	print("[Options] Added scroll container")
 
 	var main_vbox = VBoxContainer.new()
 	main_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -144,6 +157,8 @@ func _build_controls_ui() -> void:
 	var info_center = CenterContainer.new()
 	info_center.add_child(info_label)
 	main_vbox.add_child(info_center)
+
+	print("[Options] Controls UI built successfully!")
 
 func _get_keyboard_binding_text(action_name: String) -> String:
 	"""Get keyboard binding text for an action"""
