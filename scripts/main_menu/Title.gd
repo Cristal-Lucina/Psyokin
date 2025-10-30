@@ -371,9 +371,11 @@ func _input(event: InputEvent) -> void:
 	elif event.is_action_pressed(aInputManager.ACTION_ACCEPT):
 		if selected_button_index >= 0 and selected_button_index < navigable_buttons.size():
 			var button = navigable_buttons[selected_button_index]
-			# Trigger the button's pressed signal by emitting it
-			button.emit_signal("pressed")
+			# Mark input as handled BEFORE triggering button (scene may change)
 			get_viewport().set_input_as_handled()
+			# Trigger the button's pressed signal by emitting it
+			# Note: This may destroy this node if it changes scenes, so nothing after this line will execute
+			button.emit_signal("pressed")
 
 func _navigate_menu(direction: int) -> void:
 	"""Navigate menu with controller"""
