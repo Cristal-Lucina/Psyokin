@@ -76,37 +76,6 @@ func _build_controls_ui() -> void:
 	spacer2.custom_minimum_size = Vector2(0, 20)
 	main_vbox.add_child(spacer2)
 
-	# Grid header
-	var header_grid = GridContainer.new()
-	header_grid.columns = 3
-	header_grid.add_theme_constant_override("h_separation", 30)
-	main_vbox.add_child(header_grid)
-
-	var header_action = Label.new()
-	header_action.text = "Action"
-	header_action.add_theme_font_size_override("font_size", 14)
-	header_action.custom_minimum_size.x = 200
-	header_grid.add_child(header_action)
-
-	var header_keyboard = Label.new()
-	header_keyboard.text = "Keyboard"
-	header_keyboard.add_theme_font_size_override("font_size", 14)
-	header_keyboard.custom_minimum_size.x = 200
-	header_grid.add_child(header_keyboard)
-
-	var header_controller = Label.new()
-	header_controller.text = "Controller"
-	header_controller.add_theme_font_size_override("font_size", 14)
-	header_controller.custom_minimum_size.x = 200
-	header_grid.add_child(header_controller)
-
-	# Controls grid
-	var grid = GridContainer.new()
-	grid.columns = 3
-	grid.add_theme_constant_override("h_separation", 30)
-	grid.add_theme_constant_override("v_separation", 5)
-	main_vbox.add_child(grid)
-
 	# Action definitions - Overworld
 	var overworld_actions = [
 		{"name": "move_up", "display": "Move Up"},
@@ -133,6 +102,8 @@ func _build_controls_ui() -> void:
 		{"name": "battle_status", "display": "Status (Select)"},
 	]
 
+	# ========== OVERWORLD SECTION ==========
+
 	# Overworld section header
 	var overworld_header = Label.new()
 	overworld_header.text = "━━━ OVERWORLD ━━━"
@@ -147,6 +118,37 @@ func _build_controls_ui() -> void:
 	spacer_ow.custom_minimum_size = Vector2(0, 5)
 	main_vbox.add_child(spacer_ow)
 
+	# Overworld grid header
+	var ow_header_grid = GridContainer.new()
+	ow_header_grid.columns = 3
+	ow_header_grid.add_theme_constant_override("h_separation", 30)
+	main_vbox.add_child(ow_header_grid)
+
+	var ow_header_action = Label.new()
+	ow_header_action.text = "Action"
+	ow_header_action.add_theme_font_size_override("font_size", 14)
+	ow_header_action.custom_minimum_size.x = 200
+	ow_header_grid.add_child(ow_header_action)
+
+	var ow_header_keyboard = Label.new()
+	ow_header_keyboard.text = "Keyboard"
+	ow_header_keyboard.add_theme_font_size_override("font_size", 14)
+	ow_header_keyboard.custom_minimum_size.x = 200
+	ow_header_grid.add_child(ow_header_keyboard)
+
+	var ow_header_controller = Label.new()
+	ow_header_controller.text = "Controller"
+	ow_header_controller.add_theme_font_size_override("font_size", 14)
+	ow_header_controller.custom_minimum_size.x = 200
+	ow_header_grid.add_child(ow_header_controller)
+
+	# Overworld controls grid
+	var ow_grid = GridContainer.new()
+	ow_grid.columns = 3
+	ow_grid.add_theme_constant_override("h_separation", 30)
+	ow_grid.add_theme_constant_override("v_separation", 5)
+	main_vbox.add_child(ow_grid)
+
 	# Create overworld controls
 	for action_def in overworld_actions:
 		var action_name = action_def["name"]
@@ -157,27 +159,29 @@ func _build_controls_ui() -> void:
 		label.text = display_name
 		label.custom_minimum_size.x = 200
 		label.add_theme_font_size_override("font_size", 13)
-		grid.add_child(label)
+		ow_grid.add_child(label)
 
 		# Keyboard binding button
 		var kb_btn = Button.new()
 		kb_btn.text = _get_keyboard_binding_text(action_name)
 		kb_btn.custom_minimum_size = Vector2(200, 28)
 		kb_btn.pressed.connect(_on_remap_pressed.bind(action_name, kb_btn, false))
-		grid.add_child(kb_btn)
+		ow_grid.add_child(kb_btn)
 
 		# Controller binding button
 		var ctrl_btn = Button.new()
 		ctrl_btn.text = _get_controller_binding_text(action_name)
 		ctrl_btn.custom_minimum_size = Vector2(200, 28)
 		ctrl_btn.pressed.connect(_on_remap_pressed.bind(action_name, ctrl_btn, true))
-		grid.add_child(ctrl_btn)
+		ow_grid.add_child(ctrl_btn)
 
 		_action_buttons.append([kb_btn, ctrl_btn])
 
+	# ========== BATTLE SECTION ==========
+
 	# Battle section spacer
 	var spacer_battle_top = Control.new()
-	spacer_battle_top.custom_minimum_size = Vector2(0, 15)
+	spacer_battle_top.custom_minimum_size = Vector2(0, 20)
 	main_vbox.add_child(spacer_battle_top)
 
 	# Battle section header
@@ -194,6 +198,37 @@ func _build_controls_ui() -> void:
 	spacer_b.custom_minimum_size = Vector2(0, 5)
 	main_vbox.add_child(spacer_b)
 
+	# Battle grid header
+	var battle_header_grid = GridContainer.new()
+	battle_header_grid.columns = 3
+	battle_header_grid.add_theme_constant_override("h_separation", 30)
+	main_vbox.add_child(battle_header_grid)
+
+	var battle_header_action = Label.new()
+	battle_header_action.text = "Action"
+	battle_header_action.add_theme_font_size_override("font_size", 14)
+	battle_header_action.custom_minimum_size.x = 200
+	battle_header_grid.add_child(battle_header_action)
+
+	var battle_header_keyboard = Label.new()
+	battle_header_keyboard.text = "Keyboard"
+	battle_header_keyboard.add_theme_font_size_override("font_size", 14)
+	battle_header_keyboard.custom_minimum_size.x = 200
+	battle_header_grid.add_child(battle_header_keyboard)
+
+	var battle_header_controller = Label.new()
+	battle_header_controller.text = "Controller"
+	battle_header_controller.add_theme_font_size_override("font_size", 14)
+	battle_header_controller.custom_minimum_size.x = 200
+	battle_header_grid.add_child(battle_header_controller)
+
+	# Battle controls grid
+	var battle_grid = GridContainer.new()
+	battle_grid.columns = 3
+	battle_grid.add_theme_constant_override("h_separation", 30)
+	battle_grid.add_theme_constant_override("v_separation", 5)
+	main_vbox.add_child(battle_grid)
+
 	# Create battle controls
 	for action_def in battle_actions:
 		var action_name = action_def["name"]
@@ -204,23 +239,25 @@ func _build_controls_ui() -> void:
 		label.text = display_name
 		label.custom_minimum_size.x = 200
 		label.add_theme_font_size_override("font_size", 13)
-		grid.add_child(label)
+		battle_grid.add_child(label)
 
 		# Keyboard binding button
 		var kb_btn = Button.new()
 		kb_btn.text = _get_keyboard_binding_text(action_name)
 		kb_btn.custom_minimum_size = Vector2(200, 28)
 		kb_btn.pressed.connect(_on_remap_pressed.bind(action_name, kb_btn, false))
-		grid.add_child(kb_btn)
+		battle_grid.add_child(kb_btn)
 
 		# Controller binding button
 		var ctrl_btn = Button.new()
 		ctrl_btn.text = _get_controller_binding_text(action_name)
 		ctrl_btn.custom_minimum_size = Vector2(200, 28)
 		ctrl_btn.pressed.connect(_on_remap_pressed.bind(action_name, ctrl_btn, true))
-		grid.add_child(ctrl_btn)
+		battle_grid.add_child(ctrl_btn)
 
 		_action_buttons.append([kb_btn, ctrl_btn])
+
+	# ========== FOOTER ==========
 
 	# Spacer
 	var spacer3 = Control.new()
