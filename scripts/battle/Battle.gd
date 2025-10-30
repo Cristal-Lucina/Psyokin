@@ -36,6 +36,9 @@ var skill_menu_panel: PanelContainer = null  # Skill selection menu
 var skill_menu_buttons: Array = []  # Buttons in skill menu for controller navigation
 var selected_skill_index: int = 0  # Currently selected skill in menu
 var item_menu_panel: PanelContainer = null  # Item selection menu
+var item_menu_buttons: Array = []  # Buttons in current item tab for controller navigation
+var selected_item_index: int = 0  # Currently selected item in menu
+var item_tab_container: TabContainer = null  # Reference to tab container for switching
 var item_description_label: Label = null  # Item description display
 var capture_menu_panel: PanelContainer = null  # Capture selection menu
 var capture_menu_buttons: Array = []  # Buttons in capture menu for controller navigation
@@ -234,6 +237,29 @@ func _input(event: InputEvent) -> void:
 			return
 		elif event.is_action_pressed(aInputManager.ACTION_ACCEPT):
 			_confirm_burst_selection()
+			get_viewport().set_input_as_handled()
+			return
+
+	# If item menu is open, handle controller navigation
+	if item_menu_panel != null:
+		if event.is_action_pressed(aInputManager.ACTION_MOVE_UP):
+			_navigate_item_menu(-1)
+			get_viewport().set_input_as_handled()
+			return
+		elif event.is_action_pressed(aInputManager.ACTION_MOVE_DOWN):
+			_navigate_item_menu(1)
+			get_viewport().set_input_as_handled()
+			return
+		elif event.is_action_pressed(aInputManager.ACTION_MOVE_LEFT):
+			_switch_item_tab(-1)
+			get_viewport().set_input_as_handled()
+			return
+		elif event.is_action_pressed(aInputManager.ACTION_MOVE_RIGHT):
+			_switch_item_tab(1)
+			get_viewport().set_input_as_handled()
+			return
+		elif event.is_action_pressed(aInputManager.ACTION_ACCEPT):
+			_confirm_item_selection()
 			get_viewport().set_input_as_handled()
 			return
 
@@ -2836,6 +2862,10 @@ func _show_item_menu(items: Array) -> void:
 	# Hide action menu
 	action_menu.visible = false
 
+	# Reset navigation
+	item_menu_buttons = []
+	selected_item_index = 0
+
 	# Categorize items
 	var restore_items = []
 	var cure_items = []
@@ -2887,6 +2917,9 @@ func _show_item_menu(items: Array) -> void:
 	tab_container.custom_minimum_size = Vector2(530, 300)
 	vbox.add_child(tab_container)
 
+	# Store reference for controller navigation
+	item_tab_container = tab_container
+
 	# Add category tabs (Restore, Cure, Tactical, Combat)
 	_add_category_tab(tab_container, "Restore", restore_items)
 	_add_category_tab(tab_container, "Cure", cure_items)
@@ -2923,6 +2956,9 @@ func _show_item_menu(items: Array) -> void:
 		(get_viewport_rect().size.x - 550) / 2,
 		(get_viewport_rect().size.y - 400) / 2
 	)
+
+	# Rebuild button list for first tab and highlight first item
+	_rebuild_item_button_list()
 
 func _add_category_tab(tab_container: TabContainer, category_name: String, category_items: Array) -> void:
 	"""Add a tab for a specific item category with two-column layout"""
@@ -2966,6 +3002,12 @@ func _add_category_tab(tab_container: TabContainer, category_name: String, categ
 		button.pressed.connect(_on_item_selected.bind(item_data))
 		button.mouse_entered.connect(_on_item_hover.bind(item_name, item_desc))
 		button.mouse_exited.connect(_on_item_unhover)
+
+		# Store item data on button for controller navigation
+		button.set_meta("item_data", item_data)
+		button.set_meta("item_name", item_name)
+		button.set_meta("item_desc", item_desc)
+
 		grid.add_child(button)
 
 func _close_item_menu() -> void:
@@ -2975,9 +3017,113 @@ func _close_item_menu() -> void:
 		item_menu_panel = null
 
 	item_description_label = null
+	item_tab_container = null
+	item_menu_buttons = []
+	selected_item_index = 0
 
 	# Show action menu again
 	action_menu.visible = true
+
+func _rebuild_item_button_list() -> void:
+	"""Rebuild the button list for the current tab"""
+	if not item_tab_container:
+		return
+
+	item_menu_buttons = []
+	selected_item_index = 0
+
+	# Get current tab
+	var current_tab = item_tab_container.get_current_tab_control()
+	if not current_tab:
+		return
+
+	# Find all buttons in the current tab
+	var scroll = current_tab as ScrollContainer
+	if not scroll:
+		return
+
+	var grid = scroll.get_child(0) as GridContainer
+	if not grid:
+		return
+
+	# Collect all buttons
+	for child in grid.get_children():
+		if child is Button:
+			item_menu_buttons.append(child)
+
+	# Highlight first item if available
+	if not item_menu_buttons.is_empty():
+		_highlight_item_button(0)
+		# Show description for first item
+		var first_button = item_menu_buttons[0]
+		if first_button.has_meta("item_name") and first_button.has_meta("item_desc"):
+			_on_item_hover(first_button.get_meta("item_name"), first_button.get_meta("item_desc"))
+
+func _navigate_item_menu(direction: int) -> void:
+	"""Navigate item menu with controller (direction: -1 for up, 1 for down)"""
+	if item_menu_buttons.is_empty():
+		return
+
+	# Remove highlight from current button
+	_unhighlight_item_button(selected_item_index)
+
+	# Move selection (by 2 since it's a two-column grid)
+	# Up/down moves by 2 positions (one row)
+	selected_item_index += direction * 2
+
+	# Wrap around
+	if selected_item_index < 0:
+		selected_item_index = item_menu_buttons.size() - 1
+	elif selected_item_index >= item_menu_buttons.size():
+		selected_item_index = 0
+
+	# Highlight new button
+	_highlight_item_button(selected_item_index)
+
+	# Update description
+	var button = item_menu_buttons[selected_item_index]
+	if button.has_meta("item_name") and button.has_meta("item_desc"):
+		_on_item_hover(button.get_meta("item_name"), button.get_meta("item_desc"))
+
+func _switch_item_tab(direction: int) -> void:
+	"""Switch item tabs with left/right (direction: -1 for left, 1 for right)"""
+	if not item_tab_container:
+		return
+
+	var current_tab = item_tab_container.get_current_tab()
+	var tab_count = item_tab_container.get_tab_count()
+
+	var new_tab = current_tab + direction
+
+	# Wrap around
+	if new_tab < 0:
+		new_tab = tab_count - 1
+	elif new_tab >= tab_count:
+		new_tab = 0
+
+	item_tab_container.set_current_tab(new_tab)
+
+	# Rebuild button list for new tab
+	_rebuild_item_button_list()
+
+func _confirm_item_selection() -> void:
+	"""Confirm item selection with A button"""
+	if selected_item_index >= 0 and selected_item_index < item_menu_buttons.size():
+		var button = item_menu_buttons[selected_item_index]
+		# Trigger the button press
+		button.emit_signal("pressed")
+
+func _highlight_item_button(index: int) -> void:
+	"""Highlight an item button for controller navigation"""
+	if index >= 0 and index < item_menu_buttons.size():
+		var button = item_menu_buttons[index]
+		button.modulate = Color(1.2, 1.2, 0.8, 1.0)  # Yellowish tint
+
+func _unhighlight_item_button(index: int) -> void:
+	"""Remove highlight from an item button"""
+	if index >= 0 and index < item_menu_buttons.size():
+		var button = item_menu_buttons[index]
+		button.modulate = Color(1.0, 1.0, 1.0, 1.0)  # Normal color
 
 func _on_item_hover(item_name: String, item_desc: String) -> void:
 	"""Show item description when hovering over button"""
