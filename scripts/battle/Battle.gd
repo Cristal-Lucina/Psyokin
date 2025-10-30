@@ -51,6 +51,7 @@ var current_skill_menu: Array = []  # Current skills in menu
 var selected_item: Dictionary = {}  # Selected item data
 var selected_burst: Dictionary = {}  # Selected burst ability data
 var victory_panel: PanelContainer = null  # Victory screen panel
+var victory_scroll: ScrollContainer = null  # Victory screen scroll container for controller scrolling
 var is_in_round_transition: bool = false  # True during round transition animations
 var combatant_panels: Dictionary = {}  # combatant_id -> PanelContainer for shake animations
 
@@ -173,8 +174,30 @@ func _input(event: InputEvent) -> void:
 	# Note: Input processing is disabled until battle is fully initialized
 	# This function only runs after set_process_input(true) is called in _ready()
 
-	# CRITICAL: Block ALL input if victory screen is showing
+	# If victory screen is showing, handle scrolling and accept
 	if victory_panel != null:
+		# Check cooldown to prevent rapid inputs
+		if input_cooldown > 0:
+			return
+
+		# Scroll with directional buttons
+		if victory_scroll:
+			var scroll_speed = 30.0  # Pixels to scroll per input
+			if event.is_action_pressed(aInputManager.ACTION_MOVE_UP):
+				victory_scroll.scroll_vertical -= scroll_speed
+				input_cooldown = input_cooldown_duration
+				get_viewport().set_input_as_handled()
+				return
+			elif event.is_action_pressed(aInputManager.ACTION_MOVE_DOWN):
+				victory_scroll.scroll_vertical += scroll_speed
+				input_cooldown = input_cooldown_duration
+				get_viewport().set_input_as_handled()
+				return
+
+		# Accept button to exit
+		if event.is_action_pressed(aInputManager.ACTION_ACCEPT):
+			_on_victory_accept_pressed()
+			get_viewport().set_input_as_handled()
 		return
 
 	# CRITICAL: Block ALL input if a minigame is active
@@ -561,10 +584,15 @@ func _show_victory_screen() -> void:
 	# Get rewards data from battle manager
 	var rewards = battle_mgr.battle_rewards
 
-	# Rewards display
+	# Rewards display (scrollable)
 	var rewards_scroll = ScrollContainer.new()
 	rewards_scroll.custom_minimum_size = Vector2(400, 200)
+	rewards_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	rewards_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 	content_vbox.add_child(rewards_scroll)
+
+	# Store reference for controller scrolling
+	victory_scroll = rewards_scroll
 
 	var rewards_vbox = VBoxContainer.new()
 	rewards_vbox.add_theme_constant_override("separation", 5)
@@ -684,6 +712,7 @@ func _on_victory_accept_pressed() -> void:
 	if victory_panel:
 		victory_panel.queue_free()
 		victory_panel = null
+	victory_scroll = null
 	battle_mgr.return_to_overworld()
 
 func _get_member_display_name(member_id: String) -> String:
