@@ -20,6 +20,8 @@ var has_started: bool = false
 var timer: float = 0.0
 var time_limit: float = 3.0  # Reduced to 3 seconds
 var minigame_complete: bool = false  # Lock out all input when complete
+var input_grace_timer: float = 0.0  # Prevent button carryover from target selection
+var input_grace_period: float = 0.3  # 0.3 second grace period
 
 ## Weak spot movement
 var weak_spot_pos: Vector2 = Vector2.ZERO  # Current position
@@ -219,6 +221,12 @@ func _process(delta: float) -> void:
 			_process_charging(delta)
 
 func _process_watching(delta: float) -> void:
+	# Update input grace timer
+	if input_grace_timer < input_grace_period:
+		input_grace_timer += delta
+		# During grace period, ignore charge button but allow movement
+		timer_label.text = "Get ready..."
+
 	# Update shake effect if poisoned/burned
 	if has_shake_status:
 		shake_timer += delta
@@ -271,7 +279,8 @@ func _process_watching(delta: float) -> void:
 	# Update timer (always, even before started)
 	if has_started:
 		timer += delta
-		timer_label.text = "Time: %.1fs" % (time_limit - timer)
+		if input_grace_timer >= input_grace_period:
+			timer_label.text = "Time: %.1fs" % (time_limit - timer)
 
 		if timer >= time_limit:
 			# Time's up! Force attack
@@ -279,21 +288,24 @@ func _process_watching(delta: float) -> void:
 			_force_attack()
 			return
 	else:
-		timer_label.text = "Move to start timer..."
+		if input_grace_timer >= input_grace_period:
+			timer_label.text = "Move to start timer..."
 
 	# Check for Accept button HELD to start charging (A button or Space)
-	if aInputManager.is_action_pressed(aInputManager.ACTION_ACCEPT):
-		if not is_charging:
-			if not has_started:
-				has_started = true
-				print("[AttackMinigame] Timer started!")
-			_start_charging()
-			is_charging = true
-	else:
-		if is_charging:
-			# Released! Attack at current charge
-			_release_attack()
-			is_charging = false
+	# Only accept input after grace period
+	if input_grace_timer >= input_grace_period:
+		if aInputManager.is_action_pressed(aInputManager.ACTION_ACCEPT):
+			if not is_charging:
+				if not has_started:
+					has_started = true
+					print("[AttackMinigame] Timer started!")
+				_start_charging()
+				is_charging = true
+		else:
+			if is_charging:
+				# Released! Attack at current charge
+				_release_attack()
+				is_charging = false
 
 func _start_charging() -> void:
 	"""Start charging the attack gauge"""
