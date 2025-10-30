@@ -115,7 +115,7 @@ func _setup_minigame() -> void:
 
 	# Instructions
 	instruction_label = Label.new()
-	instruction_label.text = "WASD: Move view | HOLD SPACE: Charge when visible!"
+	instruction_label.text = "Directions: Move view | HOLD A (Accept): Charge when visible!"
 	instruction_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	instruction_label.add_theme_font_size_override("font_size", 11)
 	content_container.add_child(instruction_label)
@@ -201,8 +201,8 @@ func _start_minigame() -> void:
 	arena.queue_redraw()
 
 	timer_label.text = "Move view to find weak spot..."
-	charge_label.text = "HOLD SPACE when it's visible!"
-	instruction_label.text = "WASD: Move view | HOLD SPACE: Charge when visible!"
+	charge_label.text = "HOLD A (Accept) when it's visible!"
+	instruction_label.text = "Directions: Move view | HOLD A (Accept): Charge when visible!"
 
 func _process(delta: float) -> void:
 	# Call parent to update status effect animations
@@ -277,8 +277,8 @@ func _process_watching(delta: float) -> void:
 	else:
 		timer_label.text = "Move to start timer..."
 
-	# Check for jump/confirm button HELD to start charging
-	if aInputManager.is_action_pressed(aInputManager.ACTION_JUMP):
+	# Check for Accept button HELD to start charging (A button or Space)
+	if aInputManager.is_action_pressed(aInputManager.ACTION_ACCEPT):
 		if not is_charging:
 			if not has_started:
 				has_started = true
