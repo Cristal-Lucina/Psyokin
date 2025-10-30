@@ -230,12 +230,12 @@ func _input(event: InputEvent) -> void:
 			_close_burst_menu()
 			get_viewport().set_input_as_handled()
 			return
-		elif status_picker_panel != null:
-			_close_status_picker()
-			get_viewport().set_input_as_handled()
-			return
 		elif status_details_popup != null:
 			_close_status_details()
+			get_viewport().set_input_as_handled()
+			return
+		elif status_picker_panel != null:
+			_close_status_picker()
 			get_viewport().set_input_as_handled()
 			return
 		# If in target selection, cancel it
