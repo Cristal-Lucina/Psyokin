@@ -1118,6 +1118,16 @@ func _show_status_details(combatant: Dictionary) -> void:
 
 	add_child(status_details_popup)
 
+	# Pause the status picker panel while status details are open
+	if status_picker_panel:
+		# Block all input to status picker
+		status_picker_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		status_picker_panel.process_mode = Node.PROCESS_MODE_DISABLED
+		# Release focus from any buttons
+		for btn in status_picker_buttons:
+			if btn.has_focus():
+				btn.release_focus()
+
 func _format_buff_description(buff_type: String, value: float, duration: int) -> String:
 	"""Format buff/debuff into readable description"""
 	var type_name = ""
@@ -3146,6 +3156,14 @@ func _close_status_details() -> void:
 	if status_details_modal:
 		status_details_modal.queue_free()
 		status_details_modal = null
+
+	# Resume the status picker panel
+	if status_picker_panel:
+		status_picker_panel.process_mode = Node.PROCESS_MODE_INHERIT
+		status_picker_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+		# Re-highlight the selected button
+		if selected_status_index >= 0 and selected_status_index < status_picker_buttons.size():
+			_highlight_status_button(selected_status_index)
 
 ## ═══════════════════════════════════════════════════════════════
 ## ITEM MENU
