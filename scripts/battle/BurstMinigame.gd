@@ -58,7 +58,7 @@ func _setup_minigame() -> void:
 
 	# Instructions
 	instruction_label = Label.new()
-	instruction_label.text = "MASH SPACE AS FAST AS YOU CAN!"
+	instruction_label.text = "MASH A (Accept) AS FAST AS YOU CAN!"
 	instruction_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	instruction_label.add_theme_font_size_override("font_size", 16)
 	content_container.add_child(instruction_label)
