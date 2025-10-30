@@ -13,6 +13,12 @@ var _waiting_for_input: Button = null
 var _waiting_action: String = ""
 var _waiting_is_controller: bool = false
 
+# Controller navigation
+var _all_buttons: Array[Button] = []
+var _selected_button_index: int = 0
+var _input_cooldown: float = 0.0
+var _input_cooldown_duration: float = 0.2
+
 func _ready() -> void:
 	print("[Options] _ready() called")
 	print("[Options] Close button: ", _close_btn)
@@ -390,6 +396,34 @@ func _build_controls_ui() -> void:
 
 	print("[Options] Controls UI built successfully!")
 
+	# Setup controller navigation
+	_setup_controller_navigation()
+
+func _setup_controller_navigation() -> void:
+	"""Setup controller navigation for all buttons"""
+	_all_buttons.clear()
+
+	# Collect all remapping buttons
+	for button_pair in _action_buttons:
+		_all_buttons.append(button_pair[0])  # Keyboard button
+		_all_buttons.append(button_pair[1])  # Controller button
+
+	# Add close button last
+	if _close_btn:
+		_all_buttons.append(_close_btn)
+
+	# Start with first button selected
+	if _all_buttons.size() > 0:
+		_selected_button_index = 0
+		_highlight_button(_selected_button_index)
+
+	print("[Options] Navigation setup complete. ", _all_buttons.size(), " buttons")
+
+func _process(delta: float) -> void:
+	"""Handle input cooldown"""
+	if _input_cooldown > 0:
+		_input_cooldown -= delta
+
 func _on_remap_pressed(action_name: String, button: Button, is_controller: bool) -> void:
 	"""Start waiting for input to remap an action"""
 	if _waiting_for_input != null:
@@ -415,12 +449,42 @@ func _get_current_binding_text(action_name: String, is_controller: bool) -> Stri
 		return _get_keyboard_binding_text(action_name)
 
 func _input(event: InputEvent) -> void:
-	# Handle back button to close options menu (when not remapping)
+	# Handle controller navigation and actions when not remapping
 	if _waiting_for_input == null:
+		# Back button closes menu
 		if event.is_action_pressed("menu_back") or (event is InputEventKey and event.keycode == KEY_ESCAPE and event.pressed):
 			_on_close_pressed()
 			get_viewport().set_input_as_handled()
 			return
+
+		# Controller navigation through buttons
+		if _input_cooldown <= 0 and _all_buttons.size() > 0:
+			if event.is_action_pressed("move_up"):
+				_navigate_buttons(-1)
+				_input_cooldown = _input_cooldown_duration
+				get_viewport().set_input_as_handled()
+				return
+			elif event.is_action_pressed("move_down"):
+				_navigate_buttons(1)
+				_input_cooldown = _input_cooldown_duration
+				get_viewport().set_input_as_handled()
+				return
+			elif event.is_action_pressed("move_left"):
+				_navigate_buttons(-1)
+				_input_cooldown = _input_cooldown_duration
+				get_viewport().set_input_as_handled()
+				return
+			elif event.is_action_pressed("move_right"):
+				_navigate_buttons(1)
+				_input_cooldown = _input_cooldown_duration
+				get_viewport().set_input_as_handled()
+				return
+			elif event.is_action_pressed("menu_accept"):
+				# Activate selected button
+				if _selected_button_index >= 0 and _selected_button_index < _all_buttons.size():
+					_all_buttons[_selected_button_index].emit_signal("pressed")
+				get_viewport().set_input_as_handled()
+				return
 		return
 
 	# Allow ESC to cancel remapping
@@ -581,3 +645,35 @@ func _get_joypad_axis_name(axis: int, value: float) -> String:
 		JOY_AXIS_TRIGGER_LEFT: return "LT"
 		JOY_AXIS_TRIGGER_RIGHT: return "RT"
 		_: return "Axis %d" % axis
+
+# ------------------------------------------------------------------------------
+# Controller Navigation Helpers
+# ------------------------------------------------------------------------------
+
+func _navigate_buttons(direction: int) -> void:
+	"""Navigate through buttons with controller"""
+	if _all_buttons.is_empty():
+		return
+
+	_unhighlight_button(_selected_button_index)
+
+	_selected_button_index += direction
+	if _selected_button_index < 0:
+		_selected_button_index = _all_buttons.size() - 1
+	elif _selected_button_index >= _all_buttons.size():
+		_selected_button_index = 0
+
+	_highlight_button(_selected_button_index)
+
+func _highlight_button(index: int) -> void:
+	"""Highlight a button"""
+	if index >= 0 and index < _all_buttons.size():
+		var button = _all_buttons[index]
+		button.modulate = Color(1.2, 1.2, 0.8, 1.0)
+		button.grab_focus()
+
+func _unhighlight_button(index: int) -> void:
+	"""Remove highlight from a button"""
+	if index >= 0 and index < _all_buttons.size():
+		var button = _all_buttons[index]
+		button.modulate = Color(1.0, 1.0, 1.0, 1.0)
