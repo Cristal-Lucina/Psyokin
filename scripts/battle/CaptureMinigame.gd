@@ -32,6 +32,14 @@ var wrap_progress: float = 0.0  # 0.0 to TAU (full circle)
 var wraps_in_current_break: int = 0  # Wraps completed for current break
 var wraps_per_point: int = 3  # How many wraps needed per break rating point
 
+# Button prompt system for wrapping (harder for tougher enemies)
+var prompt_active: bool = false  # Is a button prompt currently showing?
+var prompt_timer: float = 0.0  # Time until next prompt
+var prompt_window: float = 1.5  # Time player has to press button (shorter for harder enemies)
+var prompt_interval_min: float = 2.0  # Min time between prompts (shorter for harder enemies)
+var prompt_interval_max: float = 4.0  # Max time between prompts (shorter for harder enemies)
+var last_accept_state: bool = false  # Track button state for single-press detection
+
 ## Visual elements
 var title_label: Label
 var phase_label: Label
@@ -49,6 +57,7 @@ var sleep_anim_time: float = 0.0
 var bind_arena: Control  # Container for dragging mechanic
 var bind_point: ColorRect  # The point to grab and drag
 var bind_trail: Line2D  # Trail showing wrap around enemy
+var prompt_label: Label  # Shows "PRESS A!" during button prompts
 
 func _setup_minigame() -> void:
 	base_duration = 10.0
@@ -404,6 +413,18 @@ func _start_bind_phase() -> void:
 	wraps_in_current_break = 0
 	breaks_completed = 0
 
+	# Configure button prompt difficulty based on break rating (enemy difficulty)
+	# Higher break rating = tougher enemy = more frequent prompts and shorter window
+	var difficulty_scale = break_rating / 6.0  # Normalize to 0-1+ range (6 is average)
+	prompt_interval_min = max(1.5, 3.0 - (difficulty_scale * 1.0))  # 3.0s -> 1.5s
+	prompt_interval_max = max(3.0, 5.0 - (difficulty_scale * 1.5))  # 5.0s -> 3.0s
+	prompt_window = max(0.8, 1.5 - (difficulty_scale * 0.5))  # 1.5s -> 0.8s
+	print("[CaptureMinigame] Prompt difficulty - Min: %.1fs, Max: %.1fs, Window: %.1fs (BR: %d)" % [prompt_interval_min, prompt_interval_max, prompt_window, break_rating])
+
+	# Schedule first prompt
+	prompt_timer = randf_range(prompt_interval_min, prompt_interval_max)
+	prompt_active = false
+
 	_update_instruction_label()
 
 	break_progress_bar.visible = true
@@ -447,6 +468,18 @@ func _setup_bind_arena() -> void:
 	bind_trail.width = 3.0
 	bind_trail.default_color = Color(0.2, 0.8, 1.0, 0.8)
 	bind_arena.add_child(bind_trail)
+
+	# Create prompt label (hidden initially)
+	prompt_label = Label.new()
+	prompt_label.text = "PRESS A!"
+	prompt_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	prompt_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	prompt_label.add_theme_font_size_override("font_size", 32)
+	prompt_label.add_theme_color_override("font_color", Color(1.0, 0.2, 0.2, 1.0))  # Red
+	prompt_label.position = Vector2(50, 150)  # Below arena
+	prompt_label.size = Vector2(100, 40)
+	prompt_label.visible = false
+	bind_arena.add_child(prompt_label)
 
 func _spawn_bind_point() -> void:
 	"""Spawn a new bind point at a random direction"""
@@ -509,21 +542,67 @@ func _process(delta: float) -> void:
 		_finish_capture_failed()
 		return
 
+	# Handle button prompt system (only when dragging)
+	if bind_point_grabbed:
+		# Check for Accept button press (single-press detection)
+		var accept_pressed = aInputManager.is_action_pressed(aInputManager.ACTION_ACCEPT)
+
+		if prompt_active:
+			# Prompt is showing - check if player pressed the button
+			prompt_timer -= delta
+
+			# Flash the prompt label
+			if int(prompt_timer * 4) % 2 == 0:
+				prompt_label.add_theme_color_override("font_color", Color(1.0, 0.2, 0.2, 1.0))
+			else:
+				prompt_label.add_theme_color_override("font_color", Color(1.0, 0.6, 0.2, 1.0))
+
+			# Check if button was pressed (new press, not held)
+			if accept_pressed and not last_accept_state:
+				# Success! Hide prompt and schedule next one
+				print("[CaptureMinigame] Prompt succeeded!")
+				prompt_active = false
+				prompt_label.visible = false
+				prompt_timer = randf_range(prompt_interval_min, prompt_interval_max)
+			elif prompt_timer <= 0:
+				# Failed! Player didn't press in time
+				print("[CaptureMinigame] Prompt failed! Resetting wrap progress.")
+				prompt_active = false
+				prompt_label.visible = false
+				# Punishment: reset current wrap progress
+				wrap_progress = 0.0
+				bind_trail.clear_points()
+				bind_point.color = Color(1.0, 0.0, 0.0, 1.0)  # Flash red
+				# Schedule next prompt
+				prompt_timer = randf_range(prompt_interval_min, prompt_interval_max)
+		else:
+			# No prompt active - count down to next prompt
+			prompt_timer -= delta
+			if prompt_timer <= 0:
+				# Trigger prompt!
+				print("[CaptureMinigame] Button prompt triggered!")
+				prompt_active = true
+				prompt_label.visible = true
+				prompt_timer = prompt_window  # Player has this long to respond
+
+		last_accept_state = accept_pressed
+
 	# Check if player is trying to grab the bind point
 	if not bind_point_grabbed:
 		var grabbed = false
+		# Use InputManager for keyboard + controller support
 		match current_bind_direction:
 			BindDirection.UP:
-				if Input.is_key_pressed(KEY_W):
+				if aInputManager.is_action_pressed(aInputManager.ACTION_MOVE_UP):
 					grabbed = true
 			BindDirection.DOWN:
-				if Input.is_key_pressed(KEY_S):
+				if aInputManager.is_action_pressed(aInputManager.ACTION_MOVE_DOWN):
 					grabbed = true
 			BindDirection.LEFT:
-				if Input.is_key_pressed(KEY_A):
+				if aInputManager.is_action_pressed(aInputManager.ACTION_MOVE_LEFT):
 					grabbed = true
 			BindDirection.RIGHT:
-				if Input.is_key_pressed(KEY_D):
+				if aInputManager.is_action_pressed(aInputManager.ACTION_MOVE_RIGHT):
 					grabbed = true
 
 		if grabbed:
@@ -535,11 +614,8 @@ func _process(delta: float) -> void:
 			print("[CaptureMinigame] Bind point grabbed!")
 	else:
 		# Player is dragging - track circular motion
-		var input_vec = Vector2.ZERO
-		if Input.is_key_pressed(KEY_W): input_vec.y -= 1
-		if Input.is_key_pressed(KEY_S): input_vec.y += 1
-		if Input.is_key_pressed(KEY_A): input_vec.x -= 1
-		if Input.is_key_pressed(KEY_D): input_vec.x += 1
+		# Use InputManager for keyboard + controller support
+		var input_vec = aInputManager.get_movement_vector()
 
 		if input_vec.length() > 0.5:
 			# Calculate angle from enemy center

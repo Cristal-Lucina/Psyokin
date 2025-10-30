@@ -20,6 +20,8 @@ var has_started: bool = false
 var timer: float = 0.0
 var time_limit: float = 3.0  # Reduced to 3 seconds
 var minigame_complete: bool = false  # Lock out all input when complete
+var input_grace_timer: float = 0.0  # Prevent button carryover from target selection
+var input_grace_period: float = 0.3  # 0.3 second grace period
 
 ## Weak spot movement
 var weak_spot_pos: Vector2 = Vector2.ZERO  # Current position
@@ -115,7 +117,7 @@ func _setup_minigame() -> void:
 
 	# Instructions
 	instruction_label = Label.new()
-	instruction_label.text = "WASD: Move view | HOLD SPACE: Charge when visible!"
+	instruction_label.text = "Directions: Move view | HOLD A (Accept): Charge when visible!"
 	instruction_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	instruction_label.add_theme_font_size_override("font_size", 11)
 	content_container.add_child(instruction_label)
@@ -201,8 +203,8 @@ func _start_minigame() -> void:
 	arena.queue_redraw()
 
 	timer_label.text = "Move view to find weak spot..."
-	charge_label.text = "HOLD SPACE when it's visible!"
-	instruction_label.text = "WASD: Move view | HOLD SPACE: Charge when visible!"
+	charge_label.text = "HOLD A (Accept) when it's visible!"
+	instruction_label.text = "Directions: Move view | HOLD A (Accept): Charge when visible!"
 
 func _process(delta: float) -> void:
 	# Call parent to update status effect animations
@@ -219,6 +221,12 @@ func _process(delta: float) -> void:
 			_process_charging(delta)
 
 func _process_watching(delta: float) -> void:
+	# Update input grace timer
+	if input_grace_timer < input_grace_period:
+		input_grace_timer += delta
+		# During grace period, ignore charge button but allow movement
+		timer_label.text = "Get ready..."
+
 	# Update shake effect if poisoned/burned
 	if has_shake_status:
 		shake_timer += delta
@@ -230,12 +238,12 @@ func _process_watching(delta: float) -> void:
 				randf_range(-8.0, 8.0)
 			)
 
-	# Handle WASD view movement
-	var move_dir = Vector2.ZERO
-	if Input.is_key_pressed(KEY_W): move_dir.y -= 1
-	if Input.is_key_pressed(KEY_S): move_dir.y += 1
-	if Input.is_key_pressed(KEY_A): move_dir.x -= 1
-	if Input.is_key_pressed(KEY_D): move_dir.x += 1
+	# Handle movement input (WASD or analog stick)
+	var move_dir = aInputManager.get_movement_vector()
+
+	# DEBUG: Check if input is being received
+	if move_dir.length() > 0:
+		print("[AttackMinigame DEBUG] Move vector: ", move_dir)
 
 	if move_dir.length() > 0:
 		if not has_started:
@@ -271,7 +279,8 @@ func _process_watching(delta: float) -> void:
 	# Update timer (always, even before started)
 	if has_started:
 		timer += delta
-		timer_label.text = "Time: %.1fs" % (time_limit - timer)
+		if input_grace_timer >= input_grace_period:
+			timer_label.text = "Time: %.1fs" % (time_limit - timer)
 
 		if timer >= time_limit:
 			# Time's up! Force attack
@@ -279,21 +288,27 @@ func _process_watching(delta: float) -> void:
 			_force_attack()
 			return
 	else:
-		timer_label.text = "Move to start timer..."
+		if input_grace_timer >= input_grace_period:
+			timer_label.text = "Move to start timer..."
 
-	# Check for Space HELD to start charging
-	if Input.is_key_pressed(KEY_SPACE):
-		if not is_charging:
-			if not has_started:
-				has_started = true
-				print("[AttackMinigame] Timer started!")
-			_start_charging()
-			is_charging = true
-	else:
-		if is_charging:
-			# Released! Attack at current charge
-			_release_attack()
-			is_charging = false
+	# Check for Accept button HELD to start charging (A button or Space)
+	# Only accept input after grace period
+	if input_grace_timer >= input_grace_period:
+		var accept_pressed = aInputManager.is_action_pressed(aInputManager.ACTION_ACCEPT)
+
+		# DEBUG: Show button state every frame when it changes
+		if accept_pressed != is_charging:
+			print("[AttackMinigame DEBUG] Accept button: ", accept_pressed, " | is_charging: ", is_charging, " | charge: ", charge_progress)
+
+		if accept_pressed:
+			if not is_charging:
+				if not has_started:
+					has_started = true
+					print("[AttackMinigame] Timer started!")
+				_start_charging()
+				is_charging = true
+				print("[AttackMinigame DEBUG] Started charging!")
+		# Note: Release checking moved to _process_charging() phase
 
 func _start_charging() -> void:
 	"""Start charging the attack gauge"""
@@ -320,12 +335,8 @@ func _process_charging(delta: float) -> void:
 				randf_range(-8.0, 8.0)
 			)
 
-	# Handle WASD view movement WHILE charging (allows slide-to-crit!)
-	var move_dir = Vector2.ZERO
-	if Input.is_key_pressed(KEY_W): move_dir.y -= 1
-	if Input.is_key_pressed(KEY_S): move_dir.y += 1
-	if Input.is_key_pressed(KEY_A): move_dir.x -= 1
-	if Input.is_key_pressed(KEY_D): move_dir.x += 1
+	# Handle movement WHILE charging (allows slide-to-crit!)
+	var move_dir = aInputManager.get_movement_vector()
 
 	if move_dir.length() > 0:
 		move_dir = move_dir.normalized()
@@ -364,8 +375,8 @@ func _process_charging(delta: float) -> void:
 		_release_attack()
 		return
 
-	# Increase charge while Space is held
-	if Input.is_key_pressed(KEY_SPACE):
+	# Increase charge while button is held
+	if aInputManager.is_action_pressed(aInputManager.ACTION_ACCEPT):
 		# Always charge, regardless of visibility
 		charge_progress += delta * charge_speed
 		charge_progress = min(charge_progress, 1.2)  # Cap at 1.2 (past blue, into red)
@@ -376,8 +387,13 @@ func _process_charging(delta: float) -> void:
 		# Determine current zone based on visibility
 		charge_zone = _get_charge_zone(charge_progress, weak_spot_is_visible)
 		_update_charge_visuals(charge_zone)
+
+		# DEBUG: Show charge progress while holding
+		if int(charge_progress * 100) % 10 == 0:  # Print every 10%
+			print("[AttackMinigame DEBUG] Charging: %.2f" % charge_progress)
 	else:
 		# Released!
+		print("[AttackMinigame DEBUG] Button released in charging, firing at: %.2f" % charge_progress)
 		_release_attack()
 
 func _get_charge_zone(progress: float, is_weak_spot_visible: bool) -> String:

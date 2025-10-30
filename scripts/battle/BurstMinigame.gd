@@ -58,7 +58,7 @@ func _setup_minigame() -> void:
 
 	# Instructions
 	instruction_label = Label.new()
-	instruction_label.text = "MASH SPACE AS FAST AS YOU CAN!"
+	instruction_label.text = "MASH A (Accept) AS FAST AS YOU CAN!"
 	instruction_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	instruction_label.add_theme_font_size_override("font_size", 16)
 	content_container.add_child(instruction_label)
@@ -77,13 +77,14 @@ func _process(delta: float) -> void:
 	if minigame_complete:
 		return
 
-	# Check for Space press (single-press detection)
-	var space_pressed = Input.is_key_pressed(KEY_SPACE)
+	# Check for button press (single-press detection)
+	# Use InputManager for keyboard + controller support (Space/A button)
+	var button_pressed = aInputManager.is_action_pressed(aInputManager.ACTION_ACCEPT)
 
-	if space_pressed and not last_space_state:
+	if button_pressed and not last_space_state:
 		_on_button_press()
 
-	last_space_state = space_pressed
+	last_space_state = button_pressed
 
 	# Decay sync level slightly over time (encourages fast mashing)
 	sync_level = max(0, sync_level - (5.0 * delta))

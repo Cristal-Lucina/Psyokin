@@ -78,7 +78,7 @@ func _setup_minigame() -> void:
 
 	# Instructions
 	instruction_label = Label.new()
-	instruction_label.text = "Use WASD to escape through the GREEN gap!"
+	instruction_label.text = "Move (WASD/D-Pad/Analog) to escape through the GREEN gap!"
 	instruction_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	instruction_label.add_theme_font_size_override("font_size", 16)
 	content_container.add_child(instruction_label)
@@ -202,11 +202,8 @@ func _process(delta: float) -> void:
 
 	# Handle player movement (only if not caught)
 	if not is_caught:
-		var move_dir = Vector2.ZERO
-		if Input.is_key_pressed(KEY_W): move_dir.y -= 1
-		if Input.is_key_pressed(KEY_S): move_dir.y += 1
-		if Input.is_key_pressed(KEY_A): move_dir.x -= 1
-		if Input.is_key_pressed(KEY_D): move_dir.x += 1
+		# Use InputManager for keyboard + controller support
+		var move_dir = aInputManager.get_movement_vector()
 
 		if move_dir.length() > 0:
 			move_dir = move_dir.normalized()

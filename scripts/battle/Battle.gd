@@ -22,34 +22,57 @@ class_name Battle
 @onready var enemy_slots: HBoxContainer = %EnemySlots
 
 ## State
+var is_battle_ready: bool = false  # True when battle is fully initialized
 var current_combatant: Dictionary = {}
 var awaiting_target_selection: bool = false
 var target_candidates: Array = []
+var selected_target_index: int = 0  # Currently selected target in navigation
 var skill_definitions: Dictionary = {}  # skill_id -> skill data
 var awaiting_skill_selection: bool = false
 var awaiting_capture_target: bool = false  # True when selecting target for capture
 var awaiting_item_target: bool = false  # True when selecting target for item usage
 var skill_to_use: Dictionary = {}  # Selected skill data
 var skill_menu_panel: PanelContainer = null  # Skill selection menu
+var skill_menu_buttons: Array = []  # Buttons in skill menu for controller navigation
+var selected_skill_index: int = 0  # Currently selected skill in menu
 var item_menu_panel: PanelContainer = null  # Item selection menu
+var item_menu_buttons: Array = []  # Buttons in current item tab for controller navigation
+var selected_item_index: int = 0  # Currently selected item in menu
+var item_tab_container: TabContainer = null  # Reference to tab container for switching
+var item_scroll_container: ScrollContainer = null  # Current tab's scroll container for auto-scrolling
 var item_description_label: Label = null  # Item description display
 var capture_menu_panel: PanelContainer = null  # Capture selection menu
+var capture_menu_buttons: Array = []  # Buttons in capture menu for controller navigation
+var selected_capture_index: int = 0  # Currently selected capture item in menu
 var burst_menu_panel: PanelContainer = null  # Burst selection menu
+var burst_menu_buttons: Array = []  # Buttons in burst menu for controller navigation
+var selected_burst_index: int = 0  # Currently selected burst ability in menu
 var current_skill_menu: Array = []  # Current skills in menu
 var selected_item: Dictionary = {}  # Selected item data
 var selected_burst: Dictionary = {}  # Selected burst ability data
 var victory_panel: PanelContainer = null  # Victory screen panel
+var victory_scroll: ScrollContainer = null  # Victory screen scroll container for controller scrolling
 var is_in_round_transition: bool = false  # True during round transition animations
 var combatant_panels: Dictionary = {}  # combatant_id -> PanelContainer for shake animations
 
+# Input debouncing for joystick sensitivity
+var input_cooldown: float = 0.0  # Current cooldown timer
+var input_cooldown_duration: float = 0.15  # 150ms between inputs
+
 func _ready() -> void:
 	print("[Battle] Battle scene loaded")
+
+	# CRITICAL: Disable input processing until fully initialized
+	set_process_input(false)
 
 	# Add combat resolver to scene tree
 	add_child(combat_resolver)
 
 	# Wait for next frame to ensure all autoloads are ready
 	await get_tree().process_frame
+
+	# Update action button labels with mapped keys/buttons
+	_update_action_button_labels()
 
 	# Load skill definitions
 	_load_skills()
@@ -72,6 +95,66 @@ func _ready() -> void:
 	# Initialize battle with party and enemies
 	_initialize_battle()
 
+	# Mark battle as ready for input
+	is_battle_ready = true
+
+	# CRITICAL: Now enable input processing
+	set_process_input(true)
+	print("[Battle] Input processing enabled")
+
+func _update_action_button_labels() -> void:
+	"""Update action button labels to show action name + mapped key/button"""
+	var button_mappings = [
+		{"button": "AttackButton", "name": "Attack", "action": aInputManager.ACTION_ATTACK},
+		{"button": "SkillButton", "name": "Skill", "action": aInputManager.ACTION_SKILL},
+		{"button": "CaptureButton", "name": "Capture", "action": aInputManager.ACTION_CAPTURE},
+		{"button": "DefendButton", "name": "Defend", "action": aInputManager.ACTION_DEFEND},
+		{"button": "BurstButton", "name": "Burst", "action": aInputManager.ACTION_BURST},
+		{"button": "RunButton", "name": "Run", "action": aInputManager.ACTION_BATTLE_RUN},
+		{"button": "ItemButton", "name": "Items", "action": aInputManager.ACTION_ITEMS},
+		{"button": "StatusButton", "name": "Status", "action": aInputManager.ACTION_STATUS},
+	]
+
+	for mapping in button_mappings:
+		var btn = action_menu.get_node_or_null(mapping["button"])
+		if btn:
+			var key_text = _get_primary_binding_text(mapping["action"])
+			btn.text = "%s (%s)" % [mapping["name"], key_text]
+
+func _get_primary_binding_text(action_name: String) -> String:
+	"""Get the primary binding text for an action (controller preferred if connected)"""
+	if not InputMap.has_action(action_name):
+		return "?"
+
+	var events = InputMap.action_get_events(action_name)
+	var is_controller_connected = aInputManager.is_controller_connected()
+
+	# Prefer controller button if controller is connected
+	if is_controller_connected:
+		for event in events:
+			if event is InputEventJoypadButton:
+				return _get_joypad_button_short_name(event.button_index)
+
+	# Otherwise use keyboard
+	for event in events:
+		if event is InputEventKey:
+			return OS.get_keycode_string(event.keycode)
+
+	return "?"
+
+func _get_joypad_button_short_name(button_index: int) -> String:
+	"""Get short name for joypad button"""
+	match button_index:
+		JOY_BUTTON_A: return "A"
+		JOY_BUTTON_B: return "B"
+		JOY_BUTTON_X: return "X"
+		JOY_BUTTON_Y: return "Y"
+		JOY_BUTTON_LEFT_SHOULDER: return "LB"
+		JOY_BUTTON_RIGHT_SHOULDER: return "RB"
+		JOY_BUTTON_START: return "Start"
+		JOY_BUTTON_BACK: return "Select"
+		_: return "Btn%d" % button_index
+
 func _load_skills() -> void:
 	"""Load skill definitions from skills.csv"""
 	skill_definitions = csv_loader.load_csv("res://data/skills/skills.csv", "skill_id")
@@ -79,6 +162,268 @@ func _load_skills() -> void:
 		print("[Battle] Loaded %d skill definitions" % skill_definitions.size())
 	else:
 		push_error("[Battle] Failed to load skills.csv")
+
+func _process(delta: float) -> void:
+	"""Update battle state each frame"""
+	# Update input cooldown timer
+	if input_cooldown > 0:
+		input_cooldown -= delta
+
+func _input(event: InputEvent) -> void:
+	"""Handle keyboard/controller input for battle actions and target selection"""
+	# Note: Input processing is disabled until battle is fully initialized
+	# This function only runs after set_process_input(true) is called in _ready()
+
+	# If victory screen is showing, handle scrolling and accept
+	if victory_panel != null:
+		# Check cooldown to prevent rapid inputs
+		if input_cooldown > 0:
+			return
+
+		# Scroll with directional buttons
+		if victory_scroll:
+			var scroll_speed = 30.0  # Pixels to scroll per input
+			if event.is_action_pressed(aInputManager.ACTION_MOVE_UP):
+				victory_scroll.scroll_vertical -= scroll_speed
+				input_cooldown = input_cooldown_duration
+				get_viewport().set_input_as_handled()
+				return
+			elif event.is_action_pressed(aInputManager.ACTION_MOVE_DOWN):
+				victory_scroll.scroll_vertical += scroll_speed
+				input_cooldown = input_cooldown_duration
+				get_viewport().set_input_as_handled()
+				return
+
+		# Accept button to exit
+		if event.is_action_pressed(aInputManager.ACTION_ACCEPT):
+			_on_victory_accept_pressed()
+			get_viewport().set_input_as_handled()
+		return
+
+	# CRITICAL: Block ALL input if a minigame is active
+	if minigame_mgr.current_minigame != null:
+		return
+
+	# Check for back button to close any open menus
+	if event.is_action_pressed(aInputManager.ACTION_BACK):
+		# Check if any menu is open and close it
+		if skill_menu_panel != null:
+			_close_skill_menu()
+			get_viewport().set_input_as_handled()
+			return
+		elif item_menu_panel != null:
+			_close_item_menu()
+			get_viewport().set_input_as_handled()
+			return
+		elif capture_menu_panel != null:
+			_close_capture_menu()
+			get_viewport().set_input_as_handled()
+			return
+		elif burst_menu_panel != null:
+			_close_burst_menu()
+			get_viewport().set_input_as_handled()
+			return
+		# If in target selection, cancel it
+		elif awaiting_target_selection and not target_candidates.is_empty():
+			_cancel_target_selection()
+			get_viewport().set_input_as_handled()
+			return
+
+	# If skill menu is open, handle controller navigation
+	if skill_menu_panel != null and not skill_menu_buttons.is_empty():
+		if event.is_action_pressed(aInputManager.ACTION_MOVE_UP):
+			_navigate_skill_menu(-1)
+			get_viewport().set_input_as_handled()
+			return
+		elif event.is_action_pressed(aInputManager.ACTION_MOVE_DOWN):
+			_navigate_skill_menu(1)
+			get_viewport().set_input_as_handled()
+			return
+		elif event.is_action_pressed(aInputManager.ACTION_ACCEPT):
+			_confirm_skill_selection()
+			get_viewport().set_input_as_handled()
+			return
+
+	# If capture menu is open, handle controller navigation
+	if capture_menu_panel != null and not capture_menu_buttons.is_empty():
+		if event.is_action_pressed(aInputManager.ACTION_MOVE_UP):
+			_navigate_capture_menu(-1)
+			get_viewport().set_input_as_handled()
+			return
+		elif event.is_action_pressed(aInputManager.ACTION_MOVE_DOWN):
+			_navigate_capture_menu(1)
+			get_viewport().set_input_as_handled()
+			return
+		elif event.is_action_pressed(aInputManager.ACTION_ACCEPT):
+			_confirm_capture_selection()
+			get_viewport().set_input_as_handled()
+			return
+
+	# If burst menu is open, handle controller navigation
+	if burst_menu_panel != null and not burst_menu_buttons.is_empty():
+		if event.is_action_pressed(aInputManager.ACTION_MOVE_UP):
+			_navigate_burst_menu(-1)
+			get_viewport().set_input_as_handled()
+			return
+		elif event.is_action_pressed(aInputManager.ACTION_MOVE_DOWN):
+			_navigate_burst_menu(1)
+			get_viewport().set_input_as_handled()
+			return
+		elif event.is_action_pressed(aInputManager.ACTION_ACCEPT):
+			_confirm_burst_selection()
+			get_viewport().set_input_as_handled()
+			return
+
+	# If item menu is open, handle controller navigation
+	if item_menu_panel != null:
+		# Check cooldown to prevent rapid inputs
+		if input_cooldown > 0:
+			return
+
+		if event.is_action_pressed(aInputManager.ACTION_MOVE_UP):
+			_navigate_item_menu(-1)
+			input_cooldown = input_cooldown_duration
+			get_viewport().set_input_as_handled()
+			return
+		elif event.is_action_pressed(aInputManager.ACTION_MOVE_DOWN):
+			_navigate_item_menu(1)
+			input_cooldown = input_cooldown_duration
+			get_viewport().set_input_as_handled()
+			return
+		elif event.is_action_pressed(aInputManager.ACTION_MOVE_LEFT):
+			_navigate_item_menu_horizontal(-1)
+			input_cooldown = input_cooldown_duration
+			get_viewport().set_input_as_handled()
+			return
+		elif event.is_action_pressed(aInputManager.ACTION_MOVE_RIGHT):
+			_navigate_item_menu_horizontal(1)
+			input_cooldown = input_cooldown_duration
+			get_viewport().set_input_as_handled()
+			return
+		elif event.is_action_pressed(aInputManager.ACTION_BURST):  # L bumper
+			_switch_item_tab(-1)
+			input_cooldown = input_cooldown_duration
+			get_viewport().set_input_as_handled()
+			return
+		elif event.is_action_pressed(aInputManager.ACTION_BATTLE_RUN):  # R bumper
+			_switch_item_tab(1)
+			input_cooldown = input_cooldown_duration
+			get_viewport().set_input_as_handled()
+			return
+		elif event.is_action_pressed(aInputManager.ACTION_ACCEPT):
+			_confirm_item_selection()
+			input_cooldown = input_cooldown_duration
+			get_viewport().set_input_as_handled()
+			return
+
+	# If awaiting target selection, handle navigation
+	if awaiting_target_selection and not target_candidates.is_empty():
+		if event.is_action_pressed(aInputManager.ACTION_MOVE_LEFT):
+			_navigate_targets(-1)
+			get_viewport().set_input_as_handled()
+		elif event.is_action_pressed(aInputManager.ACTION_MOVE_RIGHT):
+			_navigate_targets(1)
+			get_viewport().set_input_as_handled()
+		elif event.is_action_pressed(aInputManager.ACTION_ACCEPT):
+			_confirm_target_selection()
+			get_viewport().set_input_as_handled()
+		return
+
+	# If action menu is visible, handle direct button presses
+	if action_menu and action_menu.visible and not is_in_round_transition:
+		if event.is_action_pressed(aInputManager.ACTION_ATTACK):
+			_on_attack_pressed()
+			get_viewport().set_input_as_handled()
+		elif event.is_action_pressed(aInputManager.ACTION_SKILL):
+			_on_skill_pressed()
+			get_viewport().set_input_as_handled()
+		elif event.is_action_pressed(aInputManager.ACTION_CAPTURE):
+			_on_capture_pressed()
+			get_viewport().set_input_as_handled()
+		elif event.is_action_pressed(aInputManager.ACTION_DEFEND):
+			_on_defend_pressed()
+			get_viewport().set_input_as_handled()
+		elif event.is_action_pressed(aInputManager.ACTION_BURST):
+			_on_burst_pressed()
+			get_viewport().set_input_as_handled()
+		elif event.is_action_pressed(aInputManager.ACTION_BATTLE_RUN):
+			_on_run_pressed()
+			get_viewport().set_input_as_handled()
+		elif event.is_action_pressed(aInputManager.ACTION_ITEMS):
+			_on_item_pressed()
+			get_viewport().set_input_as_handled()
+		elif event.is_action_pressed(aInputManager.ACTION_STATUS):
+			_on_status_pressed()
+			get_viewport().set_input_as_handled()
+
+func _navigate_targets(direction: int) -> void:
+	"""Navigate through target candidates"""
+	if target_candidates.is_empty():
+		return
+
+	# Update selected index
+	selected_target_index += direction
+
+	# Wrap around
+	if selected_target_index < 0:
+		selected_target_index = target_candidates.size() - 1
+	elif selected_target_index >= target_candidates.size():
+		selected_target_index = 0
+
+	# Update visual highlights
+	_highlight_target_candidates()
+
+	# Log current target
+	var target = target_candidates[selected_target_index]
+	log_message("→ %s" % target.display_name)
+
+func _confirm_target_selection() -> void:
+	"""Confirm the currently selected target"""
+	if target_candidates.is_empty() or selected_target_index < 0 or selected_target_index >= target_candidates.size():
+		return
+
+	var target = target_candidates[selected_target_index]
+
+	# Determine what action to execute based on state
+	if awaiting_capture_target:
+		# Attempting capture
+		await _execute_capture(target)
+	elif awaiting_item_target:
+		# Using an item
+		_execute_item_usage(target)
+	elif awaiting_skill_selection:
+		# Using a skill
+		_clear_target_highlights()
+		awaiting_target_selection = false
+		awaiting_skill_selection = false
+		await _execute_skill_single(target)
+
+		# Check if battle is over
+		var battle_ended = await battle_mgr._check_battle_end()
+		if not battle_ended:
+			battle_mgr.end_turn()
+	elif not selected_burst.is_empty():
+		# Using a burst ability (single target)
+		_clear_target_highlights()
+		awaiting_target_selection = false
+		await _execute_burst_on_target(target)
+
+		# Check if battle is over
+		var battle_ended = await battle_mgr._check_battle_end()
+		if not battle_ended:
+			battle_mgr.end_turn()
+	else:
+		# Regular attack
+		_execute_attack(target)
+
+func _cancel_target_selection() -> void:
+	"""Cancel target selection and return to action menu"""
+	awaiting_target_selection = false
+	awaiting_capture_target = false
+	awaiting_item_target = false
+	selected_target_index = 0
+	_clear_target_highlights()
+	log_message("Target selection cancelled.")
 
 func _initialize_battle() -> void:
 	"""Initialize the battle from encounter data"""
@@ -239,10 +584,15 @@ func _show_victory_screen() -> void:
 	# Get rewards data from battle manager
 	var rewards = battle_mgr.battle_rewards
 
-	# Rewards display
+	# Rewards display (scrollable)
 	var rewards_scroll = ScrollContainer.new()
 	rewards_scroll.custom_minimum_size = Vector2(400, 200)
+	rewards_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	rewards_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 	content_vbox.add_child(rewards_scroll)
+
+	# Store reference for controller scrolling
+	victory_scroll = rewards_scroll
 
 	var rewards_vbox = VBoxContainer.new()
 	rewards_vbox.add_theme_constant_override("separation", 5)
@@ -362,6 +712,7 @@ func _on_victory_accept_pressed() -> void:
 	if victory_panel:
 		victory_panel.queue_free()
 		victory_panel = null
+	victory_scroll = null
 	battle_mgr.return_to_overworld()
 
 func _get_member_display_name(member_id: String) -> String:
@@ -822,7 +1173,12 @@ func _on_attack_pressed() -> void:
 
 	# Enable target selection mode
 	awaiting_target_selection = true
+	selected_target_index = 0  # Start with first target
 	_highlight_target_candidates()
+
+	# Show currently selected target
+	if not target_candidates.is_empty():
+		log_message("→ %s" % target_candidates[0].display_name)
 
 func _execute_attack(target: Dictionary) -> void:
 	"""Execute attack on selected target"""
@@ -1874,6 +2230,199 @@ func _on_run_pressed() -> void:
 		log_message("Couldn't escape!")
 		battle_mgr.end_turn()
 
+func _on_status_pressed() -> void:
+	"""Handle Status action - view party/enemy information"""
+	# Block input during round transitions
+	if is_in_round_transition:
+		return
+
+	# Show character picker for status viewing
+	_show_status_character_picker()
+
+func _show_status_character_picker() -> void:
+	"""Show a character picker to select whose status to view"""
+	# Create modal background
+	var modal_bg = ColorRect.new()
+	modal_bg.color = Color(0, 0, 0, 0.7)
+	modal_bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	modal_bg.z_index = 99
+	modal_bg.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(modal_bg)
+
+	# Create picker panel
+	var picker_panel = PanelContainer.new()
+	picker_panel.custom_minimum_size = Vector2(500, 400)
+
+	var panel_style = StyleBoxFlat.new()
+	panel_style.bg_color = Color(0.15, 0.15, 0.2, 1.0)
+	panel_style.border_width_left = 3
+	panel_style.border_width_right = 3
+	panel_style.border_width_top = 3
+	panel_style.border_width_bottom = 3
+	panel_style.border_color = Color(0.4, 0.6, 0.8, 1.0)
+	picker_panel.add_theme_stylebox_override("panel", panel_style)
+
+	picker_panel.position = get_viewport_rect().size / 2 - picker_panel.custom_minimum_size / 2
+	picker_panel.z_index = 100
+	picker_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+
+	var vbox = VBoxContainer.new()
+	picker_panel.add_child(vbox)
+
+	# Title
+	var title = Label.new()
+	title.text = "=== View Character Status ==="
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 18)
+	vbox.add_child(title)
+
+	# Instructions
+	var instructions = Label.new()
+	instructions.text = "Select a character to view their detailed status"
+	instructions.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	instructions.add_theme_font_size_override("font_size", 12)
+	instructions.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7, 1.0))
+	vbox.add_child(instructions)
+
+	# Scroll container for character list
+	var scroll = ScrollContainer.new()
+	scroll.custom_minimum_size = Vector2(480, 280)
+	vbox.add_child(scroll)
+
+	var character_list = VBoxContainer.new()
+	scroll.add_child(character_list)
+
+	# Storage for navigation
+	var character_buttons: Array[Button] = []
+	var character_data: Array[Dictionary] = []
+
+	# Add allies
+	var allies = battle_mgr.get_ally_combatants()
+	if allies.size() > 0:
+		var ally_header = Label.new()
+		ally_header.text = "\n--- Party Members ---"
+		ally_header.add_theme_font_size_override("font_size", 14)
+		ally_header.add_theme_color_override("font_color", Color(0.3, 1.0, 0.3, 1.0))
+		character_list.add_child(ally_header)
+
+		for ally in allies:
+			var btn = Button.new()
+			var hp_text = "%d/%d HP" % [ally.hp, ally.hp_max]
+			var mp_text = "%d/%d MP" % [ally.mp, ally.mp_max]
+			var status_text = ""
+			if ally.is_ko:
+				status_text = " [KO]"
+			elif ally.get("ailment", "") != "":
+				status_text = " [%s]" % String(ally.ailment).capitalize()
+
+			btn.text = "%s - %s | %s%s" % [ally.display_name, hp_text, mp_text, status_text]
+			btn.custom_minimum_size = Vector2(460, 30)
+			character_list.add_child(btn)
+			character_buttons.append(btn)
+			character_data.append(ally)
+
+	# Add enemies
+	var enemies = battle_mgr.get_enemy_combatants()
+	if enemies.size() > 0:
+		var enemy_header = Label.new()
+		enemy_header.text = "\n--- Enemies ---"
+		enemy_header.add_theme_font_size_override("font_size", 14)
+		enemy_header.add_theme_color_override("font_color", Color(1.0, 0.3, 0.3, 1.0))
+		character_list.add_child(enemy_header)
+
+		for enemy in enemies:
+			var btn = Button.new()
+			var hp_text = "%d/%d HP" % [enemy.hp, enemy.hp_max]
+			var status_text = ""
+			if enemy.is_ko:
+				status_text = " [KO]"
+			elif enemy.get("ailment", "") != "":
+				status_text = " [%s]" % String(enemy.ailment).capitalize()
+
+			btn.text = "%s - %s%s" % [enemy.display_name, hp_text, status_text]
+			btn.custom_minimum_size = Vector2(460, 30)
+			character_list.add_child(btn)
+			character_buttons.append(btn)
+			character_data.append(enemy)
+
+	# Close button
+	var close_btn = Button.new()
+	close_btn.text = "Close (B)"
+	close_btn.custom_minimum_size = Vector2(120, 30)
+	vbox.add_child(close_btn)
+
+	# Controller navigation state
+	var selected_index: int = 0
+	var input_cooldown: float = 0.0
+	var input_cooldown_duration: float = 0.15
+
+	# Connect button signals
+	for i in range(character_buttons.size()):
+		var idx = i  # Capture index
+		character_buttons[i].pressed.connect(func():
+			# Show status for this character
+			_show_status_details(character_data[idx])
+		)
+
+	close_btn.pressed.connect(func():
+		picker_panel.queue_free()
+		modal_bg.queue_free()
+	)
+
+	# Highlight first character
+	var _highlight_status_button = func(index: int) -> void:
+		for i in range(character_buttons.size()):
+			character_buttons[i].modulate = Color(1.0, 1.0, 1.0, 1.0)
+		if index >= 0 and index < character_buttons.size():
+			character_buttons[index].modulate = Color(1.2, 1.2, 0.8, 1.0)
+			character_buttons[index].grab_focus()
+			if scroll:
+				scroll.ensure_control_visible(character_buttons[index])
+
+	if character_buttons.size() > 0:
+		_highlight_status_button.call(0)
+
+	# Controller input handling
+	var input_handler = func(event: InputEvent) -> void:
+		if input_cooldown > 0:
+			return
+
+		if event.is_action_pressed(aInputManager.ACTION_MOVE_UP):
+			selected_index -= 1
+			if selected_index < 0:
+				selected_index = character_buttons.size() - 1
+			_highlight_status_button.call(selected_index)
+			input_cooldown = input_cooldown_duration
+			get_viewport().set_input_as_handled()
+		elif event.is_action_pressed(aInputManager.ACTION_MOVE_DOWN):
+			selected_index += 1
+			if selected_index >= character_buttons.size():
+				selected_index = 0
+			_highlight_status_button.call(selected_index)
+			input_cooldown = input_cooldown_duration
+			get_viewport().set_input_as_handled()
+		elif event.is_action_pressed(aInputManager.ACTION_ACCEPT):
+			if selected_index >= 0 and selected_index < character_buttons.size():
+				get_viewport().set_input_as_handled()
+				_show_status_details(character_data[selected_index])
+		elif event.is_action_pressed(aInputManager.ACTION_BACK):
+			get_viewport().set_input_as_handled()
+			picker_panel.queue_free()
+			modal_bg.queue_free()
+
+	# Process function for cooldown
+	var process_handler = func(delta: float) -> void:
+		if input_cooldown > 0:
+			input_cooldown -= delta
+
+	# Connect input and process
+	picker_panel.set_process_input(true)
+	picker_panel.input_event.connect(input_handler)
+	picker_panel.set_process(true)
+	picker_panel.process.connect(process_handler)
+
+	add_child(picker_panel)
+
 func _calculate_run_chance() -> float:
 	"""Calculate run chance based on enemy HP percentage and level difference"""
 	const BASE_RUN_CHANCE: float = 5.0  # Base 5% escape chance (18° gap)
@@ -1995,20 +2544,30 @@ func _on_ally_panel_input(event: InputEvent, target: Dictionary) -> void:
 
 func _highlight_target_candidates() -> void:
 	"""Highlight valid targets with a visual indicator"""
+	# Get currently selected target ID
+	var selected_target_id = ""
+	if selected_target_index >= 0 and selected_target_index < target_candidates.size():
+		selected_target_id = target_candidates[selected_target_index].id
+
 	# Highlight enemies
 	for child in enemy_slots.get_children():
 		var combatant_id = child.get_meta("combatant_id", "")
 		var is_candidate = target_candidates.any(func(c): return c.id == combatant_id)
 
 		if is_candidate:
-			# Add yellow border to indicate targetable
 			var style = StyleBoxFlat.new()
 			style.bg_color = Color(0.3, 0.2, 0.2, 0.9)
 			style.border_width_left = 4
 			style.border_width_right = 4
 			style.border_width_top = 4
 			style.border_width_bottom = 4
-			style.border_color = Color(1.0, 1.0, 0.0, 1.0)  # Yellow highlight
+
+			# Red border for currently selected, yellow for others
+			if combatant_id == selected_target_id:
+				style.border_color = Color(1.0, 0.2, 0.2, 1.0)  # Red - currently selected
+			else:
+				style.border_color = Color(1.0, 1.0, 0.0, 1.0)  # Yellow - targetable
+
 			child.add_theme_stylebox_override("panel", style)
 
 	# Highlight allies (for items)
@@ -2017,14 +2576,19 @@ func _highlight_target_candidates() -> void:
 		var is_candidate = target_candidates.any(func(c): return c.id == combatant_id)
 
 		if is_candidate:
-			# Add green border to indicate targetable ally
 			var style = StyleBoxFlat.new()
 			style.bg_color = Color(0.2, 0.3, 0.2, 0.9)
 			style.border_width_left = 4
 			style.border_width_right = 4
 			style.border_width_top = 4
 			style.border_width_bottom = 4
-			style.border_color = Color(0.0, 1.0, 0.0, 1.0)  # Green highlight
+
+			# Red border for currently selected, green for others
+			if combatant_id == selected_target_id:
+				style.border_color = Color(1.0, 0.2, 0.2, 1.0)  # Red - currently selected
+			else:
+				style.border_color = Color(0.0, 1.0, 0.0, 1.0)  # Green - targetable
+
 			child.add_theme_stylebox_override("panel", style)
 
 func _clear_target_highlights() -> void:
@@ -2272,6 +2836,8 @@ func _show_skill_menu(skill_menu: Array) -> void:
 
 	# Store current menu
 	current_skill_menu = skill_menu
+	skill_menu_buttons = []
+	selected_skill_index = 0
 
 	# Create skill menu panel
 	skill_menu_panel = PanelContainer.new()
@@ -2348,6 +2914,8 @@ func _show_skill_menu(skill_menu: Array) -> void:
 			button.text += "\n[Wrong Type - Need %s]" % skill_element_cap
 		else:
 			button.pressed.connect(_on_skill_button_pressed.bind(i))
+			# Only add enabled buttons to navigation list
+			skill_menu_buttons.append(button)
 
 		vbox.add_child(button)
 
@@ -2369,6 +2937,10 @@ func _show_skill_menu(skill_menu: Array) -> void:
 		(get_viewport_rect().size.x - skill_menu_panel.custom_minimum_size.x) / 2,
 		100
 	)
+
+	# Highlight first skill if available
+	if not skill_menu_buttons.is_empty():
+		_highlight_skill_button(0)
 
 func _on_skill_button_pressed(index: int) -> void:
 	"""Handle skill button press"""
@@ -2468,9 +3040,60 @@ func _close_skill_menu() -> void:
 		skill_menu_panel.queue_free()
 		skill_menu_panel = null
 	current_skill_menu = []
+	skill_menu_buttons = []
+	selected_skill_index = 0
 
 	# Show action menu again
 	action_menu.visible = true
+
+func _navigate_skill_menu(direction: int) -> void:
+	"""Navigate skill menu with controller (direction: -1 for up, 1 for down)"""
+	if skill_menu_buttons.is_empty():
+		return
+
+	# Remove highlight from current button
+	_unhighlight_skill_button(selected_skill_index)
+
+	# Move selection
+	selected_skill_index += direction
+
+	# Wrap around
+	if selected_skill_index < 0:
+		selected_skill_index = skill_menu_buttons.size() - 1
+	elif selected_skill_index >= skill_menu_buttons.size():
+		selected_skill_index = 0
+
+	# Highlight new button
+	_highlight_skill_button(selected_skill_index)
+
+func _confirm_skill_selection() -> void:
+	"""Confirm skill selection with A button"""
+	if selected_skill_index >= 0 and selected_skill_index < skill_menu_buttons.size():
+		# Find the actual skill index in current_skill_menu
+		var button = skill_menu_buttons[selected_skill_index]
+		# Simulate button press - need to find the index
+		for i in range(current_skill_menu.size()):
+			var menu_entry = current_skill_menu[i]
+			var skill_data = menu_entry.skill_data
+			var skill_name = String(skill_data.get("name", "Unknown"))
+			var sigil_name = menu_entry.sigil_name
+
+			# Check if this matches the selected button text
+			if button.text.contains(skill_name) and button.text.contains(sigil_name):
+				_on_skill_button_pressed(i)
+				return
+
+func _highlight_skill_button(index: int) -> void:
+	"""Highlight a skill button for controller navigation"""
+	if index >= 0 and index < skill_menu_buttons.size():
+		var button = skill_menu_buttons[index]
+		button.modulate = Color(1.2, 1.2, 0.8, 1.0)  # Yellowish tint
+
+func _unhighlight_skill_button(index: int) -> void:
+	"""Remove highlight from a skill button"""
+	if index >= 0 and index < skill_menu_buttons.size():
+		var button = skill_menu_buttons[index]
+		button.modulate = Color(1.0, 1.0, 1.0, 1.0)  # Normal color
 
 ## ═══════════════════════════════════════════════════════════════
 ## ITEM MENU
@@ -2480,6 +3103,10 @@ func _show_item_menu(items: Array) -> void:
 	"""Show item selection menu with categorized tabs"""
 	# Hide action menu
 	action_menu.visible = false
+
+	# Reset navigation
+	item_menu_buttons = []
+	selected_item_index = 0
 
 	# Categorize items
 	var restore_items = []
@@ -2532,6 +3159,9 @@ func _show_item_menu(items: Array) -> void:
 	tab_container.custom_minimum_size = Vector2(530, 300)
 	vbox.add_child(tab_container)
 
+	# Store reference for controller navigation
+	item_tab_container = tab_container
+
 	# Add category tabs (Restore, Cure, Tactical, Combat)
 	_add_category_tab(tab_container, "Restore", restore_items)
 	_add_category_tab(tab_container, "Cure", cure_items)
@@ -2568,6 +3198,9 @@ func _show_item_menu(items: Array) -> void:
 		(get_viewport_rect().size.x - 550) / 2,
 		(get_viewport_rect().size.y - 400) / 2
 	)
+
+	# Rebuild button list for first tab and highlight first item
+	_rebuild_item_button_list()
 
 func _add_category_tab(tab_container: TabContainer, category_name: String, category_items: Array) -> void:
 	"""Add a tab for a specific item category with two-column layout"""
@@ -2611,6 +3244,12 @@ func _add_category_tab(tab_container: TabContainer, category_name: String, categ
 		button.pressed.connect(_on_item_selected.bind(item_data))
 		button.mouse_entered.connect(_on_item_hover.bind(item_name, item_desc))
 		button.mouse_exited.connect(_on_item_unhover)
+
+		# Store item data on button for controller navigation
+		button.set_meta("item_data", item_data)
+		button.set_meta("item_name", item_name)
+		button.set_meta("item_desc", item_desc)
+
 		grid.add_child(button)
 
 func _close_item_menu() -> void:
@@ -2620,9 +3259,150 @@ func _close_item_menu() -> void:
 		item_menu_panel = null
 
 	item_description_label = null
+	item_tab_container = null
+	item_scroll_container = null
+	item_menu_buttons = []
+	selected_item_index = 0
 
 	# Show action menu again
 	action_menu.visible = true
+
+func _rebuild_item_button_list() -> void:
+	"""Rebuild the button list for the current tab"""
+	if not item_tab_container:
+		return
+
+	item_menu_buttons = []
+	selected_item_index = 0
+
+	# Get current tab
+	var current_tab = item_tab_container.get_current_tab_control()
+	if not current_tab:
+		return
+
+	# Find all buttons in the current tab
+	var scroll = current_tab as ScrollContainer
+	if not scroll:
+		return
+
+	# Store reference to scroll container for auto-scrolling
+	item_scroll_container = scroll
+
+	var grid = scroll.get_child(0) as GridContainer
+	if not grid:
+		return
+
+	# Collect all buttons
+	for child in grid.get_children():
+		if child is Button:
+			item_menu_buttons.append(child)
+
+	# Highlight first item if available
+	if not item_menu_buttons.is_empty():
+		_highlight_item_button(0)
+		# Show description for first item
+		var first_button = item_menu_buttons[0]
+		if first_button.has_meta("item_name") and first_button.has_meta("item_desc"):
+			_on_item_hover(first_button.get_meta("item_name"), first_button.get_meta("item_desc"))
+
+func _navigate_item_menu(direction: int) -> void:
+	"""Navigate item menu vertically (direction: -1 for up, 1 for down)"""
+	if item_menu_buttons.is_empty():
+		return
+
+	# Remove highlight from current button
+	_unhighlight_item_button(selected_item_index)
+
+	# Move selection by 2 (one row in 2-column grid)
+	selected_item_index += direction * 2
+
+	# Wrap around
+	if selected_item_index < 0:
+		# Wrapped past top - go to last row
+		selected_item_index = item_menu_buttons.size() - 1
+	elif selected_item_index >= item_menu_buttons.size():
+		# Wrapped past bottom - go to first row, same column
+		# Check if we were on left or right column
+		var was_right_column = (selected_item_index - direction * 2) % 2 == 1
+		selected_item_index = 1 if was_right_column else 0
+
+	# Highlight new button
+	_highlight_item_button(selected_item_index)
+
+	# Update description
+	var button = item_menu_buttons[selected_item_index]
+	if button.has_meta("item_name") and button.has_meta("item_desc"):
+		_on_item_hover(button.get_meta("item_name"), button.get_meta("item_desc"))
+
+func _navigate_item_menu_horizontal(direction: int) -> void:
+	"""Navigate item menu horizontally (direction: -1 for left, 1 for right)"""
+	if item_menu_buttons.is_empty():
+		return
+
+	# Remove highlight from current button
+	_unhighlight_item_button(selected_item_index)
+
+	# Move selection by 1 (left/right within same row)
+	selected_item_index += direction
+
+	# Wrap around
+	if selected_item_index < 0:
+		selected_item_index = item_menu_buttons.size() - 1
+	elif selected_item_index >= item_menu_buttons.size():
+		selected_item_index = 0
+
+	# Highlight new button
+	_highlight_item_button(selected_item_index)
+
+	# Update description
+	var button = item_menu_buttons[selected_item_index]
+	if button.has_meta("item_name") and button.has_meta("item_desc"):
+		_on_item_hover(button.get_meta("item_name"), button.get_meta("item_desc"))
+
+func _switch_item_tab(direction: int) -> void:
+	"""Switch item tabs with left/right (direction: -1 for left, 1 for right)"""
+	if not item_tab_container:
+		return
+
+	var current_tab = item_tab_container.get_current_tab()
+	var tab_count = item_tab_container.get_tab_count()
+
+	var new_tab = current_tab + direction
+
+	# Wrap around
+	if new_tab < 0:
+		new_tab = tab_count - 1
+	elif new_tab >= tab_count:
+		new_tab = 0
+
+	item_tab_container.set_current_tab(new_tab)
+
+	# Rebuild button list for new tab
+	_rebuild_item_button_list()
+
+func _confirm_item_selection() -> void:
+	"""Confirm item selection with A button"""
+	if selected_item_index >= 0 and selected_item_index < item_menu_buttons.size():
+		var button = item_menu_buttons[selected_item_index]
+		# Trigger the button press
+		button.emit_signal("pressed")
+
+func _highlight_item_button(index: int) -> void:
+	"""Highlight an item button for controller navigation"""
+	if index >= 0 and index < item_menu_buttons.size():
+		var button = item_menu_buttons[index]
+		button.modulate = Color(1.2, 1.2, 0.8, 1.0)  # Yellowish tint
+
+		# Auto-scroll to ensure button is visible
+		if item_scroll_container:
+			# Use ensure_control_visible to automatically scroll to the button
+			item_scroll_container.ensure_control_visible(button)
+
+func _unhighlight_item_button(index: int) -> void:
+	"""Remove highlight from an item button"""
+	if index >= 0 and index < item_menu_buttons.size():
+		var button = item_menu_buttons[index]
+		button.modulate = Color(1.0, 1.0, 1.0, 1.0)  # Normal color
 
 func _on_item_hover(item_name: String, item_desc: String) -> void:
 	"""Show item description when hovering over button"""
@@ -2716,7 +3496,12 @@ func _on_item_selected(item_data: Dictionary) -> void:
 	# Enable target selection mode
 	awaiting_target_selection = true
 	awaiting_item_target = true
+	selected_target_index = 0  # Start with first target
 	_highlight_target_candidates()
+
+	# Show currently selected target
+	if not target_candidates.is_empty():
+		log_message("→ %s" % target_candidates[0].display_name)
 
 ## ═══════════════════════════════════════════════════════════════
 ## CAPTURE/BIND MENU
@@ -2726,6 +3511,10 @@ func _show_capture_menu(bind_items: Array) -> void:
 	"""Show bind item selection menu for capture"""
 	# Hide action menu
 	action_menu.visible = false
+
+	# Reset navigation
+	capture_menu_buttons = []
+	selected_capture_index = 0
 
 	# Create capture menu panel
 	capture_menu_panel = PanelContainer.new()
@@ -2781,6 +3570,9 @@ func _show_capture_menu(bind_items: Array) -> void:
 		button.pressed.connect(_on_bind_selected.bind(bind_data))
 		items_vbox.add_child(button)
 
+		# Add to navigation list
+		capture_menu_buttons.append(button)
+
 	# Add cancel button
 	var sep2 = HSeparator.new()
 	vbox.add_child(sep2)
@@ -2798,14 +3590,59 @@ func _show_capture_menu(bind_items: Array) -> void:
 		(get_viewport_rect().size.y - vbox.size.y) / 2
 	)
 
+	# Highlight first item if available
+	if not capture_menu_buttons.is_empty():
+		_highlight_capture_button(0)
+
 func _close_capture_menu() -> void:
 	"""Close the capture menu"""
 	if capture_menu_panel:
 		capture_menu_panel.queue_free()
 		capture_menu_panel = null
+	capture_menu_buttons = []
+	selected_capture_index = 0
 
 	# Show action menu again
 	action_menu.visible = true
+
+func _navigate_capture_menu(direction: int) -> void:
+	"""Navigate capture menu with controller (direction: -1 for up, 1 for down)"""
+	if capture_menu_buttons.is_empty():
+		return
+
+	# Remove highlight from current button
+	_unhighlight_capture_button(selected_capture_index)
+
+	# Move selection
+	selected_capture_index += direction
+
+	# Wrap around
+	if selected_capture_index < 0:
+		selected_capture_index = capture_menu_buttons.size() - 1
+	elif selected_capture_index >= capture_menu_buttons.size():
+		selected_capture_index = 0
+
+	# Highlight new button
+	_highlight_capture_button(selected_capture_index)
+
+func _confirm_capture_selection() -> void:
+	"""Confirm capture item selection with A button"""
+	if selected_capture_index >= 0 and selected_capture_index < capture_menu_buttons.size():
+		var button = capture_menu_buttons[selected_capture_index]
+		# Trigger the button press
+		button.emit_signal("pressed")
+
+func _highlight_capture_button(index: int) -> void:
+	"""Highlight a capture button for controller navigation"""
+	if index >= 0 and index < capture_menu_buttons.size():
+		var button = capture_menu_buttons[index]
+		button.modulate = Color(1.2, 1.2, 0.8, 1.0)  # Yellowish tint
+
+func _unhighlight_capture_button(index: int) -> void:
+	"""Remove highlight from a capture button"""
+	if index >= 0 and index < capture_menu_buttons.size():
+		var button = capture_menu_buttons[index]
+		button.modulate = Color(1.0, 1.0, 1.0, 1.0)  # Normal color
 
 func _on_bind_selected(bind_data: Dictionary) -> void:
 	"""Handle bind item selection from capture menu"""
@@ -2827,7 +3664,12 @@ func _on_bind_selected(bind_data: Dictionary) -> void:
 	# Enable capture target selection mode
 	awaiting_target_selection = true
 	awaiting_capture_target = true
+	selected_target_index = 0  # Start with first target
 	_highlight_target_candidates()
+
+	# Show currently selected target
+	if not target_candidates.is_empty():
+		log_message("→ %s" % target_candidates[0].display_name)
 
 ## ═══════════════════════════════════════════════════════════════
 ## BURST MENU & EXECUTION
@@ -2837,6 +3679,10 @@ func _show_burst_menu(burst_abilities: Array) -> void:
 	"""Show burst ability selection menu"""
 	# Hide action menu
 	action_menu.visible = false
+
+	# Reset navigation
+	burst_menu_buttons = []
+	selected_burst_index = 0
 
 	# Debug: print burst abilities
 	print("[Battle] Showing burst menu with %d abilities" % burst_abilities.size())
@@ -2937,6 +3783,8 @@ func _show_burst_menu(burst_abilities: Array) -> void:
 			button.text += "\n[Not enough Burst Gauge]"
 		else:
 			button.pressed.connect(_on_burst_selected.bind(burst_data))
+			# Only add enabled buttons to navigation list
+			burst_menu_buttons.append(button)
 
 		vbox.add_child(button)
 
@@ -2957,14 +3805,59 @@ func _show_burst_menu(burst_abilities: Array) -> void:
 		100
 	)
 
+	# Highlight first burst if available
+	if not burst_menu_buttons.is_empty():
+		_highlight_burst_button(0)
+
 func _close_burst_menu() -> void:
 	"""Close the burst menu"""
 	if burst_menu_panel:
 		burst_menu_panel.queue_free()
 		burst_menu_panel = null
+	burst_menu_buttons = []
+	selected_burst_index = 0
 
 	# Show action menu again
 	action_menu.visible = true
+
+func _navigate_burst_menu(direction: int) -> void:
+	"""Navigate burst menu with controller (direction: -1 for up, 1 for down)"""
+	if burst_menu_buttons.is_empty():
+		return
+
+	# Remove highlight from current button
+	_unhighlight_burst_button(selected_burst_index)
+
+	# Move selection
+	selected_burst_index += direction
+
+	# Wrap around
+	if selected_burst_index < 0:
+		selected_burst_index = burst_menu_buttons.size() - 1
+	elif selected_burst_index >= burst_menu_buttons.size():
+		selected_burst_index = 0
+
+	# Highlight new button
+	_highlight_burst_button(selected_burst_index)
+
+func _confirm_burst_selection() -> void:
+	"""Confirm burst ability selection with A button"""
+	if selected_burst_index >= 0 and selected_burst_index < burst_menu_buttons.size():
+		var button = burst_menu_buttons[selected_burst_index]
+		# Trigger the button press
+		button.emit_signal("pressed")
+
+func _highlight_burst_button(index: int) -> void:
+	"""Highlight a burst button for controller navigation"""
+	if index >= 0 and index < burst_menu_buttons.size():
+		var button = burst_menu_buttons[index]
+		button.modulate = Color(1.2, 1.2, 0.8, 1.0)  # Yellowish tint
+
+func _unhighlight_burst_button(index: int) -> void:
+	"""Remove highlight from a burst button"""
+	if index >= 0 and index < burst_menu_buttons.size():
+		var button = burst_menu_buttons[index]
+		button.modulate = Color(1.0, 1.0, 1.0, 1.0)  # Normal color
 
 func _on_burst_selected(burst_data: Dictionary) -> void:
 	"""Handle burst ability selection"""
@@ -2992,7 +3885,12 @@ func _on_burst_selected(burst_data: Dictionary) -> void:
 
 		log_message("Select a target...")
 		awaiting_target_selection = true
+		selected_target_index = 0  # Start with first target
 		_highlight_target_candidates()
+
+		# Show currently selected target
+		if not target_candidates.is_empty():
+			log_message("→ %s" % target_candidates[0].display_name)
 	else:
 		# Self/Ally targeting not implemented yet
 		log_message("This burst targeting not yet implemented")
@@ -3162,7 +4060,12 @@ func _on_skill_selected(skill_entry: Dictionary) -> void:
 			log_message("Select a target...")
 			awaiting_target_selection = true
 			awaiting_skill_selection = true
+			selected_target_index = 0  # Start with first target
 			_highlight_target_candidates()
+
+			# Show currently selected target
+			if not target_candidates.is_empty():
+				log_message("→ %s" % target_candidates[0].display_name)
 	elif target_type == "ally" or target_type == "allies":
 		# TODO: Implement ally targeting
 		log_message("Ally targeting not yet implemented")

@@ -25,6 +25,8 @@ var overall_timer: float = 0.0  # Overall countdown timer
 var max_overall_time: float = 3.0  # Total time for entire minigame (reduced to 3 seconds)
 var last_input_button: String = ""  # Track last button to prevent double-input
 var minigame_complete: bool = false  # Lock out all input when complete
+var input_grace_timer: float = 0.0  # Prevent button carryover from target selection
+var input_grace_period: float = 0.3  # 0.3 second grace period
 
 ## Visual elements
 var title_label: Label
@@ -43,12 +45,14 @@ var drop_offset: float = 0.0
 var drop_velocity: float = 0.0
 var drop_gravity: float = 800.0  # Pixels per second squared
 
-## Button mapping
+## Button mapping (InputManager action strings to button labels)
+## Using InputManager action strings for proper controller support
+## These match the face buttons on Xbox/PlayStation controllers
 const BUTTON_MAP = {
-	KEY_SPACE: "A",
-	KEY_COMMA: "B",
-	KEY_PERIOD: "Y",
-	KEY_SLASH: "X"
+	"menu_accept": "A",      # A button (Xbox A / PS Cross)
+	"battle_defend": "X",    # X button (Xbox X / PS Square)
+	"battle_attack": "B",    # B button (Xbox B / PS Circle)
+	"battle_skill": "Y"      # Y button (Xbox Y / PS Triangle)
 }
 
 ## Focus charge speeds (seconds per level)
@@ -175,7 +179,7 @@ func _setup_minigame() -> void:
 
 	# Focus level label
 	focus_level_label = Label.new()
-	focus_level_label.text = "Focus Level: 0 | Hold SPACE to charge!"
+	focus_level_label.text = "Focus Level: 0 | Hold A (Accept) to charge!"
 	focus_level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	focus_level_label.add_theme_font_size_override("font_size", 20)
 	content_container.add_child(focus_level_label)
@@ -199,7 +203,7 @@ func _setup_minigame() -> void:
 
 	# Instructions
 	instruction_label = Label.new()
-	instruction_label.text = "Release to start casting!"
+	instruction_label.text = "Release A (Accept) to start casting!"
 	instruction_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	instruction_label.add_theme_font_size_override("font_size", 16)
 	content_container.add_child(instruction_label)
@@ -251,6 +255,13 @@ func _process(delta: float) -> void:
 			_process_inputting(delta)
 
 func _process_charging(delta: float) -> void:
+	# Update input grace timer
+	if input_grace_timer < input_grace_period:
+		input_grace_timer += delta
+		# During grace period, show waiting message
+		focus_level_label.text = "Get ready..."
+		return
+
 	# Update halt timer if status effect is active
 	if has_halt_status and not is_charge_halted:
 		halt_timer += delta
@@ -261,10 +272,10 @@ func _process_charging(delta: float) -> void:
 			focus_level_label.modulate = Color(1.0, 0.3, 0.3, 1.0)
 			print("[SkillMinigame] Charge halted at %.2fs" % halt_timer)
 
-	# Track Space key state
-	var space_is_pressed = Input.is_key_pressed(KEY_SPACE)
+	# Track Accept button state (A button / Space)
+	var space_is_pressed = aInputManager.is_action_pressed(aInputManager.ACTION_ACCEPT)
 
-	# Check if Space is held
+	# Check if button is held
 	if space_is_pressed:
 		# Start the timer on first press
 		if not has_started_charging:
@@ -309,8 +320,8 @@ func _process_charging(delta: float) -> void:
 			_finish_minigame_incomplete()
 			return
 
-	# Check if Space was released
-	if Input.is_action_just_released("ui_accept") or (not Input.is_key_pressed(KEY_SPACE) and charge_time > 0):
+	# Check if button was released
+	if aInputManager.is_action_just_released(aInputManager.ACTION_ACCEPT) and charge_time > 0:
 		_start_input_phase()
 
 func _update_focus_visuals() -> void:
@@ -367,9 +378,9 @@ func _process_inputting(delta: float) -> void:
 
 	# Check for button input (single press detection)
 	var current_button = ""
-	for key in BUTTON_MAP.keys():
-		if Input.is_key_pressed(key):
-			current_button = BUTTON_MAP[key]
+	for action in BUTTON_MAP.keys():
+		if aInputManager.is_action_pressed(action):
+			current_button = BUTTON_MAP[action]
 			break
 
 	# Only process if a button is pressed AND it's different from last frame

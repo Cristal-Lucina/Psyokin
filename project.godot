@@ -51,6 +51,7 @@ aStarterLoadout="*res://scripts/systems/StarterLoadout.gd"
 aTransitionManager="*res://scripts/core/TransitionManager.gd"
 aBattleManager="*res://scripts/battle/BattleManager.gd"
 aMinigameManager="*res://scripts/battle/MinigameManager.gd"
+aInputManager="*res://scripts/core/InputManager.gd"
 
 [editor]
 

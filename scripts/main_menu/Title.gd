@@ -33,6 +33,12 @@ const QUIT_PATHS     : PackedStringArray = [
 	"QuitButton"
 ]
 
+# Controller navigation
+var navigable_buttons: Array[Button] = []
+var selected_button_index: int = 0
+var input_cooldown: float = 0.0
+var input_cooldown_duration: float = 0.15  # 150ms between inputs
+
 # ------------------------------------------------------------------------------
 
 func _ready() -> void:
@@ -75,6 +81,9 @@ func _ready() -> void:
 				var label: String = String(meta.get("summary", String(meta.get("label", ""))))
 				if label != "":
 					continue_btn.text = "Continue - %s" % label
+
+	# Setup controller navigation
+	_setup_controller_navigation(new_btn, continue_btn, load_btn, options_btn, quit_btn, has_save)
 
 # ------------------------------------------------------------------------------
 # Button handlers
@@ -310,3 +319,93 @@ func _collect_buttons(n: Node, out: Array) -> void:
 		if c is Button:
 			out.append(c)
 		_collect_buttons(c, out)
+
+# ------------------------------------------------------------------------------
+# Controller Navigation
+# ------------------------------------------------------------------------------
+
+func _setup_controller_navigation(new_btn: Button, continue_btn: Button, load_btn: Button, options_btn: Button, quit_btn: Button, has_save: bool) -> void:
+	"""Setup controller navigation for menu buttons"""
+	navigable_buttons.clear()
+
+	# Add buttons in order (skip hidden ones)
+	if new_btn:
+		navigable_buttons.append(new_btn)
+	if continue_btn and has_save:
+		navigable_buttons.append(continue_btn)
+	if load_btn and has_save:
+		navigable_buttons.append(load_btn)
+	if options_btn:
+		navigable_buttons.append(options_btn)
+	if quit_btn:
+		navigable_buttons.append(quit_btn)
+
+	# Highlight first button
+	if navigable_buttons.size() > 0:
+		selected_button_index = 0
+		_highlight_button(selected_button_index)
+
+func _process(delta: float) -> void:
+	"""Handle input cooldown"""
+	if input_cooldown > 0:
+		input_cooldown -= delta
+
+func _input(event: InputEvent) -> void:
+	"""Handle controller input for menu navigation"""
+	if navigable_buttons.is_empty():
+		return
+
+	if input_cooldown > 0:
+		return
+
+	# Navigate up/down
+	if event.is_action_pressed(aInputManager.ACTION_MOVE_UP):
+		_navigate_menu(-1)
+		input_cooldown = input_cooldown_duration
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed(aInputManager.ACTION_MOVE_DOWN):
+		_navigate_menu(1)
+		input_cooldown = input_cooldown_duration
+		get_viewport().set_input_as_handled()
+	# Accept button activates selected button
+	elif event.is_action_pressed(aInputManager.ACTION_ACCEPT):
+		if selected_button_index >= 0 and selected_button_index < navigable_buttons.size():
+			var button = navigable_buttons[selected_button_index]
+			# Mark input as handled BEFORE triggering button (scene may change)
+			get_viewport().set_input_as_handled()
+			# Trigger the button's pressed signal by emitting it
+			# Note: This may destroy this node if it changes scenes, so nothing after this line will execute
+			button.emit_signal("pressed")
+
+func _navigate_menu(direction: int) -> void:
+	"""Navigate menu with controller"""
+	if navigable_buttons.is_empty():
+		return
+
+	_unhighlight_button(selected_button_index)
+
+	selected_button_index += direction
+	if selected_button_index < 0:
+		selected_button_index = navigable_buttons.size() - 1
+	elif selected_button_index >= navigable_buttons.size():
+		selected_button_index = 0
+
+	_highlight_button(selected_button_index)
+
+func _highlight_button(index: int) -> void:
+	"""Highlight a button - resets all buttons first to ensure only one is selected"""
+	# First, unhighlight ALL buttons to ensure only one is highlighted
+	for i in range(navigable_buttons.size()):
+		navigable_buttons[i].modulate = Color(1.0, 1.0, 1.0, 1.0)
+
+	# Now highlight the selected button
+	if index >= 0 and index < navigable_buttons.size():
+		var button = navigable_buttons[index]
+		button.modulate = Color(1.2, 1.2, 0.8, 1.0)
+		button.grab_focus()
+
+func _unhighlight_button(index: int) -> void:
+	"""Remove highlight from a button"""
+	if index >= 0 and index < navigable_buttons.size():
+		var button = navigable_buttons[index]
+		button.modulate = Color(1.0, 1.0, 1.0, 1.0)
