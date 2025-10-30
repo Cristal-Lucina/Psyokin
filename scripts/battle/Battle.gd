@@ -22,6 +22,7 @@ class_name Battle
 @onready var enemy_slots: HBoxContainer = %EnemySlots
 
 ## State
+var is_battle_ready: bool = false  # True when battle is fully initialized
 var current_combatant: Dictionary = {}
 var awaiting_target_selection: bool = false
 var target_candidates: Array = []
@@ -75,6 +76,9 @@ func _ready() -> void:
 
 	# Initialize battle with party and enemies
 	_initialize_battle()
+
+	# Mark battle as ready for input
+	is_battle_ready = true
 
 func _update_action_button_labels() -> void:
 	"""Update action button labels to show action name + mapped key/button"""
@@ -139,6 +143,10 @@ func _load_skills() -> void:
 
 func _input(event: InputEvent) -> void:
 	"""Handle keyboard/controller input for battle actions and target selection"""
+	# Safety check: only handle input if battle is ready
+	if not is_battle_ready or not is_instance_valid(aInputManager):
+		return
+
 	# If awaiting target selection, handle navigation
 	if awaiting_target_selection and not target_candidates.is_empty():
 		if event.is_action_pressed(aInputManager.ACTION_MOVE_LEFT):
