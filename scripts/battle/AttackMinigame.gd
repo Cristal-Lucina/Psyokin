@@ -308,12 +308,7 @@ func _process_watching(delta: float) -> void:
 				_start_charging()
 				is_charging = true
 				print("[AttackMinigame DEBUG] Started charging!")
-		else:
-			if is_charging:
-				# Released! Attack at current charge
-				print("[AttackMinigame DEBUG] Button released, firing at charge: ", charge_progress)
-				_release_attack()
-				is_charging = false
+		# Note: Release checking moved to _process_charging() phase
 
 func _start_charging() -> void:
 	"""Start charging the attack gauge"""
