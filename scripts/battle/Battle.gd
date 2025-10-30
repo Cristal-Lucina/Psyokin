@@ -2382,9 +2382,15 @@ func _show_status_character_picker() -> void:
 	if character_buttons.size() > 0:
 		_highlight_status_button.call(0)
 
+	# Create cooldown timer for input navigation
+	var cooldown_timer = Timer.new()
+	cooldown_timer.wait_time = input_cooldown_duration
+	cooldown_timer.one_shot = true
+	picker_panel.add_child(cooldown_timer)
+
 	# Controller input handling
 	var input_handler = func(event: InputEvent) -> void:
-		if input_cooldown > 0:
+		if not cooldown_timer.is_stopped():
 			return
 
 		if event.is_action_pressed(aInputManager.ACTION_MOVE_UP):
@@ -2392,14 +2398,14 @@ func _show_status_character_picker() -> void:
 			if selected_index < 0:
 				selected_index = character_buttons.size() - 1
 			_highlight_status_button.call(selected_index)
-			input_cooldown = input_cooldown_duration
+			cooldown_timer.start()
 			get_viewport().set_input_as_handled()
 		elif event.is_action_pressed(aInputManager.ACTION_MOVE_DOWN):
 			selected_index += 1
 			if selected_index >= character_buttons.size():
 				selected_index = 0
 			_highlight_status_button.call(selected_index)
-			input_cooldown = input_cooldown_duration
+			cooldown_timer.start()
 			get_viewport().set_input_as_handled()
 		elif event.is_action_pressed(aInputManager.ACTION_ACCEPT):
 			if selected_index >= 0 and selected_index < character_buttons.size():
@@ -2410,16 +2416,8 @@ func _show_status_character_picker() -> void:
 			picker_panel.queue_free()
 			modal_bg.queue_free()
 
-	# Process function for cooldown
-	var process_handler = func(delta: float) -> void:
-		if input_cooldown > 0:
-			input_cooldown -= delta
-
-	# Connect input and process
-	picker_panel.set_process_input(true)
-	picker_panel.input_event.connect(input_handler)
-	picker_panel.set_process(true)
-	picker_panel.process.connect(process_handler)
+	# Connect input handler
+	picker_panel.gui_input.connect(input_handler)
 
 	add_child(picker_panel)
 
