@@ -15,12 +15,11 @@ const TAB_DEFS: Dictionary = {
 	"dorms":   {"title": "Dorms",   "scene": "res://scenes/main_menu/panels/DormsPanel.tscn"},
 	"calendar":{"title": "Calendar","scene": "res://scenes/main_menu/panels/CalendarPanel.tscn"},
 	"index":   {"title": "Index",   "scene": "res://scenes/main_menu/panels/IndexPanel.tscn"},
-	"controls":{"title": "Controls","scene": "res://scenes/main_menu/panels/ControlsPanel.tscn"},
 	"system":  {"title": "System",  "scene": "res://scenes/main_menu/panels/SystemPanel.tscn"},
 }
 
 const TAB_ORDER: PackedStringArray = [
-	"status","stats","perks","items","loadout","bonds","outreach","dorms","calendar","index","controls","system"
+	"status","stats","perks","items","loadout","bonds","outreach","dorms","calendar","index","system"
 ]
 
 @onready var _left_tabs: VBoxContainer = %LeftTabs
