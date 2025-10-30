@@ -38,7 +38,6 @@ var navigable_buttons: Array[Button] = []
 var selected_button_index: int = 0
 var input_cooldown: float = 0.0
 var input_cooldown_duration: float = 0.15  # 150ms between inputs
-var overlay_active: bool = false  # Track if overlay menu is open
 
 # ------------------------------------------------------------------------------
 
@@ -144,9 +143,8 @@ func _on_quit_pressed() -> void:
 
 func _on_overlay_closed() -> void:
 	"""Resume title screen when overlay closes."""
-	overlay_active = false
-	set_process_input(true)
-	set_process_unhandled_input(true)
+	print("[Title] Overlay closed, resuming title screen")
+	process_mode = Node.PROCESS_MODE_INHERIT
 
 # ------------------------------------------------------------------------------
 # Overlay helper
@@ -158,19 +156,15 @@ func _open_popup_overlay(scene_path: String) -> void:
 		push_error("[Title] Missing scene: %s" % scene_path)
 		return
 
-	# Pause title screen interaction
-	overlay_active = true
-	set_process_input(false)
-	set_process_unhandled_input(false)
+	print("[Title] Opening overlay: ", scene_path)
 
-	# Router preferred if present
-	if has_node("/root/aSceneRouter") and aSceneRouter.has_method("open_popup"):
-		aSceneRouter.open_popup(scene_path, get_tree().current_scene)
-		return
+	# Completely freeze title screen by disabling processing
+	process_mode = Node.PROCESS_MODE_DISABLED
 
 	var ps: PackedScene = load(scene_path) as PackedScene
 	if ps == null:
 		push_error("[Title] Could not load scene: %s" % scene_path)
+		process_mode = Node.PROCESS_MODE_INHERIT  # Resume on error
 		return
 
 	var inst: Node = ps.instantiate()
@@ -180,13 +174,14 @@ func _open_popup_overlay(scene_path: String) -> void:
 	# Connect to resume when overlay closes
 	if inst:
 		inst.tree_exited.connect(_on_overlay_closed)
+		print("[Title] Connected to overlay tree_exited signal")
 
 	if inst is Control:
 		var c: Control = inst
 		c.top_level = true
 		c.set_anchors_preset(Control.PRESET_FULL_RECT)
 		c.z_index = 2000
-		# Ensure overlay processes even when title is "paused"
+		# Ensure overlay processes even when title is disabled
 		c.process_mode = Node.PROCESS_MODE_ALWAYS
 
 func _find_or_make_overlay_layer() -> CanvasLayer:
@@ -371,17 +366,11 @@ func _setup_controller_navigation(new_btn: Button, continue_btn: Button, load_bt
 
 func _process(delta: float) -> void:
 	"""Handle input cooldown"""
-	if overlay_active:
-		return
-
 	if input_cooldown > 0:
 		input_cooldown -= delta
 
 func _input(event: InputEvent) -> void:
 	"""Handle controller input for menu navigation"""
-	if overlay_active:
-		return
-
 	if navigable_buttons.is_empty():
 		return
 

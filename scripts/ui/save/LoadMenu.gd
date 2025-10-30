@@ -174,6 +174,7 @@ func _on_delete_pressed(slot: int) -> void:
 	_rebuild()
 
 func _on_close() -> void:
+	print("[LoadMenu] Closing load menu")
 	queue_free()
 
 func _on_to_title() -> void:

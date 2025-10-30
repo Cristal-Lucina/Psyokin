@@ -39,6 +39,7 @@ func _ready() -> void:
 		push_error("[Options] Controls panel not found!")
 
 func _on_close_pressed() -> void:
+	print("[Options] Closing options menu")
 	queue_free()
 
 func _build_controls_ui() -> void:
