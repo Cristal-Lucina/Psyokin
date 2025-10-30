@@ -69,10 +69,10 @@ func _input(event: InputEvent) -> void:
 		return
 
 	# Tab navigation mode
-	if event.is_action_pressed(aInputManager.ACTION_MOVE_UP):
+	if event.is_action_pressed(aInputManager.ACTION_MOVE_UP) or event.is_action_pressed(aInputManager.ACTION_MOVE_LEFT):
 		_navigate_tabs(-1)
 		get_viewport().set_input_as_handled()
-	elif event.is_action_pressed(aInputManager.ACTION_MOVE_DOWN):
+	elif event.is_action_pressed(aInputManager.ACTION_MOVE_DOWN) or event.is_action_pressed(aInputManager.ACTION_MOVE_RIGHT):
 		_navigate_tabs(1)
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed(aInputManager.ACTION_ACCEPT):
