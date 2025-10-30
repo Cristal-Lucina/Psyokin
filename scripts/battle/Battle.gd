@@ -3107,7 +3107,7 @@ func _navigate_item_menu(direction: int) -> void:
 		# Wrapped past bottom - go to first row, same column
 		# Check if we were on left or right column
 		var was_right_column = (selected_item_index - direction * 2) % 2 == 1
-		selected_item_index = was_right_column ? 1 : 0
+		selected_item_index = 1 if was_right_column else 0
 
 	# Highlight new button
 	_highlight_item_button(selected_item_index)
