@@ -39,6 +39,7 @@ var item_menu_panel: PanelContainer = null  # Item selection menu
 var item_menu_buttons: Array = []  # Buttons in current item tab for controller navigation
 var selected_item_index: int = 0  # Currently selected item in menu
 var item_tab_container: TabContainer = null  # Reference to tab container for switching
+var item_scroll_container: ScrollContainer = null  # Current tab's scroll container for auto-scrolling
 var item_description_label: Label = null  # Item description display
 var capture_menu_panel: PanelContainer = null  # Capture selection menu
 var capture_menu_buttons: Array = []  # Buttons in capture menu for controller navigation
@@ -3047,6 +3048,7 @@ func _close_item_menu() -> void:
 
 	item_description_label = null
 	item_tab_container = null
+	item_scroll_container = null
 	item_menu_buttons = []
 	selected_item_index = 0
 
@@ -3070,6 +3072,9 @@ func _rebuild_item_button_list() -> void:
 	var scroll = current_tab as ScrollContainer
 	if not scroll:
 		return
+
+	# Store reference to scroll container for auto-scrolling
+	item_scroll_container = scroll
 
 	var grid = scroll.get_child(0) as GridContainer
 	if not grid:
@@ -3175,6 +3180,11 @@ func _highlight_item_button(index: int) -> void:
 	if index >= 0 and index < item_menu_buttons.size():
 		var button = item_menu_buttons[index]
 		button.modulate = Color(1.2, 1.2, 0.8, 1.0)  # Yellowish tint
+
+		# Auto-scroll to ensure button is visible
+		if item_scroll_container:
+			# Use ensure_control_visible to automatically scroll to the button
+			item_scroll_container.ensure_control_visible(button)
 
 func _unhighlight_item_button(index: int) -> void:
 	"""Remove highlight from an item button"""
