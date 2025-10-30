@@ -155,6 +155,10 @@ func _input(event: InputEvent) -> void:
 	# Note: Input processing is disabled until battle is fully initialized
 	# This function only runs after set_process_input(true) is called in _ready()
 
+	# CRITICAL: Block ALL input if victory screen is showing
+	if victory_panel != null:
+		return
+
 	# CRITICAL: Block ALL input if a minigame is active
 	if minigame_mgr.current_minigame != null:
 		return
