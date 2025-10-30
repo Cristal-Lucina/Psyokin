@@ -370,7 +370,14 @@ func _input(event: InputEvent) -> void:
 	# Accept button activates selected button
 	elif event.is_action_pressed(aInputManager.ACTION_ACCEPT):
 		if selected_button_index >= 0 and selected_button_index < navigable_buttons.size():
-			navigable_buttons[selected_button_index].pressed.emit()
+			var button = navigable_buttons[selected_button_index]
+			# Simulate a button click by calling emit_signal instead of pressed.emit()
+			if button.pressed.get_connections().size() > 0:
+				# Get the first connected callable and call it
+				var connections = button.pressed.get_connections()
+				if connections.size() > 0:
+					var callable = connections[0]["callable"]
+					callable.call()
 			get_viewport().set_input_as_handled()
 
 func _navigate_menu(direction: int) -> void:
@@ -389,7 +396,12 @@ func _navigate_menu(direction: int) -> void:
 	_highlight_button(selected_button_index)
 
 func _highlight_button(index: int) -> void:
-	"""Highlight a button"""
+	"""Highlight a button - resets all buttons first to ensure only one is selected"""
+	# First, unhighlight ALL buttons to ensure only one is highlighted
+	for i in range(navigable_buttons.size()):
+		navigable_buttons[i].modulate = Color(1.0, 1.0, 1.0, 1.0)
+
+	# Now highlight the selected button
 	if index >= 0 and index < navigable_buttons.size():
 		var button = navigable_buttons[index]
 		button.modulate = Color(1.2, 1.2, 0.8, 1.0)
