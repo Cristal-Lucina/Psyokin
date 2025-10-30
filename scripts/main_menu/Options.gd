@@ -16,6 +16,7 @@ var _waiting_action: String = ""
 var _selected_action_index: int = 0
 var _input_cooldown: float = 0.0
 var _input_cooldown_duration: float = 0.2
+var _scroll_container: ScrollContainer = null  # Reference for auto-scrolling
 
 func _ready() -> void:
 	print("[Options] _ready() called")
@@ -60,6 +61,7 @@ func _build_controls_ui() -> void:
 	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_controls_panel.add_child(scroll)
+	_scroll_container = scroll  # Store reference for auto-scrolling
 	print("[Options] Added scroll container")
 
 	var main_vbox = VBoxContainer.new()
@@ -607,6 +609,25 @@ func _highlight_action(index: int) -> void:
 		action.kb_button.modulate = Color(1.2, 1.2, 0.8, 1.0)
 		action.ctrl_button.modulate = Color(1.2, 1.2, 0.8, 1.0)
 		action.kb_button.grab_focus()
+
+		# Auto-scroll to keep selected action visible
+		if _scroll_container:
+			await get_tree().process_frame  # Wait for layout update
+			var button_pos = action.kb_button.global_position.y - _scroll_container.global_position.y
+			var button_height = action.kb_button.size.y
+			var scroll_height = _scroll_container.size.y
+			var current_scroll = _scroll_container.scroll_vertical
+
+			# Calculate if we need to scroll
+			var visible_top = current_scroll
+			var visible_bottom = current_scroll + scroll_height
+
+			# If button is above visible area, scroll up to it
+			if button_pos < visible_top:
+				_scroll_container.scroll_vertical = int(button_pos)
+			# If button is below visible area, scroll down to it
+			elif button_pos + button_height > visible_bottom:
+				_scroll_container.scroll_vertical = int(button_pos + button_height - scroll_height)
 
 func _unhighlight_action(index: int) -> void:
 	"""Remove highlight from an action row"""
