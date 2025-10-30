@@ -30,8 +30,12 @@ var _points     : int = 0                    # available perk points (from syste
 ## Controller navigation
 var _selected_row: int = 0
 var _selected_col: int = 0
+var _back_label: Label = null
 
 func _ready() -> void:
+	# Add "Back (B)" indicator in bottom right
+	_add_back_indicator()
+
 	_stats = get_node_or_null(STATS_PATH)
 	_perk  = get_node_or_null(PERKSYS_PATH)
 
@@ -395,3 +399,24 @@ func _activate_selected_cell() -> void:
 	# Only activate if button is enabled and not already unlocked
 	if not button.disabled and not button.button_pressed:
 		_on_cell_pressed(button)
+
+# --- Back Button Indicator ---
+func _add_back_indicator() -> void:
+	"""Add 'Back (B)' text in bottom right corner"""
+	_back_label = Label.new()
+	_back_label.text = "Back (B)"
+	_back_label.add_theme_font_size_override("font_size", 14)
+	_back_label.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7, 1.0))
+
+	# Position in bottom right
+	_back_label.anchor_right = 1.0
+	_back_label.anchor_bottom = 1.0
+	_back_label.anchor_left = 1.0
+	_back_label.anchor_top = 1.0
+	_back_label.offset_right = -20
+	_back_label.offset_bottom = -10
+	_back_label.offset_left = -100
+	_back_label.offset_top = -30
+	_back_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+
+	add_child(_back_label)
