@@ -33,6 +33,7 @@ var _current_tab: String = ""
 var _tab_buttons: Array[Button] = []
 var _selected_tab_index: int = 0
 var _panel_has_focus: bool = false  # true when navigating inside a panel, false when navigating tabs
+var _is_fullscreen: bool = false  # true when a non-Status panel is open full screen
 
 # --- Dorm hooks ---
 var _ds: Node = null
@@ -58,6 +59,20 @@ func _ready() -> void:
 
 func _input(event: InputEvent) -> void:
 	if not visible:
+		return
+
+	# If in fullscreen mode, B returns to Status tab
+	if _is_fullscreen:
+		if event.is_action_pressed(aInputManager.ACTION_BACK):
+			# Check if we can leave current panel (for Dorms validation)
+			if _current_tab == "dorms" and not _can_leave_dorms():
+				_toast("Finish placing everyone from the Common Room before leaving Dorms.")
+				get_viewport().set_input_as_handled()
+				return
+
+			_exit_fullscreen()
+			get_viewport().set_input_as_handled()
+		# Let panel handle all other input
 		return
 
 	# If panel has focus, only handle B to return to tab navigation
@@ -156,6 +171,16 @@ func _select_tab(tab_id: String) -> void:
 		settings.call("set_value", "main_menu_last_tab", tab_id)
 
 func _show_panel(tab_id: String) -> void:
+	# If switching to a non-Status panel, enter fullscreen mode
+	if tab_id != "status":
+		_enter_fullscreen(tab_id)
+		return
+
+	# Showing Status panel - normal sidebar view
+	_is_fullscreen = false
+	if _left_tabs:
+		_left_tabs.visible = true
+
 	for child in _panel_holder.get_children():
 		child.visible = false
 	var panel := _get_or_create_panel(tab_id)
@@ -285,3 +310,35 @@ func _exit_panel_focus() -> void:
 
 	_panel_has_focus = false
 	_highlight_tab(_selected_tab_index)
+
+func _enter_fullscreen(tab_id: String) -> void:
+	"""Enter fullscreen mode for a panel (hide sidebar)"""
+	_is_fullscreen = true
+
+	# Hide the sidebar
+	if _left_tabs:
+		_left_tabs.visible = false
+
+	# Show the panel full screen
+	for child in _panel_holder.get_children():
+		child.visible = false
+
+	var panel := _get_or_create_panel(tab_id)
+	if panel:
+		panel.visible = true
+		panel.set_anchors_preset(Control.PRESET_FULL_RECT)
+		# Give panel focus if it has the method
+		if panel.has_method("panel_gained_focus"):
+			panel.call("panel_gained_focus")
+
+func _exit_fullscreen() -> void:
+	"""Exit fullscreen mode - return to Status tab with sidebar"""
+	_is_fullscreen = false
+
+	# Call panel_lost_focus on the current panel
+	var panel = _panels.get(_current_tab)
+	if panel and panel.has_method("panel_lost_focus"):
+		panel.call("panel_lost_focus")
+
+	# Return to Status tab
+	_select_tab("status")

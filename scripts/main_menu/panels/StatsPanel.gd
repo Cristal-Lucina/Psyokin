@@ -38,8 +38,12 @@ var _current_id : String = "hero"
 # Controller navigation
 var _member_buttons: Array[Button] = []
 var _panel_has_focus: bool = false
+var _back_label: Label = null
 
 func _ready() -> void:
+	# Add "Back (B)" indicator in bottom right
+	_add_back_indicator()
+
 	_stats = get_node_or_null(STATS_AUTOLOAD_PATH)
 	_cal   = get_node_or_null(CAL_AUTOLOAD_PATH)
 	_gs    = get_node_or_null(GS_PATH)
@@ -584,3 +588,24 @@ func _draw_pentagon_outline(control: Control, points: PackedVector2Array, color:
 		var start := points[i]
 		var end := points[(i + 1) % points.size()]
 		control.draw_line(start, end, color, width)
+
+# --- Back Button Indicator ---
+func _add_back_indicator() -> void:
+	"""Add 'Back (B)' text in bottom right corner"""
+	_back_label = Label.new()
+	_back_label.text = "Back (B)"
+	_back_label.add_theme_font_size_override("font_size", 14)
+	_back_label.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7, 1.0))
+
+	# Position in bottom right
+	_back_label.anchor_right = 1.0
+	_back_label.anchor_bottom = 1.0
+	_back_label.anchor_left = 1.0
+	_back_label.anchor_top = 1.0
+	_back_label.offset_right = -20
+	_back_label.offset_bottom = -10
+	_back_label.offset_left = -100
+	_back_label.offset_top = -30
+	_back_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+
+	add_child(_back_label)
