@@ -52,6 +52,8 @@ var status_picker_modal: ColorRect = null  # Status picker modal background
 var status_picker_buttons: Array = []  # Buttons in status picker for controller navigation
 var status_picker_data: Array = []  # Character data for status picker
 var selected_status_index: int = 0  # Currently selected character in status picker
+var status_details_popup: PanelContainer = null  # Status details popup panel
+var status_details_modal: ColorRect = null  # Status details modal background
 var current_skill_menu: Array = []  # Current skills in menu
 var selected_item: Dictionary = {}  # Selected item data
 var selected_burst: Dictionary = {}  # Selected burst ability data
@@ -232,6 +234,10 @@ func _input(event: InputEvent) -> void:
 			_close_status_picker()
 			get_viewport().set_input_as_handled()
 			return
+		elif status_details_popup != null:
+			_close_status_details()
+			get_viewport().set_input_as_handled()
+			return
 		# If in target selection, cancel it
 		elif awaiting_target_selection and not target_candidates.is_empty():
 			_cancel_target_selection()
@@ -341,6 +347,17 @@ func _input(event: InputEvent) -> void:
 			return
 		elif event.is_action_pressed(aInputManager.ACTION_BACK):
 			_close_status_picker()
+			get_viewport().set_input_as_handled()
+			return
+
+	# If status details popup is open, handle B button to close
+	if status_details_popup != null:
+		if event.is_action_pressed(aInputManager.ACTION_BACK):
+			_close_status_details()
+			get_viewport().set_input_as_handled()
+			return
+		elif event.is_action_pressed(aInputManager.ACTION_ACCEPT):
+			_close_status_details()
 			get_viewport().set_input_as_handled()
 			return
 
@@ -998,17 +1015,17 @@ func _get_skill_button_sequence(skill_id: String) -> Array:
 func _show_status_details(combatant: Dictionary) -> void:
 	"""Show detailed status information popup for a combatant"""
 	# Create modal background (blocks clicks)
-	var modal_bg = ColorRect.new()
-	modal_bg.color = Color(0, 0, 0, 0.5)  # Semi-transparent black overlay
-	modal_bg.set_anchors_preset(Control.PRESET_FULL_RECT)
-	modal_bg.z_index = 99
-	modal_bg.mouse_filter = Control.MOUSE_FILTER_STOP  # Block all clicks
-	add_child(modal_bg)
+	status_details_modal = ColorRect.new()
+	status_details_modal.color = Color(0, 0, 0, 0.5)  # Semi-transparent black overlay
+	status_details_modal.set_anchors_preset(Control.PRESET_FULL_RECT)
+	status_details_modal.z_index = 99
+	status_details_modal.mouse_filter = Control.MOUSE_FILTER_STOP  # Block all clicks
+	add_child(status_details_modal)
 
 	# Create popup panel - fully opaque, no transparency
-	var popup = PanelContainer.new()
-	popup.custom_minimum_size = Vector2(400, 300)
-	popup.modulate.a = 1.0  # 100% solid, no transparency
+	status_details_popup = PanelContainer.new()
+	status_details_popup.custom_minimum_size = Vector2(400, 300)
+	status_details_popup.modulate.a = 1.0  # 100% solid, no transparency
 
 	# Add solid dark background style
 	var panel_style = StyleBoxFlat.new()
@@ -1018,15 +1035,15 @@ func _show_status_details(combatant: Dictionary) -> void:
 	panel_style.border_width_top = 3
 	panel_style.border_width_bottom = 3
 	panel_style.border_color = Color(0.4, 0.6, 0.8, 1.0)  # Light blue border
-	popup.add_theme_stylebox_override("panel", panel_style)
+	status_details_popup.add_theme_stylebox_override("panel", panel_style)
 
 	# Center it on screen
-	popup.position = get_viewport_rect().size / 2 - popup.custom_minimum_size / 2
-	popup.z_index = 100
-	popup.mouse_filter = Control.MOUSE_FILTER_STOP  # Prevent clicking through
+	status_details_popup.position = get_viewport_rect().size / 2 - status_details_popup.custom_minimum_size / 2
+	status_details_popup.z_index = 100
+	status_details_popup.mouse_filter = Control.MOUSE_FILTER_STOP  # Prevent clicking through
 
 	var vbox = VBoxContainer.new()
-	popup.add_child(vbox)
+	status_details_popup.add_child(vbox)
 
 	# Title
 	var title = Label.new()
@@ -1087,14 +1104,11 @@ func _show_status_details(combatant: Dictionary) -> void:
 
 	# Close button
 	var close_btn = Button.new()
-	close_btn.text = "Close"
-	close_btn.pressed.connect(func():
-		popup.queue_free()
-		modal_bg.queue_free()  # Remove modal background too
-	)
+	close_btn.text = "Close (B)"
+	close_btn.pressed.connect(_close_status_details)
 	vbox.add_child(close_btn)
 
-	add_child(popup)
+	add_child(status_details_popup)
 
 func _format_buff_description(buff_type: String, value: float, duration: int) -> String:
 	"""Format buff/debuff into readable description"""
@@ -3115,6 +3129,15 @@ func _unhighlight_status_button(index: int) -> void:
 	if index >= 0 and index < status_picker_buttons.size():
 		var button = status_picker_buttons[index]
 		button.modulate = Color(1.0, 1.0, 1.0, 1.0)  # Normal color
+
+func _close_status_details() -> void:
+	"""Close the status details popup"""
+	if status_details_popup:
+		status_details_popup.queue_free()
+		status_details_popup = null
+	if status_details_modal:
+		status_details_modal.queue_free()
+		status_details_modal = null
 
 ## ═══════════════════════════════════════════════════════════════
 ## ITEM MENU
