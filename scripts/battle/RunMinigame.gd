@@ -202,11 +202,8 @@ func _process(delta: float) -> void:
 
 	# Handle player movement (only if not caught)
 	if not is_caught:
-		var move_dir = Vector2.ZERO
-		if Input.is_key_pressed(KEY_W): move_dir.y -= 1
-		if Input.is_key_pressed(KEY_S): move_dir.y += 1
-		if Input.is_key_pressed(KEY_A): move_dir.x -= 1
-		if Input.is_key_pressed(KEY_D): move_dir.x += 1
+		# Use InputManager for keyboard + controller support
+		var move_dir = aInputManager.get_movement_vector()
 
 		if move_dir.length() > 0:
 			move_dir = move_dir.normalized()

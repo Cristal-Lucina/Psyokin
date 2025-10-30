@@ -153,6 +153,31 @@ func _input(event: InputEvent) -> void:
 	# Note: Input processing is disabled until battle is fully initialized
 	# This function only runs after set_process_input(true) is called in _ready()
 
+	# Check for back button to close any open menus
+	if event.is_action_pressed(aInputManager.ACTION_BACK):
+		# Check if any menu is open and close it
+		if skill_menu_panel != null:
+			_close_skill_menu()
+			get_viewport().set_input_as_handled()
+			return
+		elif item_menu_panel != null:
+			_close_item_menu()
+			get_viewport().set_input_as_handled()
+			return
+		elif capture_menu_panel != null:
+			_close_capture_menu()
+			get_viewport().set_input_as_handled()
+			return
+		elif burst_menu_panel != null:
+			_close_burst_menu()
+			get_viewport().set_input_as_handled()
+			return
+		# If in target selection, cancel it
+		elif awaiting_target_selection and not target_candidates.is_empty():
+			_cancel_target_selection()
+			get_viewport().set_input_as_handled()
+			return
+
 	# If awaiting target selection, handle navigation
 	if awaiting_target_selection and not target_candidates.is_empty():
 		if event.is_action_pressed(aInputManager.ACTION_MOVE_LEFT):
@@ -163,9 +188,6 @@ func _input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 		elif event.is_action_pressed(aInputManager.ACTION_ACCEPT):
 			_confirm_target_selection()
-			get_viewport().set_input_as_handled()
-		elif event.is_action_pressed(aInputManager.ACTION_BACK):
-			_cancel_target_selection()
 			get_viewport().set_input_as_handled()
 		return
 

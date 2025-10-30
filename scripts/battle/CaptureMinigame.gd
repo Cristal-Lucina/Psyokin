@@ -512,18 +512,19 @@ func _process(delta: float) -> void:
 	# Check if player is trying to grab the bind point
 	if not bind_point_grabbed:
 		var grabbed = false
+		# Use InputManager for keyboard + controller support
 		match current_bind_direction:
 			BindDirection.UP:
-				if Input.is_key_pressed(KEY_W):
+				if aInputManager.is_action_pressed(aInputManager.ACTION_MOVE_UP):
 					grabbed = true
 			BindDirection.DOWN:
-				if Input.is_key_pressed(KEY_S):
+				if aInputManager.is_action_pressed(aInputManager.ACTION_MOVE_DOWN):
 					grabbed = true
 			BindDirection.LEFT:
-				if Input.is_key_pressed(KEY_A):
+				if aInputManager.is_action_pressed(aInputManager.ACTION_MOVE_LEFT):
 					grabbed = true
 			BindDirection.RIGHT:
-				if Input.is_key_pressed(KEY_D):
+				if aInputManager.is_action_pressed(aInputManager.ACTION_MOVE_RIGHT):
 					grabbed = true
 
 		if grabbed:
@@ -535,11 +536,8 @@ func _process(delta: float) -> void:
 			print("[CaptureMinigame] Bind point grabbed!")
 	else:
 		# Player is dragging - track circular motion
-		var input_vec = Vector2.ZERO
-		if Input.is_key_pressed(KEY_W): input_vec.y -= 1
-		if Input.is_key_pressed(KEY_S): input_vec.y += 1
-		if Input.is_key_pressed(KEY_A): input_vec.x -= 1
-		if Input.is_key_pressed(KEY_D): input_vec.x += 1
+		# Use InputManager for keyboard + controller support
+		var input_vec = aInputManager.get_movement_vector()
 
 		if input_vec.length() > 0.5:
 			# Calculate angle from enemy center
