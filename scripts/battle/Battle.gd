@@ -259,14 +259,22 @@ func _input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 			return
 
-	# If capture menu is open, handle controller navigation
+	# If capture menu is open, handle controller navigation (2D grid)
 	if capture_menu_panel != null and not capture_menu_buttons.is_empty():
 		if event.is_action_pressed(aInputManager.ACTION_MOVE_UP):
-			_navigate_capture_menu(-1)
+			_navigate_capture_menu_vertical(-2)  # Move up one row (2 columns)
 			get_viewport().set_input_as_handled()
 			return
 		elif event.is_action_pressed(aInputManager.ACTION_MOVE_DOWN):
-			_navigate_capture_menu(1)
+			_navigate_capture_menu_vertical(2)  # Move down one row (2 columns)
+			get_viewport().set_input_as_handled()
+			return
+		elif event.is_action_pressed(aInputManager.ACTION_MOVE_LEFT):
+			_navigate_capture_menu_horizontal(-1)  # Move left one column
+			get_viewport().set_input_as_handled()
+			return
+		elif event.is_action_pressed(aInputManager.ACTION_MOVE_RIGHT):
+			_navigate_capture_menu_horizontal(1)  # Move right one column
 			get_viewport().set_input_as_handled()
 			return
 		elif event.is_action_pressed(aInputManager.ACTION_ACCEPT):
@@ -3653,22 +3661,55 @@ func _close_capture_menu() -> void:
 	# Show action menu again
 	action_menu.visible = true
 
-func _navigate_capture_menu(direction: int) -> void:
-	"""Navigate capture menu with controller (direction: -1 for up, 1 for down)"""
+func _navigate_capture_menu_vertical(direction: int) -> void:
+	"""Navigate capture menu vertically (direction: -2 for up, 2 for down in 2-column grid)"""
 	if capture_menu_buttons.is_empty():
 		return
 
 	# Remove highlight from current button
 	_unhighlight_capture_button(selected_capture_index)
 
-	# Move selection
-	selected_capture_index += direction
+	# Move selection vertically
+	var new_index = selected_capture_index + direction
 
-	# Wrap around
-	if selected_capture_index < 0:
-		selected_capture_index = capture_menu_buttons.size() - 1
-	elif selected_capture_index >= capture_menu_buttons.size():
-		selected_capture_index = 0
+	# Wrap around vertically
+	if new_index < 0:
+		# If going up from top row, wrap to bottom
+		# Find last item in same column
+		var column = selected_capture_index % 2
+		var last_row = (capture_menu_buttons.size() - 1) / 2
+		new_index = last_row * 2 + column
+		# Make sure it doesn't exceed array size
+		if new_index >= capture_menu_buttons.size():
+			new_index = capture_menu_buttons.size() - 1
+	elif new_index >= capture_menu_buttons.size():
+		# If going down from bottom row, wrap to top
+		var column = selected_capture_index % 2
+		new_index = column
+
+	selected_capture_index = new_index
+
+	# Highlight new button
+	_highlight_capture_button(selected_capture_index)
+
+func _navigate_capture_menu_horizontal(direction: int) -> void:
+	"""Navigate capture menu horizontally (direction: -1 for left, 1 for right in 2-column grid)"""
+	if capture_menu_buttons.is_empty():
+		return
+
+	# Remove highlight from current button
+	_unhighlight_capture_button(selected_capture_index)
+
+	# Move selection horizontally
+	var new_index = selected_capture_index + direction
+
+	# Wrap around horizontally
+	if new_index < 0:
+		new_index = capture_menu_buttons.size() - 1
+	elif new_index >= capture_menu_buttons.size():
+		new_index = 0
+
+	selected_capture_index = new_index
 
 	# Highlight new button
 	_highlight_capture_button(selected_capture_index)
