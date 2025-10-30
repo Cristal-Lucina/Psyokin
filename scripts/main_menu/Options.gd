@@ -107,26 +107,48 @@ func _build_controls_ui() -> void:
 	grid.add_theme_constant_override("v_separation", 8)
 	main_vbox.add_child(grid)
 
-	# Action definitions
-	var actions = [
+	# Action definitions - Overworld
+	var overworld_actions = [
 		{"name": "move_up", "display": "Move Up"},
 		{"name": "move_down", "display": "Move Down"},
 		{"name": "move_left", "display": "Move Left"},
 		{"name": "move_right", "display": "Move Right"},
-		{"name": "run", "display": "Run/Sprint"},
-		{"name": "jump", "display": "Jump/Confirm"},
-		{"name": "pull", "display": "Pull"},
-		{"name": "push", "display": "Push"},
-		{"name": "minigame_1", "display": "Minigame 1"},
-		{"name": "minigame_2", "display": "Minigame 2"},
-		{"name": "minigame_3", "display": "Minigame 3"},
-		{"name": "minigame_4", "display": "Minigame 4"},
-		{"name": "ui_menu", "display": "Menu"},
-		{"name": "ui_phone", "display": "Phone"},
+		{"name": "action", "display": "Action (A)"},
+		{"name": "jump", "display": "Jump (Y)"},
+		{"name": "run", "display": "Run (X)"},
+		{"name": "phone", "display": "Phone (B)"},
+		{"name": "menu", "display": "Menu (Start)"},
+		{"name": "save", "display": "Save (Select)"},
 	]
 
-	# Create rows for each action
-	for action_def in actions:
+	# Battle actions
+	var battle_actions = [
+		{"name": "battle_attack", "display": "Attack (B)"},
+		{"name": "battle_skill", "display": "Skill (Y)"},
+		{"name": "battle_capture", "display": "Capture (A)"},
+		{"name": "battle_defend", "display": "Defend (X)"},
+		{"name": "battle_burst", "display": "Burst (L)"},
+		{"name": "battle_run", "display": "Run (R)"},
+		{"name": "battle_items", "display": "Items (Start)"},
+		{"name": "battle_status", "display": "Status (Select)"},
+	]
+
+	# Overworld section header
+	var overworld_header = Label.new()
+	overworld_header.text = "OVERWORLD CONTROLS"
+	overworld_header.add_theme_font_size_override("font_size", 18)
+	overworld_header.add_theme_color_override("font_color", Color(1.0, 0.8, 0.3))
+	var overworld_center = CenterContainer.new()
+	overworld_center.add_child(overworld_header)
+	main_vbox.add_child(overworld_center)
+
+	# Spacer
+	var spacer_ow = Control.new()
+	spacer_ow.custom_minimum_size = Vector2(0, 10)
+	main_vbox.add_child(spacer_ow)
+
+	# Create overworld controls
+	for action_def in overworld_actions:
 		var action_name = action_def["name"]
 		var display_name = action_def["display"]
 
@@ -136,14 +158,60 @@ func _build_controls_ui() -> void:
 		label.custom_minimum_size.x = 180
 		grid.add_child(label)
 
-		# Keyboard binding button (clickable for remapping)
+		# Keyboard binding button
 		var kb_btn = Button.new()
 		kb_btn.text = _get_keyboard_binding_text(action_name)
 		kb_btn.custom_minimum_size = Vector2(180, 30)
 		kb_btn.pressed.connect(_on_remap_pressed.bind(action_name, kb_btn, false))
 		grid.add_child(kb_btn)
 
-		# Controller binding button (clickable for remapping)
+		# Controller binding button
+		var ctrl_btn = Button.new()
+		ctrl_btn.text = _get_controller_binding_text(action_name)
+		ctrl_btn.custom_minimum_size = Vector2(180, 30)
+		ctrl_btn.pressed.connect(_on_remap_pressed.bind(action_name, ctrl_btn, true))
+		grid.add_child(ctrl_btn)
+
+		_action_buttons.append([kb_btn, ctrl_btn])
+
+	# Battle section spacer
+	var spacer_battle_top = Control.new()
+	spacer_battle_top.custom_minimum_size = Vector2(0, 20)
+	main_vbox.add_child(spacer_battle_top)
+
+	# Battle section header
+	var battle_header = Label.new()
+	battle_header.text = "BATTLE CONTROLS"
+	battle_header.add_theme_font_size_override("font_size", 18)
+	battle_header.add_theme_color_override("font_color", Color(1.0, 0.3, 0.3))
+	var battle_center = CenterContainer.new()
+	battle_center.add_child(battle_header)
+	main_vbox.add_child(battle_center)
+
+	# Spacer
+	var spacer_b = Control.new()
+	spacer_b.custom_minimum_size = Vector2(0, 10)
+	main_vbox.add_child(spacer_b)
+
+	# Create battle controls
+	for action_def in battle_actions:
+		var action_name = action_def["name"]
+		var display_name = action_def["display"]
+
+		# Action label
+		var label = Label.new()
+		label.text = display_name
+		label.custom_minimum_size.x = 180
+		grid.add_child(label)
+
+		# Keyboard binding button
+		var kb_btn = Button.new()
+		kb_btn.text = _get_keyboard_binding_text(action_name)
+		kb_btn.custom_minimum_size = Vector2(180, 30)
+		kb_btn.pressed.connect(_on_remap_pressed.bind(action_name, kb_btn, false))
+		grid.add_child(kb_btn)
+
+		# Controller binding button
 		var ctrl_btn = Button.new()
 		ctrl_btn.text = _get_controller_binding_text(action_name)
 		ctrl_btn.custom_minimum_size = Vector2(180, 30)
@@ -274,32 +342,30 @@ func _remap_action(action_name: String, new_event: InputEvent, is_controller: bo
 
 func _refresh_bindings() -> void:
 	"""Update all binding button labels"""
-	for buttons in _action_buttons:
+	var all_actions = [
+		"move_up", "move_down", "move_left", "move_right",
+		"action", "jump", "run", "phone", "menu", "save",
+		"battle_attack", "battle_skill", "battle_capture", "battle_defend",
+		"battle_burst", "battle_run", "battle_items", "battle_status"
+	]
+
+	for i in range(min(_action_buttons.size(), all_actions.size())):
+		var buttons = _action_buttons[i]
 		var kb_btn = buttons[0] as Button
 		var ctrl_btn = buttons[1] as Button
+		var action_name = all_actions[i]
 
-		# Find which action this button pair represents
-		var action_idx = _action_buttons.find(buttons)
-		if action_idx >= 0:
-			var actions = [
-				"move_up", "move_down", "move_left", "move_right",
-				"run", "jump", "pull", "push",
-				"minigame_1", "minigame_2", "minigame_3", "minigame_4",
-				"ui_menu", "ui_phone"
-			]
-			if action_idx < actions.size():
-				var action_name = actions[action_idx]
-				kb_btn.text = _get_keyboard_binding_text(action_name)
-				ctrl_btn.text = _get_controller_binding_text(action_name)
+		kb_btn.text = _get_keyboard_binding_text(action_name)
+		ctrl_btn.text = _get_controller_binding_text(action_name)
 
 func _on_reset_pressed() -> void:
 	"""Reset all controls to defaults"""
 	# Clear all actions
 	var actions = [
 		"move_up", "move_down", "move_left", "move_right",
-		"run", "jump", "pull", "push",
-		"minigame_1", "minigame_2", "minigame_3", "minigame_4",
-		"ui_menu", "ui_phone"
+		"action", "jump", "run", "phone", "menu", "save",
+		"battle_attack", "battle_skill", "battle_capture", "battle_defend",
+		"battle_burst", "battle_run", "battle_items", "battle_status"
 	]
 
 	for action_name in actions:

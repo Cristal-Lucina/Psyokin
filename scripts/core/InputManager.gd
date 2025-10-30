@@ -5,26 +5,39 @@ extends Node
 signal controller_connected(device_id: int)
 signal controller_disconnected(device_id: int)
 
-# Input action names
+# Movement actions (shared between Overworld and Battle)
 const ACTION_MOVE_UP = "move_up"
 const ACTION_MOVE_DOWN = "move_down"
 const ACTION_MOVE_LEFT = "move_left"
 const ACTION_MOVE_RIGHT = "move_right"
-const ACTION_RUN = "run"
-const ACTION_JUMP = "jump"
-const ACTION_PULL = "pull"
-const ACTION_PUSH = "push"
-const ACTION_INTERACT = "interact"
-const ACTION_MENU = "ui_menu"
-const ACTION_PHONE = "ui_phone"
-const ACTION_CONFIRM = "ui_accept"
-const ACTION_CANCEL = "ui_cancel"
 
-# Battle/Minigame actions
-const ACTION_MINIGAME_1 = "minigame_1"  # Space
-const ACTION_MINIGAME_2 = "minigame_2"  # Comma
-const ACTION_MINIGAME_3 = "minigame_3"  # Period
-const ACTION_MINIGAME_4 = "minigame_4"  # Slash
+# Overworld actions
+const ACTION_ACTION = "action"  # A button - accept/push/pull/interact
+const ACTION_JUMP = "jump"      # Y button
+const ACTION_RUN = "run"        # X button
+const ACTION_PHONE = "phone"    # B button
+const ACTION_MENU = "menu"      # Start button
+const ACTION_SAVE = "save"      # Select button
+
+# Battle actions
+const ACTION_ATTACK = "battle_attack"   # B button
+const ACTION_SKILL = "battle_skill"     # Y button
+const ACTION_CAPTURE = "battle_capture" # A button
+const ACTION_DEFEND = "battle_defend"   # X button
+const ACTION_BURST = "battle_burst"     # L bumper
+const ACTION_BATTLE_RUN = "battle_run"  # R bumper
+const ACTION_ITEMS = "battle_items"     # Start button
+const ACTION_STATUS = "battle_status"   # Select button
+
+# Legacy action names (for compatibility)
+const ACTION_PULL = "action"  # Now maps to ACTION_ACTION
+const ACTION_PUSH = "action"  # Now maps to ACTION_ACTION
+const ACTION_INTERACT = "action"  # Now maps to ACTION_ACTION
+const ACTION_CONFIRM = "action"  # Now maps to ACTION_ACTION
+const ACTION_MINIGAME_1 = "action"  # Now maps to ACTION_ACTION (for minigames)
+const ACTION_MINIGAME_2 = "battle_defend"  # X button
+const ACTION_MINIGAME_3 = "battle_attack"  # B button
+const ACTION_MINIGAME_4 = "battle_skill"   # Y button
 
 var controller_connected_flag: bool = false
 var active_controller_id: int = -1
@@ -42,19 +55,29 @@ func _ready() -> void:
 func _ensure_input_actions() -> void:
 	"""Ensure all required input actions are registered"""
 	var actions = {
+		# Movement (shared)
 		ACTION_MOVE_UP: [KEY_W, KEY_UP, JOY_BUTTON_DPAD_UP],
 		ACTION_MOVE_DOWN: [KEY_S, KEY_DOWN, JOY_BUTTON_DPAD_DOWN],
 		ACTION_MOVE_LEFT: [KEY_A, KEY_LEFT, JOY_BUTTON_DPAD_LEFT],
 		ACTION_MOVE_RIGHT: [KEY_D, KEY_RIGHT, JOY_BUTTON_DPAD_RIGHT],
-		ACTION_RUN: [KEY_SHIFT, JOY_BUTTON_RIGHT_SHOULDER],
-		ACTION_JUMP: [KEY_SPACE, JOY_BUTTON_A],
-		ACTION_PULL: [KEY_COMMA, JOY_BUTTON_LEFT_SHOULDER],
-		ACTION_PUSH: [KEY_PERIOD, JOY_BUTTON_RIGHT_SHOULDER],
-		ACTION_INTERACT: [KEY_E, JOY_BUTTON_A],
-		ACTION_MINIGAME_1: [KEY_SPACE, JOY_BUTTON_A],
-		ACTION_MINIGAME_2: [KEY_COMMA, JOY_BUTTON_X],
-		ACTION_MINIGAME_3: [KEY_PERIOD, JOY_BUTTON_B],
-		ACTION_MINIGAME_4: [KEY_SLASH, JOY_BUTTON_Y],
+
+		# Overworld
+		ACTION_ACTION: [KEY_E, KEY_SPACE, JOY_BUTTON_A],  # A button (Xbox)
+		ACTION_JUMP: [KEY_SPACE, JOY_BUTTON_Y],            # Y button (Xbox)
+		ACTION_RUN: [KEY_SHIFT, JOY_BUTTON_X],             # X button (Xbox)
+		ACTION_PHONE: [KEY_P, JOY_BUTTON_B],               # B button (Xbox)
+		ACTION_MENU: [KEY_ESCAPE, JOY_BUTTON_START],       # Start button
+		ACTION_SAVE: [KEY_F5, JOY_BUTTON_BACK],            # Select/Back button
+
+		# Battle
+		ACTION_ATTACK: [KEY_SPACE, JOY_BUTTON_B],          # B button (Xbox)
+		ACTION_SKILL: [KEY_Q, JOY_BUTTON_Y],               # Y button (Xbox)
+		ACTION_CAPTURE: [KEY_E, JOY_BUTTON_A],             # A button (Xbox)
+		ACTION_DEFEND: [KEY_SHIFT, JOY_BUTTON_X],          # X button (Xbox)
+		ACTION_BURST: [KEY_R, JOY_BUTTON_LEFT_SHOULDER],   # L bumper
+		ACTION_BATTLE_RUN: [KEY_F, JOY_BUTTON_RIGHT_SHOULDER], # R bumper
+		ACTION_ITEMS: [KEY_I, JOY_BUTTON_START],           # Start button
+		ACTION_STATUS: [KEY_TAB, JOY_BUTTON_BACK],         # Select/Back button
 	}
 
 	for action_name in actions:
@@ -77,6 +100,19 @@ func _ensure_input_actions() -> void:
 
 	# Add analog stick support for movement
 	_add_analog_stick_support()
+
+	# Add legacy action mappings for ui_menu and ui_phone
+	if not InputMap.has_action("ui_menu"):
+		InputMap.add_action("ui_menu")
+		var event = InputEventKey.new()
+		event.keycode = KEY_ESCAPE
+		InputMap.action_add_event("ui_menu", event)
+
+	if not InputMap.has_action("ui_phone"):
+		InputMap.add_action("ui_phone")
+		var event = InputEventKey.new()
+		event.keycode = KEY_P
+		InputMap.action_add_event("ui_phone", event)
 
 func _add_analog_stick_support() -> void:
 	"""Add left analog stick support for movement"""
@@ -172,9 +208,9 @@ func save_input_mapping() -> Dictionary:
 	var mapping = {}
 	var actions = [
 		ACTION_MOVE_UP, ACTION_MOVE_DOWN, ACTION_MOVE_LEFT, ACTION_MOVE_RIGHT,
-		ACTION_RUN, ACTION_JUMP, ACTION_PULL, ACTION_PUSH, ACTION_INTERACT,
-		ACTION_MENU, ACTION_PHONE, ACTION_CONFIRM, ACTION_CANCEL,
-		ACTION_MINIGAME_1, ACTION_MINIGAME_2, ACTION_MINIGAME_3, ACTION_MINIGAME_4
+		ACTION_ACTION, ACTION_JUMP, ACTION_RUN, ACTION_PHONE, ACTION_MENU, ACTION_SAVE,
+		ACTION_ATTACK, ACTION_SKILL, ACTION_CAPTURE, ACTION_DEFEND,
+		ACTION_BURST, ACTION_BATTLE_RUN, ACTION_ITEMS, ACTION_STATUS
 	]
 
 	for action in actions:
