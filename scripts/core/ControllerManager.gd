@@ -50,6 +50,13 @@ func _ready() -> void:
 	set_process_input(true)
 	print("[ControllerManager] Initialized - Current context: %s" % InputContext.keys()[current_context])
 
+	# Add scene tree input monitoring to catch ALL events (even those consumed elsewhere)
+	get_tree().root.set_input_as_handled.connect(_on_viewport_handled_input)
+
+func _on_viewport_handled_input() -> void:
+	# This is called when ANY input is handled by the viewport
+	pass  # We just need the connection to exist, logging happens in _input
+
 func _process(delta: float) -> void:
 	# Update cooldown timer
 	if input_cooldown > 0:

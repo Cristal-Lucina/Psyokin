@@ -335,6 +335,16 @@ func _ready() -> void:
 	_give_test_bind_items()
 
 # ---------- Input ----------
+func _input(event: InputEvent) -> void:
+	"""Process input events - log ALL joypad button events for debugging"""
+	if event is InputEventJoypadButton:
+		print("[Main._input] Joypad button %d, pressed=%s" % [event.button_index, event.pressed])
+
+func _on_viewport_input(event: InputEvent) -> void:
+	"""Monitor viewport input - catches events even if handled elsewhere"""
+	if event is InputEventJoypadButton:
+		print("[Main.viewport] Joypad button %d, pressed=%s" % [event.button_index, event.pressed])
+
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_echo(): return
 	# Toggle ALL cheats with "i" key
