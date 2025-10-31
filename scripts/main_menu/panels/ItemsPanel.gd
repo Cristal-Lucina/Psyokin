@@ -247,22 +247,32 @@ func _rebuild() -> void:
 
 	# Render recovery items section first (if applicable)
 	if show_recovery_section and not recovery_items.is_empty():
-		# Add subsection header
+		# Add subsection header (spans 2 columns by adding it with a spacer)
 		var header := Label.new()
 		header.text = "━━━ Recovery Items ━━━"
 		header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		header.add_theme_font_size_override("font_size", 12)
 		header.modulate = Color(0.8, 0.9, 1.0, 1.0)  # Light blue tint
+		header.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		_list_box.add_child(header)
 
-		# Render recovery items
+		# Add empty control to complete the grid row (2 columns)
+		var header_spacer := Control.new()
+		header_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_list_box.add_child(header_spacer)
+
+		# Render recovery items (each item takes 1 column, 2 items per row)
 		for item_data in recovery_items:
 			_render_item(item_data["id"], item_data["def"], item_data["qty"])
 
-		# Add spacing after recovery section
-		var spacer := Control.new()
-		spacer.custom_minimum_size = Vector2(0, 10)
-		_list_box.add_child(spacer)
+		# Add spacing after recovery section (2 spacers for 2 columns)
+		var spacer1 := Control.new()
+		spacer1.custom_minimum_size = Vector2(0, 10)
+		_list_box.add_child(spacer1)
+
+		var spacer2 := Control.new()
+		spacer2.custom_minimum_size = Vector2(0, 10)
+		_list_box.add_child(spacer2)
 
 	# Render other items
 	for item_data in other_items:
@@ -954,8 +964,33 @@ func _on_use_item(item_id: String, item_def: Dictionary) -> void:
 	host.add_child(dlg)
 	dlg.popup_centered()
 
-	# Setup focus chain for member buttons
+	# Setup focus chain for member buttons and dialog buttons
 	await get_tree().process_frame
+
+	# Get dialog buttons (Cancel and OK)
+	var cancel_btn: Button = dlg.get_cancel_button()
+	var ok_btn: Button = dlg.get_ok_button()
+
+	# Add controller support to Cancel button
+	if cancel_btn:
+		var cancel_action = func():
+			print("[ItemsPanel] Use dialog canceled")
+			dlg.hide()
+
+		cancel_btn.gui_input.connect(func(event: InputEvent):
+			if (event.is_action_pressed(aInputManager.ACTION_ACCEPT) or event.is_action_pressed("ui_accept")) and cancel_btn.has_focus():
+				cancel_action.call()
+				get_viewport().set_input_as_handled()
+		)
+
+	# Add controller support to OK button
+	if ok_btn:
+		ok_btn.gui_input.connect(func(event: InputEvent):
+			if (event.is_action_pressed(aInputManager.ACTION_ACCEPT) or event.is_action_pressed("ui_accept")) and ok_btn.has_focus():
+				dlg.hide()
+				get_viewport().set_input_as_handled()
+		)
+
 	if member_buttons.size() > 0:
 		for i in range(member_buttons.size()):
 			var btn = member_buttons[i]
@@ -963,6 +998,13 @@ func _on_use_item(item_id: String, item_def: Dictionary) -> void:
 				btn.focus_neighbor_top = btn.get_path_to(member_buttons[i - 1])
 			if i < member_buttons.size() - 1:
 				btn.focus_neighbor_bottom = btn.get_path_to(member_buttons[i + 1])
+
+			# Connect member buttons to dialog buttons
+			if i == 0 and cancel_btn:
+				cancel_btn.focus_neighbor_top = cancel_btn.get_path_to(btn)
+			if i == member_buttons.size() - 1:
+				if cancel_btn:
+					btn.focus_neighbor_bottom = btn.get_path_to(cancel_btn)
 
 		# Focus first member button
 		member_buttons[0].grab_focus()
@@ -992,6 +1034,17 @@ func _apply_recovery_item(item_id: String, member_token: String, effect: String)
 		host = get_tree().root
 	host.add_child(msg_dlg)
 	msg_dlg.popup_centered()
+
+	# Add controller support to OK button
+	await get_tree().process_frame
+	var ok_btn: Button = msg_dlg.get_ok_button()
+	if ok_btn:
+		ok_btn.gui_input.connect(func(event: InputEvent):
+			if (event.is_action_pressed(aInputManager.ACTION_ACCEPT) or event.is_action_pressed("ui_accept")) and ok_btn.has_focus():
+				msg_dlg.hide()
+				get_viewport().set_input_as_handled()
+		)
+		ok_btn.grab_focus()
 
 	# Refresh the item list
 	_rebuild()
