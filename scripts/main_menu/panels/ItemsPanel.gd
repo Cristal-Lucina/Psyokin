@@ -648,7 +648,12 @@ func _on_item_clicked(btn: Button) -> void:
 
 	# IMPORTANT: Handle controller input directly on button
 	inspect_btn.gui_input.connect(func(event: InputEvent):
-		if event.is_action_pressed("ui_accept") and inspect_btn.has_focus():
+		print("[ItemsPanel] Inspect button received input event: ", event)
+		if event.is_action_pressed(aInputManager.ACTION_ACCEPT) and inspect_btn.has_focus():
+			print("[ItemsPanel] Inspect button: ACTION_ACCEPT detected!")
+			inspect_action.call()
+			get_viewport().set_input_as_handled()
+		elif event.is_action_pressed("ui_accept") and inspect_btn.has_focus():
 			print("[ItemsPanel] Inspect button: ui_accept detected!")
 			inspect_action.call()
 			get_viewport().set_input_as_handled()
@@ -676,7 +681,12 @@ func _on_item_clicked(btn: Button) -> void:
 
 	# IMPORTANT: Handle controller input directly on button
 	discard_btn.gui_input.connect(func(event: InputEvent):
-		if event.is_action_pressed("ui_accept") and discard_btn.has_focus():
+		print("[ItemsPanel] Discard button received input event: ", event)
+		if event.is_action_pressed(aInputManager.ACTION_ACCEPT) and discard_btn.has_focus():
+			print("[ItemsPanel] Discard button: ACTION_ACCEPT detected!")
+			discard_action.call()
+			get_viewport().set_input_as_handled()
+		elif event.is_action_pressed("ui_accept") and discard_btn.has_focus():
 			print("[ItemsPanel] Discard button: ui_accept detected!")
 			discard_action.call()
 			get_viewport().set_input_as_handled()
@@ -713,7 +723,13 @@ func _on_item_clicked(btn: Button) -> void:
 
 		# IMPORTANT: Handle controller input directly on OK button
 		ok_button.gui_input.connect(func(event: InputEvent):
-			if event.is_action_pressed("ui_accept") and ok_button.has_focus():
+			print("[ItemsPanel] OK button received input event: ", event)
+			if event.is_action_pressed(aInputManager.ACTION_ACCEPT) and ok_button.has_focus():
+				print("[ItemsPanel] OK button: ACTION_ACCEPT detected!")
+				print("[ItemsPanel] OK button pressed!")
+				dlg.hide()
+				get_viewport().set_input_as_handled()
+			elif event.is_action_pressed("ui_accept") and ok_button.has_focus():
 				print("[ItemsPanel] OK button: ui_accept detected!")
 				print("[ItemsPanel] OK button pressed!")
 				dlg.hide()
@@ -838,7 +854,14 @@ func _on_discard_row(btn: Button) -> void:
 
 		# IMPORTANT: Handle controller input directly on OK button
 		ok_button.gui_input.connect(func(event: InputEvent):
-			if event.is_action_pressed("ui_accept") and ok_button.has_focus():
+			print("[ItemsPanel] Discard OK button received input event: ", event)
+			if event.is_action_pressed(aInputManager.ACTION_ACCEPT) and ok_button.has_focus():
+				print("[ItemsPanel] Discard OK button: ACTION_ACCEPT detected!")
+				print("[ItemsPanel] Discard OK button pressed!")
+				dlg.hide()
+				_on_discard_confirmed(dlg)
+				get_viewport().set_input_as_handled()
+			elif event.is_action_pressed("ui_accept") and ok_button.has_focus():
 				print("[ItemsPanel] Discard OK button: ui_accept detected!")
 				print("[ItemsPanel] Discard OK button pressed!")
 				dlg.hide()
@@ -856,7 +879,13 @@ func _on_discard_row(btn: Button) -> void:
 
 		# IMPORTANT: Handle controller input directly on Cancel button
 		cancel_button.gui_input.connect(func(event: InputEvent):
-			if event.is_action_pressed("ui_accept") and cancel_button.has_focus():
+			print("[ItemsPanel] Discard Cancel button received input event: ", event)
+			if event.is_action_pressed(aInputManager.ACTION_ACCEPT) and cancel_button.has_focus():
+				print("[ItemsPanel] Discard Cancel button: ACTION_ACCEPT detected!")
+				print("[ItemsPanel] Discard Cancel button pressed!")
+				dlg.hide()
+				get_viewport().set_input_as_handled()
+			elif event.is_action_pressed("ui_accept") and cancel_button.has_focus():
 				print("[ItemsPanel] Discard Cancel button: ui_accept detected!")
 				print("[ItemsPanel] Discard Cancel button pressed!")
 				dlg.hide()
