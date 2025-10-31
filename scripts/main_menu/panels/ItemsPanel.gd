@@ -16,7 +16,7 @@ const ITEMS_CSV : String = "res://data/items/items.csv"
 const KEY_ID    : String = "item_id"
 
 const CATEGORIES : PackedStringArray = [
-	"All","Consumables","Weapons","Armor","Headwear","Footwear",
+	"All","Consumables","Bindings","Weapons","Armor","Headwear","Footwear",
 	"Bracelets","Sigils","Battle","Materials","Gifts","Key","Other"
 ]
 
@@ -26,6 +26,7 @@ const CATEGORIES : PackedStringArray = [
 @onready var _list_box  : GridContainer = null  # Will change to GridContainer
 @onready var _header    : HBoxContainer = %Header
 @onready var _vbox      : VBoxContainer = %VBox
+@onready var _scroll    : ScrollContainer = %Scroll
 
 var _inv  : Node = null
 var _csv  : Node = null
@@ -38,9 +39,24 @@ var _counts_map  : Dictionary = {}    # {id -> int}  (after expansion, per-insta
 var _equipped_by : Dictionary = {}    # {base_id -> PackedStringArray of member display names}
 var _active_category : String = "All"  # Track currently selected category
 
+# Controller navigation and UI
+var _category_buttons: Array[Button] = []
+var _selected_category_index: int = 0
+var _panel_has_focus: bool = false
+var _back_label: Label = null
+var _description_label: Label = null
+var _selected_item_id: String = ""
+var _selected_item_def: Dictionary = {}
+
+# Item grid navigation
+var _item_buttons: Array[Button] = []
+var _selected_item_index: int = 0
+var _in_category_mode: bool = true  # true = navigating categories, false = navigating items
+
 # Normalize arbitrary category strings to our canonical set
 const _CAT_MAP := {
 	"consumable":"Consumables","consumables":"Consumables",
+	"binding":"Bindings","bindings":"Bindings","capture":"Bindings","captures":"Bindings",
 	"weapon":"Weapons","weapons":"Weapons",
 	"armor":"Armor",
 	"head":"Headwear","headwear":"Headwear","helm":"Headwear","helmet":"Headwear",
@@ -55,6 +71,9 @@ const _CAT_MAP := {
 }
 
 func _ready() -> void:
+	# Add "Back (B)" indicator in bottom right
+	_add_back_indicator()
+
 	_inv = get_node_or_null(INV_PATH)
 	_csv = get_node_or_null(CSV_PATH)
 	_eq  = get_node_or_null(EQUIP_SYS_PATH)
@@ -66,6 +85,9 @@ func _ready() -> void:
 
 	# Setup GridContainer for 2-column item layout
 	_setup_item_grid()
+
+	# Setup description section at the bottom
+	_setup_description_section()
 
 	# Live refresh on inventory
 	if _inv != null and _inv.has_signal("inventory_changed"):
@@ -115,17 +137,26 @@ func _setup_category_buttons() -> void:
 	else:
 		_header.add_child(_filter_container)
 
+	# Clear button array
+	_category_buttons.clear()
+
 	# Create button for each category
 	for cat in CATEGORIES:
 		var btn := Button.new()
 		btn.text = cat
 		btn.toggle_mode = true
+		btn.focus_mode = Control.FOCUS_NONE  # Disable direct selection - only L/R navigation
 		btn.add_theme_font_size_override("font_size", 10)
 		btn.set_meta("category", cat)
 		if cat == "All":
 			btn.button_pressed = true  # Start with "All" selected
 		btn.pressed.connect(_on_category_button_pressed.bind(btn))
 		_filter_container.add_child(btn)
+		_category_buttons.append(btn)
+
+	# Highlight first category button
+	_selected_category_index = 0
+	_highlight_category_button(_selected_category_index)
 
 func _setup_item_grid() -> void:
 	# Find and replace the List VBoxContainer with GridContainer
@@ -164,6 +195,9 @@ func _on_category_button_pressed(btn: Button) -> void:
 func _rebuild() -> void:
 	for c in _list_box.get_children():
 		c.queue_free()
+
+	# Clear item buttons array
+	_item_buttons.clear()
 
 	_defs       = _read_defs()
 	_counts_map = _read_counts()
@@ -232,6 +266,9 @@ func _rebuild() -> void:
 			item_btn.pressed.connect(_on_item_clicked.bind(item_btn))
 		item_vbox.add_child(item_btn)
 
+		# Track item button for controller navigation
+		_item_buttons.append(item_btn)
+
 		# Show equipped info if applicable
 		var equip_txt := _equip_string_for(id, def)
 		if equip_txt != "":
@@ -248,6 +285,9 @@ func _rebuild() -> void:
 
 	await get_tree().process_frame
 	_list_box.queue_sort()
+
+	# Auto-select first item after rebuild
+	_auto_select_first_item()
 
 # --- name/category helpers ----------------------------------------------------
 
@@ -553,10 +593,16 @@ func _on_item_clicked(btn: Button) -> void:
 	var qty: int = int(btn.get_meta("qty"))
 	var nm: String = _display_name(id, def)
 
+	# Update description
+	_selected_item_id = id
+	_selected_item_def = def
+	_update_description(id, def)
+
 	# Create a dialog with item info and action buttons
 	var dlg := AcceptDialog.new()
 	dlg.title = nm
 	dlg.min_size = Vector2(400, 0)
+	dlg.dialog_hide_on_ok = true
 
 	# Build dialog content
 	var vbox := VBoxContainer.new()
@@ -583,6 +629,7 @@ func _on_item_clicked(btn: Button) -> void:
 	# Inspect button
 	var inspect_btn := Button.new()
 	inspect_btn.text = "Inspect"
+	inspect_btn.focus_mode = Control.FOCUS_ALL
 	inspect_btn.set_meta("id", id)
 	inspect_btn.pressed.connect(func():
 		dlg.hide()
@@ -593,6 +640,7 @@ func _on_item_clicked(btn: Button) -> void:
 	# Discard button
 	var discard_btn := Button.new()
 	discard_btn.text = "Discard"
+	discard_btn.focus_mode = Control.FOCUS_ALL
 	discard_btn.set_meta("id", id)
 	discard_btn.pressed.connect(func():
 		dlg.hide()
@@ -611,6 +659,28 @@ func _on_item_clicked(btn: Button) -> void:
 		host = get_tree().root
 	host.add_child(dlg)
 	dlg.popup_centered()
+
+	# Setup focus neighbors for controller navigation
+	await get_tree().process_frame
+
+	# Get the dialog's OK button
+	var ok_button = dlg.get_ok_button()
+
+	# Set up focus chain: inspect -> discard -> OK -> inspect
+	inspect_btn.focus_neighbor_right = inspect_btn.get_path_to(discard_btn)
+	inspect_btn.focus_neighbor_bottom = inspect_btn.get_path_to(ok_button)
+	inspect_btn.focus_next = inspect_btn.get_path_to(discard_btn)
+
+	discard_btn.focus_neighbor_left = discard_btn.get_path_to(inspect_btn)
+	discard_btn.focus_neighbor_bottom = discard_btn.get_path_to(ok_button)
+	discard_btn.focus_next = discard_btn.get_path_to(ok_button)
+
+	ok_button.focus_neighbor_top = ok_button.get_path_to(inspect_btn)
+	ok_button.focus_previous = ok_button.get_path_to(discard_btn)
+	ok_button.focus_next = ok_button.get_path_to(inspect_btn)
+
+	# Give focus to first button for controller navigation
+	inspect_btn.grab_focus()
 
 func _on_inspect_row(btn: Button) -> void:
 	var id_v: Variant = btn.get_meta("id")
@@ -671,6 +741,21 @@ func _on_discard_row(btn: Button) -> void:
 	if host == null: host = get_tree().root
 	host.add_child(dlg)
 	dlg.popup_centered()
+
+	# Setup focus for controller navigation
+	await get_tree().process_frame
+	var ok_button = dlg.get_ok_button()
+	var cancel_button = dlg.get_cancel_button()
+
+	# Set up focus chain between OK and Cancel buttons
+	ok_button.focus_neighbor_right = ok_button.get_path_to(cancel_button)
+	ok_button.focus_next = ok_button.get_path_to(cancel_button)
+	cancel_button.focus_neighbor_left = cancel_button.get_path_to(ok_button)
+	cancel_button.focus_previous = cancel_button.get_path_to(ok_button)
+	cancel_button.focus_next = cancel_button.get_path_to(ok_button)
+
+	# Focus the cancel button by default (safer choice)
+	cancel_button.grab_focus()
 
 func _on_discard_confirmed(dlg: ConfirmationDialog) -> void:
 	if dlg == null: return
@@ -869,6 +954,316 @@ func _member_display_name(token: String) -> String:
 		var v: Variant = _gs.call("_display_name_for_id", token)
 		if typeof(v) == TYPE_STRING and String(v) != "": return String(v)
 	return token.capitalize()
+
+# ------------------------------------------------------------------------------
+# Controller Navigation & UI Enhancements
+# ------------------------------------------------------------------------------
+
+func _setup_description_section() -> void:
+	"""Add description section at the bottom of the panel"""
+	if not _vbox:
+		return
+
+	# Create a separator
+	var separator := HSeparator.new()
+	_vbox.add_child(separator)
+
+	# Create description container
+	var desc_container := MarginContainer.new()
+	desc_container.add_theme_constant_override("margin_left", 16)
+	desc_container.add_theme_constant_override("margin_right", 16)
+	desc_container.add_theme_constant_override("margin_top", 8)
+	desc_container.add_theme_constant_override("margin_bottom", 8)
+	desc_container.custom_minimum_size.y = 60
+
+	_description_label = Label.new()
+	_description_label.text = "Select an item to view its description"
+	_description_label.add_theme_font_size_override("font_size", 12)
+	_description_label.add_theme_color_override("font_color", Color(0.8, 0.8, 0.8, 1.0))
+	_description_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_description_label.vertical_alignment = VERTICAL_ALIGNMENT_TOP
+	desc_container.add_child(_description_label)
+
+	_vbox.add_child(desc_container)
+
+func _input(event: InputEvent) -> void:
+	if not _panel_has_focus or not visible:
+		return
+
+	# UP/DOWN - Toggle between category mode and item mode
+	if event.is_action_pressed(aInputManager.ACTION_MOVE_UP):
+		if not _in_category_mode and _selected_item_index > 0:
+			# Navigate items up
+			_navigate_items(-2)  # -2 for up (grid is 2 columns)
+			get_viewport().set_input_as_handled()
+		else:
+			# Switch to category mode
+			_enter_category_mode()
+			get_viewport().set_input_as_handled()
+	elif event.is_action_pressed(aInputManager.ACTION_MOVE_DOWN):
+		if _in_category_mode:
+			# Switch to item mode
+			_enter_item_mode()
+			get_viewport().set_input_as_handled()
+		elif _selected_item_index + 2 < _item_buttons.size():
+			# Navigate items down
+			_navigate_items(2)  # +2 for down (grid is 2 columns)
+			get_viewport().set_input_as_handled()
+	# LEFT/RIGHT - Navigate within current mode
+	elif event.is_action_pressed(aInputManager.ACTION_MOVE_LEFT):
+		if _in_category_mode:
+			_navigate_categories(-1)
+		else:
+			_navigate_items(-1)
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed(aInputManager.ACTION_MOVE_RIGHT):
+		if _in_category_mode:
+			_navigate_categories(1)
+		else:
+			_navigate_items(1)
+		get_viewport().set_input_as_handled()
+	# L/R bumpers - Always navigate categories
+	elif event.is_action_pressed(aInputManager.ACTION_BURST):
+		_navigate_categories(-1)
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed(aInputManager.ACTION_BATTLE_RUN):
+		_navigate_categories(1)
+		get_viewport().set_input_as_handled()
+	# Action buttons
+	elif event.is_action_pressed(aInputManager.ACTION_ACCEPT):
+		if not _in_category_mode:
+			_use_selected_item()
+			get_viewport().set_input_as_handled()
+	elif event.is_action_pressed(aInputManager.ACTION_RUN):  # X button
+		if not _in_category_mode:
+			_inspect_selected_item()
+			get_viewport().set_input_as_handled()
+	elif event.is_action_pressed(aInputManager.ACTION_JUMP):  # Y button
+		if not _in_category_mode:
+			_discard_selected_item()
+			get_viewport().set_input_as_handled()
+
+func _navigate_categories(direction: int) -> void:
+	"""Navigate through categories with L/R bumpers or left/right"""
+	if _category_buttons.is_empty():
+		return
+
+	# Unhighlight current
+	_unhighlight_category_button(_selected_category_index)
+
+	# Update index with wrap-around
+	_selected_category_index += direction
+	if _selected_category_index < 0:
+		_selected_category_index = _category_buttons.size() - 1
+	elif _selected_category_index >= _category_buttons.size():
+		_selected_category_index = 0
+
+	# Highlight and activate new category
+	_highlight_category_button(_selected_category_index)
+	var button = _category_buttons[_selected_category_index]
+	button.button_pressed = true
+	_on_category_button_pressed(button)
+
+	# Auto-select first item in new category and update description
+	await get_tree().process_frame
+	_auto_select_first_item()
+
+func _highlight_category_button(index: int) -> void:
+	"""Highlight a category button"""
+	if index >= 0 and index < _category_buttons.size():
+		var button = _category_buttons[index]
+		button.modulate = Color(1.2, 1.2, 0.8, 1.0)  # Yellow tint
+		button.grab_focus()
+
+func _unhighlight_category_button(index: int) -> void:
+	"""Remove highlight from a category button"""
+	if index >= 0 and index < _category_buttons.size():
+		var button = _category_buttons[index]
+		button.modulate = Color(1.0, 1.0, 1.0, 1.0)  # Normal color
+
+func panel_gained_focus() -> void:
+	"""Called by GameMenu when this panel gains focus"""
+	_panel_has_focus = true
+	# Start in category mode
+	_in_category_mode = true
+	_highlight_category_button(_selected_category_index)
+
+func panel_lost_focus() -> void:
+	"""Called by GameMenu when this panel loses focus"""
+	_panel_has_focus = false
+	# Remove highlights
+	for btn in _category_buttons:
+		btn.modulate = Color(1.0, 1.0, 1.0, 1.0)
+	for btn in _item_buttons:
+		btn.modulate = Color(1.0, 1.0, 1.0, 1.0)
+
+func _enter_category_mode() -> void:
+	"""Switch to category navigation mode"""
+	_in_category_mode = true
+	# Unhighlight items
+	_unhighlight_item(_selected_item_index)
+	# Highlight category
+	_highlight_category_button(_selected_category_index)
+
+func _enter_item_mode() -> void:
+	"""Switch to item navigation mode"""
+	if _item_buttons.is_empty():
+		return
+	_in_category_mode = false
+	# Unhighlight category
+	_unhighlight_category_button(_selected_category_index)
+	# Highlight first item
+	_selected_item_index = 0
+	_highlight_item(_selected_item_index)
+
+func _navigate_items(delta: int) -> void:
+	"""Navigate through items in the grid"""
+	if _item_buttons.is_empty():
+		return
+
+	# Unhighlight current
+	_unhighlight_item(_selected_item_index)
+
+	# Calculate new index
+	var new_index = _selected_item_index + delta
+	new_index = clamp(new_index, 0, _item_buttons.size() - 1)
+	_selected_item_index = new_index
+
+	# Highlight new selection
+	_highlight_item(_selected_item_index)
+
+func _highlight_item(index: int) -> void:
+	"""Highlight an item button"""
+	if index >= 0 and index < _item_buttons.size():
+		var button = _item_buttons[index]
+		button.modulate = Color(1.2, 1.2, 0.8, 1.0)  # Yellow tint
+		button.grab_focus()
+
+		# Update description
+		var id: String = String(button.get_meta("id"))
+		var def: Dictionary = button.get_meta("def")
+		_update_description(id, def)
+
+		# Scroll to follow selected item
+		_scroll_to_item(button)
+
+func _unhighlight_item(index: int) -> void:
+	"""Remove highlight from an item button"""
+	if index >= 0 and index < _item_buttons.size():
+		var button = _item_buttons[index]
+		button.modulate = Color(1.0, 1.0, 1.0, 1.0)  # Normal color
+
+func _use_selected_item() -> void:
+	"""Use/activate the selected item (A button)"""
+	if _selected_item_index < 0 or _selected_item_index >= _item_buttons.size():
+		return
+	var button = _item_buttons[_selected_item_index]
+	_on_item_clicked(button)
+
+func _inspect_selected_item() -> void:
+	"""Inspect the selected item (X button)"""
+	if _selected_item_index < 0 or _selected_item_index >= _item_buttons.size():
+		return
+	var button = _item_buttons[_selected_item_index]
+	_on_inspect_row(button)
+
+func _discard_selected_item() -> void:
+	"""Discard the selected item (Y button)"""
+	if _selected_item_index < 0 or _selected_item_index >= _item_buttons.size():
+		return
+	var button = _item_buttons[_selected_item_index]
+	_on_discard_row(button)
+
+func _add_back_indicator() -> void:
+	"""Add 'Back (B)' text in bottom right corner"""
+	_back_label = Label.new()
+	_back_label.text = "Back (B)"
+	_back_label.add_theme_font_size_override("font_size", 14)
+	_back_label.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7, 1.0))
+
+	# Position in bottom right
+	_back_label.anchor_right = 1.0
+	_back_label.anchor_bottom = 1.0
+	_back_label.anchor_left = 1.0
+	_back_label.anchor_top = 1.0
+	_back_label.offset_right = -20
+	_back_label.offset_bottom = -10
+	_back_label.offset_left = -100
+	_back_label.offset_top = -30
+	_back_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+
+	add_child(_back_label)
+
+func _auto_select_first_item() -> void:
+	"""Auto-select first item in current category and update description"""
+	if _item_buttons.is_empty():
+		# No items in this category - show dash
+		if _description_label:
+			_description_label.text = "-"
+		return
+
+	# Select first item
+	_selected_item_index = 0
+	_highlight_item(_selected_item_index)
+
+func _scroll_to_item(item_button: Button) -> void:
+	"""Scroll the container to ensure the item is visible"""
+	if not _scroll or not item_button:
+		return
+
+	# Get the item's panel container (parent of item's vbox)
+	var item_vbox = item_button.get_parent()
+	if not item_vbox:
+		return
+
+	var panel_container = item_vbox.get_parent()
+	if not panel_container:
+		return
+
+	# Calculate the position we need to scroll to
+	var item_pos = panel_container.position.y
+	var item_height = panel_container.size.y
+	var scroll_height = _scroll.size.y
+
+	# Get current scroll position
+	var current_scroll = _scroll.scroll_vertical
+
+	# Check if item is above viewport
+	if item_pos < current_scroll:
+		_scroll.scroll_vertical = item_pos
+
+	# Check if item is below viewport
+	elif item_pos + item_height > current_scroll + scroll_height:
+		_scroll.scroll_vertical = item_pos + item_height - scroll_height
+
+func _update_description(id: String, def: Dictionary) -> void:
+	"""Update the description label with item info"""
+	if not _description_label:
+		return
+
+	var nm: String = _display_name(id, def)
+	var desc_text: String = ""
+
+	# Try to get description from various fields
+	for key in ["description", "desc", "info", "details", "text"]:
+		if def.has(key) and typeof(def[key]) == TYPE_STRING:
+			var s: String = String(def[key]).strip_edges()
+			if s != "":
+				desc_text = s
+				break
+
+	# If no description found, show basic info
+	if desc_text == "":
+		var cat: String = _category_of(def)
+		desc_text = "%s - %s category item" % [nm, cat]
+
+	# Add equipped info if applicable
+	var equip_txt := _equip_string_for(id, def)
+	if equip_txt != "":
+		desc_text += "\n" + equip_txt
+
+	_description_label.text = desc_text
+
 # Try to read current inventory count, or -1 if unavailable.
 func _get_inv_count(id: String) -> int:
 	if _inv != null and _inv.has_method("get_count"):

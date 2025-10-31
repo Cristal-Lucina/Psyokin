@@ -27,7 +27,15 @@ var _levels_map : Dictionary = {}            # {stat -> level:int}
 var _cells      : Dictionary = {}            # {stat -> Array[Button]}
 var _points     : int = 0                    # available perk points (from system if possible)
 
+## Controller navigation
+var _selected_row: int = 0
+var _selected_col: int = 0
+var _back_label: Label = null
+
 func _ready() -> void:
+	# Add "Back (B)" indicator in bottom right
+	_add_back_indicator()
+
 	_stats = get_node_or_null(STATS_PATH)
 	_perk  = get_node_or_null(PERKSYS_PATH)
 
@@ -139,6 +147,11 @@ func _rebuild_all() -> void:
 
 	await get_tree().process_frame
 	_grid.queue_sort()
+
+	# Highlight first available cell
+	_selected_row = 0
+	_selected_col = 0
+	_highlight_cell(_selected_row, _selected_col)
 
 # ------------------------------------------------------------------------------
 
@@ -285,3 +298,125 @@ func _pretty_stat(id_str: String) -> String:
 	if s.length() == 0:
 		return "Stat"
 	return s.substr(0,1).to_upper() + s.substr(1, s.length() - 1)
+
+# ------------------------------------------------------------------------------
+# Controller Navigation
+# ------------------------------------------------------------------------------
+
+func _input(event: InputEvent) -> void:
+	"""Handle controller input for grid navigation"""
+	if not visible or _stat_keys.is_empty():
+		return
+
+	var handled: bool = false
+
+	if event.is_action_pressed(aInputManager.ACTION_MOVE_UP):
+		_navigate_grid(0, -1)
+		handled = true
+	elif event.is_action_pressed(aInputManager.ACTION_MOVE_DOWN):
+		_navigate_grid(0, 1)
+		handled = true
+	elif event.is_action_pressed(aInputManager.ACTION_MOVE_LEFT):
+		_navigate_grid(-1, 0)
+		handled = true
+	elif event.is_action_pressed(aInputManager.ACTION_MOVE_RIGHT):
+		_navigate_grid(1, 0)
+		handled = true
+	elif event.is_action_pressed(aInputManager.ACTION_ACCEPT):
+		_activate_selected_cell()
+		handled = true
+
+	if handled:
+		get_viewport().set_input_as_handled()
+
+func _navigate_grid(col_delta: int, row_delta: int) -> void:
+	"""Navigate through the perk grid"""
+	if _stat_keys.is_empty():
+		return
+
+	# Unhighlight current
+	_unhighlight_cell(_selected_row, _selected_col)
+
+	# Update position with clamping
+	_selected_col += col_delta
+	_selected_row += row_delta
+
+	# Clamp to valid grid bounds
+	_selected_col = clamp(_selected_col, 0, MAX_COLS - 1)
+	_selected_row = clamp(_selected_row, 0, _stat_keys.size() - 1)
+
+	# Highlight new selection
+	_highlight_cell(_selected_row, _selected_col)
+
+func _highlight_cell(row: int, col: int) -> void:
+	"""Highlight a cell in the grid"""
+	if row < 0 or row >= _stat_keys.size():
+		return
+
+	var stat_id: String = String(_stat_keys[row])
+	if not _cells.has(stat_id):
+		return
+
+	var buttons: Array = _cells[stat_id]
+	if col < 0 or col >= buttons.size():
+		return
+
+	var button: Button = buttons[col]
+	button.modulate = Color(1.2, 1.2, 0.8, 1.0)  # Yellow tint
+	button.grab_focus()
+
+func _unhighlight_cell(row: int, col: int) -> void:
+	"""Remove highlight from a cell"""
+	if row < 0 or row >= _stat_keys.size():
+		return
+
+	var stat_id: String = String(_stat_keys[row])
+	if not _cells.has(stat_id):
+		return
+
+	var buttons: Array = _cells[stat_id]
+	if col < 0 or col >= buttons.size():
+		return
+
+	var button: Button = buttons[col]
+	button.modulate = Color(1.0, 1.0, 1.0, 1.0)  # Normal color
+
+func _activate_selected_cell() -> void:
+	"""Activate the currently selected cell"""
+	if _selected_row < 0 or _selected_row >= _stat_keys.size():
+		return
+
+	var stat_id: String = String(_stat_keys[_selected_row])
+	if not _cells.has(stat_id):
+		return
+
+	var buttons: Array = _cells[stat_id]
+	if _selected_col < 0 or _selected_col >= buttons.size():
+		return
+
+	var button: Button = buttons[_selected_col]
+
+	# Only activate if button is enabled and not already unlocked
+	if not button.disabled and not button.button_pressed:
+		_on_cell_pressed(button)
+
+# --- Back Button Indicator ---
+func _add_back_indicator() -> void:
+	"""Add 'Back (B)' text in bottom right corner"""
+	_back_label = Label.new()
+	_back_label.text = "Back (B)"
+	_back_label.add_theme_font_size_override("font_size", 14)
+	_back_label.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7, 1.0))
+
+	# Position in bottom right
+	_back_label.anchor_right = 1.0
+	_back_label.anchor_bottom = 1.0
+	_back_label.anchor_left = 1.0
+	_back_label.anchor_top = 1.0
+	_back_label.offset_right = -20
+	_back_label.offset_bottom = -10
+	_back_label.offset_left = -100
+	_back_label.offset_top = -30
+	_back_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+
+	add_child(_back_label)

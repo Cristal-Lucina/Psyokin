@@ -87,17 +87,17 @@ func _input(event: InputEvent) -> void:
 	if not _panel_has_focus or not visible:
 		return
 
-	# L bumper - previous member
-	if event.is_action_pressed(aInputManager.ACTION_BURST):
+	# L bumper or LEFT - previous member
+	if event.is_action_pressed(aInputManager.ACTION_BURST) or event.is_action_pressed(aInputManager.ACTION_MOVE_LEFT):
 		_navigate_members(-1)
 		get_viewport().set_input_as_handled()
-	# R bumper - next member
-	elif event.is_action_pressed(aInputManager.ACTION_BATTLE_RUN):
+	# R bumper or RIGHT - next member
+	elif event.is_action_pressed(aInputManager.ACTION_BATTLE_RUN) or event.is_action_pressed(aInputManager.ACTION_MOVE_RIGHT):
 		_navigate_members(1)
 		get_viewport().set_input_as_handled()
 
 func _navigate_members(direction: int) -> void:
-	"""Navigate through party members with L/R bumpers"""
+	"""Navigate through party members with L/R bumpers or left/right"""
 	var party_ids := _active_party_ids()
 	if party_ids.is_empty():
 		return

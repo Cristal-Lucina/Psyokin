@@ -70,6 +70,9 @@ class_name StatusPanel
 ## Shows party HP/MP, summary info, and appearance.
 ## Prefers GameState meta + CombatProfileSystem; falls back to Stats/CSV.
 
+# Signal emitted when a menu tab button is clicked
+signal tab_selected(tab_id: String)
+
 const GS_PATH        := "/root/aGameState"
 const STATS_PATH     := "/root/aStatsSystem"
 const CAL_PATH       := "/root/aCalendarSystem"
@@ -86,6 +89,24 @@ const ALT_MES_PATHS := [
 	"/root/MainEventSystem", "/root/MainEvents", "/root/MainEvent"
 ]
 
+# Tab button definitions
+const TAB_DEFS: Dictionary = {
+	"stats":   {"title": "Stats"},
+	"perks":   {"title": "Perks"},
+	"items":   {"title": "Items"},
+	"loadout": {"title": "Loadout"},
+	"bonds":   {"title": "Bonds"},
+	"outreach":{"title": "Outreach"},
+	"dorms":   {"title": "Dorms"},
+	"calendar":{"title": "Calendar"},
+	"index":   {"title": "Index"},
+	"system":  {"title": "System"},
+}
+
+const TAB_ORDER: PackedStringArray = [
+	"stats","perks","items","loadout","bonds","outreach","dorms","calendar","index","system"
+]
+
 # Character preview constants
 const CHAR_BASE_PATH = "res://assets/graphics/characters/"
 const CHAR_VARIANTS = ["char_a_p1"]
@@ -100,6 +121,7 @@ const LAYERS = {
 	"tool_b": {"code": "7tlb", "node_name": "ToolBSprite", "path": "7tlb"}
 }
 
+@onready var _tab_buttons_container: VBoxContainer = %TabButtons
 @onready var _refresh   : Button        = $Root/Left/PartyHeader/RefreshBtn
 @onready var _party     : VBoxContainer = $Root/Left/PartyScroll/PartyList
 @onready var _creds     : Label         = $Root/Right/InfoGrid/MoneyValue
@@ -126,6 +148,10 @@ var _cps       : Node = null
 var _csv_by_id   : Dictionary = {}      # "actor_id" -> row dict
 var _name_to_id  : Dictionary = {}      # lowercase "name" -> "actor_id"
 
+# Controller navigation for tab buttons
+var _tab_buttons: Array[Button] = []
+var _selected_button_index: int = 0
+
 func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -144,6 +170,7 @@ func _ready() -> void:
 	_normalize_scroll_children()
 	_connect_signals()
 	_load_party_csv_cache()
+	_build_tab_buttons()
 
 	if _refresh and not _refresh.pressed.is_connected(_rebuild_all):
 		_refresh.pressed.connect(_rebuild_all)
@@ -165,6 +192,96 @@ func _first_fill() -> void:
 	if _cps == null:       _cps       = get_node_or_null(CPS_PATH)
 	_load_party_csv_cache()
 	_rebuild_all()
+
+func _build_tab_buttons() -> void:
+	"""Build the menu tab buttons"""
+	if not _tab_buttons_container:
+		return
+
+	# Clear existing buttons
+	for child in _tab_buttons_container.get_children():
+		child.queue_free()
+	_tab_buttons.clear()
+
+	# Create buttons for each tab
+	var ids: Array = Array(TAB_ORDER)
+	for tab_id_any in ids:
+		var tab_id: String = String(tab_id_any)
+		if not TAB_DEFS.has(tab_id):
+			continue
+		var meta: Dictionary = TAB_DEFS[tab_id]
+
+		var btn := Button.new()
+		btn.text = String(meta["title"])
+		btn.focus_mode = Control.FOCUS_ALL
+		btn.size_flags_horizontal = Control.SIZE_FILL
+		btn.set_meta("tab_id", tab_id)
+		btn.pressed.connect(_on_tab_button_pressed.bind(tab_id))
+		_tab_buttons_container.add_child(btn)
+		_tab_buttons.append(btn)
+
+	# Highlight first button
+	if _tab_buttons.size() > 0:
+		_selected_button_index = 0
+		_highlight_button(_selected_button_index)
+
+func _on_tab_button_pressed(tab_id: String) -> void:
+	"""Handle tab button press - emit signal for GameMenu to handle"""
+	tab_selected.emit(tab_id)
+
+func _input(event: InputEvent) -> void:
+	"""Handle controller input for tab button navigation"""
+	if not visible or _tab_buttons.is_empty():
+		return
+
+	# Navigate up/down through tab buttons
+	if event.is_action_pressed(aInputManager.ACTION_MOVE_UP):
+		_navigate_buttons(-1)
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed(aInputManager.ACTION_MOVE_DOWN):
+		_navigate_buttons(1)
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed(aInputManager.ACTION_ACCEPT):
+		_confirm_button_selection()
+		get_viewport().set_input_as_handled()
+
+func _navigate_buttons(direction: int) -> void:
+	"""Navigate through tab buttons with controller"""
+	if _tab_buttons.is_empty():
+		return
+
+	# Unhighlight current
+	_unhighlight_button(_selected_button_index)
+
+	# Update index with wrap-around
+	_selected_button_index += direction
+	if _selected_button_index < 0:
+		_selected_button_index = _tab_buttons.size() - 1
+	elif _selected_button_index >= _tab_buttons.size():
+		_selected_button_index = 0
+
+	# Highlight new selection
+	_highlight_button(_selected_button_index)
+
+func _confirm_button_selection() -> void:
+	"""Confirm the currently highlighted button"""
+	if _selected_button_index >= 0 and _selected_button_index < _tab_buttons.size():
+		var button = _tab_buttons[_selected_button_index]
+		var tab_id: String = String(button.get_meta("tab_id"))
+		_on_tab_button_pressed(tab_id)
+
+func _highlight_button(index: int) -> void:
+	"""Highlight a tab button"""
+	if index >= 0 and index < _tab_buttons.size():
+		var button = _tab_buttons[index]
+		button.modulate = Color(1.2, 1.2, 0.8, 1.0)  # Yellow tint
+		button.grab_focus()
+
+func _unhighlight_button(index: int) -> void:
+	"""Remove highlight from a tab button"""
+	if index >= 0 and index < _tab_buttons.size():
+		var button = _tab_buttons[index]
+		button.modulate = Color(1.0, 1.0, 1.0, 1.0)  # Normal color
 
 func _connect_signals() -> void:
 	# Calendar
@@ -1068,6 +1185,11 @@ func _safe_hero_level() -> int:
 # --------------------- Dev dump/hotkey ------------------------
 
 func _on_visibility_changed() -> void:
+	# Re-highlight first button when panel becomes visible
+	if visible and _tab_buttons.size() > 0:
+		_selected_button_index = 0
+		_highlight_button(_selected_button_index)
+
 	if not OS.is_debug_build(): return
 	_dev_dump_profiles()
 
