@@ -988,11 +988,11 @@ func _input(event: InputEvent) -> void:
 		if not _in_category_mode:
 			_use_selected_item()
 			get_viewport().set_input_as_handled()
-	elif event.is_action_pressed(aInputManager.ACTION_ITEM):  # X button
+	elif event.is_action_pressed(aInputManager.ACTION_RUN):  # X button
 		if not _in_category_mode:
 			_inspect_selected_item()
 			get_viewport().set_input_as_handled()
-	elif event.is_action_pressed(aInputManager.ACTION_QUICK_SWITCH):  # Y button
+	elif event.is_action_pressed(aInputManager.ACTION_JUMP):  # Y button
 		if not _in_category_mode:
 			_discard_selected_item()
 			get_viewport().set_input_as_handled()

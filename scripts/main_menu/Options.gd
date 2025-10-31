@@ -122,8 +122,8 @@ func _build_controls_ui() -> void:
 	var menu_actions = [
 		{"name": "menu_accept", "display": "Accept (A)"},
 		{"name": "menu_back", "display": "Back (B)"},
-		{"name": "item", "display": "Inspect Item (X)"},
-		{"name": "quick_switch", "display": "Discard Item (Y)"},
+		{"name": "run", "display": "Inspect Item (X)"},
+		{"name": "jump", "display": "Discard Item (Y)"},
 	]
 
 	# ========== OVERWORLD SECTION ==========
