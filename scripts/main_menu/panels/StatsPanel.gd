@@ -419,9 +419,9 @@ class RadarChart extends Control:
 		if _stat_labels.size() == 0 or _stat_values.size() == 0:
 			return
 
-		var center := size / 2.0
-		var radius := min(size.x, size.y) * 0.35
-		var num_stats := _stat_labels.size()
+		var center: Vector2 = size / 2.0
+		var radius: float = min(size.x, size.y) * 0.35
+		var num_stats: int = _stat_labels.size()
 
 		if num_stats == 0:
 			return
@@ -437,22 +437,22 @@ class RadarChart extends Control:
 
 	func _draw_grid(center: Vector2, radius: float, num_stats: int) -> void:
 		"""Draw the background grid lines"""
-		var angle_step := TAU / float(num_stats)
+		var angle_step: float = TAU / float(num_stats)
 
 		# Draw concentric rings (25%, 50%, 75%, 100%)
 		for ring in [0.25, 0.5, 0.75, 1.0]:
 			var points: PackedVector2Array = []
 			for i in range(num_stats):
-				var angle := -PI / 2.0 + angle_step * i
-				var point := center + Vector2(cos(angle), sin(angle)) * radius * ring
+				var angle: float = -PI / 2.0 + angle_step * i
+				var point: Vector2 = center + Vector2(cos(angle), sin(angle)) * radius * ring
 				points.append(point)
 			points.append(points[0])  # Close the polygon
 			draw_polyline(points, grid_color, 1.0)
 
 		# Draw lines from center to each vertex
 		for i in range(num_stats):
-			var angle := -PI / 2.0 + angle_step * i
-			var point := center + Vector2(cos(angle), sin(angle)) * radius
+			var angle: float = -PI / 2.0 + angle_step * i
+			var point: Vector2 = center + Vector2(cos(angle), sin(angle)) * radius
 			draw_line(center, point, grid_color, 1.0)
 
 	func _draw_stat_polygon(center: Vector2, radius: float, num_stats: int) -> void:
@@ -460,13 +460,13 @@ class RadarChart extends Control:
 		if _stat_values.size() != num_stats:
 			return
 
-		var angle_step := TAU / float(num_stats)
+		var angle_step: float = TAU / float(num_stats)
 		var points: PackedVector2Array = []
 
 		for i in range(num_stats):
-			var angle := -PI / 2.0 + angle_step * i
-			var value_ratio := clamp(_stat_values[i] / _max_value, 0.0, 1.0)
-			var point := center + Vector2(cos(angle), sin(angle)) * radius * value_ratio
+			var angle: float = -PI / 2.0 + angle_step * i
+			var value_ratio: float = clamp(_stat_values[i] / _max_value, 0.0, 1.0)
+			var point: Vector2 = center + Vector2(cos(angle), sin(angle)) * radius * value_ratio
 			points.append(point)
 
 		if points.size() >= 3:
@@ -482,17 +482,17 @@ class RadarChart extends Control:
 		if _stat_labels.size() != num_stats:
 			return
 
-		var angle_step := TAU / float(num_stats)
-		var font := get_theme_default_font()
-		var font_size := 14
+		var angle_step: float = TAU / float(num_stats)
+		var font: Font = get_theme_default_font()
+		var font_size: int = 14
 
 		for i in range(num_stats):
-			var angle := -PI / 2.0 + angle_step * i
-			var label_pos := center + Vector2(cos(angle), sin(angle)) * radius
-			var label := "%s: %d" % [_stat_labels[i], int(_stat_values[i])]
+			var angle: float = -PI / 2.0 + angle_step * i
+			var label_pos: Vector2 = center + Vector2(cos(angle), sin(angle)) * radius
+			var label: String = "%s: %d" % [_stat_labels[i], int(_stat_values[i])]
 
 			# Get text size for centering
-			var text_size := font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size)
+			var text_size: Vector2 = font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size)
 			label_pos -= text_size / 2.0
 
 			draw_string(font, label_pos, label, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, label_color)
