@@ -1211,30 +1211,33 @@ func _scroll_to_item(item_button: Button) -> void:
 	if not _scroll or not item_button:
 		return
 
-	# Get the item's panel container (parent of item's vbox)
-	var item_vbox = item_button.get_parent()
-	if not item_vbox:
+	# Find button's index in the item array
+	var button_index = _item_buttons.find(item_button)
+	if button_index < 0:
 		return
 
-	var panel_container = item_vbox.get_parent()
-	if not panel_container:
-		return
+	# Calculate item position based on index in 2-column grid
+	# Grid layout: 2 columns, panels are ~50px tall (button + margins), 6px v_separation
+	var panel_height = 58.0  # Approximate height of panel + margin + separation
+	var row_index = button_index / 2  # Integer division (0,1 = row 0; 2,3 = row 1)
 
-	# Calculate the position we need to scroll to
-	var item_pos = panel_container.position.y
-	var item_height = panel_container.size.y
+	# Calculate Y position of this row
+	var item_y = row_index * panel_height
+	var item_bottom = item_y + panel_height
+
+	# Get scroll dimensions
 	var scroll_height = _scroll.size.y
-
-	# Get current scroll position
 	var current_scroll = _scroll.scroll_vertical
 
-	# Check if item is above viewport
-	if item_pos < current_scroll:
-		_scroll.scroll_vertical = item_pos
+	# Add padding for better visibility
+	var padding = 20.0
 
-	# Check if item is below viewport
-	elif item_pos + item_height > current_scroll + scroll_height:
-		_scroll.scroll_vertical = item_pos + item_height - scroll_height
+	# Check if item is above visible area (need to scroll up)
+	if item_y < current_scroll + padding:
+		_scroll.scroll_vertical = max(0, item_y - padding)
+	# Check if item is below visible area (need to scroll down)
+	elif item_bottom > current_scroll + scroll_height - padding:
+		_scroll.scroll_vertical = item_bottom - scroll_height + padding
 
 func _update_description(id: String, def: Dictionary) -> void:
 	"""Update the description label with item info"""
