@@ -121,7 +121,7 @@ const LAYERS = {
 	"tool_b": {"code": "7tlb", "node_name": "ToolBSprite", "path": "7tlb"}
 }
 
-@onready var _tab_buttons_container: VBoxContainer = %TabButtons
+@onready var _tab_list  : ItemList      = %TabList
 @onready var _refresh   : Button        = $Root/Left/PartyHeader/RefreshBtn
 @onready var _party     : VBoxContainer = $Root/Left/PartyScroll/PartyList
 @onready var _creds     : Label         = $Root/Right/InfoGrid/MoneyValue
@@ -129,7 +129,7 @@ const LAYERS = {
 @onready var _morality  : Label         = $Root/Right/InfoGrid/MoralityValue
 @onready var _date      : Label         = $Root/Right/InfoGrid/DateValue
 @onready var _phase     : Label         = $Root/Right/InfoGrid/PhaseValue
-@onready var _hint      : RichTextLabel = $Root/Right/HintValue
+@onready var _hint      : RichTextLabel = $Root/Right/HintSection/HintValue
 
 # Character Preview UI
 @onready var character_layers = $Root/Right/CharacterPreviewBox/ViewportWrapper/CharacterLayers
@@ -149,9 +149,8 @@ var _ctrl_mgr  : Node = null  # ControllerManager reference
 var _csv_by_id   : Dictionary = {}      # "actor_id" -> row dict
 var _name_to_id  : Dictionary = {}      # lowercase "name" -> "actor_id"
 
-# Controller navigation for tab buttons
-var _tab_buttons: Array[Button] = []
-var _selected_button_index: int = 0
+# Tab metadata (maps item index to tab_id)
+var _tab_ids: Array[String] = []
 
 func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -196,16 +195,15 @@ func _first_fill() -> void:
 	_rebuild_all()
 
 func _build_tab_buttons() -> void:
-	"""Build the menu tab buttons"""
-	if not _tab_buttons_container:
+	"""Build the menu tab items in ItemList"""
+	if not _tab_list:
 		return
 
-	# Clear existing buttons
-	for child in _tab_buttons_container.get_children():
-		child.queue_free()
-	_tab_buttons.clear()
+	# Clear existing items
+	_tab_list.clear()
+	_tab_ids.clear()
 
-	# Create buttons for each tab
+	# Add items for each tab
 	var ids: Array = Array(TAB_ORDER)
 	for tab_id_any in ids:
 		var tab_id: String = String(tab_id_any)
@@ -213,62 +211,34 @@ func _build_tab_buttons() -> void:
 			continue
 		var meta: Dictionary = TAB_DEFS[tab_id]
 
-		var btn := Button.new()
-		btn.text = String(meta["title"])
-		btn.focus_mode = Control.FOCUS_NONE  # Disable auto-focus to allow ControllerManager to handle input
-		btn.size_flags_horizontal = Control.SIZE_FILL
-		btn.set_meta("tab_id", tab_id)
-		btn.pressed.connect(_on_tab_button_pressed.bind(tab_id))
-		_tab_buttons_container.add_child(btn)
-		_tab_buttons.append(btn)
+		_tab_list.add_item(String(meta["title"]))
+		_tab_ids.append(tab_id)
 
-	# Highlight first button
-	if _tab_buttons.size() > 0:
-		_selected_button_index = 0
-		_highlight_button(_selected_button_index)
+	# Select first item and connect signal
+	if _tab_list.item_count > 0:
+		_tab_list.select(0)
 
-func _on_tab_button_pressed(tab_id: String) -> void:
-	"""Handle tab button press - emit signal for GameMenu to handle"""
-	tab_selected.emit(tab_id)
+	# Connect item selection signal
+	if not _tab_list.item_selected.is_connected(_on_tab_item_selected):
+		_tab_list.item_selected.connect(_on_tab_item_selected)
 
+	# Connect item activation signal (double-click or Enter)
+	if not _tab_list.item_activated.is_connected(_on_tab_item_activated):
+		_tab_list.item_activated.connect(_on_tab_item_activated)
 
-func _navigate_buttons(direction: int) -> void:
-	"""Navigate through tab buttons with controller"""
-	if _tab_buttons.is_empty():
+func _on_tab_item_selected(index: int) -> void:
+	"""Handle tab item selection (when navigating with UP/DOWN)"""
+	# Just visual feedback - don't switch tabs yet
+	print("[StatusPanel] Tab selected: index %d" % index)
+
+func _on_tab_item_activated(index: int) -> void:
+	"""Handle tab item activation (A button or double-click)"""
+	if index < 0 or index >= _tab_ids.size():
 		return
 
-	# Unhighlight current
-	_unhighlight_button(_selected_button_index)
-
-	# Update index with wrap-around
-	_selected_button_index += direction
-	if _selected_button_index < 0:
-		_selected_button_index = _tab_buttons.size() - 1
-	elif _selected_button_index >= _tab_buttons.size():
-		_selected_button_index = 0
-
-	# Highlight new selection
-	_highlight_button(_selected_button_index)
-
-func _confirm_button_selection() -> void:
-	"""Confirm the currently highlighted button"""
-	if _selected_button_index >= 0 and _selected_button_index < _tab_buttons.size():
-		var button = _tab_buttons[_selected_button_index]
-		var tab_id: String = String(button.get_meta("tab_id"))
-		_on_tab_button_pressed(tab_id)
-
-func _highlight_button(index: int) -> void:
-	"""Highlight a tab button"""
-	if index >= 0 and index < _tab_buttons.size():
-		var button = _tab_buttons[index]
-		button.modulate = Color(1.2, 1.2, 0.8, 1.0)  # Yellow tint
-		button.grab_focus()
-
-func _unhighlight_button(index: int) -> void:
-	"""Remove highlight from a tab button"""
-	if index >= 0 and index < _tab_buttons.size():
-		var button = _tab_buttons[index]
-		button.modulate = Color(1.0, 1.0, 1.0, 1.0)  # Normal color
+	var tab_id: String = _tab_ids[index]
+	print("[StatusPanel] Tab activated: %s" % tab_id)
+	tab_selected.emit(tab_id)
 
 func _connect_signals() -> void:
 	# Calendar
@@ -1181,28 +1151,23 @@ func _on_visibility_changed() -> void:
 	_dev_dump_profiles()
 
 func _unhandled_input(event: InputEvent) -> void:
-	"""Handle controller input for tab button navigation - direct input handling"""
-	# Only handle when visible and not in fullscreen panel
-	if not visible or _tab_buttons.is_empty():
+	"""Handle controller input for tab navigation - ItemList handles UP/DOWN automatically"""
+	# Only handle when visible
+	if not visible or not _tab_list:
 		return
 
 	# Check if we're in MENU_MAIN context (not in a fullscreen panel)
 	if _ctrl_mgr and _ctrl_mgr.get_current_context() != _ctrl_mgr.InputContext.MENU_MAIN:
 		return
 
-	# Navigate up/down through tab buttons
-	if event.is_action_pressed("move_up"):
-		print("[StatusPanel] D-pad UP - navigating")
-		_navigate_buttons(-1)
-		get_viewport().set_input_as_handled()
-	elif event.is_action_pressed("move_down"):
-		print("[StatusPanel] D-pad DOWN - navigating")
-		_navigate_buttons(1)
-		get_viewport().set_input_as_handled()
-	elif event.is_action_pressed("menu_accept"):
-		print("[StatusPanel] A button - confirming selection: %d" % _selected_button_index)
-		_confirm_button_selection()
-		get_viewport().set_input_as_handled()
+	# Handle A button to activate selected tab (ItemList handles UP/DOWN navigation)
+	if event.is_action_pressed("menu_accept"):
+		var selected_items = _tab_list.get_selected_items()
+		if selected_items.size() > 0:
+			var index = selected_items[0]
+			print("[StatusPanel] A button - confirming selection: %d" % index)
+			_on_tab_item_activated(index)
+			get_viewport().set_input_as_handled()
 
 	# Debug key handling (F9 to dump profiles)
 	if not OS.is_debug_build(): return
