@@ -38,6 +38,15 @@ var _counts_map  : Dictionary = {}    # {id -> int}  (after expansion, per-insta
 var _equipped_by : Dictionary = {}    # {base_id -> PackedStringArray of member display names}
 var _active_category : String = "All"  # Track currently selected category
 
+# Controller navigation and UI
+var _category_buttons: Array[Button] = []
+var _selected_category_index: int = 0
+var _panel_has_focus: bool = false
+var _back_label: Label = null
+var _description_label: Label = null
+var _selected_item_id: String = ""
+var _selected_item_def: Dictionary = {}
+
 # Normalize arbitrary category strings to our canonical set
 const _CAT_MAP := {
 	"consumable":"Consumables","consumables":"Consumables",
@@ -55,6 +64,9 @@ const _CAT_MAP := {
 }
 
 func _ready() -> void:
+	# Add "Back (B)" indicator in bottom right
+	_add_back_indicator()
+
 	_inv = get_node_or_null(INV_PATH)
 	_csv = get_node_or_null(CSV_PATH)
 	_eq  = get_node_or_null(EQUIP_SYS_PATH)
@@ -66,6 +78,9 @@ func _ready() -> void:
 
 	# Setup GridContainer for 2-column item layout
 	_setup_item_grid()
+
+	# Setup description section at the bottom
+	_setup_description_section()
 
 	# Live refresh on inventory
 	if _inv != null and _inv.has_signal("inventory_changed"):
@@ -115,6 +130,9 @@ func _setup_category_buttons() -> void:
 	else:
 		_header.add_child(_filter_container)
 
+	# Clear button array
+	_category_buttons.clear()
+
 	# Create button for each category
 	for cat in CATEGORIES:
 		var btn := Button.new()
@@ -126,6 +144,11 @@ func _setup_category_buttons() -> void:
 			btn.button_pressed = true  # Start with "All" selected
 		btn.pressed.connect(_on_category_button_pressed.bind(btn))
 		_filter_container.add_child(btn)
+		_category_buttons.append(btn)
+
+	# Highlight first category button
+	_selected_category_index = 0
+	_highlight_category_button(_selected_category_index)
 
 func _setup_item_grid() -> void:
 	# Find and replace the List VBoxContainer with GridContainer
@@ -553,6 +576,11 @@ func _on_item_clicked(btn: Button) -> void:
 	var qty: int = int(btn.get_meta("qty"))
 	var nm: String = _display_name(id, def)
 
+	# Update description
+	_selected_item_id = id
+	_selected_item_def = def
+	_update_description(id, def)
+
 	# Create a dialog with item info and action buttons
 	var dlg := AcceptDialog.new()
 	dlg.title = nm
@@ -869,6 +897,146 @@ func _member_display_name(token: String) -> String:
 		var v: Variant = _gs.call("_display_name_for_id", token)
 		if typeof(v) == TYPE_STRING and String(v) != "": return String(v)
 	return token.capitalize()
+
+# ------------------------------------------------------------------------------
+# Controller Navigation & UI Enhancements
+# ------------------------------------------------------------------------------
+
+func _setup_description_section() -> void:
+	"""Add description section at the bottom of the panel"""
+	if not _vbox:
+		return
+
+	# Create a separator
+	var separator := HSeparator.new()
+	_vbox.add_child(separator)
+
+	# Create description container
+	var desc_container := MarginContainer.new()
+	desc_container.add_theme_constant_override("margin_left", 16)
+	desc_container.add_theme_constant_override("margin_right", 16)
+	desc_container.add_theme_constant_override("margin_top", 8)
+	desc_container.add_theme_constant_override("margin_bottom", 8)
+	desc_container.custom_minimum_size.y = 60
+
+	_description_label = Label.new()
+	_description_label.text = "Select an item to view its description"
+	_description_label.add_theme_font_size_override("font_size", 12)
+	_description_label.add_theme_color_override("font_color", Color(0.8, 0.8, 0.8, 1.0))
+	_description_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_description_label.vertical_alignment = VERTICAL_ALIGNMENT_TOP
+	desc_container.add_child(_description_label)
+
+	_vbox.add_child(desc_container)
+
+func _input(event: InputEvent) -> void:
+	if not _panel_has_focus or not visible:
+		return
+
+	# L bumper or LEFT - previous category
+	if event.is_action_pressed(aInputManager.ACTION_BURST) or event.is_action_pressed(aInputManager.ACTION_MOVE_LEFT):
+		_navigate_categories(-1)
+		get_viewport().set_input_as_handled()
+	# R bumper or RIGHT - next category
+	elif event.is_action_pressed(aInputManager.ACTION_BATTLE_RUN) or event.is_action_pressed(aInputManager.ACTION_MOVE_RIGHT):
+		_navigate_categories(1)
+		get_viewport().set_input_as_handled()
+
+func _navigate_categories(direction: int) -> void:
+	"""Navigate through categories with L/R bumpers or left/right"""
+	if _category_buttons.is_empty():
+		return
+
+	# Unhighlight current
+	_unhighlight_category_button(_selected_category_index)
+
+	# Update index with wrap-around
+	_selected_category_index += direction
+	if _selected_category_index < 0:
+		_selected_category_index = _category_buttons.size() - 1
+	elif _selected_category_index >= _category_buttons.size():
+		_selected_category_index = 0
+
+	# Highlight and activate new category
+	_highlight_category_button(_selected_category_index)
+	var button = _category_buttons[_selected_category_index]
+	button.button_pressed = true
+	_on_category_button_pressed(button)
+
+func _highlight_category_button(index: int) -> void:
+	"""Highlight a category button"""
+	if index >= 0 and index < _category_buttons.size():
+		var button = _category_buttons[index]
+		button.modulate = Color(1.2, 1.2, 0.8, 1.0)  # Yellow tint
+		button.grab_focus()
+
+func _unhighlight_category_button(index: int) -> void:
+	"""Remove highlight from a category button"""
+	if index >= 0 and index < _category_buttons.size():
+		var button = _category_buttons[index]
+		button.modulate = Color(1.0, 1.0, 1.0, 1.0)  # Normal color
+
+func panel_gained_focus() -> void:
+	"""Called by GameMenu when this panel gains focus"""
+	_panel_has_focus = true
+	# Highlight current category
+	_highlight_category_button(_selected_category_index)
+
+func panel_lost_focus() -> void:
+	"""Called by GameMenu when this panel loses focus"""
+	_panel_has_focus = false
+	# Remove highlights
+	for btn in _category_buttons:
+		btn.modulate = Color(1.0, 1.0, 1.0, 1.0)
+
+func _add_back_indicator() -> void:
+	"""Add 'Back (B)' text in bottom right corner"""
+	_back_label = Label.new()
+	_back_label.text = "Back (B)"
+	_back_label.add_theme_font_size_override("font_size", 14)
+	_back_label.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7, 1.0))
+
+	# Position in bottom right
+	_back_label.anchor_right = 1.0
+	_back_label.anchor_bottom = 1.0
+	_back_label.anchor_left = 1.0
+	_back_label.anchor_top = 1.0
+	_back_label.offset_right = -20
+	_back_label.offset_bottom = -10
+	_back_label.offset_left = -100
+	_back_label.offset_top = -30
+	_back_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+
+	add_child(_back_label)
+
+func _update_description(id: String, def: Dictionary) -> void:
+	"""Update the description label with item info"""
+	if not _description_label:
+		return
+
+	var nm: String = _display_name(id, def)
+	var desc_text: String = ""
+
+	# Try to get description from various fields
+	for key in ["description", "desc", "info", "details", "text"]:
+		if def.has(key) and typeof(def[key]) == TYPE_STRING:
+			var s: String = String(def[key]).strip_edges()
+			if s != "":
+				desc_text = s
+				break
+
+	# If no description found, show basic info
+	if desc_text == "":
+		var cat: String = _category_of(def)
+		desc_text = "%s - %s category item" % [nm, cat]
+
+	# Add equipped info if applicable
+	var equip_txt := _equip_string_for(id, def)
+	if equip_txt != "":
+		desc_text += "\n" + equip_txt
+
+	_description_label.text = desc_text
+
 # Try to read current inventory count, or -1 if unavailable.
 func _get_inv_count(id: String) -> int:
 	if _inv != null and _inv.has_method("get_count"):
