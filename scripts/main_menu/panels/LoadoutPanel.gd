@@ -398,49 +398,56 @@ func _show_item_menu_for_slot(member_token: String, slot: String) -> void:
 		_handle.call(pm.get_item_index(idnum))
 	)
 
-	# Add controller support for PopupMenu
-	pm.gui_input.connect(func(event: InputEvent):
+	# Controller support will be handled via _unhandled_input on the popup
+	# Store reference for controller navigation
+	var current_idx: int = 0
+
+	# Find first valid item
+	for i in range(pm.get_item_count()):
+		if not pm.is_item_separator(i) and not pm.is_item_disabled(i):
+			current_idx = i
+			break
+
+	var navigate_popup: Callable = func(event: InputEvent) -> void:
 		if event.is_action_pressed("move_up"):
-			var idx = pm.get_focused_item()
-			if idx <= 0:
+			# Navigate up
+			var idx = current_idx - 1
+			if idx < 0:
 				idx = pm.get_item_count() - 1
-			else:
-				idx -= 1
 			# Skip separators and disabled items
-			while pm.is_item_separator(idx) or pm.is_item_disabled(idx):
+			var attempts = 0
+			while (pm.is_item_separator(idx) or pm.is_item_disabled(idx)) and attempts < pm.get_item_count():
 				idx -= 1
 				if idx < 0:
 					idx = pm.get_item_count() - 1
-			pm.set_focused_item(idx)
+				attempts += 1
+			if attempts < pm.get_item_count():
+				current_idx = idx
 			get_viewport().set_input_as_handled()
 		elif event.is_action_pressed("move_down"):
-			var idx = pm.get_focused_item()
-			idx = (idx + 1) % pm.get_item_count()
+			# Navigate down
+			var idx = (current_idx + 1) % pm.get_item_count()
 			# Skip separators and disabled items
-			while pm.is_item_separator(idx) or pm.is_item_disabled(idx):
+			var attempts = 0
+			while (pm.is_item_separator(idx) or pm.is_item_disabled(idx)) and attempts < pm.get_item_count():
 				idx = (idx + 1) % pm.get_item_count()
-			pm.set_focused_item(idx)
+				attempts += 1
+			if attempts < pm.get_item_count():
+				current_idx = idx
 			get_viewport().set_input_as_handled()
 		elif event.is_action_pressed("menu_accept"):
-			var idx = pm.get_focused_item()
-			if idx >= 0 and idx < pm.get_item_count():
-				if not pm.is_item_disabled(idx) and not pm.is_item_separator(idx):
-					_handle.call(idx)
+			if current_idx >= 0 and current_idx < pm.get_item_count():
+				if not pm.is_item_disabled(current_idx) and not pm.is_item_separator(current_idx):
+					_handle.call(current_idx)
 			get_viewport().set_input_as_handled()
 		elif event.is_action_pressed("menu_back"):
 			pm.hide()
 			pm.queue_free()
 			get_viewport().set_input_as_handled()
-	)
+
+	pm.gui_input.connect(navigate_popup)
 
 	pm.popup(Rect2(get_global_mouse_position(), Vector2(280, 0)))
-
-	# Focus first valid item
-	await get_tree().process_frame
-	for i in range(pm.get_item_count()):
-		if not pm.is_item_separator(i) and not pm.is_item_disabled(i):
-			pm.set_focused_item(i)
-			break
 
 # ────────────────── sigils ──────────────────
 func _sigil_disp(inst_id: String) -> String:
