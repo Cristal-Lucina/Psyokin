@@ -303,7 +303,7 @@ func _pretty_stat(id_str: String) -> String:
 # Controller Navigation
 # ------------------------------------------------------------------------------
 
-func _input(event: InputEvent) -> void:
+func _unhandled_input(event: InputEvent) -> void:
 	"""Handle controller input for grid navigation"""
 	if not visible or _stat_keys.is_empty():
 		return

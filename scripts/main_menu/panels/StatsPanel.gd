@@ -83,7 +83,7 @@ func _ready() -> void:
 	_rebuild_member_bar()
 	_rebuild_all()
 
-func _input(event: InputEvent) -> void:
+func _unhandled_input(event: InputEvent) -> void:
 	if not _panel_has_focus or not visible:
 		return
 
