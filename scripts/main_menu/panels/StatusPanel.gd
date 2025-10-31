@@ -1142,10 +1142,10 @@ func _safe_hero_level() -> int:
 # --------------------- Dev dump/hotkey ------------------------
 
 func _on_visibility_changed() -> void:
-	# Re-highlight first button when panel becomes visible
-	if visible and _tab_buttons.size() > 0:
-		_selected_button_index = 0
-		_highlight_button(_selected_button_index)
+	# Select first tab when panel becomes visible
+	if visible and _tab_list and _tab_list.item_count > 0:
+		_tab_list.select(0)
+		_tab_list.grab_focus()
 
 	if not OS.is_debug_build(): return
 	_dev_dump_profiles()
