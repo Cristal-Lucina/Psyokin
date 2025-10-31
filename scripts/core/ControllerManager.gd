@@ -47,8 +47,14 @@ var debug_mode: bool = true
 func _ready() -> void:
 	# Set as autoload singleton
 	name = "aControllerManager"
+
+	# CRITICAL: Process input at highest priority to receive events first
+	# This ensures we see events before any scene nodes
+	set_process_priority(-100)  # Negative = higher priority
 	set_process_input(true)
+
 	print("[ControllerManager] Initialized - Current context: %s" % InputContext.keys()[current_context])
+	print("[ControllerManager] Process priority set to: %d" % process_priority)
 
 func _process(delta: float) -> void:
 	# Update cooldown timer
