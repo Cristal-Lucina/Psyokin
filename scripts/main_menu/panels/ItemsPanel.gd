@@ -637,11 +637,23 @@ func _on_item_clicked(btn: Button) -> void:
 	inspect_btn.text = "Inspect"
 	inspect_btn.focus_mode = Control.FOCUS_ALL
 	inspect_btn.set_meta("id", id)
-	inspect_btn.pressed.connect(func():
+
+	# Handle both mouse clicks and controller A button
+	var inspect_action = func():
 		print("[ItemsPanel] Inspect button pressed!")
 		dlg.hide()
 		_on_inspect_row(inspect_btn)
+
+	inspect_btn.pressed.connect(inspect_action)
+
+	# IMPORTANT: Handle controller input directly on button
+	inspect_btn.gui_input.connect(func(event: InputEvent):
+		if event.is_action_pressed("ui_accept") and inspect_btn.has_focus():
+			print("[ItemsPanel] Inspect button: ui_accept detected!")
+			inspect_action.call()
+			get_viewport().set_input_as_handled()
 	)
+
 	inspect_btn.focus_entered.connect(func():
 		print("[ItemsPanel] Inspect button focused")
 	)
@@ -653,11 +665,23 @@ func _on_item_clicked(btn: Button) -> void:
 	discard_btn.text = "Discard"
 	discard_btn.focus_mode = Control.FOCUS_ALL
 	discard_btn.set_meta("id", id)
-	discard_btn.pressed.connect(func():
+
+	# Handle both mouse clicks and controller A button
+	var discard_action = func():
 		print("[ItemsPanel] Discard button pressed!")
 		dlg.hide()
 		_on_discard_row(discard_btn)
+
+	discard_btn.pressed.connect(discard_action)
+
+	# IMPORTANT: Handle controller input directly on button
+	discard_btn.gui_input.connect(func(event: InputEvent):
+		if event.is_action_pressed("ui_accept") and discard_btn.has_focus():
+			print("[ItemsPanel] Discard button: ui_accept detected!")
+			discard_action.call()
+			get_viewport().set_input_as_handled()
 	)
+
 	discard_btn.focus_entered.connect(func():
 		print("[ItemsPanel] Discard button focused")
 	)
@@ -686,11 +710,18 @@ func _on_item_clicked(btn: Button) -> void:
 	print("[ItemsPanel] OK button found: ", ok_button != null)
 	if ok_button:
 		ok_button.focus_mode = Control.FOCUS_ALL
+
+		# IMPORTANT: Handle controller input directly on OK button
+		ok_button.gui_input.connect(func(event: InputEvent):
+			if event.is_action_pressed("ui_accept") and ok_button.has_focus():
+				print("[ItemsPanel] OK button: ui_accept detected!")
+				print("[ItemsPanel] OK button pressed!")
+				dlg.hide()
+				get_viewport().set_input_as_handled()
+		)
+
 		ok_button.focus_entered.connect(func():
 			print("[ItemsPanel] OK button focused")
-		)
-		ok_button.pressed.connect(func():
-			print("[ItemsPanel] OK button pressed!")
 		)
 		print("[ItemsPanel] OK button focus_mode: ", ok_button.focus_mode)
 
@@ -804,20 +835,36 @@ func _on_discard_row(btn: Button) -> void:
 	# Make sure buttons are focusable
 	if ok_button:
 		ok_button.focus_mode = Control.FOCUS_ALL
+
+		# IMPORTANT: Handle controller input directly on OK button
+		ok_button.gui_input.connect(func(event: InputEvent):
+			if event.is_action_pressed("ui_accept") and ok_button.has_focus():
+				print("[ItemsPanel] Discard OK button: ui_accept detected!")
+				print("[ItemsPanel] Discard OK button pressed!")
+				dlg.hide()
+				_on_discard_confirmed(dlg)
+				get_viewport().set_input_as_handled()
+		)
+
 		ok_button.focus_entered.connect(func():
 			print("[ItemsPanel] Discard OK button focused")
 		)
-		ok_button.pressed.connect(func():
-			print("[ItemsPanel] Discard OK button pressed!")
-		)
 		print("[ItemsPanel] Discard OK button focus_mode: ", ok_button.focus_mode)
+
 	if cancel_button:
 		cancel_button.focus_mode = Control.FOCUS_ALL
+
+		# IMPORTANT: Handle controller input directly on Cancel button
+		cancel_button.gui_input.connect(func(event: InputEvent):
+			if event.is_action_pressed("ui_accept") and cancel_button.has_focus():
+				print("[ItemsPanel] Discard Cancel button: ui_accept detected!")
+				print("[ItemsPanel] Discard Cancel button pressed!")
+				dlg.hide()
+				get_viewport().set_input_as_handled()
+		)
+
 		cancel_button.focus_entered.connect(func():
 			print("[ItemsPanel] Discard Cancel button focused")
-		)
-		cancel_button.pressed.connect(func():
-			print("[ItemsPanel] Discard Cancel button pressed!")
 		)
 		print("[ItemsPanel] Discard Cancel button focus_mode: ", cancel_button.focus_mode)
 
