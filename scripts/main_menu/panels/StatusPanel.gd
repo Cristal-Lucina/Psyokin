@@ -171,7 +171,6 @@ func _ready() -> void:
 	_resolve_event_system()
 	_normalize_scroll_children()
 	_connect_signals()
-	_connect_controller_signals()
 	_load_party_csv_cache()
 	_build_tab_buttons()
 
@@ -270,58 +269,6 @@ func _unhighlight_button(index: int) -> void:
 	if index >= 0 and index < _tab_buttons.size():
 		var button = _tab_buttons[index]
 		button.modulate = Color(1.0, 1.0, 1.0, 1.0)  # Normal color
-
-func _connect_controller_signals() -> void:
-	"""Connect to ControllerManager signals for tab navigation"""
-	if not _ctrl_mgr:
-		return
-
-	if _ctrl_mgr.has_signal("navigate_pressed"):
-		if not _ctrl_mgr.is_connected("navigate_pressed", Callable(self, "_on_controller_navigate")):
-			_ctrl_mgr.connect("navigate_pressed", Callable(self, "_on_controller_navigate"))
-
-	if _ctrl_mgr.has_signal("action_button_pressed"):
-		if not _ctrl_mgr.is_connected("action_button_pressed", Callable(self, "_on_controller_action")):
-			_ctrl_mgr.connect("action_button_pressed", Callable(self, "_on_controller_action"))
-
-func _on_controller_navigate(direction: Vector2, context: int) -> void:
-	"""Handle navigation from ControllerManager - only in MENU_MAIN context"""
-	if not visible or _tab_buttons.is_empty():
-		return
-
-	# Only handle navigation when in MENU_MAIN context
-	if _ctrl_mgr and _ctrl_mgr.get_current_context() != _ctrl_mgr.InputContext.MENU_MAIN:
-		return
-
-	if direction == Vector2.UP:
-		print("[StatusPanel] Controller navigate UP")
-		_navigate_buttons(-1)
-	elif direction == Vector2.DOWN:
-		print("[StatusPanel] Controller navigate DOWN")
-		_navigate_buttons(1)
-
-func _on_controller_action(action: String, context: int) -> void:
-	"""Handle action button from ControllerManager - only in MENU_MAIN context"""
-	print("[StatusPanel._on_controller_action] action=%s, context=%d, visible=%s, buttons=%d" % [
-		action, context, visible, _tab_buttons.size()
-	])
-
-	if not visible or _tab_buttons.is_empty():
-		print("[StatusPanel._on_controller_action] BLOCKED - not visible or no buttons")
-		return
-
-	# Only handle accept action when in MENU_MAIN context
-	if _ctrl_mgr and _ctrl_mgr.get_current_context() != _ctrl_mgr.InputContext.MENU_MAIN:
-		print("[StatusPanel._on_controller_action] BLOCKED - wrong context: %s" % [
-			_ctrl_mgr.InputContext.keys()[_ctrl_mgr.get_current_context()]
-		])
-		return
-
-	if action == "accept":
-		print("[StatusPanel] Controller ACCEPT - confirming selection: %d" % _selected_button_index)
-		_confirm_button_selection()
-	else:
-		print("[StatusPanel._on_controller_action] Ignoring action: %s" % action)
 
 func _connect_signals() -> void:
 	# Calendar
@@ -1234,7 +1181,29 @@ func _on_visibility_changed() -> void:
 	_dev_dump_profiles()
 
 func _unhandled_input(event: InputEvent) -> void:
-	"""Handle debug input only - controller navigation is now handled via ControllerManager signals"""
+	"""Handle controller input for tab button navigation - direct input handling"""
+	# Only handle when visible and not in fullscreen panel
+	if not visible or _tab_buttons.is_empty():
+		return
+
+	# Check if we're in MENU_MAIN context (not in a fullscreen panel)
+	if _ctrl_mgr and _ctrl_mgr.get_current_context() != _ctrl_mgr.InputContext.MENU_MAIN:
+		return
+
+	# Navigate up/down through tab buttons
+	if event.is_action_pressed("move_up"):
+		print("[StatusPanel] D-pad UP - navigating")
+		_navigate_buttons(-1)
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("move_down"):
+		print("[StatusPanel] D-pad DOWN - navigating")
+		_navigate_buttons(1)
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("menu_accept"):
+		print("[StatusPanel] A button - confirming selection: %d" % _selected_button_index)
+		_confirm_button_selection()
+		get_viewport().set_input_as_handled()
+
 	# Debug key handling (F9 to dump profiles)
 	if not OS.is_debug_build(): return
 	if event is InputEventKey and (event as InputEventKey).pressed and not (event as InputEventKey).echo:
