@@ -357,6 +357,15 @@ func _show_item_menu_for_slot(member_token: String, slot: String) -> void:
 	var cur: Dictionary = _fetch_equip_for(member_token)
 	var cur_id: String = String(cur.get(slot, ""))
 
+	# Get the button that was clicked for positioning
+	var source_btn: Button = null
+	match slot:
+		"weapon": source_btn = _w_btn
+		"armor": source_btn = _a_btn
+		"head": source_btn = _h_btn
+		"foot": source_btn = _f_btn
+		"bracelet": source_btn = _b_btn
+
 	var pm: PopupMenu = PopupMenu.new()
 	pm.process_mode = Node.PROCESS_MODE_ALWAYS  # Important for input
 	add_child(pm)
@@ -398,10 +407,45 @@ func _show_item_menu_for_slot(member_token: String, slot: String) -> void:
 		_handle.call(pm.get_item_index(idnum))
 	)
 
-	pm.popup(Rect2(get_global_mouse_position(), Vector2(280, 0)))
+	# Position popup next to the equipment button
+	var popup_pos: Vector2 = get_global_mouse_position()
+	if source_btn and is_instance_valid(source_btn):
+		popup_pos = source_btn.global_position + Vector2(source_btn.size.x + 10, 0)
 
-	# PopupMenu has built-in keyboard/controller support via ui_* actions
-	# ui_up/ui_down/ui_accept work automatically for D-pad and A button
+	# Add controller support since we cleared ui_accept/ui_cancel joypad bindings
+	var popup_active: bool = true
+	var popup_input_handler: Callable = func(event: InputEvent) -> void:
+		if not popup_active or not is_instance_valid(pm) or not pm.visible:
+			return
+
+		if event.is_action_pressed("menu_accept"):
+			# Simulate ui_accept for the popup
+			var accept_event = InputEventAction.new()
+			accept_event.action = "ui_accept"
+			accept_event.pressed = true
+			Input.parse_input_event(accept_event)
+			get_viewport().set_input_as_handled()
+		elif event.is_action_pressed("menu_back"):
+			pm.hide()
+			pm.queue_free()
+			popup_active = false
+			get_viewport().set_input_as_handled()
+
+	# Connect the handler for this panel's unhandled input
+	if not is_connected("tree_exiting", func(): popup_active = false):
+		tree_exiting.connect(func(): popup_active = false)
+
+	# Store handler reference so we can use it in _unhandled_input
+	set_meta("_popup_handler", popup_input_handler)
+	set_meta("_popup_active", true)
+
+	# Clean up when popup closes
+	pm.popup_hide.connect(func() -> void:
+		popup_active = false
+		set_meta("_popup_active", false)
+	)
+
+	pm.popup(Rect2(popup_pos, Vector2(280, 0)))
 
 # ────────────────── sigils ──────────────────
 func _sigil_disp(inst_id: String) -> String:
@@ -1066,7 +1110,7 @@ func _as_bool(v: Variant) -> bool:
 
 func _unhandled_input(event: InputEvent) -> void:
 	"""Handle controller navigation for LoadoutPanel
-	
+
 	Navigation flow:
 	1. Party list (UP/DOWN to select member, ACCEPT to confirm)
 	2. Equipment slots (UP/DOWN to navigate)
@@ -1076,7 +1120,15 @@ func _unhandled_input(event: InputEvent) -> void:
 	"""
 	if not visible:
 		return
-	
+
+	# If popup is active, let popup handler process input first
+	if has_meta("_popup_active") and get_meta("_popup_active"):
+		if has_meta("_popup_handler"):
+			var handler: Callable = get_meta("_popup_handler")
+			handler.call(event)
+			if event.is_action_pressed("menu_accept") or event.is_action_pressed("menu_back"):
+				return  # Don't process navigation if popup handled it
+
 	if _in_party_mode:
 		# Party list navigation
 		if event.is_action_pressed("move_up"):
