@@ -11,6 +11,7 @@ const SIGIL_SYS_PATH : String = "/root/aSigilSystem"
 const EQUIP_SYS_PATH : String = "/root/aEquipmentSystem"
 const GS_PATH        : String = "/root/aGameState"
 const STATS_PATH     : String = "/root/aStatsSystem"
+const INPUT_MGR_PATH : String = "/root/aInputManager"
 const INSPECT_SCENE  : String = "res://scenes/main_menu/panels/ItemInspect.tscn"
 
 const ITEMS_CSV : String = "res://data/items/items.csv"
@@ -29,12 +30,13 @@ const CATEGORIES : PackedStringArray = [
 @onready var _vbox      : VBoxContainer = %VBox
 @onready var _scroll    : ScrollContainer = %Scroll
 
-var _inv   : Node = null
-var _csv   : Node = null
-var _eq    : Node = null
-var _gs    : Node = null
-var _sig   : Node = null
-var _stats : Node = null
+var _inv       : Node = null
+var _csv       : Node = null
+var _eq        : Node = null
+var _gs        : Node = null
+var _sig       : Node = null
+var _stats     : Node = null
+var _input_mgr : Node = null
 
 var _defs        : Dictionary = {}    # {id -> row dict}
 var _counts_map  : Dictionary = {}    # {id -> int}  (after expansion, per-instance = 1)
@@ -76,12 +78,13 @@ func _ready() -> void:
 	# Add "Back (B)" indicator in bottom right
 	_add_back_indicator()
 
-	_inv   = get_node_or_null(INV_PATH)
-	_csv   = get_node_or_null(CSV_PATH)
-	_eq    = get_node_or_null(EQUIP_SYS_PATH)
-	_gs    = get_node_or_null(GS_PATH)
-	_sig   = get_node_or_null(SIGIL_SYS_PATH)
-	_stats = get_node_or_null(STATS_PATH)
+	_inv       = get_node_or_null(INV_PATH)
+	_csv       = get_node_or_null(CSV_PATH)
+	_eq        = get_node_or_null(EQUIP_SYS_PATH)
+	_gs        = get_node_or_null(GS_PATH)
+	_sig       = get_node_or_null(SIGIL_SYS_PATH)
+	_stats     = get_node_or_null(STATS_PATH)
+	_input_mgr = get_node_or_null(INPUT_MGR_PATH)
 
 	# Setup UI: replace Filter dropdown with category buttons
 	_setup_category_buttons()
@@ -722,7 +725,7 @@ func _on_item_clicked(btn: Button) -> void:
 	# IMPORTANT: Handle controller input directly on button
 	inspect_btn.gui_input.connect(func(event: InputEvent):
 		print("[ItemsPanel] Inspect button received input event: ", event)
-		if event.is_action_pressed(aInputManager.ACTION_ACCEPT) and inspect_btn.has_focus():
+		if _input_mgr and event.is_action_pressed(_input_mgr.ACTION_ACCEPT) and inspect_btn.has_focus():
 			print("[ItemsPanel] Inspect button: ACTION_ACCEPT detected!")
 			inspect_action.call()
 			get_viewport().set_input_as_handled()
@@ -758,7 +761,7 @@ func _on_item_clicked(btn: Button) -> void:
 		# IMPORTANT: Handle controller input directly on button
 		use_btn.gui_input.connect(func(event: InputEvent):
 			print("[ItemsPanel] Use button received input event: ", event)
-			if event.is_action_pressed(aInputManager.ACTION_ACCEPT) and use_btn.has_focus():
+			if _input_mgr and event.is_action_pressed(_input_mgr.ACTION_ACCEPT) and use_btn.has_focus():
 				print("[ItemsPanel] Use button: ACTION_ACCEPT detected!")
 				use_action.call()
 				get_viewport().set_input_as_handled()
@@ -791,7 +794,7 @@ func _on_item_clicked(btn: Button) -> void:
 	# IMPORTANT: Handle controller input directly on button
 	discard_btn.gui_input.connect(func(event: InputEvent):
 		print("[ItemsPanel] Discard button received input event: ", event)
-		if event.is_action_pressed(aInputManager.ACTION_ACCEPT) and discard_btn.has_focus():
+		if _input_mgr and event.is_action_pressed(_input_mgr.ACTION_ACCEPT) and discard_btn.has_focus():
 			print("[ItemsPanel] Discard button: ACTION_ACCEPT detected!")
 			discard_action.call()
 			get_viewport().set_input_as_handled()
@@ -833,7 +836,7 @@ func _on_item_clicked(btn: Button) -> void:
 		# IMPORTANT: Handle controller input directly on OK button
 		ok_button.gui_input.connect(func(event: InputEvent):
 			print("[ItemsPanel] OK button received input event: ", event)
-			if event.is_action_pressed(aInputManager.ACTION_ACCEPT) and ok_button.has_focus():
+			if _input_mgr and event.is_action_pressed(_input_mgr.ACTION_ACCEPT) and ok_button.has_focus():
 				print("[ItemsPanel] OK button: ACTION_ACCEPT detected!")
 				print("[ItemsPanel] OK button pressed!")
 				dlg.hide()
@@ -980,7 +983,7 @@ func _on_use_item(item_id: String, item_def: Dictionary) -> void:
 
 		# Handle controller input
 		member_btn.gui_input.connect(func(event: InputEvent):
-			if (event.is_action_pressed(aInputManager.ACTION_ACCEPT) or event.is_action_pressed("ui_accept")) and member_btn.has_focus():
+			if ((_input_mgr and event.is_action_pressed(_input_mgr.ACTION_ACCEPT)) or event.is_action_pressed("ui_accept")) and member_btn.has_focus():
 				apply_use.call()
 				get_viewport().set_input_as_handled()
 		)
@@ -1010,7 +1013,7 @@ func _on_use_item(item_id: String, item_def: Dictionary) -> void:
 			dlg.hide()
 
 		cancel_btn.gui_input.connect(func(event: InputEvent):
-			if (event.is_action_pressed(aInputManager.ACTION_ACCEPT) or event.is_action_pressed("ui_accept")) and cancel_btn.has_focus():
+			if ((_input_mgr and event.is_action_pressed(_input_mgr.ACTION_ACCEPT)) or event.is_action_pressed("ui_accept")) and cancel_btn.has_focus():
 				cancel_action.call()
 				get_viewport().set_input_as_handled()
 		)
@@ -1018,7 +1021,7 @@ func _on_use_item(item_id: String, item_def: Dictionary) -> void:
 	# Add controller support to OK button
 	if ok_btn:
 		ok_btn.gui_input.connect(func(event: InputEvent):
-			if (event.is_action_pressed(aInputManager.ACTION_ACCEPT) or event.is_action_pressed("ui_accept")) and ok_btn.has_focus():
+			if ((_input_mgr and event.is_action_pressed(_input_mgr.ACTION_ACCEPT)) or event.is_action_pressed("ui_accept")) and ok_btn.has_focus():
 				dlg.hide()
 				get_viewport().set_input_as_handled()
 		)
@@ -1092,7 +1095,7 @@ func _apply_recovery_item(item_id: String, member_token: String, effect: String)
 	var ok_btn: Button = msg_dlg.get_ok_button()
 	if ok_btn:
 		ok_btn.gui_input.connect(func(event: InputEvent):
-			if (event.is_action_pressed(aInputManager.ACTION_ACCEPT) or event.is_action_pressed("ui_accept")) and ok_btn.has_focus():
+			if ((_input_mgr and event.is_action_pressed(_input_mgr.ACTION_ACCEPT)) or event.is_action_pressed("ui_accept")) and ok_btn.has_focus():
 				msg_dlg.hide()
 				get_viewport().set_input_as_handled()
 		)
@@ -1185,7 +1188,7 @@ func _on_discard_row(btn: Button) -> void:
 		# IMPORTANT: Handle controller input directly on OK button
 		ok_button.gui_input.connect(func(event: InputEvent):
 			print("[ItemsPanel] Discard OK button received input event: ", event)
-			if event.is_action_pressed(aInputManager.ACTION_ACCEPT) and ok_button.has_focus():
+			if _input_mgr and event.is_action_pressed(_input_mgr.ACTION_ACCEPT) and ok_button.has_focus():
 				print("[ItemsPanel] Discard OK button: ACTION_ACCEPT detected!")
 				print("[ItemsPanel] Discard OK button pressed!")
 				dlg.hide()
@@ -1210,7 +1213,7 @@ func _on_discard_row(btn: Button) -> void:
 		# IMPORTANT: Handle controller input directly on Cancel button
 		cancel_button.gui_input.connect(func(event: InputEvent):
 			print("[ItemsPanel] Discard Cancel button received input event: ", event)
-			if event.is_action_pressed(aInputManager.ACTION_ACCEPT) and cancel_button.has_focus():
+			if _input_mgr and event.is_action_pressed(_input_mgr.ACTION_ACCEPT) and cancel_button.has_focus():
 				print("[ItemsPanel] Discard Cancel button: ACTION_ACCEPT detected!")
 				print("[ItemsPanel] Discard Cancel button pressed!")
 				dlg.hide()
@@ -1450,7 +1453,7 @@ func _get_member_hp_mp(token: String) -> Dictionary:
 		return result
 
 	# Get current HP/MP from member_data
-	if _gs.has("member_data"):
+	if _gs and _gs.has_method("get"):
 		var member_data: Variant = _gs.get("member_data")
 		if typeof(member_data) == TYPE_DICTIONARY:
 			var md := member_data as Dictionary
@@ -1521,11 +1524,11 @@ func _setup_description_section() -> void:
 	_vbox.add_child(desc_container)
 
 func _input(event: InputEvent) -> void:
-	if not _panel_has_focus or not visible:
+	if not _panel_has_focus or not visible or not _input_mgr:
 		return
 
 	# UP/DOWN - Toggle between category mode and item mode
-	if event.is_action_pressed(aInputManager.ACTION_MOVE_UP):
+	if event.is_action_pressed(_input_mgr.ACTION_MOVE_UP):
 		if not _in_category_mode and _selected_item_index > 0:
 			# Navigate items up
 			_navigate_items(-2)  # -2 for up (grid is 2 columns)
@@ -1534,7 +1537,7 @@ func _input(event: InputEvent) -> void:
 			# Switch to category mode
 			_enter_category_mode()
 			get_viewport().set_input_as_handled()
-	elif event.is_action_pressed(aInputManager.ACTION_MOVE_DOWN):
+	elif event.is_action_pressed(_input_mgr.ACTION_MOVE_DOWN):
 		if _in_category_mode:
 			# Switch to item mode
 			_enter_item_mode()
@@ -1544,23 +1547,23 @@ func _input(event: InputEvent) -> void:
 			_navigate_items(2)  # +2 for down (grid is 2 columns)
 			get_viewport().set_input_as_handled()
 	# LEFT/RIGHT - Navigate items only (not categories)
-	elif event.is_action_pressed(aInputManager.ACTION_MOVE_LEFT):
+	elif event.is_action_pressed(_input_mgr.ACTION_MOVE_LEFT):
 		if not _in_category_mode:
 			_navigate_items(-1)
 			get_viewport().set_input_as_handled()
-	elif event.is_action_pressed(aInputManager.ACTION_MOVE_RIGHT):
+	elif event.is_action_pressed(_input_mgr.ACTION_MOVE_RIGHT):
 		if not _in_category_mode:
 			_navigate_items(1)
 			get_viewport().set_input_as_handled()
 	# L/R bumpers - Always navigate categories
-	elif event.is_action_pressed(aInputManager.ACTION_BURST):
+	elif event.is_action_pressed(_input_mgr.ACTION_BURST):
 		_navigate_categories(-1)
 		get_viewport().set_input_as_handled()
-	elif event.is_action_pressed(aInputManager.ACTION_BATTLE_RUN):
+	elif event.is_action_pressed(_input_mgr.ACTION_BATTLE_RUN):
 		_navigate_categories(1)
 		get_viewport().set_input_as_handled()
 	# Action buttons
-	elif event.is_action_pressed(aInputManager.ACTION_ACCEPT):
+	elif event.is_action_pressed(_input_mgr.ACTION_ACCEPT):
 		if _in_category_mode:
 			# If in category mode, switch to item mode first
 			_enter_item_mode()
@@ -1569,11 +1572,11 @@ func _input(event: InputEvent) -> void:
 			# Use selected item
 			_use_selected_item()
 			get_viewport().set_input_as_handled()
-	elif event.is_action_pressed(aInputManager.ACTION_RUN):  # X button
+	elif event.is_action_pressed(_input_mgr.ACTION_RUN):  # X button
 		if not _in_category_mode and not _item_buttons.is_empty():
 			_inspect_selected_item()
 			get_viewport().set_input_as_handled()
-	elif event.is_action_pressed(aInputManager.ACTION_JUMP):  # Y button
+	elif event.is_action_pressed(_input_mgr.ACTION_JUMP):  # Y button
 		if not _in_category_mode and not _item_buttons.is_empty():
 			_discard_selected_item()
 			get_viewport().set_input_as_handled()
