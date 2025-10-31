@@ -1535,6 +1535,76 @@ func _setup_description_section() -> void:
 ## CONTROLLER INPUT (via ControllerManager signals)
 ## ═══════════════════════════════════════════════════════════════
 
+func _unhandled_input(event: InputEvent) -> void:
+	"""Handle controller input directly - bypassing ControllerManager signal routing"""
+	# Only process when panel has focus
+	if not _panel_has_focus or not visible:
+		return
+
+	# L/R bumpers (9-10) - navigate categories
+	if event.is_action_pressed("battle_burst"):  # L bumper
+		print("[ItemsPanel] L bumper - navigate categories LEFT")
+		_navigate_categories(-1)
+		get_viewport().set_input_as_handled()
+		return
+	elif event.is_action_pressed("battle_run"):  # R bumper
+		print("[ItemsPanel] R bumper - navigate categories RIGHT")
+		_navigate_categories(1)
+		get_viewport().set_input_as_handled()
+		return
+
+	# D-pad navigation
+	if event.is_action_pressed("move_up"):
+		print("[ItemsPanel] D-pad UP")
+		if not _in_category_mode and _selected_item_index > 0:
+			_navigate_items(-2)  # -2 for up (grid is 2 columns)
+		else:
+			_enter_category_mode()
+		get_viewport().set_input_as_handled()
+		return
+	elif event.is_action_pressed("move_down"):
+		print("[ItemsPanel] D-pad DOWN")
+		if _in_category_mode:
+			_enter_item_mode()
+		elif _selected_item_index + 2 < _item_buttons.size():
+			_navigate_items(2)  # +2 for down (grid is 2 columns)
+		get_viewport().set_input_as_handled()
+		return
+	elif event.is_action_pressed("move_left"):
+		print("[ItemsPanel] D-pad LEFT")
+		if not _in_category_mode:
+			_navigate_items(-1)
+		get_viewport().set_input_as_handled()
+		return
+	elif event.is_action_pressed("move_right"):
+		print("[ItemsPanel] D-pad RIGHT")
+		if not _in_category_mode:
+			_navigate_items(1)
+		get_viewport().set_input_as_handled()
+		return
+
+	# Action buttons
+	if event.is_action_pressed("menu_accept"):  # A button
+		print("[ItemsPanel] A button - accept/use item")
+		if _in_category_mode:
+			_enter_item_mode()
+		elif not _item_buttons.is_empty():
+			_use_selected_item()
+		get_viewport().set_input_as_handled()
+		return
+	elif event.is_action_pressed("battle_defend"):  # X button
+		print("[ItemsPanel] X button - inspect item")
+		if not _in_category_mode and not _item_buttons.is_empty():
+			_inspect_selected_item()
+		get_viewport().set_input_as_handled()
+		return
+	elif event.is_action_pressed("battle_skill"):  # Y button
+		print("[ItemsPanel] Y button - discard item")
+		if not _in_category_mode and not _item_buttons.is_empty():
+			_discard_selected_item()
+		get_viewport().set_input_as_handled()
+		return
+
 func _on_controller_navigate(direction: Vector2, context: int) -> void:
 	"""Handle navigation input from ControllerManager"""
 	# Only process if this is our context
