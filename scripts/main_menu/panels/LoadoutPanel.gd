@@ -63,23 +63,23 @@ class_name LoadoutPanel
 @onready var _party_list: ItemList       = get_node("Row/Party/PartyList") as ItemList
 @onready var _member_name: Label         = get_node("Row/Right/MemberName") as Label
 
-@onready var _w_val: Label = get_node("Row/Right/Grid/WValue") as Label
-@onready var _a_val: Label = get_node("Row/Right/Grid/AValue") as Label
-@onready var _h_val: Label = get_node("Row/Right/Grid/HValue") as Label
-@onready var _f_val: Label = get_node("Row/Right/Grid/FValue") as Label
-@onready var _b_val: Label = get_node("Row/Right/Grid/BValue") as Label
+@onready var _w_val: Label = get_node("Row/Right/Grid/WHBox/WValue") as Label
+@onready var _a_val: Label = get_node("Row/Right/Grid/AHBox/AValue") as Label
+@onready var _h_val: Label = get_node("Row/Right/Grid/HHBox/HValue") as Label
+@onready var _f_val: Label = get_node("Row/Right/Grid/FHBox/FValue") as Label
+@onready var _b_val: Label = get_node("Row/Right/Grid/BHBox/BValue") as Label
 
-@onready var _w_btn: Button = get_node_or_null("Row/Right/Grid/WBtn") as Button
-@onready var _a_btn: Button = get_node_or_null("Row/Right/Grid/ABtn") as Button
-@onready var _h_btn: Button = get_node_or_null("Row/Right/Grid/HBtn") as Button
-@onready var _f_btn: Button = get_node_or_null("Row/Right/Grid/FBtn") as Button
-@onready var _b_btn: Button = get_node_or_null("Row/Right/Grid/BBtn") as Button
+@onready var _w_btn: Button = get_node_or_null("Row/Right/Grid/WHBox/WBtn") as Button
+@onready var _a_btn: Button = get_node_or_null("Row/Right/Grid/AHBox/ABtn") as Button
+@onready var _h_btn: Button = get_node_or_null("Row/Right/Grid/HHBox/HBtn") as Button
+@onready var _f_btn: Button = get_node_or_null("Row/Right/Grid/FHBox/FBtn") as Button
+@onready var _b_btn: Button = get_node_or_null("Row/Right/Grid/BHBox/BBtn") as Button
 
 @onready var _sigils_title: Label         = get_node_or_null("Row/Right/Sigils/Title") as Label
 @onready var _sigils_list:  VBoxContainer = get_node_or_null("Row/Right/Sigils/List") as VBoxContainer
 @onready var _btn_manage:   Button        = get_node_or_null("Row/Right/Buttons/BtnManageSigils") as Button
 
-@onready var _stats_grid:  GridContainer = get_node("Row/Right/StatsGrid") as GridContainer
+@onready var _stats_grid:  GridContainer = get_node("Row/StatsColumn/StatsGrid") as GridContainer
 @onready var _mind_value:  Label         = get_node_or_null("Row/Right/MindRow/Value") as Label
 @onready var _mind_row:    HBoxContainer = get_node_or_null("Row/Right/MindRow") as HBoxContainer
 
@@ -827,7 +827,7 @@ func _rebuild_stats_grid(member_token: String, equip: Dictionary) -> void:
 	var crit_bonus: int = int(d_wea.get("crit_bonus_pct", 0))
 	var type_raw: String = String(d_wea.get("watk_type_tag","")).strip_edges().to_lower()
 	var weapon_type: String = ("Neutral" if (type_raw == "" or type_raw == "wand") else type_raw.capitalize())
-	var special: String = ("NL" if _as_bool(d_wea.get("non_lethal", false)) else "")
+	var special: String = ("NL" if _as_bool(d_wea.get("non_lethal", false)) else "—")
 
 	var vtl: int = _stat_for_member(member_token, "VTL")
 	var armor_flat: int = int(d_arm.get("armor_flat", 0))
@@ -847,49 +847,49 @@ func _rebuild_stats_grid(member_token: String, equip: Dictionary) -> void:
 	var speed: int = int(d_foot.get("speed", 0))
 
 	var slots: int = int(d_brac.get("sigil_slots", 0))
-	var active: String = ""
-	if _sig and _sig.has_method("get_loadout"):
-		var v: Variant = _sig.call("get_loadout", member_token)
-		var arr: Array = []
-		if typeof(v) == TYPE_PACKED_STRING_ARRAY: arr = Array(v)
-		elif typeof(v) == TYPE_ARRAY: arr = v
-		if arr.size() > 0 and String(arr[0]) != "":
-			active = _sigil_disp(String(arr[0]))
 
 	var _pair: Callable = func(lbl: String, val: String) -> void:
 		_stats_grid.add_child(_label_cell(lbl))
 		_stats_grid.add_child(_value_cell(val))
 
-	_pair.call("Level",  str(lvl))
-	_pair.call("Max HP", str(hp_max))
-	_pair.call("Max MP", str(mp_max))
+	# Core stats
+	_pair.call("Level", str(lvl))
+	_pair.call("HP", str(hp_max))
+	_pair.call("MP", str(mp_max))
 
-	_pair.call("Weapon Attack", ("" if d_wea.is_empty() else str(weapon_attack)))
-	_pair.call("Weapon Scale",  ("" if d_wea.is_empty() else weapon_scale))
-	_pair.call("Weapon Accuracy", ("" if d_wea.is_empty() else str(weapon_acc)))
+	# Weapon stats
+	if not d_wea.is_empty():
+		_pair.call("W.Attack", str(weapon_attack))
+		_pair.call("W.Acc", str(weapon_acc))
+		_pair.call("W.Type", weapon_type)
+		_pair.call("Crit %", str(crit_bonus))
+		if skill_acc_boost > 0:
+			_pair.call("Skill Acc", str(skill_acc_boost))
+		if special != "—":
+			_pair.call("Special", special)
 
-	_pair.call("Skill Accuracy Boost", ("" if d_wea.is_empty() else str(skill_acc_boost)))
-	_pair.call("Crit Bonus", ("" if d_wea.is_empty() else str(crit_bonus)))
-	_pair.call("Weapon Type", ("" if d_wea.is_empty() else weapon_type))
+	# Armor stats
+	if not d_arm.is_empty():
+		_pair.call("P.Def", str(pdef))
+		_pair.call("Ail.Res %", str(ail_res))
 
-	_pair.call("Special", ("" if d_wea.is_empty() else special))
-	_pair.call("Physical Defence", ("" if d_arm.is_empty() else str(pdef)))
-	_pair.call("Ailment Resistance", ("" if d_arm.is_empty() else str(ail_res)))
+	# Head stats
+	if not d_head.is_empty():
+		if hp_bonus > 0:
+			_pair.call("HP Bonus", str(hp_bonus))
+		if mp_bonus > 0:
+			_pair.call("MP Bonus", str(mp_bonus))
+		_pair.call("M.Def", str(mdef))
 
-	_pair.call("HP Bonus", ("" if d_head.is_empty() else str(hp_bonus)))
-	_pair.call("MP Bonus", ("" if d_head.is_empty() else str(mp_bonus)))
-	_pair.call("Mind Defense", ("" if d_head.is_empty() else str(mdef)))
+	# Foot stats
+	if not d_foot.is_empty():
+		_pair.call("P.Eva", str(peva))
+		_pair.call("M.Eva", str(meva))
+		_pair.call("Speed", str(speed))
 
-	_pair.call("Physical Evasion", ("" if d_foot.is_empty() else str(peva)))
-	_pair.call("Mind Evasion", ("" if d_foot.is_empty() else str(meva)))
-	_pair.call("Speed", ("" if d_foot.is_empty() else str(speed)))
-
-	_pair.call("Set Bonus", "")
-	_pair.call("Sigil Slots", ("" if d_brac.is_empty() else str(slots)))
-	_stats_grid.add_child(_label_cell("Active Sigil"))
-	var active_cell: Label = _value_cell("" if d_brac.is_empty() else active)
-	active_cell.custom_minimum_size.x = 60
-	_stats_grid.add_child(active_cell)
+	# Bracelet stats
+	if not d_brac.is_empty():
+		_pair.call("Sigils", str(slots))
 
 # ────────────────── Active Type (hero) ──────────────────
 func _setup_active_type_widgets() -> void:

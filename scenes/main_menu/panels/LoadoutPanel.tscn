@@ -17,13 +17,15 @@ anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 offset_left = 8.0
-offset_right = -73.0
+offset_right = -8.0
+offset_top = 8.0
+offset_bottom = -8.0
 grow_horizontal = 2
 grow_vertical = 2
 theme_override_constants/separation = 16
 
 [node name="Party" type="VBoxContainer" parent="Row"]
-custom_minimum_size = Vector2(260, 0)
+custom_minimum_size = Vector2(200, 0)
 layout_mode = 2
 theme_override_constants/separation = 8
 
@@ -38,85 +40,118 @@ size_flags_vertical = 3
 [node name="Right" type="VBoxContainer" parent="Row"]
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_constants/separation = 10
+theme_override_constants/separation = 12
 
 [node name="MemberName" type="Label" parent="Row/Right"]
 custom_minimum_size = Vector2(0, 28)
 layout_mode = 2
 text = "(Select a member)"
+horizontal_alignment = 1
+
+[node name="EquipmentLabel" type="Label" parent="Row/Right"]
+layout_mode = 2
+text = "Equipment"
 
 [node name="Grid" type="GridContainer" parent="Row/Right"]
 layout_mode = 2
 theme_override_constants/h_separation = 8
 theme_override_constants/v_separation = 4
-columns = 3
+columns = 2
 
-[node name="WValue" type="Label" parent="Row/Right/Grid"]
-custom_minimum_size = Vector2(200, 0)
+[node name="WLabel" type="Label" parent="Row/Right/Grid"]
 layout_mode = 2
-text = "(Weapon) "
+text = "Weapon:"
 
-[node name="WBtn" type="Button" parent="Row/Right/Grid"]
+[node name="WHBox" type="HBoxContainer" parent="Row/Right/Grid"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="WValue" type="Label" parent="Row/Right/Grid/WHBox"]
+custom_minimum_size = Vector2(180, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "(Weapon)"
+
+[node name="WBtn" type="Button" parent="Row/Right/Grid/WHBox"]
 layout_mode = 2
 text = "Equip…"
 
-[node name="WFill" type="Control" parent="Row/Right/Grid"]
+[node name="ALabel" type="Label" parent="Row/Right/Grid"]
+layout_mode = 2
+text = "Armor:"
+
+[node name="AHBox" type="HBoxContainer" parent="Row/Right/Grid"]
 layout_mode = 2
 size_flags_horizontal = 3
+theme_override_constants/separation = 8
 
-[node name="AValue" type="Label" parent="Row/Right/Grid"]
+[node name="AValue" type="Label" parent="Row/Right/Grid/AHBox"]
+custom_minimum_size = Vector2(180, 0)
 layout_mode = 2
+size_flags_horizontal = 3
 text = "(Armor)"
 
-[node name="ABtn" type="Button" parent="Row/Right/Grid"]
+[node name="ABtn" type="Button" parent="Row/Right/Grid/AHBox"]
 layout_mode = 2
 text = "Equip…"
 
-[node name="AFill" type="Control" parent="Row/Right/Grid"]
+[node name="HLabel" type="Label" parent="Row/Right/Grid"]
+layout_mode = 2
+text = "Head:"
+
+[node name="HHBox" type="HBoxContainer" parent="Row/Right/Grid"]
 layout_mode = 2
 size_flags_horizontal = 3
+theme_override_constants/separation = 8
 
-[node name="HValue" type="Label" parent="Row/Right/Grid"]
+[node name="HValue" type="Label" parent="Row/Right/Grid/HHBox"]
+custom_minimum_size = Vector2(180, 0)
 layout_mode = 2
+size_flags_horizontal = 3
 text = "(Headwear)"
 
-[node name="HBtn" type="Button" parent="Row/Right/Grid"]
+[node name="HBtn" type="Button" parent="Row/Right/Grid/HHBox"]
 layout_mode = 2
 text = "Equip…"
 
-[node name="HFill" type="Control" parent="Row/Right/Grid"]
+[node name="FLabel" type="Label" parent="Row/Right/Grid"]
+layout_mode = 2
+text = "Foot:"
+
+[node name="FHBox" type="HBoxContainer" parent="Row/Right/Grid"]
 layout_mode = 2
 size_flags_horizontal = 3
+theme_override_constants/separation = 8
 
-[node name="FValue" type="Label" parent="Row/Right/Grid"]
+[node name="FValue" type="Label" parent="Row/Right/Grid/FHBox"]
+custom_minimum_size = Vector2(180, 0)
 layout_mode = 2
+size_flags_horizontal = 3
 text = "(Footwear)"
 
-[node name="FBtn" type="Button" parent="Row/Right/Grid"]
+[node name="FBtn" type="Button" parent="Row/Right/Grid/FHBox"]
 layout_mode = 2
 text = "Equip…"
 
-[node name="FFill" type="Control" parent="Row/Right/Grid"]
+[node name="BLabel" type="Label" parent="Row/Right/Grid"]
+layout_mode = 2
+text = "Bracelet:"
+
+[node name="BHBox" type="HBoxContainer" parent="Row/Right/Grid"]
 layout_mode = 2
 size_flags_horizontal = 3
+theme_override_constants/separation = 8
 
-[node name="BValue" type="Label" parent="Row/Right/Grid"]
+[node name="BValue" type="Label" parent="Row/Right/Grid/BHBox"]
+custom_minimum_size = Vector2(180, 0)
 layout_mode = 2
-text = "(Breacelet)"
+size_flags_horizontal = 3
+text = "(Bracelet)"
 
-[node name="BBtn" type="Button" parent="Row/Right/Grid"]
+[node name="BBtn" type="Button" parent="Row/Right/Grid/BHBox"]
 layout_mode = 2
 text = "Equip…"
-
-[node name="BFill" type="Control" parent="Row/Right/Grid"]
-custom_minimum_size = Vector2(0, 4)
-layout_mode = 2
-size_flags_horizontal = 3
-metadata/_spacer = true
-
-[node name="Spacer" type="VBoxContainer" parent="Row/Right/Grid"]
-custom_minimum_size = Vector2(0, 20)
-layout_mode = 2
 
 [node name="Sigils" type="VBoxContainer" parent="Row/Right"]
 custom_minimum_size = Vector2(100, 0)
@@ -132,7 +167,6 @@ custom_minimum_size = Vector2(300, 0)
 layout_mode = 2
 size_flags_horizontal = 0
 size_flags_vertical = 3
-size_flags_stretch_ratio = 1.65
 theme_override_constants/separation = 2
 
 [node name="Buttons" type="HBoxContainer" parent="Row/Right"]
@@ -149,7 +183,7 @@ theme_override_constants/separation = 8
 
 [node name="Label" type="Label" parent="Row/Right/MindRow"]
 layout_mode = 2
-text = "Mind Type"
+text = "Mind Type:"
 
 [node name="Value" type="Label" parent="Row/Right/MindRow"]
 layout_mode = 2
@@ -173,8 +207,18 @@ visible = false
 layout_mode = 2
 text = "Set…"
 
-[node name="StatsGrid" type="GridContainer" parent="Row/Right"]
+[node name="StatsColumn" type="VBoxContainer" parent="Row"]
+custom_minimum_size = Vector2(240, 0)
 layout_mode = 2
-theme_override_constants/h_separation = 20
-theme_override_constants/v_separation = 12
-columns = 6
+theme_override_constants/separation = 4
+
+[node name="StatsLabel" type="Label" parent="Row/StatsColumn"]
+layout_mode = 2
+text = "Stats"
+horizontal_alignment = 1
+
+[node name="StatsGrid" type="GridContainer" parent="Row/StatsColumn"]
+layout_mode = 2
+theme_override_constants/h_separation = 12
+theme_override_constants/v_separation = 8
+columns = 2
