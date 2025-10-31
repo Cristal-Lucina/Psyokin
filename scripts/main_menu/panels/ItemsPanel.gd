@@ -989,11 +989,16 @@ func _on_use_item(item_id: String, item_def: Dictionary) -> void:
 
 		member_btn.pressed.connect(apply_use)
 
-		# Handle controller input
+		# Handle controller input - check BOTH ui_accept and menu_accept
 		member_btn.gui_input.connect(func(event: InputEvent):
-			if ((event.is_action_pressed("menu_accept")) or event.is_action_pressed("ui_accept")) and member_btn.has_focus():
-				apply_use.call()
-				get_viewport().set_input_as_handled()
+			if member_btn.has_focus():
+				if event.is_action_pressed("menu_accept") or event.is_action_pressed("ui_accept"):
+					apply_use.call()
+					get_viewport().set_input_as_handled()
+				# Also handle joypad button 0 directly in case actions fail
+				elif event is InputEventJoypadButton and event.button_index == 0 and event.pressed:
+					apply_use.call()
+					get_viewport().set_input_as_handled()
 		)
 
 		grid.add_child(member_btn)
@@ -1103,9 +1108,14 @@ func _apply_recovery_item(item_id: String, member_token: String, effect: String)
 	var ok_btn: Button = msg_dlg.get_ok_button()
 	if ok_btn:
 		ok_btn.gui_input.connect(func(event: InputEvent):
-			if ((event.is_action_pressed("menu_accept")) or event.is_action_pressed("ui_accept")) and ok_btn.has_focus():
-				msg_dlg.hide()
-				get_viewport().set_input_as_handled()
+			if ok_btn.has_focus():
+				if event.is_action_pressed("menu_accept") or event.is_action_pressed("ui_accept"):
+					msg_dlg.hide()
+					get_viewport().set_input_as_handled()
+				# Also handle joypad button 0 directly
+				elif event is InputEventJoypadButton and event.button_index == 0 and event.pressed:
+					msg_dlg.hide()
+					get_viewport().set_input_as_handled()
 		)
 		ok_btn.grab_focus()
 

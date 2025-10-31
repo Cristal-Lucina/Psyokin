@@ -64,15 +64,16 @@ func _clear_ui_action_joypad_bindings() -> void:
 	"""Remove joypad button bindings from Godot's default ui_* actions
 
 	This prevents Godot's GUI system from automatically consuming controller
-	inputs before our ControllerManager can process them.
+	inputs before our panels can process them. We keep ui_left/right/up/down
+	for popup/dialog navigation, but clear ui_accept to prevent conflicts.
 	"""
-	var ui_actions = [
+	# Clear these actions - they conflict with panel input
+	var ui_actions_to_clear = [
 		"ui_accept", "ui_select", "ui_cancel", "ui_focus_next", "ui_focus_prev",
-		"ui_left", "ui_right", "ui_up", "ui_down",
 		"ui_page_up", "ui_page_down", "ui_home", "ui_end"
 	]
 
-	for action in ui_actions:
+	for action in ui_actions_to_clear:
 		if InputMap.has_action(action):
 			var events_to_remove = []
 			for event in InputMap.action_get_events(action):
@@ -83,6 +84,9 @@ func _clear_ui_action_joypad_bindings() -> void:
 			for event in events_to_remove:
 				InputMap.action_erase_event(action, event)
 				print("[InputManager] Cleared joypad binding from %s: %s" % [action, event])
+
+	# Keep ui_left/right/up/down for popup navigation - they shouldn't conflict
+	print("[InputManager] Keeping ui_up/down/left/right for popup/dialog navigation")
 
 func _ensure_input_actions() -> void:
 	"""Ensure all required input actions are registered"""
