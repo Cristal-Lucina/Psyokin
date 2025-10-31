@@ -725,7 +725,7 @@ func _on_item_clicked(btn: Button) -> void:
 	# IMPORTANT: Handle controller input directly on button
 	inspect_btn.gui_input.connect(func(event: InputEvent):
 		print("[ItemsPanel] Inspect button received input event: ", event)
-		if _input_mgr and event.is_action_pressed(_input_mgr.ACTION_ACCEPT) and inspect_btn.has_focus():
+		if event.is_action_pressed("menu_accept") and inspect_btn.has_focus():
 			print("[ItemsPanel] Inspect button: ACTION_ACCEPT detected!")
 			inspect_action.call()
 			get_viewport().set_input_as_handled()
@@ -761,7 +761,7 @@ func _on_item_clicked(btn: Button) -> void:
 		# IMPORTANT: Handle controller input directly on button
 		use_btn.gui_input.connect(func(event: InputEvent):
 			print("[ItemsPanel] Use button received input event: ", event)
-			if _input_mgr and event.is_action_pressed(_input_mgr.ACTION_ACCEPT) and use_btn.has_focus():
+			if event.is_action_pressed("menu_accept") and use_btn.has_focus():
 				print("[ItemsPanel] Use button: ACTION_ACCEPT detected!")
 				use_action.call()
 				get_viewport().set_input_as_handled()
@@ -794,7 +794,7 @@ func _on_item_clicked(btn: Button) -> void:
 	# IMPORTANT: Handle controller input directly on button
 	discard_btn.gui_input.connect(func(event: InputEvent):
 		print("[ItemsPanel] Discard button received input event: ", event)
-		if _input_mgr and event.is_action_pressed(_input_mgr.ACTION_ACCEPT) and discard_btn.has_focus():
+		if event.is_action_pressed("menu_accept") and discard_btn.has_focus():
 			print("[ItemsPanel] Discard button: ACTION_ACCEPT detected!")
 			discard_action.call()
 			get_viewport().set_input_as_handled()
@@ -836,7 +836,7 @@ func _on_item_clicked(btn: Button) -> void:
 		# IMPORTANT: Handle controller input directly on OK button
 		ok_button.gui_input.connect(func(event: InputEvent):
 			print("[ItemsPanel] OK button received input event: ", event)
-			if _input_mgr and event.is_action_pressed(_input_mgr.ACTION_ACCEPT) and ok_button.has_focus():
+			if event.is_action_pressed("menu_accept") and ok_button.has_focus():
 				print("[ItemsPanel] OK button: ACTION_ACCEPT detected!")
 				print("[ItemsPanel] OK button pressed!")
 				dlg.hide()
@@ -983,7 +983,7 @@ func _on_use_item(item_id: String, item_def: Dictionary) -> void:
 
 		# Handle controller input
 		member_btn.gui_input.connect(func(event: InputEvent):
-			if ((_input_mgr and event.is_action_pressed(_input_mgr.ACTION_ACCEPT)) or event.is_action_pressed("ui_accept")) and member_btn.has_focus():
+			if ((event.is_action_pressed("menu_accept")) or event.is_action_pressed("ui_accept")) and member_btn.has_focus():
 				apply_use.call()
 				get_viewport().set_input_as_handled()
 		)
@@ -1013,7 +1013,7 @@ func _on_use_item(item_id: String, item_def: Dictionary) -> void:
 			dlg.hide()
 
 		cancel_btn.gui_input.connect(func(event: InputEvent):
-			if ((_input_mgr and event.is_action_pressed(_input_mgr.ACTION_ACCEPT)) or event.is_action_pressed("ui_accept")) and cancel_btn.has_focus():
+			if ((event.is_action_pressed("menu_accept")) or event.is_action_pressed("ui_accept")) and cancel_btn.has_focus():
 				cancel_action.call()
 				get_viewport().set_input_as_handled()
 		)
@@ -1021,7 +1021,7 @@ func _on_use_item(item_id: String, item_def: Dictionary) -> void:
 	# Add controller support to OK button
 	if ok_btn:
 		ok_btn.gui_input.connect(func(event: InputEvent):
-			if ((_input_mgr and event.is_action_pressed(_input_mgr.ACTION_ACCEPT)) or event.is_action_pressed("ui_accept")) and ok_btn.has_focus():
+			if ((event.is_action_pressed("menu_accept")) or event.is_action_pressed("ui_accept")) and ok_btn.has_focus():
 				dlg.hide()
 				get_viewport().set_input_as_handled()
 		)
@@ -1095,7 +1095,7 @@ func _apply_recovery_item(item_id: String, member_token: String, effect: String)
 	var ok_btn: Button = msg_dlg.get_ok_button()
 	if ok_btn:
 		ok_btn.gui_input.connect(func(event: InputEvent):
-			if ((_input_mgr and event.is_action_pressed(_input_mgr.ACTION_ACCEPT)) or event.is_action_pressed("ui_accept")) and ok_btn.has_focus():
+			if ((event.is_action_pressed("menu_accept")) or event.is_action_pressed("ui_accept")) and ok_btn.has_focus():
 				msg_dlg.hide()
 				get_viewport().set_input_as_handled()
 		)
@@ -1188,7 +1188,7 @@ func _on_discard_row(btn: Button) -> void:
 		# IMPORTANT: Handle controller input directly on OK button
 		ok_button.gui_input.connect(func(event: InputEvent):
 			print("[ItemsPanel] Discard OK button received input event: ", event)
-			if _input_mgr and event.is_action_pressed(_input_mgr.ACTION_ACCEPT) and ok_button.has_focus():
+			if event.is_action_pressed("menu_accept") and ok_button.has_focus():
 				print("[ItemsPanel] Discard OK button: ACTION_ACCEPT detected!")
 				print("[ItemsPanel] Discard OK button pressed!")
 				dlg.hide()
@@ -1213,7 +1213,7 @@ func _on_discard_row(btn: Button) -> void:
 		# IMPORTANT: Handle controller input directly on Cancel button
 		cancel_button.gui_input.connect(func(event: InputEvent):
 			print("[ItemsPanel] Discard Cancel button received input event: ", event)
-			if _input_mgr and event.is_action_pressed(_input_mgr.ACTION_ACCEPT) and cancel_button.has_focus():
+			if event.is_action_pressed("menu_accept") and cancel_button.has_focus():
 				print("[ItemsPanel] Discard Cancel button: ACTION_ACCEPT detected!")
 				print("[ItemsPanel] Discard Cancel button pressed!")
 				dlg.hide()
@@ -1524,11 +1524,11 @@ func _setup_description_section() -> void:
 	_vbox.add_child(desc_container)
 
 func _input(event: InputEvent) -> void:
-	if not _panel_has_focus or not visible or not _input_mgr:
+	if not _panel_has_focus or not visible:
 		return
 
 	# UP/DOWN - Toggle between category mode and item mode
-	if event.is_action_pressed(_input_mgr.ACTION_MOVE_UP):
+	if event.is_action_pressed("move_up"):
 		if not _in_category_mode and _selected_item_index > 0:
 			# Navigate items up
 			_navigate_items(-2)  # -2 for up (grid is 2 columns)
@@ -1537,7 +1537,7 @@ func _input(event: InputEvent) -> void:
 			# Switch to category mode
 			_enter_category_mode()
 			get_viewport().set_input_as_handled()
-	elif event.is_action_pressed(_input_mgr.ACTION_MOVE_DOWN):
+	elif event.is_action_pressed("move_down"):
 		if _in_category_mode:
 			# Switch to item mode
 			_enter_item_mode()
@@ -1547,23 +1547,23 @@ func _input(event: InputEvent) -> void:
 			_navigate_items(2)  # +2 for down (grid is 2 columns)
 			get_viewport().set_input_as_handled()
 	# LEFT/RIGHT - Navigate items only (not categories)
-	elif event.is_action_pressed(_input_mgr.ACTION_MOVE_LEFT):
+	elif event.is_action_pressed("move_left"):
 		if not _in_category_mode:
 			_navigate_items(-1)
 			get_viewport().set_input_as_handled()
-	elif event.is_action_pressed(_input_mgr.ACTION_MOVE_RIGHT):
+	elif event.is_action_pressed("move_right"):
 		if not _in_category_mode:
 			_navigate_items(1)
 			get_viewport().set_input_as_handled()
 	# L/R bumpers - Always navigate categories
-	elif event.is_action_pressed(_input_mgr.ACTION_BURST):
+	elif event.is_action_pressed("battle_burst"):
 		_navigate_categories(-1)
 		get_viewport().set_input_as_handled()
-	elif event.is_action_pressed(_input_mgr.ACTION_BATTLE_RUN):
+	elif event.is_action_pressed("battle_run"):
 		_navigate_categories(1)
 		get_viewport().set_input_as_handled()
 	# Action buttons
-	elif event.is_action_pressed(_input_mgr.ACTION_ACCEPT):
+	elif event.is_action_pressed("menu_accept"):
 		if _in_category_mode:
 			# If in category mode, switch to item mode first
 			_enter_item_mode()
@@ -1572,11 +1572,11 @@ func _input(event: InputEvent) -> void:
 			# Use selected item
 			_use_selected_item()
 			get_viewport().set_input_as_handled()
-	elif event.is_action_pressed(_input_mgr.ACTION_RUN):  # X button
+	elif event.is_action_pressed("run"):  # X button
 		if not _in_category_mode and not _item_buttons.is_empty():
 			_inspect_selected_item()
 			get_viewport().set_input_as_handled()
-	elif event.is_action_pressed(_input_mgr.ACTION_JUMP):  # Y button
+	elif event.is_action_pressed("jump"):  # Y button
 		if not _in_category_mode and not _item_buttons.is_empty():
 			_discard_selected_item()
 			get_viewport().set_input_as_handled()
