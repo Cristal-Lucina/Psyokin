@@ -3508,14 +3508,40 @@ func _highlight_item_button(index: int) -> void:
 
 		# Auto-scroll to ensure button is visible
 		if item_scroll_container:
-			# Use ensure_control_visible to automatically scroll to the button
-			item_scroll_container.ensure_control_visible(button)
+			# Scroll to make button visible
+			_scroll_to_item_button(button)
 
 func _unhighlight_item_button(index: int) -> void:
 	"""Remove highlight from an item button"""
 	if index >= 0 and index < item_menu_buttons.size():
 		var button = item_menu_buttons[index]
 		button.modulate = Color(1.0, 1.0, 1.0, 1.0)  # Normal color
+
+func _scroll_to_item_button(button: Button) -> void:
+	"""Scroll the item menu to make the button visible"""
+	if not item_scroll_container or not button:
+		return
+
+	# Get the grid container (parent of button)
+	var grid = button.get_parent()
+	if not grid:
+		return
+
+	# Calculate button's vertical position within the scrollable content
+	var button_y = button.position.y
+	var button_height = button.size.y
+	var scroll_height = item_scroll_container.size.y
+	var current_scroll = item_scroll_container.scroll_vertical
+
+	# Add padding for better visibility
+	var padding = 10.0
+
+	# Check if button is above visible area (need to scroll up)
+	if button_y < current_scroll + padding:
+		item_scroll_container.scroll_vertical = max(0, button_y - padding)
+	# Check if button is below visible area (need to scroll down)
+	elif button_y + button_height > current_scroll + scroll_height - padding:
+		item_scroll_container.scroll_vertical = button_y + button_height - scroll_height + padding
 
 func _on_item_hover(item_name: String, item_desc: String) -> void:
 	"""Show item description when hovering over button"""
