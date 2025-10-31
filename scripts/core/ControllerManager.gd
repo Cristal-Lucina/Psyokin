@@ -332,10 +332,12 @@ func _handle_menu_items_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 	# L/R Bumpers for categories
 	elif event.is_action_pressed("battle_burst"):  # L bumper
+		print("[ControllerManager] L bumper pressed in MENU_ITEMS context, emitting bumper_pressed(-1)")
 		bumper_pressed.emit(-1, current_context)
 		_start_cooldown()
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("battle_run"):  # R bumper
+		print("[ControllerManager] R bumper pressed in MENU_ITEMS context, emitting bumper_pressed(+1)")
 		bumper_pressed.emit(1, current_context)
 		_start_cooldown()
 		get_viewport().set_input_as_handled()

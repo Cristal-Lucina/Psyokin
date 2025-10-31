@@ -1564,10 +1564,16 @@ func _on_controller_navigate(direction: Vector2, context: int) -> void:
 
 func _on_controller_bumper(direction: int, context: int) -> void:
 	"""Handle L/R bumper input from ControllerManager"""
+	print("[ItemsPanel] Received bumper signal: direction=%d, context=%d, expected=%d" % [
+		direction, context, _ctrl_mgr.InputContext.MENU_ITEMS if _ctrl_mgr else -1
+	])
+
 	# Only process if this is our context
 	if not _ctrl_mgr or context != _ctrl_mgr.InputContext.MENU_ITEMS:
+		print("[ItemsPanel] Bumper REJECTED - wrong context or no ctrl_mgr")
 		return
 
+	print("[ItemsPanel] Bumper ACCEPTED - navigating categories")
 	# L/R bumpers always navigate categories
 	_navigate_categories(direction)
 
@@ -1635,6 +1641,7 @@ func _unhighlight_category_button(index: int) -> void:
 
 func panel_gained_focus() -> void:
 	"""Called by GameMenu when this panel gains focus"""
+	print("[ItemsPanel] panel_gained_focus() called")
 	_panel_has_focus = true
 	# Start in category mode
 	_in_category_mode = true
@@ -1642,14 +1649,18 @@ func panel_gained_focus() -> void:
 
 	# Push context to ControllerManager
 	if _ctrl_mgr:
+		print("[ItemsPanel] Pushing MENU_ITEMS context to ControllerManager")
 		_ctrl_mgr.push_context(_ctrl_mgr.InputContext.MENU_ITEMS, {
 			"panel": self,
 			"in_category_mode": _in_category_mode,
 			"selected_item_index": _selected_item_index
 		})
+	else:
+		print("[ItemsPanel] WARNING: No ControllerManager reference!")
 
 func panel_lost_focus() -> void:
 	"""Called by GameMenu when this panel loses focus"""
+	print("[ItemsPanel] panel_lost_focus() called")
 	_panel_has_focus = false
 	# Remove highlights
 	for btn in _category_buttons:
@@ -1659,7 +1670,10 @@ func panel_lost_focus() -> void:
 
 	# Pop context from ControllerManager
 	if _ctrl_mgr:
+		print("[ItemsPanel] Popping context from ControllerManager")
 		_ctrl_mgr.pop_context()
+	else:
+		print("[ItemsPanel] WARNING: No ControllerManager reference!")
 
 func _enter_category_mode() -> void:
 	"""Switch to category navigation mode"""
