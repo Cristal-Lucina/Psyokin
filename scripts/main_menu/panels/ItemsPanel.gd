@@ -224,70 +224,108 @@ func _rebuild() -> void:
 	var ids: Array = _defs.keys()
 	ids.sort_custom(Callable(self, "_cmp_ids_by_name"))
 
+	# Separate recovery items from other items if in "All" or "Consumables"
+	var show_recovery_section := (want == "All" or want == "Consumables")
+	var recovery_items: Array = []
+	var other_items: Array = []
+
 	for id_v in ids:
 		var id: String = String(id_v)
 		var def: Dictionary = _defs.get(id, {}) as Dictionary
-		var nm: String = _display_name(id, def)
 		var cat: String = _category_of(def)
 		var qty: int = int(_counts_map.get(id, 0))
 
 		if qty <= 0: continue
 		if want != "All" and cat != want: continue
 
-		# Wrap each item in a PanelContainer for nice box effect
-		var panel := PanelContainer.new()
-		panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		panel.clip_contents = true
+		var item_data := {"id": id, "def": def, "qty": qty}
 
-		# Add margin inside the panel
-		var margin := MarginContainer.new()
-		margin.add_theme_constant_override("margin_left", 8)
-		margin.add_theme_constant_override("margin_top", 4)
-		margin.add_theme_constant_override("margin_right", 8)
-		margin.add_theme_constant_override("margin_bottom", 4)
-		panel.add_child(margin)
+		if show_recovery_section and _is_recovery_item(def):
+			recovery_items.append(item_data)
+		else:
+			other_items.append(item_data)
 
-		# Create a VBox to hold item info and equipped status
-		var item_vbox := VBoxContainer.new()
-		item_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		item_vbox.add_theme_constant_override("separation", 2)
+	# Render recovery items section first (if applicable)
+	if show_recovery_section and not recovery_items.is_empty():
+		# Add subsection header
+		var header := Label.new()
+		header.text = "━━━ Recovery Items ━━━"
+		header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		header.add_theme_font_size_override("font_size", 12)
+		header.modulate = Color(0.8, 0.9, 1.0, 1.0)  # Light blue tint
+		_list_box.add_child(header)
 
-		# Create a clickable button showing item name and quantity
-		var item_btn := Button.new()
-		item_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		item_btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		item_btn.text = "%s  x%d" % [nm, qty]
-		item_btn.add_theme_font_size_override("font_size", 10)
-		item_btn.set_meta("id", id)
-		item_btn.set_meta("def", def)
-		item_btn.set_meta("qty", qty)
-		item_btn.disabled = (qty <= 0)
-		if not item_btn.pressed.is_connected(_on_item_clicked):
-			item_btn.pressed.connect(_on_item_clicked.bind(item_btn))
-		item_vbox.add_child(item_btn)
+		# Render recovery items
+		for item_data in recovery_items:
+			_render_item(item_data["id"], item_data["def"], item_data["qty"])
 
-		# Track item button for controller navigation
-		_item_buttons.append(item_btn)
+		# Add spacing after recovery section
+		var spacer := Control.new()
+		spacer.custom_minimum_size = Vector2(0, 10)
+		_list_box.add_child(spacer)
 
-		# Show equipped info if applicable
-		var equip_txt := _equip_string_for(id, def)
-		if equip_txt != "":
-			var equip_lbl := Label.new()
-			equip_lbl.text = "  " + equip_txt
-			equip_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-			equip_lbl.add_theme_font_size_override("font_size", 10)
-			equip_lbl.modulate = Color(0.7, 0.7, 0.7, 1.0)  # Slightly dimmed
-			item_vbox.add_child(equip_lbl)
-
-		margin.add_child(item_vbox)
-
-		_list_box.add_child(panel)
+	# Render other items
+	for item_data in other_items:
+		_render_item(item_data["id"], item_data["def"], item_data["qty"])
 
 	await get_tree().process_frame
 	_list_box.queue_sort()
 
 	# Auto-select first item after rebuild
 	_auto_select_first_item()
+
+func _render_item(id: String, def: Dictionary, qty: int) -> void:
+	"""Render a single item in the list"""
+	var nm: String = _display_name(id, def)
+
+	# Wrap each item in a PanelContainer for nice box effect
+	var panel := PanelContainer.new()
+	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	panel.clip_contents = true
+
+	# Add margin inside the panel
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 8)
+	margin.add_theme_constant_override("margin_top", 4)
+	margin.add_theme_constant_override("margin_right", 8)
+	margin.add_theme_constant_override("margin_bottom", 4)
+	panel.add_child(margin)
+
+	# Create a VBox to hold item info and equipped status
+	var item_vbox := VBoxContainer.new()
+	item_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	item_vbox.add_theme_constant_override("separation", 2)
+
+	# Create a clickable button showing item name and quantity
+	var item_btn := Button.new()
+	item_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	item_btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	item_btn.text = "%s  x%d" % [nm, qty]
+	item_btn.add_theme_font_size_override("font_size", 10)
+	item_btn.set_meta("id", id)
+	item_btn.set_meta("def", def)
+	item_btn.set_meta("qty", qty)
+	item_btn.disabled = (qty <= 0)
+	if not item_btn.pressed.is_connected(_on_item_clicked):
+		item_btn.pressed.connect(_on_item_clicked.bind(item_btn))
+	item_vbox.add_child(item_btn)
+
+	# Track item button for controller navigation
+	_item_buttons.append(item_btn)
+
+	# Show equipped info if applicable
+	var equip_txt := _equip_string_for(id, def)
+	if equip_txt != "":
+		var equip_lbl := Label.new()
+		equip_lbl.text = "  " + equip_txt
+		equip_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+		equip_lbl.add_theme_font_size_override("font_size", 10)
+		equip_lbl.modulate = Color(0.7, 0.7, 0.7, 1.0)  # Slightly dimmed
+		item_vbox.add_child(equip_lbl)
+
+	margin.add_child(item_vbox)
+
+	_list_box.add_child(panel)
 
 # --- name/category helpers ----------------------------------------------------
 
@@ -334,6 +372,22 @@ func _normalize_category(s: String) -> String:
 	if _CAT_MAP.has(key + "s"):
 		return String(_CAT_MAP[key + "s"])
 	return ""
+
+func _is_recovery_item(def: Dictionary) -> bool:
+	"""Check if item is an HP/MP recovery item"""
+	# Check field_status_effect for healing
+	if def.has("field_status_effect"):
+		var effect := String(def["field_status_effect"]).to_lower()
+		if effect.contains("heal") and (effect.contains("hp") or effect.contains("mp")):
+			return true
+
+	# Check battle_status_effect for healing
+	if def.has("battle_status_effect"):
+		var effect := String(def["battle_status_effect"]).to_lower()
+		if effect.contains("heal") and (effect.contains("hp") or effect.contains("mp")):
+			return true
+
+	return false
 
 # --- reads --------------------------------------------------------------------
 
@@ -665,6 +719,42 @@ func _on_item_clicked(btn: Button) -> void:
 	btn_row.add_child(inspect_btn)
 	print("[ItemsPanel] Created Inspect button, focus_mode: ", inspect_btn.focus_mode)
 
+	# Use button (only for recovery items)
+	var use_btn: Button = null
+	if _is_recovery_item(def):
+		use_btn = Button.new()
+		use_btn.text = "Use"
+		use_btn.focus_mode = Control.FOCUS_ALL
+		use_btn.set_meta("id", id)
+		use_btn.set_meta("def", def)
+
+		# Handle both mouse clicks and controller A button
+		var use_action = func():
+			print("[ItemsPanel] Use button pressed!")
+			dlg.hide()
+			_on_use_item(id, def)
+
+		use_btn.pressed.connect(use_action)
+
+		# IMPORTANT: Handle controller input directly on button
+		use_btn.gui_input.connect(func(event: InputEvent):
+			print("[ItemsPanel] Use button received input event: ", event)
+			if event.is_action_pressed(aInputManager.ACTION_ACCEPT) and use_btn.has_focus():
+				print("[ItemsPanel] Use button: ACTION_ACCEPT detected!")
+				use_action.call()
+				get_viewport().set_input_as_handled()
+			elif event.is_action_pressed("ui_accept") and use_btn.has_focus():
+				print("[ItemsPanel] Use button: ui_accept detected!")
+				use_action.call()
+				get_viewport().set_input_as_handled()
+		)
+
+		use_btn.focus_entered.connect(func():
+			print("[ItemsPanel] Use button focused")
+		)
+		btn_row.add_child(use_btn)
+		print("[ItemsPanel] Created Use button, focus_mode: ", use_btn.focus_mode)
+
 	# Discard button
 	var discard_btn := Button.new()
 	discard_btn.text = "Discard"
@@ -741,35 +831,170 @@ func _on_item_clicked(btn: Button) -> void:
 		)
 		print("[ItemsPanel] OK button focus_mode: ", ok_button.focus_mode)
 
-	# Set up focus chain: inspect -> discard -> OK -> inspect
-	if ok_button:
-		print("[ItemsPanel] Setting up 3-button focus chain (Inspect/Discard/OK)")
-		inspect_btn.focus_neighbor_right = inspect_btn.get_path_to(discard_btn)
-		inspect_btn.focus_neighbor_bottom = inspect_btn.get_path_to(ok_button)
-		inspect_btn.focus_next = inspect_btn.get_path_to(discard_btn)
+	# Set up focus chain based on which buttons exist
+	if use_btn:
+		# Focus chain: Inspect -> Use -> Discard -> OK -> Inspect
+		if ok_button:
+			print("[ItemsPanel] Setting up 4-button focus chain (Inspect/Use/Discard/OK)")
+			inspect_btn.focus_neighbor_right = inspect_btn.get_path_to(use_btn)
+			inspect_btn.focus_neighbor_bottom = inspect_btn.get_path_to(ok_button)
+			inspect_btn.focus_next = inspect_btn.get_path_to(use_btn)
 
-		discard_btn.focus_neighbor_left = discard_btn.get_path_to(inspect_btn)
-		discard_btn.focus_neighbor_bottom = discard_btn.get_path_to(ok_button)
-		discard_btn.focus_next = discard_btn.get_path_to(ok_button)
+			use_btn.focus_neighbor_left = use_btn.get_path_to(inspect_btn)
+			use_btn.focus_neighbor_right = use_btn.get_path_to(discard_btn)
+			use_btn.focus_neighbor_bottom = use_btn.get_path_to(ok_button)
+			use_btn.focus_next = use_btn.get_path_to(discard_btn)
 
-		ok_button.focus_neighbor_top = ok_button.get_path_to(inspect_btn)
-		ok_button.focus_neighbor_left = ok_button.get_path_to(discard_btn)
-		ok_button.focus_neighbor_right = ok_button.get_path_to(inspect_btn)
-		ok_button.focus_previous = ok_button.get_path_to(discard_btn)
-		ok_button.focus_next = ok_button.get_path_to(inspect_btn)
+			discard_btn.focus_neighbor_left = discard_btn.get_path_to(use_btn)
+			discard_btn.focus_neighbor_bottom = discard_btn.get_path_to(ok_button)
+			discard_btn.focus_next = discard_btn.get_path_to(ok_button)
+
+			ok_button.focus_neighbor_top = ok_button.get_path_to(inspect_btn)
+			ok_button.focus_neighbor_left = ok_button.get_path_to(discard_btn)
+			ok_button.focus_neighbor_right = ok_button.get_path_to(inspect_btn)
+			ok_button.focus_previous = ok_button.get_path_to(discard_btn)
+			ok_button.focus_next = ok_button.get_path_to(inspect_btn)
+		else:
+			# Focus chain: Inspect -> Use -> Discard -> Inspect
+			print("[ItemsPanel] Setting up 3-button focus chain (Inspect/Use/Discard)")
+			inspect_btn.focus_neighbor_right = inspect_btn.get_path_to(use_btn)
+			inspect_btn.focus_next = inspect_btn.get_path_to(use_btn)
+			use_btn.focus_neighbor_left = use_btn.get_path_to(inspect_btn)
+			use_btn.focus_neighbor_right = use_btn.get_path_to(discard_btn)
+			use_btn.focus_next = use_btn.get_path_to(discard_btn)
+			discard_btn.focus_neighbor_left = discard_btn.get_path_to(use_btn)
+			discard_btn.focus_next = discard_btn.get_path_to(inspect_btn)
 	else:
-		print("[ItemsPanel] No OK button, setting up 2-button focus chain (Inspect/Discard)")
-		# If no OK button, just loop between Inspect and Discard
-		inspect_btn.focus_neighbor_right = inspect_btn.get_path_to(discard_btn)
-		inspect_btn.focus_next = inspect_btn.get_path_to(discard_btn)
-		discard_btn.focus_neighbor_left = discard_btn.get_path_to(inspect_btn)
-		discard_btn.focus_next = discard_btn.get_path_to(inspect_btn)
+		# No Use button - original focus chain
+		if ok_button:
+			print("[ItemsPanel] Setting up 3-button focus chain (Inspect/Discard/OK)")
+			inspect_btn.focus_neighbor_right = inspect_btn.get_path_to(discard_btn)
+			inspect_btn.focus_neighbor_bottom = inspect_btn.get_path_to(ok_button)
+			inspect_btn.focus_next = inspect_btn.get_path_to(discard_btn)
+
+			discard_btn.focus_neighbor_left = discard_btn.get_path_to(inspect_btn)
+			discard_btn.focus_neighbor_bottom = discard_btn.get_path_to(ok_button)
+			discard_btn.focus_next = discard_btn.get_path_to(ok_button)
+
+			ok_button.focus_neighbor_top = ok_button.get_path_to(inspect_btn)
+			ok_button.focus_neighbor_left = ok_button.get_path_to(discard_btn)
+			ok_button.focus_neighbor_right = ok_button.get_path_to(inspect_btn)
+			ok_button.focus_previous = ok_button.get_path_to(discard_btn)
+			ok_button.focus_next = ok_button.get_path_to(inspect_btn)
+		else:
+			print("[ItemsPanel] No OK button, setting up 2-button focus chain (Inspect/Discard)")
+			# If no OK button, just loop between Inspect and Discard
+			inspect_btn.focus_neighbor_right = inspect_btn.get_path_to(discard_btn)
+			inspect_btn.focus_next = inspect_btn.get_path_to(discard_btn)
+			discard_btn.focus_neighbor_left = discard_btn.get_path_to(inspect_btn)
+			discard_btn.focus_next = discard_btn.get_path_to(inspect_btn)
 
 	# Give focus to first button for controller navigation
 	print("[ItemsPanel] Attempting to grab focus on Inspect button...")
 	inspect_btn.grab_focus()
 	print("[ItemsPanel] Focus grabbed. Current focus owner: ", inspect_btn.get_viewport().gui_get_focus_owner())
 	print("[ItemsPanel] Inspect button has focus: ", inspect_btn.has_focus())
+
+func _on_use_item(item_id: String, item_def: Dictionary) -> void:
+	"""Use a recovery item on a party member"""
+	var item_name := _display_name(item_id, item_def)
+
+	# Get field effect
+	var effect := ""
+	if item_def.has("field_status_effect"):
+		effect = String(item_def["field_status_effect"])
+
+	if effect == "":
+		push_warning("[ItemsPanel] Cannot use %s - no field effect" % item_name)
+		return
+
+	# Create target selection dialog
+	var dlg := ConfirmationDialog.new()
+	dlg.title = "Use " + item_name
+	dlg.dialog_text = "Select a party member to use this item on:"
+	dlg.min_size = Vector2(400, 0)
+	dlg.process_mode = Node.PROCESS_MODE_ALWAYS
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 8)
+
+	# Get party members
+	var members := _gather_members()
+	var member_buttons: Array[Button] = []
+
+	for member_token in members:
+		var member_name := _member_display_name(member_token)
+		var member_btn := Button.new()
+		member_btn.text = member_name
+		member_btn.focus_mode = Control.FOCUS_ALL
+		member_btn.set_meta("member_token", member_token)
+
+		var apply_use = func():
+			print("[ItemsPanel] Using %s on %s" % [item_name, member_name])
+			dlg.hide()
+			_apply_recovery_item(item_id, member_token, effect)
+
+		member_btn.pressed.connect(apply_use)
+
+		# Handle controller input
+		member_btn.gui_input.connect(func(event: InputEvent):
+			if (event.is_action_pressed(aInputManager.ACTION_ACCEPT) or event.is_action_pressed("ui_accept")) and member_btn.has_focus():
+				apply_use.call()
+				get_viewport().set_input_as_handled()
+		)
+
+		vbox.add_child(member_btn)
+		member_buttons.append(member_btn)
+
+	dlg.add_child(vbox)
+
+	var host := get_tree().current_scene
+	if host == null:
+		host = get_tree().root
+	host.add_child(dlg)
+	dlg.popup_centered()
+
+	# Setup focus chain for member buttons
+	await get_tree().process_frame
+	if member_buttons.size() > 0:
+		for i in range(member_buttons.size()):
+			var btn = member_buttons[i]
+			if i > 0:
+				btn.focus_neighbor_top = btn.get_path_to(member_buttons[i - 1])
+			if i < member_buttons.size() - 1:
+				btn.focus_neighbor_bottom = btn.get_path_to(member_buttons[i + 1])
+
+		# Focus first member button
+		member_buttons[0].grab_focus()
+
+func _apply_recovery_item(item_id: String, member_token: String, effect: String) -> void:
+	"""Apply a recovery item's effect to a party member"""
+	print("[ItemsPanel] Applying %s to %s: %s" % [item_id, member_token, effect])
+
+	# TODO: Implement actual HP/MP recovery logic here
+	# This would need to interface with your character stats system
+	# For now, just consume the item
+
+	# Consume the item from inventory
+	if _inv and _inv.has_method("remove_item"):
+		_inv.call("remove_item", item_id, 1)
+		print("[ItemsPanel] Item %s consumed" % item_id)
+
+	# Show confirmation message
+	var member_name := _member_display_name(member_token)
+	var msg_dlg := AcceptDialog.new()
+	msg_dlg.dialog_text = "Used item on %s!\n%s" % [member_name, effect]
+	msg_dlg.title = "Item Used"
+	msg_dlg.process_mode = Node.PROCESS_MODE_ALWAYS
+
+	var host := get_tree().current_scene
+	if host == null:
+		host = get_tree().root
+	host.add_child(msg_dlg)
+	msg_dlg.popup_centered()
+
+	# Refresh the item list
+	_rebuild()
 
 func _on_inspect_row(btn: Button) -> void:
 	var id_v: Variant = btn.get_meta("id")
