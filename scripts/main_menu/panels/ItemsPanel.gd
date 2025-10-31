@@ -117,6 +117,12 @@ func _rebuild() -> void:
 	"""Rebuild entire panel - refresh data and UI"""
 	print("[ItemsPanel] === REBUILD CALLED ===")
 	print("[ItemsPanel] Current focus_mode: %s" % _focus_mode)
+
+	# Don't rebuild while party picker is active - it will rebuild when closed
+	if _focus_mode == "party_picker":
+		print("[ItemsPanel] Skipping rebuild - party picker is active")
+		return
+
 	_load_data()
 	_populate_categories()
 	_populate_items()
@@ -526,6 +532,8 @@ func _on_party_picker_accept() -> void:
 
 func _close_party_picker() -> void:
 	"""Close party picker and return to normal view"""
+	print("[ItemsPanel] Closing party picker...")
+
 	# Remove party picker list
 	if _party_picker_list and is_instance_valid(_party_picker_list):
 		_party_picker_list.queue_free()
@@ -542,13 +550,20 @@ func _close_party_picker() -> void:
 	if _action_buttons:
 		_action_buttons.visible = true
 
-	# Update details to reflect current selection
-	_update_details()
-
-	# Return focus to item list
+	# Return focus to item list BEFORE rebuilding
 	_focus_mode = "items"
-	if _item_list:
+
+	# Now rebuild to refresh item counts
+	_rebuild()
+
+	# Grab focus after rebuild completes
+	if _item_list and _item_list.item_count > 0:
 		_item_list.grab_focus()
+	else:
+		# No items in this category, return to category list
+		_focus_mode = "category"
+		if _category_list:
+			_category_list.grab_focus()
 
 func _use_item_on_member(item_id: String, item_def: Dictionary, member_token: String) -> void:
 	"""Apply item effect to a party member"""
