@@ -488,7 +488,12 @@ func _unhandled_input(event: InputEvent) -> void:
 				_item_list.grab_focus()
 				get_viewport().set_input_as_handled()
 	elif _focus_mode == "items":
-		if event.is_action_pressed("menu_back") or event.is_action_pressed("ui_left"):
+		if event.is_action_pressed("menu_accept"):
+			# If Use button is visible (recovery item), trigger it
+			if _use_button and _use_button.visible:
+				_on_use_button_pressed()
+				get_viewport().set_input_as_handled()
+		elif event.is_action_pressed("menu_back") or event.is_action_pressed("ui_left"):
 			# Return to category list
 			_focus_mode = "category"
 			_category_list.grab_focus()
