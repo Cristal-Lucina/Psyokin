@@ -115,10 +115,13 @@ func _grab_category_focus() -> void:
 
 func _rebuild() -> void:
 	"""Rebuild entire panel - refresh data and UI"""
+	print("[ItemsPanel] === REBUILD CALLED ===")
+	print("[ItemsPanel] Current focus_mode: %s" % _focus_mode)
 	_load_data()
 	_populate_categories()
 	_populate_items()
 	_update_details()
+	print("[ItemsPanel] === REBUILD COMPLETE ===")
 
 func _load_data() -> void:
 	"""Load item definitions and counts"""
@@ -134,12 +137,18 @@ func _load_data() -> void:
 	if _inv:
 		if _inv.has_method("get_inventory"):
 			var inv_data: Variant = _inv.call("get_inventory")
+			print("[ItemsPanel] get_inventory returned type: ", typeof(inv_data), " data: ", inv_data)
 			if typeof(inv_data) == TYPE_DICTIONARY:
 				_counts = inv_data.duplicate()
+				print("[ItemsPanel] Loaded %d items from get_inventory" % _counts.size())
 		elif _inv.has_method("get_counts"):
 			var counts_data: Variant = _inv.call("get_counts")
+			print("[ItemsPanel] get_counts returned type: ", typeof(counts_data), " data: ", counts_data)
 			if typeof(counts_data) == TYPE_DICTIONARY:
 				_counts = counts_data.duplicate()
+				print("[ItemsPanel] Loaded %d items from get_counts" % _counts.size())
+
+	print("[ItemsPanel] After loading, _counts has %d items" % _counts.size())
 
 	# Load equipped items
 	_equipped_by.clear()
@@ -543,6 +552,10 @@ func _close_party_picker() -> void:
 
 func _use_item_on_member(item_id: String, item_def: Dictionary, member_token: String) -> void:
 	"""Apply item effect to a party member"""
+	print("[ItemsPanel] === USE ITEM START ===")
+	print("[ItemsPanel] Item ID: %s, Member: %s" % [item_id, member_token])
+	print("[ItemsPanel] Current _counts size: %d" % _counts.size())
+
 	var effect: String = String(item_def.get("field_status_effect", ""))
 	if effect == "":
 		effect = String(item_def.get("battle_status_effect", ""))
@@ -634,13 +647,17 @@ func _use_item_on_member(item_id: String, item_def: Dictionary, member_token: St
 			print("[ItemsPanel] Updated GameState.member_data: HP=%d/%d, MP=%d/%d" % [new_hp, hp_max, new_mp, mp_max])
 
 	# Consume the item
+	print("[ItemsPanel] About to consume item: %s" % item_id)
 	if _inv and _inv.has_method("remove_item"):
 		_inv.call("remove_item", item_id, 1)
+		print("[ItemsPanel] Item consumed, inventory should emit signal now")
 
 	# Show confirmation
 	var member_name: String = _member_display_name(member_token)
 	var item_name: String = _display_name(item_id, item_def)
 	print("[ItemsPanel] Used %s on %s" % [item_name, member_name])
+	print("[ItemsPanel] _counts size after use: %d" % _counts.size())
+	print("[ItemsPanel] === USE ITEM END ===")
 
 func _extract_number(text: String) -> RegExMatch:
 	"""Extract first number from text"""
