@@ -334,6 +334,10 @@ func _ready() -> void:
 	# DEBUG: Auto-give bind items for testing capture system
 	_give_test_bind_items()
 
+	# DEBUG: Monitor viewport input for L/R button debugging
+	if not get_viewport().gui_input.is_connected(_on_viewport_input):
+		get_viewport().gui_input.connect(_on_viewport_input)
+
 # ---------- Input ----------
 func _input(event: InputEvent) -> void:
 	"""Process input events - log ALL joypad button events for debugging"""
