@@ -604,6 +604,9 @@ func _on_item_clicked(btn: Button) -> void:
 	dlg.min_size = Vector2(400, 0)
 	dlg.dialog_hide_on_ok = true
 
+	# IMPORTANT: Enable input processing for dialog
+	dlg.process_mode = Node.PROCESS_MODE_ALWAYS
+
 	# Build dialog content
 	var vbox := VBoxContainer.new()
 	vbox.add_theme_constant_override("separation", 8)
@@ -663,21 +666,32 @@ func _on_item_clicked(btn: Button) -> void:
 	# Setup focus neighbors for controller navigation
 	await get_tree().process_frame
 
-	# Get the dialog's OK button
+	# Get the dialog's OK button and make it focusable
 	var ok_button = dlg.get_ok_button()
+	if ok_button:
+		ok_button.focus_mode = Control.FOCUS_ALL
 
 	# Set up focus chain: inspect -> discard -> OK -> inspect
-	inspect_btn.focus_neighbor_right = inspect_btn.get_path_to(discard_btn)
-	inspect_btn.focus_neighbor_bottom = inspect_btn.get_path_to(ok_button)
-	inspect_btn.focus_next = inspect_btn.get_path_to(discard_btn)
+	if ok_button:
+		inspect_btn.focus_neighbor_right = inspect_btn.get_path_to(discard_btn)
+		inspect_btn.focus_neighbor_bottom = inspect_btn.get_path_to(ok_button)
+		inspect_btn.focus_next = inspect_btn.get_path_to(discard_btn)
 
-	discard_btn.focus_neighbor_left = discard_btn.get_path_to(inspect_btn)
-	discard_btn.focus_neighbor_bottom = discard_btn.get_path_to(ok_button)
-	discard_btn.focus_next = discard_btn.get_path_to(ok_button)
+		discard_btn.focus_neighbor_left = discard_btn.get_path_to(inspect_btn)
+		discard_btn.focus_neighbor_bottom = discard_btn.get_path_to(ok_button)
+		discard_btn.focus_next = discard_btn.get_path_to(ok_button)
 
-	ok_button.focus_neighbor_top = ok_button.get_path_to(inspect_btn)
-	ok_button.focus_previous = ok_button.get_path_to(discard_btn)
-	ok_button.focus_next = ok_button.get_path_to(inspect_btn)
+		ok_button.focus_neighbor_top = ok_button.get_path_to(inspect_btn)
+		ok_button.focus_neighbor_left = ok_button.get_path_to(discard_btn)
+		ok_button.focus_neighbor_right = ok_button.get_path_to(inspect_btn)
+		ok_button.focus_previous = ok_button.get_path_to(discard_btn)
+		ok_button.focus_next = ok_button.get_path_to(inspect_btn)
+	else:
+		# If no OK button, just loop between Inspect and Discard
+		inspect_btn.focus_neighbor_right = inspect_btn.get_path_to(discard_btn)
+		inspect_btn.focus_next = inspect_btn.get_path_to(discard_btn)
+		discard_btn.focus_neighbor_left = discard_btn.get_path_to(inspect_btn)
+		discard_btn.focus_next = discard_btn.get_path_to(inspect_btn)
 
 	# Give focus to first button for controller navigation
 	inspect_btn.grab_focus()
@@ -734,6 +748,9 @@ func _on_discard_row(btn: Button) -> void:
 	# Store a shallow copy so future rebuilds don't race this reference
 	dlg.set_meta("def", def.duplicate(true))
 
+	# IMPORTANT: Enable input processing for dialog
+	dlg.process_mode = Node.PROCESS_MODE_ALWAYS
+
 	if not dlg.confirmed.is_connected(_on_discard_confirmed):
 		dlg.confirmed.connect(_on_discard_confirmed.bind(dlg))
 
@@ -747,15 +764,24 @@ func _on_discard_row(btn: Button) -> void:
 	var ok_button = dlg.get_ok_button()
 	var cancel_button = dlg.get_cancel_button()
 
-	# Set up focus chain between OK and Cancel buttons
-	ok_button.focus_neighbor_right = ok_button.get_path_to(cancel_button)
-	ok_button.focus_next = ok_button.get_path_to(cancel_button)
-	cancel_button.focus_neighbor_left = cancel_button.get_path_to(ok_button)
-	cancel_button.focus_previous = cancel_button.get_path_to(ok_button)
-	cancel_button.focus_next = cancel_button.get_path_to(ok_button)
+	# Make sure buttons are focusable
+	if ok_button:
+		ok_button.focus_mode = Control.FOCUS_ALL
+	if cancel_button:
+		cancel_button.focus_mode = Control.FOCUS_ALL
 
-	# Focus the cancel button by default (safer choice)
-	cancel_button.grab_focus()
+	# Set up focus chain between OK and Cancel buttons
+	if ok_button and cancel_button:
+		ok_button.focus_neighbor_right = ok_button.get_path_to(cancel_button)
+		ok_button.focus_neighbor_left = ok_button.get_path_to(cancel_button)
+		ok_button.focus_next = ok_button.get_path_to(cancel_button)
+		cancel_button.focus_neighbor_left = cancel_button.get_path_to(ok_button)
+		cancel_button.focus_neighbor_right = cancel_button.get_path_to(ok_button)
+		cancel_button.focus_previous = cancel_button.get_path_to(ok_button)
+		cancel_button.focus_next = cancel_button.get_path_to(ok_button)
+
+		# Focus the cancel button by default (safer choice)
+		cancel_button.grab_focus()
 
 func _on_discard_confirmed(dlg: ConfirmationDialog) -> void:
 	if dlg == null: return
