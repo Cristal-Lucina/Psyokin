@@ -358,6 +358,7 @@ func _show_item_menu_for_slot(member_token: String, slot: String) -> void:
 	var cur_id: String = String(cur.get(slot, ""))
 
 	var pm: PopupMenu = PopupMenu.new()
+	pm.process_mode = Node.PROCESS_MODE_ALWAYS  # Important for input
 	add_child(pm)
 
 	if cur_id != "" and cur_id != "—":
@@ -396,7 +397,50 @@ func _show_item_menu_for_slot(member_token: String, slot: String) -> void:
 	pm.id_pressed.connect(func(idnum: int) -> void:
 		_handle.call(pm.get_item_index(idnum))
 	)
+
+	# Add controller support for PopupMenu
+	pm.gui_input.connect(func(event: InputEvent):
+		if event.is_action_pressed("move_up"):
+			var idx = pm.get_focused_item()
+			if idx <= 0:
+				idx = pm.get_item_count() - 1
+			else:
+				idx -= 1
+			# Skip separators and disabled items
+			while pm.is_item_separator(idx) or pm.is_item_disabled(idx):
+				idx -= 1
+				if idx < 0:
+					idx = pm.get_item_count() - 1
+			pm.set_focused_item(idx)
+			get_viewport().set_input_as_handled()
+		elif event.is_action_pressed("move_down"):
+			var idx = pm.get_focused_item()
+			idx = (idx + 1) % pm.get_item_count()
+			# Skip separators and disabled items
+			while pm.is_item_separator(idx) or pm.is_item_disabled(idx):
+				idx = (idx + 1) % pm.get_item_count()
+			pm.set_focused_item(idx)
+			get_viewport().set_input_as_handled()
+		elif event.is_action_pressed("menu_accept"):
+			var idx = pm.get_focused_item()
+			if idx >= 0 and idx < pm.get_item_count():
+				if not pm.is_item_disabled(idx) and not pm.is_item_separator(idx):
+					_handle.call(idx)
+			get_viewport().set_input_as_handled()
+		elif event.is_action_pressed("menu_back"):
+			pm.hide()
+			pm.queue_free()
+			get_viewport().set_input_as_handled()
+	)
+
 	pm.popup(Rect2(get_global_mouse_position(), Vector2(280, 0)))
+
+	# Focus first valid item
+	await get_tree().process_frame
+	for i in range(pm.get_item_count()):
+		if not pm.is_item_separator(i) and not pm.is_item_disabled(i):
+			pm.set_focused_item(i)
+			break
 
 # ────────────────── sigils ──────────────────
 func _sigil_disp(inst_id: String) -> String:
@@ -1187,11 +1231,12 @@ func _highlight_element(index: int) -> void:
 	"""Highlight the element at the given index"""
 	if index < 0 or index >= _nav_elements.size():
 		return
-	
+
 	var element = _nav_elements[index]
 	if element is Button:
-		element.modulate = Color(1.2, 1.2, 0.8, 1.0)  # Yellow tint
+		element.modulate = Color(1.5, 1.5, 0.5, 1.0)  # Bright yellow highlight
 		element.grab_focus()
+		print("[LoadoutPanel] Highlighted element %d: %s" % [index, element.text])
 
 func _unhighlight_element(index: int) -> void:
 	"""Remove highlight from element at given index"""
