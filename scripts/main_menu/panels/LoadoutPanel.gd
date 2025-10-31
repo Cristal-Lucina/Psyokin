@@ -116,6 +116,7 @@ var _poll_accum: float = 0.0
 var _in_party_mode: bool = true  # true = navigating party list, false = navigating equipment
 var _nav_elements: Array[Control] = []  # Ordered list of focusable elements
 var _nav_index: int = 0  # Current selection index
+var _active_popup: PopupMenu = null  # Currently open popup menu
 
 func _ready() -> void:
 	_gs    = get_node_or_null("/root/aGameState")
@@ -387,6 +388,7 @@ func _show_item_menu_for_slot(member_token: String, slot: String) -> void:
 	var _handle: Callable = func(index: int) -> void:
 		var meta: Variant = pm.get_item_metadata(index)
 		pm.queue_free()
+		_active_popup = null  # Clear reference
 		if typeof(meta) == TYPE_NIL:
 			if _eq and _eq.has_method("unequip_slot"):
 				_eq.call("unequip_slot", member_token, slot)
@@ -412,40 +414,29 @@ func _show_item_menu_for_slot(member_token: String, slot: String) -> void:
 	if source_btn and is_instance_valid(source_btn):
 		popup_pos = source_btn.global_position + Vector2(source_btn.size.x + 10, 0)
 
-	# Add controller support since we cleared ui_accept/ui_cancel joypad bindings
-	var popup_active: bool = true
-	var popup_input_handler: Callable = func(event: InputEvent) -> void:
-		if not popup_active or not is_instance_valid(pm) or not pm.visible:
-			return
+	# Store reference for controller input handling
+	_active_popup = pm
 
-		if event.is_action_pressed("menu_accept"):
-			# Simulate ui_accept for the popup
-			var accept_event = InputEventAction.new()
-			accept_event.action = "ui_accept"
-			accept_event.pressed = true
-			Input.parse_input_event(accept_event)
-			get_viewport().set_input_as_handled()
-		elif event.is_action_pressed("menu_back"):
-			pm.hide()
-			pm.queue_free()
-			popup_active = false
-			get_viewport().set_input_as_handled()
+	# Track selected index for controller navigation (PopupMenu doesn't expose this)
+	var selected_idx: int = 0
+	# Find first non-separator, non-disabled item
+	for i in range(pm.get_item_count()):
+		if not pm.is_item_separator(i) and not pm.is_item_disabled(i):
+			selected_idx = i
+			break
 
-	# Connect the handler for this panel's unhandled input
-	if not is_connected("tree_exiting", func(): popup_active = false):
-		tree_exiting.connect(func(): popup_active = false)
-
-	# Store handler reference so we can use it in _unhandled_input
-	set_meta("_popup_handler", popup_input_handler)
-	set_meta("_popup_active", true)
+	# Store selected index in popup metadata for access in _unhandled_input
+	pm.set_meta("_selected_idx", selected_idx)
+	pm.set_meta("_handle_callable", _handle)
 
 	# Clean up when popup closes
 	pm.popup_hide.connect(func() -> void:
-		popup_active = false
-		set_meta("_popup_active", false)
+		_active_popup = null
+		pm.queue_free()
 	)
 
 	pm.popup(Rect2(popup_pos, Vector2(280, 0)))
+	print("[LoadoutPanel] Popup opened with %d items, selected: %d" % [pm.get_item_count(), selected_idx])
 
 # ────────────────── sigils ──────────────────
 func _sigil_disp(inst_id: String) -> String:
@@ -1121,13 +1112,26 @@ func _unhandled_input(event: InputEvent) -> void:
 	if not visible:
 		return
 
-	# If popup is active, let popup handler process input first
-	if has_meta("_popup_active") and get_meta("_popup_active"):
-		if has_meta("_popup_handler"):
-			var handler: Callable = get_meta("_popup_handler")
-			handler.call(event)
-			if event.is_action_pressed("menu_accept") or event.is_action_pressed("menu_back"):
-				return  # Don't process navigation if popup handled it
+	# If popup is active, intercept controller input for navigation
+	if _active_popup and is_instance_valid(_active_popup) and _active_popup.visible:
+		if event.is_action_pressed("move_up"):
+			_navigate_popup(-1)
+			get_viewport().set_input_as_handled()
+			return
+		elif event.is_action_pressed("move_down"):
+			_navigate_popup(1)
+			get_viewport().set_input_as_handled()
+			return
+		elif event.is_action_pressed("menu_accept"):
+			_activate_popup_selection()
+			get_viewport().set_input_as_handled()
+			return
+		elif event.is_action_pressed("menu_back"):
+			_active_popup.hide()
+			_active_popup.queue_free()
+			_active_popup = null
+			get_viewport().set_input_as_handled()
+			return
 
 	if _in_party_mode:
 		# Party list navigation
@@ -1284,3 +1288,49 @@ func _activate_current_element() -> void:
 	if element is Button:
 		print("[LoadoutPanel] Activating button: %s" % element.text)
 		element.emit_signal("pressed")
+
+# ───────────────── popup navigation ─────────────────
+func _navigate_popup(delta: int) -> void:
+	"""Navigate UP/DOWN in active popup menu"""
+	if not _active_popup or not is_instance_valid(_active_popup):
+		return
+
+	var current_idx: int = _active_popup.get_meta("_selected_idx", 0)
+	var count = _active_popup.get_item_count()
+	if count == 0:
+		return
+
+	# Navigate with wrapping
+	var new_idx = current_idx + delta
+	if new_idx < 0:
+		new_idx = count - 1
+	elif new_idx >= count:
+		new_idx = 0
+
+	# Skip separators and disabled items
+	var attempts = 0
+	while (_active_popup.is_item_separator(new_idx) or _active_popup.is_item_disabled(new_idx)) and attempts < count:
+		new_idx += delta
+		if new_idx < 0:
+			new_idx = count - 1
+		elif new_idx >= count:
+			new_idx = 0
+		attempts += 1
+
+	if attempts < count:
+		_active_popup.set_meta("_selected_idx", new_idx)
+		print("[LoadoutPanel] Popup navigation: selected index %d (%s)" % [new_idx, _active_popup.get_item_text(new_idx)])
+
+func _activate_popup_selection() -> void:
+	"""Activate the currently selected popup item (A button)"""
+	if not _active_popup or not is_instance_valid(_active_popup):
+		return
+
+	var idx: int = _active_popup.get_meta("_selected_idx", 0)
+	if idx >= 0 and idx < _active_popup.get_item_count():
+		if not _active_popup.is_item_separator(idx) and not _active_popup.is_item_disabled(idx):
+			print("[LoadoutPanel] Activating popup item %d: %s" % [idx, _active_popup.get_item_text(idx)])
+			# Call the handler directly
+			if _active_popup.has_meta("_handle_callable"):
+				var handler: Callable = _active_popup.get_meta("_handle_callable")
+				handler.call(idx)
