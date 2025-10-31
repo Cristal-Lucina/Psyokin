@@ -56,6 +56,9 @@ func _ready() -> void:
 	if _party_list:
 		_party_list.item_selected.connect(_on_party_member_selected)
 
+	# Connect visibility change
+	visibility_changed.connect(_on_visibility_changed)
+
 	# Create radar chart
 	_create_radar_chart()
 
@@ -65,7 +68,13 @@ func _first_fill() -> void:
 	_refresh_party()
 	if _party_list.item_count > 0:
 		_party_list.select(0)
+		_party_list.grab_focus()
 		_on_party_member_selected(0)
+
+func _on_visibility_changed() -> void:
+	"""Grab focus when panel becomes visible"""
+	if visible and _party_list and _party_list.item_count > 0:
+		_party_list.grab_focus()
 
 func _on_party_changed(_arg = null) -> void:
 	var current_selection = -1
