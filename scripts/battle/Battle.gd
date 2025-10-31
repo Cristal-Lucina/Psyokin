@@ -246,54 +246,77 @@ func _input(event: InputEvent) -> void:
 
 	# If skill menu is open, handle controller navigation
 	if skill_menu_panel != null and not skill_menu_buttons.is_empty():
+		# Check cooldown to prevent rapid inputs
+		if input_cooldown > 0:
+			return
+
 		if event.is_action_pressed(aInputManager.ACTION_MOVE_UP):
 			_navigate_skill_menu(-1)
+			input_cooldown = input_cooldown_duration
 			get_viewport().set_input_as_handled()
 			return
 		elif event.is_action_pressed(aInputManager.ACTION_MOVE_DOWN):
 			_navigate_skill_menu(1)
+			input_cooldown = input_cooldown_duration
 			get_viewport().set_input_as_handled()
 			return
 		elif event.is_action_pressed(aInputManager.ACTION_ACCEPT):
 			_confirm_skill_selection()
+			input_cooldown = input_cooldown_duration
 			get_viewport().set_input_as_handled()
 			return
 
 	# If capture menu is open, handle controller navigation (2D grid)
 	if capture_menu_panel != null and not capture_menu_buttons.is_empty():
+		# Check cooldown to prevent rapid inputs
+		if input_cooldown > 0:
+			return
+
 		if event.is_action_pressed(aInputManager.ACTION_MOVE_UP):
 			_navigate_capture_menu_vertical(-2)  # Move up one row (2 columns)
+			input_cooldown = input_cooldown_duration
 			get_viewport().set_input_as_handled()
 			return
 		elif event.is_action_pressed(aInputManager.ACTION_MOVE_DOWN):
 			_navigate_capture_menu_vertical(2)  # Move down one row (2 columns)
+			input_cooldown = input_cooldown_duration
 			get_viewport().set_input_as_handled()
 			return
 		elif event.is_action_pressed(aInputManager.ACTION_MOVE_LEFT):
 			_navigate_capture_menu_horizontal(-1)  # Move left one column
+			input_cooldown = input_cooldown_duration
 			get_viewport().set_input_as_handled()
 			return
 		elif event.is_action_pressed(aInputManager.ACTION_MOVE_RIGHT):
 			_navigate_capture_menu_horizontal(1)  # Move right one column
+			input_cooldown = input_cooldown_duration
 			get_viewport().set_input_as_handled()
 			return
 		elif event.is_action_pressed(aInputManager.ACTION_ACCEPT):
 			_confirm_capture_selection()
+			input_cooldown = input_cooldown_duration
 			get_viewport().set_input_as_handled()
 			return
 
 	# If burst menu is open, handle controller navigation
 	if burst_menu_panel != null and not burst_menu_buttons.is_empty():
+		# Check cooldown to prevent rapid inputs
+		if input_cooldown > 0:
+			return
+
 		if event.is_action_pressed(aInputManager.ACTION_MOVE_UP):
 			_navigate_burst_menu(-1)
+			input_cooldown = input_cooldown_duration
 			get_viewport().set_input_as_handled()
 			return
 		elif event.is_action_pressed(aInputManager.ACTION_MOVE_DOWN):
 			_navigate_burst_menu(1)
+			input_cooldown = input_cooldown_duration
 			get_viewport().set_input_as_handled()
 			return
 		elif event.is_action_pressed(aInputManager.ACTION_ACCEPT):
 			_confirm_burst_selection()
+			input_cooldown = input_cooldown_duration
 			get_viewport().set_input_as_handled()
 			return
 
@@ -355,20 +378,28 @@ func _input(event: InputEvent) -> void:
 
 	# If status picker is open, handle controller navigation
 	if status_picker_panel != null and not status_picker_buttons.is_empty():
+		# Check cooldown to prevent rapid inputs
+		if input_cooldown > 0:
+			return
+
 		if event.is_action_pressed(aInputManager.ACTION_MOVE_UP):
 			_navigate_status_picker(-1)
+			input_cooldown = input_cooldown_duration
 			get_viewport().set_input_as_handled()
 			return
 		elif event.is_action_pressed(aInputManager.ACTION_MOVE_DOWN):
 			_navigate_status_picker(1)
+			input_cooldown = input_cooldown_duration
 			get_viewport().set_input_as_handled()
 			return
 		elif event.is_action_pressed(aInputManager.ACTION_ACCEPT):
 			_confirm_status_selection()
+			input_cooldown = input_cooldown_duration
 			get_viewport().set_input_as_handled()
 			return
 		elif event.is_action_pressed(aInputManager.ACTION_BACK):
 			_close_status_picker()
+			input_cooldown = input_cooldown_duration
 			get_viewport().set_input_as_handled()
 			return
 
@@ -2424,6 +2455,9 @@ func _show_status_character_picker() -> void:
 
 	add_child(status_picker_panel)
 
+	# Set cooldown to prevent immediate button press
+	input_cooldown = input_cooldown_duration
+
 func _calculate_run_chance() -> float:
 	"""Calculate run chance based on enemy HP percentage and level difference"""
 	const BASE_RUN_CHANCE: float = 5.0  # Base 5% escape chance (18° gap)
@@ -2943,6 +2977,9 @@ func _show_skill_menu(skill_menu: Array) -> void:
 	if not skill_menu_buttons.is_empty():
 		_highlight_skill_button(0)
 
+	# Set cooldown to prevent immediate button press
+	input_cooldown = input_cooldown_duration
+
 func _on_skill_button_pressed(index: int) -> void:
 	"""Handle skill button press"""
 	if index >= 0 and index < current_skill_menu.size():
@@ -3274,6 +3311,9 @@ func _show_item_menu(items: Array) -> void:
 
 	# Rebuild button list for first tab and highlight first item
 	_rebuild_item_button_list()
+
+	# Set cooldown to prevent immediate button press
+	input_cooldown = input_cooldown_duration
 
 func _add_category_tab(tab_container: TabContainer, category_name: String, category_items: Array) -> void:
 	"""Add a tab for a specific item category with two-column layout"""
@@ -3671,6 +3711,9 @@ func _show_capture_menu(bind_items: Array) -> void:
 	if not capture_menu_buttons.is_empty():
 		_highlight_capture_button(0)
 
+	# Set cooldown to prevent immediate button press
+	input_cooldown = input_cooldown_duration
+
 func _close_capture_menu() -> void:
 	"""Close the capture menu"""
 	if capture_menu_panel:
@@ -3918,6 +3961,9 @@ func _show_burst_menu(burst_abilities: Array) -> void:
 	# Highlight first burst if available
 	if not burst_menu_buttons.is_empty():
 		_highlight_burst_button(0)
+
+	# Set cooldown to prevent immediate button press
+	input_cooldown = input_cooldown_duration
 
 func _close_burst_menu() -> void:
 	"""Close the burst menu"""
