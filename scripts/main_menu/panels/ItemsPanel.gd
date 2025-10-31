@@ -10,6 +10,7 @@ const CSV_PATH       : String = "/root/aCSVLoader"
 const SIGIL_SYS_PATH : String = "/root/aSigilSystem"
 const EQUIP_SYS_PATH : String = "/root/aEquipmentSystem"
 const GS_PATH        : String = "/root/aGameState"
+const STATS_PATH     : String = "/root/aStatsSystem"
 const INSPECT_SCENE  : String = "res://scenes/main_menu/panels/ItemInspect.tscn"
 
 const ITEMS_CSV : String = "res://data/items/items.csv"
@@ -28,11 +29,12 @@ const CATEGORIES : PackedStringArray = [
 @onready var _vbox      : VBoxContainer = %VBox
 @onready var _scroll    : ScrollContainer = %Scroll
 
-var _inv  : Node = null
-var _csv  : Node = null
-var _eq   : Node = null
-var _gs  : Node = null
-var _sig : Node = null
+var _inv   : Node = null
+var _csv   : Node = null
+var _eq    : Node = null
+var _gs    : Node = null
+var _sig   : Node = null
+var _stats : Node = null
 
 var _defs        : Dictionary = {}    # {id -> row dict}
 var _counts_map  : Dictionary = {}    # {id -> int}  (after expansion, per-instance = 1)
@@ -74,11 +76,12 @@ func _ready() -> void:
 	# Add "Back (B)" indicator in bottom right
 	_add_back_indicator()
 
-	_inv = get_node_or_null(INV_PATH)
-	_csv = get_node_or_null(CSV_PATH)
-	_eq  = get_node_or_null(EQUIP_SYS_PATH)
-	_gs  = get_node_or_null(GS_PATH)
-	_sig = get_node_or_null(SIGIL_SYS_PATH)
+	_inv   = get_node_or_null(INV_PATH)
+	_csv   = get_node_or_null(CSV_PATH)
+	_eq    = get_node_or_null(EQUIP_SYS_PATH)
+	_gs    = get_node_or_null(GS_PATH)
+	_sig   = get_node_or_null(SIGIL_SYS_PATH)
+	_stats = get_node_or_null(STATS_PATH)
 
 	# Setup UI: replace Filter dropdown with category buttons
 	_setup_category_buttons()
@@ -264,6 +267,12 @@ func _rebuild() -> void:
 		# Render recovery items (each item takes 1 column, 2 items per row)
 		for item_data in recovery_items:
 			_render_item(item_data["id"], item_data["def"], item_data["qty"])
+
+		# Add blank cell if odd number of items to complete the row
+		if recovery_items.size() % 2 == 1:
+			var blank_cell := Control.new()
+			blank_cell.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			_list_box.add_child(blank_cell)
 
 		# Add spacing after recovery section (2 spacers for 2 columns)
 		var spacer1 := Control.new()
@@ -949,11 +958,18 @@ func _on_use_item(item_id: String, item_def: Dictionary) -> void:
 	for i in range(max_members):
 		var member_token = members[i]
 		var member_name := _member_display_name(member_token)
+		var stats := _get_member_hp_mp(member_token)
+
 		var member_btn := Button.new()
-		member_btn.text = member_name
+		# Format: "Name  HP: 100/150  MP: 50/75"
+		member_btn.text = "%s  HP:%d/%d  MP:%d/%d" % [
+			member_name,
+			stats["hp"], stats["hp_max"],
+			stats["mp"], stats["mp_max"]
+		]
 		member_btn.focus_mode = Control.FOCUS_ALL
 		member_btn.set_meta("member_token", member_token)
-		member_btn.custom_minimum_size = Vector2(200, 40)
+		member_btn.custom_minimum_size = Vector2(220, 40)
 
 		var apply_use = func():
 			print("[ItemsPanel] Using %s on %s" % [item_name, member_name])
@@ -1425,6 +1441,53 @@ func _member_display_name(token: String) -> String:
 		var v: Variant = _gs.call("_display_name_for_id", token)
 		if typeof(v) == TYPE_STRING and String(v) != "": return String(v)
 	return token.capitalize()
+
+func _get_member_hp_mp(token: String) -> Dictionary:
+	"""Get current and max HP/MP for a party member. Returns {hp, hp_max, mp, mp_max}"""
+	var result := {"hp": 0, "hp_max": 0, "mp": 0, "mp_max": 0}
+
+	if not _gs or not _stats:
+		return result
+
+	# Get current HP/MP from member_data
+	if _gs.has("member_data"):
+		var member_data: Variant = _gs.get("member_data")
+		if typeof(member_data) == TYPE_DICTIONARY:
+			var md := member_data as Dictionary
+			if md.has(token):
+				var data := md[token] as Dictionary
+				result["hp"] = int(data.get("hp", 0))
+				result["mp"] = int(data.get("mp", 0))
+
+	# Get max HP/MP from StatsSystem
+	if _stats.has_method("get_member_level") and _stats.has_method("get_member_stat_level"):
+		var level: int = 0
+		var level_v: Variant = _stats.call("get_member_level", token)
+		if typeof(level_v) == TYPE_INT:
+			level = level_v as int
+
+		var vtl: int = 0
+		var vtl_v: Variant = _stats.call("get_member_stat_level", token, "VTL")
+		if typeof(vtl_v) == TYPE_INT:
+			vtl = vtl_v as int
+
+		var fcs: int = 0
+		var fcs_v: Variant = _stats.call("get_member_stat_level", token, "FCS")
+		if typeof(fcs_v) == TYPE_INT:
+			fcs = fcs_v as int
+
+		# Compute max HP/MP
+		if _stats.has_method("compute_max_hp"):
+			var hp_max_v: Variant = _stats.call("compute_max_hp", level, vtl)
+			if typeof(hp_max_v) == TYPE_INT:
+				result["hp_max"] = hp_max_v as int
+
+		if _stats.has_method("compute_max_mp"):
+			var mp_max_v: Variant = _stats.call("compute_max_mp", level, fcs)
+			if typeof(mp_max_v) == TYPE_INT:
+				result["mp_max"] = mp_max_v as int
+
+	return result
 
 # ------------------------------------------------------------------------------
 # Controller Navigation & UI Enhancements
