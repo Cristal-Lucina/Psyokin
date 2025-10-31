@@ -141,6 +141,23 @@ func set_context_data(key: String, value: Variant) -> void:
 ## ═══════════════════════════════════════════════════════════════
 
 func _input(event: InputEvent) -> void:
+	# Debug: Log ALL controller button presses with action mapping info
+	if event is InputEventJoypadButton and event.pressed:
+		var burst_check = event.is_action("battle_burst")
+		var run_check = event.is_action("battle_run")
+		print("[ControllerManager] Joypad button %d pressed, context=%s, is_burst=%s, is_run=%s" % [
+			event.button_index,
+			InputContext.keys()[current_context],
+			burst_check,
+			run_check
+		])
+
+		# Also check if the actions exist in InputMap
+		if not InputMap.has_action("battle_burst"):
+			print("[ControllerManager] WARNING: battle_burst action not found in InputMap!")
+		if not InputMap.has_action("battle_run"):
+			print("[ControllerManager] WARNING: battle_run action not found in InputMap!")
+
 	# Check cooldown
 	if input_cooldown > 0:
 		return
