@@ -216,7 +216,7 @@ func _build_tab_buttons() -> void:
 
 		var btn := Button.new()
 		btn.text = String(meta["title"])
-		btn.focus_mode = Control.FOCUS_ALL
+		btn.focus_mode = Control.FOCUS_NONE  # Disable auto-focus to allow ControllerManager to handle input
 		btn.size_flags_horizontal = Control.SIZE_FILL
 		btn.set_meta("tab_id", tab_id)
 		btn.pressed.connect(_on_tab_button_pressed.bind(tab_id))
