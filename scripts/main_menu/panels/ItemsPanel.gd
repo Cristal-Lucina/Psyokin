@@ -105,6 +105,12 @@ func _ready() -> void:
 		if not _eq.is_connected("equipment_changed", Callable(self, "_on_equipment_changed")):
 			_eq.connect("equipment_changed", Callable(self, "_on_equipment_changed"))
 
+	# Connect to ControllerManager signals
+	if aControllerManager:
+		aControllerManager.navigate_pressed.connect(_on_controller_navigate)
+		aControllerManager.bumper_pressed.connect(_on_controller_bumper)
+		aControllerManager.action_button_pressed.connect(_on_controller_action)
+
 	# Live refresh on sigils (xp/level/loadout etc)
 	if _sig != null:
 		for s in ["loadout_changed","instance_xp_changed","instances_changed",
@@ -1523,63 +1529,69 @@ func _setup_description_section() -> void:
 
 	_vbox.add_child(desc_container)
 
-func _input(event: InputEvent) -> void:
-	if not _panel_has_focus or not visible:
+## ═══════════════════════════════════════════════════════════════
+## CONTROLLER INPUT (via ControllerManager signals)
+## ═══════════════════════════════════════════════════════════════
+
+func _on_controller_navigate(direction: Vector2, context: int) -> void:
+	"""Handle navigation input from ControllerManager"""
+	# Only process if this is our context
+	if context != aControllerManager.InputContext.MENU_ITEMS:
 		return
 
-	# UP/DOWN - Toggle between category mode and item mode
-	if event.is_action_pressed("move_up"):
+	if direction == Vector2.UP:
 		if not _in_category_mode and _selected_item_index > 0:
 			# Navigate items up
 			_navigate_items(-2)  # -2 for up (grid is 2 columns)
-			get_viewport().set_input_as_handled()
 		else:
 			# Switch to category mode
 			_enter_category_mode()
-			get_viewport().set_input_as_handled()
-	elif event.is_action_pressed("move_down"):
+	elif direction == Vector2.DOWN:
 		if _in_category_mode:
 			# Switch to item mode
 			_enter_item_mode()
-			get_viewport().set_input_as_handled()
 		elif _selected_item_index + 2 < _item_buttons.size():
 			# Navigate items down
 			_navigate_items(2)  # +2 for down (grid is 2 columns)
-			get_viewport().set_input_as_handled()
-	# LEFT/RIGHT - Navigate items only (not categories)
-	elif event.is_action_pressed("move_left"):
+	elif direction == Vector2.LEFT:
 		if not _in_category_mode:
 			_navigate_items(-1)
-			get_viewport().set_input_as_handled()
-	elif event.is_action_pressed("move_right"):
+	elif direction == Vector2.RIGHT:
 		if not _in_category_mode:
 			_navigate_items(1)
-			get_viewport().set_input_as_handled()
-	# L/R bumpers - Always navigate categories
-	elif event.is_action_pressed("battle_burst"):
-		_navigate_categories(-1)
-		get_viewport().set_input_as_handled()
-	elif event.is_action_pressed("battle_run"):
-		_navigate_categories(1)
-		get_viewport().set_input_as_handled()
-	# Action buttons
-	elif event.is_action_pressed("menu_accept"):
-		if _in_category_mode:
-			# If in category mode, switch to item mode first
-			_enter_item_mode()
-			get_viewport().set_input_as_handled()
-		elif not _item_buttons.is_empty():
-			# Use selected item
-			_use_selected_item()
-			get_viewport().set_input_as_handled()
-	elif event.is_action_pressed("run"):  # X button
-		if not _in_category_mode and not _item_buttons.is_empty():
-			_inspect_selected_item()
-			get_viewport().set_input_as_handled()
-	elif event.is_action_pressed("jump"):  # Y button
-		if not _in_category_mode and not _item_buttons.is_empty():
-			_discard_selected_item()
-			get_viewport().set_input_as_handled()
+
+func _on_controller_bumper(direction: int, context: int) -> void:
+	"""Handle L/R bumper input from ControllerManager"""
+	# Only process if this is our context
+	if context != aControllerManager.InputContext.MENU_ITEMS:
+		return
+
+	# L/R bumpers always navigate categories
+	_navigate_categories(direction)
+
+func _on_controller_action(button: String, context: int) -> void:
+	"""Handle action button input from ControllerManager"""
+	# Only process if this is our context
+	if context != aControllerManager.InputContext.MENU_ITEMS:
+		return
+
+	match button:
+		"accept":  # A button
+			if _in_category_mode:
+				# If in category mode, switch to item mode first
+				_enter_item_mode()
+			elif not _item_buttons.is_empty():
+				# Use selected item
+				_use_selected_item()
+		"back":  # B button
+			# Close panel (handled by parent GameMenu)
+			pass
+		"inspect":  # X button
+			if not _in_category_mode and not _item_buttons.is_empty():
+				_inspect_selected_item()
+		"discard":  # Y button
+			if not _in_category_mode and not _item_buttons.is_empty():
+				_discard_selected_item()
 
 func _navigate_categories(direction: int) -> void:
 	"""Navigate through categories with L/R bumpers only"""
@@ -1626,6 +1638,14 @@ func panel_gained_focus() -> void:
 	_in_category_mode = true
 	_highlight_category_button(_selected_category_index)
 
+	# Push context to ControllerManager
+	if aControllerManager:
+		aControllerManager.push_context(aControllerManager.InputContext.MENU_ITEMS, {
+			"panel": self,
+			"in_category_mode": _in_category_mode,
+			"selected_item_index": _selected_item_index
+		})
+
 func panel_lost_focus() -> void:
 	"""Called by GameMenu when this panel loses focus"""
 	_panel_has_focus = false
@@ -1634,6 +1654,10 @@ func panel_lost_focus() -> void:
 		btn.modulate = Color(1.0, 1.0, 1.0, 1.0)
 	for btn in _item_buttons:
 		btn.modulate = Color(1.0, 1.0, 1.0, 1.0)
+
+	# Pop context from ControllerManager
+	if aControllerManager:
+		aControllerManager.pop_context()
 
 func _enter_category_mode() -> void:
 	"""Switch to category navigation mode"""
