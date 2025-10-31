@@ -229,27 +229,6 @@ func _on_tab_button_pressed(tab_id: String) -> void:
 	"""Handle tab button press - emit signal for GameMenu to handle"""
 	tab_selected.emit(tab_id)
 
-func _unhandled_input(event: InputEvent) -> void:
-	"""Handle controller input for tab button navigation
-
-	Uses _unhandled_input instead of _input to ensure ControllerManager
-	processes events first. This prevents blocking L/R bumpers and other
-	controller inputs needed by other panels.
-	"""
-	# Only process if visible and we have buttons
-	if not visible or _tab_buttons.is_empty():
-		return
-
-	# Navigate up/down through tab buttons
-	if event.is_action_pressed(aInputManager.ACTION_MOVE_UP):
-		_navigate_buttons(-1)
-		get_viewport().set_input_as_handled()
-	elif event.is_action_pressed(aInputManager.ACTION_MOVE_DOWN):
-		_navigate_buttons(1)
-		get_viewport().set_input_as_handled()
-	elif event.is_action_pressed(aInputManager.ACTION_ACCEPT):
-		_confirm_button_selection()
-		get_viewport().set_input_as_handled()
 
 func _navigate_buttons(direction: int) -> void:
 	"""Navigate through tab buttons with controller"""
@@ -1200,6 +1179,28 @@ func _on_visibility_changed() -> void:
 	_dev_dump_profiles()
 
 func _unhandled_input(event: InputEvent) -> void:
+	"""Handle controller input for tab button navigation
+
+	Uses _unhandled_input instead of _input to ensure ControllerManager
+	processes events first. This prevents blocking L/R bumpers and other
+	controller inputs needed by other panels.
+	"""
+	# Handle controller input for tab navigation (only when visible with buttons)
+	if visible and not _tab_buttons.is_empty():
+		if event.is_action_pressed(aInputManager.ACTION_MOVE_UP):
+			_navigate_buttons(-1)
+			get_viewport().set_input_as_handled()
+			return
+		elif event.is_action_pressed(aInputManager.ACTION_MOVE_DOWN):
+			_navigate_buttons(1)
+			get_viewport().set_input_as_handled()
+			return
+		elif event.is_action_pressed(aInputManager.ACTION_ACCEPT):
+			_confirm_button_selection()
+			get_viewport().set_input_as_handled()
+			return
+
+	# Debug key handling (F9 to dump profiles)
 	if not OS.is_debug_build(): return
 	if event is InputEventKey and (event as InputEventKey).pressed and not (event as InputEventKey).echo:
 		var ek := event as InputEventKey
