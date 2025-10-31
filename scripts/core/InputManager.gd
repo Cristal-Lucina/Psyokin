@@ -47,6 +47,10 @@ var controller_connected_flag: bool = false
 var active_controller_id: int = -1
 
 func _ready() -> void:
+	# CRITICAL: Remove joypad bindings from Godot's default ui_* actions
+	# These interfere with ControllerManager by consuming controller input
+	_clear_ui_action_joypad_bindings()
+
 	# Register input actions if they don't exist
 	_ensure_input_actions()
 
@@ -55,6 +59,30 @@ func _ready() -> void:
 
 	# Connect to input device changes
 	Input.joy_connection_changed.connect(_on_joy_connection_changed)
+
+func _clear_ui_action_joypad_bindings() -> void:
+	"""Remove joypad button bindings from Godot's default ui_* actions
+
+	This prevents Godot's GUI system from automatically consuming controller
+	inputs before our ControllerManager can process them.
+	"""
+	var ui_actions = [
+		"ui_accept", "ui_select", "ui_cancel", "ui_focus_next", "ui_focus_prev",
+		"ui_left", "ui_right", "ui_up", "ui_down",
+		"ui_page_up", "ui_page_down", "ui_home", "ui_end"
+	]
+
+	for action in ui_actions:
+		if InputMap.has_action(action):
+			var events_to_remove = []
+			for event in InputMap.action_get_events(action):
+				# Remove only joypad button events, keep keyboard events
+				if event is InputEventJoypadButton or event is InputEventJoypadMotion:
+					events_to_remove.append(event)
+
+			for event in events_to_remove:
+				InputMap.action_erase_event(action, event)
+				print("[InputManager] Cleared joypad binding from %s: %s" % [action, event])
 
 func _ensure_input_actions() -> void:
 	"""Ensure all required input actions are registered"""
