@@ -191,22 +191,26 @@ func _handle_overworld_input(event: InputEvent) -> void:
 	# Movement is handled by player controller directly
 	# We only intercept action buttons here
 
+	# NOTE: In OVERWORLD context, we emit signals but DON'T mark input as handled
+	# This allows existing handlers (like Main.gd's _unhandled_input) to still work
+	# Once all systems are migrated to ControllerManager, we can mark as handled
+
 	if event.is_action_pressed("action"):
 		action_button_pressed.emit("action", current_context)
 		_start_cooldown()
-		get_viewport().set_input_as_handled()
+		# DON'T mark as handled - let existing handlers work
 	elif event.is_action_pressed("jump"):
 		action_button_pressed.emit("jump", current_context)
 		_start_cooldown()
-		get_viewport().set_input_as_handled()
+		# DON'T mark as handled - let existing handlers work
 	elif event.is_action_pressed("run"):
 		action_button_pressed.emit("run", current_context)
 		_start_cooldown()
-		get_viewport().set_input_as_handled()
+		# DON'T mark as handled - let existing handlers work
 	elif event.is_action_pressed("menu"):
 		action_button_pressed.emit("menu", current_context)
 		_start_cooldown()
-		get_viewport().set_input_as_handled()
+		# DON'T mark as handled - let existing handlers work (Main.gd opens game menu)
 
 func _handle_battle_action_input(event: InputEvent) -> void:
 	"""Handle input in battle action menu"""
