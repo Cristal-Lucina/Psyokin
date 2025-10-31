@@ -1,611 +1,363 @@
 extends Control
 class_name StatsPanel
 
-## StatsPanel (party-aware)
-## - Monday fatigue reset is handled by StatsSystem; we just refresh when stats change.
-## - Shows hero SXP/Fatigue; hides those for non-hero.
-## - Adds a simple member selector row (auto-created) without changing your .tscn.
-## - Prints weekday debug on each day advance (computed from Y/M/D).
+## StatsPanel - Comprehensive Character Stats Display
+## Shows base stats, equipment stats, and derived combat stats for party members
 
 const STATS_AUTOLOAD_PATH : String = "/root/aStatsSystem"
-const CAL_AUTOLOAD_PATH   : String = "/root/aCalendarSystem"
 const GS_PATH             : String = "/root/aGameState"
-const PARTY_PATH          : String = "/root/aPartySystem"
+const EQ_PATH             : String = "/root/aEquipmentSystem"
+const INV_PATH            : String = "/root/aInventorySystem"
 
-# Local stat keys (kept in sync with StatsSystem)
-const STATS_KEYS: Array[String] = ["BRW","MND","TPO","VTL","FCS"]
+# Base stat keys
+const BASE_STATS: Array[String] = ["BRW", "MND", "TPO", "VTL", "FCS"]
 
-# Fallback only (UI guess) if StatsSystem doesn't give us a 'fatigued' boolean
-const FATIGUE_THRESHOLD_PER_WEEK := 60
+@onready var _party_list: ItemList = %PartyList
+@onready var _member_name: Label = %MemberName
+@onready var _base_grid: GridContainer = %BaseStatsGrid
+@onready var _equip_grid: GridContainer = %EquipmentGrid
+@onready var _derived_grid: GridContainer = %DerivedGrid
+@onready var _radar_container: VBoxContainer = %RadarContainer
 
-@onready var _root_vb         : VBoxContainer = %Root
-@onready var _list            : VBoxContainer = %List
-@onready var _refresh         : Button        = %RefreshBtn
-@onready var _title           : Label         = %Title
-@onready var _member_bar      : HBoxContainer = %MemberBar
-@onready var _radar_container : VBoxContainer = %RadarContainer
+var _stats: Node = null
+var _gs: Node = null
+var _eq: Node = null
+var _inv: Node = null
 
 # Radar chart for stat visualization
-var _radar_chart : Control = null
+var _radar_chart: Control = null
 
-var _stats : Node = null
-var _cal   : Node = null
-var _gs    : Node = null
-var _party : Node = null
-
-var _current_id : String = "hero"
-
-# Controller navigation
-var _member_buttons: Array[Button] = []
-var _panel_has_focus: bool = false
-var _back_label: Label = null
+# Party data
+var _party_tokens: Array[String] = []
+var _party_labels: Array[String] = []
 
 func _ready() -> void:
-	# Add "Back (B)" indicator in bottom right
-	_add_back_indicator()
-
 	_stats = get_node_or_null(STATS_AUTOLOAD_PATH)
-	_cal   = get_node_or_null(CAL_AUTOLOAD_PATH)
-	_gs    = get_node_or_null(GS_PATH)
-	_party = get_node_or_null(PARTY_PATH)
+	_gs = get_node_or_null(GS_PATH)
+	_eq = get_node_or_null(EQ_PATH)
+	_inv = get_node_or_null(INV_PATH)
 
-	if _refresh and not _refresh.pressed.is_connected(_rebuild_all):
-		_refresh.pressed.connect(_rebuild_all)
-
-	# Listen for stat changes
+	# Connect signals
 	if _stats:
-		if _stats.has_signal("stat_leveled_up"): _stats.connect("stat_leveled_up", Callable(self, "_on_stats_changed"))
-		if _stats.has_signal("stats_changed"):    _stats.connect("stats_changed", Callable(self, "_on_stats_changed"))
-		if _stats.has_signal("level_up"):         _stats.connect("level_up", Callable(self, "_on_stats_changed"))
+		if _stats.has_signal("stats_changed"):
+			_stats.connect("stats_changed", Callable(self, "_on_stats_changed"))
+		if _stats.has_signal("level_up"):
+			_stats.connect("level_up", Callable(self, "_on_stats_changed"))
 
-	# Calendar: listen so we can print weekday debug + refresh UI
-	if _cal and _cal.has_signal("week_reset"):
-		_cal.connect("week_reset", Callable(self, "_on_stats_changed"))
-	if _cal and _cal.has_signal("day_advanced"):
-		_cal.connect("day_advanced", Callable(self, "_on_cal_day_advanced"))
+	if _gs:
+		for sig in ["party_changed", "active_changed", "roster_changed"]:
+			if _gs.has_signal(sig):
+				_gs.connect(sig, Callable(self, "_on_party_changed"))
 
-	# Party changes → refresh selector
-	for src in [_gs, _party]:
-		if src == null: continue
-		for sig in ["party_changed","active_changed","roster_changed","changed"]:
-			if src.has_signal(sig) and not src.is_connected(sig, Callable(self, "_on_party_changed")):
-				src.connect(sig, Callable(self, "_on_party_changed"))
+	if _eq and _eq.has_signal("equipment_changed"):
+		_eq.connect("equipment_changed", Callable(self, "_on_equipment_changed"))
 
-	# Creation screen may ping us
-	for n in get_tree().root.get_children():
-		if n.has_signal("creation_applied") and not n.is_connected("creation_applied", Callable(self, "_rebuild_all")):
-			n.connect("creation_applied", Callable(self, "_rebuild_all"))
+	# Connect party list signals
+	if _party_list:
+		_party_list.item_selected.connect(_on_party_member_selected)
 
-	# Create and add radar chart
+	# Create radar chart
 	_create_radar_chart()
 
-	# build
-	_rebuild_member_bar()
-	_rebuild_all()
+	call_deferred("_first_fill")
 
-func _unhandled_input(event: InputEvent) -> void:
-	if not _panel_has_focus or not visible:
-		return
+func _first_fill() -> void:
+	_refresh_party()
+	if _party_list.item_count > 0:
+		_party_list.select(0)
+		_on_party_member_selected(0)
 
-	# L bumper or LEFT - previous member
-	if event.is_action_pressed(aInputManager.ACTION_BURST) or event.is_action_pressed(aInputManager.ACTION_MOVE_LEFT):
-		_navigate_members(-1)
-		get_viewport().set_input_as_handled()
-	# R bumper or RIGHT - next member
-	elif event.is_action_pressed(aInputManager.ACTION_BATTLE_RUN) or event.is_action_pressed(aInputManager.ACTION_MOVE_RIGHT):
-		_navigate_members(1)
-		get_viewport().set_input_as_handled()
+func _on_party_changed(_arg = null) -> void:
+	var current_selection = -1
+	if _party_list.get_selected_items().size() > 0:
+		current_selection = _party_list.get_selected_items()[0]
 
-func _navigate_members(direction: int) -> void:
-	"""Navigate through party members with L/R bumpers or left/right"""
-	var party_ids := _active_party_ids()
-	if party_ids.is_empty():
-		return
+	_refresh_party()
 
-	# Find current index
-	var current_index := 0
-	for i in range(party_ids.size()):
-		if String(party_ids[i]) == _current_id:
-			current_index = i
-			break
+	# Restore selection
+	if current_selection >= 0 and current_selection < _party_list.item_count:
+		_party_list.select(current_selection)
+		_on_party_member_selected(current_selection)
+	elif _party_list.item_count > 0:
+		_party_list.select(0)
+		_on_party_member_selected(0)
 
-	# Calculate new index with wrap-around
-	current_index += direction
-	if current_index < 0:
-		current_index = party_ids.size() - 1
-	elif current_index >= party_ids.size():
-		current_index = 0
+func _on_stats_changed(_arg1 = null, _arg2 = null) -> void:
+	# Refresh current member stats
+	var selected = _party_list.get_selected_items()
+	if selected.size() > 0:
+		_on_party_member_selected(selected[0])
 
-	# Switch to new member
-	var new_id := String(party_ids[current_index])
-	_on_pick_member(new_id)
-	_highlight_member_button(current_index)
+func _on_equipment_changed(member: String) -> void:
+	# Refresh if it's the currently viewed member
+	var selected = _party_list.get_selected_items()
+	if selected.size() > 0:
+		var idx = selected[0]
+		if idx >= 0 and idx < _party_tokens.size():
+			if _party_tokens[idx].to_lower() == member.to_lower():
+				_on_party_member_selected(idx)
 
-func _highlight_member_button(index: int) -> void:
-	"""Highlight the member button at the given index"""
-	# Unhighlight all buttons first
-	for btn in _member_buttons:
-		btn.modulate = Color(1.0, 1.0, 1.0, 1.0)
+func _refresh_party() -> void:
+	"""Rebuild party member list"""
+	_party_list.clear()
+	_party_tokens.clear()
+	_party_labels.clear()
 
-	# Highlight selected button
-	if index >= 0 and index < _member_buttons.size():
-		_member_buttons[index].modulate = Color(1.2, 1.2, 0.8, 1.0)  # Yellow tint
-		_member_buttons[index].button_pressed = true
+	var tokens: Array[String] = _gather_party_tokens()
 
-func panel_gained_focus() -> void:
-	"""Called by GameMenu when this panel gains focus"""
-	_panel_has_focus = true
-	# Highlight the current member button
-	var party_ids := _active_party_ids()
-	for i in range(party_ids.size()):
-		if String(party_ids[i]) == _current_id:
-			_highlight_member_button(i)
-			break
+	if tokens.is_empty():
+		tokens.append("hero")
 
-func panel_lost_focus() -> void:
-	"""Called by GameMenu when this panel loses focus"""
-	_panel_has_focus = false
-	# Remove highlights
-	for btn in _member_buttons:
-		btn.modulate = Color(1.0, 1.0, 1.0, 1.0)
+	for token in tokens:
+		var display_name = _get_display_name(token)
+		_party_list.add_item(display_name)
+		_party_tokens.append(token)
+		_party_labels.append(display_name)
 
-# ---------- Calendar weekday debug ----------
-func _on_cal_day_advanced(date: Dictionary) -> void:
-	var info := _derive_day_info(date)
-	print("[StatsPanel][Cal] payload=", date)
-	if info.get("ok", false):
-		print("[StatsPanel][Cal] computed day=", String(info["day_name"]), " (idx=", int(info["day_index"]), ")")
-	else:
-		print("[StatsPanel][Cal] could not compute weekday (need year/month/day).")
-	_on_stats_changed()
-
-# Sakamoto’s algorithm (Gregorian). Returns 0=Mon..6=Sun.
-func _dow_index_gregorian(y: int, m: int, d: int) -> int:
-	var t: PackedInt32Array = PackedInt32Array([0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4])
-	var yy: int = y
-	if m < 3:
-		yy -= 1
-
-	var div4: int   = int(floor(float(yy) / 4.0))
-	var div100: int = int(floor(float(yy) / 100.0))
-	var div400: int = int(floor(float(yy) / 400.0))
-
-	var sun0: int = (yy + div4 - div100 + div400 + t[m - 1] + d) % 7  # 0=Sun..6=Sat
-	var mon0: int = (sun0 + 6) % 7                                    # shift so 0=Mon..6=Sun
-	return mon0
-
-func _derive_day_info(date: Dictionary) -> Dictionary:
-	var y: int = int(date.get("year", 0))
-	var m: int = int(date.get("month", 0))
-	var d: int = int(date.get("day", 0))
-	if y <= 0 or m <= 0 or d <= 0:
-		return {"ok": false}
-	var idx: int = _dow_index_gregorian(y, m, d)  # 0=Mon..6=Sun
-	var names: Array[String] = ["monday","tuesday","wednesday","thursday","friday","saturday","sunday"]
-	return {"ok": true, "day_index": idx, "day_name": names[idx]}
-
-# ---------- Signals ----------
-func _on_stats_changed(_a: Variant = null, _b: Variant = null) -> void:
-	_rebuild_list_only()
-
-func _on_party_changed(_a: Variant = null, _b: Variant = null) -> void:
-	_rebuild_member_bar()
-	if not _in_party(_current_id) and not _active_party_ids().is_empty():
-		_current_id = String(_active_party_ids()[0])
-	_rebuild_all()
-
-# ---------- Build / Rebuild ----------
-func _rebuild_all() -> void:
-	_update_title()
-	_rebuild_list_only()
-
-func _rebuild_list_only() -> void:
-	for c in _list.get_children():
-		c.queue_free()
-
-	# Redraw radar chart with updated stats
-	if _radar_chart:
-		_radar_chart.queue_redraw()
-
-	var is_hero := (_current_id == "hero")
-	var data := ( _get_stats_for_hero() if is_hero else _get_stats_for_member(_current_id) )
-
-	# Optional "overall level" row at the top
-	var lvl := _get_member_level(_current_id)
-	_add_header_row2("Info", "Value")
-	_add_row2("Level", str(lvl))
-	_add_spacer_row()
-
-	# Stats header + rows
-	_add_header_row2("Stat", "Level")
-
-	var keys: Array[String] = []
-	for k in data.keys(): keys.append(String(k))
-	keys.sort()
-
-	for key in keys:
-		var entry_v: Variant = data.get(key)
-		var level: int = 0
-
-		if typeof(entry_v) == TYPE_DICTIONARY:
-			var entry: Dictionary = entry_v
-			level = int(entry.get("level", entry.get("lvl", 0)))
-		elif typeof(entry_v) in [TYPE_INT, TYPE_FLOAT]:
-			level = int(entry_v)
-
-		_add_row2(String(key).capitalize(), str(level))
-
-	# Add Affinity (AXP) section
-	_add_spacer_row()
-	_add_affinity_section(_current_id)
-
-	await get_tree().process_frame
-	_list.queue_sort()
-
-# ---------- Data pulls ----------
-func _get_stats_for_hero() -> Dictionary:
-	# Prefer purpose-built payload from StatsSystem
-	if _stats != null and _stats.has_method("get_stats_panel_dict"):
-		var d1: Variant = _stats.call("get_stats_panel_dict")
-		if typeof(d1) == TYPE_DICTIONARY and not (d1 as Dictionary).is_empty():
-			return d1 as Dictionary
-
-	# Next: their existing get_stats_dict()/to_dict() already returns {stat:{level,sxp,weekly/fatigued/fatigue}}
-	if _stats != null:
-		if _stats.has_method("get_stats_dict"):
-			var d2_v: Variant = _stats.call("get_stats_dict")
-			if typeof(d2_v) == TYPE_DICTIONARY and not (d2_v as Dictionary).is_empty():
-				return d2_v as Dictionary
-		if _stats.has_method("to_dict"):
-			var d3_v: Variant = _stats.call("to_dict")
-			if typeof(d3_v) == TYPE_DICTIONARY and not (d3_v as Dictionary).is_empty():
-				return d3_v as Dictionary
-
-	# Fallback: picked stats (still show as level 1)
-	if _gs != null and _gs.has_meta("hero_picked_stats"):
-		var out: Dictionary = {}
-		var ps_v: Variant = _gs.get_meta("hero_picked_stats")
-		if typeof(ps_v) == TYPE_PACKED_STRING_ARRAY:
-			for s in (ps_v as PackedStringArray): out[String(s)] = {"level":1,"sxp":0,"fatigued":false}
-		elif typeof(ps_v) == TYPE_ARRAY:
-			for v in (ps_v as Array): out[String(v)] = {"level":1,"sxp":0,"fatigued":false}
+func _gather_party_tokens() -> Array[String]:
+	"""Get all party member tokens"""
+	var out: Array[String] = []
+	if _gs == null:
 		return out
 
-	# Final fallback: all keys at level 1
-	var out2: Dictionary = {}
-	for s in STATS_KEYS: out2[s] = {"level":1,"sxp":0,"fatigued":false}
-	return out2
+	# Active party
+	for m in ["get_active_party_ids", "get_party_ids", "list_active_party"]:
+		if _gs.has_method(m):
+			var raw: Variant = _gs.call(m)
+			if typeof(raw) == TYPE_PACKED_STRING_ARRAY:
+				for s in (raw as PackedStringArray):
+					out.append(String(s))
+			elif typeof(raw) == TYPE_ARRAY:
+				for s in (raw as Array):
+					out.append(String(s))
+			if out.size() > 0:
+				break
 
-func _get_stats_for_member(pid: String) -> Dictionary:
-	var out: Dictionary = {}
-	if _stats == null:
-		for s in STATS_KEYS: out[s] = {"level":1}
-		return out
+	# Bench
+	if _gs.has_method("get"):
+		var bench_v: Variant = _gs.get("bench")
+		if typeof(bench_v) == TYPE_PACKED_STRING_ARRAY:
+			for s in (bench_v as PackedStringArray):
+				if not out.has(String(s)):
+					out.append(String(s))
+		elif typeof(bench_v) == TYPE_ARRAY:
+			for s in (bench_v as Array):
+				if not out.has(String(s)):
+					out.append(String(s))
 
-	for s in STATS_KEYS:
-		var lv := 1
-		if _stats.has_method("get_member_stat_level"):
-			var v: Variant = _stats.call("get_member_stat_level", pid, s)
-			if typeof(v) in [TYPE_INT, TYPE_FLOAT]: lv = int(v)
-		out[s] = {"level": lv}
 	return out
 
-func _get_member_level(pid: String) -> int:
-	if _stats and _stats.has_method("get_member_level"):
-		var v: Variant = _stats.call("get_member_level", pid)
-		if typeof(v) in [TYPE_INT, TYPE_FLOAT]: return int(v)
+func _get_display_name(token: String) -> String:
+	"""Get display name for a party member"""
+	if token == "hero":
+		if _gs and _gs.has_method("get"):
+			var name = String(_gs.get("player_name"))
+			if name.strip_edges() != "":
+				return name
+		return "Player"
+
+	if _gs and _gs.has_method("_display_name_for_id"):
+		var v: Variant = _gs.call("_display_name_for_id", token)
+		if typeof(v) == TYPE_STRING and String(v) != "":
+			return String(v)
+
+	return token.capitalize()
+
+func _on_party_member_selected(index: int) -> void:
+	"""Handle party member selection"""
+	if index < 0 or index >= _party_tokens.size():
+		return
+
+	var token: String = _party_tokens[index]
+	var display_name: String = _party_labels[index]
+
+	_member_name.text = display_name
+
+	# Rebuild all stat grids
+	_rebuild_base_stats(token)
+	_rebuild_equipment_stats(token)
+	_rebuild_derived_stats(token)
+	_update_radar_chart(token)
+
+func _rebuild_base_stats(token: String) -> void:
+	"""Build the base stats grid (BRW, MND, TPO, VTL, FCS, Level, XP)"""
+	_clear_grid(_base_grid)
+
+	var level = 1
+	var xp = 0
+	var to_next = 0
+
+	if _stats:
+		if _stats.has_method("get_member_level"):
+			level = int(_stats.call("get_member_level", token))
+		if _stats.has_method("get_xp"):
+			xp = int(_stats.call("get_xp", token))
+		if _stats.has_method("xp_to_next_level"):
+			to_next = int(_stats.call("xp_to_next_level", token))
+
+	_add_stat_pair(_base_grid, "Level", str(level))
+
+	if to_next > 0:
+		_add_stat_pair(_base_grid, "XP", "%d / %d" % [xp, to_next])
+	else:
+		_add_stat_pair(_base_grid, "XP", str(xp))
+
+	# Base stats
+	for stat_key in BASE_STATS:
+		var value = _get_stat_value(token, stat_key)
+		_add_stat_pair(_base_grid, stat_key, str(value))
+
+func _rebuild_equipment_stats(token: String) -> void:
+	"""Build equipment stats grid (weapon/armor/head/foot/bracelet stats)"""
+	_clear_grid(_equip_grid)
+
+	var equip = _get_equipment(token)
+
+	# Weapon stats
+	var weapon_id = String(equip.get("weapon", ""))
+	if weapon_id != "" and weapon_id != "—":
+		var w_def = _get_item_def(weapon_id)
+		var brw = _get_stat_value(token, "BRW")
+		var base_watk = int(w_def.get("base_watk", 0))
+		var scale = float(w_def.get("scale_brw", 0.0))
+		var total_atk = base_watk + int(round(scale * float(brw)))
+
+		_add_stat_pair(_equip_grid, "W.Attack", str(total_atk))
+		_add_stat_pair(_equip_grid, "W.Acc", str(w_def.get("base_acc", 0)))
+		_add_stat_pair(_equip_grid, "Crit %", str(w_def.get("crit_bonus_pct", 0)))
+
+	# Armor stats
+	var armor_id = String(equip.get("armor", ""))
+	if armor_id != "" and armor_id != "—":
+		var a_def = _get_item_def(armor_id)
+		var vtl = _get_stat_value(token, "VTL")
+		var armor_flat = int(a_def.get("armor_flat", 0))
+		var pdef = int(round(float(armor_flat) * (5.0 + 0.25 * float(vtl))))
+
+		_add_stat_pair(_equip_grid, "P.Def", str(pdef))
+		_add_stat_pair(_equip_grid, "Ail.Res %", str(a_def.get("ail_resist_pct", 0)))
+
+	# Head stats
+	var head_id = String(equip.get("head", ""))
+	if head_id != "" and head_id != "—":
+		var h_def = _get_item_def(head_id)
+		var fcs = _get_stat_value(token, "FCS")
+		var ward = int(h_def.get("ward_flat", 0))
+		var mdef = int(round(float(ward) * (5.0 + 0.25 * float(fcs))))
+
+		_add_stat_pair(_equip_grid, "M.Def", str(mdef))
+		if int(h_def.get("max_hp_boost", 0)) > 0:
+			_add_stat_pair(_equip_grid, "HP Bonus", str(h_def.get("max_hp_boost", 0)))
+		if int(h_def.get("max_mp_boost", 0)) > 0:
+			_add_stat_pair(_equip_grid, "MP Bonus", str(h_def.get("max_mp_boost", 0)))
+
+	# Foot stats
+	var foot_id = String(equip.get("foot", ""))
+	if foot_id != "" and foot_id != "—":
+		var f_def = _get_item_def(foot_id)
+		_add_stat_pair(_equip_grid, "Speed", str(f_def.get("speed", 0)))
+		_add_stat_pair(_equip_grid, "Evasion", str(f_def.get("base_eva", 0)))
+
+func _rebuild_derived_stats(token: String) -> void:
+	"""Build derived stats grid (HP, MP, pools)"""
+	_clear_grid(_derived_grid)
+
+	var hp_max = 0
+	var mp_max = 0
+	var hp_current = 0
+	var mp_current = 0
+
+	if _gs and _gs.has_method("compute_member_pools"):
+		var pools = _gs.call("compute_member_pools", token)
+		hp_max = int(pools.get("hp_max", 0))
+		mp_max = int(pools.get("mp_max", 0))
+
+	# Try to get current HP/MP from combat profiles
+	var cps = get_node_or_null("/root/aCombatProfileSystem")
+	if cps and cps.has_method("get_profile"):
+		var profile = cps.call("get_profile", token)
+		if typeof(profile) == TYPE_DICTIONARY:
+			hp_current = int(profile.get("hp", hp_max))
+			mp_current = int(profile.get("mp", mp_max))
+	else:
+		hp_current = hp_max
+		mp_current = mp_max
+
+	_add_stat_pair(_derived_grid, "HP", "%d / %d" % [hp_current, hp_max])
+	_add_stat_pair(_derived_grid, "MP", "%d / %d" % [mp_current, mp_max])
+
+func _get_equipment(token: String) -> Dictionary:
+	"""Get equipped items for a member"""
+	if _gs and _gs.has_method("get_member_equip"):
+		var equip_v = _gs.call("get_member_equip", token)
+		if typeof(equip_v) == TYPE_DICTIONARY:
+			return equip_v
+	return {}
+
+func _get_item_def(item_id: String) -> Dictionary:
+	"""Get item definition"""
+	if item_id == "" or item_id == "—":
+		return {}
+
+	if _eq and _eq.has_method("get_item_def"):
+		var def_v = _eq.call("get_item_def", item_id)
+		if typeof(def_v) == TYPE_DICTIONARY:
+			return def_v
+
+	if _inv and _inv.has_method("get_item_defs"):
+		var defs_v = _inv.call("get_item_defs")
+		if typeof(defs_v) == TYPE_DICTIONARY:
+			var defs: Dictionary = defs_v
+			return defs.get(item_id, {})
+
+	return {}
+
+func _get_stat_value(token: String, stat_key: String) -> int:
+	"""Get a stat value for a member"""
+	if _gs and _gs.has_method("get_member_stat"):
+		return int(_gs.call("get_member_stat", token, stat_key))
 	return 1
 
-# ---------- Member bar ----------
-func _rebuild_member_bar() -> void:
-	if _member_bar == null: return
-	for c in _member_bar.get_children(): c.queue_free()
+func _add_stat_pair(grid: GridContainer, label: String, value: String) -> void:
+	"""Add a label/value pair to a grid"""
+	var lbl = Label.new()
+	lbl.text = label + ":"
+	grid.add_child(lbl)
 
-	# Clear button array
-	_member_buttons.clear()
+	var val = Label.new()
+	val.text = value
+	grid.add_child(val)
 
-	var group := ButtonGroup.new()
-	for id_any in _active_party_ids():
-		var pid := String(id_any)
-		var btn := Button.new()
-		btn.toggle_mode = true
-		btn.button_group = group
-		btn.text = _label_for(pid)
-		btn.pressed.connect(_on_pick_member.bind(pid))
-		if pid == _current_id: btn.button_pressed = true
-		_member_bar.add_child(btn)
-		_member_buttons.append(btn)
+func _clear_grid(grid: GridContainer) -> void:
+	"""Clear all children from a grid"""
+	for child in grid.get_children():
+		child.queue_free()
 
-	# Fallback "hero" if no party
-	if _member_bar.get_child_count() == 0:
-		var b := Button.new()
-		b.toggle_mode = true
-		b.text = _label_for("hero")
-		b.button_group = group
-		b.button_pressed = true
-		b.pressed.connect(_on_pick_member.bind("hero"))
-		_member_bar.add_child(b)
-		_member_buttons.append(b)
-
-func _on_pick_member(pid: String) -> void:
-	_current_id = pid
-	_update_title()
-	_rebuild_list_only()
-
-# ---------- Helpers ----------
-func _active_party_ids() -> Array:
-	var combined: Array = []
-
-	# Get active party members
-	if _gs and _gs.has_method("get_active_party_ids"):
-		var v: Variant = _gs.call("get_active_party_ids")
-		if typeof(v) == TYPE_ARRAY:
-			combined.append_array(v as Array)
-		elif typeof(v) == TYPE_PACKED_STRING_ARRAY:
-			for s in (v as PackedStringArray): combined.append(String(s))
-
-	# Get benched members
-	if _gs and _gs.has_method("get"):
-		var bench_v: Variant = _gs.get("bench")
-		if typeof(bench_v) == TYPE_ARRAY:
-			combined.append_array(bench_v as Array)
-		elif typeof(bench_v) == TYPE_PACKED_STRING_ARRAY:
-			for s in (bench_v as PackedStringArray): combined.append(String(s))
-
-	# Fallback to hero if nothing found
-	if combined.is_empty():
-		return ["hero"]
-
-	return combined
-
-func _in_party(pid: String) -> bool:
-	for id_any in _active_party_ids():
-		if String(id_any) == pid: return true
-	return (pid == "hero")
-
-func _label_for(pid: String) -> String:
-	# First try StatsSystem's get_member_display_name (gets name from CSV)
-	if _stats and _stats.has_method("get_member_display_name"):
-		var name_v: Variant = _stats.call("get_member_display_name", pid)
-		if typeof(name_v) == TYPE_STRING and String(name_v).strip_edges() != "":
-			return String(name_v)
-
-	# Fallback for hero: check player_name in GameState
-	if pid == "hero" and _gs and _gs.has_method("get"):
-		var nm_v: Variant = _gs.get("player_name")
-		if typeof(nm_v) == TYPE_STRING and String(nm_v).strip_edges() != "":
-			return String(nm_v)
-
-	# Last resort: capitalize the ID
-	return pid.capitalize()
-
-func _update_title() -> void:
-	if _title:
-		_title.text = "%s Stats" % _label_for(_current_id)
-
-# ---------- Row builders ----------
-func _add_header_row3(col1: String, col2: String, col3: String) -> void:
-	var row := HBoxContainer.new()
-	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	row.add_theme_constant_override("separation", 8)
-	var l1 := Label.new(); l1.text = col1; l1.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var l2 := Label.new(); l2.text = col2; l2.custom_minimum_size.x = 80
-	var l3 := Label.new(); l3.text = col3; l3.custom_minimum_size.x = 160
-	row.add_child(l1); row.add_child(l2); row.add_child(l3)
-	_list.add_child(row)
-
-func _add_header_row2(col1: String, col2: String) -> void:
-	var row := HBoxContainer.new()
-	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	row.add_theme_constant_override("separation", 8)
-	var l1 := Label.new(); l1.text = col1; l1.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var l2 := Label.new(); l2.text = col2; l2.custom_minimum_size.x = 100
-	row.add_child(l1); row.add_child(l2)
-	_list.add_child(row)
-
-func _add_row3(stat_name: String, level: String, right: String) -> void:
-	var row := HBoxContainer.new()
-	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	row.add_theme_constant_override("separation", 8)
-	var n := Label.new();  n.text = stat_name;  n.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var lv := Label.new(); lv.text = level;     lv.custom_minimum_size.x = 80
-	var rv := Label.new(); rv.text = right;     rv.custom_minimum_size.x = 160
-	row.add_child(n); row.add_child(lv); row.add_child(rv)
-	_list.add_child(row)
-
-func _add_row2(label_text: String, val: String) -> void:
-	var row := HBoxContainer.new()
-	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	row.add_theme_constant_override("separation", 8)
-
-	var n := Label.new()
-	n.text = label_text
-	n.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-
-	var v := Label.new()
-	v.text = val
-	v.custom_minimum_size.x = 100
-
-	row.add_child(n)
-	row.add_child(v)
-	_list.add_child(row)
-
-func _add_spacer_row() -> void:
-	var sep := HSeparator.new()
-	_list.add_child(sep)
-
-func _add_affinity_section(member_id: String) -> void:
-	"""Add AXP/Affinity relationships section for the current member"""
-	var affinity_sys = get_node_or_null("/root/aAffinitySystem")
-	if not affinity_sys or not affinity_sys.has_method("get_all_pair_data"):
-		return
-
-	var all_pairs: Array = affinity_sys.call("get_all_pair_data")
-	var relationships: Array = []
-
-	# Find all pairs involving this member
-	for pair_data in all_pairs:
-		if typeof(pair_data) != TYPE_DICTIONARY:
-			continue
-
-		var pair_dict: Dictionary = pair_data
-		var member_a: String = String(pair_dict.get("member_a", ""))
-		var member_b: String = String(pair_dict.get("member_b", ""))
-
-		# Check if this member is in this pair
-		var partner_id: String = ""
-		if member_a == member_id:
-			partner_id = member_b
-		elif member_b == member_id:
-			partner_id = member_a
-		else:
-			continue  # This pair doesn't involve this member
-
-		# Get partner's display name
-		var partner_name: String = _label_for(partner_id)
-
-		relationships.append({
-			"partner_id": partner_id,
-			"partner_name": partner_name,
-			"tier": int(pair_dict.get("tier", 0)),
-			"weekly_axp": int(pair_dict.get("weekly_axp", 0)),
-			"lifetime_axp": int(pair_dict.get("lifetime_axp", 0))
-		})
-
-	# Only show section if there are relationships
-	if relationships.is_empty():
-		return
-
-	# Add header
-	_add_header_row2("Affinity", "Tier (Lifetime)")
-
-	# Add each relationship
-	for rel in relationships:
-		var partner_name: String = String(rel.get("partner_name", "???"))
-		var tier: int = int(rel.get("tier", 0))
-		var lifetime: int = int(rel.get("lifetime_axp", 0))
-
-		var tier_text: String = "AT%d (%d)" % [tier, lifetime]
-		_add_row2(partner_name, tier_text)
-
-# ---------- Radar Chart ----------
 func _create_radar_chart() -> void:
-	if not _radar_container:
+	"""Create radar chart for stat visualization"""
+	# Placeholder - you can add your radar chart implementation here
+	var placeholder = Label.new()
+	placeholder.text = "[Radar Chart]"
+	placeholder.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	placeholder.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	placeholder.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	placeholder.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_radar_container.add_child(placeholder)
+	_radar_chart = placeholder
+
+func _update_radar_chart(token: String) -> void:
+	"""Update radar chart with current member stats"""
+	# Placeholder - implement radar chart update logic
+	pass
+
+func _unhandled_input(event: InputEvent) -> void:
+	"""Handle controller input - ItemList handles UP/DOWN automatically"""
+	if not visible or not _party_list:
 		return
 
-	_radar_chart = Control.new()
-	_radar_chart.custom_minimum_size = Vector2(300, 300)
-	_radar_chart.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_radar_chart.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_radar_chart.set_process(false)  # No need for _process, we'll redraw manually
-
-	# Add chart to the radar container on the right side
-	_radar_container.add_child(_radar_chart)
-
-	# Connect draw callback
-	_radar_chart.draw.connect(_on_radar_draw)
-
-func _on_radar_draw() -> void:
-	if _radar_chart == null:
-		return
-
-	# Get current member stats
-	var is_hero := (_current_id == "hero")
-	var data := (_get_stats_for_hero() if is_hero else _get_stats_for_member(_current_id))
-
-	# Extract stat levels in order: BRW, MND, TPO, VTL, FCS
-	var stat_levels: Array[float] = []
-	for key in STATS_KEYS:
-		var entry_v: Variant = data.get(key)
-		var level: float = 0.0
-		if typeof(entry_v) == TYPE_DICTIONARY:
-			level = float((entry_v as Dictionary).get("level", (entry_v as Dictionary).get("lvl", 0)))
-		elif typeof(entry_v) in [TYPE_INT, TYPE_FLOAT]:
-			level = float(entry_v)
-		stat_levels.append(level)
-
-	_draw_pentagon_radar(_radar_chart, stat_levels)
-
-func _draw_pentagon_radar(control: Control, stat_levels: Array[float]) -> void:
-	var chart_size: Vector2 = control.size
-	var center: Vector2 = Vector2(chart_size.x / 2.0 - 50.0, chart_size.y / 2.0)  # Shifted 50px left
-	var max_radius: float = min(chart_size.x, chart_size.y) / 2.0 - 20.0  # Padding
-
-	# Draw 10 concentric pentagons (grid layers)
-	for layer in range(1, 11):
-		var radius := max_radius * (float(layer) / 10.0)
-		var points := _get_pentagon_points(center, radius)
-		var color := Color(0.3, 0.3, 0.3, 0.3)  # Dark gray for grid
-		_draw_pentagon_outline(control, points, color, 1.0)
-
-	# Draw axis lines from center to each vertex
-	for i in range(5):
-		var angle := -PI / 2.0 + (TAU / 5.0) * float(i)  # Start from top
-		var end_point := center + Vector2(cos(angle), sin(angle)) * max_radius
-		control.draw_line(center, end_point, Color(0.4, 0.4, 0.4, 0.5), 1.0)
-
-	# Draw stat labels at each point
-	var label_names: Array[String] = ["BRW", "MND", "TPO", "VTL", "FCS"]
-	for i in range(5):
-		var angle := -PI / 2.0 + (TAU / 5.0) * float(i)
-		var label_pos := center + Vector2(cos(angle), sin(angle)) * (max_radius + 15.0)
-		# Offset label based on position so it doesn't overlap
-		label_pos.x -= 15.0  # Rough centering
-		label_pos.y -= 5.0
-		control.draw_string(ThemeDB.fallback_font, label_pos, label_names[i],
-							HORIZONTAL_ALIGNMENT_CENTER, -1, 12, Color.WHITE)
-
-	# Calculate stat polygon points (normalized to 0-10 range)
-	var stat_points: PackedVector2Array = PackedVector2Array()
-	for i in range(5):
-		var stat_level: float = clamp(stat_levels[i], 0.0, 10.0)
-		var normalized: float = stat_level / 10.0  # Normalize to 0-1
-		var angle: float = -PI / 2.0 + (TAU / 5.0) * float(i)
-		var point: Vector2 = center + Vector2(cos(angle), sin(angle)) * max_radius * normalized
-		stat_points.append(point)
-
-	# Draw filled stat polygon (light blue)
-	if stat_points.size() >= 3:
-		control.draw_colored_polygon(stat_points, Color(0.3, 0.6, 1.0, 0.4))
-
-	# Draw stat polygon outline (brighter blue)
-	if stat_points.size() >= 2:
-		for i in range(stat_points.size()):
-			var start := stat_points[i]
-			var end := stat_points[(i + 1) % stat_points.size()]
-			control.draw_line(start, end, Color(0.4, 0.7, 1.0, 0.8), 2.0)
-
-func _get_pentagon_points(center: Vector2, radius: float) -> PackedVector2Array:
-	var points := PackedVector2Array()
-	for i in range(5):
-		var angle := -PI / 2.0 + (TAU / 5.0) * float(i)  # Start from top
-		var point := center + Vector2(cos(angle), sin(angle)) * radius
-		points.append(point)
-	return points
-
-func _draw_pentagon_outline(control: Control, points: PackedVector2Array, color: Color, width: float) -> void:
-	for i in range(points.size()):
-		var start := points[i]
-		var end := points[(i + 1) % points.size()]
-		control.draw_line(start, end, color, width)
-
-# --- Back Button Indicator ---
-func _add_back_indicator() -> void:
-	"""Add 'Back (B)' text in bottom right corner"""
-	_back_label = Label.new()
-	_back_label.text = "Back (B)"
-	_back_label.add_theme_font_size_override("font_size", 14)
-	_back_label.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7, 1.0))
-
-	# Position in bottom right
-	_back_label.anchor_right = 1.0
-	_back_label.anchor_bottom = 1.0
-	_back_label.anchor_left = 1.0
-	_back_label.anchor_top = 1.0
-	_back_label.offset_right = -20
-	_back_label.offset_bottom = -10
-	_back_label.offset_left = -100
-	_back_label.offset_top = -30
-	_back_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-
-	add_child(_back_label)
+	# A button to confirm selection (though selection already updates display)
+	if event.is_action_pressed("menu_accept"):
+		var selected = _party_list.get_selected_items()
+		if selected.size() > 0:
+			_on_party_member_selected(selected[0])
+			get_viewport().set_input_as_handled()
