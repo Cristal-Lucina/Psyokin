@@ -3401,6 +3401,9 @@ func _rebuild_item_button_list() -> void:
 	# Store reference to scroll container for auto-scrolling
 	item_scroll_container = scroll
 
+	# Reset scroll to top when switching tabs
+	scroll.scroll_vertical = 0
+
 	var grid = scroll.get_child(0) as GridContainer
 	if not grid:
 		return
@@ -3522,26 +3525,37 @@ func _scroll_to_item_button(button: Button) -> void:
 	if not item_scroll_container or not button:
 		return
 
-	# Get the grid container (parent of button)
-	var grid = button.get_parent()
-	if not grid:
+	# Find the button's index in our button list
+	var button_index = item_menu_buttons.find(button)
+	if button_index < 0:
 		return
 
-	# Calculate button's vertical position within the scrollable content
-	var button_y = button.position.y
-	var button_height = button.size.y
+	# Calculate the button's Y position based on its index in a 2-column grid
+	# Grid layout: 2 columns, buttons are 40px tall, 5px vertical separation
+	var button_height = 40.0
+	var v_separation = 5.0
+	var row_height = button_height + v_separation
+
+	# Calculate which row this button is in (2 columns = divide index by 2)
+	var row_index = button_index / 2  # Integer division
+
+	# Calculate the Y position of this row
+	var button_y = row_index * row_height
+	var button_bottom = button_y + button_height
+
+	# Get scroll container dimensions
 	var scroll_height = item_scroll_container.size.y
 	var current_scroll = item_scroll_container.scroll_vertical
 
 	# Add padding for better visibility
-	var padding = 10.0
+	var padding = 20.0
 
 	# Check if button is above visible area (need to scroll up)
 	if button_y < current_scroll + padding:
 		item_scroll_container.scroll_vertical = max(0, button_y - padding)
 	# Check if button is below visible area (need to scroll down)
-	elif button_y + button_height > current_scroll + scroll_height - padding:
-		item_scroll_container.scroll_vertical = button_y + button_height - scroll_height + padding
+	elif button_bottom > current_scroll + scroll_height - padding:
+		item_scroll_container.scroll_vertical = button_bottom - scroll_height + padding
 
 func _on_item_hover(item_name: String, item_desc: String) -> void:
 	"""Show item description when hovering over button"""
