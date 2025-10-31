@@ -326,19 +326,23 @@ func _handle_menu_main_input(event: InputEvent) -> void:
 	"""Handle input in main pause menu"""
 	# Navigation
 	if event.is_action_pressed("move_up"):
+		print("[ControllerManager] MENU_MAIN: Emitting navigate UP")
 		navigate_pressed.emit(Vector2.UP, current_context)
 		_start_cooldown()
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("move_down"):
+		print("[ControllerManager] MENU_MAIN: Emitting navigate DOWN")
 		navigate_pressed.emit(Vector2.DOWN, current_context)
 		_start_cooldown()
 		get_viewport().set_input_as_handled()
 	# Actions
 	elif event.is_action_pressed("menu_accept"):
+		print("[ControllerManager] MENU_MAIN: Emitting action_button_pressed 'accept'")
 		action_button_pressed.emit("accept", current_context)
 		_start_cooldown()
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("menu_back"):
+		print("[ControllerManager] MENU_MAIN: Emitting action_button_pressed 'back'")
 		action_button_pressed.emit("back", current_context)
 		_start_cooldown()
 		get_viewport().set_input_as_handled()

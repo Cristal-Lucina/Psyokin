@@ -302,16 +302,26 @@ func _on_controller_navigate(direction: Vector2, context: int) -> void:
 
 func _on_controller_action(action: String, context: int) -> void:
 	"""Handle action button from ControllerManager - only in MENU_MAIN context"""
+	print("[StatusPanel._on_controller_action] action=%s, context=%d, visible=%s, buttons=%d" % [
+		action, context, visible, _tab_buttons.size()
+	])
+
 	if not visible or _tab_buttons.is_empty():
+		print("[StatusPanel._on_controller_action] BLOCKED - not visible or no buttons")
 		return
 
 	# Only handle accept action when in MENU_MAIN context
 	if _ctrl_mgr and _ctrl_mgr.get_current_context() != _ctrl_mgr.InputContext.MENU_MAIN:
+		print("[StatusPanel._on_controller_action] BLOCKED - wrong context: %s" % [
+			_ctrl_mgr.InputContext.keys()[_ctrl_mgr.get_current_context()]
+		])
 		return
 
 	if action == "accept":
 		print("[StatusPanel] Controller ACCEPT - confirming selection: %d" % _selected_button_index)
 		_confirm_button_selection()
+	else:
+		print("[StatusPanel._on_controller_action] Ignoring action: %s" % action)
 
 func _connect_signals() -> void:
 	# Calendar
