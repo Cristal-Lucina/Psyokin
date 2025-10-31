@@ -116,7 +116,7 @@ var _poll_accum: float = 0.0
 var _in_party_mode: bool = true  # true = navigating party list, false = navigating equipment
 var _nav_elements: Array[Control] = []  # Ordered list of focusable elements
 var _nav_index: int = 0  # Current selection index
-var _active_popup: PopupMenu = null  # Currently open popup menu
+var _active_popup: Control = null  # Currently open equipment popup panel
 
 func _ready() -> void:
 	_gs    = get_node_or_null("/root/aGameState")
@@ -367,76 +367,76 @@ func _show_item_menu_for_slot(member_token: String, slot: String) -> void:
 		"foot": source_btn = _f_btn
 		"bracelet": source_btn = _b_btn
 
-	var pm: PopupMenu = PopupMenu.new()
-	pm.process_mode = Node.PROCESS_MODE_ALWAYS  # Important for input
-	add_child(pm)
+	# Create custom popup using Control nodes for proper controller support
+	var popup_panel: Panel = Panel.new()
+	popup_panel.process_mode = Node.PROCESS_MODE_ALWAYS
+	popup_panel.z_index = 100
+	add_child(popup_panel)
 
+	var vbox: VBoxContainer = VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 4)
+	popup_panel.add_child(vbox)
+
+	# Title label
+	var title: Label = Label.new()
+	title.text = "Select %s" % slot.capitalize()
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(title)
+
+	# Item list
+	var item_list: ItemList = ItemList.new()
+	item_list.custom_minimum_size = Vector2(280, 200)
+	item_list.focus_mode = Control.FOCUS_ALL
+	vbox.add_child(item_list)
+
+	# Build item list data
+	var item_ids: Array[String] = []
+
+	# Add unequip option if something is equipped
 	if cur_id != "" and cur_id != "—":
-		pm.add_item("Unequip")
-		pm.set_item_metadata(pm.get_item_count() - 1, null)
-		pm.add_separator()
+		item_list.add_item("← Unequip")
+		item_ids.append("")  # Empty string = unequip
 
+	# Add available items
 	if items.is_empty():
-		pm.add_item("(No items)")
-		pm.set_item_disabled(pm.get_item_count() - 1, true)
+		item_list.add_item("(No items available)")
+		item_list.set_item_disabled(item_list.item_count - 1, true)
+		item_ids.append("")
 	else:
 		for id in items:
 			var label: String = _pretty_item(id)
-			pm.add_item(label)
-			pm.set_item_metadata(pm.get_item_count() - 1, id)
-
-	var _handle: Callable = func(index: int) -> void:
-		var meta: Variant = pm.get_item_metadata(index)
-		pm.queue_free()
-		_active_popup = null  # Clear reference
-		if typeof(meta) == TYPE_NIL:
-			if _eq and _eq.has_method("unequip_slot"):
-				_eq.call("unequip_slot", member_token, slot)
-			if slot == "bracelet" and _sig and _sig.has_method("on_bracelet_changed"):
-				_sig.call("on_bracelet_changed", member_token)
-		else:
-			var picked_id: String = String(meta)
-			if _eq and _eq.has_method("equip_item"):
-				_eq.call("equip_item", member_token, picked_id)
-			if slot == "bracelet" and _sig and _sig.has_method("on_bracelet_changed"):
-				_sig.call("on_bracelet_changed", member_token)
-
-		var sel2: PackedInt32Array = _party_list.get_selected_items()
-		_on_party_selected(sel2[0] if sel2.size() > 0 else -1)
-
-	pm.index_pressed.connect(_handle)
-	pm.id_pressed.connect(func(idnum: int) -> void:
-		_handle.call(pm.get_item_index(idnum))
-	)
+			item_list.add_item(label)
+			item_ids.append(id)
 
 	# Position popup next to the equipment button
-	var popup_pos: Vector2 = get_global_mouse_position()
+	var popup_pos: Vector2 = Vector2(100, 100)
 	if source_btn and is_instance_valid(source_btn):
 		popup_pos = source_btn.global_position + Vector2(source_btn.size.x + 10, 0)
+	popup_panel.position = popup_pos
 
-	# Store reference for controller input handling
-	_active_popup = pm
+	# Auto-size panel to fit content
+	await get_tree().process_frame
+	popup_panel.size = vbox.size + Vector2(20, 20)
+	vbox.position = Vector2(10, 10)
 
-	# Track selected index for controller navigation (PopupMenu doesn't expose this)
-	var selected_idx: int = 0
-	# Find first non-separator, non-disabled item
-	for i in range(pm.get_item_count()):
-		if not pm.is_item_separator(i) and not pm.is_item_disabled(i):
-			selected_idx = i
-			break
+	# Select first item and grab focus
+	if item_list.item_count > 0:
+		var first_enabled = 0
+		for i in range(item_list.item_count):
+			if not item_list.is_item_disabled(i):
+				first_enabled = i
+				break
+		item_list.select(first_enabled)
+		item_list.grab_focus()
 
-	# Store selected index in popup metadata for access in _unhandled_input
-	pm.set_meta("_selected_idx", selected_idx)
-	pm.set_meta("_handle_callable", _handle)
+	# Store reference for controller input
+	_active_popup = popup_panel
+	popup_panel.set_meta("_item_list", item_list)
+	popup_panel.set_meta("_item_ids", item_ids)
+	popup_panel.set_meta("_member_token", member_token)
+	popup_panel.set_meta("_slot", slot)
 
-	# Clean up when popup closes
-	pm.popup_hide.connect(func() -> void:
-		_active_popup = null
-		pm.queue_free()
-	)
-
-	pm.popup(Rect2(popup_pos, Vector2(280, 0)))
-	print("[LoadoutPanel] Popup opened with %d items, selected: %d" % [pm.get_item_count(), selected_idx])
+	print("[LoadoutPanel] Equipment popup opened for %s - %d items" % [slot, item_ids.size()])
 
 # ────────────────── sigils ──────────────────
 func _sigil_disp(inst_id: String) -> String:
@@ -1112,24 +1112,14 @@ func _unhandled_input(event: InputEvent) -> void:
 	if not visible:
 		return
 
-	# If popup is active, intercept controller input for navigation
+	# If popup is active, handle accept/back (ItemList handles UP/DOWN automatically)
 	if _active_popup and is_instance_valid(_active_popup) and _active_popup.visible:
-		if event.is_action_pressed("move_up"):
-			_navigate_popup(-1)
-			get_viewport().set_input_as_handled()
-			return
-		elif event.is_action_pressed("move_down"):
-			_navigate_popup(1)
-			get_viewport().set_input_as_handled()
-			return
-		elif event.is_action_pressed("menu_accept"):
+		if event.is_action_pressed("menu_accept"):
 			_activate_popup_selection()
 			get_viewport().set_input_as_handled()
 			return
 		elif event.is_action_pressed("menu_back"):
-			_active_popup.hide()
-			_active_popup.queue_free()
-			_active_popup = null
+			_close_equipment_popup()
 			get_viewport().set_input_as_handled()
 			return
 
@@ -1290,47 +1280,56 @@ func _activate_current_element() -> void:
 		element.emit_signal("pressed")
 
 # ───────────────── popup navigation ─────────────────
-func _navigate_popup(delta: int) -> void:
-	"""Navigate UP/DOWN in active popup menu"""
-	if not _active_popup or not is_instance_valid(_active_popup):
-		return
-
-	var current_idx: int = _active_popup.get_meta("_selected_idx", 0)
-	var count = _active_popup.get_item_count()
-	if count == 0:
-		return
-
-	# Navigate with wrapping
-	var new_idx = current_idx + delta
-	if new_idx < 0:
-		new_idx = count - 1
-	elif new_idx >= count:
-		new_idx = 0
-
-	# Skip separators and disabled items
-	var attempts = 0
-	while (_active_popup.is_item_separator(new_idx) or _active_popup.is_item_disabled(new_idx)) and attempts < count:
-		new_idx += delta
-		if new_idx < 0:
-			new_idx = count - 1
-		elif new_idx >= count:
-			new_idx = 0
-		attempts += 1
-
-	if attempts < count:
-		_active_popup.set_meta("_selected_idx", new_idx)
-		print("[LoadoutPanel] Popup navigation: selected index %d (%s)" % [new_idx, _active_popup.get_item_text(new_idx)])
-
 func _activate_popup_selection() -> void:
-	"""Activate the currently selected popup item (A button)"""
+	"""Activate the currently selected item in equipment popup (A button)"""
 	if not _active_popup or not is_instance_valid(_active_popup):
 		return
 
-	var idx: int = _active_popup.get_meta("_selected_idx", 0)
-	if idx >= 0 and idx < _active_popup.get_item_count():
-		if not _active_popup.is_item_separator(idx) and not _active_popup.is_item_disabled(idx):
-			print("[LoadoutPanel] Activating popup item %d: %s" % [idx, _active_popup.get_item_text(idx)])
-			# Call the handler directly
-			if _active_popup.has_meta("_handle_callable"):
-				var handler: Callable = _active_popup.get_meta("_handle_callable")
-				handler.call(idx)
+	if not _active_popup.has_meta("_item_list"):
+		return
+
+	var item_list: ItemList = _active_popup.get_meta("_item_list")
+	var item_ids: Array = _active_popup.get_meta("_item_ids", [])
+	var member_token: String = _active_popup.get_meta("_member_token", "")
+	var slot: String = _active_popup.get_meta("_slot", "")
+
+	var selected_items = item_list.get_selected_items()
+	if selected_items.is_empty():
+		print("[LoadoutPanel] No item selected in popup")
+		return
+
+	var idx: int = selected_items[0]
+	if idx < 0 or idx >= item_ids.size():
+		print("[LoadoutPanel] Invalid selection index: %d" % idx)
+		return
+
+	var item_id: String = item_ids[idx]
+	print("[LoadoutPanel] Equipping item: '%s' to slot: %s" % [item_id, slot])
+
+	# Close popup first
+	_close_equipment_popup()
+
+	# Handle equip/unequip
+	if item_id == "":
+		# Unequip
+		if _eq and _eq.has_method("unequip_slot"):
+			_eq.call("unequip_slot", member_token, slot)
+	else:
+		# Equip item
+		if _eq and _eq.has_method("equip_item"):
+			_eq.call("equip_item", member_token, item_id)
+
+	# Special handling for bracelet
+	if slot == "bracelet" and _sig and _sig.has_method("on_bracelet_changed"):
+		_sig.call("on_bracelet_changed", member_token)
+
+	# Refresh display
+	var sel2: PackedInt32Array = _party_list.get_selected_items()
+	_on_party_selected(sel2[0] if sel2.size() > 0 else -1)
+
+func _close_equipment_popup() -> void:
+	"""Close the equipment popup (B button)"""
+	if _active_popup and is_instance_valid(_active_popup):
+		print("[LoadoutPanel] Closing equipment popup")
+		_active_popup.queue_free()
+		_active_popup = null
