@@ -62,6 +62,10 @@ func _ready() -> void:
 	# Connect to visibility changes to manage MENU_MAIN context
 	visibility_changed.connect(_on_visibility_changed)
 
+	# IMPORTANT: Initialize MENU_MAIN context if menu starts visible
+	# Use call_deferred to ensure this happens after visibility_changed signal is connected
+	call_deferred("_initialize_context")
+
 func _input(event: InputEvent) -> void:
 	if not visible:
 		return
@@ -84,6 +88,12 @@ func _input(event: InputEvent) -> void:
 	if event.is_action_pressed(aInputManager.ACTION_BACK):
 		_close_menu()
 		get_viewport().set_input_as_handled()
+
+func _initialize_context() -> void:
+	"""Initialize controller context after ready - handles case where menu starts visible"""
+	if _ctrl_mgr and visible and _ctrl_mgr.get_current_context() == _ctrl_mgr.InputContext.OVERWORLD:
+		print("[GameMenu] Initializing - pushing MENU_MAIN context")
+		_ctrl_mgr.push_context(_ctrl_mgr.InputContext.MENU_MAIN)
 
 func _connect_status_panel_signal() -> void:
 	"""Connect to StatusPanel's tab_selected signal"""
@@ -179,19 +189,29 @@ func _on_visibility_changed() -> void:
 	"""Handle menu visibility changes - manage MENU_MAIN context"""
 	if visible:
 		# Menu opened - push MENU_MAIN context as the base menu context
-		if _ctrl_mgr:
+		# Only push if we're currently at OVERWORLD (not already in menu)
+		if _ctrl_mgr and _ctrl_mgr.get_current_context() == _ctrl_mgr.InputContext.OVERWORLD:
 			print("[GameMenu] Menu opened - pushing MENU_MAIN context")
 			_ctrl_mgr.push_context(_ctrl_mgr.InputContext.MENU_MAIN)
 	else:
-		# Menu closed - pop MENU_MAIN context back to OVERWORLD
+		# Menu closed - pop back to OVERWORLD, cleaning up any panel contexts
 		if _ctrl_mgr:
-			print("[GameMenu] Menu closed - popping MENU_MAIN context")
-			# Pop any panel-specific contexts first
-			if _ctrl_mgr.get_current_context() != _ctrl_mgr.InputContext.MENU_MAIN:
+			print("[GameMenu] Menu closed - cleaning up contexts (current: %s, stack depth: %d)" % [
+				_ctrl_mgr.InputContext.keys()[_ctrl_mgr.get_current_context()],
+				_ctrl_mgr.context_stack.size()
+			])
+			# Pop all contexts until we're back at OVERWORLD
+			var safety_counter = 0
+			while _ctrl_mgr.get_current_context() != _ctrl_mgr.InputContext.OVERWORLD and safety_counter < 10:
+				print("[GameMenu]   Popping context: %s" % _ctrl_mgr.InputContext.keys()[_ctrl_mgr.get_current_context()])
 				_ctrl_mgr.pop_context()
-			# Then pop MENU_MAIN itself
-			if _ctrl_mgr.get_current_context() == _ctrl_mgr.InputContext.MENU_MAIN:
-				_ctrl_mgr.pop_context()
+				safety_counter += 1
+				# Safety check to prevent infinite loop
+				if _ctrl_mgr.context_stack.is_empty() and _ctrl_mgr.get_current_context() != _ctrl_mgr.InputContext.OVERWORLD:
+					print("[GameMenu]   WARNING: Context stack empty but not at OVERWORLD - forcing context")
+					_ctrl_mgr.set_context(_ctrl_mgr.InputContext.OVERWORLD)
+					break
+			print("[GameMenu] Context cleanup complete - now at: %s" % _ctrl_mgr.InputContext.keys()[_ctrl_mgr.get_current_context()])
 
 func _close_menu() -> void:
 	"""Close the game menu"""
@@ -207,6 +227,7 @@ func _close_menu() -> void:
 
 func _enter_fullscreen(tab_id: String) -> void:
 	"""Enter fullscreen mode for a panel"""
+	print("[GameMenu] Entering fullscreen for tab: %s" % tab_id)
 	_is_fullscreen = true
 	_current_tab = tab_id
 
@@ -219,17 +240,39 @@ func _enter_fullscreen(tab_id: String) -> void:
 		panel.visible = true
 		panel.set_anchors_preset(Control.PRESET_FULL_RECT)
 		# Give panel focus if it has the method
+		# This will push the panel's specific context (e.g., MENU_ITEMS)
 		if panel.has_method("panel_gained_focus"):
+			print("[GameMenu] Calling panel_gained_focus for %s" % tab_id)
 			panel.call("panel_gained_focus")
+		if _ctrl_mgr:
+			print("[GameMenu] After panel_gained_focus - context: %s, stack depth: %d" % [
+				_ctrl_mgr.InputContext.keys()[_ctrl_mgr.get_current_context()],
+				_ctrl_mgr.context_stack.size()
+			])
 
 func _exit_fullscreen() -> void:
 	"""Exit fullscreen mode - return to Status tab with sidebar"""
-	_is_fullscreen = false
+	print("[GameMenu] Exiting fullscreen from tab: %s" % _current_tab)
+	if _ctrl_mgr:
+		print("[GameMenu] Before panel_lost_focus - context: %s, stack depth: %d" % [
+			_ctrl_mgr.InputContext.keys()[_ctrl_mgr.get_current_context()],
+			_ctrl_mgr.context_stack.size()
+		])
 
 	# Call panel_lost_focus on the current panel
+	# This will pop the panel's specific context (e.g., MENU_ITEMS -> MENU_MAIN)
 	var panel = _panels.get(_current_tab)
 	if panel and panel.has_method("panel_lost_focus"):
+		print("[GameMenu] Calling panel_lost_focus for %s" % _current_tab)
 		panel.call("panel_lost_focus")
+
+	if _ctrl_mgr:
+		print("[GameMenu] After panel_lost_focus - context: %s, stack depth: %d" % [
+			_ctrl_mgr.InputContext.keys()[_ctrl_mgr.get_current_context()],
+			_ctrl_mgr.context_stack.size()
+		])
+
+	_is_fullscreen = false
 
 	# Return to Status tab
 	_select_tab("status")
