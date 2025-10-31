@@ -26,6 +26,7 @@ const CATEGORIES : PackedStringArray = [
 @onready var _list_box  : GridContainer = null  # Will change to GridContainer
 @onready var _header    : HBoxContainer = %Header
 @onready var _vbox      : VBoxContainer = %VBox
+@onready var _scroll    : ScrollContainer = %Scroll
 
 var _inv  : Node = null
 var _csv  : Node = null
@@ -282,6 +283,9 @@ func _rebuild() -> void:
 
 	await get_tree().process_frame
 	_list_box.queue_sort()
+
+	# Auto-select first item after rebuild
+	_auto_select_first_item()
 
 # --- name/category helpers ----------------------------------------------------
 
@@ -622,6 +626,7 @@ func _on_item_clicked(btn: Button) -> void:
 	# Inspect button
 	var inspect_btn := Button.new()
 	inspect_btn.text = "Inspect"
+	inspect_btn.focus_mode = Control.FOCUS_ALL
 	inspect_btn.set_meta("id", id)
 	inspect_btn.pressed.connect(func():
 		dlg.hide()
@@ -632,6 +637,7 @@ func _on_item_clicked(btn: Button) -> void:
 	# Discard button
 	var discard_btn := Button.new()
 	discard_btn.text = "Discard"
+	discard_btn.focus_mode = Control.FOCUS_ALL
 	discard_btn.set_meta("id", id)
 	discard_btn.pressed.connect(func():
 		dlg.hide()
@@ -650,6 +656,10 @@ func _on_item_clicked(btn: Button) -> void:
 		host = get_tree().root
 	host.add_child(dlg)
 	dlg.popup_centered()
+
+	# Give focus to first button for controller navigation
+	await get_tree().process_frame
+	inspect_btn.grab_focus()
 
 func _on_inspect_row(btn: Button) -> void:
 	var id_v: Variant = btn.get_meta("id")
@@ -1018,6 +1028,10 @@ func _navigate_categories(direction: int) -> void:
 	button.button_pressed = true
 	_on_category_button_pressed(button)
 
+	# Auto-select first item in new category and update description
+	await get_tree().process_frame
+	_auto_select_first_item()
+
 func _highlight_category_button(index: int) -> void:
 	"""Highlight a category button"""
 	if index >= 0 and index < _category_buttons.size():
@@ -1094,6 +1108,9 @@ func _highlight_item(index: int) -> void:
 		var def: Dictionary = button.get_meta("def")
 		_update_description(id, def)
 
+		# Scroll to follow selected item
+		_scroll_to_item(button)
+
 func _unhighlight_item(index: int) -> void:
 	"""Remove highlight from an item button"""
 	if index >= 0 and index < _item_buttons.size():
@@ -1140,6 +1157,48 @@ func _add_back_indicator() -> void:
 	_back_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 
 	add_child(_back_label)
+
+func _auto_select_first_item() -> void:
+	"""Auto-select first item in current category and update description"""
+	if _item_buttons.is_empty():
+		# No items in this category - show dash
+		if _description_label:
+			_description_label.text = "-"
+		return
+
+	# Select first item
+	_selected_item_index = 0
+	_highlight_item(_selected_item_index)
+
+func _scroll_to_item(item_button: Button) -> void:
+	"""Scroll the container to ensure the item is visible"""
+	if not _scroll or not item_button:
+		return
+
+	# Get the item's panel container (parent of item's vbox)
+	var item_vbox = item_button.get_parent()
+	if not item_vbox:
+		return
+
+	var panel_container = item_vbox.get_parent()
+	if not panel_container:
+		return
+
+	# Calculate the position we need to scroll to
+	var item_pos = panel_container.position.y
+	var item_height = panel_container.size.y
+	var scroll_height = _scroll.size.y
+
+	# Get current scroll position
+	var current_scroll = _scroll.scroll_vertical
+
+	# Check if item is above viewport
+	if item_pos < current_scroll:
+		_scroll.scroll_vertical = item_pos
+
+	# Check if item is below viewport
+	elif item_pos + item_height > current_scroll + scroll_height:
+		_scroll.scroll_vertical = item_pos + item_height - scroll_height
 
 func _update_description(id: String, def: Dictionary) -> void:
 	"""Update the description label with item info"""
