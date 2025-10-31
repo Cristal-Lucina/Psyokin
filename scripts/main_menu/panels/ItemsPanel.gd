@@ -37,6 +37,7 @@ var _gs        : Node = null
 var _sig       : Node = null
 var _stats     : Node = null
 var _input_mgr : Node = null
+var _ctrl_mgr  : Node = null  # ControllerManager reference
 
 var _defs        : Dictionary = {}    # {id -> row dict}
 var _counts_map  : Dictionary = {}    # {id -> int}  (after expansion, per-instance = 1)
@@ -85,6 +86,7 @@ func _ready() -> void:
 	_sig       = get_node_or_null(SIGIL_SYS_PATH)
 	_stats     = get_node_or_null(STATS_PATH)
 	_input_mgr = get_node_or_null(INPUT_MGR_PATH)
+	_ctrl_mgr  = get_node_or_null("/root/aControllerManager")
 
 	# Setup UI: replace Filter dropdown with category buttons
 	_setup_category_buttons()
@@ -106,10 +108,10 @@ func _ready() -> void:
 			_eq.connect("equipment_changed", Callable(self, "_on_equipment_changed"))
 
 	# Connect to ControllerManager signals
-	if aControllerManager:
-		aControllerManager.navigate_pressed.connect(_on_controller_navigate)
-		aControllerManager.bumper_pressed.connect(_on_controller_bumper)
-		aControllerManager.action_button_pressed.connect(_on_controller_action)
+	if _ctrl_mgr:
+		_ctrl_mgr.navigate_pressed.connect(_on_controller_navigate)
+		_ctrl_mgr.bumper_pressed.connect(_on_controller_bumper)
+		_ctrl_mgr.action_button_pressed.connect(_on_controller_action)
 
 	# Live refresh on sigils (xp/level/loadout etc)
 	if _sig != null:
@@ -1536,7 +1538,7 @@ func _setup_description_section() -> void:
 func _on_controller_navigate(direction: Vector2, context: int) -> void:
 	"""Handle navigation input from ControllerManager"""
 	# Only process if this is our context
-	if context != aControllerManager.InputContext.MENU_ITEMS:
+	if not _ctrl_mgr or context != _ctrl_mgr.InputContext.MENU_ITEMS:
 		return
 
 	if direction == Vector2.UP:
@@ -1563,7 +1565,7 @@ func _on_controller_navigate(direction: Vector2, context: int) -> void:
 func _on_controller_bumper(direction: int, context: int) -> void:
 	"""Handle L/R bumper input from ControllerManager"""
 	# Only process if this is our context
-	if context != aControllerManager.InputContext.MENU_ITEMS:
+	if not _ctrl_mgr or context != _ctrl_mgr.InputContext.MENU_ITEMS:
 		return
 
 	# L/R bumpers always navigate categories
@@ -1572,7 +1574,7 @@ func _on_controller_bumper(direction: int, context: int) -> void:
 func _on_controller_action(button: String, context: int) -> void:
 	"""Handle action button input from ControllerManager"""
 	# Only process if this is our context
-	if context != aControllerManager.InputContext.MENU_ITEMS:
+	if not _ctrl_mgr or context != _ctrl_mgr.InputContext.MENU_ITEMS:
 		return
 
 	match button:
@@ -1639,8 +1641,8 @@ func panel_gained_focus() -> void:
 	_highlight_category_button(_selected_category_index)
 
 	# Push context to ControllerManager
-	if aControllerManager:
-		aControllerManager.push_context(aControllerManager.InputContext.MENU_ITEMS, {
+	if _ctrl_mgr:
+		_ctrl_mgr.push_context(_ctrl_mgr.InputContext.MENU_ITEMS, {
 			"panel": self,
 			"in_category_mode": _in_category_mode,
 			"selected_item_index": _selected_item_index
@@ -1656,8 +1658,8 @@ func panel_lost_focus() -> void:
 		btn.modulate = Color(1.0, 1.0, 1.0, 1.0)
 
 	# Pop context from ControllerManager
-	if aControllerManager:
-		aControllerManager.pop_context()
+	if _ctrl_mgr:
+		_ctrl_mgr.pop_context()
 
 func _enter_category_mode() -> void:
 	"""Switch to category navigation mode"""
