@@ -143,6 +143,7 @@ var _csv       : Node = null
 var _resolver  : Node = null
 var _sig       : Node = null
 var _cps       : Node = null
+var _ctrl_mgr  : Node = null  # ControllerManager reference
 
 # party.csv cache
 var _csv_by_id   : Dictionary = {}      # "actor_id" -> row dict
@@ -165,10 +166,12 @@ func _ready() -> void:
 	_resolver  = get_node_or_null(RESOLVER_PATH)
 	_sig       = get_node_or_null(SIGIL_PATH)
 	_cps       = get_node_or_null(CPS_PATH)
+	_ctrl_mgr  = get_node_or_null("/root/aControllerManager")
 
 	_resolve_event_system()
 	_normalize_scroll_children()
 	_connect_signals()
+	_connect_controller_signals()
 	_load_party_csv_cache()
 	_build_tab_buttons()
 
@@ -267,6 +270,48 @@ func _unhighlight_button(index: int) -> void:
 	if index >= 0 and index < _tab_buttons.size():
 		var button = _tab_buttons[index]
 		button.modulate = Color(1.0, 1.0, 1.0, 1.0)  # Normal color
+
+func _connect_controller_signals() -> void:
+	"""Connect to ControllerManager signals for tab navigation"""
+	if not _ctrl_mgr:
+		return
+
+	if _ctrl_mgr.has_signal("navigate_pressed"):
+		if not _ctrl_mgr.is_connected("navigate_pressed", Callable(self, "_on_controller_navigate")):
+			_ctrl_mgr.connect("navigate_pressed", Callable(self, "_on_controller_navigate"))
+
+	if _ctrl_mgr.has_signal("action_button_pressed"):
+		if not _ctrl_mgr.is_connected("action_button_pressed", Callable(self, "_on_controller_action")):
+			_ctrl_mgr.connect("action_button_pressed", Callable(self, "_on_controller_action"))
+
+func _on_controller_navigate(direction: Vector2, context: int) -> void:
+	"""Handle navigation from ControllerManager - only in MENU_MAIN context"""
+	if not visible or _tab_buttons.is_empty():
+		return
+
+	# Only handle navigation when in MENU_MAIN context
+	if _ctrl_mgr and _ctrl_mgr.get_current_context() != _ctrl_mgr.InputContext.MENU_MAIN:
+		return
+
+	if direction == Vector2.UP:
+		print("[StatusPanel] Controller navigate UP")
+		_navigate_buttons(-1)
+	elif direction == Vector2.DOWN:
+		print("[StatusPanel] Controller navigate DOWN")
+		_navigate_buttons(1)
+
+func _on_controller_action(action: String, context: int) -> void:
+	"""Handle action button from ControllerManager - only in MENU_MAIN context"""
+	if not visible or _tab_buttons.is_empty():
+		return
+
+	# Only handle accept action when in MENU_MAIN context
+	if _ctrl_mgr and _ctrl_mgr.get_current_context() != _ctrl_mgr.InputContext.MENU_MAIN:
+		return
+
+	if action == "accept":
+		print("[StatusPanel] Controller ACCEPT - confirming selection: %d" % _selected_button_index)
+		_confirm_button_selection()
 
 func _connect_signals() -> void:
 	# Calendar
@@ -1179,27 +1224,7 @@ func _on_visibility_changed() -> void:
 	_dev_dump_profiles()
 
 func _unhandled_input(event: InputEvent) -> void:
-	"""Handle controller input for tab button navigation
-
-	Uses _unhandled_input instead of _input to ensure ControllerManager
-	processes events first. This prevents blocking L/R bumpers and other
-	controller inputs needed by other panels.
-	"""
-	# Handle controller input for tab navigation (only when visible with buttons)
-	if visible and not _tab_buttons.is_empty():
-		if event.is_action_pressed(aInputManager.ACTION_MOVE_UP):
-			_navigate_buttons(-1)
-			get_viewport().set_input_as_handled()
-			return
-		elif event.is_action_pressed(aInputManager.ACTION_MOVE_DOWN):
-			_navigate_buttons(1)
-			get_viewport().set_input_as_handled()
-			return
-		elif event.is_action_pressed(aInputManager.ACTION_ACCEPT):
-			_confirm_button_selection()
-			get_viewport().set_input_as_handled()
-			return
-
+	"""Handle debug input only - controller navigation is now handled via ControllerManager signals"""
 	# Debug key handling (F9 to dump profiles)
 	if not OS.is_debug_build(): return
 	if event is InputEventKey and (event as InputEventKey).pressed and not (event as InputEventKey).echo:
