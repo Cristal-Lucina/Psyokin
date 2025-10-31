@@ -112,6 +112,11 @@ var _party_sig: String = ""
 var _sigils_sig: String = ""
 var _poll_accum: float = 0.0
 
+# Controller navigation state
+var _in_party_mode: bool = true  # true = navigating party list, false = navigating equipment
+var _nav_elements: Array[Control] = []  # Ordered list of focusable elements
+var _nav_index: int = 0  # Current selection index
+
 func _ready() -> void:
 	_gs    = get_node_or_null("/root/aGameState")
 	_inv   = get_node_or_null("/root/aInventorySystem")
@@ -196,6 +201,12 @@ func _refresh_all_for_current() -> void:
 	_rebuild_sigils(cur)
 	_refresh_mind_row(cur)
 	_refresh_active_type_row(cur)
+
+	# Rebuild navigation elements if in equipment mode (sigils may have changed)
+	if not _in_party_mode:
+		call_deferred("_build_nav_elements")
+		if _nav_index >= 0 and _nav_index < _nav_elements.size():
+			call_deferred("_highlight_element", _nav_index)
 
 func _on_sigil_instances_updated(_a=null,_b=null,_c=null) -> void:
 	_refresh_all_for_current()
@@ -1043,3 +1054,165 @@ func _as_bool(v: Variant) -> bool:
 			var s := String(v).strip_edges().to_lower()
 			return s in ["true","1","yes","y","on","t"]
 		_:           return false
+
+## ═══════════════════════════════════════════════════════════════
+## CONTROLLER NAVIGATION
+## ═══════════════════════════════════════════════════════════════
+
+func _unhandled_input(event: InputEvent) -> void:
+	"""Handle controller navigation for LoadoutPanel
+	
+	Navigation flow:
+	1. Party list (UP/DOWN to select member, ACCEPT to confirm)
+	2. Equipment slots (UP/DOWN to navigate)
+	3. Sigil slots (UP/DOWN to navigate)
+	4. Manage Sigils button
+	5. Mind Type button
+	"""
+	if not visible:
+		return
+	
+	if _in_party_mode:
+		# Party list navigation
+		if event.is_action_pressed("move_up"):
+			_navigate_party(-1)
+			get_viewport().set_input_as_handled()
+		elif event.is_action_pressed("move_down"):
+			_navigate_party(1)
+			get_viewport().set_input_as_handled()
+		elif event.is_action_pressed("menu_accept"):
+			# Lock in party member and switch to equipment mode
+			_enter_equipment_mode()
+			get_viewport().set_input_as_handled()
+		elif event.is_action_pressed("menu_back"):
+			# Already in party mode, let parent handle back
+			pass
+	else:
+		# Equipment/sigil/button navigation
+		if event.is_action_pressed("move_up"):
+			_navigate_equipment(-1)
+			get_viewport().set_input_as_handled()
+		elif event.is_action_pressed("move_down"):
+			_navigate_equipment(1)
+			get_viewport().set_input_as_handled()
+		elif event.is_action_pressed("menu_accept"):
+			_activate_current_element()
+			get_viewport().set_input_as_handled()
+		elif event.is_action_pressed("menu_back"):
+			# Return to party mode
+			_enter_party_mode()
+			get_viewport().set_input_as_handled()
+
+func _navigate_party(delta: int) -> void:
+	"""Navigate UP/DOWN in party list"""
+	if not _party_list:
+		return
+	
+	var count = _party_list.get_item_count()
+	if count == 0:
+		return
+	
+	var current = _party_list.get_selected_items()
+	var idx = current[0] if current.size() > 0 else 0
+	
+	idx += delta
+	idx = clamp(idx, 0, count - 1)
+	
+	_party_list.select(idx)
+	_party_list.ensure_current_is_visible()
+	print("[LoadoutPanel] Party navigation: selected index %d" % idx)
+
+func _enter_equipment_mode() -> void:
+	"""Switch from party selection to equipment/sigil navigation"""
+	print("[LoadoutPanel] Entering equipment mode")
+	_in_party_mode = false
+	_build_nav_elements()
+	_nav_index = 0
+	if _nav_elements.size() > 0:
+		_highlight_element(_nav_index)
+
+func _enter_party_mode() -> void:
+	"""Return to party list navigation"""
+	print("[LoadoutPanel] Returning to party mode")
+	_in_party_mode = true
+	_unhighlight_all_elements()
+	if _party_list:
+		var current = _party_list.get_selected_items()
+		if current.size() == 0 and _party_list.get_item_count() > 0:
+			_party_list.select(0)
+
+func _build_nav_elements() -> void:
+	"""Build ordered list of focusable elements for equipment mode"""
+	_nav_elements.clear()
+	
+	# Equipment slot buttons (W, A, H, F, B)
+	if _w_btn: _nav_elements.append(_w_btn)
+	if _a_btn: _nav_elements.append(_a_btn)
+	if _h_btn: _nav_elements.append(_h_btn)
+	if _f_btn: _nav_elements.append(_f_btn)
+	if _b_btn: _nav_elements.append(_b_btn)
+	
+	# Sigil slot buttons (dynamically created)
+	if _sigils_list:
+		for child in _sigils_list.get_children():
+			if child is HBoxContainer:
+				for subchild in child.get_children():
+					if subchild is Button:
+						_nav_elements.append(subchild)
+	
+	# Manage Sigils button
+	if _btn_manage:
+		_nav_elements.append(_btn_manage)
+	
+	# Mind Type button  
+	if _active_btn:
+		_nav_elements.append(_active_btn)
+	
+	print("[LoadoutPanel] Built navigation with %d elements" % _nav_elements.size())
+
+func _navigate_equipment(delta: int) -> void:
+	"""Navigate UP/DOWN through equipment/sigil/button elements"""
+	if _nav_elements.is_empty():
+		return
+	
+	_unhighlight_element(_nav_index)
+	
+	_nav_index += delta
+	_nav_index = clamp(_nav_index, 0, _nav_elements.size() - 1)
+	
+	_highlight_element(_nav_index)
+	print("[LoadoutPanel] Equipment navigation: index %d" % _nav_index)
+
+func _highlight_element(index: int) -> void:
+	"""Highlight the element at the given index"""
+	if index < 0 or index >= _nav_elements.size():
+		return
+	
+	var element = _nav_elements[index]
+	if element is Button:
+		element.modulate = Color(1.2, 1.2, 0.8, 1.0)  # Yellow tint
+		element.grab_focus()
+
+func _unhighlight_element(index: int) -> void:
+	"""Remove highlight from element at given index"""
+	if index < 0 or index >= _nav_elements.size():
+		return
+	
+	var element = _nav_elements[index]
+	if element is Button:
+		element.modulate = Color(1.0, 1.0, 1.0, 1.0)  # Normal
+
+func _unhighlight_all_elements() -> void:
+	"""Remove all highlights"""
+	for i in range(_nav_elements.size()):
+		_unhighlight_element(i)
+
+func _activate_current_element() -> void:
+	"""Press/activate the currently highlighted element (A button)"""
+	if _nav_index < 0 or _nav_index >= _nav_elements.size():
+		return
+	
+	var element = _nav_elements[_nav_index]
+	if element is Button:
+		print("[LoadoutPanel] Activating button: %s" % element.text)
+		element.emit_signal("pressed")
