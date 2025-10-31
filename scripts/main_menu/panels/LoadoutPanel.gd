@@ -398,20 +398,19 @@ func _show_item_menu_for_slot(member_token: String, slot: String) -> void:
 		_handle.call(pm.get_item_index(idnum))
 	)
 
-	# Controller support will be handled via _unhandled_input on the popup
-	# Store reference for controller navigation
-	var current_idx: int = 0
+	# Controller support - use Array as mutable reference for index tracking
+	var idx_ref: Array = [0]  # Array is reference type, can be mutated in lambda
 
 	# Find first valid item
 	for i in range(pm.get_item_count()):
 		if not pm.is_item_separator(i) and not pm.is_item_disabled(i):
-			current_idx = i
+			idx_ref[0] = i
 			break
 
 	var navigate_popup: Callable = func(event: InputEvent) -> void:
 		if event.is_action_pressed("move_up"):
 			# Navigate up
-			var idx = current_idx - 1
+			var idx = idx_ref[0] - 1
 			if idx < 0:
 				idx = pm.get_item_count() - 1
 			# Skip separators and disabled items
@@ -422,23 +421,24 @@ func _show_item_menu_for_slot(member_token: String, slot: String) -> void:
 					idx = pm.get_item_count() - 1
 				attempts += 1
 			if attempts < pm.get_item_count():
-				current_idx = idx
+				idx_ref[0] = idx
 			get_viewport().set_input_as_handled()
 		elif event.is_action_pressed("move_down"):
 			# Navigate down
-			var idx = (current_idx + 1) % pm.get_item_count()
+			var idx = (idx_ref[0] + 1) % pm.get_item_count()
 			# Skip separators and disabled items
 			var attempts = 0
 			while (pm.is_item_separator(idx) or pm.is_item_disabled(idx)) and attempts < pm.get_item_count():
 				idx = (idx + 1) % pm.get_item_count()
 				attempts += 1
 			if attempts < pm.get_item_count():
-				current_idx = idx
+				idx_ref[0] = idx
 			get_viewport().set_input_as_handled()
 		elif event.is_action_pressed("menu_accept"):
-			if current_idx >= 0 and current_idx < pm.get_item_count():
-				if not pm.is_item_disabled(current_idx) and not pm.is_item_separator(current_idx):
-					_handle.call(current_idx)
+			var current = idx_ref[0]
+			if current >= 0 and current < pm.get_item_count():
+				if not pm.is_item_disabled(current) and not pm.is_item_separator(current):
+					_handle.call(current)
 			get_viewport().set_input_as_handled()
 		elif event.is_action_pressed("menu_back"):
 			pm.hide()
@@ -1240,6 +1240,9 @@ func _highlight_element(index: int) -> void:
 		return
 
 	var element = _nav_elements[index]
+	if not is_instance_valid(element):
+		return
+
 	if element is Button:
 		element.modulate = Color(1.5, 1.5, 0.5, 1.0)  # Bright yellow highlight
 		element.grab_focus()
@@ -1249,8 +1252,11 @@ func _unhighlight_element(index: int) -> void:
 	"""Remove highlight from element at given index"""
 	if index < 0 or index >= _nav_elements.size():
 		return
-	
+
 	var element = _nav_elements[index]
+	if not is_instance_valid(element):
+		return
+
 	if element is Button:
 		element.modulate = Color(1.0, 1.0, 1.0, 1.0)  # Normal
 
@@ -1263,8 +1269,12 @@ func _activate_current_element() -> void:
 	"""Press/activate the currently highlighted element (A button)"""
 	if _nav_index < 0 or _nav_index >= _nav_elements.size():
 		return
-	
+
 	var element = _nav_elements[_nav_index]
+	if not is_instance_valid(element):
+		print("[LoadoutPanel] Element at index %d is no longer valid" % _nav_index)
+		return
+
 	if element is Button:
 		print("[LoadoutPanel] Activating button: %s" % element.text)
 		element.emit_signal("pressed")
