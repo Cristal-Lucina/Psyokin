@@ -18,7 +18,7 @@ const KEY_ID    : String = "item_id"
 
 # Categories
 const CATEGORIES : Array[String] = [
-	"All", "Consumables", "Weapons", "Armor", "Headwear", "Footwear",
+	"All", "Recovery", "Consumables", "Weapons", "Armor", "Headwear", "Footwear",
 	"Bracelets", "Sigils", "Materials", "Key", "Other"
 ]
 
@@ -536,8 +536,91 @@ func _use_item_on_member(item_id: String, item_def: Dictionary, member_token: St
 
 	print("[ItemsPanel] Using %s on %s: %s" % [item_id, member_token, effect])
 
-	# TODO: Parse and apply effect properly
-	# For now, just consume the item
+	# Get member's current stats
+	var stats: Dictionary = _get_member_hp_mp(member_token)
+	var hp: int = stats["hp"]
+	var hp_max: int = stats["hp_max"]
+	var mp: int = stats["mp"]
+	var mp_max: int = stats["mp_max"]
+
+	# Parse and apply healing effects
+	var effect_lower: String = effect.to_lower()
+	var new_hp: int = hp
+	var new_mp: int = mp
+	var healed: bool = false
+
+	# Parse HP healing
+	if effect_lower.contains("heal") and effect_lower.contains("hp"):
+		if effect_lower.contains("100%") or effect_lower.contains("full"):
+			# Full HP restore
+			new_hp = hp_max
+			healed = true
+			print("[ItemsPanel] Full HP restore: %d -> %d" % [hp, new_hp])
+		elif effect_lower.contains("%"):
+			# Percentage HP heal
+			var percent_match: RegExMatch = _extract_percentage(effect)
+			if percent_match:
+				var percent: float = float(percent_match.get_string()) / 100.0
+				var heal_amount: int = int(hp_max * percent)
+				new_hp = min(hp + heal_amount, hp_max)
+				healed = true
+				print("[ItemsPanel] %d%% HP heal: %d -> %d (+%d)" % [int(percent * 100), hp, new_hp, heal_amount])
+		else:
+			# Flat HP heal
+			var amount_match: RegExMatch = _extract_number(effect)
+			if amount_match:
+				var heal_amount: int = int(amount_match.get_string())
+				new_hp = min(hp + heal_amount, hp_max)
+				healed = true
+				print("[ItemsPanel] Flat HP heal: %d -> %d (+%d)" % [hp, new_hp, heal_amount])
+
+	# Parse MP healing
+	if effect_lower.contains("heal") and effect_lower.contains("mp"):
+		if effect_lower.contains("100%") or effect_lower.contains("full"):
+			# Full MP restore
+			new_mp = mp_max
+			healed = true
+			print("[ItemsPanel] Full MP restore: %d -> %d" % [mp, new_mp])
+		elif effect_lower.contains("%"):
+			# Percentage MP heal
+			var percent_match: RegExMatch = _extract_percentage(effect)
+			if percent_match:
+				var percent: float = float(percent_match.get_string()) / 100.0
+				var heal_amount: int = int(mp_max * percent)
+				new_mp = min(mp + heal_amount, mp_max)
+				healed = true
+				print("[ItemsPanel] %d%% MP heal: %d -> %d (+%d)" % [int(percent * 100), mp, new_mp, heal_amount])
+		else:
+			# Flat MP heal
+			var amount_match: RegExMatch = _extract_number(effect)
+			if amount_match:
+				var heal_amount: int = int(amount_match.get_string())
+				new_mp = min(mp + heal_amount, mp_max)
+				healed = true
+				print("[ItemsPanel] Flat MP heal: %d -> %d (+%d)" % [mp, new_mp, heal_amount])
+
+	# Apply healing to GameState.member_data for persistence
+	if healed and _gs:
+		var member_data: Variant = _gs.get("member_data") if _gs.has_method("get") else {}
+		if typeof(member_data) == TYPE_DICTIONARY:
+			if not member_data.has(member_token):
+				member_data[member_token] = {}
+			var gs_rec: Dictionary = member_data[member_token]
+			gs_rec["hp"] = new_hp
+			gs_rec["mp"] = new_mp
+			member_data[member_token] = gs_rec
+
+			# Write back to GameState
+			if _gs.has_method("set"):
+				_gs.set("member_data", member_data)
+
+			# Refresh combat profile to show updates
+			if _cps and _cps.has_method("refresh_member"):
+				_cps.call("refresh_member", member_token)
+
+			print("[ItemsPanel] Updated GameState.member_data: HP=%d/%d, MP=%d/%d" % [new_hp, hp_max, new_mp, mp_max])
+
+	# Consume the item
 	if _inv and _inv.has_method("remove_item"):
 		_inv.call("remove_item", item_id, 1)
 
@@ -545,6 +628,18 @@ func _use_item_on_member(item_id: String, item_def: Dictionary, member_token: St
 	var member_name: String = _member_display_name(member_token)
 	var item_name: String = _display_name(item_id, item_def)
 	print("[ItemsPanel] Used %s on %s" % [item_name, member_name])
+
+func _extract_number(text: String) -> RegExMatch:
+	"""Extract first number from text"""
+	var regex: RegEx = RegEx.new()
+	regex.compile("\\d+")
+	return regex.search(text)
+
+func _extract_percentage(text: String) -> RegExMatch:
+	"""Extract percentage number from text (e.g., '25' from '25%')"""
+	var regex: RegEx = RegEx.new()
+	regex.compile("(\\d+)\\s*%")
+	return regex.search(text)
 
 # ==============================================================================
 # Helper Functions
@@ -563,6 +658,10 @@ func _display_name(item_id: String, def: Dictionary) -> String:
 
 func _category_of(def: Dictionary) -> String:
 	"""Get category of an item"""
+	# Check if it's a recovery item first (HP/MP healing)
+	if _is_recovery_item(def):
+		return "Recovery"
+
 	for key in ["category", "cat", "type"]:
 		if def.has(key):
 			var cat: String = String(def[key]).strip_edges()
