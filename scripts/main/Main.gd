@@ -338,7 +338,11 @@ func _ready() -> void:
 func _input(event: InputEvent) -> void:
 	"""Process input events - log ALL joypad button events for debugging"""
 	if event is InputEventJoypadButton:
-		print("[Main._input] Joypad button %d, pressed=%s" % [event.button_index, event.pressed])
+		print("[Main._input] Joypad button %d, pressed=%s, is_handled=%s" % [
+			event.button_index,
+			event.pressed,
+			get_viewport().is_input_handled()
+		])
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_echo(): return
