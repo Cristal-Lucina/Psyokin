@@ -47,6 +47,11 @@ var _description_label: Label = null
 var _selected_item_id: String = ""
 var _selected_item_def: Dictionary = {}
 
+# Item grid navigation
+var _item_buttons: Array[Button] = []
+var _selected_item_index: int = 0
+var _in_category_mode: bool = true  # true = navigating categories, false = navigating items
+
 # Normalize arbitrary category strings to our canonical set
 const _CAT_MAP := {
 	"consumable":"Consumables","consumables":"Consumables",
@@ -188,6 +193,9 @@ func _rebuild() -> void:
 	for c in _list_box.get_children():
 		c.queue_free()
 
+	# Clear item buttons array
+	_item_buttons.clear()
+
 	_defs       = _read_defs()
 	_counts_map = _read_counts()
 
@@ -254,6 +262,9 @@ func _rebuild() -> void:
 		if not item_btn.pressed.is_connected(_on_item_clicked):
 			item_btn.pressed.connect(_on_item_clicked.bind(item_btn))
 		item_vbox.add_child(item_btn)
+
+		# Track item button for controller navigation
+		_item_buttons.append(item_btn)
 
 		# Show equipped info if applicable
 		var equip_txt := _equip_string_for(id, def)
@@ -933,14 +944,58 @@ func _input(event: InputEvent) -> void:
 	if not _panel_has_focus or not visible:
 		return
 
-	# L bumper or LEFT - previous category
-	if event.is_action_pressed(aInputManager.ACTION_BURST) or event.is_action_pressed(aInputManager.ACTION_MOVE_LEFT):
+	# UP/DOWN - Toggle between category mode and item mode
+	if event.is_action_pressed(aInputManager.ACTION_MOVE_UP):
+		if not _in_category_mode and _selected_item_index > 0:
+			# Navigate items up
+			_navigate_items(-2)  # -2 for up (grid is 2 columns)
+			get_viewport().set_input_as_handled()
+		else:
+			# Switch to category mode
+			_enter_category_mode()
+			get_viewport().set_input_as_handled()
+	elif event.is_action_pressed(aInputManager.ACTION_MOVE_DOWN):
+		if _in_category_mode:
+			# Switch to item mode
+			_enter_item_mode()
+			get_viewport().set_input_as_handled()
+		elif _selected_item_index + 2 < _item_buttons.size():
+			# Navigate items down
+			_navigate_items(2)  # +2 for down (grid is 2 columns)
+			get_viewport().set_input_as_handled()
+	# LEFT/RIGHT - Navigate within current mode
+	elif event.is_action_pressed(aInputManager.ACTION_MOVE_LEFT):
+		if _in_category_mode:
+			_navigate_categories(-1)
+		else:
+			_navigate_items(-1)
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed(aInputManager.ACTION_MOVE_RIGHT):
+		if _in_category_mode:
+			_navigate_categories(1)
+		else:
+			_navigate_items(1)
+		get_viewport().set_input_as_handled()
+	# L/R bumpers - Always navigate categories
+	elif event.is_action_pressed(aInputManager.ACTION_BURST):
 		_navigate_categories(-1)
 		get_viewport().set_input_as_handled()
-	# R bumper or RIGHT - next category
-	elif event.is_action_pressed(aInputManager.ACTION_BATTLE_RUN) or event.is_action_pressed(aInputManager.ACTION_MOVE_RIGHT):
+	elif event.is_action_pressed(aInputManager.ACTION_BATTLE_RUN):
 		_navigate_categories(1)
 		get_viewport().set_input_as_handled()
+	# Action buttons
+	elif event.is_action_pressed(aInputManager.ACTION_ACCEPT):
+		if not _in_category_mode:
+			_use_selected_item()
+			get_viewport().set_input_as_handled()
+	elif event.is_action_pressed(aInputManager.ACTION_ITEM):  # X button
+		if not _in_category_mode:
+			_inspect_selected_item()
+			get_viewport().set_input_as_handled()
+	elif event.is_action_pressed(aInputManager.ACTION_QUICK_SWITCH):  # Y button
+		if not _in_category_mode:
+			_discard_selected_item()
+			get_viewport().set_input_as_handled()
 
 func _navigate_categories(direction: int) -> void:
 	"""Navigate through categories with L/R bumpers or left/right"""
@@ -979,7 +1034,8 @@ func _unhighlight_category_button(index: int) -> void:
 func panel_gained_focus() -> void:
 	"""Called by GameMenu when this panel gains focus"""
 	_panel_has_focus = true
-	# Highlight current category
+	# Start in category mode
+	_in_category_mode = true
 	_highlight_category_button(_selected_category_index)
 
 func panel_lost_focus() -> void:
@@ -988,6 +1044,82 @@ func panel_lost_focus() -> void:
 	# Remove highlights
 	for btn in _category_buttons:
 		btn.modulate = Color(1.0, 1.0, 1.0, 1.0)
+	for btn in _item_buttons:
+		btn.modulate = Color(1.0, 1.0, 1.0, 1.0)
+
+func _enter_category_mode() -> void:
+	"""Switch to category navigation mode"""
+	_in_category_mode = true
+	# Unhighlight items
+	_unhighlight_item(_selected_item_index)
+	# Highlight category
+	_highlight_category_button(_selected_category_index)
+
+func _enter_item_mode() -> void:
+	"""Switch to item navigation mode"""
+	if _item_buttons.is_empty():
+		return
+	_in_category_mode = false
+	# Unhighlight category
+	_unhighlight_category_button(_selected_category_index)
+	# Highlight first item
+	_selected_item_index = 0
+	_highlight_item(_selected_item_index)
+
+func _navigate_items(delta: int) -> void:
+	"""Navigate through items in the grid"""
+	if _item_buttons.is_empty():
+		return
+
+	# Unhighlight current
+	_unhighlight_item(_selected_item_index)
+
+	# Calculate new index
+	var new_index = _selected_item_index + delta
+	new_index = clamp(new_index, 0, _item_buttons.size() - 1)
+	_selected_item_index = new_index
+
+	# Highlight new selection
+	_highlight_item(_selected_item_index)
+
+func _highlight_item(index: int) -> void:
+	"""Highlight an item button"""
+	if index >= 0 and index < _item_buttons.size():
+		var button = _item_buttons[index]
+		button.modulate = Color(1.2, 1.2, 0.8, 1.0)  # Yellow tint
+		button.grab_focus()
+
+		# Update description
+		var id: String = String(button.get_meta("id"))
+		var def: Dictionary = button.get_meta("def")
+		_update_description(id, def)
+
+func _unhighlight_item(index: int) -> void:
+	"""Remove highlight from an item button"""
+	if index >= 0 and index < _item_buttons.size():
+		var button = _item_buttons[index]
+		button.modulate = Color(1.0, 1.0, 1.0, 1.0)  # Normal color
+
+func _use_selected_item() -> void:
+	"""Use/activate the selected item (A button)"""
+	if _selected_item_index < 0 or _selected_item_index >= _item_buttons.size():
+		return
+	var button = _item_buttons[_selected_item_index]
+	_on_item_clicked(button)
+
+func _inspect_selected_item() -> void:
+	"""Inspect the selected item (X button)"""
+	if _selected_item_index < 0 or _selected_item_index >= _item_buttons.size():
+		return
+	var button = _item_buttons[_selected_item_index]
+	_on_inspect_row(button)
+
+func _discard_selected_item() -> void:
+	"""Discard the selected item (Y button)"""
+	if _selected_item_index < 0 or _selected_item_index >= _item_buttons.size():
+		return
+	var button = _item_buttons[_selected_item_index]
+	_on_discard_row(button)
 
 func _add_back_indicator() -> void:
 	"""Add 'Back (B)' text in bottom right corner"""
