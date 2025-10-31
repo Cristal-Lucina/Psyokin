@@ -144,6 +144,7 @@ func _setup_category_buttons() -> void:
 		var btn := Button.new()
 		btn.text = cat
 		btn.toggle_mode = true
+		btn.focus_mode = Control.FOCUS_NONE  # Disable direct selection - only L/R navigation
 		btn.add_theme_font_size_override("font_size", 10)
 		btn.set_meta("category", cat)
 		if cat == "All":
