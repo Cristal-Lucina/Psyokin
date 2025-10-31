@@ -217,6 +217,9 @@ func _build_tab_buttons() -> void:
 	# Select first item and connect signal
 	if _tab_list.item_count > 0:
 		_tab_list.select(0)
+		# Grab focus if panel is visible
+		if visible:
+			call_deferred("_grab_tab_list_focus")
 
 	# Connect item selection signal
 	if not _tab_list.item_selected.is_connected(_on_tab_item_selected):
@@ -1143,12 +1146,18 @@ func _safe_hero_level() -> int:
 
 func _on_visibility_changed() -> void:
 	# Select first tab when panel becomes visible
-	if visible and _tab_list and _tab_list.item_count > 0:
-		_tab_list.select(0)
-		_tab_list.grab_focus()
+	if visible and _tab_list:
+		# Defer to ensure ItemList is ready
+		call_deferred("_grab_tab_list_focus")
 
 	if not OS.is_debug_build(): return
 	_dev_dump_profiles()
+
+func _grab_tab_list_focus() -> void:
+	"""Helper to grab focus on tab list"""
+	if _tab_list and _tab_list.item_count > 0:
+		_tab_list.select(0)
+		_tab_list.grab_focus()
 
 func _unhandled_input(event: InputEvent) -> void:
 	"""Handle controller input for tab navigation - ItemList handles UP/DOWN automatically"""
