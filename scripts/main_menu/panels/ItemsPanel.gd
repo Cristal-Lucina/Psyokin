@@ -29,6 +29,7 @@ const CATEGORIES : Array[String] = [
 @onready var _count_label: Label = %CountLabel
 @onready var _item_name: Label = %ItemName
 @onready var _details_text: Label = %DetailsText
+@onready var _scroll_container: ScrollContainer = $Root/DetailsColumn/ScrollContainer
 @onready var _action_buttons: VBoxContainer = %ActionButtons
 @onready var _use_button: Button = %UseButton
 @onready var _inspect_button: Button = %InspectButton
@@ -51,10 +52,13 @@ var _current_category: String = "All"
 var _category_ids: Array[String] = []
 var _item_ids: Array[String] = []
 var _selected_item_id: String = ""
-var _focus_mode: String = "category"  # "category" or "items"
+var _focus_mode: String = "category"  # "category", "items", or "party_picker"
 
-# Active popup reference
-var _active_popup: Panel = null
+# Party picker state
+var _party_picker_list: ItemList = null
+var _party_member_tokens: Array[String] = []
+var _item_to_use_id: String = ""
+var _item_to_use_def: Dictionary = {}
 
 func _ready() -> void:
 	# Get system references
@@ -396,85 +400,80 @@ func _on_equipment_changed(_member: String) -> void:
 	_rebuild()
 
 func _show_party_picker() -> void:
-	"""Show party member picker popup for item usage"""
+	"""Show party member picker in details panel"""
 	if _selected_item_id == "":
 		return
 
 	var def: Dictionary = _defs.get(_selected_item_id, {})
 	var name: String = _display_name(_selected_item_id, def)
 
-	# Create popup panel
-	var popup_panel: Panel = Panel.new()
-	popup_panel.custom_minimum_size = Vector2(300, 250)
+	# Store item info for later use
+	_item_to_use_id = _selected_item_id
+	_item_to_use_def = def
 
-	var margin: MarginContainer = MarginContainer.new()
-	margin.add_theme_constant_override("margin_left", 12)
-	margin.add_theme_constant_override("margin_top", 12)
-	margin.add_theme_constant_override("margin_right", 12)
-	margin.add_theme_constant_override("margin_bottom", 12)
-	popup_panel.add_child(margin)
+	# Update header to show we're picking a party member
+	if _item_name:
+		_item_name.text = "Choose Party Member"
 
-	var vbox: VBoxContainer = VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 12)
-	margin.add_child(vbox)
+	# Hide the normal details text
+	if _details_text:
+		_details_text.visible = false
 
-	# Title
-	var title: Label = Label.new()
-	title.text = "Use %s on:" % name
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vbox.add_child(title)
+	# Hide action buttons
+	if _action_buttons:
+		_action_buttons.visible = false
 
-	# Party member list
-	var member_list: ItemList = ItemList.new()
-	member_list.custom_minimum_size = Vector2(280, 180)
-	member_list.focus_mode = Control.FOCUS_ALL
-	vbox.add_child(member_list)
+	# Create party member ItemList in the scroll container
+	_party_picker_list = ItemList.new()
+	_party_picker_list.custom_minimum_size = Vector2(0, 300)
+	_party_picker_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_party_picker_list.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_party_picker_list.focus_mode = Control.FOCUS_ALL
 
 	# Populate members
 	var members: Array[String] = _gather_members()
-	var member_tokens: Array[String] = []
+	_party_member_tokens.clear()
 
 	for member_token in members:
 		var member_name: String = _member_display_name(member_token)
 		var stats: Dictionary = _get_member_hp_mp(member_token)
-		member_list.add_item("%s  HP:%d/%d  MP:%d/%d" % [
+		_party_picker_list.add_item("%s  HP:%d/%d  MP:%d/%d" % [
 			member_name,
 			stats["hp"], stats["hp_max"],
 			stats["mp"], stats["mp_max"]
 		])
-		member_tokens.append(member_token)
+		_party_member_tokens.append(member_token)
 
-	if member_list.item_count > 0:
-		member_list.select(0)
-		member_list.grab_focus()
+	# Add to scroll container
+	if _scroll_container:
+		_scroll_container.add_child(_party_picker_list)
 
-	# Store metadata
-	popup_panel.set_meta("_member_list", member_list)
-	popup_panel.set_meta("_member_tokens", member_tokens)
-	popup_panel.set_meta("_item_id", _selected_item_id)
-	popup_panel.set_meta("_item_def", def)
+	# Select first and grab focus
+	if _party_picker_list.item_count > 0:
+		_party_picker_list.select(0)
+		call_deferred("_grab_party_picker_focus")
 
-	# Add to scene
-	add_child(popup_panel)
-	_active_popup = popup_panel
+	# Update focus mode
+	_focus_mode = "party_picker"
 
-	# Position popup
-	var popup_pos: Vector2 = get_viewport_rect().size / 2.0 - popup_panel.custom_minimum_size / 2.0
-	popup_panel.position = popup_pos
+func _grab_party_picker_focus() -> void:
+	"""Helper to grab focus on party picker"""
+	if _party_picker_list and is_instance_valid(_party_picker_list):
+		_party_picker_list.grab_focus()
 
 func _unhandled_input(event: InputEvent) -> void:
 	"""Handle controller input"""
 	if not visible:
 		return
 
-	# Handle popup input
-	if _active_popup and is_instance_valid(_active_popup):
+	# Handle party picker input
+	if _focus_mode == "party_picker":
 		if event.is_action_pressed("menu_accept"):
-			_on_popup_accept()
+			_on_party_picker_accept()
 			get_viewport().set_input_as_handled()
 			return
 		elif event.is_action_pressed("menu_back"):
-			_close_popup()
+			_close_party_picker()
 			get_viewport().set_input_as_handled()
 			return
 		return
@@ -499,39 +498,48 @@ func _unhandled_input(event: InputEvent) -> void:
 			_category_list.grab_focus()
 			get_viewport().set_input_as_handled()
 
-func _on_popup_accept() -> void:
-	"""Handle A button in popup"""
-	if not _active_popup or not is_instance_valid(_active_popup):
+func _on_party_picker_accept() -> void:
+	"""Handle A button in party picker"""
+	if not _party_picker_list or not is_instance_valid(_party_picker_list):
 		return
 
-	var member_list: ItemList = _active_popup.get_meta("_member_list")
-	var member_tokens: Array = _active_popup.get_meta("_member_tokens")
-	var item_id: String = _active_popup.get_meta("_item_id")
-	var item_def: Dictionary = _active_popup.get_meta("_item_def")
-
-	var selected_indices: Array = member_list.get_selected_items()
+	var selected_indices: Array = _party_picker_list.get_selected_items()
 	if selected_indices.size() == 0:
 		return
 
 	var index: int = selected_indices[0]
-	if index < 0 or index >= member_tokens.size():
+	if index < 0 or index >= _party_member_tokens.size():
 		return
 
-	var member_token: String = member_tokens[index]
-	_use_item_on_member(item_id, item_def, member_token)
-	_close_popup()
+	var member_token: String = _party_member_tokens[index]
+	_use_item_on_member(_item_to_use_id, _item_to_use_def, member_token)
+	_close_party_picker()
 
-func _close_popup() -> void:
-	"""Close active popup"""
-	if _active_popup and is_instance_valid(_active_popup):
-		_active_popup.queue_free()
-		_active_popup = null
+func _close_party_picker() -> void:
+	"""Close party picker and return to normal view"""
+	# Remove party picker list
+	if _party_picker_list and is_instance_valid(_party_picker_list):
+		_party_picker_list.queue_free()
+		_party_picker_list = null
 
-	# Return focus to appropriate list
-	if _focus_mode == "items" and _item_list:
+	# Clear state
+	_party_member_tokens.clear()
+	_item_to_use_id = ""
+	_item_to_use_def = {}
+
+	# Restore details panel visibility
+	if _details_text:
+		_details_text.visible = true
+	if _action_buttons:
+		_action_buttons.visible = true
+
+	# Update details to reflect current selection
+	_update_details()
+
+	# Return focus to item list
+	_focus_mode = "items"
+	if _item_list:
 		_item_list.grab_focus()
-	elif _category_list:
-		_category_list.grab_focus()
 
 func _use_item_on_member(item_id: String, item_def: Dictionary, member_token: String) -> void:
 	"""Apply item effect to a party member"""
