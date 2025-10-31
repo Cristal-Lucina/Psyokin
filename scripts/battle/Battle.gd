@@ -1199,6 +1199,10 @@ func _format_buff_description(buff_type: String, value: float, duration: int) ->
 
 func _show_action_menu() -> void:
 	"""Show the action menu for player's turn"""
+	# Ensure input is enabled (in case animation was skipped)
+	if is_in_round_transition:
+		_enable_all_input()
+
 	action_menu.visible = true
 
 	# Disable Run button if already attempted this round
