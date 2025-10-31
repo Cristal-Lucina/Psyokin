@@ -1009,19 +1009,15 @@ func _input(event: InputEvent) -> void:
 			# Navigate items down
 			_navigate_items(2)  # +2 for down (grid is 2 columns)
 			get_viewport().set_input_as_handled()
-	# LEFT/RIGHT - Navigate within current mode
+	# LEFT/RIGHT - Navigate items only (not categories)
 	elif event.is_action_pressed(aInputManager.ACTION_MOVE_LEFT):
-		if _in_category_mode:
-			_navigate_categories(-1)
-		else:
+		if not _in_category_mode:
 			_navigate_items(-1)
-		get_viewport().set_input_as_handled()
+			get_viewport().set_input_as_handled()
 	elif event.is_action_pressed(aInputManager.ACTION_MOVE_RIGHT):
-		if _in_category_mode:
-			_navigate_categories(1)
-		else:
+		if not _in_category_mode:
 			_navigate_items(1)
-		get_viewport().set_input_as_handled()
+			get_viewport().set_input_as_handled()
 	# L/R bumpers - Always navigate categories
 	elif event.is_action_pressed(aInputManager.ACTION_BURST):
 		_navigate_categories(-1)
@@ -1031,20 +1027,25 @@ func _input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 	# Action buttons
 	elif event.is_action_pressed(aInputManager.ACTION_ACCEPT):
-		if not _in_category_mode:
+		if _in_category_mode:
+			# If in category mode, switch to item mode first
+			_enter_item_mode()
+			get_viewport().set_input_as_handled()
+		elif not _item_buttons.is_empty():
+			# Use selected item
 			_use_selected_item()
 			get_viewport().set_input_as_handled()
 	elif event.is_action_pressed(aInputManager.ACTION_RUN):  # X button
-		if not _in_category_mode:
+		if not _in_category_mode and not _item_buttons.is_empty():
 			_inspect_selected_item()
 			get_viewport().set_input_as_handled()
 	elif event.is_action_pressed(aInputManager.ACTION_JUMP):  # Y button
-		if not _in_category_mode:
+		if not _in_category_mode and not _item_buttons.is_empty():
 			_discard_selected_item()
 			get_viewport().set_input_as_handled()
 
 func _navigate_categories(direction: int) -> void:
-	"""Navigate through categories with L/R bumpers or left/right"""
+	"""Navigate through categories with L/R bumpers only"""
 	if _category_buttons.is_empty():
 		return
 
@@ -1229,15 +1230,13 @@ func _scroll_to_item(item_button: Button) -> void:
 	var scroll_height = _scroll.size.y
 	var current_scroll = _scroll.scroll_vertical
 
-	# Add padding for better visibility
-	var padding = 20.0
-
-	# Check if item is above visible area (need to scroll up)
-	if item_y < current_scroll + padding:
-		_scroll.scroll_vertical = max(0, item_y - padding)
-	# Check if item is below visible area (need to scroll down)
-	elif item_bottom > current_scroll + scroll_height - padding:
-		_scroll.scroll_vertical = item_bottom - scroll_height + padding
+	# Only scroll if item is actually outside the visible area (no padding)
+	# Check if item top is above visible area (need to scroll up)
+	if item_y < current_scroll:
+		_scroll.scroll_vertical = item_y
+	# Check if item bottom is below visible area (need to scroll down)
+	elif item_bottom > current_scroll + scroll_height:
+		_scroll.scroll_vertical = item_bottom - scroll_height
 
 func _update_description(id: String, def: Dictionary) -> void:
 	"""Update the description label with item info"""
