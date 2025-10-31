@@ -141,18 +141,19 @@ func set_context_data(key: String, value: Variant) -> void:
 ## ═══════════════════════════════════════════════════════════════
 
 func _input(event: InputEvent) -> void:
-	# Debug: Log ALL controller button presses with action mapping info
+	# Debug: Log ALL input events, not just joypad buttons
 	if event is InputEventJoypadButton:
-		print("[ControllerManager] RAW Joypad event: button=%d, pressed=%s, context=%s" % [
+		print("[ControllerManager._input] RAW Joypad event: button=%d, pressed=%s, context=%s, is_handled=%s" % [
 			event.button_index,
 			event.pressed,
-			InputContext.keys()[current_context]
+			InputContext.keys()[current_context],
+			get_viewport().is_input_handled()
 		])
 
 		if event.pressed:
 			var burst_check = event.is_action("battle_burst")
 			var run_check = event.is_action("battle_run")
-			print("[ControllerManager] Button %d pressed, context=%s, is_burst=%s, is_run=%s" % [
+			print("[ControllerManager._input] Button %d pressed, context=%s, is_burst=%s, is_run=%s" % [
 				event.button_index,
 				InputContext.keys()[current_context],
 				burst_check,
@@ -167,6 +168,7 @@ func _input(event: InputEvent) -> void:
 
 	# Check cooldown
 	if input_cooldown > 0:
+		print("[ControllerManager._input] BLOCKED by cooldown (remaining: %.2f)" % input_cooldown) if event is InputEventJoypadButton and event.pressed else null
 		return
 
 	# Block if disabled
