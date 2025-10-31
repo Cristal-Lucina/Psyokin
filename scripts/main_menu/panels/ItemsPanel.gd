@@ -257,7 +257,9 @@ func _count_items_in_category(category: String) -> int:
 
 func _populate_items() -> void:
 	"""Populate item list based on current category"""
+	print("[ItemsPanel] _populate_items() called, category: %s" % _current_category)
 	if not _item_list:
+		print("[ItemsPanel] ERROR: _item_list is null!")
 		return
 
 	_item_list.clear()
@@ -269,6 +271,7 @@ func _populate_items() -> void:
 
 	# Gather items in category
 	var items: Array[String] = []
+	print("[ItemsPanel] Starting to gather items from %d entries in _counts" % _counts.size())
 	for item_id in _counts.keys():
 		var qty: int = _counts[item_id]
 		if qty <= 0:
@@ -280,6 +283,9 @@ func _populate_items() -> void:
 		var item_cat: String = _category_of(def)
 		if item_cat == _current_category:
 			items.append(item_id)
+			print("[ItemsPanel] Added %s (cat: %s, qty: %d)" % [item_id, item_cat, qty])
+
+	print("[ItemsPanel] Gathered %d items for category '%s'" % [items.size(), _current_category])
 
 	# Sort by name
 	items.sort_custom(func(a: String, b: String) -> bool:
@@ -298,6 +304,8 @@ func _populate_items() -> void:
 		_item_list.add_item("%s  x%d" % [name, qty])
 		_item_ids.append(item_id)
 
+	print("[ItemsPanel] Added %d items to ItemList UI" % _item_list.item_count)
+
 	# Update count
 	if _count_label:
 		_count_label.text = "Count: %d" % items.size()
@@ -306,6 +314,9 @@ func _populate_items() -> void:
 	if _item_list.item_count > 0 and _selected_item_id == "":
 		_item_list.select(0)
 		_selected_item_id = _item_ids[0]
+		print("[ItemsPanel] Selected first item: %s" % _selected_item_id)
+	else:
+		print("[ItemsPanel] No items to select or item already selected: %s" % _selected_item_id)
 
 func _update_details() -> void:
 	"""Update item details panel"""
