@@ -231,17 +231,29 @@ func _on_tab_button_pressed(tab_id: String) -> void:
 
 func _input(event: InputEvent) -> void:
 	"""Handle controller input for tab button navigation"""
+	# DEBUG: Log ALL joypad button events in StatusPanel
+	if event is InputEventJoypadButton:
+		print("[StatusPanel._input] Button %d, pressed=%s, visible=%s, is_handled=%s" % [
+			event.button_index,
+			event.pressed,
+			visible,
+			get_viewport().is_input_handled()
+		])
+
 	if not visible or _tab_buttons.is_empty():
 		return
 
 	# Navigate up/down through tab buttons
 	if event.is_action_pressed(aInputManager.ACTION_MOVE_UP):
+		print("[StatusPanel._input] Consuming MOVE_UP")
 		_navigate_buttons(-1)
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed(aInputManager.ACTION_MOVE_DOWN):
+		print("[StatusPanel._input] Consuming MOVE_DOWN")
 		_navigate_buttons(1)
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed(aInputManager.ACTION_ACCEPT):
+		print("[StatusPanel._input] Consuming ACCEPT")
 		_confirm_button_selection()
 		get_viewport().set_input_as_handled()
 
