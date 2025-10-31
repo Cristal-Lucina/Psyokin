@@ -73,7 +73,13 @@ func _first_fill() -> void:
 
 func _on_visibility_changed() -> void:
 	"""Grab focus when panel becomes visible"""
-	if visible and _party_list and _party_list.item_count > 0:
+	if visible and _party_list:
+		# Defer to ensure ItemList is ready
+		call_deferred("_grab_party_list_focus")
+
+func _grab_party_list_focus() -> void:
+	"""Helper to grab focus on party list"""
+	if _party_list and _party_list.item_count > 0:
 		_party_list.grab_focus()
 
 func _on_party_changed(_arg = null) -> void:
@@ -344,20 +350,23 @@ func _clear_grid(grid: GridContainer) -> void:
 
 func _create_radar_chart() -> void:
 	"""Create radar chart for stat visualization"""
-	# Placeholder - you can add your radar chart implementation here
-	var placeholder = Label.new()
-	placeholder.text = "[Radar Chart]"
-	placeholder.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	placeholder.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	placeholder.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	placeholder.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_radar_container.add_child(placeholder)
-	_radar_chart = placeholder
+	var chart = RadarChart.new()
+	chart.custom_minimum_size = Vector2(280, 280)
+	chart.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	chart.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_radar_container.add_child(chart)
+	_radar_chart = chart
 
 func _update_radar_chart(token: String) -> void:
 	"""Update radar chart with current member stats"""
-	# Placeholder - implement radar chart update logic
-	pass
+	if not _radar_chart or not _radar_chart.has_method("set_stats"):
+		return
+
+	var stat_values: Array[float] = []
+	for stat_key in BASE_STATS:
+		stat_values.append(float(_get_stat_value(token, stat_key)))
+
+	_radar_chart.call("set_stats", BASE_STATS, stat_values)
 
 func _unhandled_input(event: InputEvent) -> void:
 	"""Handle controller input - ItemList handles UP/DOWN automatically"""
@@ -370,3 +379,120 @@ func _unhandled_input(event: InputEvent) -> void:
 		if selected.size() > 0:
 			_on_party_member_selected(selected[0])
 			get_viewport().set_input_as_handled()
+
+# ==============================================================================
+# RadarChart - Custom Control for Radar/Spider Graph Visualization
+# ==============================================================================
+
+class RadarChart extends Control:
+	"""Draws a radar/spider chart for visualizing multiple stat values"""
+
+	var _stat_labels: Array[String] = []
+	var _stat_values: Array[float] = []
+	var _max_value: float = 100.0
+
+	# Colors
+	var grid_color: Color = Color(0.3, 0.3, 0.3, 0.6)
+	var stat_color: Color = Color(0.2, 0.6, 1.0, 0.4)
+	var stat_border_color: Color = Color(0.2, 0.6, 1.0, 1.0)
+	var label_color: Color = Color(1.0, 1.0, 1.0, 1.0)
+
+	func set_stats(labels: Array[String], values: Array[float]) -> void:
+		"""Set the stat labels and values to display"""
+		_stat_labels = labels.duplicate()
+		_stat_values = values.duplicate()
+
+		# Calculate max value for scaling
+		_max_value = 1.0
+		for val in _stat_values:
+			if val > _max_value:
+				_max_value = val
+
+		# Round max to nice number
+		_max_value = ceil(_max_value / 10.0) * 10.0
+		if _max_value < 10.0:
+			_max_value = 10.0
+
+		queue_redraw()
+
+	func _draw() -> void:
+		if _stat_labels.size() == 0 or _stat_values.size() == 0:
+			return
+
+		var center := size / 2.0
+		var radius := min(size.x, size.y) * 0.35
+		var num_stats := _stat_labels.size()
+
+		if num_stats == 0:
+			return
+
+		# Draw grid (background pentagon/polygon with rings)
+		_draw_grid(center, radius, num_stats)
+
+		# Draw stat polygon
+		_draw_stat_polygon(center, radius, num_stats)
+
+		# Draw labels
+		_draw_labels(center, radius * 1.15, num_stats)
+
+	func _draw_grid(center: Vector2, radius: float, num_stats: int) -> void:
+		"""Draw the background grid lines"""
+		var angle_step := TAU / float(num_stats)
+
+		# Draw concentric rings (25%, 50%, 75%, 100%)
+		for ring in [0.25, 0.5, 0.75, 1.0]:
+			var points: PackedVector2Array = []
+			for i in range(num_stats):
+				var angle := -PI / 2.0 + angle_step * i
+				var point := center + Vector2(cos(angle), sin(angle)) * radius * ring
+				points.append(point)
+			points.append(points[0])  # Close the polygon
+			draw_polyline(points, grid_color, 1.0)
+
+		# Draw lines from center to each vertex
+		for i in range(num_stats):
+			var angle := -PI / 2.0 + angle_step * i
+			var point := center + Vector2(cos(angle), sin(angle)) * radius
+			draw_line(center, point, grid_color, 1.0)
+
+	func _draw_stat_polygon(center: Vector2, radius: float, num_stats: int) -> void:
+		"""Draw the stat value polygon"""
+		if _stat_values.size() != num_stats:
+			return
+
+		var angle_step := TAU / float(num_stats)
+		var points: PackedVector2Array = []
+
+		for i in range(num_stats):
+			var angle := -PI / 2.0 + angle_step * i
+			var value_ratio := clamp(_stat_values[i] / _max_value, 0.0, 1.0)
+			var point := center + Vector2(cos(angle), sin(angle)) * radius * value_ratio
+			points.append(point)
+
+		if points.size() >= 3:
+			# Draw filled polygon
+			draw_colored_polygon(points, stat_color)
+
+			# Draw border
+			points.append(points[0])  # Close the polygon
+			draw_polyline(points, stat_border_color, 2.0)
+
+	func _draw_labels(center: Vector2, radius: float, num_stats: int) -> void:
+		"""Draw stat labels around the chart"""
+		if _stat_labels.size() != num_stats:
+			return
+
+		var angle_step := TAU / float(num_stats)
+		var font := get_theme_default_font()
+		var font_size := 14
+
+		for i in range(num_stats):
+			var angle := -PI / 2.0 + angle_step * i
+			var label_pos := center + Vector2(cos(angle), sin(angle)) * radius
+			var label := "%s: %d" % [_stat_labels[i], int(_stat_values[i])]
+
+			# Get text size for centering
+			var text_size := font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size)
+			label_pos -= text_size / 2.0
+
+			draw_string(font, label_pos, label, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, label_color)
