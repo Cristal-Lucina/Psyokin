@@ -16,7 +16,7 @@ const ITEMS_CSV : String = "res://data/items/items.csv"
 const KEY_ID    : String = "item_id"
 
 const CATEGORIES : PackedStringArray = [
-	"All","Consumables","Weapons","Armor","Headwear","Footwear",
+	"All","Consumables","Bindings","Weapons","Armor","Headwear","Footwear",
 	"Bracelets","Sigils","Battle","Materials","Gifts","Key","Other"
 ]
 
@@ -56,6 +56,7 @@ var _in_category_mode: bool = true  # true = navigating categories, false = navi
 # Normalize arbitrary category strings to our canonical set
 const _CAT_MAP := {
 	"consumable":"Consumables","consumables":"Consumables",
+	"binding":"Bindings","bindings":"Bindings","capture":"Bindings","captures":"Bindings",
 	"weapon":"Weapons","weapons":"Weapons",
 	"armor":"Armor",
 	"head":"Headwear","headwear":"Headwear","helm":"Headwear","helmet":"Headwear",
@@ -601,6 +602,7 @@ func _on_item_clicked(btn: Button) -> void:
 	var dlg := AcceptDialog.new()
 	dlg.title = nm
 	dlg.min_size = Vector2(400, 0)
+	dlg.dialog_hide_on_ok = true
 
 	# Build dialog content
 	var vbox := VBoxContainer.new()
@@ -658,8 +660,26 @@ func _on_item_clicked(btn: Button) -> void:
 	host.add_child(dlg)
 	dlg.popup_centered()
 
-	# Give focus to first button for controller navigation
+	# Setup focus neighbors for controller navigation
 	await get_tree().process_frame
+
+	# Get the dialog's OK button
+	var ok_button = dlg.get_ok_button()
+
+	# Set up focus chain: inspect -> discard -> OK -> inspect
+	inspect_btn.focus_neighbor_right = inspect_btn.get_path_to(discard_btn)
+	inspect_btn.focus_neighbor_bottom = inspect_btn.get_path_to(ok_button)
+	inspect_btn.focus_next = inspect_btn.get_path_to(discard_btn)
+
+	discard_btn.focus_neighbor_left = discard_btn.get_path_to(inspect_btn)
+	discard_btn.focus_neighbor_bottom = discard_btn.get_path_to(ok_button)
+	discard_btn.focus_next = discard_btn.get_path_to(ok_button)
+
+	ok_button.focus_neighbor_top = ok_button.get_path_to(inspect_btn)
+	ok_button.focus_previous = ok_button.get_path_to(discard_btn)
+	ok_button.focus_next = ok_button.get_path_to(inspect_btn)
+
+	# Give focus to first button for controller navigation
 	inspect_btn.grab_focus()
 
 func _on_inspect_row(btn: Button) -> void:
@@ -721,6 +741,21 @@ func _on_discard_row(btn: Button) -> void:
 	if host == null: host = get_tree().root
 	host.add_child(dlg)
 	dlg.popup_centered()
+
+	# Setup focus for controller navigation
+	await get_tree().process_frame
+	var ok_button = dlg.get_ok_button()
+	var cancel_button = dlg.get_cancel_button()
+
+	# Set up focus chain between OK and Cancel buttons
+	ok_button.focus_neighbor_right = ok_button.get_path_to(cancel_button)
+	ok_button.focus_next = ok_button.get_path_to(cancel_button)
+	cancel_button.focus_neighbor_left = cancel_button.get_path_to(ok_button)
+	cancel_button.focus_previous = cancel_button.get_path_to(ok_button)
+	cancel_button.focus_next = cancel_button.get_path_to(ok_button)
+
+	# Focus the cancel button by default (safer choice)
+	cancel_button.grab_focus()
 
 func _on_discard_confirmed(dlg: ConfirmationDialog) -> void:
 	if dlg == null: return
