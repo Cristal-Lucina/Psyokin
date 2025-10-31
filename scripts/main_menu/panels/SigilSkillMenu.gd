@@ -93,12 +93,6 @@ func _on_gui_input(event: InputEvent) -> void:
 		if mb.pressed:
 			print("[SigilSkillMenu] GUI INPUT: Mouse button %d at (%d, %d)" % [mb.button_index, mb.position.x, mb.position.y])
 
-func _unhandled_input(event: InputEvent) -> void:
-	if event is InputEventMouseButton:
-		var mb := event as InputEventMouseButton
-		if mb.pressed:
-			print("[SigilSkillMenu] _input: Mouse button %d at (%d, %d)" % [mb.button_index, mb.position.x, mb.position.y])
-
 func _unhandled_input(e: InputEvent) -> void:
 	if e is InputEventMouseButton:
 		var mb := e as InputEventMouseButton
@@ -106,6 +100,7 @@ func _unhandled_input(e: InputEvent) -> void:
 			print("[SigilSkillMenu] _unhandled_input: Mouse button %d at (%d, %d)" % [mb.button_index, mb.position.x, mb.position.y])
 	if e is InputEventKey and e.is_pressed() and e.keycode == KEY_ESCAPE:
 		_on_close()
+
 
 # Public
 func set_member(member: String) -> void:
