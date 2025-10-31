@@ -922,22 +922,38 @@ func _on_use_item(item_id: String, item_def: Dictionary) -> void:
 	var dlg := ConfirmationDialog.new()
 	dlg.title = "Use " + item_name
 	dlg.dialog_text = "Select a party member to use this item on:"
-	dlg.min_size = Vector2(400, 0)
+	dlg.min_size = Vector2(500, 0)
 	dlg.process_mode = Node.PROCESS_MODE_ALWAYS
 
-	var vbox := VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 8)
+	# Main container to add spacing and grid
+	var main_vbox := VBoxContainer.new()
+	main_vbox.add_theme_constant_override("separation", 16)
 
-	# Get party members
+	# Add spacer to push grid down from dialog text
+	var spacer := Control.new()
+	spacer.custom_minimum_size = Vector2(0, 20)
+	main_vbox.add_child(spacer)
+
+	# Grid container for 2 columns of party members
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", 12)
+	grid.add_theme_constant_override("v_separation", 8)
+	main_vbox.add_child(grid)
+
+	# Get party members (limit to 8)
 	var members := _gather_members()
 	var member_buttons: Array[Button] = []
+	var max_members := mini(members.size(), 8)
 
-	for member_token in members:
+	for i in range(max_members):
+		var member_token = members[i]
 		var member_name := _member_display_name(member_token)
 		var member_btn := Button.new()
 		member_btn.text = member_name
 		member_btn.focus_mode = Control.FOCUS_ALL
 		member_btn.set_meta("member_token", member_token)
+		member_btn.custom_minimum_size = Vector2(200, 40)
 
 		var apply_use = func():
 			print("[ItemsPanel] Using %s on %s" % [item_name, member_name])
@@ -953,10 +969,10 @@ func _on_use_item(item_id: String, item_def: Dictionary) -> void:
 				get_viewport().set_input_as_handled()
 		)
 
-		vbox.add_child(member_btn)
+		grid.add_child(member_btn)
 		member_buttons.append(member_btn)
 
-	dlg.add_child(vbox)
+	dlg.add_child(main_vbox)
 
 	var host := get_tree().current_scene
 	if host == null:
@@ -991,20 +1007,40 @@ func _on_use_item(item_id: String, item_def: Dictionary) -> void:
 				get_viewport().set_input_as_handled()
 		)
 
+	# Setup 2D grid focus navigation (2 columns)
 	if member_buttons.size() > 0:
 		for i in range(member_buttons.size()):
 			var btn = member_buttons[i]
-			if i > 0:
-				btn.focus_neighbor_top = btn.get_path_to(member_buttons[i - 1])
-			if i < member_buttons.size() - 1:
-				btn.focus_neighbor_bottom = btn.get_path_to(member_buttons[i + 1])
+			var col = i % 2  # Column: 0 (left) or 1 (right)
+			var row = i / 2  # Row index
 
-			# Connect member buttons to dialog buttons
-			if i == 0 and cancel_btn:
-				cancel_btn.focus_neighbor_top = cancel_btn.get_path_to(btn)
-			if i == member_buttons.size() - 1:
-				if cancel_btn:
-					btn.focus_neighbor_bottom = btn.get_path_to(cancel_btn)
+			# Left/right navigation
+			if col == 0 and i + 1 < member_buttons.size():
+				# Left column -> right column
+				btn.focus_neighbor_right = btn.get_path_to(member_buttons[i + 1])
+			elif col == 1:
+				# Right column -> left column
+				btn.focus_neighbor_left = btn.get_path_to(member_buttons[i - 1])
+
+			# Up/down navigation
+			if i >= 2:
+				# Has row above
+				btn.focus_neighbor_top = btn.get_path_to(member_buttons[i - 2])
+			if i + 2 < member_buttons.size():
+				# Has row below
+				btn.focus_neighbor_bottom = btn.get_path_to(member_buttons[i + 2])
+
+		# Connect bottom row to dialog buttons
+		var last_row_start = (member_buttons.size() - 1) / 2 * 2
+		for i in range(last_row_start, member_buttons.size()):
+			if cancel_btn:
+				member_buttons[i].focus_neighbor_bottom = member_buttons[i].get_path_to(cancel_btn)
+
+		# Connect dialog buttons back to first row
+		if cancel_btn:
+			cancel_btn.focus_neighbor_top = cancel_btn.get_path_to(member_buttons[0])
+		if ok_btn:
+			ok_btn.focus_neighbor_top = ok_btn.get_path_to(member_buttons[0])
 
 		# Focus first member button
 		member_buttons[0].grab_focus()
