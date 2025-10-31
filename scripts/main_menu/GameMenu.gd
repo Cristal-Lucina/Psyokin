@@ -67,6 +67,16 @@ func _ready() -> void:
 	call_deferred("_initialize_context")
 
 func _input(event: InputEvent) -> void:
+	# Debug: Log ALL joypad button events
+	if event is InputEventJoypadButton:
+		print("[GameMenu._input] Button %d, pressed=%s, visible=%s, fullscreen=%s, is_handled=%s" % [
+			event.button_index,
+			event.pressed,
+			visible,
+			_is_fullscreen,
+			get_viewport().is_input_handled()
+		])
+
 	if not visible:
 		return
 
