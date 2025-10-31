@@ -52,6 +52,7 @@ aTransitionManager="*res://scripts/core/TransitionManager.gd"
 aBattleManager="*res://scripts/battle/BattleManager.gd"
 aMinigameManager="*res://scripts/battle/MinigameManager.gd"
 aInputManager="*res://scripts/core/InputManager.gd"
+aControllerManager="*res://scripts/core/ControllerManager.gd"
 
 [editor]
 

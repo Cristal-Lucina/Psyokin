@@ -35,8 +35,14 @@ var _is_fullscreen: bool = false  # true when a non-Status panel is open full sc
 # --- Dorm hooks ---
 var _ds: Node = null
 
+# --- Controller Manager ---
+var _ctrl_mgr: Node = null
+
 func _ready() -> void:
 	_btn_group = ButtonGroup.new()
+
+	# Get ControllerManager reference
+	_ctrl_mgr = get_node_or_null("/root/aControllerManager")
 
 	# Hide the LeftTabs since tab buttons are now in StatusPanel
 	if _left_tabs:
@@ -52,6 +58,9 @@ func _ready() -> void:
 	_ds = get_node_or_null("/root/aDormSystem")
 	if _ds and _ds.has_signal("common_added") and not _ds.is_connected("common_added", Callable(self, "_on_common_added")):
 		_ds.connect("common_added", Callable(self, "_on_common_added"))
+
+	# Connect to visibility changes to manage MENU_MAIN context
+	visibility_changed.connect(_on_visibility_changed)
 
 func _input(event: InputEvent) -> void:
 	if not visible:
@@ -165,6 +174,24 @@ func _toast(msg: String) -> void:
 	dlg.popup_centered()
 	await dlg.confirmed
 	dlg.queue_free()
+
+func _on_visibility_changed() -> void:
+	"""Handle menu visibility changes - manage MENU_MAIN context"""
+	if visible:
+		# Menu opened - push MENU_MAIN context as the base menu context
+		if _ctrl_mgr:
+			print("[GameMenu] Menu opened - pushing MENU_MAIN context")
+			_ctrl_mgr.push_context(_ctrl_mgr.InputContext.MENU_MAIN)
+	else:
+		# Menu closed - pop MENU_MAIN context back to OVERWORLD
+		if _ctrl_mgr:
+			print("[GameMenu] Menu closed - popping MENU_MAIN context")
+			# Pop any panel-specific contexts first
+			if _ctrl_mgr.get_current_context() != _ctrl_mgr.InputContext.MENU_MAIN:
+				_ctrl_mgr.pop_context()
+			# Then pop MENU_MAIN itself
+			if _ctrl_mgr.get_current_context() == _ctrl_mgr.InputContext.MENU_MAIN:
+				_ctrl_mgr.pop_context()
 
 func _close_menu() -> void:
 	"""Close the game menu"""
