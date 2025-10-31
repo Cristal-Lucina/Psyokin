@@ -607,6 +607,9 @@ func _on_item_clicked(btn: Button) -> void:
 	# IMPORTANT: Enable input processing for dialog
 	dlg.process_mode = Node.PROCESS_MODE_ALWAYS
 
+	print("[ItemsPanel] Creating popup dialog for: ", nm)
+	print("[ItemsPanel] Dialog process_mode: ", dlg.process_mode)
+
 	# Build dialog content
 	var vbox := VBoxContainer.new()
 	vbox.add_theme_constant_override("separation", 8)
@@ -635,10 +638,15 @@ func _on_item_clicked(btn: Button) -> void:
 	inspect_btn.focus_mode = Control.FOCUS_ALL
 	inspect_btn.set_meta("id", id)
 	inspect_btn.pressed.connect(func():
+		print("[ItemsPanel] Inspect button pressed!")
 		dlg.hide()
 		_on_inspect_row(inspect_btn)
 	)
+	inspect_btn.focus_entered.connect(func():
+		print("[ItemsPanel] Inspect button focused")
+	)
 	btn_row.add_child(inspect_btn)
+	print("[ItemsPanel] Created Inspect button, focus_mode: ", inspect_btn.focus_mode)
 
 	# Discard button
 	var discard_btn := Button.new()
@@ -646,10 +654,15 @@ func _on_item_clicked(btn: Button) -> void:
 	discard_btn.focus_mode = Control.FOCUS_ALL
 	discard_btn.set_meta("id", id)
 	discard_btn.pressed.connect(func():
+		print("[ItemsPanel] Discard button pressed!")
 		dlg.hide()
 		_on_discard_row(discard_btn)
 	)
+	discard_btn.focus_entered.connect(func():
+		print("[ItemsPanel] Discard button focused")
+	)
 	btn_row.add_child(discard_btn)
+	print("[ItemsPanel] Created Discard button, focus_mode: ", discard_btn.focus_mode)
 
 	vbox.add_child(btn_row)
 
@@ -666,13 +679,24 @@ func _on_item_clicked(btn: Button) -> void:
 	# Setup focus neighbors for controller navigation
 	await get_tree().process_frame
 
+	print("[ItemsPanel] Dialog popup shown, setting up focus...")
+
 	# Get the dialog's OK button and make it focusable
 	var ok_button = dlg.get_ok_button()
+	print("[ItemsPanel] OK button found: ", ok_button != null)
 	if ok_button:
 		ok_button.focus_mode = Control.FOCUS_ALL
+		ok_button.focus_entered.connect(func():
+			print("[ItemsPanel] OK button focused")
+		)
+		ok_button.pressed.connect(func():
+			print("[ItemsPanel] OK button pressed!")
+		)
+		print("[ItemsPanel] OK button focus_mode: ", ok_button.focus_mode)
 
 	# Set up focus chain: inspect -> discard -> OK -> inspect
 	if ok_button:
+		print("[ItemsPanel] Setting up 3-button focus chain (Inspect/Discard/OK)")
 		inspect_btn.focus_neighbor_right = inspect_btn.get_path_to(discard_btn)
 		inspect_btn.focus_neighbor_bottom = inspect_btn.get_path_to(ok_button)
 		inspect_btn.focus_next = inspect_btn.get_path_to(discard_btn)
@@ -687,6 +711,7 @@ func _on_item_clicked(btn: Button) -> void:
 		ok_button.focus_previous = ok_button.get_path_to(discard_btn)
 		ok_button.focus_next = ok_button.get_path_to(inspect_btn)
 	else:
+		print("[ItemsPanel] No OK button, setting up 2-button focus chain (Inspect/Discard)")
 		# If no OK button, just loop between Inspect and Discard
 		inspect_btn.focus_neighbor_right = inspect_btn.get_path_to(discard_btn)
 		inspect_btn.focus_next = inspect_btn.get_path_to(discard_btn)
@@ -694,7 +719,10 @@ func _on_item_clicked(btn: Button) -> void:
 		discard_btn.focus_next = discard_btn.get_path_to(inspect_btn)
 
 	# Give focus to first button for controller navigation
+	print("[ItemsPanel] Attempting to grab focus on Inspect button...")
 	inspect_btn.grab_focus()
+	print("[ItemsPanel] Focus grabbed. Current focus owner: ", inspect_btn.get_viewport().gui_get_focus_owner())
+	print("[ItemsPanel] Inspect button has focus: ", inspect_btn.has_focus())
 
 func _on_inspect_row(btn: Button) -> void:
 	var id_v: Variant = btn.get_meta("id")
@@ -751,6 +779,9 @@ func _on_discard_row(btn: Button) -> void:
 	# IMPORTANT: Enable input processing for dialog
 	dlg.process_mode = Node.PROCESS_MODE_ALWAYS
 
+	print("[ItemsPanel] Creating DISCARD confirmation dialog for: ", nm)
+	print("[ItemsPanel] Discard dialog process_mode: ", dlg.process_mode)
+
 	if not dlg.confirmed.is_connected(_on_discard_confirmed):
 		dlg.confirmed.connect(_on_discard_confirmed.bind(dlg))
 
@@ -761,17 +792,38 @@ func _on_discard_row(btn: Button) -> void:
 
 	# Setup focus for controller navigation
 	await get_tree().process_frame
+
+	print("[ItemsPanel] Discard dialog shown, setting up focus...")
+
 	var ok_button = dlg.get_ok_button()
 	var cancel_button = dlg.get_cancel_button()
+
+	print("[ItemsPanel] Discard OK button found: ", ok_button != null)
+	print("[ItemsPanel] Discard Cancel button found: ", cancel_button != null)
 
 	# Make sure buttons are focusable
 	if ok_button:
 		ok_button.focus_mode = Control.FOCUS_ALL
+		ok_button.focus_entered.connect(func():
+			print("[ItemsPanel] Discard OK button focused")
+		)
+		ok_button.pressed.connect(func():
+			print("[ItemsPanel] Discard OK button pressed!")
+		)
+		print("[ItemsPanel] Discard OK button focus_mode: ", ok_button.focus_mode)
 	if cancel_button:
 		cancel_button.focus_mode = Control.FOCUS_ALL
+		cancel_button.focus_entered.connect(func():
+			print("[ItemsPanel] Discard Cancel button focused")
+		)
+		cancel_button.pressed.connect(func():
+			print("[ItemsPanel] Discard Cancel button pressed!")
+		)
+		print("[ItemsPanel] Discard Cancel button focus_mode: ", cancel_button.focus_mode)
 
 	# Set up focus chain between OK and Cancel buttons
 	if ok_button and cancel_button:
+		print("[ItemsPanel] Setting up 2-button focus chain (OK/Cancel)")
 		ok_button.focus_neighbor_right = ok_button.get_path_to(cancel_button)
 		ok_button.focus_neighbor_left = ok_button.get_path_to(cancel_button)
 		ok_button.focus_next = ok_button.get_path_to(cancel_button)
@@ -781,7 +833,10 @@ func _on_discard_row(btn: Button) -> void:
 		cancel_button.focus_next = cancel_button.get_path_to(ok_button)
 
 		# Focus the cancel button by default (safer choice)
+		print("[ItemsPanel] Attempting to grab focus on Cancel button...")
 		cancel_button.grab_focus()
+		print("[ItemsPanel] Focus grabbed. Current focus owner: ", cancel_button.get_viewport().gui_get_focus_owner())
+		print("[ItemsPanel] Cancel button has focus: ", cancel_button.has_focus())
 
 func _on_discard_confirmed(dlg: ConfirmationDialog) -> void:
 	if dlg == null: return
