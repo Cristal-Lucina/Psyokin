@@ -160,16 +160,6 @@ func _ready() -> void:
 func _on_panel_gained_focus() -> void:
 	super()  # Call parent
 	print("[LoadoutPanel] Panel gained focus")
-
-	# Clean up any leftover popup from previous session
-	if _active_popup and is_instance_valid(_active_popup):
-		var panel_mgr = get_node_or_null("/root/aPanelManager")
-		# Only close if the popup is NOT the currently active panel in the stack
-		if panel_mgr and not panel_mgr.is_panel_active(_active_popup):
-			print("[LoadoutPanel] Cleaning up leftover popup")
-			_active_popup.queue_free()
-			_active_popup = null
-
 	call_deferred("_grab_initial_focus")
 
 ## PanelBase callback - Called when LoadoutPanel loses focus
@@ -1370,14 +1360,18 @@ func _close_equipment_popup() -> void:
 	if _active_popup and is_instance_valid(_active_popup):
 		print("[LoadoutPanel] Closing equipment popup")
 
+		# Store reference and clear _active_popup BEFORE popping
+		# This prevents _on_panel_gained_focus from trying to clean up the same popup
+		var popup_to_close = _active_popup
+		_active_popup = null
+
 		# Pop from aPanelManager if it's in the stack
 		var panel_mgr = get_node_or_null("/root/aPanelManager")
-		if panel_mgr and panel_mgr.is_panel_active(_active_popup):
+		if panel_mgr and panel_mgr.is_panel_active(popup_to_close):
 			panel_mgr.pop_panel()
 			print("[LoadoutPanel] Popped equipment popup from aPanelManager stack")
 
-		_active_popup.queue_free()
-		_active_popup = null
+		popup_to_close.queue_free()
 
 		# Regain focus on LoadoutPanel
 		call_deferred("_grab_initial_focus")
