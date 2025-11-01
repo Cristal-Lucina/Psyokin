@@ -141,18 +141,29 @@ func _load_data() -> void:
 	# Load counts from inventory
 	_counts.clear()
 	if _inv:
-		if _inv.has_method("get_inventory"):
+		if _inv.has_method("get_counts"):
+			var counts_data: Variant = _inv.call("get_counts")
+			print("[ItemsPanel] get_counts returned type: ", typeof(counts_data))
+			if typeof(counts_data) == TYPE_DICTIONARY:
+				# Deep duplicate to avoid any reference issues
+				var raw_counts: Dictionary = counts_data
+				for item_id in raw_counts.keys():
+					# Skip comment entries (start with #)
+					var id_str: String = String(item_id)
+					if id_str.begins_with("#"):
+						continue
+					var qty: Variant = raw_counts[item_id]
+					if typeof(qty) == TYPE_FLOAT or typeof(qty) == TYPE_INT:
+						var qty_int: int = int(qty)
+						if qty_int > 0:
+							_counts[id_str] = qty_int
+				print("[ItemsPanel] Loaded %d items from get_counts (filtered %d comments)" % [_counts.size(), raw_counts.size() - _counts.size()])
+		elif _inv.has_method("get_inventory"):
 			var inv_data: Variant = _inv.call("get_inventory")
-			print("[ItemsPanel] get_inventory returned type: ", typeof(inv_data), " data: ", inv_data)
+			print("[ItemsPanel] get_inventory returned type: ", typeof(inv_data))
 			if typeof(inv_data) == TYPE_DICTIONARY:
 				_counts = inv_data.duplicate()
 				print("[ItemsPanel] Loaded %d items from get_inventory" % _counts.size())
-		elif _inv.has_method("get_counts"):
-			var counts_data: Variant = _inv.call("get_counts")
-			print("[ItemsPanel] get_counts returned type: ", typeof(counts_data), " data: ", counts_data)
-			if typeof(counts_data) == TYPE_DICTIONARY:
-				_counts = counts_data.duplicate()
-				print("[ItemsPanel] Loaded %d items from get_counts" % _counts.size())
 
 	print("[ItemsPanel] After loading, _counts has %d items" % _counts.size())
 
