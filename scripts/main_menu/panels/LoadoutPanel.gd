@@ -166,9 +166,8 @@ func _on_panel_gained_focus() -> void:
 func _on_panel_lost_focus() -> void:
 	super()  # Call parent
 	print("[LoadoutPanel] Panel lost focus")
-	# Close any active popups when panel loses focus
-	if _active_popup and is_instance_valid(_active_popup):
-		_close_equipment_popup()
+	# Don't auto-close popup - it will be managed by the panel stack
+	# The popup losing focus happens naturally when it's pushed to the stack
 
 func _grab_initial_focus() -> void:
 	"""Set initial focus state when panel opens"""
