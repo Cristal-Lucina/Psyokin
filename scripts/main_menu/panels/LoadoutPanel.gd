@@ -1337,9 +1337,6 @@ func _activate_popup_selection() -> void:
 	var item_id: String = item_ids[idx]
 	print("[LoadoutPanel] Equipping item: '%s' to slot: %s" % [item_id, slot])
 
-	# Close popup first
-	_close_equipment_popup()
-
 	# Handle equip/unequip
 	if item_id == "":
 		# Unequip
@@ -1354,9 +1351,9 @@ func _activate_popup_selection() -> void:
 	if slot == "bracelet" and _sig and _sig.has_method("on_bracelet_changed"):
 		_sig.call("on_bracelet_changed", member_token)
 
-	# Refresh display
-	var sel2: PackedInt32Array = _party_list.get_selected_items()
-	_on_party_selected(sel2[0] if sel2.size() > 0 else -1)
+	# Close popup AFTER equipping (so signals can fire)
+	# This will automatically refresh via equipment_changed signal
+	_close_equipment_popup()
 
 func _close_equipment_popup() -> void:
 	"""Close the equipment popup (B button)"""
