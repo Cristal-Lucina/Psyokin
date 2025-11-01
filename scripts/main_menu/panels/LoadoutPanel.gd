@@ -148,11 +148,28 @@ func _ready() -> void:
 	# Extra refresh hooks (level ups, roster changes)
 	_wire_refresh_signals()
 
+	# Connect visibility changed to handle focus
+	visibility_changed.connect(_on_visibility_changed)
+
 	_setup_active_type_widgets()
 	call_deferred("_first_fill")
 
 	# polling fallback so UI never goes stale
 	set_process(true)
+
+func _on_visibility_changed() -> void:
+	"""Grab focus on party list when panel becomes visible"""
+	if visible and _party_list:
+		call_deferred("_grab_initial_focus")
+
+func _grab_initial_focus() -> void:
+	"""Set initial focus state when panel opens"""
+	_in_party_mode = true
+	if _party_list and _party_list.get_item_count() > 0:
+		_party_list.grab_focus()
+		if _party_list.get_selected_items().is_empty():
+			_party_list.select(0)
+		print("[LoadoutPanel] Initial focus grabbed - party mode")
 
 func _first_fill() -> void:
 	_refresh_party()
@@ -207,7 +224,7 @@ func _refresh_all_for_current() -> void:
 	if not _in_party_mode:
 		call_deferred("_build_nav_elements")
 		if _nav_index >= 0 and _nav_index < _nav_elements.size():
-			call_deferred("_highlight_element", _nav_index)
+			call_deferred("_focus_element", _nav_index)
 
 func _on_sigil_instances_updated(_a=null,_b=null,_c=null) -> void:
 	_refresh_all_for_current()
@@ -1158,19 +1175,23 @@ func _navigate_party(delta: int) -> void:
 	"""Navigate UP/DOWN in party list"""
 	if not _party_list:
 		return
-	
+
 	var count = _party_list.get_item_count()
 	if count == 0:
 		return
-	
+
 	var current = _party_list.get_selected_items()
 	var idx = current[0] if current.size() > 0 else 0
-	
+
 	idx += delta
 	idx = clamp(idx, 0, count - 1)
-	
+
 	_party_list.select(idx)
 	_party_list.ensure_current_is_visible()
+
+	# Manually trigger the selection callback since ItemList.select() doesn't emit signal
+	_on_party_selected(idx)
+
 	print("[LoadoutPanel] Party navigation: selected index %d" % idx)
 
 func _enter_equipment_mode() -> void:
@@ -1180,14 +1201,15 @@ func _enter_equipment_mode() -> void:
 	_build_nav_elements()
 	_nav_index = 0
 	if _nav_elements.size() > 0:
-		_highlight_element(_nav_index)
+		_focus_element(_nav_index)
 
 func _enter_party_mode() -> void:
 	"""Return to party list navigation"""
 	print("[LoadoutPanel] Returning to party mode")
 	_in_party_mode = true
-	_unhighlight_all_elements()
+	# Release focus from equipment elements
 	if _party_list:
+		_party_list.grab_focus()
 		var current = _party_list.get_selected_items()
 		if current.size() == 0 and _party_list.get_item_count() > 0:
 			_party_list.select(0)
@@ -1225,17 +1247,15 @@ func _navigate_equipment(delta: int) -> void:
 	"""Navigate UP/DOWN through equipment/sigil/button elements"""
 	if _nav_elements.is_empty():
 		return
-	
-	_unhighlight_element(_nav_index)
-	
+
 	_nav_index += delta
 	_nav_index = clamp(_nav_index, 0, _nav_elements.size() - 1)
-	
-	_highlight_element(_nav_index)
+
+	_focus_element(_nav_index)
 	print("[LoadoutPanel] Equipment navigation: index %d" % _nav_index)
 
-func _highlight_element(index: int) -> void:
-	"""Highlight the element at the given index"""
+func _focus_element(index: int) -> void:
+	"""Focus the element at the given index using Godot's built-in focus system"""
 	if index < 0 or index >= _nav_elements.size():
 		return
 
@@ -1243,41 +1263,24 @@ func _highlight_element(index: int) -> void:
 	if not is_instance_valid(element):
 		return
 
-	if element is Button:
-		element.modulate = Color(1.5, 1.5, 0.5, 1.0)  # Bright yellow highlight
+	if element is Control:
 		element.grab_focus()
-		print("[LoadoutPanel] Highlighted element %d: %s" % [index, element.text])
-
-func _unhighlight_element(index: int) -> void:
-	"""Remove highlight from element at given index"""
-	if index < 0 or index >= _nav_elements.size():
-		return
-
-	var element = _nav_elements[index]
-	if not is_instance_valid(element):
-		return
-
-	if element is Button:
-		element.modulate = Color(1.0, 1.0, 1.0, 1.0)  # Normal
-
-func _unhighlight_all_elements() -> void:
-	"""Remove all highlights"""
-	for i in range(_nav_elements.size()):
-		_unhighlight_element(i)
+		print("[LoadoutPanel] Focused element %d: %s" % [index, element.get_class()])
 
 func _activate_current_element() -> void:
-	"""Press/activate the currently highlighted element (A button)"""
-	if _nav_index < 0 or _nav_index >= _nav_elements.size():
-		return
+	"""Press/activate the currently focused element (A button)"""
+	# Use Godot's focus system to determine which element to activate
+	var focused = get_viewport().gui_get_focus_owner()
 
-	var element = _nav_elements[_nav_index]
-	if not is_instance_valid(element):
-		print("[LoadoutPanel] Element at index %d is no longer valid" % _nav_index)
-		return
-
-	if element is Button:
-		print("[LoadoutPanel] Activating button: %s" % element.text)
-		element.emit_signal("pressed")
+	if focused and focused is Button:
+		print("[LoadoutPanel] Activating focused button: %s" % focused.text)
+		focused.emit_signal("pressed")
+	elif _nav_index >= 0 and _nav_index < _nav_elements.size():
+		# Fallback to nav_index if no focus (shouldn't happen)
+		var element = _nav_elements[_nav_index]
+		if is_instance_valid(element) and element is Button:
+			print("[LoadoutPanel] Activating button via nav_index: %s" % element.text)
+			element.emit_signal("pressed")
 
 # ───────────────── popup navigation ─────────────────
 func _activate_popup_selection() -> void:
