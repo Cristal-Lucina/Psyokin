@@ -134,6 +134,7 @@ func _ready() -> void:
 
 	if _story_btn != null and not _story_btn.pressed.is_connected(_on_story_points_pressed):
 		_story_btn.pressed.connect(_on_story_points_pressed)
+		print("[BondsPanel] Connected Story Points button signal")
 
 	# Connect unlock layer buttons to show rewards
 	if _unlock_acq and not _unlock_acq.pressed.is_connected(_on_unlock_button_pressed):
@@ -317,12 +318,16 @@ func _focus_detail_button(index: int) -> void:
 func _activate_detail_button() -> void:
 	"""Activate the currently focused detail button"""
 	if _nav_detail_index < 0 or _nav_detail_index >= _nav_detail_elements.size():
+		print("[BondsPanel] _activate_detail_button: index out of range")
 		return
 
 	var btn = _nav_detail_elements[_nav_detail_index]
 	if is_instance_valid(btn) and btn is Button:
 		print("[BondsPanel] Activating button: %s" % btn.name)
+		print("[BondsPanel] Button has %d connections on 'pressed' signal" % (btn as Button).pressed.get_connections().size())
 		btn.emit_signal("pressed")
+	else:
+		print("[BondsPanel] _activate_detail_button: button invalid or not a Button")
 
 func _rebuild_detail_navigation() -> void:
 	"""Build list of focusable detail buttons"""
