@@ -332,7 +332,8 @@ func _ready() -> void:
 				ds.connect("saturday_applied", Callable(self, "_on_dorms_saturday_applied"))
 
 	# DEBUG: Auto-give bind items for testing capture system
-	_give_test_bind_items()
+	# DISABLED - Uncomment to re-enable test items
+	# _give_test_bind_items()
 
 # ---------- Input ----------
 func _input(event: InputEvent) -> void:
