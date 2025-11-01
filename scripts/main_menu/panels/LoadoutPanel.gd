@@ -57,7 +57,7 @@
 ##
 ## ═══════════════════════════════════════════════════════════════════════════
 
-extends Control
+extends PanelBase
 class_name LoadoutPanel
 
 @onready var _party_list: ItemList       = get_node("Row/Party/PartyList") as ItemList
@@ -119,6 +119,8 @@ var _nav_index: int = 0  # Current selection index
 var _active_popup: Control = null  # Currently open equipment popup panel
 
 func _ready() -> void:
+	super()  # Call PanelBase._ready()
+
 	_gs    = get_node_or_null("/root/aGameState")
 	_inv   = get_node_or_null("/root/aInventorySystem")
 	_sig   = get_node_or_null("/root/aSigilSystem")
@@ -148,19 +150,25 @@ func _ready() -> void:
 	# Extra refresh hooks (level ups, roster changes)
 	_wire_refresh_signals()
 
-	# Connect visibility changed to handle focus
-	visibility_changed.connect(_on_visibility_changed)
-
 	_setup_active_type_widgets()
 	call_deferred("_first_fill")
 
 	# polling fallback so UI never goes stale
 	set_process(true)
 
-func _on_visibility_changed() -> void:
-	"""Grab focus on party list when panel becomes visible"""
-	if visible and _party_list:
-		call_deferred("_grab_initial_focus")
+## PanelBase callback - Called when LoadoutPanel gains focus
+func _on_panel_gained_focus() -> void:
+	super()  # Call parent
+	print("[LoadoutPanel] Panel gained focus")
+	call_deferred("_grab_initial_focus")
+
+## PanelBase callback - Called when LoadoutPanel loses focus
+func _on_panel_lost_focus() -> void:
+	super()  # Call parent
+	print("[LoadoutPanel] Panel lost focus")
+	# Close any active popups when panel loses focus
+	if _active_popup and is_instance_valid(_active_popup):
+		_close_equipment_popup()
 
 func _grab_initial_focus() -> void:
 	"""Set initial focus state when panel opens"""
@@ -448,6 +456,14 @@ func _show_item_menu_for_slot(member_token: String, slot: String) -> void:
 	popup_panel.set_meta("_item_ids", item_ids)
 	popup_panel.set_meta("_member_token", member_token)
 	popup_panel.set_meta("_slot", slot)
+
+	# Push popup to aPanelManager stack
+	var panel_mgr = get_node_or_null("/root/aPanelManager")
+	if panel_mgr:
+		# Make popup a "fake panel" that aPanelManager can track
+		popup_panel.set_meta("_is_equipment_popup", true)
+		panel_mgr.push_panel(popup_panel)
+		print("[LoadoutPanel] Pushed equipment popup to aPanelManager stack")
 
 	print("[LoadoutPanel] Equipment popup opened for %s - %d items" % [slot, item_ids.size()])
 
@@ -1122,7 +1138,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	4. Manage Sigils button
 	5. Mind Type button
 	"""
-	if not visible:
+	# Only handle input if we're the active panel in aPanelManager
+	if not is_active():
 		return
 
 	# If popup is active, handle accept/back (ItemList handles UP/DOWN automatically)
@@ -1149,8 +1166,12 @@ func _unhandled_input(event: InputEvent) -> void:
 			_enter_equipment_mode()
 			get_viewport().set_input_as_handled()
 		elif event.is_action_pressed("menu_back"):
-			# Already in party mode, let parent handle back
-			pass
+			# Pop LoadoutPanel from aPanelManager to go back to previous panel
+			var panel_mgr = get_node_or_null("/root/aPanelManager")
+			if panel_mgr:
+				panel_mgr.pop_panel()
+				print("[LoadoutPanel] Popped LoadoutPanel from stack via back button")
+				get_viewport().set_input_as_handled()
 	else:
 		# Equipment/sigil/button navigation
 		if event.is_action_pressed("move_up"):
@@ -1163,7 +1184,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			_activate_current_element()
 			get_viewport().set_input_as_handled()
 		elif event.is_action_pressed("menu_back"):
-			# Return to party mode
+			# Return to party mode (don't pop from aPanelManager, stay on LoadoutPanel)
 			_enter_party_mode()
 			get_viewport().set_input_as_handled()
 
@@ -1330,5 +1351,15 @@ func _close_equipment_popup() -> void:
 	"""Close the equipment popup (B button)"""
 	if _active_popup and is_instance_valid(_active_popup):
 		print("[LoadoutPanel] Closing equipment popup")
+
+		# Pop from aPanelManager if it's in the stack
+		var panel_mgr = get_node_or_null("/root/aPanelManager")
+		if panel_mgr and panel_mgr.is_panel_active(_active_popup):
+			panel_mgr.pop_panel()
+			print("[LoadoutPanel] Popped equipment popup from aPanelManager stack")
+
 		_active_popup.queue_free()
 		_active_popup = null
+
+		# Regain focus on LoadoutPanel
+		call_deferred("_grab_initial_focus")
