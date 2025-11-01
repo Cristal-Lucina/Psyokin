@@ -57,7 +57,7 @@
 ##
 ## ═══════════════════════════════════════════════════════════════════════════
 
-extends Control
+extends PanelBase
 class_name LoadoutPanel
 
 @onready var _party_list: ItemList       = get_node("Row/Party/PartyList") as ItemList
@@ -112,13 +112,16 @@ var _party_sig: String = ""
 var _sigils_sig: String = ""
 var _poll_accum: float = 0.0
 
-# Controller navigation state
-var _in_party_mode: bool = true  # true = navigating party list, false = navigating equipment
-var _nav_elements: Array[Control] = []  # Ordered list of focusable elements
-var _nav_index: int = 0  # Current selection index
+# Controller navigation state - Simple state machine
+enum NavState { PARTY_SELECT, EQUIPMENT_NAV, POPUP_ACTIVE }
+var _nav_state: NavState = NavState.PARTY_SELECT
+var _nav_elements: Array[Control] = []  # Ordered list of focusable elements in equipment mode
+var _nav_index: int = 0  # Current selection index in equipment mode
 var _active_popup: Control = null  # Currently open equipment popup panel
 
 func _ready() -> void:
+	super()  # Call PanelBase._ready()
+
 	_gs    = get_node_or_null("/root/aGameState")
 	_inv   = get_node_or_null("/root/aInventorySystem")
 	_sig   = get_node_or_null("/root/aSigilSystem")
@@ -153,6 +156,31 @@ func _ready() -> void:
 
 	# polling fallback so UI never goes stale
 	set_process(true)
+
+## PanelBase callback - Called when LoadoutPanel gains focus
+func _on_panel_gained_focus() -> void:
+	super()  # Call parent
+	print("[LoadoutPanel] Panel gained focus - state: %s" % NavState.keys()[_nav_state])
+
+	# Restore focus based on current navigation state
+	match _nav_state:
+		NavState.PARTY_SELECT:
+			print("[LoadoutPanel] Calling deferred _enter_party_select_state")
+			call_deferred("_enter_party_select_state")
+		NavState.EQUIPMENT_NAV:
+			print("[LoadoutPanel] Calling deferred _restore_equipment_focus")
+			call_deferred("_restore_equipment_focus")
+		NavState.POPUP_ACTIVE:
+			# Popup will handle its own focus when it's the active panel
+			print("[LoadoutPanel] In POPUP_ACTIVE state, popup handles focus")
+			pass
+
+## PanelBase callback - Called when LoadoutPanel loses focus
+func _on_panel_lost_focus() -> void:
+	super()  # Call parent
+	print("[LoadoutPanel] Panel lost focus - state: %s" % NavState.keys()[_nav_state])
+	# Don't auto-close popup - it's managed by panel stack
+	# Don't change state - preserve it for when we regain focus
 
 func _first_fill() -> void:
 	_refresh_party()
@@ -189,9 +217,12 @@ func _wire_refresh_signals() -> void:
 	_connect_if(_stats, "stats_changed",        Callable(self, "_on_stats_changed"))
 
 func _refresh_all_for_current() -> void:
+	"""Refresh all display elements for currently selected party member
+	Preserves navigation state (_nav_state and _nav_index)"""
 	var cur: String = _current_token()
 	if cur == "":
 		return
+
 	var equip: Dictionary = _fetch_equip_for(cur)
 	_set_slot_value(_w_val, String(equip.get("weapon","")), "weapon")
 	_set_slot_value(_a_val, String(equip.get("armor","")), "armor")
@@ -203,11 +234,10 @@ func _refresh_all_for_current() -> void:
 	_refresh_mind_row(cur)
 	_refresh_active_type_row(cur)
 
-	# Rebuild navigation elements if in equipment mode (sigils may have changed)
-	if not _in_party_mode:
-		call_deferred("_build_nav_elements")
-		if _nav_index >= 0 and _nav_index < _nav_elements.size():
-			call_deferred("_highlight_element", _nav_index)
+	# Rebuild navigation elements if in equipment mode
+	# This preserves _nav_state and _nav_index
+	if _nav_state == NavState.EQUIPMENT_NAV:
+		call_deferred("_rebuild_equipment_navigation_and_restore_focus")
 
 func _on_sigil_instances_updated(_a=null,_b=null,_c=null) -> void:
 	_refresh_all_for_current()
@@ -354,24 +384,23 @@ func _on_slot_button(slot: String) -> void:
 	_show_item_menu_for_slot(token, slot)
 
 func _show_item_menu_for_slot(member_token: String, slot: String) -> void:
+	# Prevent multiple popups from being created simultaneously
+	if _active_popup and is_instance_valid(_active_popup):
+		print("[LoadoutPanel] Popup already open, ignoring request")
+		return
+
 	var items: PackedStringArray = _list_equippable(member_token, slot)
 	var cur: Dictionary = _fetch_equip_for(member_token)
 	var cur_id: String = String(cur.get(slot, ""))
-
-	# Get the button that was clicked for positioning
-	var source_btn: Button = null
-	match slot:
-		"weapon": source_btn = _w_btn
-		"armor": source_btn = _a_btn
-		"head": source_btn = _h_btn
-		"foot": source_btn = _f_btn
-		"bracelet": source_btn = _b_btn
 
 	# Create custom popup using Control nodes for proper controller support
 	var popup_panel: Panel = Panel.new()
 	popup_panel.process_mode = Node.PROCESS_MODE_ALWAYS
 	popup_panel.z_index = 100
 	add_child(popup_panel)
+
+	# Set active popup immediately to prevent multiple popups during async operations
+	_active_popup = popup_panel
 
 	var vbox: VBoxContainer = VBoxContainer.new()
 	vbox.add_theme_constant_override("separation", 4)
@@ -408,16 +437,22 @@ func _show_item_menu_for_slot(member_token: String, slot: String) -> void:
 			item_list.add_item(label)
 			item_ids.append(id)
 
-	# Position popup next to the equipment button
-	var popup_pos: Vector2 = Vector2(100, 100)
-	if source_btn and is_instance_valid(source_btn):
-		popup_pos = source_btn.global_position + Vector2(source_btn.size.x + 10, 0)
-	popup_panel.position = popup_pos
+	# Add back button
+	var back_btn: Button = Button.new()
+	back_btn.text = "Back"
+	back_btn.pressed.connect(_popup_cancel)
+	vbox.add_child(back_btn)
 
-	# Auto-size panel to fit content
+	# Auto-size panel to fit content - wait TWO frames for proper layout calculation
+	await get_tree().process_frame
 	await get_tree().process_frame
 	popup_panel.size = vbox.size + Vector2(20, 20)
 	vbox.position = Vector2(10, 10)
+
+	# Center popup on screen
+	var viewport_size: Vector2 = get_viewport_rect().size
+	popup_panel.position = (viewport_size - popup_panel.size) / 2.0
+	print("[LoadoutPanel] Equipment popup centered at: %s, size: %s" % [popup_panel.position, popup_panel.size])
 
 	# Select first item and grab focus
 	if item_list.item_count > 0:
@@ -429,12 +464,22 @@ func _show_item_menu_for_slot(member_token: String, slot: String) -> void:
 		item_list.select(first_enabled)
 		item_list.grab_focus()
 
-	# Store reference for controller input
-	_active_popup = popup_panel
+	# Store metadata for controller input (popup reference already set earlier)
 	popup_panel.set_meta("_item_list", item_list)
 	popup_panel.set_meta("_item_ids", item_ids)
 	popup_panel.set_meta("_member_token", member_token)
 	popup_panel.set_meta("_slot", slot)
+
+	# Push popup to aPanelManager stack
+	var panel_mgr = get_node_or_null("/root/aPanelManager")
+	if panel_mgr:
+		# Make popup a "fake panel" that aPanelManager can track
+		popup_panel.set_meta("_is_equipment_popup", true)
+		panel_mgr.push_panel(popup_panel)
+		print("[LoadoutPanel] Pushed equipment popup to aPanelManager stack")
+
+	# Set state to POPUP_ACTIVE
+	_nav_state = NavState.POPUP_ACTIVE
 
 	print("[LoadoutPanel] Equipment popup opened for %s - %d items" % [slot, item_ids.size()])
 
@@ -512,13 +557,10 @@ func _rebuild_sigils(member_token: String) -> void:
 		nm.text = (_sigil_disp(cur_id) if cur_id != "" else "(empty)")
 		row.add_child(nm)
 
+		# Always show "Equip…" button - popup will handle unequip option
 		var btn: Button = Button.new()
-		if cur_id == "":
-			btn.text = "Equip…"
-			btn.pressed.connect(Callable(self, "_on_equip_sigil").bind(member_token, idx))
-		else:
-			btn.text = "Remove"
-			btn.pressed.connect(Callable(self, "_on_remove_sigil").bind(member_token, idx))
+		btn.text = "Equip…"
+		btn.pressed.connect(Callable(self, "_on_equip_sigil").bind(member_token, idx))
 		row.add_child(btn)
 
 		_sigils_list.add_child(row)
@@ -527,13 +569,35 @@ func _rebuild_sigils(member_token: String) -> void:
 		_btn_manage.disabled = false
 
 func _on_equip_sigil(member_token: String, socket_index: int) -> void:
+	"""Open sigil picker for a specific socket"""
 	if _sig == null:
 		return
+	_show_sigil_picker_for_socket(member_token, socket_index)
+
+func _show_sigil_picker_for_socket(member_token: String, socket_index: int) -> void:
+	"""Show sigil picker popup using Panel-based system for controller support"""
+	# Prevent multiple popups
+	if _active_popup and is_instance_valid(_active_popup):
+		print("[LoadoutPanel] Popup already open, ignoring sigil picker request")
+		return
+
+	print("[LoadoutPanel] === Opening Sigil Picker for %s, socket %d ===" % [member_token, socket_index])
+
+	# Get member's mind type for debugging
+	var member_mind := ""
+	if _sig and _sig.has_method("resolve_member_mind_base"):
+		member_mind = String(_sig.call("resolve_member_mind_base", member_token))
+	print("[LoadoutPanel] Member mind type: %s" % member_mind)
 
 	# Helper: allowed?
 	var _allowed := func(school: String) -> bool:
+		# Empty school means unknown - skip to be safe
+		if school.strip_edges() == "":
+			return false
 		if _sig and _sig.has_method("is_school_allowed_for_member"):
-			return bool(_sig.call("is_school_allowed_for_member", member_token, school))
+			var allowed: bool = bool(_sig.call("is_school_allowed_for_member", member_token, school))
+			return allowed
+		# If no filtering method exists, allow all non-empty schools
 		return true
 
 	# Gather free instances and filter by mind type
@@ -544,6 +608,8 @@ func _on_equip_sigil(member_token: String, socket_index: int) -> void:
 			free_instances_all = v0 as PackedStringArray
 		elif typeof(v0) == TYPE_ARRAY:
 			for s in (v0 as Array): free_instances_all.append(String(s))
+
+	print("[LoadoutPanel] Found %d free instances total" % free_instances_all.size())
 
 	var free_instances := PackedStringArray()
 	for inst in free_instances_all:
@@ -556,11 +622,18 @@ func _on_equip_sigil(member_token: String, socket_index: int) -> void:
 			var base := (String(_sig.call("get_base_from_instance", inst)) if _sig.has_method("get_base_from_instance") else inst)
 			if _sig.has_method("get_element_for"):
 				school = String(_sig.call("get_element_for", base))
-		if _allowed.call(school):
+
+		var allowed: bool = _allowed.call(school)
+		if allowed:
 			free_instances.append(inst)
+			print("[LoadoutPanel]   ✓ Instance: %s (school: %s)" % [_sigil_disp(inst), school])
+		else:
+			print("[LoadoutPanel]   ✗ Filtered out: %s (school: %s)" % [_sigil_disp(inst), school])
 
 	# Gather base sigils from inventory and filter by mind type
 	var base_ids_all := _collect_base_sigils()
+	print("[LoadoutPanel] Found %d base sigils in inventory" % base_ids_all.size())
+
 	var base_ids := PackedStringArray()
 	for base in base_ids_all:
 		var school := ""
@@ -568,79 +641,133 @@ func _on_equip_sigil(member_token: String, socket_index: int) -> void:
 			school = String(_sig.call("get_element_for", base))
 		elif _sig.has_method("get_mind_for"):
 			school = String(_sig.call("get_mind_for", base))
-		if _allowed.call(school):
+
+		var allowed: bool = _allowed.call(school)
+		if allowed:
 			base_ids.append(base)
+			var label: String = (String(_sig.call("get_display_name_for", base)) if (_sig and _sig.has_method("get_display_name_for")) else base)
+			print("[LoadoutPanel]   ✓ Base: %s (school: %s)" % [label, school])
+		else:
+			var label: String = (String(_sig.call("get_display_name_for", base)) if (_sig and _sig.has_method("get_display_name_for")) else base)
+			print("[LoadoutPanel]   ✗ Filtered out: %s (school: %s)" % [label, school])
 
-	# Build the popup
-	var pm: PopupMenu = PopupMenu.new()
-	add_child(pm)
-	var any := false
+	# Create custom popup using Control nodes for proper controller support
+	var popup_panel: Panel = Panel.new()
+	popup_panel.process_mode = Node.PROCESS_MODE_ALWAYS
+	popup_panel.z_index = 100
+	add_child(popup_panel)
 
+	# Set active popup immediately to prevent multiple popups
+	_active_popup = popup_panel
+
+	var vbox: VBoxContainer = VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 4)
+	popup_panel.add_child(vbox)
+
+	# Title label
+	var title: Label = Label.new()
+	title.text = "Select Sigil (Socket %d)" % (socket_index + 1)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(title)
+
+	# Item list
+	var item_list: ItemList = ItemList.new()
+	item_list.custom_minimum_size = Vector2(300, 250)
+	item_list.focus_mode = Control.FOCUS_ALL
+	vbox.add_child(item_list)
+
+	# Build item list with metadata
+	var item_metadata: Array[Dictionary] = []
+
+	# Add unequip option (check if socket has sigil)
+	var current_sigils: Array = []
+	if _sig.has_method("get_loadout"):
+		var loadout: Variant = _sig.call("get_loadout", member_token)
+		if typeof(loadout) == TYPE_ARRAY:
+			current_sigils = loadout as Array
+
+	if socket_index < current_sigils.size() and current_sigils[socket_index] != "":
+		item_list.add_item("← Unequip")
+		item_metadata.append({"kind": "unequip", "id": ""})
+
+	# Add unslotted instances
 	if free_instances.size() > 0:
-		pm.add_item("— Unslotted Instances —")
-		pm.set_item_disabled(pm.get_item_count() - 1, true)
-		for inst in free_instances:
-			pm.add_item(_sigil_disp(inst))
-			pm.set_item_metadata(pm.get_item_count() - 1, {"kind":"inst","id":inst})
-		any = true
+		item_list.add_item("— Unslotted Instances —")
+		item_list.set_item_disabled(item_list.item_count - 1, true)
+		item_metadata.append({})  # Placeholder for disabled header
 
+		for inst in free_instances:
+			item_list.add_item(_sigil_disp(inst))
+			item_metadata.append({"kind": "inst", "id": inst})
+
+	# Add base sigils from inventory
 	if base_ids.size() > 0:
-		pm.add_separator()
-		pm.add_item("— From Inventory —")
-		pm.set_item_disabled(pm.get_item_count() - 1, true)
+		item_list.add_item("— From Inventory —")
+		item_list.set_item_disabled(item_list.item_count - 1, true)
+		item_metadata.append({})  # Placeholder for disabled header
+
 		for base in base_ids:
 			var label2: String = (String(_sig.call("get_display_name_for", base)) if (_sig and _sig.has_method("get_display_name_for")) else _pretty_item(base))
-			pm.add_item(label2)
-			pm.set_item_metadata(pm.get_item_count() - 1, {"kind":"base","id":base})
-		any = true
+			item_list.add_item(label2)
+			item_metadata.append({"kind": "base", "id": base})
 
-	if not any:
-		pm.add_item("(No sigils available)")
-		pm.set_item_disabled(pm.get_item_count() - 1, true)
+	# Add fallback if no items
+	if item_list.item_count == 0:
+		item_list.add_item("(No sigils available)")
+		item_list.set_item_disabled(0, true)
+		item_metadata.append({})
 
-	var _handle_pick: Callable = func(index: int) -> void:
-		var meta: Variant = pm.get_item_metadata(index)
-		pm.queue_free()
-		if typeof(meta) != TYPE_DICTIONARY and typeof(meta) != TYPE_STRING:
-			return
+	# Add back button
+	var back_btn: Button = Button.new()
+	back_btn.text = "Back"
+	back_btn.pressed.connect(_popup_cancel)
+	vbox.add_child(back_btn)
 
-		var kind: String = ""
-		var id: String = ""
-		if typeof(meta) == TYPE_DICTIONARY:
-			var d: Dictionary = meta
-			kind = String(d.get("kind",""))
-			id   = String(d.get("id",""))
-		else:
-			id = String(meta)
+	# Auto-size panel to fit content - wait TWO frames for proper layout calculation
+	await get_tree().process_frame
+	await get_tree().process_frame
+	popup_panel.size = vbox.size + Vector2(20, 20)
+	vbox.position = Vector2(10, 10)
 
-		var final_inst: String = ""
-		# instances: equip instance directly (system re-checks)
-		if kind == "inst" or (_sig and _sig.has_method("is_instance_id") and bool(_sig.call("is_instance_id", id))):
-			final_inst = id
+	# Center popup on screen
+	var viewport_size: Vector2 = get_viewport_rect().size
+	popup_panel.position = (viewport_size - popup_panel.size) / 2.0
+	print("[LoadoutPanel] Sigil popup centered at: %s, size: %s" % [popup_panel.position, popup_panel.size])
 
-		# base: try direct “from inventory”, else draft then equip
-		if final_inst == "" and (kind == "base" or kind == ""):
-			if _sig.has_method("equip_from_inventory"):
-				var ok_direct: bool = bool(_sig.call("equip_from_inventory", member_token, socket_index, id))
-				if ok_direct:
-					_on_sigils_changed(member_token)
-					return
-			if _sig.has_method("draft_from_inventory"):
-				var drafted: Variant = _sig.call("draft_from_inventory", id)
-				if typeof(drafted) == TYPE_STRING:
-					final_inst = String(drafted)
+	# Select first enabled item and grab focus
+	if item_list.item_count > 0:
+		var first_enabled = 0
+		for i in range(item_list.item_count):
+			if not item_list.is_item_disabled(i):
+				first_enabled = i
+				break
+		item_list.select(first_enabled)
+		item_list.grab_focus()
 
-		if final_inst != "" and _sig.has_method("equip_into_socket"):
-			var ok_e: bool = bool(_sig.call("equip_into_socket", member_token, socket_index, final_inst))
-			if ok_e and _sig.has_method("on_bracelet_changed"):
-				_sig.call("on_bracelet_changed", member_token)
-			_on_sigils_changed(member_token)
+	# Store metadata for controller input
+	popup_panel.set_meta("_is_sigil_popup", true)
+	popup_panel.set_meta("_item_list", item_list)
+	popup_panel.set_meta("_item_metadata", item_metadata)
+	popup_panel.set_meta("_member_token", member_token)
+	popup_panel.set_meta("_socket_index", socket_index)
 
-	pm.index_pressed.connect(_handle_pick)
-	pm.id_pressed.connect(func(idnum: int) -> void:
-		_handle_pick.call(pm.get_item_index(idnum))
-	)
-	pm.popup(Rect2(get_global_mouse_position(), Vector2(260, 0)))
+	# Push popup to aPanelManager stack
+	var panel_mgr = get_node_or_null("/root/aPanelManager")
+	if panel_mgr:
+		panel_mgr.push_panel(popup_panel)
+		print("[LoadoutPanel] Pushed sigil popup to aPanelManager stack")
+
+	# Set state to POPUP_ACTIVE
+	_nav_state = NavState.POPUP_ACTIVE
+
+	# Summary
+	var has_unequip: bool = (socket_index < current_sigils.size() and current_sigils[socket_index] != "")
+	print("[LoadoutPanel] Sigil popup opened for socket %d:" % socket_index)
+	print("[LoadoutPanel]   - Has current sigil: %s" % has_unequip)
+	print("[LoadoutPanel]   - Free instances: %d" % free_instances.size())
+	print("[LoadoutPanel]   - Base sigils: %d" % base_ids.size())
+	print("[LoadoutPanel]   - Total items in list: %d" % item_list.item_count)
+	print("[LoadoutPanel] ===================================")
 
 func _on_remove_sigil(member_token: String, socket_index: int) -> void:
 	if _sig and _sig.has_method("remove_sigil_at"):
@@ -958,37 +1085,115 @@ func _collect_all_schools() -> Array[String]:
 	return out
 
 func _open_active_type_picker() -> void:
+	"""Show active type picker popup using Panel-based system for controller support"""
 	var token: String = _current_token()
 	if not (token == "hero" or token.strip_edges().to_lower() == _hero_name().strip_edges().to_lower()):
 		return
+
+	# Prevent multiple popups
+	if _active_popup and is_instance_valid(_active_popup):
+		print("[LoadoutPanel] Popup already open, ignoring active type picker request")
+		return
+
 	var schools: Array[String] = _collect_all_schools()
 	var cur: String = _get_hero_active_type()
 
-	var pm: PopupMenu = PopupMenu.new()
-	add_child(pm)
-	pm.add_item("Omega")
-	pm.set_item_metadata(0, "Omega")
-	pm.set_item_checked(0, cur.strip_edges().to_lower() == "omega")
-	pm.add_separator()
+	print("[LoadoutPanel] === Opening Active Type Picker ===")
+	print("[LoadoutPanel] Current active type: %s" % cur)
+
+	# Create custom popup using Control nodes for proper controller support
+	var popup_panel: Panel = Panel.new()
+	popup_panel.process_mode = Node.PROCESS_MODE_ALWAYS
+	popup_panel.z_index = 100
+	add_child(popup_panel)
+
+	# Set active popup immediately to prevent multiple popups
+	_active_popup = popup_panel
+
+	var vbox: VBoxContainer = VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 4)
+	popup_panel.add_child(vbox)
+
+	# Title label
+	var title: Label = Label.new()
+	title.text = "Select Active Type"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(title)
+
+	# Item list
+	var item_list: ItemList = ItemList.new()
+	item_list.custom_minimum_size = Vector2(250, 200)
+	item_list.focus_mode = Control.FOCUS_ALL
+	vbox.add_child(item_list)
+
+	# Build item list with metadata
+	var item_metadata: Array[String] = []
+
+	# Add Omega first
+	item_list.add_item("Omega")
+	item_metadata.append("Omega")
+	if cur.strip_edges().to_lower() == "omega":
+		item_list.select(0)
+
+	# Add separator (as disabled item)
+	item_list.add_item("───────")
+	item_list.set_item_disabled(item_list.item_count - 1, true)
+	item_metadata.append("")  # Placeholder for disabled separator
+
+	# Add other schools
 	for s in schools:
-		if s == "Omega": continue
-		pm.add_item(s)
-		pm.set_item_metadata(pm.get_item_count() - 1, s)
+		if s == "Omega":
+			continue
+		item_list.add_item(s)
+		item_metadata.append(s)
 		if s.strip_edges().to_lower() == cur.strip_edges().to_lower():
-			pm.set_item_checked(pm.get_item_count() - 1, true)
+			item_list.select(item_list.item_count - 1)
 
-	var _pick: Callable = func(i: int) -> void:
-		var meta: Variant = pm.get_item_metadata(i)
-		pm.queue_free()
-		if typeof(meta) == TYPE_STRING:
-			_set_hero_active_type(String(meta))
-			_refresh_active_type_row("hero")
+	# Add back button
+	var back_btn: Button = Button.new()
+	back_btn.text = "Back"
+	back_btn.pressed.connect(_popup_cancel)
+	vbox.add_child(back_btn)
 
-	pm.index_pressed.connect(_pick)
-	pm.id_pressed.connect(func(idnum: int) -> void:
-		_pick.call(pm.get_item_index(idnum))
-	)
-	pm.popup(Rect2(get_global_mouse_position(), Vector2(200, 0)))
+	# Auto-size panel to fit content - wait TWO frames for proper layout calculation
+	await get_tree().process_frame
+	await get_tree().process_frame
+	popup_panel.size = vbox.size + Vector2(20, 20)
+	vbox.position = Vector2(10, 10)
+
+	# Center popup on screen
+	var viewport_size: Vector2 = get_viewport_rect().size
+	popup_panel.position = (viewport_size - popup_panel.size) / 2.0
+	print("[LoadoutPanel] Active type popup centered at: %s, size: %s" % [popup_panel.position, popup_panel.size])
+
+	# Select first enabled item if nothing selected, and grab focus
+	if item_list.item_count > 0:
+		var has_selection = item_list.get_selected_items().size() > 0
+		if not has_selection:
+			# Find first non-disabled item
+			for i in range(item_list.item_count):
+				if not item_list.is_item_disabled(i):
+					item_list.select(i)
+					break
+		item_list.grab_focus()
+
+	# Store metadata for controller input
+	popup_panel.set_meta("_is_active_type_popup", true)
+	popup_panel.set_meta("_item_list", item_list)
+	popup_panel.set_meta("_item_metadata", item_metadata)
+
+	# Push popup to aPanelManager stack
+	var panel_mgr = get_node_or_null("/root/aPanelManager")
+	if panel_mgr:
+		panel_mgr.push_panel(popup_panel)
+		print("[LoadoutPanel] Pushed active type popup to aPanelManager stack")
+
+	# Set state to POPUP_ACTIVE
+	_nav_state = NavState.POPUP_ACTIVE
+
+	print("[LoadoutPanel] Active type popup opened with %d items" % item_list.item_count)
+	print("[LoadoutPanel] ===================================")
+
 
 # ────────────────── Manage Sigils action ──────────────────
 func _instance_sigil_menu_scene() -> Control:
@@ -1001,6 +1206,7 @@ func _instance_sigil_menu_scene() -> Control:
 	return SigilSkillMenu.new()
 
 func _on_manage_sigils() -> void:
+	"""Open Sigil Skill Menu via panel stack"""
 	var token: String = _current_token()
 	if token == "":
 		print("[LoadoutPanel] ERROR: Cannot open sigil menu - no member selected")
@@ -1014,36 +1220,37 @@ func _on_manage_sigils() -> void:
 		menu.call("set_member", token)
 		print("[LoadoutPanel] Set member to: %s" % token)
 
-	var layer := CanvasLayer.new()
-	layer.layer = 128  # Higher layer to ensure it's on top of pause/menu screens
-	layer.name = "SigilMenuLayer"
-
-	get_tree().root.add_child(layer)
-	layer.add_child(menu)
+	# Add to tree first (required before pushing to panel manager)
+	add_child(menu)
 	menu.set_anchors_preset(Control.PRESET_FULL_RECT)
-	menu.mouse_filter = Control.MOUSE_FILTER_STOP  # Ensure it captures mouse input
-	menu.z_index = 1000  # Force high z-index
+	menu.mouse_filter = Control.MOUSE_FILTER_STOP
+	menu.z_index = 100
 
-	if not menu.tree_exited.is_connected(Callable(self, "_on_overlay_closed")):
-		menu.tree_exited.connect(Callable(self, "_on_overlay_closed").bind(layer))
+	# Push to panel manager stack
+	var panel_mgr = get_node_or_null("/root/aPanelManager")
+	if panel_mgr:
+		panel_mgr.push_panel(menu)
+		print("[LoadoutPanel] Pushed SigilSkillMenu to panel stack")
 
-	print("[LoadoutPanel] Sigil menu added to tree")
-	print("[LoadoutPanel] Menu visible: %s, position: %s, size: %s" % [menu.visible, menu.global_position, menu.size])
-	print("[LoadoutPanel] Layer: %d, z_index: %d, mouse_filter: %d" % [layer.layer, menu.z_index, menu.mouse_filter])
+	# Connect cleanup signal
+	if not menu.tree_exited.is_connected(Callable(self, "_on_sigil_menu_closed")):
+		menu.tree_exited.connect(Callable(self, "_on_sigil_menu_closed"))
 
-	# Debug: Check what else is in the scene tree
-	await get_tree().process_frame
-	print("[LoadoutPanel] All CanvasLayers in root:")
-	for child in get_tree().root.get_children():
-		if child is CanvasLayer:
-			var cl := child as CanvasLayer
-			print("  - %s (layer %d)" % [child.name, cl.layer])
+	# Update LoadoutPanel state
+	_nav_state = NavState.POPUP_ACTIVE
+	print("[LoadoutPanel] SigilSkillMenu opened, state = POPUP_ACTIVE")
 
-func _on_overlay_closed(layer: CanvasLayer) -> void:
-	if is_instance_valid(layer):
-		layer.queue_free()
-	# In case levels/skills changed while overlay was open
-	_refresh_all_for_current()
+func _on_sigil_menu_closing() -> void:
+	"""Called by SigilSkillMenu BEFORE it closes - set state before panel pops"""
+	print("[LoadoutPanel] SigilSkillMenu closing, setting state to EQUIPMENT_NAV")
+	_nav_state = NavState.EQUIPMENT_NAV
+	# Now when panel_gained_focus runs, it will see EQUIPMENT_NAV and restore focus
+
+func _on_sigil_menu_closed() -> void:
+	"""Called when SigilSkillMenu is fully closed (tree_exited)"""
+	print("[LoadoutPanel] SigilSkillMenu closed, refreshing loadout")
+	# In case levels/skills changed while menu was open
+	call_deferred("_refresh_all_for_current")
 
 # ────────────────── polling fallback ──────────────────
 func _snapshot_party_signature() -> String:
@@ -1096,240 +1303,478 @@ func _as_bool(v: Variant) -> bool:
 		_:           return false
 
 ## ═══════════════════════════════════════════════════════════════
-## CONTROLLER NAVIGATION
+## CONTROLLER NAVIGATION - Clean State Machine
+## ═══════════════════════════════════════════════════════════════
+##
+## State Flow:
+##   PARTY_SELECT → (Accept) → EQUIPMENT_NAV → (Equip btn) → POPUP_ACTIVE
+##   POPUP_ACTIVE → (Accept/Back) → EQUIPMENT_NAV
+##   EQUIPMENT_NAV → (Back) → PARTY_SELECT
+##   PARTY_SELECT → (Back) → Pop panel (exit to StatusPanel)
+##
 ## ═══════════════════════════════════════════════════════════════
 
-func _unhandled_input(event: InputEvent) -> void:
-	"""Handle controller navigation for LoadoutPanel
+func _input(event: InputEvent) -> void:
+	"""Single entry point for all controller input - Clean state machine
 
-	Navigation flow:
-	1. Party list (UP/DOWN to select member, ACCEPT to confirm)
-	2. Equipment slots (UP/DOWN to navigate)
-	3. Sigil slots (UP/DOWN to navigate)
-	4. Manage Sigils button
-	5. Mind Type button
+	Uses _input() instead of _unhandled_input() to have same priority as GameMenu,
+	allowing us to mark input as handled before GameMenu intercepts it.
 	"""
-	if not visible:
+
+	# STATE 1: POPUP_ACTIVE - Handle even when not "active" (popup is on top in panel stack)
+	if _nav_state == NavState.POPUP_ACTIVE:
+		_handle_popup_input(event)
+		# NOTE: _handle_popup_input decides which inputs to mark as handled
+		# Navigation (up/down) is NOT marked as handled, so ItemList can navigate
 		return
 
-	# If popup is active, handle accept/back (ItemList handles UP/DOWN automatically)
-	if _active_popup and is_instance_valid(_active_popup) and _active_popup.visible:
-		if event.is_action_pressed("menu_accept"):
-			_activate_popup_selection()
-			get_viewport().set_input_as_handled()
-			return
-		elif event.is_action_pressed("menu_back"):
-			_close_equipment_popup()
-			get_viewport().set_input_as_handled()
-			return
-
-	if _in_party_mode:
-		# Party list navigation
-		if event.is_action_pressed("move_up"):
-			_navigate_party(-1)
-			get_viewport().set_input_as_handled()
-		elif event.is_action_pressed("move_down"):
-			_navigate_party(1)
-			get_viewport().set_input_as_handled()
-		elif event.is_action_pressed("menu_accept"):
-			# Lock in party member and switch to equipment mode
-			_enter_equipment_mode()
-			get_viewport().set_input_as_handled()
-		elif event.is_action_pressed("menu_back"):
-			# Already in party mode, let parent handle back
-			pass
-	else:
-		# Equipment/sigil/button navigation
-		if event.is_action_pressed("move_up"):
-			_navigate_equipment(-1)
-			get_viewport().set_input_as_handled()
-		elif event.is_action_pressed("move_down"):
-			_navigate_equipment(1)
-			get_viewport().set_input_as_handled()
-		elif event.is_action_pressed("menu_accept"):
-			_activate_current_element()
-			get_viewport().set_input_as_handled()
-		elif event.is_action_pressed("menu_back"):
-			# Return to party mode
-			_enter_party_mode()
-			get_viewport().set_input_as_handled()
-
-func _navigate_party(delta: int) -> void:
-	"""Navigate UP/DOWN in party list"""
-	if not _party_list:
-		return
-	
-	var count = _party_list.get_item_count()
-	if count == 0:
-		return
-	
-	var current = _party_list.get_selected_items()
-	var idx = current[0] if current.size() > 0 else 0
-	
-	idx += delta
-	idx = clamp(idx, 0, count - 1)
-	
-	_party_list.select(idx)
-	_party_list.ensure_current_is_visible()
-	print("[LoadoutPanel] Party navigation: selected index %d" % idx)
-
-func _enter_equipment_mode() -> void:
-	"""Switch from party selection to equipment/sigil navigation"""
-	print("[LoadoutPanel] Entering equipment mode")
-	_in_party_mode = false
-	_build_nav_elements()
-	_nav_index = 0
-	if _nav_elements.size() > 0:
-		_highlight_element(_nav_index)
-
-func _enter_party_mode() -> void:
-	"""Return to party list navigation"""
-	print("[LoadoutPanel] Returning to party mode")
-	_in_party_mode = true
-	_unhighlight_all_elements()
-	if _party_list:
-		var current = _party_list.get_selected_items()
-		if current.size() == 0 and _party_list.get_item_count() > 0:
-			_party_list.select(0)
-
-func _build_nav_elements() -> void:
-	"""Build ordered list of focusable elements for equipment mode"""
-	_nav_elements.clear()
-	
-	# Equipment slot buttons (W, A, H, F, B)
-	if _w_btn: _nav_elements.append(_w_btn)
-	if _a_btn: _nav_elements.append(_a_btn)
-	if _h_btn: _nav_elements.append(_h_btn)
-	if _f_btn: _nav_elements.append(_f_btn)
-	if _b_btn: _nav_elements.append(_b_btn)
-	
-	# Sigil slot buttons (dynamically created)
-	if _sigils_list:
-		for child in _sigils_list.get_children():
-			if child is HBoxContainer:
-				for subchild in child.get_children():
-					if subchild is Button:
-						_nav_elements.append(subchild)
-	
-	# Manage Sigils button
-	if _btn_manage:
-		_nav_elements.append(_btn_manage)
-	
-	# Mind Type button  
-	if _active_btn:
-		_nav_elements.append(_active_btn)
-	
-	print("[LoadoutPanel] Built navigation with %d elements" % _nav_elements.size())
-
-func _navigate_equipment(delta: int) -> void:
-	"""Navigate UP/DOWN through equipment/sigil/button elements"""
-	if _nav_elements.is_empty():
-		return
-	
-	_unhighlight_element(_nav_index)
-	
-	_nav_index += delta
-	_nav_index = clamp(_nav_index, 0, _nav_elements.size() - 1)
-	
-	_highlight_element(_nav_index)
-	print("[LoadoutPanel] Equipment navigation: index %d" % _nav_index)
-
-func _highlight_element(index: int) -> void:
-	"""Highlight the element at the given index"""
-	if index < 0 or index >= _nav_elements.size():
+	# Only handle other states if we're the active panel
+	if not is_active():
 		return
 
-	var element = _nav_elements[index]
-	if not is_instance_valid(element):
+	# STATE 2: PARTY_SELECT
+	if _nav_state == NavState.PARTY_SELECT:
+		_handle_party_select_input(event)
 		return
 
-	if element is Button:
-		element.modulate = Color(1.5, 1.5, 0.5, 1.0)  # Bright yellow highlight
-		element.grab_focus()
-		print("[LoadoutPanel] Highlighted element %d: %s" % [index, element.text])
-
-func _unhighlight_element(index: int) -> void:
-	"""Remove highlight from element at given index"""
-	if index < 0 or index >= _nav_elements.size():
+	# STATE 3: EQUIPMENT_NAV
+	if _nav_state == NavState.EQUIPMENT_NAV:
+		_handle_equipment_nav_input(event)
 		return
 
-	var element = _nav_elements[index]
-	if not is_instance_valid(element):
+## ─────────────────────── STATE 1: POPUP_ACTIVE ───────────────────────
+
+func _handle_popup_input(event: InputEvent) -> void:
+	"""Handle input when popup is active (equipment, sigil picker, or sigil menu)
+
+	Only intercept accept/back for equipment/sigil picker popups.
+	For SigilSkillMenu, do nothing - it handles its own input.
+	"""
+	# If SigilSkillMenu is open, don't handle any input - it handles everything
+	if _has_active_sigil_menu():
 		return
 
-	if element is Button:
-		element.modulate = Color(1.0, 1.0, 1.0, 1.0)  # Normal
+	# Handle equipment/sigil/active type picker popup input
+	if event.is_action_pressed("menu_accept"):
+		# Route to appropriate handler based on popup type
+		if _active_popup and _active_popup.get_meta("_is_active_type_popup", false):
+			_popup_accept_active_type()
+		elif _active_popup and _active_popup.get_meta("_is_sigil_popup", false):
+			_popup_accept_sigil()
+		else:
+			_popup_accept_item()
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("menu_back"):
+		_popup_cancel()
+		get_viewport().set_input_as_handled()
+	# NOTE: Do NOT handle move_up/move_down here - let ItemList handle its own navigation
 
-func _unhighlight_all_elements() -> void:
-	"""Remove all highlights"""
-	for i in range(_nav_elements.size()):
-		_unhighlight_element(i)
+func _has_active_sigil_menu() -> bool:
+	"""Check if SigilSkillMenu is currently open as a child"""
+	for child in get_children():
+		if child.get_class() == "SigilSkillMenu" or child.name.contains("SigilSkillMenu"):
+			return true
+	return false
 
-func _activate_current_element() -> void:
-	"""Press/activate the currently highlighted element (A button)"""
-	if _nav_index < 0 or _nav_index >= _nav_elements.size():
-		return
-
-	var element = _nav_elements[_nav_index]
-	if not is_instance_valid(element):
-		print("[LoadoutPanel] Element at index %d is no longer valid" % _nav_index)
-		return
-
-	if element is Button:
-		print("[LoadoutPanel] Activating button: %s" % element.text)
-		element.emit_signal("pressed")
-
-# ───────────────── popup navigation ─────────────────
-func _activate_popup_selection() -> void:
-	"""Activate the currently selected item in equipment popup (A button)"""
+func _popup_accept_item() -> void:
+	"""User pressed accept on popup - equip the selected item"""
 	if not _active_popup or not is_instance_valid(_active_popup):
 		return
 
-	if not _active_popup.has_meta("_item_list"):
-		return
-
-	var item_list: ItemList = _active_popup.get_meta("_item_list")
+	var item_list: ItemList = _active_popup.get_meta("_item_list", null)
 	var item_ids: Array = _active_popup.get_meta("_item_ids", [])
 	var member_token: String = _active_popup.get_meta("_member_token", "")
 	var slot: String = _active_popup.get_meta("_slot", "")
 
-	var selected_items = item_list.get_selected_items()
-	if selected_items.is_empty():
-		print("[LoadoutPanel] No item selected in popup")
+	if not item_list:
+		_popup_cancel()
 		return
 
-	var idx: int = selected_items[0]
+	var selected = item_list.get_selected_items()
+	if selected.is_empty():
+		print("[LoadoutPanel] No item selected - closing popup")
+		_popup_cancel()
+		return
+
+	var idx: int = selected[0]
 	if idx < 0 or idx >= item_ids.size():
-		print("[LoadoutPanel] Invalid selection index: %d" % idx)
+		print("[LoadoutPanel] Invalid selection index")
+		_popup_cancel()
 		return
 
 	var item_id: String = item_ids[idx]
-	print("[LoadoutPanel] Equipping item: '%s' to slot: %s" % [item_id, slot])
+	print("[LoadoutPanel] Equipping: '%s' to %s" % [item_id, slot])
 
-	# Close popup first
-	_close_equipment_popup()
-
-	# Handle equip/unequip
+	# Equip the item
 	if item_id == "":
 		# Unequip
 		if _eq and _eq.has_method("unequip_slot"):
 			_eq.call("unequip_slot", member_token, slot)
 	else:
-		# Equip item
+		# Equip
 		if _eq and _eq.has_method("equip_item"):
 			_eq.call("equip_item", member_token, item_id)
 
-	# Special handling for bracelet
+	# Special bracelet handling
 	if slot == "bracelet" and _sig and _sig.has_method("on_bracelet_changed"):
 		_sig.call("on_bracelet_changed", member_token)
 
-	# Refresh display
-	var sel2: PackedInt32Array = _party_list.get_selected_items()
-	_on_party_selected(sel2[0] if sel2.size() > 0 else -1)
+	# Close popup and return to EQUIPMENT_NAV (stay at same position!)
+	_popup_close_and_return_to_equipment()
 
-func _close_equipment_popup() -> void:
-	"""Close the equipment popup (B button)"""
-	if _active_popup and is_instance_valid(_active_popup):
-		print("[LoadoutPanel] Closing equipment popup")
-		_active_popup.queue_free()
-		_active_popup = null
+func _popup_accept_sigil() -> void:
+	"""User pressed accept on sigil popup - equip/unequip the selected sigil"""
+	if not _active_popup or not is_instance_valid(_active_popup):
+		print("[LoadoutPanel] ERROR: No active popup")
+		return
+
+	var item_list: ItemList = _active_popup.get_meta("_item_list", null)
+	var item_metadata: Array = _active_popup.get_meta("_item_metadata", [])
+	var member_token: String = _active_popup.get_meta("_member_token", "")
+	var socket_index: int = _active_popup.get_meta("_socket_index", -1)
+
+	if not item_list or socket_index < 0:
+		print("[LoadoutPanel] ERROR: Invalid popup metadata")
+		_popup_cancel()
+		return
+
+	var selected = item_list.get_selected_items()
+	if selected.is_empty():
+		print("[LoadoutPanel] No sigil selected - closing popup")
+		_popup_cancel()
+		return
+
+	var idx: int = selected[0]
+	if idx < 0 or idx >= item_metadata.size():
+		print("[LoadoutPanel] ERROR: Invalid selection index %d (metadata size: %d)" % [idx, item_metadata.size()])
+		_popup_cancel()
+		return
+
+	var meta: Dictionary = item_metadata[idx]
+	var kind: String = meta.get("kind", "")
+	var id: String = meta.get("id", "")
+
+	print("[LoadoutPanel] === Sigil Equip Action ===" )
+	print("[LoadoutPanel]   Member: %s" % member_token)
+	print("[LoadoutPanel]   Socket: %d" % socket_index)
+	print("[LoadoutPanel]   Kind: %s" % kind)
+	print("[LoadoutPanel]   ID: %s" % id)
+
+	# Handle unequip
+	if kind == "unequip":
+		print("[LoadoutPanel] Unequipping sigil from socket %d" % socket_index)
+		if _sig and _sig.has_method("remove_sigil_at"):
+			_sig.call("remove_sigil_at", member_token, socket_index)
+			print("[LoadoutPanel] ✓ Sigil unequipped")
+		else:
+			print("[LoadoutPanel] ✗ remove_sigil_at method not available")
+		_popup_close_and_return_to_equipment()
+		# Call AFTER popup closes so state is EQUIPMENT_NAV
+		call_deferred("_on_sigils_changed", member_token)
+		return
+
+	# Handle instance equip
+	if kind == "inst":
+		print("[LoadoutPanel] Equipping instance: %s" % id)
+		if _sig and _sig.has_method("equip_into_socket"):
+			var ok: bool = bool(_sig.call("equip_into_socket", member_token, socket_index, id))
+			if ok:
+				print("[LoadoutPanel] ✓ Instance equipped successfully")
+				if _sig.has_method("on_bracelet_changed"):
+					_sig.call("on_bracelet_changed", member_token)
+			else:
+				print("[LoadoutPanel] ✗ Failed to equip instance")
+		else:
+			print("[LoadoutPanel] ✗ equip_into_socket method not available")
+		_popup_close_and_return_to_equipment()
+		# Call AFTER popup closes so state is EQUIPMENT_NAV
+		call_deferred("_on_sigils_changed", member_token)
+		return
+
+	# Handle base sigil equip
+	if kind == "base":
+		print("[LoadoutPanel] Equipping base sigil: %s" % id)
+		var final_inst: String = ""
+
+		# Try direct equip from inventory first
+		if _sig.has_method("equip_from_inventory"):
+			print("[LoadoutPanel] Trying direct equip from inventory...")
+			var ok_direct: bool = bool(_sig.call("equip_from_inventory", member_token, socket_index, id))
+			if ok_direct:
+				print("[LoadoutPanel] ✓ Equipped directly from inventory")
+				_popup_close_and_return_to_equipment()
+				# Call AFTER popup closes so state is EQUIPMENT_NAV
+				call_deferred("_on_sigils_changed", member_token)
+				return
+			else:
+				print("[LoadoutPanel] Direct equip failed, trying draft...")
+
+		# Otherwise, draft instance then equip
+		if _sig.has_method("draft_from_inventory"):
+			var drafted: Variant = _sig.call("draft_from_inventory", id)
+			if typeof(drafted) == TYPE_STRING:
+				final_inst = String(drafted)
+				print("[LoadoutPanel] Drafted instance: %s" % final_inst)
+			else:
+				print("[LoadoutPanel] ✗ Failed to draft instance")
+
+		if final_inst != "" and _sig.has_method("equip_into_socket"):
+			var ok_e: bool = bool(_sig.call("equip_into_socket", member_token, socket_index, final_inst))
+			if ok_e:
+				print("[LoadoutPanel] ✓ Drafted instance equipped successfully")
+				if _sig.has_method("on_bracelet_changed"):
+					_sig.call("on_bracelet_changed", member_token)
+			else:
+				print("[LoadoutPanel] ✗ Failed to equip drafted instance")
+		elif final_inst == "":
+			print("[LoadoutPanel] ✗ No instance to equip")
+
+		_popup_close_and_return_to_equipment()
+		# Call AFTER popup closes so state is EQUIPMENT_NAV
+		call_deferred("_on_sigils_changed", member_token)
+		return
+
+	# Unknown kind - just close
+	print("[LoadoutPanel] ERROR: Unknown sigil kind: %s" % kind)
+	_popup_cancel()
+
+func _popup_accept_active_type() -> void:
+	"""User pressed accept on active type popup - set the new active type"""
+	if not _active_popup or not is_instance_valid(_active_popup):
+		print("[LoadoutPanel] ERROR: No active popup")
+		return
+
+	var item_list: ItemList = _active_popup.get_meta("_item_list", null)
+	var item_metadata: Array = _active_popup.get_meta("_item_metadata", [])
+
+	if not item_list:
+		print("[LoadoutPanel] ERROR: No item_list in active type popup")
+		_popup_cancel()
+		return
+
+	var picks: PackedInt32Array = item_list.get_selected_items()
+	if picks.size() == 0:
+		print("[LoadoutPanel] No active type selected")
+		_popup_cancel()
+		return
+
+	var idx: int = picks[0]
+	if idx < 0 or idx >= item_metadata.size():
+		print("[LoadoutPanel] Invalid selection index: %d" % idx)
+		_popup_cancel()
+		return
+
+	# Check if it's a disabled separator
+	if item_list.is_item_disabled(idx):
+		print("[LoadoutPanel] Selected item is disabled (separator)")
+		return  # Don't close, let user select again
+
+	var selected_type: String = item_metadata[idx]
+	if selected_type == "":
+		print("[LoadoutPanel] Empty active type selected")
+		_popup_cancel()
+		return
+
+	print("[LoadoutPanel] Setting hero active type to: %s" % selected_type)
+	_set_hero_active_type(selected_type)
+	_refresh_active_type_row("hero")
+
+	_popup_close_and_return_to_equipment()
+
+func _popup_cancel() -> void:
+	"""User pressed back on popup - close without equipping"""
+	_popup_close_and_return_to_equipment()
+
+func _popup_close_and_return_to_equipment() -> void:
+	"""Close popup and return to EQUIPMENT_NAV state at same nav index"""
+	if not _active_popup or not is_instance_valid(_active_popup):
+		return
+
+	print("[LoadoutPanel] Closing popup, returning to equipment mode")
+
+	# Store popup reference and clear BEFORE popping (prevents double-free)
+	var popup_to_close = _active_popup
+	_active_popup = null
+
+	# CRITICAL: Set state to EQUIPMENT_NAV BEFORE popping
+	# pop_panel() synchronously calls _on_panel_gained_focus(), which needs correct state
+	_nav_state = NavState.EQUIPMENT_NAV
+
+	# Pop from panel manager
+	var panel_mgr = get_node_or_null("/root/aPanelManager")
+	if panel_mgr and panel_mgr.is_panel_active(popup_to_close):
+		panel_mgr.pop_panel()
+
+	popup_to_close.queue_free()
+
+	# Focus will be restored by _on_panel_gained_focus() when panel_mgr.pop_panel() returns
+	# No need to call _restore_equipment_focus here
+
+## ─────────────────────── STATE 2: PARTY_SELECT ───────────────────────
+
+func _handle_party_select_input(event: InputEvent) -> void:
+	"""Handle input when in party select mode"""
+	if event.is_action_pressed("move_up"):
+		_navigate_party(-1)
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("move_down"):
+		_navigate_party(1)
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("menu_accept"):
+		_transition_to_equipment_nav()
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("menu_back"):
+		_exit_loadout_panel()
+		get_viewport().set_input_as_handled()
+
+func _navigate_party(delta: int) -> void:
+	"""Navigate up/down in party list"""
+	if not _party_list or _party_list.get_item_count() == 0:
+		return
+
+	var current = _party_list.get_selected_items()
+	var idx = current[0] if current.size() > 0 else 0
+	idx = clamp(idx + delta, 0, _party_list.get_item_count() - 1)
+
+	_party_list.select(idx)
+	_party_list.ensure_current_is_visible()
+	_on_party_selected(idx)  # Manually trigger signal
+
+func _transition_to_equipment_nav() -> void:
+	"""Transition from PARTY_SELECT to EQUIPMENT_NAV"""
+	print("[LoadoutPanel] Transition: PARTY_SELECT → EQUIPMENT_NAV")
+	_nav_state = NavState.EQUIPMENT_NAV
+	_nav_index = 0  # Start at first equipment button
+	call_deferred("_rebuild_equipment_navigation_and_focus_first")
+
+func _exit_loadout_panel() -> void:
+	"""Exit LoadoutPanel back to previous panel (StatusPanel)"""
+	print("[LoadoutPanel] Exiting to previous panel")
+	var panel_mgr = get_node_or_null("/root/aPanelManager")
+	if panel_mgr:
+		panel_mgr.pop_panel()
+
+func _enter_party_select_state() -> void:
+	"""Enter PARTY_SELECT state and grab focus on party list"""
+	_nav_state = NavState.PARTY_SELECT
+	if _party_list and _party_list.get_item_count() > 0:
+		_party_list.grab_focus()
+		if _party_list.get_selected_items().is_empty():
+			_party_list.select(0)
+	print("[LoadoutPanel] Entered PARTY_SELECT state")
+
+## ─────────────────────── STATE 3: EQUIPMENT_NAV ───────────────────────
+
+func _handle_equipment_nav_input(event: InputEvent) -> void:
+	"""Handle input when navigating equipment buttons"""
+	if event.is_action_pressed("move_up"):
+		_navigate_equipment(-1)
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("move_down"):
+		_navigate_equipment(1)
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("menu_accept"):
+		_activate_current_equipment_button()
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("menu_back"):
+		_transition_to_party_select()
+		get_viewport().set_input_as_handled()
+
+func _navigate_equipment(delta: int) -> void:
+	"""Navigate up/down through equipment buttons"""
+	if _nav_elements.is_empty():
+		return
+
+	_nav_index = clamp(_nav_index + delta, 0, _nav_elements.size() - 1)
+	_focus_equipment_element(_nav_index)
+
+func _activate_current_equipment_button() -> void:
+	"""Press the currently focused equipment button"""
+	var focused = get_viewport().gui_get_focus_owner()
+	if focused and focused is Button:
+		focused.emit_signal("pressed")
+	elif _nav_index >= 0 and _nav_index < _nav_elements.size():
+		var element = _nav_elements[_nav_index]
+		if is_instance_valid(element) and element is Button:
+			element.emit_signal("pressed")
+
+func _transition_to_party_select() -> void:
+	"""Transition from EQUIPMENT_NAV to PARTY_SELECT"""
+	print("[LoadoutPanel] Transition: EQUIPMENT_NAV → PARTY_SELECT")
+	_nav_state = NavState.PARTY_SELECT
+	call_deferred("_enter_party_select_state")
+
+func _rebuild_equipment_navigation_and_focus_first() -> void:
+	"""Rebuild navigation elements and focus the first one"""
+	_rebuild_equipment_navigation()
+	_nav_index = 0
+	if _nav_elements.size() > 0:
+		_focus_equipment_element(0)
+
+func _rebuild_equipment_navigation_and_restore_focus() -> void:
+	"""Rebuild navigation elements and restore focus to current index"""
+	print("[LoadoutPanel] _rebuild_equipment_navigation_and_restore_focus called")
+	_rebuild_equipment_navigation()
+	if _nav_index >= 0 and _nav_index < _nav_elements.size():
+		_focus_equipment_element(_nav_index)
+		print("[LoadoutPanel] Focus restored to index %d" % _nav_index)
+	else:
+		print("[LoadoutPanel] Index %d out of range (0-%d)" % [_nav_index, _nav_elements.size() - 1])
+
+func _rebuild_equipment_navigation() -> void:
+	"""Build list of focusable equipment elements"""
+	_nav_elements.clear()
+
+	# Equipment slot buttons
+	if _w_btn: _nav_elements.append(_w_btn)
+	if _a_btn: _nav_elements.append(_a_btn)
+	if _h_btn: _nav_elements.append(_h_btn)
+	if _f_btn: _nav_elements.append(_f_btn)
+	if _b_btn: _nav_elements.append(_b_btn)
+
+	# Sigil slot buttons - FILTER OUT nodes queued for deletion
+	if _sigils_list:
+		for child in _sigils_list.get_children():
+			# Skip nodes queued for deletion (from queue_free())
+			if not is_instance_valid(child) or child.is_queued_for_deletion():
+				continue
+			if child is HBoxContainer:
+				for subchild in child.get_children():
+					# Skip nodes queued for deletion
+					if not is_instance_valid(subchild) or subchild.is_queued_for_deletion():
+						continue
+					if subchild is Button:
+						_nav_elements.append(subchild)
+
+	# Special buttons
+	if _btn_manage: _nav_elements.append(_btn_manage)
+	if _active_btn: _nav_elements.append(_active_btn)
+
+	print("[LoadoutPanel] Built navigation: %d elements" % _nav_elements.size())
+
+func _focus_equipment_element(index: int) -> void:
+	"""Focus the equipment element at given index"""
+	print("[LoadoutPanel] _focus_equipment_element: index %d of %d elements" % [index, _nav_elements.size()])
+	if index < 0 or index >= _nav_elements.size():
+		print("[LoadoutPanel] Index out of bounds!")
+		return
+
+	var element = _nav_elements[index]
+	if is_instance_valid(element) and element is Control:
+		element.grab_focus()
+		print("[LoadoutPanel] Grabbed focus on element: %s" % element.name)
+	else:
+		print("[LoadoutPanel] Element invalid or not a Control")
+
+func _restore_equipment_focus() -> void:
+	"""Restore focus to current equipment navigation index"""
+	print("[LoadoutPanel] _restore_equipment_focus called: %d elements, index %d" % [_nav_elements.size(), _nav_index])
+	if _nav_elements.is_empty():
+		print("[LoadoutPanel] Nav elements empty, rebuilding...")
+		call_deferred("_rebuild_equipment_navigation_and_restore_focus")
+	else:
+		print("[LoadoutPanel] Focusing element at index %d" % _nav_index)
+		_focus_equipment_element(_nav_index)
+		if _nav_index < _nav_elements.size():
+			var elem = _nav_elements[_nav_index]
+			print("[LoadoutPanel] Element valid: %s, is Control: %s" % [is_instance_valid(elem), elem is Control if is_instance_valid(elem) else "N/A"])
