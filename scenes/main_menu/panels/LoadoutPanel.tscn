@@ -50,6 +50,7 @@ horizontal_alignment = 1
 
 [node name="EquipmentLabel" type="Label" parent="Row/Right"]
 layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
 theme_override_font_sizes/font_size = 20
 text = "EQUIPMENT"
 
@@ -166,6 +167,7 @@ theme_override_constants/separation = 6
 
 [node name="Title" type="Label" parent="Row/Right/Sigils"]
 layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
 theme_override_font_sizes/font_size = 20
 text = "SIGILS"
 
@@ -180,6 +182,10 @@ theme_override_constants/separation = 2
 layout_mode = 2
 theme_override_constants/separation = 8
 
+[node name="Spacer" type="Control" parent="Row/Right/Buttons"]
+layout_mode = 2
+size_flags_horizontal = 3
+
 [node name="BtnManageSigils" type="Button" parent="Row/Right/Buttons"]
 custom_minimum_size = Vector2(90, 0)
 layout_mode = 2
@@ -191,6 +197,7 @@ theme_override_constants/separation = 6
 
 [node name="MindLabel" type="Label" parent="Row/Right/MindSection"]
 layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
 theme_override_font_sizes/font_size = 20
 text = "MIND TYPE"
 
@@ -215,6 +222,7 @@ theme_override_constants/separation = 6
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
 theme_override_font_sizes/font_size = 20
 text = "ACTIVE TYPE"
 
@@ -233,6 +241,10 @@ text = "Active:"
 unique_name_in_owner = true
 layout_mode = 2
 text = "Omega"
+
+[node name="Spacer" type="Control" parent="Row/Right/ActiveSection/ActiveRow"]
+layout_mode = 2
+size_flags_horizontal = 3
 
 [node name="ActiveBtn" type="Button" parent="Row/Right/ActiveSection/ActiveRow"]
 unique_name_in_owner = true
