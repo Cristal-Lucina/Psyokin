@@ -165,11 +165,14 @@ func _on_panel_gained_focus() -> void:
 	# Restore focus based on current navigation state
 	match _nav_state:
 		NavState.PARTY_SELECT:
+			print("[LoadoutPanel] Calling deferred _enter_party_select_state")
 			call_deferred("_enter_party_select_state")
 		NavState.EQUIPMENT_NAV:
+			print("[LoadoutPanel] Calling deferred _restore_equipment_focus")
 			call_deferred("_restore_equipment_focus")
 		NavState.POPUP_ACTIVE:
 			# Popup will handle its own focus when it's the active panel
+			print("[LoadoutPanel] In POPUP_ACTIVE state, popup handles focus")
 			pass
 
 ## PanelBase callback - Called when LoadoutPanel loses focus
@@ -1597,16 +1600,27 @@ func _rebuild_equipment_navigation() -> void:
 
 func _focus_equipment_element(index: int) -> void:
 	"""Focus the equipment element at given index"""
+	print("[LoadoutPanel] _focus_equipment_element: index %d of %d elements" % [index, _nav_elements.size()])
 	if index < 0 or index >= _nav_elements.size():
+		print("[LoadoutPanel] Index out of bounds!")
 		return
 
 	var element = _nav_elements[index]
 	if is_instance_valid(element) and element is Control:
 		element.grab_focus()
+		print("[LoadoutPanel] Grabbed focus on element: %s" % element.name)
+	else:
+		print("[LoadoutPanel] Element invalid or not a Control")
 
 func _restore_equipment_focus() -> void:
 	"""Restore focus to current equipment navigation index"""
+	print("[LoadoutPanel] _restore_equipment_focus called: %d elements, index %d" % [_nav_elements.size(), _nav_index])
 	if _nav_elements.is_empty():
+		print("[LoadoutPanel] Nav elements empty, rebuilding...")
 		call_deferred("_rebuild_equipment_navigation_and_restore_focus")
 	else:
+		print("[LoadoutPanel] Focusing element at index %d" % _nav_index)
 		_focus_equipment_element(_nav_index)
+		if _nav_index < _nav_elements.size():
+			var elem = _nav_elements[_nav_index]
+			print("[LoadoutPanel] Element valid: %s, is Control: %s" % [is_instance_valid(elem), elem is Control if is_instance_valid(elem) else "N/A"])
