@@ -1236,10 +1236,11 @@ func _input(event: InputEvent) -> void:
 	allowing us to mark input as handled before GameMenu intercepts it.
 	"""
 
-	# STATE 1: POPUP_ACTIVE - Highest priority, blocks all other input
+	# STATE 1: POPUP_ACTIVE - Handle accept/back, let navigation pass to ItemList
 	if _nav_state == NavState.POPUP_ACTIVE:
 		_handle_popup_input(event)
-		get_viewport().set_input_as_handled()  # Block ALL input when popup active
+		# NOTE: _handle_popup_input decides which inputs to mark as handled
+		# Navigation (up/down) is NOT marked as handled, so ItemList can navigate
 		return
 
 	# Only handle input if we're the active panel
@@ -1259,15 +1260,21 @@ func _input(event: InputEvent) -> void:
 ## ─────────────────────── STATE 1: POPUP_ACTIVE ───────────────────────
 
 func _handle_popup_input(event: InputEvent) -> void:
-	"""Handle input when popup is active (equipment or sigil)"""
+	"""Handle input when popup is active (equipment or sigil)
+
+	Only intercept accept/back - let navigation (up/down) pass to ItemList
+	"""
 	if event.is_action_pressed("menu_accept"):
 		# Route to appropriate handler based on popup type
 		if _active_popup and _active_popup.get_meta("_is_sigil_popup", false):
 			_popup_accept_sigil()
 		else:
 			_popup_accept_item()
+		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("menu_back"):
 		_popup_cancel()
+		get_viewport().set_input_as_handled()
+	# NOTE: Do NOT handle move_up/move_down here - let ItemList handle its own navigation
 
 func _popup_accept_item() -> void:
 	"""User pressed accept on popup - equip the selected item"""
