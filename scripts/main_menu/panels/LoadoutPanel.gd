@@ -375,15 +375,6 @@ func _show_item_menu_for_slot(member_token: String, slot: String) -> void:
 	var cur: Dictionary = _fetch_equip_for(member_token)
 	var cur_id: String = String(cur.get(slot, ""))
 
-	# Get the button that was clicked for positioning
-	var source_btn: Button = null
-	match slot:
-		"weapon": source_btn = _w_btn
-		"armor": source_btn = _a_btn
-		"head": source_btn = _h_btn
-		"foot": source_btn = _f_btn
-		"bracelet": source_btn = _b_btn
-
 	# Create custom popup using Control nodes for proper controller support
 	var popup_panel: Panel = Panel.new()
 	popup_panel.process_mode = Node.PROCESS_MODE_ALWAYS
@@ -425,16 +416,21 @@ func _show_item_menu_for_slot(member_token: String, slot: String) -> void:
 			item_list.add_item(label)
 			item_ids.append(id)
 
-	# Position popup next to the equipment button
-	var popup_pos: Vector2 = Vector2(100, 100)
-	if source_btn and is_instance_valid(source_btn):
-		popup_pos = source_btn.global_position + Vector2(source_btn.size.x + 10, 0)
-	popup_panel.position = popup_pos
+	# Add back button
+	var back_btn: Button = Button.new()
+	back_btn.text = "Back"
+	back_btn.pressed.connect(_close_equipment_popup)
+	vbox.add_child(back_btn)
 
 	# Auto-size panel to fit content
 	await get_tree().process_frame
 	popup_panel.size = vbox.size + Vector2(20, 20)
 	vbox.position = Vector2(10, 10)
+
+	# Center popup on screen
+	var viewport_size: Vector2 = get_viewport_rect().size
+	popup_panel.position = (viewport_size - popup_panel.size) / 2.0
+	print("[LoadoutPanel] Popup centered at: %s, size: %s" % [popup_panel.position, popup_panel.size])
 
 	# Select first item and grab focus
 	if item_list.item_count > 0:
