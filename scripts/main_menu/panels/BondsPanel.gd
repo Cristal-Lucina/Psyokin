@@ -63,6 +63,8 @@ enum NavState { BOND_LIST, BOND_DETAIL }
 var _nav_state: NavState = NavState.BOND_LIST
 var _nav_elements: Array[Control] = []  # Bond buttons in list
 var _nav_index: int = 0  # Current selection index
+var _nav_detail_elements: Array[Control] = []  # Detail buttons (Story Points, Layer transitions)
+var _nav_detail_index: int = 0  # Current selection in detail view
 
 @onready var _filter    : OptionButton   = %Filter
 @onready var _refresh   : Button         = %RefreshBtn
@@ -133,6 +135,16 @@ func _ready() -> void:
 	if _story_btn != null and not _story_btn.pressed.is_connected(_on_story_points_pressed):
 		_story_btn.pressed.connect(_on_story_points_pressed)
 
+	# Connect unlock layer buttons to show rewards
+	if _unlock_acq and not _unlock_acq.pressed.is_connected(_on_unlock_button_pressed):
+		_unlock_acq.pressed.connect(_on_unlock_button_pressed.bind("acquaintance_to_outer"))
+	if _unlock_outer and not _unlock_outer.pressed.is_connected(_on_unlock_button_pressed):
+		_unlock_outer.pressed.connect(_on_unlock_button_pressed.bind("outer_to_middle"))
+	if _unlock_middle and not _unlock_middle.pressed.is_connected(_on_unlock_button_pressed):
+		_unlock_middle.pressed.connect(_on_unlock_button_pressed.bind("middle_to_inner"))
+	if _unlock_inner and not _unlock_inner.pressed.is_connected(_on_unlock_button_pressed):
+		_unlock_inner.pressed.connect(_on_unlock_button_pressed.bind("inner_to_core"))
+
 	_rebuild()
 
 ## PanelBase callback - Called when BondsPanel gains focus
@@ -145,8 +157,7 @@ func _on_panel_gained_focus() -> void:
 		NavState.BOND_LIST:
 			call_deferred("_enter_bond_list_state")
 		NavState.BOND_DETAIL:
-			# In detail view, could add button navigation later
-			print("[BondsPanel] In BOND_DETAIL state")
+			call_deferred("_enter_bond_detail_state")
 
 ## PanelBase callback - Called when BondsPanel loses focus
 func _on_panel_lost_focus() -> void:
@@ -198,6 +209,14 @@ func _navigate_bond_list(delta: int) -> void:
 	var size = _nav_elements.size()
 	_nav_index = (_nav_index + delta + size) % size
 	_focus_bond_element(_nav_index)
+
+	# Immediately show details for the newly focused bond
+	if _nav_index >= 0 and _nav_index < _nav_elements.size():
+		var btn = _nav_elements[_nav_index]
+		if is_instance_valid(btn) and btn is Button:
+			var id: String = String(btn.get_meta("id", ""))
+			_selected = id
+			_update_detail(id)
 
 func _focus_bond_element(index: int) -> void:
 	"""Focus the bond button at given index"""
@@ -258,16 +277,92 @@ func _exit_bonds_panel() -> void:
 ## ─────────────────────── STATE 2: BOND_DETAIL ───────────────────────
 
 func _handle_bond_detail_input(event: InputEvent) -> void:
-	"""Handle input when viewing bond details"""
-	if event.is_action_pressed("menu_back"):
+	"""Handle input when viewing bond details (vertical-only navigation)"""
+	if event.is_action_pressed("move_up"):
+		_navigate_detail_buttons(-1)
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("move_down"):
+		_navigate_detail_buttons(1)
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("move_left") or event.is_action_pressed("move_right"):
+		# Block left/right input in detail view (vertical-only navigation)
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("menu_accept"):
+		_activate_detail_button()
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("menu_back"):
 		_transition_to_bond_list()
 		get_viewport().set_input_as_handled()
-	# Future: Add up/down navigation for detail buttons (Story Points, Layer Transitions, etc.)
+
+func _navigate_detail_buttons(delta: int) -> void:
+	"""Navigate up/down through detail buttons (wraps around cyclically)"""
+	if _nav_detail_elements.is_empty():
+		return
+
+	# Wrap around: pressing down at bottom goes to top, pressing up at top goes to bottom
+	var size = _nav_detail_elements.size()
+	_nav_detail_index = (_nav_detail_index + delta + size) % size
+	_focus_detail_button(_nav_detail_index)
+
+func _focus_detail_button(index: int) -> void:
+	"""Focus the detail button at given index"""
+	if index < 0 or index >= _nav_detail_elements.size():
+		return
+
+	var element = _nav_detail_elements[index]
+	if is_instance_valid(element) and element is Control:
+		element.grab_focus()
+		print("[BondsPanel] Focused detail button: %s" % element.name)
+
+func _activate_detail_button() -> void:
+	"""Activate the currently focused detail button"""
+	if _nav_detail_index < 0 or _nav_detail_index >= _nav_detail_elements.size():
+		return
+
+	var btn = _nav_detail_elements[_nav_detail_index]
+	if is_instance_valid(btn) and btn is Button:
+		print("[BondsPanel] Activating button: %s" % btn.name)
+		btn.emit_signal("pressed")
+
+func _rebuild_detail_navigation() -> void:
+	"""Build list of focusable detail buttons"""
+	_nav_detail_elements.clear()
+
+	# Add Story Points button if visible
+	if _story_btn and _story_btn.visible and not _story_btn.disabled:
+		_nav_detail_elements.append(_story_btn)
+
+	# Add unlock layer buttons if visible and enabled
+	if _unlock_acq and _unlock_acq.visible and not _unlock_acq.disabled:
+		_nav_detail_elements.append(_unlock_acq)
+	if _unlock_outer and _unlock_outer.visible and not _unlock_outer.disabled:
+		_nav_detail_elements.append(_unlock_outer)
+	if _unlock_middle and _unlock_middle.visible and not _unlock_middle.disabled:
+		_nav_detail_elements.append(_unlock_middle)
+	if _unlock_inner and _unlock_inner.visible and not _unlock_inner.disabled:
+		_nav_detail_elements.append(_unlock_inner)
+
+	print("[BondsPanel] Built detail navigation: %d buttons" % _nav_detail_elements.size())
+
+	# Clamp index to valid range
+	if _nav_detail_elements.size() > 0:
+		_nav_detail_index = clamp(_nav_detail_index, 0, _nav_detail_elements.size() - 1)
+	else:
+		_nav_detail_index = 0
 
 func _transition_to_bond_detail() -> void:
 	"""Transition from BOND_LIST to BOND_DETAIL"""
 	print("[BondsPanel] Transition: BOND_LIST → BOND_DETAIL")
 	_nav_state = NavState.BOND_DETAIL
+	_nav_detail_index = 0  # Start at first button
+	call_deferred("_enter_bond_detail_state")
+
+func _enter_bond_detail_state() -> void:
+	"""Enter BOND_DETAIL state and focus first button"""
+	_rebuild_detail_navigation()
+	if _nav_detail_elements.size() > 0:
+		_focus_detail_button(_nav_detail_index)
+	print("[BondsPanel] Entered BOND_DETAIL state with %d buttons" % _nav_detail_elements.size())
 
 func _transition_to_bond_list() -> void:
 	"""Transition from BOND_DETAIL to BOND_LIST"""
@@ -803,6 +898,125 @@ func _get_filter_id() -> int:
 	if _filter == null:
 		return Filter.ALL
 	return int(_filter.get_selected_id())
+
+# ─────────────────────────────────────────────────────────────
+# Layer Unlock Rewards
+# ─────────────────────────────────────────────────────────────
+
+func _on_unlock_button_pressed(transition_id: String) -> void:
+	"""Show reward information for a layer transition"""
+	if _selected == "":
+		return
+
+	var reward_text: String = _get_layer_reward_text(transition_id)
+	var title_text: String = _get_layer_transition_title(transition_id)
+
+	_show_info_popup(title_text, reward_text)
+
+func _get_layer_transition_title(transition_id: String) -> String:
+	"""Get display title for layer transition"""
+	match transition_id:
+		"acquaintance_to_outer":
+			return "Acquaintance → Outer Reward"
+		"outer_to_middle":
+			return "Outer → Middle Reward"
+		"middle_to_inner":
+			return "Middle → Inner Reward"
+		"inner_to_core":
+			return "Inner → Core Reward"
+		_:
+			return "Layer Reward"
+
+func _get_layer_reward_text(transition_id: String) -> String:
+	"""Get reward information for a layer transition from the bond system"""
+	if _sys == null or _selected == "":
+		return "No reward information available."
+
+	# Try to get reward from system
+	if _sys.has_method("get_layer_reward"):
+		var reward = _sys.call("get_layer_reward", _selected, transition_id)
+		if reward != null and String(reward).strip_edges() != "":
+			return String(reward)
+
+	# Try to get from bond definition
+	var rec: Dictionary = _bond_def(_selected)
+	var reward_key: String = "reward_" + transition_id
+	if rec.has(reward_key):
+		return String(rec[reward_key])
+
+	# Fallback placeholder text
+	match transition_id:
+		"acquaintance_to_outer":
+			return "Unlocks deeper conversation topics and gift preferences."
+		"outer_to_middle":
+			return "Unlocks personal quests and special dialogue options."
+		"middle_to_inner":
+			return "Unlocks character-specific abilities and team bonuses."
+		"inner_to_core":
+			return "Unlocks ultimate bond ability and secret ending content."
+		_:
+			return "Layer transition reward."
+
+func _show_info_popup(title: String, message: String) -> void:
+	"""Show a simple info popup with title and message"""
+	# Full-screen overlay
+	var overlay := Control.new()
+	overlay.name = "InfoOverlay"
+	overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	overlay.z_index = 100
+
+	# Dim background
+	var dim := ColorRect.new()
+	dim.color = Color(0, 0, 0, 0.65)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	overlay.add_child(dim)
+
+	# Center container
+	var center := CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	overlay.add_child(center)
+
+	# Panel
+	var panel := PanelContainer.new()
+	panel.custom_minimum_size = Vector2(400, 200)
+	center.add_child(panel)
+
+	var root := VBoxContainer.new()
+	root.add_theme_constant_override("separation", 12)
+	panel.add_child(root)
+
+	# Title
+	var title_lbl := Label.new()
+	title_lbl.text = title
+	title_lbl.add_theme_font_size_override("font_size", 18)
+	title_lbl.add_theme_color_override("font_color", Color(1, 0.7, 0.75, 1))  # Pale pink
+	title_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	root.add_child(title_lbl)
+
+	# Message
+	var msg_lbl := RichTextLabel.new()
+	msg_lbl.bbcode_enabled = true
+	msg_lbl.text = message
+	msg_lbl.fit_content = true
+	msg_lbl.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	msg_lbl.custom_minimum_size = Vector2(350, 100)
+	root.add_child(msg_lbl)
+
+	# Back button
+	var back_btn := Button.new()
+	back_btn.text = "Back"
+	back_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	back_btn.pressed.connect(func() -> void:
+		overlay.queue_free()
+	)
+	root.add_child(back_btn)
+
+	# Add to scene
+	get_tree().root.add_child(overlay)
+
+	# Focus back button immediately
+	back_btn.grab_focus()
 
 # ─────────────────────────────────────────────────────────────
 # Story Points overlay (full-screen, more opaque, Back)
