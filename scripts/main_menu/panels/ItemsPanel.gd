@@ -137,6 +137,14 @@ func _load_data() -> void:
 		var loaded: Variant = _csv.call("load_csv", ITEMS_CSV, KEY_ID)
 		if typeof(loaded) == TYPE_DICTIONARY:
 			_defs = loaded
+			print("[ItemsPanel] Loaded %d item definitions from CSV" % _defs.size())
+			# Check a sample item definition
+			if _defs.has("HP_002"):
+				var sample: Dictionary = _defs["HP_002"]
+				print("[ItemsPanel] Sample HP_002 def keys: %s" % str(sample.keys()))
+				print("[ItemsPanel] Sample HP_002 category: %s" % sample.get("category", "MISSING"))
+		else:
+			print("[ItemsPanel] ERROR: Failed to load CSV definitions!")
 
 	# Load counts from inventory
 	_counts.clear()
@@ -292,6 +300,9 @@ func _populate_items() -> void:
 			continue
 		var def: Dictionary = _defs.get(item_id, {})
 		var item_cat: String = _category_of(def)
+		# Debug first few items
+		if items.size() < 3:
+			print("[ItemsPanel] DEBUG: item_id=%s, has_def=%s, def_size=%d, category=%s" % [item_id, _defs.has(item_id), def.size(), item_cat])
 		if item_cat == _current_category:
 			items.append(item_id)
 			print("[ItemsPanel] Added %s (cat: %s, qty: %d)" % [item_id, item_cat, qty])
