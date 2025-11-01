@@ -144,7 +144,8 @@ func _load_data() -> void:
 		print("[ItemsPanel] load_csv returned type: %d" % typeof(loaded))
 
 		if typeof(loaded) == TYPE_DICTIONARY:
-			_defs = loaded
+			# IMPORTANT: Duplicate to avoid modifying CSV loader's internal cache!
+			_defs = (loaded as Dictionary).duplicate(true)
 			print("[ItemsPanel] Loaded %d item definitions from CSV" % _defs.size())
 			# Check a sample item definition
 			if _defs.has("HP_002"):
