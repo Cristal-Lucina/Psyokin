@@ -160,6 +160,16 @@ func _ready() -> void:
 func _on_panel_gained_focus() -> void:
 	super()  # Call parent
 	print("[LoadoutPanel] Panel gained focus")
+
+	# Clean up any leftover popup from previous session
+	if _active_popup and is_instance_valid(_active_popup):
+		var panel_mgr = get_node_or_null("/root/aPanelManager")
+		# Only close if the popup is NOT the currently active panel in the stack
+		if panel_mgr and not panel_mgr.is_panel_active(_active_popup):
+			print("[LoadoutPanel] Cleaning up leftover popup")
+			_active_popup.queue_free()
+			_active_popup = null
+
 	call_deferred("_grab_initial_focus")
 
 ## PanelBase callback - Called when LoadoutPanel loses focus
@@ -378,6 +388,11 @@ func _on_slot_button(slot: String) -> void:
 	_show_item_menu_for_slot(token, slot)
 
 func _show_item_menu_for_slot(member_token: String, slot: String) -> void:
+	# Prevent multiple popups from being created simultaneously
+	if _active_popup and is_instance_valid(_active_popup):
+		print("[LoadoutPanel] Popup already open, ignoring request")
+		return
+
 	var items: PackedStringArray = _list_equippable(member_token, slot)
 	var cur: Dictionary = _fetch_equip_for(member_token)
 	var cur_id: String = String(cur.get(slot, ""))
@@ -387,6 +402,9 @@ func _show_item_menu_for_slot(member_token: String, slot: String) -> void:
 	popup_panel.process_mode = Node.PROCESS_MODE_ALWAYS
 	popup_panel.z_index = 100
 	add_child(popup_panel)
+
+	# Set active popup immediately to prevent multiple popups during async operations
+	_active_popup = popup_panel
 
 	var vbox: VBoxContainer = VBoxContainer.new()
 	vbox.add_theme_constant_override("separation", 4)
@@ -449,8 +467,7 @@ func _show_item_menu_for_slot(member_token: String, slot: String) -> void:
 		item_list.select(first_enabled)
 		item_list.grab_focus()
 
-	# Store reference for controller input
-	_active_popup = popup_panel
+	# Store metadata for controller input (popup reference already set earlier)
 	popup_panel.set_meta("_item_list", item_list)
 	popup_panel.set_meta("_item_ids", item_ids)
 	popup_panel.set_meta("_member_token", member_token)
@@ -1137,11 +1154,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	4. Manage Sigils button
 	5. Mind Type button
 	"""
-	# Only handle input if we're the active panel in aPanelManager
-	if not is_active():
-		return
-
-	# If popup is active, handle accept/back (ItemList handles UP/DOWN automatically)
+	# If popup is active, always handle its input (even if LoadoutPanel is not the active panel)
 	if _active_popup and is_instance_valid(_active_popup) and _active_popup.visible:
 		if event.is_action_pressed("menu_accept"):
 			_activate_popup_selection()
@@ -1151,6 +1164,12 @@ func _unhandled_input(event: InputEvent) -> void:
 			_close_equipment_popup()
 			get_viewport().set_input_as_handled()
 			return
+		# Popup is active, don't process LoadoutPanel input
+		return
+
+	# Only handle LoadoutPanel input if we're the active panel in aPanelManager
+	if not is_active():
+		return
 
 	if _in_party_mode:
 		# Party list navigation
