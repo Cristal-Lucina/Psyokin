@@ -1,4 +1,4 @@
-# PanelManager Integration Example: ItemsPanel
+# aPanelManager Integration Example: ItemsPanel
 
 ## Before & After Comparison
 
@@ -34,7 +34,7 @@ func _unhandled_input(event: InputEvent) -> void:
 - Back navigation not tracked
 - Input handling requires visibility checks
 
-### AFTER (With PanelManager)
+### AFTER (With aPanelManager)
 
 ```gdscript
 extends PanelBase  # ← Extend PanelBase instead of Control
@@ -60,7 +60,7 @@ func _on_panel_lost_focus() -> void:
     _cleanup_popups()  # Clean up any active popups
 
 func _unhandled_input(event: InputEvent) -> void:
-    # PanelManager ensures only active panel receives input
+    # aPanelManager ensures only active panel receives input
     if not is_active():
         return  # Not active, ignore input
 
@@ -137,7 +137,7 @@ func _unhandled_input(event: InputEvent) -> void:
     # Rest of input handling...
 ```
 
-### Step 5: Update Party Picker to Use PanelManager
+### Step 5: Update Party Picker to Use aPanelManager
 
 ```gdscript
 func _show_party_picker() -> void:
@@ -150,16 +150,16 @@ func _show_party_picker() -> void:
     if _scroll_container:
         _scroll_container.add_child(_party_picker_list)
 
-    # Push to PanelManager!
-    PanelManager.push_panel(_party_picker_list)  # ← NEW!
+    # Push to aPanelManager!
+    aPanelManager.push_panel(_party_picker_list)  # ← NEW!
 
-    # Focus will be handled by PanelManager
+    # Focus will be handled by aPanelManager
     call_deferred("_grab_party_picker_focus")
 
 func _close_party_picker() -> void:
-    # Pop from PanelManager
+    # Pop from aPanelManager
     if _party_picker_list and is_instance_valid(_party_picker_list):
-        PanelManager.pop_panel()  # ← NEW!
+        aPanelManager.pop_panel()  # ← NEW!
         _party_picker_list.queue_free()
         _party_picker_list = null
 
@@ -240,15 +240,15 @@ func _unhandled_input(event: InputEvent) -> void:
             get_viewport().set_input_as_handled()
             return
         elif event.is_action_pressed("menu_back"):
-            _close_party_picker()  # This will pop from PanelManager
+            _close_party_picker()  # This will pop from aPanelManager
             get_viewport().set_input_as_handled()
             return
         return
 
     # Handle normal input
     if event.is_action_pressed("menu_back"):
-        # Let PanelManager handle back navigation
-        PanelManager.pop_panel()
+        # Let aPanelManager handle back navigation
+        aPanelManager.pop_panel()
         get_viewport().set_input_as_handled()
         return
 
@@ -257,7 +257,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 ## GameMenu Integration
 
-Update GameMenu to use PanelManager:
+Update GameMenu to use aPanelManager:
 
 ```gdscript
 # In GameMenu.gd
@@ -270,7 +270,7 @@ func _on_status_panel_tab_selected(tab_name: String) -> void:
             if p != panel:
                 p.visible = false
 
-        # Show selected panel (will auto-push to PanelManager)
+        # Show selected panel (will auto-push to aPanelManager)
         panel.visible = true
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -278,9 +278,9 @@ func _unhandled_input(event: InputEvent) -> void:
         return
 
     if event.is_action_pressed("menu_back"):
-        # Let PanelManager handle back navigation
-        if PanelManager.get_stack_depth() > 1:
-            PanelManager.pop_panel()
+        # Let aPanelManager handle back navigation
+        if aPanelManager.get_stack_depth() > 1:
+            aPanelManager.pop_panel()
         else:
             _close_menu()  # Close entire menu
         get_viewport().set_input_as_handled()
@@ -300,7 +300,7 @@ After integration, test:
 - [ ] Back button works correctly
 - [ ] Opening another panel (e.g., StatsPanel) works
 - [ ] Returning to ItemsPanel restores state
-- [ ] Calling `PanelManager.print_stack()` shows correct stack
+- [ ] Calling `aPanelManager.print_stack()` shows correct stack
 
 ## Debug Commands
 
@@ -311,11 +311,11 @@ Add these to your game for testing:
 
 ## Print current panel stack
 func debug_print_panels() -> void:
-    PanelManager.print_stack()
+    aPanelManager.print_stack()
 
 ## Get active panel info
 func debug_active_panel() -> void:
-    var active = PanelManager.get_active_panel()
+    var active = aPanelManager.get_active_panel()
     if active:
         print("Active panel: ", active.name)
     else:
@@ -323,7 +323,7 @@ func debug_active_panel() -> void:
 
 ## Clear all panels
 func debug_clear_panels() -> void:
-    PanelManager.clear_stack()
+    aPanelManager.clear_stack()
 ```
 
 ## Expected Console Output
@@ -331,19 +331,19 @@ func debug_clear_panels() -> void:
 With debug logging enabled, you should see:
 
 ```
-[PanelManager] Pushed panel: ItemsPanel (stack depth: 1)
+[aPanelManager] Pushed panel: ItemsPanel (stack depth: 1)
 [ItemsPanel] Gained focus
 [ItemsPanel] Calling _grab_category_focus()
-[PanelManager] === Panel Stack (depth: 1) ===
+[aPanelManager] === Panel Stack (depth: 1) ===
   [0] ItemsPanel (ACTIVE)
 
 # After using recovery item:
-[PanelManager] Pushed panel: PartyPicker (stack depth: 2)
+[aPanelManager] Pushed panel: PartyPicker (stack depth: 2)
 [ItemsPanel] Lost focus
 [PartyPicker] Gained focus
 
 # After selecting party member:
-[PanelManager] Popped panel: PartyPicker (stack depth: 1)
+[aPanelManager] Popped panel: PartyPicker (stack depth: 1)
 [PartyPicker] Lost focus
 [ItemsPanel] Gained focus
 [ItemsPanel] Calling _grab_item_focus()

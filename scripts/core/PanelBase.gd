@@ -6,20 +6,20 @@ class_name PanelBase
 ## ═══════════════════════════════════════════════════════════════════════════
 ##
 ## PURPOSE:
-##   Provides standard interface for panels to work with PanelManager.
+##   Provides standard interface for panels to work with aPanelManager.
 ##   All menu panels should extend this class or implement its interface.
 ##
 ## FEATURES:
-##   • Automatic registration with PanelManager when visible
+##   • Automatic registration with aPanelManager when visible
 ##   • Standard lifecycle callbacks (gained/lost focus)
 ##   • Optional close prevention logic
 ##   • Automatic focus management
 ##
 ## LIFECYCLE:
-##   1. Panel becomes visible → auto-registers with PanelManager
+##   1. Panel becomes visible → auto-registers with aPanelManager
 ##   2. Panel receives panel_gained_focus() callback
 ##   3. Panel loses focus → panel_lost_focus() callback
-##   4. Panel closes → auto-unregisters from PanelManager
+##   4. Panel closes → auto-unregisters from aPanelManager
 ##
 ## SUBCLASS USAGE:
 ##   Override these methods in your panel:
@@ -45,15 +45,15 @@ class_name PanelBase
 ## Enable debug logging for this panel
 @export var debug_logging: bool = false
 
-## Automatically push to PanelManager when visible
+## Automatically push to aPanelManager when visible
 @export var auto_register: bool = true
 
-## Automatically pop from PanelManager when hidden
+## Automatically pop from aPanelManager when hidden
 @export var auto_unregister: bool = true
 
 # ────────────────────────── State ──────────────────────────────
 
-## Reference to PanelManager autoload
+## Reference to aPanelManager autoload
 var _panel_manager: Node = null
 
 ## Whether this panel is currently registered
@@ -62,10 +62,10 @@ var _is_registered: bool = false
 # ────────────────────────── Lifecycle ──────────────────────────────
 
 func _ready() -> void:
-	# Get PanelManager reference
-	_panel_manager = get_node_or_null("/root/PanelManager")
+	# Get aPanelManager reference
+	_panel_manager = get_node_or_null("/root/aPanelManager")
 	if _panel_manager == null:
-		push_warning("[%s] PanelManager not found - panel management disabled" % name)
+		push_warning("[%s] aPanelManager not found - panel management disabled" % name)
 
 	# Connect visibility signal
 	visibility_changed.connect(_on_visibility_changed)
@@ -85,17 +85,17 @@ func _on_visibility_changed() -> void:
 
 # ────────────────────────── Panel Manager Interface ──────────────────────────────
 
-## Called by PanelManager when this panel gains focus (becomes active)
+## Called by aPanelManager when this panel gains focus (becomes active)
 func panel_gained_focus() -> void:
 	_log("Gained focus")
 	_on_panel_gained_focus()
 
-## Called by PanelManager when this panel loses focus
+## Called by aPanelManager when this panel loses focus
 func panel_lost_focus() -> void:
 	_log("Lost focus")
 	_on_panel_lost_focus()
 
-## Called by PanelManager to check if panel can close
+## Called by aPanelManager to check if panel can close
 ## Return false to prevent closing
 func panel_can_close() -> bool:
 	var can_close: bool = _can_panel_close()
@@ -119,11 +119,11 @@ func _can_panel_close() -> bool:
 
 # ────────────────────────── Public API ──────────────────────────────
 
-## Manually push this panel to PanelManager
+## Manually push this panel to aPanelManager
 func push_to_manager() -> void:
 	_register_panel()
 
-## Manually pop this panel from PanelManager
+## Manually pop this panel from aPanelManager
 func pop_from_manager() -> void:
 	_unregister_panel()
 
@@ -133,13 +133,13 @@ func is_active() -> bool:
 		return false
 	return _panel_manager.is_panel_active(self)
 
-## Check if this panel is in the PanelManager stack
+## Check if this panel is in the aPanelManager stack
 func is_registered() -> bool:
 	return _is_registered
 
 # ────────────────────────── Internal Helpers ──────────────────────────────
 
-## Register panel with PanelManager
+## Register panel with aPanelManager
 func _register_panel() -> void:
 	if _panel_manager == null:
 		return
@@ -148,11 +148,11 @@ func _register_panel() -> void:
 		_log("Already registered")
 		return
 
-	_log("Registering with PanelManager")
+	_log("Registering with aPanelManager")
 	_panel_manager.push_panel(self)
 	_is_registered = true
 
-## Unregister panel from PanelManager
+## Unregister panel from aPanelManager
 func _unregister_panel() -> void:
 	if _panel_manager == null:
 		return
@@ -163,7 +163,7 @@ func _unregister_panel() -> void:
 
 	# Only pop if we're the active panel
 	if _panel_manager.is_panel_active(self):
-		_log("Unregistering from PanelManager")
+		_log("Unregistering from aPanelManager")
 		_panel_manager.pop_panel()
 		_is_registered = false
 
