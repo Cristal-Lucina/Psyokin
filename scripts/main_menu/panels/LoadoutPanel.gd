@@ -112,10 +112,11 @@ var _party_sig: String = ""
 var _sigils_sig: String = ""
 var _poll_accum: float = 0.0
 
-# Controller navigation state
-var _in_party_mode: bool = true  # true = navigating party list, false = navigating equipment
-var _nav_elements: Array[Control] = []  # Ordered list of focusable elements
-var _nav_index: int = 0  # Current selection index
+# Controller navigation state - Simple state machine
+enum NavState { PARTY_SELECT, EQUIPMENT_NAV, POPUP_ACTIVE }
+var _nav_state: NavState = NavState.PARTY_SELECT
+var _nav_elements: Array[Control] = []  # Ordered list of focusable elements in equipment mode
+var _nav_index: int = 0  # Current selection index in equipment mode
 var _active_popup: Control = null  # Currently open equipment popup panel
 
 func _ready() -> void:
@@ -159,24 +160,24 @@ func _ready() -> void:
 ## PanelBase callback - Called when LoadoutPanel gains focus
 func _on_panel_gained_focus() -> void:
 	super()  # Call parent
-	print("[LoadoutPanel] Panel gained focus")
-	call_deferred("_grab_initial_focus")
+	print("[LoadoutPanel] Panel gained focus - state: %s" % NavState.keys()[_nav_state])
+
+	# Restore focus based on current navigation state
+	match _nav_state:
+		NavState.PARTY_SELECT:
+			call_deferred("_enter_party_select_state")
+		NavState.EQUIPMENT_NAV:
+			call_deferred("_restore_equipment_focus")
+		NavState.POPUP_ACTIVE:
+			# Popup will handle its own focus when it's the active panel
+			pass
 
 ## PanelBase callback - Called when LoadoutPanel loses focus
 func _on_panel_lost_focus() -> void:
 	super()  # Call parent
-	print("[LoadoutPanel] Panel lost focus")
-	# Don't auto-close popup - it will be managed by the panel stack
-	# The popup losing focus happens naturally when it's pushed to the stack
-
-func _grab_initial_focus() -> void:
-	"""Set initial focus state when panel opens"""
-	_in_party_mode = true
-	if _party_list and _party_list.get_item_count() > 0:
-		_party_list.grab_focus()
-		if _party_list.get_selected_items().is_empty():
-			_party_list.select(0)
-		print("[LoadoutPanel] Initial focus grabbed - party mode")
+	print("[LoadoutPanel] Panel lost focus - state: %s" % NavState.keys()[_nav_state])
+	# Don't auto-close popup - it's managed by panel stack
+	# Don't change state - preserve it for when we regain focus
 
 func _first_fill() -> void:
 	_refresh_party()
@@ -213,9 +214,12 @@ func _wire_refresh_signals() -> void:
 	_connect_if(_stats, "stats_changed",        Callable(self, "_on_stats_changed"))
 
 func _refresh_all_for_current() -> void:
+	"""Refresh all display elements for currently selected party member
+	Preserves navigation state (_nav_state and _nav_index)"""
 	var cur: String = _current_token()
 	if cur == "":
 		return
+
 	var equip: Dictionary = _fetch_equip_for(cur)
 	_set_slot_value(_w_val, String(equip.get("weapon","")), "weapon")
 	_set_slot_value(_a_val, String(equip.get("armor","")), "armor")
@@ -227,11 +231,10 @@ func _refresh_all_for_current() -> void:
 	_refresh_mind_row(cur)
 	_refresh_active_type_row(cur)
 
-	# Rebuild navigation elements if in equipment mode (sigils may have changed)
-	if not _in_party_mode:
-		call_deferred("_build_nav_elements")
-		if _nav_index >= 0 and _nav_index < _nav_elements.size():
-			call_deferred("_focus_element", _nav_index)
+	# Rebuild navigation elements if in equipment mode
+	# This preserves _nav_state and _nav_index
+	if _nav_state == NavState.EQUIPMENT_NAV:
+		call_deferred("_rebuild_equipment_navigation_and_restore_focus")
 
 func _on_sigil_instances_updated(_a=null,_b=null,_c=null) -> void:
 	_refresh_all_for_current()
@@ -470,6 +473,9 @@ func _show_item_menu_for_slot(member_token: String, slot: String) -> void:
 		popup_panel.set_meta("_is_equipment_popup", true)
 		panel_mgr.push_panel(popup_panel)
 		print("[LoadoutPanel] Pushed equipment popup to aPanelManager stack")
+
+	# Set state to POPUP_ACTIVE
+	_nav_state = NavState.POPUP_ACTIVE
 
 	print("[LoadoutPanel] Equipment popup opened for %s - %d items" % [slot, item_ids.size()])
 
@@ -1131,250 +1137,265 @@ func _as_bool(v: Variant) -> bool:
 		_:           return false
 
 ## ═══════════════════════════════════════════════════════════════
-## CONTROLLER NAVIGATION
+## CONTROLLER NAVIGATION - Clean State Machine
+## ═══════════════════════════════════════════════════════════════
+##
+## State Flow:
+##   PARTY_SELECT → (Accept) → EQUIPMENT_NAV → (Equip btn) → POPUP_ACTIVE
+##   POPUP_ACTIVE → (Accept/Back) → EQUIPMENT_NAV
+##   EQUIPMENT_NAV → (Back) → PARTY_SELECT
+##   PARTY_SELECT → (Back) → Pop panel (exit to StatusPanel)
+##
 ## ═══════════════════════════════════════════════════════════════
 
 func _unhandled_input(event: InputEvent) -> void:
-	"""Handle controller navigation for LoadoutPanel
+	"""Single entry point for all controller input - Clean state machine"""
 
-	Navigation flow:
-	1. Party list (UP/DOWN to select member, ACCEPT to confirm)
-	2. Equipment slots (UP/DOWN to navigate)
-	3. Sigil slots (UP/DOWN to navigate)
-	4. Manage Sigils button
-	5. Mind Type button
-	"""
-	# If popup is active, always handle its input (even if LoadoutPanel is not the active panel)
-	if _active_popup and is_instance_valid(_active_popup) and _active_popup.visible:
-		if event.is_action_pressed("menu_accept"):
-			_activate_popup_selection()
-			get_viewport().set_input_as_handled()
-			return
-		elif event.is_action_pressed("menu_back"):
-			_close_equipment_popup()
-			get_viewport().set_input_as_handled()
-			return
-		# Popup is active, mark ALL input as handled to prevent propagation to GameMenu
-		get_viewport().set_input_as_handled()
+	# STATE 1: POPUP_ACTIVE - Highest priority, blocks all other input
+	if _nav_state == NavState.POPUP_ACTIVE:
+		_handle_popup_input(event)
+		get_viewport().set_input_as_handled()  # Block ALL input when popup active
 		return
 
-	# Only handle LoadoutPanel input if we're the active panel in aPanelManager
+	# Only handle input if we're the active panel
 	if not is_active():
 		return
 
-	if _in_party_mode:
-		# Party list navigation
-		if event.is_action_pressed("move_up"):
-			_navigate_party(-1)
-			get_viewport().set_input_as_handled()
-		elif event.is_action_pressed("move_down"):
-			_navigate_party(1)
-			get_viewport().set_input_as_handled()
-		elif event.is_action_pressed("menu_accept"):
-			# Lock in party member and switch to equipment mode
-			_enter_equipment_mode()
-			get_viewport().set_input_as_handled()
-		elif event.is_action_pressed("menu_back"):
-			# Pop LoadoutPanel from aPanelManager to go back to previous panel
-			var panel_mgr = get_node_or_null("/root/aPanelManager")
-			if panel_mgr:
-				panel_mgr.pop_panel()
-				print("[LoadoutPanel] Popped LoadoutPanel from stack via back button")
-				get_viewport().set_input_as_handled()
-	else:
-		# Equipment/sigil/button navigation
-		if event.is_action_pressed("move_up"):
-			_navigate_equipment(-1)
-			get_viewport().set_input_as_handled()
-		elif event.is_action_pressed("move_down"):
-			_navigate_equipment(1)
-			get_viewport().set_input_as_handled()
-		elif event.is_action_pressed("menu_accept"):
-			_activate_current_element()
-			get_viewport().set_input_as_handled()
-		elif event.is_action_pressed("menu_back"):
-			# Return to party mode (don't pop from aPanelManager, stay on LoadoutPanel)
-			_enter_party_mode()
-			get_viewport().set_input_as_handled()
-
-func _navigate_party(delta: int) -> void:
-	"""Navigate UP/DOWN in party list"""
-	if not _party_list:
+	# STATE 2: PARTY_SELECT
+	if _nav_state == NavState.PARTY_SELECT:
+		_handle_party_select_input(event)
 		return
 
-	var count = _party_list.get_item_count()
-	if count == 0:
+	# STATE 3: EQUIPMENT_NAV
+	if _nav_state == NavState.EQUIPMENT_NAV:
+		_handle_equipment_nav_input(event)
+		return
+
+## ─────────────────────── STATE 1: POPUP_ACTIVE ───────────────────────
+
+func _handle_popup_input(event: InputEvent) -> void:
+	"""Handle input when equipment popup is active"""
+	if event.is_action_pressed("menu_accept"):
+		_popup_accept_item()
+	elif event.is_action_pressed("menu_back"):
+		_popup_cancel()
+
+func _popup_accept_item() -> void:
+	"""User pressed accept on popup - equip the selected item"""
+	if not _active_popup or not is_instance_valid(_active_popup):
+		return
+
+	var item_list: ItemList = _active_popup.get_meta("_item_list", null)
+	var item_ids: Array = _active_popup.get_meta("_item_ids", [])
+	var member_token: String = _active_popup.get_meta("_member_token", "")
+	var slot: String = _active_popup.get_meta("_slot", "")
+
+	if not item_list:
+		_popup_cancel()
+		return
+
+	var selected = item_list.get_selected_items()
+	if selected.is_empty():
+		print("[LoadoutPanel] No item selected - closing popup")
+		_popup_cancel()
+		return
+
+	var idx: int = selected[0]
+	if idx < 0 or idx >= item_ids.size():
+		print("[LoadoutPanel] Invalid selection index")
+		_popup_cancel()
+		return
+
+	var item_id: String = item_ids[idx]
+	print("[LoadoutPanel] Equipping: '%s' to %s" % [item_id, slot])
+
+	# Equip the item
+	if item_id == "":
+		# Unequip
+		if _eq and _eq.has_method("unequip_slot"):
+			_eq.call("unequip_slot", member_token, slot)
+	else:
+		# Equip
+		if _eq and _eq.has_method("equip_item"):
+			_eq.call("equip_item", member_token, item_id)
+
+	# Special bracelet handling
+	if slot == "bracelet" and _sig and _sig.has_method("on_bracelet_changed"):
+		_sig.call("on_bracelet_changed", member_token)
+
+	# Close popup and return to EQUIPMENT_NAV (stay at same position!)
+	_popup_close_and_return_to_equipment()
+
+func _popup_cancel() -> void:
+	"""User pressed back on popup - close without equipping"""
+	_popup_close_and_return_to_equipment()
+
+func _popup_close_and_return_to_equipment() -> void:
+	"""Close popup and return to EQUIPMENT_NAV state at same nav index"""
+	if not _active_popup or not is_instance_valid(_active_popup):
+		return
+
+	print("[LoadoutPanel] Closing popup, returning to equipment mode")
+
+	# Store popup reference and clear BEFORE popping (prevents double-free)
+	var popup_to_close = _active_popup
+	_active_popup = null
+
+	# Pop from panel manager
+	var panel_mgr = get_node_or_null("/root/aPanelManager")
+	if panel_mgr and panel_mgr.is_panel_active(popup_to_close):
+		panel_mgr.pop_panel()
+
+	popup_to_close.queue_free()
+
+	# Return to EQUIPMENT_NAV state (preserve _nav_index!)
+	_nav_state = NavState.EQUIPMENT_NAV
+	call_deferred("_restore_equipment_focus")
+
+## ─────────────────────── STATE 2: PARTY_SELECT ───────────────────────
+
+func _handle_party_select_input(event: InputEvent) -> void:
+	"""Handle input when in party select mode"""
+	if event.is_action_pressed("move_up"):
+		_navigate_party(-1)
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("move_down"):
+		_navigate_party(1)
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("menu_accept"):
+		_transition_to_equipment_nav()
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("menu_back"):
+		_exit_loadout_panel()
+		get_viewport().set_input_as_handled()
+
+func _navigate_party(delta: int) -> void:
+	"""Navigate up/down in party list"""
+	if not _party_list or _party_list.get_item_count() == 0:
 		return
 
 	var current = _party_list.get_selected_items()
 	var idx = current[0] if current.size() > 0 else 0
-
-	idx += delta
-	idx = clamp(idx, 0, count - 1)
+	idx = clamp(idx + delta, 0, _party_list.get_item_count() - 1)
 
 	_party_list.select(idx)
 	_party_list.ensure_current_is_visible()
+	_on_party_selected(idx)  # Manually trigger signal
 
-	# Manually trigger the selection callback since ItemList.select() doesn't emit signal
-	_on_party_selected(idx)
+func _transition_to_equipment_nav() -> void:
+	"""Transition from PARTY_SELECT to EQUIPMENT_NAV"""
+	print("[LoadoutPanel] Transition: PARTY_SELECT → EQUIPMENT_NAV")
+	_nav_state = NavState.EQUIPMENT_NAV
+	_nav_index = 0  # Start at first equipment button
+	call_deferred("_rebuild_equipment_navigation_and_focus_first")
 
-	print("[LoadoutPanel] Party navigation: selected index %d" % idx)
+func _exit_loadout_panel() -> void:
+	"""Exit LoadoutPanel back to previous panel (StatusPanel)"""
+	print("[LoadoutPanel] Exiting to previous panel")
+	var panel_mgr = get_node_or_null("/root/aPanelManager")
+	if panel_mgr:
+		panel_mgr.pop_panel()
 
-func _enter_equipment_mode() -> void:
-	"""Switch from party selection to equipment/sigil navigation"""
-	print("[LoadoutPanel] Entering equipment mode")
-	_in_party_mode = false
-	_build_nav_elements()
+func _enter_party_select_state() -> void:
+	"""Enter PARTY_SELECT state and grab focus on party list"""
+	_nav_state = NavState.PARTY_SELECT
+	if _party_list and _party_list.get_item_count() > 0:
+		_party_list.grab_focus()
+		if _party_list.get_selected_items().is_empty():
+			_party_list.select(0)
+	print("[LoadoutPanel] Entered PARTY_SELECT state")
+
+## ─────────────────────── STATE 3: EQUIPMENT_NAV ───────────────────────
+
+func _handle_equipment_nav_input(event: InputEvent) -> void:
+	"""Handle input when navigating equipment buttons"""
+	if event.is_action_pressed("move_up"):
+		_navigate_equipment(-1)
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("move_down"):
+		_navigate_equipment(1)
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("menu_accept"):
+		_activate_current_equipment_button()
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("menu_back"):
+		_transition_to_party_select()
+		get_viewport().set_input_as_handled()
+
+func _navigate_equipment(delta: int) -> void:
+	"""Navigate up/down through equipment buttons"""
+	if _nav_elements.is_empty():
+		return
+
+	_nav_index = clamp(_nav_index + delta, 0, _nav_elements.size() - 1)
+	_focus_equipment_element(_nav_index)
+
+func _activate_current_equipment_button() -> void:
+	"""Press the currently focused equipment button"""
+	var focused = get_viewport().gui_get_focus_owner()
+	if focused and focused is Button:
+		focused.emit_signal("pressed")
+	elif _nav_index >= 0 and _nav_index < _nav_elements.size():
+		var element = _nav_elements[_nav_index]
+		if is_instance_valid(element) and element is Button:
+			element.emit_signal("pressed")
+
+func _transition_to_party_select() -> void:
+	"""Transition from EQUIPMENT_NAV to PARTY_SELECT"""
+	print("[LoadoutPanel] Transition: EQUIPMENT_NAV → PARTY_SELECT")
+	_nav_state = NavState.PARTY_SELECT
+	call_deferred("_enter_party_select_state")
+
+func _rebuild_equipment_navigation_and_focus_first() -> void:
+	"""Rebuild navigation elements and focus the first one"""
+	_rebuild_equipment_navigation()
 	_nav_index = 0
 	if _nav_elements.size() > 0:
-		_focus_element(_nav_index)
+		_focus_equipment_element(0)
 
-func _enter_party_mode() -> void:
-	"""Return to party list navigation"""
-	print("[LoadoutPanel] Returning to party mode")
-	_in_party_mode = true
-	# Release focus from equipment elements
-	if _party_list:
-		_party_list.grab_focus()
-		var current = _party_list.get_selected_items()
-		if current.size() == 0 and _party_list.get_item_count() > 0:
-			_party_list.select(0)
+func _rebuild_equipment_navigation_and_restore_focus() -> void:
+	"""Rebuild navigation elements and restore focus to current index"""
+	_rebuild_equipment_navigation()
+	if _nav_index >= 0 and _nav_index < _nav_elements.size():
+		_focus_equipment_element(_nav_index)
 
-func _build_nav_elements() -> void:
-	"""Build ordered list of focusable elements for equipment mode"""
+func _rebuild_equipment_navigation() -> void:
+	"""Build list of focusable equipment elements"""
 	_nav_elements.clear()
-	
-	# Equipment slot buttons (W, A, H, F, B)
+
+	# Equipment slot buttons
 	if _w_btn: _nav_elements.append(_w_btn)
 	if _a_btn: _nav_elements.append(_a_btn)
 	if _h_btn: _nav_elements.append(_h_btn)
 	if _f_btn: _nav_elements.append(_f_btn)
 	if _b_btn: _nav_elements.append(_b_btn)
-	
-	# Sigil slot buttons (dynamically created)
+
+	# Sigil slot buttons
 	if _sigils_list:
 		for child in _sigils_list.get_children():
 			if child is HBoxContainer:
 				for subchild in child.get_children():
 					if subchild is Button:
 						_nav_elements.append(subchild)
-	
-	# Manage Sigils button
-	if _btn_manage:
-		_nav_elements.append(_btn_manage)
-	
-	# Mind Type button  
-	if _active_btn:
-		_nav_elements.append(_active_btn)
-	
-	print("[LoadoutPanel] Built navigation with %d elements" % _nav_elements.size())
 
-func _navigate_equipment(delta: int) -> void:
-	"""Navigate UP/DOWN through equipment/sigil/button elements"""
-	if _nav_elements.is_empty():
-		return
+	# Special buttons
+	if _btn_manage: _nav_elements.append(_btn_manage)
+	if _active_btn: _nav_elements.append(_active_btn)
 
-	_nav_index += delta
-	_nav_index = clamp(_nav_index, 0, _nav_elements.size() - 1)
+	print("[LoadoutPanel] Built navigation: %d elements" % _nav_elements.size())
 
-	_focus_element(_nav_index)
-	print("[LoadoutPanel] Equipment navigation: index %d" % _nav_index)
-
-func _focus_element(index: int) -> void:
-	"""Focus the element at the given index using Godot's built-in focus system"""
+func _focus_equipment_element(index: int) -> void:
+	"""Focus the equipment element at given index"""
 	if index < 0 or index >= _nav_elements.size():
 		return
 
 	var element = _nav_elements[index]
-	if not is_instance_valid(element):
-		return
-
-	if element is Control:
+	if is_instance_valid(element) and element is Control:
 		element.grab_focus()
-		print("[LoadoutPanel] Focused element %d: %s" % [index, element.get_class()])
 
-func _activate_current_element() -> void:
-	"""Press/activate the currently focused element (A button)"""
-	# Use Godot's focus system to determine which element to activate
-	var focused = get_viewport().gui_get_focus_owner()
-
-	if focused and focused is Button:
-		print("[LoadoutPanel] Activating focused button: %s" % focused.text)
-		focused.emit_signal("pressed")
-	elif _nav_index >= 0 and _nav_index < _nav_elements.size():
-		# Fallback to nav_index if no focus (shouldn't happen)
-		var element = _nav_elements[_nav_index]
-		if is_instance_valid(element) and element is Button:
-			print("[LoadoutPanel] Activating button via nav_index: %s" % element.text)
-			element.emit_signal("pressed")
-
-# ───────────────── popup navigation ─────────────────
-func _activate_popup_selection() -> void:
-	"""Activate the currently selected item in equipment popup (A button)"""
-	if not _active_popup or not is_instance_valid(_active_popup):
-		return
-
-	if not _active_popup.has_meta("_item_list"):
-		return
-
-	var item_list: ItemList = _active_popup.get_meta("_item_list")
-	var item_ids: Array = _active_popup.get_meta("_item_ids", [])
-	var member_token: String = _active_popup.get_meta("_member_token", "")
-	var slot: String = _active_popup.get_meta("_slot", "")
-
-	var selected_items = item_list.get_selected_items()
-	if selected_items.is_empty():
-		print("[LoadoutPanel] No item selected in popup")
-		# Close popup if there's nothing to select (e.g., no items available)
-		_close_equipment_popup()
-		return
-
-	var idx: int = selected_items[0]
-	if idx < 0 or idx >= item_ids.size():
-		print("[LoadoutPanel] Invalid selection index: %d" % idx)
-		return
-
-	var item_id: String = item_ids[idx]
-	print("[LoadoutPanel] Equipping item: '%s' to slot: %s" % [item_id, slot])
-
-	# Handle equip/unequip
-	if item_id == "":
-		# Unequip
-		if _eq and _eq.has_method("unequip_slot"):
-			_eq.call("unequip_slot", member_token, slot)
+func _restore_equipment_focus() -> void:
+	"""Restore focus to current equipment navigation index"""
+	if _nav_elements.is_empty():
+		call_deferred("_rebuild_equipment_navigation_and_restore_focus")
 	else:
-		# Equip item
-		if _eq and _eq.has_method("equip_item"):
-			_eq.call("equip_item", member_token, item_id)
-
-	# Special handling for bracelet
-	if slot == "bracelet" and _sig and _sig.has_method("on_bracelet_changed"):
-		_sig.call("on_bracelet_changed", member_token)
-
-	# Close popup AFTER equipping (so signals can fire)
-	# This will automatically refresh via equipment_changed signal
-	_close_equipment_popup()
-
-func _close_equipment_popup() -> void:
-	"""Close the equipment popup (B button)"""
-	if _active_popup and is_instance_valid(_active_popup):
-		print("[LoadoutPanel] Closing equipment popup")
-
-		# Store reference and clear _active_popup BEFORE popping
-		# This prevents _on_panel_gained_focus from trying to clean up the same popup
-		var popup_to_close = _active_popup
-		_active_popup = null
-
-		# Pop from aPanelManager if it's in the stack
-		var panel_mgr = get_node_or_null("/root/aPanelManager")
-		if panel_mgr and panel_mgr.is_panel_active(popup_to_close):
-			panel_mgr.pop_panel()
-			print("[LoadoutPanel] Popped equipment popup from aPanelManager stack")
-
-		popup_to_close.queue_free()
-
-		# Stay in equipment mode and restore focus to the current equipment element
-		# Don't go back to party mode - user is still managing equipment
-		if not _in_party_mode and _nav_index >= 0 and _nav_index < _nav_elements.size():
-			call_deferred("_focus_element", _nav_index)
-			print("[LoadoutPanel] Restored focus to equipment mode, index: %d" % _nav_index)
+		_focus_equipment_element(_nav_index)
