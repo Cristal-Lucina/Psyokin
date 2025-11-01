@@ -551,9 +551,11 @@ func _rebuild_sigils(member_token: String) -> void:
 
 	for idx in range(cap):
 		var row: HBoxContainer = HBoxContainer.new()
-		row.add_theme_constant_override("separation", 6)
+		row.add_theme_constant_override("separation", 8)
+		row.size_flags_horizontal = Control.SIZE_EXPAND_FILL  # Match equipment row expansion
 
 		var nm: Label = Label.new()
+		nm.custom_minimum_size = Vector2(180, 0)  # Match equipment label width
 		nm.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
 		var cur_id: String = (String(sockets[idx]) if idx < sockets.size() else "")
