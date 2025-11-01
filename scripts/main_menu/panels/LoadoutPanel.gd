@@ -1154,7 +1154,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			_close_equipment_popup()
 			get_viewport().set_input_as_handled()
 			return
-		# Popup is active, don't process LoadoutPanel input
+		# Popup is active, mark ALL input as handled to prevent propagation to GameMenu
+		get_viewport().set_input_as_handled()
 		return
 
 	# Only handle LoadoutPanel input if we're the active panel in aPanelManager
@@ -1324,6 +1325,8 @@ func _activate_popup_selection() -> void:
 	var selected_items = item_list.get_selected_items()
 	if selected_items.is_empty():
 		print("[LoadoutPanel] No item selected in popup")
+		# Close popup if there's nothing to select (e.g., no items available)
+		_close_equipment_popup()
 		return
 
 	var idx: int = selected_items[0]
@@ -1373,5 +1376,8 @@ func _close_equipment_popup() -> void:
 
 		popup_to_close.queue_free()
 
-		# Regain focus on LoadoutPanel
-		call_deferred("_grab_initial_focus")
+		# Stay in equipment mode and restore focus to the current equipment element
+		# Don't go back to party mode - user is still managing equipment
+		if not _in_party_mode and _nav_index >= 0 and _nav_index < _nav_elements.size():
+			call_deferred("_focus_element", _nav_index)
+			print("[LoadoutPanel] Restored focus to equipment mode, index: %d" % _nav_index)
