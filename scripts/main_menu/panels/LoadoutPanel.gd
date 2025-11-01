@@ -1160,12 +1160,17 @@ func _on_manage_sigils() -> void:
 	_nav_state = NavState.POPUP_ACTIVE
 	print("[LoadoutPanel] SigilSkillMenu opened, state = POPUP_ACTIVE")
 
+func _on_sigil_menu_closing() -> void:
+	"""Called by SigilSkillMenu BEFORE it closes - set state before panel pops"""
+	print("[LoadoutPanel] SigilSkillMenu closing, setting state to EQUIPMENT_NAV")
+	_nav_state = NavState.EQUIPMENT_NAV
+	# Now when panel_gained_focus runs, it will see EQUIPMENT_NAV and restore focus
+
 func _on_sigil_menu_closed() -> void:
-	"""Called when SigilSkillMenu is closed"""
+	"""Called when SigilSkillMenu is fully closed (tree_exited)"""
 	print("[LoadoutPanel] SigilSkillMenu closed, refreshing loadout")
 	# In case levels/skills changed while menu was open
-	_refresh_all_for_current()
-	# State will be restored by _on_panel_gained_focus when we regain focus
+	call_deferred("_refresh_all_for_current")
 
 # ────────────────── polling fallback ──────────────────
 func _snapshot_party_signature() -> String:
@@ -1236,15 +1241,15 @@ func _input(event: InputEvent) -> void:
 	allowing us to mark input as handled before GameMenu intercepts it.
 	"""
 
+	# Only handle input if we're the active panel
+	if not is_active():
+		return
+
 	# STATE 1: POPUP_ACTIVE - Handle accept/back, let navigation pass to ItemList
 	if _nav_state == NavState.POPUP_ACTIVE:
 		_handle_popup_input(event)
 		# NOTE: _handle_popup_input decides which inputs to mark as handled
 		# Navigation (up/down) is NOT marked as handled, so ItemList can navigate
-		return
-
-	# Only handle input if we're the active panel
-	if not is_active():
 		return
 
 	# STATE 2: PARTY_SELECT
@@ -1260,10 +1265,16 @@ func _input(event: InputEvent) -> void:
 ## ─────────────────────── STATE 1: POPUP_ACTIVE ───────────────────────
 
 func _handle_popup_input(event: InputEvent) -> void:
-	"""Handle input when popup is active (equipment or sigil)
+	"""Handle input when popup is active (equipment, sigil picker, or sigil menu)
 
-	Only intercept accept/back - let navigation (up/down) pass to ItemList
+	Only intercept accept/back for equipment/sigil picker popups.
+	For SigilSkillMenu, do nothing - it handles its own input.
 	"""
+	# If SigilSkillMenu is open, don't handle any input - it handles everything
+	if _has_active_sigil_menu():
+		return
+
+	# Handle equipment/sigil picker popup input
 	if event.is_action_pressed("menu_accept"):
 		# Route to appropriate handler based on popup type
 		if _active_popup and _active_popup.get_meta("_is_sigil_popup", false):
@@ -1275,6 +1286,13 @@ func _handle_popup_input(event: InputEvent) -> void:
 		_popup_cancel()
 		get_viewport().set_input_as_handled()
 	# NOTE: Do NOT handle move_up/move_down here - let ItemList handle its own navigation
+
+func _has_active_sigil_menu() -> bool:
+	"""Check if SigilSkillMenu is currently open as a child"""
+	for child in get_children():
+		if child.get_class() == "SigilSkillMenu" or child.name.contains("SigilSkillMenu"):
+			return true
+	return false
 
 func _popup_accept_item() -> void:
 	"""User pressed accept on popup - equip the selected item"""

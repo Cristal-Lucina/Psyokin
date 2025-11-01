@@ -388,6 +388,12 @@ func _on_set_active() -> void:
 func _on_close() -> void:
 	print("[SigilSkillMenu] _on_close() called - closing menu")
 
+	# CRITICAL: Tell LoadoutPanel to change state BEFORE we pop
+	# Otherwise panel_gained_focus will see POPUP_ACTIVE and do nothing
+	var parent_panel = get_parent()
+	if parent_panel and parent_panel.has_method("_on_sigil_menu_closing"):
+		parent_panel.call("_on_sigil_menu_closing")
+
 	# Pop from panel manager if active
 	var panel_mgr = get_node_or_null("/root/aPanelManager")
 	if panel_mgr and panel_mgr.is_panel_active(self):
