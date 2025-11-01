@@ -1681,11 +1681,13 @@ func _handle_equipment_nav_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 func _navigate_equipment(delta: int) -> void:
-	"""Navigate up/down through equipment buttons"""
+	"""Navigate up/down through equipment buttons (wraps around cyclically)"""
 	if _nav_elements.is_empty():
 		return
 
-	_nav_index = clamp(_nav_index + delta, 0, _nav_elements.size() - 1)
+	# Wrap around: pressing down at bottom goes to top, pressing up at top goes to bottom
+	var size = _nav_elements.size()
+	_nav_index = (_nav_index + delta + size) % size
 	_focus_equipment_element(_nav_index)
 
 func _activate_current_equipment_button() -> void:
@@ -1722,17 +1724,21 @@ func _rebuild_equipment_navigation_and_restore_focus() -> void:
 		print("[LoadoutPanel] Index %d out of range (0-%d)" % [_nav_index, _nav_elements.size() - 1])
 
 func _rebuild_equipment_navigation() -> void:
-	"""Build list of focusable equipment elements"""
+	"""Build list of focusable equipment elements
+
+	Navigation cycles vertically through elements in this order:
+	Weapon → Armor → Head → Foot → Bracelet → Sigil Slots → Manage Sigil → Active Type → back to Weapon
+	"""
 	_nav_elements.clear()
 
-	# Equipment slot buttons
-	if _w_btn: _nav_elements.append(_w_btn)
-	if _a_btn: _nav_elements.append(_a_btn)
-	if _h_btn: _nav_elements.append(_h_btn)
-	if _f_btn: _nav_elements.append(_f_btn)
-	if _b_btn: _nav_elements.append(_b_btn)
+	# Equipment slot buttons (order matters - this determines vertical navigation flow)
+	if _w_btn: _nav_elements.append(_w_btn)  # Weapon
+	if _a_btn: _nav_elements.append(_a_btn)  # Armor
+	if _h_btn: _nav_elements.append(_h_btn)  # Head
+	if _f_btn: _nav_elements.append(_f_btn)  # Foot
+	if _b_btn: _nav_elements.append(_b_btn)  # Bracelet
 
-	# Sigil slot buttons - FILTER OUT nodes queued for deletion
+	# Sigil slot buttons - FILTER OUT nodes queued for deletion (dynamic count based on equipped sigils)
 	if _sigils_list:
 		for child in _sigils_list.get_children():
 			# Skip nodes queued for deletion (from queue_free())
@@ -1744,11 +1750,11 @@ func _rebuild_equipment_navigation() -> void:
 					if not is_instance_valid(subchild) or subchild.is_queued_for_deletion():
 						continue
 					if subchild is Button:
-						_nav_elements.append(subchild)
+						_nav_elements.append(subchild)  # Sigil slot equip buttons
 
-	# Special buttons
-	if _btn_manage: _nav_elements.append(_btn_manage)
-	if _active_btn: _nav_elements.append(_active_btn)
+	# Special buttons (always at the end of navigation cycle)
+	if _btn_manage: _nav_elements.append(_btn_manage)  # Manage Sigil button
+	if _active_btn: _nav_elements.append(_active_btn)  # Active Type button (player only)
 
 	print("[LoadoutPanel] Built navigation: %d elements" % _nav_elements.size())
 
