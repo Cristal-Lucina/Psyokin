@@ -80,12 +80,15 @@ class_name LoadoutPanel
 @onready var _btn_manage:   Button        = get_node_or_null("Row/Right/Buttons/BtnManageSigils") as Button
 
 @onready var _stats_grid:  GridContainer = get_node("Row/StatsColumn/StatsGrid") as GridContainer
-@onready var _mind_value:  Label         = get_node_or_null("Row/Right/MindRow/Value") as Label
-@onready var _mind_row:    HBoxContainer = get_node_or_null("Row/Right/MindRow") as HBoxContainer
+@onready var _mind_value:  Label         = get_node_or_null("Row/Right/MindSection/MindRow/Value") as Label
+@onready var _mind_section: VBoxContainer = get_node_or_null("Row/Right/MindSection") as VBoxContainer
 
-@onready var _active_name_lbl:  Label  = %ActiveNameLabel
-@onready var _active_value_lbl: Label  = %ActiveValueLabel
-@onready var _active_btn:       Button = %ActiveBtn
+@onready var _active_section:    VBoxContainer = %ActiveSection
+@onready var _active_label:      Label         = %ActiveLabel
+@onready var _active_row:        HBoxContainer = %ActiveRow
+@onready var _active_name_lbl:   Label         = %ActiveNameLabel
+@onready var _active_value_lbl:  Label         = %ActiveValueLabel
+@onready var _active_btn:        Button        = %ActiveBtn
 
 var _labels: PackedStringArray = PackedStringArray()
 var _tokens: PackedStringArray = PackedStringArray()
@@ -537,7 +540,7 @@ func _rebuild_sigils(member_token: String) -> void:
 		if String(s) != "": used += 1
 
 	if _sigils_title:
-		_sigils_title.text = "Sigils  (%d/%d)" % [used, cap]
+		_sigils_title.text = "SIGILS  (%d/%d)" % [used, cap]
 
 	if cap <= 0:
 		var none: Label = Label.new()
@@ -559,6 +562,7 @@ func _rebuild_sigils(member_token: String) -> void:
 
 		# Always show "Equip…" button - popup will handle unequip option
 		var btn: Button = Button.new()
+		btn.custom_minimum_size = Vector2(90, 0)  # Match equipment button width for grid alignment
 		btn.text = "Equip…"
 		btn.pressed.connect(Callable(self, "_on_equip_sigil").bind(member_token, idx))
 		row.add_child(btn)
@@ -1025,18 +1029,22 @@ func _setup_active_type_widgets() -> void:
 
 func _refresh_active_type_row(member_token: String) -> void:
 	var is_hero: bool = (member_token == "hero" or member_token.strip_edges().to_lower() == _hero_name().strip_edges().to_lower())
-	var do_show: bool = is_hero and _active_name_lbl != null and _active_value_lbl != null and _active_btn != null
+	var do_show: bool = is_hero and _active_section != null and _active_btn != null
 	if not do_show:
-		if _active_name_lbl:  _active_name_lbl.visible = false
-		if _active_value_lbl: _active_value_lbl.visible = false
-		if _active_btn:       _active_btn.visible = false
+		# Hide entire Active Type section for non-player characters
+		if _active_section: _active_section.visible = false
 		return
 
+	# Show Active Type section for player character
 	var cur: String = _get_hero_active_type()
-	_active_name_lbl.visible = true
-	_active_value_lbl.text = (cur if cur != "" else "Omega")
-	_active_value_lbl.visible = true
-	_active_btn.visible = true
+	if _active_section:    _active_section.visible = true
+	if _active_label:      _active_label.visible = true
+	if _active_row:        _active_row.visible = true
+	if _active_name_lbl:   _active_name_lbl.visible = true
+	if _active_value_lbl:
+		_active_value_lbl.text = (cur if cur != "" else "Omega")
+		_active_value_lbl.visible = true
+	if _active_btn:        _active_btn.visible = true
 
 func _get_hero_active_type() -> String:
 	if _gs:
@@ -1666,12 +1674,15 @@ func _enter_party_select_state() -> void:
 ## ─────────────────────── STATE 3: EQUIPMENT_NAV ───────────────────────
 
 func _handle_equipment_nav_input(event: InputEvent) -> void:
-	"""Handle input when navigating equipment buttons"""
+	"""Handle input when navigating equipment buttons (vertical-only navigation)"""
 	if event.is_action_pressed("move_up"):
 		_navigate_equipment(-1)
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("move_down"):
 		_navigate_equipment(1)
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("move_left") or event.is_action_pressed("move_right"):
+		# Explicitly block left/right input in equipment mode (vertical-only navigation)
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("menu_accept"):
 		_activate_current_equipment_button()
