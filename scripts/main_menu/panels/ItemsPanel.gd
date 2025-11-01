@@ -133,8 +133,16 @@ func _load_data() -> void:
 	"""Load item definitions and counts"""
 	# Load definitions from CSV
 	_defs.clear()
+
+	print("[ItemsPanel] _csv is null: %s" % (_csv == null))
+	if _csv:
+		print("[ItemsPanel] _csv has load_csv: %s" % _csv.has_method("load_csv"))
+
 	if _csv and _csv.has_method("load_csv"):
+		print("[ItemsPanel] Calling load_csv with path: %s, key: %s" % [ITEMS_CSV, KEY_ID])
 		var loaded: Variant = _csv.call("load_csv", ITEMS_CSV, KEY_ID)
+		print("[ItemsPanel] load_csv returned type: %d" % typeof(loaded))
+
 		if typeof(loaded) == TYPE_DICTIONARY:
 			_defs = loaded
 			print("[ItemsPanel] Loaded %d item definitions from CSV" % _defs.size())
@@ -144,7 +152,7 @@ func _load_data() -> void:
 				print("[ItemsPanel] Sample HP_002 def keys: %s" % str(sample.keys()))
 				print("[ItemsPanel] Sample HP_002 category: %s" % sample.get("category", "MISSING"))
 		else:
-			print("[ItemsPanel] ERROR: Failed to load CSV definitions!")
+			print("[ItemsPanel] ERROR: CSV load returned wrong type! Expected Dictionary (27), got type %d" % typeof(loaded))
 
 	# Load counts from inventory
 	_counts.clear()
