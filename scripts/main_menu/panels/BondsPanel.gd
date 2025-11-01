@@ -174,6 +174,11 @@ func _input(event: InputEvent) -> void:
 	if not is_active():
 		return
 
+	# Block input if story overlay is open
+	if _story_overlay != null and is_instance_valid(_story_overlay):
+		print("[BondsPanel] Story overlay is open, blocking BondsPanel input")
+		return
+
 	# Route to appropriate handler based on state
 	match _nav_state:
 		NavState.BOND_LIST:
@@ -1050,9 +1055,11 @@ func _on_story_points_pressed() -> void:
 	# Full-screen overlay (blocks input behind it)
 	var overlay := Control.new()
 	overlay.name = "StoryOverlay"
+	overlay.visible = true
 	overlay.mouse_filter = Control.MOUSE_FILTER_STOP
 	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
 	overlay.z_index = 100
+	print("[BondsPanel] Created overlay with z_index 100")
 
 	# Dim background
 	var dim := ColorRect.new()
@@ -1088,8 +1095,12 @@ func _on_story_points_pressed() -> void:
 	var back_btn := Button.new()
 	back_btn.text = "Back"
 	back_btn.focus_mode = Control.FOCUS_ALL
+	back_btn.custom_minimum_size = Vector2(80, 0)
 	back_btn.pressed.connect(func() -> void:
+		print("[BondsPanel] Story overlay back button pressed")
 		_close_story_overlay()
+		# Restore focus to detail view after closing overlay
+		call_deferred("_enter_bond_detail_state")
 	)
 	header.add_child(back_btn)
 
@@ -1133,6 +1144,8 @@ func _on_story_points_pressed() -> void:
 	back_btn.grab_focus()
 
 func _close_story_overlay() -> void:
+	print("[BondsPanel] _close_story_overlay called")
 	if _story_overlay != null and is_instance_valid(_story_overlay):
+		print("[BondsPanel] Closing existing story overlay")
 		_story_overlay.queue_free()
 	_story_overlay = null
