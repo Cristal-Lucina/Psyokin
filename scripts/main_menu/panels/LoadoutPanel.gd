@@ -1449,6 +1449,10 @@ func _popup_close_and_return_to_equipment() -> void:
 	var popup_to_close = _active_popup
 	_active_popup = null
 
+	# CRITICAL: Set state to EQUIPMENT_NAV BEFORE popping
+	# pop_panel() synchronously calls _on_panel_gained_focus(), which needs correct state
+	_nav_state = NavState.EQUIPMENT_NAV
+
 	# Pop from panel manager
 	var panel_mgr = get_node_or_null("/root/aPanelManager")
 	if panel_mgr and panel_mgr.is_panel_active(popup_to_close):
@@ -1456,9 +1460,8 @@ func _popup_close_and_return_to_equipment() -> void:
 
 	popup_to_close.queue_free()
 
-	# Return to EQUIPMENT_NAV state (preserve _nav_index!)
-	_nav_state = NavState.EQUIPMENT_NAV
-	call_deferred("_restore_equipment_focus")
+	# Focus will be restored by _on_panel_gained_focus() when panel_mgr.pop_panel() returns
+	# No need to call _restore_equipment_focus here
 
 ## ─────────────────────── STATE 2: PARTY_SELECT ───────────────────────
 
