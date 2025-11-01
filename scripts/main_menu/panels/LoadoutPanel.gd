@@ -1148,8 +1148,12 @@ func _as_bool(v: Variant) -> bool:
 ##
 ## ═══════════════════════════════════════════════════════════════
 
-func _unhandled_input(event: InputEvent) -> void:
-	"""Single entry point for all controller input - Clean state machine"""
+func _input(event: InputEvent) -> void:
+	"""Single entry point for all controller input - Clean state machine
+
+	Uses _input() instead of _unhandled_input() to have same priority as GameMenu,
+	allowing us to mark input as handled before GameMenu intercepts it.
+	"""
 
 	# STATE 1: POPUP_ACTIVE - Highest priority, blocks all other input
 	if _nav_state == NavState.POPUP_ACTIVE:
