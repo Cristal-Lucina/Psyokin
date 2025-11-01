@@ -1371,8 +1371,9 @@ func _popup_accept_sigil() -> void:
 			print("[LoadoutPanel] ✓ Sigil unequipped")
 		else:
 			print("[LoadoutPanel] ✗ remove_sigil_at method not available")
-		_on_sigils_changed(member_token)
 		_popup_close_and_return_to_equipment()
+		# Call AFTER popup closes so state is EQUIPMENT_NAV
+		call_deferred("_on_sigils_changed", member_token)
 		return
 
 	# Handle instance equip
@@ -1388,8 +1389,9 @@ func _popup_accept_sigil() -> void:
 				print("[LoadoutPanel] ✗ Failed to equip instance")
 		else:
 			print("[LoadoutPanel] ✗ equip_into_socket method not available")
-		_on_sigils_changed(member_token)
 		_popup_close_and_return_to_equipment()
+		# Call AFTER popup closes so state is EQUIPMENT_NAV
+		call_deferred("_on_sigils_changed", member_token)
 		return
 
 	# Handle base sigil equip
@@ -1403,8 +1405,9 @@ func _popup_accept_sigil() -> void:
 			var ok_direct: bool = bool(_sig.call("equip_from_inventory", member_token, socket_index, id))
 			if ok_direct:
 				print("[LoadoutPanel] ✓ Equipped directly from inventory")
-				_on_sigils_changed(member_token)
 				_popup_close_and_return_to_equipment()
+				# Call AFTER popup closes so state is EQUIPMENT_NAV
+				call_deferred("_on_sigils_changed", member_token)
 				return
 			else:
 				print("[LoadoutPanel] Direct equip failed, trying draft...")
@@ -1426,11 +1429,12 @@ func _popup_accept_sigil() -> void:
 					_sig.call("on_bracelet_changed", member_token)
 			else:
 				print("[LoadoutPanel] ✗ Failed to equip drafted instance")
-			_on_sigils_changed(member_token)
 		elif final_inst == "":
 			print("[LoadoutPanel] ✗ No instance to equip")
 
 		_popup_close_and_return_to_equipment()
+		# Call AFTER popup closes so state is EQUIPMENT_NAV
+		call_deferred("_on_sigils_changed", member_token)
 		return
 
 	# Unknown kind - just close
