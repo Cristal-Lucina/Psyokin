@@ -50,13 +50,19 @@
 ##
 ## ═══════════════════════════════════════════════════════════════════════════
 
-extends Control
+extends PanelBase
 class_name BondsPanel
 
 const SYS_PATH : String = "/root/aCircleBondSystem"
 const CSV_FALLBACK: String = "res://data/circles/circle_bonds.csv"
 
 enum Filter { ALL, KNOWN, LOCKED, MAXED }
+
+# Controller navigation state machine
+enum NavState { BOND_LIST, BOND_DETAIL }
+var _nav_state: NavState = NavState.BOND_LIST
+var _nav_elements: Array[Control] = []  # Bond buttons in list
+var _nav_index: int = 0  # Current selection index
 
 @onready var _filter    : OptionButton   = %Filter
 @onready var _refresh   : Button         = %RefreshBtn
@@ -96,6 +102,8 @@ var _selected : String = ""
 var _list_group: ButtonGroup = null  # exclusive selection group
 
 func _ready() -> void:
+	super()  # Call PanelBase._ready()
+
 	_sys = get_node_or_null(SYS_PATH)
 
 	# Optional old scene labels (may not exist)
@@ -126,6 +134,146 @@ func _ready() -> void:
 		_story_btn.pressed.connect(_on_story_points_pressed)
 
 	_rebuild()
+
+## PanelBase callback - Called when BondsPanel gains focus
+func _on_panel_gained_focus() -> void:
+	super()  # Call parent
+	print("[BondsPanel] Panel gained focus - state: %s" % NavState.keys()[_nav_state])
+
+	# Restore focus based on current navigation state
+	match _nav_state:
+		NavState.BOND_LIST:
+			call_deferred("_enter_bond_list_state")
+		NavState.BOND_DETAIL:
+			# In detail view, could add button navigation later
+			print("[BondsPanel] In BOND_DETAIL state")
+
+## PanelBase callback - Called when BondsPanel loses focus
+func _on_panel_lost_focus() -> void:
+	super()  # Call parent
+	print("[BondsPanel] Panel lost focus - state: %s" % NavState.keys()[_nav_state])
+
+# ─────────────────────────────────────────────────────────────
+# Input Handling - State Machine
+# ─────────────────────────────────────────────────────────────
+
+func _input(event: InputEvent) -> void:
+	# Only handle input if we're the active panel
+	if not is_active():
+		return
+
+	# Route to appropriate handler based on state
+	match _nav_state:
+		NavState.BOND_LIST:
+			_handle_bond_list_input(event)
+		NavState.BOND_DETAIL:
+			_handle_bond_detail_input(event)
+
+## ─────────────────────── STATE 1: BOND_LIST ───────────────────────
+
+func _handle_bond_list_input(event: InputEvent) -> void:
+	"""Handle input when navigating bond list (vertical-only navigation)"""
+	if event.is_action_pressed("move_up"):
+		_navigate_bond_list(-1)
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("move_down"):
+		_navigate_bond_list(1)
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("move_left") or event.is_action_pressed("move_right"):
+		# Block left/right input in bond list (vertical-only navigation)
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("menu_accept"):
+		_select_current_bond()
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("menu_back"):
+		_exit_bonds_panel()
+		get_viewport().set_input_as_handled()
+
+func _navigate_bond_list(delta: int) -> void:
+	"""Navigate up/down through bond list (wraps around cyclically)"""
+	if _nav_elements.is_empty():
+		return
+
+	# Wrap around: pressing down at bottom goes to top, pressing up at top goes to bottom
+	var size = _nav_elements.size()
+	_nav_index = (_nav_index + delta + size) % size
+	_focus_bond_element(_nav_index)
+
+func _focus_bond_element(index: int) -> void:
+	"""Focus the bond button at given index"""
+	if index < 0 or index >= _nav_elements.size():
+		return
+
+	var element = _nav_elements[index]
+	if is_instance_valid(element) and element is Control:
+		element.grab_focus()
+		# Also update the button pressed state for visual feedback
+		if element is Button:
+			(element as Button).button_pressed = true
+
+func _select_current_bond() -> void:
+	"""Select the currently focused bond and transition to detail view"""
+	if _nav_index < 0 or _nav_index >= _nav_elements.size():
+		return
+
+	var btn = _nav_elements[_nav_index]
+	if is_instance_valid(btn) and btn is Button:
+		var id: String = String(btn.get_meta("id", ""))
+		_selected = id
+		_update_detail(id)
+		_transition_to_bond_detail()
+
+func _enter_bond_list_state() -> void:
+	"""Enter BOND_LIST state and grab focus on bond list"""
+	_nav_state = NavState.BOND_LIST
+	_rebuild_navigation()
+	if _nav_elements.size() > 0:
+		_focus_bond_element(_nav_index)
+	print("[BondsPanel] Entered BOND_LIST state")
+
+func _rebuild_navigation() -> void:
+	"""Build list of focusable bond buttons"""
+	_nav_elements.clear()
+
+	if _list_box:
+		for child in _list_box.get_children():
+			if is_instance_valid(child) and not child.is_queued_for_deletion() and child is Button:
+				_nav_elements.append(child)
+
+	print("[BondsPanel] Built navigation: %d bond buttons" % _nav_elements.size())
+
+	# Clamp index to valid range
+	if _nav_elements.size() > 0:
+		_nav_index = clamp(_nav_index, 0, _nav_elements.size() - 1)
+	else:
+		_nav_index = 0
+
+func _exit_bonds_panel() -> void:
+	"""Exit BondsPanel back to previous panel (StatusPanel)"""
+	print("[BondsPanel] Exiting to previous panel")
+	var panel_mgr = get_node_or_null("/root/aPanelManager")
+	if panel_mgr:
+		panel_mgr.pop_panel()
+
+## ─────────────────────── STATE 2: BOND_DETAIL ───────────────────────
+
+func _handle_bond_detail_input(event: InputEvent) -> void:
+	"""Handle input when viewing bond details"""
+	if event.is_action_pressed("menu_back"):
+		_transition_to_bond_list()
+		get_viewport().set_input_as_handled()
+	# Future: Add up/down navigation for detail buttons (Story Points, Layer Transitions, etc.)
+
+func _transition_to_bond_detail() -> void:
+	"""Transition from BOND_LIST to BOND_DETAIL"""
+	print("[BondsPanel] Transition: BOND_LIST → BOND_DETAIL")
+	_nav_state = NavState.BOND_DETAIL
+
+func _transition_to_bond_list() -> void:
+	"""Transition from BOND_DETAIL to BOND_LIST"""
+	print("[BondsPanel] Transition: BOND_DETAIL → BOND_LIST")
+	_nav_state = NavState.BOND_LIST
+	call_deferred("_enter_bond_list_state")
 
 # ─────────────────────────────────────────────────────────────
 # Scene fixes
@@ -173,6 +321,7 @@ func _rebuild() -> void:
 	_rows = _read_defs()
 	_build_list()
 	_update_detail(_selected)  # keep detail synced if selection still exists
+	call_deferred("_rebuild_navigation")  # Rebuild navigation after list is built
 
 func _build_list() -> void:
 	for c in _list_box.get_children():
@@ -402,11 +551,17 @@ func _is_maxed(_id: String, layer_val: int) -> bool:
 
 func _on_filter_changed(_idx: int) -> void:
 	_build_list()
+	# Reset to BOND_LIST state when filter changes
+	_nav_state = NavState.BOND_LIST
+	_nav_index = 0
+	call_deferred("_rebuild_navigation")
 
 func _on_row_pressed(btn: Button) -> void:
 	var id_v: Variant = btn.get_meta("id")
 	_selected = String(id_v)
 	_update_detail(_selected)
+	# Transition to detail state (works for both mouse and controller)
+	_transition_to_bond_detail()
 
 func _update_detail(id: String) -> void:
 	# Handle empty selection
