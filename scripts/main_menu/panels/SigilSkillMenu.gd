@@ -12,8 +12,9 @@ var _selected_socket: int = -1
 var _selected_inst: String = ""
 var _skill_ids: Array[String] = []
 
-# Controller navigation state
-var _in_socket_mode: bool = true  # true = navigating sockets, false = navigating skills
+# Controller navigation state - Clean state machine
+enum NavMode { SOCKET_NAV, SKILLS_NAV }
+var _nav_mode: NavMode = NavMode.SOCKET_NAV
 
 # Scene nodes (from your .tscn)
 @onready var _backdrop: ColorRect = $"Backdrop" as ColorRect
@@ -96,8 +97,10 @@ func _on_gui_input(event: InputEvent) -> void:
 		if mb.pressed:
 			print("[SigilSkillMenu] GUI INPUT: Mouse button %d at (%d, %d)" % [mb.button_index, mb.position.x, mb.position.y])
 
-func _unhandled_input(e: InputEvent) -> void:
+func _input(e: InputEvent) -> void:
 	"""Handle controller navigation for SigilSkillMenu
+
+	Uses _input() instead of _unhandled_input() for same priority as GameMenu.
 
 	Two-mode navigation:
 	1. Socket mode: UP/DOWN to select socket, RIGHT/ACCEPT to enter skills
@@ -106,11 +109,11 @@ func _unhandled_input(e: InputEvent) -> void:
 	if e is InputEventMouseButton:
 		var mb := e as InputEventMouseButton
 		if mb.pressed:
-			print("[SigilSkillMenu] _unhandled_input: Mouse button %d at (%d, %d)" % [mb.button_index, mb.position.x, mb.position.y])
+			print("[SigilSkillMenu] _input: Mouse button %d at (%d, %d)" % [mb.button_index, mb.position.x, mb.position.y])
 
 	# ESC or B button to close
 	if e.is_action_pressed("menu_back") or (e is InputEventKey and e.is_pressed() and e.keycode == KEY_ESCAPE):
-		if _in_socket_mode:
+		if _nav_mode == NavMode.SOCKET_NAV:
 			# Close the menu
 			_on_close()
 			get_viewport().set_input_as_handled()
@@ -120,7 +123,7 @@ func _unhandled_input(e: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 		return
 
-	if _in_socket_mode:
+	if _nav_mode == NavMode.SOCKET_NAV:
 		# Socket navigation
 		if e.is_action_pressed("move_up"):
 			_navigate_sockets(-1)
@@ -132,7 +135,7 @@ func _unhandled_input(e: InputEvent) -> void:
 			# Enter skills mode
 			_enter_skills_mode()
 			get_viewport().set_input_as_handled()
-	else:
+	else:  # NavMode.SKILLS_NAV
 		# Skills navigation
 		if e.is_action_pressed("move_up"):
 			_navigate_skills(-1)
@@ -384,10 +387,13 @@ func _on_set_active() -> void:
 
 func _on_close() -> void:
 	print("[SigilSkillMenu] _on_close() called - closing menu")
-	print("[SigilSkillMenu] Call stack trace:")
-	var stack = get_stack()
-	for frame in stack:
-		print("  -> %s:%d in %s()" % [frame.source, frame.line, frame.function])
+
+	# Pop from panel manager if active
+	var panel_mgr = get_node_or_null("/root/aPanelManager")
+	if panel_mgr and panel_mgr.is_panel_active(self):
+		print("[SigilSkillMenu] Popping from panel stack")
+		panel_mgr.pop_panel()
+
 	queue_free()
 
 # ───────────────── helpers ─────────────────
@@ -441,18 +447,20 @@ func _navigate_skills(delta: int) -> void:
 func _enter_socket_mode() -> void:
 	"""Switch to socket navigation mode"""
 	print("[SigilSkillMenu] Entering socket mode")
-	_in_socket_mode = true
+	_nav_mode = NavMode.SOCKET_NAV
 	if _sockets and _sockets.item_count > 0:
 		var current = _sockets.get_selected_items()
 		if current.size() == 0:
 			_sockets.select(0)
 			_on_socket_pick(0)
+		_sockets.grab_focus()
 
 func _enter_skills_mode() -> void:
 	"""Switch to skills navigation mode"""
 	print("[SigilSkillMenu] Entering skills mode")
-	_in_socket_mode = false
+	_nav_mode = NavMode.SKILLS_NAV
 	if _skills and _skills.item_count > 0:
 		var current = _skills.get_selected_items()
 		if current.size() == 0:
 			_skills.select(0)
+		_skills.grab_focus()
