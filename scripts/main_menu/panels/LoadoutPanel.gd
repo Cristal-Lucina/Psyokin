@@ -1569,9 +1569,13 @@ func _rebuild_equipment_navigation_and_focus_first() -> void:
 
 func _rebuild_equipment_navigation_and_restore_focus() -> void:
 	"""Rebuild navigation elements and restore focus to current index"""
+	print("[LoadoutPanel] _rebuild_equipment_navigation_and_restore_focus called")
 	_rebuild_equipment_navigation()
 	if _nav_index >= 0 and _nav_index < _nav_elements.size():
 		_focus_equipment_element(_nav_index)
+		print("[LoadoutPanel] Focus restored to index %d" % _nav_index)
+	else:
+		print("[LoadoutPanel] Index %d out of range (0-%d)" % [_nav_index, _nav_elements.size() - 1])
 
 func _rebuild_equipment_navigation() -> void:
 	"""Build list of focusable equipment elements"""
