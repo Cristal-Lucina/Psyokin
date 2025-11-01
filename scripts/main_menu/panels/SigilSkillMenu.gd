@@ -58,10 +58,9 @@ func _ready() -> void:
 		_skills.item_selected.connect(Callable(self, "_on_skill_pick"))
 		print("[SigilSkillMenu] Connected skills.item_selected")
 
-	# Hide the Set Active button - accept on skill now sets active directly
-	if _btn_set:
-		_btn_set.visible = false
-		print("[SigilSkillMenu] Set Active button hidden - use accept on skill instead")
+	if _btn_set and not _btn_set.pressed.is_connected(Callable(self, "_on_set_active")):
+		_btn_set.pressed.connect(Callable(self, "_on_set_active"))
+		print("[SigilSkillMenu] Connected btn_set.pressed")
 
 	if _btn_close and not _btn_close.pressed.is_connected(Callable(self, "_on_close")):
 		_btn_close.pressed.connect(Callable(self, "_on_close"))
@@ -381,13 +380,8 @@ func _on_set_active() -> void:
 		ok = bool(_sig.call("set_active_skill_member", _member, _selected_socket, chosen))
 		print("[SigilSkillMenu] set_active_skill_member result: %s" % ok)
 
-	# Refresh the skills list (right side) to show the new active skill with star
 	_refresh_detail(_selected_inst)
 
-	# Refresh the sockets list (left side) to show the active skill name in socket label
-	_refresh_sockets()
-
-	# Emit loadout_changed signal so LoadoutPanel refreshes
 	if _member != "" and _sig and _sig.has_signal("loadout_changed"):
 		_sig.emit_signal("loadout_changed", _member)
 
