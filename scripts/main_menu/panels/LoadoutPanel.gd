@@ -568,7 +568,16 @@ func _rebuild_sigils(member_token: String) -> void:
 		_btn_manage.disabled = false
 
 func _on_equip_sigil(member_token: String, socket_index: int) -> void:
+	"""Open sigil picker for a specific socket"""
 	if _sig == null:
+		return
+	_show_sigil_picker_for_socket(member_token, socket_index)
+
+func _show_sigil_picker_for_socket(member_token: String, socket_index: int) -> void:
+	"""Show sigil picker popup using Panel-based system for controller support"""
+	# Prevent multiple popups
+	if _active_popup and is_instance_valid(_active_popup):
+		print("[LoadoutPanel] Popup already open, ignoring sigil picker request")
 		return
 
 	# Helper: allowed?
@@ -612,76 +621,115 @@ func _on_equip_sigil(member_token: String, socket_index: int) -> void:
 		if _allowed.call(school):
 			base_ids.append(base)
 
-	# Build the popup
-	var pm: PopupMenu = PopupMenu.new()
-	add_child(pm)
-	var any := false
+	# Create custom popup using Control nodes for proper controller support
+	var popup_panel: Panel = Panel.new()
+	popup_panel.process_mode = Node.PROCESS_MODE_ALWAYS
+	popup_panel.z_index = 100
+	add_child(popup_panel)
 
+	# Set active popup immediately to prevent multiple popups
+	_active_popup = popup_panel
+
+	var vbox: VBoxContainer = VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 4)
+	popup_panel.add_child(vbox)
+
+	# Title label
+	var title: Label = Label.new()
+	title.text = "Select Sigil (Socket %d)" % (socket_index + 1)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(title)
+
+	# Item list
+	var item_list: ItemList = ItemList.new()
+	item_list.custom_minimum_size = Vector2(300, 250)
+	item_list.focus_mode = Control.FOCUS_ALL
+	vbox.add_child(item_list)
+
+	# Build item list with metadata
+	var item_metadata: Array[Dictionary] = []
+
+	# Add unequip option (check if socket has sigil)
+	var current_sigils := []
+	if _sig.has_method("get_loadout"):
+		var loadout: Variant = _sig.call("get_loadout", member_token)
+		if typeof(loadout) == TYPE_ARRAY:
+			current_sigils = loadout as Array
+
+	if socket_index < current_sigils.size() and current_sigils[socket_index] != "":
+		item_list.add_item("← Unequip")
+		item_metadata.append({"kind": "unequip", "id": ""})
+
+	# Add unslotted instances
 	if free_instances.size() > 0:
-		pm.add_item("— Unslotted Instances —")
-		pm.set_item_disabled(pm.get_item_count() - 1, true)
-		for inst in free_instances:
-			pm.add_item(_sigil_disp(inst))
-			pm.set_item_metadata(pm.get_item_count() - 1, {"kind":"inst","id":inst})
-		any = true
+		item_list.add_item("— Unslotted Instances —")
+		item_list.set_item_disabled(item_list.item_count - 1, true)
+		item_metadata.append({})  # Placeholder for disabled header
 
+		for inst in free_instances:
+			item_list.add_item(_sigil_disp(inst))
+			item_metadata.append({"kind": "inst", "id": inst})
+
+	# Add base sigils from inventory
 	if base_ids.size() > 0:
-		pm.add_separator()
-		pm.add_item("— From Inventory —")
-		pm.set_item_disabled(pm.get_item_count() - 1, true)
+		item_list.add_item("— From Inventory —")
+		item_list.set_item_disabled(item_list.item_count - 1, true)
+		item_metadata.append({})  # Placeholder for disabled header
+
 		for base in base_ids:
 			var label2: String = (String(_sig.call("get_display_name_for", base)) if (_sig and _sig.has_method("get_display_name_for")) else _pretty_item(base))
-			pm.add_item(label2)
-			pm.set_item_metadata(pm.get_item_count() - 1, {"kind":"base","id":base})
-		any = true
+			item_list.add_item(label2)
+			item_metadata.append({"kind": "base", "id": base})
 
-	if not any:
-		pm.add_item("(No sigils available)")
-		pm.set_item_disabled(pm.get_item_count() - 1, true)
+	# Add fallback if no items
+	if item_list.item_count == 0:
+		item_list.add_item("(No sigils available)")
+		item_list.set_item_disabled(0, true)
+		item_metadata.append({})
 
-	var _handle_pick: Callable = func(index: int) -> void:
-		var meta: Variant = pm.get_item_metadata(index)
-		pm.queue_free()
-		if typeof(meta) != TYPE_DICTIONARY and typeof(meta) != TYPE_STRING:
-			return
+	# Add back button
+	var back_btn: Button = Button.new()
+	back_btn.text = "Back"
+	back_btn.pressed.connect(_popup_cancel)
+	vbox.add_child(back_btn)
 
-		var kind: String = ""
-		var id: String = ""
-		if typeof(meta) == TYPE_DICTIONARY:
-			var d: Dictionary = meta
-			kind = String(d.get("kind",""))
-			id   = String(d.get("id",""))
-		else:
-			id = String(meta)
+	# Auto-size panel to fit content
+	await get_tree().process_frame
+	popup_panel.size = vbox.size + Vector2(20, 20)
+	vbox.position = Vector2(10, 10)
 
-		var final_inst: String = ""
-		# instances: equip instance directly (system re-checks)
-		if kind == "inst" or (_sig and _sig.has_method("is_instance_id") and bool(_sig.call("is_instance_id", id))):
-			final_inst = id
+	# Center popup on screen
+	var viewport_size: Vector2 = get_viewport_rect().size
+	popup_panel.position = (viewport_size - popup_panel.size) / 2.0
+	print("[LoadoutPanel] Sigil popup centered at: %s, size: %s" % [popup_panel.position, popup_panel.size])
 
-		# base: try direct “from inventory”, else draft then equip
-		if final_inst == "" and (kind == "base" or kind == ""):
-			if _sig.has_method("equip_from_inventory"):
-				var ok_direct: bool = bool(_sig.call("equip_from_inventory", member_token, socket_index, id))
-				if ok_direct:
-					_on_sigils_changed(member_token)
-					return
-			if _sig.has_method("draft_from_inventory"):
-				var drafted: Variant = _sig.call("draft_from_inventory", id)
-				if typeof(drafted) == TYPE_STRING:
-					final_inst = String(drafted)
+	# Select first enabled item and grab focus
+	if item_list.item_count > 0:
+		var first_enabled = 0
+		for i in range(item_list.item_count):
+			if not item_list.is_item_disabled(i):
+				first_enabled = i
+				break
+		item_list.select(first_enabled)
+		item_list.grab_focus()
 
-		if final_inst != "" and _sig.has_method("equip_into_socket"):
-			var ok_e: bool = bool(_sig.call("equip_into_socket", member_token, socket_index, final_inst))
-			if ok_e and _sig.has_method("on_bracelet_changed"):
-				_sig.call("on_bracelet_changed", member_token)
-			_on_sigils_changed(member_token)
+	# Store metadata for controller input
+	popup_panel.set_meta("_is_sigil_popup", true)
+	popup_panel.set_meta("_item_list", item_list)
+	popup_panel.set_meta("_item_metadata", item_metadata)
+	popup_panel.set_meta("_member_token", member_token)
+	popup_panel.set_meta("_socket_index", socket_index)
 
-	pm.index_pressed.connect(_handle_pick)
-	pm.id_pressed.connect(func(idnum: int) -> void:
-		_handle_pick.call(pm.get_item_index(idnum))
-	)
-	pm.popup(Rect2(get_global_mouse_position(), Vector2(260, 0)))
+	# Push popup to aPanelManager stack
+	var panel_mgr = get_node_or_null("/root/aPanelManager")
+	if panel_mgr:
+		panel_mgr.push_panel(popup_panel)
+		print("[LoadoutPanel] Pushed sigil popup to aPanelManager stack")
+
+	# Set state to POPUP_ACTIVE
+	_nav_state = NavState.POPUP_ACTIVE
+
+	print("[LoadoutPanel] Sigil popup opened for socket %d - %d items" % [socket_index, item_list.item_count])
 
 func _on_remove_sigil(member_token: String, socket_index: int) -> void:
 	if _sig and _sig.has_method("remove_sigil_at"):
@@ -1178,9 +1226,13 @@ func _input(event: InputEvent) -> void:
 ## ─────────────────────── STATE 1: POPUP_ACTIVE ───────────────────────
 
 func _handle_popup_input(event: InputEvent) -> void:
-	"""Handle input when equipment popup is active"""
+	"""Handle input when popup is active (equipment or sigil)"""
 	if event.is_action_pressed("menu_accept"):
-		_popup_accept_item()
+		# Route to appropriate handler based on popup type
+		if _active_popup and _active_popup.get_meta("_is_sigil_popup", false):
+			_popup_accept_sigil()
+		else:
+			_popup_accept_item()
 	elif event.is_action_pressed("menu_back"):
 		_popup_cancel()
 
@@ -1229,6 +1281,87 @@ func _popup_accept_item() -> void:
 
 	# Close popup and return to EQUIPMENT_NAV (stay at same position!)
 	_popup_close_and_return_to_equipment()
+
+func _popup_accept_sigil() -> void:
+	"""User pressed accept on sigil popup - equip/unequip the selected sigil"""
+	if not _active_popup or not is_instance_valid(_active_popup):
+		return
+
+	var item_list: ItemList = _active_popup.get_meta("_item_list", null)
+	var item_metadata: Array = _active_popup.get_meta("_item_metadata", [])
+	var member_token: String = _active_popup.get_meta("_member_token", "")
+	var socket_index: int = _active_popup.get_meta("_socket_index", -1)
+
+	if not item_list or socket_index < 0:
+		_popup_cancel()
+		return
+
+	var selected = item_list.get_selected_items()
+	if selected.is_empty():
+		print("[LoadoutPanel] No sigil selected - closing popup")
+		_popup_cancel()
+		return
+
+	var idx: int = selected[0]
+	if idx < 0 or idx >= item_metadata.size():
+		print("[LoadoutPanel] Invalid sigil selection index")
+		_popup_cancel()
+		return
+
+	var meta: Dictionary = item_metadata[idx]
+	var kind: String = meta.get("kind", "")
+	var id: String = meta.get("id", "")
+
+	print("[LoadoutPanel] Sigil action: kind=%s, id=%s, socket=%d" % [kind, id, socket_index])
+
+	# Handle unequip
+	if kind == "unequip":
+		if _sig and _sig.has_method("remove_sigil_at"):
+			_sig.call("remove_sigil_at", member_token, socket_index)
+		_on_sigils_changed(member_token)
+		_popup_close_and_return_to_equipment()
+		return
+
+	# Handle instance equip
+	if kind == "inst":
+		if _sig and _sig.has_method("equip_into_socket"):
+			var ok: bool = bool(_sig.call("equip_into_socket", member_token, socket_index, id))
+			if ok and _sig.has_method("on_bracelet_changed"):
+				_sig.call("on_bracelet_changed", member_token)
+		_on_sigils_changed(member_token)
+		_popup_close_and_return_to_equipment()
+		return
+
+	# Handle base sigil equip
+	if kind == "base":
+		var final_inst: String = ""
+
+		# Try direct equip from inventory first
+		if _sig.has_method("equip_from_inventory"):
+			var ok_direct: bool = bool(_sig.call("equip_from_inventory", member_token, socket_index, id))
+			if ok_direct:
+				_on_sigils_changed(member_token)
+				_popup_close_and_return_to_equipment()
+				return
+
+		# Otherwise, draft instance then equip
+		if _sig.has_method("draft_from_inventory"):
+			var drafted: Variant = _sig.call("draft_from_inventory", id)
+			if typeof(drafted) == TYPE_STRING:
+				final_inst = String(drafted)
+
+		if final_inst != "" and _sig.has_method("equip_into_socket"):
+			var ok_e: bool = bool(_sig.call("equip_into_socket", member_token, socket_index, final_inst))
+			if ok_e and _sig.has_method("on_bracelet_changed"):
+				_sig.call("on_bracelet_changed", member_token)
+			_on_sigils_changed(member_token)
+
+		_popup_close_and_return_to_equipment()
+		return
+
+	# Unknown kind - just close
+	print("[LoadoutPanel] Unknown sigil kind: %s" % kind)
+	_popup_cancel()
 
 func _popup_cancel() -> void:
 	"""User pressed back on popup - close without equipping"""
