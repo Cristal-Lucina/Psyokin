@@ -437,7 +437,7 @@ func _show_item_menu_for_slot(member_token: String, slot: String) -> void:
 	# Add back button
 	var back_btn: Button = Button.new()
 	back_btn.text = "Back"
-	back_btn.pressed.connect(_close_equipment_popup)
+	back_btn.pressed.connect(_popup_cancel)
 	vbox.add_child(back_btn)
 
 	# Auto-size panel to fit content
