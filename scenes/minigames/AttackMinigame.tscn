@@ -1,6 +1,6 @@
 [gd_scene load_steps=2 format=3 uid="uid://cnx8yvp7qjl5w"]
 
-[ext_resource type="Script" path="res://scripts/battle/AttackMinigame.gd" id="1_attack"]
+[ext_resource type="Script" uid="uid://cualskvee6ir8" path="res://scripts/battle/AttackMinigame.gd" id="1_attack"]
 
 [node name="AttackMinigame" type="Control"]
 layout_mode = 3

@@ -1,7 +1,7 @@
-[gd_scene load_steps=3 format=3 uid="uid://battle_scene_001"]
+[gd_scene load_steps=3 format=3 uid="uid://c6kdayltgkpfp"]
 
-[ext_resource type="Script" path="res://scripts/battle/Battle.gd" id="1_battle"]
-[ext_resource type="Script" path="res://scripts/battle/TurnOrderDisplay.gd" id="2_turn_order"]
+[ext_resource type="Script" uid="uid://bh4st7f0x1862" path="res://scripts/battle/Battle.gd" id="1_battle"]
+[ext_resource type="Script" uid="uid://d4fuvn7bww4k1" path="res://scripts/battle/TurnOrderDisplay.gd" id="2_turn_order"]
 
 [node name="Battle" type="Control"]
 layout_mode = 3
@@ -53,7 +53,6 @@ horizontal_alignment = 1
 [node name="BurstGauge" type="ProgressBar" parent="MainLayout/BattleArena/TopPanel/VBox"]
 unique_name_in_owner = true
 layout_mode = 2
-max_value = 100.0
 show_percentage = false
 
 [node name="EnemySlots" type="HBoxContainer" parent="MainLayout/BattleArena"]
@@ -104,7 +103,7 @@ script = ExtResource("2_turn_order")
 [node name="ActionMenu" type="GridContainer" parent="."]
 unique_name_in_owner = true
 layout_mode = 1
-anchors_preset = 0
+anchors_preset = 2
 anchor_top = 1.0
 anchor_bottom = 1.0
 offset_left = 30.0
@@ -112,9 +111,9 @@ offset_top = -250.0
 offset_right = 330.0
 offset_bottom = -50.0
 grow_vertical = 0
-columns = 2
 theme_override_constants/h_separation = 10
 theme_override_constants/v_separation = 5
+columns = 2
 
 [node name="BurstButton" type="Button" parent="ActionMenu"]
 custom_minimum_size = Vector2(140, 45)
@@ -158,7 +157,7 @@ text = "(x) STATUS"
 
 [node name="BattleLogPanel" type="PanelContainer" parent="."]
 layout_mode = 1
-anchors_preset = 0
+anchors_preset = 2
 anchor_top = 1.0
 anchor_bottom = 1.0
 offset_left = 360.0
@@ -170,7 +169,6 @@ grow_vertical = 0
 [node name="ScrollContainer" type="ScrollContainer" parent="BattleLogPanel"]
 layout_mode = 2
 follow_focus = true
-scroll_vertical_enabled = true
 
 [node name="BattleLog" type="RichTextLabel" parent="BattleLogPanel/ScrollContainer"]
 unique_name_in_owner = true

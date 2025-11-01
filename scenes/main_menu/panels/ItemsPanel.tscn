@@ -38,7 +38,6 @@ horizontal_alignment = 1
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 3
-focus_mode = 2
 
 [node name="ItemColumn" type="VBoxContainer" parent="Root"]
 layout_mode = 2
@@ -64,7 +63,6 @@ text = "Count: 0"
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 3
-focus_mode = 2
 
 [node name="DetailsColumn" type="VBoxContainer" parent="Root"]
 custom_minimum_size = Vector2(320, 0)
