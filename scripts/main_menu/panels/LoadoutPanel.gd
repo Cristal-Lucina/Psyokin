@@ -443,7 +443,8 @@ func _show_item_menu_for_slot(member_token: String, slot: String) -> void:
 	back_btn.pressed.connect(_popup_cancel)
 	vbox.add_child(back_btn)
 
-	# Auto-size panel to fit content
+	# Auto-size panel to fit content - wait TWO frames for proper layout calculation
+	await get_tree().process_frame
 	await get_tree().process_frame
 	popup_panel.size = vbox.size + Vector2(20, 20)
 	vbox.position = Vector2(10, 10)
@@ -451,7 +452,7 @@ func _show_item_menu_for_slot(member_token: String, slot: String) -> void:
 	# Center popup on screen
 	var viewport_size: Vector2 = get_viewport_rect().size
 	popup_panel.position = (viewport_size - popup_panel.size) / 2.0
-	print("[LoadoutPanel] Popup centered at: %s, size: %s" % [popup_panel.position, popup_panel.size])
+	print("[LoadoutPanel] Equipment popup centered at: %s, size: %s" % [popup_panel.position, popup_panel.size])
 
 	# Select first item and grab focus
 	if item_list.item_count > 0:
@@ -722,7 +723,8 @@ func _show_sigil_picker_for_socket(member_token: String, socket_index: int) -> v
 	back_btn.pressed.connect(_popup_cancel)
 	vbox.add_child(back_btn)
 
-	# Auto-size panel to fit content
+	# Auto-size panel to fit content - wait TWO frames for proper layout calculation
+	await get_tree().process_frame
 	await get_tree().process_frame
 	popup_panel.size = vbox.size + Vector2(20, 20)
 	vbox.position = Vector2(10, 10)
@@ -1083,37 +1085,115 @@ func _collect_all_schools() -> Array[String]:
 	return out
 
 func _open_active_type_picker() -> void:
+	"""Show active type picker popup using Panel-based system for controller support"""
 	var token: String = _current_token()
 	if not (token == "hero" or token.strip_edges().to_lower() == _hero_name().strip_edges().to_lower()):
 		return
+
+	# Prevent multiple popups
+	if _active_popup and is_instance_valid(_active_popup):
+		print("[LoadoutPanel] Popup already open, ignoring active type picker request")
+		return
+
 	var schools: Array[String] = _collect_all_schools()
 	var cur: String = _get_hero_active_type()
 
-	var pm: PopupMenu = PopupMenu.new()
-	add_child(pm)
-	pm.add_item("Omega")
-	pm.set_item_metadata(0, "Omega")
-	pm.set_item_checked(0, cur.strip_edges().to_lower() == "omega")
-	pm.add_separator()
+	print("[LoadoutPanel] === Opening Active Type Picker ===")
+	print("[LoadoutPanel] Current active type: %s" % cur)
+
+	# Create custom popup using Control nodes for proper controller support
+	var popup_panel: Panel = Panel.new()
+	popup_panel.process_mode = Node.PROCESS_MODE_ALWAYS
+	popup_panel.z_index = 100
+	add_child(popup_panel)
+
+	# Set active popup immediately to prevent multiple popups
+	_active_popup = popup_panel
+
+	var vbox: VBoxContainer = VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 4)
+	popup_panel.add_child(vbox)
+
+	# Title label
+	var title: Label = Label.new()
+	title.text = "Select Active Type"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(title)
+
+	# Item list
+	var item_list: ItemList = ItemList.new()
+	item_list.custom_minimum_size = Vector2(250, 200)
+	item_list.focus_mode = Control.FOCUS_ALL
+	vbox.add_child(item_list)
+
+	# Build item list with metadata
+	var item_metadata: Array[String] = []
+
+	# Add Omega first
+	item_list.add_item("Omega")
+	item_metadata.append("Omega")
+	if cur.strip_edges().to_lower() == "omega":
+		item_list.select(0)
+
+	# Add separator (as disabled item)
+	item_list.add_item("───────")
+	item_list.set_item_disabled(item_list.item_count - 1, true)
+	item_metadata.append("")  # Placeholder for disabled separator
+
+	# Add other schools
 	for s in schools:
-		if s == "Omega": continue
-		pm.add_item(s)
-		pm.set_item_metadata(pm.get_item_count() - 1, s)
+		if s == "Omega":
+			continue
+		item_list.add_item(s)
+		item_metadata.append(s)
 		if s.strip_edges().to_lower() == cur.strip_edges().to_lower():
-			pm.set_item_checked(pm.get_item_count() - 1, true)
+			item_list.select(item_list.item_count - 1)
 
-	var _pick: Callable = func(i: int) -> void:
-		var meta: Variant = pm.get_item_metadata(i)
-		pm.queue_free()
-		if typeof(meta) == TYPE_STRING:
-			_set_hero_active_type(String(meta))
-			_refresh_active_type_row("hero")
+	# Add back button
+	var back_btn: Button = Button.new()
+	back_btn.text = "Back"
+	back_btn.pressed.connect(_popup_cancel)
+	vbox.add_child(back_btn)
 
-	pm.index_pressed.connect(_pick)
-	pm.id_pressed.connect(func(idnum: int) -> void:
-		_pick.call(pm.get_item_index(idnum))
-	)
-	pm.popup(Rect2(get_global_mouse_position(), Vector2(200, 0)))
+	# Auto-size panel to fit content - wait TWO frames for proper layout calculation
+	await get_tree().process_frame
+	await get_tree().process_frame
+	popup_panel.size = vbox.size + Vector2(20, 20)
+	vbox.position = Vector2(10, 10)
+
+	# Center popup on screen
+	var viewport_size: Vector2 = get_viewport_rect().size
+	popup_panel.position = (viewport_size - popup_panel.size) / 2.0
+	print("[LoadoutPanel] Active type popup centered at: %s, size: %s" % [popup_panel.position, popup_panel.size])
+
+	# Select first enabled item if nothing selected, and grab focus
+	if item_list.item_count > 0:
+		var has_selection = item_list.get_selected_items().size() > 0
+		if not has_selection:
+			# Find first non-disabled item
+			for i in range(item_list.item_count):
+				if not item_list.is_item_disabled(i):
+					item_list.select(i)
+					break
+		item_list.grab_focus()
+
+	# Store metadata for controller input
+	popup_panel.set_meta("_is_active_type_popup", true)
+	popup_panel.set_meta("_item_list", item_list)
+	popup_panel.set_meta("_item_metadata", item_metadata)
+
+	# Push popup to aPanelManager stack
+	var panel_mgr = get_node_or_null("/root/aPanelManager")
+	if panel_mgr:
+		panel_mgr.push_panel(popup_panel)
+		print("[LoadoutPanel] Pushed active type popup to aPanelManager stack")
+
+	# Set state to POPUP_ACTIVE
+	_nav_state = NavState.POPUP_ACTIVE
+
+	print("[LoadoutPanel] Active type popup opened with %d items" % item_list.item_count)
+	print("[LoadoutPanel] ===================================")
+
 
 # ────────────────── Manage Sigils action ──────────────────
 func _instance_sigil_menu_scene() -> Control:
@@ -1274,10 +1354,12 @@ func _handle_popup_input(event: InputEvent) -> void:
 	if _has_active_sigil_menu():
 		return
 
-	# Handle equipment/sigil picker popup input
+	# Handle equipment/sigil/active type picker popup input
 	if event.is_action_pressed("menu_accept"):
 		# Route to appropriate handler based on popup type
-		if _active_popup and _active_popup.get_meta("_is_sigil_popup", false):
+		if _active_popup and _active_popup.get_meta("_is_active_type_popup", false):
+			_popup_accept_active_type()
+		elif _active_popup and _active_popup.get_meta("_is_sigil_popup", false):
 			_popup_accept_sigil()
 		else:
 			_popup_accept_item()
@@ -1455,6 +1537,49 @@ func _popup_accept_sigil() -> void:
 	# Unknown kind - just close
 	print("[LoadoutPanel] ERROR: Unknown sigil kind: %s" % kind)
 	_popup_cancel()
+
+func _popup_accept_active_type() -> void:
+	"""User pressed accept on active type popup - set the new active type"""
+	if not _active_popup or not is_instance_valid(_active_popup):
+		print("[LoadoutPanel] ERROR: No active popup")
+		return
+
+	var item_list: ItemList = _active_popup.get_meta("_item_list", null)
+	var item_metadata: Array = _active_popup.get_meta("_item_metadata", [])
+
+	if not item_list:
+		print("[LoadoutPanel] ERROR: No item_list in active type popup")
+		_popup_cancel()
+		return
+
+	var picks: PackedInt32Array = item_list.get_selected_items()
+	if picks.size() == 0:
+		print("[LoadoutPanel] No active type selected")
+		_popup_cancel()
+		return
+
+	var idx: int = picks[0]
+	if idx < 0 or idx >= item_metadata.size():
+		print("[LoadoutPanel] Invalid selection index: %d" % idx)
+		_popup_cancel()
+		return
+
+	# Check if it's a disabled separator
+	if item_list.is_item_disabled(idx):
+		print("[LoadoutPanel] Selected item is disabled (separator)")
+		return  # Don't close, let user select again
+
+	var selected_type: String = item_metadata[idx]
+	if selected_type == "":
+		print("[LoadoutPanel] Empty active type selected")
+		_popup_cancel()
+		return
+
+	print("[LoadoutPanel] Setting hero active type to: %s" % selected_type)
+	_set_hero_active_type(selected_type)
+	_refresh_active_type_row("hero")
+
+	_popup_close_and_return_to_equipment()
 
 func _popup_cancel() -> void:
 	"""User pressed back on popup - close without equipping"""
