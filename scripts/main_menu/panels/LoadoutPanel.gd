@@ -1592,11 +1592,17 @@ func _rebuild_equipment_navigation() -> void:
 	if _f_btn: _nav_elements.append(_f_btn)
 	if _b_btn: _nav_elements.append(_b_btn)
 
-	# Sigil slot buttons
+	# Sigil slot buttons - FILTER OUT nodes queued for deletion
 	if _sigils_list:
 		for child in _sigils_list.get_children():
+			# Skip nodes queued for deletion (from queue_free())
+			if not is_instance_valid(child) or child.is_queued_for_deletion():
+				continue
 			if child is HBoxContainer:
 				for subchild in child.get_children():
+					# Skip nodes queued for deletion
+					if not is_instance_valid(subchild) or subchild.is_queued_for_deletion():
+						continue
 					if subchild is Button:
 						_nav_elements.append(subchild)
 
