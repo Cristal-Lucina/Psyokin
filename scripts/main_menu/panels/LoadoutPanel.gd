@@ -676,7 +676,7 @@ func _show_sigil_picker_for_socket(member_token: String, socket_index: int) -> v
 	var item_metadata: Array[Dictionary] = []
 
 	# Add unequip option (check if socket has sigil)
-	var current_sigils := []
+	var current_sigils: Array = []
 	if _sig.has_method("get_loadout"):
 		var loadout: Variant = _sig.call("get_loadout", member_token)
 		if typeof(loadout) == TYPE_ARRAY:
@@ -756,7 +756,7 @@ func _show_sigil_picker_for_socket(member_token: String, socket_index: int) -> v
 	_nav_state = NavState.POPUP_ACTIVE
 
 	# Summary
-	var has_unequip := (socket_index < current_sigils.size() and current_sigils[socket_index] != "")
+	var has_unequip: bool = (socket_index < current_sigils.size() and current_sigils[socket_index] != "")
 	print("[LoadoutPanel] Sigil popup opened for socket %d:" % socket_index)
 	print("[LoadoutPanel]   - Has current sigil: %s" % has_unequip)
 	print("[LoadoutPanel]   - Free instances: %d" % free_instances.size())
