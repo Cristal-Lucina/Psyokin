@@ -184,6 +184,6 @@ func _emit_changed() -> void:
 func _on_close() -> void:
 	queue_free()
 
-func _input(event: InputEvent) -> void:
+func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.is_pressed() and (event.keycode == KEY_ESCAPE):
 		_on_close()

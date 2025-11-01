@@ -47,8 +47,14 @@ var debug_mode: bool = true
 func _ready() -> void:
 	# Set as autoload singleton
 	name = "aControllerManager"
+
+	# CRITICAL: Process input at highest priority to receive events first
+	# This ensures we see events before any scene nodes
+	set_process_priority(-100)  # Negative = higher priority
 	set_process_input(true)
+
 	print("[ControllerManager] Initialized - Current context: %s" % InputContext.keys()[current_context])
+	print("[ControllerManager] Process priority set to: %d" % process_priority)
 
 func _process(delta: float) -> void:
 	# Update cooldown timer
@@ -141,18 +147,19 @@ func set_context_data(key: String, value: Variant) -> void:
 ## ═══════════════════════════════════════════════════════════════
 
 func _input(event: InputEvent) -> void:
-	# Debug: Log ALL controller button presses with action mapping info
+	# Debug: Log ALL input events, not just joypad buttons
 	if event is InputEventJoypadButton:
-		print("[ControllerManager] RAW Joypad event: button=%d, pressed=%s, context=%s" % [
+		print("[ControllerManager._input] RAW Joypad event: button=%d, pressed=%s, context=%s, is_handled=%s" % [
 			event.button_index,
 			event.pressed,
-			InputContext.keys()[current_context]
+			InputContext.keys()[current_context],
+			get_viewport().is_input_handled()
 		])
 
 		if event.pressed:
 			var burst_check = event.is_action("battle_burst")
 			var run_check = event.is_action("battle_run")
-			print("[ControllerManager] Button %d pressed, context=%s, is_burst=%s, is_run=%s" % [
+			print("[ControllerManager._input] Button %d pressed, context=%s, is_burst=%s, is_run=%s" % [
 				event.button_index,
 				InputContext.keys()[current_context],
 				burst_check,
@@ -167,6 +174,7 @@ func _input(event: InputEvent) -> void:
 
 	# Check cooldown
 	if input_cooldown > 0:
+		print("[ControllerManager._input] BLOCKED by cooldown (remaining: %.2f)" % input_cooldown) if event is InputEventJoypadButton and event.pressed else null
 		return
 
 	# Block if disabled
@@ -318,19 +326,23 @@ func _handle_menu_main_input(event: InputEvent) -> void:
 	"""Handle input in main pause menu"""
 	# Navigation
 	if event.is_action_pressed("move_up"):
+		print("[ControllerManager] MENU_MAIN: Emitting navigate UP")
 		navigate_pressed.emit(Vector2.UP, current_context)
 		_start_cooldown()
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("move_down"):
+		print("[ControllerManager] MENU_MAIN: Emitting navigate DOWN")
 		navigate_pressed.emit(Vector2.DOWN, current_context)
 		_start_cooldown()
 		get_viewport().set_input_as_handled()
 	# Actions
 	elif event.is_action_pressed("menu_accept"):
+		print("[ControllerManager] MENU_MAIN: Emitting action_button_pressed 'accept'")
 		action_button_pressed.emit("accept", current_context)
 		_start_cooldown()
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("menu_back"):
+		print("[ControllerManager] MENU_MAIN: Emitting action_button_pressed 'back'")
 		action_button_pressed.emit("back", current_context)
 		_start_cooldown()
 		get_viewport().set_input_as_handled()

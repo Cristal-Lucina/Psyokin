@@ -11,58 +11,91 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1")
 
-[node name="Root" type="VBoxContainer" parent="."]
-unique_name_in_owner = true
-layout_mode = 0
+[node name="Root" type="HBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
+offset_left = 8.0
+offset_top = 8.0
+offset_right = -8.0
+offset_bottom = -8.0
 grow_horizontal = 2
 grow_vertical = 2
-theme_override_constants/separation = 10
+theme_override_constants/separation = 16
 
-[node name="Header" type="HBoxContainer" parent="Root"]
-unique_name_in_owner = true
+[node name="PartyColumn" type="VBoxContainer" parent="Root"]
+custom_minimum_size = Vector2(200, 0)
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="Title" type="Label" parent="Root/Header"]
+[node name="PartyLabel" type="Label" parent="Root/PartyColumn"]
 layout_mode = 2
-text = "Player Stats"
+text = "Party"
+horizontal_alignment = 1
 
-[node name="Spacer" type="Control" parent="Root/Header"]
-layout_mode = 2
-size_flags_horizontal = 3
-
-[node name="RefreshBtn" type="Button" parent="Root/Header"]
+[node name="PartyList" type="ItemList" parent="Root/PartyColumn"]
 unique_name_in_owner = true
 layout_mode = 2
-text = "Refresh"
-
-[node name="MemberBar" type="HBoxContainer" parent="Root"]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_constants/separation = 6
-
-[node name="ContentHBox" type="HBoxContainer" parent="Root"]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_horizontal = 3
 size_flags_vertical = 3
-theme_override_constants/separation = 20
+focus_mode = 2
 
-[node name="Scroll" type="ScrollContainer" parent="Root/ContentHBox"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(300, 280)
+[node name="StatsColumn" type="VBoxContainer" parent="Root"]
 layout_mode = 2
 size_flags_horizontal = 3
-size_flags_vertical = 3
+theme_override_constants/separation = 12
 
-[node name="List" type="VBoxContainer" parent="Root/ContentHBox/Scroll"]
+[node name="MemberName" type="Label" parent="Root/StatsColumn"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 28)
+layout_mode = 2
+text = "(Select a member)"
+horizontal_alignment = 1
+
+[node name="BaseStatsLabel" type="Label" parent="Root/StatsColumn"]
+layout_mode = 2
+text = "Base Stats"
+
+[node name="BaseStatsGrid" type="GridContainer" parent="Root/StatsColumn"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_constants/separation = 6
+theme_override_constants/h_separation = 16
+theme_override_constants/v_separation = 8
+columns = 2
 
-[node name="RadarContainer" type="VBoxContainer" parent="Root/ContentHBox"]
+[node name="EquipmentLabel" type="Label" parent="Root/StatsColumn"]
+layout_mode = 2
+text = "Equipment Stats"
+
+[node name="EquipmentGrid" type="GridContainer" parent="Root/StatsColumn"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/h_separation = 16
+theme_override_constants/v_separation = 8
+columns = 2
+
+[node name="DerivedLabel" type="Label" parent="Root/StatsColumn"]
+layout_mode = 2
+text = "Derived Stats"
+
+[node name="DerivedGrid" type="GridContainer" parent="Root/StatsColumn"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/h_separation = 16
+theme_override_constants/v_separation = 8
+columns = 2
+
+[node name="VisualColumn" type="VBoxContainer" parent="Root"]
+custom_minimum_size = Vector2(300, 0)
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="RadarLabel" type="Label" parent="Root/VisualColumn"]
+layout_mode = 2
+text = "Stat Distribution"
+horizontal_alignment = 1
+
+[node name="RadarContainer" type="VBoxContainer" parent="Root/VisualColumn"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(300, 300)
 layout_mode = 2

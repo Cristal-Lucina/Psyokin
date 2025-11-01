@@ -239,7 +239,7 @@ func _get_current_binding_text(action_name: String, is_controller: bool) -> Stri
 
 	return "None"
 
-func _input(event: InputEvent) -> void:
+func _unhandled_input(event: InputEvent) -> void:
 	if _waiting_for_input == null:
 		return
 

@@ -1,328 +1,484 @@
 extends Control
 class_name PerksPanel
 
-## PerksPanel (gated)
-## - Buttons are disabled unless: stat meets tier threshold AND you have ≥1 perk point.
-## - On click: spend point first; attempt unlock; if unlock fails, refund 1.
+## Perks Panel - Fallout 3-Style Grid Design (Flipped Layout)
+## LEFT: Perk Points + Acquired Perks + Details | RIGHT: 8×5 Grid with perk names
 
-const STATS_PATH   : String = "/root/aStatsSystem"
-const PERKSYS_PATH : String = "/root/aPerkSystem"  # optional; UI works without it
+# Autoload paths
+const STATS_PATH: String = "/root/aStatsSystem"
+const PERK_PATH: String = "/root/aPerkSystem"
 
-const MAX_ROWS : int = 5
-const MAX_COLS : int = 5
+# Constants
+const GRID_ROWS: int = 8  # Header + Level + Tiers 1-5 + Tier 6
+const GRID_COLS: int = 5  # 5 stats
+const TIER_6_LEVEL_REQUIREMENT: int = 11
+const DEFAULT_THRESHOLDS: PackedInt32Array = [1, 3, 5, 7, 10, 11]  # Including Tier 6
 
-## Default tier thresholds per row (stat-level gates). Override via systems if available.
-const DEFAULT_THRESHOLDS : PackedInt32Array = [1, 3, 5, 7, 10]
+# Scene references
+@onready var _perk_grid: GridContainer = %PerkGrid
+@onready var _points_value: Label = %PointsValue
+@onready var _acquired_list: ItemList = %AcquiredList
+@onready var _perk_name: Label = %PerkName
+@onready var _details_text: Label = %DetailsText
 
-@onready var _grid      : GridContainer = %Grid
-@onready var _refresh   : Button        = %RefreshBtn
-@onready var _points_tv : Label         = %PointsValue
+# System references
+var _stats: Node = null
+var _perk: Node = null
 
-var _stats : Node = null
-var _perk  : Node = null
+# Data
+var _stat_ids: Array[String] = []
+var _stat_levels: Dictionary = {}  # stat_id -> level
+var _perk_points: int = 0
+var _acquired_perks: Array[Dictionary] = []  # All unlocked perks
 
-## Cached derived data for the current rebuild
-var _stat_keys  : PackedStringArray = []     # 5 stat ids/names in display order
-var _levels_map : Dictionary = {}            # {stat -> level:int}
-var _cells      : Dictionary = {}            # {stat -> Array[Button]}
-var _points     : int = 0                    # available perk points (from system if possible)
-
-## Controller navigation
-var _selected_row: int = 0
+# Grid navigation
+var _grid_cells: Array[Array] = []  # 8×5 array of Controls
+var _selected_row: int = 2  # Start at first tier row
 var _selected_col: int = 0
-var _back_label: Label = null
 
 func _ready() -> void:
-	# Add "Back (B)" indicator in bottom right
-	_add_back_indicator()
-
+	# Get system references
 	_stats = get_node_or_null(STATS_PATH)
-	_perk  = get_node_or_null(PERKSYS_PATH)
+	_perk = get_node_or_null(PERK_PATH)
 
-	if _refresh != null and not _refresh.pressed.is_connected(_rebuild_all):
-		_refresh.pressed.connect(_rebuild_all)
+	# Connect signals
+	if _acquired_list:
+		_acquired_list.item_selected.connect(_on_acquired_perk_selected)
 
-	# If systems fire useful signals, listen and refresh
-	if _stats != null:
+	# Connect system signals
+	if _stats:
 		if _stats.has_signal("stats_changed"):
-			_stats.connect("stats_changed", Callable(self, "_rebuild_all"))
+			_stats.connect("stats_changed", Callable(self, "_rebuild"))
 		if _stats.has_signal("perk_points_changed"):
-			_stats.connect("perk_points_changed", Callable(self, "_rebuild_all"))
-
-	if _perk != null:
+			_stats.connect("perk_points_changed", Callable(self, "_rebuild"))
+	if _perk:
 		if _perk.has_signal("perk_unlocked"):
-			_perk.connect("perk_unlocked", Callable(self, "_rebuild_all"))
+			_perk.connect("perk_unlocked", Callable(self, "_rebuild"))
 		if _perk.has_signal("perks_changed"):
-			_perk.connect("perks_changed", Callable(self, "_rebuild_all"))
+			_perk.connect("perks_changed", Callable(self, "_rebuild"))
 
-	_rebuild_all()
+	# Connect visibility
+	visibility_changed.connect(_on_visibility_changed)
 
-# ------------------------------------------------------------------------------
+	# Initial build
+	call_deferred("_first_fill")
 
-func _rebuild_all() -> void:
-	_levels_map = _read_levels()
-	_stat_keys  = _choose_rows(_levels_map.keys())
-	_points     = _read_perk_points()
-	_update_points_label()
+func _first_fill() -> void:
+	"""Initial population of UI"""
+	_rebuild()
+	_find_first_selectable_perk()
+	_show_selected_perk_details()
 
-	# clear grid
-	for c in _grid.get_children():
-		c.queue_free()
-	_cells.clear()
+func _on_visibility_changed() -> void:
+	"""Highlight selection when panel becomes visible"""
+	if visible:
+		call_deferred("_refresh_highlight")
 
-	# header row: blank + T1..T5
-	var blank: Label = Label.new()
-	_grid.add_child(blank)
-	for i in range(MAX_COLS):
-		var h: Label = Label.new()
-		h.text = "T%d" % (i + 1)
-		h.add_theme_color_override("font_color", Color(0.9, 0.9, 0.9))
-		_grid.add_child(h)
+func _refresh_highlight() -> void:
+	"""Refresh grid highlight"""
+	_find_first_selectable_perk()
+	_highlight_selection()
+	_show_selected_perk_details()
 
-	# 5 rows (stats)
-	for s in _stat_keys:
-		var stat_id: String = String(s)
+func _rebuild() -> void:
+	"""Rebuild entire panel - refresh data and UI"""
+	_load_data()
+	_build_grid()
+	_populate_acquired_perks()
 
-		# left label: stat name
-		var name_lbl: Label = Label.new()
-		name_lbl.text = _pretty_stat(stat_id)
-		name_lbl.add_theme_color_override("font_color", Color(1, 1, 1))
-		name_lbl.custom_minimum_size.x = 140
-		_grid.add_child(name_lbl)
+func _load_data() -> void:
+	"""Load stat levels and perk points"""
+	_stat_levels.clear()
+	_stat_ids.clear()
+	_perk_points = 0
+	_acquired_perks.clear()
 
-		# 5 perk cells
-		var row_buttons: Array = []
-		for tier_i in range(MAX_COLS):
-			var b: Button = Button.new()
-			b.toggle_mode = true
-			b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			b.custom_minimum_size.y = 32
-
-			var threshold: int = _tier_threshold(stat_id, tier_i)
-			var level: int = int(_levels_map.get(stat_id, 0))
-			var is_unlocked: bool = _is_unlocked(stat_id, tier_i)
-			var meets_stat: bool = level >= threshold
-			var can_buy: bool = (not is_unlocked) and meets_stat and (_points > 0)
-
-			# --- Names/descs from PerkSystem when available ---
-			var display: String = "Perk T%d" % (tier_i + 1)
-			var tip: String     = "Requires %s ≥ %d" % [_pretty_stat(stat_id), threshold]
-			if _perk != null:
-				if _perk.has_method("get_perk_name"):
-					display = String(_perk.call("get_perk_name", stat_id, tier_i))
-				if _perk.has_method("get_perk_desc"):
-					var dsc := String(_perk.call("get_perk_desc", stat_id, tier_i))
-					if dsc != "":
-						tip = "%s\n%s" % [tip, dsc]
-				if _perk.has_method("get_perk_id"):
-					b.set_meta("perk_id", String(_perk.call("get_perk_id", stat_id, tier_i)))
-
-			# visuals
-			b.text = ("✔ " if is_unlocked else "") + display
-			if not meets_stat:
-				b.disabled = true
-				b.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))
-				b.tooltip_text = "%s (yours: %d)" % [tip, level]
-			elif is_unlocked:
-				b.button_pressed = true
-				b.disabled = true
-				b.add_theme_color_override("font_color", Color(0.6, 1.0, 0.6))
-				b.tooltip_text = "Unlocked\n%s" % tip
-			else:
-				b.disabled = false
-				b.tooltip_text = "Cost: 1 Perk Point • %s" % tip
-
-			# metadata + connect
-			b.set_meta("stat_id", stat_id)
-			b.set_meta("tier", tier_i)
-
-			# Only connect if the user can actually buy right now
-			if can_buy and not b.pressed.is_connected(_on_cell_pressed):
-				b.pressed.connect(_on_cell_pressed.bind(b))
-
-			row_buttons.append(b)
-			_grid.add_child(b)
-
-		_cells[stat_id] = row_buttons
-
-	await get_tree().process_frame
-	_grid.queue_sort()
-
-	# Highlight first available cell
-	_selected_row = 0
-	_selected_col = 0
-	_highlight_cell(_selected_row, _selected_col)
-
-# ------------------------------------------------------------------------------
-
-func _read_levels() -> Dictionary:
-	var out: Dictionary = {}
-	var st: Node = _stats
-	if st == null:
-		return out
-
-	# Preferred: a dict map
-	if st.has_method("get_stats_dict"):
-		var res: Variant = st.call("get_stats_dict")
-		if typeof(res) == TYPE_DICTIONARY:
-			var d: Dictionary = res
-			for k in d.keys():
-				var rec_v: Variant = d[k]
-				if typeof(rec_v) == TYPE_DICTIONARY:
-					var rec: Dictionary = rec_v
-					out[String(k)] = int(rec.get("level", int(rec.get("lvl", 0))))
-				else:
-					out[String(k)] = int(rec_v)
-			return out
-
-	# Alt: parallel arrays (names + levels)
-	if st.has_method("get_stat_names") and st.has_method("get_stat_levels"):
-		var names_v: Variant = st.call("get_stat_names")
-		var levels_v: Variant = st.call("get_stat_levels")
-		if typeof(names_v) == TYPE_ARRAY and typeof(levels_v) == TYPE_ARRAY:
-			var names: Array = names_v
-			var levels: Array = levels_v
-			for i in range(min(names.size(), levels.size())):
-				out[String(names[i])] = int(levels[i])
-			return out
-
-	# Last resort
-	if out.is_empty():
-		var lvl: int = 0
-		if st.has_method("get"):
-			var v: Variant = st.get("level")
-			if typeof(v) == TYPE_INT or typeof(v) == TYPE_FLOAT:
-				lvl = int(v)
-		out["Stat"] = lvl
-	return out
-
-func _read_perk_points() -> int:
-	var st: Node = _stats
-	if st != null:
-		if st.has_method("get_perk_points"):
-			return int(st.call("get_perk_points"))
-		if st.has_method("get"):
-			var v: Variant = st.get("perk_points")
-			if typeof(v) == TYPE_INT or typeof(v) == TYPE_FLOAT:
-				return int(v)
-	return 0
-
-func _choose_rows(keys: Array) -> PackedStringArray:
-	var order: PackedStringArray = []
-	var st: Node = _stats
-	if st != null and st.has_method("get_stats_order"):
-		var v: Variant = st.call("get_stats_order")
-		if typeof(v) == TYPE_ARRAY:
-			for x in (v as Array):
-				order.append(String(x))
-	for k in keys:
-		var ks: String = String(k)
-		if not order.has(ks):
-			order.append(ks)
-	while order.size() > MAX_ROWS:
-		order.remove_at(order.size() - 1)
-	return order
-
-func _tier_threshold(_stat_id: String, tier_index: int) -> int:
-	if _perk != null:
-		if _perk.has_method("get_threshold"):
-			return int(_perk.call("get_threshold", _stat_id, tier_index))
-		if _perk.has_method("get_thresholds"):
-			var v: Variant = _perk.call("get_thresholds", _stat_id)
-			if typeof(v) == TYPE_ARRAY:
-				var arr: Array = v
-				if tier_index >= 0 and tier_index < arr.size():
-					return int(arr[tier_index])
-	return DEFAULT_THRESHOLDS[min(tier_index, DEFAULT_THRESHOLDS.size() - 1)]
-
-func _is_unlocked(stat_id: String, tier_index: int) -> bool:
-	if _perk != null:
-		if _perk.has_method("is_unlocked"):
-			return bool(_perk.call("is_unlocked", stat_id, tier_index))
-		if _perk.has_method("has_perk"):
-			return bool(_perk.call("has_perk", "%s:%d" % [stat_id, tier_index]))
-	return false
-
-# ------------------------------------------------------------------------------
-
-func _on_cell_pressed(btn: Button) -> void:
-	# Gate: stat threshold and points are rechecked here (defense)
-	var stat_id: String = String(btn.get_meta("stat_id"))
-	var tier_i : int    = int(btn.get_meta("tier"))
-
-	var threshold: int = _tier_threshold(stat_id, tier_i)
-	var level: int = int(_levels_map.get(stat_id, 0))
-	if level < threshold:
+	if not _stats:
 		return
 
-	# Spend 1 point FIRST; if you don’t have it, bail.
+	# Get stat levels
+	if _stats.has_method("get_stats_dict"):
+		var stats_data: Variant = _stats.call("get_stats_dict")
+		if typeof(stats_data) == TYPE_DICTIONARY:
+			for key in stats_data.keys():
+				var stat_id: String = String(key)
+				var value: Variant = stats_data[key]
+				if typeof(value) == TYPE_DICTIONARY:
+					var stat_dict: Dictionary = value
+					_stat_levels[stat_id] = int(stat_dict.get("level", int(stat_dict.get("lvl", 0))))
+				else:
+					_stat_levels[stat_id] = int(value)
+
+	# Get perk points
+	if _stats.has_method("get_perk_points"):
+		_perk_points = int(_stats.call("get_perk_points"))
+	elif _stats.has_method("get"):
+		var points: Variant = _stats.get("perk_points")
+		if typeof(points) in [TYPE_INT, TYPE_FLOAT]:
+			_perk_points = int(points)
+
+	# Get stat order
+	if _stats.has_method("get_stats_order"):
+		var order: Variant = _stats.call("get_stats_order")
+		if typeof(order) == TYPE_ARRAY:
+			for stat in order:
+				var stat_id: String = String(stat)
+				if _stat_levels.has(stat_id):
+					_stat_ids.append(stat_id)
+
+	# Fallback to all stats
+	for stat_id in _stat_levels.keys():
+		if not _stat_ids.has(stat_id):
+			_stat_ids.append(stat_id)
+
+	# Limit to 5 stats
+	while _stat_ids.size() > GRID_COLS:
+		_stat_ids.remove_at(_stat_ids.size() - 1)
+
+	# Get all unlocked perks
+	_load_acquired_perks()
+
+	# Update points display
+	if _points_value:
+		_points_value.text = str(_perk_points)
+
+func _load_acquired_perks() -> void:
+	"""Load all unlocked perks"""
+	_acquired_perks.clear()
+
+	for stat_id in _stat_ids:
+		for tier_i in range(6):  # Tiers 0-5 (1-6 in display)
+			var perk_info: Dictionary = _get_perk_info(stat_id, tier_i)
+			if perk_info["unlocked"]:
+				_acquired_perks.append(perk_info)
+
+func _build_grid() -> void:
+	"""Build the 8×5 perk grid"""
+	# Clear existing grid
+	for child in _perk_grid.get_children():
+		child.queue_free()
+	_grid_cells.clear()
+
+	# Initialize 2D array
+	for row in range(GRID_ROWS):
+		_grid_cells.append([])
+
+	# Build grid row by row
+	for row in range(GRID_ROWS):
+		for col in range(GRID_COLS):
+			if col >= _stat_ids.size():
+				# Empty cell
+				var empty: Control = Control.new()
+				empty.custom_minimum_size = Vector2(120, 40)
+				_perk_grid.add_child(empty)
+				_grid_cells[row].append(empty)
+				continue
+
+			var stat_id: String = _stat_ids[col]
+
+			if row == 0:
+				# Header row: Stat names
+				var header: Label = _create_header_cell(stat_id)
+				_perk_grid.add_child(header)
+				_grid_cells[row].append(header)
+			elif row == 1:
+				# Level row: Current stat levels
+				var level_cell: Label = _create_level_cell(stat_id)
+				_perk_grid.add_child(level_cell)
+				_grid_cells[row].append(level_cell)
+			else:
+				# Tier rows (2-7 → Tiers 1-6)
+				var tier_index: int = row - 2
+				var tier_cell: Button = _create_tier_cell(stat_id, tier_index)
+				_perk_grid.add_child(tier_cell)
+				_grid_cells[row].append(tier_cell)
+
+func _create_header_cell(stat_id: String) -> Label:
+	"""Create header cell with stat name"""
+	var label: Label = Label.new()
+	label.text = _pretty_stat(stat_id)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.custom_minimum_size = Vector2(120, 40)
+	label.add_theme_color_override("font_color", Color(0.9, 0.9, 0.9))
+	return label
+
+func _create_level_cell(stat_id: String) -> Label:
+	"""Create level cell showing current stat level"""
+	var label: Label = Label.new()
+	var level: int = _stat_levels.get(stat_id, 0)
+	label.text = "Lv.%d" % level
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.custom_minimum_size = Vector2(120, 40)
+	label.add_theme_color_override("font_color", Color(1.0, 1.0, 0.6))
+	return label
+
+func _create_tier_cell(stat_id: String, tier_index: int) -> Button:
+	"""Create tier cell button with perk name"""
+	var button: Button = Button.new()
+	button.custom_minimum_size = Vector2(120, 40)
+	button.add_theme_font_size_override("font_size", 9)
+
+	var perk_info: Dictionary = _get_perk_info(stat_id, tier_index)
+
+	# Set text to perk name
+	var perk_name: String = perk_info["name"]
+	# Shorten long names
+	if perk_name.length() > 15:
+		perk_name = perk_name.substr(0, 12) + "..."
+	button.text = perk_name
+
+	# Store metadata
+	button.set_meta("stat_id", stat_id)
+	button.set_meta("tier", tier_index)
+	button.set_meta("perk_info", perk_info)
+
+	# Color-code by status
+	if perk_info["unlocked"]:
+		button.add_theme_color_override("font_color", Color(0.6, 1.0, 0.6))  # Green
+		button.disabled = true
+	elif perk_info["available"]:
+		button.add_theme_color_override("font_color", Color(1.0, 1.0, 0.6))  # Yellow
+		button.disabled = false
+	else:
+		button.add_theme_color_override("font_color", Color(0.5, 0.5, 0.5))  # Gray
+		button.disabled = true
+
+	# Hide Tier 6 if stat level < 11
+	if tier_index == 5:  # Tier 6
+		var stat_level: int = _stat_levels.get(stat_id, 0)
+		button.visible = (stat_level >= TIER_6_LEVEL_REQUIREMENT)
+
+	# Connect press
+	button.pressed.connect(_on_tier_cell_pressed.bind(stat_id, tier_index))
+
+	# Connect hover for mouse users
+	button.mouse_entered.connect(_on_tier_cell_hovered.bind(stat_id, tier_index))
+
+	return button
+
+func _get_perk_info(stat_id: String, tier_index: int) -> Dictionary:
+	"""Get complete info about a perk"""
+	var stat_level: int = _stat_levels.get(stat_id, 0)
+
+	var info: Dictionary = {
+		"stat_id": stat_id,
+		"tier": tier_index,
+		"name": "%s T%d" % [_pretty_stat(stat_id), tier_index + 1],
+		"description": "",
+		"threshold": DEFAULT_THRESHOLDS[min(tier_index, DEFAULT_THRESHOLDS.size() - 1)],
+		"unlocked": false,
+		"available": false,
+		"perk_id": ""
+	}
+
+	# Get data from PerkSystem
+	if _perk:
+		if _perk.has_method("get_threshold"):
+			info["threshold"] = int(_perk.call("get_threshold", stat_id, tier_index))
+		elif _perk.has_method("get_thresholds"):
+			var thresholds: Variant = _perk.call("get_thresholds", stat_id)
+			if typeof(thresholds) == TYPE_ARRAY and tier_index < (thresholds as Array).size():
+				info["threshold"] = int((thresholds as Array)[tier_index])
+
+		if _perk.has_method("get_perk_id"):
+			info["perk_id"] = String(_perk.call("get_perk_id", stat_id, tier_index))
+
+		if _perk.has_method("get_perk_name"):
+			var name: String = String(_perk.call("get_perk_name", stat_id, tier_index))
+			if name != "":
+				info["name"] = name
+
+		if _perk.has_method("get_perk_desc"):
+			info["description"] = String(_perk.call("get_perk_desc", stat_id, tier_index))
+
+		if _perk.has_method("is_unlocked"):
+			info["unlocked"] = bool(_perk.call("is_unlocked", stat_id, tier_index))
+		elif _perk.has_method("has_perk") and info["perk_id"] != "":
+			info["unlocked"] = bool(_perk.call("has_perk", info["perk_id"]))
+
+	# Check availability
+	var meets_requirement: bool = stat_level >= info["threshold"]
+	info["available"] = meets_requirement and not info["unlocked"] and _perk_points > 0
+
+	return info
+
+func _populate_acquired_perks() -> void:
+	"""Populate the acquired perks list"""
+	if not _acquired_list:
+		return
+
+	_acquired_list.clear()
+
+	for perk in _acquired_perks:
+		_acquired_list.add_item(perk["name"])
+
+func _find_first_selectable_perk() -> void:
+	"""Find and select first selectable perk in grid"""
+	for row in range(2, GRID_ROWS):  # Start from first tier row
+		for col in range(GRID_COLS):
+			if col >= _grid_cells[row].size():
+				continue
+			var cell: Control = _grid_cells[row][col]
+			if cell is Button and cell.visible:
+				_selected_row = row
+				_selected_col = col
+				return
+
+func _highlight_selection() -> void:
+	"""Highlight the currently selected grid cell"""
+	# Clear all highlights first
+	for row in range(2, GRID_ROWS):
+		for col in range(GRID_COLS):
+			if row >= _grid_cells.size() or col >= _grid_cells[row].size():
+				continue
+			var cell: Control = _grid_cells[row][col]
+			if cell is Button:
+				cell.modulate = Color(1.0, 1.0, 1.0, 1.0)
+
+	# Highlight selected
+	if _selected_row < 0 or _selected_row >= _grid_cells.size():
+		return
+	if _selected_col < 0 or _selected_col >= _grid_cells[_selected_row].size():
+		return
+
+	var cell: Control = _grid_cells[_selected_row][_selected_col]
+	if cell is Button:
+		cell.modulate = Color(1.3, 1.3, 0.8, 1.0)  # Yellow glow
+
+func _show_selected_perk_details() -> void:
+	"""Show details for currently selected perk"""
+	if _selected_row < 2 or _selected_row >= _grid_cells.size():
+		return
+	if _selected_col < 0 or _selected_col >= _grid_cells[_selected_row].size():
+		return
+
+	var cell: Control = _grid_cells[_selected_row][_selected_col]
+	if not cell is Button or not cell.has_meta("perk_info"):
+		return
+
+	var perk: Dictionary = cell.get_meta("perk_info")
+	_show_perk_details(perk)
+
+func _show_perk_details(perk: Dictionary) -> void:
+	"""Show perk details in left panel"""
+	if _perk_name:
+		_perk_name.text = perk["name"]
+
+	var details: String = ""
+	details += "Tier: %d\n\n" % (perk["tier"] + 1)
+
+	if perk["description"] != "":
+		details += "%s\n\n" % perk["description"]
+
+	var stat_level: int = _stat_levels.get(perk["stat_id"], 0)
+	var threshold: int = perk["threshold"]
+	details += "Requires: %s ≥ %d\n" % [_pretty_stat(perk["stat_id"]), threshold]
+	details += "Current: %s = %d\n\n" % [_pretty_stat(perk["stat_id"]), stat_level]
+
+	if perk["unlocked"]:
+		details += "Status: ✔ Unlocked\n"
+	elif perk["available"]:
+		details += "Status: Available!\n"
+		details += "Cost: 1 Perk Point\n"
+		details += "Press A to unlock\n"
+	else:
+		if stat_level < threshold:
+			details += "Status: Locked (need %d more %s)\n" % [threshold - stat_level, _pretty_stat(perk["stat_id"])]
+		else:
+			details += "Status: Need perk points\n"
+
+	if _details_text:
+		_details_text.text = details
+
+func _on_tier_cell_hovered(stat_id: String, tier_index: int) -> void:
+	"""Handle mouse hover over tier cell"""
+	var perk: Dictionary = _get_perk_info(stat_id, tier_index)
+	_show_perk_details(perk)
+
+func _on_tier_cell_pressed(stat_id: String, tier_index: int) -> void:
+	"""Handle tier cell button press"""
+	var perk: Dictionary = _get_perk_info(stat_id, tier_index)
+	if not perk["available"]:
+		return
+
+	_unlock_perk(perk)
+
+func _unlock_perk(perk: Dictionary) -> void:
+	"""Attempt to unlock a perk"""
+	var stat_id: String = perk["stat_id"]
+	var tier: int = perk["tier"]
+
+	# Verify requirements
+	var stat_level: int = _stat_levels.get(stat_id, 0)
+	if stat_level < perk["threshold"]:
+		print("[PerksPanel] Cannot unlock: stat level too low")
+		return
+
+	if _perk_points < 1:
+		print("[PerksPanel] Cannot unlock: no perk points")
+		return
+
+	# Spend perk point
 	var spent: int = 0
-	if _stats != null and _stats.has_method("spend_perk_point"):
+	if _stats and _stats.has_method("spend_perk_point"):
 		spent = int(_stats.call("spend_perk_point", 1))
 	if spent < 1:
+		print("[PerksPanel] Failed to spend perk point")
 		return
 
-	# Try to unlock the perk.
+	# Try to unlock
 	var unlocked: bool = false
-	if _perk != null:
-		if _perk.has_method("unlock_by_id") and btn.has_meta("perk_id"):
-			unlocked = bool(_perk.call("unlock_by_id", String(btn.get_meta("perk_id"))))
+	if _perk:
+		if _perk.has_method("unlock_by_id") and perk["perk_id"] != "":
+			unlocked = bool(_perk.call("unlock_by_id", perk["perk_id"]))
 		elif _perk.has_method("unlock_perk"):
-			unlocked = bool(_perk.call("unlock_perk", stat_id, tier_i))
+			unlocked = bool(_perk.call("unlock_perk", stat_id, tier))
 		elif _perk.has_method("unlock"):
-			unlocked = bool(_perk.call("unlock", stat_id, tier_i))
+			unlocked = bool(_perk.call("unlock", stat_id, tier))
 	else:
-		# No PerkSystem? treat as UI-only “success”
 		unlocked = true
 
-	# If unlock FAILED, refund the point.
+	# Refund if failed
 	if not unlocked:
-		if _stats != null and _stats.has_method("add_perk_points"):
+		print("[PerksPanel] Unlock failed, refunding point")
+		if _stats and _stats.has_method("add_perk_points"):
 			_stats.call("add_perk_points", 1)
 
-	_rebuild_all()
+	# Rebuild
+	_rebuild()
+	_highlight_selection()
+	_show_selected_perk_details()
 
-# ------------------------------------------------------------------------------
+func _on_acquired_perk_selected(index: int) -> void:
+	"""Show details for selected acquired perk"""
+	if index < 0 or index >= _acquired_perks.size():
+		return
 
-func _update_points_label() -> void:
-	if _points_tv != null:
-		_points_tv.text = str(_points)
+	var perk: Dictionary = _acquired_perks[index]
+	_show_perk_details(perk)
 
-func _pretty_stat(id_str: String) -> String:
-	if _stats != null:
-		if _stats.has_method("get_stat_display_name"):
-			var v: Variant = _stats.call("get_stat_display_name", id_str)
-			if typeof(v) == TYPE_STRING and String(v) != "":
-				return String(v)
-	var s: String = id_str.replace("_", " ").strip_edges()
-	if s.length() == 0:
-		return "Stat"
-	return s.substr(0,1).to_upper() + s.substr(1, s.length() - 1)
-
-# ------------------------------------------------------------------------------
-# Controller Navigation
-# ------------------------------------------------------------------------------
-
-func _input(event: InputEvent) -> void:
+func _unhandled_input(event: InputEvent) -> void:
 	"""Handle controller input for grid navigation"""
-	if not visible or _stat_keys.is_empty():
+	if not visible:
 		return
 
 	var handled: bool = false
 
-	if event.is_action_pressed(aInputManager.ACTION_MOVE_UP):
+	if event.is_action_pressed("ui_up"):
 		_navigate_grid(0, -1)
 		handled = true
-	elif event.is_action_pressed(aInputManager.ACTION_MOVE_DOWN):
+	elif event.is_action_pressed("ui_down"):
 		_navigate_grid(0, 1)
 		handled = true
-	elif event.is_action_pressed(aInputManager.ACTION_MOVE_LEFT):
+	elif event.is_action_pressed("ui_left"):
 		_navigate_grid(-1, 0)
 		handled = true
-	elif event.is_action_pressed(aInputManager.ACTION_MOVE_RIGHT):
+	elif event.is_action_pressed("ui_right"):
 		_navigate_grid(1, 0)
 		handled = true
-	elif event.is_action_pressed(aInputManager.ACTION_ACCEPT):
+	elif event.is_action_pressed("menu_accept"):
 		_activate_selected_cell()
 		handled = true
 
@@ -330,93 +486,72 @@ func _input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 func _navigate_grid(col_delta: int, row_delta: int) -> void:
-	"""Navigate through the perk grid"""
-	if _stat_keys.is_empty():
-		return
+	"""Navigate through selectable grid cells"""
+	var new_row: int = _selected_row + row_delta
+	var new_col: int = _selected_col + col_delta
 
-	# Unhighlight current
-	_unhighlight_cell(_selected_row, _selected_col)
+	# Clamp to grid bounds
+	new_row = clamp(new_row, 2, GRID_ROWS - 1)  # Only tier rows
+	new_col = clamp(new_col, 0, GRID_COLS - 1)
 
-	# Update position with clamping
-	_selected_col += col_delta
-	_selected_row += row_delta
+	# Find next valid cell
+	var found: bool = false
+	var attempts: int = 0
+	while not found and attempts < 50:
+		if new_row < 2 or new_row >= _grid_cells.size():
+			break
+		if new_col < 0 or new_col >= _grid_cells[new_row].size():
+			break
 
-	# Clamp to valid grid bounds
-	_selected_col = clamp(_selected_col, 0, MAX_COLS - 1)
-	_selected_row = clamp(_selected_row, 0, _stat_keys.size() - 1)
+		var cell: Control = _grid_cells[new_row][new_col]
+		if cell is Button and cell.visible:
+			_selected_row = new_row
+			_selected_col = new_col
+			found = true
+			break
 
-	# Highlight new selection
-	_highlight_cell(_selected_row, _selected_col)
+		# Try next cell in direction
+		if col_delta != 0:
+			new_col += col_delta
+			if new_col < 0 or new_col >= GRID_COLS:
+				break
+		elif row_delta != 0:
+			new_row += row_delta
+			if new_row < 2 or new_row >= GRID_ROWS:
+				break
+		else:
+			break
 
-func _highlight_cell(row: int, col: int) -> void:
-	"""Highlight a cell in the grid"""
-	if row < 0 or row >= _stat_keys.size():
-		return
+		attempts += 1
 
-	var stat_id: String = String(_stat_keys[row])
-	if not _cells.has(stat_id):
-		return
-
-	var buttons: Array = _cells[stat_id]
-	if col < 0 or col >= buttons.size():
-		return
-
-	var button: Button = buttons[col]
-	button.modulate = Color(1.2, 1.2, 0.8, 1.0)  # Yellow tint
-	button.grab_focus()
-
-func _unhighlight_cell(row: int, col: int) -> void:
-	"""Remove highlight from a cell"""
-	if row < 0 or row >= _stat_keys.size():
-		return
-
-	var stat_id: String = String(_stat_keys[row])
-	if not _cells.has(stat_id):
-		return
-
-	var buttons: Array = _cells[stat_id]
-	if col < 0 or col >= buttons.size():
-		return
-
-	var button: Button = buttons[col]
-	button.modulate = Color(1.0, 1.0, 1.0, 1.0)  # Normal color
+	_highlight_selection()
+	_show_selected_perk_details()
 
 func _activate_selected_cell() -> void:
-	"""Activate the currently selected cell"""
-	if _selected_row < 0 or _selected_row >= _stat_keys.size():
+	"""Activate (unlock) the selected perk"""
+	if _selected_row < 2 or _selected_row >= _grid_cells.size():
+		return
+	if _selected_col < 0 or _selected_col >= _grid_cells[_selected_row].size():
 		return
 
-	var stat_id: String = String(_stat_keys[_selected_row])
-	if not _cells.has(stat_id):
-		return
+	var cell: Control = _grid_cells[_selected_row][_selected_col]
+	if cell is Button and not cell.disabled and cell.has_meta("perk_info"):
+		var perk: Dictionary = cell.get_meta("perk_info")
+		if perk["available"]:
+			_unlock_perk(perk)
 
-	var buttons: Array = _cells[stat_id]
-	if _selected_col < 0 or _selected_col >= buttons.size():
-		return
+# ==============================================================================
+# Helper Functions
+# ==============================================================================
 
-	var button: Button = buttons[_selected_col]
+func _pretty_stat(stat_id: String) -> String:
+	"""Get display name for a stat"""
+	if _stats and _stats.has_method("get_stat_display_name"):
+		var name: Variant = _stats.call("get_stat_display_name", stat_id)
+		if typeof(name) == TYPE_STRING and String(name) != "":
+			return String(name)
 
-	# Only activate if button is enabled and not already unlocked
-	if not button.disabled and not button.button_pressed:
-		_on_cell_pressed(button)
-
-# --- Back Button Indicator ---
-func _add_back_indicator() -> void:
-	"""Add 'Back (B)' text in bottom right corner"""
-	_back_label = Label.new()
-	_back_label.text = "Back (B)"
-	_back_label.add_theme_font_size_override("font_size", 14)
-	_back_label.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7, 1.0))
-
-	# Position in bottom right
-	_back_label.anchor_right = 1.0
-	_back_label.anchor_bottom = 1.0
-	_back_label.anchor_left = 1.0
-	_back_label.anchor_top = 1.0
-	_back_label.offset_right = -20
-	_back_label.offset_bottom = -10
-	_back_label.offset_left = -100
-	_back_label.offset_top = -30
-	_back_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-
-	add_child(_back_label)
+	var formatted: String = stat_id.replace("_", " ").strip_edges()
+	if formatted.length() == 0:
+		return "Stat"
+	return formatted.substr(0, 1).to_upper() + formatted.substr(1)

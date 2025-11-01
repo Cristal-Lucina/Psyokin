@@ -24,12 +24,21 @@ grow_horizontal = 2
 grow_vertical = 2
 theme_override_constants/separation = 16
 
-[node name="TabButtons" type="VBoxContainer" parent="Root"]
+[node name="TabColumn" type="VBoxContainer" parent="Root"]
+custom_minimum_size = Vector2(160, 0)
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="TabLabel" type="Label" parent="Root/TabColumn"]
+layout_mode = 2
+text = "Menu"
+horizontal_alignment = 1
+
+[node name="TabList" type="ItemList" parent="Root/TabColumn"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(180, 0)
 layout_mode = 2
 size_flags_vertical = 3
-theme_override_constants/separation = 6
+focus_mode = 2
 
 [node name="Left" type="VBoxContainer" parent="Root"]
 custom_minimum_size = Vector2(280, 0)
@@ -69,15 +78,20 @@ size_flags_horizontal = 3
 size_flags_vertical = 3
 theme_override_constants/separation = 10
 
+[node name="InfoTitle" type="Label" parent="Root/Right"]
+layout_mode = 2
+text = "Player Info"
+horizontal_alignment = 1
+
 [node name="InfoGrid" type="GridContainer" parent="Root/Right"]
 layout_mode = 2
-theme_override_constants/h_separation = 8
-theme_override_constants/v_separation = 6
+theme_override_constants/h_separation = 16
+theme_override_constants/v_separation = 8
 columns = 2
 
 [node name="MoneyLabel" type="Label" parent="Root/Right/InfoGrid"]
 layout_mode = 2
-text = "CREDS"
+text = "CREDS:"
 
 [node name="MoneyValue" type="Label" parent="Root/Right/InfoGrid"]
 layout_mode = 2
@@ -85,7 +99,7 @@ text = "0"
 
 [node name="PerkLabel" type="Label" parent="Root/Right/InfoGrid"]
 layout_mode = 2
-text = "Perk Pts"
+text = "Perk Pts:"
 
 [node name="PerkValue" type="Label" parent="Root/Right/InfoGrid"]
 layout_mode = 2
@@ -93,7 +107,7 @@ text = "0"
 
 [node name="MoralityLabel" type="Label" parent="Root/Right/InfoGrid"]
 layout_mode = 2
-text = "Morality"
+text = "Morality:"
 
 [node name="MoralityValue" type="Label" parent="Root/Right/InfoGrid"]
 layout_mode = 2
@@ -101,7 +115,7 @@ text = "Neutral (0)"
 
 [node name="DateLabel" type="Label" parent="Root/Right/InfoGrid"]
 layout_mode = 2
-text = "Date"
+text = "Date:"
 
 [node name="DateValue" type="Label" parent="Root/Right/InfoGrid"]
 layout_mode = 2
@@ -109,17 +123,22 @@ text = "--/--"
 
 [node name="PhaseLabel" type="Label" parent="Root/Right/InfoGrid"]
 layout_mode = 2
-text = "Phase"
+text = "Phase:"
 
 [node name="PhaseValue" type="Label" parent="Root/Right/InfoGrid"]
 layout_mode = 2
 text = "—"
 
-[node name="HintHeader" type="Label" parent="Root/Right"]
+[node name="HintSection" type="VBoxContainer" parent="Root/Right"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 4
+
+[node name="HintHeader" type="Label" parent="Root/Right/HintSection"]
 layout_mode = 2
 text = "Next Mission"
 
-[node name="HintValue" type="RichTextLabel" parent="Root/Right"]
+[node name="HintValue" type="RichTextLabel" parent="Root/Right/HintSection"]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3

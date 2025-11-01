@@ -63,23 +63,23 @@ class_name LoadoutPanel
 @onready var _party_list: ItemList       = get_node("Row/Party/PartyList") as ItemList
 @onready var _member_name: Label         = get_node("Row/Right/MemberName") as Label
 
-@onready var _w_val: Label = get_node("Row/Right/Grid/WValue") as Label
-@onready var _a_val: Label = get_node("Row/Right/Grid/AValue") as Label
-@onready var _h_val: Label = get_node("Row/Right/Grid/HValue") as Label
-@onready var _f_val: Label = get_node("Row/Right/Grid/FValue") as Label
-@onready var _b_val: Label = get_node("Row/Right/Grid/BValue") as Label
+@onready var _w_val: Label = get_node("Row/Right/Grid/WHBox/WValue") as Label
+@onready var _a_val: Label = get_node("Row/Right/Grid/AHBox/AValue") as Label
+@onready var _h_val: Label = get_node("Row/Right/Grid/HHBox/HValue") as Label
+@onready var _f_val: Label = get_node("Row/Right/Grid/FHBox/FValue") as Label
+@onready var _b_val: Label = get_node("Row/Right/Grid/BHBox/BValue") as Label
 
-@onready var _w_btn: Button = get_node_or_null("Row/Right/Grid/WBtn") as Button
-@onready var _a_btn: Button = get_node_or_null("Row/Right/Grid/ABtn") as Button
-@onready var _h_btn: Button = get_node_or_null("Row/Right/Grid/HBtn") as Button
-@onready var _f_btn: Button = get_node_or_null("Row/Right/Grid/FBtn") as Button
-@onready var _b_btn: Button = get_node_or_null("Row/Right/Grid/BBtn") as Button
+@onready var _w_btn: Button = get_node_or_null("Row/Right/Grid/WHBox/WBtn") as Button
+@onready var _a_btn: Button = get_node_or_null("Row/Right/Grid/AHBox/ABtn") as Button
+@onready var _h_btn: Button = get_node_or_null("Row/Right/Grid/HHBox/HBtn") as Button
+@onready var _f_btn: Button = get_node_or_null("Row/Right/Grid/FHBox/FBtn") as Button
+@onready var _b_btn: Button = get_node_or_null("Row/Right/Grid/BHBox/BBtn") as Button
 
 @onready var _sigils_title: Label         = get_node_or_null("Row/Right/Sigils/Title") as Label
 @onready var _sigils_list:  VBoxContainer = get_node_or_null("Row/Right/Sigils/List") as VBoxContainer
 @onready var _btn_manage:   Button        = get_node_or_null("Row/Right/Buttons/BtnManageSigils") as Button
 
-@onready var _stats_grid:  GridContainer = get_node("Row/Right/StatsGrid") as GridContainer
+@onready var _stats_grid:  GridContainer = get_node("Row/StatsColumn/StatsGrid") as GridContainer
 @onready var _mind_value:  Label         = get_node_or_null("Row/Right/MindRow/Value") as Label
 @onready var _mind_row:    HBoxContainer = get_node_or_null("Row/Right/MindRow") as HBoxContainer
 
@@ -111,6 +111,12 @@ const _SIGIL_MENU_SCENE_PATHS: Array[String] = [
 var _party_sig: String = ""
 var _sigils_sig: String = ""
 var _poll_accum: float = 0.0
+
+# Controller navigation state
+var _in_party_mode: bool = true  # true = navigating party list, false = navigating equipment
+var _nav_elements: Array[Control] = []  # Ordered list of focusable elements
+var _nav_index: int = 0  # Current selection index
+var _active_popup: Control = null  # Currently open equipment popup panel
 
 func _ready() -> void:
 	_gs    = get_node_or_null("/root/aGameState")
@@ -196,6 +202,12 @@ func _refresh_all_for_current() -> void:
 	_rebuild_sigils(cur)
 	_refresh_mind_row(cur)
 	_refresh_active_type_row(cur)
+
+	# Rebuild navigation elements if in equipment mode (sigils may have changed)
+	if not _in_party_mode:
+		call_deferred("_build_nav_elements")
+		if _nav_index >= 0 and _nav_index < _nav_elements.size():
+			call_deferred("_highlight_element", _nav_index)
 
 func _on_sigil_instances_updated(_a=null,_b=null,_c=null) -> void:
 	_refresh_all_for_current()
@@ -346,46 +358,85 @@ func _show_item_menu_for_slot(member_token: String, slot: String) -> void:
 	var cur: Dictionary = _fetch_equip_for(member_token)
 	var cur_id: String = String(cur.get(slot, ""))
 
-	var pm: PopupMenu = PopupMenu.new()
-	add_child(pm)
+	# Get the button that was clicked for positioning
+	var source_btn: Button = null
+	match slot:
+		"weapon": source_btn = _w_btn
+		"armor": source_btn = _a_btn
+		"head": source_btn = _h_btn
+		"foot": source_btn = _f_btn
+		"bracelet": source_btn = _b_btn
 
+	# Create custom popup using Control nodes for proper controller support
+	var popup_panel: Panel = Panel.new()
+	popup_panel.process_mode = Node.PROCESS_MODE_ALWAYS
+	popup_panel.z_index = 100
+	add_child(popup_panel)
+
+	var vbox: VBoxContainer = VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 4)
+	popup_panel.add_child(vbox)
+
+	# Title label
+	var title: Label = Label.new()
+	title.text = "Select %s" % slot.capitalize()
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(title)
+
+	# Item list
+	var item_list: ItemList = ItemList.new()
+	item_list.custom_minimum_size = Vector2(280, 200)
+	item_list.focus_mode = Control.FOCUS_ALL
+	vbox.add_child(item_list)
+
+	# Build item list data
+	var item_ids: Array[String] = []
+
+	# Add unequip option if something is equipped
 	if cur_id != "" and cur_id != "—":
-		pm.add_item("Unequip")
-		pm.set_item_metadata(pm.get_item_count() - 1, null)
-		pm.add_separator()
+		item_list.add_item("← Unequip")
+		item_ids.append("")  # Empty string = unequip
 
+	# Add available items
 	if items.is_empty():
-		pm.add_item("(No items)")
-		pm.set_item_disabled(pm.get_item_count() - 1, true)
+		item_list.add_item("(No items available)")
+		item_list.set_item_disabled(item_list.item_count - 1, true)
+		item_ids.append("")
 	else:
 		for id in items:
 			var label: String = _pretty_item(id)
-			pm.add_item(label)
-			pm.set_item_metadata(pm.get_item_count() - 1, id)
+			item_list.add_item(label)
+			item_ids.append(id)
 
-	var _handle: Callable = func(index: int) -> void:
-		var meta: Variant = pm.get_item_metadata(index)
-		pm.queue_free()
-		if typeof(meta) == TYPE_NIL:
-			if _eq and _eq.has_method("unequip_slot"):
-				_eq.call("unequip_slot", member_token, slot)
-			if slot == "bracelet" and _sig and _sig.has_method("on_bracelet_changed"):
-				_sig.call("on_bracelet_changed", member_token)
-		else:
-			var picked_id: String = String(meta)
-			if _eq and _eq.has_method("equip_item"):
-				_eq.call("equip_item", member_token, picked_id)
-			if slot == "bracelet" and _sig and _sig.has_method("on_bracelet_changed"):
-				_sig.call("on_bracelet_changed", member_token)
+	# Position popup next to the equipment button
+	var popup_pos: Vector2 = Vector2(100, 100)
+	if source_btn and is_instance_valid(source_btn):
+		popup_pos = source_btn.global_position + Vector2(source_btn.size.x + 10, 0)
+	popup_panel.position = popup_pos
 
-		var sel2: PackedInt32Array = _party_list.get_selected_items()
-		_on_party_selected(sel2[0] if sel2.size() > 0 else -1)
+	# Auto-size panel to fit content
+	await get_tree().process_frame
+	popup_panel.size = vbox.size + Vector2(20, 20)
+	vbox.position = Vector2(10, 10)
 
-	pm.index_pressed.connect(_handle)
-	pm.id_pressed.connect(func(idnum: int) -> void:
-		_handle.call(pm.get_item_index(idnum))
-	)
-	pm.popup(Rect2(get_global_mouse_position(), Vector2(280, 0)))
+	# Select first item and grab focus
+	if item_list.item_count > 0:
+		var first_enabled = 0
+		for i in range(item_list.item_count):
+			if not item_list.is_item_disabled(i):
+				first_enabled = i
+				break
+		item_list.select(first_enabled)
+		item_list.grab_focus()
+
+	# Store reference for controller input
+	_active_popup = popup_panel
+	popup_panel.set_meta("_item_list", item_list)
+	popup_panel.set_meta("_item_ids", item_ids)
+	popup_panel.set_meta("_member_token", member_token)
+	popup_panel.set_meta("_slot", slot)
+
+	print("[LoadoutPanel] Equipment popup opened for %s - %d items" % [slot, item_ids.size()])
 
 # ────────────────── sigils ──────────────────
 func _sigil_disp(inst_id: String) -> String:
@@ -776,7 +827,7 @@ func _rebuild_stats_grid(member_token: String, equip: Dictionary) -> void:
 	var crit_bonus: int = int(d_wea.get("crit_bonus_pct", 0))
 	var type_raw: String = String(d_wea.get("watk_type_tag","")).strip_edges().to_lower()
 	var weapon_type: String = ("Neutral" if (type_raw == "" or type_raw == "wand") else type_raw.capitalize())
-	var special: String = ("NL" if _as_bool(d_wea.get("non_lethal", false)) else "")
+	var special: String = ("NL" if _as_bool(d_wea.get("non_lethal", false)) else "—")
 
 	var vtl: int = _stat_for_member(member_token, "VTL")
 	var armor_flat: int = int(d_arm.get("armor_flat", 0))
@@ -796,49 +847,49 @@ func _rebuild_stats_grid(member_token: String, equip: Dictionary) -> void:
 	var speed: int = int(d_foot.get("speed", 0))
 
 	var slots: int = int(d_brac.get("sigil_slots", 0))
-	var active: String = ""
-	if _sig and _sig.has_method("get_loadout"):
-		var v: Variant = _sig.call("get_loadout", member_token)
-		var arr: Array = []
-		if typeof(v) == TYPE_PACKED_STRING_ARRAY: arr = Array(v)
-		elif typeof(v) == TYPE_ARRAY: arr = v
-		if arr.size() > 0 and String(arr[0]) != "":
-			active = _sigil_disp(String(arr[0]))
 
 	var _pair: Callable = func(lbl: String, val: String) -> void:
 		_stats_grid.add_child(_label_cell(lbl))
 		_stats_grid.add_child(_value_cell(val))
 
-	_pair.call("Level",  str(lvl))
-	_pair.call("Max HP", str(hp_max))
-	_pair.call("Max MP", str(mp_max))
+	# Core stats
+	_pair.call("Level", str(lvl))
+	_pair.call("HP", str(hp_max))
+	_pair.call("MP", str(mp_max))
 
-	_pair.call("Weapon Attack", ("" if d_wea.is_empty() else str(weapon_attack)))
-	_pair.call("Weapon Scale",  ("" if d_wea.is_empty() else weapon_scale))
-	_pair.call("Weapon Accuracy", ("" if d_wea.is_empty() else str(weapon_acc)))
+	# Weapon stats
+	if not d_wea.is_empty():
+		_pair.call("W.Attack", str(weapon_attack))
+		_pair.call("W.Acc", str(weapon_acc))
+		_pair.call("W.Type", weapon_type)
+		_pair.call("Crit %", str(crit_bonus))
+		if skill_acc_boost > 0:
+			_pair.call("Skill Acc", str(skill_acc_boost))
+		if special != "—":
+			_pair.call("Special", special)
 
-	_pair.call("Skill Accuracy Boost", ("" if d_wea.is_empty() else str(skill_acc_boost)))
-	_pair.call("Crit Bonus", ("" if d_wea.is_empty() else str(crit_bonus)))
-	_pair.call("Weapon Type", ("" if d_wea.is_empty() else weapon_type))
+	# Armor stats
+	if not d_arm.is_empty():
+		_pair.call("P.Def", str(pdef))
+		_pair.call("Ail.Res %", str(ail_res))
 
-	_pair.call("Special", ("" if d_wea.is_empty() else special))
-	_pair.call("Physical Defence", ("" if d_arm.is_empty() else str(pdef)))
-	_pair.call("Ailment Resistance", ("" if d_arm.is_empty() else str(ail_res)))
+	# Head stats
+	if not d_head.is_empty():
+		if hp_bonus > 0:
+			_pair.call("HP Bonus", str(hp_bonus))
+		if mp_bonus > 0:
+			_pair.call("MP Bonus", str(mp_bonus))
+		_pair.call("M.Def", str(mdef))
 
-	_pair.call("HP Bonus", ("" if d_head.is_empty() else str(hp_bonus)))
-	_pair.call("MP Bonus", ("" if d_head.is_empty() else str(mp_bonus)))
-	_pair.call("Mind Defense", ("" if d_head.is_empty() else str(mdef)))
+	# Foot stats
+	if not d_foot.is_empty():
+		_pair.call("P.Eva", str(peva))
+		_pair.call("M.Eva", str(meva))
+		_pair.call("Speed", str(speed))
 
-	_pair.call("Physical Evasion", ("" if d_foot.is_empty() else str(peva)))
-	_pair.call("Mind Evasion", ("" if d_foot.is_empty() else str(meva)))
-	_pair.call("Speed", ("" if d_foot.is_empty() else str(speed)))
-
-	_pair.call("Set Bonus", "")
-	_pair.call("Sigil Slots", ("" if d_brac.is_empty() else str(slots)))
-	_stats_grid.add_child(_label_cell("Active Sigil"))
-	var active_cell: Label = _value_cell("" if d_brac.is_empty() else active)
-	active_cell.custom_minimum_size.x = 60
-	_stats_grid.add_child(active_cell)
+	# Bracelet stats
+	if not d_brac.is_empty():
+		_pair.call("Sigils", str(slots))
 
 # ────────────────── Active Type (hero) ──────────────────
 func _setup_active_type_widgets() -> void:
@@ -1043,3 +1094,242 @@ func _as_bool(v: Variant) -> bool:
 			var s := String(v).strip_edges().to_lower()
 			return s in ["true","1","yes","y","on","t"]
 		_:           return false
+
+## ═══════════════════════════════════════════════════════════════
+## CONTROLLER NAVIGATION
+## ═══════════════════════════════════════════════════════════════
+
+func _unhandled_input(event: InputEvent) -> void:
+	"""Handle controller navigation for LoadoutPanel
+
+	Navigation flow:
+	1. Party list (UP/DOWN to select member, ACCEPT to confirm)
+	2. Equipment slots (UP/DOWN to navigate)
+	3. Sigil slots (UP/DOWN to navigate)
+	4. Manage Sigils button
+	5. Mind Type button
+	"""
+	if not visible:
+		return
+
+	# If popup is active, handle accept/back (ItemList handles UP/DOWN automatically)
+	if _active_popup and is_instance_valid(_active_popup) and _active_popup.visible:
+		if event.is_action_pressed("menu_accept"):
+			_activate_popup_selection()
+			get_viewport().set_input_as_handled()
+			return
+		elif event.is_action_pressed("menu_back"):
+			_close_equipment_popup()
+			get_viewport().set_input_as_handled()
+			return
+
+	if _in_party_mode:
+		# Party list navigation
+		if event.is_action_pressed("move_up"):
+			_navigate_party(-1)
+			get_viewport().set_input_as_handled()
+		elif event.is_action_pressed("move_down"):
+			_navigate_party(1)
+			get_viewport().set_input_as_handled()
+		elif event.is_action_pressed("menu_accept"):
+			# Lock in party member and switch to equipment mode
+			_enter_equipment_mode()
+			get_viewport().set_input_as_handled()
+		elif event.is_action_pressed("menu_back"):
+			# Already in party mode, let parent handle back
+			pass
+	else:
+		# Equipment/sigil/button navigation
+		if event.is_action_pressed("move_up"):
+			_navigate_equipment(-1)
+			get_viewport().set_input_as_handled()
+		elif event.is_action_pressed("move_down"):
+			_navigate_equipment(1)
+			get_viewport().set_input_as_handled()
+		elif event.is_action_pressed("menu_accept"):
+			_activate_current_element()
+			get_viewport().set_input_as_handled()
+		elif event.is_action_pressed("menu_back"):
+			# Return to party mode
+			_enter_party_mode()
+			get_viewport().set_input_as_handled()
+
+func _navigate_party(delta: int) -> void:
+	"""Navigate UP/DOWN in party list"""
+	if not _party_list:
+		return
+	
+	var count = _party_list.get_item_count()
+	if count == 0:
+		return
+	
+	var current = _party_list.get_selected_items()
+	var idx = current[0] if current.size() > 0 else 0
+	
+	idx += delta
+	idx = clamp(idx, 0, count - 1)
+	
+	_party_list.select(idx)
+	_party_list.ensure_current_is_visible()
+	print("[LoadoutPanel] Party navigation: selected index %d" % idx)
+
+func _enter_equipment_mode() -> void:
+	"""Switch from party selection to equipment/sigil navigation"""
+	print("[LoadoutPanel] Entering equipment mode")
+	_in_party_mode = false
+	_build_nav_elements()
+	_nav_index = 0
+	if _nav_elements.size() > 0:
+		_highlight_element(_nav_index)
+
+func _enter_party_mode() -> void:
+	"""Return to party list navigation"""
+	print("[LoadoutPanel] Returning to party mode")
+	_in_party_mode = true
+	_unhighlight_all_elements()
+	if _party_list:
+		var current = _party_list.get_selected_items()
+		if current.size() == 0 and _party_list.get_item_count() > 0:
+			_party_list.select(0)
+
+func _build_nav_elements() -> void:
+	"""Build ordered list of focusable elements for equipment mode"""
+	_nav_elements.clear()
+	
+	# Equipment slot buttons (W, A, H, F, B)
+	if _w_btn: _nav_elements.append(_w_btn)
+	if _a_btn: _nav_elements.append(_a_btn)
+	if _h_btn: _nav_elements.append(_h_btn)
+	if _f_btn: _nav_elements.append(_f_btn)
+	if _b_btn: _nav_elements.append(_b_btn)
+	
+	# Sigil slot buttons (dynamically created)
+	if _sigils_list:
+		for child in _sigils_list.get_children():
+			if child is HBoxContainer:
+				for subchild in child.get_children():
+					if subchild is Button:
+						_nav_elements.append(subchild)
+	
+	# Manage Sigils button
+	if _btn_manage:
+		_nav_elements.append(_btn_manage)
+	
+	# Mind Type button  
+	if _active_btn:
+		_nav_elements.append(_active_btn)
+	
+	print("[LoadoutPanel] Built navigation with %d elements" % _nav_elements.size())
+
+func _navigate_equipment(delta: int) -> void:
+	"""Navigate UP/DOWN through equipment/sigil/button elements"""
+	if _nav_elements.is_empty():
+		return
+	
+	_unhighlight_element(_nav_index)
+	
+	_nav_index += delta
+	_nav_index = clamp(_nav_index, 0, _nav_elements.size() - 1)
+	
+	_highlight_element(_nav_index)
+	print("[LoadoutPanel] Equipment navigation: index %d" % _nav_index)
+
+func _highlight_element(index: int) -> void:
+	"""Highlight the element at the given index"""
+	if index < 0 or index >= _nav_elements.size():
+		return
+
+	var element = _nav_elements[index]
+	if not is_instance_valid(element):
+		return
+
+	if element is Button:
+		element.modulate = Color(1.5, 1.5, 0.5, 1.0)  # Bright yellow highlight
+		element.grab_focus()
+		print("[LoadoutPanel] Highlighted element %d: %s" % [index, element.text])
+
+func _unhighlight_element(index: int) -> void:
+	"""Remove highlight from element at given index"""
+	if index < 0 or index >= _nav_elements.size():
+		return
+
+	var element = _nav_elements[index]
+	if not is_instance_valid(element):
+		return
+
+	if element is Button:
+		element.modulate = Color(1.0, 1.0, 1.0, 1.0)  # Normal
+
+func _unhighlight_all_elements() -> void:
+	"""Remove all highlights"""
+	for i in range(_nav_elements.size()):
+		_unhighlight_element(i)
+
+func _activate_current_element() -> void:
+	"""Press/activate the currently highlighted element (A button)"""
+	if _nav_index < 0 or _nav_index >= _nav_elements.size():
+		return
+
+	var element = _nav_elements[_nav_index]
+	if not is_instance_valid(element):
+		print("[LoadoutPanel] Element at index %d is no longer valid" % _nav_index)
+		return
+
+	if element is Button:
+		print("[LoadoutPanel] Activating button: %s" % element.text)
+		element.emit_signal("pressed")
+
+# ───────────────── popup navigation ─────────────────
+func _activate_popup_selection() -> void:
+	"""Activate the currently selected item in equipment popup (A button)"""
+	if not _active_popup or not is_instance_valid(_active_popup):
+		return
+
+	if not _active_popup.has_meta("_item_list"):
+		return
+
+	var item_list: ItemList = _active_popup.get_meta("_item_list")
+	var item_ids: Array = _active_popup.get_meta("_item_ids", [])
+	var member_token: String = _active_popup.get_meta("_member_token", "")
+	var slot: String = _active_popup.get_meta("_slot", "")
+
+	var selected_items = item_list.get_selected_items()
+	if selected_items.is_empty():
+		print("[LoadoutPanel] No item selected in popup")
+		return
+
+	var idx: int = selected_items[0]
+	if idx < 0 or idx >= item_ids.size():
+		print("[LoadoutPanel] Invalid selection index: %d" % idx)
+		return
+
+	var item_id: String = item_ids[idx]
+	print("[LoadoutPanel] Equipping item: '%s' to slot: %s" % [item_id, slot])
+
+	# Close popup first
+	_close_equipment_popup()
+
+	# Handle equip/unequip
+	if item_id == "":
+		# Unequip
+		if _eq and _eq.has_method("unequip_slot"):
+			_eq.call("unequip_slot", member_token, slot)
+	else:
+		# Equip item
+		if _eq and _eq.has_method("equip_item"):
+			_eq.call("equip_item", member_token, item_id)
+
+	# Special handling for bracelet
+	if slot == "bracelet" and _sig and _sig.has_method("on_bracelet_changed"):
+		_sig.call("on_bracelet_changed", member_token)
+
+	# Refresh display
+	var sel2: PackedInt32Array = _party_list.get_selected_items()
+	_on_party_selected(sel2[0] if sel2.size() > 0 else -1)
+
+func _close_equipment_popup() -> void:
+	"""Close the equipment popup (B button)"""
+	if _active_popup and is_instance_valid(_active_popup):
+		print("[LoadoutPanel] Closing equipment popup")
+		_active_popup.queue_free()
+		_active_popup = null

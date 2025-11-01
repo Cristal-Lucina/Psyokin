@@ -9,114 +9,106 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-mouse_filter = 2
 script = ExtResource("1")
 
-[node name="Root" type="VBoxContainer" parent="."]
-unique_name_in_owner = true
-layout_mode = 0
+[node name="Root" type="HBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
+offset_left = 8.0
+offset_top = 8.0
+offset_right = -8.0
+offset_bottom = -8.0
 grow_horizontal = 2
 grow_vertical = 2
-theme_override_constants/separation = 10
+theme_override_constants/separation = 16
 
-[node name="Header" type="HBoxContainer" parent="Root"]
-unique_name_in_owner = true
+[node name="LeftColumn" type="VBoxContainer" parent="Root"]
+custom_minimum_size = Vector2(320, 0)
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="PointsRow" type="HBoxContainer" parent="Root/LeftColumn"]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="Title" type="Label" parent="Root/Header"]
-layout_mode = 2
-text = "Perks"
-
-[node name="Spacer" type="Control" parent="Root/Header"]
-layout_mode = 2
-size_flags_horizontal = 3
-
-[node name="PointsRow" type="HBoxContainer" parent="Root/Header"]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_constants/separation = 6
-
-[node name="PointsLabel" type="Label" parent="Root/Header/PointsRow"]
+[node name="PointsLabel" type="Label" parent="Root/LeftColumn/PointsRow"]
 layout_mode = 2
 text = "Perk Points:"
 
-[node name="PointsValue" type="Label" parent="Root/Header/PointsRow"]
+[node name="PointsValue" type="Label" parent="Root/LeftColumn/PointsRow"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "0"
 
-[node name="RefreshBtn" type="Button" parent="Root/Header"]
-unique_name_in_owner = true
+[node name="Separator1" type="HSeparator" parent="Root/LeftColumn"]
 layout_mode = 2
-text = "Refresh"
 
-[node name="Frame" type="Panel" parent="Root"]
-unique_name_in_owner = true
+[node name="AcquiredLabel" type="Label" parent="Root/LeftColumn"]
 layout_mode = 2
-size_flags_horizontal = 3
-size_flags_vertical = 3
+text = "Acquired Perks"
+horizontal_alignment = 1
 
-[node name="Content" type="MarginContainer" parent="Root/Frame"]
-unique_name_in_owner = true
-layout_mode = 0
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-theme_override_constants/margin_left = 16
-theme_override_constants/margin_top = 16
-theme_override_constants/margin_right = 16
-theme_override_constants/margin_bottom = 16
+[node name="AcquiredScroll" type="ScrollContainer" parent="Root/LeftColumn"]
+custom_minimum_size = Vector2(0, 150)
+layout_mode = 2
 
-[node name="VBox" type="VBoxContainer" parent="Root/Frame/Content"]
+[node name="AcquiredList" type="ItemList" parent="Root/LeftColumn/AcquiredScroll"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
-theme_override_constants/separation = 10
+focus_mode = 2
 
-[node name="Legend" type="HBoxContainer" parent="Root/Frame/Content/VBox"]
+[node name="Separator2" type="HSeparator" parent="Root/LeftColumn"]
+layout_mode = 2
+
+[node name="DetailsLabel" type="Label" parent="Root/LeftColumn"]
+layout_mode = 2
+text = "Perk Details"
+horizontal_alignment = 1
+
+[node name="PerkName" type="Label" parent="Root/LeftColumn"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 28)
+layout_mode = 2
+text = "(Navigate to a perk)"
+horizontal_alignment = 1
+autowrap_mode = 2
+
+[node name="Separator3" type="HSeparator" parent="Root/LeftColumn"]
+layout_mode = 2
+
+[node name="DetailsScroll" type="ScrollContainer" parent="Root/LeftColumn"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="DetailsText" type="Label" parent="Root/LeftColumn/DetailsScroll"]
 unique_name_in_owner = true
 layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+autowrap_mode = 3
+clip_text = true
+
+[node name="GridColumn" type="VBoxContainer" parent="Root"]
+layout_mode = 2
+size_flags_horizontal = 3
 theme_override_constants/separation = 12
 
-[node name="LegendLabel" type="Label" parent="Root/Frame/Content/VBox/Legend"]
+[node name="GridLabel" type="Label" parent="Root/GridColumn"]
 layout_mode = 2
-text = "Tiers:"
+text = "Perks Grid"
+horizontal_alignment = 1
 
-[node name="Tier1" type="Label" parent="Root/Frame/Content/VBox/Legend"]
+[node name="GridScroll" type="ScrollContainer" parent="Root/GridColumn"]
 layout_mode = 2
-text = "T1"
-
-[node name="Tier2" type="Label" parent="Root/Frame/Content/VBox/Legend"]
-layout_mode = 2
-text = "T2"
-
-[node name="Tier3" type="Label" parent="Root/Frame/Content/VBox/Legend"]
-layout_mode = 2
-text = "T3"
-
-[node name="Tier4" type="Label" parent="Root/Frame/Content/VBox/Legend"]
-layout_mode = 2
-text = "T4"
-
-[node name="Tier5" type="Label" parent="Root/Frame/Content/VBox/Legend"]
-layout_mode = 2
-text = "T5"
-
-[node name="Scroll" type="ScrollContainer" parent="Root/Frame/Content/VBox"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 300)
-layout_mode = 2
-size_flags_horizontal = 3
 size_flags_vertical = 3
 
-[node name="Grid" type="GridContainer" parent="Root/Frame/Content/VBox/Scroll"]
+[node name="PerkGrid" type="GridContainer" parent="Root/GridColumn/GridScroll"]
 unique_name_in_owner = true
 layout_mode = 2
-size_flags_horizontal = 3
-size_flags_vertical = 3
-columns = 6
+theme_override_constants/h_separation = 8
+theme_override_constants/v_separation = 8
+columns = 5
