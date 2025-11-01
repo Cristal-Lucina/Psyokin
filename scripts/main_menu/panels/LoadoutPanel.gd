@@ -553,13 +553,10 @@ func _rebuild_sigils(member_token: String) -> void:
 		nm.text = (_sigil_disp(cur_id) if cur_id != "" else "(empty)")
 		row.add_child(nm)
 
+		# Always show "Equip…" button - popup will handle unequip option
 		var btn: Button = Button.new()
-		if cur_id == "":
-			btn.text = "Equip…"
-			btn.pressed.connect(Callable(self, "_on_equip_sigil").bind(member_token, idx))
-		else:
-			btn.text = "Remove"
-			btn.pressed.connect(Callable(self, "_on_remove_sigil").bind(member_token, idx))
+		btn.text = "Equip…"
+		btn.pressed.connect(Callable(self, "_on_equip_sigil").bind(member_token, idx))
 		row.add_child(btn)
 
 		_sigils_list.add_child(row)
@@ -580,10 +577,23 @@ func _show_sigil_picker_for_socket(member_token: String, socket_index: int) -> v
 		print("[LoadoutPanel] Popup already open, ignoring sigil picker request")
 		return
 
+	print("[LoadoutPanel] === Opening Sigil Picker for %s, socket %d ===" % [member_token, socket_index])
+
+	# Get member's mind type for debugging
+	var member_mind := ""
+	if _sig and _sig.has_method("resolve_member_mind_base"):
+		member_mind = String(_sig.call("resolve_member_mind_base", member_token))
+	print("[LoadoutPanel] Member mind type: %s" % member_mind)
+
 	# Helper: allowed?
 	var _allowed := func(school: String) -> bool:
+		# Empty school means unknown - skip to be safe
+		if school.strip_edges() == "":
+			return false
 		if _sig and _sig.has_method("is_school_allowed_for_member"):
-			return bool(_sig.call("is_school_allowed_for_member", member_token, school))
+			var allowed: bool = bool(_sig.call("is_school_allowed_for_member", member_token, school))
+			return allowed
+		# If no filtering method exists, allow all non-empty schools
 		return true
 
 	# Gather free instances and filter by mind type
@@ -594,6 +604,8 @@ func _show_sigil_picker_for_socket(member_token: String, socket_index: int) -> v
 			free_instances_all = v0 as PackedStringArray
 		elif typeof(v0) == TYPE_ARRAY:
 			for s in (v0 as Array): free_instances_all.append(String(s))
+
+	print("[LoadoutPanel] Found %d free instances total" % free_instances_all.size())
 
 	var free_instances := PackedStringArray()
 	for inst in free_instances_all:
@@ -606,11 +618,18 @@ func _show_sigil_picker_for_socket(member_token: String, socket_index: int) -> v
 			var base := (String(_sig.call("get_base_from_instance", inst)) if _sig.has_method("get_base_from_instance") else inst)
 			if _sig.has_method("get_element_for"):
 				school = String(_sig.call("get_element_for", base))
-		if _allowed.call(school):
+
+		var allowed: bool = _allowed.call(school)
+		if allowed:
 			free_instances.append(inst)
+			print("[LoadoutPanel]   ✓ Instance: %s (school: %s)" % [_sigil_disp(inst), school])
+		else:
+			print("[LoadoutPanel]   ✗ Filtered out: %s (school: %s)" % [_sigil_disp(inst), school])
 
 	# Gather base sigils from inventory and filter by mind type
 	var base_ids_all := _collect_base_sigils()
+	print("[LoadoutPanel] Found %d base sigils in inventory" % base_ids_all.size())
+
 	var base_ids := PackedStringArray()
 	for base in base_ids_all:
 		var school := ""
@@ -618,8 +637,15 @@ func _show_sigil_picker_for_socket(member_token: String, socket_index: int) -> v
 			school = String(_sig.call("get_element_for", base))
 		elif _sig.has_method("get_mind_for"):
 			school = String(_sig.call("get_mind_for", base))
-		if _allowed.call(school):
+
+		var allowed: bool = _allowed.call(school)
+		if allowed:
 			base_ids.append(base)
+			var label: String = (String(_sig.call("get_display_name_for", base)) if (_sig and _sig.has_method("get_display_name_for")) else base)
+			print("[LoadoutPanel]   ✓ Base: %s (school: %s)" % [label, school])
+		else:
+			var label: String = (String(_sig.call("get_display_name_for", base)) if (_sig and _sig.has_method("get_display_name_for")) else base)
+			print("[LoadoutPanel]   ✗ Filtered out: %s (school: %s)" % [label, school])
 
 	# Create custom popup using Control nodes for proper controller support
 	var popup_panel: Panel = Panel.new()
@@ -729,7 +755,14 @@ func _show_sigil_picker_for_socket(member_token: String, socket_index: int) -> v
 	# Set state to POPUP_ACTIVE
 	_nav_state = NavState.POPUP_ACTIVE
 
-	print("[LoadoutPanel] Sigil popup opened for socket %d - %d items" % [socket_index, item_list.item_count])
+	# Summary
+	var has_unequip := (socket_index < current_sigils.size() and current_sigils[socket_index] != "")
+	print("[LoadoutPanel] Sigil popup opened for socket %d:" % socket_index)
+	print("[LoadoutPanel]   - Has current sigil: %s" % has_unequip)
+	print("[LoadoutPanel]   - Free instances: %d" % free_instances.size())
+	print("[LoadoutPanel]   - Base sigils: %d" % base_ids.size())
+	print("[LoadoutPanel]   - Total items in list: %d" % item_list.item_count)
+	print("[LoadoutPanel] ===================================")
 
 func _on_remove_sigil(member_token: String, socket_index: int) -> void:
 	if _sig and _sig.has_method("remove_sigil_at"):
@@ -1285,6 +1318,7 @@ func _popup_accept_item() -> void:
 func _popup_accept_sigil() -> void:
 	"""User pressed accept on sigil popup - equip/unequip the selected sigil"""
 	if not _active_popup or not is_instance_valid(_active_popup):
+		print("[LoadoutPanel] ERROR: No active popup")
 		return
 
 	var item_list: ItemList = _active_popup.get_meta("_item_list", null)
@@ -1293,6 +1327,7 @@ func _popup_accept_sigil() -> void:
 	var socket_index: int = _active_popup.get_meta("_socket_index", -1)
 
 	if not item_list or socket_index < 0:
+		print("[LoadoutPanel] ERROR: Invalid popup metadata")
 		_popup_cancel()
 		return
 
@@ -1304,7 +1339,7 @@ func _popup_accept_sigil() -> void:
 
 	var idx: int = selected[0]
 	if idx < 0 or idx >= item_metadata.size():
-		print("[LoadoutPanel] Invalid sigil selection index")
+		print("[LoadoutPanel] ERROR: Invalid selection index %d (metadata size: %d)" % [idx, item_metadata.size()])
 		_popup_cancel()
 		return
 
@@ -1312,55 +1347,84 @@ func _popup_accept_sigil() -> void:
 	var kind: String = meta.get("kind", "")
 	var id: String = meta.get("id", "")
 
-	print("[LoadoutPanel] Sigil action: kind=%s, id=%s, socket=%d" % [kind, id, socket_index])
+	print("[LoadoutPanel] === Sigil Equip Action ===" )
+	print("[LoadoutPanel]   Member: %s" % member_token)
+	print("[LoadoutPanel]   Socket: %d" % socket_index)
+	print("[LoadoutPanel]   Kind: %s" % kind)
+	print("[LoadoutPanel]   ID: %s" % id)
 
 	# Handle unequip
 	if kind == "unequip":
+		print("[LoadoutPanel] Unequipping sigil from socket %d" % socket_index)
 		if _sig and _sig.has_method("remove_sigil_at"):
 			_sig.call("remove_sigil_at", member_token, socket_index)
+			print("[LoadoutPanel] ✓ Sigil unequipped")
+		else:
+			print("[LoadoutPanel] ✗ remove_sigil_at method not available")
 		_on_sigils_changed(member_token)
 		_popup_close_and_return_to_equipment()
 		return
 
 	# Handle instance equip
 	if kind == "inst":
+		print("[LoadoutPanel] Equipping instance: %s" % id)
 		if _sig and _sig.has_method("equip_into_socket"):
 			var ok: bool = bool(_sig.call("equip_into_socket", member_token, socket_index, id))
-			if ok and _sig.has_method("on_bracelet_changed"):
-				_sig.call("on_bracelet_changed", member_token)
+			if ok:
+				print("[LoadoutPanel] ✓ Instance equipped successfully")
+				if _sig.has_method("on_bracelet_changed"):
+					_sig.call("on_bracelet_changed", member_token)
+			else:
+				print("[LoadoutPanel] ✗ Failed to equip instance")
+		else:
+			print("[LoadoutPanel] ✗ equip_into_socket method not available")
 		_on_sigils_changed(member_token)
 		_popup_close_and_return_to_equipment()
 		return
 
 	# Handle base sigil equip
 	if kind == "base":
+		print("[LoadoutPanel] Equipping base sigil: %s" % id)
 		var final_inst: String = ""
 
 		# Try direct equip from inventory first
 		if _sig.has_method("equip_from_inventory"):
+			print("[LoadoutPanel] Trying direct equip from inventory...")
 			var ok_direct: bool = bool(_sig.call("equip_from_inventory", member_token, socket_index, id))
 			if ok_direct:
+				print("[LoadoutPanel] ✓ Equipped directly from inventory")
 				_on_sigils_changed(member_token)
 				_popup_close_and_return_to_equipment()
 				return
+			else:
+				print("[LoadoutPanel] Direct equip failed, trying draft...")
 
 		# Otherwise, draft instance then equip
 		if _sig.has_method("draft_from_inventory"):
 			var drafted: Variant = _sig.call("draft_from_inventory", id)
 			if typeof(drafted) == TYPE_STRING:
 				final_inst = String(drafted)
+				print("[LoadoutPanel] Drafted instance: %s" % final_inst)
+			else:
+				print("[LoadoutPanel] ✗ Failed to draft instance")
 
 		if final_inst != "" and _sig.has_method("equip_into_socket"):
 			var ok_e: bool = bool(_sig.call("equip_into_socket", member_token, socket_index, final_inst))
-			if ok_e and _sig.has_method("on_bracelet_changed"):
-				_sig.call("on_bracelet_changed", member_token)
+			if ok_e:
+				print("[LoadoutPanel] ✓ Drafted instance equipped successfully")
+				if _sig.has_method("on_bracelet_changed"):
+					_sig.call("on_bracelet_changed", member_token)
+			else:
+				print("[LoadoutPanel] ✗ Failed to equip drafted instance")
 			_on_sigils_changed(member_token)
+		elif final_inst == "":
+			print("[LoadoutPanel] ✗ No instance to equip")
 
 		_popup_close_and_return_to_equipment()
 		return
 
 	# Unknown kind - just close
-	print("[LoadoutPanel] Unknown sigil kind: %s" % kind)
+	print("[LoadoutPanel] ERROR: Unknown sigil kind: %s" % kind)
 	_popup_cancel()
 
 func _popup_cancel() -> void:
