@@ -1126,6 +1126,7 @@ func _instance_sigil_menu_scene() -> Control:
 	return SigilSkillMenu.new()
 
 func _on_manage_sigils() -> void:
+	"""Open Sigil Skill Menu via panel stack"""
 	var token: String = _current_token()
 	if token == "":
 		print("[LoadoutPanel] ERROR: Cannot open sigil menu - no member selected")
@@ -1139,36 +1140,32 @@ func _on_manage_sigils() -> void:
 		menu.call("set_member", token)
 		print("[LoadoutPanel] Set member to: %s" % token)
 
-	var layer := CanvasLayer.new()
-	layer.layer = 128  # Higher layer to ensure it's on top of pause/menu screens
-	layer.name = "SigilMenuLayer"
-
-	get_tree().root.add_child(layer)
-	layer.add_child(menu)
+	# Add to tree first (required before pushing to panel manager)
+	add_child(menu)
 	menu.set_anchors_preset(Control.PRESET_FULL_RECT)
-	menu.mouse_filter = Control.MOUSE_FILTER_STOP  # Ensure it captures mouse input
-	menu.z_index = 1000  # Force high z-index
+	menu.mouse_filter = Control.MOUSE_FILTER_STOP
+	menu.z_index = 100
 
-	if not menu.tree_exited.is_connected(Callable(self, "_on_overlay_closed")):
-		menu.tree_exited.connect(Callable(self, "_on_overlay_closed").bind(layer))
+	# Push to panel manager stack
+	var panel_mgr = get_node_or_null("/root/aPanelManager")
+	if panel_mgr:
+		panel_mgr.push_panel(menu)
+		print("[LoadoutPanel] Pushed SigilSkillMenu to panel stack")
 
-	print("[LoadoutPanel] Sigil menu added to tree")
-	print("[LoadoutPanel] Menu visible: %s, position: %s, size: %s" % [menu.visible, menu.global_position, menu.size])
-	print("[LoadoutPanel] Layer: %d, z_index: %d, mouse_filter: %d" % [layer.layer, menu.z_index, menu.mouse_filter])
+	# Connect cleanup signal
+	if not menu.tree_exited.is_connected(Callable(self, "_on_sigil_menu_closed")):
+		menu.tree_exited.connect(Callable(self, "_on_sigil_menu_closed"))
 
-	# Debug: Check what else is in the scene tree
-	await get_tree().process_frame
-	print("[LoadoutPanel] All CanvasLayers in root:")
-	for child in get_tree().root.get_children():
-		if child is CanvasLayer:
-			var cl := child as CanvasLayer
-			print("  - %s (layer %d)" % [child.name, cl.layer])
+	# Update LoadoutPanel state
+	_nav_state = NavState.POPUP_ACTIVE
+	print("[LoadoutPanel] SigilSkillMenu opened, state = POPUP_ACTIVE")
 
-func _on_overlay_closed(layer: CanvasLayer) -> void:
-	if is_instance_valid(layer):
-		layer.queue_free()
-	# In case levels/skills changed while overlay was open
+func _on_sigil_menu_closed() -> void:
+	"""Called when SigilSkillMenu is closed"""
+	print("[LoadoutPanel] SigilSkillMenu closed, refreshing loadout")
+	# In case levels/skills changed while menu was open
 	_refresh_all_for_current()
+	# State will be restored by _on_panel_gained_focus when we regain focus
 
 # ────────────────── polling fallback ──────────────────
 func _snapshot_party_signature() -> String:
