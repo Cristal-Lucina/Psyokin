@@ -1023,7 +1023,9 @@ func _show_info_popup(title: String, message: String) -> void:
 # ─────────────────────────────────────────────────────────────
 
 func _on_story_points_pressed() -> void:
+	print("[BondsPanel] _on_story_points_pressed called, _selected = '%s'" % _selected)
 	if _selected == "":
+		print("[BondsPanel] No bond selected, returning")
 		return
 
 	# Pull points safely
@@ -1031,8 +1033,11 @@ func _on_story_points_pressed() -> void:
 	if _sys != null and _sys.has_method("get_story_points"):
 		points = _to_psa_local(_sys.call("get_story_points", _selected))
 
+	print("[BondsPanel] Got %d story points" % points.size())
+
 	# Find display name for title
 	var disp: String = _display_name(_selected)
+	print("[BondsPanel] Display name: '%s'" % disp)
 
 	# Clear any prior overlay
 	_close_story_overlay()
@@ -1116,8 +1121,11 @@ func _on_story_points_pressed() -> void:
 			body.add_child(row)
 
 	# Add to the top-level so it truly fills the window
+	print("[BondsPanel] Adding story overlay to scene tree")
 	get_tree().root.add_child(overlay)
 	_story_overlay = overlay
+	print("[BondsPanel] Story overlay added successfully, focusing back button")
+	back_btn.grab_focus()
 
 func _close_story_overlay() -> void:
 	if _story_overlay != null and is_instance_valid(_story_overlay):
