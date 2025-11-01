@@ -1241,15 +1241,15 @@ func _input(event: InputEvent) -> void:
 	allowing us to mark input as handled before GameMenu intercepts it.
 	"""
 
-	# Only handle input if we're the active panel
-	if not is_active():
-		return
-
-	# STATE 1: POPUP_ACTIVE - Handle accept/back, let navigation pass to ItemList
+	# STATE 1: POPUP_ACTIVE - Handle even when not "active" (popup is on top in panel stack)
 	if _nav_state == NavState.POPUP_ACTIVE:
 		_handle_popup_input(event)
 		# NOTE: _handle_popup_input decides which inputs to mark as handled
 		# Navigation (up/down) is NOT marked as handled, so ItemList can navigate
+		return
+
+	# Only handle other states if we're the active panel
+	if not is_active():
 		return
 
 	# STATE 2: PARTY_SELECT
