@@ -380,16 +380,24 @@ func _update_action_buttons(mission: Dictionary) -> void:
 
 func _on_primary_action() -> void:
 	"""Primary button pressed - Set Current or Advance"""
+	print("[OutreachPanel] _on_primary_action called")
+
 	if _selected_mission.is_empty():
+		print("[OutreachPanel] ERROR: No mission selected!")
 		return
 
 	var is_current = _selected_mission.get("current", false)
+	var mission_title = _selected_mission.get("title", "")
+
+	print("[OutreachPanel] Mission: %s, is_current: %s" % [mission_title, is_current])
 
 	if is_current:
 		# Advance current mission
+		print("[OutreachPanel] Advancing current mission...")
 		_advance_current_mission()
 	else:
 		# Set as current - show confirmation
+		print("[OutreachPanel] Showing set current confirmation...")
 		_show_set_current_confirmation()
 
 func _show_set_current_confirmation() -> void:
@@ -423,6 +431,7 @@ func _show_set_current_confirmation() -> void:
 
 	var accept_btn: Button = Button.new()
 	accept_btn.text = "Accept"
+	accept_btn.focus_mode = Control.FOCUS_ALL  # Ensure button is focusable
 	accept_btn.pressed.connect(func():
 		print("[OutreachPanel] Accept button pressed!")
 		_confirm_set_current()
@@ -431,6 +440,7 @@ func _show_set_current_confirmation() -> void:
 
 	var cancel_btn: Button = Button.new()
 	cancel_btn.text = "Cancel"
+	cancel_btn.focus_mode = Control.FOCUS_ALL  # Ensure button is focusable
 	cancel_btn.pressed.connect(_popup_cancel)
 	btn_hbox.add_child(cancel_btn)
 
@@ -623,9 +633,9 @@ func _handle_mission_list_input(event: InputEvent) -> void:
 		_enter_category_select_state()
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("menu_accept"):
-		# Pressing accept on mission focuses primary action button
-		if _primary_btn and _primary_btn.visible:
-			_primary_btn.grab_focus()
+		# Pressing accept on mission triggers the primary action directly
+		print("[OutreachPanel] ACCEPT pressed on mission - triggering primary action")
+		_on_primary_action()
 		get_viewport().set_input_as_handled()
 
 func _handle_popup_input(event: InputEvent) -> void:
