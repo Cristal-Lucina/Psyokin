@@ -57,8 +57,8 @@ func _ready() -> void:
 			if dorm.has_signal(s) and not dorm.is_connected(s, Callable(self, "_on_dorm_changed")):
 				dorm.connect(s, Callable(self, "_on_dorm_changed"))
 
-	# Initial fill
-	refresh_all()
+	# Initial fill (deferred to ensure all autoloads are ready)
+	call_deferred("refresh_all")
 
 # ───────────────────────── Public API ─────────────────────────
 
@@ -373,7 +373,9 @@ func _compute_for_member(member: String) -> Dictionary:
 	var dorm_sys: Node = get_node_or_null("/root/aDormSystem")
 	if dorm_sys != null and dorm_sys.has_method("calculate_affinity_power"):
 		var affinity_result: Variant = dorm_sys.call("calculate_affinity_power", pid)
-		var affinity_data: Dictionary = affinity_result if typeof(affinity_result) == TYPE_DICTIONARY else {}
+		var affinity_data: Dictionary = {}
+		if typeof(affinity_result) == TYPE_DICTIONARY:
+			affinity_data = affinity_result as Dictionary
 		prof["affinity_power"] = affinity_data
 		prof["roll_bonus_affinity"] = int(affinity_data.get("roll_bonus", 0))
 	else:

@@ -910,8 +910,14 @@ func _mark_new_pairs_hidden(aid: String, before_list: Array[String], after_list:
 func _current_neighbors_of_actor(aid: String) -> Array[String]:
 	var out: Array[String] = []
 	var room_of: String = ""
-	for rid in ROOM_IDS:
-		var room_data: Dictionary = _rooms[rid] as Dictionary
+	for rid_val in ROOM_IDS:
+		var rid: String = String(rid_val)
+		if not _rooms.has(rid):
+			continue
+		var room_variant: Variant = _rooms[rid]
+		if typeof(room_variant) != TYPE_DICTIONARY:
+			continue
+		var room_data: Dictionary = room_variant as Dictionary
 		if String(room_data.get("occupant","")) == aid:
 			room_of = rid
 			break
