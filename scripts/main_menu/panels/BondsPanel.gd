@@ -969,12 +969,16 @@ func _get_layer_reward_text(transition_id: String) -> String:
 
 func _show_info_popup(title: String, message: String) -> void:
 	"""Show a simple info popup with title and message"""
+	# Use CanvasLayer to ensure overlay renders on top of everything
+	var canvas_layer := CanvasLayer.new()
+	canvas_layer.name = "InfoOverlayLayer"
+	canvas_layer.layer = 100  # Very high layer to be on top
+
 	# Full-screen overlay
 	var overlay := Control.new()
 	overlay.name = "InfoOverlay"
 	overlay.mouse_filter = Control.MOUSE_FILTER_STOP
 	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
-	overlay.z_index = 100
 
 	# Dim background
 	var dim := ColorRect.new()
@@ -1018,12 +1022,15 @@ func _show_info_popup(title: String, message: String) -> void:
 	back_btn.text = "Back"
 	back_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	back_btn.pressed.connect(func() -> void:
-		overlay.queue_free()
+		canvas_layer.queue_free()
 	)
 	root.add_child(back_btn)
 
-	# Add to scene
-	get_tree().root.add_child(overlay)
+	# Add overlay to canvas layer
+	canvas_layer.add_child(overlay)
+
+	# Add canvas layer to scene
+	get_tree().root.add_child(canvas_layer)
 
 	# Focus back button immediately
 	back_btn.grab_focus()
