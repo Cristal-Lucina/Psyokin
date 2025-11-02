@@ -195,14 +195,16 @@ func _input(event: InputEvent) -> void:
 
 func _handle_bond_list_input(event: InputEvent) -> void:
 	"""Handle input when navigating bond list (vertical-only navigation)"""
+	# Block left/right input completely (both pressed and released)
+	if event.is_action("move_left") or event.is_action("move_right"):
+		get_viewport().set_input_as_handled()
+		return
+
 	if event.is_action_pressed("move_up"):
 		_navigate_bond_list(-1)
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("move_down"):
 		_navigate_bond_list(1)
-		get_viewport().set_input_as_handled()
-	elif event.is_action_pressed("move_left") or event.is_action_pressed("move_right"):
-		# Block left/right input in bond list (vertical-only navigation)
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("menu_accept"):
 		_select_current_bond()
@@ -289,14 +291,16 @@ func _exit_bonds_panel() -> void:
 
 func _handle_bond_detail_input(event: InputEvent) -> void:
 	"""Handle input when viewing bond details (vertical-only navigation)"""
+	# Block left/right input completely (both pressed and released)
+	if event.is_action("move_left") or event.is_action("move_right"):
+		get_viewport().set_input_as_handled()
+		return
+
 	if event.is_action_pressed("move_up"):
 		_navigate_detail_buttons(-1)
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("move_down"):
 		_navigate_detail_buttons(1)
-		get_viewport().set_input_as_handled()
-	elif event.is_action_pressed("move_left") or event.is_action_pressed("move_right"):
-		# Block left/right input in detail view (vertical-only navigation)
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("menu_accept"):
 		_activate_detail_button()
