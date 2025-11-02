@@ -117,6 +117,12 @@ var _staged_assign: Dictionary = {}
 var _plan_locked: bool = false
 var _locked_involved_rooms: Dictionary = {}
 
+# move penalties (stacking affinity penalty with protagonist for 1 week after move)
+var _move_penalties: Dictionary = {}  # { "actor_id": {"penalty": -2, "applied_week": int, "expires_week": int} }
+
+# player relationship matrix (calculated from hero stat picks)
+var _player_relationships: Dictionary = {}  # { "actor_id": "bestie"|"rival"|"neutral" }
+
 # relationships
 var _bestie_map: Dictionary = {}
 var _rival_map : Dictionary = {}
@@ -286,6 +292,10 @@ func _on_calendar_day_changed(a: Variant = null, _b: Variant = null, _c: Variant
 	var idx2: int = (idx if idx >= 0 else _weekday_name_to_index(wd_name))
 	if idx2 >= 0: _last_weekday_index = idx2
 	if wd_name != "": _last_weekday_name = wd_name
+
+	# Cleanup expired move penalties on every day change
+	cleanup_expired_move_penalties()
+
 	if _compute_blocking(): return
 	if _is_friday_name(wd_name) or _is_friday_index(idx2):
 		_reveal_friday_now()
@@ -759,6 +769,8 @@ func saturday_execute_changes() -> void:
 		var to_r: String = String(_staged_assign[aid])
 		if from_r != "" and to_r != "" and from_r != to_r:
 			moves.append({"aid": aid, "name": display_name(aid), "from": from_r, "to": to_r})
+			# Apply move penalty: -2 affinity with protagonist for 1 week
+			apply_move_penalty(aid)
 	for aid_k2 in _staged_assign.keys():
 		var aid2: String = String(aid_k2)
 		var from_r2: String = String(_staged_prev_room.get(aid2, ""))
@@ -1033,6 +1045,9 @@ func save() -> Dictionary:
 	for dk in _discovered_pairs.keys(): disc.append(String(dk))
 	blob["discovered_pairs"] = disc
 
+	# move penalties
+	blob["move_penalties"] = _move_penalties.duplicate(true)
+
 	return blob
 
 func load(blob: Dictionary) -> void:
@@ -1071,6 +1086,11 @@ func load(blob: Dictionary) -> void:
 	_discovered_pairs.clear()
 	for dk in _as_string_array(blob.get("discovered_pairs", [])):
 		_discovered_pairs[String(dk)] = true
+
+	# move penalties
+	_move_penalties.clear()
+	if blob.has("move_penalties") and typeof(blob["move_penalties"]) == TYPE_DICTIONARY:
+		_move_penalties = (blob["move_penalties"] as Dictionary).duplicate(true)
 
 	# sanity: ensure hero exists somewhere
 	var hero_found: bool = false
@@ -1118,3 +1138,214 @@ func _apply_rooms_from_layout(layout: Dictionary) -> void:
 
 func _set_dict_keys_true(dst: Dictionary, keys: PackedStringArray) -> void:
 	for k in keys: dst[String(k)] = true
+
+## ═══════════════════════════════════════════════════════════════════════════
+## MOVE PENALTY SYSTEM
+## ═══════════════════════════════════════════════════════════════════════════
+
+func apply_move_penalty(actor_id: String) -> void:
+	"""Apply -2 affinity penalty with protagonist for 1 week after room reassignment"""
+	var current_week = _get_current_week_number()
+	_move_penalties[actor_id] = {
+		"penalty": -2,
+		"applied_week": current_week,
+		"expires_week": current_week + 1
+	}
+	print("[DormSystem] Applied move penalty to %s (expires week %d)" % [actor_id, current_week + 1])
+
+func get_move_penalty(actor_id: String) -> int:
+	"""Get current move penalty for actor (0 if none/expired)"""
+	if not _move_penalties.has(actor_id):
+		return 0
+
+	var penalty_data: Dictionary = _move_penalties[actor_id]
+	var current_week = _get_current_week_number()
+	var expires_week = penalty_data.get("expires_week", 0)
+
+	if current_week >= expires_week:
+		# Penalty expired
+		_move_penalties.erase(actor_id)
+		return 0
+
+	return penalty_data.get("penalty", 0)
+
+func cleanup_expired_move_penalties() -> void:
+	"""Remove all expired move penalties (called on day change)"""
+	var current_week = _get_current_week_number()
+	var to_remove: Array[String] = []
+
+	for actor_id in _move_penalties.keys():
+		var penalty_data: Dictionary = _move_penalties[actor_id]
+		var expires_week = penalty_data.get("expires_week", 0)
+		if current_week >= expires_week:
+			to_remove.append(actor_id)
+
+	for actor_id in to_remove:
+		_move_penalties.erase(actor_id)
+		print("[DormSystem] Removed expired move penalty for %s" % actor_id)
+
+func _get_current_week_number() -> int:
+	"""Get current week number from CalendarSystem"""
+	if _calendar_node == null:
+		return 0
+
+	# Try to get week number from calendar
+	for method in ["get_week", "get_week_number", "week", "week_number"]:
+		if _calendar_node.has_method(method):
+			var result = _calendar_node.call(method)
+			if typeof(result) == TYPE_INT:
+				return result
+
+	# Fallback: calculate from day number
+	for method in ["get_day", "get_day_number", "day", "day_number", "total_days"]:
+		if _calendar_node.has_method(method):
+			var result = _calendar_node.call(method)
+			if typeof(result) == TYPE_INT:
+				return int(result / 7)  # Weeks = days / 7
+
+	return 0
+
+## ═══════════════════════════════════════════════════════════════════════════
+## AFFINITY POWER CALCULATION
+## ═══════════════════════════════════════════════════════════════════════════
+
+func calculate_affinity_power(actor_id: String) -> Dictionary:
+	"""
+	Calculate total affinity power for an actor
+
+	Affinity Power = Neighbor Score + Battle Affinity Bonus + Move Penalty
+	Capped at -3 to +5
+
+	Returns: {
+		"neighbor_score": int,      # -3 to +3 from dorm neighbors
+		"battle_affinity": int,     # 0 to +2 from active party AT level
+		"move_penalty": int,        # -2 if moved this week, else 0
+		"total_affinity": int,      # Sum, capped at -3 to +5
+		"roll_bonus": int           # Final roll bonus: -4 to +10
+	}
+	"""
+	var neighbor_score = _calculate_neighbor_score(actor_id)
+	var battle_bonus = _get_battle_affinity_bonus(actor_id)
+	var move_pen = get_move_penalty(actor_id)
+
+	# Calculate total (neighbor + battle + penalty)
+	var total = neighbor_score + battle_bonus + move_pen
+
+	# Cap at -3 to +5 (max affinity power)
+	total = clampi(total, -3, 5)
+
+	# Convert to roll bonus
+	var roll_bonus = _affinity_to_roll_bonus(total)
+
+	return {
+		"neighbor_score": neighbor_score,
+		"battle_affinity": battle_bonus,
+		"move_penalty": move_pen,
+		"total_affinity": total,
+		"roll_bonus": roll_bonus
+	}
+
+func _calculate_neighbor_score(actor_id: String) -> int:
+	"""
+	Count besties/rivals among neighbors, return -3 to +3
+
+	Each bestie neighbor: +1
+	Each rival neighbor: -1
+	Neutral neighbors: 0
+	"""
+	var neighbors = _current_neighbors_of_actor(actor_id)
+	var bestie_count = 0
+	var rival_count = 0
+
+	for neighbor_id in neighbors:
+		var status = get_pair_status(actor_id, neighbor_id)
+		if status == "Bestie":
+			bestie_count += 1
+		elif status == "Rival":
+			rival_count += 1
+		# Neutral = 0, don't count
+
+	var score = bestie_count - rival_count
+	return clampi(score, -3, 3)  # Cap at -3 to +3
+
+func _get_battle_affinity_bonus(actor_id: String) -> int:
+	"""
+	Get battle affinity bonus if actor is in active party with appropriate AT levels
+
+	AT2 with another active party member = +1
+	AT3 with another active party member = +2
+
+	Returns highest bonus from any active party pairing
+	"""
+	var aff_sys = get_node_or_null("/root/aAffinitySystem")
+	if not aff_sys:
+		return 0
+
+	var gs = get_node_or_null("/root/aGameState")
+	if not gs or not gs.has_method("get"):
+		return 0
+
+	# Get active party (should be 3 members)
+	var party_v = gs.get("party")
+	var active_party: Array[String] = []
+	if typeof(party_v) == TYPE_ARRAY:
+		for member in party_v:
+			active_party.append(String(member))
+	elif typeof(party_v) == TYPE_PACKED_STRING_ARRAY:
+		for member in (party_v as PackedStringArray):
+			active_party.append(String(member))
+
+	# Check if actor is in active party
+	if not active_party.has(actor_id):
+		return 0  # Not in active party, no battle bonus
+
+	# Check affinity tiers with other active party members
+	var highest_bonus = 0
+
+	for other_member in active_party:
+		if other_member == actor_id:
+			continue  # Skip self
+
+		# Get affinity tier for this pair
+		var tier = 0
+		if aff_sys.has_method("get_affinity_tier"):
+			tier = aff_sys.call("get_affinity_tier", actor_id, other_member)
+
+		# Convert tier to bonus
+		# AT2 = +1, AT3 = +2
+		var bonus = 0
+		if tier >= 3:  # AT3
+			bonus = 2
+		elif tier >= 2:  # AT2
+			bonus = 1
+
+		highest_bonus = max(highest_bonus, bonus)
+
+	return highest_bonus
+
+func _affinity_to_roll_bonus(affinity: int) -> int:
+	"""
+	Convert affinity level to roll bonus
+
+	Based on affinity_power_config.csv:
+	-3 → -4 (three rivals)
+	-2 → -2 (two rivals, one neutral)
+	-1 → -1 (one rival, two neutrals)
+	 0 →  0 (all neutral)
+	 1 →  1 (mixed or one bestie)
+	 2 →  2 (two besties, one neutral)
+	 3 →  4 (three besties)
+	 4 →  8 (three besties + AT2)
+	 5 → 10 (three besties + AT3) [MAX]
+	"""
+	match affinity:
+		-3: return -4
+		-2: return -2
+		-1: return -1
+		0: return 0
+		1: return 1
+		2: return 2
+		3: return 4
+		4: return 8
+		5: return 10
+		_: return 0
