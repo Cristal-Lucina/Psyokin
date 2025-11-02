@@ -95,7 +95,7 @@ var _dislikes_row   : HBoxContainer = null
 var _lvl_tv    : Label          = null
 var _xp_tv     : Label          = null
 
-var _story_overlay  : Control        = null
+var _story_overlay  : CanvasLayer    = null
 
 # Data / state
 var _sys  : Node = null
