@@ -423,13 +423,20 @@ func _show_set_current_confirmation() -> void:
 
 	var accept_btn: Button = Button.new()
 	accept_btn.text = "Accept"
-	accept_btn.pressed.connect(_confirm_set_current)
+	accept_btn.pressed.connect(func():
+		print("[OutreachPanel] Accept button pressed!")
+		_confirm_set_current()
+	)
 	btn_hbox.add_child(accept_btn)
 
 	var cancel_btn: Button = Button.new()
 	cancel_btn.text = "Cancel"
 	cancel_btn.pressed.connect(_popup_cancel)
 	btn_hbox.add_child(cancel_btn)
+
+	# Set up left/right navigation between buttons
+	accept_btn.focus_neighbor_right = accept_btn.get_path_to(cancel_btn)
+	cancel_btn.focus_neighbor_left = cancel_btn.get_path_to(accept_btn)
 
 	# Auto-size and center
 	await get_tree().process_frame
@@ -459,10 +466,27 @@ func _show_set_current_confirmation() -> void:
 func _confirm_set_current() -> void:
 	"""User confirmed setting mission as current"""
 	var mission_id = _selected_mission.get("id", "")
+	print("[OutreachPanel] _confirm_set_current called - mission_id: %s" % mission_id)
 
-	if mission_id != "" and _main_event and _main_event.has_method("set_current"):
-		_main_event.call("set_current", mission_id)
-		print("[OutreachPanel] Set current mission: %s" % mission_id)
+	if mission_id == "":
+		print("[OutreachPanel] ERROR: Empty mission ID!")
+		_popup_close_and_return_to_list()
+		return
+
+	if not _main_event:
+		print("[OutreachPanel] ERROR: aMainEventSystem not found!")
+		_popup_close_and_return_to_list()
+		return
+
+	if not _main_event.has_method("set_current"):
+		print("[OutreachPanel] ERROR: aMainEventSystem has no set_current method!")
+		print("[OutreachPanel] Available methods: %s" % _main_event.get_method_list())
+		_popup_close_and_return_to_list()
+		return
+
+	print("[OutreachPanel] Calling set_current(%s)..." % mission_id)
+	_main_event.call("set_current", mission_id)
+	print("[OutreachPanel] ✓ Set current mission: %s" % mission_id)
 
 	_popup_close_and_return_to_list()
 
@@ -607,14 +631,20 @@ func _handle_mission_list_input(event: InputEvent) -> void:
 func _handle_popup_input(event: InputEvent) -> void:
 	"""Handle input when popup is active"""
 	if event.is_action_pressed("menu_accept"):
+		print("[OutreachPanel] ACCEPT pressed in popup")
 		# Find focused button and press it
 		var focused = get_viewport().gui_get_focus_owner()
+		print("[OutreachPanel] Focused control: %s" % (focused.name if focused else "null"))
 		if focused and focused is Button:
+			print("[OutreachPanel] Emitting pressed signal on button: %s" % focused.text)
 			focused.emit_signal("pressed")
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("menu_back"):
+		print("[OutreachPanel] BACK pressed in popup")
 		_popup_cancel()
 		get_viewport().set_input_as_handled()
+	# NOTE: Do NOT consume move_left/move_right/move_up/move_down
+	# Let Godot's focus system handle button navigation via focus neighbors
 
 ## ═══════════════════════════════════════════════════════════════════════════
 ## NAVIGATION HELPERS
