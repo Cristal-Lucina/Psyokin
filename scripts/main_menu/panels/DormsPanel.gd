@@ -203,7 +203,38 @@ func _input(event: InputEvent) -> void:
 	if not is_active():
 		return
 
+	# Handle popup input
 	if _nav_state == NavState.POPUP_ACTIVE:
+		# Allow buttons in popups to receive gamepad input
+		if event.is_action_pressed("menu_accept"):
+			# Trigger the currently focused button
+			var focused := get_viewport().gui_get_focus_owner()
+			if focused is Button:
+				print("[DormsPanel._input] POPUP: Triggering focused button: %s" % focused.text)
+				focused.emit_signal("pressed")
+				get_viewport().set_input_as_handled()
+		elif event.is_action_pressed("menu_back"):
+			# Try to find and trigger Cancel button, or just handle back
+			print("[DormsPanel._input] POPUP: Back pressed")
+			get_viewport().set_input_as_handled()
+		elif event.is_action_pressed("move_left") or event.is_action_pressed("move_right"):
+			# Allow left/right navigation between popup buttons
+			var focused := get_viewport().gui_get_focus_owner()
+			if focused is Button:
+				# Find next/previous button sibling
+				var parent := focused.get_parent()
+				if parent != null:
+					var children := parent.get_children()
+					var idx := children.find(focused)
+					if idx >= 0:
+						if event.is_action_pressed("move_left") and idx > 0:
+							if children[idx - 1] is Button:
+								children[idx - 1].grab_focus()
+								get_viewport().set_input_as_handled()
+						elif event.is_action_pressed("move_right") and idx < children.size() - 1:
+							if children[idx + 1] is Button:
+								children[idx + 1].grab_focus()
+								get_viewport().set_input_as_handled()
 		return
 
 	# Handle directional navigation
@@ -1150,41 +1181,9 @@ func _ask_confirm(msg: String) -> bool:
 		popup.hide()
 	)
 
-	# Handle gamepad/keyboard input for the popup
-	var input_handler := func(event: InputEvent) -> void:
-		if popup_closed:
-			return
-
-		if event.is_action_pressed("menu_accept"):
-			print("[DormsPanel._ask_confirm] menu_accept detected, triggering focused button")
-			var focused := popup.get_viewport().gui_get_focus_owner()
-			if focused == accept_btn:
-				accept_btn.emit_signal("pressed")
-			elif focused == cancel_btn:
-				cancel_btn.emit_signal("pressed")
-			else:
-				# Default to accept if no button focused
-				accept_btn.emit_signal("pressed")
-			get_viewport().set_input_as_handled()
-		elif event.is_action_pressed("menu_back"):
-			print("[DormsPanel._ask_confirm] menu_back detected, cancelling")
-			cancel_btn.emit_signal("pressed")
-			get_viewport().set_input_as_handled()
-		elif event.is_action_pressed("move_left"):
-			accept_btn.grab_focus()
-			get_viewport().set_input_as_handled()
-		elif event.is_action_pressed("move_right"):
-			cancel_btn.grab_focus()
-			get_viewport().set_input_as_handled()
-
-	# Connect input handler
-	get_viewport().gui_input.connect(input_handler)
-
+	# Wait for user input via the panel's _input method
+	# The popup_closed flag will be set by button presses
 	await popup.hidden
-
-	# Disconnect input handler
-	if get_viewport().gui_input.is_connected(input_handler):
-		get_viewport().gui_input.disconnect(input_handler)
 
 	popup.queue_free()
 
@@ -1248,22 +1247,9 @@ func _show_toast(msg: String) -> void:
 		popup.hide()
 	)
 
-	# Handle gamepad/keyboard input for the toast
-	var input_handler := func(event: InputEvent) -> void:
-		if popup_closed:
-			return
-		if event.is_action_pressed("menu_accept") or event.is_action_pressed("menu_back"):
-			ok_btn.emit_signal("pressed")
-			get_viewport().set_input_as_handled()
-
-	# Connect input handler
-	get_viewport().gui_input.connect(input_handler)
-
+	# Wait for user input via the panel's _input method
+	# The popup_closed flag will be set by button press
 	await popup.hidden
-
-	# Disconnect input handler
-	if get_viewport().gui_input.is_connected(input_handler):
-		get_viewport().gui_input.disconnect(input_handler)
 
 	popup.queue_free()
 
