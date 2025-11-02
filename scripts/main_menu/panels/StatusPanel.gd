@@ -121,8 +121,12 @@ const LAYERS = {
 	"tool_b": {"code": "7tlb", "node_name": "ToolBSprite", "path": "7tlb"}
 }
 
+@onready var _vertical_menu_label : Label = %VerticalMenuLabel
+@onready var _root_container : HBoxContainer = $Root
 @onready var _tab_column : VBoxContainer = $Root/TabColumn
 @onready var _tab_list  : ItemList      = %TabList
+@onready var _left_panel : VBoxContainer = $Root/Left
+@onready var _right_panel : VBoxContainer = $Root/Right
 @onready var _party     : VBoxContainer = $Root/Left/PartyScroll/PartyList
 @onready var _creds     : Label         = $Root/Right/InfoGrid/MoneyValue
 @onready var _perk      : Label         = $Root/Right/InfoGrid/PerkValue
@@ -1222,7 +1226,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			_dev_dump_profiles()
 
 func _hide_menu() -> void:
-	"""Slide menu to the left (hide it)"""
+	"""Slide menu to the left (hide it) and show vertical MENU label"""
 	if not _tab_column or not _menu_visible:
 		return
 
@@ -1237,20 +1241,29 @@ func _hide_menu() -> void:
 	_menu_tween.set_ease(Tween.EASE_OUT)
 	_menu_tween.set_trans(Tween.TRANS_CUBIC)
 
-	# Slide to the left by moving offset_left to hide the column
+	# Slide menu column to the left (hide it)
 	# custom_minimum_size.x is 160, so we move it -176 (160 + 16 separation)
 	_menu_tween.tween_property(_tab_column, "position:x", -176.0, 0.3)
 	_menu_tween.parallel().tween_property(_tab_column, "modulate:a", 0.0, 0.3)
 
-	# After animation completes, make it non-interactive
+	# Show vertical MENU label (fade in)
+	if _vertical_menu_label:
+		_menu_tween.parallel().tween_property(_vertical_menu_label, "modulate:a", 1.0, 0.3)
+
+	# Center the status panels by shifting root container left
+	# Move left by 88 pixels (half of 176) to center: offset_left from 16 to -72
+	if _root_container:
+		_menu_tween.parallel().tween_property(_root_container, "offset_left", -72.0, 0.3)
+
+	# After animation completes, make menu non-interactive
 	_menu_tween.tween_callback(func():
 		_tab_column.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	)
 
-	print("[StatusPanel] Menu hidden")
+	print("[StatusPanel] Menu hidden, vertical label shown, panels centered")
 
 func _show_menu() -> void:
-	"""Slide menu back from the left (show it)"""
+	"""Slide menu back from the left (show it) and hide vertical MENU label"""
 	if not _tab_column or _menu_visible:
 		return
 
@@ -1268,16 +1281,25 @@ func _show_menu() -> void:
 	_menu_tween.set_ease(Tween.EASE_OUT)
 	_menu_tween.set_trans(Tween.TRANS_CUBIC)
 
-	# Slide back to original position (x = 0)
+	# Slide menu column back to original position (x = 0)
 	_menu_tween.tween_property(_tab_column, "position:x", 0.0, 0.3)
 	_menu_tween.parallel().tween_property(_tab_column, "modulate:a", 1.0, 0.3)
+
+	# Hide vertical MENU label (fade out)
+	if _vertical_menu_label:
+		_menu_tween.parallel().tween_property(_vertical_menu_label, "modulate:a", 0.0, 0.3)
+
+	# Restore status panels to original position
+	# Move root container back to offset_left = 16
+	if _root_container:
+		_menu_tween.parallel().tween_property(_root_container, "offset_left", 16.0, 0.3)
 
 	# After animation completes, restore focus to tab list
 	_menu_tween.tween_callback(func():
 		call_deferred("_grab_tab_list_focus")
 	)
 
-	print("[StatusPanel] Menu shown")
+	print("[StatusPanel] Menu shown, vertical label hidden, panels restored")
 
 func _dev_dump_profiles() -> void:
 	print_rich("[b]=== Combat Profiles (StatusPanel) ===[/b]")
