@@ -1429,9 +1429,17 @@ func _unhandled_input(event: InputEvent) -> void:
 	if _ctrl_mgr and _ctrl_mgr.get_current_context() != _ctrl_mgr.InputContext.MENU_MAIN:
 		return
 
-	# Handle A button to activate selected tab (ItemList handles UP/DOWN navigation)
-	# ONLY if the tab list has focus (don't intercept button presses on Switch buttons, etc.)
+	# Handle A button
 	if event.is_action_pressed("menu_accept"):
+		# If a button has focus, activate it
+		var focused_control = get_viewport().gui_get_focus_owner()
+		if focused_control is Button:
+			print("[StatusPanel] A button - activating focused button: %s" % (focused_control as Button).text)
+			(focused_control as Button).emit_signal("pressed")
+			get_viewport().set_input_as_handled()
+			return
+
+		# Otherwise, if tab list has focus, activate selected tab
 		if _tab_list.has_focus():
 			var selected_items = _tab_list.get_selected_items()
 			if selected_items.size() > 0:
