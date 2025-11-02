@@ -68,6 +68,7 @@ var _nav_detail_index: int = 0  # Current selection in detail view
 
 @onready var _filter    : OptionButton   = %Filter
 @onready var _refresh   : Button         = %RefreshBtn
+@onready var _scroll    : ScrollContainer = %Scroll
 @onready var _list_box  : VBoxContainer  = %List
 
 @onready var _name_tv   : Label          = %Name
@@ -242,6 +243,8 @@ func _focus_bond_element(index: int) -> void:
 		# Also update the button pressed state for visual feedback
 		if element is Button:
 			(element as Button).button_pressed = true
+		# Scroll to ensure element is visible
+		_scroll_to_element(element)
 
 func _select_current_bond() -> void:
 	"""Select the currently focused bond and transition to detail view"""
@@ -871,6 +874,29 @@ func _bond_def(id: String) -> Dictionary:
 # ─────────────────────────────────────────────────────────────
 # Helpers
 # ─────────────────────────────────────────────────────────────
+
+func _scroll_to_element(element: Control) -> void:
+	"""Scroll to ensure the given element is visible in the scroll container"""
+	if not _scroll or not is_instance_valid(element):
+		return
+
+	# Wait one frame for layout to be updated
+	await get_tree().process_frame
+
+	# Get the element's position relative to the scroll container
+	var element_top: float = element.position.y
+	var element_bottom: float = element.position.y + element.size.y
+
+	# Get current scroll position and visible area
+	var scroll_pos: float = _scroll.scroll_vertical
+	var scroll_height: float = _scroll.size.y
+
+	# Check if element is above visible area
+	if element_top < scroll_pos:
+		_scroll.scroll_vertical = element_top
+	# Check if element is below visible area
+	elif element_bottom > scroll_pos + scroll_height:
+		_scroll.scroll_vertical = element_bottom - scroll_height
 
 func _to_psa_local(v: Variant) -> PackedStringArray:
 	var out := PackedStringArray()
