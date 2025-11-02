@@ -699,12 +699,20 @@ func _on_move_out_pressed() -> void:
 	var ds: Node = _ds()
 	if not ds:
 		print("[DormsPanel._on_move_out_pressed] ERROR: DormSystem not found")
+		_show_toast("Error: DormSystem not found.")
 		return
 
 	# Check if reassignment can start today (Sunday only)
-	if ds.has_method("can_start_reassignment_today") and not bool(ds.call("can_start_reassignment_today")):
+	var can_start: bool = false
+	if ds.has_method("can_start_reassignment_today"):
+		can_start = bool(ds.call("can_start_reassignment_today"))
+
+	print("[DormsPanel._on_move_out_pressed] can_start_reassignment_today: %s" % can_start)
+
+	if not can_start:
 		print("[DormsPanel._on_move_out_pressed] Not Sunday - cannot start reassignment")
-		_show_toast("Room reassignment can only be started on Sunday.")
+		_show_toast("Room reassignment can only be started on Sunday.\nAdvance the calendar to Sunday first.")
+		# Don't switch to reassignments view if we can't start
 		return
 
 	var member_name: String = _get_member_name(_selected_member)
