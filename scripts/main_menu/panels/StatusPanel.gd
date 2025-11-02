@@ -450,6 +450,21 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 	name_lbl.add_theme_font_size_override("font_size", 10)
 	top_row.add_child(name_lbl)
 
+	# Recovery button (always shown for all members)
+	var recovery_btn := Button.new()
+	recovery_btn.text = "Recovery"
+	recovery_btn.custom_minimum_size.x = 70
+	recovery_btn.add_theme_font_size_override("font_size", 10)
+	var member_id: String = String(member_data.get("_member_id", ""))
+	recovery_btn.set_meta("member_id", member_id)
+	recovery_btn.set_meta("member_name", String(member_data.get("name", "Member")))
+	recovery_btn.set_meta("hp", int(member_data.get("hp", 0)))
+	recovery_btn.set_meta("hp_max", int(member_data.get("hp_max", 0)))
+	recovery_btn.set_meta("mp", int(member_data.get("mp", 0)))
+	recovery_btn.set_meta("mp_max", int(member_data.get("mp_max", 0)))
+	recovery_btn.pressed.connect(_on_recovery_pressed.bind(recovery_btn))
+	top_row.add_child(recovery_btn)
+
 	if show_switch:
 		var switch_btn := Button.new()
 		switch_btn.text = "Switch"
@@ -592,6 +607,18 @@ func _on_switch_pressed(active_slot: int) -> void:
 	# Show bench member picker popup
 	_show_member_picker(active_slot)
 
+func _on_recovery_pressed(button: Button) -> void:
+	"""Show recovery item selection popup"""
+	var member_id: String = String(button.get_meta("member_id", ""))
+	var member_name: String = String(button.get_meta("member_name", "Member"))
+	var hp: int = int(button.get_meta("hp", 0))
+	var hp_max: int = int(button.get_meta("hp_max", 0))
+	var mp: int = int(button.get_meta("mp", 0))
+	var mp_max: int = int(button.get_meta("mp_max", 0))
+
+	print("[StatusPanel] Recovery button pressed for %s (ID: %s)" % [member_name, member_id])
+	_show_recovery_popup(member_id, member_name, hp, hp_max, mp, mp_max)
+
 func _show_member_picker(active_slot: int) -> void:
 	if not _gs: return
 
@@ -686,6 +713,159 @@ func _perform_swap(active_slot: int, bench_member_id: String) -> void:
 		add_child(error_popup)
 		error_popup.popup_centered()
 		error_popup.confirmed.connect(func(): error_popup.queue_free())
+
+func _show_recovery_popup(member_id: String, member_name: String, hp: int, hp_max: int, mp: int, mp_max: int) -> void:
+	"""Show recovery item selection popup for a party member"""
+	# Get inventory system
+	var inv_sys = get_node_or_null("/root/aInventorySystem")
+	if not inv_sys:
+		print("[StatusPanel] No inventory system found")
+		return
+
+	# Get recovery items from inventory
+	var hp_items: Array = []
+	var mp_items: Array = []
+
+	# Check if inventory has methods to get items by category
+	if inv_sys.has_method("get_items_by_category"):
+		hp_items = inv_sys.call("get_items_by_category", "hp_recovery")
+		mp_items = inv_sys.call("get_items_by_category", "mp_recovery")
+	elif inv_sys.has_method("get_all_item_ids"):
+		# Fallback: get all items and filter manually
+		var all_ids = inv_sys.call("get_all_item_ids")
+		for item_id in all_ids:
+			if inv_sys.has_method("get_count"):
+				var count = inv_sys.call("get_count", item_id)
+				if count > 0:
+					if inv_sys.has_method("get_def"):
+						var def_data = inv_sys.call("get_def", item_id)
+						if typeof(def_data) == TYPE_DICTIONARY:
+							var category = String(def_data.get("category", "")).to_lower()
+							if category.contains("hp") or category.contains("health"):
+								hp_items.append(item_id)
+							elif category.contains("mp") or category.contains("mana") or category.contains("magic"):
+								mp_items.append(item_id)
+
+	# Create picker popup
+	var picker := ConfirmationDialog.new()
+	picker.title = "Recovery - %s" % member_name
+	picker.max_size = Vector2(400, 500)
+
+	# Create content container
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 8)
+
+	# Add instruction text
+	var instruction := Label.new()
+	instruction.text = "Select a recovery item to use on %s:" % member_name
+	instruction.add_theme_font_size_override("font_size", 10)
+	instruction.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	vbox.add_child(instruction)
+
+	# Add member status display
+	var status_label := Label.new()
+	status_label.text = "HP: %d/%d  |  MP: %d/%d" % [hp, hp_max, mp, mp_max]
+	status_label.add_theme_font_size_override("font_size", 10)
+	status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(status_label)
+
+	# Add item list
+	var item_list := ItemList.new()
+	item_list.custom_minimum_size = Vector2(280, 200)
+	item_list.size_flags_vertical = Control.SIZE_EXPAND_FILL
+
+	# Add HP recovery items
+	if hp_items.size() > 0:
+		item_list.add_item("=== HP RECOVERY ===")
+		item_list.set_item_disabled(item_list.item_count - 1, true)
+		item_list.set_item_custom_fg_color(item_list.item_count - 1, Color(1, 0.7, 0.75, 1))
+
+		for item_id in hp_items:
+			if inv_sys.has_method("get_count") and inv_sys.has_method("get_def"):
+				var count = inv_sys.call("get_count", item_id)
+				var def_data = inv_sys.call("get_def", item_id)
+				if typeof(def_data) == TYPE_DICTIONARY and count > 0:
+					var item_name = String(def_data.get("name", item_id))
+					item_list.add_item("%s (x%d)" % [item_name, count])
+					item_list.set_item_metadata(item_list.item_count - 1, {"id": item_id, "type": "hp"})
+
+	# Add MP recovery items
+	if mp_items.size() > 0:
+		if hp_items.size() > 0:
+			item_list.add_item("")  # Spacer
+			item_list.set_item_disabled(item_list.item_count - 1, true)
+		item_list.add_item("=== MP RECOVERY ===")
+		item_list.set_item_disabled(item_list.item_count - 1, true)
+		item_list.set_item_custom_fg_color(item_list.item_count - 1, Color(1, 0.7, 0.75, 1))
+
+		for item_id in mp_items:
+			if inv_sys.has_method("get_count") and inv_sys.has_method("get_def"):
+				var count = inv_sys.call("get_count", item_id)
+				var def_data = inv_sys.call("get_def", item_id)
+				if typeof(def_data) == TYPE_DICTIONARY and count > 0:
+					var item_name = String(def_data.get("name", item_id))
+					item_list.add_item("%s (x%d)" % [item_name, count])
+					item_list.set_item_metadata(item_list.item_count - 1, {"id": item_id, "type": "mp"})
+
+	# If no items, show message
+	if hp_items.size() == 0 and mp_items.size() == 0:
+		item_list.add_item("No recovery items available")
+		item_list.set_item_disabled(0, true)
+
+	vbox.add_child(item_list)
+	picker.add_child(vbox)
+	add_child(picker)
+
+	picker.confirmed.connect(func():
+		var selected_idx: int = item_list.get_selected_items()[0] if item_list.get_selected_items().size() > 0 else -1
+		if selected_idx >= 0:
+			var meta = item_list.get_item_metadata(selected_idx)
+			if typeof(meta) == TYPE_DICTIONARY:
+				var item_id = String(meta.get("id", ""))
+				var item_type = String(meta.get("type", ""))
+				_use_recovery_item(member_id, member_name, item_id, item_type, hp, hp_max, mp, mp_max)
+		picker.queue_free()
+	)
+	picker.canceled.connect(func(): picker.queue_free())
+
+	# Center the dialog
+	picker.popup_centered()
+
+func _use_recovery_item(member_id: String, member_name: String, item_id: String, item_type: String, hp: int, hp_max: int, mp: int, mp_max: int) -> void:
+	"""Use a recovery item on a party member"""
+	# Check if already at max
+	if item_type == "hp" and hp >= hp_max:
+		var msg_popup := AcceptDialog.new()
+		msg_popup.dialog_text = "%s is already at max HP." % member_name
+		msg_popup.title = "Already at Max"
+		add_child(msg_popup)
+		msg_popup.popup_centered()
+		msg_popup.confirmed.connect(func(): msg_popup.queue_free())
+		return
+	elif item_type == "mp" and mp >= mp_max:
+		var msg_popup := AcceptDialog.new()
+		msg_popup.dialog_text = "%s is already at max MP." % member_name
+		msg_popup.title = "Already at Max"
+		add_child(msg_popup)
+		msg_popup.popup_centered()
+		msg_popup.confirmed.connect(func(): msg_popup.queue_free())
+		return
+
+	# Use the item
+	var inv_sys = get_node_or_null("/root/aInventorySystem")
+	if inv_sys and inv_sys.has_method("use_item"):
+		# Try to use item with target parameter
+		var success = inv_sys.call("use_item", item_id, member_id)
+		if success:
+			print("[StatusPanel] Used %s on %s" % [item_id, member_name])
+			_rebuild_party()  # Refresh display
+		else:
+			var error_popup := AcceptDialog.new()
+			error_popup.dialog_text = "Failed to use item."
+			error_popup.title = "Use Item Failed"
+			add_child(error_popup)
+			error_popup.popup_centered()
+			error_popup.confirmed.connect(func(): error_popup.queue_free())
 
 # Prefer CPS for real-time party pools
 func _get_party_snapshot() -> Array:
