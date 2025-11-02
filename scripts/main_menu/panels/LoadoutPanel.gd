@@ -80,12 +80,15 @@ class_name LoadoutPanel
 @onready var _btn_manage:   Button        = get_node_or_null("Row/Right/Buttons/BtnManageSigils") as Button
 
 @onready var _stats_grid:  GridContainer = get_node("Row/StatsColumn/StatsGrid") as GridContainer
-@onready var _mind_value:  Label         = get_node_or_null("Row/Right/MindRow/Value") as Label
-@onready var _mind_row:    HBoxContainer = get_node_or_null("Row/Right/MindRow") as HBoxContainer
+@onready var _mind_value:  Label         = get_node_or_null("Row/Right/MindSection/MindRow/Value") as Label
+@onready var _mind_section: VBoxContainer = get_node_or_null("Row/Right/MindSection") as VBoxContainer
 
-@onready var _active_name_lbl:  Label  = %ActiveNameLabel
-@onready var _active_value_lbl: Label  = %ActiveValueLabel
-@onready var _active_btn:       Button = %ActiveBtn
+@onready var _active_section:    VBoxContainer = %ActiveSection
+@onready var _active_label:      Label         = %ActiveLabel
+@onready var _active_row:        HBoxContainer = %ActiveRow
+@onready var _active_name_lbl:   Label         = %ActiveNameLabel
+@onready var _active_value_lbl:  Label         = %ActiveValueLabel
+@onready var _active_btn:        Button        = %ActiveBtn
 
 var _labels: PackedStringArray = PackedStringArray()
 var _tokens: PackedStringArray = PackedStringArray()
@@ -537,7 +540,7 @@ func _rebuild_sigils(member_token: String) -> void:
 		if String(s) != "": used += 1
 
 	if _sigils_title:
-		_sigils_title.text = "Sigils  (%d/%d)" % [used, cap]
+		_sigils_title.text = "SIGILS  (%d/%d)" % [used, cap]
 
 	if cap <= 0:
 		var none: Label = Label.new()
@@ -548,9 +551,11 @@ func _rebuild_sigils(member_token: String) -> void:
 
 	for idx in range(cap):
 		var row: HBoxContainer = HBoxContainer.new()
-		row.add_theme_constant_override("separation", 6)
+		row.add_theme_constant_override("separation", 8)
+		row.size_flags_horizontal = Control.SIZE_EXPAND_FILL  # Match equipment row expansion
 
 		var nm: Label = Label.new()
+		nm.custom_minimum_size = Vector2(180, 0)  # Match equipment label width
 		nm.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
 		var cur_id: String = (String(sockets[idx]) if idx < sockets.size() else "")
@@ -559,6 +564,7 @@ func _rebuild_sigils(member_token: String) -> void:
 
 		# Always show "Equip…" button - popup will handle unequip option
 		var btn: Button = Button.new()
+		btn.custom_minimum_size = Vector2(90, 0)  # Match equipment button width for grid alignment
 		btn.text = "Equip…"
 		btn.pressed.connect(Callable(self, "_on_equip_sigil").bind(member_token, idx))
 		row.add_child(btn)
@@ -1025,18 +1031,22 @@ func _setup_active_type_widgets() -> void:
 
 func _refresh_active_type_row(member_token: String) -> void:
 	var is_hero: bool = (member_token == "hero" or member_token.strip_edges().to_lower() == _hero_name().strip_edges().to_lower())
-	var do_show: bool = is_hero and _active_name_lbl != null and _active_value_lbl != null and _active_btn != null
+	var do_show: bool = is_hero and _active_section != null and _active_btn != null
 	if not do_show:
-		if _active_name_lbl:  _active_name_lbl.visible = false
-		if _active_value_lbl: _active_value_lbl.visible = false
-		if _active_btn:       _active_btn.visible = false
+		# Hide entire Active Type section for non-player characters
+		if _active_section: _active_section.visible = false
 		return
 
+	# Show Active Type section for player character
 	var cur: String = _get_hero_active_type()
-	_active_name_lbl.visible = true
-	_active_value_lbl.text = (cur if cur != "" else "Omega")
-	_active_value_lbl.visible = true
-	_active_btn.visible = true
+	if _active_section:    _active_section.visible = true
+	if _active_label:      _active_label.visible = true
+	if _active_row:        _active_row.visible = true
+	if _active_name_lbl:   _active_name_lbl.visible = true
+	if _active_value_lbl:
+		_active_value_lbl.text = (cur if cur != "" else "Omega")
+		_active_value_lbl.visible = true
+	if _active_btn:        _active_btn.visible = true
 
 func _get_hero_active_type() -> String:
 	if _gs:
@@ -1666,12 +1676,15 @@ func _enter_party_select_state() -> void:
 ## ─────────────────────── STATE 3: EQUIPMENT_NAV ───────────────────────
 
 func _handle_equipment_nav_input(event: InputEvent) -> void:
-	"""Handle input when navigating equipment buttons"""
+	"""Handle input when navigating equipment buttons (vertical-only navigation)"""
 	if event.is_action_pressed("move_up"):
 		_navigate_equipment(-1)
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("move_down"):
 		_navigate_equipment(1)
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("move_left") or event.is_action_pressed("move_right"):
+		# Explicitly block left/right input in equipment mode (vertical-only navigation)
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("menu_accept"):
 		_activate_current_equipment_button()
@@ -1681,11 +1694,13 @@ func _handle_equipment_nav_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 func _navigate_equipment(delta: int) -> void:
-	"""Navigate up/down through equipment buttons"""
+	"""Navigate up/down through equipment buttons (wraps around cyclically)"""
 	if _nav_elements.is_empty():
 		return
 
-	_nav_index = clamp(_nav_index + delta, 0, _nav_elements.size() - 1)
+	# Wrap around: pressing down at bottom goes to top, pressing up at top goes to bottom
+	var size = _nav_elements.size()
+	_nav_index = (_nav_index + delta + size) % size
 	_focus_equipment_element(_nav_index)
 
 func _activate_current_equipment_button() -> void:
@@ -1722,17 +1737,21 @@ func _rebuild_equipment_navigation_and_restore_focus() -> void:
 		print("[LoadoutPanel] Index %d out of range (0-%d)" % [_nav_index, _nav_elements.size() - 1])
 
 func _rebuild_equipment_navigation() -> void:
-	"""Build list of focusable equipment elements"""
+	"""Build list of focusable equipment elements
+
+	Navigation cycles vertically through elements in this order:
+	Weapon → Armor → Head → Foot → Bracelet → Sigil Slots → Manage Sigil → Active Type → back to Weapon
+	"""
 	_nav_elements.clear()
 
-	# Equipment slot buttons
-	if _w_btn: _nav_elements.append(_w_btn)
-	if _a_btn: _nav_elements.append(_a_btn)
-	if _h_btn: _nav_elements.append(_h_btn)
-	if _f_btn: _nav_elements.append(_f_btn)
-	if _b_btn: _nav_elements.append(_b_btn)
+	# Equipment slot buttons (order matters - this determines vertical navigation flow)
+	if _w_btn: _nav_elements.append(_w_btn)  # Weapon
+	if _a_btn: _nav_elements.append(_a_btn)  # Armor
+	if _h_btn: _nav_elements.append(_h_btn)  # Head
+	if _f_btn: _nav_elements.append(_f_btn)  # Foot
+	if _b_btn: _nav_elements.append(_b_btn)  # Bracelet
 
-	# Sigil slot buttons - FILTER OUT nodes queued for deletion
+	# Sigil slot buttons - FILTER OUT nodes queued for deletion (dynamic count based on equipped sigils)
 	if _sigils_list:
 		for child in _sigils_list.get_children():
 			# Skip nodes queued for deletion (from queue_free())
@@ -1744,11 +1763,11 @@ func _rebuild_equipment_navigation() -> void:
 					if not is_instance_valid(subchild) or subchild.is_queued_for_deletion():
 						continue
 					if subchild is Button:
-						_nav_elements.append(subchild)
+						_nav_elements.append(subchild)  # Sigil slot equip buttons
 
-	# Special buttons
-	if _btn_manage: _nav_elements.append(_btn_manage)
-	if _active_btn: _nav_elements.append(_active_btn)
+	# Special buttons (always at the end of navigation cycle)
+	if _btn_manage: _nav_elements.append(_btn_manage)  # Manage Sigil button
+	if _active_btn: _nav_elements.append(_active_btn)  # Active Type button (player only)
 
 	print("[LoadoutPanel] Built navigation: %d elements" % _nav_elements.size())
 

@@ -37,7 +37,9 @@ theme_override_constants/separation = 8
 
 [node name="Title" type="Label" parent="Root/Header"]
 layout_mode = 2
-text = "Bonds"
+theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
+theme_override_font_sizes/font_size = 24
+text = "BONDS"
 
 [node name="Spacer" type="Control" parent="Root/Header"]
 layout_mode = 2
@@ -172,7 +174,9 @@ text = "—"
 [node name="UnlockHeader" type="Label" parent="Root/Frame/Content/Row/Right"]
 unique_name_in_owner = true
 layout_mode = 2
-text = "Layer Transitions:"
+theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
+theme_override_font_sizes/font_size = 18
+text = "LAYER TRANSITIONS"
 
 [node name="UnlockAcquaintance" type="Button" parent="Root/Frame/Content/Row/Right"]
 unique_name_in_owner = true

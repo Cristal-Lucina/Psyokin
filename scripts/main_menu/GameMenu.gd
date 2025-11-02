@@ -238,27 +238,60 @@ func _close_menu() -> void:
 func _enter_fullscreen(tab_id: String) -> void:
 	"""Enter fullscreen mode for a panel"""
 	print("[GameMenu] Entering fullscreen for tab: %s" % tab_id)
+
+	# Get current panel (should be Status) and new panel
+	var current_panel = _panels.get(_current_tab)
+	var new_panel := _get_or_create_panel(tab_id)
+
+	if not new_panel:
+		return
+
 	_is_fullscreen = true
 	_current_tab = tab_id
 
-	# Show the panel full screen
-	for child in _panel_holder.get_children():
-		child.visible = false
+	# If we have a current panel, animate the transition
+	if current_panel and current_panel != new_panel:
+		# Get viewport width for slide distance
+		var viewport_width = get_viewport_rect().size.x
 
-	var panel := _get_or_create_panel(tab_id)
-	if panel:
-		panel.visible = true
-		panel.set_anchors_preset(Control.PRESET_FULL_RECT)
-		# Give panel focus if it has the method
-		# This will push the panel's specific context (e.g., MENU_ITEMS)
-		if panel.has_method("panel_gained_focus"):
-			print("[GameMenu] Calling panel_gained_focus for %s" % tab_id)
-			panel.call("panel_gained_focus")
-		if _ctrl_mgr:
-			print("[GameMenu] After panel_gained_focus - context: %s, stack depth: %d" % [
-				_ctrl_mgr.InputContext.keys()[_ctrl_mgr.get_current_context()],
-				_ctrl_mgr.context_stack.size()
-			])
+		# Position new panel off-screen to the right
+		new_panel.position.x = viewport_width
+		new_panel.visible = true
+		new_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
+
+		# Create tween for smooth animation
+		var tween = create_tween()
+		tween.set_parallel(true)  # Run both animations simultaneously
+		tween.set_ease(Tween.EASE_IN_OUT)
+		tween.set_trans(Tween.TRANS_CUBIC)
+
+		# Slide current panel out to the left
+		tween.tween_property(current_panel, "position:x", -viewport_width, 0.3)
+
+		# Slide new panel in from the right
+		tween.tween_property(new_panel, "position:x", 0, 0.3)
+
+		# Hide current panel when animation completes
+		tween.chain().tween_callback(func():
+			current_panel.visible = false
+			current_panel.position.x = 0  # Reset position for next time
+		)
+	else:
+		# No current panel, just show the new one immediately
+		new_panel.visible = true
+		new_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
+		new_panel.position.x = 0
+
+	# Give panel focus if it has the method
+	# This will push the panel's specific context (e.g., MENU_ITEMS)
+	if new_panel.has_method("panel_gained_focus"):
+		print("[GameMenu] Calling panel_gained_focus for %s" % tab_id)
+		new_panel.call("panel_gained_focus")
+	if _ctrl_mgr:
+		print("[GameMenu] After panel_gained_focus - context: %s, stack depth: %d" % [
+			_ctrl_mgr.InputContext.keys()[_ctrl_mgr.get_current_context()],
+			_ctrl_mgr.context_stack.size()
+		])
 
 func _exit_fullscreen() -> void:
 	"""Exit fullscreen mode - return to Status tab with sidebar"""
@@ -269,12 +302,15 @@ func _exit_fullscreen() -> void:
 			_ctrl_mgr.context_stack.size()
 		])
 
+	# Get current panel and Status panel
+	var current_panel = _panels.get(_current_tab)
+	var status_panel = _get_or_create_panel("status")
+
 	# Call panel_lost_focus on the current panel
 	# This will pop the panel's specific context (e.g., MENU_ITEMS -> MENU_MAIN)
-	var panel = _panels.get(_current_tab)
-	if panel and panel.has_method("panel_lost_focus"):
+	if current_panel and current_panel.has_method("panel_lost_focus"):
 		print("[GameMenu] Calling panel_lost_focus for %s" % _current_tab)
-		panel.call("panel_lost_focus")
+		current_panel.call("panel_lost_focus")
 
 	if _ctrl_mgr:
 		print("[GameMenu] After panel_lost_focus - context: %s, stack depth: %d" % [
@@ -284,5 +320,47 @@ func _exit_fullscreen() -> void:
 
 	_is_fullscreen = false
 
-	# Return to Status tab
-	_select_tab("status")
+	# Remember which tab was being viewed
+	var previous_tab = _current_tab
+
+	# Animate the transition back to Status
+	if current_panel and status_panel and current_panel != status_panel:
+		# Get viewport width for slide distance
+		var viewport_width = get_viewport_rect().size.x
+
+		# Position Status panel off-screen to the left
+		status_panel.position.x = -viewport_width
+		status_panel.visible = true
+		status_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
+
+		# Create tween for smooth animation
+		var tween = create_tween()
+		tween.set_parallel(true)  # Run both animations simultaneously
+		tween.set_ease(Tween.EASE_IN_OUT)
+		tween.set_trans(Tween.TRANS_CUBIC)
+
+		# Slide current panel out to the right
+		tween.tween_property(current_panel, "position:x", viewport_width, 0.3)
+
+		# Slide Status panel in from the left
+		tween.tween_property(status_panel, "position:x", 0, 0.3)
+
+		# Hide current panel and restore tab selection when animation completes
+		tween.chain().tween_callback(func():
+			current_panel.visible = false
+			current_panel.position.x = 0  # Reset position for next time
+
+			# Restore focus to the tab that was just being viewed
+			if status_panel.has_method("select_tab"):
+				status_panel.call("select_tab", previous_tab)
+		)
+
+		# Update current tab AFTER animation completes
+		_current_tab = "status"
+	else:
+		# No animation needed, just switch immediately
+		_select_tab("status")
+
+		# Restore focus to the tab that was just being viewed
+		if status_panel and status_panel.has_method("select_tab"):
+			status_panel.call("select_tab", previous_tab)
