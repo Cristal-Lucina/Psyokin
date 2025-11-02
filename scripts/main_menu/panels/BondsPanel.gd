@@ -134,7 +134,6 @@ func _ready() -> void:
 
 	if _story_btn != null and not _story_btn.pressed.is_connected(_on_story_points_pressed):
 		_story_btn.pressed.connect(_on_story_points_pressed)
-		print("[BondsPanel] Connected Story Points button signal")
 
 	# Connect unlock layer buttons to show rewards
 	if _unlock_acq and not _unlock_acq.pressed.is_connected(_on_unlock_button_pressed):
@@ -176,7 +175,6 @@ func _input(event: InputEvent) -> void:
 
 	# Block input if story overlay is open
 	if _story_overlay != null and is_instance_valid(_story_overlay):
-		print("[BondsPanel] Story overlay is open, blocking BondsPanel input")
 		return
 
 	# Route to appropriate handler based on state
@@ -1040,9 +1038,7 @@ func _show_info_popup(title: String, message: String) -> void:
 # ─────────────────────────────────────────────────────────────
 
 func _on_story_points_pressed() -> void:
-	print("[BondsPanel] _on_story_points_pressed called, _selected = '%s'" % _selected)
 	if _selected == "":
-		print("[BondsPanel] No bond selected, returning")
 		return
 
 	# Pull points safely
@@ -1050,11 +1046,8 @@ func _on_story_points_pressed() -> void:
 	if _sys != null and _sys.has_method("get_story_points"):
 		points = _to_psa_local(_sys.call("get_story_points", _selected))
 
-	print("[BondsPanel] Got %d story points" % points.size())
-
 	# Find display name for title
 	var disp: String = _display_name(_selected)
-	print("[BondsPanel] Display name: '%s'" % disp)
 
 	# Clear any prior overlay
 	_close_story_overlay()
@@ -1063,7 +1056,6 @@ func _on_story_points_pressed() -> void:
 	var canvas_layer := CanvasLayer.new()
 	canvas_layer.name = "StoryOverlayLayer"
 	canvas_layer.layer = 100  # Very high layer to be on top
-	print("[BondsPanel] Created CanvasLayer with layer 100")
 
 	# Full-screen overlay (blocks input behind it)
 	var overlay := Control.new()
@@ -1071,14 +1063,12 @@ func _on_story_points_pressed() -> void:
 	overlay.visible = true
 	overlay.mouse_filter = Control.MOUSE_FILTER_STOP
 	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
-	print("[BondsPanel] Created overlay control")
 
 	# Dim background
 	var dim := ColorRect.new()
 	dim.color = Color(0, 0, 0, 0.65) # darker → more opaque
 	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
 	overlay.add_child(dim)
-	print("[BondsPanel] Added dim background")
 
 	# Margin frame to keep text off edges
 	var margins := MarginContainer.new()
@@ -1110,7 +1100,6 @@ func _on_story_points_pressed() -> void:
 	back_btn.focus_mode = Control.FOCUS_ALL
 	back_btn.custom_minimum_size = Vector2(80, 0)
 	back_btn.pressed.connect(func() -> void:
-		print("[BondsPanel] Story overlay back button pressed")
 		_close_story_overlay()
 		# Restore focus to detail view after closing overlay
 		call_deferred("_enter_bond_detail_state")
@@ -1153,15 +1142,11 @@ func _on_story_points_pressed() -> void:
 	canvas_layer.add_child(overlay)
 
 	# Add canvas layer to the scene tree
-	print("[BondsPanel] Adding canvas layer to scene tree")
 	get_tree().root.add_child(canvas_layer)
 	_story_overlay = canvas_layer  # Store canvas_layer reference so we can clean it up
-	print("[BondsPanel] Story overlay added successfully, focusing back button")
 	back_btn.grab_focus()
 
 func _close_story_overlay() -> void:
-	print("[BondsPanel] _close_story_overlay called")
 	if _story_overlay != null and is_instance_valid(_story_overlay):
-		print("[BondsPanel] Closing existing story overlay")
 		_story_overlay.queue_free()
 	_story_overlay = null
