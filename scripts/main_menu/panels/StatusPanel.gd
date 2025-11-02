@@ -455,6 +455,7 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 	recovery_btn.text = "Recovery"
 	recovery_btn.custom_minimum_size.x = 70
 	recovery_btn.add_theme_font_size_override("font_size", 10)
+	recovery_btn.focus_mode = Control.FOCUS_ALL  # Make sure button can receive focus
 	var member_id: String = String(member_data.get("_member_id", ""))
 	recovery_btn.set_meta("member_id", member_id)
 	recovery_btn.set_meta("member_name", String(member_data.get("name", "Member")))
@@ -464,6 +465,7 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 	recovery_btn.set_meta("mp_max", int(member_data.get("mp_max", 0)))
 	recovery_btn.pressed.connect(_on_recovery_pressed.bind(recovery_btn))
 	top_row.add_child(recovery_btn)
+	print("[StatusPanel] Created Recovery button for %s" % String(member_data.get("name", "Member")))
 
 	if show_switch:
 		var switch_btn := Button.new()
