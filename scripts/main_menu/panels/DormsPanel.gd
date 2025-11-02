@@ -84,8 +84,8 @@ var _common_members: PackedStringArray = []  # Members in common room
 var _pending_reassignments: Dictionary = {}  # actor_id -> room_id
 
 # Navigation
-enum NavState { VIEW_SELECT, ROSTER_SELECT, ROOM_SELECT, COMMON_SELECT, ACTION_SELECT, POPUP_ACTIVE }
-var _nav_state: NavState = NavState.ROSTER_SELECT
+enum NavState { ROSTER_SELECT, COMMON_SELECT, ROOM_SELECT, ACTION_SELECT }
+var _nav_state: NavState = NavState.ACTION_SELECT
 var _nav_state_history: Array[NavState] = []  # Track navigation history for back button
 var _roster_buttons: Array[Button] = []
 var _room_buttons: Array[Button] = []
@@ -182,10 +182,11 @@ func _ds() -> Node:
 func _on_panel_gained_focus() -> void:
 	super()
 	print("[DormsPanel] Panel gained focus")
-	_nav_state = NavState.VIEW_SELECT
+	_nav_state = NavState.ACTION_SELECT
 	_nav_state_history.clear()
-	print("[DormsPanel] Nav state set to VIEW_SELECT, history cleared")
-	_focus_view_type()
+	print("[DormsPanel] Nav state set to ACTION_SELECT, history cleared")
+	_current_action_index = 0
+	_focus_current_action()
 
 func _can_panel_close() -> bool:
 	# Prevent closing if common room has members without assignments
@@ -235,29 +236,18 @@ func _input(event: InputEvent) -> void:
 
 func _get_nav_state_name(state: NavState) -> String:
 	match state:
-		NavState.VIEW_SELECT: return "VIEW_SELECT"
 		NavState.ROSTER_SELECT: return "ROSTER_SELECT"
-		NavState.ROOM_SELECT: return "ROOM_SELECT"
 		NavState.COMMON_SELECT: return "COMMON_SELECT"
+		NavState.ROOM_SELECT: return "ROOM_SELECT"
 		NavState.ACTION_SELECT: return "ACTION_SELECT"
-		NavState.POPUP_ACTIVE: return "POPUP_ACTIVE"
 		_: return "UNKNOWN"
 
 func _navigate_up() -> void:
 	match _nav_state:
-		NavState.VIEW_SELECT:
-			# Move to roster
-			_push_nav_state(NavState.ROSTER_SELECT)
-			_current_roster_index = 0
-			_focus_current_roster()
 		NavState.ROSTER_SELECT:
 			if _current_roster_index > 0:
 				_current_roster_index -= 1
 				_focus_current_roster()
-			else:
-				# Move to view type
-				_push_nav_state(NavState.VIEW_SELECT)
-				_focus_view_type()
 		NavState.ROOM_SELECT:
 			# 2x4 grid: move up one row (subtract 4)
 			var new_index: int = _current_room_index - 4
@@ -272,14 +262,12 @@ func _navigate_up() -> void:
 			if _current_action_index > 0:
 				_current_action_index -= 1
 				_focus_current_action()
+			elif _current_action_index == 0:
+				# Move to View Type filter (above first button)
+				_focus_view_type()
 
 func _navigate_down() -> void:
 	match _nav_state:
-		NavState.VIEW_SELECT:
-			# Move to roster
-			_push_nav_state(NavState.ROSTER_SELECT)
-			_current_roster_index = 0
-			_focus_current_roster()
 		NavState.ROSTER_SELECT:
 			if _current_roster_index < _roster_buttons.size() - 1:
 				_current_roster_index += 1
@@ -313,13 +301,6 @@ func _navigate_right() -> void:
 
 func _on_accept_input() -> void:
 	match _nav_state:
-		NavState.VIEW_SELECT:
-			# Toggle view type
-			if _view_type_filter:
-				var current: int = _view_type_filter.get_selected_id()
-				var next: int = 1 if current == 0 else 0
-				_view_type_filter.select(next)
-				_on_view_type_changed(next)
 		NavState.ROSTER_SELECT:
 			if _current_roster_index >= 0 and _current_roster_index < _roster_buttons.size():
 				_roster_buttons[_current_roster_index].emit_signal("pressed")
@@ -349,14 +330,12 @@ func _on_back_input() -> void:
 			_update_room_colors()
 
 		match _nav_state:
-			NavState.VIEW_SELECT:
-				_focus_view_type()
 			NavState.ROSTER_SELECT:
 				_focus_current_roster()
-			NavState.ROOM_SELECT:
-				_focus_current_room()
 			NavState.COMMON_SELECT:
 				_focus_current_common()
+			NavState.ROOM_SELECT:
+				_focus_current_room()
 			NavState.ACTION_SELECT:
 				_focus_current_action()
 		get_viewport().set_input_as_handled()
@@ -367,6 +346,7 @@ func _on_back_input() -> void:
 		# Do NOT call get_viewport().set_input_as_handled() - let event bubble up
 
 func _focus_view_type() -> void:
+	# View type is now in Action Menu (right panel)
 	if _view_type_filter:
 		_view_type_filter.grab_focus()
 
@@ -499,8 +479,10 @@ func _build_rooms_grid() -> void:
 		_room_buttons.append(btn)
 
 func _build_action_button_array() -> void:
-	"""Build array of action buttons for navigation"""
+	"""Build array of action elements for navigation (View Type + buttons)"""
 	_action_buttons.clear()
+	# View Type filter is first action element (OptionButton, not Button)
+	# We'll handle it specially in focus code
 	if _assign_room_btn:
 		_action_buttons.append(_assign_room_btn)
 	if _move_out_btn:
@@ -643,12 +625,8 @@ func _on_roster_member_selected(aid: String) -> void:
 	_update_details()
 	_update_action_buttons()
 	_update_room_colors()
-
-	# Move cursor to action buttons
-	print("[DormsPanel._on_roster_member_selected] Moving to ACTION_SELECT state")
-	_push_nav_state(NavState.ACTION_SELECT)
-	_current_action_index = 0
-	_focus_current_action()
+	# Note: No longer auto-navigating to ACTION_SELECT
+	# User can manually navigate to Action Menu with directional controls
 
 func _on_room_selected(room_id: String) -> void:
 	_selected_room = room_id

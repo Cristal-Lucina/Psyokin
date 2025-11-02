@@ -70,24 +70,31 @@ layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
 text = "DORM ROSTER"
 
-[node name="ViewTypeHBox" type="HBoxContainer" parent="Root/MainContent/LeftPanel/VBox"]
-layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="ViewTypeLabel" type="Label" parent="Root/MainContent/LeftPanel/VBox/ViewTypeHBox"]
-layout_mode = 2
-text = "View Type:"
-
-[node name="ViewTypeFilter" type="OptionButton" parent="Root/MainContent/LeftPanel/VBox/ViewTypeHBox"]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_horizontal = 3
-
 [node name="RosterScroll" type="ScrollContainer" parent="Root/MainContent/LeftPanel/VBox"]
 layout_mode = 2
 size_flags_vertical = 3
 
 [node name="RosterList" type="VBoxContainer" parent="Root/MainContent/LeftPanel/VBox/RosterScroll"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/separation = 4
+
+[node name="Separator1" type="HSeparator" parent="Root/MainContent/LeftPanel/VBox"]
+layout_mode = 2
+
+[node name="CommonLabel" type="Label" parent="Root/MainContent/LeftPanel/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
+text = "COMMON ROOM"
+
+[node name="CommonScroll" type="ScrollContainer" parent="Root/MainContent/LeftPanel/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+size_flags_stretch_ratio = 0.8
+
+[node name="CommonList" type="VBoxContainer" parent="Root/MainContent/LeftPanel/VBox/CommonScroll"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
@@ -135,6 +142,7 @@ theme_override_constants/separation = 8
 [node name="RoomsSection" type="VBoxContainer" parent="Root/MainContent/RightPanel/VBox"]
 layout_mode = 2
 size_flags_vertical = 3
+size_flags_stretch_ratio = 2.0
 theme_override_constants/separation = 8
 
 [node name="RoomsLabel" type="Label" parent="Root/MainContent/RightPanel/VBox/RoomsSection"]
@@ -155,51 +163,54 @@ theme_override_constants/h_separation = 8
 theme_override_constants/v_separation = 8
 columns = 4
 
-[node name="CommonSection" type="VBoxContainer" parent="Root/MainContent/RightPanel/VBox"]
+[node name="Separator2" type="HSeparator" parent="Root/MainContent/RightPanel/VBox"]
+layout_mode = 2
+
+[node name="ActionSection" type="VBoxContainer" parent="Root/MainContent/RightPanel/VBox"]
 layout_mode = 2
 size_flags_vertical = 3
+size_flags_stretch_ratio = 1.0
 theme_override_constants/separation = 8
 
-[node name="CommonLabel" type="Label" parent="Root/MainContent/RightPanel/VBox/CommonSection"]
+[node name="ActionLabel" type="Label" parent="Root/MainContent/RightPanel/VBox/ActionSection"]
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
-text = "COMMON ROOM"
+text = "ACTION MENU"
 
-[node name="CommonScroll" type="ScrollContainer" parent="Root/MainContent/RightPanel/VBox/CommonSection"]
-layout_mode = 2
-size_flags_vertical = 3
-
-[node name="CommonList" type="VBoxContainer" parent="Root/MainContent/RightPanel/VBox/CommonSection/CommonScroll"]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_horizontal = 3
-size_flags_vertical = 3
-theme_override_constants/separation = 4
-
-[node name="ActionButtons" type="HBoxContainer" parent="Root/MainContent/RightPanel/VBox/CommonSection"]
+[node name="ViewTypeHBox" type="HBoxContainer" parent="Root/MainContent/RightPanel/VBox/ActionSection"]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="AssignRoomBtn" type="Button" parent="Root/MainContent/RightPanel/VBox/CommonSection/ActionButtons"]
+[node name="ViewTypeLabel" type="Label" parent="Root/MainContent/RightPanel/VBox/ActionSection/ViewTypeHBox"]
+layout_mode = 2
+text = "View Type:"
+size_flags_horizontal = 0
+
+[node name="ViewTypeFilter" type="OptionButton" parent="Root/MainContent/RightPanel/VBox/ActionSection/ViewTypeHBox"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
+
+[node name="ActionButtons" type="VBoxContainer" parent="Root/MainContent/RightPanel/VBox/ActionSection"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="AssignRoomBtn" type="Button" parent="Root/MainContent/RightPanel/VBox/ActionSection/ActionButtons"]
+unique_name_in_owner = true
+layout_mode = 2
 text = "Assign Room"
 
-[node name="MoveOutBtn" type="Button" parent="Root/MainContent/RightPanel/VBox/CommonSection/ActionButtons"]
+[node name="MoveOutBtn" type="Button" parent="Root/MainContent/RightPanel/VBox/ActionSection/ActionButtons"]
 unique_name_in_owner = true
 layout_mode = 2
-size_flags_horizontal = 3
 text = "Move Out"
 
-[node name="CancelMoveBtn" type="Button" parent="Root/MainContent/RightPanel/VBox/CommonSection/ActionButtons"]
+[node name="CancelMoveBtn" type="Button" parent="Root/MainContent/RightPanel/VBox/ActionSection/ActionButtons"]
 unique_name_in_owner = true
 layout_mode = 2
-size_flags_horizontal = 3
 text = "Cancel Move"
 
-[node name="AcceptPlanBtn" type="Button" parent="Root/MainContent/RightPanel/VBox/CommonSection/ActionButtons"]
+[node name="AcceptPlanBtn" type="Button" parent="Root/MainContent/RightPanel/VBox/ActionSection/ActionButtons"]
 unique_name_in_owner = true
 layout_mode = 2
-size_flags_horizontal = 3
 text = "Accept Plan"
