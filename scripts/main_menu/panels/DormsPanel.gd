@@ -68,10 +68,10 @@ extends PanelBase
 class_name DormsPanel
 
 # Scene hooks
-@onready var _grid_holder  : VBoxContainer  = $Root/Left/Scroll/List
-@onready var _detail       : RichTextLabel  = $Root/Right/Detail
-@onready var _refresh_btn  : Button         = $Root/Left/Header/RefreshBtn
-@onready var _filter       : OptionButton   = $Root/Left/Filter
+@onready var _grid_holder  : VBoxContainer  = $Root/MainContent/LeftPanel/VBox/Scroll/List
+@onready var _detail       : RichTextLabel  = $Root/MainContent/RightPanel/VBox/DetailScroll/DetailContent/Detail
+@onready var _refresh_btn  : Button         = $Root/Header/RefreshBtn
+@onready var _filter       : OptionButton   = $Root/Header/Filter
 
 # Right-side controls (from TSCN)
 @onready var _common_box  : VBoxContainer = %CommonBox
