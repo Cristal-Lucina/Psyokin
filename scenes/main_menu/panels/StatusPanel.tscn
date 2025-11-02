@@ -58,10 +58,7 @@ size_flags_horizontal = 3
 theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
 theme_override_font_sizes/font_size = 20
 text = "PARTY"
-
-[node name="RefreshBtn" type="Button" parent="Root/Left/PartyHeader"]
-layout_mode = 2
-text = "Refresh"
+horizontal_alignment = 1
 
 [node name="PartyScroll" type="ScrollContainer" parent="Root/Left"]
 custom_minimum_size = Vector2(0, 220)

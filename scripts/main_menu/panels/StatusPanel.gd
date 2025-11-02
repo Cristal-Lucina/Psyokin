@@ -123,7 +123,6 @@ const LAYERS = {
 
 @onready var _tab_column : VBoxContainer = $Root/TabColumn
 @onready var _tab_list  : ItemList      = %TabList
-@onready var _refresh   : Button        = $Root/Left/PartyHeader/RefreshBtn
 @onready var _party     : VBoxContainer = $Root/Left/PartyScroll/PartyList
 @onready var _creds     : Label         = $Root/Right/InfoGrid/MoneyValue
 @onready var _perk      : Label         = $Root/Right/InfoGrid/PerkValue
@@ -177,9 +176,6 @@ func _ready() -> void:
 	_connect_signals()
 	_load_party_csv_cache()
 	_build_tab_buttons()
-
-	if _refresh and not _refresh.pressed.is_connected(_rebuild_all):
-		_refresh.pressed.connect(_rebuild_all)
 
 	if not is_connected("visibility_changed", Callable(self, "_on_visibility_changed")):
 		connect("visibility_changed", Callable(self, "_on_visibility_changed"))
