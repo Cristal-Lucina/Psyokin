@@ -109,7 +109,21 @@ const VIS_LOCKED := 3
 func _ready() -> void:
 	super()  # Call PanelBase._ready()
 
+	print("[DormsPanel._ready] Starting initialization")
+
 	set_anchors_preset(Control.PRESET_FULL_RECT)
+
+	# Verify node references
+	print("[DormsPanel._ready] Node checks:")
+	print("  _view_type_filter: ", _view_type_filter != null)
+	print("  _roster_list: ", _roster_list != null)
+	print("  _detail_content: ", _detail_content != null)
+	print("  _rooms_grid: ", _rooms_grid != null)
+	print("  _common_list: ", _common_list != null)
+	print("  _assign_room_btn: ", _assign_room_btn != null)
+	print("  _move_out_btn: ", _move_out_btn != null)
+	print("  _cancel_move_btn: ", _cancel_move_btn != null)
+	print("  _accept_plan_btn: ", _accept_plan_btn != null)
 
 	# Setup view type filter
 	if _view_type_filter and _view_type_filter.item_count == 0:
@@ -118,30 +132,45 @@ func _ready() -> void:
 		_view_type_filter.select(0)
 		if not _view_type_filter.item_selected.is_connected(_on_view_type_changed):
 			_view_type_filter.item_selected.connect(_on_view_type_changed)
+			print("[DormsPanel._ready] Connected view_type_filter.item_selected")
 
 	# Connect refresh button
 	if _refresh_btn and not _refresh_btn.pressed.is_connected(_rebuild):
 		_refresh_btn.pressed.connect(_rebuild)
+		print("[DormsPanel._ready] Connected refresh button")
 
 	# Connect action buttons
 	if _assign_room_btn and not _assign_room_btn.pressed.is_connected(_on_assign_room_pressed):
 		_assign_room_btn.pressed.connect(_on_assign_room_pressed)
+		print("[DormsPanel._ready] Connected assign_room button")
 	if _move_out_btn and not _move_out_btn.pressed.is_connected(_on_move_out_pressed):
 		_move_out_btn.pressed.connect(_on_move_out_pressed)
+		print("[DormsPanel._ready] Connected move_out button")
 	if _cancel_move_btn and not _cancel_move_btn.pressed.is_connected(_on_cancel_move_pressed):
 		_cancel_move_btn.pressed.connect(_on_cancel_move_pressed)
+		print("[DormsPanel._ready] Connected cancel_move button")
 	if _accept_plan_btn and not _accept_plan_btn.pressed.is_connected(_on_accept_plan_pressed):
 		_accept_plan_btn.pressed.connect(_on_accept_plan_pressed)
+		print("[DormsPanel._ready] Connected accept_plan button")
 
 	# Connect to DormSystem signals
 	var ds: Node = _ds()
+	print("[DormsPanel._ready] DormSystem found: ", ds != null)
 	if ds:
-		if ds.has_signal("dorms_changed"):
-			ds.connect("dorms_changed", Callable(self, "_on_dorms_changed"))
-		if ds.has_signal("plan_changed"):
-			ds.connect("plan_changed", Callable(self, "_on_dorms_changed"))
+		print("[DormsPanel._ready] DormSystem signals available:")
+		print("  dorms_changed: ", ds.has_signal("dorms_changed"))
+		print("  plan_changed: ", ds.has_signal("plan_changed"))
 
+		if ds.has_signal("dorms_changed") and not ds.is_connected("dorms_changed", Callable(self, "_on_dorms_changed")):
+			ds.connect("dorms_changed", Callable(self, "_on_dorms_changed"))
+			print("[DormsPanel._ready] Connected dorms_changed signal")
+		if ds.has_signal("plan_changed") and not ds.is_connected("plan_changed", Callable(self, "_on_dorms_changed")):
+			ds.connect("plan_changed", Callable(self, "_on_dorms_changed"))
+			print("[DormsPanel._ready] Connected plan_changed signal")
+
+	print("[DormsPanel._ready] Calling _rebuild()")
 	_rebuild()
+	print("[DormsPanel._ready] Initialization complete")
 
 func _ds() -> Node:
 	return get_node_or_null("/root/aDormSystem")
@@ -152,8 +181,10 @@ func _ds() -> Node:
 
 func _on_panel_gained_focus() -> void:
 	super()
+	print("[DormsPanel] Panel gained focus")
 	_nav_state = NavState.VIEW_SELECT
 	_nav_state_history.clear()
+	print("[DormsPanel] Nav state set to VIEW_SELECT, history cleared")
 	_focus_view_type()
 
 func _can_panel_close() -> bool:
@@ -169,28 +200,47 @@ func _can_panel_close() -> bool:
 # ═══════════════════════════════════════════════════════════════════════════
 
 func _input(event: InputEvent) -> void:
-	if not is_active() or _nav_state == NavState.POPUP_ACTIVE:
+	if not is_active():
+		return
+
+	if _nav_state == NavState.POPUP_ACTIVE:
 		return
 
 	# Handle directional navigation
 	if event.is_action_pressed("move_up"):
+		print("[DormsPanel._input] UP pressed, current state: ", _get_nav_state_name(_nav_state))
 		_navigate_up()
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("move_down"):
+		print("[DormsPanel._input] DOWN pressed, current state: ", _get_nav_state_name(_nav_state))
 		_navigate_down()
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("move_left"):
+		print("[DormsPanel._input] LEFT pressed, current state: ", _get_nav_state_name(_nav_state))
 		_navigate_left()
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("move_right"):
+		print("[DormsPanel._input] RIGHT pressed, current state: ", _get_nav_state_name(_nav_state))
 		_navigate_right()
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("menu_accept"):
+		print("[DormsPanel._input] ACCEPT pressed, current state: ", _get_nav_state_name(_nav_state))
 		_on_accept_input()
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("menu_back"):
+		print("[DormsPanel._input] BACK pressed, current state: ", _get_nav_state_name(_nav_state), ", history size: ", _nav_state_history.size())
 		_on_back_input()
 		get_viewport().set_input_as_handled()
+
+func _get_nav_state_name(state: NavState) -> String:
+	match state:
+		NavState.VIEW_SELECT: return "VIEW_SELECT"
+		NavState.ROSTER_SELECT: return "ROSTER_SELECT"
+		NavState.ROOM_SELECT: return "ROOM_SELECT"
+		NavState.COMMON_SELECT: return "COMMON_SELECT"
+		NavState.ACTION_SELECT: return "ACTION_SELECT"
+		NavState.POPUP_ACTIVE: return "POPUP_ACTIVE"
+		_: return "UNKNOWN"
 
 func _navigate_up() -> void:
 	match _nav_state:
@@ -285,7 +335,9 @@ func _on_accept_input() -> void:
 func _on_back_input() -> void:
 	# Go back to previous navigation state
 	if _nav_state_history.size() > 0:
-		_nav_state = _nav_state_history.pop_back()
+		var prev_state: NavState = _nav_state_history.pop_back()
+		print("[DormsPanel._on_back_input] Going back from %s to %s" % [_get_nav_state_name(_nav_state), _get_nav_state_name(prev_state)])
+		_nav_state = prev_state
 		match _nav_state:
 			NavState.VIEW_SELECT:
 				_focus_view_type()
@@ -300,6 +352,7 @@ func _on_back_input() -> void:
 		get_viewport().set_input_as_handled()
 	else:
 		# No history, let panel close
+		print("[DormsPanel._on_back_input] No history, allowing panel to close")
 		pass
 
 func _focus_view_type() -> void:
@@ -324,22 +377,32 @@ func _focus_current_action() -> void:
 
 func _push_nav_state(new_state: NavState) -> void:
 	"""Push current state to history and switch to new state"""
+	print("[DormsPanel._push_nav_state] Pushing %s to history, switching to %s" % [_get_nav_state_name(_nav_state), _get_nav_state_name(new_state)])
 	_nav_state_history.append(_nav_state)
 	_nav_state = new_state
+	print("[DormsPanel._push_nav_state] History size now: ", _nav_state_history.size())
 
 # ═══════════════════════════════════════════════════════════════════════════
 # UI BUILDING
 # ═══════════════════════════════════════════════════════════════════════════
 
 func _rebuild() -> void:
+	print("[DormsPanel._rebuild] Starting rebuild, current view: ", "PLACEMENTS" if _current_view == ViewType.PLACEMENTS else "REASSIGNMENTS")
+	var ds: Node = _ds()
+	if not ds:
+		print("[DormsPanel._rebuild] ERROR: DormSystem not found!")
+		return
+
 	_build_roster_list()
 	_build_rooms_grid()
 	_build_common_list()
 	_build_action_button_array()
 	_update_details()
 	_update_action_buttons()
+	print("[DormsPanel._rebuild] Rebuild complete")
 
 func _build_roster_list() -> void:
+	print("[DormsPanel._build_roster_list] Building roster list")
 	# Clear existing roster
 	for c in _roster_list.get_children():
 		c.queue_free()
@@ -347,10 +410,12 @@ func _build_roster_list() -> void:
 
 	var ds: Node = _ds()
 	if not ds:
+		print("[DormsPanel._build_roster_list] ERROR: DormSystem not found!")
 		return
 
 	# Get all dorm members (everyone who has or could have a room)
 	_all_members = _get_all_dorm_members(ds)
+	print("[DormsPanel._build_roster_list] Found %d members" % _all_members.size())
 
 	if _all_members.size() == 0:
 		var empty := Label.new()
@@ -371,6 +436,8 @@ func _build_roster_list() -> void:
 		)
 		_roster_list.add_child(btn)
 		_roster_buttons.append(btn)
+
+	print("[DormsPanel._build_roster_list] Created %d roster buttons" % _roster_buttons.size())
 
 func _build_rooms_grid() -> void:
 	# Clear existing rooms
@@ -551,12 +618,14 @@ func _update_action_buttons() -> void:
 # ═══════════════════════════════════════════════════════════════════════════
 
 func _on_roster_member_selected(aid: String) -> void:
+	print("[DormsPanel._on_roster_member_selected] Selected member: ", aid)
 	_selected_member = aid
 	_update_details()
 	_update_action_buttons()
 	_update_room_colors()
 
 	# Move cursor to action buttons
+	print("[DormsPanel._on_roster_member_selected] Moving to ACTION_SELECT state")
 	_push_nav_state(NavState.ACTION_SELECT)
 	_current_action_index = 0
 	_focus_current_action()
@@ -924,10 +993,13 @@ func _can_accept_plan() -> bool:
 	return true
 
 func _on_view_type_changed(index: int) -> void:
+	print("[DormsPanel._on_view_type_changed] View changed to index: ", index)
 	_current_view = ViewType.PLACEMENTS if index == 0 else ViewType.REASSIGNMENTS
+	print("[DormsPanel._on_view_type_changed] Current view now: ", "PLACEMENTS" if _current_view == ViewType.PLACEMENTS else "REASSIGNMENTS")
 	_rebuild()
 
 func _on_dorms_changed() -> void:
+	print("[DormsPanel._on_dorms_changed] DormSystem signal received, rebuilding...")
 	_rebuild()
 
 # ═══════════════════════════════════════════════════════════════════════════
