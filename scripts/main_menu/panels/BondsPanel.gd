@@ -173,8 +173,15 @@ func _input(event: InputEvent) -> void:
 	if not is_active():
 		return
 
-	# Block input if story overlay is open
+	# Block input if story overlay is open - but handle back button to close it
 	if _story_overlay != null and is_instance_valid(_story_overlay):
+		if event.is_action_pressed("menu_back"):
+			_close_story_overlay()
+			call_deferred("_enter_bond_detail_state")
+			get_viewport().set_input_as_handled()
+		else:
+			# Block all other input when overlay is open
+			get_viewport().set_input_as_handled()
 		return
 
 	# Route to appropriate handler based on state
@@ -1063,15 +1070,6 @@ func _on_story_points_pressed() -> void:
 	overlay.visible = true
 	overlay.mouse_filter = Control.MOUSE_FILTER_STOP
 	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
-
-	# Handle controller back button input
-	overlay.set_process_input(true)
-	var on_overlay_input = func(event: InputEvent) -> void:
-		if event.is_action_pressed("menu_back"):
-			_close_story_overlay()
-			call_deferred("_enter_bond_detail_state")
-			overlay.get_viewport().set_input_as_handled()
-	overlay.gui_input.connect(on_overlay_input)
 
 	# Dim background
 	var dim := ColorRect.new()
