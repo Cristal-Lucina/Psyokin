@@ -1178,7 +1178,7 @@ func _ask_confirm(msg: String) -> bool:
 			get_viewport().set_input_as_handled()
 
 	# Connect input handler
-	var input_connection := get_viewport().gui_input.connect(input_handler)
+	get_viewport().gui_input.connect(input_handler)
 
 	await popup.hidden
 
@@ -1257,7 +1257,7 @@ func _show_toast(msg: String) -> void:
 			get_viewport().set_input_as_handled()
 
 	# Connect input handler
-	var input_connection := get_viewport().gui_input.connect(input_handler)
+	get_viewport().gui_input.connect(input_handler)
 
 	await popup.hidden
 
