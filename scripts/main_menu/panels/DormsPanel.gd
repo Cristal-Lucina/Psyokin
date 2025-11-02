@@ -84,14 +84,17 @@ var _common_members: PackedStringArray = []  # Members in common room
 var _pending_reassignments: Dictionary = {}  # actor_id -> room_id
 
 # Navigation
-enum NavState { ROSTER_SELECT, ROOM_SELECT, COMMON_SELECT, POPUP_ACTIVE }
+enum NavState { VIEW_SELECT, ROSTER_SELECT, ROOM_SELECT, COMMON_SELECT, ACTION_SELECT, POPUP_ACTIVE }
 var _nav_state: NavState = NavState.ROSTER_SELECT
+var _nav_state_history: Array[NavState] = []  # Track navigation history for back button
 var _roster_buttons: Array[Button] = []
 var _room_buttons: Array[Button] = []
 var _common_buttons: Array[Button] = []
+var _action_buttons: Array[Button] = []
 var _current_roster_index: int = 0
 var _current_room_index: int = 0
 var _current_common_index: int = 0
+var _current_action_index: int = 0
 
 # Room visual states
 const VIS_EMPTY := 0
@@ -149,8 +152,9 @@ func _ds() -> Node:
 
 func _on_panel_gained_focus() -> void:
 	super()
-	_nav_state = NavState.ROSTER_SELECT
-	_focus_current_roster()
+	_nav_state = NavState.VIEW_SELECT
+	_nav_state_history.clear()
+	_focus_view_type()
 
 func _can_panel_close() -> bool:
 	# Prevent closing if common room has members without assignments
@@ -184,69 +188,123 @@ func _input(event: InputEvent) -> void:
 	elif event.is_action_pressed("menu_accept"):
 		_on_accept_input()
 		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("menu_back"):
+		_on_back_input()
+		get_viewport().set_input_as_handled()
 
 func _navigate_up() -> void:
-	if _nav_state == NavState.ROSTER_SELECT:
-		if _current_roster_index > 0:
-			_current_roster_index -= 1
+	match _nav_state:
+		NavState.VIEW_SELECT:
+			# Move to roster
+			_push_nav_state(NavState.ROSTER_SELECT)
+			_current_roster_index = 0
 			_focus_current_roster()
-	elif _nav_state == NavState.ROOM_SELECT:
-		# 2x4 grid: move up one row (subtract 4)
-		var new_index: int = _current_room_index - 4
-		if new_index >= 0:
-			_current_room_index = new_index
-			_focus_current_room()
-	elif _nav_state == NavState.COMMON_SELECT:
-		if _current_common_index > 0:
-			_current_common_index -= 1
-			_focus_current_common()
+		NavState.ROSTER_SELECT:
+			if _current_roster_index > 0:
+				_current_roster_index -= 1
+				_focus_current_roster()
+			else:
+				# Move to view type
+				_push_nav_state(NavState.VIEW_SELECT)
+				_focus_view_type()
+		NavState.ROOM_SELECT:
+			# 2x4 grid: move up one row (subtract 4)
+			var new_index: int = _current_room_index - 4
+			if new_index >= 0:
+				_current_room_index = new_index
+				_focus_current_room()
+		NavState.COMMON_SELECT:
+			if _current_common_index > 0:
+				_current_common_index -= 1
+				_focus_current_common()
+		NavState.ACTION_SELECT:
+			if _current_action_index > 0:
+				_current_action_index -= 1
+				_focus_current_action()
 
 func _navigate_down() -> void:
-	if _nav_state == NavState.ROSTER_SELECT:
-		if _current_roster_index < _roster_buttons.size() - 1:
-			_current_roster_index += 1
+	match _nav_state:
+		NavState.VIEW_SELECT:
+			# Move to roster
+			_push_nav_state(NavState.ROSTER_SELECT)
+			_current_roster_index = 0
 			_focus_current_roster()
-	elif _nav_state == NavState.ROOM_SELECT:
-		# 2x4 grid: move down one row (add 4)
-		var new_index: int = _current_room_index + 4
-		if new_index < _room_buttons.size():
-			_current_room_index = new_index
-			_focus_current_room()
-	elif _nav_state == NavState.COMMON_SELECT:
-		if _current_common_index < _common_buttons.size() - 1:
-			_current_common_index += 1
-			_focus_current_common()
+		NavState.ROSTER_SELECT:
+			if _current_roster_index < _roster_buttons.size() - 1:
+				_current_roster_index += 1
+				_focus_current_roster()
+		NavState.ROOM_SELECT:
+			# 2x4 grid: move down one row (add 4)
+			var new_index: int = _current_room_index + 4
+			if new_index < _room_buttons.size():
+				_current_room_index = new_index
+				_focus_current_room()
+		NavState.COMMON_SELECT:
+			if _current_common_index < _common_buttons.size() - 1:
+				_current_common_index += 1
+				_focus_current_common()
+		NavState.ACTION_SELECT:
+			if _current_action_index < _action_buttons.size() - 1:
+				_current_action_index += 1
+				_focus_current_action()
 
 func _navigate_left() -> void:
-	if _nav_state == NavState.ROOM_SELECT:
-		# 2x4 grid: move left
-		if _current_room_index % 4 > 0:
-			_current_room_index -= 1
-			_focus_current_room()
+	match _nav_state:
+		NavState.ROOM_SELECT:
+			# 2x4 grid: move left
+			if _current_room_index % 4 > 0:
+				_current_room_index -= 1
+				_focus_current_room()
 
 func _navigate_right() -> void:
-	if _nav_state == NavState.ROSTER_SELECT:
-		# Move from roster to rooms or common
-		if _selected_member != "":
-			_nav_state = NavState.ROOM_SELECT
-			_current_room_index = 0
-			_focus_current_room()
-	elif _nav_state == NavState.ROOM_SELECT:
-		# 2x4 grid: move right
-		if _current_room_index % 4 < 3 and _current_room_index < _room_buttons.size() - 1:
-			_current_room_index += 1
-			_focus_current_room()
+	# Disabled - navigation is locked within current state unless back pressed
+	pass
 
 func _on_accept_input() -> void:
-	if _nav_state == NavState.ROSTER_SELECT:
-		if _current_roster_index >= 0 and _current_roster_index < _roster_buttons.size():
-			_roster_buttons[_current_roster_index].emit_signal("pressed")
-	elif _nav_state == NavState.ROOM_SELECT:
-		if _current_room_index >= 0 and _current_room_index < _room_buttons.size():
-			_room_buttons[_current_room_index].emit_signal("pressed")
-	elif _nav_state == NavState.COMMON_SELECT:
-		if _current_common_index >= 0 and _current_common_index < _common_buttons.size():
-			_common_buttons[_current_common_index].emit_signal("pressed")
+	match _nav_state:
+		NavState.VIEW_SELECT:
+			# Toggle view type
+			if _view_type_filter:
+				var current: int = _view_type_filter.get_selected_id()
+				var next: int = 1 if current == 0 else 0
+				_view_type_filter.select(next)
+				_on_view_type_changed(next)
+		NavState.ROSTER_SELECT:
+			if _current_roster_index >= 0 and _current_roster_index < _roster_buttons.size():
+				_roster_buttons[_current_roster_index].emit_signal("pressed")
+		NavState.ROOM_SELECT:
+			if _current_room_index >= 0 and _current_room_index < _room_buttons.size():
+				_room_buttons[_current_room_index].emit_signal("pressed")
+		NavState.COMMON_SELECT:
+			if _current_common_index >= 0 and _current_common_index < _common_buttons.size():
+				_common_buttons[_current_common_index].emit_signal("pressed")
+		NavState.ACTION_SELECT:
+			if _current_action_index >= 0 and _current_action_index < _action_buttons.size():
+				_action_buttons[_current_action_index].emit_signal("pressed")
+
+func _on_back_input() -> void:
+	# Go back to previous navigation state
+	if _nav_state_history.size() > 0:
+		_nav_state = _nav_state_history.pop_back()
+		match _nav_state:
+			NavState.VIEW_SELECT:
+				_focus_view_type()
+			NavState.ROSTER_SELECT:
+				_focus_current_roster()
+			NavState.ROOM_SELECT:
+				_focus_current_room()
+			NavState.COMMON_SELECT:
+				_focus_current_common()
+			NavState.ACTION_SELECT:
+				_focus_current_action()
+		get_viewport().set_input_as_handled()
+	else:
+		# No history, let panel close
+		pass
+
+func _focus_view_type() -> void:
+	if _view_type_filter:
+		_view_type_filter.grab_focus()
 
 func _focus_current_roster() -> void:
 	if _current_roster_index >= 0 and _current_roster_index < _roster_buttons.size():
@@ -260,6 +318,15 @@ func _focus_current_common() -> void:
 	if _current_common_index >= 0 and _current_common_index < _common_buttons.size():
 		_common_buttons[_current_common_index].grab_focus()
 
+func _focus_current_action() -> void:
+	if _current_action_index >= 0 and _current_action_index < _action_buttons.size():
+		_action_buttons[_current_action_index].grab_focus()
+
+func _push_nav_state(new_state: NavState) -> void:
+	"""Push current state to history and switch to new state"""
+	_nav_state_history.append(_nav_state)
+	_nav_state = new_state
+
 # ═══════════════════════════════════════════════════════════════════════════
 # UI BUILDING
 # ═══════════════════════════════════════════════════════════════════════════
@@ -268,6 +335,7 @@ func _rebuild() -> void:
 	_build_roster_list()
 	_build_rooms_grid()
 	_build_common_list()
+	_build_action_button_array()
 	_update_details()
 	_update_action_buttons()
 
@@ -339,6 +407,9 @@ func _build_rooms_grid() -> void:
 		else:
 			btn.text = "%s\n(empty)" % rid
 
+		# Make text smaller
+		btn.add_theme_font_size_override("font_size", 11)
+
 		# Apply visual styling based on state
 		_apply_room_visual(btn, rid)
 
@@ -348,6 +419,18 @@ func _build_rooms_grid() -> void:
 
 		_rooms_grid.add_child(btn)
 		_room_buttons.append(btn)
+
+func _build_action_button_array() -> void:
+	"""Build array of action buttons for navigation"""
+	_action_buttons.clear()
+	if _assign_room_btn:
+		_action_buttons.append(_assign_room_btn)
+	if _move_out_btn:
+		_action_buttons.append(_move_out_btn)
+	if _cancel_move_btn:
+		_action_buttons.append(_cancel_move_btn)
+	if _accept_plan_btn:
+		_action_buttons.append(_accept_plan_btn)
 
 func _build_common_list() -> void:
 	# Clear existing common room members
@@ -473,6 +556,11 @@ func _on_roster_member_selected(aid: String) -> void:
 	_update_action_buttons()
 	_update_room_colors()
 
+	# Move cursor to action buttons
+	_push_nav_state(NavState.ACTION_SELECT)
+	_current_action_index = 0
+	_focus_current_action()
+
 func _on_room_selected(room_id: String) -> void:
 	_selected_room = room_id
 
@@ -534,6 +622,11 @@ func _on_move_out_pressed() -> void:
 
 	_show_toast("%s moved to common room." % member_name)
 	_rebuild()
+
+	# Move cursor to room grid for next selection
+	_push_nav_state(NavState.ROOM_SELECT)
+	_current_room_index = 0
+	_focus_current_room()
 
 func _on_cancel_move_pressed() -> void:
 	var confirmed: bool = await _ask_confirm("Cancel all pending reassignments?")
@@ -842,6 +935,7 @@ func _on_dorms_changed() -> void:
 # ═══════════════════════════════════════════════════════════════════════════
 
 func _ask_confirm(msg: String) -> bool:
+	var prev_state: NavState = _nav_state
 	_nav_state = NavState.POPUP_ACTIVE
 
 	var popup := Panel.new()
@@ -894,11 +988,25 @@ func _ask_confirm(msg: String) -> bool:
 
 	await popup.hidden
 	popup.queue_free()
-	_nav_state = NavState.ROSTER_SELECT
-	_focus_current_roster()
+
+	# Restore previous navigation state
+	_nav_state = prev_state
+	match _nav_state:
+		NavState.VIEW_SELECT:
+			_focus_view_type()
+		NavState.ROSTER_SELECT:
+			_focus_current_roster()
+		NavState.ROOM_SELECT:
+			_focus_current_room()
+		NavState.COMMON_SELECT:
+			_focus_current_common()
+		NavState.ACTION_SELECT:
+			_focus_current_action()
+
 	return result
 
 func _show_toast(msg: String) -> void:
+	var prev_state: NavState = _nav_state
 	_nav_state = NavState.POPUP_ACTIVE
 
 	var popup := Panel.new()
@@ -939,8 +1047,20 @@ func _show_toast(msg: String) -> void:
 
 	await popup.hidden
 	popup.queue_free()
-	_nav_state = NavState.ROSTER_SELECT
-	_focus_current_roster()
+
+	# Restore previous navigation state
+	_nav_state = prev_state
+	match _nav_state:
+		NavState.VIEW_SELECT:
+			_focus_view_type()
+		NavState.ROSTER_SELECT:
+			_focus_current_roster()
+		NavState.ROOM_SELECT:
+			_focus_current_room()
+		NavState.COMMON_SELECT:
+			_focus_current_common()
+		NavState.ACTION_SELECT:
+			_focus_current_action()
 
 func _join_psa(arr: PackedStringArray, sep: String) -> String:
 	var out: String = ""
