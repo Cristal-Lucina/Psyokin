@@ -164,6 +164,7 @@ var _tab_ids: Array[String] = []
 enum NavState { MENU, CONTENT, POPUP_ACTIVE }
 var _nav_state: NavState = NavState.MENU
 var _active_popup: Control = null  # Currently open popup panel
+var _focus_member_id: String = ""  # Member ID to focus after rebuild
 
 func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -1136,6 +1137,9 @@ func _use_recovery_item(member_id: String, member_name: String, item_id: String,
 			# Apply recovery effect to the party member
 			_apply_recovery_effect(member_id, member_name, item_id, item_type)
 
+			# Save member_id to restore focus after rebuild
+			_focus_member_id = member_id
+
 			# Refresh party display
 			_rebuild_party()
 		else:
@@ -1214,6 +1218,14 @@ func _apply_recovery_effect(member_id: String, member_name: String, item_id: Str
 
 						member_dict["mp"] = min(current_mp + heal_amount, max_mp)
 						print("[StatusPanel] ✓ Restored %d MP to %s (now: %d/%d)" % [heal_amount, member_name, member_dict["mp"], max_mp])
+
+					# Update the member_data entry
+					member_data[member_id] = member_dict
+
+					# CRITICAL: Set the modified dictionary back to GameState for persistence
+					if _gs.has_method("set"):
+						_gs.set("member_data", member_data)
+						print("[StatusPanel] ✓ Persisted changes to GameState.member_data")
 	else:
 		print("[StatusPanel] WARNING: Could not apply recovery effect - no suitable system found")
 
@@ -1723,7 +1735,21 @@ func _navigate_to_content() -> void:
 	for i in range(buttons.size()):
 		print("[StatusPanel]   Button %d: %s" % [i, buttons[i].text])
 
-	# Focus the first button found
+	# If we have a specific member to focus (after using recovery item), find that button
+	if _focus_member_id != "":
+		print("[StatusPanel] Looking for Recovery button for member: %s" % _focus_member_id)
+		for btn in buttons:
+			if btn.text == "Recovery" and btn.has_meta("member_id"):
+				var btn_member_id = String(btn.get_meta("member_id", ""))
+				if btn_member_id == _focus_member_id:
+					btn.grab_focus()
+					print("[StatusPanel] ✓ Restored focus to Recovery button for %s" % _focus_member_id)
+					_focus_member_id = ""  # Clear the focus target
+					return
+		print("[StatusPanel] WARNING: Could not find Recovery button for %s, focusing first button" % _focus_member_id)
+		_focus_member_id = ""  # Clear the focus target
+
+	# Focus the first button found (default behavior)
 	if buttons.size() > 0:
 		buttons[0].grab_focus()
 		print("[StatusPanel] ✓ Navigated to content - focused first button: %s" % buttons[0].text)
