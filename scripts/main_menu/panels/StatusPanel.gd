@@ -714,6 +714,80 @@ func _popup_close_notice() -> void:
 	print("[StatusPanel] Notice popup closed")
 	_popup_close_and_return_to_content()
 
+func _show_heal_confirmation(member_name: String, heal_amount: int, healed_type: String) -> void:
+	"""Show healing confirmation message using Panel pattern"""
+	# Prevent multiple popups
+	if _active_popup and is_instance_valid(_active_popup):
+		print("[StatusPanel] Popup already open, ignoring request")
+		return
+
+	# Create popup panel
+	var popup_panel: Panel = Panel.new()
+	popup_panel.process_mode = Node.PROCESS_MODE_ALWAYS
+	popup_panel.z_index = 100
+	add_child(popup_panel)
+
+	# Set active popup immediately
+	_active_popup = popup_panel
+
+	# Create content container
+	var vbox: VBoxContainer = VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 8)
+	popup_panel.add_child(vbox)
+
+	# Title label
+	var title: Label = Label.new()
+	title.text = "Recovery"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 14)
+	vbox.add_child(title)
+
+	# Message label
+	var message: Label = Label.new()
+	message.text = "%s has healed %d %s" % [member_name, heal_amount, healed_type]
+	message.add_theme_font_size_override("font_size", 10)
+	message.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	message.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	vbox.add_child(message)
+
+	# Add OK button
+	var ok_btn: Button = Button.new()
+	ok_btn.text = "OK"
+	ok_btn.pressed.connect(_popup_close_heal_confirmation)
+	vbox.add_child(ok_btn)
+
+	# Auto-size panel - wait two frames
+	await get_tree().process_frame
+	await get_tree().process_frame
+	popup_panel.size = vbox.size + Vector2(20, 20)
+	vbox.position = Vector2(10, 10)
+
+	# Center popup on screen
+	var viewport_size: Vector2 = get_viewport_rect().size
+	popup_panel.position = (viewport_size - popup_panel.size) / 2.0
+	print("[StatusPanel] Heal confirmation centered at: %s, size: %s" % [popup_panel.position, popup_panel.size])
+
+	# Store metadata
+	popup_panel.set_meta("_is_heal_confirmation_popup", true)
+
+	# Push popup to aPanelManager stack
+	var panel_mgr = get_node_or_null("/root/aPanelManager")
+	if panel_mgr:
+		panel_mgr.push_panel(popup_panel)
+		print("[StatusPanel] Pushed heal confirmation to aPanelManager stack")
+
+	# Set state to POPUP_ACTIVE
+	_nav_state = NavState.POPUP_ACTIVE
+
+	# Grab focus on OK button
+	await get_tree().process_frame
+	ok_btn.grab_focus()
+
+func _popup_close_heal_confirmation() -> void:
+	"""Close heal confirmation popup and return focus to Recovery button"""
+	print("[StatusPanel] Heal confirmation popup closed")
+	_popup_close_and_return_to_content()
+
 func _show_member_picker(active_slot: int) -> void:
 	"""Show bench member picker popup - LoadoutPanel pattern"""
 	if not _gs: return
@@ -1160,12 +1234,7 @@ func _use_recovery_item(member_id: String, member_name: String, item_id: String,
 			if heal_result.get("success", false):
 				var heal_amount: int = int(heal_result.get("heal_amount", 0))
 				var healed_type: String = String(heal_result.get("type", "HP")).to_upper()
-				var msg_popup := AcceptDialog.new()
-				msg_popup.dialog_text = "%s has healed %d %s" % [member_name, heal_amount, healed_type]
-				msg_popup.title = "Recovery"
-				add_child(msg_popup)
-				msg_popup.popup_centered()
-				msg_popup.confirmed.connect(func(): msg_popup.queue_free())
+				_show_heal_confirmation(member_name, heal_amount, healed_type)
 		else:
 			var error_popup := AcceptDialog.new()
 			error_popup.dialog_text = "Failed to use item - you don't have any."
@@ -1839,7 +1908,7 @@ func _input(event: InputEvent) -> void:
 ## ─────────────────────── STATE 1: POPUP_ACTIVE ───────────────────────
 
 func _handle_popup_input(event: InputEvent) -> void:
-	"""Handle input when popup is active (switch, recovery, or notice popup)"""
+	"""Handle input when popup is active (switch, recovery, notice, or heal confirmation popup)"""
 	if event.is_action_pressed("menu_accept"):
 		# Route to appropriate handler based on popup type
 		if _active_popup and _active_popup.get_meta("_is_recovery_popup", false):
@@ -1848,6 +1917,8 @@ func _handle_popup_input(event: InputEvent) -> void:
 			_popup_accept_switch()
 		elif _active_popup and _active_popup.get_meta("_is_notice_popup", false):
 			_popup_close_notice()
+		elif _active_popup and _active_popup.get_meta("_is_heal_confirmation_popup", false):
+			_popup_close_heal_confirmation()
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("menu_back"):
 		# Cancel popup - all popups can be cancelled with back
@@ -1857,6 +1928,8 @@ func _handle_popup_input(event: InputEvent) -> void:
 			_popup_cancel_switch()
 		elif _active_popup and _active_popup.get_meta("_is_notice_popup", false):
 			_popup_close_notice()
+		elif _active_popup and _active_popup.get_meta("_is_heal_confirmation_popup", false):
+			_popup_close_heal_confirmation()
 		get_viewport().set_input_as_handled()
 	# UP/DOWN navigation is NOT handled - let ItemList/Button handle it
 
