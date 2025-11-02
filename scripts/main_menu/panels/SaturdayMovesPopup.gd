@@ -155,7 +155,7 @@ func _build_ui() -> void:
 func _position_center() -> void:
 	if get_parent() == null:
 		return
-	var parent_rect := get_parent().get_viewport_rect()
+	var parent_rect: Rect2 = get_parent().get_viewport_rect()
 	position = (parent_rect.size - size) / 2
 
 func _input(event: InputEvent) -> void:
