@@ -110,6 +110,13 @@ func _ds() -> Node:
 	return get_node_or_null("/root/aDormSystem")
 
 func _ready() -> void:
+	super()  # Call PanelBase._ready() first
+
+	# Debug node references
+	print("[DormsPanel._ready] _grid_holder: %s" % _grid_holder)
+	print("[DormsPanel._ready] _detail: %s" % _detail)
+	print("[DormsPanel._ready] _common_box: %s" % _common_box)
+
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	if _detail != null:
 		_detail.bbcode_enabled = true
