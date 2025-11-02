@@ -156,6 +156,7 @@ func _ready() -> void:
 
 func _on_panel_gained_focus() -> void:
 	super()
+	print("[DormsPanel] Panel gained focus - is_active: %s, is_registered: %s" % [is_active(), is_registered()])
 	_nav_state = NavState.ROOM_SELECT
 	_focus_current_room()
 
@@ -184,6 +185,10 @@ func _can_panel_close() -> bool:
 # ═══════════════════════════════════════════════════════════════════════════
 
 func _input(event: InputEvent) -> void:
+	# Debug logging
+	if event is InputEventJoypadButton and event.pressed:
+		print("[DormsPanel._input] Button %d, is_active: %s, nav_state: %s" % [event.button_index, is_active(), _nav_state])
+
 	if not is_active():
 		return
 
