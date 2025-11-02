@@ -733,6 +733,7 @@ func _show_heal_confirmation(member_name: String, heal_amount: int, healed_type:
 	# Create content container
 	var vbox: VBoxContainer = VBoxContainer.new()
 	vbox.add_theme_constant_override("separation", 8)
+	vbox.custom_minimum_size.x = 300  # Set panel width to 300px
 	popup_panel.add_child(vbox)
 
 	# Title label
