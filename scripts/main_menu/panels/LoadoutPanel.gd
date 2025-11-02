@@ -237,10 +237,14 @@ func _refresh_all_for_current() -> void:
 	_refresh_mind_row(cur)
 	_refresh_active_type_row(cur)
 
-	# Rebuild navigation elements if in equipment mode
-	# This preserves _nav_state and _nav_index
+	# ALWAYS rebuild navigation when UI changes (equipment/sigils)
+	# This ensures _nav_elements stays in sync even if popup is open
+	# We check state before restoring focus, not before rebuilding
+	call_deferred("_rebuild_equipment_navigation")
+
+	# Only restore focus if we're actively in equipment mode
 	if _nav_state == NavState.EQUIPMENT_NAV:
-		call_deferred("_rebuild_equipment_navigation_and_restore_focus")
+		call_deferred("_restore_equipment_focus")
 
 func _on_sigil_instances_updated(_a=null,_b=null,_c=null) -> void:
 	_refresh_all_for_current()
