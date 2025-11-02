@@ -1183,13 +1183,15 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 
 	# Handle A button to activate selected tab (ItemList handles UP/DOWN navigation)
+	# ONLY if the tab list has focus (don't intercept button presses on Switch buttons, etc.)
 	if event.is_action_pressed("menu_accept"):
-		var selected_items = _tab_list.get_selected_items()
-		if selected_items.size() > 0:
-			var index = selected_items[0]
-			print("[StatusPanel] A button - confirming selection: %d" % index)
-			_on_tab_item_activated(index)
-			get_viewport().set_input_as_handled()
+		if _tab_list.has_focus():
+			var selected_items = _tab_list.get_selected_items()
+			if selected_items.size() > 0:
+				var index = selected_items[0]
+				print("[StatusPanel] A button - confirming selection: %d" % index)
+				_on_tab_item_activated(index)
+				get_viewport().set_input_as_handled()
 
 	# Debug key handling (F9 to dump profiles)
 	if not OS.is_debug_build(): return
