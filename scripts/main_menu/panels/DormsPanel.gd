@@ -230,7 +230,8 @@ func _input(event: InputEvent) -> void:
 	elif event.is_action_pressed("menu_back"):
 		print("[DormsPanel._input] BACK pressed, current state: ", _get_nav_state_name(_nav_state), ", history size: ", _nav_state_history.size())
 		_on_back_input()
-		get_viewport().set_input_as_handled()
+		# Note: _on_back_input() only handles input if history exists
+		# If no history, it lets the event bubble up to GameMenu for proper panel transition
 
 func _get_nav_state_name(state: NavState) -> String:
 	match state:
@@ -338,6 +339,15 @@ func _on_back_input() -> void:
 		var prev_state: NavState = _nav_state_history.pop_back()
 		print("[DormsPanel._on_back_input] Going back from %s to %s" % [_get_nav_state_name(_nav_state), _get_nav_state_name(prev_state)])
 		_nav_state = prev_state
+
+		# Clear selection when going back to roster
+		if _nav_state == NavState.ROSTER_SELECT:
+			print("[DormsPanel._on_back_input] Clearing member selection")
+			_selected_member = ""
+			_update_details()
+			_update_action_buttons()
+			_update_room_colors()
+
 		match _nav_state:
 			NavState.VIEW_SELECT:
 				_focus_view_type()
@@ -351,9 +361,10 @@ func _on_back_input() -> void:
 				_focus_current_action()
 		get_viewport().set_input_as_handled()
 	else:
-		# No history, let panel close
-		print("[DormsPanel._on_back_input] No history, allowing panel to close")
-		pass
+		# No history - don't handle input, let GameMenu handle the back button
+		# This allows proper slide animation back to StatusPanel
+		print("[DormsPanel._on_back_input] No history, letting GameMenu handle back button for slide transition")
+		# Do NOT call get_viewport().set_input_as_handled() - let event bubble up
 
 func _focus_view_type() -> void:
 	if _view_type_filter:
