@@ -203,39 +203,8 @@ func _input(event: InputEvent) -> void:
 	if not is_active():
 		return
 
-	# Handle popup input
-	if _nav_state == NavState.POPUP_ACTIVE:
-		# Allow buttons in popups to receive gamepad input
-		if event.is_action_pressed("menu_accept"):
-			# Trigger the currently focused button
-			var focused := get_viewport().gui_get_focus_owner()
-			if focused is Button:
-				print("[DormsPanel._input] POPUP: Triggering focused button: %s" % focused.text)
-				focused.emit_signal("pressed")
-				get_viewport().set_input_as_handled()
-		elif event.is_action_pressed("menu_back"):
-			# Try to find and trigger Cancel button, or just handle back
-			print("[DormsPanel._input] POPUP: Back pressed")
-			get_viewport().set_input_as_handled()
-		elif event.is_action_pressed("move_left") or event.is_action_pressed("move_right"):
-			# Allow left/right navigation between popup buttons
-			var focused := get_viewport().gui_get_focus_owner()
-			if focused is Button:
-				# Find next/previous button sibling
-				var parent := focused.get_parent()
-				if parent != null:
-					var children := parent.get_children()
-					var idx := children.find(focused)
-					if idx >= 0:
-						if event.is_action_pressed("move_left") and idx > 0:
-							if children[idx - 1] is Button:
-								children[idx - 1].grab_focus()
-								get_viewport().set_input_as_handled()
-						elif event.is_action_pressed("move_right") and idx < children.size() - 1:
-							if children[idx + 1] is Button:
-								children[idx + 1].grab_focus()
-								get_viewport().set_input_as_handled()
-		return
+	# Note: Popup input is now handled by ConfirmationPopup and ToastPopup classes
+	# They call set_input_as_handled() to block panel input while visible
 
 	# Handle directional navigation
 	if event.is_action_pressed("move_up"):
@@ -1123,150 +1092,32 @@ func _on_dorms_changed() -> void:
 # ═══════════════════════════════════════════════════════════════════════════
 
 func _ask_confirm(msg: String) -> bool:
-	var prev_state: NavState = _nav_state
-	_nav_state = NavState.POPUP_ACTIVE
+	print("[DormsPanel._ask_confirm] Showing confirmation: %s" % msg)
 
-	var popup := Panel.new()
-	popup.custom_minimum_size = Vector2(400, 200)
-	var vbox := VBoxContainer.new()
-	vbox.set_anchors_preset(Control.PRESET_FULL_RECT)
-	vbox.add_theme_constant_override("separation", 12)
-	popup.add_child(vbox)
-
-	# Title
-	var title := Label.new()
-	title.text = "Confirm"
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vbox.add_child(title)
-
-	# Message
-	var msg_label := Label.new()
-	msg_label.text = msg
-	msg_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	msg_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	vbox.add_child(msg_label)
-
-	# Buttons
-	var hbox := HBoxContainer.new()
-	hbox.add_theme_constant_override("separation", 8)
-	var accept_btn := Button.new()
-	accept_btn.text = "Accept"
-	accept_btn.focus_mode = Control.FOCUS_ALL
-	var cancel_btn := Button.new()
-	cancel_btn.text = "Cancel"
-	cancel_btn.focus_mode = Control.FOCUS_ALL
-	hbox.add_child(accept_btn)
-	hbox.add_child(cancel_btn)
-	vbox.add_child(hbox)
-
+	# Create and show modal confirmation popup
+	var popup := ConfirmationPopup.create(msg)
 	add_child(popup)
-	popup.position = (get_viewport_rect().size - popup.custom_minimum_size) / 2
-	popup.show()
-	accept_btn.grab_focus()
 
-	# Use array to ensure proper variable capture in lambdas
-	var result_ref: Array = [false]
+	# Wait for user response (true = Accept, false = Cancel/Back)
+	var result: bool = await popup.confirmed
 
-	# Handle button presses
-	accept_btn.pressed.connect(func() -> void:
-		print("[DormsPanel._ask_confirm] Accept button pressed, setting result to true")
-		result_ref[0] = true
-		popup.hide()
-	)
-	cancel_btn.pressed.connect(func() -> void:
-		print("[DormsPanel._ask_confirm] Cancel button pressed, setting result to false")
-		result_ref[0] = false
-		popup.hide()
-	)
-
-	# Wait for user input via the panel's _input method
-	# The popup will be hidden when a button is pressed
-	await popup.hidden
-
-	var result: bool = result_ref[0]
-	print("[DormsPanel._ask_confirm] After await, result: %s" % result)
-
+	print("[DormsPanel._ask_confirm] Result: %s" % result)
 	popup.queue_free()
 
-	# Restore previous navigation state
-	_nav_state = prev_state
-	match _nav_state:
-		NavState.VIEW_SELECT:
-			_focus_view_type()
-		NavState.ROSTER_SELECT:
-			_focus_current_roster()
-		NavState.ROOM_SELECT:
-			_focus_current_room()
-		NavState.COMMON_SELECT:
-			_focus_current_common()
-		NavState.ACTION_SELECT:
-			_focus_current_action()
-
-	print("[DormsPanel._ask_confirm] Returning result: %s" % result)
 	return result
 
 func _show_toast(msg: String) -> void:
-	var prev_state: NavState = _nav_state
-	_nav_state = NavState.POPUP_ACTIVE
+	print("[DormsPanel._show_toast] Showing toast: %s" % msg)
 
-	var popup := Panel.new()
-	popup.custom_minimum_size = Vector2(400, 150)
-	var vbox := VBoxContainer.new()
-	vbox.set_anchors_preset(Control.PRESET_FULL_RECT)
-	vbox.add_theme_constant_override("separation", 12)
-	popup.add_child(vbox)
-
-	# Title
-	var title := Label.new()
-	title.text = "Notice"
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vbox.add_child(title)
-
-	# Message
-	var msg_label := Label.new()
-	msg_label.text = msg
-	msg_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	msg_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	vbox.add_child(msg_label)
-
-	# OK Button
-	var ok_btn := Button.new()
-	ok_btn.text = "OK"
-	ok_btn.focus_mode = Control.FOCUS_ALL
-	ok_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	vbox.add_child(ok_btn)
-
+	# Create and show modal toast popup
+	var popup := ToastPopup.create(msg)
 	add_child(popup)
-	popup.position = (get_viewport_rect().size - popup.custom_minimum_size) / 2
-	popup.show()
-	ok_btn.grab_focus()
 
-	var popup_closed: bool = false
-
-	ok_btn.pressed.connect(func() -> void:
-		popup_closed = true
-		popup.hide()
-	)
-
-	# Wait for user input via the panel's _input method
-	# The popup_closed flag will be set by button press
-	await popup.hidden
+	# Wait for user to acknowledge
+	await popup.closed
 
 	popup.queue_free()
-
-	# Restore previous navigation state
-	_nav_state = prev_state
-	match _nav_state:
-		NavState.VIEW_SELECT:
-			_focus_view_type()
-		NavState.ROSTER_SELECT:
-			_focus_current_roster()
-		NavState.ROOM_SELECT:
-			_focus_current_room()
-		NavState.COMMON_SELECT:
-			_focus_current_common()
-		NavState.ACTION_SELECT:
-			_focus_current_action()
+	print("[DormsPanel._show_toast] Toast closed")
 
 func _join_psa(arr: PackedStringArray, sep: String) -> String:
 	var out: String = ""
