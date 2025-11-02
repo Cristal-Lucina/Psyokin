@@ -244,6 +244,21 @@ func _build_tab_buttons() -> void:
 	if not _tab_list.item_clicked.is_connected(_on_tab_item_clicked):
 		_tab_list.item_clicked.connect(_on_tab_item_clicked)
 
+func select_tab(tab_id: String) -> void:
+	"""Programmatically select a tab by tab_id and give it focus"""
+	if not _tab_list:
+		return
+
+	# Find the index of the tab_id
+	var index: int = _tab_ids.find(tab_id)
+	if index >= 0 and index < _tab_list.item_count:
+		_tab_list.select(index)
+		if visible:
+			call_deferred("_grab_tab_list_focus")
+		print("[StatusPanel] Selected tab: %s (index %d)" % [tab_id, index])
+	else:
+		print("[StatusPanel] WARNING: Tab not found: %s" % tab_id)
+
 func _on_tab_item_selected(index: int) -> void:
 	"""Handle tab item selection (when navigating with UP/DOWN)"""
 	# Just visual feedback - don't switch tabs yet

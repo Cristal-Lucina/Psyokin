@@ -320,6 +320,9 @@ func _exit_fullscreen() -> void:
 
 	_is_fullscreen = false
 
+	# Remember which tab was being viewed
+	var previous_tab = _current_tab
+
 	# Animate the transition back to Status
 	if current_panel and status_panel and current_panel != status_panel:
 		# Get viewport width for slide distance
@@ -342,10 +345,14 @@ func _exit_fullscreen() -> void:
 		# Slide Status panel in from the left
 		tween.tween_property(status_panel, "position:x", 0, 0.3)
 
-		# Hide current panel when animation completes
+		# Hide current panel and restore tab selection when animation completes
 		tween.chain().tween_callback(func():
 			current_panel.visible = false
 			current_panel.position.x = 0  # Reset position for next time
+
+			# Restore focus to the tab that was just being viewed
+			if status_panel.has_method("select_tab"):
+				status_panel.call("select_tab", previous_tab)
 		)
 
 		# Update current tab AFTER animation completes
@@ -353,3 +360,7 @@ func _exit_fullscreen() -> void:
 	else:
 		# No animation needed, just switch immediately
 		_select_tab("status")
+
+		# Restore focus to the tab that was just being viewed
+		if status_panel and status_panel.has_method("select_tab"):
+			status_panel.call("select_tab", previous_tab)
