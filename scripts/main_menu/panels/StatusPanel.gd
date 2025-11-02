@@ -160,6 +160,11 @@ var _name_to_id  : Dictionary = {}      # lowercase "name" -> "actor_id"
 # Tab metadata (maps item index to tab_id)
 var _tab_ids: Array[String] = []
 
+# Controller navigation state - Simple state machine (like LoadoutPanel)
+enum NavState { MENU, CONTENT, POPUP_ACTIVE }
+var _nav_state: NavState = NavState.MENU
+var _active_popup: Control = null  # Currently open popup panel
+
 func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -622,7 +627,13 @@ func _on_recovery_pressed(button: Button) -> void:
 	_show_recovery_popup(member_id, member_name, hp, hp_max, mp, mp_max)
 
 func _show_member_picker(active_slot: int) -> void:
+	"""Show bench member picker popup - LoadoutPanel pattern"""
 	if not _gs: return
+
+	# Prevent multiple popups
+	if _active_popup and is_instance_valid(_active_popup):
+		print("[StatusPanel] Popup already open, ignoring request")
+		return
 
 	# Enforce limits before checking bench
 	if _gs.has_method("_enforce_party_limits"):
@@ -637,12 +648,10 @@ func _show_member_picker(active_slot: int) -> void:
 				bench_ids.append(String(id))
 
 	# Debug output
-	print("[_show_member_picker] Active slot: ", active_slot)
-	print("[_show_member_picker] Bench IDs found: ", bench_ids)
-	print("[_show_member_picker] Bench array from GameState: ", _gs.get("bench") if _gs.has_method("get") else "N/A")
+	print("[StatusPanel] Switch button - Active slot: %d, Bench IDs: %s" % [active_slot, bench_ids])
 
 	if bench_ids.is_empty():
-		# Show message: no bench members available
+		# Show message: no bench members available (not a popup in panel stack)
 		var msg_popup := AcceptDialog.new()
 		msg_popup.dialog_text = "No benched party members available."
 		msg_popup.title = "No Bench Members"
@@ -652,30 +661,42 @@ func _show_member_picker(active_slot: int) -> void:
 		msg_popup.canceled.connect(func(): msg_popup.queue_free())
 		return
 
-	# Create picker popup
-	var picker := ConfirmationDialog.new()
-	picker.title = "Select Bench Member"
-	picker.max_size = Vector2(400, 500)  # Max height is 500px
+	# Create popup panel using LoadoutPanel pattern
+	var popup_panel: Panel = Panel.new()
+	popup_panel.process_mode = Node.PROCESS_MODE_ALWAYS
+	popup_panel.z_index = 100
+	add_child(popup_panel)
+
+	# Set active popup immediately
+	_active_popup = popup_panel
 
 	# Create content container
-	var vbox := VBoxContainer.new()
+	var vbox: VBoxContainer = VBoxContainer.new()
 	vbox.add_theme_constant_override("separation", 8)
+	popup_panel.add_child(vbox)
 
-	# Add instruction text as a separate label
-	var instruction := Label.new()
-	instruction.text = "Choose a member from the bench to swap into this active slot:"
+	# Title label
+	var title: Label = Label.new()
+	title.text = "Select Bench Member"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 14)
+	vbox.add_child(title)
+
+	# Instruction text
+	var instruction: Label = Label.new()
+	instruction.text = "Choose a member to swap into the active slot:"
 	instruction.add_theme_font_size_override("font_size", 10)
 	instruction.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	vbox.add_child(instruction)
 
-	# Add member list (scrollable, will fit within max dialog height)
-	var item_list := ItemList.new()
+	# Item list
+	var item_list: ItemList = ItemList.new()
 	item_list.custom_minimum_size = Vector2(280, 150)
 	item_list.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	vbox.add_child(item_list)
 
-	# Get roster for accurate name lookup
+	# Populate list with bench members
 	var roster: Dictionary = _read_roster()
-
 	for bench_id in bench_ids:
 		var display_name: String = _label_for_id(bench_id, roster)
 		var level: int = 1
@@ -686,21 +707,42 @@ func _show_member_picker(active_slot: int) -> void:
 		item_list.add_item("%s (Lv %d)" % [display_name, level])
 		item_list.set_item_metadata(item_list.item_count - 1, bench_id)
 
-	vbox.add_child(item_list)
-	picker.add_child(vbox)
-	add_child(picker)
+	# Add Back button
+	var back_btn: Button = Button.new()
+	back_btn.text = "Back"
+	back_btn.pressed.connect(_popup_cancel_switch)
+	vbox.add_child(back_btn)
 
-	picker.confirmed.connect(func():
-		var selected_idx: int = item_list.get_selected_items()[0] if item_list.get_selected_items().size() > 0 else -1
-		if selected_idx >= 0:
-			var selected_id: String = String(item_list.get_item_metadata(selected_idx))
-			_perform_swap(active_slot, selected_id)
-		picker.queue_free()
-	)
-	picker.canceled.connect(func(): picker.queue_free())
+	# Auto-size panel - wait two frames for proper layout
+	await get_tree().process_frame
+	await get_tree().process_frame
+	popup_panel.size = vbox.size + Vector2(20, 20)
+	vbox.position = Vector2(10, 10)
 
-	# Center the dialog (will auto-size within max_size constraint)
-	picker.popup_centered()
+	# Center popup on screen
+	var viewport_size: Vector2 = get_viewport_rect().size
+	popup_panel.position = (viewport_size - popup_panel.size) / 2.0
+	print("[StatusPanel] Switch popup centered at: %s, size: %s" % [popup_panel.position, popup_panel.size])
+
+	# Store metadata
+	popup_panel.set_meta("_is_switch_popup", true)
+	popup_panel.set_meta("_active_slot", active_slot)
+	popup_panel.set_meta("_item_list", item_list)
+
+	# Push popup to aPanelManager stack
+	var panel_mgr = get_node_or_null("/root/aPanelManager")
+	if panel_mgr:
+		panel_mgr.push_panel(popup_panel)
+		print("[StatusPanel] Pushed switch popup to aPanelManager stack")
+
+	# Set state to POPUP_ACTIVE
+	_nav_state = NavState.POPUP_ACTIVE
+
+	# Select first item and grab focus
+	if item_list.item_count > 0:
+		item_list.select(0)
+		await get_tree().process_frame
+		item_list.grab_focus()
 
 func _perform_swap(active_slot: int, bench_member_id: String) -> void:
 	if not _gs or not _gs.has_method("swap_active_bench"): return
@@ -716,122 +758,253 @@ func _perform_swap(active_slot: int, bench_member_id: String) -> void:
 		error_popup.popup_centered()
 		error_popup.confirmed.connect(func(): error_popup.queue_free())
 
+func _popup_accept_switch() -> void:
+	"""User pressed A/Accept on switch popup - perform member swap"""
+	if not _active_popup or not is_instance_valid(_active_popup):
+		return
+
+	var item_list = _active_popup.get_meta("_item_list", null)
+	var active_slot = _active_popup.get_meta("_active_slot", -1)
+
+	if not item_list or active_slot < 0:
+		print("[StatusPanel] Switch popup missing metadata")
+		_popup_cancel_switch()
+		return
+
+	var selected_items = item_list.get_selected_items()
+	if selected_items.is_empty():
+		print("[StatusPanel] No member selected")
+		return
+
+	var selected_idx = selected_items[0]
+	var bench_member_id: String = String(item_list.get_item_metadata(selected_idx))
+
+	print("[StatusPanel] Swapping slot %d with bench member: %s" % [active_slot, bench_member_id])
+
+	# Close popup first
+	_popup_close_and_return_to_content()
+
+	# Perform swap
+	_perform_swap(active_slot, bench_member_id)
+
+func _popup_cancel_switch() -> void:
+	"""User pressed Back on switch popup - close without swapping"""
+	print("[StatusPanel] Switch popup cancelled")
+	_popup_close_and_return_to_content()
+
+func _popup_close_and_return_to_content() -> void:
+	"""Close popup and return to CONTENT state"""
+	if not _active_popup or not is_instance_valid(_active_popup):
+		return
+
+	print("[StatusPanel] Closing popup, returning to content mode")
+
+	# Store popup reference and clear BEFORE popping
+	var popup_to_close = _active_popup
+	_active_popup = null
+
+	# CRITICAL: Set state to CONTENT BEFORE popping
+	_nav_state = NavState.CONTENT
+
+	# Pop from panel manager
+	var panel_mgr = get_node_or_null("/root/aPanelManager")
+	if panel_mgr and panel_mgr.has_method("pop_panel"):
+		panel_mgr.call("pop_panel")
+		print("[StatusPanel] Popped switch popup from aPanelManager")
+
+	# Free the popup
+	if is_instance_valid(popup_to_close):
+		popup_to_close.queue_free()
+
+	# Restore focus to first button in content
+	call_deferred("_navigate_to_content")
+
 func _show_recovery_popup(member_id: String, member_name: String, hp: int, hp_max: int, mp: int, mp_max: int) -> void:
-	"""Show recovery item selection popup for a party member"""
+	"""Show recovery item selection popup - LoadoutPanel pattern"""
+	# Prevent multiple popups
+	if _active_popup and is_instance_valid(_active_popup):
+		print("[StatusPanel] Popup already open, ignoring request")
+		return
+
 	# Get inventory system
 	var inv_sys = get_node_or_null("/root/aInventorySystem")
 	if not inv_sys:
 		print("[StatusPanel] No inventory system found")
 		return
 
-	# Get recovery items from inventory
-	var hp_items: Array = []
-	var mp_items: Array = []
+	# Get recovery items from inventory by category "recovery"
+	var recovery_items: Array = []
 
-	# Check if inventory has methods to get items by category
 	if inv_sys.has_method("get_items_by_category"):
-		hp_items = inv_sys.call("get_items_by_category", "hp_recovery")
-		mp_items = inv_sys.call("get_items_by_category", "mp_recovery")
-	elif inv_sys.has_method("get_all_item_ids"):
-		# Fallback: get all items and filter manually
+		# Try getting items by "recovery" category first
+		var items_variant = inv_sys.call("get_items_by_category", "recovery")
+		if typeof(items_variant) == TYPE_ARRAY:
+			recovery_items = items_variant
+			print("[StatusPanel] Found %d items in 'recovery' category" % recovery_items.size())
+
+	# If no items found by category, fall back to manual filtering
+	if recovery_items.is_empty() and inv_sys.has_method("get_all_item_ids"):
+		print("[StatusPanel] Falling back to manual category filtering")
 		var all_ids = inv_sys.call("get_all_item_ids")
 		for item_id in all_ids:
-			if inv_sys.has_method("get_count"):
+			if inv_sys.has_method("get_count") and inv_sys.has_method("get_def"):
 				var count = inv_sys.call("get_count", item_id)
 				if count > 0:
-					if inv_sys.has_method("get_def"):
-						var def_data = inv_sys.call("get_def", item_id)
-						if typeof(def_data) == TYPE_DICTIONARY:
-							var category = String(def_data.get("category", "")).to_lower()
-							if category.contains("hp") or category.contains("health"):
-								hp_items.append(item_id)
-							elif category.contains("mp") or category.contains("mana") or category.contains("magic"):
-								mp_items.append(item_id)
+					var def_data = inv_sys.call("get_def", item_id)
+					if typeof(def_data) == TYPE_DICTIONARY:
+						var category = String(def_data.get("category", "")).to_lower()
+						if category == "recovery" or category.contains("recovery") or category.contains("heal") or category.contains("potion"):
+							recovery_items.append(item_id)
+							print("[StatusPanel] Added recovery item: %s (category: %s)" % [item_id, category])
 
-	# Create picker popup
-	var picker := ConfirmationDialog.new()
-	picker.title = "Recovery - %s" % member_name
-	picker.max_size = Vector2(400, 500)
+	print("[StatusPanel] Total recovery items found: %d" % recovery_items.size())
+
+	# Create popup panel using LoadoutPanel pattern
+	var popup_panel: Panel = Panel.new()
+	popup_panel.process_mode = Node.PROCESS_MODE_ALWAYS
+	popup_panel.z_index = 100
+	add_child(popup_panel)
+
+	# Set active popup immediately
+	_active_popup = popup_panel
 
 	# Create content container
-	var vbox := VBoxContainer.new()
+	var vbox: VBoxContainer = VBoxContainer.new()
 	vbox.add_theme_constant_override("separation", 8)
+	popup_panel.add_child(vbox)
 
-	# Add instruction text
-	var instruction := Label.new()
-	instruction.text = "Select a recovery item to use on %s:" % member_name
-	instruction.add_theme_font_size_override("font_size", 10)
-	instruction.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	vbox.add_child(instruction)
+	# Title label
+	var title: Label = Label.new()
+	title.text = "Recovery - %s" % member_name
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 14)
+	vbox.add_child(title)
 
-	# Add member status display
-	var status_label := Label.new()
+	# Member status display
+	var status_label: Label = Label.new()
 	status_label.text = "HP: %d/%d  |  MP: %d/%d" % [hp, hp_max, mp, mp_max]
 	status_label.add_theme_font_size_override("font_size", 10)
 	status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vbox.add_child(status_label)
 
-	# Add item list
-	var item_list := ItemList.new()
+	# Item list
+	var item_list: ItemList = ItemList.new()
 	item_list.custom_minimum_size = Vector2(280, 200)
 	item_list.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	vbox.add_child(item_list)
 
-	# Add HP recovery items
-	if hp_items.size() > 0:
-		item_list.add_item("=== HP RECOVERY ===")
-		item_list.set_item_disabled(item_list.item_count - 1, true)
-		item_list.set_item_custom_fg_color(item_list.item_count - 1, Color(1, 0.7, 0.75, 1))
-
-		for item_id in hp_items:
-			if inv_sys.has_method("get_count") and inv_sys.has_method("get_def"):
-				var count = inv_sys.call("get_count", item_id)
-				var def_data = inv_sys.call("get_def", item_id)
-				if typeof(def_data) == TYPE_DICTIONARY and count > 0:
-					var item_name = String(def_data.get("name", item_id))
-					item_list.add_item("%s (x%d)" % [item_name, count])
-					item_list.set_item_metadata(item_list.item_count - 1, {"id": item_id, "type": "hp"})
-
-	# Add MP recovery items
-	if mp_items.size() > 0:
-		if hp_items.size() > 0:
-			item_list.add_item("")  # Spacer
-			item_list.set_item_disabled(item_list.item_count - 1, true)
-		item_list.add_item("=== MP RECOVERY ===")
-		item_list.set_item_disabled(item_list.item_count - 1, true)
-		item_list.set_item_custom_fg_color(item_list.item_count - 1, Color(1, 0.7, 0.75, 1))
-
-		for item_id in mp_items:
-			if inv_sys.has_method("get_count") and inv_sys.has_method("get_def"):
-				var count = inv_sys.call("get_count", item_id)
-				var def_data = inv_sys.call("get_def", item_id)
-				if typeof(def_data) == TYPE_DICTIONARY and count > 0:
-					var item_name = String(def_data.get("name", item_id))
-					item_list.add_item("%s (x%d)" % [item_name, count])
-					item_list.set_item_metadata(item_list.item_count - 1, {"id": item_id, "type": "mp"})
-
-	# If no items, show message
-	if hp_items.size() == 0 and mp_items.size() == 0:
+	# Populate list with recovery items
+	if recovery_items.is_empty():
 		item_list.add_item("No recovery items available")
 		item_list.set_item_disabled(0, true)
+	else:
+		for item_id in recovery_items:
+			if inv_sys.has_method("get_count") and inv_sys.has_method("get_def"):
+				var count = inv_sys.call("get_count", item_id)
+				var def_data = inv_sys.call("get_def", item_id)
+				if typeof(def_data) == TYPE_DICTIONARY and count > 0:
+					var item_name = String(def_data.get("name", item_id))
+					var item_type = String(def_data.get("effect_type", "hp"))  # hp or mp
+					item_list.add_item("%s (x%d)" % [item_name, count])
+					item_list.set_item_metadata(item_list.item_count - 1, {"id": item_id, "type": item_type})
 
-	vbox.add_child(item_list)
-	picker.add_child(vbox)
-	add_child(picker)
+	# Add Back button
+	var back_btn: Button = Button.new()
+	back_btn.text = "Back"
+	back_btn.pressed.connect(_popup_cancel_recovery)
+	vbox.add_child(back_btn)
 
-	picker.confirmed.connect(func():
-		var selected_idx: int = item_list.get_selected_items()[0] if item_list.get_selected_items().size() > 0 else -1
-		if selected_idx >= 0:
-			var meta = item_list.get_item_metadata(selected_idx)
-			if typeof(meta) == TYPE_DICTIONARY:
-				var item_id = String(meta.get("id", ""))
-				var item_type = String(meta.get("type", ""))
-				_use_recovery_item(member_id, member_name, item_id, item_type, hp, hp_max, mp, mp_max)
-		picker.queue_free()
-	)
-	picker.canceled.connect(func(): picker.queue_free())
+	# Auto-size panel - wait two frames
+	await get_tree().process_frame
+	await get_tree().process_frame
+	popup_panel.size = vbox.size + Vector2(20, 20)
+	vbox.position = Vector2(10, 10)
 
-	# Center the dialog
-	picker.popup_centered()
+	# Center popup on screen
+	var viewport_size: Vector2 = get_viewport_rect().size
+	popup_panel.position = (viewport_size - popup_panel.size) / 2.0
+	print("[StatusPanel] Recovery popup centered at: %s, size: %s" % [popup_panel.position, popup_panel.size])
+
+	# Store metadata
+	popup_panel.set_meta("_is_recovery_popup", true)
+	popup_panel.set_meta("_member_id", member_id)
+	popup_panel.set_meta("_member_name", member_name)
+	popup_panel.set_meta("_hp", hp)
+	popup_panel.set_meta("_hp_max", hp_max)
+	popup_panel.set_meta("_mp", mp)
+	popup_panel.set_meta("_mp_max", mp_max)
+	popup_panel.set_meta("_item_list", item_list)
+
+	# Push popup to aPanelManager stack
+	var panel_mgr = get_node_or_null("/root/aPanelManager")
+	if panel_mgr:
+		panel_mgr.push_panel(popup_panel)
+		print("[StatusPanel] Pushed recovery popup to aPanelManager stack")
+
+	# Set state to POPUP_ACTIVE
+	_nav_state = NavState.POPUP_ACTIVE
+
+	# Select first non-disabled item and grab focus
+	if item_list.item_count > 0:
+		var first_enabled = 0
+		for i in range(item_list.item_count):
+			if not item_list.is_item_disabled(i):
+				first_enabled = i
+				break
+		item_list.select(first_enabled)
+		await get_tree().process_frame
+		item_list.grab_focus()
+
+func _popup_accept_recovery() -> void:
+	"""User pressed A/Accept on recovery popup - use selected item"""
+	if not _active_popup or not is_instance_valid(_active_popup):
+		return
+
+	var item_list = _active_popup.get_meta("_item_list", null)
+	var member_id = _active_popup.get_meta("_member_id", "")
+	var member_name = _active_popup.get_meta("_member_name", "")
+	var hp = _active_popup.get_meta("_hp", 0)
+	var hp_max = _active_popup.get_meta("_hp_max", 0)
+	var mp = _active_popup.get_meta("_mp", 0)
+	var mp_max = _active_popup.get_meta("_mp_max", 0)
+
+	if not item_list:
+		print("[StatusPanel] Recovery popup missing item_list")
+		_popup_cancel_recovery()
+		return
+
+	var selected_items = item_list.get_selected_items()
+	if selected_items.is_empty():
+		print("[StatusPanel] No item selected")
+		return
+
+	var selected_idx = selected_items[0]
+
+	# Check if it's a disabled item (shouldn't happen but be safe)
+	if item_list.is_item_disabled(selected_idx):
+		print("[StatusPanel] Selected item is disabled")
+		return
+
+	var meta = item_list.get_item_metadata(selected_idx)
+	if typeof(meta) != TYPE_DICTIONARY:
+		print("[StatusPanel] Invalid metadata for selected item")
+		return
+
+	var item_id: String = String(meta.get("id", ""))
+	var item_type: String = String(meta.get("type", "hp"))
+
+	print("[StatusPanel] Using recovery item: %s (type: %s) on %s" % [item_id, item_type, member_name])
+
+	# Close popup first
+	_popup_close_and_return_to_content()
+
+	# Use the item
+	_use_recovery_item(member_id, member_name, item_id, item_type, hp, hp_max, mp, mp_max)
+
+func _popup_cancel_recovery() -> void:
+	"""User pressed Back on recovery popup - close without using item"""
+	print("[StatusPanel] Recovery popup cancelled")
+	_popup_close_and_return_to_content()
 
 func _use_recovery_item(member_id: String, member_name: String, item_id: String, item_type: String, hp: int, hp_max: int, mp: int, mp_max: int) -> void:
 	"""Use a recovery item on a party member"""
@@ -1384,69 +1557,136 @@ func _find_buttons_recursive(node: Node, buttons: Array[Button]) -> void:
 		_find_buttons_recursive(child, buttons)
 
 func _input(event: InputEvent) -> void:
-	"""Handle controller input - prioritize menu slide over other navigation"""
-	# Only handle when visible
+	"""Handle controller input - LoadoutPanel pattern with state machine
+
+	State Flow:
+	  MENU → (Right) → CONTENT → (Recovery/Switch btn) → POPUP_ACTIVE
+	  POPUP_ACTIVE → (Accept/Back) → CONTENT
+	  CONTENT → (Left) → MENU
+	  MENU → (Back) → Pop panel (exit StatusPanel)
+	"""
+
+	# STATE 1: POPUP_ACTIVE - Handle even when not visible (popup is on top in panel stack)
+	if _nav_state == NavState.POPUP_ACTIVE:
+		_handle_popup_input(event)
+		# NOTE: _handle_popup_input decides which inputs to mark as handled
+		return
+
+	# Only handle other states when visible
 	if not visible or not _tab_list:
 		return
 
-	# Check if we're in MENU_MAIN context (not in a fullscreen panel)
+	# Check if we're in MENU_MAIN context
 	if _ctrl_mgr and _ctrl_mgr.get_current_context() != _ctrl_mgr.InputContext.MENU_MAIN:
 		return
 
+	# STATE 2: MENU - Tab list navigation
+	if _nav_state == NavState.MENU:
+		_handle_menu_input(event)
+		return
+
+	# STATE 3: CONTENT - Content buttons navigation
+	if _nav_state == NavState.CONTENT:
+		_handle_content_input(event)
+		return
+
+## ─────────────────────── STATE 1: POPUP_ACTIVE ───────────────────────
+
+func _handle_popup_input(event: InputEvent) -> void:
+	"""Handle input when popup is active (switch or recovery popup)"""
+	if event.is_action_pressed("menu_accept"):
+		# Route to appropriate handler based on popup type
+		if _active_popup and _active_popup.get_meta("_is_recovery_popup", false):
+			_popup_accept_recovery()
+		elif _active_popup and _active_popup.get_meta("_is_switch_popup", false):
+			_popup_accept_switch()
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("menu_back"):
+		# Cancel popup
+		if _active_popup and _active_popup.get_meta("_is_recovery_popup", false):
+			_popup_cancel_recovery()
+		elif _active_popup and _active_popup.get_meta("_is_switch_popup", false):
+			_popup_cancel_switch()
+		get_viewport().set_input_as_handled()
+	# UP/DOWN navigation is NOT handled - let ItemList handle it
+
+## ─────────────────────── STATE 2: MENU ───────────────────────
+
+func _handle_menu_input(event: InputEvent) -> void:
+	"""Handle input in MENU state - tab list navigation"""
 	# Handle RIGHT: navigate to content OR hide menu
 	if event.is_action_pressed("move_right"):
 		# If tab list has focus, navigate to first button in content area
 		if _tab_list.has_focus():
+			_nav_state = NavState.CONTENT
 			_navigate_to_content()
 			get_viewport().set_input_as_handled()
 			return
-		# Otherwise, if menu is visible and content has focus, hide menu
+		# Otherwise, if menu is visible, hide menu
 		elif _menu_visible:
 			_hide_menu()
 			get_viewport().set_input_as_handled()
 			return
 
-	# Handle LEFT: navigate back to menu OR show menu
+	# Handle LEFT: show menu if hidden
 	elif event.is_action_pressed("move_left"):
-		# If content has focus, navigate back to tab list
-		if not _tab_list.has_focus():
-			_tab_list.grab_focus()
-			get_viewport().set_input_as_handled()
-			return
-		# Otherwise, if menu is hidden, show it
-		elif not _menu_visible:
+		if not _menu_visible:
 			_show_menu()
 			get_viewport().set_input_as_handled()
 			return
 
+## ─────────────────────── STATE 3: CONTENT ───────────────────────
+
+func _handle_content_input(event: InputEvent) -> void:
+	"""Handle input in CONTENT state - button navigation"""
+	# Handle LEFT: navigate back to menu
+	if event.is_action_pressed("move_left"):
+		_nav_state = NavState.MENU
+		_tab_list.grab_focus()
+		get_viewport().set_input_as_handled()
+		return
+
+	# Handle RIGHT: hide menu if visible
+	elif event.is_action_pressed("move_right"):
+		if _menu_visible:
+			_hide_menu()
+			get_viewport().set_input_as_handled()
+			return
+
 func _unhandled_input(event: InputEvent) -> void:
-	"""Handle controller input for tab navigation - ItemList handles UP/DOWN automatically"""
+	"""Handle A button activation for tabs and buttons"""
+	# Don't handle if in popup state
+	if _nav_state == NavState.POPUP_ACTIVE:
+		return
+
 	# Only handle when visible
 	if not visible or not _tab_list:
 		return
 
-	# Check if we're in MENU_MAIN context (not in a fullscreen panel)
+	# Check if we're in MENU_MAIN context
 	if _ctrl_mgr and _ctrl_mgr.get_current_context() != _ctrl_mgr.InputContext.MENU_MAIN:
 		return
 
 	# Handle A button
 	if event.is_action_pressed("menu_accept"):
-		# If a button has focus, activate it
-		var focused_control = get_viewport().gui_get_focus_owner()
-		if focused_control is Button:
-			print("[StatusPanel] A button - activating focused button: %s" % (focused_control as Button).text)
-			(focused_control as Button).emit_signal("pressed")
-			get_viewport().set_input_as_handled()
-			return
-
-		# Otherwise, if tab list has focus, activate selected tab
-		if _tab_list.has_focus():
-			var selected_items = _tab_list.get_selected_items()
-			if selected_items.size() > 0:
-				var index = selected_items[0]
-				print("[StatusPanel] A button - confirming selection: %d" % index)
-				_on_tab_item_activated(index)
+		# STATE: CONTENT - Activate focused button (Recovery/Switch)
+		if _nav_state == NavState.CONTENT:
+			var focused_control = get_viewport().gui_get_focus_owner()
+			if focused_control is Button:
+				print("[StatusPanel] A button - activating focused button: %s" % (focused_control as Button).text)
+				(focused_control as Button).emit_signal("pressed")
 				get_viewport().set_input_as_handled()
+				return
+
+		# STATE: MENU - Activate selected tab
+		elif _nav_state == NavState.MENU:
+			if _tab_list.has_focus():
+				var selected_items = _tab_list.get_selected_items()
+				if selected_items.size() > 0:
+					var index = selected_items[0]
+					print("[StatusPanel] A button - confirming selection: %d" % index)
+					_on_tab_item_activated(index)
+					get_viewport().set_input_as_handled()
 
 	# Debug key handling (F9 to dump profiles)
 	if not OS.is_debug_build(): return
