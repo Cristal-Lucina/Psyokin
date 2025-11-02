@@ -615,8 +615,14 @@ func _update_action_buttons() -> void:
 	_assign_room_btn.disabled = not (_selected_member != "" and in_common)
 
 	# Move Out: active if member selected and has a room (not in common)
+	# Changed: Remove view type restriction - allow Move Out in both Placements and Reassignments
 	var has_room: bool = _get_member_room(_selected_member) != ""
-	_move_out_btn.disabled = not (_selected_member != "" and has_room and _current_view == ViewType.REASSIGNMENTS)
+	print("[DormsPanel._update_action_buttons] Move Out button state:")
+	print("  _selected_member: '%s'" % _selected_member)
+	print("  has_room: %s" % has_room)
+	print("  _current_view: %s" % ("PLACEMENTS" if _current_view == ViewType.PLACEMENTS else "REASSIGNMENTS"))
+	_move_out_btn.disabled = not (_selected_member != "" and has_room)
+	print("  button disabled: %s" % _move_out_btn.disabled)
 
 	# Cancel Move: active if in reassignments view and has pending changes
 	_cancel_move_btn.disabled = not (_current_view == ViewType.REASSIGNMENTS and _has_pending_changes())
@@ -683,30 +689,54 @@ func _on_move_out_pressed() -> void:
 		_show_toast("Member is already in the common room.")
 		return
 
-	# Move member to common room (stage for reassignment)
 	var ds: Node = _ds()
 	if not ds:
 		return
 
 	var member_name: String = _get_member_name(_selected_member)
-	var confirmed: bool = await _ask_confirm("Move %s out of room %s?" % [member_name, room_id])
-	if not confirmed:
-		return
 
-	# Stage the move
-	if ds.has_method("stage_vacate_room"):
-		var res: Dictionary = ds.call("stage_vacate_room", room_id)
-		if not bool(res.get("ok", false)):
-			_show_toast(String(res.get("reason", "Cannot move member.")))
+	# Different behavior based on view type
+	if _current_view == ViewType.REASSIGNMENTS:
+		# Reassignments view: Stage the move for Saturday
+		var confirmed: bool = await _ask_confirm("Move %s out of room %s on Saturday?" % [member_name, room_id])
+		if not confirmed:
 			return
 
-	_show_toast("%s moved to common room." % member_name)
+		# Stage the move
+		if ds.has_method("stage_vacate_room"):
+			var res: Dictionary = ds.call("stage_vacate_room", room_id)
+			if not bool(res.get("ok", false)):
+				_show_toast(String(res.get("reason", "Cannot stage move.")))
+				return
+
+		_show_toast("%s will move to common room on Saturday." % member_name)
+	else:
+		# Placements view: Immediate move to common room
+		var confirmed: bool = await _ask_confirm("Move %s out of room %s now?" % [member_name, room_id])
+		if not confirmed:
+			return
+
+		# Immediate move (use vacate_room_now if available, otherwise stage_vacate_room)
+		if ds.has_method("vacate_room_now"):
+			var res: Dictionary = ds.call("vacate_room_now", room_id)
+			if not bool(res.get("ok", false)):
+				_show_toast(String(res.get("reason", "Cannot move member.")))
+				return
+		elif ds.has_method("stage_vacate_room"):
+			# Fallback to staging if immediate method not available
+			var res: Dictionary = ds.call("stage_vacate_room", room_id)
+			if not bool(res.get("ok", false)):
+				_show_toast(String(res.get("reason", "Cannot move member.")))
+				return
+
+		_show_toast("%s moved to common room." % member_name)
+
 	_rebuild()
 
-	# Move cursor to room grid for next selection
-	_push_nav_state(NavState.ROOM_SELECT)
-	_current_room_index = 0
-	_focus_current_room()
+	# Move cursor to roster for next selection
+	_push_nav_state(NavState.ROSTER_SELECT)
+	_current_roster_index = 0
+	_focus_current_roster()
 
 func _on_cancel_move_pressed() -> void:
 	var confirmed: bool = await _ask_confirm("Cancel all pending reassignments?")
