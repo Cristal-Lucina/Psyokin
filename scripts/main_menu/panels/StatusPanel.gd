@@ -368,7 +368,6 @@ func _rebuild_party() -> void:
 	leader_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	leader_header.add_theme_font_size_override("font_size", 16)
 	leader_header.add_theme_color_override("font_color", Color(1, 0.7, 0.75, 1))
-	leader_header.underline = true
 	_party.add_child(leader_header)
 
 	if party_ids.size() > 0:
@@ -383,7 +382,6 @@ func _rebuild_party() -> void:
 	active_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	active_header.add_theme_font_size_override("font_size", 16)
 	active_header.add_theme_color_override("font_color", Color(1, 0.7, 0.75, 1))
-	active_header.underline = true
 	_party.add_child(active_header)
 
 	for slot_idx in range(1, 3):  # Slots 1 and 2
@@ -401,7 +399,6 @@ func _rebuild_party() -> void:
 	bench_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	bench_header.add_theme_font_size_override("font_size", 16)
 	bench_header.add_theme_color_override("font_color", Color(1, 0.7, 0.75, 1))
-	bench_header.underline = true
 	_party.add_child(bench_header)
 
 	# Only show bench slots that have members (hide empty slots)
