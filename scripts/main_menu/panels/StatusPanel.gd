@@ -490,7 +490,17 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 		hp_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		hp_bar.custom_minimum_size.y = 8  # Half height (was ~16px default)
 		hp_bar.show_percentage = false  # Remove percentage text
-		hp_bar.modulate = Color(0.5, 0.8, 1.0)  # Light blue
+
+		# Create pale pink background (backing bar)
+		var hp_bg := StyleBoxFlat.new()
+		hp_bg.bg_color = Color(1.0, 0.8, 0.85)  # Pale pink
+		hp_bar.add_theme_stylebox_override("background", hp_bg)
+
+		# Create bright pink fill (current HP)
+		var hp_fill := StyleBoxFlat.new()
+		hp_fill.bg_color = Color(1.0, 0.3, 0.5)  # Bright pink
+		hp_bar.add_theme_stylebox_override("fill", hp_fill)
+
 		hp_bar.min_value = 0.0
 		hp_bar.max_value = float(hp_max_i)
 		hp_bar.value = clamp(float(hp_i), 0.0, float(hp_max_i))
@@ -524,7 +534,17 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 		mp_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		mp_bar.custom_minimum_size.y = 8  # Half height (was ~16px default)
 		mp_bar.show_percentage = false  # Remove percentage text
-		mp_bar.modulate = Color(1.0, 0.7, 0.85)  # Light pink
+
+		# Create pale light blue background (backing bar)
+		var mp_bg := StyleBoxFlat.new()
+		mp_bg.bg_color = Color(0.8, 0.9, 1.0)  # Pale light blue
+		mp_bar.add_theme_stylebox_override("background", mp_bg)
+
+		# Create bright blue fill (current MP)
+		var mp_fill := StyleBoxFlat.new()
+		mp_fill.bg_color = Color(0.3, 0.6, 1.0)  # Bright blue
+		mp_bar.add_theme_stylebox_override("fill", mp_fill)
+
 		mp_bar.min_value = 0.0
 		mp_bar.max_value = float(mp_max_i)
 		mp_bar.value = clamp(float(mp_i), 0.0, float(mp_max_i))
