@@ -683,17 +683,28 @@ func _on_assign_room_pressed() -> void:
 	_show_toast("Select a room to assign %s." % _get_member_name(_selected_member))
 
 func _on_move_out_pressed() -> void:
+	print("[DormsPanel._on_move_out_pressed] Move Out button pressed")
+
 	if _selected_member == "":
 		_show_toast("Please select a member from the roster first.")
 		return
 
 	var room_id: String = _get_member_room(_selected_member)
+	print("[DormsPanel._on_move_out_pressed] Selected member: %s, room: %s" % [_selected_member, room_id])
+
 	if room_id == "":
 		_show_toast("Member is already in the common room.")
 		return
 
 	var ds: Node = _ds()
 	if not ds:
+		print("[DormsPanel._on_move_out_pressed] ERROR: DormSystem not found")
+		return
+
+	# Check if reassignment can start today (Sunday only)
+	if ds.has_method("can_start_reassignment_today") and not bool(ds.call("can_start_reassignment_today")):
+		print("[DormsPanel._on_move_out_pressed] Not Sunday - cannot start reassignment")
+		_show_toast("Room reassignment can only be started on Sunday.")
 		return
 
 	var member_name: String = _get_member_name(_selected_member)
@@ -704,23 +715,34 @@ func _on_move_out_pressed() -> void:
 		_current_view = ViewType.REASSIGNMENTS
 		if _view_type_filter:
 			_view_type_filter.select(1)  # Select Reassignments
+		_rebuild()  # Rebuild to update view
 
 	# Confirm staging the move
+	print("[DormsPanel._on_move_out_pressed] Showing confirmation dialog")
 	var confirmed: bool = await _ask_confirm("Move %s out of room %s?\n(Change will take effect on Saturday)" % [member_name, room_id])
+	print("[DormsPanel._on_move_out_pressed] Confirmed: %s" % confirmed)
+
 	if not confirmed:
 		return
 
 	# Stage the move for Saturday
+	print("[DormsPanel._on_move_out_pressed] Calling stage_vacate_room for room: %s" % room_id)
 	if ds.has_method("stage_vacate_room"):
 		var res: Dictionary = ds.call("stage_vacate_room", room_id)
+		print("[DormsPanel._on_move_out_pressed] Result: %s" % res)
+
 		if not bool(res.get("ok", false)):
-			_show_toast(String(res.get("reason", "Cannot stage move.")))
+			var reason: String = String(res.get("reason", "Cannot stage move."))
+			print("[DormsPanel._on_move_out_pressed] ERROR: %s" % reason)
+			_show_toast(reason)
 			return
 	else:
+		print("[DormsPanel._on_move_out_pressed] ERROR: stage_vacate_room method not found")
 		_show_toast("DormSystem doesn't support staging moves.")
 		return
 
-	_show_toast("%s will move to common room on Saturday." % member_name)
+	print("[DormsPanel._on_move_out_pressed] Success - rebuilding panel")
+	_show_toast("%s staged for common room on Saturday." % member_name)
 	_rebuild()
 
 	# Keep cursor on roster for selecting more members to move out
