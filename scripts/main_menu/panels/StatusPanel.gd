@@ -443,46 +443,21 @@ func _create_empty_slot(slot_type: String, slot_idx: int) -> PanelContainer:
 
 func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot: int) -> PanelContainer:
 	var panel := PanelContainer.new()
-	var vbox := VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 2)
 
-	# Top row: Name + Switch button
-	var top_row := HBoxContainer.new()
-	top_row.add_theme_constant_override("separation", 8)
+	# Main horizontal container: member info on left, buttons on right
+	var main_hbox := HBoxContainer.new()
+	main_hbox.add_theme_constant_override("separation", 12)
 
+	# Left side: Member info (name + stats)
+	var info_vbox := VBoxContainer.new()
+	info_vbox.add_theme_constant_override("separation", 2)
+	info_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+
+	# Name label
 	var name_lbl := Label.new()
 	name_lbl.text = String(member_data.get("name", "Member"))
-	name_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	name_lbl.add_theme_font_size_override("font_size", 10)
-	top_row.add_child(name_lbl)
-
-	# Recovery button (always shown for all members)
-	var recovery_btn := Button.new()
-	recovery_btn.text = "Recovery"
-	recovery_btn.custom_minimum_size.x = 70
-	recovery_btn.add_theme_font_size_override("font_size", 10)
-	recovery_btn.focus_mode = Control.FOCUS_ALL  # Make sure button can receive focus
-	var member_id: String = String(member_data.get("_member_id", ""))
-	recovery_btn.set_meta("member_id", member_id)
-	recovery_btn.set_meta("member_name", String(member_data.get("name", "Member")))
-	recovery_btn.set_meta("hp", int(member_data.get("hp", 0)))
-	recovery_btn.set_meta("hp_max", int(member_data.get("hp_max", 0)))
-	recovery_btn.set_meta("mp", int(member_data.get("mp", 0)))
-	recovery_btn.set_meta("mp_max", int(member_data.get("mp_max", 0)))
-	recovery_btn.pressed.connect(_on_recovery_pressed.bind(recovery_btn))
-	top_row.add_child(recovery_btn)
-	print("[StatusPanel] Created Recovery button for %s" % String(member_data.get("name", "Member")))
-
-	if show_switch:
-		var switch_btn := Button.new()
-		switch_btn.text = "Switch"
-		switch_btn.custom_minimum_size.x = 60
-		switch_btn.add_theme_font_size_override("font_size", 10)
-		switch_btn.set_meta("active_slot", active_slot)
-		switch_btn.pressed.connect(_on_switch_pressed.bind(active_slot))
-		top_row.add_child(switch_btn)
-
-	vbox.add_child(top_row)
+	info_vbox.add_child(name_lbl)
 
 	# HP/MP stats row (side by side)
 	var stats_row := HBoxContainer.new()
@@ -556,9 +531,47 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 		mp_section.add_child(mp_bar)
 
 	stats_row.add_child(mp_section)
-	vbox.add_child(stats_row)
+	info_vbox.add_child(stats_row)
+	main_hbox.add_child(info_vbox)
 
-	panel.add_child(vbox)
+	# Right side: Buttons (stacked vertically)
+	var buttons_vbox := VBoxContainer.new()
+	buttons_vbox.add_theme_constant_override("separation", 4)
+
+	# Recovery button (always shown for all members)
+	var recovery_btn := Button.new()
+	recovery_btn.text = "Recovery"
+	recovery_btn.custom_minimum_size.x = 70
+	recovery_btn.add_theme_font_size_override("font_size", 10)
+	recovery_btn.focus_mode = Control.FOCUS_ALL
+	var member_id: String = String(member_data.get("_member_id", ""))
+	recovery_btn.set_meta("member_id", member_id)
+	recovery_btn.set_meta("member_name", String(member_data.get("name", "Member")))
+	recovery_btn.set_meta("hp", int(member_data.get("hp", 0)))
+	recovery_btn.set_meta("hp_max", int(member_data.get("hp_max", 0)))
+	recovery_btn.set_meta("mp", int(member_data.get("mp", 0)))
+	recovery_btn.set_meta("mp_max", int(member_data.get("mp_max", 0)))
+	recovery_btn.pressed.connect(_on_recovery_pressed.bind(recovery_btn))
+	buttons_vbox.add_child(recovery_btn)
+	print("[StatusPanel] Created Recovery button for %s" % String(member_data.get("name", "Member")))
+
+	# Switch button (only for active members)
+	if show_switch:
+		var switch_btn := Button.new()
+		switch_btn.text = "Switch"
+		switch_btn.custom_minimum_size.x = 70
+		switch_btn.add_theme_font_size_override("font_size", 10)
+		switch_btn.focus_mode = Control.FOCUS_ALL
+		switch_btn.set_meta("active_slot", active_slot)
+		switch_btn.pressed.connect(_on_switch_pressed.bind(active_slot))
+		buttons_vbox.add_child(switch_btn)
+
+		# Set up left/right navigation between Recovery and Switch buttons
+		recovery_btn.focus_neighbor_right = recovery_btn.get_path_to(switch_btn)
+		switch_btn.focus_neighbor_left = switch_btn.get_path_to(recovery_btn)
+
+	main_hbox.add_child(buttons_vbox)
+	panel.add_child(main_hbox)
 	return panel
 
 func _get_member_snapshot(member_id: String) -> Dictionary:
@@ -1867,19 +1880,35 @@ func _handle_menu_input(event: InputEvent) -> void:
 
 func _handle_content_input(event: InputEvent) -> void:
 	"""Handle input in CONTENT state - button navigation"""
-	# Handle LEFT: navigate back to menu (and show menu)
-	if event.is_action_pressed("move_left"):
-		print("[StatusPanel] CONTENT → MENU transition (showing menu)")
-		_nav_state = NavState.MENU
-		# Show menu when transitioning back to menu
-		if not _menu_visible:
-			_show_menu()
-		_tab_list.grab_focus()
-		get_viewport().set_input_as_handled()
-		return
+	# Handle LEFT/RIGHT: Check if focused button has focus neighbors first
+	if event.is_action_pressed("move_left") or event.is_action_pressed("move_right"):
+		var focused_control = get_viewport().gui_get_focus_owner()
+		if focused_control is Button:
+			# Check if button has a focus neighbor in the pressed direction
+			if event.is_action_pressed("move_left"):
+				var left_neighbor_path = focused_control.focus_neighbor_left
+				if left_neighbor_path != NodePath(""):
+					# Has a left neighbor - let Godot's focus system handle it
+					print("[StatusPanel] Button has left neighbor, using focus navigation")
+					return
+				else:
+					# No left neighbor - navigate back to menu
+					print("[StatusPanel] CONTENT → MENU transition (showing menu)")
+					_nav_state = NavState.MENU
+					if not _menu_visible:
+						_show_menu()
+					_tab_list.grab_focus()
+					get_viewport().set_input_as_handled()
+					return
+			elif event.is_action_pressed("move_right"):
+				var right_neighbor_path = focused_control.focus_neighbor_right
+				if right_neighbor_path != NodePath(""):
+					# Has a right neighbor - let Godot's focus system handle it
+					print("[StatusPanel] Button has right neighbor, using focus navigation")
+					return
 
 	# Handle BACK: go to menu (don't close panel)
-	elif event.is_action_pressed("menu_back"):
+	if event.is_action_pressed("menu_back"):
 		print("[StatusPanel] Back pressed in CONTENT state - going to MENU")
 		_nav_state = NavState.MENU
 		# Show menu when going back
