@@ -1361,12 +1361,12 @@ func _grab_tab_list_focus() -> void:
 
 func _navigate_to_content() -> void:
 	"""Navigate from tab list to first focusable button in content area"""
-	if not _party_content:
+	if not _party:
 		return
 
 	# Find all buttons in the content area (recursively search children)
 	var buttons: Array[Button] = []
-	_find_buttons_recursive(_party_content, buttons)
+	_find_buttons_recursive(_party, buttons)
 
 	# Focus the first button found
 	if buttons.size() > 0:
