@@ -1226,6 +1226,11 @@ func _apply_recovery_effect(member_id: String, member_name: String, item_id: Str
 					if _gs.has_method("set"):
 						_gs.set("member_data", member_data)
 						print("[StatusPanel] ✓ Persisted changes to GameState.member_data")
+
+					# CRITICAL: Refresh CombatProfileSystem cache so it picks up the new HP/MP values
+					if _cps and _cps.has_method("refresh_member"):
+						_cps.call("refresh_member", member_id)
+						print("[StatusPanel] ✓ Refreshed CombatProfileSystem cache for %s" % member_id)
 	else:
 		print("[StatusPanel] WARNING: Could not apply recovery effect - no suitable system found")
 
