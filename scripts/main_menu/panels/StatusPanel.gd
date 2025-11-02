@@ -1147,14 +1147,25 @@ func _use_recovery_item(member_id: String, member_name: String, item_id: String,
 		if success:
 			print("[StatusPanel] Consumed %s from inventory" % item_id)
 
-			# Apply recovery effect to the party member
-			_apply_recovery_effect(member_id, member_name, item_id, item_type)
+			# Apply recovery effect to the party member and get the heal result
+			var heal_result: Dictionary = _apply_recovery_effect(member_id, member_name, item_id, item_type)
 
 			# Save member_id to restore focus after rebuild
 			_focus_member_id = member_id
 
 			# Refresh party display
 			_rebuild_party()
+
+			# Show confirmation message
+			if heal_result.get("success", false):
+				var heal_amount: int = int(heal_result.get("heal_amount", 0))
+				var healed_type: String = String(heal_result.get("type", "HP")).to_upper()
+				var msg_popup := AcceptDialog.new()
+				msg_popup.dialog_text = "%s has healed %d %s" % [member_name, heal_amount, healed_type]
+				msg_popup.title = "Recovery"
+				add_child(msg_popup)
+				msg_popup.popup_centered()
+				msg_popup.confirmed.connect(func(): msg_popup.queue_free())
 		else:
 			var error_popup := AcceptDialog.new()
 			error_popup.dialog_text = "Failed to use item - you don't have any."
@@ -1165,14 +1176,15 @@ func _use_recovery_item(member_id: String, member_name: String, item_id: String,
 	else:
 		print("[StatusPanel] ERROR: use_item method not found on InventorySystem")
 
-func _apply_recovery_effect(member_id: String, member_name: String, item_id: String, item_type: String) -> void:
-	"""Apply recovery effect to a party member by restoring HP/MP"""
+func _apply_recovery_effect(member_id: String, member_name: String, item_id: String, item_type: String) -> Dictionary:
+	"""Apply recovery effect to a party member by restoring HP/MP
+	Returns: Dictionary with 'success' (bool), 'heal_amount' (int), and 'type' (String)"""
 	print("[StatusPanel] Applying recovery effect: %s to %s (type: %s)" % [item_id, member_name, item_type])
 
 	# Get the item definition to find recovery amount
 	var inv_sys = get_node_or_null("/root/aInventorySystem")
 	if not inv_sys:
-		return
+		return {"success": false, "heal_amount": 0, "type": item_type}
 
 	var item_def: Dictionary = {}
 	if inv_sys.has_method("get_item_def"):
@@ -1201,6 +1213,7 @@ func _apply_recovery_effect(member_id: String, member_name: String, item_id: Str
 	print("[StatusPanel] Recovery: %d%s %s" % [recovery_amount, "%" if is_percentage else "", item_type.to_upper()])
 
 	# Apply effect to GameState.member_data directly
+	var actual_heal_amount: int = 0
 	if _gs and _gs.has_method("get"):
 		var member_data_v = _gs.get("member_data")
 		if typeof(member_data_v) == TYPE_DICTIONARY:
@@ -1217,8 +1230,10 @@ func _apply_recovery_effect(member_id: String, member_name: String, item_id: Str
 						if is_percentage:
 							heal_amount = int(float(max_hp) * float(recovery_amount) / 100.0)
 
-						member_dict["hp"] = min(current_hp + heal_amount, max_hp)
-						print("[StatusPanel] ✓ Restored %d HP to %s (now: %d/%d)" % [heal_amount, member_name, member_dict["hp"], max_hp])
+						var new_hp = min(current_hp + heal_amount, max_hp)
+						actual_heal_amount = new_hp - current_hp
+						member_dict["hp"] = new_hp
+						print("[StatusPanel] ✓ Restored %d HP to %s (now: %d/%d)" % [actual_heal_amount, member_name, member_dict["hp"], max_hp])
 
 					elif item_type == "mp":
 						var current_mp = int(member_dict.get("mp", 0))
@@ -1229,8 +1244,10 @@ func _apply_recovery_effect(member_id: String, member_name: String, item_id: Str
 						if is_percentage:
 							heal_amount = int(float(max_mp) * float(recovery_amount) / 100.0)
 
-						member_dict["mp"] = min(current_mp + heal_amount, max_mp)
-						print("[StatusPanel] ✓ Restored %d MP to %s (now: %d/%d)" % [heal_amount, member_name, member_dict["mp"], max_mp])
+						var new_mp = min(current_mp + heal_amount, max_mp)
+						actual_heal_amount = new_mp - current_mp
+						member_dict["mp"] = new_mp
+						print("[StatusPanel] ✓ Restored %d MP to %s (now: %d/%d)" % [actual_heal_amount, member_name, member_dict["mp"], max_mp])
 
 					# Update the member_data entry
 					member_data[member_id] = member_dict
@@ -1244,8 +1261,11 @@ func _apply_recovery_effect(member_id: String, member_name: String, item_id: Str
 					if _cps and _cps.has_method("refresh_member"):
 						_cps.call("refresh_member", member_id)
 						print("[StatusPanel] ✓ Refreshed CombatProfileSystem cache for %s" % member_id)
-	else:
-		print("[StatusPanel] WARNING: Could not apply recovery effect - no suitable system found")
+
+					return {"success": true, "heal_amount": actual_heal_amount, "type": item_type}
+
+	print("[StatusPanel] WARNING: Could not apply recovery effect - no suitable system found")
+	return {"success": false, "heal_amount": 0, "type": item_type}
 
 # Prefer CPS for real-time party pools
 func _get_party_snapshot() -> Array:
