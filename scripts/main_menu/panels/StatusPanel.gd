@@ -626,6 +626,80 @@ func _on_recovery_pressed(button: Button) -> void:
 	print("[StatusPanel] Recovery button pressed for %s (ID: %s)" % [member_name, member_id])
 	_show_recovery_popup(member_id, member_name, hp, hp_max, mp, mp_max)
 
+func _show_no_bench_notice() -> void:
+	"""Show 'no bench members' notice using Panel pattern"""
+	# Prevent multiple popups
+	if _active_popup and is_instance_valid(_active_popup):
+		print("[StatusPanel] Popup already open, ignoring request")
+		return
+
+	# Create popup panel
+	var popup_panel: Panel = Panel.new()
+	popup_panel.process_mode = Node.PROCESS_MODE_ALWAYS
+	popup_panel.z_index = 100
+	add_child(popup_panel)
+
+	# Set active popup immediately
+	_active_popup = popup_panel
+
+	# Create content container
+	var vbox: VBoxContainer = VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 8)
+	popup_panel.add_child(vbox)
+
+	# Title label
+	var title: Label = Label.new()
+	title.text = "No Bench Members"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 14)
+	vbox.add_child(title)
+
+	# Message label
+	var message: Label = Label.new()
+	message.text = "No benched party members available."
+	message.add_theme_font_size_override("font_size", 10)
+	message.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	message.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	vbox.add_child(message)
+
+	# Add OK button
+	var ok_btn: Button = Button.new()
+	ok_btn.text = "OK"
+	ok_btn.pressed.connect(_popup_close_notice)
+	vbox.add_child(ok_btn)
+
+	# Auto-size panel - wait two frames
+	await get_tree().process_frame
+	await get_tree().process_frame
+	popup_panel.size = vbox.size + Vector2(20, 20)
+	vbox.position = Vector2(10, 10)
+
+	# Center popup on screen
+	var viewport_size: Vector2 = get_viewport_rect().size
+	popup_panel.position = (viewport_size - popup_panel.size) / 2.0
+	print("[StatusPanel] No-bench notice centered at: %s, size: %s" % [popup_panel.position, popup_panel.size])
+
+	# Store metadata
+	popup_panel.set_meta("_is_notice_popup", true)
+
+	# Push popup to aPanelManager stack
+	var panel_mgr = get_node_or_null("/root/aPanelManager")
+	if panel_mgr:
+		panel_mgr.push_panel(popup_panel)
+		print("[StatusPanel] Pushed no-bench notice to aPanelManager stack")
+
+	# Set state to POPUP_ACTIVE
+	_nav_state = NavState.POPUP_ACTIVE
+
+	# Grab focus on OK button
+	await get_tree().process_frame
+	ok_btn.grab_focus()
+
+func _popup_close_notice() -> void:
+	"""Close notice popup and return to content"""
+	print("[StatusPanel] Notice popup closed")
+	_popup_close_and_return_to_content()
+
 func _show_member_picker(active_slot: int) -> void:
 	"""Show bench member picker popup - LoadoutPanel pattern"""
 	if not _gs: return
@@ -651,14 +725,8 @@ func _show_member_picker(active_slot: int) -> void:
 	print("[StatusPanel] Switch button - Active slot: %d, Bench IDs: %s" % [active_slot, bench_ids])
 
 	if bench_ids.is_empty():
-		# Show message: no bench members available (not a popup in panel stack)
-		var msg_popup := AcceptDialog.new()
-		msg_popup.dialog_text = "No benched party members available."
-		msg_popup.title = "No Bench Members"
-		add_child(msg_popup)
-		msg_popup.popup_centered()
-		msg_popup.confirmed.connect(func(): msg_popup.queue_free())
-		msg_popup.canceled.connect(func(): msg_popup.queue_free())
+		# Show message: no bench members available (using Panel pattern)
+		_show_no_bench_notice()
 		return
 
 	# Create popup panel using LoadoutPanel pattern
@@ -835,17 +903,24 @@ func _show_recovery_popup(member_id: String, member_name: String, hp: int, hp_ma
 	# Get recovery items from inventory by category "recovery"
 	var recovery_items: Array = []
 
+	print("[StatusPanel] Inventory system methods: get_items_by_category=%s, get_all_item_ids=%s" % [
+		inv_sys.has_method("get_items_by_category"),
+		inv_sys.has_method("get_all_item_ids")
+	])
+
 	if inv_sys.has_method("get_items_by_category"):
 		# Try getting items by "recovery" category first
 		var items_variant = inv_sys.call("get_items_by_category", "recovery")
+		print("[StatusPanel] get_items_by_category returned type: %s" % typeof(items_variant))
 		if typeof(items_variant) == TYPE_ARRAY:
 			recovery_items = items_variant
-			print("[StatusPanel] Found %d items in 'recovery' category" % recovery_items.size())
+			print("[StatusPanel] Found %d items in 'recovery' category: %s" % [recovery_items.size(), recovery_items])
 
 	# If no items found by category, fall back to manual filtering
 	if recovery_items.is_empty() and inv_sys.has_method("get_all_item_ids"):
 		print("[StatusPanel] Falling back to manual category filtering")
 		var all_ids = inv_sys.call("get_all_item_ids")
+		print("[StatusPanel] Total items in inventory: %d" % all_ids.size())
 		for item_id in all_ids:
 			if inv_sys.has_method("get_count") and inv_sys.has_method("get_def"):
 				var count = inv_sys.call("get_count", item_id)
@@ -853,9 +928,10 @@ func _show_recovery_popup(member_id: String, member_name: String, hp: int, hp_ma
 					var def_data = inv_sys.call("get_def", item_id)
 					if typeof(def_data) == TYPE_DICTIONARY:
 						var category = String(def_data.get("category", "")).to_lower()
+						print("[StatusPanel] Item %s: count=%d, category='%s'" % [item_id, count, category])
 						if category == "recovery" or category.contains("recovery") or category.contains("heal") or category.contains("potion"):
 							recovery_items.append(item_id)
-							print("[StatusPanel] Added recovery item: %s (category: %s)" % [item_id, category])
+							print("[StatusPanel] ✓ Added recovery item: %s" % item_id)
 
 	print("[StatusPanel] Total recovery items found: %d" % recovery_items.size())
 
@@ -1534,19 +1610,26 @@ func _grab_tab_list_focus() -> void:
 
 func _navigate_to_content() -> void:
 	"""Navigate from tab list to first focusable button in content area"""
+	print("[StatusPanel] _navigate_to_content called, current state: %s" % NavState.keys()[_nav_state])
+
 	if not _party:
+		print("[StatusPanel] ERROR: _party is null!")
 		return
 
 	# Find all buttons in the content area (recursively search children)
 	var buttons: Array[Button] = []
 	_find_buttons_recursive(_party, buttons)
 
+	print("[StatusPanel] Found %d buttons in content area" % buttons.size())
+	for i in range(buttons.size()):
+		print("[StatusPanel]   Button %d: %s" % [i, buttons[i].text])
+
 	# Focus the first button found
 	if buttons.size() > 0:
 		buttons[0].grab_focus()
-		print("[StatusPanel] Navigated to content - focused first button: %s" % buttons[0].text)
+		print("[StatusPanel] ✓ Navigated to content - focused first button: %s" % buttons[0].text)
 	else:
-		print("[StatusPanel] No buttons found in content area")
+		print("[StatusPanel] WARNING: No buttons found in content area")
 
 func _find_buttons_recursive(node: Node, buttons: Array[Button]) -> void:
 	"""Recursively find all Button nodes in a tree"""
@@ -1593,22 +1676,26 @@ func _input(event: InputEvent) -> void:
 ## ─────────────────────── STATE 1: POPUP_ACTIVE ───────────────────────
 
 func _handle_popup_input(event: InputEvent) -> void:
-	"""Handle input when popup is active (switch or recovery popup)"""
+	"""Handle input when popup is active (switch, recovery, or notice popup)"""
 	if event.is_action_pressed("menu_accept"):
 		# Route to appropriate handler based on popup type
 		if _active_popup and _active_popup.get_meta("_is_recovery_popup", false):
 			_popup_accept_recovery()
 		elif _active_popup and _active_popup.get_meta("_is_switch_popup", false):
 			_popup_accept_switch()
+		elif _active_popup and _active_popup.get_meta("_is_notice_popup", false):
+			_popup_close_notice()
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("menu_back"):
-		# Cancel popup
+		# Cancel popup - all popups can be cancelled with back
 		if _active_popup and _active_popup.get_meta("_is_recovery_popup", false):
 			_popup_cancel_recovery()
 		elif _active_popup and _active_popup.get_meta("_is_switch_popup", false):
 			_popup_cancel_switch()
+		elif _active_popup and _active_popup.get_meta("_is_notice_popup", false):
+			_popup_close_notice()
 		get_viewport().set_input_as_handled()
-	# UP/DOWN navigation is NOT handled - let ItemList handle it
+	# UP/DOWN navigation is NOT handled - let ItemList/Button handle it
 
 ## ─────────────────────── STATE 2: MENU ───────────────────────
 
@@ -1618,12 +1705,14 @@ func _handle_menu_input(event: InputEvent) -> void:
 	if event.is_action_pressed("move_right"):
 		# If tab list has focus, navigate to first button in content area
 		if _tab_list.has_focus():
+			print("[StatusPanel] MENU → CONTENT transition")
 			_nav_state = NavState.CONTENT
 			_navigate_to_content()
 			get_viewport().set_input_as_handled()
 			return
 		# Otherwise, if menu is visible, hide menu
 		elif _menu_visible:
+			print("[StatusPanel] Hiding menu (MENU state, RIGHT pressed)")
 			_hide_menu()
 			get_viewport().set_input_as_handled()
 			return
@@ -1631,6 +1720,7 @@ func _handle_menu_input(event: InputEvent) -> void:
 	# Handle LEFT: show menu if hidden
 	elif event.is_action_pressed("move_left"):
 		if not _menu_visible:
+			print("[StatusPanel] Showing menu (MENU state, LEFT pressed)")
 			_show_menu()
 			get_viewport().set_input_as_handled()
 			return
@@ -1641,6 +1731,7 @@ func _handle_content_input(event: InputEvent) -> void:
 	"""Handle input in CONTENT state - button navigation"""
 	# Handle LEFT: navigate back to menu
 	if event.is_action_pressed("move_left"):
+		print("[StatusPanel] CONTENT → MENU transition")
 		_nav_state = NavState.MENU
 		_tab_list.grab_focus()
 		get_viewport().set_input_as_handled()
@@ -1649,6 +1740,7 @@ func _handle_content_input(event: InputEvent) -> void:
 	# Handle RIGHT: hide menu if visible
 	elif event.is_action_pressed("move_right"):
 		if _menu_visible:
+			print("[StatusPanel] Hiding menu (CONTENT state, RIGHT pressed)")
 			_hide_menu()
 			get_viewport().set_input_as_handled()
 			return
@@ -1669,14 +1761,22 @@ func _unhandled_input(event: InputEvent) -> void:
 
 	# Handle A button
 	if event.is_action_pressed("menu_accept"):
+		print("[StatusPanel] A button pressed, state: %s" % NavState.keys()[_nav_state])
+
 		# STATE: CONTENT - Activate focused button (Recovery/Switch)
 		if _nav_state == NavState.CONTENT:
 			var focused_control = get_viewport().gui_get_focus_owner()
+			print("[StatusPanel] Focused control: %s (is Button: %s)" % [
+				focused_control.name if focused_control else "null",
+				focused_control is Button
+			])
 			if focused_control is Button:
-				print("[StatusPanel] A button - activating focused button: %s" % (focused_control as Button).text)
+				print("[StatusPanel] ✓ Activating focused button: %s" % (focused_control as Button).text)
 				(focused_control as Button).emit_signal("pressed")
 				get_viewport().set_input_as_handled()
 				return
+			else:
+				print("[StatusPanel] WARNING: A pressed but no button has focus")
 
 		# STATE: MENU - Activate selected tab
 		elif _nav_state == NavState.MENU:
@@ -1684,7 +1784,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				var selected_items = _tab_list.get_selected_items()
 				if selected_items.size() > 0:
 					var index = selected_items[0]
-					print("[StatusPanel] A button - confirming selection: %d" % index)
+					print("[StatusPanel] A button - confirming tab selection: %d" % index)
 					_on_tab_item_activated(index)
 					get_viewport().set_input_as_handled()
 
