@@ -936,8 +936,8 @@ func _show_recovery_popup(member_id: String, member_name: String, hp: int, hp_ma
 					# Log all owned items with their categories
 					print("[StatusPanel] Owned item: %s (category: '%s', count: %d)" % [item_id, category, count])
 
-					# Check if this is a recovery item
-					if category == "recovery" or category.contains("recovery") or category.contains("heal") or category.contains("potion"):
+					# Check if this is a recovery/consumable item
+					if category == "consumables" or category == "consumable" or category.contains("recovery") or category.contains("heal") or category.contains("potion"):
 						recovery_items.append(item_id)
 						print("[StatusPanel] ✓ This is a recovery item!")
 
