@@ -31,6 +31,17 @@ static func create(message: String) -> ToastPopup:
 func _build_ui() -> void:
 	custom_minimum_size = Vector2(400, 150)
 
+	# Add solid background (no transparency)
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.15, 0.15, 0.15, 1.0)  # Dark gray, fully opaque
+	style.border_color = Color(1.0, 0.7, 0.75, 1.0)  # Pink border
+	style.set_border_width_all(2)
+	style.corner_radius_top_left = 8
+	style.corner_radius_top_right = 8
+	style.corner_radius_bottom_left = 8
+	style.corner_radius_bottom_right = 8
+	add_theme_stylebox_override("panel", style)
+
 	var vbox := VBoxContainer.new()
 	vbox.set_anchors_preset(Control.PRESET_FULL_RECT)
 	vbox.add_theme_constant_override("separation", 12)
