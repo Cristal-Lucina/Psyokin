@@ -165,7 +165,6 @@ enum NavState { MENU, CONTENT, POPUP_ACTIVE }
 var _nav_state: NavState = NavState.MENU
 var _active_popup: Control = null  # Currently open popup panel
 var _focus_member_id: String = ""  # Member ID to focus after rebuild (for Recovery button)
-var _focus_active_slot: int = -1  # Active slot to focus after rebuild (for Switch button)
 
 func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -790,6 +789,81 @@ func _popup_close_heal_confirmation() -> void:
 	print("[StatusPanel] Heal confirmation popup closed")
 	_popup_close_and_return_to_content()
 
+func _show_swap_confirmation(member_name: String, member_id: String) -> void:
+	"""Show swap confirmation message using Panel pattern"""
+	# Prevent multiple popups
+	if _active_popup and is_instance_valid(_active_popup):
+		print("[StatusPanel] Popup already open, ignoring request")
+		return
+
+	# Create popup panel
+	var popup_panel: Panel = Panel.new()
+	popup_panel.process_mode = Node.PROCESS_MODE_ALWAYS
+	popup_panel.z_index = 100
+	add_child(popup_panel)
+
+	# Set active popup immediately
+	_active_popup = popup_panel
+
+	# Create content container
+	var vbox: VBoxContainer = VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 8)
+	vbox.custom_minimum_size.x = 300  # Set panel width to 300px
+	popup_panel.add_child(vbox)
+
+	# Title label
+	var title: Label = Label.new()
+	title.text = "Party Swap"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 14)
+	vbox.add_child(title)
+
+	# Message label
+	var message: Label = Label.new()
+	message.text = "%s is now in your active party" % member_name
+	message.add_theme_font_size_override("font_size", 10)
+	message.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	message.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	vbox.add_child(message)
+
+	# Add OK button
+	var ok_btn: Button = Button.new()
+	ok_btn.text = "OK"
+	ok_btn.pressed.connect(_popup_close_swap_confirmation)
+	vbox.add_child(ok_btn)
+
+	# Auto-size panel - wait two frames
+	await get_tree().process_frame
+	await get_tree().process_frame
+	popup_panel.size = vbox.size + Vector2(20, 20)
+	vbox.position = Vector2(10, 10)
+
+	# Center popup on screen
+	var viewport_size: Vector2 = get_viewport_rect().size
+	popup_panel.position = (viewport_size - popup_panel.size) / 2.0
+	print("[StatusPanel] Swap confirmation centered at: %s, size: %s" % [popup_panel.position, popup_panel.size])
+
+	# Store metadata
+	popup_panel.set_meta("_is_swap_confirmation_popup", true)
+
+	# Push popup to aPanelManager stack
+	var panel_mgr = get_node_or_null("/root/aPanelManager")
+	if panel_mgr:
+		panel_mgr.push_panel(popup_panel)
+		print("[StatusPanel] Pushed swap confirmation to aPanelManager stack")
+
+	# Set state to POPUP_ACTIVE
+	_nav_state = NavState.POPUP_ACTIVE
+
+	# Grab focus on OK button
+	await get_tree().process_frame
+	ok_btn.grab_focus()
+
+func _popup_close_swap_confirmation() -> void:
+	"""Close swap confirmation popup and return focus to new member's Recovery button"""
+	print("[StatusPanel] Swap confirmation popup closed")
+	_popup_close_and_return_to_content()
+
 func _show_member_picker(active_slot: int) -> void:
 	"""Show bench member picker popup - LoadoutPanel pattern"""
 	if not _gs: return
@@ -902,12 +976,18 @@ func _show_member_picker(active_slot: int) -> void:
 		await get_tree().process_frame
 		item_list.grab_focus()
 
-func _perform_swap(active_slot: int, bench_member_id: String) -> void:
+func _perform_swap(active_slot: int, bench_member_id: String, member_name: String) -> void:
 	if not _gs or not _gs.has_method("swap_active_bench"): return
 
 	var success: bool = _gs.call("swap_active_bench", active_slot, bench_member_id)
 	if success:
+		# Save member_id to restore focus after rebuild
+		_focus_member_id = bench_member_id
+
 		_rebuild_party()  # Refresh display
+
+		# Show confirmation message
+		_show_swap_confirmation(member_name, bench_member_id)
 	else:
 		var error_popup := AcceptDialog.new()
 		error_popup.dialog_text = "Failed to swap party members. Please try again."
@@ -937,16 +1017,17 @@ func _popup_accept_switch() -> void:
 	var selected_idx = selected_items[0]
 	var bench_member_id: String = String(item_list.get_item_metadata(selected_idx))
 
-	print("[StatusPanel] Swapping slot %d with bench member: %s" % [active_slot, bench_member_id])
+	# Get the display name of the bench member being swapped in
+	var roster: Dictionary = _read_roster()
+	var member_name: String = _label_for_id(bench_member_id, roster)
 
-	# Save active_slot to restore focus after rebuild
-	_focus_active_slot = active_slot
+	print("[StatusPanel] Swapping slot %d with bench member: %s (%s)" % [active_slot, bench_member_id, member_name])
 
 	# Close popup first
 	_popup_close_and_return_to_content()
 
 	# Perform swap
-	_perform_swap(active_slot, bench_member_id)
+	_perform_swap(active_slot, bench_member_id, member_name)
 
 func _popup_cancel_switch() -> void:
 	"""User pressed Back on switch popup - close without swapping"""
@@ -1861,20 +1942,6 @@ func _navigate_to_content() -> void:
 		print("[StatusPanel] WARNING: Could not find Recovery button for %s, focusing first button" % _focus_member_id)
 		_focus_member_id = ""  # Clear the focus target
 
-	# If we have a specific slot to focus (after switching members), find that button
-	if _focus_active_slot >= 0:
-		print("[StatusPanel] Looking for Switch button for slot: %d" % _focus_active_slot)
-		for btn in buttons:
-			if btn.text == "Switch" and btn.has_meta("active_slot"):
-				var btn_slot = int(btn.get_meta("active_slot", -1))
-				if btn_slot == _focus_active_slot:
-					btn.grab_focus()
-					print("[StatusPanel] ✓ Restored focus to Switch button for slot %d" % _focus_active_slot)
-					_focus_active_slot = -1  # Clear the focus target
-					return
-		print("[StatusPanel] WARNING: Could not find Switch button for slot %d, focusing first button" % _focus_active_slot)
-		_focus_active_slot = -1  # Clear the focus target
-
 	# Focus the first button found (default behavior)
 	if buttons.size() > 0:
 		buttons[0].grab_focus()
@@ -1927,7 +1994,7 @@ func _input(event: InputEvent) -> void:
 ## ─────────────────────── STATE 1: POPUP_ACTIVE ───────────────────────
 
 func _handle_popup_input(event: InputEvent) -> void:
-	"""Handle input when popup is active (switch, recovery, notice, or heal confirmation popup)"""
+	"""Handle input when popup is active (switch, recovery, notice, heal confirmation, or swap confirmation popup)"""
 	if event.is_action_pressed("menu_accept"):
 		# Route to appropriate handler based on popup type
 		if _active_popup and _active_popup.get_meta("_is_recovery_popup", false):
@@ -1938,6 +2005,8 @@ func _handle_popup_input(event: InputEvent) -> void:
 			_popup_close_notice()
 		elif _active_popup and _active_popup.get_meta("_is_heal_confirmation_popup", false):
 			_popup_close_heal_confirmation()
+		elif _active_popup and _active_popup.get_meta("_is_swap_confirmation_popup", false):
+			_popup_close_swap_confirmation()
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("menu_back"):
 		# Cancel popup - all popups can be cancelled with back
@@ -1949,6 +2018,8 @@ func _handle_popup_input(event: InputEvent) -> void:
 			_popup_close_notice()
 		elif _active_popup and _active_popup.get_meta("_is_heal_confirmation_popup", false):
 			_popup_close_heal_confirmation()
+		elif _active_popup and _active_popup.get_meta("_is_swap_confirmation_popup", false):
+			_popup_close_swap_confirmation()
 		get_viewport().set_input_as_handled()
 	# UP/DOWN navigation is NOT handled - let ItemList/Button handle it
 
