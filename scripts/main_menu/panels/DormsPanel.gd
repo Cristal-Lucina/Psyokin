@@ -1134,16 +1134,58 @@ func _ask_confirm(msg: String) -> bool:
 	accept_btn.grab_focus()
 
 	var result: bool = false
+	var popup_closed: bool = false
+
+	# Handle button presses
 	accept_btn.pressed.connect(func() -> void:
+		print("[DormsPanel._ask_confirm] Accept button pressed")
 		result = true
+		popup_closed = true
 		popup.hide()
 	)
 	cancel_btn.pressed.connect(func() -> void:
+		print("[DormsPanel._ask_confirm] Cancel button pressed")
 		result = false
+		popup_closed = true
 		popup.hide()
 	)
 
+	# Handle gamepad/keyboard input for the popup
+	var input_handler := func(event: InputEvent) -> void:
+		if popup_closed:
+			return
+
+		if event.is_action_pressed("menu_accept"):
+			print("[DormsPanel._ask_confirm] menu_accept detected, triggering focused button")
+			var focused := popup.get_viewport().gui_get_focus_owner()
+			if focused == accept_btn:
+				accept_btn.emit_signal("pressed")
+			elif focused == cancel_btn:
+				cancel_btn.emit_signal("pressed")
+			else:
+				# Default to accept if no button focused
+				accept_btn.emit_signal("pressed")
+			get_viewport().set_input_as_handled()
+		elif event.is_action_pressed("menu_back"):
+			print("[DormsPanel._ask_confirm] menu_back detected, cancelling")
+			cancel_btn.emit_signal("pressed")
+			get_viewport().set_input_as_handled()
+		elif event.is_action_pressed("move_left"):
+			accept_btn.grab_focus()
+			get_viewport().set_input_as_handled()
+		elif event.is_action_pressed("move_right"):
+			cancel_btn.grab_focus()
+			get_viewport().set_input_as_handled()
+
+	# Connect input handler
+	var input_connection := get_viewport().gui_input.connect(input_handler)
+
 	await popup.hidden
+
+	# Disconnect input handler
+	if get_viewport().gui_input.is_connected(input_handler):
+		get_viewport().gui_input.disconnect(input_handler)
+
 	popup.queue_free()
 
 	# Restore previous navigation state
@@ -1160,6 +1202,7 @@ func _ask_confirm(msg: String) -> bool:
 		NavState.ACTION_SELECT:
 			_focus_current_action()
 
+	print("[DormsPanel._ask_confirm] Returning result: %s" % result)
 	return result
 
 func _show_toast(msg: String) -> void:
@@ -1198,11 +1241,30 @@ func _show_toast(msg: String) -> void:
 	popup.show()
 	ok_btn.grab_focus()
 
+	var popup_closed: bool = false
+
 	ok_btn.pressed.connect(func() -> void:
+		popup_closed = true
 		popup.hide()
 	)
 
+	# Handle gamepad/keyboard input for the toast
+	var input_handler := func(event: InputEvent) -> void:
+		if popup_closed:
+			return
+		if event.is_action_pressed("menu_accept") or event.is_action_pressed("menu_back"):
+			ok_btn.emit_signal("pressed")
+			get_viewport().set_input_as_handled()
+
+	# Connect input handler
+	var input_connection := get_viewport().gui_input.connect(input_handler)
+
 	await popup.hidden
+
+	# Disconnect input handler
+	if get_viewport().gui_input.is_connected(input_handler):
+		get_viewport().gui_input.disconnect(input_handler)
+
 	popup.queue_free()
 
 	# Restore previous navigation state
