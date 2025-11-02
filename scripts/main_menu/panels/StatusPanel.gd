@@ -121,7 +121,7 @@ const LAYERS = {
 	"tool_b": {"code": "7tlb", "node_name": "ToolBSprite", "path": "7tlb"}
 }
 
-@onready var _vertical_menu_label : Label = %VerticalMenuLabel
+@onready var _vertical_menu_box : PanelContainer = %VerticalMenuBox
 @onready var _root_container : HBoxContainer = $Root
 @onready var _tab_column : VBoxContainer = $Root/TabColumn
 @onready var _tab_list  : ItemList      = %TabList
@@ -1246,14 +1246,14 @@ func _hide_menu() -> void:
 	_menu_tween.tween_property(_tab_column, "position:x", -176.0, 0.3)
 	_menu_tween.parallel().tween_property(_tab_column, "modulate:a", 0.0, 0.3)
 
-	# Show vertical MENU label (fade in)
-	if _vertical_menu_label:
-		_menu_tween.parallel().tween_property(_vertical_menu_label, "modulate:a", 1.0, 0.3)
+	# Show vertical MENU box (fade in)
+	if _vertical_menu_box:
+		_menu_tween.parallel().tween_property(_vertical_menu_box, "modulate:a", 1.0, 0.3)
 
 	# Center the status panels by shifting root container left
 	# Move left by 88 pixels (half of 176) to center: offset_left from 16 to -72
 	if _root_container:
-		_menu_tween.parallel().tween_property(_root_container, "offset_left", -72.0, 0.3)
+		_menu_tween.parallel().tween_property(_root_container, "position:x", -88.0, 0.3)
 
 	# After animation completes, make menu non-interactive
 	_menu_tween.tween_callback(func():
@@ -1285,14 +1285,14 @@ func _show_menu() -> void:
 	_menu_tween.tween_property(_tab_column, "position:x", 0.0, 0.3)
 	_menu_tween.parallel().tween_property(_tab_column, "modulate:a", 1.0, 0.3)
 
-	# Hide vertical MENU label (fade out)
-	if _vertical_menu_label:
-		_menu_tween.parallel().tween_property(_vertical_menu_label, "modulate:a", 0.0, 0.3)
+	# Hide vertical MENU box (fade out)
+	if _vertical_menu_box:
+		_menu_tween.parallel().tween_property(_vertical_menu_box, "modulate:a", 0.0, 0.3)
 
 	# Restore status panels to original position
-	# Move root container back to offset_left = 16
+	# Move root container back to position x = 0
 	if _root_container:
-		_menu_tween.parallel().tween_property(_root_container, "offset_left", 16.0, 0.3)
+		_menu_tween.parallel().tween_property(_root_container, "position:x", 0.0, 0.3)
 
 	# After animation completes, restore focus to tab list
 	_menu_tween.tween_callback(func():
