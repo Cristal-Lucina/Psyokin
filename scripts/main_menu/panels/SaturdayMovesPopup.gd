@@ -70,7 +70,6 @@ func _build_ui() -> void:
 	# Section 1: Room Moves
 	var moves_title := Label.new()
 	moves_title.text = "[b]Room Moves Executed:[/b]"
-	moves_title.use_bbcode = true
 	moves_title.bbcode_enabled = true
 	content_vbox.add_child(moves_title)
 
@@ -98,7 +97,6 @@ func _build_ui() -> void:
 			else:
 				move_label.text = "• [b]%s[/b] moved (details unavailable)" % name
 			move_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-			move_label.use_bbcode = true
 			move_label.bbcode_enabled = true
 			content_vbox.add_child(move_label)
 
@@ -110,7 +108,6 @@ func _build_ui() -> void:
 
 		var reveals_title := Label.new()
 		reveals_title.text = "[b]New Neighbor Relationships:[/b]"
-		reveals_title.use_bbcode = true
 		reveals_title.bbcode_enabled = true
 		content_vbox.add_child(reveals_title)
 
