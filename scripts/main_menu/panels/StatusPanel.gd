@@ -1173,8 +1173,8 @@ func _grab_tab_list_focus() -> void:
 		_tab_list.select(0)
 		_tab_list.grab_focus()
 
-func _unhandled_input(event: InputEvent) -> void:
-	"""Handle controller input for tab navigation - ItemList handles UP/DOWN automatically"""
+func _input(event: InputEvent) -> void:
+	"""Handle controller input - prioritize menu slide over other navigation"""
 	# Only handle when visible
 	if not visible or not _tab_list:
 		return
@@ -1183,7 +1183,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if _ctrl_mgr and _ctrl_mgr.get_current_context() != _ctrl_mgr.InputContext.MENU_MAIN:
 		return
 
-	# Handle left/right to toggle menu visibility
+	# Handle left/right to toggle menu visibility (intercept before ItemList gets it)
 	if event.is_action_pressed("move_right") and _menu_visible:
 		_hide_menu()
 		get_viewport().set_input_as_handled()
@@ -1191,6 +1191,16 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event.is_action_pressed("move_left") and not _menu_visible:
 		_show_menu()
 		get_viewport().set_input_as_handled()
+		return
+
+func _unhandled_input(event: InputEvent) -> void:
+	"""Handle controller input for tab navigation - ItemList handles UP/DOWN automatically"""
+	# Only handle when visible
+	if not visible or not _tab_list:
+		return
+
+	# Check if we're in MENU_MAIN context (not in a fullscreen panel)
+	if _ctrl_mgr and _ctrl_mgr.get_current_context() != _ctrl_mgr.InputContext.MENU_MAIN:
 		return
 
 	# Handle A button to activate selected tab (ItemList handles UP/DOWN navigation)
