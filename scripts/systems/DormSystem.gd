@@ -911,7 +911,8 @@ func _current_neighbors_of_actor(aid: String) -> Array[String]:
 	var out: Array[String] = []
 	var room_of: String = ""
 	for rid in ROOM_IDS:
-		if String((_rooms[rid] as Dictionary).get("occupant","")) == aid:
+		var room_data: Dictionary = _rooms[rid] as Dictionary
+		if String(room_data.get("occupant","")) == aid:
 			room_of = rid
 			break
 	if room_of == "":
@@ -1224,18 +1225,18 @@ func calculate_affinity_power(actor_id: String) -> Dictionary:
 		"roll_bonus": int           # Final roll bonus: -4 to +10
 	}
 	"""
-	var neighbor_score = _calculate_neighbor_score(actor_id)
-	var battle_bonus = _get_battle_affinity_bonus(actor_id)
-	var move_pen = get_move_penalty(actor_id)
+	var neighbor_score: int = _calculate_neighbor_score(actor_id)
+	var battle_bonus: int = _get_battle_affinity_bonus(actor_id)
+	var move_pen: int = get_move_penalty(actor_id)
 
 	# Calculate total (neighbor + battle + penalty)
-	var total = neighbor_score + battle_bonus + move_pen
+	var total: int = neighbor_score + battle_bonus + move_pen
 
 	# Cap at -3 to +5 (max affinity power)
 	total = clampi(total, -3, 5)
 
 	# Convert to roll bonus
-	var roll_bonus = _affinity_to_roll_bonus(total)
+	var roll_bonus: int = _affinity_to_roll_bonus(total)
 
 	return {
 		"neighbor_score": neighbor_score,
@@ -1253,19 +1254,19 @@ func _calculate_neighbor_score(actor_id: String) -> int:
 	Each rival neighbor: -1
 	Neutral neighbors: 0
 	"""
-	var neighbors = _current_neighbors_of_actor(actor_id)
-	var bestie_count = 0
-	var rival_count = 0
+	var neighbors: Array[String] = _current_neighbors_of_actor(actor_id)
+	var bestie_count: int = 0
+	var rival_count: int = 0
 
 	for neighbor_id in neighbors:
-		var status = get_pair_status(actor_id, neighbor_id)
+		var status: String = get_pair_status(actor_id, neighbor_id)
 		if status == "Bestie":
 			bestie_count += 1
 		elif status == "Rival":
 			rival_count += 1
 		# Neutral = 0, don't count
 
-	var score = bestie_count - rival_count
+	var score: int = bestie_count - rival_count
 	return clampi(score, -3, 3)  # Cap at -3 to +3
 
 func _get_battle_affinity_bonus(actor_id: String) -> int:

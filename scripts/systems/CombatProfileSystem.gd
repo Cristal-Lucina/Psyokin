@@ -52,7 +52,8 @@ func _ready() -> void:
 	# Hook DormSystem for affinity power changes
 	var dorm: Node = get_node_or_null("/root/aDormSystem")
 	if dorm != null:
-		for s in ["assignments_changed", "relationships_discovered"]:
+		var signals: PackedStringArray = ["assignments_changed", "relationships_discovered"]
+		for s in signals:
 			if dorm.has_signal(s) and not dorm.is_connected(s, Callable(self, "_on_dorm_changed")):
 				dorm.connect(s, Callable(self, "_on_dorm_changed"))
 
@@ -371,7 +372,8 @@ func _compute_for_member(member: String) -> Dictionary:
 	# Integrate affinity power from DormSystem
 	var dorm_sys: Node = get_node_or_null("/root/aDormSystem")
 	if dorm_sys != null and dorm_sys.has_method("calculate_affinity_power"):
-		var affinity_data: Dictionary = dorm_sys.call("calculate_affinity_power", pid)
+		var affinity_result: Variant = dorm_sys.call("calculate_affinity_power", pid)
+		var affinity_data: Dictionary = affinity_result if typeof(affinity_result) == TYPE_DICTIONARY else {}
 		prof["affinity_power"] = affinity_data
 		prof["roll_bonus_affinity"] = int(affinity_data.get("roll_bonus", 0))
 	else:
