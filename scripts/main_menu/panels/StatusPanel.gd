@@ -121,6 +121,7 @@ const LAYERS = {
 	"tool_b": {"code": "7tlb", "node_name": "ToolBSprite", "path": "7tlb"}
 }
 
+@onready var _tab_column : VBoxContainer = $Root/TabColumn
 @onready var _tab_list  : ItemList      = %TabList
 @onready var _refresh   : Button        = $Root/Left/PartyHeader/RefreshBtn
 @onready var _party     : VBoxContainer = $Root/Left/PartyScroll/PartyList
@@ -144,6 +145,10 @@ var _resolver  : Node = null
 var _sig       : Node = null
 var _cps       : Node = null
 var _ctrl_mgr  : Node = null  # ControllerManager reference
+
+# Menu slide state
+var _menu_visible : bool = true
+var _menu_tween   : Tween = null
 
 # party.csv cache
 var _csv_by_id   : Dictionary = {}      # "actor_id" -> row dict
@@ -1182,6 +1187,16 @@ func _unhandled_input(event: InputEvent) -> void:
 	if _ctrl_mgr and _ctrl_mgr.get_current_context() != _ctrl_mgr.InputContext.MENU_MAIN:
 		return
 
+	# Handle left/right to toggle menu visibility
+	if event.is_action_pressed("move_right") and _menu_visible:
+		_hide_menu()
+		get_viewport().set_input_as_handled()
+		return
+	elif event.is_action_pressed("move_left") and not _menu_visible:
+		_show_menu()
+		get_viewport().set_input_as_handled()
+		return
+
 	# Handle A button to activate selected tab (ItemList handles UP/DOWN navigation)
 	# ONLY if the tab list has focus (don't intercept button presses on Switch buttons, etc.)
 	if event.is_action_pressed("menu_accept"):
@@ -1199,6 +1214,64 @@ func _unhandled_input(event: InputEvent) -> void:
 		var ek := event as InputEventKey
 		if ek.keycode == KEY_F9:
 			_dev_dump_profiles()
+
+func _hide_menu() -> void:
+	"""Slide menu to the left (hide it)"""
+	if not _tab_column or not _menu_visible:
+		return
+
+	_menu_visible = false
+
+	# Cancel any ongoing tween
+	if _menu_tween and _menu_tween.is_running():
+		_menu_tween.kill()
+
+	# Create new tween for smooth slide-out animation
+	_menu_tween = create_tween()
+	_menu_tween.set_ease(Tween.EASE_OUT)
+	_menu_tween.set_trans(Tween.TRANS_CUBIC)
+
+	# Slide to the left by moving offset_left to hide the column
+	# custom_minimum_size.x is 160, so we move it -176 (160 + 16 separation)
+	_menu_tween.tween_property(_tab_column, "position:x", -176.0, 0.3)
+	_menu_tween.parallel().tween_property(_tab_column, "modulate:a", 0.0, 0.3)
+
+	# After animation completes, make it non-interactive
+	_menu_tween.tween_callback(func():
+		_tab_column.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	)
+
+	print("[StatusPanel] Menu hidden")
+
+func _show_menu() -> void:
+	"""Slide menu back from the left (show it)"""
+	if not _tab_column or _menu_visible:
+		return
+
+	_menu_visible = true
+
+	# Make interactive immediately
+	_tab_column.mouse_filter = Control.MOUSE_FILTER_STOP
+
+	# Cancel any ongoing tween
+	if _menu_tween and _menu_tween.is_running():
+		_menu_tween.kill()
+
+	# Create new tween for smooth slide-in animation
+	_menu_tween = create_tween()
+	_menu_tween.set_ease(Tween.EASE_OUT)
+	_menu_tween.set_trans(Tween.TRANS_CUBIC)
+
+	# Slide back to original position (x = 0)
+	_menu_tween.tween_property(_tab_column, "position:x", 0.0, 0.3)
+	_menu_tween.parallel().tween_property(_tab_column, "modulate:a", 1.0, 0.3)
+
+	# After animation completes, restore focus to tab list
+	_menu_tween.tween_callback(func():
+		call_deferred("_grab_tab_list_focus")
+	)
+
+	print("[StatusPanel] Menu shown")
 
 func _dev_dump_profiles() -> void:
 	print_rich("[b]=== Combat Profiles (StatusPanel) ===[/b]")
