@@ -64,14 +64,14 @@
 ##
 ## ═══════════════════════════════════════════════════════════════════════════
 
-extends Control
+extends PanelBase
 class_name DormsPanel
 
 # Scene hooks
-@onready var _grid_holder  : VBoxContainer  = $Root/Left/Scroll/List
-@onready var _detail       : RichTextLabel  = $Root/Right/Detail
-@onready var _refresh_btn  : Button         = $Root/Left/Header/RefreshBtn
-@onready var _filter       : OptionButton   = $Root/Left/Filter
+@onready var _grid_holder  : VBoxContainer  = $Root/MainContent/LeftPanel/VBox/Scroll/List
+@onready var _detail       : RichTextLabel  = $Root/MainContent/RightPanel/VBox/DetailScroll/DetailContent/Detail
+@onready var _refresh_btn  : Button         = $Root/Header/RefreshBtn
+@onready var _filter       : OptionButton   = $Root/Header/Filter
 
 # Right-side controls (from TSCN)
 @onready var _common_box  : VBoxContainer = %CommonBox
@@ -88,6 +88,18 @@ var _group: ButtonGroup = null
 # Track rooms consumed during this reassignment session (turned red in UI)
 var _used_rooms: Dictionary = {}  # room_id -> true
 
+# Navigation state machine
+enum NavState {
+	ROOM_SELECT,    # Navigating room grid
+	COMMON_SELECT,  # Navigating common room list
+	POPUP_ACTIVE    # Popup is open (block navigation)
+}
+var _nav_state: NavState = NavState.ROOM_SELECT
+var _room_buttons: Array[Button] = []
+var _common_buttons: Array[Button] = []
+var _current_room_index: int = 0
+var _current_common_index: int = 0
+
 # Local mirror of DormsSystem.RoomVisual values (keep in sync)
 const VIS_EMPTY     := 0
 const VIS_OCCUPIED  := 1
@@ -98,6 +110,13 @@ func _ds() -> Node:
 	return get_node_or_null("/root/aDormSystem")
 
 func _ready() -> void:
+	super()  # Call PanelBase._ready() first
+
+	# Debug node references
+	print("[DormsPanel._ready] _grid_holder: %s" % _grid_holder)
+	print("[DormsPanel._ready] _detail: %s" % _detail)
+	print("[DormsPanel._ready] _common_box: %s" % _common_box)
+
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	if _detail != null:
 		_detail.bbcode_enabled = true
@@ -138,6 +157,136 @@ func _ready() -> void:
 
 	_rebuild()
 
+# ═══════════════════════════════════════════════════════════════════════════
+# PanelBase Overrides
+# ═══════════════════════════════════════════════════════════════════════════
+
+func _on_panel_gained_focus() -> void:
+	super()
+	print("[DormsPanel] Panel gained focus - is_active: %s, is_registered: %s" % [is_active(), is_registered()])
+	_nav_state = NavState.ROOM_SELECT
+	_focus_current_room()
+
+func _on_panel_lost_focus() -> void:
+	super()
+
+func _can_panel_close() -> bool:
+	# Prevent closing if common room has members
+	var ds: Node = _ds()
+	if ds != null:
+		var common_v: Variant = ds.call("get_common")
+		var common: PackedStringArray = (common_v if typeof(common_v) == TYPE_PACKED_STRING_ARRAY else PackedStringArray())
+		if common.size() > 0:
+			_show_toast("Cannot close panel while unassigned members are in the common room. Please assign them first.")
+			return false
+
+	# Also prevent closing if Accept Plan is active
+	if _is_accept_active():
+		_show_toast("Room Reassignments not complete.")
+		return false
+
+	return true
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Controller Input Handling
+# ═══════════════════════════════════════════════════════════════════════════
+
+func _input(event: InputEvent) -> void:
+	# Debug logging
+	if event is InputEventJoypadButton and event.pressed:
+		print("[DormsPanel._input] Button %d, is_active: %s, nav_state: %s" % [event.button_index, is_active(), _nav_state])
+
+	if not is_active():
+		return
+
+	if _nav_state == NavState.POPUP_ACTIVE:
+		return  # Let popup handle input
+
+	# Handle directional navigation
+	if event.is_action_pressed("move_up"):
+		_navigate_up()
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("move_down"):
+		_navigate_down()
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("move_left"):
+		_navigate_left()
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("move_right"):
+		_navigate_right()
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("menu_accept"):
+		_on_accept_input()
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("menu_back"):
+		# Handle back - try to close panel
+		if _can_panel_close():
+			hide()
+		get_viewport().set_input_as_handled()
+
+func _navigate_up() -> void:
+	if _nav_state == NavState.ROOM_SELECT:
+		# 2x4 grid: move up one row (subtract 4 from index)
+		var new_index: int = _current_room_index - 4
+		if new_index >= 0:
+			_current_room_index = new_index
+			_focus_current_room()
+	elif _nav_state == NavState.COMMON_SELECT:
+		if _current_common_index > 0:
+			_current_common_index -= 1
+			_focus_current_common()
+		else:
+			# Wrap to room grid
+			_nav_state = NavState.ROOM_SELECT
+			_focus_current_room()
+
+func _navigate_down() -> void:
+	if _nav_state == NavState.ROOM_SELECT:
+		# 2x4 grid: move down one row (add 4 to index)
+		var new_index: int = _current_room_index + 4
+		if new_index < _room_buttons.size():
+			_current_room_index = new_index
+			_focus_current_room()
+		else:
+			# Move to common room list
+			_nav_state = NavState.COMMON_SELECT
+			_current_common_index = 0
+			_focus_current_common()
+	elif _nav_state == NavState.COMMON_SELECT:
+		if _current_common_index < _common_buttons.size() - 1:
+			_current_common_index += 1
+			_focus_current_common()
+
+func _navigate_left() -> void:
+	if _nav_state == NavState.ROOM_SELECT:
+		# 2x4 grid: move left
+		if _current_room_index % 4 > 0:
+			_current_room_index -= 1
+			_focus_current_room()
+
+func _navigate_right() -> void:
+	if _nav_state == NavState.ROOM_SELECT:
+		# 2x4 grid: move right
+		if _current_room_index % 4 < 3 and _current_room_index < _room_buttons.size() - 1:
+			_current_room_index += 1
+			_focus_current_room()
+
+func _on_accept_input() -> void:
+	if _nav_state == NavState.ROOM_SELECT:
+		if _current_room_index >= 0 and _current_room_index < _room_buttons.size():
+			_room_buttons[_current_room_index].emit_signal("pressed")
+	elif _nav_state == NavState.COMMON_SELECT:
+		if _current_common_index >= 0 and _current_common_index < _common_buttons.size():
+			_common_buttons[_current_common_index].emit_signal("pressed")
+
+func _focus_current_room() -> void:
+	if _current_room_index >= 0 and _current_room_index < _room_buttons.size():
+		_room_buttons[_current_room_index].grab_focus()
+
+func _focus_current_common() -> void:
+	if _current_common_index >= 0 and _current_common_index < _common_buttons.size():
+		_common_buttons[_current_common_index].grab_focus()
+
 func _on_model_bumped() -> void:
 	_rebuild()
 
@@ -160,6 +309,9 @@ func _rebuild() -> void:
 func _build_grid() -> void:
 	for c in _grid_holder.get_children():
 		c.queue_free()
+
+	# Clear button array for controller navigation
+	_room_buttons.clear()
 
 	var grid := GridContainer.new()
 	grid.columns = 4
@@ -205,6 +357,7 @@ func _build_grid() -> void:
 		if _selected_room == rid:
 			b.button_pressed = true
 		grid.add_child(b)
+		_room_buttons.append(b)
 
 	# Summary under the grid
 	var summary := RichTextLabel.new()
@@ -345,6 +498,9 @@ func _build_common_list() -> void:
 	for c in _common_box.get_children():
 		c.queue_free()
 
+	# Clear common buttons array for controller navigation
+	_common_buttons.clear()
+
 	var ds: Node = _ds()
 	if ds == null:
 		return
@@ -380,6 +536,7 @@ func _build_common_list() -> void:
 			_update_tile_colors()
 		)
 		_common_box.add_child(btn)
+		_common_buttons.append(btn)
 
 # ─────────────────────────────────────────────────────────────
 # Detail (right)
@@ -733,9 +890,9 @@ func _on_visibility_changed() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	# Catch Esc / gamepad back while Accept is active.
 	if _is_accept_active():
-		if event.is_action_pressed("ui_cancel") or event.is_action_pressed("ui_end"):
+		if event.is_action_pressed("menu_back"):
 			_show_toast("Room Reassignments not complete.")
-			accept_event()
+			get_viewport().set_input_as_handled()
 
 # Public opt-in for parent menus that want to ask first.
 func can_close_panel() -> bool:
@@ -743,26 +900,112 @@ func can_close_panel() -> bool:
 	return not _is_accept_active()
 
 # ─────────────────────────────────────────────────────────────
-# Tiny UX helpers
+# Tiny UX helpers (Panel-based popups)
 # ─────────────────────────────────────────────────────────────
 func _ask_confirm(msg: String) -> bool:
-	var dlg := ConfirmationDialog.new()
-	dlg.title = "Confirm"
-	dlg.dialog_text = msg
-	add_child(dlg)
-	dlg.popup_centered()
-	await dlg.confirmed
-	dlg.queue_free()
-	return true
+	_nav_state = NavState.POPUP_ACTIVE
+
+	var popup := Panel.new()
+	popup.custom_minimum_size = Vector2(400, 200)
+	var vbox := VBoxContainer.new()
+	vbox.set_anchors_preset(Control.PRESET_FULL_RECT)
+	vbox.add_theme_constant_override("separation", 12)
+	popup.add_child(vbox)
+
+	# Title
+	var title := Label.new()
+	title.text = "Confirm"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(title)
+
+	# Message
+	var msg_label := Label.new()
+	msg_label.text = msg
+	msg_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	msg_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	vbox.add_child(msg_label)
+
+	# Buttons
+	var hbox := HBoxContainer.new()
+	hbox.add_theme_constant_override("separation", 8)
+	var accept_btn := Button.new()
+	accept_btn.text = "Accept"
+	accept_btn.focus_mode = Control.FOCUS_ALL
+	var cancel_btn := Button.new()
+	cancel_btn.text = "Cancel"
+	cancel_btn.focus_mode = Control.FOCUS_ALL
+	hbox.add_child(accept_btn)
+	hbox.add_child(cancel_btn)
+	vbox.add_child(hbox)
+
+	add_child(popup)
+	popup.position = (get_viewport_rect().size - popup.custom_minimum_size) / 2
+	popup.show()
+	accept_btn.grab_focus()
+
+	# Setup navigation
+	accept_btn.focus_neighbor_right = cancel_btn.get_path()
+	cancel_btn.focus_neighbor_left = accept_btn.get_path()
+
+	var result: bool = false
+	accept_btn.pressed.connect(func() -> void:
+		result = true
+		popup.hide()
+	)
+	cancel_btn.pressed.connect(func() -> void:
+		result = false
+		popup.hide()
+	)
+
+	await popup.hidden
+	popup.queue_free()
+	_nav_state = NavState.ROOM_SELECT
+	_focus_current_room()
+	return result
 
 func _show_toast(msg: String) -> void:
-	var dlg := AcceptDialog.new()
-	dlg.title = "Notice"
-	dlg.dialog_text = msg
-	add_child(dlg)
-	dlg.popup_centered()
-	await dlg.confirmed
-	dlg.queue_free()
+	_nav_state = NavState.POPUP_ACTIVE
+
+	var popup := Panel.new()
+	popup.custom_minimum_size = Vector2(400, 150)
+	var vbox := VBoxContainer.new()
+	vbox.set_anchors_preset(Control.PRESET_FULL_RECT)
+	vbox.add_theme_constant_override("separation", 12)
+	popup.add_child(vbox)
+
+	# Title
+	var title := Label.new()
+	title.text = "Notice"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(title)
+
+	# Message
+	var msg_label := Label.new()
+	msg_label.text = msg
+	msg_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	msg_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	vbox.add_child(msg_label)
+
+	# OK Button
+	var ok_btn := Button.new()
+	ok_btn.text = "OK"
+	ok_btn.focus_mode = Control.FOCUS_ALL
+	ok_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	vbox.add_child(ok_btn)
+
+	add_child(popup)
+	popup.position = (get_viewport_rect().size - popup.custom_minimum_size) / 2
+	popup.show()
+	ok_btn.grab_focus()
+
+	ok_btn.pressed.connect(func() -> void:
+		popup.hide()
+	)
+
+	await popup.hidden
+	popup.queue_free()
+	_nav_state = NavState.ROOM_SELECT
+	_focus_current_room()
 
 func _join_psa(arr: PackedStringArray, sep: String) -> String:
 	var out: String = ""

@@ -1,0 +1,9 @@
+room_id,room_name,description,neighbors,floor,position
+301,Corner Room A,Cozy corner room with windows on two sides,302;305,3,top_left
+302,Standard Room A,Standard dorm room with good natural light,301;303;306,3,top_center_left
+303,Standard Room B,Standard dorm room near the common area,302;304;307,3,top_center_right
+304,Corner Room B,Corner room with private balcony access,303;308,3,top_right
+305,Corner Room C,Quiet corner room away from elevator,301;306,3,bottom_left
+306,Central Room A,Central room with easy access to amenities,302;305;307,3,bottom_center_left
+307,Central Room B,Central room near the study lounge,303;306;308,3,bottom_center_right
+308,Corner Room D,Corner room with skylight,304;307,3,bottom_right

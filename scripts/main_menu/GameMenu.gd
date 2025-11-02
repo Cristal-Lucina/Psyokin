@@ -34,6 +34,7 @@ var _is_fullscreen: bool = false  # true when a non-Status panel is open full sc
 
 # --- Dorm hooks ---
 var _ds: Node = null
+var _pending_saturday_moves: Array = []  # Stores moves for Saturday popup
 
 # --- Controller Manager ---
 var _ctrl_mgr: Node = null
@@ -56,8 +57,17 @@ func _ready() -> void:
 
 	# Hook: auto-open Dorms tab when someone is added to Common (menu already open)
 	_ds = get_node_or_null("/root/aDormSystem")
-	if _ds and _ds.has_signal("common_added") and not _ds.is_connected("common_added", Callable(self, "_on_common_added")):
-		_ds.connect("common_added", Callable(self, "_on_common_added"))
+	if _ds:
+		if _ds.has_signal("common_added") and not _ds.is_connected("common_added", Callable(self, "_on_common_added")):
+			_ds.connect("common_added", Callable(self, "_on_common_added"))
+		# Hook Friday RA Mail popup
+		if _ds.has_signal("friday_reveals_ready") and not _ds.is_connected("friday_reveals_ready", Callable(self, "_on_friday_reveals")):
+			_ds.connect("friday_reveals_ready", Callable(self, "_on_friday_reveals"))
+		# Hook Saturday moves popup
+		if _ds.has_signal("saturday_reveals_ready") and not _ds.is_connected("saturday_reveals_ready", Callable(self, "_on_saturday_reveals")):
+			_ds.connect("saturday_reveals_ready", Callable(self, "_on_saturday_reveals"))
+		if _ds.has_signal("saturday_applied_v2") and not _ds.is_connected("saturday_applied_v2", Callable(self, "_on_saturday_applied")):
+			_ds.connect("saturday_applied_v2", Callable(self, "_on_saturday_applied"))
 
 	# Connect to visibility changes to manage MENU_MAIN context
 	visibility_changed.connect(_on_visibility_changed)
@@ -174,6 +184,29 @@ func _on_common_added(_aid: String) -> void:
 
 func _open_dorms_tab() -> void:
 	_select_tab("dorms")
+
+func _on_friday_reveals(pairs: Array) -> void:
+	"""Show Friday RA Mail popup with revealed relationships"""
+	if pairs.size() == 0:
+		return  # Don't show popup if no reveals
+
+	var popup := preload("res://scripts/main_menu/panels/FridayRAMailPopup.gd").create(pairs)
+	add_child(popup)
+	await popup.closed
+	popup.queue_free()
+
+func _on_saturday_applied(new_layout: Dictionary, moves: Array) -> void:
+	"""Store Saturday moves for later display"""
+	_pending_saturday_moves = moves
+
+func _on_saturday_reveals(pairs: Array) -> void:
+	"""Show Saturday moves popup with executed moves and new relationships"""
+	# Combine moves and relationship reveals
+	var popup := preload("res://scripts/main_menu/panels/SaturdayMovesPopup.gd").create(_pending_saturday_moves, pairs)
+	add_child(popup)
+	await popup.closed
+	popup.queue_free()
+	_pending_saturday_moves.clear()
 
 func _can_leave_dorms() -> bool:
 	var ds := get_node_or_null("/root/aDormSystem")

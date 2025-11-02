@@ -49,8 +49,16 @@ func _ready() -> void:
 	if cal != null and cal.has_signal("day_advanced") and not cal.is_connected("day_advanced", Callable(self, "_on_day_advanced")):
 		cal.connect("day_advanced", Callable(self, "_on_day_advanced"))
 
-	# Initial fill
-	refresh_all()
+	# Hook DormSystem for affinity power changes
+	var dorm: Node = get_node_or_null("/root/aDormSystem")
+	if dorm != null:
+		var signals: PackedStringArray = ["assignments_changed", "relationships_discovered"]
+		for s in signals:
+			if dorm.has_signal(s) and not dorm.is_connected(s, Callable(self, "_on_dorm_changed")):
+				dorm.connect(s, Callable(self, "_on_dorm_changed"))
+
+	# Initial fill (deferred to ensure all autoloads are ready)
+	call_deferred("refresh_all")
 
 # ───────────────────────── Public API ─────────────────────────
 
@@ -185,6 +193,10 @@ func _on_sigils_changed(member: String) -> void:
 func _on_day_advanced(_new_date: Dictionary) -> void:
 	# Auto-heal all party members at the start of each new day
 	heal_all_to_full()
+
+func _on_dorm_changed() -> void:
+	# Refresh profiles when dorm assignments or relationships change (affects affinity power)
+	refresh_all()
 
 # ───────────────────────── Core compute ─────────────────────────
 
@@ -356,6 +368,26 @@ func _compute_for_member(member: String) -> Dictionary:
 			"loadout": loadout
 		}
 	}
+
+	# Integrate affinity power from DormSystem
+	var dorm_sys: Node = get_node_or_null("/root/aDormSystem")
+	if dorm_sys != null and dorm_sys.has_method("calculate_affinity_power"):
+		var affinity_result: Variant = dorm_sys.call("calculate_affinity_power", pid)
+		var affinity_data: Dictionary = {}
+		if typeof(affinity_result) == TYPE_DICTIONARY:
+			affinity_data = affinity_result as Dictionary
+		prof["affinity_power"] = affinity_data
+		prof["roll_bonus_affinity"] = int(affinity_data.get("roll_bonus", 0))
+	else:
+		# Fallback if DormSystem not available
+		prof["affinity_power"] = {
+			"neighbor_score": 0,
+			"battle_affinity": 0,
+			"move_penalty": 0,
+			"total_affinity": 0,
+			"roll_bonus": 0
+		}
+		prof["roll_bonus_affinity"] = 0
 
 	return prof
 
