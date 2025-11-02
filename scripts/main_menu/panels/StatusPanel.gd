@@ -1359,6 +1359,30 @@ func _grab_tab_list_focus() -> void:
 		_tab_list.select(0)
 		_tab_list.grab_focus()
 
+func _navigate_to_content() -> void:
+	"""Navigate from tab list to first focusable button in content area"""
+	if not _party_content:
+		return
+
+	# Find all buttons in the content area (recursively search children)
+	var buttons: Array[Button] = []
+	_find_buttons_recursive(_party_content, buttons)
+
+	# Focus the first button found
+	if buttons.size() > 0:
+		buttons[0].grab_focus()
+		print("[StatusPanel] Navigated to content - focused first button: %s" % buttons[0].text)
+	else:
+		print("[StatusPanel] No buttons found in content area")
+
+func _find_buttons_recursive(node: Node, buttons: Array[Button]) -> void:
+	"""Recursively find all Button nodes in a tree"""
+	if node is Button:
+		buttons.append(node as Button)
+
+	for child in node.get_children():
+		_find_buttons_recursive(child, buttons)
+
 func _input(event: InputEvent) -> void:
 	"""Handle controller input - prioritize menu slide over other navigation"""
 	# Only handle when visible
@@ -1369,15 +1393,31 @@ func _input(event: InputEvent) -> void:
 	if _ctrl_mgr and _ctrl_mgr.get_current_context() != _ctrl_mgr.InputContext.MENU_MAIN:
 		return
 
-	# Handle left/right to toggle menu visibility (intercept before ItemList gets it)
-	if event.is_action_pressed("move_right") and _menu_visible:
-		_hide_menu()
-		get_viewport().set_input_as_handled()
-		return
-	elif event.is_action_pressed("move_left") and not _menu_visible:
-		_show_menu()
-		get_viewport().set_input_as_handled()
-		return
+	# Handle RIGHT: navigate to content OR hide menu
+	if event.is_action_pressed("move_right"):
+		# If tab list has focus, navigate to first button in content area
+		if _tab_list.has_focus():
+			_navigate_to_content()
+			get_viewport().set_input_as_handled()
+			return
+		# Otherwise, if menu is visible and content has focus, hide menu
+		elif _menu_visible:
+			_hide_menu()
+			get_viewport().set_input_as_handled()
+			return
+
+	# Handle LEFT: navigate back to menu OR show menu
+	elif event.is_action_pressed("move_left"):
+		# If content has focus, navigate back to tab list
+		if not _tab_list.has_focus():
+			_tab_list.grab_focus()
+			get_viewport().set_input_as_handled()
+			return
+		# Otherwise, if menu is hidden, show it
+		elif not _menu_visible:
+			_show_menu()
+			get_viewport().set_input_as_handled()
+			return
 
 func _unhandled_input(event: InputEvent) -> void:
 	"""Handle controller input for tab navigation - ItemList handles UP/DOWN automatically"""
