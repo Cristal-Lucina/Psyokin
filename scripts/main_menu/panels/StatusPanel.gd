@@ -164,7 +164,8 @@ var _tab_ids: Array[String] = []
 enum NavState { MENU, CONTENT, POPUP_ACTIVE }
 var _nav_state: NavState = NavState.MENU
 var _active_popup: Control = null  # Currently open popup panel
-var _focus_member_id: String = ""  # Member ID to focus after rebuild
+var _focus_member_id: String = ""  # Member ID to focus after rebuild (for Recovery button)
+var _focus_active_slot: int = -1  # Active slot to focus after rebuild (for Switch button)
 
 func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -937,6 +938,9 @@ func _popup_accept_switch() -> void:
 	var bench_member_id: String = String(item_list.get_item_metadata(selected_idx))
 
 	print("[StatusPanel] Swapping slot %d with bench member: %s" % [active_slot, bench_member_id])
+
+	# Save active_slot to restore focus after rebuild
+	_focus_active_slot = active_slot
 
 	# Close popup first
 	_popup_close_and_return_to_content()
@@ -1856,6 +1860,20 @@ func _navigate_to_content() -> void:
 					return
 		print("[StatusPanel] WARNING: Could not find Recovery button for %s, focusing first button" % _focus_member_id)
 		_focus_member_id = ""  # Clear the focus target
+
+	# If we have a specific slot to focus (after switching members), find that button
+	if _focus_active_slot >= 0:
+		print("[StatusPanel] Looking for Switch button for slot: %d" % _focus_active_slot)
+		for btn in buttons:
+			if btn.text == "Switch" and btn.has_meta("active_slot"):
+				var btn_slot = int(btn.get_meta("active_slot", -1))
+				if btn_slot == _focus_active_slot:
+					btn.grab_focus()
+					print("[StatusPanel] ✓ Restored focus to Switch button for slot %d" % _focus_active_slot)
+					_focus_active_slot = -1  # Clear the focus target
+					return
+		print("[StatusPanel] WARNING: Could not find Switch button for slot %d, focusing first button" % _focus_active_slot)
+		_focus_active_slot = -1  # Clear the focus target
 
 	# Focus the first button found (default behavior)
 	if buttons.size() > 0:
