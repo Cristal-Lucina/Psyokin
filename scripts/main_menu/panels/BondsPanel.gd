@@ -1064,6 +1064,15 @@ func _on_story_points_pressed() -> void:
 	overlay.mouse_filter = Control.MOUSE_FILTER_STOP
 	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
 
+	# Handle controller back button input
+	overlay.set_process_input(true)
+	var on_overlay_input = func(event: InputEvent) -> void:
+		if event.is_action_pressed("menu_back"):
+			_close_story_overlay()
+			call_deferred("_enter_bond_detail_state")
+			overlay.get_viewport().set_input_as_handled()
+	overlay.gui_input.connect(on_overlay_input)
+
 	# Dim background
 	var dim := ColorRect.new()
 	dim.color = Color(0, 0, 0, 0.65) # darker → more opaque
