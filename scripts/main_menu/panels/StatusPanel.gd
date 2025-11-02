@@ -1701,19 +1701,16 @@ func _handle_popup_input(event: InputEvent) -> void:
 
 func _handle_menu_input(event: InputEvent) -> void:
 	"""Handle input in MENU state - tab list navigation"""
-	# Handle RIGHT: navigate to content OR hide menu
+	# Handle RIGHT: navigate to content (and hide menu)
 	if event.is_action_pressed("move_right"):
 		# If tab list has focus, navigate to first button in content area
 		if _tab_list.has_focus():
-			print("[StatusPanel] MENU → CONTENT transition")
+			print("[StatusPanel] MENU → CONTENT transition (hiding menu)")
 			_nav_state = NavState.CONTENT
+			# Hide menu when transitioning to content
+			if _menu_visible:
+				_hide_menu()
 			_navigate_to_content()
-			get_viewport().set_input_as_handled()
-			return
-		# Otherwise, if menu is visible, hide menu
-		elif _menu_visible:
-			print("[StatusPanel] Hiding menu (MENU state, RIGHT pressed)")
-			_hide_menu()
 			get_viewport().set_input_as_handled()
 			return
 
@@ -1729,21 +1726,16 @@ func _handle_menu_input(event: InputEvent) -> void:
 
 func _handle_content_input(event: InputEvent) -> void:
 	"""Handle input in CONTENT state - button navigation"""
-	# Handle LEFT: navigate back to menu
+	# Handle LEFT: navigate back to menu (and show menu)
 	if event.is_action_pressed("move_left"):
-		print("[StatusPanel] CONTENT → MENU transition")
+		print("[StatusPanel] CONTENT → MENU transition (showing menu)")
 		_nav_state = NavState.MENU
+		# Show menu when transitioning back to menu
+		if not _menu_visible:
+			_show_menu()
 		_tab_list.grab_focus()
 		get_viewport().set_input_as_handled()
 		return
-
-	# Handle RIGHT: hide menu if visible
-	elif event.is_action_pressed("move_right"):
-		if _menu_visible:
-			print("[StatusPanel] Hiding menu (CONTENT state, RIGHT pressed)")
-			_hide_menu()
-			get_viewport().set_input_as_handled()
-			return
 
 func _unhandled_input(event: InputEvent) -> void:
 	"""Handle A button activation for tabs and buttons"""
