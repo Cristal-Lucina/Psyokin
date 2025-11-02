@@ -1,0 +1,10 @@
+affinity_level,roll_bonus,description
+-3,-4,Three rivals as neighbors
+-2,-2,Two rivals and one neutral neighbor
+-1,-1,One rival and two neutral neighbors
+0,0,All neutral neighbors
+1,1,Two besties and one rival OR one bestie and two neutrals
+2,2,Two besties and one neutral
+3,4,Three besties as neighbors
+4,8,Three besties + AT2 battle affinity
+5,10,Three besties + AT3 battle affinity (MAX)
