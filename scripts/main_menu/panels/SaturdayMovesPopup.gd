@@ -163,7 +163,7 @@ func _input(event: InputEvent) -> void:
 		return
 
 	# Close on CANCEL
-	if event.is_action_pressed("ui_cancel"):
+	if event.is_action_pressed("menu_back"):
 		closed.emit()
 		hide()
-		accept_event()
+		get_viewport().set_input_as_handled()

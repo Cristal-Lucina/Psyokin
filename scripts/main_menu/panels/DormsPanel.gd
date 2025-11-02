@@ -191,26 +191,26 @@ func _input(event: InputEvent) -> void:
 		return  # Let popup handle input
 
 	# Handle directional navigation
-	if event.is_action_pressed("ui_up"):
+	if event.is_action_pressed("move_up"):
 		_navigate_up()
-		accept_event()
-	elif event.is_action_pressed("ui_down"):
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("move_down"):
 		_navigate_down()
-		accept_event()
-	elif event.is_action_pressed("ui_left"):
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("move_left"):
 		_navigate_left()
-		accept_event()
-	elif event.is_action_pressed("ui_right"):
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("move_right"):
 		_navigate_right()
-		accept_event()
-	elif event.is_action_pressed("ui_accept"):
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("menu_accept"):
 		_on_accept_input()
-		accept_event()
-	elif event.is_action_pressed("ui_cancel"):
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("menu_back"):
 		# Handle back - try to close panel
 		if _can_panel_close():
 			hide()
-		accept_event()
+		get_viewport().set_input_as_handled()
 
 func _navigate_up() -> void:
 	if _nav_state == NavState.ROOM_SELECT:
@@ -878,9 +878,9 @@ func _on_visibility_changed() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	# Catch Esc / gamepad back while Accept is active.
 	if _is_accept_active():
-		if event.is_action_pressed("ui_cancel") or event.is_action_pressed("ui_end"):
+		if event.is_action_pressed("menu_back"):
 			_show_toast("Room Reassignments not complete.")
-			accept_event()
+			get_viewport().set_input_as_handled()
 
 # Public opt-in for parent menus that want to ask first.
 func can_close_panel() -> bool:
