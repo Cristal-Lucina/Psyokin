@@ -915,7 +915,10 @@ func _show_recovery_popup(member_id: String, member_name: String, hp: int, hp_ma
 		if inv_sys.has_method("get_counts_dict"):
 			counts_dict = inv_sys.call("get_counts_dict")
 			print("[StatusPanel] Total items in inventory: %d" % counts_dict.size())
-			print("[StatusPanel] Inventory items: %s" % counts_dict.keys())
+			print("[StatusPanel] Inventory items: " + str(counts_dict.keys()))
+
+		# Track all unique categories to help debug
+		var categories_found: Array = []
 
 		# Filter by category "recovery" and check if we own the item
 		for item_id in all_defs.keys():
@@ -923,17 +926,23 @@ func _show_recovery_popup(member_id: String, member_name: String, hp: int, hp_ma
 			if typeof(def_data) == TYPE_DICTIONARY:
 				var category = String(def_data.get("category", "")).to_lower()
 
-				# Check if this is a recovery item
-				if category == "recovery" or category.contains("recovery") or category.contains("heal") or category.contains("potion"):
-					# Check if we own it
-					var count = int(counts_dict.get(item_id, 0))
-					if count > 0:
-						recovery_items.append(item_id)
-						print("[StatusPanel] ✓ Added recovery item: %s (category: '%s', count: %d)" % [item_id, category, count])
-					else:
-						print("[StatusPanel] - Found recovery def but not owned: %s (category: '%s')" % [item_id, category])
+				# Track unique categories
+				if category != "" and not categories_found.has(category):
+					categories_found.append(category)
 
-	print("[StatusPanel] Total recovery items found: %d" % recovery_items.size())
+				# Check if we own this item
+				var count = int(counts_dict.get(item_id, 0))
+				if count > 0:
+					# Log all owned items with their categories
+					print("[StatusPanel] Owned item: %s (category: '%s', count: %d)" % [item_id, category, count])
+
+					# Check if this is a recovery item
+					if category == "recovery" or category.contains("recovery") or category.contains("heal") or category.contains("potion"):
+						recovery_items.append(item_id)
+						print("[StatusPanel] ✓ This is a recovery item!")
+
+		print("[StatusPanel] All unique categories found: " + str(categories_found))
+		print("[StatusPanel] Total recovery items found: %d" % recovery_items.size())
 
 	# Create popup panel using LoadoutPanel pattern
 	var popup_panel: Panel = Panel.new()
@@ -1723,6 +1732,17 @@ func _handle_menu_input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 			return
 
+	# Handle BACK: only close panel if menu is visible
+	elif event.is_action_pressed("menu_back"):
+		if _menu_visible:
+			print("[StatusPanel] Back pressed in MENU state with menu visible - allowing panel close")
+			# Don't mark as handled - let GameMenu close the panel
+		else:
+			print("[StatusPanel] Back pressed in MENU state but menu hidden - showing menu first")
+			_show_menu()
+			get_viewport().set_input_as_handled()
+			return
+
 ## ─────────────────────── STATE 3: CONTENT ───────────────────────
 
 func _handle_content_input(event: InputEvent) -> void:
@@ -1732,6 +1752,17 @@ func _handle_content_input(event: InputEvent) -> void:
 		print("[StatusPanel] CONTENT → MENU transition (showing menu)")
 		_nav_state = NavState.MENU
 		# Show menu when transitioning back to menu
+		if not _menu_visible:
+			_show_menu()
+		_tab_list.grab_focus()
+		get_viewport().set_input_as_handled()
+		return
+
+	# Handle BACK: go to menu (don't close panel)
+	elif event.is_action_pressed("menu_back"):
+		print("[StatusPanel] Back pressed in CONTENT state - going to MENU")
+		_nav_state = NavState.MENU
+		# Show menu when going back
 		if not _menu_visible:
 			_show_menu()
 		_tab_list.grab_focus()
