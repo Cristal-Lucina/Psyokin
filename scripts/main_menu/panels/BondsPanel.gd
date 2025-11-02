@@ -1052,20 +1052,26 @@ func _on_story_points_pressed() -> void:
 	# Clear any prior overlay
 	_close_story_overlay()
 
+	# Use CanvasLayer to ensure overlay renders on top of everything
+	var canvas_layer := CanvasLayer.new()
+	canvas_layer.name = "StoryOverlayLayer"
+	canvas_layer.layer = 100  # Very high layer to be on top
+	print("[BondsPanel] Created CanvasLayer with layer 100")
+
 	# Full-screen overlay (blocks input behind it)
 	var overlay := Control.new()
 	overlay.name = "StoryOverlay"
 	overlay.visible = true
 	overlay.mouse_filter = Control.MOUSE_FILTER_STOP
 	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
-	overlay.z_index = 100
-	print("[BondsPanel] Created overlay with z_index 100")
+	print("[BondsPanel] Created overlay control")
 
 	# Dim background
 	var dim := ColorRect.new()
 	dim.color = Color(0, 0, 0, 0.65) # darker → more opaque
 	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
 	overlay.add_child(dim)
+	print("[BondsPanel] Added dim background")
 
 	# Margin frame to keep text off edges
 	var margins := MarginContainer.new()
@@ -1136,10 +1142,13 @@ func _on_story_points_pressed() -> void:
 			row.text = "• " + p_str
 			body.add_child(row)
 
-	# Add to the top-level so it truly fills the window
-	print("[BondsPanel] Adding story overlay to scene tree")
-	get_tree().root.add_child(overlay)
-	_story_overlay = overlay
+	# Add overlay to canvas layer
+	canvas_layer.add_child(overlay)
+
+	# Add canvas layer to the scene tree
+	print("[BondsPanel] Adding canvas layer to scene tree")
+	get_tree().root.add_child(canvas_layer)
+	_story_overlay = canvas_layer  # Store canvas_layer reference so we can clean it up
 	print("[BondsPanel] Story overlay added successfully, focusing back button")
 	back_btn.grab_focus()
 
