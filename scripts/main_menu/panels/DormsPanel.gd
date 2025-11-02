@@ -1164,26 +1164,27 @@ func _ask_confirm(msg: String) -> bool:
 	popup.show()
 	accept_btn.grab_focus()
 
-	var result: bool = false
-	var popup_closed: bool = false
+	# Use array to ensure proper variable capture in lambdas
+	var result_ref: Array = [false]
 
 	# Handle button presses
 	accept_btn.pressed.connect(func() -> void:
-		print("[DormsPanel._ask_confirm] Accept button pressed")
-		result = true
-		popup_closed = true
+		print("[DormsPanel._ask_confirm] Accept button pressed, setting result to true")
+		result_ref[0] = true
 		popup.hide()
 	)
 	cancel_btn.pressed.connect(func() -> void:
-		print("[DormsPanel._ask_confirm] Cancel button pressed")
-		result = false
-		popup_closed = true
+		print("[DormsPanel._ask_confirm] Cancel button pressed, setting result to false")
+		result_ref[0] = false
 		popup.hide()
 	)
 
 	# Wait for user input via the panel's _input method
-	# The popup_closed flag will be set by button presses
+	# The popup will be hidden when a button is pressed
 	await popup.hidden
+
+	var result: bool = result_ref[0]
+	print("[DormsPanel._ask_confirm] After await, result: %s" % result)
 
 	popup.queue_free()
 
