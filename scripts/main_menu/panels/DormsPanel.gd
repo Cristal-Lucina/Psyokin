@@ -594,6 +594,14 @@ func _update_details() -> void:
 	for s in status_lines:
 		lines.append("  • %s" % s)
 
+	# Show pending reassignment in Reassignments view
+	if _current_view == ViewType.REASSIGNMENTS:
+		var pending_room: String = _get_pending_assignment(_selected_member)
+		if pending_room != "":
+			lines.append("")
+			lines.append("[b][color=yellow]Pending Saturday Move:[/color][/b]")
+			lines.append("  • Will move to room %s" % pending_room)
+
 	_detail_content.text = _join_psa(lines, "\n")
 
 func _update_action_buttons() -> void:
@@ -615,14 +623,9 @@ func _update_action_buttons() -> void:
 	_assign_room_btn.disabled = not (_selected_member != "" and in_common)
 
 	# Move Out: active if member selected and has a room (not in common)
-	# Changed: Remove view type restriction - allow Move Out in both Placements and Reassignments
+	# Move Out always works - it switches to Reassignments view and stages the move
 	var has_room: bool = _get_member_room(_selected_member) != ""
-	print("[DormsPanel._update_action_buttons] Move Out button state:")
-	print("  _selected_member: '%s'" % _selected_member)
-	print("  has_room: %s" % has_room)
-	print("  _current_view: %s" % ("PLACEMENTS" if _current_view == ViewType.PLACEMENTS else "REASSIGNMENTS"))
 	_move_out_btn.disabled = not (_selected_member != "" and has_room)
-	print("  button disabled: %s" % _move_out_btn.disabled)
 
 	# Cancel Move: active if in reassignments view and has pending changes
 	_cancel_move_btn.disabled = not (_current_view == ViewType.REASSIGNMENTS and _has_pending_changes())
@@ -695,45 +698,32 @@ func _on_move_out_pressed() -> void:
 
 	var member_name: String = _get_member_name(_selected_member)
 
-	# Different behavior based on view type
-	if _current_view == ViewType.REASSIGNMENTS:
-		# Reassignments view: Stage the move for Saturday
-		var confirmed: bool = await _ask_confirm("Move %s out of room %s on Saturday?" % [member_name, room_id])
-		if not confirmed:
+	# Switch to Reassignments view if not already there
+	if _current_view != ViewType.REASSIGNMENTS:
+		print("[DormsPanel._on_move_out_pressed] Switching to Reassignments view")
+		_current_view = ViewType.REASSIGNMENTS
+		if _view_type_filter:
+			_view_type_filter.select(1)  # Select Reassignments
+
+	# Confirm staging the move
+	var confirmed: bool = await _ask_confirm("Move %s out of room %s?\n(Change will take effect on Saturday)" % [member_name, room_id])
+	if not confirmed:
+		return
+
+	# Stage the move for Saturday
+	if ds.has_method("stage_vacate_room"):
+		var res: Dictionary = ds.call("stage_vacate_room", room_id)
+		if not bool(res.get("ok", false)):
+			_show_toast(String(res.get("reason", "Cannot stage move.")))
 			return
-
-		# Stage the move
-		if ds.has_method("stage_vacate_room"):
-			var res: Dictionary = ds.call("stage_vacate_room", room_id)
-			if not bool(res.get("ok", false)):
-				_show_toast(String(res.get("reason", "Cannot stage move.")))
-				return
-
-		_show_toast("%s will move to common room on Saturday." % member_name)
 	else:
-		# Placements view: Immediate move to common room
-		var confirmed: bool = await _ask_confirm("Move %s out of room %s now?" % [member_name, room_id])
-		if not confirmed:
-			return
+		_show_toast("DormSystem doesn't support staging moves.")
+		return
 
-		# Immediate move (use vacate_room_now if available, otherwise stage_vacate_room)
-		if ds.has_method("vacate_room_now"):
-			var res: Dictionary = ds.call("vacate_room_now", room_id)
-			if not bool(res.get("ok", false)):
-				_show_toast(String(res.get("reason", "Cannot move member.")))
-				return
-		elif ds.has_method("stage_vacate_room"):
-			# Fallback to staging if immediate method not available
-			var res: Dictionary = ds.call("stage_vacate_room", room_id)
-			if not bool(res.get("ok", false)):
-				_show_toast(String(res.get("reason", "Cannot move member.")))
-				return
-
-		_show_toast("%s moved to common room." % member_name)
-
+	_show_toast("%s will move to common room on Saturday." % member_name)
 	_rebuild()
 
-	# Move cursor to roster for next selection
+	# Keep cursor on roster for selecting more members to move out
 	_push_nav_state(NavState.ROSTER_SELECT)
 	_current_roster_index = 0
 	_focus_current_roster()
@@ -995,6 +985,30 @@ func _get_member_status(aid: String) -> PackedStringArray:
 		status.append("Doing okay")
 
 	return status
+
+func _get_pending_assignment(aid: String) -> String:
+	"""Get the pending room assignment for a member, if any"""
+	var ds: Node = _ds()
+	if not ds:
+		return ""
+
+	# Check DormSystem's locked plan (Saturday moves)
+	if ds.has_method("get_saturday_plan"):
+		var plan_v: Variant = ds.call("get_saturday_plan")
+		if typeof(plan_v) == TYPE_DICTIONARY:
+			var plan: Dictionary = plan_v
+			if plan.has(aid):
+				return String(plan[aid])
+
+	# Check staged assignments (not yet accepted)
+	if ds.has_method("get_staged_assignments"):
+		var staged_v: Variant = ds.call("get_staged_assignments")
+		if typeof(staged_v) == TYPE_DICTIONARY:
+			var staged: Dictionary = staged_v
+			if staged.has(aid):
+				return String(staged[aid])
+
+	return ""
 
 func _is_room_targeted(room_id: String) -> bool:
 	# Check if any member is already targeting this room in pending reassignments
