@@ -229,10 +229,19 @@ func _build_tab_buttons() -> void:
 	if not _tab_list.item_activated.is_connected(_on_tab_item_activated):
 		_tab_list.item_activated.connect(_on_tab_item_activated)
 
+	# Connect item clicked signal (single-click support)
+	if not _tab_list.item_clicked.is_connected(_on_tab_item_clicked):
+		_tab_list.item_clicked.connect(_on_tab_item_clicked)
+
 func _on_tab_item_selected(index: int) -> void:
 	"""Handle tab item selection (when navigating with UP/DOWN)"""
 	# Just visual feedback - don't switch tabs yet
 	print("[StatusPanel] Tab selected: index %d" % index)
+
+func _on_tab_item_clicked(index: int, _at_position: Vector2, mouse_button_index: int) -> void:
+	"""Handle tab item clicked (single left-click support)"""
+	if mouse_button_index == MOUSE_BUTTON_LEFT:
+		_on_tab_item_activated(index)
 
 func _on_tab_item_activated(index: int) -> void:
 	"""Handle tab item activation (A button or double-click)"""
@@ -355,9 +364,11 @@ func _rebuild_party() -> void:
 
 	# === LEADER SECTION ===
 	var leader_header := Label.new()
-	leader_header.text = "=== LEADER ==="
+	leader_header.text = "LEADER"
 	leader_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	leader_header.add_theme_font_size_override("font_size", 10)
+	leader_header.add_theme_font_size_override("font_size", 16)
+	leader_header.add_theme_color_override("font_color", Color(1, 0.7, 0.75, 1))
+	leader_header.underline = true
 	_party.add_child(leader_header)
 
 	if party_ids.size() > 0:
@@ -368,9 +379,11 @@ func _rebuild_party() -> void:
 
 	# === ACTIVE SECTION ===
 	var active_header := Label.new()
-	active_header.text = "=== ACTIVE ==="
+	active_header.text = "ACTIVE"
 	active_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	active_header.add_theme_font_size_override("font_size", 10)
+	active_header.add_theme_font_size_override("font_size", 16)
+	active_header.add_theme_color_override("font_color", Color(1, 0.7, 0.75, 1))
+	active_header.underline = true
 	_party.add_child(active_header)
 
 	for slot_idx in range(1, 3):  # Slots 1 and 2
@@ -384,9 +397,11 @@ func _rebuild_party() -> void:
 
 	# === BENCH SECTION ===
 	var bench_header := Label.new()
-	bench_header.text = "=== BENCH ==="
+	bench_header.text = "BENCH"
 	bench_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	bench_header.add_theme_font_size_override("font_size", 10)
+	bench_header.add_theme_font_size_override("font_size", 16)
+	bench_header.add_theme_color_override("font_color", Color(1, 0.7, 0.75, 1))
+	bench_header.underline = true
 	_party.add_child(bench_header)
 
 	# Only show bench slots that have members (hide empty slots)
@@ -598,11 +613,12 @@ func _show_member_picker(active_slot: int) -> void:
 	if bench_ids.is_empty():
 		# Show message: no bench members available
 		var msg_popup := AcceptDialog.new()
-		msg_popup.dialog_text = "No members available on the bench to switch with."
+		msg_popup.dialog_text = "No benched party members available."
 		msg_popup.title = "No Bench Members"
 		add_child(msg_popup)
 		msg_popup.popup_centered()
 		msg_popup.confirmed.connect(func(): msg_popup.queue_free())
+		msg_popup.canceled.connect(func(): msg_popup.queue_free())
 		return
 
 	# Create picker popup
