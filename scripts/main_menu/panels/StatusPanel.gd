@@ -900,38 +900,38 @@ func _show_recovery_popup(member_id: String, member_name: String, hp: int, hp_ma
 		print("[StatusPanel] No inventory system found")
 		return
 
-	# Get recovery items from inventory by category "recovery"
+	# Get recovery items from inventory by filtering item definitions
 	var recovery_items: Array = []
 
-	print("[StatusPanel] Inventory system methods: get_items_by_category=%s, get_all_item_ids=%s" % [
-		inv_sys.has_method("get_items_by_category"),
-		inv_sys.has_method("get_all_item_ids")
-	])
+	print("[StatusPanel] Using InventorySystem methods: get_item_defs, get_counts_dict, get_count")
 
-	if inv_sys.has_method("get_items_by_category"):
-		# Try getting items by "recovery" category first
-		var items_variant = inv_sys.call("get_items_by_category", "recovery")
-		print("[StatusPanel] get_items_by_category returned type: %s" % typeof(items_variant))
-		if typeof(items_variant) == TYPE_ARRAY:
-			recovery_items = items_variant
-			print("[StatusPanel] Found %d items in 'recovery' category: %s" % [recovery_items.size(), recovery_items])
+	# Get all item definitions
+	if inv_sys.has_method("get_item_defs"):
+		var all_defs: Dictionary = inv_sys.call("get_item_defs")
+		print("[StatusPanel] Total item definitions: %d" % all_defs.size())
 
-	# If no items found by category, fall back to manual filtering
-	if recovery_items.is_empty() and inv_sys.has_method("get_all_item_ids"):
-		print("[StatusPanel] Falling back to manual category filtering")
-		var all_ids = inv_sys.call("get_all_item_ids")
-		print("[StatusPanel] Total items in inventory: %d" % all_ids.size())
-		for item_id in all_ids:
-			if inv_sys.has_method("get_count") and inv_sys.has_method("get_def"):
-				var count = inv_sys.call("get_count", item_id)
-				if count > 0:
-					var def_data = inv_sys.call("get_def", item_id)
-					if typeof(def_data) == TYPE_DICTIONARY:
-						var category = String(def_data.get("category", "")).to_lower()
-						print("[StatusPanel] Item %s: count=%d, category='%s'" % [item_id, count, category])
-						if category == "recovery" or category.contains("recovery") or category.contains("heal") or category.contains("potion"):
-							recovery_items.append(item_id)
-							print("[StatusPanel] ✓ Added recovery item: %s" % item_id)
+		# Get item counts to check what we actually own
+		var counts_dict: Dictionary = {}
+		if inv_sys.has_method("get_counts_dict"):
+			counts_dict = inv_sys.call("get_counts_dict")
+			print("[StatusPanel] Total items in inventory: %d" % counts_dict.size())
+			print("[StatusPanel] Inventory items: %s" % counts_dict.keys())
+
+		# Filter by category "recovery" and check if we own the item
+		for item_id in all_defs.keys():
+			var def_data = all_defs[item_id]
+			if typeof(def_data) == TYPE_DICTIONARY:
+				var category = String(def_data.get("category", "")).to_lower()
+
+				# Check if this is a recovery item
+				if category == "recovery" or category.contains("recovery") or category.contains("heal") or category.contains("potion"):
+					# Check if we own it
+					var count = int(counts_dict.get(item_id, 0))
+					if count > 0:
+						recovery_items.append(item_id)
+						print("[StatusPanel] ✓ Added recovery item: %s (category: '%s', count: %d)" % [item_id, category, count])
+					else:
+						print("[StatusPanel] - Found recovery def but not owned: %s (category: '%s')" % [item_id, category])
 
 	print("[StatusPanel] Total recovery items found: %d" % recovery_items.size())
 
@@ -975,14 +975,15 @@ func _show_recovery_popup(member_id: String, member_name: String, hp: int, hp_ma
 		item_list.set_item_disabled(0, true)
 	else:
 		for item_id in recovery_items:
-			if inv_sys.has_method("get_count") and inv_sys.has_method("get_def"):
+			if inv_sys.has_method("get_count") and inv_sys.has_method("get_item_def"):
 				var count = inv_sys.call("get_count", item_id)
-				var def_data = inv_sys.call("get_def", item_id)
+				var def_data = inv_sys.call("get_item_def", item_id)
 				if typeof(def_data) == TYPE_DICTIONARY and count > 0:
 					var item_name = String(def_data.get("name", item_id))
 					var item_type = String(def_data.get("effect_type", "hp"))  # hp or mp
 					item_list.add_item("%s (x%d)" % [item_name, count])
 					item_list.set_item_metadata(item_list.item_count - 1, {"id": item_id, "type": item_type})
+					print("[StatusPanel] Added to popup list: %s (x%d)" % [item_name, count])
 
 	# Add Back button
 	var back_btn: Button = Button.new()
