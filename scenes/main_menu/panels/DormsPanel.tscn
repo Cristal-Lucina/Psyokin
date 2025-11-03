@@ -165,6 +165,7 @@ layout_mode = 2
 theme_override_constants/separation = 8
 
 [node name="RoomsSection" type="VBoxContainer" parent="Root/MainContent/RightPanel/VBox"]
+custom_minimum_size = Vector2(0, 215)
 layout_mode = 2
 size_flags_vertical = 3
 theme_override_constants/separation = 8
