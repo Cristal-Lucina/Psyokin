@@ -190,10 +190,41 @@ func _on_friday_reveals(pairs: Array) -> void:
 	if pairs.size() == 0:
 		return  # Don't show popup if no reveals
 
-	var popup := preload("res://scripts/main_menu/panels/FridayRAMailPopup.gd").create(pairs)
-	add_child(popup)
+	# Pause the game
+	get_tree().paused = true
+
+	# Build message from pairs
+	var lines: PackedStringArray = []
+	lines.append("The following neighbor relationships have been revealed after being neighbors for 2+ weeks:")
+	lines.append("")  # Empty line for spacing
+
+	for pair_v in pairs:
+		if typeof(pair_v) != TYPE_DICTIONARY:
+			continue
+		var pair: Dictionary = pair_v
+		var a_name: String = String(pair.get("a_name", ""))
+		var b_name: String = String(pair.get("b_name", ""))
+		var status: String = String(pair.get("status", "Neutral"))
+
+		lines.append("• %s and %s are %s" % [a_name, b_name, status])
+
+	var message := _join_lines(lines)
+
+	# Show popup using ToastPopup as overlay (controller-friendly)
+	var overlay := CanvasLayer.new()
+	overlay.layer = 100  # High layer to ensure it's on top
+	overlay.process_mode = Node.PROCESS_MODE_ALWAYS  # Process even when paused
+	add_child(overlay)
+
+	var popup := ToastPopup.create(message, "RA MAIL - FRIDAY NEIGHBOR REPORT")
+	popup.process_mode = Node.PROCESS_MODE_ALWAYS  # Process even when paused
+	overlay.add_child(popup)
 	await popup.closed
 	popup.queue_free()
+	overlay.queue_free()
+
+	# Unpause the game
+	get_tree().paused = false
 
 func _on_saturday_applied(new_layout: Dictionary, moves: Array) -> void:
 	"""Store Saturday moves for later display"""
@@ -397,3 +428,12 @@ func _exit_fullscreen() -> void:
 		# Restore focus to the tab that was just being viewed
 		if status_panel and status_panel.has_method("select_tab"):
 			status_panel.call("select_tab", previous_tab)
+
+func _join_lines(arr: PackedStringArray) -> String:
+	"""Helper to join PackedStringArray into a single string"""
+	var out := ""
+	for i in range(arr.size()):
+		if i > 0:
+			out += "\n"
+		out += arr[i]
+	return out
