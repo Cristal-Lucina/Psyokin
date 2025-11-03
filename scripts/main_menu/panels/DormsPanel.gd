@@ -354,6 +354,27 @@ func _on_accept_input() -> void:
 				_action_buttons[_current_action_index].emit_signal("pressed")
 
 func _on_back_input() -> void:
+	# Special case: if in ROSTER_SELECT, clear all state and exit to StatusPanel
+	if _nav_state == NavState.ROSTER_SELECT:
+		print("[DormsPanel._on_back_input] In ROSTER_SELECT - clearing all state and attempting to exit")
+
+		# Clear all navigation state
+		_nav_state_history.clear()
+		_selected_member = ""
+		_selected_room = ""
+
+		# Check if panel can close
+		if not _can_panel_close():
+			# Panel has pending changes - prevent closing
+			print("[DormsPanel._on_back_input] Cannot close panel - pending changes exist")
+			get_viewport().set_input_as_handled()
+		else:
+			# Panel can close - let GameMenu handle the back button
+			# This allows proper slide animation back to StatusPanel
+			print("[DormsPanel._on_back_input] Cleared state, returning to StatusPanel")
+			# Do NOT call get_viewport().set_input_as_handled() - let event bubble up
+		return
+
 	# Go back to previous navigation state
 	if _nav_state_history.size() > 0:
 		var prev_state: NavState = _nav_state_history.pop_back()
