@@ -25,8 +25,8 @@ const CATEGORIES : Array[String] = [
 # Scene references
 @onready var _category_list: ItemList = %CategoryList
 @onready var _item_list: ItemList = %ItemList
-@onready var _item_label: Label = %ItemLabel
-@onready var _count_label: Label = %CountLabel
+@onready var _item_label: Label = %ItemLabel  # Now in ItemColumn (moved from ItemHeader)
+@onready var _count_label: Label = %CountLabel  # Now in ItemHeader
 @onready var _item_name: Label = %ItemName
 @onready var _details_text: Label = %DetailsText
 @onready var _scroll_container: ScrollContainer = $Root/DetailsColumn/ScrollContainer
