@@ -544,7 +544,7 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 				var tween := create_tween()
 				tween.set_ease(Tween.EASE_OUT)
 				tween.set_trans(Tween.TRANS_CUBIC)
-				tween.tween_property(hp_bar, "value", new_hp, 0.5)
+				tween.tween_property(hp_bar, "value", new_hp, 2.0)
 			else:
 				hp_bar.value = new_hp
 		else:
@@ -604,7 +604,7 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 				var tween := create_tween()
 				tween.set_ease(Tween.EASE_OUT)
 				tween.set_trans(Tween.TRANS_CUBIC)
-				tween.tween_property(mp_bar, "value", new_mp, 0.5)
+				tween.tween_property(mp_bar, "value", new_mp, 2.0)
 			else:
 				mp_bar.value = new_mp
 		else:
