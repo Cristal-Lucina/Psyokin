@@ -42,6 +42,9 @@ func _build_ui() -> void:
 	# Ensure popup processes even when game is paused
 	process_mode = Node.PROCESS_MODE_ALWAYS
 
+	# Block all input from passing through
+	mouse_filter = Control.MOUSE_FILTER_STOP
+
 	# Add solid background (no transparency)
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0.15, 0.15, 0.15, 1.0)  # Dark gray, fully opaque

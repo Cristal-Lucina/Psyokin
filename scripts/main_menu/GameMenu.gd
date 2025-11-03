@@ -214,7 +214,7 @@ func _on_friday_reveals(pairs: Array) -> void:
 	var overlay := CanvasLayer.new()
 	overlay.layer = 100  # High layer to ensure it's on top
 	overlay.process_mode = Node.PROCESS_MODE_ALWAYS  # Process even when paused
-	add_child(overlay)
+	get_tree().root.add_child(overlay)  # Add to root so it processes input first
 
 	var popup := ToastPopup.create(message, "RA MAIL - FRIDAY NEIGHBOR REPORT")
 	popup.process_mode = Node.PROCESS_MODE_ALWAYS  # Process even when paused

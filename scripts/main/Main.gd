@@ -249,7 +249,7 @@ func _on_friday_reveals(pairs: Array) -> void:
 	var overlay := CanvasLayer.new()
 	overlay.layer = 100  # High layer to ensure it's on top
 	overlay.process_mode = Node.PROCESS_MODE_ALWAYS  # Process even when paused
-	add_child(overlay)
+	get_tree().root.add_child(overlay)  # Add to root so it processes input first
 
 	var popup := ToastPopup.create(message, "RA MAIL - FRIDAY NEIGHBOR REPORT")
 	popup.process_mode = Node.PROCESS_MODE_ALWAYS  # Process even when paused
@@ -1224,7 +1224,7 @@ func _show_reassignments_summary(new_layout: Dictionary, moves_in: Array) -> voi
 	var overlay := CanvasLayer.new()
 	overlay.layer = 100  # High layer to ensure it's on top
 	overlay.process_mode = Node.PROCESS_MODE_ALWAYS  # Process even when paused
-	add_child(overlay)
+	get_tree().root.add_child(overlay)  # Add to root so it processes input first
 
 	var popup := ToastPopup.create(message, "Reassignments Applied")
 	popup.process_mode = Node.PROCESS_MODE_ALWAYS  # Process even when paused
@@ -1264,7 +1264,7 @@ func _menu_can_close() -> bool:
 func _main_toast(msg: String) -> void:
 	var overlay := CanvasLayer.new()
 	overlay.layer = 100  # High layer to ensure it's on top
-	add_child(overlay)
+	get_tree().root.add_child(overlay)  # Add to root so it processes input first
 
 	var popup := ToastPopup.create(msg)
 	overlay.add_child(popup)
