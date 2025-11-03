@@ -1226,7 +1226,7 @@ func _show_reassignments_summary(new_layout: Dictionary, moves_in: Array) -> voi
 	overlay.process_mode = Node.PROCESS_MODE_ALWAYS  # Process even when paused
 	add_child(overlay)
 
-	var popup := ToastPopup.create(message, "Reassignments Applied")
+	var popup := ToastPopup.create(message, "Reassignments Applied", Vector2(550, 350))
 	popup.process_mode = Node.PROCESS_MODE_ALWAYS  # Process even when paused
 	overlay.add_child(popup)
 	await popup.closed
