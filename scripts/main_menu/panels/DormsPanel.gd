@@ -71,7 +71,6 @@ class_name DormsPanel
 @onready var _assign_room_btn: Button = %AssignRoomBtn
 @onready var _move_out_btn: Button = %MoveOutBtn
 @onready var _cancel_move_btn: Button = %CancelMoveBtn
-@onready var _accept_plan_btn: Button = %AcceptPlanBtn
 
 # ═══════════════════════════════════════════════════════════════════════════
 # STATE
@@ -151,9 +150,6 @@ func _ready() -> void:
 	if _cancel_move_btn and not _cancel_move_btn.pressed.is_connected(_on_cancel_move_pressed):
 		_cancel_move_btn.pressed.connect(_on_cancel_move_pressed)
 		print("[DormsPanel._ready] Connected cancel_move button")
-	if _accept_plan_btn and not _accept_plan_btn.pressed.is_connected(_on_accept_plan_pressed):
-		_accept_plan_btn.pressed.connect(_on_accept_plan_pressed)
-		print("[DormsPanel._ready] Connected accept_plan button")
 
 	# Connect to DormSystem signals
 	var ds: Node = _ds()
@@ -572,8 +568,6 @@ func _build_action_button_array() -> void:
 		_action_buttons.append(_move_out_btn)
 	if _cancel_move_btn:
 		_action_buttons.append(_cancel_move_btn)
-	if _accept_plan_btn:
-		_action_buttons.append(_accept_plan_btn)
 
 func _build_common_list() -> void:
 	# Clear existing common room members
@@ -688,7 +682,7 @@ func _update_details_for_member(member_id: String) -> void:
 	print("[DormsPanel._update_details_for_member] Details panel updated with %d lines for %s" % [lines.size(), name])
 
 func _update_action_buttons() -> void:
-	if not _assign_room_btn or not _move_out_btn or not _cancel_move_btn or not _accept_plan_btn:
+	if not _assign_room_btn or not _move_out_btn or not _cancel_move_btn:
 		return
 
 	var ds: Node = _ds()
@@ -696,7 +690,6 @@ func _update_action_buttons() -> void:
 		_assign_room_btn.disabled = true
 		_move_out_btn.disabled = true
 		_cancel_move_btn.disabled = true
-		_accept_plan_btn.disabled = true
 		return
 
 	# Assign Room: active if member selected and either:
@@ -712,9 +705,6 @@ func _update_action_buttons() -> void:
 
 	# Cancel Move: active if in reassignments view and has pending changes
 	_cancel_move_btn.disabled = not (_current_view == ViewType.REASSIGNMENTS and _has_pending_changes())
-
-	# Accept Plan: active if all common room members have been assigned to rooms
-	_accept_plan_btn.disabled = not (_current_view == ViewType.REASSIGNMENTS and _can_accept_plan())
 
 # ═══════════════════════════════════════════════════════════════════════════
 # SELECTION HANDLERS
@@ -867,14 +857,9 @@ func _on_cancel_move_pressed() -> void:
 	_show_toast("All pending moves cancelled.")
 	_rebuild()
 
-func _on_accept_plan_pressed() -> void:
-	if not _can_accept_plan():
-		_show_toast("Please assign all members in the common room before accepting the plan.")
-		return
-
-	var confirmed: bool = await _ask_confirm("Accept these room reassignments? Changes will take effect on Saturday.")
-	if not confirmed:
-		return
+func _auto_accept_plan() -> void:
+	"""Automatically accept the plan when all common room members are assigned"""
+	print("[DormsPanel._auto_accept_plan] Auto-accepting plan - common room is empty")
 
 	var ds: Node = _ds()
 	if not ds:
@@ -891,6 +876,7 @@ func _on_accept_plan_pressed() -> void:
 		_show_toast(String(res.get("reason", "Cannot accept plan.")))
 		return
 
+	print("[DormsPanel._auto_accept_plan] Plan locked for Saturday execution")
 	_pending_reassignments.clear()
 	_rebuild()
 
@@ -968,6 +954,11 @@ func _try_assign_to_room(room_id: String) -> void:
 	_nav_state = NavState.ROSTER_SELECT
 	_nav_state_history.clear()  # Clear history to reset navigation flow
 	_rebuild()
+
+	# Auto-accept plan if common room is now empty
+	if _can_accept_plan():
+		_auto_accept_plan()
+		return  # Skip focus since plan is locked
 
 	# Focus back on roster for next selection
 	_current_roster_index = 0
