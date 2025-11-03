@@ -290,23 +290,53 @@ func _navigate_down() -> void:
 func _navigate_left() -> void:
 	match _nav_state:
 		NavState.ROOM_SELECT:
-			# 2x4 grid: move left
+			# 2x4 grid: move left within grid
 			if _current_room_index % 4 > 0:
 				_current_room_index -= 1
 				_focus_current_room()
+			else:
+				# At leftmost edge of grid - navigate to Action Menu
+				_push_nav_state(NavState.ACTION_SELECT)
+				_current_action_index = 0
+				_focus_current_action()
+		NavState.ACTION_SELECT:
+			# Navigate to Roster
+			_push_nav_state(NavState.ROSTER_SELECT)
+			_current_roster_index = 0
+			_focus_current_roster()
+		NavState.COMMON_SELECT:
+			# Navigate to Roster
+			_push_nav_state(NavState.ROSTER_SELECT)
+			_current_roster_index = 0
+			_focus_current_roster()
 		_:
-			# All other states: no horizontal navigation between panels
+			# ROSTER_SELECT at left edge - no further left navigation
 			pass
 
 func _navigate_right() -> void:
 	match _nav_state:
+		NavState.ROSTER_SELECT:
+			# Navigate to Action Menu
+			_push_nav_state(NavState.ACTION_SELECT)
+			_current_action_index = 0
+			_focus_current_action()
+		NavState.COMMON_SELECT:
+			# Navigate to Action Menu
+			_push_nav_state(NavState.ACTION_SELECT)
+			_current_action_index = 0
+			_focus_current_action()
+		NavState.ACTION_SELECT:
+			# Navigate to Rooms
+			_push_nav_state(NavState.ROOM_SELECT)
+			_current_room_index = 0
+			_focus_current_room()
 		NavState.ROOM_SELECT:
-			# 2x4 grid: move right
+			# 2x4 grid: move right within grid
 			if _current_room_index % 4 < 3 and _current_room_index < _room_buttons.size() - 1:
 				_current_room_index += 1
 				_focus_current_room()
+			# At rightmost edge - no further right navigation
 		_:
-			# All other states: no horizontal navigation between panels
 			pass
 
 func _on_accept_input() -> void:
