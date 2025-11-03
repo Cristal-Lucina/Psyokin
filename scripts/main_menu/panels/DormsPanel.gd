@@ -992,30 +992,9 @@ func _get_member_previous_room(aid: String) -> String:
 	if not ds:
 		return ""
 
-	# Check if this member is in common room
-	var common_v: Variant = ds.call("get_common")
-	var common: PackedStringArray = (common_v if typeof(common_v) == TYPE_PACKED_STRING_ARRAY else PackedStringArray())
-	if not common.has(aid):
-		return ""  # Not in common room, no previous room
-
-	# Check staged vacations to find which room this member vacated
-	if ds.has_method("get_staged_vacations"):
-		var vacations_v: Variant = ds.call("get_staged_vacations")
-		if typeof(vacations_v) == TYPE_DICTIONARY:
-			var vacations: Dictionary = vacations_v
-			# vacations format: { room_id: actor_id } - maps room to who's leaving it
-			for room_id in vacations.keys():
-				if String(vacations[room_id]) == aid:
-					return room_id
-
-	# Alternative: check all rooms to see if any have VIS_STAGED and this member staged to leave
-	var room_ids_v: Variant = ds.call("list_rooms")
-	var room_ids: PackedStringArray = (room_ids_v if typeof(room_ids_v) == TYPE_PACKED_STRING_ARRAY else PackedStringArray())
-	for rid in room_ids:
-		var room_data: Dictionary = ds.call("get_room", rid)
-		var staged_to_leave: String = String(room_data.get("staged_to_leave", ""))
-		if staged_to_leave == aid:
-			return rid
+	# Check if DormSystem has the staged_prev_room data
+	if ds.has_method("get_staged_prev_room_for"):
+		return String(ds.call("get_staged_prev_room_for", aid))
 
 	return ""
 
