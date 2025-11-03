@@ -162,6 +162,9 @@ var _tab_ids: Array[String] = []
 var _last_selected_tab_index: int = 0  # Remember last selected tab
 var _last_focused_content_button_index: int = 0  # Remember last focused content button
 
+# HP/MP value cache for bar animations
+var _prev_hp_mp: Dictionary = {}  # "member_id" -> {"hp": int, "mp": int}
+
 # Controller navigation state - Simple state machine (like LoadoutPanel)
 enum NavState { MENU, CONTENT, POPUP_ACTIVE }
 var _nav_state: NavState = NavState.MENU
@@ -468,6 +471,9 @@ func _create_empty_slot(slot_type: String, slot_idx: int) -> PanelContainer:
 func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot: int) -> PanelContainer:
 	var panel := PanelContainer.new()
 
+	# Get member_id early for animation tracking
+	var member_id: String = String(member_data.get("_member_id", ""))
+
 	# Main horizontal container: member info on left, buttons on right
 	var main_hbox := HBoxContainer.new()
 	main_hbox.add_theme_constant_override("separation", 12)
@@ -527,7 +533,23 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 
 		hp_bar.min_value = 0.0
 		hp_bar.max_value = float(hp_max_i)
-		hp_bar.value = clamp(float(hp_i), 0.0, float(hp_max_i))
+
+		# Check if we have previous HP value and it's different (animate if changed)
+		var new_hp: float = clamp(float(hp_i), 0.0, float(hp_max_i))
+		if member_id != "" and _prev_hp_mp.has(member_id):
+			var old_hp: float = float(_prev_hp_mp[member_id].get("hp", new_hp))
+			if old_hp != new_hp:
+				# Start at old value and animate to new
+				hp_bar.value = old_hp
+				var tween := create_tween()
+				tween.set_ease(Tween.EASE_OUT)
+				tween.set_trans(Tween.TRANS_CUBIC)
+				tween.tween_property(hp_bar, "value", new_hp, 0.5)
+			else:
+				hp_bar.value = new_hp
+		else:
+			hp_bar.value = new_hp
+
 		hp_section.add_child(hp_bar)
 
 	stats_row.add_child(hp_section)
@@ -571,7 +593,23 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 
 		mp_bar.min_value = 0.0
 		mp_bar.max_value = float(mp_max_i)
-		mp_bar.value = clamp(float(mp_i), 0.0, float(mp_max_i))
+
+		# Check if we have previous MP value and it's different (animate if changed)
+		var new_mp: float = clamp(float(mp_i), 0.0, float(mp_max_i))
+		if member_id != "" and _prev_hp_mp.has(member_id):
+			var old_mp: float = float(_prev_hp_mp[member_id].get("mp", new_mp))
+			if old_mp != new_mp:
+				# Start at old value and animate to new
+				mp_bar.value = old_mp
+				var tween := create_tween()
+				tween.set_ease(Tween.EASE_OUT)
+				tween.set_trans(Tween.TRANS_CUBIC)
+				tween.tween_property(mp_bar, "value", new_mp, 0.5)
+			else:
+				mp_bar.value = new_mp
+		else:
+			mp_bar.value = new_mp
+
 		mp_section.add_child(mp_bar)
 
 	stats_row.add_child(mp_section)
@@ -588,7 +626,6 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 	recovery_btn.custom_minimum_size.x = 70
 	recovery_btn.add_theme_font_size_override("font_size", 10)
 	recovery_btn.focus_mode = Control.FOCUS_ALL
-	var member_id: String = String(member_data.get("_member_id", ""))
 	recovery_btn.set_meta("member_id", member_id)
 	recovery_btn.set_meta("member_name", String(member_data.get("name", "Member")))
 	recovery_btn.set_meta("hp", int(member_data.get("hp", 0)))
@@ -616,6 +653,14 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 
 	main_hbox.add_child(buttons_vbox)
 	panel.add_child(main_hbox)
+
+	# Store current HP/MP values for next rebuild animation
+	if member_id != "":
+		_prev_hp_mp[member_id] = {
+			"hp": hp_i,
+			"mp": mp_i
+		}
+
 	return panel
 
 func _get_member_snapshot(member_id: String) -> Dictionary:
