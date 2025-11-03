@@ -875,7 +875,6 @@ func _auto_accept_plan() -> void:
 		_show_toast(String(res.get("reason", "Cannot accept plan.")))
 		return
 
-	print("[DormsPanel._auto_accept_plan] Plan locked for Saturday execution")
 	_pending_reassignments.clear()
 	_rebuild()
 
