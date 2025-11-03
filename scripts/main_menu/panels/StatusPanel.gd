@@ -160,6 +160,7 @@ var _name_to_id  : Dictionary = {}      # lowercase "name" -> "actor_id"
 # Tab metadata (maps item index to tab_id)
 var _tab_ids: Array[String] = []
 var _last_selected_tab_index: int = 0  # Remember last selected tab
+var _last_focused_content_button_index: int = 0  # Remember last focused content button
 
 # Controller navigation state - Simple state machine (like LoadoutPanel)
 enum NavState { MENU, CONTENT, POPUP_ACTIVE }
@@ -690,6 +691,7 @@ func _show_no_bench_notice() -> void:
 	var popup_panel: Panel = Panel.new()
 	popup_panel.process_mode = Node.PROCESS_MODE_ALWAYS
 	popup_panel.z_index = 100
+	popup_panel.visible = false  # Hide until properly sized/positioned
 	add_child(popup_panel)
 
 	# Apply consistent styling (matches ToastPopup/ConfirmationPopup)
@@ -735,6 +737,9 @@ func _show_no_bench_notice() -> void:
 	popup_panel.position = (viewport_size - popup_panel.size) / 2.0
 	print("[StatusPanel] No-bench notice centered at: %s, size: %s" % [popup_panel.position, popup_panel.size])
 
+	# Now that it's properly sized and positioned, make it visible
+	popup_panel.visible = true
+
 	# Store metadata
 	popup_panel.set_meta("_is_notice_popup", true)
 
@@ -756,6 +761,76 @@ func _popup_close_notice() -> void:
 	print("[StatusPanel] Notice popup closed")
 	_popup_close_and_return_to_content()
 
+func _show_already_at_max_notice(member_name: String, stat_type: String) -> void:
+	"""Show 'already at max HP/MP' notice using Panel pattern"""
+	# Prevent multiple popups
+	if _active_popup and is_instance_valid(_active_popup):
+		print("[StatusPanel] Popup already open, ignoring request")
+		return
+
+	# Create popup panel
+	var popup_panel: Panel = Panel.new()
+	popup_panel.process_mode = Node.PROCESS_MODE_ALWAYS
+	popup_panel.z_index = 100
+	popup_panel.visible = false  # Hide until properly sized/positioned
+	add_child(popup_panel)
+
+	# Apply consistent styling (matches ToastPopup/ConfirmationPopup)
+	_style_popup_panel(popup_panel)
+
+	# Set active popup immediately
+	_active_popup = popup_panel
+
+	# Create content container
+	var vbox: VBoxContainer = VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 8)
+	vbox.custom_minimum_size.x = 300  # Set panel width to 300px
+	popup_panel.add_child(vbox)
+
+	# Title label
+	var title: Label = Label.new()
+	title.text = "Already at Max"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 14)
+	vbox.add_child(title)
+
+	# Message label
+	var message: Label = Label.new()
+	message.text = "%s is already at max %s." % [member_name, stat_type]
+	message.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	message.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	vbox.add_child(message)
+
+	# OK button
+	var ok_btn: Button = Button.new()
+	ok_btn.text = "OK"
+	ok_btn.custom_minimum_size.y = 32
+	ok_btn.pressed.connect(_popup_close_notice)
+	vbox.add_child(ok_btn)
+
+	# Position popup at screen center
+	popup_panel.set_anchors_preset(Control.PRESET_CENTER)
+	popup_panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	popup_panel.grow_vertical = Control.GROW_DIRECTION_BOTH
+	popup_panel.position = get_viewport_rect().size / 2 - vbox.custom_minimum_size / 2
+
+	# Now that it's properly sized and positioned, make it visible
+	popup_panel.visible = true
+
+	# Add to aPanelManager stack
+	if has_node("/root/aPanelManager"):
+		var pm = get_node("/root/aPanelManager")
+		if pm.has_method("push"):
+			pm.call("push", popup_panel)
+			print("[StatusPanel] Pushed 'already at max' notice to aPanelManager stack")
+
+	# Set state to POPUP_ACTIVE
+	_nav_state = NavState.POPUP_ACTIVE
+
+	# Grab focus on OK button
+	await get_tree().process_frame
+	ok_btn.grab_focus()
+
 func _show_heal_confirmation(member_name: String, heal_amount: int, healed_type: String) -> void:
 	"""Show healing confirmation message using Panel pattern"""
 	# Prevent multiple popups
@@ -767,6 +842,7 @@ func _show_heal_confirmation(member_name: String, heal_amount: int, healed_type:
 	var popup_panel: Panel = Panel.new()
 	popup_panel.process_mode = Node.PROCESS_MODE_ALWAYS
 	popup_panel.z_index = 100
+	popup_panel.visible = false  # Hide until properly sized/positioned
 	add_child(popup_panel)
 
 	# Apply consistent styling (matches ToastPopup/ConfirmationPopup)
@@ -813,6 +889,9 @@ func _show_heal_confirmation(member_name: String, heal_amount: int, healed_type:
 	popup_panel.position = (viewport_size - popup_panel.size) / 2.0
 	print("[StatusPanel] Heal confirmation centered at: %s, size: %s" % [popup_panel.position, popup_panel.size])
 
+	# Now that it's properly sized and positioned, make it visible
+	popup_panel.visible = true
+
 	# Store metadata
 	popup_panel.set_meta("_is_heal_confirmation_popup", true)
 
@@ -845,6 +924,7 @@ func _show_swap_confirmation(member_name: String, member_id: String) -> void:
 	var popup_panel: Panel = Panel.new()
 	popup_panel.process_mode = Node.PROCESS_MODE_ALWAYS
 	popup_panel.z_index = 100
+	popup_panel.visible = false  # Hide until properly sized/positioned
 	add_child(popup_panel)
 
 	# Apply consistent styling (matches ToastPopup/ConfirmationPopup)
@@ -890,6 +970,9 @@ func _show_swap_confirmation(member_name: String, member_id: String) -> void:
 	var viewport_size: Vector2 = get_viewport_rect().size
 	popup_panel.position = (viewport_size - popup_panel.size) / 2.0
 	print("[StatusPanel] Swap confirmation centered at: %s, size: %s" % [popup_panel.position, popup_panel.size])
+
+	# Now that it's properly sized and positioned, make it visible
+	popup_panel.visible = true
 
 	# Store metadata
 	popup_panel.set_meta("_is_swap_confirmation_popup", true)
@@ -957,6 +1040,7 @@ func _show_member_picker(active_slot: int) -> void:
 	var popup_panel: Panel = Panel.new()
 	popup_panel.process_mode = Node.PROCESS_MODE_ALWAYS
 	popup_panel.z_index = 100
+	popup_panel.visible = false  # Hide until properly sized/positioned
 	add_child(popup_panel)
 
 	# Apply consistent styling (matches ToastPopup/ConfirmationPopup)
@@ -1018,6 +1102,9 @@ func _show_member_picker(active_slot: int) -> void:
 	var viewport_size: Vector2 = get_viewport_rect().size
 	popup_panel.position = (viewport_size - popup_panel.size) / 2.0
 	print("[StatusPanel] Switch popup centered at: %s, size: %s" % [popup_panel.position, popup_panel.size])
+
+	# Now that it's properly sized and positioned, make it visible
+	popup_panel.visible = true
 
 	# Store metadata
 	popup_panel.set_meta("_is_switch_popup", true)
@@ -1190,6 +1277,7 @@ func _show_recovery_popup(member_id: String, member_name: String, hp: int, hp_ma
 	var popup_panel: Panel = Panel.new()
 	popup_panel.process_mode = Node.PROCESS_MODE_ALWAYS
 	popup_panel.z_index = 100
+	popup_panel.visible = false  # Hide until properly sized/positioned
 	add_child(popup_panel)
 
 	# Apply consistent styling (matches ToastPopup/ConfirmationPopup)
@@ -1259,6 +1347,9 @@ func _show_recovery_popup(member_id: String, member_name: String, hp: int, hp_ma
 	var viewport_size: Vector2 = get_viewport_rect().size
 	popup_panel.position = (viewport_size - popup_panel.size) / 2.0
 	print("[StatusPanel] Recovery popup centered at: %s, size: %s" % [popup_panel.position, popup_panel.size])
+
+	# Now that it's properly sized and positioned, make it visible
+	popup_panel.visible = true
 
 	# Store metadata
 	popup_panel.set_meta("_is_recovery_popup", true)
@@ -1345,20 +1436,10 @@ func _use_recovery_item(member_id: String, member_name: String, item_id: String,
 	"""Use a recovery item on a party member"""
 	# Check if already at max
 	if item_type == "hp" and hp >= hp_max:
-		var msg_popup := AcceptDialog.new()
-		msg_popup.dialog_text = "%s is already at max HP." % member_name
-		msg_popup.title = "Already at Max"
-		add_child(msg_popup)
-		msg_popup.popup_centered()
-		msg_popup.confirmed.connect(func(): msg_popup.queue_free())
+		_show_already_at_max_notice(member_name, "HP")
 		return
 	elif item_type == "mp" and mp >= mp_max:
-		var msg_popup := AcceptDialog.new()
-		msg_popup.dialog_text = "%s is already at max MP." % member_name
-		msg_popup.title = "Already at Max"
-		add_child(msg_popup)
-		msg_popup.popup_centered()
-		msg_popup.confirmed.connect(func(): msg_popup.queue_free())
+		_show_already_at_max_notice(member_name, "MP")
 		return
 
 	# Use the item
@@ -2001,21 +2082,24 @@ func _navigate_to_content() -> void:
 	# If we have a specific member to focus (after using recovery item), find that button
 	if _focus_member_id != "":
 		print("[StatusPanel] Looking for Recovery button for member: %s" % _focus_member_id)
-		for btn in buttons:
+		for i in range(buttons.size()):
+			var btn = buttons[i]
 			if btn.text == "Recovery" and btn.has_meta("member_id"):
 				var btn_member_id = String(btn.get_meta("member_id", ""))
 				if btn_member_id == _focus_member_id:
 					btn.grab_focus()
-					print("[StatusPanel] ✓ Restored focus to Recovery button for %s" % _focus_member_id)
+					_last_focused_content_button_index = i  # Remember this position
+					print("[StatusPanel] ✓ Restored focus to Recovery button for %s (index %d)" % [_focus_member_id, i])
 					_focus_member_id = ""  # Clear the focus target
 					return
-		print("[StatusPanel] WARNING: Could not find Recovery button for %s, focusing first button" % _focus_member_id)
+		print("[StatusPanel] WARNING: Could not find Recovery button for %s, using last position" % _focus_member_id)
 		_focus_member_id = ""  # Clear the focus target
 
-	# Focus the first button found (default behavior)
+	# Focus the last focused button (or first if index is invalid)
 	if buttons.size() > 0:
-		buttons[0].grab_focus()
-		print("[StatusPanel] ✓ Navigated to content - focused first button: %s" % buttons[0].text)
+		var index_to_focus = mini(_last_focused_content_button_index, buttons.size() - 1)
+		buttons[index_to_focus].grab_focus()
+		print("[StatusPanel] ✓ Navigated to content - focused button %d: %s" % [index_to_focus, buttons[index_to_focus].text])
 	else:
 		print("[StatusPanel] WARNING: No buttons found in content area")
 
@@ -2197,7 +2281,14 @@ func _unhandled_input(event: InputEvent) -> void:
 				focused_control is Button
 			])
 			if focused_control is Button:
-				print("[StatusPanel] ✓ Activating focused button: %s" % (focused_control as Button).text)
+				# Find and store the index of the activated button
+				var buttons: Array[Button] = []
+				_find_buttons_recursive(_party, buttons)
+				for i in range(buttons.size()):
+					if buttons[i] == focused_control:
+						_last_focused_content_button_index = i
+						print("[StatusPanel] ✓ Activating focused button %d: %s" % [i, (focused_control as Button).text])
+						break
 				(focused_control as Button).emit_signal("pressed")
 				get_viewport().set_input_as_handled()
 				return
