@@ -695,6 +695,8 @@ func _show_no_bench_notice() -> void:
 	var popup_panel: Panel = Panel.new()
 	popup_panel.process_mode = Node.PROCESS_MODE_ALWAYS
 	popup_panel.z_index = 100
+	popup_panel.modulate.a = 0.0  # Start fully transparent
+	popup_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE  # Block input until fade completes
 	add_child(popup_panel)
 
 	# Apply consistent styling (matches ToastPopup/ConfirmationPopup)
@@ -740,6 +742,8 @@ func _show_no_bench_notice() -> void:
 	popup_panel.position = (viewport_size - popup_panel.size) / 2.0
 	print("[StatusPanel] No-bench notice centered at: %s, size: %s" % [popup_panel.position, popup_panel.size])
 
+	# Fade in popup
+	_fade_in_popup(popup_panel)
 
 	# Store metadata
 	popup_panel.set_meta("_is_notice_popup", true)
@@ -773,6 +777,8 @@ func _show_already_at_max_notice(member_name: String, stat_type: String) -> void
 	var popup_panel: Panel = Panel.new()
 	popup_panel.process_mode = Node.PROCESS_MODE_ALWAYS
 	popup_panel.z_index = 100
+	popup_panel.modulate.a = 0.0  # Start fully transparent
+	popup_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE  # Block input until fade completes
 	add_child(popup_panel)
 
 	# Apply consistent styling (matches ToastPopup/ConfirmationPopup)
@@ -814,6 +820,8 @@ func _show_already_at_max_notice(member_name: String, stat_type: String) -> void
 	popup_panel.grow_vertical = Control.GROW_DIRECTION_BOTH
 	popup_panel.position = get_viewport_rect().size / 2 - vbox.custom_minimum_size / 2
 
+	# Fade in popup
+	_fade_in_popup(popup_panel)
 
 	# Add to aPanelManager stack
 	if has_node("/root/aPanelManager"):
@@ -840,6 +848,8 @@ func _show_heal_confirmation(member_name: String, heal_amount: int, healed_type:
 	var popup_panel: Panel = Panel.new()
 	popup_panel.process_mode = Node.PROCESS_MODE_ALWAYS
 	popup_panel.z_index = 100
+	popup_panel.modulate.a = 0.0  # Start fully transparent
+	popup_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE  # Block input until fade completes
 	add_child(popup_panel)
 
 	# Apply consistent styling (matches ToastPopup/ConfirmationPopup)
@@ -885,6 +895,8 @@ func _show_heal_confirmation(member_name: String, heal_amount: int, healed_type:
 	var viewport_size: Vector2 = get_viewport_rect().size
 	popup_panel.position = (viewport_size - popup_panel.size) / 2.0
 	print("[StatusPanel] Heal confirmation centered at: %s, size: %s" % [popup_panel.position, popup_panel.size])
+	# Fade in popup
+	_fade_in_popup(popup_panel)
 
 
 	# Store metadata
@@ -919,6 +931,8 @@ func _show_swap_confirmation(member_name: String, member_id: String) -> void:
 	var popup_panel: Panel = Panel.new()
 	popup_panel.process_mode = Node.PROCESS_MODE_ALWAYS
 	popup_panel.z_index = 100
+	popup_panel.modulate.a = 0.0  # Start fully transparent
+	popup_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE  # Block input until fade completes
 	add_child(popup_panel)
 
 	# Apply consistent styling (matches ToastPopup/ConfirmationPopup)
@@ -964,6 +978,8 @@ func _show_swap_confirmation(member_name: String, member_id: String) -> void:
 	var viewport_size: Vector2 = get_viewport_rect().size
 	popup_panel.position = (viewport_size - popup_panel.size) / 2.0
 	print("[StatusPanel] Swap confirmation centered at: %s, size: %s" % [popup_panel.position, popup_panel.size])
+	# Fade in popup
+	_fade_in_popup(popup_panel)
 
 
 	# Store metadata
@@ -999,6 +1015,38 @@ func _style_popup_panel(popup_panel: Panel) -> void:
 	style.corner_radius_bottom_right = 8
 	popup_panel.add_theme_stylebox_override("panel", style)
 
+func _fade_in_popup(popup_panel: Panel) -> void:
+	"""Fade in popup over 0.3 seconds and enable input when complete"""
+	# Create tween for fade-in animation
+	var tween := create_tween()
+	tween.set_ease(Tween.EASE_OUT)
+	tween.set_trans(Tween.TRANS_CUBIC)
+
+	# Fade from transparent to fully visible
+	tween.tween_property(popup_panel, "modulate:a", 1.0, 0.3)
+
+	# Enable input after fade completes
+	tween.tween_callback(func():
+		popup_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+		print("[StatusPanel] Popup fade-in complete, input enabled")
+	)
+
+func _fade_out_popup(popup_panel: Panel, on_complete: Callable) -> void:
+	"""Fade out popup over 0.3 seconds and call callback when complete"""
+	# Disable input immediately
+	popup_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	# Create tween for fade-out animation
+	var tween := create_tween()
+	tween.set_ease(Tween.EASE_IN)
+	tween.set_trans(Tween.TRANS_CUBIC)
+
+	# Fade to transparent
+	tween.tween_property(popup_panel, "modulate:a", 0.0, 0.3)
+
+	# Call callback after fade completes
+	tween.tween_callback(on_complete)
+
 func _show_member_picker(active_slot: int) -> void:
 	"""Show bench member picker popup - LoadoutPanel pattern"""
 	if not _gs: return
@@ -1032,6 +1080,8 @@ func _show_member_picker(active_slot: int) -> void:
 	var popup_panel: Panel = Panel.new()
 	popup_panel.process_mode = Node.PROCESS_MODE_ALWAYS
 	popup_panel.z_index = 100
+	popup_panel.modulate.a = 0.0  # Start fully transparent
+	popup_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE  # Block input until fade completes
 	add_child(popup_panel)
 
 	# Apply consistent styling (matches ToastPopup/ConfirmationPopup)
@@ -1093,6 +1143,8 @@ func _show_member_picker(active_slot: int) -> void:
 	var viewport_size: Vector2 = get_viewport_rect().size
 	popup_panel.position = (viewport_size - popup_panel.size) / 2.0
 	print("[StatusPanel] Switch popup centered at: %s, size: %s" % [popup_panel.position, popup_panel.size])
+	# Fade in popup
+	_fade_in_popup(popup_panel)
 
 
 	# Store metadata
@@ -1178,27 +1230,30 @@ func _popup_close_and_return_to_content() -> void:
 	if not _active_popup or not is_instance_valid(_active_popup):
 		return
 
-	print("[StatusPanel] Closing popup, returning to content mode")
+	print("[StatusPanel] Closing popup with fade-out, returning to content mode")
 
-	# Store popup reference and clear BEFORE popping
+	# Store popup reference and clear BEFORE fading
 	var popup_to_close = _active_popup
 	_active_popup = null
 
-	# CRITICAL: Set state to CONTENT BEFORE popping
+	# CRITICAL: Set state to CONTENT BEFORE fading
 	_nav_state = NavState.CONTENT
 
-	# Pop from panel manager
-	var panel_mgr = get_node_or_null("/root/aPanelManager")
-	if panel_mgr and panel_mgr.has_method("pop_panel"):
-		panel_mgr.call("pop_panel")
-		print("[StatusPanel] Popped switch popup from aPanelManager")
+	# Fade out popup, then clean up
+	_fade_out_popup(popup_to_close, func():
+		# Pop from panel manager
+		var panel_mgr = get_node_or_null("/root/aPanelManager")
+		if panel_mgr and panel_mgr.has_method("pop_panel"):
+			panel_mgr.call("pop_panel")
+			print("[StatusPanel] Popped popup from aPanelManager")
 
-	# Free the popup
-	if is_instance_valid(popup_to_close):
-		popup_to_close.queue_free()
+		# Free the popup
+		if is_instance_valid(popup_to_close):
+			popup_to_close.queue_free()
 
-	# Restore focus to first button in content
-	call_deferred("_navigate_to_content")
+		# Restore focus to first button in content
+		call_deferred("_navigate_to_content")
+	)
 
 func _show_recovery_popup(member_id: String, member_name: String, hp: int, hp_max: int, mp: int, mp_max: int) -> void:
 	"""Show recovery item selection popup - LoadoutPanel pattern"""
@@ -1266,6 +1321,8 @@ func _show_recovery_popup(member_id: String, member_name: String, hp: int, hp_ma
 	var popup_panel: Panel = Panel.new()
 	popup_panel.process_mode = Node.PROCESS_MODE_ALWAYS
 	popup_panel.z_index = 100
+	popup_panel.modulate.a = 0.0  # Start fully transparent
+	popup_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE  # Block input until fade completes
 	add_child(popup_panel)
 
 	# Apply consistent styling (matches ToastPopup/ConfirmationPopup)
@@ -1335,6 +1392,8 @@ func _show_recovery_popup(member_id: String, member_name: String, hp: int, hp_ma
 	var viewport_size: Vector2 = get_viewport_rect().size
 	popup_panel.position = (viewport_size - popup_panel.size) / 2.0
 	print("[StatusPanel] Recovery popup centered at: %s, size: %s" % [popup_panel.position, popup_panel.size])
+	# Fade in popup
+	_fade_in_popup(popup_panel)
 
 
 	# Store metadata
