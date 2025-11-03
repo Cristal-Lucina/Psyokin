@@ -17,15 +17,15 @@
 ##
 ## LAYOUT:
 ##   Left Panel (Dorm Roster):
-##   • View Type selector (Placements/Reassignments)
-##   • List of all dorm members (up/down navigation)
+##   • Dorm Roster list (all members in rooms)
+##   • Common Room list (members awaiting assignment)
 ##
-##   Center Panel (Details):
-##   • Name, Room, Neighbors, Status for selected member
+##   Center Panel (Action Menu):
+##   • Assign Room, Move Out, Cancel Move, Accept Plan buttons
 ##
 ##   Right Panel (split):
 ##   • Top: Rooms grid (2x4) showing room numbers and occupants
-##   • Bottom: Common Room list + 4 action buttons
+##   • Bottom: Details section (Name, Room, Neighbors, Status for selected/hovered member)
 ##
 ## SELECTION FLOW:
 ##   1. Initially can only navigate up/down in roster or change view
@@ -60,7 +60,7 @@ class_name DormsPanel
 # Left Panel - Roster
 @onready var _roster_list: VBoxContainer = %RosterList
 
-# Center Panel - Details
+# Right Panel - Details (bottom section)
 @onready var _detail_content: RichTextLabel = %DetailContent
 
 # Right Panel - Rooms + Common
@@ -609,15 +609,21 @@ func _build_common_list() -> void:
 
 func _update_details() -> void:
 	"""Update details panel for the currently selected member"""
+	print("[DormsPanel._update_details] Updating details for selected member: ", _selected_member)
 	if _selected_member == "":
 		if _detail_content:
 			_detail_content.text = "[i]Select a member from the roster.[/i]"
+			print("[DormsPanel._update_details] Showing default prompt (no selection)")
 	else:
 		_update_details_for_member(_selected_member)
+		print("[DormsPanel._update_details] Details updated for: ", _selected_member)
 
 func _update_details_for_member(member_id: String) -> void:
 	"""Update details panel for a specific member (used for hover and selection)"""
+	print("[DormsPanel._update_details_for_member] Updating details panel in RIGHT PANEL for member: ", member_id)
+
 	if not _detail_content:
+		print("[DormsPanel._update_details_for_member] ERROR: _detail_content is null!")
 		return
 
 	if member_id == "":
@@ -669,6 +675,7 @@ func _update_details_for_member(member_id: String) -> void:
 			lines.append("  • Will move to room %s" % pending_room)
 
 	_detail_content.text = _join_psa(lines, "\n")
+	print("[DormsPanel._update_details_for_member] Details panel updated with %d lines for %s" % [lines.size(), name])
 
 func _update_action_buttons() -> void:
 	if not _assign_room_btn or not _move_out_btn or not _cancel_move_btn or not _accept_plan_btn:
