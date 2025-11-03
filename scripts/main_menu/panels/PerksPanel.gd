@@ -542,6 +542,8 @@ func _show_perk_confirmation(perk: Dictionary) -> void:
 	var confirm_btn: Button = Button.new()
 	confirm_btn.text = "Unlock Perk"
 	confirm_btn.custom_minimum_size.x = 120
+	confirm_btn.process_mode = Node.PROCESS_MODE_ALWAYS  # Must process when game is paused
+	confirm_btn.focus_mode = Control.FOCUS_ALL
 	confirm_btn.pressed.connect(_on_confirm_perk)
 	button_row.add_child(confirm_btn)
 
@@ -549,8 +551,14 @@ func _show_perk_confirmation(perk: Dictionary) -> void:
 	var cancel_btn: Button = Button.new()
 	cancel_btn.text = "Cancel"
 	cancel_btn.custom_minimum_size.x = 120
+	cancel_btn.process_mode = Node.PROCESS_MODE_ALWAYS  # Must process when game is paused
+	cancel_btn.focus_mode = Control.FOCUS_ALL
 	cancel_btn.pressed.connect(_on_cancel_perk)
 	button_row.add_child(cancel_btn)
+
+	# Set up focus neighbors for left/right navigation
+	confirm_btn.focus_neighbor_right = confirm_btn.get_path_to(cancel_btn)
+	cancel_btn.focus_neighbor_left = cancel_btn.get_path_to(confirm_btn)
 
 	# Auto-size and center
 	await get_tree().process_frame
@@ -622,21 +630,29 @@ func _on_acquired_perk_selected(index: int) -> void:
 
 func _input(event: InputEvent) -> void:
 	"""Catch ALL input when popup is active to prevent it from reaching other systems"""
-	# When popup is active, block ALL input from propagating
+	# When popup is active, block everything except what we explicitly handle
 	if _active_popup and is_instance_valid(_active_popup):
+		# Handle Back to cancel
+		if event.is_action_pressed("menu_back"):
+			_on_cancel_perk()
+			get_viewport().set_input_as_handled()
+			return
+		# Allow menu_accept to reach focused button (will trigger pressed signal)
+		# but mark as handled after buttons process it
+		elif event.is_action_pressed("menu_accept"):
+			# Don't mark as handled yet - let button process it first
+			return
+		# Block ALL other input to prevent grid navigation in background
 		get_viewport().set_input_as_handled()
-		return
 
 func _unhandled_input(event: InputEvent) -> void:
 	"""Handle controller input for grid navigation"""
 	if not visible:
 		return
 
-	# Block input when popup is active
+	# Block ALL input when popup is active (buttons handle their own input via signals)
 	if _active_popup and is_instance_valid(_active_popup):
-		# Consume all input events including back button
-		if event.is_action_pressed("menu_back") or event.is_action_pressed("ui_cancel"):
-			get_viewport().set_input_as_handled()
+		get_viewport().set_input_as_handled()
 		return
 
 	var handled: bool = false

@@ -1249,8 +1249,8 @@ func _show_toast(msg: String) -> void:
 	var popup := ToastPopup.create(msg)
 	add_child(popup)
 
-	# Wait for user to acknowledge
-	await popup.closed
+	# Wait for user to respond (accept or cancel)
+	await popup.confirmed
 
 	popup.queue_free()
 	print("[DormsPanel._show_toast] Toast closed")
