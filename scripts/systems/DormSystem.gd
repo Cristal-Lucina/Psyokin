@@ -709,17 +709,34 @@ func cancel_reassignment_for(aid: String) -> void:
 	plan_changed.emit()
 
 func pick_room_for(aid: String, to_room: String) -> Dictionary:
-	if not _staged_common.has(aid): return {"ok": false, "reason": "Character is not in reassignment staging."}
+	# Accept characters from BOTH staged_common (reassignments) AND regular common (new placements)
+	var in_staged: bool = _staged_common.has(aid)
+	var in_common: bool = _common.has(aid)
+
+	if not in_staged and not in_common:
+		return {"ok": false, "reason": "Character is not in common room or reassignment staging."}
+
 	if not ROOM_IDS.has(to_room): return {"ok": false, "reason": "Unknown room."}
 	if to_room == "301": return {"ok": false, "reason": "RA room (301) is reserved."}
+
+	# Check if they're going back to their origin room (only applies to reassignments)
 	var origin: String = String(_staged_prev_room.get(aid, ""))
-	if origin != "" and origin == to_room: return {"ok": false, "reason": "That’s their current room; no reassignment needed."}
+	if origin != "" and origin == to_room: return {"ok": false, "reason": "That's their current room; no reassignment needed."}
+
+	# Check if room is free
 	var is_free: bool = (String((_rooms[to_room] as Dictionary).get("occupant","")) == "")
 	for k_any in _staged_assign.keys():
 		if String(_staged_assign[k_any]) == to_room and String(k_any) != aid:
 			is_free = false
 			break
 	if not is_free: return {"ok": false, "reason": "Room is occupied or targeted by another reassignment."}
+
+	# If character is in regular common (not staged), move them to staged_common for tracking
+	if in_common and not in_staged:
+		_common.erase(aid)
+		_staged_common.append(aid)
+		# No previous room for new characters, so we don't set _staged_prev_room[aid]
+
 	_staged_assign[aid] = to_room
 	_update_blocking_state()
 	dorms_changed.emit()
@@ -727,11 +744,18 @@ func pick_room_for(aid: String, to_room: String) -> Dictionary:
 	return {"ok": true}
 
 func reset_placement() -> void:
+	# Return characters with previous rooms back to their rooms
 	for aid_k in _staged_prev_room.keys():
 		var aid: String = String(aid_k)
 		var r: String = String(_staged_prev_room[aid])
 		if r != "" and String((_rooms[r] as Dictionary).get("occupant","")) == "":
 			_rooms[r]["occupant"] = aid
+
+	# Return new characters (in staged_common but NOT in staged_prev_room) back to regular common
+	for aid in _staged_common:
+		if not _staged_prev_room.has(aid) and not _common.has(aid):
+			_common.append(aid)
+
 	_staged_common.clear()
 	_staged_prev_room.clear()
 	_staged_assign.clear()
