@@ -192,6 +192,58 @@ func _find_cps() -> Node:
 
 # --- Dorm hooks (new) ----------------------------------------------------------
 var _prelock_layout: Dictionary = {}  # room_id -> aid (snapshot after Accept Plan)
+var _ds: Node = null  # DormSystem reference
+var _pending_saturday_moves: Array = []  # Store moves for Saturday popup
+
+func _connect_dorm_signals() -> void:
+	"""Connect to DormSystem signals for popups"""
+	_ds = get_node_or_null("/root/aDormSystem")
+	if not _ds:
+		print("[Main] Warning: DormSystem not found")
+		return
+
+	print("[Main] Connecting to DormSystem signals...")
+
+	# Friday RA Mail popup
+	if _ds.has_signal("friday_reveals_ready") and not _ds.is_connected("friday_reveals_ready", Callable(self, "_on_friday_reveals")):
+		_ds.connect("friday_reveals_ready", Callable(self, "_on_friday_reveals"))
+		print("[Main] Connected friday_reveals_ready signal")
+
+	# Saturday moves popup
+	if _ds.has_signal("saturday_reveals_ready") and not _ds.is_connected("saturday_reveals_ready", Callable(self, "_on_saturday_reveals")):
+		_ds.connect("saturday_reveals_ready", Callable(self, "_on_saturday_reveals"))
+		print("[Main] Connected saturday_reveals_ready signal")
+
+	# Store Saturday moves for display
+	if _ds.has_signal("saturday_applied_v2") and not _ds.is_connected("saturday_applied_v2", Callable(self, "_on_saturday_applied")):
+		_ds.connect("saturday_applied_v2", Callable(self, "_on_saturday_applied"))
+		print("[Main] Connected saturday_applied_v2 signal")
+
+func _on_friday_reveals(pairs: Array) -> void:
+	"""Show Friday RA Mail popup"""
+	print("[Main] Friday reveals triggered with %d pairs" % pairs.size())
+	if pairs.size() == 0:
+		return  # Don't show popup if no reveals
+
+	var popup := preload("res://scripts/main_menu/panels/FridayRAMailPopup.gd").create(pairs)
+	add_child(popup)
+	await popup.closed
+	popup.queue_free()
+
+func _on_saturday_applied(new_layout: Dictionary, moves: Array) -> void:
+	"""Store Saturday moves for later display"""
+	print("[Main] Saturday applied with %d moves" % moves.size())
+	_pending_saturday_moves = moves
+
+func _on_saturday_reveals(pairs: Array) -> void:
+	"""Show Saturday moves popup with executed moves and new relationships"""
+	print("[Main] Saturday reveals triggered with %d pairs" % pairs.size())
+	# Combine moves and relationship reveals
+	var popup := preload("res://scripts/main_menu/panels/SaturdayMovesPopup.gd").create(_pending_saturday_moves, pairs)
+	add_child(popup)
+	await popup.closed
+	popup.queue_free()
+	_pending_saturday_moves.clear()
 
 func _reparent_ui_to_canvas_layers() -> void:
 	"""Reparent UI elements to CanvasLayers so they stay fixed when camera moves"""
@@ -297,6 +349,9 @@ func _ready() -> void:
 	_refresh_roster_picker()
 	_refresh_ui()
 	_refresh_spots_status()
+
+	# Dorm system signals (popups show on Main, not GameMenu)
+	_connect_dorm_signals()
 
 	# Calendar signals
 	if calendar:

@@ -68,16 +68,18 @@ func _build_ui() -> void:
 	scroll.add_child(content_vbox)
 
 	# Section 1: Room Moves
-	var moves_title := Label.new()
+	var moves_title := RichTextLabel.new()
 	moves_title.text = "[b]Room Moves Executed:[/b]"
-	moves_title.use_bbcode = true
 	moves_title.bbcode_enabled = true
+	moves_title.fit_content = true
+	moves_title.scroll_active = false
 	content_vbox.add_child(moves_title)
 
 	if _moves.size() == 0:
-		var no_moves := Label.new()
+		var no_moves := RichTextLabel.new()
 		no_moves.text = "• No room reassignments this week."
-		no_moves.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		no_moves.fit_content = true
+		no_moves.scroll_active = false
 		content_vbox.add_child(no_moves)
 	else:
 		for move_v in _moves:
@@ -88,7 +90,7 @@ func _build_ui() -> void:
 			var from_room: String = String(move.get("from", ""))
 			var to_room: String = String(move.get("to", ""))
 
-			var move_label := Label.new()
+			var move_label := RichTextLabel.new()
 			if from_room != "" and to_room != "":
 				move_label.text = "• [b]%s[/b] moved from [color=#2196F3]%s[/color] to [color=#4CAF50]%s[/color]" % [name, from_room, to_room]
 			elif from_room != "":
@@ -97,9 +99,9 @@ func _build_ui() -> void:
 				move_label.text = "• [b]%s[/b] moved to [color=#4CAF50]%s[/color]" % [name, to_room]
 			else:
 				move_label.text = "• [b]%s[/b] moved (details unavailable)" % name
-			move_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-			move_label.use_bbcode = true
 			move_label.bbcode_enabled = true
+			move_label.fit_content = true
+			move_label.scroll_active = false
 			content_vbox.add_child(move_label)
 
 	# Section 2: New Neighbor Relationships (if any)
@@ -108,16 +110,18 @@ func _build_ui() -> void:
 		spacer.custom_minimum_size = Vector2(0, 12)
 		content_vbox.add_child(spacer)
 
-		var reveals_title := Label.new()
+		var reveals_title := RichTextLabel.new()
 		reveals_title.text = "[b]New Neighbor Relationships:[/b]"
-		reveals_title.use_bbcode = true
 		reveals_title.bbcode_enabled = true
+		reveals_title.fit_content = true
+		reveals_title.scroll_active = false
 		content_vbox.add_child(reveals_title)
 
-		var reveals_note := Label.new()
+		var reveals_note := RichTextLabel.new()
 		reveals_note.text = "(These relationships are now 'Unknown Connection' until next Friday)"
-		reveals_note.add_theme_font_size_override("font_size", 11)
-		reveals_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		reveals_note.add_theme_font_size_override("normal_font_size", 11)
+		reveals_note.fit_content = true
+		reveals_note.scroll_active = false
 		content_vbox.add_child(reveals_note)
 
 		for pair_v in _reveal_pairs:
@@ -127,9 +131,10 @@ func _build_ui() -> void:
 			var a_name: String = String(pair.get("a_name", ""))
 			var b_name: String = String(pair.get("b_name", ""))
 
-			var pair_label := Label.new()
+			var pair_label := RichTextLabel.new()
 			pair_label.text = "• %s and %s are now neighbors" % [a_name, b_name]
-			pair_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			pair_label.fit_content = true
+			pair_label.scroll_active = false
 			content_vbox.add_child(pair_label)
 
 	# Divider

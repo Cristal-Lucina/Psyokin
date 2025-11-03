@@ -1,283 +1,358 @@
 ## ═══════════════════════════════════════════════════════════════════════════
-## DormsPanel - Dormitory Room Assignment UI
+## DormsPanel - Dormitory Room Assignment UI (Redesigned)
 ## ═══════════════════════════════════════════════════════════════════════════
 ##
 ## PURPOSE:
-##   Main menu panel for managing dormitory room assignments, displaying the
-##   8-room layout, handling weekly Saturday reassignments, and showing
-##   neighbor relationships (Bestie/Rival pairs).
+##   Main menu panel for managing dormitory room assignments with a roster-based
+##   interface. Three-panel layout: Roster | Details | Rooms+Common
 ##
 ## RESPONSIBILITIES:
-##   • 8-room visual grid display (301-308)
-##   • Room occupancy display (name/empty/staged)
-##   • Common area management (unassigned members)
-##   • Two modes:
-##     - Placements: Immediate Common area assignments
-##     - Reassignment: Saturday weekly planning mode
-##   • Planning/staging system (preview moves before applying)
-##   • Accept/Cancel controls for staged reassignments
-##   • Neighbor relationship display (Bestie/Rival indicators)
-##   • Real-time updates when dorm state changes
+##   • Dorm roster display with all members
+##   • View type selection (Placements/Reassignments)
+##   • Member details display (name, room, neighbors, status)
+##   • 8-room visual grid display (301-308) with occupants
+##   • Common room management with action buttons
+##   • Room assignment flow with validation and confirmations
+##   • Reassignment planning for Saturday moves
 ##
-## DISPLAY MODES:
-##   Placements Mode:
-##   • Show current room assignments
-##   • Common area member list
-##   • Click member + room to assign immediately
-##   • Shows neighbor relationships
+## LAYOUT:
+##   Left Panel (Dorm Roster):
+##   • View Type selector (Placements/Reassignments)
+##   • List of all dorm members (up/down navigation)
 ##
-##   Reassignment Mode (Saturday):
-##   • Plan room swaps/reassignments
-##   • Staged moves turn rooms red (consumed)
-##   • Accept Plan button (applies all changes)
-##   • Cancel button (discard staging)
-##   • Blocks time advancement until accepted/cancelled
+##   Center Panel (Details):
+##   • Name, Room, Neighbors, Status for selected member
 ##
-## ROOM VISUAL STATES:
-##   • EMPTY (0) - No occupant, available
-##   • OCCUPIED (1) - Has occupant, normal state
-##   • STAGED (2) - Part of pending reassignment plan (red)
-##   • LOCKED (3) - Cannot be modified
+##   Right Panel (split):
+##   • Top: Rooms grid (2x4) showing room numbers and occupants
+##   • Bottom: Common Room list + 4 action buttons
 ##
-## CONNECTED SYSTEMS (Autoloads):
-##   • DormSystem - Room assignments, neighbor tracking, reassignment logic
-##
-## UI ELEMENTS:
-##   Left Panel:
-##   • 8-room grid (2x4 layout)
-##   • Common area member list
-##   • Filter dropdown (Placements/Reassignment)
-##   • Refresh button
-##
-##   Right Panel:
-##   • Detail text (selected room/member info)
-##   • Reassignment controls (when in Reassignment mode)
-##   • Accept/Cancel buttons
-##
-## KEY METHODS:
-##   • _rebuild() - Refresh entire room grid and Common list
-##   • _on_room_clicked(room_id) - Handle room selection
-##   • _on_common_person_clicked(actor_id) - Handle Common member selection
-##   • _on_accept_plan() - Apply staged reassignments
-##   • _on_cancel_plan() - Discard staging, return to normal
-##   • _on_filter_changed(index) - Switch between Placements/Reassignment
+## SELECTION FLOW:
+##   1. Initially can only navigate up/down in roster or change view
+##   2. Selecting roster member → enables common room actions
+##   3. First-time members: only "Assign Room" active
+##   4. Previously assigned: "Assign Room" inactive until moved to common room
+##   5. Can move multiple members to common room
+##   6. When assigning from common room, select a room:
+##      - Yellow = room with person moving out (available)
+##      - Green = vacant room
+##      - Red = their current room (can't go back)
+##   7. Accept Plan becomes active when all common room members assigned
+##   8. Confirmation → everyone returns to previous room
+##   9. Reassignments view shows pending Saturday moves
 ##
 ## ═══════════════════════════════════════════════════════════════════════════
 
 extends PanelBase
 class_name DormsPanel
 
-# Scene hooks
-@onready var _grid_holder  : VBoxContainer  = $Root/MainContent/LeftPanel/VBox/Scroll/List
-@onready var _detail       : RichTextLabel  = $Root/MainContent/RightPanel/VBox/DetailScroll/DetailContent/Detail
-@onready var _refresh_btn  : Button         = $Root/Header/RefreshBtn
-@onready var _filter       : OptionButton   = $Root/Header/Filter
+# ═══════════════════════════════════════════════════════════════════════════
+# NODE REFERENCES
+# ═══════════════════════════════════════════════════════════════════════════
 
-# Right-side controls (from TSCN)
-@onready var _common_box  : VBoxContainer = %CommonBox
-@onready var _reassign_btn: Button        = %ReassignBtn
-@onready var _reset_btn   : Button        = %ResetBtn
-@onready var _accept_btn  : Button        = %AcceptBtn
+@onready var _refresh_btn: Button = $Root/Header/RefreshBtn
 
-# State
-var _selected_room: String = ""
-var _selected_person: String = ""  # actor_id (from Common Room)
-var _pending_room: String = ""     # room-first flow: user clicked a room first
-var _group: ButtonGroup = null
+# Left Panel - Roster
+@onready var _view_type_filter: OptionButton = %ViewTypeFilter
+@onready var _roster_list: VBoxContainer = %RosterList
 
-# Track rooms consumed during this reassignment session (turned red in UI)
-var _used_rooms: Dictionary = {}  # room_id -> true
+# Center Panel - Details
+@onready var _detail_content: RichTextLabel = %DetailContent
 
-# Navigation state machine
-enum NavState {
-	ROOM_SELECT,    # Navigating room grid
-	COMMON_SELECT,  # Navigating common room list
-	POPUP_ACTIVE    # Popup is open (block navigation)
-}
-var _nav_state: NavState = NavState.ROOM_SELECT
+# Right Panel - Rooms + Common
+@onready var _rooms_grid: GridContainer = %RoomsGrid
+@onready var _common_list: VBoxContainer = %CommonList
+
+# Action Buttons
+@onready var _assign_room_btn: Button = %AssignRoomBtn
+@onready var _move_out_btn: Button = %MoveOutBtn
+@onready var _cancel_move_btn: Button = %CancelMoveBtn
+@onready var _accept_plan_btn: Button = %AcceptPlanBtn
+
+# ═══════════════════════════════════════════════════════════════════════════
+# STATE
+# ═══════════════════════════════════════════════════════════════════════════
+
+enum ViewType { PLACEMENTS, REASSIGNMENTS }
+var _current_view: ViewType = ViewType.PLACEMENTS
+
+var _selected_member: String = ""  # actor_id from roster
+var _selected_room: String = ""    # room_id from rooms grid
+
+var _all_members: PackedStringArray = []  # All dorm members
+var _common_members: PackedStringArray = []  # Members in common room
+var _pending_reassignments: Dictionary = {}  # actor_id -> room_id
+
+# Navigation
+enum NavState { ROSTER_SELECT, COMMON_SELECT, ROOM_SELECT, ACTION_SELECT }
+var _nav_state: NavState = NavState.ACTION_SELECT
+var _nav_state_history: Array[NavState] = []  # Track navigation history for back button
+var _roster_buttons: Array[Button] = []
 var _room_buttons: Array[Button] = []
 var _common_buttons: Array[Button] = []
+var _action_buttons: Array[Button] = []
+var _current_roster_index: int = 0
 var _current_room_index: int = 0
 var _current_common_index: int = 0
+var _current_action_index: int = 0
 
-# Local mirror of DormsSystem.RoomVisual values (keep in sync)
-const VIS_EMPTY     := 0
-const VIS_OCCUPIED  := 1
-const VIS_STAGED    := 2
-const VIS_LOCKED    := 3
+# Room visual states
+const VIS_EMPTY := 0
+const VIS_OCCUPIED := 1
+const VIS_STAGED := 2
+const VIS_LOCKED := 3
+
+# ═══════════════════════════════════════════════════════════════════════════
+# INITIALIZATION
+# ═══════════════════════════════════════════════════════════════════════════
+
+func _ready() -> void:
+	super()  # Call PanelBase._ready()
+
+	print("[DormsPanel._ready] Starting initialization")
+
+	set_anchors_preset(Control.PRESET_FULL_RECT)
+
+	# Verify node references
+	print("[DormsPanel._ready] Node checks:")
+	print("  _view_type_filter: ", _view_type_filter != null)
+	print("  _roster_list: ", _roster_list != null)
+	print("  _detail_content: ", _detail_content != null)
+	print("  _rooms_grid: ", _rooms_grid != null)
+	print("  _common_list: ", _common_list != null)
+	print("  _assign_room_btn: ", _assign_room_btn != null)
+	print("  _move_out_btn: ", _move_out_btn != null)
+	print("  _cancel_move_btn: ", _cancel_move_btn != null)
+	print("  _accept_plan_btn: ", _accept_plan_btn != null)
+
+	# Setup view type filter
+	if _view_type_filter and _view_type_filter.item_count == 0:
+		_view_type_filter.add_item("Placements", 0)
+		_view_type_filter.add_item("Reassignments", 1)
+		_view_type_filter.select(0)
+		if not _view_type_filter.item_selected.is_connected(_on_view_type_changed):
+			_view_type_filter.item_selected.connect(_on_view_type_changed)
+			print("[DormsPanel._ready] Connected view_type_filter.item_selected")
+
+	# Connect refresh button
+	if _refresh_btn and not _refresh_btn.pressed.is_connected(_rebuild):
+		_refresh_btn.pressed.connect(_rebuild)
+		print("[DormsPanel._ready] Connected refresh button")
+
+	# Connect action buttons
+	if _assign_room_btn and not _assign_room_btn.pressed.is_connected(_on_assign_room_pressed):
+		_assign_room_btn.pressed.connect(_on_assign_room_pressed)
+		print("[DormsPanel._ready] Connected assign_room button")
+	if _move_out_btn and not _move_out_btn.pressed.is_connected(_on_move_out_pressed):
+		_move_out_btn.pressed.connect(_on_move_out_pressed)
+		print("[DormsPanel._ready] Connected move_out button")
+	if _cancel_move_btn and not _cancel_move_btn.pressed.is_connected(_on_cancel_move_pressed):
+		_cancel_move_btn.pressed.connect(_on_cancel_move_pressed)
+		print("[DormsPanel._ready] Connected cancel_move button")
+	if _accept_plan_btn and not _accept_plan_btn.pressed.is_connected(_on_accept_plan_pressed):
+		_accept_plan_btn.pressed.connect(_on_accept_plan_pressed)
+		print("[DormsPanel._ready] Connected accept_plan button")
+
+	# Connect to DormSystem signals
+	var ds: Node = _ds()
+	print("[DormsPanel._ready] DormSystem found: ", ds != null)
+	if ds:
+		print("[DormsPanel._ready] DormSystem signals available:")
+		print("  dorms_changed: ", ds.has_signal("dorms_changed"))
+		print("  plan_changed: ", ds.has_signal("plan_changed"))
+
+		if ds.has_signal("dorms_changed") and not ds.is_connected("dorms_changed", Callable(self, "_on_dorms_changed")):
+			ds.connect("dorms_changed", Callable(self, "_on_dorms_changed"))
+			print("[DormsPanel._ready] Connected dorms_changed signal")
+		if ds.has_signal("plan_changed") and not ds.is_connected("plan_changed", Callable(self, "_on_dorms_changed")):
+			ds.connect("plan_changed", Callable(self, "_on_dorms_changed"))
+			print("[DormsPanel._ready] Connected plan_changed signal")
+
+	print("[DormsPanel._ready] Calling _rebuild()")
+	_rebuild()
+	print("[DormsPanel._ready] Initialization complete")
 
 func _ds() -> Node:
 	return get_node_or_null("/root/aDormSystem")
 
-func _ready() -> void:
-	super()  # Call PanelBase._ready() first
-
-	# Debug node references
-	print("[DormsPanel._ready] _grid_holder: %s" % _grid_holder)
-	print("[DormsPanel._ready] _detail: %s" % _detail)
-	print("[DormsPanel._ready] _common_box: %s" % _common_box)
-
-	set_anchors_preset(Control.PRESET_FULL_RECT)
-	if _detail != null:
-		_detail.bbcode_enabled = true
-
-	if _filter != null and _filter.item_count == 0:
-		_filter.add_item("Placements", 0)
-		_filter.add_item("Reassignment", 1)
-		_filter.select(0)
-		if not _filter.item_selected.is_connected(_on_filter_changed):
-			_filter.item_selected.connect(_on_filter_changed)
-
-	if _refresh_btn != null and not _refresh_btn.pressed.is_connected(_rebuild):
-		_refresh_btn.pressed.connect(_rebuild)
-
-	# Wire up right control buttons
-	if _reassign_btn != null and not _reassign_btn.pressed.is_connected(_on_reassign_pressed):
-		_reassign_btn.pressed.connect(_on_reassign_pressed)
-	if _reset_btn != null and not _reset_btn.pressed.is_connected(_on_reset_pressed):
-		_reset_btn.pressed.connect(_on_reset_pressed)
-	if _accept_btn != null and not _accept_btn.pressed.is_connected(_on_accept_pressed):
-		_accept_btn.pressed.connect(_on_accept_pressed)
-
-	var ds: Node = _ds()
-	if ds != null:
-		if ds.has_signal("dorms_changed"):
-			ds.connect("dorms_changed", Callable(self, "_on_model_bumped"))
-		if ds.has_signal("plan_changed"):
-			ds.connect("plan_changed", Callable(self, "_on_model_bumped"))
-		if ds.has_signal("saturday_applied"):
-			ds.connect("saturday_applied", func(_snap: Dictionary) -> void: _on_model_bumped())
-		# Optional: react if the system is blocking time advance (could show a banner)
-		if ds.has_signal("blocking_state_changed"):
-			ds.connect("blocking_state_changed", func(_locked: bool) -> void: _refresh_accept_state())
-
-	# Guard: if someone tries to hide/swap the panel while Accept is active, cancel it.
-	if not visibility_changed.is_connected(_on_visibility_changed):
-		visibility_changed.connect(_on_visibility_changed)
-
-	_rebuild()
-
 # ═══════════════════════════════════════════════════════════════════════════
-# PanelBase Overrides
+# PANELBASE OVERRIDES
 # ═══════════════════════════════════════════════════════════════════════════
 
 func _on_panel_gained_focus() -> void:
 	super()
-	print("[DormsPanel] Panel gained focus - is_active: %s, is_registered: %s" % [is_active(), is_registered()])
-	_nav_state = NavState.ROOM_SELECT
-	_focus_current_room()
-
-func _on_panel_lost_focus() -> void:
-	super()
+	print("[DormsPanel] Panel gained focus")
+	_nav_state = NavState.ACTION_SELECT
+	_nav_state_history.clear()
+	print("[DormsPanel] Nav state set to ACTION_SELECT, history cleared")
+	_current_action_index = 0
+	_focus_current_action()
 
 func _can_panel_close() -> bool:
-	# Prevent closing if common room has members
-	var ds: Node = _ds()
-	if ds != null:
-		var common_v: Variant = ds.call("get_common")
-		var common: PackedStringArray = (common_v if typeof(common_v) == TYPE_PACKED_STRING_ARRAY else PackedStringArray())
-		if common.size() > 0:
-			_show_toast("Cannot close panel while unassigned members are in the common room. Please assign them first.")
+	# Prevent closing if common room has members without assignments
+	if _current_view == ViewType.REASSIGNMENTS:
+		if _has_unassigned_common_members():
+			_show_toast("Please assign all members in the common room before leaving.")
 			return false
-
-	# Also prevent closing if Accept Plan is active
-	if _is_accept_active():
-		_show_toast("Room Reassignments not complete.")
-		return false
-
 	return true
 
 # ═══════════════════════════════════════════════════════════════════════════
-# Controller Input Handling
+# INPUT HANDLING
 # ═══════════════════════════════════════════════════════════════════════════
 
 func _input(event: InputEvent) -> void:
-	# Debug logging
-	if event is InputEventJoypadButton and event.pressed:
-		print("[DormsPanel._input] Button %d, is_active: %s, nav_state: %s" % [event.button_index, is_active(), _nav_state])
-
 	if not is_active():
 		return
 
-	if _nav_state == NavState.POPUP_ACTIVE:
-		return  # Let popup handle input
+	# Note: Popup input is now handled by ConfirmationPopup and ToastPopup classes
+	# They call set_input_as_handled() to block panel input while visible
 
 	# Handle directional navigation
 	if event.is_action_pressed("move_up"):
+		print("[DormsPanel._input] UP pressed, current state: ", _get_nav_state_name(_nav_state))
 		_navigate_up()
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("move_down"):
+		print("[DormsPanel._input] DOWN pressed, current state: ", _get_nav_state_name(_nav_state))
 		_navigate_down()
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("move_left"):
+		print("[DormsPanel._input] LEFT pressed, current state: ", _get_nav_state_name(_nav_state))
 		_navigate_left()
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("move_right"):
+		print("[DormsPanel._input] RIGHT pressed, current state: ", _get_nav_state_name(_nav_state))
 		_navigate_right()
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("menu_accept"):
+		print("[DormsPanel._input] ACCEPT pressed, current state: ", _get_nav_state_name(_nav_state))
 		_on_accept_input()
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("menu_back"):
-		# Handle back - try to close panel
-		if _can_panel_close():
-			hide()
-		get_viewport().set_input_as_handled()
+		print("[DormsPanel._input] BACK pressed, current state: ", _get_nav_state_name(_nav_state), ", history size: ", _nav_state_history.size())
+		_on_back_input()
+		# Note: _on_back_input() only handles input if history exists
+		# If no history, it lets the event bubble up to GameMenu for proper panel transition
+
+func _get_nav_state_name(state: NavState) -> String:
+	match state:
+		NavState.ROSTER_SELECT: return "ROSTER_SELECT"
+		NavState.COMMON_SELECT: return "COMMON_SELECT"
+		NavState.ROOM_SELECT: return "ROOM_SELECT"
+		NavState.ACTION_SELECT: return "ACTION_SELECT"
+		_: return "UNKNOWN"
 
 func _navigate_up() -> void:
-	if _nav_state == NavState.ROOM_SELECT:
-		# 2x4 grid: move up one row (subtract 4 from index)
-		var new_index: int = _current_room_index - 4
-		if new_index >= 0:
-			_current_room_index = new_index
-			_focus_current_room()
-	elif _nav_state == NavState.COMMON_SELECT:
-		if _current_common_index > 0:
-			_current_common_index -= 1
-			_focus_current_common()
-		else:
-			# Wrap to room grid
-			_nav_state = NavState.ROOM_SELECT
-			_focus_current_room()
+	match _nav_state:
+		NavState.ROSTER_SELECT:
+			if _current_roster_index > 0:
+				_current_roster_index -= 1
+				_focus_current_roster()
+		NavState.ROOM_SELECT:
+			# 2x4 grid: move up one row (subtract 4)
+			var new_index: int = _current_room_index - 4
+			if new_index >= 0:
+				_current_room_index = new_index
+				_focus_current_room()
+		NavState.COMMON_SELECT:
+			if _current_common_index > 0:
+				_current_common_index -= 1
+				_focus_current_common()
+		NavState.ACTION_SELECT:
+			if _current_action_index > 0:
+				_current_action_index -= 1
+				_focus_current_action()
+			elif _current_action_index == 0:
+				# Move to View Type filter (above first button)
+				_focus_view_type()
 
 func _navigate_down() -> void:
-	if _nav_state == NavState.ROOM_SELECT:
-		# 2x4 grid: move down one row (add 4 to index)
-		var new_index: int = _current_room_index + 4
-		if new_index < _room_buttons.size():
-			_current_room_index = new_index
-			_focus_current_room()
-		else:
-			# Move to common room list
-			_nav_state = NavState.COMMON_SELECT
-			_current_common_index = 0
-			_focus_current_common()
-	elif _nav_state == NavState.COMMON_SELECT:
-		if _current_common_index < _common_buttons.size() - 1:
-			_current_common_index += 1
-			_focus_current_common()
+	match _nav_state:
+		NavState.ROSTER_SELECT:
+			if _current_roster_index < _roster_buttons.size() - 1:
+				_current_roster_index += 1
+				_focus_current_roster()
+		NavState.ROOM_SELECT:
+			# 2x4 grid: move down one row (add 4)
+			var new_index: int = _current_room_index + 4
+			if new_index < _room_buttons.size():
+				_current_room_index = new_index
+				_focus_current_room()
+		NavState.COMMON_SELECT:
+			if _current_common_index < _common_buttons.size() - 1:
+				_current_common_index += 1
+				_focus_current_common()
+		NavState.ACTION_SELECT:
+			if _current_action_index < _action_buttons.size() - 1:
+				_current_action_index += 1
+				_focus_current_action()
 
 func _navigate_left() -> void:
-	if _nav_state == NavState.ROOM_SELECT:
-		# 2x4 grid: move left
-		if _current_room_index % 4 > 0:
-			_current_room_index -= 1
-			_focus_current_room()
+	match _nav_state:
+		NavState.ROOM_SELECT:
+			# 2x4 grid: move left
+			if _current_room_index % 4 > 0:
+				_current_room_index -= 1
+				_focus_current_room()
 
 func _navigate_right() -> void:
-	if _nav_state == NavState.ROOM_SELECT:
-		# 2x4 grid: move right
-		if _current_room_index % 4 < 3 and _current_room_index < _room_buttons.size() - 1:
-			_current_room_index += 1
-			_focus_current_room()
+	# Disabled - navigation is locked within current state unless back pressed
+	pass
 
 func _on_accept_input() -> void:
-	if _nav_state == NavState.ROOM_SELECT:
-		if _current_room_index >= 0 and _current_room_index < _room_buttons.size():
-			_room_buttons[_current_room_index].emit_signal("pressed")
-	elif _nav_state == NavState.COMMON_SELECT:
-		if _current_common_index >= 0 and _current_common_index < _common_buttons.size():
-			_common_buttons[_current_common_index].emit_signal("pressed")
+	match _nav_state:
+		NavState.ROSTER_SELECT:
+			if _current_roster_index >= 0 and _current_roster_index < _roster_buttons.size():
+				_roster_buttons[_current_roster_index].emit_signal("pressed")
+		NavState.ROOM_SELECT:
+			if _current_room_index >= 0 and _current_room_index < _room_buttons.size():
+				_room_buttons[_current_room_index].emit_signal("pressed")
+		NavState.COMMON_SELECT:
+			if _current_common_index >= 0 and _current_common_index < _common_buttons.size():
+				_common_buttons[_current_common_index].emit_signal("pressed")
+		NavState.ACTION_SELECT:
+			if _current_action_index >= 0 and _current_action_index < _action_buttons.size():
+				_action_buttons[_current_action_index].emit_signal("pressed")
+
+func _on_back_input() -> void:
+	# Go back to previous navigation state
+	if _nav_state_history.size() > 0:
+		var prev_state: NavState = _nav_state_history.pop_back()
+		print("[DormsPanel._on_back_input] Going back from %s to %s" % [_get_nav_state_name(_nav_state), _get_nav_state_name(prev_state)])
+		_nav_state = prev_state
+
+		# Clear selection when going back to roster
+		if _nav_state == NavState.ROSTER_SELECT:
+			print("[DormsPanel._on_back_input] Clearing member selection")
+			_selected_member = ""
+			_update_details()
+			_update_action_buttons()
+			_update_room_colors()
+
+		match _nav_state:
+			NavState.ROSTER_SELECT:
+				_focus_current_roster()
+			NavState.COMMON_SELECT:
+				_focus_current_common()
+			NavState.ROOM_SELECT:
+				_focus_current_room()
+			NavState.ACTION_SELECT:
+				_focus_current_action()
+		get_viewport().set_input_as_handled()
+	else:
+		# No history - don't handle input, let GameMenu handle the back button
+		# This allows proper slide animation back to StatusPanel
+		print("[DormsPanel._on_back_input] No history, letting GameMenu handle back button for slide transition")
+		# Do NOT call get_viewport().set_input_as_handled() - let event bubble up
+
+func _focus_view_type() -> void:
+	# View type is now in Action Menu (right panel)
+	if _view_type_filter:
+		_view_type_filter.grab_focus()
+
+func _focus_current_roster() -> void:
+	if _current_roster_index >= 0 and _current_roster_index < _roster_buttons.size():
+		_roster_buttons[_current_roster_index].grab_focus()
 
 func _focus_current_room() -> void:
 	if _current_room_index >= 0 and _current_room_index < _room_buttons.size():
@@ -287,518 +362,520 @@ func _focus_current_common() -> void:
 	if _current_common_index >= 0 and _current_common_index < _common_buttons.size():
 		_common_buttons[_current_common_index].grab_focus()
 
-func _on_model_bumped() -> void:
-	_rebuild()
+func _focus_current_action() -> void:
+	if _current_action_index >= 0 and _current_action_index < _action_buttons.size():
+		_action_buttons[_current_action_index].grab_focus()
 
-func _on_filter_changed(_ix: int) -> void:
-	# Leaving Reassignment view? clear local red paint
-	if _filter and _filter.get_selected_id() != 1:
-		_used_rooms.clear()
-		_pending_room = ""
-	_rebuild()
+func _push_nav_state(new_state: NavState) -> void:
+	"""Push current state to history and switch to new state"""
+	print("[DormsPanel._push_nav_state] Pushing %s to history, switching to %s" % [_get_nav_state_name(_nav_state), _get_nav_state_name(new_state)])
+	_nav_state_history.append(_nav_state)
+	_nav_state = new_state
+	print("[DormsPanel._push_nav_state] History size now: ", _nav_state_history.size())
 
-# ─────────────────────────────────────────────────────────────
-# Build grid + common list + summary
-# ─────────────────────────────────────────────────────────────
+# ═══════════════════════════════════════════════════════════════════════════
+# UI BUILDING
+# ═══════════════════════════════════════════════════════════════════════════
+
 func _rebuild() -> void:
-	_build_grid()
+	print("[DormsPanel._rebuild] Starting rebuild, current view: ", "PLACEMENTS" if _current_view == ViewType.PLACEMENTS else "REASSIGNMENTS")
+	var ds: Node = _ds()
+	if not ds:
+		print("[DormsPanel._rebuild] ERROR: DormSystem not found!")
+		return
+
+	_build_roster_list()
+	_build_rooms_grid()
 	_build_common_list()
-	_update_detail(_selected_room)
-	_refresh_accept_state()
+	_build_action_button_array()
+	_update_details()
+	_update_action_buttons()
+	print("[DormsPanel._rebuild] Rebuild complete")
 
-func _build_grid() -> void:
-	for c in _grid_holder.get_children():
+func _build_roster_list() -> void:
+	print("[DormsPanel._build_roster_list] Building roster list")
+	# Clear existing roster
+	for c in _roster_list.get_children():
 		c.queue_free()
-
-	# Clear button array for controller navigation
-	_room_buttons.clear()
-
-	var grid := GridContainer.new()
-	grid.columns = 4
-	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	grid.size_flags_vertical   = Control.SIZE_EXPAND_FILL
-	_grid_holder.add_child(grid)
-
-	_group = ButtonGroup.new()
-	_group.allow_unpress = false
+	_roster_buttons.clear()
 
 	var ds: Node = _ds()
-	if ds == null:
+	if not ds:
+		print("[DormsPanel._build_roster_list] ERROR: DormSystem not found!")
 		return
 
-	var ids_v: Variant = ds.call("list_rooms")
-	var ids: PackedStringArray = (ids_v if typeof(ids_v) == TYPE_PACKED_STRING_ARRAY else PackedStringArray())
-	for rid in ids:
-		var b := Button.new()
-		b.toggle_mode = true
-		b.button_group = _group
-		b.focus_mode = Control.FOCUS_ALL
-		b.text = rid
-		_apply_room_visual(b, rid)
-		b.pressed.connect(func(room_id := rid) -> void:
-			_selected_room = room_id
-			_update_detail(room_id)
+	# Get all dorm members (everyone who has or could have a room)
+	_all_members = _get_all_dorm_members(ds)
+	print("[DormsPanel._build_roster_list] Found %d members" % _all_members.size())
 
-			# Room-first flow: if empty (green) or staged (yellow), remember it
-			var vis: int = int(ds.call("get_room_visual", room_id))
-			if vis == VIS_EMPTY or vis == VIS_STAGED:
-				_pending_room = room_id
-			else:
-				_pending_room = ""
-
-			# Person-first flow (standard)
-			if _selected_person != "":
-				_try_place_selected(room_id)
-			else:
-				# If no one selected and room is placeable, nudge user to pick from Common
-				if vis == VIS_EMPTY or vis == VIS_STAGED:
-					pass
-		)
-		if _selected_room == rid:
-			b.button_pressed = true
-		grid.add_child(b)
-		_room_buttons.append(b)
-
-	# Summary under the grid
-	var summary := RichTextLabel.new()
-	summary.bbcode_enabled = false
-	summary.fit_content = true
-	summary.scroll_active = false
-	summary.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	summary.add_theme_font_size_override("normal_font_size", 12)
-	summary.text = _build_summary_text()
-	_grid_holder.add_child(summary)
-
-func _build_summary_text() -> String:
-	var ds: Node = _ds()
-	if ds == null:
-		return ""
-	var mode: int = 0
-	if _filter:
-		mode = _filter.get_selected_id()
-
-	if mode == 0:
-		# Placements: show current occupant of each room
-		var out := PackedStringArray()
-		var ids: PackedStringArray = ds.call("list_rooms")
-		for i in range(ids.size()):
-			var rid2: String = ids[i]
-			var r: Dictionary = ds.call("get_room", rid2)
-			var who: String = String(r.get("occupant", ""))
-			var disp_name: String = (String(ds.call("display_name", who)) if who != "" else "— empty —")
-			out.append("%s : %s" % [rid2, disp_name])
-		return _join_psa(out, "\n")
-	else:
-		# Reassignment preview (prefer explicit API)
-		if ds.has_method("list_upcoming_reassignments"):
-			var rows_v: Variant = ds.call("list_upcoming_reassignments")
-			if typeof(rows_v) == TYPE_ARRAY:
-				var lines := PackedStringArray()
-				var arr: Array = rows_v
-				for i in range(arr.size()):
-					var row_v: Variant = arr[i]
-					if typeof(row_v) == TYPE_DICTIONARY:
-						var d: Dictionary = row_v
-						var nm: String = String(d.get("name",""))
-						var fr: String = String(d.get("from",""))
-						var to: String = String(d.get("to",""))
-						if nm != "" and fr != "" and to != "":
-							lines.append("%s moving from %s into %s" % [nm, fr, to])
-						elif nm != "" and fr != "":
-							lines.append("%s moving from %s (target TBD)" % [nm, fr])
-						elif nm != "" and to != "":
-							lines.append("%s moving into %s" % [nm, to])
-				return _join_psa(lines, "\n")
-		# Fallback discovery
-		var lines2 := PackedStringArray()
-		var staged: Array[String] = _collect_staged_members(ds)
-		if staged.size() == 0:
-			return "— none —"
-		for i2 in range(staged.size()):
-			var aid: String = staged[i2]
-			var from_room: String = _find_current_room_of(ds, aid)
-			var to_room: String = _staged_target_for(ds, aid)
-			var nm2: String = String(ds.call("display_name", aid))
-			if from_room != "" and to_room != "":
-				lines2.append("%s moving from %s into %s" % [nm2, from_room, to_room])
-			elif from_room != "":
-				lines2.append("%s moving from %s (target TBD)" % [nm2, from_room])
-			elif to_room != "":
-				lines2.append("%s moving into %s" % [nm2, to_room])
-			else:
-				lines2.append("%s — staged (details TBD)" % nm2)
-		return _join_psa(lines2, "\n")
-
-# Robust staged-members discovery
-func _collect_staged_members(ds: Node) -> Array[String]:
-	var out: Array[String] = []
-	for m in ["get_all_staged_members","list_staged_members","get_staged_members"]:
-		if ds.has_method(m):
-			var v: Variant = ds.call(m)
-			if typeof(v) == TYPE_ARRAY:
-				var arr: Array = v
-				for i in range(arr.size()): out.append(String(arr[i]))
-			elif typeof(v) == TYPE_PACKED_STRING_ARRAY:
-				var psa: PackedStringArray = v
-				for j in range(psa.size()): out.append(String(psa[j]))
-			if out.size() > 0:
-				return out
-	# Fallback: any occupant currently marked staged
-	var ids: PackedStringArray = ds.call("list_rooms")
-	for i2 in range(ids.size()):
-		var rid: String = ids[i2]
-		var r: Dictionary = ds.call("get_room", rid)
-		var who: String = String(r.get("occupant",""))
-		if who != "" and ds.has_method("is_staged") and bool(ds.call("is_staged", who)) and not out.has(who):
-			out.append(who)
-	return out
-
-# Where is a member right now?
-func _find_current_room_of(ds: Node, aid: String) -> String:
-	var ids: PackedStringArray = ds.call("list_rooms")
-	for i in range(ids.size()):
-		var rid: String = ids[i]
-		var r: Dictionary = ds.call("get_room", rid)
-		if String(r.get("occupant","")) == aid:
-			return rid
-	return ""
-
-# Try very hard to find the staged target for a member
-func _staged_target_for(ds: Node, aid: String) -> String:
-	for fn in ["get_staged_target_for","staged_target_for","get_plan_target_for"]:
-		if ds.has_method(fn):
-			var v: Variant = ds.call(fn, aid)
-			if typeof(v) == TYPE_STRING and String(v) != "":
-				return String(v)
-	for fn2 in ["get_staged_assignments","staged_assignments","get_staged_places","list_staged_assignments"]:
-		if ds.has_method(fn2):
-			var v2: Variant = ds.call(fn2)
-			if typeof(v2) == TYPE_DICTIONARY and (v2 as Dictionary).has(aid):
-				return String((v2 as Dictionary)[aid])
-	var ids: PackedStringArray = ds.call("list_rooms")
-	for i2 in range(ids.size()):
-		var rid2: String = ids[i2]
-		var r2: Dictionary = ds.call("get_room", rid2)
-		for k in r2.keys():
-			var key: String = String(k).to_lower()
-			if key.find("stage") != -1 or key.find("plan") != -1 or key.find("incoming") != -1:
-				var val: Variant = r2[k]
-				if typeof(val) == TYPE_STRING and String(val) == aid:
-					return rid2
-				elif typeof(val) == TYPE_DICTIONARY:
-					var d3: Dictionary = val
-					for inner in ["member","id","who","occupant"]:
-						if d3.has(inner) and typeof(d3[inner]) == TYPE_STRING and String(d3[inner]) == aid:
-							return rid2
-	return ""
-
-func _build_common_list() -> void:
-	if _common_box == null:
-		return
-	for c in _common_box.get_children():
-		c.queue_free()
-
-	# Clear common buttons array for controller navigation
-	_common_buttons.clear()
-
-	var ds: Node = _ds()
-	if ds == null:
-		return
-
-	var list_v: Variant = ds.call("get_common")
-	var list_psa: PackedStringArray = (list_v if typeof(list_v) == TYPE_PACKED_STRING_ARRAY else PackedStringArray())
-	if list_psa.size() == 0:
+	if _all_members.size() == 0:
 		var empty := Label.new()
-		empty.text = "— none —"
-		_common_box.add_child(empty)
+		empty.text = "— no members —"
+		_roster_list.add_child(empty)
 		return
 
-	# A small hint row if user “armed” a room first
-	if _pending_room != "":
-		var hint := Label.new()
-		hint.text = "Place into room %s:" % _pending_room
-		hint.add_theme_font_size_override("font_size", 11)
-		_common_box.add_child(hint)
-
-	for i in range(list_psa.size()):
-		var aid: String = list_psa[i]
+	# Create button for each member
+	for i in range(_all_members.size()):
+		var aid: String = _all_members[i]
 		var btn := Button.new()
 		btn.text = String(ds.call("display_name", aid))
 		btn.toggle_mode = true
 		btn.focus_mode = Control.FOCUS_ALL
-		btn.button_pressed = (_selected_person == aid)
+		btn.button_pressed = (_selected_member == aid)
 		btn.pressed.connect(func(id := aid) -> void:
-			_selected_person = ("" if _selected_person == id else id)
-			# If the user armed a room and now picked a person, try the place immediately
-			if _selected_person != "" and _pending_room != "":
-				_try_place_selected(_pending_room)
-			_build_common_list()
-			_update_tile_colors()
+			_on_roster_member_selected(id)
 		)
-		_common_box.add_child(btn)
+		_roster_list.add_child(btn)
+		_roster_buttons.append(btn)
+
+	print("[DormsPanel._build_roster_list] Created %d roster buttons" % _roster_buttons.size())
+
+func _build_rooms_grid() -> void:
+	# Clear existing rooms
+	for c in _rooms_grid.get_children():
+		c.queue_free()
+	_room_buttons.clear()
+
+	var ds: Node = _ds()
+	if not ds:
+		return
+
+	# Get room list
+	var room_ids_v: Variant = ds.call("list_rooms")
+	var room_ids: PackedStringArray = (room_ids_v if typeof(room_ids_v) == TYPE_PACKED_STRING_ARRAY else PackedStringArray())
+
+	# Create button for each room (2x4 grid)
+	for i in range(room_ids.size()):
+		var rid: String = room_ids[i]
+		var btn := Button.new()
+		btn.custom_minimum_size = Vector2(120, 80)
+		btn.toggle_mode = false
+		btn.focus_mode = Control.FOCUS_ALL
+
+		# Build button content (room number + occupant name)
+		var room_data: Dictionary = ds.call("get_room", rid)
+		var occupant: String = String(room_data.get("occupant", ""))
+		var occupant_name: String = ""
+		if occupant != "":
+			occupant_name = String(ds.call("display_name", occupant))
+
+		# Format: Room number on top, name below
+		if occupant_name != "":
+			btn.text = "%s\n%s" % [rid, occupant_name]
+		else:
+			btn.text = "%s\n(empty)" % rid
+
+		# Make text smaller
+		btn.add_theme_font_size_override("font_size", 11)
+
+		# Apply visual styling based on state
+		_apply_room_visual(btn, rid)
+
+		btn.pressed.connect(func(room_id := rid) -> void:
+			_on_room_selected(room_id)
+		)
+
+		_rooms_grid.add_child(btn)
+		_room_buttons.append(btn)
+
+func _build_action_button_array() -> void:
+	"""Build array of action elements for navigation (View Type + buttons)"""
+	_action_buttons.clear()
+	# View Type filter is first action element (OptionButton, not Button)
+	# We'll handle it specially in focus code
+	if _assign_room_btn:
+		_action_buttons.append(_assign_room_btn)
+	if _move_out_btn:
+		_action_buttons.append(_move_out_btn)
+	if _cancel_move_btn:
+		_action_buttons.append(_cancel_move_btn)
+	if _accept_plan_btn:
+		_action_buttons.append(_accept_plan_btn)
+
+func _build_common_list() -> void:
+	# Clear existing common room members
+	for c in _common_list.get_children():
+		c.queue_free()
+	_common_buttons.clear()
+
+	var ds: Node = _ds()
+	if not ds:
+		return
+
+	# Get common room members
+	var common_v: Variant = ds.call("get_common")
+	_common_members = (common_v if typeof(common_v) == TYPE_PACKED_STRING_ARRAY else PackedStringArray())
+
+	if _common_members.size() == 0:
+		var empty := Label.new()
+		empty.text = "— empty —"
+		_common_list.add_child(empty)
+		return
+
+	# Create label for each common room member
+	for i in range(_common_members.size()):
+		var aid: String = _common_members[i]
+		var btn := Button.new()
+		btn.text = String(ds.call("display_name", aid))
+		btn.toggle_mode = true
+		btn.focus_mode = Control.FOCUS_ALL
+		btn.button_pressed = (_selected_member == aid)
+		btn.pressed.connect(func(id := aid) -> void:
+			_on_common_member_selected(id)
+		)
+		_common_list.add_child(btn)
 		_common_buttons.append(btn)
 
-# ─────────────────────────────────────────────────────────────
-# Detail (right)
-# ─────────────────────────────────────────────────────────────
-func _update_detail(room_id: String) -> void:
-	if _detail == null:
+func _update_details() -> void:
+	if not _detail_content:
 		return
+
+	if _selected_member == "":
+		_detail_content.text = "[i]Select a member from the roster.[/i]"
+		return
+
 	var ds: Node = _ds()
-	if ds == null:
-		_detail.text = "[i]Dorm system missing.[/i]"
+	if not ds:
+		_detail_content.text = "[i]Dorm system unavailable.[/i]"
 		return
-
-	var r_v: Variant = ds.call("get_room", room_id)
-	if typeof(r_v) != TYPE_DICTIONARY:
-		_detail.text = "[i]Select a room.[/i]"
-		return
-	var r: Dictionary = r_v
-	if r.is_empty():
-		_detail.text = "[i]Select a room.[/i]"
-		return
-
-	var room_name: String = String(r.get("name", room_id))
-	var who: String = ""
-	var occ_v: Variant = r.get("occupant","")
-	if typeof(occ_v) == TYPE_STRING:
-		who = String(occ_v)
 
 	var lines := PackedStringArray()
-	lines.append("[b]%s[/b]" % room_name)
+
+	# Name
+	var name: String = String(ds.call("display_name", _selected_member))
+	lines.append("[b]Name:[/b] %s" % name)
 	lines.append("")
 
-	var occ_line := "Occupant: [b]%s[/b]" % (String(ds.call("display_name", who)) if who != "" else "— empty —")
-	lines.append(occ_line)
-
-	# If plan is locked and this room is involved, show banner (tiles stay normal colors)
-	if ds.has_method("room_in_locked_plan") and bool(ds.call("room_in_locked_plan", room_id)):
-		lines.append("[color=#d33](Room Reassignments happening on Saturday)[/color]")
-
-	lines.append("\n[b]Neighbors[/b]:")
-	var neigh_v: Variant = ds.call("room_neighbors", room_id)
-	var neigh: PackedStringArray = (neigh_v if typeof(neigh_v) == TYPE_PACKED_STRING_ARRAY else PackedStringArray())
-	for i in range(neigh.size()):
-		var nid: String = neigh[i]
-		var nocc_v: Variant = ds.call("occupants_of", nid)
-		var nocc_psa: PackedStringArray = (nocc_v if typeof(nocc_v) == TYPE_PACKED_STRING_ARRAY else PackedStringArray())
-		var nwho: String = (nocc_psa[0] if nocc_psa.size() > 0 else "")
-		if nwho == "":
-			lines.append("• %s — empty" % nid)
-		else:
-			var label_status: String = "Neutral"
-			if ds.has_method("is_pair_hidden") and who != "" and nwho != "" and bool(ds.call("is_pair_hidden", who, nwho)):
-				label_status = "Unknown connection"
-			elif ds.has_method("get_pair_status") and who != "" and nwho != "":
-				label_status = String(ds.call("get_pair_status", who, nwho))
-			lines.append("• %s — %s with [b]%s[/b]" % [nid, label_status, String(ds.call("display_name", nwho))])
-
-	_detail.text = _join_psa(lines, "\n")
-
-# ─────────────────────────────────────────────────────────────
-# Actions
-# ─────────────────────────────────────────────────────────────
-func _on_reassign_pressed() -> void:
-	var ds: Node = _ds()
-	if ds == null or _selected_room == "":
-		# Even if no room is selected, ensure we flip to Reassignment mode on click.
-		if _filter and _filter.get_selected_id() != 1:
-			_filter.select(1)
-			_on_filter_changed(1)
-		return
-
-	# Flip the forms panel from Placements -> Reassignment (and leave it if already there)
-	if _filter and _filter.get_selected_id() != 1:
-		_filter.select(1)
-		_on_filter_changed(1)
-
-	# Block Friday/Saturday for starting reassignment
-	if ds.has_method("can_start_reassignment_today") and not bool(ds.call("can_start_reassignment_today")):
-		_show_toast("Room reassignment can only be started on Sunday.")
-		return
-
-	var r: Dictionary = ds.call("get_room", _selected_room)
-	var curr: String = String(r.get("occupant",""))
-	if curr == "":
-		return
-
-	var staged_now: bool = false
-	if ds.has_method("is_staged"):
-		var staged_now_v: Variant = ds.call("is_staged", curr)
-		staged_now = bool(staged_now_v)
-
-	if staged_now:
-		if ds.has_method("unstage_vacate_room"):
-			ds.call("unstage_vacate_room", _selected_room)
+	# Room
+	var room_id: String = _get_member_room(_selected_member)
+	if room_id != "":
+		lines.append("[b]Room:[/b] %s" % room_id)
 	else:
-		var who_name: String = String(ds.call("display_name", curr))
-		var ok: bool = await _ask_confirm("Are you sure you want to reassign %s's room?" % who_name)
-		if not ok:
+		lines.append("[b]Room:[/b] Common Room")
+	lines.append("")
+
+	# Neighbors (if in a room)
+	if room_id != "":
+		lines.append("[b]Neighbors:[/b]")
+		var neighbors_v: Variant = ds.call("room_neighbors", room_id)
+		var neighbors: PackedStringArray = (neighbors_v if typeof(neighbors_v) == TYPE_PACKED_STRING_ARRAY else PackedStringArray())
+		for n in neighbors:
+			var n_room: Dictionary = ds.call("get_room", n)
+			var n_occupant: String = String(n_room.get("occupant", ""))
+			if n_occupant == "":
+				lines.append("  • %s - Empty" % n)
+			else:
+				var n_name: String = String(ds.call("display_name", n_occupant))
+				var status: String = _get_relationship_status(ds, _selected_member, n_occupant)
+				lines.append("  • %s - %s with %s" % [n, status, n_name])
+		lines.append("")
+
+	# Status
+	lines.append("[b]Status:[/b]")
+	var status_lines: PackedStringArray = _get_member_status(_selected_member)
+	for s in status_lines:
+		lines.append("  • %s" % s)
+
+	# Show pending reassignment in Reassignments view
+	if _current_view == ViewType.REASSIGNMENTS:
+		var pending_room: String = _get_pending_assignment(_selected_member)
+		if pending_room != "":
+			lines.append("")
+			lines.append("[b][color=yellow]Pending Saturday Move:[/color][/b]")
+			lines.append("  • Will move to room %s" % pending_room)
+
+	_detail_content.text = _join_psa(lines, "\n")
+
+func _update_action_buttons() -> void:
+	if not _assign_room_btn or not _move_out_btn or not _cancel_move_btn or not _accept_plan_btn:
+		return
+
+	var ds: Node = _ds()
+	if not ds:
+		_assign_room_btn.disabled = true
+		_move_out_btn.disabled = true
+		_cancel_move_btn.disabled = true
+		_accept_plan_btn.disabled = true
+		return
+
+	# Assign Room: active if member selected and either:
+	# 1. First time (in common room)
+	# 2. Already in common room (after Move Out)
+	var in_common: bool = _common_members.has(_selected_member)
+	_assign_room_btn.disabled = not (_selected_member != "" and in_common)
+
+	# Move Out: active if member selected and has a room (not in common)
+	# Move Out always works - it switches to Reassignments view and stages the move
+	var has_room: bool = _get_member_room(_selected_member) != ""
+	_move_out_btn.disabled = not (_selected_member != "" and has_room)
+
+	# Cancel Move: active if in reassignments view and has pending changes
+	_cancel_move_btn.disabled = not (_current_view == ViewType.REASSIGNMENTS and _has_pending_changes())
+
+	# Accept Plan: active if all common room members have been assigned to rooms
+	_accept_plan_btn.disabled = not (_current_view == ViewType.REASSIGNMENTS and _can_accept_plan())
+
+# ═══════════════════════════════════════════════════════════════════════════
+# SELECTION HANDLERS
+# ═══════════════════════════════════════════════════════════════════════════
+
+func _on_roster_member_selected(aid: String) -> void:
+	print("[DormsPanel._on_roster_member_selected] Selected member: ", aid)
+	_selected_member = aid
+	_update_details()
+	_update_action_buttons()
+	_update_room_colors()
+	# Note: No longer auto-navigating to ACTION_SELECT
+	# User can manually navigate to Action Menu with directional controls
+
+func _on_room_selected(room_id: String) -> void:
+	_selected_room = room_id
+
+	# If we have a member selected from common room, try to assign them
+	if _selected_member != "" and _common_members.has(_selected_member):
+		_try_assign_to_room(room_id)
+
+func _on_common_member_selected(aid: String) -> void:
+	_selected_member = aid
+	_update_details()
+	_update_action_buttons()
+	_update_room_colors()
+
+# ═══════════════════════════════════════════════════════════════════════════
+# ACTION BUTTON HANDLERS
+# ═══════════════════════════════════════════════════════════════════════════
+
+func _on_assign_room_pressed() -> void:
+	if _selected_member == "":
+		_show_toast("Please select a member from the roster first.")
+		return
+
+	if not _common_members.has(_selected_member):
+		_show_toast("Member must be in the common room to assign a room.")
+		return
+
+	# Switch to room selection mode
+	_nav_state = NavState.ROOM_SELECT
+	_current_room_index = 0
+	_focus_current_room()
+	_show_toast("Select a room to assign %s." % _get_member_name(_selected_member))
+
+func _on_move_out_pressed() -> void:
+	print("[DormsPanel._on_move_out_pressed] Move Out button pressed")
+
+	if _selected_member == "":
+		_show_toast("Please select a member from the roster first.")
+		return
+
+	var room_id: String = _get_member_room(_selected_member)
+	print("[DormsPanel._on_move_out_pressed] Selected member: %s, room: %s" % [_selected_member, room_id])
+
+	if room_id == "":
+		_show_toast("Member is already in the common room.")
+		return
+
+	var ds: Node = _ds()
+	if not ds:
+		print("[DormsPanel._on_move_out_pressed] ERROR: DormSystem not found")
+		_show_toast("Error: DormSystem not found.")
+		return
+
+	# Check if reassignment can start today (Sunday only)
+	var can_start: bool = false
+	if ds.has_method("can_start_reassignment_today"):
+		can_start = bool(ds.call("can_start_reassignment_today"))
+
+	print("[DormsPanel._on_move_out_pressed] can_start_reassignment_today: %s" % can_start)
+
+	if not can_start:
+		print("[DormsPanel._on_move_out_pressed] Not Sunday - cannot start reassignment")
+		_show_toast("Room reassignment can only be started on Sunday.\nAdvance the calendar to Sunday first.")
+		# Don't switch to reassignments view if we can't start
+		return
+
+	var member_name: String = _get_member_name(_selected_member)
+
+	# Switch to Reassignments view if not already there
+	if _current_view != ViewType.REASSIGNMENTS:
+		print("[DormsPanel._on_move_out_pressed] Switching to Reassignments view")
+		_current_view = ViewType.REASSIGNMENTS
+		if _view_type_filter:
+			_view_type_filter.select(1)  # Select Reassignments
+		_rebuild()  # Rebuild to update view
+
+	# Confirm staging the move
+	print("[DormsPanel._on_move_out_pressed] Showing confirmation dialog")
+	var confirmed: bool = await _ask_confirm("Move %s out of room %s?\n(Change will take effect on Saturday)" % [member_name, room_id])
+	print("[DormsPanel._on_move_out_pressed] Confirmed: %s" % confirmed)
+
+	if not confirmed:
+		return
+
+	# Stage the move for Saturday
+	print("[DormsPanel._on_move_out_pressed] Calling stage_vacate_room for room: %s" % room_id)
+	if ds.has_method("stage_vacate_room"):
+		var res: Dictionary = ds.call("stage_vacate_room", room_id)
+		print("[DormsPanel._on_move_out_pressed] Result: %s" % res)
+
+		if not bool(res.get("ok", false)):
+			var reason: String = String(res.get("reason", "Cannot stage move."))
+			print("[DormsPanel._on_move_out_pressed] ERROR: %s" % reason)
+			_show_toast(reason)
 			return
-		if ds.has_method("stage_vacate_room"):
-			var res: Dictionary = ds.call("stage_vacate_room", _selected_room)
-			if not bool(res.get("ok", false)):
-				_show_toast(String(res.get("reason","Cannot stage.")))
-
-	# Fresh session markers
-	_pending_room = ""
-	# Refresh everything (summary/common/accept state)
-	_rebuild()
-
-func _on_reset_pressed() -> void:
-	var ds: Node = _ds()
-	if ds == null:
-		return
-	if ds.has_method("stage_reset_plan"):
-		ds.call("stage_reset_plan")
-	elif ds.has_method("reset_placement"):
-		ds.call("reset_placement")
-	_selected_person = ""
-	_pending_room = ""
-	_used_rooms.clear()  # clear our session paint
-	_rebuild()
-
-func _on_accept_pressed() -> void:
-	var ds: Node = _ds()
-	if ds == null:
-		return
-
-	# Only when everyone staged has a target (no one left in "Common" for reassignment)
-	var ok_meta: bool = false
-	if ds.has_method("can_lock_plan"):
-		var meta: Dictionary = ds.call("can_lock_plan")
-		ok_meta = bool(meta.get("ok", false))
 	else:
-		ok_meta = _compute_can_accept()
-	if not ok_meta:
-		_show_toast("Place every staged member into a target room before accepting.")
+		print("[DormsPanel._on_move_out_pressed] ERROR: stage_vacate_room method not found")
+		_show_toast("DormSystem doesn't support staging moves.")
 		return
 
-	# Lock the plan for Saturday; live layout reverts now (visuals back to blue/green)
+	print("[DormsPanel._on_move_out_pressed] Success - rebuilding panel")
+	_show_toast("%s staged for common room on Saturday." % member_name)
+	_rebuild()
+
+	# Keep cursor on roster for selecting more members to move out
+	_push_nav_state(NavState.ROSTER_SELECT)
+	_current_roster_index = 0
+	_focus_current_roster()
+
+func _on_cancel_move_pressed() -> void:
+	var confirmed: bool = await _ask_confirm("Cancel all pending reassignments?")
+	if not confirmed:
+		return
+
+	var ds: Node = _ds()
+	if ds and ds.has_method("stage_reset_plan"):
+		ds.call("stage_reset_plan")
+
+	_pending_reassignments.clear()
+	_show_toast("All pending moves cancelled.")
+	_rebuild()
+
+func _on_accept_plan_pressed() -> void:
+	if not _can_accept_plan():
+		_show_toast("Please assign all members in the common room before accepting the plan.")
+		return
+
+	var confirmed: bool = await _ask_confirm("Accept these room reassignments? Changes will take effect on Saturday.")
+	if not confirmed:
+		return
+
+	var ds: Node = _ds()
+	if not ds:
+		return
+
+	# Lock the plan for Saturday
 	var res: Dictionary = {}
 	if ds.has_method("accept_plan_for_saturday"):
 		res = ds.call("accept_plan_for_saturday")
-	elif ds.has_method("stage_accept_plan"):
-		res = ds.call("stage_accept_plan")
 	elif ds.has_method("lock_plan_for_saturday"):
 		res = ds.call("lock_plan_for_saturday")
 
 	if typeof(res) == TYPE_DICTIONARY and not bool(res.get("ok", false)):
-		_show_toast(String(res.get("reason","Cannot accept plan.")))
-	else:
-		_show_toast("Plan locked. Changes will apply on Saturday.")
-
-	_selected_person = ""
-	_pending_room = ""
-	_used_rooms.clear()  # new session starts after lock
-	_rebuild()
-
-# Place selected person into a room (handles staged & immediate)
-func _try_place_selected(room_id: String) -> void:
-	var ds: Node = _ds()
-	if ds == null or _selected_person == "":
+		_show_toast(String(res.get("reason", "Cannot accept plan.")))
 		return
 
-	var staged: bool = false
-	if ds.has_method("is_staged"):
-		staged = bool(ds.call("is_staged", _selected_person))
+	_show_toast("Plan accepted! Changes will apply on Saturday morning.")
+	_pending_reassignments.clear()
 
-	if staged:
-		# Disallow blue rooms explicitly: only green/yellow
-		var vis: int = int(ds.call("get_room_visual", room_id))
-		if not (vis == VIS_EMPTY or vis == VIS_STAGED):
-			_show_toast("Pick a green or yellow room for reassignment.")
-			return
-
-		# If trying to place back to original room, block
-		var origin: String = ""
-		if ds.has_method("get_staged_prev_room_for"):
-			origin = String(ds.call("get_staged_prev_room_for", _selected_person))
-		if origin != "" and origin == room_id:
-			_show_toast("That's their current room; placing them there doesn't require reassignment.")
-			return
-
-		# If another staged person already targets this room, block
-		if _room_targeted_in_plan(room_id, _selected_person):
-			_show_toast("That room is already targeted by another reassignment.")
-			return
-
-		var who_name: String = String(ds.call("display_name", _selected_person))
-		var ok: bool = await _ask_confirm("Assign %s to room %s?" % [who_name, room_id])
-		if not ok:
-			return
-		var res: Dictionary = {}
-		for fn in ["stage_assign","stage_set_target","pick_room_for"]:
-			if ds.has_method(fn):
-				res = ds.call(fn, _selected_person, room_id)
-				break
-		if typeof(res) == TYPE_DICTIONARY and not bool(res.get("ok", false)):
-			_show_toast(String(res.get("reason","Cannot place.")))
-			return
-		_selected_person = ""
-		_pending_room = ""
-		_show_toast("Placement staged.")
-
-		# Mark room used locally (UI red). Also DS will reflect this; we still keep a local flag for instant feedback.
-		if _filter and _filter.get_selected_id() == 1:
-			_used_rooms[room_id] = true
-	else:
-		# Immediate (new Common member). Only allow empty (green).
-		var vis2: int = int(ds.call("get_room_visual", room_id))
-		if vis2 != VIS_EMPTY:
-			_show_toast("That room is not empty.")
-			return
-		var who_name2: String = String(ds.call("display_name", _selected_person))
-		var ok2: bool = await _ask_confirm("Assign %s to room %s?" % [who_name2, room_id])
-		if not ok2:
-			return
-		if ds.has_method("assign_now_from_common"):
-			var res2: Dictionary = ds.call("assign_now_from_common", _selected_person, room_id)
-			if not bool(res2.get("ok", false)):
-				_show_toast(String(res2.get("reason","Cannot assign.")))
-				return
-			_selected_person = ""
-			_pending_room = ""
-			_show_toast("Assigned.")
-
-	# One rebuild to refresh grid, summary, common list, and details
+	# Switch to reassignments view to show pending moves
+	_current_view = ViewType.REASSIGNMENTS
+	if _view_type_filter:
+		_view_type_filter.select(1)
 	_rebuild()
 
-# ─────────────────────────────────────────────────────────────
-# Visual helpers
-# ─────────────────────────────────────────────────────────────
+# ═══════════════════════════════════════════════════════════════════════════
+# ROOM ASSIGNMENT
+# ═══════════════════════════════════════════════════════════════════════════
+
+func _try_assign_to_room(room_id: String) -> void:
+	var ds: Node = _ds()
+	if not ds:
+		return
+
+	# Validate room selection
+	var room_data: Dictionary = ds.call("get_room", room_id)
+	var occupant: String = String(room_data.get("occupant", ""))
+
+	# Check if room is available
+	var vis: int = int(ds.call("get_room_visual", room_id))
+
+	# Only allow green (empty) or yellow (staged) rooms
+	if vis == VIS_OCCUPIED:
+		_show_toast("This room is currently occupied.")
+		return
+	elif vis == VIS_LOCKED:
+		_show_toast("This room is locked.")
+		return
+
+	# Check if this is their current room
+	var current_room: String = _get_member_room(_selected_member)
+	if current_room == room_id:
+		_show_toast("That's their current room. Please select a different room.")
+		return
+
+	# Check if room is already targeted in plan
+	if _is_room_targeted(room_id):
+		_show_toast("This room is already targeted by another reassignment.")
+		return
+
+	# Confirm assignment
+	var member_name: String = _get_member_name(_selected_member)
+	var confirmed: bool = await _ask_confirm("Assign %s to room %s?" % [member_name, room_id])
+	if not confirmed:
+		return
+
+	# Perform assignment
+	if _current_view == ViewType.REASSIGNMENTS:
+		# Stage the assignment for Saturday
+		if ds.has_method("stage_assign"):
+			var res: Dictionary = ds.call("stage_assign", _selected_member, room_id)
+			if not bool(res.get("ok", false)):
+				_show_toast(String(res.get("reason", "Cannot assign room.")))
+				return
+		_pending_reassignments[_selected_member] = room_id
+		_show_toast("Assignment staged for Saturday.")
+	else:
+		# Immediate assignment
+		if ds.has_method("assign_now_from_common"):
+			var res: Dictionary = ds.call("assign_now_from_common", _selected_member, room_id)
+			if not bool(res.get("ok", false)):
+				_show_toast(String(res.get("reason", "Cannot assign room.")))
+				return
+		_show_toast("%s assigned to room %s." % [member_name, room_id])
+
+	# Clear selection and return to roster
+	_selected_member = ""
+	_selected_room = ""
+	_nav_state = NavState.ROSTER_SELECT
+	_rebuild()
+
+# ═══════════════════════════════════════════════════════════════════════════
+# VISUAL HELPERS
+# ═══════════════════════════════════════════════════════════════════════════
+
 func _apply_room_visual(btn: Button, room_id: String) -> void:
 	var ds: Node = _ds()
-	if ds == null:
+	if not ds:
 		return
+
 	var state: int = int(ds.call("get_room_visual", room_id))
 
-	var col := Color(0.15, 0.17, 0.20) # default
+	var col := Color(0.15, 0.17, 0.20)  # default
 	if state == VIS_EMPTY:
-		col = Color(0.12, 0.30, 0.12) # green (empty)
+		col = Color(0.12, 0.30, 0.12)  # green (empty)
 	elif state == VIS_OCCUPIED:
-		col = Color(0.12, 0.18, 0.32) # blue (occupied)
+		col = Color(0.12, 0.18, 0.32)  # blue (occupied)
 	elif state == VIS_STAGED:
-		col = Color(0.40, 0.34, 0.08) # yellow (staged tile)
+		col = Color(0.40, 0.34, 0.08)  # yellow (staged/available)
 	elif state == VIS_LOCKED:
-		col = Color(0.38, 0.10, 0.10) # red (locked/kept)
+		col = Color(0.38, 0.10, 0.10)  # red (locked)
 
-	# Only in Reassignment mode do we add our session red paints/overrides
-	if _filter and _filter.get_selected_id() == 1:
-		# 1) Red for the origin room when a staged person is selected (can't place them back)
-		if _selected_person != "" and ds.has_method("is_staged") and bool(ds.call("is_staged", _selected_person)):
-			if ds.has_method("get_staged_prev_room_for"):
-				var origin: String = String(ds.call("get_staged_prev_room_for", _selected_person))
-				if origin == room_id:
-					col = Color(0.75, 0.15, 0.15)
+	# Override with red if this is the selected member's current room
+	if _selected_member != "" and _get_member_room(_selected_member) == room_id:
+		col = Color(0.75, 0.15, 0.15)  # red (can't go back to current room)
 
-		# 2) Red for rooms already targeted by any staged assignment (no double-placing)
-		if _room_targeted_in_plan(room_id):
-			col = Color(0.75, 0.15, 0.15)
-
-		# 3) Also honor local 'used this session' paint
-		if _used_rooms.has(room_id):
-			col = Color(0.75, 0.15, 0.15)
+	# Override with red if room is already targeted in pending reassignments
+	if _is_room_targeted(room_id):
+		col = Color(0.75, 0.15, 0.15)  # red (already targeted)
 
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = col
@@ -813,199 +890,212 @@ func _apply_room_visual(btn: Button, room_id: String) -> void:
 	btn.add_theme_stylebox_override("hover", sb)
 	btn.add_theme_stylebox_override("pressed", sb)
 
-func _room_targeted_in_plan(room_id: String, ignore_aid: String = "") -> bool:
-	var ds := _ds()
-	if ds == null:
-		return false
-	# Prefer explicit staged assignments
-	for fn in ["get_staged_assignments","staged_assignments","get_staged_places","list_staged_assignments"]:
-		if ds.has_method(fn):
-			var d_v: Variant = ds.call(fn)
-			if typeof(d_v) == TYPE_DICTIONARY:
-				var d: Dictionary = d_v
-				for k in d.keys():
-					var aid: String = String(k)
-					if ignore_aid != "" and aid == ignore_aid:
-						continue
-					if String(d[k]) == room_id:
-						return true
-	return false
-
-func _update_tile_colors() -> void:
+func _update_room_colors() -> void:
 	var ds: Node = _ds()
-	if ds == null:
+	if not ds:
 		return
-	var ids: PackedStringArray = ds.call("list_rooms")
-	var grid: Node = _grid_holder.get_child(0)
-	if grid == null:
-		return
-	var i: int = 0
-	for child in grid.get_children():
-		if child is Button and i < ids.size():
-			_apply_room_visual(child, ids[i])
-			i += 1
 
-# ─────────────────────────────────────────────────────────────
-# Accept button state
-# ─────────────────────────────────────────────────────────────
-func _refresh_accept_state() -> void:
-	if _accept_btn == null:
-		return
-	_accept_btn.disabled = not _compute_can_accept()
+	var room_ids_v: Variant = ds.call("list_rooms")
+	var room_ids: PackedStringArray = (room_ids_v if typeof(room_ids_v) == TYPE_PACKED_STRING_ARRAY else PackedStringArray())
 
-func _compute_can_accept() -> bool:
+	for i in range(min(room_ids.size(), _room_buttons.size())):
+		_apply_room_visual(_room_buttons[i], room_ids[i])
+
+# ═══════════════════════════════════════════════════════════════════════════
+# HELPER METHODS
+# ═══════════════════════════════════════════════════════════════════════════
+
+func _get_all_dorm_members(ds: Node) -> PackedStringArray:
+	var members := PackedStringArray()
+
+	# Get members from rooms
+	var room_ids_v: Variant = ds.call("list_rooms")
+	var room_ids: PackedStringArray = (room_ids_v if typeof(room_ids_v) == TYPE_PACKED_STRING_ARRAY else PackedStringArray())
+	for rid in room_ids:
+		var room_data: Dictionary = ds.call("get_room", rid)
+		var occupant: String = String(room_data.get("occupant", ""))
+		if occupant != "" and not members.has(occupant):
+			members.append(occupant)
+
+	# Get members from common room
+	var common_v: Variant = ds.call("get_common")
+	var common: PackedStringArray = (common_v if typeof(common_v) == TYPE_PACKED_STRING_ARRAY else PackedStringArray())
+	for aid in common:
+		if not members.has(aid):
+			members.append(aid)
+
+	return members
+
+func _get_member_room(aid: String) -> String:
 	var ds: Node = _ds()
-	if ds == null:
-		return false
-	# If plan exposes an explicit "locked" flag, don't allow (already accepted)
-	if ds.has_method("is_plan_locked") and bool(ds.call("is_plan_locked")):
-		return false
-	# Prefer explicit "can_lock_plan" when available
-	if ds.has_method("can_lock_plan"):
-		var meta: Dictionary = ds.call("can_lock_plan")
-		return bool(meta.get("ok", false))
-	# Otherwise: at least one staged target
-	if ds.has_method("staged_assign_size"):
-		return int(ds.call("staged_assign_size")) > 0
+	if not ds:
+		return ""
+
+	var room_ids_v: Variant = ds.call("list_rooms")
+	var room_ids: PackedStringArray = (room_ids_v if typeof(room_ids_v) == TYPE_PACKED_STRING_ARRAY else PackedStringArray())
+	for rid in room_ids:
+		var room_data: Dictionary = ds.call("get_room", rid)
+		if String(room_data.get("occupant", "")) == aid:
+			return rid
+	return ""
+
+func _get_member_name(aid: String) -> String:
+	var ds: Node = _ds()
+	if not ds:
+		return aid
+	return String(ds.call("display_name", aid))
+
+func _get_relationship_status(ds: Node, aid1: String, aid2: String) -> String:
+	if ds.has_method("is_pair_hidden") and bool(ds.call("is_pair_hidden", aid1, aid2)):
+		return "Unknown connection"
+	if ds.has_method("get_pair_status"):
+		return String(ds.call("get_pair_status", aid1, aid2))
+	return "Neutral"
+
+func _get_member_status(aid: String) -> PackedStringArray:
+	var status := PackedStringArray()
+	var ds: Node = _ds()
+	if not ds:
+		return status
+
+	# Check if recently moved (tired)
+	if ds.has_method("has_move_penalty") and bool(ds.call("has_move_penalty", aid)):
+		status.append("Tired from recent move (-2 affinity with you)")
+
+	# Check feelings about current setup
+	var room_id: String = _get_member_room(aid)
+	if room_id != "":
+		status.append("Settled in room %s" % room_id)
+
+		# Get neighbor quality hints
+		var neighbors_v: Variant = ds.call("room_neighbors", room_id)
+		var neighbors: PackedStringArray = (neighbors_v if typeof(neighbors_v) == TYPE_PACKED_STRING_ARRAY else PackedStringArray())
+		var bestie_count: int = 0
+		var rival_count: int = 0
+		for n in neighbors:
+			var n_room: Dictionary = ds.call("get_room", n)
+			var n_occupant: String = String(n_room.get("occupant", ""))
+			if n_occupant != "":
+				var rel_status: String = _get_relationship_status(ds, aid, n_occupant)
+				if rel_status == "Bestie":
+					bestie_count += 1
+				elif rel_status == "Rival":
+					rival_count += 1
+
+		if bestie_count > 0:
+			status.append("Happy with %d bestie neighbor%s!" % [bestie_count, "s" if bestie_count > 1 else ""])
+		if rival_count > 0:
+			status.append("Unhappy with %d rival neighbor%s" % [rival_count, "s" if rival_count > 1 else ""])
+	else:
+		status.append("In common room, awaiting assignment")
+
+	if status.size() == 0:
+		status.append("Doing okay")
+
+	return status
+
+func _get_pending_assignment(aid: String) -> String:
+	"""Get the pending room assignment for a member, if any"""
+	var ds: Node = _ds()
+	if not ds:
+		return ""
+
+	# Check DormSystem's locked plan (Saturday moves)
+	if ds.has_method("get_saturday_plan"):
+		var plan_v: Variant = ds.call("get_saturday_plan")
+		if typeof(plan_v) == TYPE_DICTIONARY:
+			var plan: Dictionary = plan_v
+			if plan.has(aid):
+				return String(plan[aid])
+
+	# Check staged assignments (not yet accepted)
 	if ds.has_method("get_staged_assignments"):
-		var d_v: Variant = ds.call("get_staged_assignments")
-		if typeof(d_v) == TYPE_DICTIONARY:
-			return (d_v as Dictionary).size() > 0
+		var staged_v: Variant = ds.call("get_staged_assignments")
+		if typeof(staged_v) == TYPE_DICTIONARY:
+			var staged: Dictionary = staged_v
+			if staged.has(aid):
+				return String(staged[aid])
+
+	return ""
+
+func _is_room_targeted(room_id: String) -> bool:
+	# Check if any member is already targeting this room in pending reassignments
+	if _pending_reassignments.has(room_id):
+		return true
+
+	var ds: Node = _ds()
+	if not ds:
+		return false
+
+	# Check DormSystem's staged assignments
+	if ds.has_method("get_staged_assignments"):
+		var assignments_v: Variant = ds.call("get_staged_assignments")
+		if typeof(assignments_v) == TYPE_DICTIONARY:
+			var assignments: Dictionary = assignments_v
+			for aid in assignments.keys():
+				if String(assignments[aid]) == room_id:
+					return true
+
 	return false
 
-# Helper: is Accept Plan currently active (enabled)?
-func _is_accept_active() -> bool:
-	return _accept_btn != null and not _accept_btn.disabled
+func _has_unassigned_common_members() -> bool:
+	return _common_members.size() > 0
 
-# ─────────────────────────────────────────────────────────────
-# Exit guard — block leaving the menu while Accept is active
-# ─────────────────────────────────────────────────────────────
-func _on_visibility_changed() -> void:
-	# If something tries to hide this panel while Accept is active, bring it back and warn.
-	if not is_visible_in_tree() and _is_accept_active():
-		# Re-show ourselves on the next frame to avoid flicker/race.
-		call_deferred("show")
-		call_deferred("_show_toast", "Room Reassignments not complete.")
+func _has_pending_changes() -> bool:
+	return _pending_reassignments.size() > 0 or _common_members.size() > 0
 
-func _unhandled_input(event: InputEvent) -> void:
-	# Catch Esc / gamepad back while Accept is active.
-	if _is_accept_active():
-		if event.is_action_pressed("menu_back"):
-			_show_toast("Room Reassignments not complete.")
-			get_viewport().set_input_as_handled()
+func _can_accept_plan() -> bool:
+	# Can accept if all common room members have been assigned
+	if _common_members.size() > 0:
+		return false
 
-# Public opt-in for parent menus that want to ask first.
-func can_close_panel() -> bool:
-	# Return false while Accept is active; parent can honor this to block tab changes.
-	return not _is_accept_active()
+	# Must have at least one pending reassignment
+	if _pending_reassignments.size() == 0:
+		return false
 
-# ─────────────────────────────────────────────────────────────
-# Tiny UX helpers (Panel-based popups)
-# ─────────────────────────────────────────────────────────────
+	return true
+
+func _on_view_type_changed(index: int) -> void:
+	print("[DormsPanel._on_view_type_changed] View changed to index: ", index)
+	_current_view = ViewType.PLACEMENTS if index == 0 else ViewType.REASSIGNMENTS
+	print("[DormsPanel._on_view_type_changed] Current view now: ", "PLACEMENTS" if _current_view == ViewType.PLACEMENTS else "REASSIGNMENTS")
+	_rebuild()
+
+func _on_dorms_changed() -> void:
+	print("[DormsPanel._on_dorms_changed] DormSystem signal received, rebuilding...")
+	_rebuild()
+
+# ═══════════════════════════════════════════════════════════════════════════
+# POPUP HELPERS
+# ═══════════════════════════════════════════════════════════════════════════
+
 func _ask_confirm(msg: String) -> bool:
-	_nav_state = NavState.POPUP_ACTIVE
+	print("[DormsPanel._ask_confirm] Showing confirmation: %s" % msg)
 
-	var popup := Panel.new()
-	popup.custom_minimum_size = Vector2(400, 200)
-	var vbox := VBoxContainer.new()
-	vbox.set_anchors_preset(Control.PRESET_FULL_RECT)
-	vbox.add_theme_constant_override("separation", 12)
-	popup.add_child(vbox)
-
-	# Title
-	var title := Label.new()
-	title.text = "Confirm"
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vbox.add_child(title)
-
-	# Message
-	var msg_label := Label.new()
-	msg_label.text = msg
-	msg_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	msg_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	vbox.add_child(msg_label)
-
-	# Buttons
-	var hbox := HBoxContainer.new()
-	hbox.add_theme_constant_override("separation", 8)
-	var accept_btn := Button.new()
-	accept_btn.text = "Accept"
-	accept_btn.focus_mode = Control.FOCUS_ALL
-	var cancel_btn := Button.new()
-	cancel_btn.text = "Cancel"
-	cancel_btn.focus_mode = Control.FOCUS_ALL
-	hbox.add_child(accept_btn)
-	hbox.add_child(cancel_btn)
-	vbox.add_child(hbox)
-
+	# Create and show modal confirmation popup
+	var popup := ConfirmationPopup.create(msg)
 	add_child(popup)
-	popup.position = (get_viewport_rect().size - popup.custom_minimum_size) / 2
-	popup.show()
-	accept_btn.grab_focus()
 
-	# Setup navigation
-	accept_btn.focus_neighbor_right = cancel_btn.get_path()
-	cancel_btn.focus_neighbor_left = accept_btn.get_path()
+	# Wait for user response (true = Accept, false = Cancel/Back)
+	var result: bool = await popup.confirmed
 
-	var result: bool = false
-	accept_btn.pressed.connect(func() -> void:
-		result = true
-		popup.hide()
-	)
-	cancel_btn.pressed.connect(func() -> void:
-		result = false
-		popup.hide()
-	)
-
-	await popup.hidden
+	print("[DormsPanel._ask_confirm] Result: %s" % result)
 	popup.queue_free()
-	_nav_state = NavState.ROOM_SELECT
-	_focus_current_room()
+
 	return result
 
 func _show_toast(msg: String) -> void:
-	_nav_state = NavState.POPUP_ACTIVE
+	print("[DormsPanel._show_toast] Showing toast: %s" % msg)
 
-	var popup := Panel.new()
-	popup.custom_minimum_size = Vector2(400, 150)
-	var vbox := VBoxContainer.new()
-	vbox.set_anchors_preset(Control.PRESET_FULL_RECT)
-	vbox.add_theme_constant_override("separation", 12)
-	popup.add_child(vbox)
-
-	# Title
-	var title := Label.new()
-	title.text = "Notice"
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vbox.add_child(title)
-
-	# Message
-	var msg_label := Label.new()
-	msg_label.text = msg
-	msg_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	msg_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	vbox.add_child(msg_label)
-
-	# OK Button
-	var ok_btn := Button.new()
-	ok_btn.text = "OK"
-	ok_btn.focus_mode = Control.FOCUS_ALL
-	ok_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	vbox.add_child(ok_btn)
-
+	# Create and show modal toast popup
+	var popup := ToastPopup.create(msg)
 	add_child(popup)
-	popup.position = (get_viewport_rect().size - popup.custom_minimum_size) / 2
-	popup.show()
-	ok_btn.grab_focus()
 
-	ok_btn.pressed.connect(func() -> void:
-		popup.hide()
-	)
+	# Wait for user to acknowledge
+	await popup.closed
 
-	await popup.hidden
 	popup.queue_free()
-	_nav_state = NavState.ROOM_SELECT
-	_focus_current_room()
+	print("[DormsPanel._show_toast] Toast closed")
 
 func _join_psa(arr: PackedStringArray, sep: String) -> String:
 	var out: String = ""
