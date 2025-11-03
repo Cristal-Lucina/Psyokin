@@ -133,7 +133,6 @@ func _ready() -> void:
 	print("  _assign_room_btn: ", _assign_room_btn != null)
 	print("  _move_out_btn: ", _move_out_btn != null)
 	print("  _cancel_move_btn: ", _cancel_move_btn != null)
-	print("  _accept_plan_btn: ", _accept_plan_btn != null)
 
 	# Connect refresh button
 	if _refresh_btn and not _refresh_btn.pressed.is_connected(_rebuild):
