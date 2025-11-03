@@ -358,7 +358,11 @@ func _rebuild_all() -> void:
 
 func _rebuild_party() -> void:
 	if not _party: return
-	for c in _party.get_children(): c.queue_free()
+
+	# Remove and free all children immediately (don't use queue_free to avoid duplicates during rebuild)
+	for c in _party.get_children():
+		_party.remove_child(c)
+		c.free()
 
 	# Enforce party limits first
 	if _gs and _gs.has_method("_enforce_party_limits"):
@@ -691,7 +695,6 @@ func _show_no_bench_notice() -> void:
 	var popup_panel: Panel = Panel.new()
 	popup_panel.process_mode = Node.PROCESS_MODE_ALWAYS
 	popup_panel.z_index = 100
-	popup_panel.visible = false  # Hide until properly sized/positioned
 	add_child(popup_panel)
 
 	# Apply consistent styling (matches ToastPopup/ConfirmationPopup)
@@ -737,8 +740,6 @@ func _show_no_bench_notice() -> void:
 	popup_panel.position = (viewport_size - popup_panel.size) / 2.0
 	print("[StatusPanel] No-bench notice centered at: %s, size: %s" % [popup_panel.position, popup_panel.size])
 
-	# Now that it's properly sized and positioned, make it visible
-	popup_panel.visible = true
 
 	# Store metadata
 	popup_panel.set_meta("_is_notice_popup", true)
@@ -772,7 +773,6 @@ func _show_already_at_max_notice(member_name: String, stat_type: String) -> void
 	var popup_panel: Panel = Panel.new()
 	popup_panel.process_mode = Node.PROCESS_MODE_ALWAYS
 	popup_panel.z_index = 100
-	popup_panel.visible = false  # Hide until properly sized/positioned
 	add_child(popup_panel)
 
 	# Apply consistent styling (matches ToastPopup/ConfirmationPopup)
@@ -814,8 +814,6 @@ func _show_already_at_max_notice(member_name: String, stat_type: String) -> void
 	popup_panel.grow_vertical = Control.GROW_DIRECTION_BOTH
 	popup_panel.position = get_viewport_rect().size / 2 - vbox.custom_minimum_size / 2
 
-	# Now that it's properly sized and positioned, make it visible
-	popup_panel.visible = true
 
 	# Add to aPanelManager stack
 	if has_node("/root/aPanelManager"):
@@ -842,7 +840,6 @@ func _show_heal_confirmation(member_name: String, heal_amount: int, healed_type:
 	var popup_panel: Panel = Panel.new()
 	popup_panel.process_mode = Node.PROCESS_MODE_ALWAYS
 	popup_panel.z_index = 100
-	popup_panel.visible = false  # Hide until properly sized/positioned
 	add_child(popup_panel)
 
 	# Apply consistent styling (matches ToastPopup/ConfirmationPopup)
@@ -889,8 +886,6 @@ func _show_heal_confirmation(member_name: String, heal_amount: int, healed_type:
 	popup_panel.position = (viewport_size - popup_panel.size) / 2.0
 	print("[StatusPanel] Heal confirmation centered at: %s, size: %s" % [popup_panel.position, popup_panel.size])
 
-	# Now that it's properly sized and positioned, make it visible
-	popup_panel.visible = true
 
 	# Store metadata
 	popup_panel.set_meta("_is_heal_confirmation_popup", true)
@@ -924,7 +919,6 @@ func _show_swap_confirmation(member_name: String, member_id: String) -> void:
 	var popup_panel: Panel = Panel.new()
 	popup_panel.process_mode = Node.PROCESS_MODE_ALWAYS
 	popup_panel.z_index = 100
-	popup_panel.visible = false  # Hide until properly sized/positioned
 	add_child(popup_panel)
 
 	# Apply consistent styling (matches ToastPopup/ConfirmationPopup)
@@ -971,8 +965,6 @@ func _show_swap_confirmation(member_name: String, member_id: String) -> void:
 	popup_panel.position = (viewport_size - popup_panel.size) / 2.0
 	print("[StatusPanel] Swap confirmation centered at: %s, size: %s" % [popup_panel.position, popup_panel.size])
 
-	# Now that it's properly sized and positioned, make it visible
-	popup_panel.visible = true
 
 	# Store metadata
 	popup_panel.set_meta("_is_swap_confirmation_popup", true)
@@ -1040,7 +1032,6 @@ func _show_member_picker(active_slot: int) -> void:
 	var popup_panel: Panel = Panel.new()
 	popup_panel.process_mode = Node.PROCESS_MODE_ALWAYS
 	popup_panel.z_index = 100
-	popup_panel.visible = false  # Hide until properly sized/positioned
 	add_child(popup_panel)
 
 	# Apply consistent styling (matches ToastPopup/ConfirmationPopup)
@@ -1103,8 +1094,6 @@ func _show_member_picker(active_slot: int) -> void:
 	popup_panel.position = (viewport_size - popup_panel.size) / 2.0
 	print("[StatusPanel] Switch popup centered at: %s, size: %s" % [popup_panel.position, popup_panel.size])
 
-	# Now that it's properly sized and positioned, make it visible
-	popup_panel.visible = true
 
 	# Store metadata
 	popup_panel.set_meta("_is_switch_popup", true)
@@ -1277,7 +1266,6 @@ func _show_recovery_popup(member_id: String, member_name: String, hp: int, hp_ma
 	var popup_panel: Panel = Panel.new()
 	popup_panel.process_mode = Node.PROCESS_MODE_ALWAYS
 	popup_panel.z_index = 100
-	popup_panel.visible = false  # Hide until properly sized/positioned
 	add_child(popup_panel)
 
 	# Apply consistent styling (matches ToastPopup/ConfirmationPopup)
@@ -1348,8 +1336,6 @@ func _show_recovery_popup(member_id: String, member_name: String, hp: int, hp_ma
 	popup_panel.position = (viewport_size - popup_panel.size) / 2.0
 	print("[StatusPanel] Recovery popup centered at: %s, size: %s" % [popup_panel.position, popup_panel.size])
 
-	# Now that it's properly sized and positioned, make it visible
-	popup_panel.visible = true
 
 	# Store metadata
 	popup_panel.set_meta("_is_recovery_popup", true)
@@ -2185,6 +2171,12 @@ func _handle_menu_input(event: InputEvent) -> void:
 	if event.is_action_pressed("move_right"):
 		# If tab list has focus, navigate to first button in content area
 		if _tab_list.has_focus():
+			# Save current tab selection before hiding menu
+			var selected_items = _tab_list.get_selected_items()
+			if selected_items.size() > 0:
+				_last_selected_tab_index = selected_items[0]
+				print("[StatusPanel] Saved tab selection: %d" % _last_selected_tab_index)
+
 			print("[StatusPanel] MENU → CONTENT transition (hiding menu)")
 			_nav_state = NavState.CONTENT
 			# Hide menu when transitioning to content
