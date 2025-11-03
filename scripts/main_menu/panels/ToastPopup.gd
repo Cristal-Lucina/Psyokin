@@ -24,17 +24,19 @@ signal closed
 
 var _title: String = "Notice"
 var _message: String = ""
+var _custom_size: Vector2 = Vector2(400, 160)
 var _ok_btn: Button = null
 
-static func create(message: String, title: String = "Notice") -> ToastPopup:
+static func create(message: String, title: String = "Notice", custom_size: Vector2 = Vector2(400, 160)) -> ToastPopup:
 	var popup := ToastPopup.new()
 	popup._title = title
 	popup._message = message
+	popup._custom_size = custom_size
 	popup._build_ui()
 	return popup
 
 func _build_ui() -> void:
-	custom_minimum_size = Vector2(400, 160)
+	custom_minimum_size = _custom_size
 
 	# Ensure popup processes even when game is paused
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -72,13 +74,17 @@ func _build_ui() -> void:
 	title.add_theme_font_size_override("font_size", 18)
 	vbox.add_child(title)
 
+	# ScrollContainer for message (allows scrolling for long content)
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	vbox.add_child(scroll)
+
 	# Message
 	var msg_label := Label.new()
 	msg_label.text = _message
 	msg_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	msg_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	msg_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	vbox.add_child(msg_label)
+	msg_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(msg_label)
 
 	# OK Button
 	_ok_btn = Button.new()

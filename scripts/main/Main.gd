@@ -251,7 +251,7 @@ func _on_friday_reveals(pairs: Array) -> void:
 	overlay.process_mode = Node.PROCESS_MODE_ALWAYS  # Process even when paused
 	add_child(overlay)
 
-	var popup := ToastPopup.create(message, "RA MAIL - FRIDAY NEIGHBOR REPORT")
+	var popup := ToastPopup.create(message, "RA MAIL - FRIDAY NEIGHBOR REPORT", Vector2(550, 350))
 	popup.process_mode = Node.PROCESS_MODE_ALWAYS  # Process even when paused
 	overlay.add_child(popup)
 	await popup.closed
