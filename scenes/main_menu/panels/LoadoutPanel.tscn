@@ -3,6 +3,7 @@
 [ext_resource type="Script" uid="uid://debx6ongvnqax" path="res://scripts/main_menu/panels/LoadoutPanel.gd" id="1"]
 
 [node name="LoadoutPanel" type="Control"]
+process_mode = 3
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
