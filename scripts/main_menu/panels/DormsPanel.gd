@@ -414,6 +414,11 @@ func _on_back_input() -> void:
 func _focus_current_roster() -> void:
 	if _current_roster_index >= 0 and _current_roster_index < _roster_buttons.size():
 		_roster_buttons[_current_roster_index].grab_focus()
+		# Update details panel to show the focused member
+		if _current_roster_index < _all_members.size():
+			var focused_member: String = _all_members[_current_roster_index]
+			print("[DormsPanel._focus_current_roster] Focused member: ", focused_member)
+			_update_details_for_member(focused_member)
 	_animate_panel_focus(NavState.ROSTER_SELECT)
 
 func _focus_current_room() -> void:
@@ -424,6 +429,11 @@ func _focus_current_room() -> void:
 func _focus_current_common() -> void:
 	if _current_common_index >= 0 and _current_common_index < _common_buttons.size():
 		_common_buttons[_current_common_index].grab_focus()
+		# Update details panel to show the focused member
+		if _current_common_index < _common_members.size():
+			var focused_member: String = _common_members[_current_common_index]
+			print("[DormsPanel._focus_current_common] Focused member: ", focused_member)
+			_update_details_for_member(focused_member)
 	_animate_panel_focus(NavState.COMMON_SELECT)
 
 func _focus_current_action() -> void:
