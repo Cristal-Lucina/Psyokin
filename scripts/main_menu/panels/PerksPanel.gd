@@ -42,7 +42,7 @@ var _pending_perk: Dictionary = {}  # Perk waiting for confirmation
 
 func _ready() -> void:
 	# Set high input priority so popup input blocking happens before parent nodes
-	set_process_input_priority(100)
+	process_priority = 100
 
 	# Get system references
 	_stats = get_node_or_null(STATS_PATH)
