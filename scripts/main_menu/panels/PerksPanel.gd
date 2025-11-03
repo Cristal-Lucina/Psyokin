@@ -636,16 +636,17 @@ func _input(event: InputEvent) -> void:
 	"""Catch ALL input when popup is active to prevent it from reaching other systems"""
 	# When popup is active, block everything except what we explicitly handle
 	if _active_popup and is_instance_valid(_active_popup):
-		print("[PerksPanel._input] POPUP ACTIVE - blocking input: %s" % event)
-		# Handle Back to cancel
-		if event.is_action_pressed("menu_back"):
-			_on_cancel_perk()
+		# Handle Accept - manually trigger confirm (don't rely on button focus/signals)
+		if event.is_action_pressed("menu_accept"):
+			print("[PerksPanel._input] Accept pressed - confirming perk")
+			_on_confirm_perk()
 			get_viewport().set_input_as_handled()
 			return
-		# Allow menu_accept to reach focused button (will trigger pressed signal)
-		# but mark as handled after buttons process it
-		elif event.is_action_pressed("menu_accept"):
-			# Don't mark as handled yet - let button process it first
+		# Handle Back to cancel
+		elif event.is_action_pressed("menu_back"):
+			print("[PerksPanel._input] Back pressed - cancelling perk")
+			_on_cancel_perk()
+			get_viewport().set_input_as_handled()
 			return
 		# Block ALL other input to prevent grid navigation in background
 		get_viewport().set_input_as_handled()
