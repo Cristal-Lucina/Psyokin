@@ -265,14 +265,21 @@ func _toast(msg: String) -> void:
 	dlg.queue_free()
 
 func _on_visibility_changed() -> void:
-	"""Handle menu visibility changes - manage MENU_MAIN context"""
+	"""Handle menu visibility changes - manage MENU_MAIN context and pause state"""
 	if visible:
+		# Pause the game when menu is shown
+		get_tree().paused = true
+		print("[GameMenu] Menu opened - pausing game")
+
 		# Menu opened - push MENU_MAIN context as the base menu context
 		# Only push if we're currently at OVERWORLD (not already in menu)
 		if _ctrl_mgr and _ctrl_mgr.get_current_context() == _ctrl_mgr.InputContext.OVERWORLD:
 			print("[GameMenu] Menu opened - pushing MENU_MAIN context")
 			_ctrl_mgr.push_context(_ctrl_mgr.InputContext.MENU_MAIN)
 	else:
+		# Unpause the game when menu is hidden
+		get_tree().paused = false
+		print("[GameMenu] Menu closed - unpausing game")
 		# Menu closed - pop back to OVERWORLD, cleaning up any panel contexts
 		if _ctrl_mgr:
 			print("[GameMenu] Menu closed - cleaning up contexts (current: %s, stack depth: %d)" % [
