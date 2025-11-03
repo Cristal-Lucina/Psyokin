@@ -490,6 +490,14 @@ func _build_roster_list() -> void:
 		btn.pressed.connect(func(id := aid) -> void:
 			_on_roster_member_selected(id)
 		)
+		# Add hover functionality to update details on mouse enter
+		btn.mouse_entered.connect(func(id := aid) -> void:
+			_on_roster_member_hovered(id)
+		)
+		# Restore selected member details on mouse exit
+		btn.mouse_exited.connect(func() -> void:
+			_on_roster_member_unhovered()
+		)
 		_roster_list.add_child(btn)
 		_roster_buttons.append(btn)
 
@@ -588,14 +596,31 @@ func _build_common_list() -> void:
 		btn.pressed.connect(func(id := aid) -> void:
 			_on_common_member_selected(id)
 		)
+		# Add hover functionality to update details on mouse enter
+		btn.mouse_entered.connect(func(id := aid) -> void:
+			_on_roster_member_hovered(id)
+		)
+		# Restore selected member details on mouse exit
+		btn.mouse_exited.connect(func() -> void:
+			_on_roster_member_unhovered()
+		)
 		_common_list.add_child(btn)
 		_common_buttons.append(btn)
 
 func _update_details() -> void:
+	"""Update details panel for the currently selected member"""
+	if _selected_member == "":
+		if _detail_content:
+			_detail_content.text = "[i]Select a member from the roster.[/i]"
+	else:
+		_update_details_for_member(_selected_member)
+
+func _update_details_for_member(member_id: String) -> void:
+	"""Update details panel for a specific member (used for hover and selection)"""
 	if not _detail_content:
 		return
 
-	if _selected_member == "":
+	if member_id == "":
 		_detail_content.text = "[i]Select a member from the roster.[/i]"
 		return
 
@@ -607,12 +632,12 @@ func _update_details() -> void:
 	var lines := PackedStringArray()
 
 	# Name
-	var name: String = String(ds.call("display_name", _selected_member))
+	var name: String = String(ds.call("display_name", member_id))
 	lines.append("[b]Name:[/b] %s" % name)
 	lines.append("")
 
 	# Room
-	var room_id: String = _get_member_room(_selected_member)
+	var room_id: String = _get_member_room(member_id)
 	if room_id != "":
 		lines.append("[b]Room:[/b] %s" % room_id)
 	else:
@@ -631,13 +656,13 @@ func _update_details() -> void:
 				lines.append("  • %s - Empty" % n)
 			else:
 				var n_name: String = String(ds.call("display_name", n_occupant))
-				var status: String = _get_relationship_status(ds, _selected_member, n_occupant)
+				var status: String = _get_relationship_status(ds, member_id, n_occupant)
 				lines.append("  • %s - %s with %s" % [n, status, n_name])
 		lines.append("")
 
 	# Show pending reassignment in Reassignments view
 	if _current_view == ViewType.REASSIGNMENTS:
-		var pending_room: String = _get_pending_assignment(_selected_member)
+		var pending_room: String = _get_pending_assignment(member_id)
 		if pending_room != "":
 			lines.append("")
 			lines.append("[b][color=yellow]Pending Saturday Move:[/color][/b]")
@@ -690,6 +715,17 @@ func _on_roster_member_selected(aid: String) -> void:
 	_current_action_index = 0
 	_focus_current_action()
 	print("[DormsPanel._on_roster_member_selected] Auto-navigated to ACTION_SELECT")
+
+func _on_roster_member_hovered(aid: String) -> void:
+	"""Update details panel when hovering over a roster member"""
+	print("[DormsPanel._on_roster_member_hovered] Hovering over: ", aid)
+	_update_details_for_member(aid)
+
+func _on_roster_member_unhovered() -> void:
+	"""Restore details panel to selected member when hover leaves"""
+	print("[DormsPanel._on_roster_member_unhovered] Mouse left roster member")
+	# Restore details to the currently selected member (or empty if none selected)
+	_update_details()
 
 func _on_room_selected(room_id: String) -> void:
 	_selected_room = room_id
