@@ -182,11 +182,11 @@ func _ds() -> Node:
 func _on_panel_gained_focus() -> void:
 	super()
 	print("[DormsPanel] Panel gained focus")
-	_nav_state = NavState.ACTION_SELECT
+	_nav_state = NavState.ROSTER_SELECT
 	_nav_state_history.clear()
-	print("[DormsPanel] Nav state set to ACTION_SELECT, history cleared")
-	_current_action_index = 0
-	_focus_current_action()
+	print("[DormsPanel] Nav state set to ROSTER_SELECT, history cleared")
+	_current_roster_index = 0
+	_focus_current_roster()
 
 func _can_panel_close() -> bool:
 	# Prevent closing if common room has members without assignments
