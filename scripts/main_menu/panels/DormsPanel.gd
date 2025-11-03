@@ -193,7 +193,7 @@ func _on_panel_gained_focus() -> void:
 func _can_panel_close() -> bool:
 	# Prevent closing if there are any pending changes (move plan in progress)
 	if _has_pending_changes():
-		_show_toast("You must either Accept the plan or Cancel all moves before leaving.")
+		_show_toast("You must place and accept all changes before continuing.")
 		return false
 	return true
 
