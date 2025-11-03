@@ -52,6 +52,11 @@ class_name DormsPanel
 
 @onready var _refresh_btn: Button = $Root/Header/RefreshBtn
 
+# Panel containers (for animation)
+@onready var _left_panel: PanelContainer = %LeftPanel
+@onready var _center_panel: PanelContainer = %CenterPanel
+@onready var _right_panel: PanelContainer = %RightPanel
+
 # Left Panel - Roster
 @onready var _view_type_filter: OptionButton = %ViewTypeFilter
 @onready var _roster_list: VBoxContainer = %RosterList
@@ -101,6 +106,14 @@ const VIS_EMPTY := 0
 const VIS_OCCUPIED := 1
 const VIS_STAGED := 2
 const VIS_LOCKED := 3
+
+# Panel animation settings
+const BASE_LEFT_RATIO := 2.5
+const BASE_CENTER_RATIO := 2.5
+const BASE_RIGHT_RATIO := 5.0
+const ACTIVE_SCALE := 1.10  # Active panel grows by 10%
+const INACTIVE_SCALE := 0.95  # Inactive panels shrink by 5%
+const ANIM_DURATION := 0.2  # Animation duration in seconds
 
 # ═══════════════════════════════════════════════════════════════════════════
 # INITIALIZATION
@@ -360,18 +373,22 @@ func _focus_view_type() -> void:
 func _focus_current_roster() -> void:
 	if _current_roster_index >= 0 and _current_roster_index < _roster_buttons.size():
 		_roster_buttons[_current_roster_index].grab_focus()
+	_animate_panel_focus(NavState.ROSTER_SELECT)
 
 func _focus_current_room() -> void:
 	if _current_room_index >= 0 and _current_room_index < _room_buttons.size():
 		_room_buttons[_current_room_index].grab_focus()
+	_animate_panel_focus(NavState.ROOM_SELECT)
 
 func _focus_current_common() -> void:
 	if _current_common_index >= 0 and _current_common_index < _common_buttons.size():
 		_common_buttons[_current_common_index].grab_focus()
+	_animate_panel_focus(NavState.COMMON_SELECT)
 
 func _focus_current_action() -> void:
 	if _current_action_index >= 0 and _current_action_index < _action_buttons.size():
 		_action_buttons[_current_action_index].grab_focus()
+	_animate_panel_focus(NavState.ACTION_SELECT)
 
 func _push_nav_state(new_state: NavState) -> void:
 	"""Push current state to history and switch to new state"""
@@ -455,7 +472,7 @@ func _build_rooms_grid() -> void:
 	for i in range(room_ids.size()):
 		var rid: String = room_ids[i]
 		var btn := Button.new()
-		btn.custom_minimum_size = Vector2(120, 80)
+		btn.custom_minimum_size = Vector2(108, 72)  # 10% smaller than 120x80
 		btn.toggle_mode = false
 		btn.focus_mode = Control.FOCUS_ALL
 
@@ -576,12 +593,6 @@ func _update_details() -> void:
 				var status: String = _get_relationship_status(ds, _selected_member, n_occupant)
 				lines.append("  • %s - %s with %s" % [n, status, n_name])
 		lines.append("")
-
-	# Status
-	lines.append("[b]Status:[/b]")
-	var status_lines: PackedStringArray = _get_member_status(_selected_member)
-	for s in status_lines:
-		lines.append("  • %s" % s)
 
 	# Show pending reassignment in Reassignments view
 	if _current_view == ViewType.REASSIGNMENTS:
@@ -878,6 +889,40 @@ func _try_assign_to_room(room_id: String) -> void:
 # ═══════════════════════════════════════════════════════════════════════════
 # VISUAL HELPERS
 # ═══════════════════════════════════════════════════════════════════════════
+
+func _animate_panel_focus(active_panel: NavState) -> void:
+	"""Animate panels to highlight which one is currently active"""
+	if not _left_panel or not _center_panel or not _right_panel:
+		return
+
+	var left_ratio := BASE_LEFT_RATIO
+	var center_ratio := BASE_CENTER_RATIO
+	var right_ratio := BASE_RIGHT_RATIO
+
+	# Determine which panel gets the active scale
+	match active_panel:
+		NavState.ROSTER_SELECT, NavState.COMMON_SELECT:
+			left_ratio = BASE_LEFT_RATIO * ACTIVE_SCALE
+			center_ratio = BASE_CENTER_RATIO * INACTIVE_SCALE
+			right_ratio = BASE_RIGHT_RATIO * INACTIVE_SCALE
+		NavState.ACTION_SELECT:
+			left_ratio = BASE_LEFT_RATIO * INACTIVE_SCALE
+			center_ratio = BASE_CENTER_RATIO * ACTIVE_SCALE
+			right_ratio = BASE_RIGHT_RATIO * INACTIVE_SCALE
+		NavState.ROOM_SELECT:
+			left_ratio = BASE_LEFT_RATIO * INACTIVE_SCALE
+			center_ratio = BASE_CENTER_RATIO * INACTIVE_SCALE
+			right_ratio = BASE_RIGHT_RATIO * ACTIVE_SCALE
+
+	# Create tweens for smooth animation
+	var tween := create_tween()
+	tween.set_parallel(true)
+	tween.set_trans(Tween.TRANS_CUBIC)
+	tween.set_ease(Tween.EASE_OUT)
+
+	tween.tween_property(_left_panel, "size_flags_stretch_ratio", left_ratio, ANIM_DURATION)
+	tween.tween_property(_center_panel, "size_flags_stretch_ratio", center_ratio, ANIM_DURATION)
+	tween.tween_property(_right_panel, "size_flags_stretch_ratio", right_ratio, ANIM_DURATION)
 
 func _apply_room_visual(btn: Button, room_id: String) -> void:
 	var ds: Node = _ds()
