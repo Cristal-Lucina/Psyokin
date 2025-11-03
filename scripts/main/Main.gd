@@ -249,7 +249,8 @@ func _on_friday_reveals(pairs: Array) -> void:
 	var overlay := CanvasLayer.new()
 	overlay.layer = 100  # High layer to ensure it's on top
 	overlay.process_mode = Node.PROCESS_MODE_ALWAYS  # Process even when paused
-	get_tree().root.add_child(overlay)  # Add to root so it processes input first
+	get_tree().root.add_child(overlay)  # Add to root
+	get_tree().root.move_child(overlay, 0)  # Move to first position so it processes input first
 
 	var popup := ToastPopup.create(message, "RA MAIL - FRIDAY NEIGHBOR REPORT")
 	popup.process_mode = Node.PROCESS_MODE_ALWAYS  # Process even when paused
@@ -424,6 +425,10 @@ func _ready() -> void:
 # ---------- Input ----------
 func _input(event: InputEvent) -> void:
 	"""Process input events - log ALL joypad button events for debugging"""
+	# Skip if input already handled by popup or other node
+	if get_viewport().is_input_handled():
+		return
+
 	if event is InputEventJoypadButton:
 		print("[Main._input] Joypad button %d, pressed=%s, is_handled=%s" % [
 			event.button_index,
@@ -1224,7 +1229,8 @@ func _show_reassignments_summary(new_layout: Dictionary, moves_in: Array) -> voi
 	var overlay := CanvasLayer.new()
 	overlay.layer = 100  # High layer to ensure it's on top
 	overlay.process_mode = Node.PROCESS_MODE_ALWAYS  # Process even when paused
-	get_tree().root.add_child(overlay)  # Add to root so it processes input first
+	get_tree().root.add_child(overlay)  # Add to root
+	get_tree().root.move_child(overlay, 0)  # Move to first position so it processes input first
 
 	var popup := ToastPopup.create(message, "Reassignments Applied")
 	popup.process_mode = Node.PROCESS_MODE_ALWAYS  # Process even when paused
@@ -1264,7 +1270,8 @@ func _menu_can_close() -> bool:
 func _main_toast(msg: String) -> void:
 	var overlay := CanvasLayer.new()
 	overlay.layer = 100  # High layer to ensure it's on top
-	get_tree().root.add_child(overlay)  # Add to root so it processes input first
+	get_tree().root.add_child(overlay)  # Add to root
+	get_tree().root.move_child(overlay, 0)  # Move to first position so it processes input first
 
 	var popup := ToastPopup.create(msg)
 	overlay.add_child(popup)

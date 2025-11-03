@@ -77,6 +77,10 @@ func _ready() -> void:
 	call_deferred("_initialize_context")
 
 func _input(event: InputEvent) -> void:
+	# Skip if input already handled by popup or other node
+	if get_viewport().is_input_handled():
+		return
+
 	# Debug: Log ALL joypad button events
 	if event is InputEventJoypadButton:
 		print("[GameMenu._input] Button %d, pressed=%s, visible=%s, fullscreen=%s, is_handled=%s" % [
@@ -214,7 +218,8 @@ func _on_friday_reveals(pairs: Array) -> void:
 	var overlay := CanvasLayer.new()
 	overlay.layer = 100  # High layer to ensure it's on top
 	overlay.process_mode = Node.PROCESS_MODE_ALWAYS  # Process even when paused
-	get_tree().root.add_child(overlay)  # Add to root so it processes input first
+	get_tree().root.add_child(overlay)  # Add to root
+	get_tree().root.move_child(overlay, 0)  # Move to first position so it processes input first
 
 	var popup := ToastPopup.create(message, "RA MAIL - FRIDAY NEIGHBOR REPORT")
 	popup.process_mode = Node.PROCESS_MODE_ALWAYS  # Process even when paused
