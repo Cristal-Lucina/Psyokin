@@ -398,11 +398,19 @@ func _show_perk_details(perk: Dictionary) -> void:
 
 func _on_tier_cell_hovered(stat_id: String, tier_index: int) -> void:
 	"""Handle mouse hover over tier cell"""
+	# Block hover interactions when popup is active
+	if _active_popup and is_instance_valid(_active_popup):
+		return
+
 	var perk: Dictionary = _get_perk_info(stat_id, tier_index)
 	_show_perk_details(perk)
 
 func _on_tier_cell_pressed(stat_id: String, tier_index: int) -> void:
 	"""Handle tier cell button press"""
+	# Block button presses when popup is active
+	if _active_popup and is_instance_valid(_active_popup):
+		return
+
 	var perk: Dictionary = _get_perk_info(stat_id, tier_index)
 	if not perk["available"]:
 		return
@@ -615,6 +623,10 @@ func _on_acquired_perk_selected(index: int) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	"""Handle controller input for grid navigation"""
 	if not visible:
+		return
+
+	# Block input when popup is active
+	if _active_popup and is_instance_valid(_active_popup):
 		return
 
 	var handled: bool = false
