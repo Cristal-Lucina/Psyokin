@@ -249,7 +249,7 @@ func _rebuild_battle_stats(token: String) -> void:
 	_add_stat_pair(_battle_grid, "S ACC", str(profile.get("s_acc", 0)))
 	_add_stat_pair(_battle_grid, "EVA", str(profile.get("eva", 0)))
 	_add_stat_pair(_battle_grid, "SPD", str(profile.get("spd", 0)))
-	_add_stat_pair(_battle_grid, "ALI", str(profile.get("ali_resist", 0)))
+	_add_stat_pair(_battle_grid, "AIL R", str(profile.get("ali_resist", 0)))
 	_add_stat_pair(_battle_grid, "CRIT", str(profile.get("crit", 0)))
 
 func _get_equipment(token: String) -> Dictionary:
