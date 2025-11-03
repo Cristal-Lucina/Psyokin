@@ -242,15 +242,21 @@ func _rebuild_battle_stats(token: String) -> void:
 	# Note: CombatProfileSystem stores stats in nested dictionaries
 	var weapon: Dictionary = profile.get("weapon", {})
 	var defense: Dictionary = profile.get("defense", {})
+	var stats: Dictionary = profile.get("stats", {})
+
+	# S ATK = MND + skill_acc_boost
+	var mnd: int = stats.get("MND", 0)
+	var skill_boost: int = weapon.get("skill_acc_boost", 0)
+	var s_atk: int = mnd + skill_boost
 
 	_add_battle_stat(_battle_grid, "MAX HP", profile.get("hp_max", 0))
 	_add_battle_stat(_battle_grid, "MAX MP", profile.get("mp_max", 0))
 	_add_battle_stat(_battle_grid, "P ATK", weapon.get("attack", 0))
-	_add_battle_stat(_battle_grid, "M ATK", 0)  # TODO: Not yet in CombatProfileSystem
+	_add_battle_stat(_battle_grid, "S ATK", s_atk)
 	_add_battle_stat(_battle_grid, "P DEF", defense.get("pdef", 0))
-	_add_battle_stat(_battle_grid, "M DEF", defense.get("mdef", 0))
-	_add_battle_stat(_battle_grid, "W ACC", weapon.get("accuracy", 0))
-	_add_battle_stat(_battle_grid, "S ACC", weapon.get("skill_acc_boost", 0))
+	_add_battle_stat(_battle_grid, "S DEF", defense.get("mdef", 0))
+	_add_battle_stat(_battle_grid, "P ACC", weapon.get("accuracy", 0))
+	_add_battle_stat(_battle_grid, "S ACC", skill_boost)
 	_add_battle_stat(_battle_grid, "EVA", defense.get("peva", 0))  # Using physical evasion
 	_add_battle_stat(_battle_grid, "SPD", defense.get("speed", 0))
 	_add_battle_stat(_battle_grid, "AIL R", defense.get("ail_resist_pct", 0))
