@@ -254,7 +254,7 @@ func _on_friday_reveals(pairs: Array) -> void:
 	var popup := ToastPopup.create(message, "RA MAIL - FRIDAY NEIGHBOR REPORT")
 	popup.process_mode = Node.PROCESS_MODE_ALWAYS  # Process even when paused
 	overlay.add_child(popup)
-	await popup.closed
+	await popup.confirmed  # User can accept or cancel
 	popup.queue_free()
 	overlay.queue_free()
 
@@ -1229,7 +1229,7 @@ func _show_reassignments_summary(new_layout: Dictionary, moves_in: Array) -> voi
 	var popup := ToastPopup.create(message, "Reassignments Applied")
 	popup.process_mode = Node.PROCESS_MODE_ALWAYS  # Process even when paused
 	overlay.add_child(popup)
-	await popup.closed
+	await popup.confirmed  # User can accept or cancel
 	popup.queue_free()
 	overlay.queue_free()
 
@@ -1268,7 +1268,7 @@ func _main_toast(msg: String) -> void:
 
 	var popup := ToastPopup.create(msg)
 	overlay.add_child(popup)
-	await popup.closed
+	await popup.confirmed  # User can accept or cancel
 	popup.queue_free()
 	overlay.queue_free()
 

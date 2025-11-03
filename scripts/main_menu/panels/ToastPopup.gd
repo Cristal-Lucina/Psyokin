@@ -6,26 +6,31 @@ class_name ToastPopup
 ## ═══════════════════════════════════════════════════════════════════════════
 ##
 ## PURPOSE:
-##   Modal toast dialog that blocks all other input until user acknowledges.
-##   Supports gamepad and keyboard input (Accept/Back to close).
+##   Modal toast dialog that blocks all other input until user responds.
+##   Supports gamepad and keyboard input (Accept/Back).
 ##
 ## USAGE:
 ##   var popup = ToastPopup.create("Something happened!")
 ##   parent.add_child(popup)
-##   await popup.closed
+##   var result = await popup.confirmed
 ##   popup.queue_free()
+##   if result:
+##       # User pressed Accept
+##   else:
+##       # User pressed Cancel or Back
 ##
 ##   # With custom title:
 ##   var popup = ToastPopup.create("Details here", "Custom Title")
 ##
 ## ═══════════════════════════════════════════════════════════════════════════
 
-signal closed
+signal confirmed(result: bool)
 
 var _title: String = "Notice"
 var _message: String = ""
 var _custom_size: Vector2 = Vector2(400, 160)
-var _ok_btn: Button = null
+var _accept_btn: Button = null
+var _cancel_btn: Button = null
 
 static func create(message: String, title: String = "Notice") -> ToastPopup:
 	var popup := ToastPopup.new()
@@ -82,20 +87,31 @@ func _build_ui() -> void:
 	msg_label.custom_minimum_size = Vector2(400, 0)  # Set width for wrapping
 	vbox.add_child(msg_label)
 
-	# OK Button
-	_ok_btn = Button.new()
-	_ok_btn.text = "OK"
-	_ok_btn.focus_mode = Control.FOCUS_ALL
-	_ok_btn.custom_minimum_size = Vector2(100, 40)
-	_ok_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	vbox.add_child(_ok_btn)
+	# Buttons
+	var hbox := HBoxContainer.new()
+	hbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	hbox.add_theme_constant_override("separation", 12)
+	vbox.add_child(hbox)
 
-	# Connect button
-	_ok_btn.pressed.connect(_on_ok)
+	_accept_btn = Button.new()
+	_accept_btn.text = "Accept"
+	_accept_btn.focus_mode = Control.FOCUS_ALL
+	_accept_btn.custom_minimum_size = Vector2(100, 40)
+	hbox.add_child(_accept_btn)
+
+	_cancel_btn = Button.new()
+	_cancel_btn.text = "Cancel"
+	_cancel_btn.focus_mode = Control.FOCUS_ALL
+	_cancel_btn.custom_minimum_size = Vector2(100, 40)
+	hbox.add_child(_cancel_btn)
+
+	# Connect buttons
+	_accept_btn.pressed.connect(_on_accept)
+	_cancel_btn.pressed.connect(_on_cancel)
 
 	# Auto-position and show (deferred to allow size calculation)
 	call_deferred("_finalize_size_and_position")
-	_ok_btn.call_deferred("grab_focus")
+	_accept_btn.call_deferred("grab_focus")
 
 func _finalize_size_and_position() -> void:
 	# Force update to calculate proper size
@@ -112,17 +128,43 @@ func _input(event: InputEvent) -> void:
 	if not visible:
 		return
 
-	# Handle Back to close (buttons don't handle Back by default)
-	if event.is_action_pressed("menu_back"):
-		_on_ok()
+	# Handle Accept
+	if event.is_action_pressed("menu_accept"):
+		var focused := get_viewport().gui_get_focus_owner()
+		if focused == _accept_btn:
+			_on_accept()
+		elif focused == _cancel_btn:
+			_on_cancel()
+		else:
+			# Default to accept if nothing focused
+			_on_accept()
 		get_viewport().set_input_as_handled()
 
-	# Block all directional navigation to keep focus in popup
-	elif event.is_action_pressed("move_up") or event.is_action_pressed("move_down") or \
-	     event.is_action_pressed("move_left") or event.is_action_pressed("move_right"):
+	# Handle Back (cancel)
+	elif event.is_action_pressed("menu_back"):
+		_on_cancel()
 		get_viewport().set_input_as_handled()
 
-func _on_ok() -> void:
-	print("[ToastPopup] OK pressed")
-	closed.emit()
+	# Handle left/right navigation between buttons
+	elif event.is_action_pressed("move_left"):
+		_accept_btn.grab_focus()
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("move_right"):
+		_cancel_btn.grab_focus()
+		get_viewport().set_input_as_handled()
+
+	# Block up/down navigation to keep focus in popup
+	elif event.is_action_pressed("move_up"):
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("move_down"):
+		get_viewport().set_input_as_handled()
+
+func _on_accept() -> void:
+	print("[ToastPopup] Accept pressed")
+	confirmed.emit(true)
+	hide()
+
+func _on_cancel() -> void:
+	print("[ToastPopup] Cancel pressed")
+	confirmed.emit(false)
 	hide()
