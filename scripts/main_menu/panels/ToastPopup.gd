@@ -15,15 +15,20 @@ class_name ToastPopup
 ##   await popup.closed
 ##   popup.queue_free()
 ##
+##   # With custom title:
+##   var popup = ToastPopup.create("Details here", "Custom Title")
+##
 ## ═══════════════════════════════════════════════════════════════════════════
 
 signal closed
 
+var _title: String = "Notice"
 var _message: String = ""
 var _ok_btn: Button = null
 
-static func create(message: String) -> ToastPopup:
+static func create(message: String, title: String = "Notice") -> ToastPopup:
 	var popup := ToastPopup.new()
+	popup._title = title
 	popup._message = message
 	popup._build_ui()
 	return popup
@@ -54,7 +59,7 @@ func _build_ui() -> void:
 
 	# Title
 	var title := Label.new()
-	title.text = "Notice"
+	title.text = _title
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.add_theme_font_size_override("font_size", 18)
 	vbox.add_child(title)
