@@ -630,22 +630,20 @@ func _on_acquired_perk_selected(index: int) -> void:
 
 func _input(event: InputEvent) -> void:
 	"""Catch ALL input when popup is active to prevent it from reaching other systems"""
-	# When popup is active, handle Accept/Back for buttons
+	# When popup is active, block everything except what we explicitly handle
 	if _active_popup and is_instance_valid(_active_popup):
 		# Handle Back to cancel
 		if event.is_action_pressed("menu_back"):
 			_on_cancel_perk()
 			get_viewport().set_input_as_handled()
 			return
-		# Block directional navigation to prevent grid movement in background
-		elif event.is_action_pressed("ui_up") or event.is_action_pressed("ui_down") or \
-		     event.is_action_pressed("ui_left") or event.is_action_pressed("ui_right") or \
-		     event.is_action_pressed("move_up") or event.is_action_pressed("move_down") or \
-		     event.is_action_pressed("move_left") or event.is_action_pressed("move_right"):
-			get_viewport().set_input_as_handled()
-			return
 		# Allow menu_accept to reach focused button (will trigger pressed signal)
-		# Don't mark other inputs as handled here - let _unhandled_input catch them
+		# but mark as handled after buttons process it
+		elif event.is_action_pressed("menu_accept"):
+			# Don't mark as handled yet - let button process it first
+			return
+		# Block ALL other input to prevent grid navigation in background
+		get_viewport().set_input_as_handled()
 
 func _unhandled_input(event: InputEvent) -> void:
 	"""Handle controller input for grid navigation"""
