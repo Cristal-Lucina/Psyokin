@@ -124,7 +124,12 @@ func _position_center() -> void:
 
 func _input(event: InputEvent) -> void:
 	if not visible:
+		print("[ToastPopup._input] Not visible, skipping input")
 		return
+
+	# Debug logging
+	if event is InputEventJoypadButton and event.pressed:
+		print("[ToastPopup._input] Joypad button %d pressed, visible=%s" % [event.button_index, visible])
 
 	# Handle Accept
 	if event.is_action_pressed("menu_accept"):
