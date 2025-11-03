@@ -58,7 +58,6 @@ class_name DormsPanel
 @onready var _right_panel: PanelContainer = %RightPanel
 
 # Left Panel - Roster
-@onready var _view_type_filter: OptionButton = %ViewTypeFilter
 @onready var _roster_list: VBoxContainer = %RosterList
 
 # Center Panel - Details
@@ -79,7 +78,7 @@ class_name DormsPanel
 # ═══════════════════════════════════════════════════════════════════════════
 
 enum ViewType { PLACEMENTS, REASSIGNMENTS }
-var _current_view: ViewType = ViewType.PLACEMENTS
+var _current_view: ViewType = ViewType.REASSIGNMENTS  # Always use reassignments mode
 
 var _selected_member: String = ""  # actor_id from roster
 var _selected_room: String = ""    # room_id from rooms grid
@@ -128,7 +127,6 @@ func _ready() -> void:
 
 	# Verify node references
 	print("[DormsPanel._ready] Node checks:")
-	print("  _view_type_filter: ", _view_type_filter != null)
 	print("  _roster_list: ", _roster_list != null)
 	print("  _detail_content: ", _detail_content != null)
 	print("  _rooms_grid: ", _rooms_grid != null)
@@ -137,15 +135,6 @@ func _ready() -> void:
 	print("  _move_out_btn: ", _move_out_btn != null)
 	print("  _cancel_move_btn: ", _cancel_move_btn != null)
 	print("  _accept_plan_btn: ", _accept_plan_btn != null)
-
-	# Setup view type filter
-	if _view_type_filter and _view_type_filter.item_count == 0:
-		_view_type_filter.add_item("Placements", 0)
-		_view_type_filter.add_item("Reassignments", 1)
-		_view_type_filter.select(0)
-		if not _view_type_filter.item_selected.is_connected(_on_view_type_changed):
-			_view_type_filter.item_selected.connect(_on_view_type_changed)
-			print("[DormsPanel._ready] Connected view_type_filter.item_selected")
 
 	# Connect refresh button
 	if _refresh_btn and not _refresh_btn.pressed.is_connected(_rebuild):
@@ -275,9 +264,7 @@ func _navigate_up() -> void:
 			if _current_action_index > 0:
 				_current_action_index -= 1
 				_focus_current_action()
-			elif _current_action_index == 0:
-				# Move to View Type filter (above first button)
-				_focus_view_type()
+			# At top of action menu - can't go up further
 
 func _navigate_down() -> void:
 	match _nav_state:
@@ -307,6 +294,9 @@ func _navigate_left() -> void:
 			if _current_room_index % 4 > 0:
 				_current_room_index -= 1
 				_focus_current_room()
+		_:
+			# All other states: no horizontal navigation between panels
+			pass
 
 func _navigate_right() -> void:
 	match _nav_state:
@@ -364,11 +354,6 @@ func _on_back_input() -> void:
 		# This allows proper slide animation back to StatusPanel
 		print("[DormsPanel._on_back_input] No history, letting GameMenu handle back button for slide transition")
 		# Do NOT call get_viewport().set_input_as_handled() - let event bubble up
-
-func _focus_view_type() -> void:
-	# View type is now in Action Menu (right panel)
-	if _view_type_filter:
-		_view_type_filter.grab_focus()
 
 func _focus_current_roster() -> void:
 	if _current_roster_index >= 0 and _current_roster_index < _roster_buttons.size():
@@ -724,17 +709,9 @@ func _on_move_out_pressed() -> void:
 
 	var member_name: String = _get_member_name(_selected_member)
 
-	# Switch to Reassignments view if not already there
-	if _current_view != ViewType.REASSIGNMENTS:
-		print("[DormsPanel._on_move_out_pressed] Switching to Reassignments view")
-		_current_view = ViewType.REASSIGNMENTS
-		if _view_type_filter:
-			_view_type_filter.select(1)  # Select Reassignments
-		_rebuild()  # Rebuild to update view
-
 	# Confirm staging the move
 	print("[DormsPanel._on_move_out_pressed] Showing confirmation dialog")
-	var confirmed: bool = await _ask_confirm("Move %s out of room %s?\n(Change will take effect on Saturday)" % [member_name, room_id])
+	var confirmed: bool = await _ask_confirm("Would you like to move out %s and stage in the Common Room?" % member_name)
 	print("[DormsPanel._on_move_out_pressed] Confirmed: %s" % confirmed)
 
 	if not confirmed:
@@ -757,7 +734,6 @@ func _on_move_out_pressed() -> void:
 		return
 
 	print("[DormsPanel._on_move_out_pressed] Success - rebuilding panel")
-	_show_toast("%s staged for common room on Saturday." % member_name)
 
 	# Clear selection and return to roster (locked navigation flow)
 	_selected_member = ""
@@ -808,11 +784,6 @@ func _on_accept_plan_pressed() -> void:
 
 	_show_toast("Plan accepted! Changes will apply on Saturday morning.")
 	_pending_reassignments.clear()
-
-	# Switch to reassignments view to show pending moves
-	_current_view = ViewType.REASSIGNMENTS
-	if _view_type_filter:
-		_view_type_filter.select(1)
 	_rebuild()
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -949,6 +920,10 @@ func _apply_room_visual(btn: Button, room_id: String) -> void:
 	if _is_room_targeted(room_id):
 		col = Color(0.75, 0.15, 0.15)  # red (already targeted)
 
+	# Override with red if this is the selected member's previous room (before moving to common)
+	if _selected_member != "" and _get_member_previous_room(_selected_member) == room_id:
+		col = Color(0.75, 0.15, 0.15)  # red (can't go back to previous room)
+
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = col
 	sb.corner_radius_top_left = 6
@@ -1009,6 +984,39 @@ func _get_member_room(aid: String) -> String:
 		var room_data: Dictionary = ds.call("get_room", rid)
 		if String(room_data.get("occupant", "")) == aid:
 			return rid
+	return ""
+
+func _get_member_previous_room(aid: String) -> String:
+	"""Get the room this member vacated when moved to common room"""
+	var ds: Node = _ds()
+	if not ds:
+		return ""
+
+	# Check if this member is in common room
+	var common_v: Variant = ds.call("get_common")
+	var common: PackedStringArray = (common_v if typeof(common_v) == TYPE_PACKED_STRING_ARRAY else PackedStringArray())
+	if not common.has(aid):
+		return ""  # Not in common room, no previous room
+
+	# Check staged vacations to find which room this member vacated
+	if ds.has_method("get_staged_vacations"):
+		var vacations_v: Variant = ds.call("get_staged_vacations")
+		if typeof(vacations_v) == TYPE_DICTIONARY:
+			var vacations: Dictionary = vacations_v
+			# vacations format: { room_id: actor_id } - maps room to who's leaving it
+			for room_id in vacations.keys():
+				if String(vacations[room_id]) == aid:
+					return room_id
+
+	# Alternative: check all rooms to see if any have VIS_STAGED and this member staged to leave
+	var room_ids_v: Variant = ds.call("list_rooms")
+	var room_ids: PackedStringArray = (room_ids_v if typeof(room_ids_v) == TYPE_PACKED_STRING_ARRAY else PackedStringArray())
+	for rid in room_ids:
+		var room_data: Dictionary = ds.call("get_room", rid)
+		var staged_to_leave: String = String(room_data.get("staged_to_leave", ""))
+		if staged_to_leave == aid:
+			return rid
+
 	return ""
 
 func _get_member_name(aid: String) -> String:
@@ -1126,12 +1134,6 @@ func _can_accept_plan() -> bool:
 		return false
 
 	return true
-
-func _on_view_type_changed(index: int) -> void:
-	print("[DormsPanel._on_view_type_changed] View changed to index: ", index)
-	_current_view = ViewType.PLACEMENTS if index == 0 else ViewType.REASSIGNMENTS
-	print("[DormsPanel._on_view_type_changed] Current view now: ", "PLACEMENTS" if _current_view == ViewType.PLACEMENTS else "REASSIGNMENTS")
-	_rebuild()
 
 func _on_dorms_changed() -> void:
 	print("[DormsPanel._on_dorms_changed] DormSystem signal received, rebuilding...")
