@@ -891,7 +891,6 @@ func _on_accept_plan_pressed() -> void:
 		_show_toast(String(res.get("reason", "Cannot accept plan.")))
 		return
 
-	_show_toast("Plan accepted! Changes will apply on Saturday morning.")
 	_pending_reassignments.clear()
 	_rebuild()
 
