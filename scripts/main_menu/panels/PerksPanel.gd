@@ -686,7 +686,7 @@ func _activate_selected_cell() -> void:
 	if cell is Button and not cell.disabled and cell.has_meta("perk_info"):
 		var perk: Dictionary = cell.get_meta("perk_info")
 		if perk["available"]:
-			_unlock_perk(perk)
+			_show_perk_confirmation(perk)
 
 # ==============================================================================
 # Helper Functions
