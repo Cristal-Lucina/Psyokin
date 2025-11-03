@@ -125,6 +125,9 @@ var _active_popup: Control = null  # Currently open equipment popup panel
 func _ready() -> void:
 	super()  # Call PanelBase._ready()
 
+	# Set process mode to work while game is paused
+	process_mode = Node.PROCESS_MODE_ALWAYS
+
 	_gs    = get_node_or_null("/root/aGameState")
 	_inv   = get_node_or_null("/root/aInventorySystem")
 	_sig   = get_node_or_null("/root/aSigilSystem")
@@ -1343,7 +1346,10 @@ func _input(event: InputEvent) -> void:
 		return
 
 	# Only handle other states if we're the active panel
-	if not is_active():
+	var active = is_active()
+	if event is InputEventJoypadButton and event.pressed:
+		print("[LoadoutPanel._input] Button %d, is_active=%s, nav_state=%s" % [event.button_index, active, _nav_state])
+	if not active:
 		return
 
 	# STATE 2: PARTY_SELECT

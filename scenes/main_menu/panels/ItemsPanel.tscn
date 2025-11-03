@@ -3,6 +3,7 @@
 [ext_resource type="Script" uid="uid://bjnp7pinwrub" path="res://scripts/main_menu/panels/ItemsPanel.gd" id="1"]
 
 [node name="ItemsPanel" type="Control"]
+process_mode = 3
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -24,60 +25,84 @@ grow_horizontal = 2
 grow_vertical = 2
 theme_override_constants/separation = 16
 
-[node name="CategoryColumn" type="VBoxContainer" parent="Root"]
+[node name="CategoryPanel" type="PanelContainer" parent="Root"]
 custom_minimum_size = Vector2(180, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="CategoryColumn" type="VBoxContainer" parent="Root/CategoryPanel"]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="CategoryLabel" type="Label" parent="Root/CategoryColumn"]
+[node name="CategoryLabel" type="Label" parent="Root/CategoryPanel/CategoryColumn"]
 layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
+theme_override_font_sizes/font_size = 16
 text = "Categories"
 horizontal_alignment = 1
 
-[node name="CategoryList" type="ItemList" parent="Root/CategoryColumn"]
+[node name="Separator" type="HSeparator" parent="Root/CategoryPanel/CategoryColumn"]
+layout_mode = 2
+
+[node name="CategoryList" type="ItemList" parent="Root/CategoryPanel/CategoryColumn"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 3
 
-[node name="ItemColumn" type="VBoxContainer" parent="Root"]
+[node name="ItemPanel" type="PanelContainer" parent="Root"]
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_constants/separation = 8
 
-[node name="ItemHeader" type="HBoxContainer" parent="Root/ItemColumn"]
-layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="ItemLabel" type="Label" parent="Root/ItemColumn/ItemHeader"]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_horizontal = 3
-text = "Items (All)"
-
-[node name="CountLabel" type="Label" parent="Root/ItemColumn/ItemHeader"]
-unique_name_in_owner = true
-layout_mode = 2
-text = "Count: 0"
-
-[node name="ItemList" type="ItemList" parent="Root/ItemColumn"]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_vertical = 3
-
-[node name="DetailsColumn" type="VBoxContainer" parent="Root"]
-custom_minimum_size = Vector2(320, 0)
+[node name="ItemColumn" type="VBoxContainer" parent="Root/ItemPanel"]
 layout_mode = 2
 theme_override_constants/separation = 12
 
-[node name="DetailsLabel" type="Label" parent="Root/DetailsColumn"]
+[node name="ItemLabel" type="Label" parent="Root/ItemPanel/ItemColumn"]
+unique_name_in_owner = true
 layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
+theme_override_font_sizes/font_size = 16
+text = "Items (All)"
+horizontal_alignment = 1
+
+[node name="Separator" type="HSeparator" parent="Root/ItemPanel/ItemColumn"]
+layout_mode = 2
+
+[node name="ItemHeader" type="HBoxContainer" parent="Root/ItemPanel/ItemColumn"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="CountLabel" type="Label" parent="Root/ItemPanel/ItemColumn/ItemHeader"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Count: 0"
+horizontal_alignment = 1
+
+[node name="ItemList" type="ItemList" parent="Root/ItemPanel/ItemColumn"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="DetailsPanel" type="PanelContainer" parent="Root"]
+custom_minimum_size = Vector2(320, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="DetailsColumn" type="VBoxContainer" parent="Root/DetailsPanel"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="DetailsLabel" type="Label" parent="Root/DetailsPanel/DetailsColumn"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
+theme_override_font_sizes/font_size = 16
 text = "Item Details"
 horizontal_alignment = 1
 
-[node name="Separator1" type="HSeparator" parent="Root/DetailsColumn"]
+[node name="Separator1" type="HSeparator" parent="Root/DetailsPanel/DetailsColumn"]
 layout_mode = 2
 
-[node name="ItemName" type="Label" parent="Root/DetailsColumn"]
+[node name="ItemName" type="Label" parent="Root/DetailsPanel/DetailsColumn"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 28)
 layout_mode = 2
@@ -85,14 +110,14 @@ text = "(Select an item)"
 horizontal_alignment = 1
 autowrap_mode = 2
 
-[node name="Separator2" type="HSeparator" parent="Root/DetailsColumn"]
+[node name="Separator2" type="HSeparator" parent="Root/DetailsPanel/DetailsColumn"]
 layout_mode = 2
 
-[node name="ScrollContainer" type="ScrollContainer" parent="Root/DetailsColumn"]
+[node name="ScrollContainer" type="ScrollContainer" parent="Root/DetailsPanel/DetailsColumn"]
 layout_mode = 2
 size_flags_vertical = 3
 
-[node name="DetailsText" type="Label" parent="Root/DetailsColumn/ScrollContainer"]
+[node name="DetailsText" type="Label" parent="Root/DetailsPanel/DetailsColumn/ScrollContainer"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
@@ -100,20 +125,20 @@ size_flags_vertical = 3
 autowrap_mode = 3
 clip_text = true
 
-[node name="Separator3" type="HSeparator" parent="Root/DetailsColumn"]
+[node name="Separator3" type="HSeparator" parent="Root/DetailsPanel/DetailsColumn"]
 layout_mode = 2
 
-[node name="ActionButtons" type="VBoxContainer" parent="Root/DetailsColumn"]
+[node name="ActionButtons" type="VBoxContainer" parent="Root/DetailsPanel/DetailsColumn"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="UseButton" type="Button" parent="Root/DetailsColumn/ActionButtons"]
+[node name="UseButton" type="Button" parent="Root/DetailsPanel/DetailsColumn/ActionButtons"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Use Item"
 
-[node name="InspectButton" type="Button" parent="Root/DetailsColumn/ActionButtons"]
+[node name="InspectButton" type="Button" parent="Root/DetailsPanel/DetailsColumn/ActionButtons"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Inspect"

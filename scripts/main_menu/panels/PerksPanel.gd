@@ -41,6 +41,9 @@ var _active_popup: Control = null
 var _pending_perk: Dictionary = {}  # Perk waiting for confirmation
 
 func _ready() -> void:
+	# Set high input priority so popup input blocking happens before parent nodes
+	process_priority = 100
+
 	# Get system references
 	_stats = get_node_or_null(STATS_PATH)
 	_perk = get_node_or_null(PERK_PATH)
@@ -495,6 +498,7 @@ func _show_perk_confirmation(perk: Dictionary) -> void:
 
 	# Set active popup
 	_active_popup = popup_panel
+	print("[PerksPanel] Popup created and set as active")
 
 	# Create content container
 	var vbox: VBoxContainer = VBoxContainer.new()
@@ -569,8 +573,7 @@ func _show_perk_confirmation(perk: Dictionary) -> void:
 	var viewport_size: Vector2 = get_viewport_rect().size
 	popup_panel.position = (viewport_size - popup_panel.size) / 2.0
 
-	# Pause the game
-	get_tree().paused = true
+	# Game is already paused by GameMenu - no need to pause again
 
 	# Fade in
 	var tween := create_tween()
@@ -614,8 +617,8 @@ func _close_confirmation_popup() -> void:
 	tween.set_trans(Tween.TRANS_CUBIC)
 	tween.tween_property(popup_to_close, "modulate:a", 0.0, 0.3)
 	tween.tween_callback(func():
-		# Unpause the game
-		get_tree().paused = false
+		# Don't unpause here - let GameMenu control pause state
+		# The game should stay paused while the menu is open
 		if is_instance_valid(popup_to_close):
 			popup_to_close.queue_free()
 	)
@@ -632,18 +635,21 @@ func _input(event: InputEvent) -> void:
 	"""Catch ALL input when popup is active to prevent it from reaching other systems"""
 	# When popup is active, block everything except what we explicitly handle
 	if _active_popup and is_instance_valid(_active_popup):
+		# Handle Accept - manually trigger confirm (don't rely on button focus/signals)
+		if event.is_action_pressed("menu_accept"):
+			print("[PerksPanel._input] Accept pressed - confirming perk")
+			_on_confirm_perk()
+			get_viewport().set_input_as_handled()
+			return
 		# Handle Back to cancel
-		if event.is_action_pressed("menu_back"):
+		elif event.is_action_pressed("menu_back"):
+			print("[PerksPanel._input] Back pressed - cancelling perk")
 			_on_cancel_perk()
 			get_viewport().set_input_as_handled()
 			return
-		# Allow menu_accept to reach focused button (will trigger pressed signal)
-		# but mark as handled after buttons process it
-		elif event.is_action_pressed("menu_accept"):
-			# Don't mark as handled yet - let button process it first
-			return
 		# Block ALL other input to prevent grid navigation in background
 		get_viewport().set_input_as_handled()
+		return
 
 func _unhandled_input(event: InputEvent) -> void:
 	"""Handle controller input for grid navigation"""
@@ -652,6 +658,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 	# Block ALL input when popup is active (buttons handle their own input via signals)
 	if _active_popup and is_instance_valid(_active_popup):
+		print("[PerksPanel._unhandled_input] POPUP ACTIVE - blocking: %s" % event)
 		get_viewport().set_input_as_handled()
 		return
 
