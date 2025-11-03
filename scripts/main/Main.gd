@@ -220,15 +220,46 @@ func _connect_dorm_signals() -> void:
 		print("[Main] Connected saturday_applied_v2 signal")
 
 func _on_friday_reveals(pairs: Array) -> void:
-	"""Show Friday RA Mail popup"""
+	"""Show Friday RA Mail popup with relationship reveals"""
 	print("[Main] Friday reveals triggered with %d pairs" % pairs.size())
 	if pairs.size() == 0:
 		return  # Don't show popup if no reveals
 
-	var popup := preload("res://scripts/main_menu/panels/FridayRAMailPopup.gd").create(pairs)
-	add_child(popup)
+	# Pause the game
+	get_tree().paused = true
+
+	# Build message from pairs
+	var lines: PackedStringArray = []
+	lines.append("The following neighbor relationships have been revealed after being neighbors for 2+ weeks:")
+	lines.append("")  # Empty line for spacing
+
+	for pair_v in pairs:
+		if typeof(pair_v) != TYPE_DICTIONARY:
+			continue
+		var pair: Dictionary = pair_v
+		var a_name: String = String(pair.get("a_name", ""))
+		var b_name: String = String(pair.get("b_name", ""))
+		var status: String = String(pair.get("status", "Neutral"))
+
+		lines.append("• %s and %s are %s" % [a_name, b_name, status])
+
+	var message := _join_lines(lines)
+
+	# Show popup using ToastPopup as overlay (controller-friendly)
+	var overlay := CanvasLayer.new()
+	overlay.layer = 100  # High layer to ensure it's on top
+	overlay.process_mode = Node.PROCESS_MODE_ALWAYS  # Process even when paused
+	add_child(overlay)
+
+	var popup := ToastPopup.create(message, "RA MAIL - FRIDAY NEIGHBOR REPORT")
+	popup.process_mode = Node.PROCESS_MODE_ALWAYS  # Process even when paused
+	overlay.add_child(popup)
 	await popup.closed
 	popup.queue_free()
+	overlay.queue_free()
+
+	# Unpause the game
+	get_tree().paused = false
 
 func _on_saturday_applied(new_layout: Dictionary, moves: Array) -> void:
 	"""Store Saturday moves for later display"""
@@ -1185,14 +1216,25 @@ func _show_reassignments_summary(new_layout: Dictionary, moves_in: Array) -> voi
 				var nm2: String = (String(ds.call("display_name", aid3)) if ds else aid3)
 				lines.append("\"%s\" moved from \"%s\" to \"%s\"" % [nm2, fr2, to2])
 
-	# Dialog (unchanged behavior when nothing to report)
-	var dlg := AcceptDialog.new()
-	dlg.title = "Reassignments Applied"
-	dlg.dialog_text = ("Room changes have been applied." if lines.size() == 0 else _join_lines(lines))
-	add_child(dlg)
-	dlg.popup_centered()
-	await dlg.confirmed
-	dlg.queue_free()
+	# Pause the game
+	get_tree().paused = true
+
+	# Show popup using ToastPopup as overlay (controller-friendly)
+	var message := ("Room changes have been applied." if lines.size() == 0 else _join_lines(lines))
+	var overlay := CanvasLayer.new()
+	overlay.layer = 100  # High layer to ensure it's on top
+	overlay.process_mode = Node.PROCESS_MODE_ALWAYS  # Process even when paused
+	add_child(overlay)
+
+	var popup := ToastPopup.create(message, "Reassignments Applied")
+	popup.process_mode = Node.PROCESS_MODE_ALWAYS  # Process even when paused
+	overlay.add_child(popup)
+	await popup.closed
+	popup.queue_free()
+	overlay.queue_free()
+
+	# Unpause the game
+	get_tree().paused = false
 
 	_prelock_layout.clear()
 
@@ -1220,13 +1262,15 @@ func _menu_can_close() -> bool:
 	return true
 
 func _main_toast(msg: String) -> void:
-	var dlg := AcceptDialog.new()
-	dlg.title = "Notice"
-	dlg.dialog_text = msg
-	add_child(dlg)
-	dlg.popup_centered()
-	await dlg.confirmed
-	dlg.queue_free()
+	var overlay := CanvasLayer.new()
+	overlay.layer = 100  # High layer to ensure it's on top
+	add_child(overlay)
+
+	var popup := ToastPopup.create(msg)
+	overlay.add_child(popup)
+	await popup.closed
+	popup.queue_free()
+	overlay.queue_free()
 
 ## ═══════════════════════════════════════════════════════════════
 ## TEST/DEBUG HELPERS - Battle System

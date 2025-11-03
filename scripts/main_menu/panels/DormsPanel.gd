@@ -17,15 +17,15 @@
 ##
 ## LAYOUT:
 ##   Left Panel (Dorm Roster):
-##   • View Type selector (Placements/Reassignments)
-##   • List of all dorm members (up/down navigation)
+##   • Dorm Roster list (all members in rooms)
+##   • Common Room list (members awaiting assignment)
 ##
-##   Center Panel (Details):
-##   • Name, Room, Neighbors, Status for selected member
+##   Center Panel (Action Menu):
+##   • Assign Room, Move Out, Cancel Move, Accept Plan buttons
 ##
 ##   Right Panel (split):
 ##   • Top: Rooms grid (2x4) showing room numbers and occupants
-##   • Bottom: Common Room list + 4 action buttons
+##   • Bottom: Details section (Name, Room, Neighbors, Status for selected/hovered member)
 ##
 ## SELECTION FLOW:
 ##   1. Initially can only navigate up/down in roster or change view
@@ -60,7 +60,7 @@ class_name DormsPanel
 # Left Panel - Roster
 @onready var _roster_list: VBoxContainer = %RosterList
 
-# Center Panel - Details
+# Right Panel - Details (bottom section)
 @onready var _detail_content: RichTextLabel = %DetailContent
 
 # Right Panel - Rooms + Common
@@ -193,7 +193,7 @@ func _on_panel_gained_focus() -> void:
 func _can_panel_close() -> bool:
 	# Prevent closing if there are any pending changes (move plan in progress)
 	if _has_pending_changes():
-		_show_toast("You must either Accept the plan or Cancel all moves before leaving.")
+		_show_toast("You must place and accept all changes before continuing.")
 		return false
 	return true
 
@@ -414,6 +414,11 @@ func _on_back_input() -> void:
 func _focus_current_roster() -> void:
 	if _current_roster_index >= 0 and _current_roster_index < _roster_buttons.size():
 		_roster_buttons[_current_roster_index].grab_focus()
+		# Update details panel to show the focused member
+		if _current_roster_index < _all_members.size():
+			var focused_member: String = _all_members[_current_roster_index]
+			print("[DormsPanel._focus_current_roster] Focused member: ", focused_member)
+			_update_details_for_member(focused_member)
 	_animate_panel_focus(NavState.ROSTER_SELECT)
 
 func _focus_current_room() -> void:
@@ -424,6 +429,11 @@ func _focus_current_room() -> void:
 func _focus_current_common() -> void:
 	if _current_common_index >= 0 and _current_common_index < _common_buttons.size():
 		_common_buttons[_current_common_index].grab_focus()
+		# Update details panel to show the focused member
+		if _current_common_index < _common_members.size():
+			var focused_member: String = _common_members[_current_common_index]
+			print("[DormsPanel._focus_current_common] Focused member: ", focused_member)
+			_update_details_for_member(focused_member)
 	_animate_panel_focus(NavState.COMMON_SELECT)
 
 func _focus_current_action() -> void:
@@ -489,6 +499,14 @@ func _build_roster_list() -> void:
 		btn.button_pressed = (_selected_member == aid)
 		btn.pressed.connect(func(id := aid) -> void:
 			_on_roster_member_selected(id)
+		)
+		# Add hover functionality to update details on mouse enter
+		btn.mouse_entered.connect(func(id := aid) -> void:
+			_on_roster_member_hovered(id)
+		)
+		# Restore selected member details on mouse exit
+		btn.mouse_exited.connect(func() -> void:
+			_on_roster_member_unhovered()
 		)
 		_roster_list.add_child(btn)
 		_roster_buttons.append(btn)
@@ -588,14 +606,37 @@ func _build_common_list() -> void:
 		btn.pressed.connect(func(id := aid) -> void:
 			_on_common_member_selected(id)
 		)
+		# Add hover functionality to update details on mouse enter
+		btn.mouse_entered.connect(func(id := aid) -> void:
+			_on_roster_member_hovered(id)
+		)
+		# Restore selected member details on mouse exit
+		btn.mouse_exited.connect(func() -> void:
+			_on_roster_member_unhovered()
+		)
 		_common_list.add_child(btn)
 		_common_buttons.append(btn)
 
 func _update_details() -> void:
+	"""Update details panel for the currently selected member"""
+	print("[DormsPanel._update_details] Updating details for selected member: ", _selected_member)
+	if _selected_member == "":
+		if _detail_content:
+			_detail_content.text = "[i]Select a member from the roster.[/i]"
+			print("[DormsPanel._update_details] Showing default prompt (no selection)")
+	else:
+		_update_details_for_member(_selected_member)
+		print("[DormsPanel._update_details] Details updated for: ", _selected_member)
+
+func _update_details_for_member(member_id: String) -> void:
+	"""Update details panel for a specific member (used for hover and selection)"""
+	print("[DormsPanel._update_details_for_member] Updating details panel in RIGHT PANEL for member: ", member_id)
+
 	if not _detail_content:
+		print("[DormsPanel._update_details_for_member] ERROR: _detail_content is null!")
 		return
 
-	if _selected_member == "":
+	if member_id == "":
 		_detail_content.text = "[i]Select a member from the roster.[/i]"
 		return
 
@@ -607,12 +648,12 @@ func _update_details() -> void:
 	var lines := PackedStringArray()
 
 	# Name
-	var name: String = String(ds.call("display_name", _selected_member))
+	var name: String = String(ds.call("display_name", member_id))
 	lines.append("[b]Name:[/b] %s" % name)
 	lines.append("")
 
 	# Room
-	var room_id: String = _get_member_room(_selected_member)
+	var room_id: String = _get_member_room(member_id)
 	if room_id != "":
 		lines.append("[b]Room:[/b] %s" % room_id)
 	else:
@@ -631,19 +672,20 @@ func _update_details() -> void:
 				lines.append("  • %s - Empty" % n)
 			else:
 				var n_name: String = String(ds.call("display_name", n_occupant))
-				var status: String = _get_relationship_status(ds, _selected_member, n_occupant)
+				var status: String = _get_relationship_status(ds, member_id, n_occupant)
 				lines.append("  • %s - %s with %s" % [n, status, n_name])
 		lines.append("")
 
 	# Show pending reassignment in Reassignments view
 	if _current_view == ViewType.REASSIGNMENTS:
-		var pending_room: String = _get_pending_assignment(_selected_member)
+		var pending_room: String = _get_pending_assignment(member_id)
 		if pending_room != "":
 			lines.append("")
 			lines.append("[b][color=yellow]Pending Saturday Move:[/color][/b]")
 			lines.append("  • Will move to room %s" % pending_room)
 
 	_detail_content.text = _join_psa(lines, "\n")
+	print("[DormsPanel._update_details_for_member] Details panel updated with %d lines for %s" % [lines.size(), name])
 
 func _update_action_buttons() -> void:
 	if not _assign_room_btn or not _move_out_btn or not _cancel_move_btn or not _accept_plan_btn:
@@ -690,6 +732,17 @@ func _on_roster_member_selected(aid: String) -> void:
 	_current_action_index = 0
 	_focus_current_action()
 	print("[DormsPanel._on_roster_member_selected] Auto-navigated to ACTION_SELECT")
+
+func _on_roster_member_hovered(aid: String) -> void:
+	"""Update details panel when hovering over a roster member"""
+	print("[DormsPanel._on_roster_member_hovered] Hovering over: ", aid)
+	_update_details_for_member(aid)
+
+func _on_roster_member_unhovered() -> void:
+	"""Restore details panel to selected member when hover leaves"""
+	print("[DormsPanel._on_roster_member_unhovered] Mouse left roster member")
+	# Restore details to the currently selected member (or empty if none selected)
+	_update_details()
 
 func _on_room_selected(room_id: String) -> void:
 	_selected_room = room_id
@@ -838,7 +891,6 @@ func _on_accept_plan_pressed() -> void:
 		_show_toast(String(res.get("reason", "Cannot accept plan.")))
 		return
 
-	_show_toast("Plan accepted! Changes will apply on Saturday morning.")
 	_pending_reassignments.clear()
 	_rebuild()
 
