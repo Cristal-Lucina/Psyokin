@@ -166,7 +166,8 @@ func _ready() -> void:
 ## PanelBase callback - Called when LoadoutPanel gains focus
 func _on_panel_gained_focus() -> void:
 	super()  # Call parent
-	print("[LoadoutPanel] Panel gained focus - state: %s" % NavState.keys()[_nav_state])
+	var active = is_active()
+	print("[LoadoutPanel] Panel gained focus - state: %s, is_active: %s" % [NavState.keys()[_nav_state], active])
 
 	# Restore focus based on current navigation state
 	match _nav_state:
@@ -184,7 +185,8 @@ func _on_panel_gained_focus() -> void:
 ## PanelBase callback - Called when LoadoutPanel loses focus
 func _on_panel_lost_focus() -> void:
 	super()  # Call parent
-	print("[LoadoutPanel] Panel lost focus - state: %s" % NavState.keys()[_nav_state])
+	var active = is_active()
+	print("[LoadoutPanel] Panel lost focus - state: %s, is_active: %s, registered: %s" % [NavState.keys()[_nav_state], active, is_registered()])
 	# Don't auto-close popup - it's managed by panel stack
 	# Don't change state - preserve it for when we regain focus
 
