@@ -48,8 +48,8 @@ size_flags_horizontal = 3
 [node name="AdvanceBtn" type="Button" parent="Root/Header"]
 unique_name_in_owner = true
 layout_mode = 2
-text = "Advance"
 tooltip_text = "Advance current mission (debug)"
+text = "Advance"
 
 [node name="MainContent" type="HBoxContainer" parent="Root"]
 unique_name_in_owner = true
@@ -75,7 +75,6 @@ text = "CATEGORIES"
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 3
-focus_mode = 2
 
 [node name="CenterPanel" type="PanelContainer" parent="Root/MainContent"]
 unique_name_in_owner = true
@@ -96,7 +95,6 @@ text = "MISSIONS"
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 3
-focus_mode = 2
 
 [node name="RightPanel" type="PanelContainer" parent="Root/MainContent"]
 unique_name_in_owner = true
