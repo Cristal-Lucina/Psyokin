@@ -115,7 +115,8 @@ func _build_ui() -> void:
 	_accept_btn.pressed.connect(_on_accept)
 	_cancel_btn.pressed.connect(_on_cancel)
 
-	# Auto-position and show (deferred to allow size calculation)
+	# Show the popup and focus accept button
+	show()
 	call_deferred("_finalize_size_and_position")
 	_accept_btn.call_deferred("grab_focus")
 
