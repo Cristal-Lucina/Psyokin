@@ -296,8 +296,15 @@ func _navigate_left() -> void:
 				_focus_current_room()
 
 func _navigate_right() -> void:
-	# Disabled - navigation is locked within current state unless back pressed
-	pass
+	match _nav_state:
+		NavState.ROOM_SELECT:
+			# 2x4 grid: move right
+			if _current_room_index % 4 < 3 and _current_room_index < _room_buttons.size() - 1:
+				_current_room_index += 1
+				_focus_current_room()
+		_:
+			# All other states: no horizontal navigation between panels
+			pass
 
 func _on_accept_input() -> void:
 	match _nav_state:
@@ -625,8 +632,12 @@ func _on_roster_member_selected(aid: String) -> void:
 	_update_details()
 	_update_action_buttons()
 	_update_room_colors()
-	# Note: No longer auto-navigating to ACTION_SELECT
-	# User can manually navigate to Action Menu with directional controls
+
+	# Auto-navigate to Action Menu (locked navigation flow)
+	_push_nav_state(NavState.ACTION_SELECT)
+	_current_action_index = 0
+	_focus_current_action()
+	print("[DormsPanel._on_roster_member_selected] Auto-navigated to ACTION_SELECT")
 
 func _on_room_selected(room_id: String) -> void:
 	_selected_room = room_id
@@ -636,10 +647,17 @@ func _on_room_selected(room_id: String) -> void:
 		_try_assign_to_room(room_id)
 
 func _on_common_member_selected(aid: String) -> void:
+	print("[DormsPanel._on_common_member_selected] Selected member: ", aid)
 	_selected_member = aid
 	_update_details()
 	_update_action_buttons()
 	_update_room_colors()
+
+	# Auto-navigate to Action Menu (locked navigation flow)
+	_push_nav_state(NavState.ACTION_SELECT)
+	_current_action_index = 0
+	_focus_current_action()
+	print("[DormsPanel._on_common_member_selected] Auto-navigated to ACTION_SELECT")
 
 # ═══════════════════════════════════════════════════════════════════════════
 # ACTION BUTTON HANDLERS
@@ -654,8 +672,8 @@ func _on_assign_room_pressed() -> void:
 		_show_toast("Member must be in the common room to assign a room.")
 		return
 
-	# Switch to room selection mode
-	_nav_state = NavState.ROOM_SELECT
+	# Auto-navigate to room selection (locked navigation flow)
+	_push_nav_state(NavState.ROOM_SELECT)
 	_current_room_index = 0
 	_focus_current_room()
 	_show_toast("Select a room to assign %s." % _get_member_name(_selected_member))
@@ -729,10 +747,14 @@ func _on_move_out_pressed() -> void:
 
 	print("[DormsPanel._on_move_out_pressed] Success - rebuilding panel")
 	_show_toast("%s staged for common room on Saturday." % member_name)
+
+	# Clear selection and return to roster (locked navigation flow)
+	_selected_member = ""
+	_nav_state = NavState.ROSTER_SELECT
+	_nav_state_history.clear()  # Clear history to reset navigation flow
 	_rebuild()
 
-	# Keep cursor on roster for selecting more members to move out
-	_push_nav_state(NavState.ROSTER_SELECT)
+	# Focus back on roster for next selection
 	_current_roster_index = 0
 	_focus_current_roster()
 
@@ -842,11 +864,16 @@ func _try_assign_to_room(room_id: String) -> void:
 				return
 		_show_toast("%s assigned to room %s." % [member_name, room_id])
 
-	# Clear selection and return to roster
+	# Clear selection and return to roster (locked navigation flow)
 	_selected_member = ""
 	_selected_room = ""
 	_nav_state = NavState.ROSTER_SELECT
+	_nav_state_history.clear()  # Clear history to reset navigation flow
 	_rebuild()
+
+	# Focus back on roster for next selection
+	_current_roster_index = 0
+	_focus_current_roster()
 
 # ═══════════════════════════════════════════════════════════════════════════
 # VISUAL HELPERS
