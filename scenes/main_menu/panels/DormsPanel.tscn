@@ -105,83 +105,37 @@ theme_override_constants/separation = 4
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
-size_flags_stretch_ratio = 4.5
+size_flags_stretch_ratio = 2.5
 
 [node name="VBox" type="VBoxContainer" parent="Root/MainContent/CenterPanel"]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="RoomsSection" type="VBoxContainer" parent="Root/MainContent/CenterPanel/VBox"]
-layout_mode = 2
-size_flags_vertical = 3
-size_flags_stretch_ratio = 2.0
-theme_override_constants/separation = 8
-
-[node name="RoomsLabel" type="Label" parent="Root/MainContent/CenterPanel/VBox/RoomsSection"]
-layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
-text = "ROOMS (301-308)"
-
-[node name="RoomsScroll" type="ScrollContainer" parent="Root/MainContent/CenterPanel/VBox/RoomsSection"]
-layout_mode = 2
-size_flags_vertical = 3
-
-[node name="RoomsGrid" type="GridContainer" parent="Root/MainContent/CenterPanel/VBox/RoomsSection/RoomsScroll"]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_horizontal = 3
-size_flags_vertical = 3
-theme_override_constants/h_separation = 8
-theme_override_constants/v_separation = 8
-columns = 4
-
-[node name="Separator2" type="HSeparator" parent="Root/MainContent/CenterPanel/VBox"]
-layout_mode = 2
-
-[node name="ActionSection" type="VBoxContainer" parent="Root/MainContent/CenterPanel/VBox"]
-layout_mode = 2
-size_flags_vertical = 3
-theme_override_constants/separation = 8
-
-[node name="ActionLabel" type="Label" parent="Root/MainContent/CenterPanel/VBox/ActionSection"]
+[node name="ActionLabel" type="Label" parent="Root/MainContent/CenterPanel/VBox"]
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
 text = "ACTION MENU"
 
-[node name="ViewTypeHBox" type="HBoxContainer" parent="Root/MainContent/CenterPanel/VBox/ActionSection"]
-layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="ViewTypeLabel" type="Label" parent="Root/MainContent/CenterPanel/VBox/ActionSection/ViewTypeHBox"]
-layout_mode = 2
-size_flags_horizontal = 0
-text = "View Type:"
-
-[node name="ViewTypeFilter" type="OptionButton" parent="Root/MainContent/CenterPanel/VBox/ActionSection/ViewTypeHBox"]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_horizontal = 3
-
-[node name="ActionButtons" type="VBoxContainer" parent="Root/MainContent/CenterPanel/VBox/ActionSection"]
+[node name="ActionButtons" type="VBoxContainer" parent="Root/MainContent/CenterPanel/VBox"]
 layout_mode = 2
 theme_override_constants/separation = 6
 
-[node name="AssignRoomBtn" type="Button" parent="Root/MainContent/CenterPanel/VBox/ActionSection/ActionButtons"]
+[node name="AssignRoomBtn" type="Button" parent="Root/MainContent/CenterPanel/VBox/ActionButtons"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Assign Room"
 
-[node name="MoveOutBtn" type="Button" parent="Root/MainContent/CenterPanel/VBox/ActionSection/ActionButtons"]
+[node name="MoveOutBtn" type="Button" parent="Root/MainContent/CenterPanel/VBox/ActionButtons"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Move Out"
 
-[node name="CancelMoveBtn" type="Button" parent="Root/MainContent/CenterPanel/VBox/ActionSection/ActionButtons"]
+[node name="CancelMoveBtn" type="Button" parent="Root/MainContent/CenterPanel/VBox/ActionButtons"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Cancel Move"
 
-[node name="AcceptPlanBtn" type="Button" parent="Root/MainContent/CenterPanel/VBox/ActionSection/ActionButtons"]
+[node name="AcceptPlanBtn" type="Button" parent="Root/MainContent/CenterPanel/VBox/ActionButtons"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Accept Plan"
@@ -190,22 +144,55 @@ text = "Accept Plan"
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
-size_flags_stretch_ratio = 3.0
+size_flags_stretch_ratio = 5.0
 
 [node name="VBox" type="VBoxContainer" parent="Root/MainContent/RightPanel"]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="DetailsLabel" type="Label" parent="Root/MainContent/RightPanel/VBox"]
+[node name="RoomsSection" type="VBoxContainer" parent="Root/MainContent/RightPanel/VBox"]
+custom_minimum_size = Vector2(0, 215)
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 8
+
+[node name="RoomsLabel" type="Label" parent="Root/MainContent/RightPanel/VBox/RoomsSection"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
+text = "ROOMS (301-308)"
+
+[node name="RoomsScroll" type="ScrollContainer" parent="Root/MainContent/RightPanel/VBox/RoomsSection"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="RoomsGrid" type="GridContainer" parent="Root/MainContent/RightPanel/VBox/RoomsSection/RoomsScroll"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/h_separation = 8
+theme_override_constants/v_separation = 8
+columns = 4
+
+[node name="Separator2" type="HSeparator" parent="Root/MainContent/RightPanel/VBox"]
+layout_mode = 2
+
+[node name="DetailsSection" type="VBoxContainer" parent="Root/MainContent/RightPanel/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+size_flags_stretch_ratio = 2.0
+theme_override_constants/separation = 8
+
+[node name="DetailsLabel" type="Label" parent="Root/MainContent/RightPanel/VBox/DetailsSection"]
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
 text = "DETAILS"
 
-[node name="DetailScroll" type="ScrollContainer" parent="Root/MainContent/RightPanel/VBox"]
+[node name="DetailScroll" type="ScrollContainer" parent="Root/MainContent/RightPanel/VBox/DetailsSection"]
 layout_mode = 2
 size_flags_vertical = 3
 
-[node name="DetailContent" type="RichTextLabel" parent="Root/MainContent/RightPanel/VBox/DetailScroll"]
+[node name="DetailContent" type="RichTextLabel" parent="Root/MainContent/RightPanel/VBox/DetailsSection/DetailScroll"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3

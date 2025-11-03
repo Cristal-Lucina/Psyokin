@@ -52,8 +52,12 @@ class_name DormsPanel
 
 @onready var _refresh_btn: Button = $Root/Header/RefreshBtn
 
+# Panel containers (for animation)
+@onready var _left_panel: PanelContainer = %LeftPanel
+@onready var _center_panel: PanelContainer = %CenterPanel
+@onready var _right_panel: PanelContainer = %RightPanel
+
 # Left Panel - Roster
-@onready var _view_type_filter: OptionButton = %ViewTypeFilter
 @onready var _roster_list: VBoxContainer = %RosterList
 
 # Center Panel - Details
@@ -74,7 +78,7 @@ class_name DormsPanel
 # ═══════════════════════════════════════════════════════════════════════════
 
 enum ViewType { PLACEMENTS, REASSIGNMENTS }
-var _current_view: ViewType = ViewType.PLACEMENTS
+var _current_view: ViewType = ViewType.REASSIGNMENTS  # Always use reassignments mode
 
 var _selected_member: String = ""  # actor_id from roster
 var _selected_room: String = ""    # room_id from rooms grid
@@ -102,6 +106,14 @@ const VIS_OCCUPIED := 1
 const VIS_STAGED := 2
 const VIS_LOCKED := 3
 
+# Panel animation settings
+const BASE_LEFT_RATIO := 2.5
+const BASE_CENTER_RATIO := 2.5
+const BASE_RIGHT_RATIO := 5.0
+const ACTIVE_SCALE := 1.10  # Active panel grows by 10%
+const INACTIVE_SCALE := 0.95  # Inactive panels shrink by 5%
+const ANIM_DURATION := 0.2  # Animation duration in seconds
+
 # ═══════════════════════════════════════════════════════════════════════════
 # INITIALIZATION
 # ═══════════════════════════════════════════════════════════════════════════
@@ -115,7 +127,6 @@ func _ready() -> void:
 
 	# Verify node references
 	print("[DormsPanel._ready] Node checks:")
-	print("  _view_type_filter: ", _view_type_filter != null)
 	print("  _roster_list: ", _roster_list != null)
 	print("  _detail_content: ", _detail_content != null)
 	print("  _rooms_grid: ", _rooms_grid != null)
@@ -124,15 +135,6 @@ func _ready() -> void:
 	print("  _move_out_btn: ", _move_out_btn != null)
 	print("  _cancel_move_btn: ", _cancel_move_btn != null)
 	print("  _accept_plan_btn: ", _accept_plan_btn != null)
-
-	# Setup view type filter
-	if _view_type_filter and _view_type_filter.item_count == 0:
-		_view_type_filter.add_item("Placements", 0)
-		_view_type_filter.add_item("Reassignments", 1)
-		_view_type_filter.select(0)
-		if not _view_type_filter.item_selected.is_connected(_on_view_type_changed):
-			_view_type_filter.item_selected.connect(_on_view_type_changed)
-			print("[DormsPanel._ready] Connected view_type_filter.item_selected")
 
 	# Connect refresh button
 	if _refresh_btn and not _refresh_btn.pressed.is_connected(_rebuild):
@@ -182,18 +184,17 @@ func _ds() -> Node:
 func _on_panel_gained_focus() -> void:
 	super()
 	print("[DormsPanel] Panel gained focus")
-	_nav_state = NavState.ACTION_SELECT
+	_nav_state = NavState.ROSTER_SELECT
 	_nav_state_history.clear()
-	print("[DormsPanel] Nav state set to ACTION_SELECT, history cleared")
-	_current_action_index = 0
-	_focus_current_action()
+	print("[DormsPanel] Nav state set to ROSTER_SELECT, history cleared")
+	_current_roster_index = 0
+	_focus_current_roster()
 
 func _can_panel_close() -> bool:
-	# Prevent closing if common room has members without assignments
-	if _current_view == ViewType.REASSIGNMENTS:
-		if _has_unassigned_common_members():
-			_show_toast("Please assign all members in the common room before leaving.")
-			return false
+	# Prevent closing if there are any pending changes (move plan in progress)
+	if _has_pending_changes():
+		_show_toast("You must either Accept the plan or Cancel all moves before leaving.")
+		return false
 	return true
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -262,9 +263,7 @@ func _navigate_up() -> void:
 			if _current_action_index > 0:
 				_current_action_index -= 1
 				_focus_current_action()
-			elif _current_action_index == 0:
-				# Move to View Type filter (above first button)
-				_focus_view_type()
+			# At top of action menu - can't go up further
 
 func _navigate_down() -> void:
 	match _nav_state:
@@ -290,14 +289,54 @@ func _navigate_down() -> void:
 func _navigate_left() -> void:
 	match _nav_state:
 		NavState.ROOM_SELECT:
-			# 2x4 grid: move left
+			# 2x4 grid: move left within grid
 			if _current_room_index % 4 > 0:
 				_current_room_index -= 1
 				_focus_current_room()
+			else:
+				# At leftmost edge of grid - navigate to Action Menu
+				_push_nav_state(NavState.ACTION_SELECT)
+				_current_action_index = 0
+				_focus_current_action()
+		NavState.ACTION_SELECT:
+			# Navigate to Roster
+			_push_nav_state(NavState.ROSTER_SELECT)
+			_current_roster_index = 0
+			_focus_current_roster()
+		NavState.COMMON_SELECT:
+			# Navigate to Roster
+			_push_nav_state(NavState.ROSTER_SELECT)
+			_current_roster_index = 0
+			_focus_current_roster()
+		_:
+			# ROSTER_SELECT at left edge - no further left navigation
+			pass
 
 func _navigate_right() -> void:
-	# Disabled - navigation is locked within current state unless back pressed
-	pass
+	match _nav_state:
+		NavState.ROSTER_SELECT:
+			# Navigate to Action Menu
+			_push_nav_state(NavState.ACTION_SELECT)
+			_current_action_index = 0
+			_focus_current_action()
+		NavState.COMMON_SELECT:
+			# Navigate to Action Menu
+			_push_nav_state(NavState.ACTION_SELECT)
+			_current_action_index = 0
+			_focus_current_action()
+		NavState.ACTION_SELECT:
+			# Navigate to Rooms
+			_push_nav_state(NavState.ROOM_SELECT)
+			_current_room_index = 0
+			_focus_current_room()
+		NavState.ROOM_SELECT:
+			# 2x4 grid: move right within grid
+			if _current_room_index % 4 < 3 and _current_room_index < _room_buttons.size() - 1:
+				_current_room_index += 1
+				_focus_current_room()
+			# At rightmost edge - no further right navigation
+		_:
+			pass
 
 func _on_accept_input() -> void:
 	match _nav_state:
@@ -315,6 +354,27 @@ func _on_accept_input() -> void:
 				_action_buttons[_current_action_index].emit_signal("pressed")
 
 func _on_back_input() -> void:
+	# Special case: if in ROSTER_SELECT, clear all state and exit to StatusPanel
+	if _nav_state == NavState.ROSTER_SELECT:
+		print("[DormsPanel._on_back_input] In ROSTER_SELECT - clearing all state and attempting to exit")
+
+		# Clear all navigation state
+		_nav_state_history.clear()
+		_selected_member = ""
+		_selected_room = ""
+
+		# Check if panel can close
+		if not _can_panel_close():
+			# Panel has pending changes - prevent closing
+			print("[DormsPanel._on_back_input] Cannot close panel - pending changes exist")
+			get_viewport().set_input_as_handled()
+		else:
+			# Panel can close - let GameMenu handle the back button
+			# This allows proper slide animation back to StatusPanel
+			print("[DormsPanel._on_back_input] Cleared state, returning to StatusPanel")
+			# Do NOT call get_viewport().set_input_as_handled() - let event bubble up
+		return
+
 	# Go back to previous navigation state
 	if _nav_state_history.size() > 0:
 		var prev_state: NavState = _nav_state_history.pop_back()
@@ -340,31 +400,36 @@ func _on_back_input() -> void:
 				_focus_current_action()
 		get_viewport().set_input_as_handled()
 	else:
-		# No history - don't handle input, let GameMenu handle the back button
-		# This allows proper slide animation back to StatusPanel
-		print("[DormsPanel._on_back_input] No history, letting GameMenu handle back button for slide transition")
-		# Do NOT call get_viewport().set_input_as_handled() - let event bubble up
-
-func _focus_view_type() -> void:
-	# View type is now in Action Menu (right panel)
-	if _view_type_filter:
-		_view_type_filter.grab_focus()
+		# No history - check if panel can close
+		if not _can_panel_close():
+			# Panel has pending changes - prevent closing
+			print("[DormsPanel._on_back_input] Cannot close panel - pending changes exist")
+			get_viewport().set_input_as_handled()
+		else:
+			# Panel can close - let GameMenu handle the back button
+			# This allows proper slide animation back to StatusPanel
+			print("[DormsPanel._on_back_input] No history, letting GameMenu handle back button for slide transition")
+			# Do NOT call get_viewport().set_input_as_handled() - let event bubble up
 
 func _focus_current_roster() -> void:
 	if _current_roster_index >= 0 and _current_roster_index < _roster_buttons.size():
 		_roster_buttons[_current_roster_index].grab_focus()
+	_animate_panel_focus(NavState.ROSTER_SELECT)
 
 func _focus_current_room() -> void:
 	if _current_room_index >= 0 and _current_room_index < _room_buttons.size():
 		_room_buttons[_current_room_index].grab_focus()
+	_animate_panel_focus(NavState.ROOM_SELECT)
 
 func _focus_current_common() -> void:
 	if _current_common_index >= 0 and _current_common_index < _common_buttons.size():
 		_common_buttons[_current_common_index].grab_focus()
+	_animate_panel_focus(NavState.COMMON_SELECT)
 
 func _focus_current_action() -> void:
 	if _current_action_index >= 0 and _current_action_index < _action_buttons.size():
 		_action_buttons[_current_action_index].grab_focus()
+	_animate_panel_focus(NavState.ACTION_SELECT)
 
 func _push_nav_state(new_state: NavState) -> void:
 	"""Push current state to history and switch to new state"""
@@ -448,7 +513,7 @@ func _build_rooms_grid() -> void:
 	for i in range(room_ids.size()):
 		var rid: String = room_ids[i]
 		var btn := Button.new()
-		btn.custom_minimum_size = Vector2(120, 80)
+		btn.custom_minimum_size = Vector2(108, 72)  # 10% smaller than 120x80
 		btn.toggle_mode = false
 		btn.focus_mode = Control.FOCUS_ALL
 
@@ -570,12 +635,6 @@ func _update_details() -> void:
 				lines.append("  • %s - %s with %s" % [n, status, n_name])
 		lines.append("")
 
-	# Status
-	lines.append("[b]Status:[/b]")
-	var status_lines: PackedStringArray = _get_member_status(_selected_member)
-	for s in status_lines:
-		lines.append("  • %s" % s)
-
 	# Show pending reassignment in Reassignments view
 	if _current_view == ViewType.REASSIGNMENTS:
 		var pending_room: String = _get_pending_assignment(_selected_member)
@@ -625,8 +684,12 @@ func _on_roster_member_selected(aid: String) -> void:
 	_update_details()
 	_update_action_buttons()
 	_update_room_colors()
-	# Note: No longer auto-navigating to ACTION_SELECT
-	# User can manually navigate to Action Menu with directional controls
+
+	# Auto-navigate to Action Menu (locked navigation flow)
+	_push_nav_state(NavState.ACTION_SELECT)
+	_current_action_index = 0
+	_focus_current_action()
+	print("[DormsPanel._on_roster_member_selected] Auto-navigated to ACTION_SELECT")
 
 func _on_room_selected(room_id: String) -> void:
 	_selected_room = room_id
@@ -636,10 +699,17 @@ func _on_room_selected(room_id: String) -> void:
 		_try_assign_to_room(room_id)
 
 func _on_common_member_selected(aid: String) -> void:
+	print("[DormsPanel._on_common_member_selected] Selected member: ", aid)
 	_selected_member = aid
 	_update_details()
 	_update_action_buttons()
 	_update_room_colors()
+
+	# Auto-navigate to Action Menu (locked navigation flow)
+	_push_nav_state(NavState.ACTION_SELECT)
+	_current_action_index = 0
+	_focus_current_action()
+	print("[DormsPanel._on_common_member_selected] Auto-navigated to ACTION_SELECT")
 
 # ═══════════════════════════════════════════════════════════════════════════
 # ACTION BUTTON HANDLERS
@@ -654,8 +724,8 @@ func _on_assign_room_pressed() -> void:
 		_show_toast("Member must be in the common room to assign a room.")
 		return
 
-	# Switch to room selection mode
-	_nav_state = NavState.ROOM_SELECT
+	# Auto-navigate to room selection (locked navigation flow)
+	_push_nav_state(NavState.ROOM_SELECT)
 	_current_room_index = 0
 	_focus_current_room()
 	_show_toast("Select a room to assign %s." % _get_member_name(_selected_member))
@@ -695,17 +765,9 @@ func _on_move_out_pressed() -> void:
 
 	var member_name: String = _get_member_name(_selected_member)
 
-	# Switch to Reassignments view if not already there
-	if _current_view != ViewType.REASSIGNMENTS:
-		print("[DormsPanel._on_move_out_pressed] Switching to Reassignments view")
-		_current_view = ViewType.REASSIGNMENTS
-		if _view_type_filter:
-			_view_type_filter.select(1)  # Select Reassignments
-		_rebuild()  # Rebuild to update view
-
 	# Confirm staging the move
 	print("[DormsPanel._on_move_out_pressed] Showing confirmation dialog")
-	var confirmed: bool = await _ask_confirm("Move %s out of room %s?\n(Change will take effect on Saturday)" % [member_name, room_id])
+	var confirmed: bool = await _ask_confirm("Would you like to move out %s and stage in the Common Room?" % member_name)
 	print("[DormsPanel._on_move_out_pressed] Confirmed: %s" % confirmed)
 
 	if not confirmed:
@@ -728,11 +790,14 @@ func _on_move_out_pressed() -> void:
 		return
 
 	print("[DormsPanel._on_move_out_pressed] Success - rebuilding panel")
-	_show_toast("%s staged for common room on Saturday." % member_name)
+
+	# Clear selection and return to roster (locked navigation flow)
+	_selected_member = ""
+	_nav_state = NavState.ROSTER_SELECT
+	_nav_state_history.clear()  # Clear history to reset navigation flow
 	_rebuild()
 
-	# Keep cursor on roster for selecting more members to move out
-	_push_nav_state(NavState.ROSTER_SELECT)
+	# Focus back on roster for next selection
 	_current_roster_index = 0
 	_focus_current_roster()
 
@@ -775,11 +840,6 @@ func _on_accept_plan_pressed() -> void:
 
 	_show_toast("Plan accepted! Changes will apply on Saturday morning.")
 	_pending_reassignments.clear()
-
-	# Switch to reassignments view to show pending moves
-	_current_view = ViewType.REASSIGNMENTS
-	if _view_type_filter:
-		_view_type_filter.select(1)
 	_rebuild()
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -809,7 +869,15 @@ func _try_assign_to_room(room_id: String) -> void:
 	# Check if this is their current room
 	var current_room: String = _get_member_room(_selected_member)
 	if current_room == room_id:
-		_show_toast("That's their current room. Please select a different room.")
+		var member_name: String = _get_member_name(_selected_member)
+		_show_toast("%s is already in this room." % member_name)
+		return
+
+	# Check if this is their previous room (before moving to common)
+	var previous_room: String = _get_member_previous_room(_selected_member)
+	if previous_room == room_id:
+		var member_name: String = _get_member_name(_selected_member)
+		_show_toast("%s is already in this room." % member_name)
 		return
 
 	# Check if room is already targeted in plan
@@ -842,15 +910,54 @@ func _try_assign_to_room(room_id: String) -> void:
 				return
 		_show_toast("%s assigned to room %s." % [member_name, room_id])
 
-	# Clear selection and return to roster
+	# Clear selection and return to roster (locked navigation flow)
 	_selected_member = ""
 	_selected_room = ""
 	_nav_state = NavState.ROSTER_SELECT
+	_nav_state_history.clear()  # Clear history to reset navigation flow
 	_rebuild()
+
+	# Focus back on roster for next selection
+	_current_roster_index = 0
+	_focus_current_roster()
 
 # ═══════════════════════════════════════════════════════════════════════════
 # VISUAL HELPERS
 # ═══════════════════════════════════════════════════════════════════════════
+
+func _animate_panel_focus(active_panel: NavState) -> void:
+	"""Animate panels to highlight which one is currently active"""
+	if not _left_panel or not _center_panel or not _right_panel:
+		return
+
+	var left_ratio := BASE_LEFT_RATIO
+	var center_ratio := BASE_CENTER_RATIO
+	var right_ratio := BASE_RIGHT_RATIO
+
+	# Determine which panel gets the active scale
+	match active_panel:
+		NavState.ROSTER_SELECT, NavState.COMMON_SELECT:
+			left_ratio = BASE_LEFT_RATIO * ACTIVE_SCALE
+			center_ratio = BASE_CENTER_RATIO * INACTIVE_SCALE
+			right_ratio = BASE_RIGHT_RATIO * INACTIVE_SCALE
+		NavState.ACTION_SELECT:
+			left_ratio = BASE_LEFT_RATIO * INACTIVE_SCALE
+			center_ratio = BASE_CENTER_RATIO * ACTIVE_SCALE
+			right_ratio = BASE_RIGHT_RATIO * INACTIVE_SCALE
+		NavState.ROOM_SELECT:
+			left_ratio = BASE_LEFT_RATIO * INACTIVE_SCALE
+			center_ratio = BASE_CENTER_RATIO * INACTIVE_SCALE
+			right_ratio = BASE_RIGHT_RATIO * ACTIVE_SCALE
+
+	# Create tweens for smooth animation
+	var tween := create_tween()
+	tween.set_parallel(true)
+	tween.set_trans(Tween.TRANS_CUBIC)
+	tween.set_ease(Tween.EASE_OUT)
+
+	tween.tween_property(_left_panel, "size_flags_stretch_ratio", left_ratio, ANIM_DURATION)
+	tween.tween_property(_center_panel, "size_flags_stretch_ratio", center_ratio, ANIM_DURATION)
+	tween.tween_property(_right_panel, "size_flags_stretch_ratio", right_ratio, ANIM_DURATION)
 
 func _apply_room_visual(btn: Button, room_id: String) -> void:
 	var ds: Node = _ds()
@@ -876,6 +983,10 @@ func _apply_room_visual(btn: Button, room_id: String) -> void:
 	# Override with red if room is already targeted in pending reassignments
 	if _is_room_targeted(room_id):
 		col = Color(0.75, 0.15, 0.15)  # red (already targeted)
+
+	# Override with red if this is the selected member's previous room (before moving to common)
+	if _selected_member != "" and _get_member_previous_room(_selected_member) == room_id:
+		col = Color(0.75, 0.15, 0.15)  # red (can't go back to previous room)
 
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = col
@@ -937,6 +1048,18 @@ func _get_member_room(aid: String) -> String:
 		var room_data: Dictionary = ds.call("get_room", rid)
 		if String(room_data.get("occupant", "")) == aid:
 			return rid
+	return ""
+
+func _get_member_previous_room(aid: String) -> String:
+	"""Get the room this member vacated when moved to common room"""
+	var ds: Node = _ds()
+	if not ds:
+		return ""
+
+	# Check if DormSystem has the staged_prev_room data
+	if ds.has_method("get_staged_prev_room_for"):
+		return String(ds.call("get_staged_prev_room_for", aid))
+
 	return ""
 
 func _get_member_name(aid: String) -> String:
@@ -1054,12 +1177,6 @@ func _can_accept_plan() -> bool:
 		return false
 
 	return true
-
-func _on_view_type_changed(index: int) -> void:
-	print("[DormsPanel._on_view_type_changed] View changed to index: ", index)
-	_current_view = ViewType.PLACEMENTS if index == 0 else ViewType.REASSIGNMENTS
-	print("[DormsPanel._on_view_type_changed] Current view now: ", "PLACEMENTS" if _current_view == ViewType.PLACEMENTS else "REASSIGNMENTS")
-	_rebuild()
 
 func _on_dorms_changed() -> void:
 	print("[DormsPanel._on_dorms_changed] DormSystem signal received, rebuilding...")
