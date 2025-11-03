@@ -632,35 +632,29 @@ func _input(event: InputEvent) -> void:
 	"""Catch ALL input when popup is active to prevent it from reaching other systems"""
 	# When popup is active, handle Accept/Back for buttons
 	if _active_popup and is_instance_valid(_active_popup):
-		# Allow buttons to handle Accept action (they'll trigger pressed signal)
-		if event.is_action_pressed("menu_accept"):
-			# Don't mark as handled - let buttons process it
-			return
 		# Handle Back to cancel
-		elif event.is_action_pressed("menu_back"):
+		if event.is_action_pressed("menu_back"):
 			_on_cancel_perk()
 			get_viewport().set_input_as_handled()
 			return
-		# Allow left/right navigation (for button focus switching)
-		elif event.is_action_pressed("move_left") or event.is_action_pressed("move_right") or \
-		     event.is_action_pressed("ui_left") or event.is_action_pressed("ui_right"):
-			# Don't mark as handled - let UI system handle focus navigation
-			return
-		# Block all other input
-		else:
+		# Block directional navigation to prevent grid movement in background
+		elif event.is_action_pressed("ui_up") or event.is_action_pressed("ui_down") or \
+		     event.is_action_pressed("ui_left") or event.is_action_pressed("ui_right") or \
+		     event.is_action_pressed("move_up") or event.is_action_pressed("move_down") or \
+		     event.is_action_pressed("move_left") or event.is_action_pressed("move_right"):
 			get_viewport().set_input_as_handled()
 			return
+		# Allow menu_accept to reach focused button (will trigger pressed signal)
+		# Don't mark other inputs as handled here - let _unhandled_input catch them
 
 func _unhandled_input(event: InputEvent) -> void:
 	"""Handle controller input for grid navigation"""
 	if not visible:
 		return
 
-	# Block input when popup is active
+	# Block ALL input when popup is active (buttons handle their own input via signals)
 	if _active_popup and is_instance_valid(_active_popup):
-		# Consume all input events including back button
-		if event.is_action_pressed("menu_back") or event.is_action_pressed("ui_cancel"):
-			get_viewport().set_input_as_handled()
+		get_viewport().set_input_as_handled()
 		return
 
 	var handled: bool = false
