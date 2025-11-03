@@ -239,18 +239,22 @@ func _rebuild_battle_stats(token: String) -> void:
 			profile = profile_v
 
 	# Display all battle stats in 2 columns - each cell has "LABEL: VALUE"
+	# Note: CombatProfileSystem stores stats in nested dictionaries
+	var weapon: Dictionary = profile.get("weapon", {})
+	var defense: Dictionary = profile.get("defense", {})
+
 	_add_battle_stat(_battle_grid, "MAX HP", profile.get("hp_max", 0))
 	_add_battle_stat(_battle_grid, "MAX MP", profile.get("mp_max", 0))
-	_add_battle_stat(_battle_grid, "P ATK", profile.get("p_atk", 0))
-	_add_battle_stat(_battle_grid, "M ATK", profile.get("m_atk", 0))
-	_add_battle_stat(_battle_grid, "P DEF", profile.get("p_def", 0))
-	_add_battle_stat(_battle_grid, "M DEF", profile.get("m_def", 0))
-	_add_battle_stat(_battle_grid, "W ACC", profile.get("w_acc", 0))
-	_add_battle_stat(_battle_grid, "S ACC", profile.get("s_acc", 0))
-	_add_battle_stat(_battle_grid, "EVA", profile.get("eva", 0))
-	_add_battle_stat(_battle_grid, "SPD", profile.get("spd", 0))
-	_add_battle_stat(_battle_grid, "AIL R", profile.get("ali_resist", 0))
-	_add_battle_stat(_battle_grid, "CRIT", profile.get("crit", 0))
+	_add_battle_stat(_battle_grid, "P ATK", weapon.get("attack", 0))
+	_add_battle_stat(_battle_grid, "M ATK", 0)  # TODO: Not yet in CombatProfileSystem
+	_add_battle_stat(_battle_grid, "P DEF", defense.get("pdef", 0))
+	_add_battle_stat(_battle_grid, "M DEF", defense.get("mdef", 0))
+	_add_battle_stat(_battle_grid, "W ACC", weapon.get("accuracy", 0))
+	_add_battle_stat(_battle_grid, "S ACC", weapon.get("skill_acc_boost", 0))
+	_add_battle_stat(_battle_grid, "EVA", defense.get("peva", 0))  # Using physical evasion
+	_add_battle_stat(_battle_grid, "SPD", defense.get("speed", 0))
+	_add_battle_stat(_battle_grid, "AIL R", defense.get("ail_resist_pct", 0))
+	_add_battle_stat(_battle_grid, "CRIT", weapon.get("crit_bonus_pct", 0))
 
 func _get_equipment(token: String) -> Dictionary:
 	"""Get equipped items for a member"""
@@ -295,9 +299,12 @@ func _add_stat_pair(grid: GridContainer, label: String, value: String) -> void:
 	grid.add_child(val)
 
 func _add_battle_stat(grid: GridContainer, label: String, value: int) -> void:
-	"""Add a battle stat as a single label with 'LABEL: VALUE' format"""
+	"""Add a battle stat as a single label with 'LABEL: VALUE' format, padded to 16 chars"""
 	var stat_label = Label.new()
-	stat_label.text = "%s: %d" % [label, value]
+	var text = "%s: %d" % [label, value]
+	# Pad to 16 characters to prevent squishing/stretching
+	stat_label.text = text.rpad(16, " ")
+	stat_label.custom_minimum_size = Vector2(120, 0)  # Ensure consistent width
 	grid.add_child(stat_label)
 
 func _clear_grid(grid: GridContainer) -> void:
