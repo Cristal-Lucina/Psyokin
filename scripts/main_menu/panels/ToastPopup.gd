@@ -32,7 +32,9 @@ var _accept_btn: Button = null
 var _cancel_btn: Button = null
 
 static func create(message: String, title: String = "Notice") -> ToastPopup:
+	print("[ToastPopup.create] Creating popup with message: %s" % message)
 	var popup := ToastPopup.new()
+	popup.process_mode = Node.PROCESS_MODE_ALWAYS  # Set BEFORE building UI
 	popup._title = title
 	popup._message = message
 	popup._build_ui()
@@ -40,10 +42,10 @@ static func create(message: String, title: String = "Notice") -> ToastPopup:
 	return popup
 
 func _ready() -> void:
-	print("[ToastPopup._ready] Popup ready, visible=%s, has_focus=%s" % [visible, has_focus()])
+	print("[ToastPopup._ready] Popup ready, visible=%s, has_focus=%s, paused=%s" % [visible, has_focus(), get_tree().paused])
 
 func _build_ui() -> void:
-	print("[ToastPopup._build_ui] Building UI")
+	print("[ToastPopup._build_ui] Building UI, paused=%s" % get_tree().paused)
 	# Ensure popup processes even when game is paused
 	process_mode = Node.PROCESS_MODE_ALWAYS
 
@@ -103,12 +105,14 @@ func _build_ui() -> void:
 	_accept_btn.text = "Accept"
 	_accept_btn.focus_mode = Control.FOCUS_ALL
 	_accept_btn.custom_minimum_size = Vector2(100, 40)
+	_accept_btn.process_mode = Node.PROCESS_MODE_ALWAYS  # Process even when paused
 	hbox.add_child(_accept_btn)
 
 	_cancel_btn = Button.new()
 	_cancel_btn.text = "Cancel"
 	_cancel_btn.focus_mode = Control.FOCUS_ALL
 	_cancel_btn.custom_minimum_size = Vector2(100, 40)
+	_cancel_btn.process_mode = Node.PROCESS_MODE_ALWAYS  # Process even when paused
 	hbox.add_child(_cancel_btn)
 
 	# Connect buttons
@@ -118,7 +122,11 @@ func _build_ui() -> void:
 	# Show the popup and focus accept button
 	show()
 	call_deferred("_finalize_size_and_position")
-	_accept_btn.call_deferred("grab_focus")
+	call_deferred("_grab_focus_and_log")
+
+func _grab_focus_and_log() -> void:
+	_accept_btn.grab_focus()
+	print("[ToastPopup] Accept button grabbed focus, has_focus=%s, visible=%s" % [_accept_btn.has_focus(), _accept_btn.visible])
 
 func _finalize_size_and_position() -> void:
 	# Force update to calculate proper size
