@@ -159,6 +159,7 @@ var _name_to_id  : Dictionary = {}      # lowercase "name" -> "actor_id"
 
 # Tab metadata (maps item index to tab_id)
 var _tab_ids: Array[String] = []
+var _last_selected_tab_index: int = 0  # Remember last selected tab
 
 # Controller navigation state - Simple state machine (like LoadoutPanel)
 enum NavState { MENU, CONTENT, POPUP_ACTIVE }
@@ -273,6 +274,9 @@ func _on_tab_item_activated(index: int) -> void:
 	"""Handle tab item activation (A button or double-click)"""
 	if index < 0 or index >= _tab_ids.size():
 		return
+
+	# Remember this tab selection
+	_last_selected_tab_index = index
 
 	var tab_id: String = _tab_ids[index]
 	print("[StatusPanel] Tab activated: %s" % tab_id)
@@ -1944,7 +1948,11 @@ func _on_visibility_changed() -> void:
 func _grab_tab_list_focus() -> void:
 	"""Helper to grab focus on tab list"""
 	if _tab_list and _tab_list.item_count > 0:
-		_tab_list.select(0)
+		# Restore last selected tab instead of always selecting first tab
+		var index_to_select = _last_selected_tab_index
+		if index_to_select >= _tab_list.item_count:
+			index_to_select = 0  # Fallback if index is out of bounds
+		_tab_list.select(index_to_select)
 		_tab_list.grab_focus()
 
 func _navigate_to_content() -> void:
