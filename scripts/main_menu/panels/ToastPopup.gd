@@ -39,6 +39,11 @@ func _build_ui() -> void:
 	# Ensure popup processes even when game is paused
 	process_mode = Node.PROCESS_MODE_ALWAYS
 
+	# Center the popup using anchors
+	set_anchors_preset(Control.PRESET_CENTER)
+	grow_horizontal = Control.GROW_DIRECTION_BOTH
+	grow_vertical = Control.GROW_DIRECTION_BOTH
+
 	# Add solid background (no transparency)
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0.15, 0.15, 0.15, 1.0)  # Dark gray, fully opaque
@@ -86,15 +91,8 @@ func _build_ui() -> void:
 	# Connect button
 	_ok_btn.pressed.connect(_on_ok)
 
-	# Auto-position and show
-	call_deferred("_position_center")
+	# Grab focus when ready
 	_ok_btn.call_deferred("grab_focus")
-
-func _position_center() -> void:
-	if get_viewport() == null:
-		return
-	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
-	position = (viewport_size - size) / 2
 
 func _input(event: InputEvent) -> void:
 	if not visible:
