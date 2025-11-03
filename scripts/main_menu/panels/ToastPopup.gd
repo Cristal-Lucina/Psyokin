@@ -104,8 +104,8 @@ func _input(event: InputEvent) -> void:
 	if not visible:
 		return
 
-	# Handle Accept or Back (both close the toast)
-	if event.is_action_pressed("menu_accept") or event.is_action_pressed("menu_back"):
+	# Handle Back to close (buttons don't handle Back by default)
+	if event.is_action_pressed("menu_back"):
 		_on_ok()
 		get_viewport().set_input_as_handled()
 
