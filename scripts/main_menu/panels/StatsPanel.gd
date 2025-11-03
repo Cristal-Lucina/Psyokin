@@ -238,19 +238,19 @@ func _rebuild_battle_stats(token: String) -> void:
 		if typeof(profile_v) == TYPE_DICTIONARY:
 			profile = profile_v
 
-	# Display all battle stats in order, always show them even if 0
-	_add_stat_pair(_battle_grid, "MAX HP", str(profile.get("hp_max", 0)))
-	_add_stat_pair(_battle_grid, "MAX MP", str(profile.get("mp_max", 0)))
-	_add_stat_pair(_battle_grid, "P ATK", str(profile.get("p_atk", 0)))
-	_add_stat_pair(_battle_grid, "M ATK", str(profile.get("m_atk", 0)))
-	_add_stat_pair(_battle_grid, "P DEF", str(profile.get("p_def", 0)))
-	_add_stat_pair(_battle_grid, "M DEF", str(profile.get("m_def", 0)))
-	_add_stat_pair(_battle_grid, "W ACC", str(profile.get("w_acc", 0)))
-	_add_stat_pair(_battle_grid, "S ACC", str(profile.get("s_acc", 0)))
-	_add_stat_pair(_battle_grid, "EVA", str(profile.get("eva", 0)))
-	_add_stat_pair(_battle_grid, "SPD", str(profile.get("spd", 0)))
-	_add_stat_pair(_battle_grid, "AIL R", str(profile.get("ali_resist", 0)))
-	_add_stat_pair(_battle_grid, "CRIT", str(profile.get("crit", 0)))
+	# Display all battle stats in 2 columns - each cell has "LABEL: VALUE"
+	_add_battle_stat(_battle_grid, "MAX HP", profile.get("hp_max", 0))
+	_add_battle_stat(_battle_grid, "MAX MP", profile.get("mp_max", 0))
+	_add_battle_stat(_battle_grid, "P ATK", profile.get("p_atk", 0))
+	_add_battle_stat(_battle_grid, "M ATK", profile.get("m_atk", 0))
+	_add_battle_stat(_battle_grid, "P DEF", profile.get("p_def", 0))
+	_add_battle_stat(_battle_grid, "M DEF", profile.get("m_def", 0))
+	_add_battle_stat(_battle_grid, "W ACC", profile.get("w_acc", 0))
+	_add_battle_stat(_battle_grid, "S ACC", profile.get("s_acc", 0))
+	_add_battle_stat(_battle_grid, "EVA", profile.get("eva", 0))
+	_add_battle_stat(_battle_grid, "SPD", profile.get("spd", 0))
+	_add_battle_stat(_battle_grid, "AIL R", profile.get("ali_resist", 0))
+	_add_battle_stat(_battle_grid, "CRIT", profile.get("crit", 0))
 
 func _get_equipment(token: String) -> Dictionary:
 	"""Get equipped items for a member"""
@@ -293,6 +293,12 @@ func _add_stat_pair(grid: GridContainer, label: String, value: String) -> void:
 	var val = Label.new()
 	val.text = value
 	grid.add_child(val)
+
+func _add_battle_stat(grid: GridContainer, label: String, value: int) -> void:
+	"""Add a battle stat as a single label with 'LABEL: VALUE' format"""
+	var stat_label = Label.new()
+	stat_label.text = "%s: %d" % [label, value]
+	grid.add_child(stat_label)
 
 func _clear_grid(grid: GridContainer) -> void:
 	"""Clear all children from a grid"""

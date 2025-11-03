@@ -97,7 +97,6 @@ columns = 2
 [node name="VisualPanel" type="PanelContainer" parent="Root"]
 custom_minimum_size = Vector2(300, 0)
 layout_mode = 2
-size_flags_horizontal = 3
 
 [node name="VisualColumn" type="VBoxContainer" parent="Root/VisualPanel"]
 layout_mode = 2
