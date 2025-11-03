@@ -1348,9 +1348,11 @@ func _input(event: InputEvent) -> void:
 		return
 
 	# Only handle other states if we're the active panel
-	var active = is_active()
+	# Note: When GameMenu manages us in tab mode, we're visible but not in PanelManager
+	# So check both is_active() (for PanelManager stack) AND visible (for GameMenu tabs)
+	var active = is_active() or visible
 	if event is InputEventJoypadButton and event.pressed:
-		print("[LoadoutPanel._input] Button %d, is_active=%s, nav_state=%s" % [event.button_index, active, _nav_state])
+		print("[LoadoutPanel._input] Button %d, is_active=%s, visible=%s, nav_state=%s" % [event.button_index, is_active(), visible, _nav_state])
 	if not active:
 		return
 
