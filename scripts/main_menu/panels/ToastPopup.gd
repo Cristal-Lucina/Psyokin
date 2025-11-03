@@ -28,7 +28,6 @@ signal confirmed(result: bool)
 
 var _title: String = "Notice"
 var _message: String = ""
-var _custom_size: Vector2 = Vector2(400, 160)
 var _accept_btn: Button = null
 var _cancel_btn: Button = null
 
@@ -36,7 +35,6 @@ static func create(message: String, title: String = "Notice") -> ToastPopup:
 	var popup := ToastPopup.new()
 	popup._title = title
 	popup._message = message
-	popup._custom_size = custom_size
 	popup._build_ui()
 	return popup
 
