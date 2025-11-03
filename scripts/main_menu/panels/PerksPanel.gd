@@ -620,6 +620,13 @@ func _on_acquired_perk_selected(index: int) -> void:
 	var perk: Dictionary = _acquired_perks[index]
 	_show_perk_details(perk)
 
+func _input(event: InputEvent) -> void:
+	"""Catch ALL input when popup is active to prevent it from reaching other systems"""
+	# When popup is active, block ALL input from propagating
+	if _active_popup and is_instance_valid(_active_popup):
+		get_viewport().set_input_as_handled()
+		return
+
 func _unhandled_input(event: InputEvent) -> void:
 	"""Handle controller input for grid navigation"""
 	if not visible:
