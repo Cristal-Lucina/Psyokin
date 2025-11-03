@@ -135,11 +135,6 @@ unique_name_in_owner = true
 layout_mode = 2
 text = "Cancel Move"
 
-[node name="AcceptPlanBtn" type="Button" parent="Root/MainContent/CenterPanel/VBox/ActionButtons"]
-unique_name_in_owner = true
-layout_mode = 2
-text = "Accept Plan"
-
 [node name="RightPanel" type="PanelContainer" parent="Root/MainContent"]
 unique_name_in_owner = true
 layout_mode = 2

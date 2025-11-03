@@ -159,6 +159,11 @@ var _name_to_id  : Dictionary = {}      # lowercase "name" -> "actor_id"
 
 # Tab metadata (maps item index to tab_id)
 var _tab_ids: Array[String] = []
+var _last_selected_tab_index: int = 0  # Remember last selected tab
+var _last_focused_content_button_index: int = 0  # Remember last focused content button
+
+# HP/MP value cache for bar animations
+var _prev_hp_mp: Dictionary = {}  # "member_id" -> {"hp": int, "mp": int}
 
 # Controller navigation state - Simple state machine (like LoadoutPanel)
 enum NavState { MENU, CONTENT, POPUP_ACTIVE }
@@ -274,6 +279,9 @@ func _on_tab_item_activated(index: int) -> void:
 	if index < 0 or index >= _tab_ids.size():
 		return
 
+	# Remember this tab selection
+	_last_selected_tab_index = index
+
 	var tab_id: String = _tab_ids[index]
 	print("[StatusPanel] Tab activated: %s" % tab_id)
 	tab_selected.emit(tab_id)
@@ -353,7 +361,11 @@ func _rebuild_all() -> void:
 
 func _rebuild_party() -> void:
 	if not _party: return
-	for c in _party.get_children(): c.queue_free()
+
+	# Remove and free all children immediately (don't use queue_free to avoid duplicates during rebuild)
+	for c in _party.get_children():
+		_party.remove_child(c)
+		c.free()
 
 	# Enforce party limits first
 	if _gs and _gs.has_method("_enforce_party_limits"):
@@ -459,6 +471,9 @@ func _create_empty_slot(slot_type: String, slot_idx: int) -> PanelContainer:
 func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot: int) -> PanelContainer:
 	var panel := PanelContainer.new()
 
+	# Get member_id early for animation tracking
+	var member_id: String = String(member_data.get("_member_id", ""))
+
 	# Main horizontal container: member info on left, buttons on right
 	var main_hbox := HBoxContainer.new()
 	main_hbox.add_theme_constant_override("separation", 12)
@@ -518,7 +533,23 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 
 		hp_bar.min_value = 0.0
 		hp_bar.max_value = float(hp_max_i)
-		hp_bar.value = clamp(float(hp_i), 0.0, float(hp_max_i))
+
+		# Check if we have previous HP value and it's different (animate if changed)
+		var new_hp: float = clamp(float(hp_i), 0.0, float(hp_max_i))
+		if member_id != "" and _prev_hp_mp.has(member_id):
+			var old_hp: float = float(_prev_hp_mp[member_id].get("hp", new_hp))
+			if old_hp != new_hp:
+				# Start at old value and animate to new
+				hp_bar.value = old_hp
+				var tween := create_tween()
+				tween.set_ease(Tween.EASE_OUT)
+				tween.set_trans(Tween.TRANS_CUBIC)
+				tween.tween_property(hp_bar, "value", new_hp, 2.0)
+			else:
+				hp_bar.value = new_hp
+		else:
+			hp_bar.value = new_hp
+
 		hp_section.add_child(hp_bar)
 
 	stats_row.add_child(hp_section)
@@ -562,7 +593,23 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 
 		mp_bar.min_value = 0.0
 		mp_bar.max_value = float(mp_max_i)
-		mp_bar.value = clamp(float(mp_i), 0.0, float(mp_max_i))
+
+		# Check if we have previous MP value and it's different (animate if changed)
+		var new_mp: float = clamp(float(mp_i), 0.0, float(mp_max_i))
+		if member_id != "" and _prev_hp_mp.has(member_id):
+			var old_mp: float = float(_prev_hp_mp[member_id].get("mp", new_mp))
+			if old_mp != new_mp:
+				# Start at old value and animate to new
+				mp_bar.value = old_mp
+				var tween := create_tween()
+				tween.set_ease(Tween.EASE_OUT)
+				tween.set_trans(Tween.TRANS_CUBIC)
+				tween.tween_property(mp_bar, "value", new_mp, 2.0)
+			else:
+				mp_bar.value = new_mp
+		else:
+			mp_bar.value = new_mp
+
 		mp_section.add_child(mp_bar)
 
 	stats_row.add_child(mp_section)
@@ -579,7 +626,6 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 	recovery_btn.custom_minimum_size.x = 70
 	recovery_btn.add_theme_font_size_override("font_size", 10)
 	recovery_btn.focus_mode = Control.FOCUS_ALL
-	var member_id: String = String(member_data.get("_member_id", ""))
 	recovery_btn.set_meta("member_id", member_id)
 	recovery_btn.set_meta("member_name", String(member_data.get("name", "Member")))
 	recovery_btn.set_meta("hp", int(member_data.get("hp", 0)))
@@ -607,6 +653,14 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 
 	main_hbox.add_child(buttons_vbox)
 	panel.add_child(main_hbox)
+
+	# Store current HP/MP values for next rebuild animation
+	if member_id != "":
+		_prev_hp_mp[member_id] = {
+			"hp": hp_i,
+			"mp": mp_i
+		}
+
 	return panel
 
 func _get_member_snapshot(member_id: String) -> Dictionary:
@@ -686,7 +740,12 @@ func _show_no_bench_notice() -> void:
 	var popup_panel: Panel = Panel.new()
 	popup_panel.process_mode = Node.PROCESS_MODE_ALWAYS
 	popup_panel.z_index = 100
+	popup_panel.modulate.a = 0.0  # Start fully transparent
+	popup_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE  # Block input until fade completes
 	add_child(popup_panel)
+
+	# Apply consistent styling (matches ToastPopup/ConfirmationPopup)
+	_style_popup_panel(popup_panel)
 
 	# Set active popup immediately
 	_active_popup = popup_panel
@@ -728,6 +787,9 @@ func _show_no_bench_notice() -> void:
 	popup_panel.position = (viewport_size - popup_panel.size) / 2.0
 	print("[StatusPanel] No-bench notice centered at: %s, size: %s" % [popup_panel.position, popup_panel.size])
 
+	# Fade in popup
+	_fade_in_popup(popup_panel)
+
 	# Store metadata
 	popup_panel.set_meta("_is_notice_popup", true)
 
@@ -749,6 +811,77 @@ func _popup_close_notice() -> void:
 	print("[StatusPanel] Notice popup closed")
 	_popup_close_and_return_to_content()
 
+func _show_already_at_max_notice(member_name: String, stat_type: String) -> void:
+	"""Show 'already at max HP/MP' notice using Panel pattern"""
+	# Prevent multiple popups
+	if _active_popup and is_instance_valid(_active_popup):
+		print("[StatusPanel] Popup already open, ignoring request")
+		return
+
+	# Create popup panel
+	var popup_panel: Panel = Panel.new()
+	popup_panel.process_mode = Node.PROCESS_MODE_ALWAYS
+	popup_panel.z_index = 100
+	popup_panel.modulate.a = 0.0  # Start fully transparent
+	popup_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE  # Block input until fade completes
+	add_child(popup_panel)
+
+	# Apply consistent styling (matches ToastPopup/ConfirmationPopup)
+	_style_popup_panel(popup_panel)
+
+	# Set active popup immediately
+	_active_popup = popup_panel
+
+	# Create content container
+	var vbox: VBoxContainer = VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 8)
+	vbox.custom_minimum_size.x = 300  # Set panel width to 300px
+	popup_panel.add_child(vbox)
+
+	# Title label
+	var title: Label = Label.new()
+	title.text = "Already at Max"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 14)
+	vbox.add_child(title)
+
+	# Message label
+	var message: Label = Label.new()
+	message.text = "%s is already at max %s." % [member_name, stat_type]
+	message.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	message.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	vbox.add_child(message)
+
+	# OK button
+	var ok_btn: Button = Button.new()
+	ok_btn.text = "OK"
+	ok_btn.custom_minimum_size.y = 32
+	ok_btn.pressed.connect(_popup_close_notice)
+	vbox.add_child(ok_btn)
+
+	# Position popup at screen center
+	popup_panel.set_anchors_preset(Control.PRESET_CENTER)
+	popup_panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	popup_panel.grow_vertical = Control.GROW_DIRECTION_BOTH
+	popup_panel.position = get_viewport_rect().size / 2 - vbox.custom_minimum_size / 2
+
+	# Fade in popup
+	_fade_in_popup(popup_panel)
+
+	# Add to aPanelManager stack
+	if has_node("/root/aPanelManager"):
+		var pm = get_node("/root/aPanelManager")
+		if pm.has_method("push"):
+			pm.call("push", popup_panel)
+			print("[StatusPanel] Pushed 'already at max' notice to aPanelManager stack")
+
+	# Set state to POPUP_ACTIVE
+	_nav_state = NavState.POPUP_ACTIVE
+
+	# Grab focus on OK button
+	await get_tree().process_frame
+	ok_btn.grab_focus()
+
 func _show_heal_confirmation(member_name: String, heal_amount: int, healed_type: String) -> void:
 	"""Show healing confirmation message using Panel pattern"""
 	# Prevent multiple popups
@@ -760,7 +893,12 @@ func _show_heal_confirmation(member_name: String, heal_amount: int, healed_type:
 	var popup_panel: Panel = Panel.new()
 	popup_panel.process_mode = Node.PROCESS_MODE_ALWAYS
 	popup_panel.z_index = 100
+	popup_panel.modulate.a = 0.0  # Start fully transparent
+	popup_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE  # Block input until fade completes
 	add_child(popup_panel)
+
+	# Apply consistent styling (matches ToastPopup/ConfirmationPopup)
+	_style_popup_panel(popup_panel)
 
 	# Set active popup immediately
 	_active_popup = popup_panel
@@ -802,6 +940,9 @@ func _show_heal_confirmation(member_name: String, heal_amount: int, healed_type:
 	var viewport_size: Vector2 = get_viewport_rect().size
 	popup_panel.position = (viewport_size - popup_panel.size) / 2.0
 	print("[StatusPanel] Heal confirmation centered at: %s, size: %s" % [popup_panel.position, popup_panel.size])
+	# Fade in popup
+	_fade_in_popup(popup_panel)
+
 
 	# Store metadata
 	popup_panel.set_meta("_is_heal_confirmation_popup", true)
@@ -835,7 +976,12 @@ func _show_swap_confirmation(member_name: String, member_id: String) -> void:
 	var popup_panel: Panel = Panel.new()
 	popup_panel.process_mode = Node.PROCESS_MODE_ALWAYS
 	popup_panel.z_index = 100
+	popup_panel.modulate.a = 0.0  # Start fully transparent
+	popup_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE  # Block input until fade completes
 	add_child(popup_panel)
+
+	# Apply consistent styling (matches ToastPopup/ConfirmationPopup)
+	_style_popup_panel(popup_panel)
 
 	# Set active popup immediately
 	_active_popup = popup_panel
@@ -877,6 +1023,9 @@ func _show_swap_confirmation(member_name: String, member_id: String) -> void:
 	var viewport_size: Vector2 = get_viewport_rect().size
 	popup_panel.position = (viewport_size - popup_panel.size) / 2.0
 	print("[StatusPanel] Swap confirmation centered at: %s, size: %s" % [popup_panel.position, popup_panel.size])
+	# Fade in popup
+	_fade_in_popup(popup_panel)
+
 
 	# Store metadata
 	popup_panel.set_meta("_is_swap_confirmation_popup", true)
@@ -898,6 +1047,50 @@ func _popup_close_swap_confirmation() -> void:
 	"""Close swap confirmation popup and return focus to new member's Recovery button"""
 	print("[StatusPanel] Swap confirmation popup closed")
 	_popup_close_and_return_to_content()
+
+func _style_popup_panel(popup_panel: Panel) -> void:
+	"""Apply consistent styling to popup panels (matches ToastPopup/ConfirmationPopup)"""
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.15, 0.15, 0.15, 1.0)  # Dark gray, fully opaque
+	style.border_color = Color(1.0, 0.7, 0.75, 1.0)  # Pink border
+	style.set_border_width_all(2)
+	style.corner_radius_top_left = 8
+	style.corner_radius_top_right = 8
+	style.corner_radius_bottom_left = 8
+	style.corner_radius_bottom_right = 8
+	popup_panel.add_theme_stylebox_override("panel", style)
+
+func _fade_in_popup(popup_panel: Panel) -> void:
+	"""Fade in popup over 0.3 seconds and enable input when complete"""
+	# Create tween for fade-in animation
+	var tween := create_tween()
+	tween.set_ease(Tween.EASE_OUT)
+	tween.set_trans(Tween.TRANS_CUBIC)
+
+	# Fade from transparent to fully visible
+	tween.tween_property(popup_panel, "modulate:a", 1.0, 0.3)
+
+	# Enable input after fade completes
+	tween.tween_callback(func():
+		popup_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+		print("[StatusPanel] Popup fade-in complete, input enabled")
+	)
+
+func _fade_out_popup(popup_panel: Panel, on_complete: Callable) -> void:
+	"""Fade out popup over 0.3 seconds and call callback when complete"""
+	# Disable input immediately
+	popup_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	# Create tween for fade-out animation
+	var tween := create_tween()
+	tween.set_ease(Tween.EASE_IN)
+	tween.set_trans(Tween.TRANS_CUBIC)
+
+	# Fade to transparent
+	tween.tween_property(popup_panel, "modulate:a", 0.0, 0.3)
+
+	# Call callback after fade completes
+	tween.tween_callback(on_complete)
 
 func _show_member_picker(active_slot: int) -> void:
 	"""Show bench member picker popup - LoadoutPanel pattern"""
@@ -932,7 +1125,12 @@ func _show_member_picker(active_slot: int) -> void:
 	var popup_panel: Panel = Panel.new()
 	popup_panel.process_mode = Node.PROCESS_MODE_ALWAYS
 	popup_panel.z_index = 100
+	popup_panel.modulate.a = 0.0  # Start fully transparent
+	popup_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE  # Block input until fade completes
 	add_child(popup_panel)
+
+	# Apply consistent styling (matches ToastPopup/ConfirmationPopup)
+	_style_popup_panel(popup_panel)
 
 	# Set active popup immediately
 	_active_popup = popup_panel
@@ -990,6 +1188,9 @@ func _show_member_picker(active_slot: int) -> void:
 	var viewport_size: Vector2 = get_viewport_rect().size
 	popup_panel.position = (viewport_size - popup_panel.size) / 2.0
 	print("[StatusPanel] Switch popup centered at: %s, size: %s" % [popup_panel.position, popup_panel.size])
+	# Fade in popup
+	_fade_in_popup(popup_panel)
+
 
 	# Store metadata
 	popup_panel.set_meta("_is_switch_popup", true)
@@ -1074,27 +1275,30 @@ func _popup_close_and_return_to_content() -> void:
 	if not _active_popup or not is_instance_valid(_active_popup):
 		return
 
-	print("[StatusPanel] Closing popup, returning to content mode")
+	print("[StatusPanel] Closing popup with fade-out, returning to content mode")
 
-	# Store popup reference and clear BEFORE popping
+	# Store popup reference but DON'T clear _active_popup yet (prevents double-close during fade)
 	var popup_to_close = _active_popup
-	_active_popup = null
 
-	# CRITICAL: Set state to CONTENT BEFORE popping
-	_nav_state = NavState.CONTENT
+	# Fade out popup, then clean up
+	_fade_out_popup(popup_to_close, func():
+		# Pop from panel manager FIRST (before freeing)
+		var panel_mgr = get_node_or_null("/root/aPanelManager")
+		if panel_mgr and panel_mgr.has_method("pop_panel"):
+			panel_mgr.call("pop_panel")
+			print("[StatusPanel] Popped popup from aPanelManager")
 
-	# Pop from panel manager
-	var panel_mgr = get_node_or_null("/root/aPanelManager")
-	if panel_mgr and panel_mgr.has_method("pop_panel"):
-		panel_mgr.call("pop_panel")
-		print("[StatusPanel] Popped switch popup from aPanelManager")
+		# NOW clear active popup and change state (after pop completes)
+		_active_popup = null
+		_nav_state = NavState.CONTENT
 
-	# Free the popup
-	if is_instance_valid(popup_to_close):
-		popup_to_close.queue_free()
+		# Free the popup
+		if is_instance_valid(popup_to_close):
+			popup_to_close.queue_free()
 
-	# Restore focus to first button in content
-	call_deferred("_navigate_to_content")
+		# Restore focus to first button in content
+		call_deferred("_navigate_to_content")
+	)
 
 func _show_recovery_popup(member_id: String, member_name: String, hp: int, hp_max: int, mp: int, mp_max: int) -> void:
 	"""Show recovery item selection popup - LoadoutPanel pattern"""
@@ -1162,7 +1366,12 @@ func _show_recovery_popup(member_id: String, member_name: String, hp: int, hp_ma
 	var popup_panel: Panel = Panel.new()
 	popup_panel.process_mode = Node.PROCESS_MODE_ALWAYS
 	popup_panel.z_index = 100
+	popup_panel.modulate.a = 0.0  # Start fully transparent
+	popup_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE  # Block input until fade completes
 	add_child(popup_panel)
+
+	# Apply consistent styling (matches ToastPopup/ConfirmationPopup)
+	_style_popup_panel(popup_panel)
 
 	# Set active popup immediately
 	_active_popup = popup_panel
@@ -1228,6 +1437,9 @@ func _show_recovery_popup(member_id: String, member_name: String, hp: int, hp_ma
 	var viewport_size: Vector2 = get_viewport_rect().size
 	popup_panel.position = (viewport_size - popup_panel.size) / 2.0
 	print("[StatusPanel] Recovery popup centered at: %s, size: %s" % [popup_panel.position, popup_panel.size])
+	# Fade in popup
+	_fade_in_popup(popup_panel)
+
 
 	# Store metadata
 	popup_panel.set_meta("_is_recovery_popup", true)
@@ -1314,20 +1526,10 @@ func _use_recovery_item(member_id: String, member_name: String, item_id: String,
 	"""Use a recovery item on a party member"""
 	# Check if already at max
 	if item_type == "hp" and hp >= hp_max:
-		var msg_popup := AcceptDialog.new()
-		msg_popup.dialog_text = "%s is already at max HP." % member_name
-		msg_popup.title = "Already at Max"
-		add_child(msg_popup)
-		msg_popup.popup_centered()
-		msg_popup.confirmed.connect(func(): msg_popup.queue_free())
+		_show_already_at_max_notice(member_name, "HP")
 		return
 	elif item_type == "mp" and mp >= mp_max:
-		var msg_popup := AcceptDialog.new()
-		msg_popup.dialog_text = "%s is already at max MP." % member_name
-		msg_popup.title = "Already at Max"
-		add_child(msg_popup)
-		msg_popup.popup_centered()
-		msg_popup.confirmed.connect(func(): msg_popup.queue_free())
+		_show_already_at_max_notice(member_name, "MP")
 		return
 
 	# Use the item
@@ -1944,7 +2146,11 @@ func _on_visibility_changed() -> void:
 func _grab_tab_list_focus() -> void:
 	"""Helper to grab focus on tab list"""
 	if _tab_list and _tab_list.item_count > 0:
-		_tab_list.select(0)
+		# Restore last selected tab instead of always selecting first tab
+		var index_to_select = _last_selected_tab_index
+		if index_to_select >= _tab_list.item_count:
+			index_to_select = 0  # Fallback if index is out of bounds
+		_tab_list.select(index_to_select)
 		_tab_list.grab_focus()
 
 func _navigate_to_content() -> void:
@@ -1966,21 +2172,24 @@ func _navigate_to_content() -> void:
 	# If we have a specific member to focus (after using recovery item), find that button
 	if _focus_member_id != "":
 		print("[StatusPanel] Looking for Recovery button for member: %s" % _focus_member_id)
-		for btn in buttons:
+		for i in range(buttons.size()):
+			var btn = buttons[i]
 			if btn.text == "Recovery" and btn.has_meta("member_id"):
 				var btn_member_id = String(btn.get_meta("member_id", ""))
 				if btn_member_id == _focus_member_id:
 					btn.grab_focus()
-					print("[StatusPanel] ✓ Restored focus to Recovery button for %s" % _focus_member_id)
+					_last_focused_content_button_index = i  # Remember this position
+					print("[StatusPanel] ✓ Restored focus to Recovery button for %s (index %d)" % [_focus_member_id, i])
 					_focus_member_id = ""  # Clear the focus target
 					return
-		print("[StatusPanel] WARNING: Could not find Recovery button for %s, focusing first button" % _focus_member_id)
+		print("[StatusPanel] WARNING: Could not find Recovery button for %s, using last position" % _focus_member_id)
 		_focus_member_id = ""  # Clear the focus target
 
-	# Focus the first button found (default behavior)
+	# Focus the last focused button (or first if index is invalid)
 	if buttons.size() > 0:
-		buttons[0].grab_focus()
-		print("[StatusPanel] ✓ Navigated to content - focused first button: %s" % buttons[0].text)
+		var index_to_focus = mini(_last_focused_content_button_index, buttons.size() - 1)
+		buttons[index_to_focus].grab_focus()
+		print("[StatusPanel] ✓ Navigated to content - focused button %d: %s" % [index_to_focus, buttons[index_to_focus].text])
 	else:
 		print("[StatusPanel] WARNING: No buttons found in content area")
 
@@ -2066,6 +2275,12 @@ func _handle_menu_input(event: InputEvent) -> void:
 	if event.is_action_pressed("move_right"):
 		# If tab list has focus, navigate to first button in content area
 		if _tab_list.has_focus():
+			# Save current tab selection before hiding menu
+			var selected_items = _tab_list.get_selected_items()
+			if selected_items.size() > 0:
+				_last_selected_tab_index = selected_items[0]
+				print("[StatusPanel] Saved tab selection: %d" % _last_selected_tab_index)
+
 			print("[StatusPanel] MENU → CONTENT transition (hiding menu)")
 			_nav_state = NavState.CONTENT
 			# Hide menu when transitioning to content
@@ -2162,7 +2377,14 @@ func _unhandled_input(event: InputEvent) -> void:
 				focused_control is Button
 			])
 			if focused_control is Button:
-				print("[StatusPanel] ✓ Activating focused button: %s" % (focused_control as Button).text)
+				# Find and store the index of the activated button
+				var buttons: Array[Button] = []
+				_find_buttons_recursive(_party, buttons)
+				for i in range(buttons.size()):
+					if buttons[i] == focused_control:
+						_last_focused_content_button_index = i
+						print("[StatusPanel] ✓ Activating focused button %d: %s" % [i, (focused_control as Button).text])
+						break
 				(focused_control as Button).emit_signal("pressed")
 				get_viewport().set_input_as_handled()
 				return

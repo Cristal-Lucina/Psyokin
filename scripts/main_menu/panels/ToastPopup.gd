@@ -24,12 +24,14 @@ signal closed
 
 var _title: String = "Notice"
 var _message: String = ""
+var _custom_size: Vector2 = Vector2(400, 160)
 var _ok_btn: Button = null
 
 static func create(message: String, title: String = "Notice") -> ToastPopup:
 	var popup := ToastPopup.new()
 	popup._title = title
 	popup._message = message
+	popup._custom_size = custom_size
 	popup._build_ui()
 	return popup
 
@@ -68,6 +70,11 @@ func _build_ui() -> void:
 	title.add_theme_font_size_override("font_size", 18)
 	vbox.add_child(title)
 
+	# ScrollContainer for message (allows scrolling for long content)
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	vbox.add_child(scroll)
+
 	# Message
 	var msg_label := Label.new()
 	msg_label.text = _message
@@ -105,8 +112,8 @@ func _input(event: InputEvent) -> void:
 	if not visible:
 		return
 
-	# Handle Accept or Back (both close the toast)
-	if event.is_action_pressed("menu_accept") or event.is_action_pressed("menu_back"):
+	# Handle Back to close (buttons don't handle Back by default)
+	if event.is_action_pressed("menu_back"):
 		_on_ok()
 		get_viewport().set_input_as_handled()
 
