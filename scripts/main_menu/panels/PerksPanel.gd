@@ -627,6 +627,9 @@ func _unhandled_input(event: InputEvent) -> void:
 
 	# Block input when popup is active
 	if _active_popup and is_instance_valid(_active_popup):
+		# Consume all input events including back button
+		if event.is_action_pressed("menu_back") or event.is_action_pressed("ui_cancel"):
+			get_viewport().set_input_as_handled()
 		return
 
 	var handled: bool = false
