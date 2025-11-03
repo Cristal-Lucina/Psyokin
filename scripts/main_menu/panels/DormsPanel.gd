@@ -191,11 +191,10 @@ func _on_panel_gained_focus() -> void:
 	_focus_current_roster()
 
 func _can_panel_close() -> bool:
-	# Prevent closing if common room has members without assignments
-	if _current_view == ViewType.REASSIGNMENTS:
-		if _has_unassigned_common_members():
-			_show_toast("Please assign all members in the common room before leaving.")
-			return false
+	# Prevent closing if there are any pending changes (move plan in progress)
+	if _has_pending_changes():
+		_show_toast("You must either Accept the plan or Cancel all moves before leaving.")
+		return false
 	return true
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -380,10 +379,16 @@ func _on_back_input() -> void:
 				_focus_current_action()
 		get_viewport().set_input_as_handled()
 	else:
-		# No history - don't handle input, let GameMenu handle the back button
-		# This allows proper slide animation back to StatusPanel
-		print("[DormsPanel._on_back_input] No history, letting GameMenu handle back button for slide transition")
-		# Do NOT call get_viewport().set_input_as_handled() - let event bubble up
+		# No history - check if panel can close
+		if not _can_panel_close():
+			# Panel has pending changes - prevent closing
+			print("[DormsPanel._on_back_input] Cannot close panel - pending changes exist")
+			get_viewport().set_input_as_handled()
+		else:
+			# Panel can close - let GameMenu handle the back button
+			# This allows proper slide animation back to StatusPanel
+			print("[DormsPanel._on_back_input] No history, letting GameMenu handle back button for slide transition")
+			# Do NOT call get_viewport().set_input_as_handled() - let event bubble up
 
 func _focus_current_roster() -> void:
 	if _current_roster_index >= 0 and _current_roster_index < _roster_buttons.size():

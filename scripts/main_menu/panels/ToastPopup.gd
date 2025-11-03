@@ -97,6 +97,11 @@ func _input(event: InputEvent) -> void:
 		_on_ok()
 		get_viewport().set_input_as_handled()
 
+	# Block all directional navigation to keep focus in popup
+	elif event.is_action_pressed("move_up") or event.is_action_pressed("move_down") or \
+	     event.is_action_pressed("move_left") or event.is_action_pressed("move_right"):
+		get_viewport().set_input_as_handled()
+
 func _on_ok() -> void:
 	print("[ToastPopup] OK pressed")
 	closed.emit()

@@ -133,6 +133,12 @@ func _input(event: InputEvent) -> void:
 		_cancel_btn.grab_focus()
 		get_viewport().set_input_as_handled()
 
+	# Block up/down navigation to keep focus in popup
+	elif event.is_action_pressed("move_up"):
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("move_down"):
+		get_viewport().set_input_as_handled()
+
 func _on_accept() -> void:
 	print("[ConfirmationPopup] Accept pressed")
 	confirmed.emit(true)
