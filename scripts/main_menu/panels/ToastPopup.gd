@@ -34,8 +34,6 @@ static func create(message: String, title: String = "Notice") -> ToastPopup:
 	return popup
 
 func _build_ui() -> void:
-	custom_minimum_size = Vector2(400, 160)
-
 	# Ensure popup processes even when game is paused
 	process_mode = Node.PROCESS_MODE_ALWAYS
 
@@ -50,15 +48,18 @@ func _build_ui() -> void:
 	style.corner_radius_bottom_right = 8
 	add_theme_stylebox_override("panel", style)
 
+	# Create margin container for padding
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 20)
+	margin.add_theme_constant_override("margin_top", 20)
+	margin.add_theme_constant_override("margin_right", 20)
+	margin.add_theme_constant_override("margin_bottom", 20)
+	add_child(margin)
+
 	var vbox := VBoxContainer.new()
-	vbox.set_anchors_preset(Control.PRESET_FULL_RECT)
 	vbox.add_theme_constant_override("separation", 12)
-	vbox.set_offsets_preset(Control.PRESET_FULL_RECT)
-	vbox.offset_left = 20
-	vbox.offset_top = 20
-	vbox.offset_right = -20
-	vbox.offset_bottom = -20
-	add_child(vbox)
+	vbox.custom_minimum_size = Vector2(400, 0)  # Min width, height auto-sizes
+	margin.add_child(vbox)
 
 	# Title
 	var title := Label.new()
@@ -71,8 +72,7 @@ func _build_ui() -> void:
 	var msg_label := Label.new()
 	msg_label.text = _message
 	msg_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	msg_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	msg_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	msg_label.custom_minimum_size = Vector2(400, 0)  # Set width for wrapping
 	vbox.add_child(msg_label)
 
 	# OK Button
@@ -86,9 +86,14 @@ func _build_ui() -> void:
 	# Connect button
 	_ok_btn.pressed.connect(_on_ok)
 
-	# Auto-position and show
-	call_deferred("_position_center")
+	# Auto-position and show (deferred to allow size calculation)
+	call_deferred("_finalize_size_and_position")
 	_ok_btn.call_deferred("grab_focus")
+
+func _finalize_size_and_position() -> void:
+	# Force update to calculate proper size
+	reset_size()
+	_position_center()
 
 func _position_center() -> void:
 	if get_viewport() == null:
