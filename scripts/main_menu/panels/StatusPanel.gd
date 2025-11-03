@@ -1232,20 +1232,20 @@ func _popup_close_and_return_to_content() -> void:
 
 	print("[StatusPanel] Closing popup with fade-out, returning to content mode")
 
-	# Store popup reference and clear BEFORE fading
+	# Store popup reference but DON'T clear _active_popup yet (prevents double-close during fade)
 	var popup_to_close = _active_popup
-	_active_popup = null
-
-	# CRITICAL: Set state to CONTENT BEFORE fading
-	_nav_state = NavState.CONTENT
 
 	# Fade out popup, then clean up
 	_fade_out_popup(popup_to_close, func():
-		# Pop from panel manager
+		# Pop from panel manager FIRST (before freeing)
 		var panel_mgr = get_node_or_null("/root/aPanelManager")
 		if panel_mgr and panel_mgr.has_method("pop_panel"):
 			panel_mgr.call("pop_panel")
 			print("[StatusPanel] Popped popup from aPanelManager")
+
+		# NOW clear active popup and change state (after pop completes)
+		_active_popup = null
+		_nav_state = NavState.CONTENT
 
 		# Free the popup
 		if is_instance_valid(popup_to_close):
