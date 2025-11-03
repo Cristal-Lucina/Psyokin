@@ -125,6 +125,9 @@ var _active_popup: Control = null  # Currently open equipment popup panel
 func _ready() -> void:
 	super()  # Call PanelBase._ready()
 
+	# Set process mode to work while game is paused
+	process_mode = Node.PROCESS_MODE_ALWAYS
+
 	_gs    = get_node_or_null("/root/aGameState")
 	_inv   = get_node_or_null("/root/aInventorySystem")
 	_sig   = get_node_or_null("/root/aSigilSystem")
