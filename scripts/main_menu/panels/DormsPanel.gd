@@ -120,6 +120,9 @@ const ANIM_DURATION := 0.2  # Animation duration in seconds
 func _ready() -> void:
 	super()  # Call PanelBase._ready()
 
+	# Set process mode to work while game is paused
+	process_mode = Node.PROCESS_MODE_ALWAYS
+
 	print("[DormsPanel._ready] Starting initialization")
 
 	set_anchors_preset(Control.PRESET_FULL_RECT)

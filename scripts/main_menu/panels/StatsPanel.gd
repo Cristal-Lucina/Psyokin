@@ -33,6 +33,9 @@ var _party_tokens: Array[String] = []
 var _party_labels: Array[String] = []
 
 func _ready() -> void:
+	# Set process mode to work while game is paused
+	process_mode = Node.PROCESS_MODE_ALWAYS
+
 	_stats = get_node_or_null(STATS_AUTOLOAD_PATH)
 	_gs = get_node_or_null(GS_PATH)
 	_eq = get_node_or_null(EQ_PATH)

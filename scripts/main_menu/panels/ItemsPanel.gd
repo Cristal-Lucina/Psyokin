@@ -61,6 +61,9 @@ var _item_to_use_id: String = ""
 var _item_to_use_def: Dictionary = {}
 
 func _ready() -> void:
+	# Set process mode to work while game is paused
+	process_mode = Node.PROCESS_MODE_ALWAYS
+
 	# Get system references
 	_inv = get_node_or_null(INV_PATH)
 	_csv = get_node_or_null(CSV_PATH)
