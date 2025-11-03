@@ -692,6 +692,9 @@ func _show_no_bench_notice() -> void:
 	popup_panel.z_index = 100
 	add_child(popup_panel)
 
+	# Apply consistent styling (matches ToastPopup/ConfirmationPopup)
+	_style_popup_panel(popup_panel)
+
 	# Set active popup immediately
 	_active_popup = popup_panel
 
@@ -765,6 +768,9 @@ func _show_heal_confirmation(member_name: String, heal_amount: int, healed_type:
 	popup_panel.process_mode = Node.PROCESS_MODE_ALWAYS
 	popup_panel.z_index = 100
 	add_child(popup_panel)
+
+	# Apply consistent styling (matches ToastPopup/ConfirmationPopup)
+	_style_popup_panel(popup_panel)
 
 	# Set active popup immediately
 	_active_popup = popup_panel
@@ -841,6 +847,9 @@ func _show_swap_confirmation(member_name: String, member_id: String) -> void:
 	popup_panel.z_index = 100
 	add_child(popup_panel)
 
+	# Apply consistent styling (matches ToastPopup/ConfirmationPopup)
+	_style_popup_panel(popup_panel)
+
 	# Set active popup immediately
 	_active_popup = popup_panel
 
@@ -903,6 +912,18 @@ func _popup_close_swap_confirmation() -> void:
 	print("[StatusPanel] Swap confirmation popup closed")
 	_popup_close_and_return_to_content()
 
+func _style_popup_panel(popup_panel: Panel) -> void:
+	"""Apply consistent styling to popup panels (matches ToastPopup/ConfirmationPopup)"""
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.15, 0.15, 0.15, 1.0)  # Dark gray, fully opaque
+	style.border_color = Color(1.0, 0.7, 0.75, 1.0)  # Pink border
+	style.set_border_width_all(2)
+	style.corner_radius_top_left = 8
+	style.corner_radius_top_right = 8
+	style.corner_radius_bottom_left = 8
+	style.corner_radius_bottom_right = 8
+	popup_panel.add_theme_stylebox_override("panel", style)
+
 func _show_member_picker(active_slot: int) -> void:
 	"""Show bench member picker popup - LoadoutPanel pattern"""
 	if not _gs: return
@@ -937,6 +958,9 @@ func _show_member_picker(active_slot: int) -> void:
 	popup_panel.process_mode = Node.PROCESS_MODE_ALWAYS
 	popup_panel.z_index = 100
 	add_child(popup_panel)
+
+	# Apply consistent styling (matches ToastPopup/ConfirmationPopup)
+	_style_popup_panel(popup_panel)
 
 	# Set active popup immediately
 	_active_popup = popup_panel
@@ -1167,6 +1191,9 @@ func _show_recovery_popup(member_id: String, member_name: String, hp: int, hp_ma
 	popup_panel.process_mode = Node.PROCESS_MODE_ALWAYS
 	popup_panel.z_index = 100
 	add_child(popup_panel)
+
+	# Apply consistent styling (matches ToastPopup/ConfirmationPopup)
+	_style_popup_panel(popup_panel)
 
 	# Set active popup immediately
 	_active_popup = popup_panel
