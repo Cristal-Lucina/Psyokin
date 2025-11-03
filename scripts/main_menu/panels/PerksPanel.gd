@@ -542,6 +542,8 @@ func _show_perk_confirmation(perk: Dictionary) -> void:
 	var confirm_btn: Button = Button.new()
 	confirm_btn.text = "Unlock Perk"
 	confirm_btn.custom_minimum_size.x = 120
+	confirm_btn.process_mode = Node.PROCESS_MODE_ALWAYS  # Must process when game is paused
+	confirm_btn.focus_mode = Control.FOCUS_ALL
 	confirm_btn.pressed.connect(_on_confirm_perk)
 	button_row.add_child(confirm_btn)
 
@@ -549,8 +551,14 @@ func _show_perk_confirmation(perk: Dictionary) -> void:
 	var cancel_btn: Button = Button.new()
 	cancel_btn.text = "Cancel"
 	cancel_btn.custom_minimum_size.x = 120
+	cancel_btn.process_mode = Node.PROCESS_MODE_ALWAYS  # Must process when game is paused
+	cancel_btn.focus_mode = Control.FOCUS_ALL
 	cancel_btn.pressed.connect(_on_cancel_perk)
 	button_row.add_child(cancel_btn)
+
+	# Set up focus neighbors for left/right navigation
+	confirm_btn.focus_neighbor_right = confirm_btn.get_path_to(cancel_btn)
+	cancel_btn.focus_neighbor_left = cancel_btn.get_path_to(confirm_btn)
 
 	# Auto-size and center
 	await get_tree().process_frame
@@ -622,10 +630,26 @@ func _on_acquired_perk_selected(index: int) -> void:
 
 func _input(event: InputEvent) -> void:
 	"""Catch ALL input when popup is active to prevent it from reaching other systems"""
-	# When popup is active, block ALL input from propagating
+	# When popup is active, handle Accept/Back for buttons
 	if _active_popup and is_instance_valid(_active_popup):
-		get_viewport().set_input_as_handled()
-		return
+		# Allow buttons to handle Accept action (they'll trigger pressed signal)
+		if event.is_action_pressed("menu_accept"):
+			# Don't mark as handled - let buttons process it
+			return
+		# Handle Back to cancel
+		elif event.is_action_pressed("menu_back"):
+			_on_cancel_perk()
+			get_viewport().set_input_as_handled()
+			return
+		# Allow left/right navigation (for button focus switching)
+		elif event.is_action_pressed("move_left") or event.is_action_pressed("move_right") or \
+		     event.is_action_pressed("ui_left") or event.is_action_pressed("ui_right"):
+			# Don't mark as handled - let UI system handle focus navigation
+			return
+		# Block all other input
+		else:
+			get_viewport().set_input_as_handled()
+			return
 
 func _unhandled_input(event: InputEvent) -> void:
 	"""Handle controller input for grid navigation"""
