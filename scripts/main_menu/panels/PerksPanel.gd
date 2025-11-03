@@ -573,8 +573,7 @@ func _show_perk_confirmation(perk: Dictionary) -> void:
 	var viewport_size: Vector2 = get_viewport_rect().size
 	popup_panel.position = (viewport_size - popup_panel.size) / 2.0
 
-	# Pause the game
-	get_tree().paused = true
+	# Game is already paused by GameMenu - no need to pause again
 
 	# Fade in
 	var tween := create_tween()
@@ -618,8 +617,8 @@ func _close_confirmation_popup() -> void:
 	tween.set_trans(Tween.TRANS_CUBIC)
 	tween.tween_property(popup_to_close, "modulate:a", 0.0, 0.3)
 	tween.tween_callback(func():
-		# Unpause the game
-		get_tree().paused = false
+		# Don't unpause here - let GameMenu control pause state
+		# The game should stay paused while the menu is open
 		if is_instance_valid(popup_to_close):
 			popup_to_close.queue_free()
 	)
