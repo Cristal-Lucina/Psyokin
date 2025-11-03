@@ -36,6 +36,9 @@ static func create(message: String, title: String = "Notice") -> ToastPopup:
 func _build_ui() -> void:
 	custom_minimum_size = Vector2(400, 160)
 
+	# Ensure popup processes even when game is paused
+	process_mode = Node.PROCESS_MODE_ALWAYS
+
 	# Add solid background (no transparency)
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0.15, 0.15, 0.15, 1.0)  # Dark gray, fully opaque
