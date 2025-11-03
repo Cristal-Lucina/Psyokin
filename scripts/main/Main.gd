@@ -1185,12 +1185,17 @@ func _show_reassignments_summary(new_layout: Dictionary, moves_in: Array) -> voi
 				var nm2: String = (String(ds.call("display_name", aid3)) if ds else aid3)
 				lines.append("\"%s\" moved from \"%s\" to \"%s\"" % [nm2, fr2, to2])
 
-	# Show popup using ToastPopup (controller-friendly)
+	# Show popup using ToastPopup as overlay (controller-friendly)
 	var message := ("Room changes have been applied." if lines.size() == 0 else _join_lines(lines))
+	var overlay := CanvasLayer.new()
+	overlay.layer = 100  # High layer to ensure it's on top
+	add_child(overlay)
+
 	var popup := ToastPopup.create(message, "Reassignments Applied")
-	add_child(popup)
+	overlay.add_child(popup)
 	await popup.closed
 	popup.queue_free()
+	overlay.queue_free()
 
 	_prelock_layout.clear()
 
@@ -1218,10 +1223,15 @@ func _menu_can_close() -> bool:
 	return true
 
 func _main_toast(msg: String) -> void:
+	var overlay := CanvasLayer.new()
+	overlay.layer = 100  # High layer to ensure it's on top
+	add_child(overlay)
+
 	var popup := ToastPopup.create(msg)
-	add_child(popup)
+	overlay.add_child(popup)
 	await popup.closed
 	popup.queue_free()
+	overlay.queue_free()
 
 ## ═══════════════════════════════════════════════════════════════
 ## TEST/DEBUG HELPERS - Battle System

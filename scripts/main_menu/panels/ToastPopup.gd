@@ -88,10 +88,10 @@ func _build_ui() -> void:
 	_ok_btn.call_deferred("grab_focus")
 
 func _position_center() -> void:
-	if get_parent() == null:
+	if get_viewport() == null:
 		return
-	var parent_rect: Rect2 = get_parent().get_viewport_rect()
-	position = (parent_rect.size - size) / 2
+	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
+	position = (viewport_size - size) / 2
 
 func _input(event: InputEvent) -> void:
 	if not visible:
