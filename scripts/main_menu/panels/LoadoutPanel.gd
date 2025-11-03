@@ -1346,7 +1346,10 @@ func _input(event: InputEvent) -> void:
 		return
 
 	# Only handle other states if we're the active panel
-	if not is_active():
+	var active = is_active()
+	if event is InputEventJoypadButton and event.pressed:
+		print("[LoadoutPanel._input] Button %d, is_active=%s, nav_state=%s" % [event.button_index, active, _nav_state])
+	if not active:
 		return
 
 	# STATE 2: PARTY_SELECT

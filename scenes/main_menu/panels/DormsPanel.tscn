@@ -3,6 +3,7 @@
 [ext_resource type="Script" uid="uid://b70twhl1c708m" path="res://scripts/main_menu/panels/DormsPanel.gd" id="1"]
 
 [node name="DormsPanel" type="Control"]
+process_mode = 3
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
