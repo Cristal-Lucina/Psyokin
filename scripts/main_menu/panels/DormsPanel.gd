@@ -813,7 +813,15 @@ func _try_assign_to_room(room_id: String) -> void:
 	# Check if this is their current room
 	var current_room: String = _get_member_room(_selected_member)
 	if current_room == room_id:
-		_show_toast("That's their current room. Please select a different room.")
+		var member_name: String = _get_member_name(_selected_member)
+		_show_toast("%s is already in this room." % member_name)
+		return
+
+	# Check if this is their previous room (before moving to common)
+	var previous_room: String = _get_member_previous_room(_selected_member)
+	if previous_room == room_id:
+		var member_name: String = _get_member_name(_selected_member)
+		_show_toast("%s is already in this room." % member_name)
 		return
 
 	# Check if room is already targeted in plan
