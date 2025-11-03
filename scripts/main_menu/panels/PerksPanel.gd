@@ -495,6 +495,7 @@ func _show_perk_confirmation(perk: Dictionary) -> void:
 
 	# Set active popup
 	_active_popup = popup_panel
+	print("[PerksPanel] Popup created and set as active")
 
 	# Create content container
 	var vbox: VBoxContainer = VBoxContainer.new()
@@ -632,6 +633,7 @@ func _input(event: InputEvent) -> void:
 	"""Catch ALL input when popup is active to prevent it from reaching other systems"""
 	# When popup is active, block everything except what we explicitly handle
 	if _active_popup and is_instance_valid(_active_popup):
+		print("[PerksPanel._input] POPUP ACTIVE - blocking input: %s" % event)
 		# Handle Back to cancel
 		if event.is_action_pressed("menu_back"):
 			_on_cancel_perk()
@@ -644,6 +646,7 @@ func _input(event: InputEvent) -> void:
 			return
 		# Block ALL other input to prevent grid navigation in background
 		get_viewport().set_input_as_handled()
+		return
 
 func _unhandled_input(event: InputEvent) -> void:
 	"""Handle controller input for grid navigation"""
@@ -652,6 +655,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 	# Block ALL input when popup is active (buttons handle their own input via signals)
 	if _active_popup and is_instance_valid(_active_popup):
+		print("[PerksPanel._unhandled_input] POPUP ACTIVE - blocking: %s" % event)
 		get_viewport().set_input_as_handled()
 		return
 
