@@ -8,6 +8,7 @@ const STATS_AUTOLOAD_PATH : String = "/root/aStatsSystem"
 const GS_PATH             : String = "/root/aGameState"
 const EQ_PATH             : String = "/root/aEquipmentSystem"
 const INV_PATH            : String = "/root/aInventorySystem"
+const CPS_PATH            : String = "/root/aCombatProfileSystem"
 
 # Base stat keys
 const BASE_STATS: Array[String] = ["BRW", "MND", "TPO", "VTL", "FCS"]
@@ -15,14 +16,14 @@ const BASE_STATS: Array[String] = ["BRW", "MND", "TPO", "VTL", "FCS"]
 @onready var _party_list: ItemList = %PartyList
 @onready var _member_name: Label = %MemberName
 @onready var _base_grid: GridContainer = %BaseStatsGrid
-@onready var _equip_grid: GridContainer = %EquipmentGrid
-@onready var _derived_grid: GridContainer = %DerivedGrid
+@onready var _battle_grid: GridContainer = %BattleStatsGrid
 @onready var _radar_container: VBoxContainer = %RadarContainer
 
 var _stats: Node = null
 var _gs: Node = null
 var _eq: Node = null
 var _inv: Node = null
+var _cps: Node = null
 
 # Radar chart for stat visualization
 var _radar_chart: Control = null
@@ -36,6 +37,7 @@ func _ready() -> void:
 	_gs = get_node_or_null(GS_PATH)
 	_eq = get_node_or_null(EQ_PATH)
 	_inv = get_node_or_null(INV_PATH)
+	_cps = get_node_or_null(CPS_PATH)
 
 	# Connect signals
 	if _stats:
@@ -190,8 +192,7 @@ func _on_party_member_selected(index: int) -> void:
 
 	# Rebuild all stat grids
 	_rebuild_base_stats(token)
-	_rebuild_equipment_stats(token)
-	_rebuild_derived_stats(token)
+	_rebuild_battle_stats(token)
 	_update_radar_chart(token)
 
 func _rebuild_base_stats(token: String) -> void:
@@ -222,84 +223,34 @@ func _rebuild_base_stats(token: String) -> void:
 		var value = _get_stat_value(token, stat_key)
 		_add_stat_pair(_base_grid, stat_key, str(value))
 
-func _rebuild_equipment_stats(token: String) -> void:
-	"""Build equipment stats grid (weapon/armor/head/foot/bracelet stats)"""
-	_clear_grid(_equip_grid)
+func _rebuild_battle_stats(token: String) -> void:
+	"""Build battle stats grid from CombatProfileSystem"""
+	_clear_grid(_battle_grid)
 
-	var equip = _get_equipment(token)
+	if not _cps:
+		print("[StatsPanel] CombatProfileSystem not available")
+		return
 
-	# Weapon stats
-	var weapon_id = String(equip.get("weapon", ""))
-	if weapon_id != "" and weapon_id != "—":
-		var w_def = _get_item_def(weapon_id)
-		var brw = _get_stat_value(token, "BRW")
-		var base_watk = int(w_def.get("base_watk", 0))
-		var scale = float(w_def.get("scale_brw", 0.0))
-		var total_atk = base_watk + int(round(scale * float(brw)))
+	# Get combat profile
+	var profile: Dictionary = {}
+	if _cps.has_method("get_profile"):
+		var profile_v = _cps.call("get_profile", token)
+		if typeof(profile_v) == TYPE_DICTIONARY:
+			profile = profile_v
 
-		_add_stat_pair(_equip_grid, "W.Attack", str(total_atk))
-		_add_stat_pair(_equip_grid, "W.Acc", str(w_def.get("base_acc", 0)))
-		_add_stat_pair(_equip_grid, "Crit %", str(w_def.get("crit_bonus_pct", 0)))
-
-	# Armor stats
-	var armor_id = String(equip.get("armor", ""))
-	if armor_id != "" and armor_id != "—":
-		var a_def = _get_item_def(armor_id)
-		var vtl = _get_stat_value(token, "VTL")
-		var armor_flat = int(a_def.get("armor_flat", 0))
-		var pdef = int(round(float(armor_flat) * (5.0 + 0.25 * float(vtl))))
-
-		_add_stat_pair(_equip_grid, "P.Def", str(pdef))
-		_add_stat_pair(_equip_grid, "Ail.Res %", str(a_def.get("ail_resist_pct", 0)))
-
-	# Head stats
-	var head_id = String(equip.get("head", ""))
-	if head_id != "" and head_id != "—":
-		var h_def = _get_item_def(head_id)
-		var fcs = _get_stat_value(token, "FCS")
-		var ward = int(h_def.get("ward_flat", 0))
-		var mdef = int(round(float(ward) * (5.0 + 0.25 * float(fcs))))
-
-		_add_stat_pair(_equip_grid, "M.Def", str(mdef))
-		if int(h_def.get("max_hp_boost", 0)) > 0:
-			_add_stat_pair(_equip_grid, "HP Bonus", str(h_def.get("max_hp_boost", 0)))
-		if int(h_def.get("max_mp_boost", 0)) > 0:
-			_add_stat_pair(_equip_grid, "MP Bonus", str(h_def.get("max_mp_boost", 0)))
-
-	# Foot stats
-	var foot_id = String(equip.get("foot", ""))
-	if foot_id != "" and foot_id != "—":
-		var f_def = _get_item_def(foot_id)
-		_add_stat_pair(_equip_grid, "Speed", str(f_def.get("speed", 0)))
-		_add_stat_pair(_equip_grid, "Evasion", str(f_def.get("base_eva", 0)))
-
-func _rebuild_derived_stats(token: String) -> void:
-	"""Build derived stats grid (HP, MP, pools)"""
-	_clear_grid(_derived_grid)
-
-	var hp_max = 0
-	var mp_max = 0
-	var hp_current = 0
-	var mp_current = 0
-
-	if _gs and _gs.has_method("compute_member_pools"):
-		var pools = _gs.call("compute_member_pools", token)
-		hp_max = int(pools.get("hp_max", 0))
-		mp_max = int(pools.get("mp_max", 0))
-
-	# Try to get current HP/MP from combat profiles
-	var cps = get_node_or_null("/root/aCombatProfileSystem")
-	if cps and cps.has_method("get_profile"):
-		var profile = cps.call("get_profile", token)
-		if typeof(profile) == TYPE_DICTIONARY:
-			hp_current = int(profile.get("hp", hp_max))
-			mp_current = int(profile.get("mp", mp_max))
-	else:
-		hp_current = hp_max
-		mp_current = mp_max
-
-	_add_stat_pair(_derived_grid, "HP", "%d / %d" % [hp_current, hp_max])
-	_add_stat_pair(_derived_grid, "MP", "%d / %d" % [mp_current, mp_max])
+	# Display all battle stats in order, always show them even if 0
+	_add_stat_pair(_battle_grid, "MAX HP", str(profile.get("hp_max", 0)))
+	_add_stat_pair(_battle_grid, "MAX MP", str(profile.get("mp_max", 0)))
+	_add_stat_pair(_battle_grid, "P ATK", str(profile.get("p_atk", 0)))
+	_add_stat_pair(_battle_grid, "M ATK", str(profile.get("m_atk", 0)))
+	_add_stat_pair(_battle_grid, "P DEF", str(profile.get("p_def", 0)))
+	_add_stat_pair(_battle_grid, "M DEF", str(profile.get("m_def", 0)))
+	_add_stat_pair(_battle_grid, "W ACC", str(profile.get("w_acc", 0)))
+	_add_stat_pair(_battle_grid, "S ACC", str(profile.get("s_acc", 0)))
+	_add_stat_pair(_battle_grid, "EVA", str(profile.get("eva", 0)))
+	_add_stat_pair(_battle_grid, "SPD", str(profile.get("spd", 0)))
+	_add_stat_pair(_battle_grid, "ALI", str(profile.get("ali_resist", 0)))
+	_add_stat_pair(_battle_grid, "CRIT", str(profile.get("crit", 0)))
 
 func _get_equipment(token: String) -> Dictionary:
 	"""Get equipped items for a member"""

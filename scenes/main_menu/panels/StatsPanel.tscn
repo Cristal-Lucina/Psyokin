@@ -92,37 +92,7 @@ theme_override_constants/h_separation = 16
 theme_override_constants/v_separation = 8
 columns = 2
 
-[node name="EquipmentLabel" type="Label" parent="Root/StatsPanel/StatsColumn"]
-layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
-theme_override_font_sizes/font_size = 16
-text = "Equipment Stats"
 
-[node name="Separator4" type="HSeparator" parent="Root/StatsPanel/StatsColumn"]
-layout_mode = 2
-
-[node name="EquipmentGrid" type="GridContainer" parent="Root/StatsPanel/StatsColumn"]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_constants/h_separation = 16
-theme_override_constants/v_separation = 8
-columns = 2
-
-[node name="DerivedLabel" type="Label" parent="Root/StatsPanel/StatsColumn"]
-layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
-theme_override_font_sizes/font_size = 16
-text = "Derived Stats"
-
-[node name="Separator5" type="HSeparator" parent="Root/StatsPanel/StatsColumn"]
-layout_mode = 2
-
-[node name="DerivedGrid" type="GridContainer" parent="Root/StatsPanel/StatsColumn"]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_constants/h_separation = 16
-theme_override_constants/v_separation = 8
-columns = 2
 
 [node name="VisualPanel" type="PanelContainer" parent="Root"]
 custom_minimum_size = Vector2(300, 0)
@@ -131,7 +101,27 @@ size_flags_horizontal = 3
 
 [node name="VisualColumn" type="VBoxContainer" parent="Root/VisualPanel"]
 layout_mode = 2
-theme_override_constants/separation = 8
+theme_override_constants/separation = 12
+
+[node name="BattleStatsLabel" type="Label" parent="Root/VisualPanel/VisualColumn"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
+theme_override_font_sizes/font_size = 16
+text = "Battle Stats"
+horizontal_alignment = 1
+
+[node name="Separator1" type="HSeparator" parent="Root/VisualPanel/VisualColumn"]
+layout_mode = 2
+
+[node name="BattleStatsGrid" type="GridContainer" parent="Root/VisualPanel/VisualColumn"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/h_separation = 16
+theme_override_constants/v_separation = 8
+columns = 2
+
+[node name="Separator2" type="HSeparator" parent="Root/VisualPanel/VisualColumn"]
+layout_mode = 2
 
 [node name="RadarLabel" type="Label" parent="Root/VisualPanel/VisualColumn"]
 layout_mode = 2
@@ -140,7 +130,7 @@ theme_override_font_sizes/font_size = 16
 text = "Stat Distribution"
 horizontal_alignment = 1
 
-[node name="Separator" type="HSeparator" parent="Root/VisualPanel/VisualColumn"]
+[node name="Separator3" type="HSeparator" parent="Root/VisualPanel/VisualColumn"]
 layout_mode = 2
 
 [node name="RadarContainer" type="VBoxContainer" parent="Root/VisualPanel/VisualColumn"]
