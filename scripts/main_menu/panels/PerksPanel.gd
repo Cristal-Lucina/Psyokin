@@ -553,6 +553,9 @@ func _show_perk_confirmation(perk: Dictionary) -> void:
 	var viewport_size: Vector2 = get_viewport_rect().size
 	popup_panel.position = (viewport_size - popup_panel.size) / 2.0
 
+	# Pause the game
+	get_tree().paused = true
+
 	# Fade in
 	var tween := create_tween()
 	tween.set_ease(Tween.EASE_OUT)
@@ -595,6 +598,8 @@ func _close_confirmation_popup() -> void:
 	tween.set_trans(Tween.TRANS_CUBIC)
 	tween.tween_property(popup_to_close, "modulate:a", 0.0, 0.3)
 	tween.tween_callback(func():
+		# Unpause the game
+		get_tree().paused = false
 		if is_instance_valid(popup_to_close):
 			popup_to_close.queue_free()
 	)
