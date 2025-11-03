@@ -36,9 +36,14 @@ static func create(message: String, title: String = "Notice") -> ToastPopup:
 	popup._title = title
 	popup._message = message
 	popup._build_ui()
+	print("[ToastPopup.create] Created popup, visible=%s, in_tree=%s" % [popup.visible, popup.is_inside_tree()])
 	return popup
 
+func _ready() -> void:
+	print("[ToastPopup._ready] Popup ready, visible=%s, has_focus=%s" % [visible, has_focus()])
+
 func _build_ui() -> void:
+	print("[ToastPopup._build_ui] Building UI")
 	# Ensure popup processes even when game is paused
 	process_mode = Node.PROCESS_MODE_ALWAYS
 
