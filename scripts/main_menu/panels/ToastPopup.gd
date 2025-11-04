@@ -93,7 +93,7 @@ func _build_ui() -> void:
 	msg_label.text = _message
 	msg_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	msg_label.custom_minimum_size = Vector2(400, 0)  # Set width for wrapping
-	vbox.add_child(msg_label)
+	scroll.add_child(msg_label)
 
 	# Buttons
 	var hbox := HBoxContainer.new()
