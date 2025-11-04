@@ -401,77 +401,26 @@ func _on_primary_action() -> void:
 		_show_set_current_confirmation()
 
 func _show_set_current_confirmation() -> void:
-	"""Show confirmation popup for setting current mission"""
+	"""Show confirmation popup for setting current mission using ConfirmationPopup"""
 	var title = _selected_mission.get("title", "")
+	print("[OutreachPanel] Showing set current confirmation for: %s" % title)
 
-	var popup_panel: Panel = Panel.new()
-	popup_panel.process_mode = Node.PROCESS_MODE_ALWAYS
-	popup_panel.z_index = 100
-	add_child(popup_panel)
+	# Create and show ConfirmationPopup
+	var popup := ConfirmationPopup.create("Set '%s' as your current mission?" % title)
+	add_child(popup)
 
-	_active_popup = popup_panel
+	# Wait for user response
+	var result: bool = await popup.confirmed
 
-	var vbox: VBoxContainer = VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 8)
-	popup_panel.add_child(vbox)
+	# Clean up
+	popup.queue_free()
 
-	# Message
-	var message: Label = Label.new()
-	message.text = "Set '%s' as your current mission?" % title
-	message.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	message.autowrap_mode = TextServer.AUTOWRAP_WORD
-	message.custom_minimum_size = Vector2(280, 0)
-	vbox.add_child(message)
-
-	# Buttons
-	var btn_hbox: HBoxContainer = HBoxContainer.new()
-	btn_hbox.add_theme_constant_override("separation", 8)
-	btn_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	vbox.add_child(btn_hbox)
-
-	var accept_btn: Button = Button.new()
-	accept_btn.text = "Accept"
-	accept_btn.focus_mode = Control.FOCUS_ALL  # Ensure button is focusable
-	accept_btn.pressed.connect(func():
-		print("[OutreachPanel] Accept button pressed!")
+	# Handle response
+	if result:
+		print("[OutreachPanel] User confirmed setting current mission")
 		_confirm_set_current()
-	)
-	btn_hbox.add_child(accept_btn)
-
-	var cancel_btn: Button = Button.new()
-	cancel_btn.text = "Cancel"
-	cancel_btn.focus_mode = Control.FOCUS_ALL  # Ensure button is focusable
-	cancel_btn.pressed.connect(_popup_cancel)
-	btn_hbox.add_child(cancel_btn)
-
-	# Set up left/right navigation between buttons
-	accept_btn.focus_neighbor_right = accept_btn.get_path_to(cancel_btn)
-	cancel_btn.focus_neighbor_left = cancel_btn.get_path_to(accept_btn)
-
-	# Auto-size and center
-	await get_tree().process_frame
-	await get_tree().process_frame
-	popup_panel.size = vbox.size + Vector2(20, 20)
-	vbox.position = Vector2(10, 10)
-
-	var viewport_size: Vector2 = get_viewport_rect().size
-	popup_panel.position = (viewport_size - popup_panel.size) / 2.0
-
-	# Focus accept button
-	accept_btn.grab_focus()
-
-	# Store metadata
-	popup_panel.set_meta("_is_confirmation_popup", true)
-	popup_panel.set_meta("_accept_btn", accept_btn)
-	popup_panel.set_meta("_cancel_btn", cancel_btn)
-
-	# Push to panel manager
-	var panel_mgr = get_node_or_null("/root/aPanelManager")
-	if panel_mgr:
-		panel_mgr.push_panel(popup_panel)
-
-	_nav_state = NavState.POPUP_ACTIVE
-	print("[OutreachPanel] Set current confirmation popup opened")
+	else:
+		print("[OutreachPanel] User canceled setting current mission")
 
 func _confirm_set_current() -> void:
 	"""User confirmed setting mission as current"""
@@ -480,25 +429,20 @@ func _confirm_set_current() -> void:
 
 	if mission_id == "":
 		print("[OutreachPanel] ERROR: Empty mission ID!")
-		_popup_close_and_return_to_list()
 		return
 
 	if not _main_event:
 		print("[OutreachPanel] ERROR: aMainEventSystem not found!")
-		_popup_close_and_return_to_list()
 		return
 
 	if not _main_event.has_method("set_current"):
 		print("[OutreachPanel] ERROR: aMainEventSystem has no set_current method!")
 		print("[OutreachPanel] Available methods: %s" % _main_event.get_method_list())
-		_popup_close_and_return_to_list()
 		return
 
 	print("[OutreachPanel] Calling set_current(%s)..." % mission_id)
 	_main_event.call("set_current", mission_id)
 	print("[OutreachPanel] ✓ Set current mission: %s" % mission_id)
-
-	_popup_close_and_return_to_list()
 
 func _advance_current_mission() -> void:
 	"""Advance the current mission"""
