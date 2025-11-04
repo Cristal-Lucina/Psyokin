@@ -1689,7 +1689,7 @@ func _exit_loadout_panel() -> bool:
 
 	# Check stack depth - if we're at depth 2 (StatusPanel + LoadoutPanel),
 	# we're being managed by GameMenu and should NOT pop ourselves
-	var stack_depth: int = panel_mgr.panel_stack.size()
+	var stack_depth: int = panel_mgr.get_stack_depth()
 	print("[LoadoutPanel] Back pressed - stack depth: %d, is_active: %s, registered: %s" % [stack_depth, is_active(), is_registered()])
 
 	if stack_depth <= 2:

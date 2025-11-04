@@ -297,7 +297,7 @@ func _exit_bonds_panel() -> bool:
 
 	# Check stack depth - if we're at depth 2 (StatusPanel + BondsPanel),
 	# we're being managed by GameMenu and should NOT pop ourselves
-	var stack_depth: int = panel_mgr.panel_stack.size()
+	var stack_depth: int = panel_mgr.get_stack_depth()
 	print("[BondsPanel] Back pressed - stack depth: %d, is_active: %s" % [stack_depth, is_active()])
 
 	if stack_depth <= 2:
