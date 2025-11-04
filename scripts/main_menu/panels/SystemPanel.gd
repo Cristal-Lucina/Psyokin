@@ -131,6 +131,13 @@ func _to_title() -> void:
 	# Don't reset game state here - let Title screen handle it when user clicks New Game
 	# This allows returning to title without losing progress if they want to Load instead
 
+	# CRITICAL: Clear the PanelManager stack before changing scenes
+	# PanelManager is an autoload and persists between scenes
+	# If we don't clear it, it will hold stale panel references after scene change
+	if has_node("/root/aPanelManager"):
+		print("[SystemPanel] Clearing PanelManager stack before scene change")
+		aPanelManager.clear_stack()
+
 	# Use SceneRouter if available, otherwise change scene directly
 	if has_node("/root/aSceneRouter") and aSceneRouter.has_method("goto_title"):
 		print("[SystemPanel] Using SceneRouter.goto_title()")
