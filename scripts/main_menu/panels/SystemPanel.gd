@@ -125,14 +125,11 @@ func _confirm_return_to_title() -> void:
 			_btn_title.grab_focus()
 
 func _to_title() -> void:
-	"""Reset game state and return to title screen"""
+	"""Return to title screen - game reset handled by title menu"""
 	print("[SystemPanel] Returning to title screen...")
 
-	# Reset game state through GameState autoload
-	var gs := get_node_or_null("/root/GameState")
-	if gs and gs.has_method("reset_game"):
-		print("[SystemPanel] Calling GameState.reset_game()")
-		gs.call("reset_game")
+	# Don't reset game state here - let Title screen handle it when user clicks New Game
+	# This allows returning to title without losing progress if they want to Load instead
 
 	# Use SceneRouter if available, otherwise change scene directly
 	if has_node("/root/aSceneRouter") and aSceneRouter.has_method("goto_title"):
@@ -140,7 +137,9 @@ func _to_title() -> void:
 		aSceneRouter.goto_title()
 	else:
 		print("[SystemPanel] Changing scene directly to title")
-		get_tree().change_scene_to_file(TITLE_SCENE)
+		var err := get_tree().change_scene_to_file(TITLE_SCENE)
+		if err != OK:
+			push_error("[SystemPanel] Failed to change to title scene, error code: %d" % err)
 
 # --- overlay helper ------------------------------------------------------------
 
