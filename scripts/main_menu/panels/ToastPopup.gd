@@ -53,8 +53,8 @@ func _build_ui() -> void:
 	# Block all input from passing through
 	mouse_filter = Control.MOUSE_FILTER_STOP
 
-	# Set minimum size for the panel
-	custom_minimum_size = Vector2(400, 200)
+	# Set minimum size for the panel - wider for better text display
+	custom_minimum_size = Vector2(600, 0)  # Width fixed, height auto-grows
 
 	# Add solid background (no transparency)
 	var style := StyleBoxFlat.new()
@@ -67,16 +67,25 @@ func _build_ui() -> void:
 	style.corner_radius_bottom_right = 8
 	add_theme_stylebox_override("panel", style)
 
-	# Create VBox with full-rect anchors and padding
+	# Create VBox with padding
 	var vbox := VBoxContainer.new()
-	vbox.set_anchors_preset(Control.PRESET_FULL_RECT)
 	vbox.add_theme_constant_override("separation", 12)
-	vbox.set_offsets_preset(Control.PRESET_FULL_RECT)
-	vbox.offset_left = 20
-	vbox.offset_top = 20
-	vbox.offset_right = -20
-	vbox.offset_bottom = -20
 	add_child(vbox)
+
+	# Add margins manually
+	var top_spacer := Control.new()
+	top_spacer.custom_minimum_size = Vector2(0, 20)
+	vbox.add_child(top_spacer)
+
+	# Content container with side margins
+	var content_margin := MarginContainer.new()
+	content_margin.add_theme_constant_override("margin_left", 20)
+	content_margin.add_theme_constant_override("margin_right", 20)
+	vbox.add_child(content_margin)
+
+	var content_vbox := VBoxContainer.new()
+	content_vbox.add_theme_constant_override("separation", 12)
+	content_margin.add_child(content_vbox)
 
 	# Title (only show if not empty)
 	if _title != "":
@@ -84,22 +93,29 @@ func _build_ui() -> void:
 		title.text = _title
 		title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		title.add_theme_font_size_override("font_size", 18)
-		vbox.add_child(title)
+		title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		content_vbox.add_child(title)
 
-	# Message - centered horizontally and vertically
+	# Message with scrolling for very long content
+	var scroll := ScrollContainer.new()
+	scroll.custom_minimum_size = Vector2(560, 0)  # Width for content
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED  # No horizontal scroll
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO  # Auto show vertical scroll
+	content_vbox.add_child(scroll)
+
 	var msg_label := Label.new()
 	msg_label.text = _message
 	msg_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	msg_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	msg_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	msg_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	vbox.add_child(msg_label)
+	msg_label.custom_minimum_size = Vector2(560, 0)  # Fixed width for wrapping
+	scroll.add_child(msg_label)
 
 	# Buttons
 	var hbox := HBoxContainer.new()
 	hbox.alignment = BoxContainer.ALIGNMENT_CENTER
 	hbox.add_theme_constant_override("separation", 12)
-	vbox.add_child(hbox)
+	content_vbox.add_child(hbox)
 
 	_accept_btn = Button.new()
 	_accept_btn.text = "Accept"
@@ -114,6 +130,11 @@ func _build_ui() -> void:
 	_cancel_btn.custom_minimum_size = Vector2(100, 40)
 	_cancel_btn.process_mode = Node.PROCESS_MODE_ALWAYS  # Process even when paused
 	hbox.add_child(_cancel_btn)
+
+	# Bottom spacer
+	var bottom_spacer := Control.new()
+	bottom_spacer.custom_minimum_size = Vector2(0, 20)
+	vbox.add_child(bottom_spacer)
 
 	# Connect buttons
 	_accept_btn.pressed.connect(_on_accept)
