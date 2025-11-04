@@ -216,8 +216,12 @@ func _on_accept() -> void:
 	print("[ToastPopup] Accept pressed")
 	confirmed.emit(true)
 	hide()
+	# Mark input as handled so _input() doesn't also trigger
+	get_viewport().set_input_as_handled()
 
 func _on_cancel() -> void:
 	print("[ToastPopup] Cancel pressed")
 	confirmed.emit(false)
 	hide()
+	# Mark input as handled so _input() doesn't also trigger
+	get_viewport().set_input_as_handled()
