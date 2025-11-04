@@ -145,9 +145,24 @@ func _position_center() -> void:
 		print("[ToastPopup._position_center] No parent, cannot center")
 		return
 
-	var parent_rect: Rect2 = get_parent().get_viewport_rect()
-	position = (parent_rect.size - size) / 2
-	print("[ToastPopup._position_center] Centered at %v" % position)
+	# Get viewport size with error handling
+	var viewport_size: Vector2 = Vector2.ZERO
+	var viewport := get_viewport()
+
+	if viewport == null:
+		print("[ToastPopup._position_center] No viewport, cannot center")
+		return
+
+	# Try to get viewport rect size
+	viewport_size = viewport.get_visible_rect().size
+
+	if viewport_size == Vector2.ZERO:
+		print("[ToastPopup._position_center] Viewport size is zero, cannot center")
+		return
+
+	# Center the popup
+	position = (viewport_size - size) / 2
+	print("[ToastPopup._position_center] Centered at %v (viewport: %v, size: %v)" % [position, viewport_size, size])
 
 func _input(event: InputEvent) -> void:
 	if not visible:
