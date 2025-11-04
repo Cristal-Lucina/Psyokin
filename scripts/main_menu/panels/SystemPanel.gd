@@ -128,18 +128,20 @@ func _to_title() -> void:
 	"""Return to title screen - game reset handled by title menu"""
 	print("[SystemPanel] Returning to title screen...")
 
-	# Don't reset game state here - let Title screen handle it when user clicks New Game
-	# This allows returning to title without losing progress if they want to Load instead
-
-	# CRITICAL: Reset all autoload managers before changing scenes
+	# CRITICAL: Reset all autoload managers and game state before changing scenes
 	# These are singletons that persist between scenes and can hold stale state
 
-	# 1. Force reset PanelManager (clears stack without lifecycle callbacks)
+	# 1. Reset GameState to clear all game data
+	if has_node("/root/aGameState"):
+		print("[SystemPanel] Resetting GameState")
+		aGameState.new_game()
+
+	# 2. Force reset PanelManager (clears stack without lifecycle callbacks)
 	if has_node("/root/aPanelManager"):
 		print("[SystemPanel] Force resetting PanelManager")
 		aPanelManager.force_reset()
 
-	# 2. Clear ControllerManager context stack and reset to OVERWORLD
+	# 3. Clear ControllerManager context stack and reset to OVERWORLD
 	if has_node("/root/aControllerManager"):
 		print("[SystemPanel] Clearing ControllerManager stack and resetting to OVERWORLD")
 		aControllerManager.clear_stack()
