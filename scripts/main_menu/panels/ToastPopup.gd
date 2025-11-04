@@ -131,13 +131,23 @@ func _grab_focus_and_log() -> void:
 func _finalize_size_and_position() -> void:
 	# Force update to calculate proper size
 	reset_size()
+	# Wait one frame to ensure we're properly in the tree before positioning
+	await get_tree().process_frame
 	_position_center()
 
 func _position_center() -> void:
+	# Safety check: ensure we're in the scene tree with a valid parent
+	if not is_inside_tree():
+		print("[ToastPopup._position_center] Not in tree yet, deferring...")
+		await get_tree().process_frame
+
 	if get_parent() == null:
+		print("[ToastPopup._position_center] No parent, cannot center")
 		return
+
 	var parent_rect: Rect2 = get_parent().get_viewport_rect()
 	position = (parent_rect.size - size) / 2
+	print("[ToastPopup._position_center] Centered at %v" % position)
 
 func _input(event: InputEvent) -> void:
 	if not visible:
