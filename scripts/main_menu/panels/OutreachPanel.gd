@@ -321,7 +321,6 @@ func _show_mission_details(mission: Dictionary) -> void:
 	var hint = mission.get("hint", "")
 	var reward = mission.get("reward", "")
 	var status = mission.get("status", "Available")
-	var is_current = mission.get("current", false)
 
 	# Title
 	_title_label.text = title

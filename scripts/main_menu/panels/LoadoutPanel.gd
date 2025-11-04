@@ -963,7 +963,6 @@ func _rebuild_stats_grid(member_token: String, equip: Dictionary) -> void:
 	var base_watk: int   = int(d_wea.get("base_watk", 0))
 	var scale_brw: float = float(d_wea.get("scale_brw", 0.0))
 	var weapon_attack: int = base_watk + int(round(scale_brw * float(brw)))
-	var weapon_scale: String = _fmt_num(scale_brw)
 	var weapon_acc: int = int(d_wea.get("base_acc", 0))
 	var skill_acc_boost: int = int(d_wea.get("skill_acc_boost", 0))
 	var crit_bonus: int = int(d_wea.get("crit_bonus_pct", 0))

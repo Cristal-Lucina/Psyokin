@@ -644,8 +644,8 @@ func _update_details_for_member(member_id: String) -> void:
 	var lines := PackedStringArray()
 
 	# Name
-	var name: String = String(ds.call("display_name", member_id))
-	lines.append("[b]Name:[/b] %s" % name)
+	var member_name: String = String(ds.call("display_name", member_id))
+	lines.append("[b]Name:[/b] %s" % member_name)
 	lines.append("")
 
 	# Room
@@ -681,7 +681,7 @@ func _update_details_for_member(member_id: String) -> void:
 			lines.append("  • Will move to room %s" % pending_room)
 
 	_detail_content.text = _join_psa(lines, "\n")
-	print("[DormsPanel._update_details_for_member] Details panel updated with %d lines for %s" % [lines.size(), name])
+	print("[DormsPanel._update_details_for_member] Details panel updated with %d lines for %s" % [lines.size(), member_name])
 
 func _update_action_buttons() -> void:
 	if not _assign_room_btn or not _move_out_btn or not _cancel_move_btn:
@@ -892,7 +892,6 @@ func _try_assign_to_room(room_id: String) -> void:
 
 	# Validate room selection
 	var room_data: Dictionary = ds.call("get_room", room_id)
-	var occupant: String = String(room_data.get("occupant", ""))
 
 	# Check if room is available
 	var vis: int = int(ds.call("get_room_visual", room_id))
