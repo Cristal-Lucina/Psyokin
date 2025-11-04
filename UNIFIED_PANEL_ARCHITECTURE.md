@@ -17,6 +17,42 @@ This document outlines the unified architecture for all GameMenu panels in Psyok
 
 ---
 
+## GameMenu Navigation Architecture
+
+**Important:** StatusPanel is the **root/entry panel** of GameMenu.
+
+### Navigation Flow
+
+```
+GameMenu Opens
+    └─> StatusPanel (ALWAYS visible first - no button to access it)
+         ├─ Tab List (Left): Shows all other panels
+         │   ├─ Stats (StatusPanel itself)
+         │   ├─ Perks → PerksPanel
+         │   ├─ Items → ItemsPanel
+         │   ├─ Loadout → LoadoutPanel
+         │   ├─ Bonds → BondsPanel
+         │   ├─ Outreach → OutreachPanel
+         │   ├─ Dorms → DormsPanel
+         │   ├─ Calendar → CalendarPanel
+         │   ├─ Index → IndexPanel
+         │   └─ System → SystemPanel
+         │
+         └─ Content (Right): Party status, HP/MP, money, date/time
+```
+
+**User Experience:**
+1. Open GameMenu → **StatusPanel appears automatically**
+2. Navigate **right** from tab list → Enter StatusPanel content (party management)
+3. Press **Accept** on a different tab → Switch to that panel (PerksPanel, DormsPanel, etc.)
+4. Press **Back** from other panels → Return to StatusPanel
+
+**Key Insight:** StatusPanel has dual role:
+- **Hub panel:** Shows tabs to access all other panels
+- **Content panel:** Shows party status, HP/MP, and provides party management features
+
+---
+
 ## Current State Analysis
 
 ### ✅ Panels Following Best Practices
@@ -44,12 +80,13 @@ This document outlines the unified architecture for all GameMenu panels in Psyok
 
 ### ❌ Panels Needing Major Refactoring
 
-**StatusPanel**
+**StatusPanel** ⭐ (ROOT/HUB PANEL - shown first when GameMenu opens)
 - ❌ Extends `Control` (should extend `PanelBase`)
-- ⚠️ Has simple NavState (MENU, CONTENT, POPUP_ACTIVE) but needs refinement
+- ⚠️ Has simple NavState (MENU, CONTENT, POPUP_ACTIVE) - this is actually good!
 - ❌ Creates Panel nodes manually with `_style_popup_panel()`, manual fade animations
 - ❌ Manual `aPanelManager` push/pop logic
 - ✅ Custom `_input()` for navigation
+- 🎯 **Special Role:** Serves as both hub (tab list to other panels) AND content panel (party management)
 
 **CalendarPanel**
 - ❌ Extends `Control` (should extend `PanelBase`)
@@ -358,18 +395,22 @@ func _on_accept_input() -> void:
 
 ### Phase 3: Convert Complex Panels
 
-**3.1 StatusPanel** ⏱️ Estimated: 2-3 hours
+**3.1 StatusPanel** ⭐ (ROOT PANEL) ⏱️ Estimated: 2-3 hours
 - Change `extends Control` → `extends PanelBase`
 - Add `super()` call in `_ready()`
-- Refine NavState (MENU, CONTENT might be sufficient)
+- **Keep NavState (MENU, CONTENT, POPUP_ACTIVE)** - Perfect for its dual role!
+  - MENU = Tab list (hub to other panels)
+  - CONTENT = Party status/management section
+  - POPUP_ACTIVE = Handles recovery/switch popups
 - **CRITICAL:** Replace ALL manual popup creation:
   - `_show_no_bench_notice()` → use `ToastPopup.create()`
   - `_show_already_at_max_notice()` → use `ToastPopup.create()`
   - `_show_heal_confirmation()` → use `ToastPopup.create()`
   - `_show_swap_confirmation()` → use `ToastPopup.create()`
-  - `_show_member_picker()` → use `ConfirmationPopup.create()` or custom popup if needed
+  - `_show_member_picker()` → Keep as custom ItemList popup (special case)
 - Remove manual `_style_popup_panel()`, `_fade_in_popup()`, `_fade_out_popup()`
 - Remove manual `aPanelManager` push/pop (handled by PanelBase)
+- **Important:** StatusPanel is first panel shown, navigated right from tab list
 - Test all recovery, switch, and party management flows
 
 **3.2 SigilSkillMenu** ⏱️ Estimated: 2 hours
