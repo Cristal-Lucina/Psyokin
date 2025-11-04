@@ -1990,29 +1990,21 @@ func _handle_popup_input(event: InputEvent) -> void:
 	"""Handle input when popup is active (switch, recovery, notice, heal confirmation, or swap confirmation popup)"""
 	if event.is_action_pressed("menu_accept"):
 		# Route to appropriate handler based on popup type
+		# Note: ToastPopup handles its own input, so we only handle custom popups here
 		if _active_popup and _active_popup.get_meta("_is_recovery_popup", false):
 			_popup_accept_recovery()
 		elif _active_popup and _active_popup.get_meta("_is_switch_popup", false):
 			_popup_accept_switch()
-		elif _active_popup and _active_popup.get_meta("_is_notice_popup", false):
-			_popup_close_notice()
-		elif _active_popup and _active_popup.get_meta("_is_heal_confirmation_popup", false):
-			_popup_close_heal_confirmation()
-		elif _active_popup and _active_popup.get_meta("_is_swap_confirmation_popup", false):
-			_popup_close_swap_confirmation()
+		# Notice, heal confirmation, and swap confirmation now use ToastPopup (self-handling)
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("menu_back"):
 		# Cancel popup - all popups can be cancelled with back
+		# Note: ToastPopup handles its own input, so we only handle custom popups here
 		if _active_popup and _active_popup.get_meta("_is_recovery_popup", false):
 			_popup_cancel_recovery()
 		elif _active_popup and _active_popup.get_meta("_is_switch_popup", false):
 			_popup_cancel_switch()
-		elif _active_popup and _active_popup.get_meta("_is_notice_popup", false):
-			_popup_close_notice()
-		elif _active_popup and _active_popup.get_meta("_is_heal_confirmation_popup", false):
-			_popup_close_heal_confirmation()
-		elif _active_popup and _active_popup.get_meta("_is_swap_confirmation_popup", false):
-			_popup_close_swap_confirmation()
+		# Notice, heal confirmation, and swap confirmation now use ToastPopup (self-handling)
 		get_viewport().set_input_as_handled()
 	# UP/DOWN navigation is NOT handled - let ItemList/Button handle it
 

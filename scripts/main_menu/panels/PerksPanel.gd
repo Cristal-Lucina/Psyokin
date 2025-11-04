@@ -36,9 +36,8 @@ var _grid_cells: Array[Array] = []  # 8×5 array of Controls
 var _selected_row: int = 2  # Start at first tier row
 var _selected_col: int = 0
 
-# Confirmation popup
-var _active_popup: Control = null
-var _pending_perk: Dictionary = {}  # Perk waiting for confirmation
+# Note: Confirmation popup handling is now done by ConfirmationPopup class
+# (removed _active_popup and _pending_perk - no longer needed)
 
 func _ready() -> void:
 	# Set high input priority so popup input blocking happens before parent nodes
@@ -401,19 +400,13 @@ func _show_perk_details(perk: Dictionary) -> void:
 
 func _on_tier_cell_hovered(stat_id: String, tier_index: int) -> void:
 	"""Handle mouse hover over tier cell"""
-	# Block hover interactions when popup is active
-	if _active_popup and is_instance_valid(_active_popup):
-		return
-
+	# Note: ConfirmationPopup blocks mouse input automatically (MOUSE_FILTER_STOP)
 	var perk: Dictionary = _get_perk_info(stat_id, tier_index)
 	_show_perk_details(perk)
 
 func _on_tier_cell_pressed(stat_id: String, tier_index: int) -> void:
 	"""Handle tier cell button press"""
-	# Block button presses when popup is active
-	if _active_popup and is_instance_valid(_active_popup):
-		return
-
+	# Note: ConfirmationPopup blocks mouse input automatically (MOUSE_FILTER_STOP)
 	var perk: Dictionary = _get_perk_info(stat_id, tier_index)
 	if not perk["available"]:
 		return
@@ -469,8 +462,8 @@ func _unlock_perk(perk: Dictionary) -> void:
 
 func _show_perk_confirmation(perk: Dictionary) -> void:
 	"""Show confirmation popup before unlocking perk using ConfirmationPopup"""
-	var perk_name := perk.get("name", "Unknown Perk")
-	var desc := perk.get("description", "")
+	var perk_name: String = perk.get("name", "Unknown Perk")
+	var desc: String = perk.get("description", "")
 
 	# Build message with perk details
 	var message := "%s\n\n%s\n\nCost: 1 Perk Point\n\nUnlock this perk?" % [perk_name, desc]
@@ -494,27 +487,6 @@ func _show_perk_confirmation(perk: Dictionary) -> void:
 	else:
 		print("[PerksPanel] User canceled perk unlock")
 
-func _close_confirmation_popup() -> void:
-	"""Close and fade out confirmation popup"""
-	if not _active_popup or not is_instance_valid(_active_popup):
-		return
-
-	var popup_to_close = _active_popup
-	_active_popup = null
-
-	# Fade out
-	popup_to_close.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var tween := create_tween()
-	tween.set_ease(Tween.EASE_IN)
-	tween.set_trans(Tween.TRANS_CUBIC)
-	tween.tween_property(popup_to_close, "modulate:a", 0.0, 0.3)
-	tween.tween_callback(func():
-		# Don't unpause here - let GameMenu control pause state
-		# The game should stay paused while the menu is open
-		if is_instance_valid(popup_to_close):
-			popup_to_close.queue_free()
-	)
-
 func _on_acquired_perk_selected(index: int) -> void:
 	"""Show details for selected acquired perk"""
 	if index < 0 or index >= _acquired_perks.size():
@@ -524,35 +496,16 @@ func _on_acquired_perk_selected(index: int) -> void:
 	_show_perk_details(perk)
 
 func _input(event: InputEvent) -> void:
-	"""Catch ALL input when popup is active to prevent it from reaching other systems"""
-	# When popup is active, block everything except what we explicitly handle
-	if _active_popup and is_instance_valid(_active_popup):
-		# Handle Accept - manually trigger confirm (don't rely on button focus/signals)
-		if event.is_action_pressed("menu_accept"):
-			print("[PerksPanel._input] Accept pressed - confirming perk")
-			_on_confirm_perk()
-			get_viewport().set_input_as_handled()
-			return
-		# Handle Back to cancel
-		elif event.is_action_pressed("menu_back"):
-			print("[PerksPanel._input] Back pressed - cancelling perk")
-			_on_cancel_perk()
-			get_viewport().set_input_as_handled()
-			return
-		# Block ALL other input to prevent grid navigation in background
-		get_viewport().set_input_as_handled()
-		return
+	"""Handle input for perk grid navigation"""
+	# Note: ConfirmationPopup handles its own input, so we don't need to handle it here
+	# (Old manual popup handling removed - ConfirmationPopup is self-contained)
 
 func _unhandled_input(event: InputEvent) -> void:
 	"""Handle controller input for grid navigation"""
 	if not visible:
 		return
 
-	# Block ALL input when popup is active (buttons handle their own input via signals)
-	if _active_popup and is_instance_valid(_active_popup):
-		print("[PerksPanel._unhandled_input] POPUP ACTIVE - blocking: %s" % event)
-		get_viewport().set_input_as_handled()
-		return
+	# Note: ConfirmationPopup handles its own input blocking, no need to check here
 
 	var handled: bool = false
 
