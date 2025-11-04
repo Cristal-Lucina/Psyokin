@@ -209,7 +209,45 @@ func _open_overlay(scene_path: String) -> void:
 		print("[SystemPanel] Overlay children count: ", c.get_child_count())
 		_print_node_tree(c, 0)
 
+		# Give focus to the overlay for controller support
+		call_deferred("_transfer_focus_to_overlay", c)
+
 	print("[SystemPanel] Overlay opened successfully!")
+
+func _transfer_focus_to_overlay(overlay: Control) -> void:
+	"""Transfer focus to the overlay for controller support"""
+	print("[SystemPanel] Transferring focus to overlay...")
+
+	# Wait one frame to ensure overlay is fully initialized
+	await get_tree().process_frame
+
+	# Try to find the first focusable control in the overlay
+	var first_focusable := _find_first_focusable(overlay)
+
+	if first_focusable:
+		print("[SystemPanel] Found focusable control: %s" % first_focusable.name)
+		first_focusable.grab_focus()
+		print("[SystemPanel] Focus transferred successfully, has_focus=%s" % first_focusable.has_focus())
+	else:
+		print("[SystemPanel] Warning: No focusable control found in overlay")
+
+func _find_first_focusable(node: Node) -> Control:
+	"""Recursively find the first focusable control in the node tree"""
+	if node is Control:
+		var control := node as Control
+		# Check if this control can receive focus
+		if control.focus_mode != Control.FOCUS_NONE and control.visible:
+			# Prefer buttons and other interactive controls
+			if control is Button or control is LineEdit or control is TextEdit or control is OptionButton:
+				return control
+
+	# Search children recursively
+	for child in node.get_children():
+		var result := _find_first_focusable(child)
+		if result:
+			return result
+
+	return null
 
 func _print_node_tree(node: Node, indent: int) -> void:
 	var prefix = ""
