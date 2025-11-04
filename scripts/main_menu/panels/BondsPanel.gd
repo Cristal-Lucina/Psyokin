@@ -211,8 +211,10 @@ func _handle_bond_list_input(event: InputEvent) -> void:
 		_select_current_bond()
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("menu_back"):
-		_exit_bonds_panel()
-		get_viewport().set_input_as_handled()
+		# Only mark as handled if we actually exited via PanelManager
+		# Otherwise let it bubble to GameMenu
+		if _exit_bonds_panel():
+			get_viewport().set_input_as_handled()
 
 func _navigate_bond_list(delta: int) -> void:
 	"""Navigate up/down through bond list (wraps around cyclically)"""
@@ -283,12 +285,30 @@ func _rebuild_navigation() -> void:
 	else:
 		_nav_index = 0
 
-func _exit_bonds_panel() -> void:
-	"""Exit BondsPanel back to previous panel (StatusPanel)"""
-	print("[BondsPanel] Exiting to previous panel")
+func _exit_bonds_panel() -> bool:
+	"""Exit BondsPanel back to previous panel (StatusPanel)
+
+	Returns: true if we popped from PanelManager, false if we let it bubble to GameMenu
+	"""
 	var panel_mgr = get_node_or_null("/root/aPanelManager")
-	if panel_mgr:
-		panel_mgr.pop_panel()
+	if not panel_mgr:
+		print("[BondsPanel] No PanelManager - ignoring exit")
+		return false
+
+	# Check stack depth - if we're at depth 2 (StatusPanel + BondsPanel),
+	# we're being managed by GameMenu and should NOT pop ourselves
+	var stack_depth: int = panel_mgr.panel_stack.size()
+	print("[BondsPanel] Back pressed - stack depth: %d, is_active: %s" % [stack_depth, is_active()])
+
+	if stack_depth <= 2:
+		print("[BondsPanel] Being managed by GameMenu - letting back button bubble up")
+		# Don't handle the input - let it bubble up to GameMenu
+		return false
+
+	# We're deeper in the stack - pop ourselves
+	print("[BondsPanel] Exiting to previous panel via PanelManager")
+	panel_mgr.pop_panel()
+	return true
 
 ## ─────────────────────── STATE 2: BOND_DETAIL ───────────────────────
 

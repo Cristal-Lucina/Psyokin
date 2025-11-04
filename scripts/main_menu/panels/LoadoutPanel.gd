@@ -1682,15 +1682,24 @@ func _exit_loadout_panel() -> bool:
 
 	Returns: true if we tried to exit via PanelManager, false if we're not in the stack
 	"""
-	# Check if we're actually registered in PanelManager
-	if not is_registered():
-		print("[LoadoutPanel] Not in PanelManager stack - ignoring exit (let GameMenu handle it)")
+	var panel_mgr = get_node_or_null("/root/aPanelManager")
+	if not panel_mgr:
+		print("[LoadoutPanel] No PanelManager - ignoring exit")
 		return false
 
+	# Check stack depth - if we're at depth 2 (StatusPanel + LoadoutPanel),
+	# we're being managed by GameMenu and should NOT pop ourselves
+	var stack_depth: int = panel_mgr.panel_stack.size()
+	print("[LoadoutPanel] Back pressed - stack depth: %d, is_active: %s, registered: %s" % [stack_depth, is_active(), is_registered()])
+
+	if stack_depth <= 2:
+		print("[LoadoutPanel] Being managed by GameMenu - letting back button bubble up")
+		# Don't handle the input - let it bubble up to GameMenu
+		return false
+
+	# We're deeper in the stack (e.g., popup open) - pop ourselves
 	print("[LoadoutPanel] Exiting to previous panel via PanelManager")
-	var panel_mgr = get_node_or_null("/root/aPanelManager")
-	if panel_mgr:
-		panel_mgr.pop_panel()
+	panel_mgr.pop_panel()
 	return true
 
 func _enter_party_select_state() -> void:

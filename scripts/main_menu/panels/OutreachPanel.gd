@@ -561,8 +561,10 @@ func _handle_category_select_input(event: InputEvent) -> void:
 		_enter_mission_list_state()
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("menu_back"):
-		_exit_outreach_panel()
-		get_viewport().set_input_as_handled()
+		# Only mark as handled if we actually exited via PanelManager
+		# Otherwise let it bubble to GameMenu
+		if _exit_outreach_panel():
+			get_viewport().set_input_as_handled()
 
 func _handle_mission_list_input(event: InputEvent) -> void:
 	"""Handle input when in mission list mode"""
@@ -629,9 +631,27 @@ func _navigate_mission(delta: int) -> void:
 	_mission_list.ensure_current_is_visible()
 	_on_mission_selected(idx)
 
-func _exit_outreach_panel() -> void:
-	"""Exit OutreachPanel back to previous panel"""
-	print("[OutreachPanel] Exiting to previous panel")
+func _exit_outreach_panel() -> bool:
+	"""Exit OutreachPanel back to previous panel
+
+	Returns: true if we popped from PanelManager, false if we let it bubble to GameMenu
+	"""
 	var panel_mgr = get_node_or_null("/root/aPanelManager")
-	if panel_mgr:
-		panel_mgr.pop_panel()
+	if not panel_mgr:
+		print("[OutreachPanel] No PanelManager - ignoring exit")
+		return false
+
+	# Check stack depth - if we're at depth 2 (StatusPanel + OutreachPanel),
+	# we're being managed by GameMenu and should NOT pop ourselves
+	var stack_depth: int = panel_mgr.panel_stack.size()
+	print("[OutreachPanel] Back pressed - stack depth: %d, is_active: %s" % [stack_depth, is_active()])
+
+	if stack_depth <= 2:
+		print("[OutreachPanel] Being managed by GameMenu - letting back button bubble up")
+		# Don't handle the input - let it bubble up to GameMenu
+		return false
+
+	# We're deeper in the stack - pop ourselves
+	print("[OutreachPanel] Exiting to previous panel via PanelManager")
+	panel_mgr.pop_panel()
+	return true
