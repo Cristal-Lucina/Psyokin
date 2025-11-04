@@ -1,8 +1,14 @@
-extends Control
+extends PanelBase
 class_name IndexPanel
 
 ## IndexPanel (MVP, backed by aIndexSystem when present)
 ## Categories: Tutorial / Enemies / Past Missions / Locations / World History
+##
+## ARCHITECTURE:
+## - Extends PanelBase for lifecycle management
+## - Filter-based navigation (no NavState needed - buttons handle focus)
+## - No popups needed (display only)
+## - Reactive to IndexSystem signals
 
 enum Filter { TUTORIALS, ENEMIES, MISSIONS, LOCATIONS, LORE }
 
@@ -12,6 +18,8 @@ enum Filter { TUTORIALS, ENEMIES, MISSIONS, LOCATIONS, LORE }
 @onready var _detail  : RichTextLabel = $Root/Right/Detail
 
 func _ready() -> void:
+	super()  # Call PanelBase._ready() for lifecycle management
+
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	size_flags_vertical   = Control.SIZE_EXPAND_FILL
@@ -35,6 +43,15 @@ func _ready() -> void:
 		idx.connect("index_changed", Callable(self, "_on_index_changed"))
 
 	_rebuild()
+
+# --- PanelBase Lifecycle Overrides ---------------------------------------------
+
+func _on_panel_gained_focus() -> void:
+	super()
+	print("[IndexPanel] Gained focus - focusing filter dropdown")
+	# Focus the filter dropdown when panel becomes active
+	if _filter:
+		_filter.grab_focus()
 
 func _on_index_changed(_cat: String) -> void:
 	_rebuild()

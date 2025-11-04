@@ -1,4 +1,4 @@
-extends Control
+extends PanelBase
 class_name CalendarPanel
 
 ## CalendarPanel (MVP, timeless + current-month-only)
@@ -6,6 +6,12 @@ class_name CalendarPanel
 ## - No year in headers
 ## - Current day is highlighted (rounded border + subtle fill)
 ## - Rebuilds on phase/day/week signals
+##
+## ARCHITECTURE:
+## - Extends PanelBase for lifecycle management
+## - Pure display panel (no NavState needed)
+## - No popups needed (read-only calendar display)
+## - Reactive to CalendarSystem signals
 
 var _label_month : Label
 var _grid        : GridContainer
@@ -15,6 +21,13 @@ var _btn_next    : Button
 const WEEKDAY_HEADERS : PackedStringArray = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"]
 
 func _ready() -> void:
+	super()  # Call PanelBase._ready() for lifecycle management
+
+	# Set up layout
+	set_anchors_preset(Control.PRESET_FULL_RECT)
+	size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	size_flags_vertical = Control.SIZE_EXPAND_FILL
+
 	_label_month = _find_label(["Header/MonthLabel","MonthLabel","Header/Title","Title"])
 	_grid        = _find_grid (["Body/Grid","Grid","Root/Grid","MonthGrid"])
 	_btn_prev    = _find_button(["Header/Prev","Prev","PrevBtn"])
@@ -44,6 +57,14 @@ func _ready() -> void:
 		if cal.has_signal("phase_advanced"): cal.connect("phase_advanced", Callable(self, "_on_cal_update"))
 		if cal.has_signal("week_reset"):     cal.connect("week_reset",     Callable(self, "_on_cal_update"))
 
+	_rebuild()
+
+# --- PanelBase Lifecycle Overrides ---------------------------------------------
+
+func _on_panel_gained_focus() -> void:
+	super()
+	print("[CalendarPanel] Gained focus - refreshing calendar display")
+	# Refresh calendar when panel becomes active (in case date changed while away)
 	_rebuild()
 
 # --- node finders --------------------------------------------------------------

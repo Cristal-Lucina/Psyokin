@@ -1,7 +1,13 @@
-extends Control
+extends PanelBase
 class_name SystemPanel
 
 ## Centers the menu and opens sub-menus above GameMenu (overlay or router).
+##
+## ARCHITECTURE:
+## - Extends PanelBase for lifecycle management
+## - Simple button panel (no NavState needed)
+## - Opens overlays for Load/Save/Settings/Title menus
+## - No popups needed (uses overlay system)
 
 const LOAD_MENU_SCENE : String = "res://scenes/ui/save/LoadMenu.tscn"
 const SAVE_MENU_SCENE : String = "res://scenes/ui/save/SaveMenu.tscn"
@@ -14,7 +20,10 @@ const TITLE_SCENE     : String = "res://scenes/main_menu/Title.tscn"
 @onready var _btn_title    : Button = %TitleBtn
 
 func _ready() -> void:
-	# Make sure we expand to the PanelHolder’s size.
+	super()  # Call PanelBase._ready() for lifecycle management
+
+	# Make sure we expand to the PanelHolder's size.
+	set_anchors_preset(Control.PRESET_FULL_RECT)
 	size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	size_flags_vertical   = Control.SIZE_EXPAND_FILL
 
@@ -22,6 +31,15 @@ func _ready() -> void:
 	_btn_save.pressed.connect(_open_save)
 	_btn_settings.pressed.connect(_open_settings)
 	_btn_title.pressed.connect(_to_title)
+
+# --- PanelBase Lifecycle Overrides ---------------------------------------------
+
+func _on_panel_gained_focus() -> void:
+	super()
+	print("[SystemPanel] Gained focus - focusing first button")
+	# Focus the first button when panel becomes active
+	if _btn_load:
+		_btn_load.grab_focus()
 
 func _open_load() -> void:
 	_open_overlay(LOAD_MENU_SCENE)
