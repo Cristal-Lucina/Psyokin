@@ -1648,8 +1648,10 @@ func _handle_party_select_input(event: InputEvent) -> void:
 		_transition_to_equipment_nav()
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("menu_back"):
-		_exit_loadout_panel()
-		get_viewport().set_input_as_handled()
+		# Only mark as handled if we actually exited via PanelManager
+		# Otherwise let it bubble to GameMenu
+		if _exit_loadout_panel():
+			get_viewport().set_input_as_handled()
 
 func _navigate_party(delta: int) -> void:
 	"""Navigate up/down in party list"""
@@ -1671,12 +1673,24 @@ func _transition_to_equipment_nav() -> void:
 	_nav_index = 0  # Start at first equipment button
 	call_deferred("_rebuild_equipment_navigation_and_focus_first")
 
-func _exit_loadout_panel() -> void:
-	"""Exit LoadoutPanel back to previous panel (StatusPanel)"""
-	print("[LoadoutPanel] Exiting to previous panel")
+func _exit_loadout_panel() -> bool:
+	"""Exit LoadoutPanel back to previous panel (StatusPanel)
+
+	Only works when panel is in PanelManager stack. When managed by GameMenu tabs,
+	don't try to exit - let the back button bubble up to GameMenu instead.
+
+	Returns: true if we tried to exit via PanelManager, false if we're not in the stack
+	"""
+	# Check if we're actually registered in PanelManager
+	if not is_registered():
+		print("[LoadoutPanel] Not in PanelManager stack - ignoring exit (let GameMenu handle it)")
+		return false
+
+	print("[LoadoutPanel] Exiting to previous panel via PanelManager")
 	var panel_mgr = get_node_or_null("/root/aPanelManager")
 	if panel_mgr:
 		panel_mgr.pop_panel()
+	return true
 
 func _enter_party_select_state() -> void:
 	"""Enter PARTY_SELECT state and grab focus on party list"""
