@@ -208,9 +208,9 @@ func _on_friday_reveals(pairs: Array) -> void:
 		var pair: Dictionary = pair_v
 		var a_name: String = String(pair.get("a_name", ""))
 		var b_name: String = String(pair.get("b_name", ""))
-		var status: String = String(pair.get("status", "Neutral"))
+		var relationship: String = String(pair.get("status", "Neutral"))
 
-		lines.append("• %s and %s are %s" % [a_name, b_name, status])
+		lines.append("• %s and %s are %s" % [a_name, b_name, relationship])
 
 	var message := _join_lines(lines)
 
