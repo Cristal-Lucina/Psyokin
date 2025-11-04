@@ -773,7 +773,6 @@ func _on_assign_room_pressed() -> void:
 	_push_nav_state(NavState.ROOM_SELECT)
 	_current_room_index = 0
 	_focus_current_room()
-	_show_toast("Select a room to assign.")
 
 func _on_move_out_pressed() -> void:
 	print("[DormsPanel._on_move_out_pressed] Move Out button pressed")
