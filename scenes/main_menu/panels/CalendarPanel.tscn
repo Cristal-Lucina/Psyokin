@@ -12,47 +12,98 @@ grow_vertical = 2
 mouse_filter = 2
 script = ExtResource("1")
 
-[node name="Root" type="VBoxContainer" parent="."]
+[node name="Root" type="HBoxContainer" parent="."]
 unique_name_in_owner = true
-layout_mode = 0
+layout_mode = 1
+anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-theme_override_constants/separation = 10
+theme_override_constants/separation = 16
 
-[node name="Header" type="HBoxContainer" parent="Root"]
+[node name="LeftPanel" type="PanelContainer" parent="Root"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 2.0
+
+[node name="LeftContent" type="VBoxContainer" parent="Root/LeftPanel"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="Title" type="Label" parent="Root/LeftPanel/LeftContent"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "IMPORTANT DATES"
+horizontal_alignment = 1
+
+[node name="Separator" type="HSeparator" parent="Root/LeftPanel/LeftContent"]
+layout_mode = 2
+
+[node name="EventsScroll" type="ScrollContainer" parent="Root/LeftPanel/LeftContent"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="EventsList" type="VBoxContainer" parent="Root/LeftPanel/LeftContent/EventsScroll"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="Placeholder" type="Label" parent="Root/LeftPanel/LeftContent/EventsScroll/EventsList"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.6, 0.6, 0.6, 1)
+text = "No upcoming events"
+horizontal_alignment = 1
+
+[node name="RightPanel" type="PanelContainer" parent="Root"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 5.0
+
+[node name="RightContent" type="VBoxContainer" parent="Root/RightPanel"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="Header" type="HBoxContainer" parent="Root/RightPanel/RightContent"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="MonthLabel" type="Label" parent="Root/Header"]
+[node name="MonthLabel" type="Label" parent="Root/RightPanel/RightContent/Header"]
 unique_name_in_owner = true
 layout_mode = 2
-text = "Month YYYY"
+theme_override_font_sizes/font_size = 28
+text = "MONTH YYYY"
 
-[node name="Spacer" type="Control" parent="Root/Header"]
+[node name="Spacer" type="Control" parent="Root/RightPanel/RightContent/Header"]
 layout_mode = 2
 size_flags_horizontal = 3
 
-[node name="PrevBtn" type="Button" parent="Root/Header"]
+[node name="PrevBtn" type="Button" parent="Root/RightPanel/RightContent/Header"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "◀"
 
-[node name="TodayBtn" type="Button" parent="Root/Header"]
+[node name="TodayBtn" type="Button" parent="Root/RightPanel/RightContent/Header"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Today"
 
-[node name="NextBtn" type="Button" parent="Root/Header"]
+[node name="NextBtn" type="Button" parent="Root/RightPanel/RightContent/Header"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "▶"
 
-[node name="Grid" type="GridContainer" parent="Root"]
+[node name="Separator" type="HSeparator" parent="Root/RightPanel/RightContent"]
+layout_mode = 2
+
+[node name="Grid" type="GridContainer" parent="Root/RightPanel/RightContent"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
+theme_override_constants/h_separation = 4
+theme_override_constants/v_separation = 4
 columns = 7

@@ -17,6 +17,7 @@ var _label_month : Label
 var _grid        : GridContainer
 var _btn_prev    : Button
 var _btn_next    : Button
+var _events_list : VBoxContainer  # For future Important Dates functionality
 
 const WEEKDAY_HEADERS : PackedStringArray = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"]
 
@@ -33,6 +34,7 @@ func _ready() -> void:
 	_grid        = get_node_or_null("%Grid")
 	_btn_prev    = get_node_or_null("%PrevBtn")
 	_btn_next    = get_node_or_null("%NextBtn")
+	_events_list = get_node_or_null("%EventsList")
 
 	# Debug: Check if critical nodes were found
 	print("[CalendarPanel._ready] Node check:")
@@ -40,6 +42,7 @@ func _ready() -> void:
 	print("  _grid: ", _grid != null)
 	print("  _btn_prev: ", _btn_prev != null)
 	print("  _btn_next: ", _btn_next != null)
+	print("  _events_list: ", _events_list != null)
 
 	if not _grid:
 		push_error("[CalendarPanel._ready] CRITICAL: Grid container not found! Calendar will not display.")
@@ -137,11 +140,11 @@ func _rebuild() -> void:
 			month = int(d.get("month", month))
 			day   = int(d.get("day", day))
 
-	# month header (no year)
+	# month header (no year) - uppercase for style consistency
 	if _label_month and cal and cal.has_method("get_month_name"):
-		_label_month.text = cal.call("get_month_name", month)
+		_label_month.text = String(cal.call("get_month_name", month)).to_upper()
 	elif _label_month:
-		_label_month.text = _month_name_local(month)
+		_label_month.text = _month_name_local(month).to_upper()
 
 	# weekday header
 	for i in range(7):
@@ -188,9 +191,9 @@ func _make_day_cell(num: int, is_today: bool) -> Control:
 	sb.corner_radius_bottom_right = 6
 
 	if is_today:
-		# subtle fill + clear border so it reads as "today"
-		sb.bg_color = Color(1, 1, 1, 0.10)
-		sb.border_color = Color(1, 1, 1, 0.9)
+		# Light blue highlight for current day (matching game style)
+		sb.bg_color = Color(0.4, 0.7, 1.0, 0.25)  # Light blue with transparency
+		sb.border_color = Color(0.4, 0.7, 1.0, 0.9)  # Light blue border
 		sb.border_width_left = 2
 		sb.border_width_top = 2
 		sb.border_width_right = 2
