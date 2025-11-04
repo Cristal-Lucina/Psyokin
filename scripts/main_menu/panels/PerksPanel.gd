@@ -293,9 +293,9 @@ func _get_perk_info(stat_id: String, tier_index: int) -> Dictionary:
 			info["perk_id"] = String(_perk.call("get_perk_id", stat_id, tier_index))
 
 		if _perk.has_method("get_perk_name"):
-			var name: String = String(_perk.call("get_perk_name", stat_id, tier_index))
-			if name != "":
-				info["name"] = name
+			var perk_name: String = String(_perk.call("get_perk_name", stat_id, tier_index))
+			if perk_name != "":
+				info["name"] = perk_name
 
 		if _perk.has_method("get_perk_desc"):
 			info["description"] = String(_perk.call("get_perk_desc", stat_id, tier_index))
@@ -340,9 +340,9 @@ func _highlight_selection() -> void:
 		for col in range(GRID_COLS):
 			if row >= _grid_cells.size() or col >= _grid_cells[row].size():
 				continue
-			var cell: Control = _grid_cells[row][col]
-			if cell is Button:
-				cell.modulate = Color(1.0, 1.0, 1.0, 1.0)
+			var grid_cell: Control = _grid_cells[row][col]
+			if grid_cell is Button:
+				grid_cell.modulate = Color(1.0, 1.0, 1.0, 1.0)
 
 	# Highlight selected
 	if _selected_row < 0 or _selected_row >= _grid_cells.size():
@@ -496,10 +496,11 @@ func _on_acquired_perk_selected(index: int) -> void:
 	var perk: Dictionary = _acquired_perks[index]
 	_show_perk_details(perk)
 
-func _input(event: InputEvent) -> void:
+func _input(_event: InputEvent) -> void:
 	"""Handle input for perk grid navigation"""
 	# Note: ConfirmationPopup handles its own input, so we don't need to handle it here
 	# (Old manual popup handling removed - ConfirmationPopup is self-contained)
+	pass  # Empty function - kept for override clarity
 
 func _unhandled_input(event: InputEvent) -> void:
 	"""Handle controller input for grid navigation"""
@@ -591,9 +592,9 @@ func _activate_selected_cell() -> void:
 func _pretty_stat(stat_id: String) -> String:
 	"""Get display name for a stat"""
 	if _stats and _stats.has_method("get_stat_display_name"):
-		var name: Variant = _stats.call("get_stat_display_name", stat_id)
-		if typeof(name) == TYPE_STRING and String(name) != "":
-			return String(name)
+		var stat_name: Variant = _stats.call("get_stat_display_name", stat_id)
+		if typeof(stat_name) == TYPE_STRING and String(stat_name) != "":
+			return String(stat_name)
 
 	var formatted: String = stat_id.replace("_", " ").strip_edges()
 	if formatted.length() == 0:

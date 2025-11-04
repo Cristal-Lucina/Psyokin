@@ -133,8 +133,7 @@ const LAYERS = {
 @onready var _root_container : HBoxContainer = $Root
 @onready var _tab_column : VBoxContainer = $Root/TabColumn
 @onready var _tab_list  : ItemList      = %TabList
-@onready var _left_panel : VBoxContainer = $Root/Left
-@onready var _right_panel : VBoxContainer = $Root/Right
+# Note: _left_panel and _right_panel removed - unused
 @onready var _party     : VBoxContainer = $Root/Left/PartyScroll/PartyList
 @onready var _creds     : Label         = $Root/Right/InfoGrid/MoneyValue
 @onready var _perk      : Label         = $Root/Right/InfoGrid/PerkValue
@@ -462,7 +461,7 @@ func _create_spacer() -> Control:
 	spacer.custom_minimum_size.y = 8
 	return spacer
 
-func _create_empty_slot(slot_type: String, slot_idx: int) -> PanelContainer:
+func _create_empty_slot(slot_type: String, _slot_idx: int) -> PanelContainer:
 	var panel := PanelContainer.new()
 	var vbox := VBoxContainer.new()
 	vbox.add_theme_constant_override("separation", 2)
@@ -677,16 +676,21 @@ func _get_member_snapshot(member_id: String) -> Dictionary:
 	# Always get display name from _label_for_id as primary source
 	var display_name: String = _label_for_id(member_id, roster)
 
+	# Declare variables at function scope to avoid confusable declarations
+	var lvl: int = 1
+	var hp_max: int = 150
+	var mp_max: int = 20
+
 	# Try to get combat profile for HP/MP/level
 	if _cps and _cps.has_method("get_profile"):
 		var p_v: Variant = _cps.call("get_profile", member_id)
 		if typeof(p_v) == TYPE_DICTIONARY:
 			var p: Dictionary = p_v
-			var lvl: int = int(p.get("level", 1))
+			lvl = int(p.get("level", 1))
 			var hp_cur: int = int(p.get("hp", -1))
-			var hp_max: int = int(p.get("hp_max", -1))
+			hp_max = int(p.get("hp_max", -1))
 			var mp_cur: int = int(p.get("mp", -1))
-			var mp_max: int = int(p.get("mp_max", -1))
+			mp_max = int(p.get("mp_max", -1))
 
 			# Always use display_name from _label_for_id which has proper CSV/roster fallbacks
 			return {
@@ -699,10 +703,7 @@ func _get_member_snapshot(member_id: String) -> Dictionary:
 			}
 
 	# Fallback: no profile data, use display name and compute stats
-	var lvl: int = 1
-	var hp_max: int = 150
-	var mp_max: int = 20
-
+	# (Variables already declared at function scope)
 	if _gs:
 		lvl = _gs.call("get_member_level", member_id) if _gs.has_method("get_member_level") else 1
 		if _gs.has_method("compute_member_pools"):
@@ -782,7 +783,7 @@ func _show_heal_confirmation(member_name: String, heal_amount: int, healed_type:
 	popup.queue_free()
 	print("[StatusPanel] Heal confirmation closed")
 
-func _show_swap_confirmation(member_name: String, member_id: String) -> void:
+func _show_swap_confirmation(member_name: String, _member_id: String) -> void:
 	"""Show swap confirmation message using ToastPopup"""
 	print("[StatusPanel] Showing swap confirmation for %s" % member_name)
 

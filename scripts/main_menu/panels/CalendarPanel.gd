@@ -158,9 +158,9 @@ func _rebuild() -> void:
 
 func _make_day_cell(num: int, is_today: bool) -> Control:
 	# PanelContainer with StyleBoxFlat so we can paint a highlight
-	var wrap: PanelContainer = PanelContainer.new()
-	wrap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	wrap.size_flags_vertical   = Control.SIZE_EXPAND_FILL
+	var wrapper: PanelContainer = PanelContainer.new()
+	wrapper.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	wrapper.size_flags_vertical   = Control.SIZE_EXPAND_FILL
 
 	var sb: StyleBoxFlat = StyleBoxFlat.new()
 	sb.bg_color = Color(0,0,0,0)   # transparent by default
@@ -170,7 +170,7 @@ func _make_day_cell(num: int, is_today: bool) -> Control:
 	sb.corner_radius_bottom_right = 6
 
 	if is_today:
-		# subtle fill + clear border so it reads as “today”
+		# subtle fill + clear border so it reads as "today"
 		sb.bg_color = Color(1, 1, 1, 0.10)
 		sb.border_color = Color(1, 1, 1, 0.9)
 		sb.border_width_left = 2
@@ -178,7 +178,7 @@ func _make_day_cell(num: int, is_today: bool) -> Control:
 		sb.border_width_right = 2
 		sb.border_width_bottom = 2
 
-	wrap.add_theme_stylebox_override("panel", sb)
+	wrapper.add_theme_stylebox_override("panel", sb)
 
 	var lbl: Label = Label.new()
 	lbl.text = str(num)
@@ -188,8 +188,8 @@ func _make_day_cell(num: int, is_today: bool) -> Control:
 	lbl.size_flags_vertical   = Control.SIZE_EXPAND_FILL
 	lbl.add_theme_color_override("font_color", Color(1,1,1,1) if is_today else Color(1,1,1,0.85))
 
-	wrap.add_child(lbl)
-	return wrap
+	wrapper.add_child(lbl)
+	return wrapper
 
 func _blank_cell() -> Control:
 	var c: Control = Control.new()
