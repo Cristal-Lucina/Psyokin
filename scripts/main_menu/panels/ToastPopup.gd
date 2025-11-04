@@ -90,7 +90,7 @@ func _build_ui() -> void:
 
 	# Message with ScrollContainer for long content
 	var scroll := ScrollContainer.new()
-	scroll.custom_minimum_size = Vector2(460, 200)  # Min height for scroll area
+	scroll.custom_minimum_size = Vector2(460, 280)  # Min height for scroll area
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
