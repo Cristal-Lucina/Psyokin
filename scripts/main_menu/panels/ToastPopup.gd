@@ -53,6 +53,9 @@ func _build_ui() -> void:
 	# Block all input from passing through
 	mouse_filter = Control.MOUSE_FILTER_STOP
 
+	# Set minimum size for the panel
+	custom_minimum_size = Vector2(400, 200)
+
 	# Add solid background (no transparency)
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0.15, 0.15, 0.15, 1.0)  # Dark gray, fully opaque
@@ -64,18 +67,16 @@ func _build_ui() -> void:
 	style.corner_radius_bottom_right = 8
 	add_theme_stylebox_override("panel", style)
 
-	# Create margin container for padding
-	var margin := MarginContainer.new()
-	margin.add_theme_constant_override("margin_left", 20)
-	margin.add_theme_constant_override("margin_top", 20)
-	margin.add_theme_constant_override("margin_right", 20)
-	margin.add_theme_constant_override("margin_bottom", 20)
-	add_child(margin)
-
+	# Create VBox with full-rect anchors and padding
 	var vbox := VBoxContainer.new()
+	vbox.set_anchors_preset(Control.PRESET_FULL_RECT)
 	vbox.add_theme_constant_override("separation", 12)
-	vbox.custom_minimum_size = Vector2(400, 0)  # Min width, height auto-sizes
-	margin.add_child(vbox)
+	vbox.set_offsets_preset(Control.PRESET_FULL_RECT)
+	vbox.offset_left = 20
+	vbox.offset_top = 20
+	vbox.offset_right = -20
+	vbox.offset_bottom = -20
+	add_child(vbox)
 
 	# Title (only show if not empty)
 	if _title != "":
@@ -85,11 +86,13 @@ func _build_ui() -> void:
 		title.add_theme_font_size_override("font_size", 18)
 		vbox.add_child(title)
 
-	# Message
+	# Message - centered horizontally and vertically
 	var msg_label := Label.new()
 	msg_label.text = _message
 	msg_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	msg_label.custom_minimum_size = Vector2(400, 0)  # Set width for wrapping
+	msg_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	msg_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	msg_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	vbox.add_child(msg_label)
 
 	# Buttons
@@ -131,10 +134,10 @@ func _finalize_size_and_position() -> void:
 	_position_center()
 
 func _position_center() -> void:
-	if get_viewport() == null:
+	if get_parent() == null:
 		return
-	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
-	position = (viewport_size - size) / 2
+	var parent_rect: Rect2 = get_parent().get_viewport_rect()
+	position = (parent_rect.size - size) / 2
 
 func _input(event: InputEvent) -> void:
 	if not visible:
