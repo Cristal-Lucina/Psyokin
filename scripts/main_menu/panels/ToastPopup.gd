@@ -26,12 +26,12 @@ class_name ToastPopup
 
 signal confirmed(result: bool)
 
-var _title: String = "Notice"
+var _title: String = ""
 var _message: String = ""
 var _accept_btn: Button = null
 var _cancel_btn: Button = null
 
-static func create(message: String, title: String = "Notice") -> ToastPopup:
+static func create(message: String, title: String = "") -> ToastPopup:
 	print("[ToastPopup.create] Creating popup with message: %s" % message)
 	var popup := ToastPopup.new()
 	popup.process_mode = Node.PROCESS_MODE_ALWAYS  # Set BEFORE building UI
