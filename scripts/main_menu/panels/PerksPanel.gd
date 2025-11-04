@@ -86,8 +86,9 @@ func _refresh_highlight() -> void:
 	_highlight_selection()
 	_show_selected_perk_details()
 
-func _rebuild() -> void:
-	"""Rebuild entire panel - refresh data and UI"""
+func _rebuild(_arg1 = null, _arg2 = null, _arg3 = null) -> void:
+	"""Rebuild entire panel - refresh data and UI
+	Accepts optional arguments from signals (perk_points_changed sends 1, perk_unlocked sends 3)"""
 	_load_data()
 	_build_grid()
 	_populate_acquired_perks()

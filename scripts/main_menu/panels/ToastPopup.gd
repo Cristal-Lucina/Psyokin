@@ -45,7 +45,8 @@ func _ready() -> void:
 	print("[ToastPopup._ready] Popup ready, visible=%s, has_focus=%s, paused=%s" % [visible, has_focus(), get_tree().paused])
 
 func _build_ui() -> void:
-	print("[ToastPopup._build_ui] Building UI, paused=%s" % get_tree().paused)
+	var paused_str := "unknown" if not is_inside_tree() else str(get_tree().paused)
+	print("[ToastPopup._build_ui] Building UI, in_tree=%s, paused=%s" % [is_inside_tree(), paused_str])
 	# Ensure popup processes even when game is paused
 	process_mode = Node.PROCESS_MODE_ALWAYS
 
