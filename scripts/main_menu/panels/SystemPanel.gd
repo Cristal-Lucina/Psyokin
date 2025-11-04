@@ -19,6 +19,9 @@ const TITLE_SCENE     : String = "res://scenes/main_menu/Title.tscn"
 @onready var _btn_settings : Button = %SettingsBtn
 @onready var _btn_title    : Button = %TitleBtn
 
+var _buttons: Array[Button] = []
+var _current_button_index: int = 0
+
 func _ready() -> void:
 	super()  # Call PanelBase._ready() for lifecycle management
 
@@ -30,7 +33,55 @@ func _ready() -> void:
 	_btn_load.pressed.connect(_open_load)
 	_btn_save.pressed.connect(_open_save)
 	_btn_settings.pressed.connect(_open_settings)
-	_btn_title.pressed.connect(_to_title)
+	_btn_title.pressed.connect(_on_title_pressed)
+
+	# Setup button array for controller navigation
+	_buttons = [_btn_load, _btn_save, _btn_settings, _btn_title]
+
+	# Enable focus for all buttons
+	for btn in _buttons:
+		if btn:
+			btn.focus_mode = Control.FOCUS_ALL
+
+# --- Input Handling -----------------------------------------------------------
+
+func _input(event: InputEvent) -> void:
+	if not is_active():
+		return
+
+	# Navigate buttons with D-pad/analog stick
+	if event.is_action_pressed("move_up"):
+		_navigate_buttons(-1)
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("move_down"):
+		_navigate_buttons(1)
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("menu_accept"):
+		_activate_current_button()
+		get_viewport().set_input_as_handled()
+
+func _navigate_buttons(direction: int) -> void:
+	"""Navigate through buttons with controller"""
+	_current_button_index += direction
+
+	# Wrap around
+	if _current_button_index < 0:
+		_current_button_index = _buttons.size() - 1
+	elif _current_button_index >= _buttons.size():
+		_current_button_index = 0
+
+	# Focus the button
+	if _buttons[_current_button_index]:
+		_buttons[_current_button_index].grab_focus()
+		print("[SystemPanel] Focused button %d: %s" % [_current_button_index, _buttons[_current_button_index].name])
+
+func _activate_current_button() -> void:
+	"""Activate the currently focused button"""
+	if _current_button_index >= 0 and _current_button_index < _buttons.size():
+		var btn := _buttons[_current_button_index]
+		if btn:
+			print("[SystemPanel] Activating button: %s" % btn.name)
+			btn.emit_signal("pressed")
 
 # --- PanelBase Lifecycle Overrides ---------------------------------------------
 
@@ -38,6 +89,7 @@ func _on_panel_gained_focus() -> void:
 	super()
 	print("[SystemPanel] Gained focus - focusing first button")
 	# Focus the first button when panel becomes active
+	_current_button_index = 0
 	if _btn_load:
 		_btn_load.grab_focus()
 
@@ -51,10 +103,43 @@ func _open_save() -> void:
 func _open_settings() -> void:
 	_open_overlay(OPTIONS_SCENE)
 
+func _on_title_pressed() -> void:
+	"""Show confirmation dialog before returning to title"""
+	print("[SystemPanel] Return to Title button pressed - showing confirmation")
+	_confirm_return_to_title()
+
+func _confirm_return_to_title() -> void:
+	"""Ask user to confirm before returning to title screen"""
+	var popup := ConfirmationPopup.create("Return to title screen?\n\nAll unsaved progress will be lost.")
+	add_child(popup)
+	var confirmed: bool = await popup.confirmed
+	popup.queue_free()
+
+	if confirmed:
+		print("[SystemPanel] User confirmed - returning to title")
+		_to_title()
+	else:
+		print("[SystemPanel] User cancelled - staying in game")
+		# Re-focus the title button after cancellation
+		if _btn_title:
+			_btn_title.grab_focus()
+
 func _to_title() -> void:
+	"""Reset game state and return to title screen"""
+	print("[SystemPanel] Returning to title screen...")
+
+	# Reset game state through GameState autoload
+	var gs := get_node_or_null("/root/GameState")
+	if gs and gs.has_method("reset_game"):
+		print("[SystemPanel] Calling GameState.reset_game()")
+		gs.call("reset_game")
+
+	# Use SceneRouter if available, otherwise change scene directly
 	if has_node("/root/aSceneRouter") and aSceneRouter.has_method("goto_title"):
+		print("[SystemPanel] Using SceneRouter.goto_title()")
 		aSceneRouter.goto_title()
 	else:
+		print("[SystemPanel] Changing scene directly to title")
 		get_tree().change_scene_to_file(TITLE_SCENE)
 
 # --- overlay helper ------------------------------------------------------------
