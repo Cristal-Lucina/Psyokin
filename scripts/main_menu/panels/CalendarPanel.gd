@@ -28,10 +28,23 @@ func _ready() -> void:
 	size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	size_flags_vertical = Control.SIZE_EXPAND_FILL
 
-	_label_month = _find_label(["Header/MonthLabel","MonthLabel","Header/Title","Title"])
-	_grid        = _find_grid (["Body/Grid","Grid","Root/Grid","MonthGrid"])
-	_btn_prev    = _find_button(["Header/Prev","Prev","PrevBtn"])
-	_btn_next    = _find_button(["Header/Next","Next","NextBtn"])
+	# Use unique names from scene (% syntax is most reliable)
+	_label_month = get_node_or_null("%MonthLabel")
+	_grid        = get_node_or_null("%Grid")
+	_btn_prev    = get_node_or_null("%PrevBtn")
+	_btn_next    = get_node_or_null("%NextBtn")
+
+	# Debug: Check if critical nodes were found
+	print("[CalendarPanel._ready] Node check:")
+	print("  _label_month: ", _label_month != null)
+	print("  _grid: ", _grid != null)
+	print("  _btn_prev: ", _btn_prev != null)
+	print("  _btn_next: ", _btn_next != null)
+
+	if not _grid:
+		push_error("[CalendarPanel._ready] CRITICAL: Grid container not found! Calendar will not display.")
+		push_error("[CalendarPanel._ready] Scene structure may be incorrect. Expected paths: Body/Grid, Grid, Root/Grid, or MonthGrid")
+		return
 
 	# current-month-only
 	if _btn_prev:
@@ -102,6 +115,11 @@ func _on_cal_update(_a: Variant = null) -> void:
 	_rebuild()
 
 func _rebuild() -> void:
+	# Check if grid exists
+	if not _grid:
+		push_error("[CalendarPanel] Grid container not found - cannot rebuild calendar")
+		return
+
 	# clear
 	for c in _grid.get_children():
 		c.queue_free()
