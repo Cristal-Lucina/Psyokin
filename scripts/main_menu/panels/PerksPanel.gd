@@ -468,139 +468,31 @@ func _unlock_perk(perk: Dictionary) -> void:
 	_show_selected_perk_details()
 
 func _show_perk_confirmation(perk: Dictionary) -> void:
-	"""Show confirmation popup before unlocking perk"""
-	# Prevent multiple popups
-	if _active_popup and is_instance_valid(_active_popup):
-		print("[PerksPanel] Popup already open, ignoring request")
-		return
+	"""Show confirmation popup before unlocking perk using ConfirmationPopup"""
+	var perk_name := perk.get("name", "Unknown Perk")
+	var desc := perk.get("description", "")
 
-	# Store pending perk
-	_pending_perk = perk
+	# Build message with perk details
+	var message := "%s\n\n%s\n\nCost: 1 Perk Point\n\nUnlock this perk?" % [perk_name, desc]
 
-	# Create popup panel
-	var popup_panel: Panel = Panel.new()
-	popup_panel.process_mode = Node.PROCESS_MODE_ALWAYS
-	popup_panel.z_index = 100
-	popup_panel.modulate.a = 0.0  # Start transparent for fade-in
-	popup_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE  # Block input during fade
-	add_child(popup_panel)
+	print("[PerksPanel] Showing perk confirmation for: %s" % perk_name)
 
-	# Apply consistent styling
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.15, 0.15, 0.15, 1.0)  # Dark gray
-	style.border_color = Color(1.0, 0.7, 0.75, 1.0)  # Pink border
-	style.set_border_width_all(2)
-	style.corner_radius_top_left = 8
-	style.corner_radius_top_right = 8
-	style.corner_radius_bottom_left = 8
-	style.corner_radius_bottom_right = 8
-	popup_panel.add_theme_stylebox_override("panel", style)
+	# Create and show ConfirmationPopup
+	var popup := ConfirmationPopup.create(message)
+	add_child(popup)
 
-	# Set active popup
-	_active_popup = popup_panel
-	print("[PerksPanel] Popup created and set as active")
+	# Wait for user response
+	var result: bool = await popup.confirmed
 
-	# Create content container
-	var vbox: VBoxContainer = VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 12)
-	vbox.custom_minimum_size.x = 400
-	popup_panel.add_child(vbox)
+	# Clean up
+	popup.queue_free()
 
-	# Title
-	var title: Label = Label.new()
-	title.text = "Confirm Perk Selection"
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 16)
-	title.add_theme_color_override("font_color", Color(1.0, 0.7, 0.75, 1.0))  # Pink
-	vbox.add_child(title)
-
-	# Perk name
-	var perk_name: Label = Label.new()
-	perk_name.text = perk.get("name", "Unknown Perk")
-	perk_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	perk_name.add_theme_font_size_override("font_size", 14)
-	vbox.add_child(perk_name)
-
-	# Description
-	var desc: Label = Label.new()
-	desc.text = perk.get("description", "")
-	desc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	desc.custom_minimum_size.x = 380
-	vbox.add_child(desc)
-
-	# Cost info
-	var cost: Label = Label.new()
-	cost.text = "Cost: 1 Perk Point"
-	cost.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	cost.add_theme_font_size_override("font_size", 12)
-	vbox.add_child(cost)
-
-	# Button row
-	var button_row: HBoxContainer = HBoxContainer.new()
-	button_row.add_theme_constant_override("separation", 16)
-	button_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	vbox.add_child(button_row)
-
-	# Confirm button
-	var confirm_btn: Button = Button.new()
-	confirm_btn.text = "Unlock Perk"
-	confirm_btn.custom_minimum_size.x = 120
-	confirm_btn.process_mode = Node.PROCESS_MODE_ALWAYS  # Must process when game is paused
-	confirm_btn.focus_mode = Control.FOCUS_ALL
-	confirm_btn.pressed.connect(_on_confirm_perk)
-	button_row.add_child(confirm_btn)
-
-	# Cancel button
-	var cancel_btn: Button = Button.new()
-	cancel_btn.text = "Cancel"
-	cancel_btn.custom_minimum_size.x = 120
-	cancel_btn.process_mode = Node.PROCESS_MODE_ALWAYS  # Must process when game is paused
-	cancel_btn.focus_mode = Control.FOCUS_ALL
-	cancel_btn.pressed.connect(_on_cancel_perk)
-	button_row.add_child(cancel_btn)
-
-	# Set up focus neighbors for left/right navigation
-	confirm_btn.focus_neighbor_right = confirm_btn.get_path_to(cancel_btn)
-	cancel_btn.focus_neighbor_left = cancel_btn.get_path_to(confirm_btn)
-
-	# Auto-size and center
-	await get_tree().process_frame
-	await get_tree().process_frame
-	popup_panel.size = vbox.size + Vector2(20, 20)
-	vbox.position = Vector2(10, 10)
-
-	var viewport_size: Vector2 = get_viewport_rect().size
-	popup_panel.position = (viewport_size - popup_panel.size) / 2.0
-
-	# Game is already paused by GameMenu - no need to pause again
-
-	# Fade in
-	var tween := create_tween()
-	tween.set_ease(Tween.EASE_OUT)
-	tween.set_trans(Tween.TRANS_CUBIC)
-	tween.tween_property(popup_panel, "modulate:a", 1.0, 0.3)
-	tween.tween_callback(func():
-		popup_panel.mouse_filter = Control.MOUSE_FILTER_STOP
-		confirm_btn.grab_focus()
-	)
-
-func _on_confirm_perk() -> void:
-	"""User confirmed perk unlock"""
-	if _pending_perk.is_empty():
-		return
-
-	# Close popup
-	_close_confirmation_popup()
-
-	# Unlock the perk
-	_unlock_perk(_pending_perk)
-	_pending_perk.clear()
-
-func _on_cancel_perk() -> void:
-	"""User cancelled perk unlock"""
-	_pending_perk.clear()
-	_close_confirmation_popup()
+	# Handle response
+	if result:
+		print("[PerksPanel] User confirmed perk unlock")
+		_unlock_perk(perk)
+	else:
+		print("[PerksPanel] User canceled perk unlock")
 
 func _close_confirmation_popup() -> void:
 	"""Close and fade out confirmation popup"""
