@@ -125,28 +125,24 @@ func _confirm_return_to_title() -> void:
 			_btn_title.grab_focus()
 
 func _to_title() -> void:
-	"""Return to title screen - game reset handled by title menu"""
+	"""Return to title screen - clear UI managers only"""
 	print("[SystemPanel] Returning to title screen...")
 
-	# CRITICAL: Reset all autoload managers and game state before changing scenes
-	# These are singletons that persist between scenes and can hold stale state
+	# CRITICAL: Clear UI manager states but DON'T reset game data
+	# Game state is preserved so user can Load if they want
+	# Title scene will reset if user clicks New Game
 
-	# 1. Reset GameState to clear all game data
-	if has_node("/root/aGameState"):
-		print("[SystemPanel] Resetting GameState")
-		aGameState.new_game()
-
-	# 2. Force reset PanelManager (clears stack without lifecycle callbacks)
+	# 1. Force reset PanelManager (clears stack without lifecycle callbacks)
 	if has_node("/root/aPanelManager"):
 		print("[SystemPanel] Force resetting PanelManager")
 		aPanelManager.force_reset()
 
-	# 3. Clear ControllerManager context stack and DISABLE it
-	# Title scene handles its own input, so we disable ControllerManager
+	# 2. Reset ControllerManager to OVERWORLD (same as fresh title load)
+	# Title.gd handles input in OVERWORLD context just like the initial load
 	if has_node("/root/aControllerManager"):
-		print("[SystemPanel] Clearing ControllerManager stack and disabling")
+		print("[SystemPanel] Resetting ControllerManager to OVERWORLD")
 		aControllerManager.clear_stack()
-		aControllerManager.set_context(aControllerManager.InputContext.DISABLED)
+		aControllerManager.set_context(aControllerManager.InputContext.OVERWORLD)
 
 	# Use SceneRouter if available, otherwise change scene directly
 	if has_node("/root/aSceneRouter") and aSceneRouter.has_method("goto_title"):
