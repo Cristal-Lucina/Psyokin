@@ -64,11 +64,19 @@
 ##
 ## ============================================================================
 
-extends Control
+extends PanelBase
 class_name StatusPanel
 
 ## Shows party HP/MP, summary info, and appearance.
 ## Prefers GameState meta + CombatProfileSystem; falls back to Stats/CSV.
+##
+## ARCHITECTURE:
+## - Extends PanelBase for lifecycle management
+## - ROOT/HUB PANEL: First panel shown when GameMenu opens
+## - Dual role: Tab list (hub to other panels) + Party management (content)
+## - NavState: MENU (tab list), CONTENT (party management), POPUP_ACTIVE
+## - Uses ToastPopup for all confirmations and notices
+## - Member picker uses custom ItemList popup (special case)
 
 # Signal emitted when a menu tab button is clicked
 signal tab_selected(tab_id: String)
@@ -172,6 +180,8 @@ var _active_popup: Control = null  # Currently open popup panel
 var _focus_member_id: String = ""  # Member ID to focus after rebuild (for Recovery button)
 
 func _ready() -> void:
+	super()  # Call PanelBase._ready() for lifecycle management
+
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	size_flags_vertical   = Control.SIZE_EXPAND_FILL
@@ -192,9 +202,7 @@ func _ready() -> void:
 	_load_party_csv_cache()
 	_build_tab_buttons()
 
-	if not is_connected("visibility_changed", Callable(self, "_on_visibility_changed")):
-		connect("visibility_changed", Callable(self, "_on_visibility_changed"))
-
+	# Note: PanelBase handles visibility_changed, no need to connect again
 	call_deferred("_first_fill")
 
 func _first_fill() -> void:
@@ -730,323 +738,64 @@ func _on_recovery_pressed(button: Button) -> void:
 	_show_recovery_popup(member_id, member_name, hp, hp_max, mp, mp_max)
 
 func _show_no_bench_notice() -> void:
-	"""Show 'no bench members' notice using Panel pattern"""
-	# Prevent multiple popups
-	if _active_popup and is_instance_valid(_active_popup):
-		print("[StatusPanel] Popup already open, ignoring request")
-		return
+	"""Show 'no bench members' notice using ToastPopup"""
+	print("[StatusPanel] Showing no bench notice")
 
-	# Create popup panel
-	var popup_panel: Panel = Panel.new()
-	popup_panel.process_mode = Node.PROCESS_MODE_ALWAYS
-	popup_panel.z_index = 100
-	popup_panel.modulate.a = 0.0  # Start fully transparent
-	popup_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE  # Block input until fade completes
-	add_child(popup_panel)
+	# Create and show ToastPopup (auto-centers, auto-styles, auto-blocks input)
+	var popup := ToastPopup.create("No benched party members available.", "No Bench Members")
+	add_child(popup)
 
-	# Apply consistent styling (matches ToastPopup/ConfirmationPopup)
-	_style_popup_panel(popup_panel)
+	# Wait for user to dismiss
+	await popup.confirmed
 
-	# Set active popup immediately
-	_active_popup = popup_panel
-
-	# Create content container
-	var vbox: VBoxContainer = VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 8)
-	popup_panel.add_child(vbox)
-
-	# Title label
-	var title: Label = Label.new()
-	title.text = "No Bench Members"
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 14)
-	vbox.add_child(title)
-
-	# Message label
-	var message: Label = Label.new()
-	message.text = "No benched party members available."
-	message.add_theme_font_size_override("font_size", 10)
-	message.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	message.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	vbox.add_child(message)
-
-	# Add OK button
-	var ok_btn: Button = Button.new()
-	ok_btn.text = "OK"
-	ok_btn.pressed.connect(_popup_close_notice)
-	vbox.add_child(ok_btn)
-
-	# Auto-size panel - wait two frames
-	await get_tree().process_frame
-	await get_tree().process_frame
-	popup_panel.size = vbox.size + Vector2(20, 20)
-	vbox.position = Vector2(10, 10)
-
-	# Center popup on screen
-	var viewport_size: Vector2 = get_viewport_rect().size
-	popup_panel.position = (viewport_size - popup_panel.size) / 2.0
-	print("[StatusPanel] No-bench notice centered at: %s, size: %s" % [popup_panel.position, popup_panel.size])
-
-	# Fade in popup
-	_fade_in_popup(popup_panel)
-
-	# Store metadata
-	popup_panel.set_meta("_is_notice_popup", true)
-
-	# Push popup to aPanelManager stack
-	var panel_mgr = get_node_or_null("/root/aPanelManager")
-	if panel_mgr:
-		panel_mgr.push_panel(popup_panel)
-		print("[StatusPanel] Pushed no-bench notice to aPanelManager stack")
-
-	# Set state to POPUP_ACTIVE
-	_nav_state = NavState.POPUP_ACTIVE
-
-	# Grab focus on OK button
-	await get_tree().process_frame
-	ok_btn.grab_focus()
-
-func _popup_close_notice() -> void:
-	"""Close notice popup and return to content"""
-	print("[StatusPanel] Notice popup closed")
-	_popup_close_and_return_to_content()
+	# Clean up
+	popup.queue_free()
+	print("[StatusPanel] No bench notice closed")
 
 func _show_already_at_max_notice(member_name: String, stat_type: String) -> void:
-	"""Show 'already at max HP/MP' notice using Panel pattern"""
-	# Prevent multiple popups
-	if _active_popup and is_instance_valid(_active_popup):
-		print("[StatusPanel] Popup already open, ignoring request")
-		return
+	"""Show 'already at max HP/MP' notice using ToastPopup"""
+	print("[StatusPanel] Showing already at max notice for %s (%s)" % [member_name, stat_type])
 
-	# Create popup panel
-	var popup_panel: Panel = Panel.new()
-	popup_panel.process_mode = Node.PROCESS_MODE_ALWAYS
-	popup_panel.z_index = 100
-	popup_panel.modulate.a = 0.0  # Start fully transparent
-	popup_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE  # Block input until fade completes
-	add_child(popup_panel)
+	# Create and show ToastPopup
+	var popup := ToastPopup.create("%s is already at max %s." % [member_name, stat_type], "Already at Max")
+	add_child(popup)
 
-	# Apply consistent styling (matches ToastPopup/ConfirmationPopup)
-	_style_popup_panel(popup_panel)
+	# Wait for user to dismiss
+	await popup.confirmed
 
-	# Set active popup immediately
-	_active_popup = popup_panel
-
-	# Create content container
-	var vbox: VBoxContainer = VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 8)
-	vbox.custom_minimum_size.x = 300  # Set panel width to 300px
-	popup_panel.add_child(vbox)
-
-	# Title label
-	var title: Label = Label.new()
-	title.text = "Already at Max"
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 14)
-	vbox.add_child(title)
-
-	# Message label
-	var message: Label = Label.new()
-	message.text = "%s is already at max %s." % [member_name, stat_type]
-	message.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	message.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	vbox.add_child(message)
-
-	# OK button
-	var ok_btn: Button = Button.new()
-	ok_btn.text = "OK"
-	ok_btn.custom_minimum_size.y = 32
-	ok_btn.pressed.connect(_popup_close_notice)
-	vbox.add_child(ok_btn)
-
-	# Position popup at screen center
-	popup_panel.set_anchors_preset(Control.PRESET_CENTER)
-	popup_panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	popup_panel.grow_vertical = Control.GROW_DIRECTION_BOTH
-	popup_panel.position = get_viewport_rect().size / 2 - vbox.custom_minimum_size / 2
-
-	# Fade in popup
-	_fade_in_popup(popup_panel)
-
-	# Add to aPanelManager stack
-	if has_node("/root/aPanelManager"):
-		var pm = get_node("/root/aPanelManager")
-		if pm.has_method("push"):
-			pm.call("push", popup_panel)
-			print("[StatusPanel] Pushed 'already at max' notice to aPanelManager stack")
-
-	# Set state to POPUP_ACTIVE
-	_nav_state = NavState.POPUP_ACTIVE
-
-	# Grab focus on OK button
-	await get_tree().process_frame
-	ok_btn.grab_focus()
+	# Clean up
+	popup.queue_free()
+	print("[StatusPanel] Already at max notice closed")
 
 func _show_heal_confirmation(member_name: String, heal_amount: int, healed_type: String) -> void:
-	"""Show healing confirmation message using Panel pattern"""
-	# Prevent multiple popups
-	if _active_popup and is_instance_valid(_active_popup):
-		print("[StatusPanel] Popup already open, ignoring request")
-		return
+	"""Show healing confirmation message using ToastPopup"""
+	print("[StatusPanel] Showing heal confirmation for %s" % member_name)
 
-	# Create popup panel
-	var popup_panel: Panel = Panel.new()
-	popup_panel.process_mode = Node.PROCESS_MODE_ALWAYS
-	popup_panel.z_index = 100
-	popup_panel.modulate.a = 0.0  # Start fully transparent
-	popup_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE  # Block input until fade completes
-	add_child(popup_panel)
+	# Create and show ToastPopup
+	var popup := ToastPopup.create("%s has healed %d %s" % [member_name, heal_amount, healed_type], "Recovery")
+	add_child(popup)
 
-	# Apply consistent styling (matches ToastPopup/ConfirmationPopup)
-	_style_popup_panel(popup_panel)
+	# Wait for user to dismiss
+	await popup.confirmed
 
-	# Set active popup immediately
-	_active_popup = popup_panel
-
-	# Create content container
-	var vbox: VBoxContainer = VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 8)
-	vbox.custom_minimum_size.x = 300  # Set panel width to 300px
-	popup_panel.add_child(vbox)
-
-	# Title label
-	var title: Label = Label.new()
-	title.text = "Recovery"
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 14)
-	vbox.add_child(title)
-
-	# Message label
-	var message: Label = Label.new()
-	message.text = "%s has healed %d %s" % [member_name, heal_amount, healed_type]
-	message.add_theme_font_size_override("font_size", 10)
-	message.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	message.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	vbox.add_child(message)
-
-	# Add OK button
-	var ok_btn: Button = Button.new()
-	ok_btn.text = "OK"
-	ok_btn.pressed.connect(_popup_close_heal_confirmation)
-	vbox.add_child(ok_btn)
-
-	# Auto-size panel - wait two frames
-	await get_tree().process_frame
-	await get_tree().process_frame
-	popup_panel.size = vbox.size + Vector2(20, 20)
-	vbox.position = Vector2(10, 10)
-
-	# Center popup on screen
-	var viewport_size: Vector2 = get_viewport_rect().size
-	popup_panel.position = (viewport_size - popup_panel.size) / 2.0
-	print("[StatusPanel] Heal confirmation centered at: %s, size: %s" % [popup_panel.position, popup_panel.size])
-	# Fade in popup
-	_fade_in_popup(popup_panel)
-
-
-	# Store metadata
-	popup_panel.set_meta("_is_heal_confirmation_popup", true)
-
-	# Push popup to aPanelManager stack
-	var panel_mgr = get_node_or_null("/root/aPanelManager")
-	if panel_mgr:
-		panel_mgr.push_panel(popup_panel)
-		print("[StatusPanel] Pushed heal confirmation to aPanelManager stack")
-
-	# Set state to POPUP_ACTIVE
-	_nav_state = NavState.POPUP_ACTIVE
-
-	# Grab focus on OK button
-	await get_tree().process_frame
-	ok_btn.grab_focus()
-
-func _popup_close_heal_confirmation() -> void:
-	"""Close heal confirmation popup and return focus to Recovery button"""
-	print("[StatusPanel] Heal confirmation popup closed")
-	_popup_close_and_return_to_content()
+	# Clean up
+	popup.queue_free()
+	print("[StatusPanel] Heal confirmation closed")
 
 func _show_swap_confirmation(member_name: String, member_id: String) -> void:
-	"""Show swap confirmation message using Panel pattern"""
-	# Prevent multiple popups
-	if _active_popup and is_instance_valid(_active_popup):
-		print("[StatusPanel] Popup already open, ignoring request")
-		return
+	"""Show swap confirmation message using ToastPopup"""
+	print("[StatusPanel] Showing swap confirmation for %s" % member_name)
 
-	# Create popup panel
-	var popup_panel: Panel = Panel.new()
-	popup_panel.process_mode = Node.PROCESS_MODE_ALWAYS
-	popup_panel.z_index = 100
-	popup_panel.modulate.a = 0.0  # Start fully transparent
-	popup_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE  # Block input until fade completes
-	add_child(popup_panel)
+	# Create and show ToastPopup
+	var popup := ToastPopup.create("%s is now in your active party" % member_name, "Party Swap")
+	add_child(popup)
 
-	# Apply consistent styling (matches ToastPopup/ConfirmationPopup)
-	_style_popup_panel(popup_panel)
+	# Wait for user to dismiss
+	await popup.confirmed
 
-	# Set active popup immediately
-	_active_popup = popup_panel
-
-	# Create content container
-	var vbox: VBoxContainer = VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 8)
-	vbox.custom_minimum_size.x = 300  # Set panel width to 300px
-	popup_panel.add_child(vbox)
-
-	# Title label
-	var title: Label = Label.new()
-	title.text = "Party Swap"
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 14)
-	vbox.add_child(title)
-
-	# Message label
-	var message: Label = Label.new()
-	message.text = "%s is now in your active party" % member_name
-	message.add_theme_font_size_override("font_size", 10)
-	message.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	message.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	vbox.add_child(message)
-
-	# Add OK button
-	var ok_btn: Button = Button.new()
-	ok_btn.text = "OK"
-	ok_btn.pressed.connect(_popup_close_swap_confirmation)
-	vbox.add_child(ok_btn)
-
-	# Auto-size panel - wait two frames
-	await get_tree().process_frame
-	await get_tree().process_frame
-	popup_panel.size = vbox.size + Vector2(20, 20)
-	vbox.position = Vector2(10, 10)
-
-	# Center popup on screen
-	var viewport_size: Vector2 = get_viewport_rect().size
-	popup_panel.position = (viewport_size - popup_panel.size) / 2.0
-	print("[StatusPanel] Swap confirmation centered at: %s, size: %s" % [popup_panel.position, popup_panel.size])
-	# Fade in popup
-	_fade_in_popup(popup_panel)
-
-
-	# Store metadata
-	popup_panel.set_meta("_is_swap_confirmation_popup", true)
-
-	# Push popup to aPanelManager stack
-	var panel_mgr = get_node_or_null("/root/aPanelManager")
-	if panel_mgr:
-		panel_mgr.push_panel(popup_panel)
-		print("[StatusPanel] Pushed swap confirmation to aPanelManager stack")
-
-	# Set state to POPUP_ACTIVE
-	_nav_state = NavState.POPUP_ACTIVE
-
-	# Grab focus on OK button
-	await get_tree().process_frame
-	ok_btn.grab_focus()
-
-func _popup_close_swap_confirmation() -> void:
-	"""Close swap confirmation popup and return focus to new member's Recovery button"""
-	print("[StatusPanel] Swap confirmation popup closed")
-	_popup_close_and_return_to_content()
+	# Clean up
+	popup.queue_free()
+	print("[StatusPanel] Swap confirmation closed")
 
 func _style_popup_panel(popup_panel: Panel) -> void:
 	"""Apply consistent styling to popup panels (matches ToastPopup/ConfirmationPopup)"""
