@@ -141,11 +141,12 @@ func _to_title() -> void:
 		print("[SystemPanel] Force resetting PanelManager")
 		aPanelManager.force_reset()
 
-	# 3. Clear ControllerManager context stack and reset to OVERWORLD
+	# 3. Clear ControllerManager context stack and DISABLE it
+	# Title scene handles its own input, so we disable ControllerManager
 	if has_node("/root/aControllerManager"):
-		print("[SystemPanel] Clearing ControllerManager stack and resetting to OVERWORLD")
+		print("[SystemPanel] Clearing ControllerManager stack and disabling")
 		aControllerManager.clear_stack()
-		aControllerManager.set_context(aControllerManager.InputContext.OVERWORLD)
+		aControllerManager.set_context(aControllerManager.InputContext.DISABLED)
 
 	# Use SceneRouter if available, otherwise change scene directly
 	if has_node("/root/aSceneRouter") and aSceneRouter.has_method("goto_title"):
