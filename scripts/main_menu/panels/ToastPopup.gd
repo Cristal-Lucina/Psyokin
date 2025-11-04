@@ -83,11 +83,6 @@ func _build_ui() -> void:
 	title.add_theme_font_size_override("font_size", 18)
 	vbox.add_child(title)
 
-	# ScrollContainer for message (allows scrolling for long content)
-	var scroll := ScrollContainer.new()
-	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	vbox.add_child(scroll)
-
 	# Message
 	var msg_label := Label.new()
 	msg_label.text = _message
