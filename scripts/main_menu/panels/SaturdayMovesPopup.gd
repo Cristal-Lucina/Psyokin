@@ -86,19 +86,19 @@ func _build_ui() -> void:
 			if typeof(move_v) != TYPE_DICTIONARY:
 				continue
 			var move: Dictionary = move_v
-			var name: String = String(move.get("name", "Unknown"))
+			var member_name: String = String(move.get("name", "Unknown"))
 			var from_room: String = String(move.get("from", ""))
 			var to_room: String = String(move.get("to", ""))
 
 			var move_label := RichTextLabel.new()
 			if from_room != "" and to_room != "":
-				move_label.text = "• [b]%s[/b] moved from [color=#2196F3]%s[/color] to [color=#4CAF50]%s[/color]" % [name, from_room, to_room]
+				move_label.text = "• [b]%s[/b] moved from [color=#2196F3]%s[/color] to [color=#4CAF50]%s[/color]" % [member_name, from_room, to_room]
 			elif from_room != "":
-				move_label.text = "• [b]%s[/b] moved from [color=#2196F3]%s[/color]" % [name, from_room]
+				move_label.text = "• [b]%s[/b] moved from [color=#2196F3]%s[/color]" % [member_name, from_room]
 			elif to_room != "":
-				move_label.text = "• [b]%s[/b] moved to [color=#4CAF50]%s[/color]" % [name, to_room]
+				move_label.text = "• [b]%s[/b] moved to [color=#4CAF50]%s[/color]" % [member_name, to_room]
 			else:
-				move_label.text = "• [b]%s[/b] moved (details unavailable)" % name
+				move_label.text = "• [b]%s[/b] moved (details unavailable)" % member_name
 			move_label.bbcode_enabled = true
 			move_label.fit_content = true
 			move_label.scroll_active = false

@@ -92,8 +92,8 @@ func _label_from_payload(payload: Dictionary) -> String:
 	if payload.has("time_played"):
 		var seconds := int(payload.get("time_played", 0))
 		if seconds > 0:
-			var hours := seconds / 3600
-			var minutes := (seconds % 3600) / 60
+			var hours := seconds / 3600  # Integer division
+			var minutes := (seconds % 3600) / 60  # Integer division
 			time_played = "%d:%02d" % [hours, minutes]
 
 	# Format: "FirstName LastName : Mon 5/5 : Time Played"
