@@ -131,12 +131,19 @@ func _to_title() -> void:
 	# Don't reset game state here - let Title screen handle it when user clicks New Game
 	# This allows returning to title without losing progress if they want to Load instead
 
-	# CRITICAL: Clear the PanelManager stack before changing scenes
-	# PanelManager is an autoload and persists between scenes
-	# If we don't clear it, it will hold stale panel references after scene change
+	# CRITICAL: Reset all autoload managers before changing scenes
+	# These are singletons that persist between scenes and can hold stale state
+
+	# 1. Force reset PanelManager (clears stack without lifecycle callbacks)
 	if has_node("/root/aPanelManager"):
-		print("[SystemPanel] Clearing PanelManager stack before scene change")
-		aPanelManager.clear_stack()
+		print("[SystemPanel] Force resetting PanelManager")
+		aPanelManager.force_reset()
+
+	# 2. Clear ControllerManager context stack and reset to OVERWORLD
+	if has_node("/root/aControllerManager"):
+		print("[SystemPanel] Clearing ControllerManager stack and resetting to OVERWORLD")
+		aControllerManager.clear_stack()
+		aControllerManager.set_context(aControllerManager.InputContext.OVERWORLD)
 
 	# Use SceneRouter if available, otherwise change scene directly
 	if has_node("/root/aSceneRouter") and aSceneRouter.has_method("goto_title"):

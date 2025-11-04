@@ -191,6 +191,13 @@ func clear_stack() -> void:
 	while not _panel_stack.is_empty():
 		pop_panel()
 
+## Force reset - clear stack without any lifecycle callbacks
+## Use this when changing scenes to avoid calling methods on freed nodes
+func force_reset() -> void:
+	_log("FORCE RESET - clearing stack without callbacks")
+	_panel_stack.clear()
+	emit_signal("panel_stack_empty")
+
 ## Print the current panel stack (for debugging)
 func print_stack() -> void:
 	print("[PanelManager] === Panel Stack (depth: %d) ===" % _panel_stack.size())
