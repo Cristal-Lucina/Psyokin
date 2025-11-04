@@ -1,5 +1,14 @@
-extends Control
+extends PanelBase
 class_name SigilSkillMenu
+
+## SigilSkillMenu - Sigil and Skill loadout management
+##
+## ARCHITECTURE:
+## - Extends PanelBase for lifecycle management
+## - Two-state navigation: SOCKET_NAV (select slot), SKILLS_NAV (select skill)
+## - Uses _input() for controller navigation
+## - No popups needed (direct skill assignment)
+## - Integrates with aSigilSystem for data
 
 # Systems
 var _sig: Node = null
@@ -13,8 +22,8 @@ var _selected_inst: String = ""
 var _skill_ids: Array[String] = []
 
 # Controller navigation state - Clean state machine
-enum NavMode { SOCKET_NAV, SKILLS_NAV }
-var _nav_mode: NavMode = NavMode.SOCKET_NAV
+enum NavState { SOCKET_NAV, SKILLS_NAV }
+var _nav_state: NavState = NavState.SOCKET_NAV
 
 # Scene nodes (from your .tscn)
 @onready var _backdrop: ColorRect = $"Backdrop" as ColorRect
@@ -29,6 +38,8 @@ var _nav_mode: NavMode = NavMode.SOCKET_NAV
 @onready var _btn_close: Button = $"Center/Card/CardPad/MainRow/RightColumn/ButtonsRow/BtnClose" as Button
 
 func _ready() -> void:
+	super()  # Call PanelBase._ready() for lifecycle management
+
 	_sig = get_node_or_null("/root/aSigilSystem")
 	# Softer dimmer so the game behind isn't shouting
 	if _backdrop:
@@ -92,6 +103,17 @@ func _ready() -> void:
 	print("  - mouse_filter: %d" % mouse_filter)
 	print("  - Clicking anywhere should now show input logs...")
 
+# --- PanelBase Lifecycle Overrides ---------------------------------------------
+
+func _on_panel_gained_focus() -> void:
+	super()
+	print("[SigilSkillMenu] Gained focus - resetting to SOCKET_NAV mode")
+	# Reset navigation state when panel becomes active
+	_nav_state = NavState.SOCKET_NAV
+	# Focus on sockets list
+	if _sockets and _sockets.item_count > 0:
+		_sockets.grab_focus()
+
 func _on_gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
@@ -103,10 +125,14 @@ func _input(e: InputEvent) -> void:
 
 	Uses _input() instead of _unhandled_input() for same priority as GameMenu.
 
-	Two-mode navigation:
+	Two-state navigation:
 	1. Socket mode: UP/DOWN to select socket, RIGHT/ACCEPT to enter skills
 	2. Skills mode: UP/DOWN to select skill, ACCEPT to set active, LEFT/BACK to return to sockets
 	"""
+	# Only process input when panel is active
+	if not is_active():
+		return
+
 	if e is InputEventMouseButton:
 		var mb := e as InputEventMouseButton
 		if mb.pressed:
@@ -114,7 +140,7 @@ func _input(e: InputEvent) -> void:
 
 	# ESC or B button to close
 	if e.is_action_pressed("menu_back") or (e is InputEventKey and e.is_pressed() and e.keycode == KEY_ESCAPE):
-		if _nav_mode == NavMode.SOCKET_NAV:
+		if _nav_state == NavState.SOCKET_NAV:
 			# Close the menu
 			_on_close()
 			get_viewport().set_input_as_handled()
@@ -124,7 +150,7 @@ func _input(e: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 		return
 
-	if _nav_mode == NavMode.SOCKET_NAV:
+	if _nav_state == NavState.SOCKET_NAV:
 		# Socket navigation
 		if e.is_action_pressed("move_up"):
 			_navigate_sockets(-1)
@@ -136,7 +162,7 @@ func _input(e: InputEvent) -> void:
 			# Enter skills mode
 			_enter_skills_mode()
 			get_viewport().set_input_as_handled()
-	else:  # NavMode.SKILLS_NAV
+	else:  # NavState.SKILLS_NAV
 		# Skills navigation
 		if e.is_action_pressed("move_up"):
 			_navigate_skills(-1)
@@ -459,7 +485,7 @@ func _navigate_skills(delta: int) -> void:
 func _enter_socket_mode() -> void:
 	"""Switch to socket navigation mode"""
 	print("[SigilSkillMenu] Entering socket mode")
-	_nav_mode = NavMode.SOCKET_NAV
+	_nav_state = NavState.SOCKET_NAV
 	if _sockets and _sockets.item_count > 0:
 		var current = _sockets.get_selected_items()
 		if current.size() == 0:
@@ -470,7 +496,7 @@ func _enter_socket_mode() -> void:
 func _enter_skills_mode() -> void:
 	"""Switch to skills navigation mode"""
 	print("[SigilSkillMenu] Entering skills mode")
-	_nav_mode = NavMode.SKILLS_NAV
+	_nav_state = NavState.SKILLS_NAV
 	if _skills and _skills.item_count > 0:
 		var current = _skills.get_selected_items()
 		if current.size() == 0:
