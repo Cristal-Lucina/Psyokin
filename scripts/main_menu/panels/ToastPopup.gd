@@ -77,12 +77,13 @@ func _build_ui() -> void:
 	vbox.custom_minimum_size = Vector2(400, 0)  # Min width, height auto-sizes
 	margin.add_child(vbox)
 
-	# Title
-	var title := Label.new()
-	title.text = _title
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 18)
-	vbox.add_child(title)
+	# Title (only show if not empty)
+	if _title != "":
+		var title := Label.new()
+		title.text = _title
+		title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		title.add_theme_font_size_override("font_size", 18)
+		vbox.add_child(title)
 
 	# Message
 	var msg_label := Label.new()

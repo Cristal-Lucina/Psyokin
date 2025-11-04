@@ -1244,11 +1244,11 @@ func _ask_confirm(msg: String) -> bool:
 
 	return result
 
-func _show_toast(msg: String) -> void:
+func _show_toast(msg: String, title: String = "") -> void:
 	print("[DormsPanel._show_toast] Showing toast: %s" % msg)
 
-	# Create and show modal toast popup
-	var popup := ToastPopup.create(msg)
+	# Create and show modal toast popup with optional title (empty = no title)
+	var popup := ToastPopup.create(msg, title)
 	add_child(popup)
 
 	# Wait for user to respond (accept or cancel)
