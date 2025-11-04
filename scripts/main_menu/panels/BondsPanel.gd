@@ -1003,72 +1003,19 @@ func _get_layer_reward_text(transition_id: String) -> String:
 			return "Layer transition reward."
 
 func _show_info_popup(title: String, message: String) -> void:
-	"""Show a simple info popup with title and message"""
-	# Use CanvasLayer to ensure overlay renders on top of everything
-	var canvas_layer := CanvasLayer.new()
-	canvas_layer.name = "InfoOverlayLayer"
-	canvas_layer.layer = 100  # Very high layer to be on top
+	"""Show a simple info popup using ToastPopup"""
+	print("[BondsPanel] Showing info popup: %s" % title)
 
-	# Full-screen overlay
-	var overlay := Control.new()
-	overlay.name = "InfoOverlay"
-	overlay.mouse_filter = Control.MOUSE_FILTER_STOP
-	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	# Create and show ToastPopup (auto-centers, auto-styles, auto-blocks input)
+	var popup := ToastPopup.create(message, title)
+	add_child(popup)
 
-	# Dim background
-	var dim := ColorRect.new()
-	dim.color = Color(0, 0, 0, 0.65)
-	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
-	overlay.add_child(dim)
+	# Wait for user to dismiss
+	await popup.confirmed
 
-	# Center container
-	var center := CenterContainer.new()
-	center.set_anchors_preset(Control.PRESET_FULL_RECT)
-	overlay.add_child(center)
-
-	# Panel
-	var panel := PanelContainer.new()
-	panel.custom_minimum_size = Vector2(400, 200)
-	center.add_child(panel)
-
-	var root := VBoxContainer.new()
-	root.add_theme_constant_override("separation", 12)
-	panel.add_child(root)
-
-	# Title
-	var title_lbl := Label.new()
-	title_lbl.text = title
-	title_lbl.add_theme_font_size_override("font_size", 18)
-	title_lbl.add_theme_color_override("font_color", Color(1, 0.7, 0.75, 1))  # Pale pink
-	title_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	root.add_child(title_lbl)
-
-	# Message
-	var msg_lbl := RichTextLabel.new()
-	msg_lbl.bbcode_enabled = true
-	msg_lbl.text = message
-	msg_lbl.fit_content = true
-	msg_lbl.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	msg_lbl.custom_minimum_size = Vector2(350, 100)
-	root.add_child(msg_lbl)
-
-	# Back button
-	var back_btn := Button.new()
-	back_btn.text = "Back"
-	back_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	back_btn.pressed.connect(func() -> void:
-		canvas_layer.queue_free()
-	)
-	root.add_child(back_btn)
-
-	# Add overlay to canvas layer
-	canvas_layer.add_child(overlay)
-
-	# Add canvas layer to scene
-	get_tree().root.add_child(canvas_layer)
-
-	# Focus back button immediately
-	back_btn.grab_focus()
+	# Clean up
+	popup.queue_free()
+	print("[BondsPanel] Info popup closed")
 
 # ─────────────────────────────────────────────────────────────
 # Story Points overlay (full-screen, more opaque, Back)
