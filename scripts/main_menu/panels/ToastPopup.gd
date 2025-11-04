@@ -83,17 +83,12 @@ func _build_ui() -> void:
 	title.add_theme_font_size_override("font_size", 18)
 	vbox.add_child(title)
 
-	# ScrollContainer for message (allows scrolling for long content)
-	var scroll := ScrollContainer.new()
-	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	vbox.add_child(scroll)
-
 	# Message
 	var msg_label := Label.new()
 	msg_label.text = _message
 	msg_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	msg_label.custom_minimum_size = Vector2(400, 0)  # Set width for wrapping
-	scroll.add_child(msg_label)
+	vbox.add_child(msg_label)
 
 	# Buttons
 	var hbox := HBoxContainer.new()
