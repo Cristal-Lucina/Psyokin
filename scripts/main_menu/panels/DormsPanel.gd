@@ -189,10 +189,21 @@ func _on_panel_gained_focus() -> void:
 	_focus_current_roster()
 
 func _can_panel_close() -> bool:
-	# Prevent closing if there are any pending changes (move plan in progress)
-	if _has_pending_changes():
-		_show_toast("You must place and accept all changes before continuing.")
+	# Prevent closing if there are incomplete changes
+	# If common room is empty, we're done - allow closing (auto-accept pending moves if any)
+
+	# Block only if there are unassigned common room members
+	if _common_members.size() > 0:
+		_show_toast("You must assign all common room members before continuing.")
 		return false
+
+	# If common room is empty but there are pending reassignments, auto-accept them
+	if _pending_reassignments.size() > 0:
+		print("[DormsPanel._can_panel_close] Auto-accepting pending reassignments before closing")
+		_auto_accept_plan()
+		# Return true to allow closing (auto-accept happens synchronously)
+
+	# Common room is empty and all moves are either accepted or there were no moves - allow closing
 	return true
 
 # ═══════════════════════════════════════════════════════════════════════════
