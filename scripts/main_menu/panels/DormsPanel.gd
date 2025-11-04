@@ -846,7 +846,13 @@ func _on_move_out_pressed() -> void:
 	_focus_current_roster()
 
 func _on_cancel_move_pressed() -> void:
-	var confirmed: bool = await _ask_confirm("Cancel all pending reassignments?")
+	"""Cancel all pending room reassignments and reset to original state
+
+	Works at any time during the week:
+	- Before plan is locked: cancels pending moves
+	- After plan is locked: unlocks and reverts to original room assignments
+	"""
+	var confirmed: bool = await _ask_confirm("Cancel all pending reassignments?\nThis will reset rooms to their original state.")
 	if not confirmed:
 		return
 
@@ -855,7 +861,12 @@ func _on_cancel_move_pressed() -> void:
 		ds.call("stage_reset_plan")
 
 	_pending_reassignments.clear()
-	_show_toast("All pending moves cancelled.")
+	_show_toast("All pending moves cancelled. Rooms reset to original state.")
+
+	# Clear selection and return to default state
+	_selected_member = ""
+	_nav_state = NavState.ROSTER_SELECT
+	_nav_state_history.clear()
 	_rebuild()
 
 func _auto_accept_plan() -> void:
@@ -1207,7 +1218,17 @@ func _has_unassigned_common_members() -> bool:
 	return _common_members.size() > 0
 
 func _has_pending_changes() -> bool:
-	return _pending_reassignments.size() > 0 or _common_members.size() > 0
+	# Check for unstaged pending reassignments or common members
+	if _pending_reassignments.size() > 0 or _common_members.size() > 0:
+		return true
+
+	# Also check if there's a locked plan in DormSystem (staged for Saturday)
+	var ds: Node = _ds()
+	if ds and ds.has_method("is_plan_locked"):
+		if bool(ds.call("is_plan_locked")):
+			return true
+
+	return false
 
 func _can_accept_plan() -> bool:
 	# Can accept if all common room members have been assigned
