@@ -53,8 +53,8 @@ func _build_ui() -> void:
 	# Block all input from passing through
 	mouse_filter = Control.MOUSE_FILTER_STOP
 
-	# Set minimum size for the panel - wider and taller for better text display
-	custom_minimum_size = Vector2(600, 300)
+	# Set minimum size for the panel
+	custom_minimum_size = Vector2(500, 400)
 
 	# Add solid background (no transparency)
 	var style := StyleBoxFlat.new()
@@ -90,7 +90,7 @@ func _build_ui() -> void:
 
 	# Message with ScrollContainer for long content
 	var scroll := ScrollContainer.new()
-	scroll.custom_minimum_size = Vector2(560, 100)  # Min height for scroll area
+	scroll.custom_minimum_size = Vector2(460, 200)  # Min height for scroll area
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
@@ -100,7 +100,7 @@ func _build_ui() -> void:
 	msg_label.text = _message
 	msg_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	msg_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	msg_label.custom_minimum_size = Vector2(560, 0)
+	msg_label.custom_minimum_size = Vector2(460, 0)
 	scroll.add_child(msg_label)
 
 	# Buttons
