@@ -475,13 +475,15 @@ func _show_party_picker() -> void:
 	if _item_name:
 		_item_name.text = "Choose Party Member"
 
-	# Hide the normal details text
-	if _details_text:
-		_details_text.visible = false
-
 	# Hide action buttons
 	if _action_buttons:
 		_action_buttons.visible = false
+
+	# Remove existing children from scroll container (including _details_text)
+	if _scroll_container:
+		for child in _scroll_container.get_children():
+			_scroll_container.remove_child(child)
+			# Don't queue_free because we'll add it back later
 
 	# Create party member ItemList in the scroll container
 	_party_picker_list = ItemList.new()
@@ -515,6 +517,8 @@ func _show_party_picker() -> void:
 
 	# Update focus mode
 	_focus_mode = "party_picker"
+
+	print("[ItemsPanel] Party picker shown with %d members" % _party_member_tokens.size())
 
 func _grab_party_picker_focus() -> void:
 	"""Helper to grab focus on party picker"""
@@ -581,17 +585,23 @@ func _close_party_picker() -> void:
 
 	# Remove party picker list
 	if _party_picker_list and is_instance_valid(_party_picker_list):
+		if _scroll_container and _party_picker_list.get_parent() == _scroll_container:
+			_scroll_container.remove_child(_party_picker_list)
 		_party_picker_list.queue_free()
 		_party_picker_list = null
+
+	# Restore _details_text to scroll container if it's not already there
+	if _scroll_container and _details_text:
+		if _details_text.get_parent() != _scroll_container:
+			_scroll_container.add_child(_details_text)
+		_details_text.visible = true
 
 	# Clear state
 	_party_member_tokens.clear()
 	_item_to_use_id = ""
 	_item_to_use_def = {}
 
-	# Restore details panel visibility
-	if _details_text:
-		_details_text.visible = true
+	# Restore action buttons
 	if _action_buttons:
 		_action_buttons.visible = true
 
