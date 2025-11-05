@@ -15,6 +15,8 @@
 - `docs/EVENT_DIALOGUE_SYSTEM.md` - Event & dialogue system (with Quick Start Guide)
 - `docs/CSV_DATA_REFERENCE.md` - All CSV file structures
 - `docs/STATS_AND_BONDS.md` - Progression systems
+- `docs/UI_POPUP_PATTERNS.md` - **CRITICAL:** Popup handling in paused contexts
+- `docs/UNIFIED_PANEL_ARCHITECTURE.md` - Panel architecture and patterns
 - `docs/psyokin-jrpg.skill` - Comprehensive code patterns
 
 ## Core Systems (Autoloads at /root/)
@@ -61,6 +63,8 @@ aCSVLoader             # Data loading
 **Dialogue** → Read `docs/EVENT_DIALOGUE_SYSTEM.md` (section 5: Quick Start Guide)
 **CSV Data** → Read `docs/CSV_DATA_REFERENCE.md`
 **Stats/Bonds** → Read `docs/STATS_AND_BONDS.md`
+**UI/Popups** → Read `docs/UI_POPUP_PATTERNS.md` (CRITICAL for popups in paused contexts)
+**Panels** → Read `docs/UNIFIED_PANEL_ARCHITECTURE.md`
 **Code Patterns** → Read `docs/psyokin-jrpg.skill`
 
 ## Common Commands
