@@ -445,7 +445,7 @@ func _on_use_button_pressed() -> void:
 	if not _is_recovery_item(def):
 		return
 
-	_show_party_picker()
+	_show_member_selection_popup()
 
 func _on_inspect_button_pressed() -> void:
 	"""Handle Inspect button press"""
@@ -459,38 +459,54 @@ func _on_equipment_changed(_member: String) -> void:
 	"""Handle equipment change"""
 	_rebuild()
 
-func _show_party_picker() -> void:
-	"""Show party member picker in details panel"""
+func _show_member_selection_popup() -> void:
+	"""Show popup to select which party member to use item on - matches StatusPanel pattern"""
 	if _selected_item_id == "":
 		return
 
 	var def: Dictionary = _defs.get(_selected_item_id, {})
-	var name: String = _display_name(_selected_item_id, def)
+	var item_name: String = _display_name(_selected_item_id, def)
 
-	# Store item info for later use
-	_item_to_use_id = _selected_item_id
-	_item_to_use_def = def
+	print("[ItemsPanel] Showing member selection popup for: %s" % item_name)
 
-	# Update header to show we're picking a party member
-	if _item_name:
-		_item_name.text = "Choose Party Member"
+	# Create CanvasLayer overlay (for paused context)
+	var overlay := CanvasLayer.new()
+	overlay.layer = 100
+	overlay.process_mode = Node.PROCESS_MODE_ALWAYS
+	get_tree().root.add_child(overlay)
+	get_tree().root.move_child(overlay, 0)
 
-	# Hide action buttons
-	if _action_buttons:
-		_action_buttons.visible = false
+	# Create popup panel
+	var popup_panel: Panel = Panel.new()
+	popup_panel.process_mode = Node.PROCESS_MODE_ALWAYS
+	popup_panel.z_index = 100
+	popup_panel.modulate = Color(1, 1, 1, 0)  # Start transparent for fade in
+	overlay.add_child(popup_panel)
 
-	# Remove existing children from scroll container (including _details_text)
-	if _scroll_container:
-		for child in _scroll_container.get_children():
-			_scroll_container.remove_child(child)
-			# Don't queue_free because we'll add it back later
+	# Apply consistent styling
+	_style_popup_panel(popup_panel)
 
-	# Create party member ItemList in the scroll container
+	# Store overlay reference
+	popup_panel.set_meta("_overlay", overlay)
+
+	# Create content container
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 8)
+	popup_panel.add_child(vbox)
+
+	# Title label
+	var title := Label.new()
+	title.text = "Use %s on..." % item_name
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 14)
+	vbox.add_child(title)
+
+	# Member list
 	_party_picker_list = ItemList.new()
-	_party_picker_list.custom_minimum_size = Vector2(0, 300)
-	_party_picker_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_party_picker_list.custom_minimum_size = Vector2(300, 250)
 	_party_picker_list.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_party_picker_list.focus_mode = Control.FOCUS_ALL
+	vbox.add_child(_party_picker_list)
 
 	# Populate members
 	var members: Array[String] = _gather_members()
@@ -506,19 +522,71 @@ func _show_party_picker() -> void:
 		])
 		_party_member_tokens.append(member_token)
 
-	# Add to scroll container
-	if _scroll_container:
-		_scroll_container.add_child(_party_picker_list)
+	# Add Cancel button
+	var cancel_btn := Button.new()
+	cancel_btn.text = "Cancel"
+	cancel_btn.pressed.connect(func(): _close_member_selection_popup(popup_panel, false))
+	vbox.add_child(cancel_btn)
+
+	# Auto-size panel
+	await get_tree().process_frame
+	await get_tree().process_frame
+	popup_panel.size = vbox.size + Vector2(20, 20)
+	vbox.position = Vector2(10, 10)
+
+	# Center popup on screen
+	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
+	popup_panel.position = (viewport_size - popup_panel.size) / 2.0
+
+	# Store item info for use
+	_item_to_use_id = _selected_item_id
+	_item_to_use_def = def
+
+	# Store popup reference
+	popup_panel.set_meta("_item_list", _party_picker_list)
+
+	# Fade in
+	_fade_in_popup(popup_panel)
 
 	# Select first and grab focus
 	if _party_picker_list.item_count > 0:
 		_party_picker_list.select(0)
-		call_deferred("_grab_party_picker_focus")
+		_party_picker_list.call_deferred("grab_focus")
 
 	# Update focus mode
 	_focus_mode = "party_picker"
 
-	print("[ItemsPanel] Party picker shown with %d members" % _party_member_tokens.size())
+	print("[ItemsPanel] Member selection popup shown with %d members" % _party_member_tokens.size())
+
+func _style_popup_panel(popup: Panel) -> void:
+	"""Apply consistent popup styling"""
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.15, 0.15, 0.15, 1.0)
+	style.border_color = Color(1.0, 0.7, 0.75, 1.0)
+	style.set_border_width_all(2)
+	style.corner_radius_top_left = 8
+	style.corner_radius_top_right = 8
+	style.corner_radius_bottom_left = 8
+	style.corner_radius_bottom_right = 8
+	popup.add_theme_stylebox_override("panel", style)
+
+func _fade_in_popup(popup: Panel) -> void:
+	"""Fade in popup"""
+	var tween := create_tween()
+	tween.set_ease(Tween.EASE_OUT)
+	tween.set_trans(Tween.TRANS_CUBIC)
+	tween.tween_property(popup, "modulate", Color(1, 1, 1, 1), 0.2)
+	await tween.finished
+	popup.mouse_filter = Control.MOUSE_FILTER_STOP  # Enable input after fade
+
+func _fade_out_popup(popup: Panel) -> void:
+	"""Fade out popup"""
+	popup.mouse_filter = Control.MOUSE_FILTER_IGNORE  # Block input during fade
+	var tween := create_tween()
+	tween.set_ease(Tween.EASE_IN)
+	tween.set_trans(Tween.TRANS_CUBIC)
+	tween.tween_property(popup, "modulate", Color(1, 1, 1, 0), 0.2)
+	await tween.finished
 
 func _grab_party_picker_focus() -> void:
 	"""Helper to grab focus on party picker"""
@@ -530,14 +598,18 @@ func _unhandled_input(event: InputEvent) -> void:
 	if not visible:
 		return
 
-	# Handle party picker input
+	# Handle party picker popup input
 	if _focus_mode == "party_picker":
 		if event.is_action_pressed("menu_accept"):
 			_on_party_picker_accept()
 			get_viewport().set_input_as_handled()
 			return
 		elif event.is_action_pressed("menu_back"):
-			_close_party_picker()
+			# Find the popup panel to close
+			if _party_picker_list and is_instance_valid(_party_picker_list):
+				var popup = _party_picker_list.get_parent().get_parent()  # vbox -> popup_panel
+				if popup is Panel:
+					_close_member_selection_popup(popup, false)
 			get_viewport().set_input_as_handled()
 			return
 		return
@@ -563,7 +635,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 
 func _on_party_picker_accept() -> void:
-	"""Handle A button in party picker"""
+	"""Handle A button in party picker popup"""
 	if not _party_picker_list or not is_instance_valid(_party_picker_list):
 		return
 
@@ -576,42 +648,47 @@ func _on_party_picker_accept() -> void:
 		return
 
 	var member_token: String = _party_member_tokens[index]
-	_use_item_on_member(_item_to_use_id, _item_to_use_def, member_token)
-	_close_party_picker()
 
-func _close_party_picker() -> void:
-	"""Close party picker and return to normal view"""
-	print("[ItemsPanel] Closing party picker...")
+	# Find the popup panel to close
+	var popup = _party_picker_list.get_parent().get_parent()  # vbox -> popup_panel
+	if popup is Panel:
+		# Use item on member
+		_use_item_on_member(_item_to_use_id, _item_to_use_def, member_token)
+		# Close popup
+		_close_member_selection_popup(popup, true)
 
-	# Remove party picker list
-	if _party_picker_list and is_instance_valid(_party_picker_list):
-		if _scroll_container and _party_picker_list.get_parent() == _scroll_container:
-			_scroll_container.remove_child(_party_picker_list)
-		_party_picker_list.queue_free()
-		_party_picker_list = null
+func _close_member_selection_popup(popup_panel: Panel, used_item: bool) -> void:
+	"""Close member selection popup and clean up"""
+	print("[ItemsPanel] Closing member selection popup (used_item: %s)" % used_item)
 
-	# Restore _details_text to scroll container if it's not already there
-	if _scroll_container and _details_text:
-		if _details_text.get_parent() != _scroll_container:
-			_scroll_container.add_child(_details_text)
-		_details_text.visible = true
+	# Fade out
+	await _fade_out_popup(popup_panel)
 
-	# Clear state
+	# Get overlay reference
+	var overlay = popup_panel.get_meta("_overlay", null)
+
+	# Clean up popup
+	if popup_panel and is_instance_valid(popup_panel):
+		popup_panel.queue_free()
+
+	# Clean up overlay
+	if overlay and is_instance_valid(overlay):
+		overlay.queue_free()
+
+	# Clear references
+	_party_picker_list = null
 	_party_member_tokens.clear()
 	_item_to_use_id = ""
 	_item_to_use_def = {}
 
-	# Restore action buttons
-	if _action_buttons:
-		_action_buttons.visible = true
-
-	# Return focus to item list BEFORE rebuilding
+	# Return focus mode
 	_focus_mode = "items"
 
-	# Now rebuild to refresh item counts
-	_rebuild()
+	# If item was used, rebuild to refresh counts
+	if used_item:
+		_rebuild()
 
-	# Grab focus after rebuild completes
+	# Grab focus back
 	if _item_list and _item_list.item_count > 0:
 		_item_list.grab_focus()
 	else:
