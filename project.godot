@@ -12,7 +12,7 @@ config_version=5
 
 config/name="Psyokin"
 run/main_scene="uid://bt2c48128oxkm"
-config/features=PackedStringArray("4.4", "Forward Plus")
+config/features=PackedStringArray("4.5", "Forward Plus")
 config/icon="res://icon.svg"
 
 [autoload]
@@ -54,6 +54,14 @@ aMinigameManager="*res://scripts/battle/MinigameManager.gd"
 aInputManager="*res://scripts/core/InputManager.gd"
 aControllerManager="*res://scripts/core/ControllerManager.gd"
 aPanelManager="*res://scripts/core/PanelManager.gd"
+
+[display]
+
+window/size/viewport_width=1280
+window/size/viewport_height=720
+window/size/extend_to_title=true
+window/stretch/mode="canvas_items"
+window/stretch/scale_mode="integer"
 
 [editor]
 
