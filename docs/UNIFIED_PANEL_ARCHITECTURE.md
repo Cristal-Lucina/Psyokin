@@ -159,6 +159,40 @@ popup.queue_free()
 - Process even when game paused (`PROCESS_MODE_ALWAYS`)
 - Auto-centering and focus management
 
+**⚠️ CRITICAL: Popup Usage When Game is Paused**
+
+When showing popups while the game is paused (like in GameMenu where `get_tree().paused = true`), you **MUST** use a CanvasLayer overlay with `PROCESS_MODE_ALWAYS`:
+
+```gdscript
+# Create CanvasLayer overlay for popup (ensures it's on top and processes input first)
+var overlay := CanvasLayer.new()
+overlay.layer = 100  # High layer to ensure it's on top
+overlay.process_mode = Node.PROCESS_MODE_ALWAYS  # Process even when paused
+get_tree().root.add_child(overlay)
+get_tree().root.move_child(overlay, 0)  # Move to first position so it processes input first
+
+# Create and show popup
+var popup := ConfirmationPopup.create(message)
+popup.process_mode = Node.PROCESS_MODE_ALWAYS  # Process even when paused
+overlay.add_child(popup)
+
+# Wait for user response
+var result: bool = await popup.confirmed
+
+# Clean up
+popup.queue_free()
+overlay.queue_free()
+```
+
+**Why this is necessary:**
+1. **GameMenu pauses the game** when visible (`get_tree().paused = true`)
+2. Without `PROCESS_MODE_ALWAYS`, nodes **don't receive ANY input events** while paused
+3. The overlay needs `PROCESS_MODE_ALWAYS` to render and process input
+4. The popup needs `PROCESS_MODE_ALWAYS` to handle button presses
+5. Moving overlay to position 0 ensures it processes input **before** other UI elements
+
+**Common mistake:** Forgetting to set `process_mode` on both the overlay AND the popup will result in a popup that is visible but doesn't respond to any input.
+
 **❌ NEVER DO THIS:**
 ```gdscript
 # DON'T create Panel nodes manually
