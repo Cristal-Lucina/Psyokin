@@ -49,14 +49,6 @@ func _ready() -> void:
 	# Get ControllerManager reference
 	_ctrl_mgr = get_node_or_null("/root/aControllerManager")
 
-	# Enable processing for input cooldown
-	set_process(true)
-
-func _process(delta: float) -> void:
-	# Update input cooldown timer
-	if _input_cooldown > 0.0:
-		_input_cooldown -= delta
-
 	# Hide the LeftTabs since tab buttons are now in StatusPanel
 	if _left_tabs:
 		_left_tabs.visible = false
@@ -87,6 +79,11 @@ func _process(delta: float) -> void:
 	# IMPORTANT: Initialize MENU_MAIN context if menu starts visible
 	# Use call_deferred to ensure this happens after visibility_changed signal is connected
 	call_deferred("_initialize_context")
+
+func _process(delta: float) -> void:
+	# Update input cooldown timer
+	if _input_cooldown > 0.0:
+		_input_cooldown -= delta
 
 func _input(event: InputEvent) -> void:
 	# Skip if input already handled by popup or other node
