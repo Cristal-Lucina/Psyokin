@@ -144,6 +144,12 @@ func _to_title() -> void:
 		aControllerManager.clear_stack()
 		aControllerManager.set_context(aControllerManager.InputContext.OVERWORLD)
 
+	# 3. CRITICAL: Unpause the game tree before changing scenes
+	# GameMenu pauses the game, but when we change scenes it gets destroyed
+	# before its visibility_changed callback can unpause, leaving the game stuck
+	print("[SystemPanel] Unpausing game tree")
+	get_tree().paused = false
+
 	# Use SceneRouter if available, otherwise change scene directly
 	if has_node("/root/aSceneRouter") and aSceneRouter.has_method("goto_title"):
 		print("[SystemPanel] Using SceneRouter.goto_title()")
