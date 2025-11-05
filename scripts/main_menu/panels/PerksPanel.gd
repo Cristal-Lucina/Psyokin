@@ -471,17 +471,22 @@ func _show_perk_confirmation(perk: Dictionary) -> void:
 
 	print("[PerksPanel] Showing perk confirmation for: %s" % perk_name)
 
-	# Create popup and add to viewport root for proper centering
-	var popup := ConfirmationPopup.create(message)
+	# Create CanvasLayer overlay for popup (ensures it's on top and processes input first)
+	var overlay := CanvasLayer.new()
+	overlay.layer = 100  # High layer to ensure it's on top
+	get_tree().root.add_child(overlay)
+	get_tree().root.move_child(overlay, 0)  # Move to first position so it processes input first
 
-	# Add to scene root instead of panel for viewport-centered positioning
-	get_tree().root.add_child(popup)
+	# Create and show popup
+	var popup := ConfirmationPopup.create(message)
+	overlay.add_child(popup)
 
 	# Wait for user response
 	var result: bool = await popup.confirmed
 
 	# Clean up
 	popup.queue_free()
+	overlay.queue_free()
 
 	# Handle response
 	if result:
