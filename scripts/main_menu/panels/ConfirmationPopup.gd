@@ -123,10 +123,16 @@ func _build_ui() -> void:
 	call_deferred("_fade_in")
 
 func _position_center() -> void:
-	if get_parent() == null:
+	if not is_inside_tree():
+		await get_tree().process_frame
+
+	if get_viewport() == null:
+		print("[ConfirmationPopup._position_center] No viewport, cannot center")
 		return
-	var parent_rect: Rect2 = get_parent().get_viewport_rect()
-	position = (parent_rect.size - size) / 2
+
+	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
+	position = (viewport_size - size) / 2
+	print("[ConfirmationPopup._position_center] Centered at %v (viewport: %v, size: %v)" % [position, viewport_size, size])
 
 func _input(event: InputEvent) -> void:
 	if not visible:
