@@ -5,16 +5,17 @@
 2. [System Architecture](#system-architecture)
 3. [Event System](#event-system)
 4. [Dialogue System](#dialogue-system)
-5. [Emoji & Expression System](#emoji--expression-system)
-6. [NPC Location Tracking](#npc-location-tracking)
-7. [Mission System](#mission-system)
-8. [Item Location System](#item-location-system)
-9. [Shop System](#shop-system)
-10. [Morality-Based NPC Reactions](#morality-based-npc-reactions)
-11. [Monthly Critical Events](#monthly-critical-events)
-12. [Localization & Multi-Language Support](#localization--multi-language-support)
-13. [CSV Data Formats](#csv-data-formats)
-14. [Integration Points](#integration-points)
+5. [Dialogue System Quick Start Guide](#dialogue-system-quick-start-guide)
+6. [Emoji & Expression System](#emoji--expression-system)
+7. [NPC Location Tracking](#npc-location-tracking)
+8. [Mission System](#mission-system)
+9. [Item Location System](#item-location-system)
+10. [Shop System](#shop-system)
+11. [Morality-Based NPC Reactions](#morality-based-npc-reactions)
+12. [Monthly Critical Events](#monthly-critical-events)
+13. [Localization & Multi-Language Support](#localization--multi-language-support)
+14. [CSV Data Formats](#csv-data-formats)
+15. [Integration Points](#integration-points)
 
 ---
 
@@ -287,6 +288,426 @@ NPCs can have multiple dialogue states:
 - **Event-Specific**: Plays during active events/missions
 - **Post-Event**: Plays after event completion
 - **Time-Specific**: Different dialogue based on time of day
+
+---
+
+## Dialogue System Quick Start Guide
+
+This section provides practical examples and step-by-step walkthroughs for implementing common dialogue patterns.
+
+### Example 1: Simple Linear Dialogue
+
+**Goal**: Create a basic conversation with no choices.
+
+**CSV Structure**:
+```csv
+dialogue_id,node_id,node_type,speaker,text,choices,next_node,condition,action
+intro_alice,1,TEXT,Alice,"Hi! I'm Alice. Welcome to the academy!",,,2,
+intro_alice,2,TEXT,Alice,"This place can be overwhelming at first.",,,3,
+intro_alice,3,TEXT,Alice,"Let me know if you need anything!",,,END,
+```
+
+**Flow**:
+1. Player interacts with Alice
+2. DialogueManager.start_dialogue("intro_alice", "npc_alice")
+3. Node 1 displays → Player presses A
+4. Node 2 displays → Player presses A
+5. Node 3 displays → Player presses A
+6. Dialogue ends, returns to gameplay
+
+**Result**: Simple 3-line conversation that always plays the same way.
+
+---
+
+### Example 2: Player Choices with Consequences
+
+**Goal**: Player makes a choice that affects morality and mission availability.
+
+**CSV Structure**:
+```csv
+dialogue_id,node_id,node_type,speaker,text,choices,next_node,condition,action
+mission_cat,1,TEXT,Alice,"My cat is missing! Will you help me find her?",,,2,
+mission_cat,2,CHOICE,Alice,"Please, I'm worried sick!","Yes, I'll help|No, sorry|What's the reward?","3|5|7",,
+mission_cat,3,TEXT,Alice,"Thank you so much! Her name is Whiskers.",,,4,"morality:+3"
+mission_cat,4,ACTION,,,,,,,"start_mission:side_cat_rescue;set_flag:accepted_cat_mission;show_emoji:npc_alice:happy:2.0"
+mission_cat,4b,TEXT,Alice,"I last saw her near the park. Please hurry!",,,END,
+mission_cat,5,TEXT,Alice,"Oh... I understand.",,,6,"morality:-2"
+mission_cat,6,ACTION,,,,,,,"show_emoji:npc_alice:sad:2.0;set_flag:declined_cat_mission"
+mission_cat,6b,TEXT,Alice,"I'll... I'll look by myself then.",,,END,
+mission_cat,7,TEXT,Alice,"Really? You want a reward for helping?",,,8,
+mission_cat,8,TEXT,Alice,"Fine. I'll give you 500 Creds if you find her.",,,9,
+mission_cat,9,CHOICE,Alice,"Is that enough?","Okay, I'll do it|Still not interested","3|5",,
+```
+
+**Flow Diagram**:
+```
+Node 1: Alice asks for help
+   ↓
+Node 2: CHOICE
+   ├─ "Yes, I'll help" (morality +3)
+   │    ↓
+   │  Node 3: Alice thanks player
+   │    ↓
+   │  Node 4: ACTION (start mission, set flag, show 😊)
+   │    ↓
+   │  Node 4b: Alice gives hint
+   │    ↓
+   │  END
+   │
+   ├─ "No, sorry" (morality -2)
+   │    ↓
+   │  Node 5: Alice disappointed
+   │    ↓
+   │  Node 6: ACTION (show 😢, set flag)
+   │    ↓
+   │  Node 6b: Alice accepts rejection
+   │    ↓
+   │  END
+   │
+   └─ "What's the reward?"
+        ↓
+      Node 7: Alice surprised
+        ↓
+      Node 8: Offers 500 Creds
+        ↓
+      Node 9: CHOICE again
+        ├─ "Okay, I'll do it" → Node 3
+        └─ "Still not interested" → Node 5
+```
+
+**Key Points**:
+- Choice nodes branch to different paths
+- Actions in node 3 and 5 affect morality (morality:+3, morality:-2)
+- ACTION nodes trigger game events (start mission, show emoji)
+- Some paths loop back (node 9 can return to node 3)
+
+---
+
+### Example 3: Conditional Branching Based on Morality
+
+**Goal**: NPC greets player differently based on morality level.
+
+**CSV Structure**:
+```csv
+dialogue_id,node_id,node_type,speaker,text,choices,next_node,condition,action
+shop_greet,1,BRANCH,,,,"2|3|4","morality>=50|morality<=-30|default",
+shop_greet,2,TEXT,Shopkeeper,"Welcome back, hero! Everything is 10% off for you today!",,,5,"show_emoji:npc_shop:happy:2.0"
+shop_greet,3,TEXT,Shopkeeper,"You again? I'm watching you. Don't try anything.",,,5,"show_emoji:npc_shop:angry:2.0"
+shop_greet,4,TEXT,Shopkeeper,"Hello. What can I get you?",,,5,
+shop_greet,5,ACTION,,,,,,,"open_shop:general_store"
+```
+
+**Flow**:
+```
+Node 1: BRANCH (auto-check morality, no player input)
+   ├─ If morality >= 50 → Node 2 (hero greeting + 😊 + discount)
+   ├─ If morality <= -30 → Node 3 (hostile greeting + 😡)
+   └─ Else (default) → Node 4 (neutral greeting)
+   ↓
+Node 5: ACTION (open shop interface)
+```
+
+**Morality Tiers**:
+- **High (≥50)**: Friendly, discount applied
+- **Low (≤-30)**: Hostile, no discount (or price increase)
+- **Neutral**: Standard greeting
+
+**Result**: Same shop, different experience based on player's moral choices.
+
+---
+
+### Example 4: Flag-Based Repeatable Dialogue
+
+**Goal**: NPC says different things on first meeting vs. subsequent visits.
+
+**CSV Structure**:
+```csv
+dialogue_id,node_id,node_type,speaker,text,choices,next_node,condition,action
+npc_bob,1,BRANCH,,,,"2|4","flag_met_bob==false|flag_met_bob==true",
+npc_bob,2,TEXT,Bob,"Hey there! I'm Bob. Nice to meet you!",,,3,
+npc_bob,3,ACTION,,,,,,,"set_flag:met_bob:true"
+npc_bob,3b,TEXT,Bob,"If you ever need training tips, come find me!",,,END,
+npc_bob,4,TEXT,Bob,"Back for more training, {player_name}?",,,5,
+npc_bob,5,CHOICE,Bob,"What do you want to work on?","Strength training|Speed training|Just chatting","6|7|8",,
+npc_bob,6,ACTION,,,,,,,"activity:strength_training"
+npc_bob,7,ACTION,,,,,,,"activity:speed_training"
+npc_bob,8,TEXT,Bob,"Alright, catch you later!",,,END,
+```
+
+**Flow**:
+```
+Node 1: BRANCH (check flag_met_bob)
+   ├─ First time (flag == false)
+   │    ↓
+   │  Node 2: "Nice to meet you!"
+   │    ↓
+   │  Node 3: ACTION (set flag_met_bob = true)
+   │    ↓
+   │  Node 3b: "Come find me!"
+   │    ↓
+   │  END
+   │
+   └─ Repeat visit (flag == true)
+        ↓
+      Node 4: "Back for more training?"
+        ↓
+      Node 5: CHOICE (training options)
+        ├─ Strength → Node 6 (activity)
+        ├─ Speed → Node 7 (activity)
+        └─ Chat → Node 8 (goodbye)
+```
+
+**Key Points**:
+- First visit: Introduction + sets flag
+- Subsequent visits: Skip intro, go straight to options
+- Uses `{player_name}` variable for personalization
+
+---
+
+### Example 5: Multi-Step Quest with Item Check
+
+**Goal**: NPC asks for an item, player must return with it.
+
+**CSV Structure**:
+
+**First Conversation (Request)**:
+```csv
+dialogue_id,node_id,node_type,speaker,text,choices,next_node,condition,action
+quest_book,1,TEXT,Professor,"I need a specific book from the library.",,,2,
+quest_book,2,TEXT,Professor,"Can you fetch 'Advanced Mind Theory' for me?",,,3,
+quest_book,3,CHOICE,Professor,"It should be on the top shelf.","I'll get it|Not right now","4|5",,
+quest_book,4,ACTION,,,,,,,"start_mission:fetch_book;set_flag:book_quest_active"
+quest_book,4b,TEXT,Professor,"Great! I'll be here waiting.",,,END,
+quest_book,5,TEXT,Professor,"Alright, but I really need it soon!",,,END,
+```
+
+**Second Conversation (Return with item)**:
+```csv
+dialogue_id,node_id,node_type,speaker,text,choices,next_node,condition,action
+quest_book_return,1,BRANCH,,,,"2|4","has_item:Advanced_Mind_Theory|default",
+quest_book_return,2,TEXT,Professor,"Ah, you found it! Thank you!",,,3,
+quest_book_return,3,ACTION,,,,,,,"remove_item:Advanced_Mind_Theory;give_item:Potion:5;add_creds:300;complete_mission:fetch_book;morality:+2"
+quest_book_return,3b,TEXT,Professor,"Here, take these potions as thanks!",,,END,
+quest_book_return,4,TEXT,Professor,"Still looking for that book?",,,5,
+quest_book_return,5,TEXT,Professor,"It's 'Advanced Mind Theory' - top shelf in the library.",,,END,
+```
+
+**Flow**:
+```
+=== FIRST VISIT ===
+Professor asks for book
+   ↓
+Player accepts quest
+   ↓
+Mission activates
+   ↓
+END
+
+=== PLAYER FINDS BOOK IN LIBRARY ===
+(ItemLocationSystem gives player book)
+
+=== RETURN TO PROFESSOR ===
+Node 1: BRANCH (check has_item:Advanced_Mind_Theory)
+   ├─ Has book → Node 2 ("You found it!")
+   │    ↓
+   │  Node 3: ACTION
+   │    - Remove book from inventory
+   │    - Give 5 potions
+   │    - Give 300 Creds
+   │    - Complete mission
+   │    - Morality +2
+   │    ↓
+   │  Node 3b: "Thanks!"
+   │    ↓
+   │  END
+   │
+   └─ No book → Node 4 ("Still looking?")
+        ↓
+      Node 5: Reminder hint
+        ↓
+      END
+```
+
+**Key Points**:
+- Uses `has_item` condition to check inventory
+- Multiple rewards in single ACTION node
+- Quest progresses through multiple dialogue interactions
+
+---
+
+### Example 6: Mission Progress Check
+
+**Goal**: NPC reacts to active mission objectives.
+
+**CSV Structure**:
+```csv
+dialogue_id,node_id,node_type,speaker,text,choices,next_node,condition,action
+npc_witness,1,BRANCH,,,,"2|4|6","mission_active:investigate_theft and objective_incomplete:talk_to_witness|mission_active:investigate_theft and objective_complete:talk_to_witness|default",
+npc_witness,2,TEXT,Witness,"You're investigating the theft? I saw something!",,,3,
+npc_witness,3,ACTION,,,,,,,"complete_objective:talk_to_witness;set_flag:witness_testimony"
+npc_witness,3b,TEXT,Witness,"I saw a figure in a red jacket running away!",,,END,
+npc_witness,4,TEXT,Witness,"I hope that tip helped with your investigation!",,,END,
+npc_witness,6,TEXT,Witness,"Beautiful day today, isn't it?",,,END,
+```
+
+**Flow**:
+```
+Node 1: BRANCH (check mission state)
+   ├─ Mission active + objective incomplete
+   │    ↓
+   │  Node 2: "I saw something!"
+   │    ↓
+   │  Node 3: ACTION (complete objective, set flag)
+   │    ↓
+   │  Node 3b: Gives testimony
+   │    ↓
+   │  END
+   │
+   ├─ Mission active + objective already complete
+   │    ↓
+   │  Node 4: "Hope that helped!"
+   │    ↓
+   │  END
+   │
+   └─ No mission active
+        ↓
+      Node 6: Generic dialogue
+        ↓
+      END
+```
+
+**Key Points**:
+- Checks both mission status AND objective status
+- Dialogue is context-aware
+- Once objective complete, dialogue changes
+
+---
+
+### Common Action Types
+
+Actions are executed in ACTION nodes and modify game state:
+
+| Action Type | Syntax | Example |
+|-------------|--------|---------|
+| **Start Mission** | `start_mission:<mission_id>` | `start_mission:side_cat_rescue` |
+| **Complete Mission** | `complete_mission:<mission_id>` | `complete_mission:fetch_book` |
+| **Complete Objective** | `complete_objective:<obj_id>` | `complete_objective:talk_to_witness` |
+| **Set Flag** | `set_flag:<flag_name>:<value>` | `set_flag:met_alice:true` |
+| **Give Item** | `give_item:<item_id>:<quantity>` | `give_item:Potion:5` |
+| **Remove Item** | `remove_item:<item_id>:<quantity>` | `remove_item:KeyCard_A:1` |
+| **Add Creds** | `add_creds:<amount>` | `add_creds:500` |
+| **Morality Change** | `morality:<delta>` | `morality:+5` or `morality:-3` |
+| **Show Emoji** | `show_emoji:<npc_id>:<emoji>:<duration>` | `show_emoji:npc_alice:happy:2.0` |
+| **Start Battle** | `start_battle:<enemy_ids>` | `start_battle:bandit;bandit;goblin` |
+| **Open Shop** | `open_shop:<shop_id>` | `open_shop:weapon_store` |
+| **Teleport** | `teleport:<location>` | `teleport:downtown_plaza` |
+
+**Multiple Actions** (semicolon-separated):
+```
+"give_item:Potion:3;add_creds:200;morality:+2;set_flag:quest_complete:true"
+```
+
+---
+
+### Common Condition Patterns
+
+Conditions are checked in BRANCH nodes:
+
+| Condition Type | Syntax | Example |
+|----------------|--------|---------|
+| **Morality Check** | `morality>=[value]` / `morality<=[value]` | `morality>=50` |
+| **Flag Check** | `flag_[name]==[value]` | `flag_met_alice==true` |
+| **Item Check** | `has_item:[item_id]` | `has_item:KeyCard_A` |
+| **Mission Check** | `mission_active:[mission_id]` | `mission_active:side_cat_rescue` |
+| **Objective Check** | `objective_complete:[obj_id]` | `objective_complete:talk_to_bob` |
+| **Party Check** | `has_party_member:[member_id]` | `has_party_member:best_friend` |
+| **Date Check** | `month>=[value]` / `day==[value]` | `month>=5` |
+| **Time Check** | `time_of_day==[value]` | `time_of_day==evening` |
+| **Default** | `default` | Always matches (fallback) |
+
+**Multiple Conditions** (AND logic with `and`):
+```
+"morality>=30 and flag_met_alice==true"
+"mission_active:investigate and has_item:Evidence"
+```
+
+---
+
+### Tips for Dialogue Design
+
+**1. Always include a default branch**:
+```csv
+branch_node,1,BRANCH,,,,"2|3|4","morality>=50|morality<=-30|default"
+```
+The `default` ensures there's always a valid path.
+
+**2. Use meaningful node IDs**:
+- Good: `quest_start`, `accept_path`, `decline_path`
+- Bad: `1`, `2`, `3`
+
+**3. Test all paths**:
+- What if player has low morality?
+- What if player doesn't have the item?
+- What if mission is already complete?
+
+**4. Set flags for one-time events**:
+```csv
+action_node,10,ACTION,,,,,,,"set_flag:saw_cutscene_intro:true"
+```
+Then check the flag:
+```csv
+branch_node,1,BRANCH,,,,"2|3","flag_saw_cutscene_intro==false|default"
+```
+
+**5. Use emojis for visual feedback**:
+```csv
+action_node,5,ACTION,,,,,,,"show_emoji:npc_alice:happy:2.0"
+```
+Player instantly sees NPC reaction.
+
+**6. Break long dialogues into chunks**:
+- Instead of 10 TEXT nodes in a row
+- Add CHOICE nodes to keep player engaged
+
+**7. Provide clear choice labels**:
+- Good: "Yes, I'll help you find your cat"
+- Bad: "Option 1"
+
+**8. Record important choices**:
+All choices are automatically stored in `GameState.dialogue_choices[dialogue_id_node_id]`, allowing you to reference them later.
+
+---
+
+### Multi-Language Implementation
+
+The same CSV structure works across all languages. Only the `text` column changes:
+
+**English (en/side_quests.csv)**:
+```csv
+dialogue_id,node_id,node_type,speaker,text,choices,next_node,condition,action
+mission_cat,1,TEXT,Alice,"My cat is missing! Will you help?",,,2,
+mission_cat,2,CHOICE,Alice,"Please!","Yes, I'll help|No, sorry","3|5",,
+```
+
+**Spanish (es/side_quests.csv)**:
+```csv
+dialogue_id,node_id,node_type,speaker,text,choices,next_node,condition,action
+mission_cat,1,TEXT,Alice,"¡Mi gato está perdido! ¿Me ayudarás?",,,2,
+mission_cat,2,CHOICE,Alice,"¡Por favor!","Sí, te ayudaré|No, lo siento","3|5",,
+```
+
+**Japanese (jp/side_quests.csv)**:
+```csv
+dialogue_id,node_id,node_type,speaker,text,choices,next_node,condition,action
+mission_cat,1,TEXT,Alice,"私の猫がいなくなった！助けてくれますか？",,,2,
+mission_cat,2,CHOICE,Alice,"お願い！","はい、手伝います|いいえ、ごめんなさい","3|5",,
+```
+
+**Key Points**:
+- Same `dialogue_id` and `node_id` across all languages
+- Same branching logic (next_node, condition, action)
+- Only translate `text` and `choices` columns
+- Variables like `{player_name}` work in all languages
 
 ---
 
