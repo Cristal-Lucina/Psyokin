@@ -1,7 +1,13 @@
-extends Control
+extends PanelBase
 class_name SystemPanel
 
 ## Centers the menu and opens sub-menus above GameMenu (overlay or router).
+##
+## ARCHITECTURE:
+## - Extends PanelBase for lifecycle management
+## - Simple button panel (no NavState needed)
+## - Opens overlays for Load/Save/Settings/Title menus
+## - No popups needed (uses overlay system)
 
 const LOAD_MENU_SCENE : String = "res://scenes/ui/save/LoadMenu.tscn"
 const SAVE_MENU_SCENE : String = "res://scenes/ui/save/SaveMenu.tscn"
@@ -13,15 +19,79 @@ const TITLE_SCENE     : String = "res://scenes/main_menu/Title.tscn"
 @onready var _btn_settings : Button = %SettingsBtn
 @onready var _btn_title    : Button = %TitleBtn
 
+var _buttons: Array[Button] = []
+var _current_button_index: int = 0
+
 func _ready() -> void:
-	# Make sure we expand to the PanelHolder’s size.
+	super()  # Call PanelBase._ready() for lifecycle management
+
+	# Make sure we expand to the PanelHolder's size.
+	set_anchors_preset(Control.PRESET_FULL_RECT)
 	size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	size_flags_vertical   = Control.SIZE_EXPAND_FILL
 
 	_btn_load.pressed.connect(_open_load)
 	_btn_save.pressed.connect(_open_save)
 	_btn_settings.pressed.connect(_open_settings)
-	_btn_title.pressed.connect(_to_title)
+	_btn_title.pressed.connect(_on_title_pressed)
+
+	# Setup button array for controller navigation
+	_buttons = [_btn_load, _btn_save, _btn_settings, _btn_title]
+
+	# Enable focus for all buttons
+	for btn in _buttons:
+		if btn:
+			btn.focus_mode = Control.FOCUS_ALL
+
+# --- Input Handling -----------------------------------------------------------
+
+func _input(event: InputEvent) -> void:
+	if not is_active():
+		return
+
+	# Navigate buttons with D-pad/analog stick
+	if event.is_action_pressed("move_up"):
+		_navigate_buttons(-1)
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("move_down"):
+		_navigate_buttons(1)
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("menu_accept"):
+		_activate_current_button()
+		get_viewport().set_input_as_handled()
+
+func _navigate_buttons(direction: int) -> void:
+	"""Navigate through buttons with controller"""
+	_current_button_index += direction
+
+	# Wrap around
+	if _current_button_index < 0:
+		_current_button_index = _buttons.size() - 1
+	elif _current_button_index >= _buttons.size():
+		_current_button_index = 0
+
+	# Focus the button
+	if _buttons[_current_button_index]:
+		_buttons[_current_button_index].grab_focus()
+		print("[SystemPanel] Focused button %d: %s" % [_current_button_index, _buttons[_current_button_index].name])
+
+func _activate_current_button() -> void:
+	"""Activate the currently focused button"""
+	if _current_button_index >= 0 and _current_button_index < _buttons.size():
+		var btn := _buttons[_current_button_index]
+		if btn:
+			print("[SystemPanel] Activating button: %s" % btn.name)
+			btn.emit_signal("pressed")
+
+# --- PanelBase Lifecycle Overrides ---------------------------------------------
+
+func _on_panel_gained_focus() -> void:
+	super()
+	print("[SystemPanel] Gained focus - focusing first button")
+	# Focus the first button when panel becomes active
+	_current_button_index = 0
+	if _btn_load:
+		_btn_load.grab_focus()
 
 func _open_load() -> void:
 	_open_overlay(LOAD_MENU_SCENE)
@@ -33,11 +103,56 @@ func _open_save() -> void:
 func _open_settings() -> void:
 	_open_overlay(OPTIONS_SCENE)
 
+func _on_title_pressed() -> void:
+	"""Show confirmation dialog before returning to title"""
+	print("[SystemPanel] Return to Title button pressed - showing confirmation")
+	_confirm_return_to_title()
+
+func _confirm_return_to_title() -> void:
+	"""Ask user to confirm before returning to title screen"""
+	var popup := ConfirmationPopup.create("Return to title screen?\n\nAll unsaved progress will be lost.")
+	add_child(popup)
+	var confirmed: bool = await popup.confirmed
+	popup.queue_free()
+
+	if confirmed:
+		print("[SystemPanel] User confirmed - returning to title")
+		_to_title()
+	else:
+		print("[SystemPanel] User cancelled - staying in game")
+		# Re-focus the title button after cancellation
+		if _btn_title:
+			_btn_title.grab_focus()
+
 func _to_title() -> void:
+	"""Return to title screen - clear UI managers only"""
+	print("[SystemPanel] Returning to title screen...")
+
+	# CRITICAL: Clear UI manager states but DON'T reset game data
+	# Game state is preserved so user can Load if they want
+	# Title scene will reset if user clicks New Game
+
+	# 1. Force reset PanelManager (clears stack without lifecycle callbacks)
+	if has_node("/root/aPanelManager"):
+		print("[SystemPanel] Force resetting PanelManager")
+		aPanelManager.force_reset()
+
+	# 2. Reset ControllerManager to OVERWORLD (same as fresh title load)
+	# Title.gd handles input in OVERWORLD context just like the initial load
+	if has_node("/root/aControllerManager"):
+		print("[SystemPanel] Resetting ControllerManager to OVERWORLD")
+		aControllerManager.clear_stack()
+		aControllerManager.set_context(aControllerManager.InputContext.OVERWORLD)
+
+	# Use SceneRouter if available, otherwise change scene directly
 	if has_node("/root/aSceneRouter") and aSceneRouter.has_method("goto_title"):
+		print("[SystemPanel] Using SceneRouter.goto_title()")
 		aSceneRouter.goto_title()
 	else:
-		get_tree().change_scene_to_file(TITLE_SCENE)
+		print("[SystemPanel] Changing scene directly to title")
+		var err := get_tree().change_scene_to_file(TITLE_SCENE)
+		if err != OK:
+			push_error("[SystemPanel] Failed to change to title scene, error code: %d" % err)
 
 # --- overlay helper ------------------------------------------------------------
 
@@ -106,7 +221,45 @@ func _open_overlay(scene_path: String) -> void:
 		print("[SystemPanel] Overlay children count: ", c.get_child_count())
 		_print_node_tree(c, 0)
 
+		# Give focus to the overlay for controller support
+		call_deferred("_transfer_focus_to_overlay", c)
+
 	print("[SystemPanel] Overlay opened successfully!")
+
+func _transfer_focus_to_overlay(overlay: Control) -> void:
+	"""Transfer focus to the overlay for controller support"""
+	print("[SystemPanel] Transferring focus to overlay...")
+
+	# Wait one frame to ensure overlay is fully initialized
+	await get_tree().process_frame
+
+	# Try to find the first focusable control in the overlay
+	var first_focusable := _find_first_focusable(overlay)
+
+	if first_focusable:
+		print("[SystemPanel] Found focusable control: %s" % first_focusable.name)
+		first_focusable.grab_focus()
+		print("[SystemPanel] Focus transferred successfully, has_focus=%s" % first_focusable.has_focus())
+	else:
+		print("[SystemPanel] Warning: No focusable control found in overlay")
+
+func _find_first_focusable(node: Node) -> Control:
+	"""Recursively find the first focusable control in the node tree"""
+	if node is Control:
+		var control := node as Control
+		# Check if this control can receive focus
+		if control.focus_mode != Control.FOCUS_NONE and control.visible:
+			# Prefer buttons and other interactive controls
+			if control is Button or control is LineEdit or control is TextEdit or control is OptionButton:
+				return control
+
+	# Search children recursively
+	for child in node.get_children():
+		var result := _find_first_focusable(child)
+		if result:
+			return result
+
+	return null
 
 func _print_node_tree(node: Node, indent: int) -> void:
 	var prefix = ""

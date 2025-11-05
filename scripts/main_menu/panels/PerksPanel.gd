@@ -36,9 +36,8 @@ var _grid_cells: Array[Array] = []  # 8×5 array of Controls
 var _selected_row: int = 2  # Start at first tier row
 var _selected_col: int = 0
 
-# Confirmation popup
-var _active_popup: Control = null
-var _pending_perk: Dictionary = {}  # Perk waiting for confirmation
+# Note: Confirmation popup handling is now done by ConfirmationPopup class
+# (removed _active_popup and _pending_perk - no longer needed)
 
 func _ready() -> void:
 	# Set high input priority so popup input blocking happens before parent nodes
@@ -87,8 +86,9 @@ func _refresh_highlight() -> void:
 	_highlight_selection()
 	_show_selected_perk_details()
 
-func _rebuild() -> void:
-	"""Rebuild entire panel - refresh data and UI"""
+func _rebuild(_arg1 = null, _arg2 = null, _arg3 = null) -> void:
+	"""Rebuild entire panel - refresh data and UI
+	Accepts optional arguments from signals (perk_points_changed sends 1, perk_unlocked sends 3)"""
 	_load_data()
 	_build_grid()
 	_populate_acquired_perks()
@@ -293,9 +293,9 @@ func _get_perk_info(stat_id: String, tier_index: int) -> Dictionary:
 			info["perk_id"] = String(_perk.call("get_perk_id", stat_id, tier_index))
 
 		if _perk.has_method("get_perk_name"):
-			var name: String = String(_perk.call("get_perk_name", stat_id, tier_index))
-			if name != "":
-				info["name"] = name
+			var perk_name: String = String(_perk.call("get_perk_name", stat_id, tier_index))
+			if perk_name != "":
+				info["name"] = perk_name
 
 		if _perk.has_method("get_perk_desc"):
 			info["description"] = String(_perk.call("get_perk_desc", stat_id, tier_index))
@@ -340,9 +340,9 @@ func _highlight_selection() -> void:
 		for col in range(GRID_COLS):
 			if row >= _grid_cells.size() or col >= _grid_cells[row].size():
 				continue
-			var cell: Control = _grid_cells[row][col]
-			if cell is Button:
-				cell.modulate = Color(1.0, 1.0, 1.0, 1.0)
+			var grid_cell: Control = _grid_cells[row][col]
+			if grid_cell is Button:
+				grid_cell.modulate = Color(1.0, 1.0, 1.0, 1.0)
 
 	# Highlight selected
 	if _selected_row < 0 or _selected_row >= _grid_cells.size():
@@ -401,19 +401,13 @@ func _show_perk_details(perk: Dictionary) -> void:
 
 func _on_tier_cell_hovered(stat_id: String, tier_index: int) -> void:
 	"""Handle mouse hover over tier cell"""
-	# Block hover interactions when popup is active
-	if _active_popup and is_instance_valid(_active_popup):
-		return
-
+	# Note: ConfirmationPopup blocks mouse input automatically (MOUSE_FILTER_STOP)
 	var perk: Dictionary = _get_perk_info(stat_id, tier_index)
 	_show_perk_details(perk)
 
 func _on_tier_cell_pressed(stat_id: String, tier_index: int) -> void:
 	"""Handle tier cell button press"""
-	# Block button presses when popup is active
-	if _active_popup and is_instance_valid(_active_popup):
-		return
-
+	# Note: ConfirmationPopup blocks mouse input automatically (MOUSE_FILTER_STOP)
 	var perk: Dictionary = _get_perk_info(stat_id, tier_index)
 	if not perk["available"]:
 		return
@@ -468,160 +462,31 @@ func _unlock_perk(perk: Dictionary) -> void:
 	_show_selected_perk_details()
 
 func _show_perk_confirmation(perk: Dictionary) -> void:
-	"""Show confirmation popup before unlocking perk"""
-	# Prevent multiple popups
-	if _active_popup and is_instance_valid(_active_popup):
-		print("[PerksPanel] Popup already open, ignoring request")
-		return
+	"""Show confirmation popup before unlocking perk using ConfirmationPopup"""
+	var perk_name: String = perk.get("name", "Unknown Perk")
+	var desc: String = perk.get("description", "")
 
-	# Store pending perk
-	_pending_perk = perk
+	# Build message with perk details
+	var message := "%s\n\n%s\n\nCost: 1 Perk Point\n\nUnlock this perk?" % [perk_name, desc]
 
-	# Create popup panel
-	var popup_panel: Panel = Panel.new()
-	popup_panel.process_mode = Node.PROCESS_MODE_ALWAYS
-	popup_panel.z_index = 100
-	popup_panel.modulate.a = 0.0  # Start transparent for fade-in
-	popup_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE  # Block input during fade
-	add_child(popup_panel)
+	print("[PerksPanel] Showing perk confirmation for: %s" % perk_name)
 
-	# Apply consistent styling
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.15, 0.15, 0.15, 1.0)  # Dark gray
-	style.border_color = Color(1.0, 0.7, 0.75, 1.0)  # Pink border
-	style.set_border_width_all(2)
-	style.corner_radius_top_left = 8
-	style.corner_radius_top_right = 8
-	style.corner_radius_bottom_left = 8
-	style.corner_radius_bottom_right = 8
-	popup_panel.add_theme_stylebox_override("panel", style)
+	# Create and show ConfirmationPopup
+	var popup := ConfirmationPopup.create(message)
+	add_child(popup)
 
-	# Set active popup
-	_active_popup = popup_panel
-	print("[PerksPanel] Popup created and set as active")
+	# Wait for user response
+	var result: bool = await popup.confirmed
 
-	# Create content container
-	var vbox: VBoxContainer = VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 12)
-	vbox.custom_minimum_size.x = 400
-	popup_panel.add_child(vbox)
+	# Clean up
+	popup.queue_free()
 
-	# Title
-	var title: Label = Label.new()
-	title.text = "Confirm Perk Selection"
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 16)
-	title.add_theme_color_override("font_color", Color(1.0, 0.7, 0.75, 1.0))  # Pink
-	vbox.add_child(title)
-
-	# Perk name
-	var perk_name: Label = Label.new()
-	perk_name.text = perk.get("name", "Unknown Perk")
-	perk_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	perk_name.add_theme_font_size_override("font_size", 14)
-	vbox.add_child(perk_name)
-
-	# Description
-	var desc: Label = Label.new()
-	desc.text = perk.get("description", "")
-	desc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	desc.custom_minimum_size.x = 380
-	vbox.add_child(desc)
-
-	# Cost info
-	var cost: Label = Label.new()
-	cost.text = "Cost: 1 Perk Point"
-	cost.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	cost.add_theme_font_size_override("font_size", 12)
-	vbox.add_child(cost)
-
-	# Button row
-	var button_row: HBoxContainer = HBoxContainer.new()
-	button_row.add_theme_constant_override("separation", 16)
-	button_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	vbox.add_child(button_row)
-
-	# Confirm button
-	var confirm_btn: Button = Button.new()
-	confirm_btn.text = "Unlock Perk"
-	confirm_btn.custom_minimum_size.x = 120
-	confirm_btn.process_mode = Node.PROCESS_MODE_ALWAYS  # Must process when game is paused
-	confirm_btn.focus_mode = Control.FOCUS_ALL
-	confirm_btn.pressed.connect(_on_confirm_perk)
-	button_row.add_child(confirm_btn)
-
-	# Cancel button
-	var cancel_btn: Button = Button.new()
-	cancel_btn.text = "Cancel"
-	cancel_btn.custom_minimum_size.x = 120
-	cancel_btn.process_mode = Node.PROCESS_MODE_ALWAYS  # Must process when game is paused
-	cancel_btn.focus_mode = Control.FOCUS_ALL
-	cancel_btn.pressed.connect(_on_cancel_perk)
-	button_row.add_child(cancel_btn)
-
-	# Set up focus neighbors for left/right navigation
-	confirm_btn.focus_neighbor_right = confirm_btn.get_path_to(cancel_btn)
-	cancel_btn.focus_neighbor_left = cancel_btn.get_path_to(confirm_btn)
-
-	# Auto-size and center
-	await get_tree().process_frame
-	await get_tree().process_frame
-	popup_panel.size = vbox.size + Vector2(20, 20)
-	vbox.position = Vector2(10, 10)
-
-	var viewport_size: Vector2 = get_viewport_rect().size
-	popup_panel.position = (viewport_size - popup_panel.size) / 2.0
-
-	# Game is already paused by GameMenu - no need to pause again
-
-	# Fade in
-	var tween := create_tween()
-	tween.set_ease(Tween.EASE_OUT)
-	tween.set_trans(Tween.TRANS_CUBIC)
-	tween.tween_property(popup_panel, "modulate:a", 1.0, 0.3)
-	tween.tween_callback(func():
-		popup_panel.mouse_filter = Control.MOUSE_FILTER_STOP
-		confirm_btn.grab_focus()
-	)
-
-func _on_confirm_perk() -> void:
-	"""User confirmed perk unlock"""
-	if _pending_perk.is_empty():
-		return
-
-	# Close popup
-	_close_confirmation_popup()
-
-	# Unlock the perk
-	_unlock_perk(_pending_perk)
-	_pending_perk.clear()
-
-func _on_cancel_perk() -> void:
-	"""User cancelled perk unlock"""
-	_pending_perk.clear()
-	_close_confirmation_popup()
-
-func _close_confirmation_popup() -> void:
-	"""Close and fade out confirmation popup"""
-	if not _active_popup or not is_instance_valid(_active_popup):
-		return
-
-	var popup_to_close = _active_popup
-	_active_popup = null
-
-	# Fade out
-	popup_to_close.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var tween := create_tween()
-	tween.set_ease(Tween.EASE_IN)
-	tween.set_trans(Tween.TRANS_CUBIC)
-	tween.tween_property(popup_to_close, "modulate:a", 0.0, 0.3)
-	tween.tween_callback(func():
-		# Don't unpause here - let GameMenu control pause state
-		# The game should stay paused while the menu is open
-		if is_instance_valid(popup_to_close):
-			popup_to_close.queue_free()
-	)
+	# Handle response
+	if result:
+		print("[PerksPanel] User confirmed perk unlock")
+		_unlock_perk(perk)
+	else:
+		print("[PerksPanel] User canceled perk unlock")
 
 func _on_acquired_perk_selected(index: int) -> void:
 	"""Show details for selected acquired perk"""
@@ -631,36 +496,18 @@ func _on_acquired_perk_selected(index: int) -> void:
 	var perk: Dictionary = _acquired_perks[index]
 	_show_perk_details(perk)
 
-func _input(event: InputEvent) -> void:
-	"""Catch ALL input when popup is active to prevent it from reaching other systems"""
-	# When popup is active, block everything except what we explicitly handle
-	if _active_popup and is_instance_valid(_active_popup):
-		# Handle Accept - manually trigger confirm (don't rely on button focus/signals)
-		if event.is_action_pressed("menu_accept"):
-			print("[PerksPanel._input] Accept pressed - confirming perk")
-			_on_confirm_perk()
-			get_viewport().set_input_as_handled()
-			return
-		# Handle Back to cancel
-		elif event.is_action_pressed("menu_back"):
-			print("[PerksPanel._input] Back pressed - cancelling perk")
-			_on_cancel_perk()
-			get_viewport().set_input_as_handled()
-			return
-		# Block ALL other input to prevent grid navigation in background
-		get_viewport().set_input_as_handled()
-		return
+func _input(_event: InputEvent) -> void:
+	"""Handle input for perk grid navigation"""
+	# Note: ConfirmationPopup handles its own input, so we don't need to handle it here
+	# (Old manual popup handling removed - ConfirmationPopup is self-contained)
+	pass  # Empty function - kept for override clarity
 
 func _unhandled_input(event: InputEvent) -> void:
 	"""Handle controller input for grid navigation"""
 	if not visible:
 		return
 
-	# Block ALL input when popup is active (buttons handle their own input via signals)
-	if _active_popup and is_instance_valid(_active_popup):
-		print("[PerksPanel._unhandled_input] POPUP ACTIVE - blocking: %s" % event)
-		get_viewport().set_input_as_handled()
-		return
+	# Note: ConfirmationPopup handles its own input blocking, no need to check here
 
 	var handled: bool = false
 
@@ -745,9 +592,9 @@ func _activate_selected_cell() -> void:
 func _pretty_stat(stat_id: String) -> String:
 	"""Get display name for a stat"""
 	if _stats and _stats.has_method("get_stat_display_name"):
-		var name: Variant = _stats.call("get_stat_display_name", stat_id)
-		if typeof(name) == TYPE_STRING and String(name) != "":
-			return String(name)
+		var stat_name: Variant = _stats.call("get_stat_display_name", stat_id)
+		if typeof(stat_name) == TYPE_STRING and String(stat_name) != "":
+			return String(stat_name)
 
 	var formatted: String = stat_id.replace("_", " ").strip_edges()
 	if formatted.length() == 0:

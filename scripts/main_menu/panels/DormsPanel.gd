@@ -189,10 +189,21 @@ func _on_panel_gained_focus() -> void:
 	_focus_current_roster()
 
 func _can_panel_close() -> bool:
-	# Prevent closing if there are any pending changes (move plan in progress)
-	if _has_pending_changes():
-		_show_toast("You must place and accept all changes before continuing.")
+	# Prevent closing if there are incomplete changes
+	# If common room is empty, we're done - allow closing (auto-accept pending moves if any)
+
+	# Block only if there are unassigned common room members
+	if _common_members.size() > 0:
+		_show_toast("You must assign all common room members before continuing.")
 		return false
+
+	# If common room is empty but there are pending reassignments, auto-accept them
+	if _pending_reassignments.size() > 0:
+		print("[DormsPanel._can_panel_close] Auto-accepting pending reassignments before closing")
+		_auto_accept_plan()
+		# Return true to allow closing (auto-accept happens synchronously)
+
+	# Common room is empty and all moves are either accepted or there were no moves - allow closing
 	return true
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -644,8 +655,8 @@ func _update_details_for_member(member_id: String) -> void:
 	var lines := PackedStringArray()
 
 	# Name
-	var name: String = String(ds.call("display_name", member_id))
-	lines.append("[b]Name:[/b] %s" % name)
+	var member_name: String = String(ds.call("display_name", member_id))
+	lines.append("[b]Name:[/b] %s" % member_name)
 	lines.append("")
 
 	# Room
@@ -681,7 +692,7 @@ func _update_details_for_member(member_id: String) -> void:
 			lines.append("  • Will move to room %s" % pending_room)
 
 	_detail_content.text = _join_psa(lines, "\n")
-	print("[DormsPanel._update_details_for_member] Details panel updated with %d lines for %s" % [lines.size(), name])
+	print("[DormsPanel._update_details_for_member] Details panel updated with %d lines for %s" % [lines.size(), member_name])
 
 func _update_action_buttons() -> void:
 	if not _assign_room_btn or not _move_out_btn or not _cancel_move_btn:
@@ -773,7 +784,6 @@ func _on_assign_room_pressed() -> void:
 	_push_nav_state(NavState.ROOM_SELECT)
 	_current_room_index = 0
 	_focus_current_room()
-	_show_toast("Select a room to assign %s." % _get_member_name(_selected_member))
 
 func _on_move_out_pressed() -> void:
 	print("[DormsPanel._on_move_out_pressed] Move Out button pressed")
@@ -847,7 +857,13 @@ func _on_move_out_pressed() -> void:
 	_focus_current_roster()
 
 func _on_cancel_move_pressed() -> void:
-	var confirmed: bool = await _ask_confirm("Cancel all pending reassignments?")
+	"""Cancel all pending room reassignments and reset to original state
+
+	Works at any time during the week:
+	- Before plan is locked: cancels pending moves
+	- After plan is locked: unlocks and reverts to original room assignments
+	"""
+	var confirmed: bool = await _ask_confirm("Cancel all pending reassignments?\nThis will reset rooms to their original state.")
 	if not confirmed:
 		return
 
@@ -856,7 +872,12 @@ func _on_cancel_move_pressed() -> void:
 		ds.call("stage_reset_plan")
 
 	_pending_reassignments.clear()
-	_show_toast("All pending moves cancelled.")
+	_show_toast("All pending moves cancelled. Rooms reset to original state.")
+
+	# Clear selection and return to default state
+	_selected_member = ""
+	_nav_state = NavState.ROSTER_SELECT
+	_nav_state_history.clear()
 	_rebuild()
 
 func _auto_accept_plan() -> void:
@@ -892,7 +913,6 @@ func _try_assign_to_room(room_id: String) -> void:
 
 	# Validate room selection
 	var room_data: Dictionary = ds.call("get_room", room_id)
-	var occupant: String = String(room_data.get("occupant", ""))
 
 	# Check if room is available
 	var vis: int = int(ds.call("get_room_visual", room_id))
@@ -1209,7 +1229,17 @@ func _has_unassigned_common_members() -> bool:
 	return _common_members.size() > 0
 
 func _has_pending_changes() -> bool:
-	return _pending_reassignments.size() > 0 or _common_members.size() > 0
+	# Check for unstaged pending reassignments or common members
+	if _pending_reassignments.size() > 0 or _common_members.size() > 0:
+		return true
+
+	# Also check if there's a locked plan in DormSystem (staged for Saturday)
+	var ds: Node = _ds()
+	if ds and ds.has_method("is_plan_locked"):
+		if bool(ds.call("is_plan_locked")):
+			return true
+
+	return false
 
 func _can_accept_plan() -> bool:
 	# Can accept if all common room members have been assigned
@@ -1245,11 +1275,11 @@ func _ask_confirm(msg: String) -> bool:
 
 	return result
 
-func _show_toast(msg: String) -> void:
+func _show_toast(msg: String, title: String = "") -> void:
 	print("[DormsPanel._show_toast] Showing toast: %s" % msg)
 
-	# Create and show modal toast popup
-	var popup := ToastPopup.create(msg)
+	# Create and show modal toast popup with optional title (empty = no title)
+	var popup := ToastPopup.create(msg, title)
 	add_child(popup)
 
 	# Wait for user to respond (accept or cancel)

@@ -963,7 +963,6 @@ func _rebuild_stats_grid(member_token: String, equip: Dictionary) -> void:
 	var base_watk: int   = int(d_wea.get("base_watk", 0))
 	var scale_brw: float = float(d_wea.get("scale_brw", 0.0))
 	var weapon_attack: int = base_watk + int(round(scale_brw * float(brw)))
-	var weapon_scale: String = _fmt_num(scale_brw)
 	var weapon_acc: int = int(d_wea.get("base_acc", 0))
 	var skill_acc_boost: int = int(d_wea.get("skill_acc_boost", 0))
 	var crit_bonus: int = int(d_wea.get("crit_bonus_pct", 0))
@@ -1683,15 +1682,24 @@ func _exit_loadout_panel() -> bool:
 
 	Returns: true if we tried to exit via PanelManager, false if we're not in the stack
 	"""
-	# Check if we're actually registered in PanelManager
-	if not is_registered():
-		print("[LoadoutPanel] Not in PanelManager stack - ignoring exit (let GameMenu handle it)")
+	var panel_mgr = get_node_or_null("/root/aPanelManager")
+	if not panel_mgr:
+		print("[LoadoutPanel] No PanelManager - ignoring exit")
 		return false
 
+	# Check stack depth - if we're at depth 2 (StatusPanel + LoadoutPanel),
+	# we're being managed by GameMenu and should NOT pop ourselves
+	var stack_depth: int = panel_mgr.get_stack_depth()
+	print("[LoadoutPanel] Back pressed - stack depth: %d, is_active: %s, registered: %s" % [stack_depth, is_active(), is_registered()])
+
+	if stack_depth <= 2:
+		print("[LoadoutPanel] Being managed by GameMenu - letting back button bubble up")
+		# Don't handle the input - let it bubble up to GameMenu
+		return false
+
+	# We're deeper in the stack (e.g., popup open) - pop ourselves
 	print("[LoadoutPanel] Exiting to previous panel via PanelManager")
-	var panel_mgr = get_node_or_null("/root/aPanelManager")
-	if panel_mgr:
-		panel_mgr.pop_panel()
+	panel_mgr.pop_panel()
 	return true
 
 func _enter_party_select_state() -> void:

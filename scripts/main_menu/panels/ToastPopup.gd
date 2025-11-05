@@ -26,12 +26,12 @@ class_name ToastPopup
 
 signal confirmed(result: bool)
 
-var _title: String = "Notice"
+var _title: String = ""
 var _message: String = ""
 var _accept_btn: Button = null
 var _cancel_btn: Button = null
 
-static func create(message: String, title: String = "Notice") -> ToastPopup:
+static func create(message: String, title: String = "") -> ToastPopup:
 	print("[ToastPopup.create] Creating popup with message: %s" % message)
 	var popup := ToastPopup.new()
 	popup.process_mode = Node.PROCESS_MODE_ALWAYS  # Set BEFORE building UI
@@ -45,12 +45,16 @@ func _ready() -> void:
 	print("[ToastPopup._ready] Popup ready, visible=%s, has_focus=%s, paused=%s" % [visible, has_focus(), get_tree().paused])
 
 func _build_ui() -> void:
-	print("[ToastPopup._build_ui] Building UI, paused=%s" % get_tree().paused)
+	var paused_str := "unknown" if not is_inside_tree() else str(get_tree().paused)
+	print("[ToastPopup._build_ui] Building UI, in_tree=%s, paused=%s" % [is_inside_tree(), paused_str])
 	# Ensure popup processes even when game is paused
 	process_mode = Node.PROCESS_MODE_ALWAYS
 
 	# Block all input from passing through
 	mouse_filter = Control.MOUSE_FILTER_STOP
+
+	# Set minimum size for the panel
+	custom_minimum_size = Vector2(500, 400)
 
 	# Add solid background (no transparency)
 	var style := StyleBoxFlat.new()
@@ -73,22 +77,31 @@ func _build_ui() -> void:
 
 	var vbox := VBoxContainer.new()
 	vbox.add_theme_constant_override("separation", 12)
-	vbox.custom_minimum_size = Vector2(400, 0)  # Min width, height auto-sizes
 	margin.add_child(vbox)
 
-	# Title
-	var title := Label.new()
-	title.text = _title
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 18)
-	vbox.add_child(title)
+	# Title (only show if not empty)
+	if _title != "":
+		var title := Label.new()
+		title.text = _title
+		title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		title.add_theme_font_size_override("font_size", 18)
+		title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		vbox.add_child(title)
 
-	# Message
+	# Message with ScrollContainer for long content
+	var scroll := ScrollContainer.new()
+	scroll.custom_minimum_size = Vector2(460, 280)  # Min height for scroll area
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	vbox.add_child(scroll)
+
 	var msg_label := Label.new()
 	msg_label.text = _message
 	msg_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	msg_label.custom_minimum_size = Vector2(400, 0)  # Set width for wrapping
-	vbox.add_child(msg_label)
+	msg_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	msg_label.custom_minimum_size = Vector2(460, 0)
+	scroll.add_child(msg_label)
 
 	# Buttons
 	var hbox := HBoxContainer.new()
@@ -126,13 +139,38 @@ func _grab_focus_and_log() -> void:
 func _finalize_size_and_position() -> void:
 	# Force update to calculate proper size
 	reset_size()
+	# Wait one frame to ensure we're properly in the tree before positioning
+	await get_tree().process_frame
 	_position_center()
 
 func _position_center() -> void:
-	if get_viewport() == null:
+	# Safety check: ensure we're in the scene tree with a valid parent
+	if not is_inside_tree():
+		print("[ToastPopup._position_center] Not in tree yet, deferring...")
+		await get_tree().process_frame
+
+	if get_parent() == null:
+		print("[ToastPopup._position_center] No parent, cannot center")
 		return
-	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
+
+	# Get viewport size with error handling
+	var viewport_size: Vector2 = Vector2.ZERO
+	var viewport := get_viewport()
+
+	if viewport == null:
+		print("[ToastPopup._position_center] No viewport, cannot center")
+		return
+
+	# Try to get viewport rect size
+	viewport_size = viewport.get_visible_rect().size
+
+	if viewport_size == Vector2.ZERO:
+		print("[ToastPopup._position_center] Viewport size is zero, cannot center")
+		return
+
+	# Center the popup
 	position = (viewport_size - size) / 2
+	print("[ToastPopup._position_center] Centered at %v (viewport: %v, size: %v)" % [position, viewport_size, size])
 
 func _input(event: InputEvent) -> void:
 	if not visible:
@@ -178,8 +216,12 @@ func _on_accept() -> void:
 	print("[ToastPopup] Accept pressed")
 	confirmed.emit(true)
 	hide()
+	# Mark input as handled so _input() doesn't also trigger
+	get_viewport().set_input_as_handled()
 
 func _on_cancel() -> void:
 	print("[ToastPopup] Cancel pressed")
 	confirmed.emit(false)
 	hide()
+	# Mark input as handled so _input() doesn't also trigger
+	get_viewport().set_input_as_handled()

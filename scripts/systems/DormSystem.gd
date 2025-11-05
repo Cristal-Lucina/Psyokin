@@ -157,6 +157,8 @@ const _CAL_SIGNALS := [
 var _calendar_node: Node = null
 var _last_weekday_index: int = -1
 var _last_weekday_name: String = ""
+var _last_friday_reveal_day: int = -1  # Track last day we revealed Friday pairs (prevent double-reveal)
+var _last_saturday_reveal_day: int = -1  # Track last day we revealed Saturday pairs (prevent double-reveal)
 var _is_blocking_time_advance: bool = false
 
 enum RoomVisual { EMPTY_GREEN, OCCUPIED_BLUE, STAGED_YELLOW, LOCKED_RED }
@@ -335,6 +337,16 @@ func _is_saturday_name(s: String) -> bool:
 	var t: String = String(s).strip_edges().to_lower()
 	return t.begins_with("sat") or t == "5"
 func _is_saturday_index(i: int) -> bool: return i == 5
+
+func _get_current_day_number() -> int:
+	"""Get a unique day number from calendar for tracking reveals"""
+	if _calendar_node and _calendar_node.has_method("get_day_of_year"):
+		return int(_calendar_node.call("get_day_of_year"))
+	# Fallback: combine week + weekday for a pseudo-unique number
+	var week: int = 1
+	if _calendar_node and _calendar_node.has_method("get_week"):
+		week = int(_calendar_node.call("get_week"))
+	return week * 7 + _last_weekday_index
 
 # ───────────── bootstrap / CSV / hero meta ─────────────
 func _bootstrap_rooms() -> void:
@@ -832,6 +844,14 @@ func current_layout() -> Dictionary:
 # ───────────── reveals ─────────────
 func _reveal_friday_now() -> void:
 	if _hidden_pairs_friday.size() == 0: return
+
+	# Prevent double-reveal on same day (two calendar handlers might trigger)
+	var current_day: int = _get_current_day_number()
+	if current_day == _last_friday_reveal_day:
+		print("[DormSystem] Already revealed Friday pairs for day %d, skipping" % current_day)
+		return
+	_last_friday_reveal_day = current_day
+
 	var pairs: Array = _collect_hidden_pairs(_hidden_pairs_friday, true)
 	_hidden_pairs_friday.clear()
 	_mark_pairs_discovered(pairs)
@@ -840,6 +860,14 @@ func _reveal_friday_now() -> void:
 
 func _reveal_saturday_now() -> void:
 	if _hidden_pairs_saturday.size() == 0: return
+
+	# Prevent double-reveal on same day (two calendar handlers might trigger)
+	var current_day: int = _get_current_day_number()
+	if current_day == _last_saturday_reveal_day:
+		print("[DormSystem] Already revealed Saturday pairs for day %d, skipping" % current_day)
+		return
+	_last_saturday_reveal_day = current_day
+
 	var pairs: Array = _collect_hidden_pairs(_hidden_pairs_saturday, true)
 	_hidden_pairs_saturday.clear()
 	_mark_pairs_discovered(pairs)

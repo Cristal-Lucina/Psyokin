@@ -29,7 +29,7 @@ const CATEGORIES : Array[String] = [
 @onready var _count_label: Label = %CountLabel  # Now in ItemHeader
 @onready var _item_name: Label = %ItemName
 @onready var _details_text: Label = %DetailsText
-@onready var _scroll_container: ScrollContainer = $Root/DetailsColumn/ScrollContainer
+@onready var _scroll_container: ScrollContainer = %ScrollContainer
 @onready var _action_buttons: VBoxContainer = %ActionButtons
 @onready var _use_button: Button = %UseButton
 @onready var _inspect_button: Button = %InspectButton
@@ -518,7 +518,7 @@ func _show_party_picker() -> void:
 
 func _grab_party_picker_focus() -> void:
 	"""Helper to grab focus on party picker"""
-	if _party_picker_list and is_instance_valid(_party_picker_list):
+	if _party_picker_list and is_instance_valid(_party_picker_list) and _party_picker_list.is_inside_tree():
 		_party_picker_list.grab_focus()
 
 func _unhandled_input(event: InputEvent) -> void:

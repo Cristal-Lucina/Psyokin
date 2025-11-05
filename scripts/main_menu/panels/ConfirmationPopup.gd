@@ -118,12 +118,12 @@ func _input(event: InputEvent) -> void:
 		else:
 			# Default to accept if nothing focused
 			_on_accept()
-		get_viewport().set_input_as_handled()
+		# Note: input handling is done in _on_accept/_on_cancel
 
 	# Handle Back (cancel)
 	elif event.is_action_pressed("menu_back"):
 		_on_cancel()
-		get_viewport().set_input_as_handled()
+		# Note: input handling is done in _on_cancel
 
 	# Handle left/right navigation between buttons
 	elif event.is_action_pressed("move_left"):
@@ -141,10 +141,16 @@ func _input(event: InputEvent) -> void:
 
 func _on_accept() -> void:
 	print("[ConfirmationPopup] Accept pressed")
+	# Mark input as handled before emitting signal (in case signal triggers scene change)
+	if is_inside_tree() and get_viewport():
+		get_viewport().set_input_as_handled()
 	confirmed.emit(true)
 	hide()
 
 func _on_cancel() -> void:
 	print("[ConfirmationPopup] Cancel pressed")
+	# Mark input as handled before emitting signal (in case signal triggers scene change)
+	if is_inside_tree() and get_viewport():
+		get_viewport().set_input_as_handled()
 	confirmed.emit(false)
 	hide()
