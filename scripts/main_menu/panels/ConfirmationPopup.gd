@@ -137,12 +137,18 @@ func _position_center() -> void:
 
 func _input(event: InputEvent) -> void:
 	if not visible:
+		print("[ConfirmationPopup._input] Not visible, skipping input")
 		return
 
 	# Block input during animations or cooldown
 	if _is_animating or _input_cooldown > 0.0:
+		print("[ConfirmationPopup._input] Blocked by animation or cooldown")
 		get_viewport().set_input_as_handled()
 		return
+
+	# Debug logging
+	if event is InputEventJoypadButton and event.pressed:
+		print("[ConfirmationPopup._input] Joypad button %d pressed" % event.button_index)
 
 	# Handle Accept
 	if event.is_action_pressed("menu_accept"):
