@@ -4,9 +4,10 @@
 
 ## Quick Reference
 
-- **Engine**: Godot 4.4
+- **Engine**: Godot 4.5.1
 - **Genre**: Turn-based JRPG with visual novel elements
 - **Docs Location**: `docs/` folder
+- **Viewport**: 1280x720 with integer scaling mode
 
 ## Key Documentation Files
 

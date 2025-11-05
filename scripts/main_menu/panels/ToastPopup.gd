@@ -31,6 +31,14 @@ var _message: String = ""
 var _accept_btn: Button = null
 var _cancel_btn: Button = null
 
+# Input cooldown to prevent multiple rapid presses
+var _input_cooldown: float = 0.0
+const INPUT_COOLDOWN_TIME: float = 0.3  # 300ms cooldown between inputs
+
+# Animation state
+var _is_animating: bool = false
+const FADE_DURATION: float = 0.2  # 200ms fade animation
+
 static func create(message: String, title: String = "") -> ToastPopup:
 	print("[ToastPopup.create] Creating popup with message: %s" % message)
 	var popup := ToastPopup.new()
@@ -43,6 +51,11 @@ static func create(message: String, title: String = "") -> ToastPopup:
 
 func _ready() -> void:
 	print("[ToastPopup._ready] Popup ready, visible=%s, has_focus=%s, paused=%s" % [visible, has_focus(), get_tree().paused])
+
+func _process(delta: float) -> void:
+	# Update input cooldown timer
+	if _input_cooldown > 0.0:
+		_input_cooldown -= delta
 
 func _build_ui() -> void:
 	var paused_str := "unknown" if not is_inside_tree() else str(get_tree().paused)
@@ -127,10 +140,12 @@ func _build_ui() -> void:
 	_accept_btn.pressed.connect(_on_accept)
 	_cancel_btn.pressed.connect(_on_cancel)
 
-	# Show the popup and focus accept button
+	# Start hidden for fade in animation
+	modulate = Color(1, 1, 1, 0)
 	show()
 	call_deferred("_finalize_size_and_position")
 	call_deferred("_grab_focus_and_log")
+	call_deferred("_fade_in")
 
 func _grab_focus_and_log() -> void:
 	_accept_btn.grab_focus()
@@ -177,12 +192,18 @@ func _input(event: InputEvent) -> void:
 		print("[ToastPopup._input] Not visible, skipping input")
 		return
 
+	# Block input during animations or cooldown
+	if _is_animating or _input_cooldown > 0.0:
+		get_viewport().set_input_as_handled()
+		return
+
 	# Debug logging
 	if event is InputEventJoypadButton and event.pressed:
 		print("[ToastPopup._input] Joypad button %d pressed, visible=%s" % [event.button_index, visible])
 
 	# Handle Accept
 	if event.is_action_pressed("menu_accept"):
+		_input_cooldown = INPUT_COOLDOWN_TIME  # Start cooldown
 		var focused := get_viewport().gui_get_focus_owner()
 		if focused == _accept_btn:
 			_on_accept()
@@ -195,6 +216,7 @@ func _input(event: InputEvent) -> void:
 
 	# Handle Back (cancel)
 	elif event.is_action_pressed("menu_back"):
+		_input_cooldown = INPUT_COOLDOWN_TIME  # Start cooldown
 		_on_cancel()
 		get_viewport().set_input_as_handled()
 
@@ -213,15 +235,39 @@ func _input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 func _on_accept() -> void:
+	if _is_animating:
+		return
 	print("[ToastPopup] Accept pressed")
-	confirmed.emit(true)
-	hide()
+	_fade_out_and_close(true)
 	# Mark input as handled so _input() doesn't also trigger
 	get_viewport().set_input_as_handled()
 
 func _on_cancel() -> void:
+	if _is_animating:
+		return
 	print("[ToastPopup] Cancel pressed")
-	confirmed.emit(false)
-	hide()
+	_fade_out_and_close(false)
 	# Mark input as handled so _input() doesn't also trigger
 	get_viewport().set_input_as_handled()
+
+func _fade_in() -> void:
+	"""Fade in the popup"""
+	_is_animating = true
+	var tween := create_tween()
+	tween.set_ease(Tween.EASE_OUT)
+	tween.set_trans(Tween.TRANS_CUBIC)
+	tween.tween_property(self, "modulate", Color(1, 1, 1, 1), FADE_DURATION)
+	await tween.finished
+	_is_animating = false
+
+func _fade_out_and_close(result: bool) -> void:
+	"""Fade out the popup and emit result"""
+	_is_animating = true
+	var tween := create_tween()
+	tween.set_ease(Tween.EASE_IN)
+	tween.set_trans(Tween.TRANS_CUBIC)
+	tween.tween_property(self, "modulate", Color(1, 1, 1, 0), FADE_DURATION)
+	await tween.finished
+	_is_animating = false
+	confirmed.emit(result)
+	hide()

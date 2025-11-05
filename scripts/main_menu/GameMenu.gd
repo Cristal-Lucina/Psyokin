@@ -32,6 +32,10 @@ var _current_tab: String = ""
 # --- Panel state ---
 var _is_fullscreen: bool = false  # true when a non-Status panel is open full screen
 
+# --- Input cooldown to prevent rapid panel switches ---
+var _input_cooldown: float = 0.0
+const INPUT_COOLDOWN_TIME: float = 0.2  # 200ms cooldown between panel switches
+
 # --- Dorm hooks ---
 var _ds: Node = null
 var _pending_saturday_moves: Array = []  # Stores moves for Saturday popup
@@ -44,6 +48,14 @@ func _ready() -> void:
 
 	# Get ControllerManager reference
 	_ctrl_mgr = get_node_or_null("/root/aControllerManager")
+
+	# Enable processing for input cooldown
+	set_process(true)
+
+func _process(delta: float) -> void:
+	# Update input cooldown timer
+	if _input_cooldown > 0.0:
+		_input_cooldown -= delta
 
 	# Hide the LeftTabs since tab buttons are now in StatusPanel
 	if _left_tabs:
@@ -81,6 +93,11 @@ func _input(event: InputEvent) -> void:
 	if get_viewport().is_input_handled():
 		return
 
+	# Block input during cooldown to prevent rapid panel switches
+	if _input_cooldown > 0.0:
+		get_viewport().set_input_as_handled()
+		return
+
 	# Debug: Log ALL joypad button events
 	if event is InputEventJoypadButton:
 		print("[GameMenu._input] Button %d, pressed=%s, visible=%s, fullscreen=%s, is_handled=%s" % [
@@ -103,6 +120,7 @@ func _input(event: InputEvent) -> void:
 				get_viewport().set_input_as_handled()
 				return
 
+			_input_cooldown = INPUT_COOLDOWN_TIME  # Start cooldown
 			_exit_fullscreen()
 			get_viewport().set_input_as_handled()
 		# Let panel handle all other input
@@ -110,6 +128,7 @@ func _input(event: InputEvent) -> void:
 
 	# When viewing Status panel, B closes the menu
 	if event.is_action_pressed(aInputManager.ACTION_BACK):
+		_input_cooldown = INPUT_COOLDOWN_TIME  # Start cooldown
 		_close_menu()
 		get_viewport().set_input_as_handled()
 
@@ -129,6 +148,7 @@ func _connect_status_panel_signal() -> void:
 func _on_status_panel_tab_selected(tab_id: String) -> void:
 	"""Handle tab selection from StatusPanel"""
 	print("[GameMenu] Tab selected from StatusPanel: ", tab_id)
+	_input_cooldown = INPUT_COOLDOWN_TIME  # Start cooldown
 	_enter_fullscreen(tab_id)
 
 func _select_tab(tab_id: String) -> void:

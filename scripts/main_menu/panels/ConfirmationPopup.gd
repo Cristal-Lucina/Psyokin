@@ -27,11 +27,24 @@ var _message: String = ""
 var _accept_btn: Button = null
 var _cancel_btn: Button = null
 
+# Input cooldown to prevent multiple rapid presses
+var _input_cooldown: float = 0.0
+const INPUT_COOLDOWN_TIME: float = 0.3  # 300ms cooldown between inputs
+
+# Animation state
+var _is_animating: bool = false
+const FADE_DURATION: float = 0.2  # 200ms fade animation
+
 static func create(message: String) -> ConfirmationPopup:
 	var popup := ConfirmationPopup.new()
 	popup._message = message
 	popup._build_ui()
 	return popup
+
+func _process(delta: float) -> void:
+	# Update input cooldown timer
+	if _input_cooldown > 0.0:
+		_input_cooldown -= delta
 
 func _build_ui() -> void:
 	custom_minimum_size = Vector2(400, 200)
@@ -94,9 +107,12 @@ func _build_ui() -> void:
 	_accept_btn.pressed.connect(_on_accept)
 	_cancel_btn.pressed.connect(_on_cancel)
 
+	# Start hidden for fade in animation
+	modulate = Color(1, 1, 1, 0)
 	# Auto-position and show
 	call_deferred("_position_center")
 	_accept_btn.call_deferred("grab_focus")
+	call_deferred("_fade_in")
 
 func _position_center() -> void:
 	if get_parent() == null:
@@ -108,8 +124,14 @@ func _input(event: InputEvent) -> void:
 	if not visible:
 		return
 
+	# Block input during animations or cooldown
+	if _is_animating or _input_cooldown > 0.0:
+		get_viewport().set_input_as_handled()
+		return
+
 	# Handle Accept
 	if event.is_action_pressed("menu_accept"):
+		_input_cooldown = INPUT_COOLDOWN_TIME  # Start cooldown
 		var focused := get_viewport().gui_get_focus_owner()
 		if focused == _accept_btn:
 			_on_accept()
@@ -122,6 +144,7 @@ func _input(event: InputEvent) -> void:
 
 	# Handle Back (cancel)
 	elif event.is_action_pressed("menu_back"):
+		_input_cooldown = INPUT_COOLDOWN_TIME  # Start cooldown
 		_on_cancel()
 		# Note: input handling is done in _on_cancel
 
@@ -140,17 +163,41 @@ func _input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 func _on_accept() -> void:
+	if _is_animating:
+		return
 	print("[ConfirmationPopup] Accept pressed")
 	# Mark input as handled before emitting signal (in case signal triggers scene change)
 	if is_inside_tree() and get_viewport():
 		get_viewport().set_input_as_handled()
-	confirmed.emit(true)
-	hide()
+	_fade_out_and_close(true)
 
 func _on_cancel() -> void:
+	if _is_animating:
+		return
 	print("[ConfirmationPopup] Cancel pressed")
 	# Mark input as handled before emitting signal (in case signal triggers scene change)
 	if is_inside_tree() and get_viewport():
 		get_viewport().set_input_as_handled()
-	confirmed.emit(false)
+	_fade_out_and_close(false)
+
+func _fade_in() -> void:
+	"""Fade in the popup"""
+	_is_animating = true
+	var tween := create_tween()
+	tween.set_ease(Tween.EASE_OUT)
+	tween.set_trans(Tween.TRANS_CUBIC)
+	tween.tween_property(self, "modulate", Color(1, 1, 1, 1), FADE_DURATION)
+	await tween.finished
+	_is_animating = false
+
+func _fade_out_and_close(result: bool) -> void:
+	"""Fade out the popup and emit result"""
+	_is_animating = true
+	var tween := create_tween()
+	tween.set_ease(Tween.EASE_IN)
+	tween.set_trans(Tween.TRANS_CUBIC)
+	tween.tween_property(self, "modulate", Color(1, 1, 1, 0), FADE_DURATION)
+	await tween.finished
+	_is_animating = false
+	confirmed.emit(result)
 	hide()
