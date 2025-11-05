@@ -117,6 +117,7 @@ func _build_ui() -> void:
 
 	# Start hidden for fade in animation
 	modulate = Color(1, 1, 1, 0)
+	show()  # Make popup visible (but transparent for fade in)
 	# Auto-position and show
 	call_deferred("_position_center")
 	_accept_btn.call_deferred("grab_focus")
