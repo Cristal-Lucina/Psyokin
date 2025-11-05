@@ -471,9 +471,11 @@ func _show_perk_confirmation(perk: Dictionary) -> void:
 
 	print("[PerksPanel] Showing perk confirmation for: %s" % perk_name)
 
-	# Create and show ConfirmationPopup
+	# Create popup and add to viewport root for proper centering
 	var popup := ConfirmationPopup.create(message)
-	add_child(popup)
+
+	# Add to scene root instead of panel for viewport-centered positioning
+	get_tree().root.add_child(popup)
 
 	# Wait for user response
 	var result: bool = await popup.confirmed

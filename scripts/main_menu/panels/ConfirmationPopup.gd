@@ -47,7 +47,7 @@ func _process(delta: float) -> void:
 		_input_cooldown -= delta
 
 func _build_ui() -> void:
-	custom_minimum_size = Vector2(400, 200)
+	custom_minimum_size = Vector2(600, 300)
 
 	# Add solid background (no transparency)
 	var style := StyleBoxFlat.new()
@@ -60,15 +60,17 @@ func _build_ui() -> void:
 	style.corner_radius_bottom_right = 8
 	add_theme_stylebox_override("panel", style)
 
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 20)
+	margin.add_theme_constant_override("margin_top", 20)
+	margin.add_theme_constant_override("margin_right", 20)
+	margin.add_theme_constant_override("margin_bottom", 20)
+	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(margin)
+
 	var vbox := VBoxContainer.new()
-	vbox.set_anchors_preset(Control.PRESET_FULL_RECT)
 	vbox.add_theme_constant_override("separation", 12)
-	vbox.set_offsets_preset(Control.PRESET_FULL_RECT)
-	vbox.offset_left = 20
-	vbox.offset_top = 20
-	vbox.offset_right = -20
-	vbox.offset_bottom = -20
-	add_child(vbox)
+	margin.add_child(vbox)
 
 	# Title
 	var title := Label.new()
@@ -77,13 +79,19 @@ func _build_ui() -> void:
 	title.add_theme_font_size_override("font_size", 18)
 	vbox.add_child(title)
 
-	# Message
+	# Message with ScrollContainer for long content
+	var scroll := ScrollContainer.new()
+	scroll.custom_minimum_size = Vector2(560, 180)  # Min height for scroll area
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	vbox.add_child(scroll)
+
 	var msg_label := Label.new()
 	msg_label.text = _message
 	msg_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	msg_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	msg_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	vbox.add_child(msg_label)
+	msg_label.custom_minimum_size = Vector2(560, 0)
+	scroll.add_child(msg_label)
 
 	# Buttons
 	var hbox := HBoxContainer.new()
