@@ -190,12 +190,17 @@ func _position_center() -> void:
 	print("[ToastPopup._position_center] Centered at %v (viewport: %v, size: %v)" % [position, viewport_size, size])
 
 func _input(event: InputEvent) -> void:
+	# Debug all input events
+	if event is InputEventJoypadButton and event.pressed:
+		print("[ToastPopup._input] Button %d, visible=%s, is_handled=%s" % [event.button_index, visible, get_viewport().is_input_handled()])
+
 	if not visible:
 		print("[ToastPopup._input] Not visible, skipping input")
 		return
 
 	# CRITICAL: Block ALL input from reaching nodes behind the popup
 	# This must be done early to prevent GameMenu from processing the event
+	print("[ToastPopup._input] BLOCKING INPUT - setting input as handled")
 	get_viewport().set_input_as_handled()
 
 	# Block input during animations or cooldown
