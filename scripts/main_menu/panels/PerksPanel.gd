@@ -497,9 +497,9 @@ func _show_perk_confirmation(perk: Dictionary) -> void:
 	# Wait for user response
 	var result: bool = await popup.confirmed
 
-	# Clear tracking (popup may have been cleaned up externally)
-	_active_popup = null
-	_active_overlay = null
+	# Defer clearing tracking variables to next frame
+	# This allows the input blocking check to work in the same frame
+	call_deferred("_clear_popup_tracking")
 
 	# Clean up (only if not already cleaned up)
 	if is_instance_valid(popup):
@@ -513,6 +513,11 @@ func _show_perk_confirmation(perk: Dictionary) -> void:
 		_unlock_perk(perk)
 	else:
 		print("[PerksPanel] User canceled perk unlock")
+
+func _clear_popup_tracking() -> void:
+	"""Deferred clearing of popup tracking variables"""
+	_active_popup = null
+	_active_overlay = null
 
 func _cleanup_active_popup() -> void:
 	"""Clean up any active popup and overlay"""
@@ -558,7 +563,10 @@ func _unhandled_input(event: InputEvent) -> void:
 	if not visible:
 		return
 
-	# Note: ToastPopup handles its own input blocking, no need to check here
+	# Block all input if popup is active
+	if _active_popup != null:
+		get_viewport().set_input_as_handled()
+		return
 
 	var handled: bool = false
 
