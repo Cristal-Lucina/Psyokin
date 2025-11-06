@@ -60,9 +60,16 @@ var _party_member_tokens: Array[String] = []
 var _item_to_use_id: String = ""
 var _item_to_use_def: Dictionary = {}
 
+# Active popup tracking
+var _active_popup: Panel = null
+var _active_overlay: CanvasLayer = null
+
 func _ready() -> void:
 	# Set process mode to work while game is paused
 	process_mode = Node.PROCESS_MODE_ALWAYS
+
+	# Set high input priority so popup input blocking happens before parent nodes
+	process_priority = 100
 
 	# Get system references
 	_inv = get_node_or_null(INV_PATH)
@@ -106,15 +113,47 @@ func _first_fill() -> void:
 		call_deferred("_grab_category_focus")
 
 func _on_visibility_changed() -> void:
-	"""Grab focus when panel becomes visible"""
+	"""Grab focus when panel becomes visible, cleanup popups when hidden"""
 	if visible:
 		call_deferred("_grab_category_focus")
+	else:
+		# Clean up any active popups when panel is hidden
+		_cleanup_active_popup()
 
 func _grab_category_focus() -> void:
 	"""Helper to grab focus on category list"""
 	if _category_list and _category_list.item_count > 0:
 		_focus_mode = "category"
 		_category_list.grab_focus()
+
+func _cleanup_active_popup() -> void:
+	"""Clean up any active popup and overlay"""
+	if not _active_popup and not _active_overlay:
+		return
+
+	print("[ItemsPanel] _cleanup_active_popup called, popup=%s, overlay=%s" % [_active_popup != null, _active_overlay != null])
+
+	# Store references locally before clearing tracking variables
+	var popup = _active_popup
+	var overlay = _active_overlay
+
+	# Clear tracking immediately to prevent re-entrance
+	_active_popup = null
+	_active_overlay = null
+
+	# Reset focus mode if in party picker
+	if _focus_mode == "party_picker":
+		_focus_mode = "items"
+
+	# Clean up popup
+	if popup and is_instance_valid(popup):
+		print("[ItemsPanel] Queuing popup free")
+		popup.queue_free()
+
+	# Clean up overlay
+	if overlay and is_instance_valid(overlay):
+		print("[ItemsPanel] Queuing overlay free")
+		overlay.queue_free()
 
 func _rebuild() -> void:
 	"""Rebuild entire panel - refresh data and UI"""
@@ -557,6 +596,10 @@ func _show_member_selection_popup() -> void:
 	# Update focus mode
 	_focus_mode = "party_picker"
 
+	# Track active popup and overlay for cleanup
+	_active_popup = popup_panel
+	_active_overlay = overlay
+
 	print("[ItemsPanel] Member selection popup shown with %d members" % _party_member_tokens.size())
 
 func _style_popup_panel(popup: Panel) -> void:
@@ -613,7 +656,13 @@ func _unhandled_input(event: InputEvent) -> void:
 					_close_member_selection_popup(popup, false)
 			get_viewport().set_input_as_handled()
 			return
-		return
+		else:
+			# Block ALL other inputs from reaching the panel behind the popup
+			# This prevents category/item navigation while popup is active
+			# ItemList navigation still works because it uses ui_up/ui_down at a lower level
+			if event is InputEventKey or event is InputEventJoypadButton:
+				get_viewport().set_input_as_handled()
+			return
 
 	# Handle focus switching
 	if _focus_mode == "category":
@@ -681,6 +730,10 @@ func _close_member_selection_popup(popup_panel: Panel, used_item: bool) -> void:
 	_party_member_tokens.clear()
 	_item_to_use_id = ""
 	_item_to_use_def = {}
+
+	# Clear popup tracking
+	_active_popup = null
+	_active_overlay = null
 
 	# Return focus mode
 	_focus_mode = "items"
