@@ -27,6 +27,7 @@ var _nav_state: NavState = NavState.SOCKET_NAV
 
 # Scene nodes (from your .tscn)
 @onready var _backdrop: ColorRect = $"Backdrop" as ColorRect
+@onready var _card: Panel = $"Center/Card" as Panel
 @onready var _title: Label = $"Center/Card/CardPad/MainRow/LeftColumn/HeaderRow/Title" as Label
 @onready var _sub: Label = $"Center/Card/CardPad/MainRow/LeftColumn/Sub" as Label
 @onready var _lv: Label = $"Center/Card/CardPad/MainRow/LeftColumn/LevelRow/LvLabel" as Label
@@ -41,6 +42,27 @@ func _ready() -> void:
 	super()  # Call PanelBase._ready() for lifecycle management
 
 	_sig = get_node_or_null("/root/aSigilSystem")
+
+	# Apply ToastPopup styling to card panel
+	if _card:
+		var style := StyleBoxFlat.new()
+		style.bg_color = Color(0.15, 0.15, 0.15, 1.0)  # Dark gray, fully opaque
+		style.border_color = Color(1.0, 0.7, 0.75, 1.0)  # Pink border
+		style.set_border_width_all(2)
+		style.corner_radius_top_left = 8
+		style.corner_radius_top_right = 8
+		style.corner_radius_bottom_left = 8
+		style.corner_radius_bottom_right = 8
+		_card.add_theme_stylebox_override("panel", style)
+
+	# Apply ToastPopup title styling (18px font)
+	if _title:
+		_title.add_theme_font_size_override("font_size", 18)
+
+	# Apply ToastPopup button styling
+	if _btn_close:
+		_btn_close.custom_minimum_size = Vector2(100, 40)
+
 	# Softer dimmer so the game behind isn't shouting
 	if _backdrop:
 		_backdrop.color = Color(0, 0, 0, 0.35)
