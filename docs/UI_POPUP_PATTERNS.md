@@ -36,7 +36,7 @@ func _show_confirmation(message: String) -> void:
     get_tree().root.move_child(overlay, 0)  # Process input first
 
     # Create popup
-    var popup := ConfirmationPopup.create(message)
+    var popup := ToastPopup.create(message, "Confirm")
     popup.process_mode = Node.PROCESS_MODE_ALWAYS  # ← CRITICAL!
     overlay.add_child(popup)
 
@@ -73,14 +73,14 @@ Result: Popup visible but frozen, no input processing
 
 ❌ **Forgetting PROCESS_MODE_ALWAYS on popup:**
 ```gdscript
-var popup := ConfirmationPopup.create(message)
+var popup := ToastPopup.create(message, "Confirm")
 // Missing: popup.process_mode = Node.PROCESS_MODE_ALWAYS
 ```
 Result: Popup visible but doesn't respond to buttons
 
 ❌ **Adding popup directly to panel instead of overlay:**
 ```gdscript
-var popup := ConfirmationPopup.create(message)
+var popup := ToastPopup.create(message, "Confirm")
 add_child(popup)  // Wrong! Not centered, wrong z-order
 ```
 Result: Popup positioned wrong, may be behind other UI
@@ -101,7 +101,7 @@ When implementing a popup in a paused context:
 - [ ] Set `overlay.layer = 100` (or higher)
 - [ ] Add overlay to `get_tree().root`
 - [ ] Move overlay to position 0 with `move_child(overlay, 0)`
-- [ ] Create popup with `ConfirmationPopup.create()` or `ToastPopup.create()`
+- [ ] Create popup with `ToastPopup.create()`
 - [ ] Set `popup.process_mode = PROCESS_MODE_ALWAYS`
 - [ ] Add popup to overlay, not to panel
 - [ ] Clean up both popup and overlay after use
@@ -153,7 +153,7 @@ func _show_perk_confirmation(perk: Dictionary) -> void:
     get_tree().root.move_child(overlay, 0)
 
     # Create and show popup
-    var popup := ConfirmationPopup.create(message)
+    var popup := ToastPopup.create(message, "Confirm")
     popup.process_mode = Node.PROCESS_MODE_ALWAYS
     overlay.add_child(popup)
 
@@ -174,8 +174,7 @@ func _show_perk_confirmation(perk: Dictionary) -> void:
 ## Related Documentation
 
 - `docs/UNIFIED_PANEL_ARCHITECTURE.md` - Full panel architecture guide
-- `scripts/main_menu/panels/ConfirmationPopup.gd` - Confirmation popup implementation
-- `scripts/main_menu/panels/ToastPopup.gd` - Toast/notice popup implementation
+- `scripts/main_menu/panels/ToastPopup.gd` - Unified popup implementation
 - `scripts/main_menu/GameMenu.gd` - Example usage in GameMenu
 
 ---

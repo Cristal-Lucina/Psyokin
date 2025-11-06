@@ -36,7 +36,7 @@ var _grid_cells: Array[Array] = []  # 8×5 array of Controls
 var _selected_row: int = 2  # Start at first tier row
 var _selected_col: int = 0
 
-# Note: Confirmation popup handling is now done by ConfirmationPopup class
+# Note: Confirmation popup handling is now done by ToastPopup class
 # (removed _active_popup and _pending_perk - no longer needed)
 
 func _ready() -> void:
@@ -401,13 +401,13 @@ func _show_perk_details(perk: Dictionary) -> void:
 
 func _on_tier_cell_hovered(stat_id: String, tier_index: int) -> void:
 	"""Handle mouse hover over tier cell"""
-	# Note: ConfirmationPopup blocks mouse input automatically (MOUSE_FILTER_STOP)
+	# Note: ToastPopup blocks mouse input automatically (MOUSE_FILTER_STOP)
 	var perk: Dictionary = _get_perk_info(stat_id, tier_index)
 	_show_perk_details(perk)
 
 func _on_tier_cell_pressed(stat_id: String, tier_index: int) -> void:
 	"""Handle tier cell button press"""
-	# Note: ConfirmationPopup blocks mouse input automatically (MOUSE_FILTER_STOP)
+	# Note: ToastPopup blocks mouse input automatically (MOUSE_FILTER_STOP)
 	var perk: Dictionary = _get_perk_info(stat_id, tier_index)
 	if not perk["available"]:
 		return
@@ -507,8 +507,8 @@ func _on_acquired_perk_selected(index: int) -> void:
 
 func _input(_event: InputEvent) -> void:
 	"""Handle input for perk grid navigation"""
-	# Note: ConfirmationPopup handles its own input, so we don't need to handle it here
-	# (Old manual popup handling removed - ConfirmationPopup is self-contained)
+	# Note: ToastPopup handles its own input, so we don't need to handle it here
+	# (Old manual popup handling removed - ToastPopup is self-contained)
 	pass  # Empty function - kept for override clarity
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -516,7 +516,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if not visible:
 		return
 
-	# Note: ConfirmationPopup handles its own input blocking, no need to check here
+	# Note: ToastPopup handles its own input blocking, no need to check here
 
 	var handled: bool = false
 

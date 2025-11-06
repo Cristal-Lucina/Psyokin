@@ -10,7 +10,7 @@
 This document outlines the unified architecture for all GameMenu panels in Psyokin. The goal is to create a cohesive, consistent experience across all panels by:
 
 1. **Standardizing on PanelBase** - All panels extend `PanelBase` for consistent lifecycle management
-2. **Unified Popup System** - Use `ConfirmationPopup` and `ToastPopup` throughout
+2. **Unified Popup System** - Use `ToastPopup` for all popups
 3. **Consistent Navigation** - NavState pattern with accept-to-move flow
 4. **Centralized Data Access** - Pull from `CombatProfileSystem` and `GameState`
 5. **Panel Stack Management** - Integrate with `aPanelManager`
@@ -60,7 +60,7 @@ GameMenu Opens
 **DormsPanel** (REFERENCE PATTERN)
 - ✅ Extends `PanelBase`
 - ✅ Uses `NavState` enum (ROSTER_SELECT, COMMON_SELECT, ROOM_SELECT, ACTION_SELECT)
-- ✅ Uses `ConfirmationPopup.create()` and `ToastPopup.create()`
+- ✅ Uses `ToastPopup.create()` and `ToastPopup.create()`
 - ✅ Custom `_input()` for controller navigation
 - ✅ Accept-to-move flow with `_nav_state_history`
 - ✅ Panel animations on focus change
@@ -69,13 +69,13 @@ GameMenu Opens
 **BondsPanel**
 - ✅ Extends `PanelBase`
 - ✅ Has `NavState` enum (BOND_LIST, BOND_DETAIL)
-- ❌ Uses ad-hoc CanvasLayer popups instead of ConfirmationPopup/ToastPopup
+- ❌ Uses ad-hoc CanvasLayer popups instead of ToastPopup
 - ✅ Custom `_input()` for navigation
 
 **OutreachPanel**
 - ✅ Extends `PanelBase`
 - ✅ Has `NavState` enum (CATEGORY_SELECT, MISSION_LIST, POPUP_ACTIVE)
-- ❌ Creates Panel nodes manually instead of using ConfirmationPopup/ToastPopup
+- ❌ Creates Panel nodes manually instead of using ToastPopup
 - ✅ Custom `_input()` for navigation
 
 ### ❌ Panels Needing Major Refactoring
@@ -136,7 +136,7 @@ Control (Godot)
 
 ```gdscript
 # YES/NO confirmation dialogs
-var popup = ConfirmationPopup.create("Are you sure?")
+var popup = ToastPopup.create("Are you sure?", "Confirm")
 add_child(popup)
 var result: bool = await popup.confirmed
 popup.queue_free()
@@ -172,7 +172,7 @@ get_tree().root.add_child(overlay)
 get_tree().root.move_child(overlay, 0)  # Move to first position so it processes input first
 
 # Create and show popup
-var popup := ConfirmationPopup.create(message)
+var popup := ToastPopup.create(message, "Confirm")
 popup.process_mode = Node.PROCESS_MODE_ALWAYS  # Process even when paused
 overlay.add_child(popup)
 
@@ -272,7 +272,7 @@ func _on_back_input() -> void:
 **For simple panels (CalendarPanel, SystemPanel):**
 - May not need NavState if they're simple display/button panels
 - Still extend PanelBase for lifecycle management
-- Still use ConfirmationPopup/ToastPopup if needed
+- Still use ToastPopup if needed
 
 ### 4. Panel Lifecycle Integration
 
@@ -450,7 +450,7 @@ func _on_accept_input() -> void:
 **3.2 SigilSkillMenu** ⏱️ Estimated: 2 hours
 - Change `extends Control` → `extends PanelBase`
 - Rename `NavMode` → `NavState` for consistency
-- Replace any ad-hoc popup creation with ConfirmationPopup/ToastPopup
+- Replace any ad-hoc popup creation with ToastPopup
 - Implement proper `_on_panel_gained_focus()` and `_on_back_input()`
 - Test socket and skills navigation
 
@@ -458,18 +458,18 @@ func _on_accept_input() -> void:
 
 **4.1 BondsPanel** ⏱️ Estimated: 1 hour
 - Replace `_show_info_popup()` CanvasLayer creation with `ToastPopup.create()`
-- Replace story overlay creation (if it's a simple confirmation) with `ConfirmationPopup.create()`
+- Replace story overlay creation (if it's a simple confirmation) with `ToastPopup.create()`
 - Remove manual popup management code
 - Test bond list and detail navigation
 
 **4.2 OutreachPanel** ⏱️ Estimated: 1 hour
-- Replace `_show_set_current_confirmation()` Panel creation with `ConfirmationPopup.create()`
+- Replace `_show_set_current_confirmation()` Panel creation with `ToastPopup.create()`
 - Remove manual popup styling and positioning
 - Test category, mission list, and confirmation flows
 
 **4.3 PerksPanel, ItemsPanel, LoadoutPanel** ⏱️ Estimated: 30 min each
 - Audit for any ad-hoc popup creation
-- Replace with ConfirmationPopup/ToastPopup if found
+- Replace with ToastPopup if found
 - Ensure NavState is consistent and well-documented
 
 ### Phase 5: Testing & Polish
@@ -499,7 +499,7 @@ func _on_accept_input() -> void:
 ### ✅ DO
 
 1. **Always extend PanelBase** for menu panels
-2. **Always use ConfirmationPopup/ToastPopup** for dialogs
+2. **Always use ToastPopup** for dialogs
 3. **Always call super()** in `_ready()`, `_on_panel_gained_focus()`, etc.
 4. **Use NavState enums** for multi-section panels
 5. **Track navigation history** with `_nav_state_history`
@@ -512,7 +512,7 @@ func _on_accept_input() -> void:
 ### ❌ DON'T
 
 1. **Don't extend Control** for menu panels (use PanelBase)
-2. **Don't create Panel/CanvasLayer popups manually** (use ConfirmationPopup/ToastPopup)
+2. **Don't create Panel/CanvasLayer popups manually** (use ToastPopup)
 3. **Don't manually push/pop from aPanelManager** (PanelBase handles this)
 4. **Don't block input without good reason** (popups auto-block)
 5. **Don't forget to call super()** in lifecycle methods
@@ -528,8 +528,7 @@ func _on_accept_input() -> void:
 
 ### Core Classes
 - `scripts/core/PanelBase.gd` - Base class for all panels
-- `scripts/main_menu/panels/ConfirmationPopup.gd` - Yes/No dialogs
-- `scripts/main_menu/panels/ToastPopup.gd` - Notice/toast messages
+- `scripts/main_menu/panels/ToastPopup.gd` - Unified popup system for all dialogs and messages
 
 ### Data Systems
 - `scripts/systems/CombatProfileSystem.gd` - HP/MP/level data
@@ -603,7 +602,7 @@ Before starting implementation, please confirm:
 
 1. ✅ Does this architecture align with your vision?
 2. ✅ Is the DormsPanel pattern the right reference?
-3. ✅ Should ALL popups use ConfirmationPopup/ToastPopup (no exceptions)?
+3. ✅ Should ALL popups use ToastPopup (no exceptions)?
 4. ✅ Should we add NavState to simple panels like CalendarPanel, or is that overkill?
 5. ✅ Any special cases or panels that need different treatment?
 
