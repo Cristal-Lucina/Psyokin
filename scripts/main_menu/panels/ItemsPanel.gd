@@ -823,7 +823,7 @@ func _use_item_on_member(item_id: String, item_def: Dictionary, member_token: St
 		var overlay := CanvasLayer.new()
 		overlay.layer = 100
 		overlay.process_mode = Node.PROCESS_MODE_ALWAYS
-	overlay.process_priority = -1000  # CRITICAL: Process before GameMenu
+		overlay.process_priority = -1000  # CRITICAL: Process before GameMenu
 		get_tree().root.add_child(overlay)
 		get_tree().root.move_child(overlay, 0)
 
