@@ -984,6 +984,37 @@ func _value_cell(txt: String) -> Label:
 	l.add_theme_font_size_override("font_size", 12)
 	return l
 
+func _create_stat_cell(stat_label: String, value: int) -> PanelContainer:
+	"""Create a rounded grey cell containing a stat label and value"""
+	var panel := PanelContainer.new()
+	panel.custom_minimum_size = Vector2(0, 30)
+
+	# Create light grey rounded background
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.25, 0.25, 0.25, 1.0)  # Light grey
+	style.corner_radius_top_left = 4
+	style.corner_radius_top_right = 4
+	style.corner_radius_bottom_left = 4
+	style.corner_radius_bottom_right = 4
+	panel.add_theme_stylebox_override("panel", style)
+
+	# Add margin for padding inside cell
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 8)
+	margin.add_theme_constant_override("margin_top", 4)
+	margin.add_theme_constant_override("margin_right", 8)
+	margin.add_theme_constant_override("margin_bottom", 4)
+	panel.add_child(margin)
+
+	# Create label with "LABEL: VALUE" format
+	var label := Label.new()
+	label.text = "%s: %d" % [stat_label, value]
+	label.add_theme_font_size_override("font_size", 12)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	margin.add_child(label)
+
+	return panel
+
 func _fmt_num(n: float) -> String:
 	var as_int: int = int(round(n))
 	return str(as_int) if abs(n - float(as_int)) < 0.0001 else str(snapped(n, 0.1))
@@ -1042,23 +1073,19 @@ func _rebuild_stats_grid(member_token: String, equip: Dictionary) -> void:
 	var skill_boost: int = weapon.get("skill_acc_boost", 0)
 	var s_atk: int = mnd + skill_boost
 
-	var _pair: Callable = func(lbl: String, val: int) -> void:
-		_stats_grid.add_child(_label_cell(lbl))
-		_stats_grid.add_child(_value_cell(str(val)))
-
-	# Battle stats with full names
-	_pair.call("Max HP", profile.get("hp_max", 0))
-	_pair.call("Max MP", profile.get("mp_max", 0))
-	_pair.call("Physical Attack", weapon.get("attack", 0))
-	_pair.call("Skill Attack", s_atk)
-	_pair.call("Physical Defense", defense.get("pdef", 0))
-	_pair.call("Skill Defense", defense.get("mdef", 0))
-	_pair.call("Physical Accuracy", weapon.get("accuracy", 0))
-	_pair.call("Skill Accuracy", skill_boost)
-	_pair.call("Evasion", defense.get("peva", 0))
-	_pair.call("Speed", defense.get("speed", 0))
-	_pair.call("Ailment Resistance", defense.get("ail_resist_pct", 0))
-	_pair.call("Critical Rate", weapon.get("crit_bonus_pct", 0))
+	# Battle stats with full names in rounded grey cells (2 columns)
+	_stats_grid.add_child(_create_stat_cell("Max HP", profile.get("hp_max", 0)))
+	_stats_grid.add_child(_create_stat_cell("Max MP", profile.get("mp_max", 0)))
+	_stats_grid.add_child(_create_stat_cell("Physical Attack", weapon.get("attack", 0)))
+	_stats_grid.add_child(_create_stat_cell("Skill Attack", s_atk))
+	_stats_grid.add_child(_create_stat_cell("Physical Defense", defense.get("pdef", 0)))
+	_stats_grid.add_child(_create_stat_cell("Skill Defense", defense.get("mdef", 0)))
+	_stats_grid.add_child(_create_stat_cell("Physical Accuracy", weapon.get("accuracy", 0)))
+	_stats_grid.add_child(_create_stat_cell("Skill Accuracy", skill_boost))
+	_stats_grid.add_child(_create_stat_cell("Evasion", defense.get("peva", 0)))
+	_stats_grid.add_child(_create_stat_cell("Speed", defense.get("speed", 0)))
+	_stats_grid.add_child(_create_stat_cell("Ailment Resistance", defense.get("ail_resist_pct", 0)))
+	_stats_grid.add_child(_create_stat_cell("Critical Rate", weapon.get("crit_bonus_pct", 0)))
 
 # ────────────────── Details Display ──────────────────
 func _update_details_for_focused_element() -> void:
