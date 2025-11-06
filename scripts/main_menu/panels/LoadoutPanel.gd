@@ -989,9 +989,9 @@ func _create_stat_cell(stat_label: String, value: int) -> PanelContainer:
 	var panel := PanelContainer.new()
 	panel.custom_minimum_size = Vector2(0, 30)
 
-	# Create light grey rounded background
+	# Create darker grey rounded background
 	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.25, 0.25, 0.25, 1.0)  # Light grey
+	style.bg_color = Color(0.15, 0.15, 0.15, 1.0)  # Darker grey
 	style.corner_radius_top_left = 4
 	style.corner_radius_top_right = 4
 	style.corner_radius_bottom_left = 4
@@ -1011,21 +1011,22 @@ func _create_stat_cell(stat_label: String, value: int) -> PanelContainer:
 	hbox.add_theme_constant_override("separation", 4)
 	margin.add_child(hbox)
 
-	# Label - 30 characters wide
+	# Label - 25 characters wide
 	var label := Label.new()
 	label.text = stat_label
-	label.custom_minimum_size = Vector2(180, 0)  # ~30 characters at 12pt
+	label.custom_minimum_size = Vector2(150, 0)  # ~25 characters at 12pt
 	label.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	label.add_theme_font_size_override("font_size", 12)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	hbox.add_child(label)
 
-	# Value - 5 characters wide
+	# Value - 5 characters wide, blue color
 	var value_label := Label.new()
 	value_label.text = str(value)
 	value_label.custom_minimum_size = Vector2(30, 0)  # ~5 characters at 12pt
 	value_label.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	value_label.add_theme_font_size_override("font_size", 12)
+	value_label.add_theme_color_override("font_color", Color(0.5, 0.7, 1.0))  # Blue
 	value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	hbox.add_child(value_label)
 
