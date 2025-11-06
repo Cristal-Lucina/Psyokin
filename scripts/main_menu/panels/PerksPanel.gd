@@ -516,16 +516,28 @@ func _show_perk_confirmation(perk: Dictionary) -> void:
 
 func _cleanup_active_popup() -> void:
 	"""Clean up any active popup and overlay"""
-	if _active_popup and is_instance_valid(_active_popup):
-		print("[PerksPanel] Cleaning up active popup")
-		# Emit canceled signal to unblock the await
-		_active_popup.confirmed.emit(false)
-		_active_popup.queue_free()
-		_active_popup = null
+	print("[PerksPanel] _cleanup_active_popup called, popup=%s, overlay=%s" % [_active_popup != null, _active_overlay != null])
 
-	if _active_overlay and is_instance_valid(_active_overlay):
-		_active_overlay.queue_free()
-		_active_overlay = null
+	# Store references locally before clearing tracking variables
+	var popup = _active_popup
+	var overlay = _active_overlay
+
+	# Clear tracking immediately to prevent re-entrance
+	_active_popup = null
+	_active_overlay = null
+
+	# Emit signal to unblock await BEFORE freeing
+	if popup and is_instance_valid(popup):
+		print("[PerksPanel] Emitting confirmed(false) and queuing free")
+		# Emit signal first to unblock the await (this is synchronous)
+		popup.confirmed.emit(false)
+		# Queue free (deferred deletion)
+		popup.queue_free()
+
+	# Clean up overlay
+	if overlay and is_instance_valid(overlay):
+		print("[PerksPanel] Freeing active overlay")
+		overlay.queue_free()
 
 func _on_acquired_perk_selected(index: int) -> void:
 	"""Show details for selected acquired perk"""
