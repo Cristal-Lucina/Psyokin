@@ -80,8 +80,9 @@ class_name LoadoutPanel
 @onready var _btn_manage:   Button        = get_node_or_null("Row/Middle/Buttons/BtnManageSigils") as Button
 
 @onready var _stats_grid:  GridContainer = get_node("Row/StatsColumn/StatsGrid") as GridContainer
-@onready var _mind_value:  Label         = get_node_or_null("Row/StatsColumn/MindSection/MindRow/Value") as Label
-@onready var _mind_section: VBoxContainer = get_node_or_null("Row/StatsColumn/MindSection") as VBoxContainer
+@onready var _mind_value:  Label         = get_node_or_null("Row/Middle/MindSection/MindRow/Value") as Label
+@onready var _mind_section: VBoxContainer = get_node_or_null("Row/Middle/MindSection") as VBoxContainer
+@onready var _mind_switch_btn: Button    = %SwitchBtn
 
 @onready var _active_section:    VBoxContainer = %ActiveSection
 @onready var _active_label:      Label         = %ActiveLabel
@@ -98,6 +99,7 @@ var _inv:   Node = null
 var _sig:   Node = null
 var _eq:    Node = null
 var _stats: Node = null
+var _cps:   Node = null  # CombatProfileSystem for battle stats
 
 const _SLOTS: Array[String] = ["weapon", "armor", "head", "foot", "bracelet"]
 const STATS_FONT_SIZE: int = 9
@@ -134,6 +136,7 @@ func _ready() -> void:
 	_sig   = get_node_or_null("/root/aSigilSystem")
 	_eq    = get_node_or_null("/root/aEquipmentSystem")
 	_stats = get_node_or_null("/root/aStatsSystem")
+	_cps   = get_node_or_null("/root/aCombatProfileSystem")
 
 	if _w_btn: _w_btn.pressed.connect(Callable(self, "_on_slot_button").bind("weapon"))
 	if _a_btn: _a_btn.pressed.connect(Callable(self, "_on_slot_button").bind("armor"))
@@ -892,6 +895,10 @@ func _refresh_mind_row(member_token: String) -> void:
 	var mt: String = _get_member_mind_type(member_token)
 	_mind_value.text = (mt if mt != "" else "—")
 
+	# Show Switch button only for player (hero)
+	if _mind_switch_btn:
+		_mind_switch_btn.visible = (member_token == "hero")
+
 func _fetch_equip_for(member_token: String) -> Dictionary:
 	if _gs and _gs.has_method("get_member_equip"):
 		var d_v: Variant = _gs.call("get_member_equip", member_token)
@@ -1002,96 +1009,48 @@ func _eva_mods_from_other(equip: Dictionary, exclude_id: String) -> int:
 	return sum
 
 func _rebuild_stats_grid(member_token: String, equip: Dictionary) -> void:
+	"""Build battle stats grid from CombatProfileSystem (matches StatsPanel)"""
 	if _stats_grid == null: return
 	_clear_stats_grid()
 
-	var lvl: int = 1
-	var hp_max: int = 0
-	var mp_max: int = 0
-	if _gs and _gs.has_method("compute_member_pools"):
-		var pools: Dictionary = _gs.call("compute_member_pools", member_token)
-		lvl    = int(pools.get("level", 1))
-		hp_max = int(pools.get("hp_max", 0))
-		mp_max = int(pools.get("mp_max", 0))
+	if not _cps:
+		print("[LoadoutPanel] CombatProfileSystem not available")
+		return
 
-	var d_wea:  Dictionary = _item_def(String(equip.get("weapon","")))
-	var d_arm:  Dictionary = _item_def(String(equip.get("armor","")))
-	var d_head: Dictionary = _item_def(String(equip.get("head","")))
-	var d_foot: Dictionary = _item_def(String(equip.get("foot","")))
-	var d_brac: Dictionary = _item_def(String(equip.get("bracelet","")))
+	# Get combat profile
+	var profile: Dictionary = {}
+	if _cps.has_method("get_profile"):
+		var profile_v = _cps.call("get_profile", member_token)
+		if typeof(profile_v) == TYPE_DICTIONARY:
+			profile = profile_v
 
-	var brw: int = _stat_for_member(member_token, "BRW")
-	var base_watk: int   = int(d_wea.get("base_watk", 0))
-	var scale_brw: float = float(d_wea.get("scale_brw", 0.0))
-	var weapon_attack: int = base_watk + int(round(scale_brw * float(brw)))
-	var weapon_acc: int = int(d_wea.get("base_acc", 0))
-	var skill_acc_boost: int = int(d_wea.get("skill_acc_boost", 0))
-	var crit_bonus: int = int(d_wea.get("crit_bonus_pct", 0))
-	var type_raw: String = String(d_wea.get("watk_type_tag","")).strip_edges().to_lower()
-	var weapon_type: String = ("Neutral" if (type_raw == "" or type_raw == "wand") else type_raw.capitalize())
-	var special: String = ("NL" if _as_bool(d_wea.get("non_lethal", false)) else "—")
+	# Display all battle stats in 2 columns
+	var weapon: Dictionary = profile.get("weapon", {})
+	var defense: Dictionary = profile.get("defense", {})
+	var stats: Dictionary = profile.get("stats", {})
 
-	var vtl: int = _stat_for_member(member_token, "VTL")
-	var armor_flat: int = int(d_arm.get("armor_flat", 0))
-	var pdef: int = int(round(float(armor_flat) * (5.0 + 0.25 * float(vtl))))
-	var ail_res: int = int(d_arm.get("ail_resist_pct", 0))
+	# S ATK = MND + skill_acc_boost
+	var mnd: int = stats.get("MND", 0)
+	var skill_boost: int = weapon.get("skill_acc_boost", 0)
+	var s_atk: int = mnd + skill_boost
 
-	var fcs: int = _stat_for_member(member_token, "FCS")
-	var hp_bonus: int = int(d_head.get("max_hp_boost", 0))
-	var mp_bonus: int = int(d_head.get("max_mp_boost", 0))
-	var ward_flat: int = int(d_head.get("ward_flat", 0))
-	var mdef: int = int(round(float(ward_flat) * (5.0 + 0.25 * float(fcs))))
-
-	var base_eva: int = int(d_foot.get("base_eva", 0))
-	var mods: int = _eva_mods_from_other(equip, String(equip.get("foot","")))
-	var peva: int = base_eva + int(round(0.25 * float(vtl))) + mods
-	var meva: int = base_eva + int(round(0.25 * float(fcs))) + mods
-	var speed: int = int(d_foot.get("speed", 0))
-
-	var slots: int = int(d_brac.get("sigil_slots", 0))
-
-	var _pair: Callable = func(lbl: String, val: String) -> void:
+	var _pair: Callable = func(lbl: String, val: int) -> void:
 		_stats_grid.add_child(_label_cell(lbl))
-		_stats_grid.add_child(_value_cell(val))
+		_stats_grid.add_child(_value_cell(str(val)))
 
-	# Core stats
-	_pair.call("Level", str(lvl))
-	_pair.call("HP", str(hp_max))
-	_pair.call("MP", str(mp_max))
-
-	# Weapon stats
-	if not d_wea.is_empty():
-		_pair.call("W.Attack", str(weapon_attack))
-		_pair.call("W.Acc", str(weapon_acc))
-		_pair.call("W.Type", weapon_type)
-		_pair.call("Crit %", str(crit_bonus))
-		if skill_acc_boost > 0:
-			_pair.call("Skill Acc", str(skill_acc_boost))
-		if special != "—":
-			_pair.call("Special", special)
-
-	# Armor stats
-	if not d_arm.is_empty():
-		_pair.call("P.Def", str(pdef))
-		_pair.call("Ail.Res %", str(ail_res))
-
-	# Head stats
-	if not d_head.is_empty():
-		if hp_bonus > 0:
-			_pair.call("HP Bonus", str(hp_bonus))
-		if mp_bonus > 0:
-			_pair.call("MP Bonus", str(mp_bonus))
-		_pair.call("M.Def", str(mdef))
-
-	# Foot stats
-	if not d_foot.is_empty():
-		_pair.call("P.Eva", str(peva))
-		_pair.call("M.Eva", str(meva))
-		_pair.call("Speed", str(speed))
-
-	# Bracelet stats
-	if not d_brac.is_empty():
-		_pair.call("Sigils", str(slots))
+	# Battle stats (same order as StatsPanel)
+	_pair.call("MAX HP", profile.get("hp_max", 0))
+	_pair.call("MAX MP", profile.get("mp_max", 0))
+	_pair.call("P ATK", weapon.get("attack", 0))
+	_pair.call("S ATK", s_atk)
+	_pair.call("P DEF", defense.get("pdef", 0))
+	_pair.call("S DEF", defense.get("mdef", 0))
+	_pair.call("P ACC", weapon.get("accuracy", 0))
+	_pair.call("S ACC", skill_boost)
+	_pair.call("EVA", defense.get("peva", 0))
+	_pair.call("SPD", defense.get("speed", 0))
+	_pair.call("AIL R", defense.get("ail_resist_pct", 0))
+	_pair.call("CRIT", weapon.get("crit_bonus_pct", 0))
 
 # ────────────────── Active Type (hero) ──────────────────
 func _setup_active_type_widgets() -> void:

@@ -49,6 +49,35 @@ layout_mode = 2
 text = "(Select a member)"
 horizontal_alignment = 1
 
+[node name="MindSection" type="VBoxContainer" parent="Row/Middle"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="MindLabel" type="Label" parent="Row/Middle/MindSection"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
+theme_override_font_sizes/font_size = 20
+text = "MIND TYPE"
+
+[node name="Underline" type="Label" parent="Row/Middle/MindSection"]
+layout_mode = 2
+text = "__________"
+
+[node name="MindRow" type="HBoxContainer" parent="Row/Middle/MindSection"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Value" type="Label" parent="Row/Middle/MindSection/MindRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "—"
+
+[node name="SwitchBtn" type="Button" parent="Row/Middle/MindSection/MindRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(90, 0)
+layout_mode = 2
+text = "Switch"
+
 [node name="EquipmentLabel" type="Label" parent="Row/Middle"]
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
@@ -209,28 +238,6 @@ layout_mode = 2
 theme_override_constants/h_separation = 12
 theme_override_constants/v_separation = 8
 columns = 2
-
-[node name="MindSection" type="VBoxContainer" parent="Row/StatsColumn"]
-layout_mode = 2
-theme_override_constants/separation = 6
-
-[node name="MindLabel" type="Label" parent="Row/StatsColumn/MindSection"]
-layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
-theme_override_font_sizes/font_size = 20
-text = "MIND TYPE"
-
-[node name="MindRow" type="HBoxContainer" parent="Row/StatsColumn/MindSection"]
-layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="Label" type="Label" parent="Row/StatsColumn/MindSection/MindRow"]
-layout_mode = 2
-text = "Type:"
-
-[node name="Value" type="Label" parent="Row/StatsColumn/MindSection/MindRow"]
-layout_mode = 2
-text = "—"
 
 [node name="ActiveSection" type="VBoxContainer" parent="Row/StatsColumn"]
 unique_name_in_owner = true
