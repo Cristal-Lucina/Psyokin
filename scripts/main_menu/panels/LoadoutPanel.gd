@@ -478,7 +478,7 @@ func _build_equipment_comparison_panel(item_id: String, slot: String, current_st
 	name_label.add_theme_font_size_override("font_size", 12)
 	vbox.add_child(name_label)
 
-	# Show type for weapons and armor
+	# Show type for weapons and armor, or slot name for head/foot/bracelet
 	if item_id != "" and item_id != "—":
 		var item_def: Dictionary = _item_def(item_id)
 		var type_text: String = ""
@@ -491,6 +491,12 @@ func _build_equipment_comparison_panel(item_id: String, slot: String, current_st
 			var atype: String = String(item_def.get("armor_type", "")).capitalize()
 			if atype != "":
 				type_text = atype + " Armor"
+		elif slot == "head":
+			type_text = "Headwear"
+		elif slot == "foot":
+			type_text = "Footwear"
+		elif slot == "bracelet":
+			type_text = "Bracelet"
 
 		if type_text != "":
 			var type_label := Label.new()
@@ -1383,6 +1389,10 @@ func _show_equipment_details(member_token: String, slot: String) -> void:
 
 	# Add item type
 	var slot_label: String = slot.capitalize()
+	if slot == "head":
+		slot_label = "Headwear"
+	elif slot == "foot":
+		slot_label = "Footwear"
 	details += "[color=#888888]%s[/color]\n\n" % slot_label
 
 	# Add stats based on slot type
@@ -1408,6 +1418,10 @@ func _show_equipment_details(member_token: String, slot: String) -> void:
 				details += "Skill Defense: [color=#FFC0CB]%d[/color]\n" % int(item_def.get("ward_flat", 0))
 			if item_def.has("ail_resist_pct"):
 				details += "Ailment Resist: [color=#FFC0CB]%d%%[/color]\n" % int(item_def.get("ail_resist_pct", 0))
+			if item_def.has("armor_type"):
+				var atype: String = String(item_def.get("armor_type", "")).capitalize()
+				if atype != "":
+					details += "Type: [color=#FFC0CB]%s[/color]\n" % atype
 
 		"head":
 			if item_def.has("max_hp_boost"):
