@@ -968,15 +968,19 @@ func _clear_stats_grid() -> void:
 func _label_cell(txt: String) -> Label:
 	var l: Label = Label.new()
 	l.text = txt
-	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	l.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	l.custom_minimum_size = Vector2(180, 0)  # Approximately 30 characters at 12pt
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	l.add_theme_font_size_override("font_size", 12)
 	return l
 
 func _value_cell(txt: String) -> Label:
 	var l: Label = Label.new()
 	l.text = txt
+	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	l.add_theme_font_size_override("font_size", 12)
 	return l
 
