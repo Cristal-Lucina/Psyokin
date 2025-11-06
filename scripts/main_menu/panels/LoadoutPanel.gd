@@ -61,28 +61,28 @@ extends PanelBase
 class_name LoadoutPanel
 
 @onready var _party_list: ItemList       = get_node("Row/Party/VBox/PartyList") as ItemList
-@onready var _member_name: Label         = get_node("Row/Middle/VBox/MemberName") as Label
+@onready var _member_name: Label         = get_node("Row/Middle/Margin/VBox/MemberName") as Label
 
-@onready var _w_val: Label = get_node("Row/Middle/VBox/Grid/WHBox/WValue") as Label
-@onready var _a_val: Label = get_node("Row/Middle/VBox/Grid/AHBox/AValue") as Label
-@onready var _h_val: Label = get_node("Row/Middle/VBox/Grid/HHBox/HValue") as Label
-@onready var _f_val: Label = get_node("Row/Middle/VBox/Grid/FHBox/FValue") as Label
-@onready var _b_val: Label = get_node("Row/Middle/VBox/Grid/BHBox/BValue") as Label
+@onready var _w_val: Label = get_node("Row/Middle/Margin/VBox/Grid/WHBox/WValue") as Label
+@onready var _a_val: Label = get_node("Row/Middle/Margin/VBox/Grid/AHBox/AValue") as Label
+@onready var _h_val: Label = get_node("Row/Middle/Margin/VBox/Grid/HHBox/HValue") as Label
+@onready var _f_val: Label = get_node("Row/Middle/Margin/VBox/Grid/FHBox/FValue") as Label
+@onready var _b_val: Label = get_node("Row/Middle/Margin/VBox/Grid/BHBox/BValue") as Label
 
-@onready var _w_btn: Button = get_node_or_null("Row/Middle/VBox/Grid/WHBox/WBtn") as Button
-@onready var _a_btn: Button = get_node_or_null("Row/Middle/VBox/Grid/AHBox/ABtn") as Button
-@onready var _h_btn: Button = get_node_or_null("Row/Middle/VBox/Grid/HHBox/HBtn") as Button
-@onready var _f_btn: Button = get_node_or_null("Row/Middle/VBox/Grid/FHBox/FBtn") as Button
-@onready var _b_btn: Button = get_node_or_null("Row/Middle/VBox/Grid/BHBox/BBtn") as Button
+@onready var _w_btn: Button = get_node_or_null("Row/Middle/Margin/VBox/Grid/WHBox/WBtn") as Button
+@onready var _a_btn: Button = get_node_or_null("Row/Middle/Margin/VBox/Grid/AHBox/ABtn") as Button
+@onready var _h_btn: Button = get_node_or_null("Row/Middle/Margin/VBox/Grid/HHBox/HBtn") as Button
+@onready var _f_btn: Button = get_node_or_null("Row/Middle/Margin/VBox/Grid/FHBox/FBtn") as Button
+@onready var _b_btn: Button = get_node_or_null("Row/Middle/Margin/VBox/Grid/BHBox/BBtn") as Button
 
-@onready var _sigils_title: Label         = get_node_or_null("Row/Middle/VBox/Sigils/Title") as Label
-@onready var _sigils_list:  GridContainer = get_node_or_null("Row/Middle/VBox/Sigils/List") as GridContainer
-@onready var _btn_manage:   Button        = get_node_or_null("Row/Middle/VBox/Buttons/BtnManageSigils") as Button
+@onready var _sigils_title: Label         = get_node_or_null("Row/Middle/Margin/VBox/Sigils/Title") as Label
+@onready var _sigils_list:  GridContainer = get_node_or_null("Row/Middle/Margin/VBox/Sigils/List") as GridContainer
+@onready var _btn_manage:   Button        = get_node_or_null("Row/Middle/Margin/VBox/Buttons/BtnManageSigils") as Button
 
-@onready var _stats_grid:  GridContainer = get_node("Row/StatsColumn/VBox/StatsGrid") as GridContainer
+@onready var _stats_grid:  GridContainer = get_node("Row/StatsColumn/Margin/VBox/StatsGrid") as GridContainer
 @onready var _details_content: RichTextLabel = %DetailsContent
-@onready var _mind_value:  Label         = get_node_or_null("Row/Middle/VBox/MindSection/MindRow/Value") as Label
-@onready var _mind_section: VBoxContainer = get_node_or_null("Row/Middle/VBox/MindSection") as VBoxContainer
+@onready var _mind_value:  Label         = get_node_or_null("Row/Middle/Margin/VBox/MindSection/MindRow/Value") as Label
+@onready var _mind_section: VBoxContainer = get_node_or_null("Row/Middle/Margin/VBox/MindSection") as VBoxContainer
 @onready var _mind_switch_btn: Button    = %SwitchBtn
 
 var _labels: PackedStringArray = PackedStringArray()
@@ -602,6 +602,7 @@ func _rebuild_sigils(member_token: String) -> void:
 		var nm: Label = Label.new()
 		nm.custom_minimum_size = Vector2(180, 0)  # Match equipment label width
 		nm.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		nm.add_theme_font_size_override("font_size", 8)
 
 		var cur_id: String = (String(sockets[idx]) if idx < sockets.size() else "")
 		nm.text = (_sigil_disp(cur_id) if cur_id != "" else "(empty)")
@@ -969,14 +970,14 @@ func _label_cell(txt: String) -> Label:
 	l.text = txt
 	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD
-	l.add_theme_font_size_override("font_size", STATS_FONT_SIZE)
+	l.add_theme_font_size_override("font_size", 8)
 	return l
 
 func _value_cell(txt: String) -> Label:
 	var l: Label = Label.new()
 	l.text = txt
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD
-	l.add_theme_font_size_override("font_size", STATS_FONT_SIZE)
+	l.add_theme_font_size_override("font_size", 8)
 	return l
 
 func _fmt_num(n: float) -> String:
