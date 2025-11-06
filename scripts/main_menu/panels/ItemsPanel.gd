@@ -392,7 +392,7 @@ func _populate_items() -> void:
 		print("[ItemsPanel] No items to select or item already selected: %s" % _selected_item_id)
 
 func _update_details() -> void:
-	"""Update item details panel"""
+	"""Update item details panel with equipment stats and formatting"""
 	if _selected_item_id == "" or not _defs.has(_selected_item_id):
 		_clear_details()
 		return
@@ -405,28 +405,35 @@ func _update_details() -> void:
 	if _item_name:
 		_item_name.text = name
 
-	# Build details text
+	# Build details text with BBCode formatting
 	var details: String = ""
 
 	# Quantity
-	details += "Quantity: x%d\n\n" % qty
+	details += "Quantity: [color=#FFC0CB]x%d[/color]\n\n" % qty
+
+	# Get equipment slot to determine if this is equipment
+	var equip_slot: String = String(def.get("equip_slot", "")).to_lower().strip_edges()
+
+	# Show equipment stats if this is equippable gear
+	if equip_slot in ["weapon", "armor", "head", "foot", "bracelet"]:
+		details += _build_equipment_stats(def, equip_slot)
 
 	# Description
 	var desc: String = _get_description(def)
 	if desc != "":
-		details += "%s\n\n" % desc
+		details += "[color=#AAAAAA]%s[/color]\n\n" % desc
 
 	# Category
 	var cat: String = _category_of(def)
-	details += "Category: %s\n\n" % cat
+	details += "Category: [color=#888888]%s[/color]\n\n" % cat
 
 	# Equipped by
 	if _equipped_by.has(_selected_item_id):
 		var members: Array = _equipped_by[_selected_item_id]
 		if members.size() > 0:
-			details += "Equipped by: %s\n\n" % ", ".join(members)
+			details += "Equipped by: [color=#FFC0CB]%s[/color]\n\n" % ", ".join(members)
 
-	# Effects
+	# Effects (for consumables)
 	var effects: String = _get_effects(def)
 	if effects != "":
 		details += "Effects:\n%s\n" % effects
@@ -436,6 +443,71 @@ func _update_details() -> void:
 
 	# Show/hide action buttons
 	_update_action_buttons(def)
+
+func _build_equipment_stats(def: Dictionary, slot: String) -> String:
+	"""Build equipment stats section with formatting (matches LoadoutPanel style)"""
+	var stats: String = ""
+
+	# Add slot label
+	var slot_label: String = slot.capitalize()
+	if slot == "head":
+		slot_label = "Headwear"
+	elif slot == "foot":
+		slot_label = "Footwear"
+	stats += "[color=#888888]%s[/color]\n\n" % slot_label
+
+	# Add stats based on slot type
+	match slot:
+		"weapon":
+			if def.has("base_watk"):
+				stats += "Attack: [color=#FFC0CB]%d[/color]\n" % int(def.get("base_watk", 0))
+			if def.has("base_acc"):
+				stats += "Accuracy: [color=#FFC0CB]%d[/color]\n" % int(def.get("base_acc", 0))
+			if def.has("crit_bonus_pct"):
+				stats += "Critical: [color=#FFC0CB]%d%%[/color]\n" % int(def.get("crit_bonus_pct", 0))
+			if def.has("skill_atk_boost"):
+				stats += "Skill Atk: [color=#FFC0CB]%d[/color]\n" % int(def.get("skill_atk_boost", 0))
+			if def.has("skill_acc_boost"):
+				stats += "Skill Acc: [color=#FFC0CB]%d[/color]\n" % int(def.get("skill_acc_boost", 0))
+			if def.has("watk_type_tag"):
+				var wtype: String = String(def.get("watk_type_tag", "")).capitalize()
+				if wtype != "":
+					stats += "Type: [color=#FFC0CB]%s[/color]\n" % wtype
+
+		"armor":
+			if def.has("armor_flat"):
+				stats += "Physical Defense: [color=#FFC0CB]%d[/color]\n" % int(def.get("armor_flat", 0))
+			if def.has("ward_flat"):
+				stats += "Skill Defense: [color=#FFC0CB]%d[/color]\n" % int(def.get("ward_flat", 0))
+			if def.has("ail_resist_pct"):
+				stats += "Ailment Resist: [color=#FFC0CB]%d%%[/color]\n" % int(def.get("ail_resist_pct", 0))
+			if def.has("armor_type"):
+				var atype: String = String(def.get("armor_type", "")).capitalize()
+				if atype != "":
+					stats += "Type: [color=#FFC0CB]%s[/color]\n" % atype
+
+		"head":
+			if def.has("max_hp_boost"):
+				stats += "HP Bonus: [color=#FFC0CB]+%d[/color]\n" % int(def.get("max_hp_boost", 0))
+			if def.has("max_mp_boost"):
+				stats += "MP Bonus: [color=#FFC0CB]+%d[/color]\n" % int(def.get("max_mp_boost", 0))
+			if def.has("ward_flat"):
+				stats += "Skill Defense: [color=#FFC0CB]%d[/color]\n" % int(def.get("ward_flat", 0))
+
+		"foot":
+			if def.has("base_eva"):
+				stats += "Evasion: [color=#FFC0CB]%d[/color]\n" % int(def.get("base_eva", 0))
+			if def.has("speed"):
+				stats += "Speed: [color=#FFC0CB]%d[/color]\n" % int(def.get("speed", 0))
+
+		"bracelet":
+			if def.has("sigil_slots"):
+				stats += "Sigil Slots: [color=#FFC0CB]%d[/color]\n" % int(def.get("sigil_slots", 0))
+
+	if stats != "":
+		stats += "\n"
+
+	return stats
 
 func _clear_details() -> void:
 	"""Clear details panel"""
