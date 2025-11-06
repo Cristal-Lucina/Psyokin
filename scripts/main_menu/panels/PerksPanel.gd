@@ -36,8 +36,9 @@ var _grid_cells: Array[Array] = []  # 8×5 array of Controls
 var _selected_row: int = 2  # Start at first tier row
 var _selected_col: int = 0
 
-# Note: Confirmation popup handling is now done by ToastPopup class
-# (removed _active_popup and _pending_perk - no longer needed)
+# Active popup tracking (needed for cleanup when panel is hidden)
+var _active_popup: ToastPopup = null
+var _active_overlay: CanvasLayer = null
 
 func _ready() -> void:
 	# Set high input priority so popup input blocking happens before parent nodes
@@ -76,9 +77,12 @@ func _first_fill() -> void:
 	_show_selected_perk_details()
 
 func _on_visibility_changed() -> void:
-	"""Highlight selection when panel becomes visible"""
+	"""Highlight selection when panel becomes visible, cleanup popups when hidden"""
 	if visible:
 		call_deferred("_refresh_highlight")
+	else:
+		# Clean up any active popups when panel is hidden
+		_cleanup_active_popup()
 
 func _refresh_highlight() -> void:
 	"""Refresh grid highlight"""
@@ -471,6 +475,9 @@ func _show_perk_confirmation(perk: Dictionary) -> void:
 
 	print("[PerksPanel] Showing perk confirmation for: %s" % perk_name)
 
+	# Clean up any existing popup first
+	_cleanup_active_popup()
+
 	# Create CanvasLayer overlay for popup (ensures it's on top and processes input first)
 	var overlay := CanvasLayer.new()
 	overlay.layer = 100  # High layer to ensure it's on top
@@ -483,12 +490,22 @@ func _show_perk_confirmation(perk: Dictionary) -> void:
 	popup.process_mode = Node.PROCESS_MODE_ALWAYS  # Process even when paused
 	overlay.add_child(popup)
 
+	# Track active popup for cleanup
+	_active_popup = popup
+	_active_overlay = overlay
+
 	# Wait for user response
 	var result: bool = await popup.confirmed
 
-	# Clean up
-	popup.queue_free()
-	overlay.queue_free()
+	# Clear tracking (popup may have been cleaned up externally)
+	_active_popup = null
+	_active_overlay = null
+
+	# Clean up (only if not already cleaned up)
+	if is_instance_valid(popup):
+		popup.queue_free()
+	if is_instance_valid(overlay):
+		overlay.queue_free()
 
 	# Handle response
 	if result:
@@ -496,6 +513,19 @@ func _show_perk_confirmation(perk: Dictionary) -> void:
 		_unlock_perk(perk)
 	else:
 		print("[PerksPanel] User canceled perk unlock")
+
+func _cleanup_active_popup() -> void:
+	"""Clean up any active popup and overlay"""
+	if _active_popup and is_instance_valid(_active_popup):
+		print("[PerksPanel] Cleaning up active popup")
+		# Emit canceled signal to unblock the await
+		_active_popup.confirmed.emit(false)
+		_active_popup.queue_free()
+		_active_popup = null
+
+	if _active_overlay and is_instance_valid(_active_overlay):
+		_active_overlay.queue_free()
+		_active_overlay = null
 
 func _on_acquired_perk_selected(index: int) -> void:
 	"""Show details for selected acquired perk"""
