@@ -431,6 +431,7 @@ func _show_item_menu_for_slot(member_token: String, slot: String) -> void:
 	popup_panel.process_priority = -1000
 	popup_panel.z_index = 100
 	popup_panel.custom_minimum_size = Vector2(320, 280)
+	popup_panel.modulate = Color(1, 1, 1, 0)  # Start hidden to prevent flash in top-left corner
 	_style_popup_panel(popup_panel)  # Apply ToastPopup styling
 	overlay.add_child(popup_panel)
 
@@ -500,6 +501,9 @@ func _show_item_menu_for_slot(member_token: String, slot: String) -> void:
 	var viewport_size: Vector2 = get_viewport_rect().size
 	popup_panel.position = (viewport_size - popup_panel.size) / 2.0
 	print("[LoadoutPanel] Equipment popup centered at: %s, size: %s" % [popup_panel.position, popup_panel.size])
+
+	# Fade in popup (now that it's positioned)
+	popup_panel.modulate = Color(1, 1, 1, 1)
 
 	# Select first item and grab focus
 	if item_list.item_count > 0:
@@ -714,6 +718,7 @@ func _show_sigil_picker_for_socket(member_token: String, socket_index: int) -> v
 	popup_panel.process_priority = -1000
 	popup_panel.z_index = 100
 	popup_panel.custom_minimum_size = Vector2(340, 310)
+	popup_panel.modulate = Color(1, 1, 1, 0)  # Start hidden to prevent flash in top-left corner
 	_style_popup_panel(popup_panel)  # Apply ToastPopup styling
 	overlay.add_child(popup_panel)
 
@@ -805,6 +810,9 @@ func _show_sigil_picker_for_socket(member_token: String, socket_index: int) -> v
 	var viewport_size: Vector2 = get_viewport_rect().size
 	popup_panel.position = (viewport_size - popup_panel.size) / 2.0
 	print("[LoadoutPanel] Sigil popup centered at: %s, size: %s" % [popup_panel.position, popup_panel.size])
+
+	# Fade in popup (now that it's positioned)
+	popup_panel.modulate = Color(1, 1, 1, 1)
 
 	# Select first enabled item and grab focus
 	if item_list.item_count > 0:
@@ -1189,6 +1197,7 @@ func _open_active_type_picker() -> void:
 	popup_panel.process_priority = -1000
 	popup_panel.z_index = 100
 	popup_panel.custom_minimum_size = Vector2(290, 260)
+	popup_panel.modulate = Color(1, 1, 1, 0)  # Start hidden to prevent flash in top-left corner
 	_style_popup_panel(popup_panel)  # Apply ToastPopup styling
 	overlay.add_child(popup_panel)
 
@@ -1262,6 +1271,9 @@ func _open_active_type_picker() -> void:
 	var viewport_size: Vector2 = get_viewport_rect().size
 	popup_panel.position = (viewport_size - popup_panel.size) / 2.0
 	print("[LoadoutPanel] Active type popup centered at: %s, size: %s" % [popup_panel.position, popup_panel.size])
+
+	# Fade in popup (now that it's positioned)
+	popup_panel.modulate = Color(1, 1, 1, 1)
 
 	# Select first enabled item if nothing selected, and grab focus
 	if item_list.item_count > 0:
