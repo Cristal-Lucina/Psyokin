@@ -1263,29 +1263,43 @@ func _on_dorms_changed() -> void:
 func _ask_confirm(msg: String) -> bool:
 	print("[DormsPanel._ask_confirm] Showing confirmation: %s" % msg)
 
-	# Create and show modal confirmation popup
+	# Create CanvasLayer overlay for popup (outside GameMenu hierarchy)
+	var overlay := CanvasLayer.new()
+	overlay.layer = 100
+	overlay.process_mode = Node.PROCESS_MODE_ALWAYS
+	get_tree().root.add_child(overlay)
+
 	var popup := ToastPopup.create(msg, "Confirm")
-	add_child(popup)
+	popup.process_mode = Node.PROCESS_MODE_ALWAYS
+	overlay.add_child(popup)
 
 	# Wait for user response (true = Accept, false = Cancel/Back)
 	var result: bool = await popup.confirmed
 
 	print("[DormsPanel._ask_confirm] Result: %s" % result)
 	popup.queue_free()
+	overlay.queue_free()
 
 	return result
 
 func _show_toast(msg: String, title: String = "") -> void:
 	print("[DormsPanel._show_toast] Showing toast: %s" % msg)
 
-	# Create and show modal toast popup with optional title (empty = no title)
+	# Create CanvasLayer overlay for popup (outside GameMenu hierarchy)
+	var overlay := CanvasLayer.new()
+	overlay.layer = 100
+	overlay.process_mode = Node.PROCESS_MODE_ALWAYS
+	get_tree().root.add_child(overlay)
+
 	var popup := ToastPopup.create(msg, title)
-	add_child(popup)
+	popup.process_mode = Node.PROCESS_MODE_ALWAYS
+	overlay.add_child(popup)
 
 	# Wait for user to respond (accept or cancel)
 	await popup.confirmed
 
 	popup.queue_free()
+	overlay.queue_free()
 	print("[DormsPanel._show_toast] Toast closed")
 
 func _join_psa(arr: PackedStringArray, sep: String) -> String:

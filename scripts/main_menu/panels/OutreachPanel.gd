@@ -404,15 +404,22 @@ func _show_set_current_confirmation() -> void:
 	var title = _selected_mission.get("title", "")
 	print("[OutreachPanel] Showing set current confirmation for: %s" % title)
 
-	# Create and show ToastPopup
+	# Create CanvasLayer overlay for popup (outside GameMenu hierarchy)
+	var overlay := CanvasLayer.new()
+	overlay.layer = 100
+	overlay.process_mode = Node.PROCESS_MODE_ALWAYS
+	get_tree().root.add_child(overlay)
+
 	var popup := ToastPopup.create("Set '%s' as your current mission?" % title, "Confirm")
-	add_child(popup)
+	popup.process_mode = Node.PROCESS_MODE_ALWAYS
+	overlay.add_child(popup)
 
 	# Wait for user response
 	var result: bool = await popup.confirmed
 
 	# Clean up
 	popup.queue_free()
+	overlay.queue_free()
 
 	# Handle response
 	if result:
