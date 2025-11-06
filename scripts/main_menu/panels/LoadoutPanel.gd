@@ -602,7 +602,7 @@ func _rebuild_sigils(member_token: String) -> void:
 		var nm: Label = Label.new()
 		nm.custom_minimum_size = Vector2(180, 0)  # Match equipment label width
 		nm.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		nm.add_theme_font_size_override("font_size", 8)
+		nm.add_theme_font_size_override("font_size", 12)
 
 		var cur_id: String = (String(sockets[idx]) if idx < sockets.size() else "")
 		nm.text = (_sigil_disp(cur_id) if cur_id != "" else "(empty)")
@@ -970,14 +970,14 @@ func _label_cell(txt: String) -> Label:
 	l.text = txt
 	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD
-	l.add_theme_font_size_override("font_size", 8)
+	l.add_theme_font_size_override("font_size", 12)
 	return l
 
 func _value_cell(txt: String) -> Label:
 	var l: Label = Label.new()
 	l.text = txt
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD
-	l.add_theme_font_size_override("font_size", 8)
+	l.add_theme_font_size_override("font_size", 12)
 	return l
 
 func _fmt_num(n: float) -> String:

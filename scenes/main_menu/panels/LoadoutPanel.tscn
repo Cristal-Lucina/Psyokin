@@ -59,7 +59,7 @@ theme_override_constants/separation = 12
 [node name="MemberName" type="Label" parent="Row/Middle/Margin/VBox"]
 custom_minimum_size = Vector2(0, 28)
 layout_mode = 2
-theme_override_font_sizes/font_size = 8
+theme_override_font_sizes/font_size = 12
 text = "(Select a member)"
 horizontal_alignment = 1
 
@@ -78,7 +78,7 @@ layout_mode = 2
 theme_override_constants/separation = 8
 
 [node name="Value" type="Label" parent="Row/Middle/Margin/VBox/MindSection/MindRow"]
-theme_override_font_sizes/font_size = 8
+theme_override_font_sizes/font_size = 12
 layout_mode = 2
 size_flags_horizontal = 3
 text = "—"
@@ -102,7 +102,7 @@ theme_override_constants/v_separation = 4
 columns = 2
 
 [node name="WLabel" type="Label" parent="Row/Middle/Margin/VBox/Grid"]
-theme_override_font_sizes/font_size = 8
+theme_override_font_sizes/font_size = 12
 layout_mode = 2
 text = "Weapon:"
 
@@ -112,7 +112,7 @@ size_flags_horizontal = 3
 theme_override_constants/separation = 8
 
 [node name="WValue" type="Label" parent="Row/Middle/Margin/VBox/Grid/WHBox"]
-theme_override_font_sizes/font_size = 8
+theme_override_font_sizes/font_size = 12
 custom_minimum_size = Vector2(180, 0)
 layout_mode = 2
 size_flags_horizontal = 3
@@ -124,7 +124,7 @@ layout_mode = 2
 text = "Equip…"
 
 [node name="ALabel" type="Label" parent="Row/Middle/Margin/VBox/Grid"]
-theme_override_font_sizes/font_size = 8
+theme_override_font_sizes/font_size = 12
 layout_mode = 2
 text = "Armor:"
 
@@ -134,7 +134,7 @@ size_flags_horizontal = 3
 theme_override_constants/separation = 8
 
 [node name="AValue" type="Label" parent="Row/Middle/Margin/VBox/Grid/AHBox"]
-theme_override_font_sizes/font_size = 8
+theme_override_font_sizes/font_size = 12
 custom_minimum_size = Vector2(180, 0)
 layout_mode = 2
 size_flags_horizontal = 3
@@ -146,7 +146,7 @@ layout_mode = 2
 text = "Equip…"
 
 [node name="HLabel" type="Label" parent="Row/Middle/Margin/VBox/Grid"]
-theme_override_font_sizes/font_size = 8
+theme_override_font_sizes/font_size = 12
 layout_mode = 2
 text = "Head:"
 
@@ -156,7 +156,7 @@ size_flags_horizontal = 3
 theme_override_constants/separation = 8
 
 [node name="HValue" type="Label" parent="Row/Middle/Margin/VBox/Grid/HHBox"]
-theme_override_font_sizes/font_size = 8
+theme_override_font_sizes/font_size = 12
 custom_minimum_size = Vector2(180, 0)
 layout_mode = 2
 size_flags_horizontal = 3
@@ -168,7 +168,7 @@ layout_mode = 2
 text = "Equip…"
 
 [node name="FLabel" type="Label" parent="Row/Middle/Margin/VBox/Grid"]
-theme_override_font_sizes/font_size = 8
+theme_override_font_sizes/font_size = 12
 layout_mode = 2
 text = "Foot:"
 
@@ -178,7 +178,7 @@ size_flags_horizontal = 3
 theme_override_constants/separation = 8
 
 [node name="FValue" type="Label" parent="Row/Middle/Margin/VBox/Grid/FHBox"]
-theme_override_font_sizes/font_size = 8
+theme_override_font_sizes/font_size = 12
 custom_minimum_size = Vector2(180, 0)
 layout_mode = 2
 size_flags_horizontal = 3
@@ -190,7 +190,7 @@ layout_mode = 2
 text = "Equip…"
 
 [node name="BLabel" type="Label" parent="Row/Middle/Margin/VBox/Grid"]
-theme_override_font_sizes/font_size = 8
+theme_override_font_sizes/font_size = 12
 layout_mode = 2
 text = "Bracelet:"
 
@@ -200,7 +200,7 @@ size_flags_horizontal = 3
 theme_override_constants/separation = 8
 
 [node name="BValue" type="Label" parent="Row/Middle/Margin/VBox/Grid/BHBox"]
-theme_override_font_sizes/font_size = 8
+theme_override_font_sizes/font_size = 12
 custom_minimum_size = Vector2(180, 0)
 layout_mode = 2
 size_flags_horizontal = 3
@@ -275,7 +275,7 @@ unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
-theme_override_font_sizes/normal_font_size = 8
+theme_override_font_sizes/normal_font_size = 12
 bbcode_enabled = true
 text = "[i]Select equipment or sigil to view details.[/i]"
 fit_content = true
