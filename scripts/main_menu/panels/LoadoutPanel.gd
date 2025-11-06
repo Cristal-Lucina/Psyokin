@@ -61,27 +61,27 @@ extends PanelBase
 class_name LoadoutPanel
 
 @onready var _party_list: ItemList       = get_node("Row/Party/PartyList") as ItemList
-@onready var _member_name: Label         = get_node("Row/Right/MemberName") as Label
+@onready var _member_name: Label         = get_node("Row/Middle/MemberName") as Label
 
-@onready var _w_val: Label = get_node("Row/Right/Grid/WHBox/WValue") as Label
-@onready var _a_val: Label = get_node("Row/Right/Grid/AHBox/AValue") as Label
-@onready var _h_val: Label = get_node("Row/Right/Grid/HHBox/HValue") as Label
-@onready var _f_val: Label = get_node("Row/Right/Grid/FHBox/FValue") as Label
-@onready var _b_val: Label = get_node("Row/Right/Grid/BHBox/BValue") as Label
+@onready var _w_val: Label = get_node("Row/Middle/Grid/WHBox/WValue") as Label
+@onready var _a_val: Label = get_node("Row/Middle/Grid/AHBox/AValue") as Label
+@onready var _h_val: Label = get_node("Row/Middle/Grid/HHBox/HValue") as Label
+@onready var _f_val: Label = get_node("Row/Middle/Grid/FHBox/FValue") as Label
+@onready var _b_val: Label = get_node("Row/Middle/Grid/BHBox/BValue") as Label
 
-@onready var _w_btn: Button = get_node_or_null("Row/Right/Grid/WHBox/WBtn") as Button
-@onready var _a_btn: Button = get_node_or_null("Row/Right/Grid/AHBox/ABtn") as Button
-@onready var _h_btn: Button = get_node_or_null("Row/Right/Grid/HHBox/HBtn") as Button
-@onready var _f_btn: Button = get_node_or_null("Row/Right/Grid/FHBox/FBtn") as Button
-@onready var _b_btn: Button = get_node_or_null("Row/Right/Grid/BHBox/BBtn") as Button
+@onready var _w_btn: Button = get_node_or_null("Row/Middle/Grid/WHBox/WBtn") as Button
+@onready var _a_btn: Button = get_node_or_null("Row/Middle/Grid/AHBox/ABtn") as Button
+@onready var _h_btn: Button = get_node_or_null("Row/Middle/Grid/HHBox/HBtn") as Button
+@onready var _f_btn: Button = get_node_or_null("Row/Middle/Grid/FHBox/FBtn") as Button
+@onready var _b_btn: Button = get_node_or_null("Row/Middle/Grid/BHBox/BBtn") as Button
 
-@onready var _sigils_title: Label         = get_node_or_null("Row/Right/Sigils/Title") as Label
-@onready var _sigils_list:  VBoxContainer = get_node_or_null("Row/Right/Sigils/List") as VBoxContainer
-@onready var _btn_manage:   Button        = get_node_or_null("Row/Right/Buttons/BtnManageSigils") as Button
+@onready var _sigils_title: Label         = get_node_or_null("Row/Middle/Sigils/Title") as Label
+@onready var _sigils_list:  GridContainer = get_node_or_null("Row/Middle/Sigils/List") as GridContainer
+@onready var _btn_manage:   Button        = get_node_or_null("Row/Middle/Buttons/BtnManageSigils") as Button
 
 @onready var _stats_grid:  GridContainer = get_node("Row/StatsColumn/StatsGrid") as GridContainer
-@onready var _mind_value:  Label         = get_node_or_null("Row/Right/MindSection/MindRow/Value") as Label
-@onready var _mind_section: VBoxContainer = get_node_or_null("Row/Right/MindSection") as VBoxContainer
+@onready var _mind_value:  Label         = get_node_or_null("Row/StatsColumn/MindSection/MindRow/Value") as Label
+@onready var _mind_section: VBoxContainer = get_node_or_null("Row/StatsColumn/MindSection") as VBoxContainer
 
 @onready var _active_section:    VBoxContainer = %ActiveSection
 @onready var _active_label:      Label         = %ActiveLabel
@@ -597,27 +597,23 @@ func _rebuild_sigils(member_token: String) -> void:
 		_sigils_list.add_child(none)
 		return
 
+	# Build 2x4 grid (2 columns, up to 8 sigils)
+	# GridContainer automatically wraps to next row after 2 items
 	for idx in range(cap):
-		var row: HBoxContainer = HBoxContainer.new()
-		row.add_theme_constant_override("separation", 8)
-		row.size_flags_horizontal = Control.SIZE_EXPAND_FILL  # Match equipment row expansion
-
 		var nm: Label = Label.new()
 		nm.custom_minimum_size = Vector2(180, 0)  # Match equipment label width
 		nm.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
 		var cur_id: String = (String(sockets[idx]) if idx < sockets.size() else "")
 		nm.text = (_sigil_disp(cur_id) if cur_id != "" else "(empty)")
-		row.add_child(nm)
+		_sigils_list.add_child(nm)
 
 		# Always show "Equip…" button - popup will handle unequip option
 		var btn: Button = Button.new()
 		btn.custom_minimum_size = Vector2(90, 0)  # Match equipment button width for grid alignment
 		btn.text = "Equip…"
 		btn.pressed.connect(Callable(self, "_on_equip_sigil").bind(member_token, idx))
-		row.add_child(btn)
-
-		_sigils_list.add_child(row)
+		_sigils_list.add_child(btn)
 
 	if _btn_manage:
 		_btn_manage.disabled = false
@@ -1887,19 +1883,16 @@ func _rebuild_equipment_navigation() -> void:
 	if _f_btn: _nav_elements.append(_f_btn)  # Foot
 	if _b_btn: _nav_elements.append(_b_btn)  # Bracelet
 
-	# Sigil slot buttons - FILTER OUT nodes queued for deletion (dynamic count based on equipped sigils)
+	# Sigil slot buttons - GridContainer has Label and Button as direct children
+	# FILTER OUT nodes queued for deletion (dynamic count based on equipped sigils)
 	if _sigils_list:
 		for child in _sigils_list.get_children():
 			# Skip nodes queued for deletion (from queue_free())
 			if not is_instance_valid(child) or child.is_queued_for_deletion():
 				continue
-			if child is HBoxContainer:
-				for subchild in child.get_children():
-					# Skip nodes queued for deletion
-					if not is_instance_valid(subchild) or subchild.is_queued_for_deletion():
-						continue
-					if subchild is Button:
-						_nav_elements.append(subchild)  # Sigil slot equip buttons
+			# In 2x4 grid, buttons are direct children (labels are skipped)
+			if child is Button:
+				_nav_elements.append(child)  # Sigil slot equip buttons
 
 	# Special buttons (always at the end of navigation cycle)
 	if _btn_manage: _nav_elements.append(_btn_manage)  # Manage Sigil button
