@@ -18,8 +18,8 @@ const KEY_ID    : String = "item_id"
 
 # Categories
 const CATEGORIES : Array[String] = [
-	"All", "Recovery", "Consumables", "Weapons", "Armor", "Headwear", "Footwear",
-	"Bracelets", "Sigils", "Materials", "Key", "Other"
+	"Acquired", "Recovery", "Battle", "Equipment", "Sigils",
+	"Capture", "Material", "Gifts", "Key", "Other"
 ]
 
 # Scene references
@@ -48,7 +48,7 @@ var _counts: Dictionary = {}        # item_id -> count
 var _equipped_by: Dictionary = {}   # item_id -> Array[member names]
 
 # State
-var _current_category: String = "All"
+var _current_category: String = "Acquired"
 var _category_ids: Array[String] = []
 var _item_ids: Array[String] = []
 var _selected_item_id: String = ""
@@ -346,9 +346,12 @@ func _populate_items() -> void:
 		var qty: int = _counts[item_id]
 		if qty <= 0:
 			continue
-		if _current_category == "All":
+
+		# For "Acquired" category, show all items
+		if _current_category == "Acquired":
 			items.append(item_id)
 			continue
+
 		var def: Dictionary = _defs.get(item_id, {})
 		var item_cat: String = _category_of(def)
 		# Debug first few items
@@ -360,14 +363,47 @@ func _populate_items() -> void:
 
 	print("[ItemsPanel] Gathered %d items for category '%s'" % [items.size(), _current_category])
 
-	# Sort by name
-	items.sort_custom(func(a: String, b: String) -> bool:
-		var def_a: Dictionary = _defs.get(a, {})
-		var def_b: Dictionary = _defs.get(b, {})
-		var name_a: String = _display_name(a, def_a)
-		var name_b: String = _display_name(b, def_b)
-		return name_a < name_b
-	)
+	# Sort items based on category
+	if _current_category == "Acquired":
+		# For Acquired: reverse alphabetical (newest first - approximation until we have true acquisition tracking)
+		items.sort_custom(func(a: String, b: String) -> bool:
+			var def_a: Dictionary = _defs.get(a, {})
+			var def_b: Dictionary = _defs.get(b, {})
+			var name_a: String = _display_name(a, def_a)
+			var name_b: String = _display_name(b, def_b)
+			return name_a > name_b  # Reverse order
+		)
+	elif _current_category == "Equipment":
+		# For Equipment: sort by equip_slot first, then by name
+		items.sort_custom(func(a: String, b: String) -> bool:
+			var def_a: Dictionary = _defs.get(a, {})
+			var def_b: Dictionary = _defs.get(b, {})
+			var slot_a: String = String(def_a.get("equip_slot", "")).to_lower()
+			var slot_b: String = String(def_b.get("equip_slot", "")).to_lower()
+
+			# Define slot order
+			const SLOT_ORDER: Dictionary = {"weapon": 0, "armor": 1, "head": 2, "foot": 3, "bracelet": 4}
+			var order_a: int = SLOT_ORDER.get(slot_a, 99)
+			var order_b: int = SLOT_ORDER.get(slot_b, 99)
+
+			# First sort by slot
+			if order_a != order_b:
+				return order_a < order_b
+
+			# Then sort by name within same slot
+			var name_a: String = _display_name(a, def_a)
+			var name_b: String = _display_name(b, def_b)
+			return name_a < name_b
+		)
+	else:
+		# Default: sort by name
+		items.sort_custom(func(a: String, b: String) -> bool:
+			var def_a: Dictionary = _defs.get(a, {})
+			var def_b: Dictionary = _defs.get(b, {})
+			var name_a: String = _display_name(a, def_a)
+			var name_b: String = _display_name(b, def_b)
+			return name_a < name_b
+		)
 
 	# Populate list
 	for item_id in items:
@@ -1010,6 +1046,23 @@ func _category_of(def: Dictionary) -> String:
 	if _is_recovery_item(def):
 		return "Recovery"
 
+	# Check if it's a capture item
+	if _is_capture_item(def):
+		return "Capture"
+
+	# Check if it's a gift item
+	if _is_gift_item(def):
+		return "Gifts"
+
+	# Check if it's equipment
+	if _is_equipment(def):
+		return "Equipment"
+
+	# Check if it's a battle consumable (not recovery, not capture, not gift)
+	if _is_battle_item(def):
+		return "Battle"
+
+	# Check category field for remaining types
 	for key in ["category", "cat", "type"]:
 		if def.has(key):
 			var cat: String = String(def[key]).strip_edges()
@@ -1023,15 +1076,10 @@ func _normalize_category(cat: String) -> String:
 	var key: String = cat.to_lower().strip_edges()
 
 	const MAP: Dictionary = {
-		"consumable": "Consumables", "consumables": "Consumables",
-		"weapon": "Weapons", "weapons": "Weapons",
-		"armor": "Armor",
-		"head": "Headwear", "headwear": "Headwear", "helm": "Headwear",
-		"foot": "Footwear", "footwear": "Footwear", "boots": "Footwear",
-		"bracelet": "Bracelets", "bracelets": "Bracelets", "bangle": "Bracelets",
 		"sigil": "Sigils", "sigils": "Sigils",
-		"material": "Materials", "materials": "Materials",
+		"material": "Material", "materials": "Material",
 		"key": "Key", "key item": "Key", "key items": "Key",
+		"gift": "Gifts", "gifts": "Gifts",
 		"other": "Other"
 	}
 
@@ -1068,6 +1116,36 @@ func _is_recovery_item(def: Dictionary) -> bool:
 			var effect: String = String(def[key]).to_lower()
 			if (effect.contains("heal") or effect.contains("restore")) and (effect.contains("hp") or effect.contains("mp")):
 				return true
+	return false
+
+func _is_capture_item(def: Dictionary) -> bool:
+	"""Check if item is a capture item (binds)"""
+	var cat: String = String(def.get("category", "")).to_lower()
+	if cat.contains("capture") or cat.contains("bind"):
+		return true
+	var name: String = String(def.get("name", "")).to_lower()
+	if name.contains("bind"):
+		return true
+	return false
+
+func _is_gift_item(def: Dictionary) -> bool:
+	"""Check if item is a gift item"""
+	var cat: String = String(def.get("category", "")).to_lower()
+	return cat.contains("gift")
+
+func _is_equipment(def: Dictionary) -> bool:
+	"""Check if item is equipment"""
+	var equip_slot: String = String(def.get("equip_slot", "")).to_lower().strip_edges()
+	return equip_slot in ["weapon", "armor", "head", "foot", "bracelet"]
+
+func _is_battle_item(def: Dictionary) -> bool:
+	"""Check if item is a battle consumable (not recovery, not capture, not gift)"""
+	var cat: String = String(def.get("category", "")).to_lower()
+	# Check if it's consumable but not already categorized
+	if cat.contains("consumable") or cat.contains("battle"):
+		# Make sure it's not recovery, capture, or gift
+		if not _is_recovery_item(def) and not _is_capture_item(def) and not _is_gift_item(def):
+			return true
 	return false
 
 func _gather_members() -> Array[String]:
