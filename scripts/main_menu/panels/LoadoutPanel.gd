@@ -1362,38 +1362,38 @@ func _show_equipment_details(member_token: String, slot: String) -> void:
 	# Add stats based on slot type
 	match slot:
 		"weapon":
-			if item_def.has("base_attack"):
-				details += "Attack: [color=#FFC0CB]%d[/color]\n" % int(item_def.get("base_attack", 0))
-			if item_def.has("base_accuracy"):
-				details += "Accuracy: [color=#FFC0CB]%d[/color]\n" % int(item_def.get("base_accuracy", 0))
+			if item_def.has("base_watk"):
+				details += "Attack: [color=#FFC0CB]%d[/color]\n" % int(item_def.get("base_watk", 0))
+			if item_def.has("base_acc"):
+				details += "Accuracy: [color=#FFC0CB]%d[/color]\n" % int(item_def.get("base_acc", 0))
 			if item_def.has("crit_bonus_pct"):
 				details += "Critical: [color=#FFC0CB]%d%%[/color]\n" % int(item_def.get("crit_bonus_pct", 0))
 			if item_def.has("skill_acc_boost"):
 				details += "Skill Acc: [color=#FFC0CB]%d[/color]\n" % int(item_def.get("skill_acc_boost", 0))
-			if item_def.has("weapon_type"):
-				details += "Type: [color=#FFC0CB]%s[/color]\n" % String(item_def.get("weapon_type", ""))
+			if item_def.has("watk_type_tag"):
+				details += "Type: [color=#FFC0CB]%s[/color]\n" % String(item_def.get("watk_type_tag", ""))
 
 		"armor":
-			if item_def.has("base_pdef"):
-				details += "Physical Defense: [color=#FFC0CB]%d[/color]\n" % int(item_def.get("base_pdef", 0))
-			if item_def.has("base_mdef"):
-				details += "Skill Defense: [color=#FFC0CB]%d[/color]\n" % int(item_def.get("base_mdef", 0))
+			if item_def.has("armor_flat"):
+				details += "Physical Defense: [color=#FFC0CB]%d[/color]\n" % int(item_def.get("armor_flat", 0))
+			if item_def.has("ward_flat"):
+				details += "Skill Defense: [color=#FFC0CB]%d[/color]\n" % int(item_def.get("ward_flat", 0))
 			if item_def.has("ail_resist_pct"):
 				details += "Ailment Resist: [color=#FFC0CB]%d%%[/color]\n" % int(item_def.get("ail_resist_pct", 0))
 
 		"head":
-			if item_def.has("hp_bonus"):
-				details += "HP Bonus: [color=#FFC0CB]+%d[/color]\n" % int(item_def.get("hp_bonus", 0))
-			if item_def.has("mp_bonus"):
-				details += "MP Bonus: [color=#FFC0CB]+%d[/color]\n" % int(item_def.get("mp_bonus", 0))
-			if item_def.has("base_mdef"):
-				details += "Skill Defense: [color=#FFC0CB]%d[/color]\n" % int(item_def.get("base_mdef", 0))
+			if item_def.has("max_hp_boost"):
+				details += "HP Bonus: [color=#FFC0CB]+%d[/color]\n" % int(item_def.get("max_hp_boost", 0))
+			if item_def.has("max_mp_boost"):
+				details += "MP Bonus: [color=#FFC0CB]+%d[/color]\n" % int(item_def.get("max_mp_boost", 0))
+			if item_def.has("ward_flat"):
+				details += "Skill Defense: [color=#FFC0CB]%d[/color]\n" % int(item_def.get("ward_flat", 0))
 
 		"foot":
 			if item_def.has("base_eva"):
 				details += "Evasion: [color=#FFC0CB]%d[/color]\n" % int(item_def.get("base_eva", 0))
-			if item_def.has("base_speed"):
-				details += "Speed: [color=#FFC0CB]%d[/color]\n" % int(item_def.get("base_speed", 0))
+			if item_def.has("speed"):
+				details += "Speed: [color=#FFC0CB]%d[/color]\n" % int(item_def.get("speed", 0))
 
 		"bracelet":
 			if item_def.has("sigil_slots"):
