@@ -636,12 +636,17 @@ func _show_item_menu_for_slot(member_token: String, slot: String) -> void:
 	back_btn.pressed.connect(_popup_cancel)
 	center_vbox.add_child(back_btn)
 
-	# RIGHT PANEL - Selected/Highlighted Equipment (initially showing first item)
+	# RIGHT PANEL CONTAINER - Holds the comparison panel
+	var right_container := Control.new()
+	right_container.custom_minimum_size = Vector2(220, 280)
+	hbox.add_child(right_container)
+
+	# Create initial right panel
 	var initial_item_id: String = ""
 	if not item_ids.is_empty():
 		initial_item_id = item_ids[0]
 	var right_panel: Panel = _build_equipment_comparison_panel(initial_item_id, slot, current_stats, "COMPARING")
-	hbox.add_child(right_panel)
+	right_container.add_child(right_panel)
 
 	# Connect selection change to update right panel
 	item_list.item_selected.connect(func(index: int) -> void:
@@ -649,14 +654,14 @@ func _show_item_menu_for_slot(member_token: String, slot: String) -> void:
 			return
 		var selected_id: String = item_ids[index]
 
-		# Remove old right panel
-		if right_panel and is_instance_valid(right_panel):
-			right_panel.queue_free()
+		# Clear old right panel immediately
+		for child in right_container.get_children():
+			right_container.remove_child(child)
+			child.queue_free()
 
 		# Create new right panel with selected item
-		right_panel = _build_equipment_comparison_panel(selected_id, slot, current_stats, "COMPARING")
-		hbox.add_child(right_panel)
-		hbox.move_child(right_panel, 2)  # Ensure it's in the right position
+		var new_panel: Panel = _build_equipment_comparison_panel(selected_id, slot, current_stats, "COMPARING")
+		right_container.add_child(new_panel)
 	)
 
 	# Auto-size container to fit content - wait TWO frames for proper layout calculation
