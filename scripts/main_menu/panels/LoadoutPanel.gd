@@ -414,6 +414,7 @@ func _get_equipment_stats(item_id: String, slot: String) -> Dictionary:
 			stats["Attack"] = int(item_def.get("base_watk", 0))
 			stats["Accuracy"] = int(item_def.get("base_acc", 0))
 			stats["Critical"] = int(item_def.get("crit_bonus_pct", 0))
+			stats["Skill Atk"] = int(item_def.get("skill_atk_boost", 0))
 			stats["Skill Acc"] = int(item_def.get("skill_acc_boost", 0))
 		"armor":
 			stats["Phys Defense"] = int(item_def.get("armor_flat", 0))
@@ -1256,10 +1257,13 @@ func _rebuild_stats_grid(member_token: String, equip: Dictionary) -> void:
 	var defense: Dictionary = profile.get("defense", {})
 	var stats: Dictionary = profile.get("stats", {})
 
-	# S ATK = MND + skill_acc_boost
+	# S ATK = MND + skill_atk_boost
 	var mnd: int = stats.get("MND", 0)
-	var skill_boost: int = weapon.get("skill_acc_boost", 0)
-	var s_atk: int = mnd + skill_boost
+	var skill_atk_bonus: int = weapon.get("skill_atk_boost", 0)
+	var s_atk: int = mnd + skill_atk_bonus
+
+	# Skill Accuracy comes from skill_acc_boost
+	var skill_acc: int = weapon.get("skill_acc_boost", 0)
 
 	# Battle stats with full names in rounded grey cells (2 columns)
 	_stats_grid.add_child(_create_stat_cell("Max HP", profile.get("hp_max", 0)))
@@ -1269,7 +1273,7 @@ func _rebuild_stats_grid(member_token: String, equip: Dictionary) -> void:
 	_stats_grid.add_child(_create_stat_cell("Physical Defense", defense.get("pdef", 0)))
 	_stats_grid.add_child(_create_stat_cell("Skill Defense", defense.get("mdef", 0)))
 	_stats_grid.add_child(_create_stat_cell("Physical Accuracy", weapon.get("accuracy", 0)))
-	_stats_grid.add_child(_create_stat_cell("Skill Accuracy", skill_boost))
+	_stats_grid.add_child(_create_stat_cell("Skill Accuracy", skill_acc))
 	_stats_grid.add_child(_create_stat_cell("Evasion", defense.get("peva", 0)))
 	_stats_grid.add_child(_create_stat_cell("Speed", defense.get("speed", 0)))
 	_stats_grid.add_child(_create_stat_cell("Ailment Resistance", defense.get("ail_resist_pct", 0)))
@@ -1368,6 +1372,8 @@ func _show_equipment_details(member_token: String, slot: String) -> void:
 				details += "Accuracy: [color=#FFC0CB]%d[/color]\n" % int(item_def.get("base_acc", 0))
 			if item_def.has("crit_bonus_pct"):
 				details += "Critical: [color=#FFC0CB]%d%%[/color]\n" % int(item_def.get("crit_bonus_pct", 0))
+			if item_def.has("skill_atk_boost"):
+				details += "Skill Atk: [color=#FFC0CB]%d[/color]\n" % int(item_def.get("skill_atk_boost", 0))
 			if item_def.has("skill_acc_boost"):
 				details += "Skill Acc: [color=#FFC0CB]%d[/color]\n" % int(item_def.get("skill_acc_boost", 0))
 			if item_def.has("watk_type_tag"):

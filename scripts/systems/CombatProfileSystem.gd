@@ -270,6 +270,7 @@ func _compute_for_member(member: String) -> Dictionary:
 	var scale_brw: float = float(d_wea.get("scale_brw", 0.0))
 	var weapon_attack: int = base_watk + int(round(scale_brw * float(brw)))
 	var weapon_acc: int  = int(d_wea.get("base_acc", 0))
+	var skill_atk_boost: int = int(d_wea.get("skill_atk_boost", 0))
 	var skill_acc_boost: int = int(d_wea.get("skill_acc_boost", 0))
 	var crit_bonus: int  = int(d_wea.get("crit_bonus_pct", 0))
 	var type_raw: String = String(d_wea.get("watk_type_tag","")).strip_edges().to_lower()
@@ -336,6 +337,7 @@ func _compute_for_member(member: String) -> Dictionary:
 			"attack": weapon_attack,
 			"scale_brw": scale_brw,
 			"accuracy": weapon_acc,
+			"skill_atk_boost": skill_atk_boost,
 			"skill_acc_boost": skill_acc_boost,
 			"crit_bonus_pct": crit_bonus,
 			"type": weapon_type,
