@@ -1834,6 +1834,7 @@ func _rebuild_equipment_navigation() -> void:
 
 	# Special buttons (always at the end of navigation cycle)
 	if _btn_manage: _nav_elements.append(_btn_manage)  # Manage Sigil button
+	if _mind_switch_btn and _mind_switch_btn.visible: _nav_elements.append(_mind_switch_btn)  # Switch button (player only)
 
 	print("[LoadoutPanel] Built navigation: %d elements" % _nav_elements.size())
 
