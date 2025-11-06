@@ -60,28 +60,28 @@
 extends PanelBase
 class_name LoadoutPanel
 
-@onready var _party_list: ItemList       = get_node("Row/Party/PartyList") as ItemList
-@onready var _member_name: Label         = get_node("Row/Middle/MemberName") as Label
+@onready var _party_list: ItemList       = get_node("Row/Party/VBox/PartyList") as ItemList
+@onready var _member_name: Label         = get_node("Row/Middle/VBox/MemberName") as Label
 
-@onready var _w_val: Label = get_node("Row/Middle/Grid/WHBox/WValue") as Label
-@onready var _a_val: Label = get_node("Row/Middle/Grid/AHBox/AValue") as Label
-@onready var _h_val: Label = get_node("Row/Middle/Grid/HHBox/HValue") as Label
-@onready var _f_val: Label = get_node("Row/Middle/Grid/FHBox/FValue") as Label
-@onready var _b_val: Label = get_node("Row/Middle/Grid/BHBox/BValue") as Label
+@onready var _w_val: Label = get_node("Row/Middle/VBox/Grid/WHBox/WValue") as Label
+@onready var _a_val: Label = get_node("Row/Middle/VBox/Grid/AHBox/AValue") as Label
+@onready var _h_val: Label = get_node("Row/Middle/VBox/Grid/HHBox/HValue") as Label
+@onready var _f_val: Label = get_node("Row/Middle/VBox/Grid/FHBox/FValue") as Label
+@onready var _b_val: Label = get_node("Row/Middle/VBox/Grid/BHBox/BValue") as Label
 
-@onready var _w_btn: Button = get_node_or_null("Row/Middle/Grid/WHBox/WBtn") as Button
-@onready var _a_btn: Button = get_node_or_null("Row/Middle/Grid/AHBox/ABtn") as Button
-@onready var _h_btn: Button = get_node_or_null("Row/Middle/Grid/HHBox/HBtn") as Button
-@onready var _f_btn: Button = get_node_or_null("Row/Middle/Grid/FHBox/FBtn") as Button
-@onready var _b_btn: Button = get_node_or_null("Row/Middle/Grid/BHBox/BBtn") as Button
+@onready var _w_btn: Button = get_node_or_null("Row/Middle/VBox/Grid/WHBox/WBtn") as Button
+@onready var _a_btn: Button = get_node_or_null("Row/Middle/VBox/Grid/AHBox/ABtn") as Button
+@onready var _h_btn: Button = get_node_or_null("Row/Middle/VBox/Grid/HHBox/HBtn") as Button
+@onready var _f_btn: Button = get_node_or_null("Row/Middle/VBox/Grid/FHBox/FBtn") as Button
+@onready var _b_btn: Button = get_node_or_null("Row/Middle/VBox/Grid/BHBox/BBtn") as Button
 
-@onready var _sigils_title: Label         = get_node_or_null("Row/Middle/Sigils/Title") as Label
-@onready var _sigils_list:  GridContainer = get_node_or_null("Row/Middle/Sigils/List") as GridContainer
-@onready var _btn_manage:   Button        = get_node_or_null("Row/Middle/Buttons/BtnManageSigils") as Button
+@onready var _sigils_title: Label         = get_node_or_null("Row/Middle/VBox/Sigils/Title") as Label
+@onready var _sigils_list:  GridContainer = get_node_or_null("Row/Middle/VBox/Sigils/List") as GridContainer
+@onready var _btn_manage:   Button        = get_node_or_null("Row/Middle/VBox/Buttons/BtnManageSigils") as Button
 
-@onready var _stats_grid:  GridContainer = get_node("Row/StatsColumn/StatsGrid") as GridContainer
-@onready var _mind_value:  Label         = get_node_or_null("Row/Middle/MindSection/MindRow/Value") as Label
-@onready var _mind_section: VBoxContainer = get_node_or_null("Row/Middle/MindSection") as VBoxContainer
+@onready var _stats_grid:  GridContainer = get_node("Row/StatsColumn/VBox/StatsGrid") as GridContainer
+@onready var _mind_value:  Label         = get_node_or_null("Row/Middle/VBox/MindSection/MindRow/Value") as Label
+@onready var _mind_section: VBoxContainer = get_node_or_null("Row/Middle/VBox/MindSection") as VBoxContainer
 @onready var _mind_switch_btn: Button    = %SwitchBtn
 
 var _labels: PackedStringArray = PackedStringArray()
