@@ -1740,6 +1740,9 @@ func _handle_party_select_input(event: InputEvent) -> void:
 	elif event.is_action_pressed("move_down"):
 		_navigate_party(1)
 		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("move_left") or event.is_action_pressed("move_right"):
+		# Block left/right navigation in party select mode
+		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("menu_accept"):
 		_transition_to_equipment_nav()
 		get_viewport().set_input_as_handled()
