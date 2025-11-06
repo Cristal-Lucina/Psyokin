@@ -169,6 +169,12 @@ func _input(event: InputEvent) -> void:
 		_on_cancel()
 		# Note: input handling is done in _on_cancel
 
+	# Fallback: Also check for raw B button press (JOY_BUTTON_B = 1) in case action isn't working
+	elif event is InputEventJoypadButton and event.pressed and event.button_index == JOY_BUTTON_B:
+		_input_cooldown = INPUT_COOLDOWN_TIME  # Start cooldown
+		_on_cancel()
+		# Note: input handling is done in _on_cancel
+
 	# Handle left/right navigation between buttons
 	elif event.is_action_pressed("move_left"):
 		_accept_btn.grab_focus()
