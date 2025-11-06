@@ -400,12 +400,12 @@ func _on_primary_action() -> void:
 		_show_set_current_confirmation()
 
 func _show_set_current_confirmation() -> void:
-	"""Show confirmation popup for setting current mission using ConfirmationPopup"""
+	"""Show confirmation popup for setting current mission using ToastPopup"""
 	var title = _selected_mission.get("title", "")
 	print("[OutreachPanel] Showing set current confirmation for: %s" % title)
 
-	# Create and show ConfirmationPopup
-	var popup := ConfirmationPopup.create("Set '%s' as your current mission?" % title)
+	# Create and show ToastPopup
+	var popup := ToastPopup.create("Set '%s' as your current mission?" % title, "Confirm")
 	add_child(popup)
 
 	# Wait for user response

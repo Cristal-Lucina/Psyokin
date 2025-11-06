@@ -214,8 +214,8 @@ func _input(event: InputEvent) -> void:
 	if not is_active():
 		return
 
-	# Note: Popup input is now handled by ConfirmationPopup and ToastPopup classes
-	# They call set_input_as_handled() to block panel input while visible
+	# Note: Popup input is now handled by ToastPopup class
+	# It calls set_input_as_handled() to block panel input while visible
 
 	# Handle directional navigation
 	if event.is_action_pressed("move_up"):
@@ -1264,7 +1264,7 @@ func _ask_confirm(msg: String) -> bool:
 	print("[DormsPanel._ask_confirm] Showing confirmation: %s" % msg)
 
 	# Create and show modal confirmation popup
-	var popup := ConfirmationPopup.create(msg)
+	var popup := ToastPopup.create(msg, "Confirm")
 	add_child(popup)
 
 	# Wait for user response (true = Accept, false = Cancel/Back)

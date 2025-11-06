@@ -462,7 +462,7 @@ func _unlock_perk(perk: Dictionary) -> void:
 	_show_selected_perk_details()
 
 func _show_perk_confirmation(perk: Dictionary) -> void:
-	"""Show confirmation popup before unlocking perk using ConfirmationPopup"""
+	"""Show confirmation popup before unlocking perk using ToastPopup"""
 	var perk_name: String = perk.get("name", "Unknown Perk")
 	var desc: String = perk.get("description", "")
 
@@ -479,7 +479,7 @@ func _show_perk_confirmation(perk: Dictionary) -> void:
 	get_tree().root.move_child(overlay, 0)  # Move to first position so it processes input first
 
 	# Create and show popup
-	var popup := ConfirmationPopup.create(message)
+	var popup := ToastPopup.create(message, "Confirm")
 	popup.process_mode = Node.PROCESS_MODE_ALWAYS  # Process even when paused
 	overlay.add_child(popup)
 

@@ -110,7 +110,7 @@ func _on_title_pressed() -> void:
 
 func _confirm_return_to_title() -> void:
 	"""Ask user to confirm before returning to title screen"""
-	var popup := ConfirmationPopup.create("Return to title screen?\n\nAll unsaved progress will be lost.")
+	var popup := ToastPopup.create("Return to title screen?\n\nAll unsaved progress will be lost.", "Confirm")
 	add_child(popup)
 	var confirmed: bool = await popup.confirmed
 	popup.queue_free()

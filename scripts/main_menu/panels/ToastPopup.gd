@@ -43,6 +43,8 @@ static func create(message: String, title: String = "") -> ToastPopup:
 	print("[ToastPopup.create] Creating popup with message: %s" % message)
 	var popup := ToastPopup.new()
 	popup.process_mode = Node.PROCESS_MODE_ALWAYS  # Set BEFORE building UI
+	# Set very high input priority (negative = processes first) to intercept input before other panels
+	popup.process_priority = -1000
 	popup._title = title
 	popup._message = message
 	popup._build_ui()
@@ -192,9 +194,12 @@ func _input(event: InputEvent) -> void:
 		print("[ToastPopup._input] Not visible, skipping input")
 		return
 
+	# CRITICAL: Block ALL input from reaching nodes behind the popup
+	# This must be done early to prevent GameMenu from processing the event
+	get_viewport().set_input_as_handled()
+
 	# Block input during animations or cooldown
 	if _is_animating or _input_cooldown > 0.0:
-		get_viewport().set_input_as_handled()
 		return
 
 	# Debug logging
@@ -212,13 +217,16 @@ func _input(event: InputEvent) -> void:
 		else:
 			# Default to accept if nothing focused
 			_on_accept()
-		get_viewport().set_input_as_handled()
 
 	# Handle Back (cancel)
 	elif event.is_action_pressed("menu_back"):
 		_input_cooldown = INPUT_COOLDOWN_TIME  # Start cooldown
 		_on_cancel()
-		get_viewport().set_input_as_handled()
+
+	# Fallback: Also check for raw B button press (JOY_BUTTON_B = 1) in case action isn't working
+	elif event is InputEventJoypadButton and event.pressed and event.button_index == JOY_BUTTON_B:
+		_input_cooldown = INPUT_COOLDOWN_TIME  # Start cooldown
+		_on_cancel()
 
 	# Handle left/right navigation between buttons
 	elif event.is_action_pressed("move_left"):
