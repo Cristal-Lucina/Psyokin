@@ -799,7 +799,7 @@ func _show_swap_confirmation(member_name: String, _member_id: String) -> void:
 	print("[StatusPanel] Swap confirmation closed")
 
 func _style_popup_panel(popup_panel: Panel) -> void:
-	"""Apply consistent styling to popup panels (matches ToastPopup/ConfirmationPopup)"""
+	"""Apply consistent styling to popup panels (matches ToastPopup)"""
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0.15, 0.15, 0.15, 1.0)  # Dark gray, fully opaque
 	style.border_color = Color(1.0, 0.7, 0.75, 1.0)  # Pink border
@@ -879,7 +879,7 @@ func _show_member_picker(active_slot: int) -> void:
 	popup_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE  # Block input until fade completes
 	add_child(popup_panel)
 
-	# Apply consistent styling (matches ToastPopup/ConfirmationPopup)
+	# Apply consistent styling (matches ToastPopup)
 	_style_popup_panel(popup_panel)
 
 	# Set active popup immediately
@@ -1120,7 +1120,7 @@ func _show_recovery_popup(member_id: String, member_name: String, hp: int, hp_ma
 	popup_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE  # Block input until fade completes
 	add_child(popup_panel)
 
-	# Apply consistent styling (matches ToastPopup/ConfirmationPopup)
+	# Apply consistent styling (matches ToastPopup)
 	_style_popup_panel(popup_panel)
 
 	# Set active popup immediately

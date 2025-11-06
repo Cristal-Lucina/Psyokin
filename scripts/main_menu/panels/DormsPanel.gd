@@ -214,8 +214,8 @@ func _input(event: InputEvent) -> void:
 	if not is_active():
 		return
 
-	# Note: Popup input is now handled by ConfirmationPopup and ToastPopup classes
-	# They call set_input_as_handled() to block panel input while visible
+	# Note: Popup input is now handled by ToastPopup class
+	# It calls set_input_as_handled() to block panel input while visible
 
 	# Handle directional navigation
 	if event.is_action_pressed("move_up"):
@@ -1263,29 +1263,45 @@ func _on_dorms_changed() -> void:
 func _ask_confirm(msg: String) -> bool:
 	print("[DormsPanel._ask_confirm] Showing confirmation: %s" % msg)
 
-	# Create and show modal confirmation popup
-	var popup := ConfirmationPopup.create(msg)
-	add_child(popup)
+	# Create CanvasLayer overlay for popup (outside GameMenu hierarchy)
+	var overlay := CanvasLayer.new()
+	overlay.layer = 100
+	overlay.process_mode = Node.PROCESS_MODE_ALWAYS
+	overlay.process_priority = -1000  # CRITICAL: Process before GameMenu
+	get_tree().root.add_child(overlay)
+
+	var popup := ToastPopup.create(msg, "Confirm")
+	popup.process_mode = Node.PROCESS_MODE_ALWAYS
+	overlay.add_child(popup)
 
 	# Wait for user response (true = Accept, false = Cancel/Back)
 	var result: bool = await popup.confirmed
 
 	print("[DormsPanel._ask_confirm] Result: %s" % result)
 	popup.queue_free()
+	overlay.queue_free()
 
 	return result
 
 func _show_toast(msg: String, title: String = "") -> void:
 	print("[DormsPanel._show_toast] Showing toast: %s" % msg)
 
-	# Create and show modal toast popup with optional title (empty = no title)
+	# Create CanvasLayer overlay for popup (outside GameMenu hierarchy)
+	var overlay := CanvasLayer.new()
+	overlay.layer = 100
+	overlay.process_mode = Node.PROCESS_MODE_ALWAYS
+	overlay.process_priority = -1000  # CRITICAL: Process before GameMenu
+	get_tree().root.add_child(overlay)
+
 	var popup := ToastPopup.create(msg, title)
-	add_child(popup)
+	popup.process_mode = Node.PROCESS_MODE_ALWAYS
+	overlay.add_child(popup)
 
 	# Wait for user to respond (accept or cancel)
 	await popup.confirmed
 
 	popup.queue_free()
+	overlay.queue_free()
 	print("[DormsPanel._show_toast] Toast closed")
 
 func _join_psa(arr: PackedStringArray, sep: String) -> String:

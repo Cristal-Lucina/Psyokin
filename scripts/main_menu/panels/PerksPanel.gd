@@ -36,8 +36,9 @@ var _grid_cells: Array[Array] = []  # 8×5 array of Controls
 var _selected_row: int = 2  # Start at first tier row
 var _selected_col: int = 0
 
-# Note: Confirmation popup handling is now done by ConfirmationPopup class
-# (removed _active_popup and _pending_perk - no longer needed)
+# Active popup tracking (needed for cleanup when panel is hidden)
+var _active_popup: ToastPopup = null
+var _active_overlay: CanvasLayer = null
 
 func _ready() -> void:
 	# Set high input priority so popup input blocking happens before parent nodes
@@ -76,9 +77,12 @@ func _first_fill() -> void:
 	_show_selected_perk_details()
 
 func _on_visibility_changed() -> void:
-	"""Highlight selection when panel becomes visible"""
+	"""Highlight selection when panel becomes visible, cleanup popups when hidden"""
 	if visible:
 		call_deferred("_refresh_highlight")
+	else:
+		# Clean up any active popups when panel is hidden
+		_cleanup_active_popup()
 
 func _refresh_highlight() -> void:
 	"""Refresh grid highlight"""
@@ -207,7 +211,7 @@ func _create_header_cell(stat_id: String) -> Label:
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	label.custom_minimum_size = Vector2(120, 40)
-	label.add_theme_color_override("font_color", Color(0.9, 0.9, 0.9))
+	label.add_theme_color_override("font_color", Color(0.5, 0.8, 1.0))  # Light blue
 	return label
 
 func _create_level_cell(stat_id: String) -> Label:
@@ -352,7 +356,7 @@ func _highlight_selection() -> void:
 
 	var cell: Control = _grid_cells[_selected_row][_selected_col]
 	if cell is Button:
-		cell.modulate = Color(1.3, 1.3, 0.8, 1.0)  # Yellow glow
+		cell.modulate = Color(1.5, 1.5, 1.5, 1.0)  # White glow
 
 func _show_selected_perk_details() -> void:
 	"""Show details for currently selected perk"""
@@ -401,13 +405,13 @@ func _show_perk_details(perk: Dictionary) -> void:
 
 func _on_tier_cell_hovered(stat_id: String, tier_index: int) -> void:
 	"""Handle mouse hover over tier cell"""
-	# Note: ConfirmationPopup blocks mouse input automatically (MOUSE_FILTER_STOP)
+	# Note: ToastPopup blocks mouse input automatically (MOUSE_FILTER_STOP)
 	var perk: Dictionary = _get_perk_info(stat_id, tier_index)
 	_show_perk_details(perk)
 
 func _on_tier_cell_pressed(stat_id: String, tier_index: int) -> void:
 	"""Handle tier cell button press"""
-	# Note: ConfirmationPopup blocks mouse input automatically (MOUSE_FILTER_STOP)
+	# Note: ToastPopup blocks mouse input automatically (MOUSE_FILTER_STOP)
 	var perk: Dictionary = _get_perk_info(stat_id, tier_index)
 	if not perk["available"]:
 		return
@@ -462,7 +466,7 @@ func _unlock_perk(perk: Dictionary) -> void:
 	_show_selected_perk_details()
 
 func _show_perk_confirmation(perk: Dictionary) -> void:
-	"""Show confirmation popup before unlocking perk using ConfirmationPopup"""
+	"""Show confirmation popup before unlocking perk using ToastPopup"""
 	var perk_name: String = perk.get("name", "Unknown Perk")
 	var desc: String = perk.get("description", "")
 
@@ -471,15 +475,37 @@ func _show_perk_confirmation(perk: Dictionary) -> void:
 
 	print("[PerksPanel] Showing perk confirmation for: %s" % perk_name)
 
-	# Create and show ConfirmationPopup
-	var popup := ConfirmationPopup.create(message)
-	add_child(popup)
+	# Clean up any existing popup first
+	_cleanup_active_popup()
+
+	# Create CanvasLayer overlay for popup (ensures it's on top and processes input first)
+	var overlay := CanvasLayer.new()
+	overlay.layer = 100  # High layer to ensure it's on top
+	overlay.process_mode = Node.PROCESS_MODE_ALWAYS  # Process even when paused
+	overlay.process_priority = -1000  # CRITICAL: Process before GameMenu
+	get_tree().root.add_child(overlay)
+
+	# Create and show popup
+	var popup := ToastPopup.create(message, "Confirm")
+	popup.process_mode = Node.PROCESS_MODE_ALWAYS  # Process even when paused
+	overlay.add_child(popup)
+
+	# Track active popup for cleanup
+	_active_popup = popup
+	_active_overlay = overlay
 
 	# Wait for user response
 	var result: bool = await popup.confirmed
 
-	# Clean up
-	popup.queue_free()
+	# Defer clearing tracking variables to next frame
+	# This allows the input blocking check to work in the same frame
+	call_deferred("_clear_popup_tracking")
+
+	# Clean up (only if not already cleaned up)
+	if is_instance_valid(popup):
+		popup.queue_free()
+	if is_instance_valid(overlay):
+		overlay.queue_free()
 
 	# Handle response
 	if result:
@@ -487,6 +513,36 @@ func _show_perk_confirmation(perk: Dictionary) -> void:
 		_unlock_perk(perk)
 	else:
 		print("[PerksPanel] User canceled perk unlock")
+
+func _clear_popup_tracking() -> void:
+	"""Deferred clearing of popup tracking variables"""
+	_active_popup = null
+	_active_overlay = null
+
+func _cleanup_active_popup() -> void:
+	"""Clean up any active popup and overlay"""
+	print("[PerksPanel] _cleanup_active_popup called, popup=%s, overlay=%s" % [_active_popup != null, _active_overlay != null])
+
+	# Store references locally before clearing tracking variables
+	var popup = _active_popup
+	var overlay = _active_overlay
+
+	# Clear tracking immediately to prevent re-entrance
+	_active_popup = null
+	_active_overlay = null
+
+	# Emit signal to unblock await BEFORE freeing
+	if popup and is_instance_valid(popup):
+		print("[PerksPanel] Emitting confirmed(false) and queuing free")
+		# Emit signal first to unblock the await (this is synchronous)
+		popup.confirmed.emit(false)
+		# Queue free (deferred deletion)
+		popup.queue_free()
+
+	# Clean up overlay
+	if overlay and is_instance_valid(overlay):
+		print("[PerksPanel] Freeing active overlay")
+		overlay.queue_free()
 
 func _on_acquired_perk_selected(index: int) -> void:
 	"""Show details for selected acquired perk"""
@@ -498,8 +554,8 @@ func _on_acquired_perk_selected(index: int) -> void:
 
 func _input(_event: InputEvent) -> void:
 	"""Handle input for perk grid navigation"""
-	# Note: ConfirmationPopup handles its own input, so we don't need to handle it here
-	# (Old manual popup handling removed - ConfirmationPopup is self-contained)
+	# Note: ToastPopup handles its own input, so we don't need to handle it here
+	# (Old manual popup handling removed - ToastPopup is self-contained)
 	pass  # Empty function - kept for override clarity
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -507,7 +563,10 @@ func _unhandled_input(event: InputEvent) -> void:
 	if not visible:
 		return
 
-	# Note: ConfirmationPopup handles its own input blocking, no need to check here
+	# Block all input if popup is active
+	if _active_popup != null:
+		get_viewport().set_input_as_handled()
+		return
 
 	var handled: bool = false
 

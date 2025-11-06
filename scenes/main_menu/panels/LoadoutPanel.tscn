@@ -25,246 +25,275 @@ grow_horizontal = 2
 grow_vertical = 2
 theme_override_constants/separation = 16
 
-[node name="Party" type="VBoxContainer" parent="Row"]
+[node name="Party" type="PanelContainer" parent="Row"]
 custom_minimum_size = Vector2(200, 0)
+layout_mode = 2
+
+[node name="VBox" type="VBoxContainer" parent="Row/Party"]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="PartyLabel" type="Label" parent="Row/Party"]
+[node name="PartyLabel" type="Label" parent="Row/Party/VBox"]
 layout_mode = 2
 text = "Party"
 
-[node name="PartyList" type="ItemList" parent="Row/Party"]
+[node name="PartyList" type="ItemList" parent="Row/Party/VBox"]
 layout_mode = 2
 size_flags_vertical = 3
 
-[node name="Right" type="VBoxContainer" parent="Row"]
+[node name="Middle" type="PanelContainer" parent="Row"]
 layout_mode = 2
 size_flags_horizontal = 3
+size_flags_stretch_ratio = 0.7
+
+[node name="Margin" type="MarginContainer" parent="Row/Middle"]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 10
+
+[node name="VBox" type="VBoxContainer" parent="Row/Middle/Margin"]
+layout_mode = 2
 theme_override_constants/separation = 12
 
-[node name="MemberName" type="Label" parent="Row/Right"]
+[node name="MemberName" type="Label" parent="Row/Middle/Margin/VBox"]
 custom_minimum_size = Vector2(0, 28)
 layout_mode = 2
+theme_override_font_sizes/font_size = 12
 text = "(Select a member)"
 horizontal_alignment = 1
 
-[node name="EquipmentLabel" type="Label" parent="Row/Right"]
-layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
-theme_override_font_sizes/font_size = 20
-text = "EQUIPMENT"
-
-[node name="Grid" type="GridContainer" parent="Row/Right"]
-layout_mode = 2
-theme_override_constants/h_separation = 8
-theme_override_constants/v_separation = 4
-columns = 2
-
-[node name="WLabel" type="Label" parent="Row/Right/Grid"]
-layout_mode = 2
-text = "Weapon:"
-
-[node name="WHBox" type="HBoxContainer" parent="Row/Right/Grid"]
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_constants/separation = 8
-
-[node name="WValue" type="Label" parent="Row/Right/Grid/WHBox"]
-custom_minimum_size = Vector2(180, 0)
-layout_mode = 2
-size_flags_horizontal = 3
-text = "(Weapon)"
-
-[node name="WBtn" type="Button" parent="Row/Right/Grid/WHBox"]
-custom_minimum_size = Vector2(90, 0)
-layout_mode = 2
-text = "Equip…"
-
-[node name="ALabel" type="Label" parent="Row/Right/Grid"]
-layout_mode = 2
-text = "Armor:"
-
-[node name="AHBox" type="HBoxContainer" parent="Row/Right/Grid"]
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_constants/separation = 8
-
-[node name="AValue" type="Label" parent="Row/Right/Grid/AHBox"]
-custom_minimum_size = Vector2(180, 0)
-layout_mode = 2
-size_flags_horizontal = 3
-text = "(Armor)"
-
-[node name="ABtn" type="Button" parent="Row/Right/Grid/AHBox"]
-custom_minimum_size = Vector2(90, 0)
-layout_mode = 2
-text = "Equip…"
-
-[node name="HLabel" type="Label" parent="Row/Right/Grid"]
-layout_mode = 2
-text = "Head:"
-
-[node name="HHBox" type="HBoxContainer" parent="Row/Right/Grid"]
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_constants/separation = 8
-
-[node name="HValue" type="Label" parent="Row/Right/Grid/HHBox"]
-custom_minimum_size = Vector2(180, 0)
-layout_mode = 2
-size_flags_horizontal = 3
-text = "(Headwear)"
-
-[node name="HBtn" type="Button" parent="Row/Right/Grid/HHBox"]
-custom_minimum_size = Vector2(90, 0)
-layout_mode = 2
-text = "Equip…"
-
-[node name="FLabel" type="Label" parent="Row/Right/Grid"]
-layout_mode = 2
-text = "Foot:"
-
-[node name="FHBox" type="HBoxContainer" parent="Row/Right/Grid"]
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_constants/separation = 8
-
-[node name="FValue" type="Label" parent="Row/Right/Grid/FHBox"]
-custom_minimum_size = Vector2(180, 0)
-layout_mode = 2
-size_flags_horizontal = 3
-text = "(Footwear)"
-
-[node name="FBtn" type="Button" parent="Row/Right/Grid/FHBox"]
-custom_minimum_size = Vector2(90, 0)
-layout_mode = 2
-text = "Equip…"
-
-[node name="BLabel" type="Label" parent="Row/Right/Grid"]
-layout_mode = 2
-text = "Bracelet:"
-
-[node name="BHBox" type="HBoxContainer" parent="Row/Right/Grid"]
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_constants/separation = 8
-
-[node name="BValue" type="Label" parent="Row/Right/Grid/BHBox"]
-custom_minimum_size = Vector2(180, 0)
-layout_mode = 2
-size_flags_horizontal = 3
-text = "(Bracelet)"
-
-[node name="BBtn" type="Button" parent="Row/Right/Grid/BHBox"]
-custom_minimum_size = Vector2(90, 0)
-layout_mode = 2
-text = "Equip…"
-
-[node name="Sigils" type="VBoxContainer" parent="Row/Right"]
-custom_minimum_size = Vector2(100, 0)
+[node name="MindSection" type="VBoxContainer" parent="Row/Middle/Margin/VBox"]
 layout_mode = 2
 theme_override_constants/separation = 6
 
-[node name="Title" type="Label" parent="Row/Right/Sigils"]
-layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
-theme_override_font_sizes/font_size = 20
-text = "SIGILS"
-
-[node name="List" type="VBoxContainer" parent="Row/Right/Sigils"]
-custom_minimum_size = Vector2(300, 0)
-layout_mode = 2
-size_flags_horizontal = 3
-size_flags_vertical = 3
-theme_override_constants/separation = 2
-
-[node name="Buttons" type="HBoxContainer" parent="Row/Right"]
-layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="Spacer" type="Control" parent="Row/Right/Buttons"]
-layout_mode = 2
-size_flags_horizontal = 3
-
-[node name="BtnManageSigils" type="Button" parent="Row/Right/Buttons"]
-custom_minimum_size = Vector2(90, 0)
-layout_mode = 2
-text = "Manage Sigils"
-
-[node name="MindSection" type="VBoxContainer" parent="Row/Right"]
-layout_mode = 2
-theme_override_constants/separation = 6
-
-[node name="MindLabel" type="Label" parent="Row/Right/MindSection"]
+[node name="MindLabel" type="Label" parent="Row/Middle/Margin/VBox/MindSection"]
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
 theme_override_font_sizes/font_size = 20
 text = "MIND TYPE"
 
-[node name="MindRow" type="HBoxContainer" parent="Row/Right/MindSection"]
+[node name="MindRow" type="HBoxContainer" parent="Row/Middle/Margin/VBox/MindSection"]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="Label" type="Label" parent="Row/Right/MindSection/MindRow"]
-layout_mode = 2
-text = "Type:"
-
-[node name="Value" type="Label" parent="Row/Right/MindSection/MindRow"]
-layout_mode = 2
-text = "—"
-
-[node name="ActiveSection" type="VBoxContainer" parent="Row/Right"]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_constants/separation = 6
-
-[node name="ActiveLabel" type="Label" parent="Row/Right/ActiveSection"]
-unique_name_in_owner = true
-visible = false
-layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
-theme_override_font_sizes/font_size = 20
-text = "ACTIVE TYPE"
-
-[node name="ActiveRow" type="HBoxContainer" parent="Row/Right/ActiveSection"]
-unique_name_in_owner = true
-visible = false
-layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="ActiveNameLabel" type="Label" parent="Row/Right/ActiveSection/ActiveRow"]
-unique_name_in_owner = true
-layout_mode = 2
-text = "Active:"
-
-[node name="ActiveValueLabel" type="Label" parent="Row/Right/ActiveSection/ActiveRow"]
-unique_name_in_owner = true
-layout_mode = 2
-text = "Omega"
-
-[node name="Spacer" type="Control" parent="Row/Right/ActiveSection/ActiveRow"]
+[node name="Value" type="Label" parent="Row/Middle/Margin/VBox/MindSection/MindRow"]
+theme_override_font_sizes/font_size = 12
 layout_mode = 2
 size_flags_horizontal = 3
+text = "—"
 
-[node name="ActiveBtn" type="Button" parent="Row/Right/ActiveSection/ActiveRow"]
+[node name="SwitchBtn" type="Button" parent="Row/Middle/Margin/VBox/MindSection/MindRow"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(90, 0)
 layout_mode = 2
-text = "Set…"
+text = "Switch"
 
-[node name="StatsColumn" type="VBoxContainer" parent="Row"]
+[node name="EquipmentLabel" type="Label" parent="Row/Middle/Margin/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
+theme_override_font_sizes/font_size = 20
+text = "EQUIPMENT"
+
+[node name="Grid" type="GridContainer" parent="Row/Middle/Margin/VBox"]
+layout_mode = 2
+theme_override_constants/h_separation = 8
+theme_override_constants/v_separation = 4
+columns = 2
+
+[node name="WLabel" type="Label" parent="Row/Middle/Margin/VBox/Grid"]
+theme_override_font_sizes/font_size = 12
+layout_mode = 2
+text = "Weapon:"
+
+[node name="WHBox" type="HBoxContainer" parent="Row/Middle/Margin/VBox/Grid"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="WValue" type="Label" parent="Row/Middle/Margin/VBox/Grid/WHBox"]
+theme_override_font_sizes/font_size = 12
+custom_minimum_size = Vector2(180, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "(Weapon)"
+
+[node name="WBtn" type="Button" parent="Row/Middle/Margin/VBox/Grid/WHBox"]
+custom_minimum_size = Vector2(90, 0)
+layout_mode = 2
+text = "Equip…"
+
+[node name="ALabel" type="Label" parent="Row/Middle/Margin/VBox/Grid"]
+theme_override_font_sizes/font_size = 12
+layout_mode = 2
+text = "Armor:"
+
+[node name="AHBox" type="HBoxContainer" parent="Row/Middle/Margin/VBox/Grid"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="AValue" type="Label" parent="Row/Middle/Margin/VBox/Grid/AHBox"]
+theme_override_font_sizes/font_size = 12
+custom_minimum_size = Vector2(180, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "(Armor)"
+
+[node name="ABtn" type="Button" parent="Row/Middle/Margin/VBox/Grid/AHBox"]
+custom_minimum_size = Vector2(90, 0)
+layout_mode = 2
+text = "Equip…"
+
+[node name="HLabel" type="Label" parent="Row/Middle/Margin/VBox/Grid"]
+theme_override_font_sizes/font_size = 12
+layout_mode = 2
+text = "Head:"
+
+[node name="HHBox" type="HBoxContainer" parent="Row/Middle/Margin/VBox/Grid"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="HValue" type="Label" parent="Row/Middle/Margin/VBox/Grid/HHBox"]
+theme_override_font_sizes/font_size = 12
+custom_minimum_size = Vector2(180, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "(Headwear)"
+
+[node name="HBtn" type="Button" parent="Row/Middle/Margin/VBox/Grid/HHBox"]
+custom_minimum_size = Vector2(90, 0)
+layout_mode = 2
+text = "Equip…"
+
+[node name="FLabel" type="Label" parent="Row/Middle/Margin/VBox/Grid"]
+theme_override_font_sizes/font_size = 12
+layout_mode = 2
+text = "Foot:"
+
+[node name="FHBox" type="HBoxContainer" parent="Row/Middle/Margin/VBox/Grid"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="FValue" type="Label" parent="Row/Middle/Margin/VBox/Grid/FHBox"]
+theme_override_font_sizes/font_size = 12
+custom_minimum_size = Vector2(180, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "(Footwear)"
+
+[node name="FBtn" type="Button" parent="Row/Middle/Margin/VBox/Grid/FHBox"]
+custom_minimum_size = Vector2(90, 0)
+layout_mode = 2
+text = "Equip…"
+
+[node name="BLabel" type="Label" parent="Row/Middle/Margin/VBox/Grid"]
+theme_override_font_sizes/font_size = 12
+layout_mode = 2
+text = "Bracelet:"
+
+[node name="BHBox" type="HBoxContainer" parent="Row/Middle/Margin/VBox/Grid"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="BValue" type="Label" parent="Row/Middle/Margin/VBox/Grid/BHBox"]
+theme_override_font_sizes/font_size = 12
+custom_minimum_size = Vector2(180, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "(Bracelet)"
+
+[node name="BBtn" type="Button" parent="Row/Middle/Margin/VBox/Grid/BHBox"]
+custom_minimum_size = Vector2(90, 0)
+layout_mode = 2
+text = "Equip…"
+
+[node name="Sigils" type="VBoxContainer" parent="Row/Middle/Margin/VBox"]
+custom_minimum_size = Vector2(100, 0)
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="Title" type="Label" parent="Row/Middle/Margin/VBox/Sigils"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
+theme_override_font_sizes/font_size = 20
+text = "SIGILS"
+
+[node name="List" type="GridContainer" parent="Row/Middle/Margin/VBox/Sigils"]
+custom_minimum_size = Vector2(300, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/h_separation = 8
+theme_override_constants/v_separation = 4
+columns = 2
+
+[node name="Buttons" type="HBoxContainer" parent="Row/Middle/Margin/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Spacer" type="Control" parent="Row/Middle/Margin/VBox/Buttons"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="BtnManageSigils" type="Button" parent="Row/Middle/Margin/VBox/Buttons"]
+custom_minimum_size = Vector2(90, 0)
+layout_mode = 2
+text = "Manage Sigils"
+
+[node name="StatsColumn" type="PanelContainer" parent="Row"]
 custom_minimum_size = Vector2(240, 0)
 layout_mode = 2
-theme_override_constants/separation = 4
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 1.3
 
-[node name="StatsLabel" type="Label" parent="Row/StatsColumn"]
+[node name="Margin" type="MarginContainer" parent="Row/StatsColumn"]
 layout_mode = 2
-text = "Stats"
-horizontal_alignment = 1
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 10
 
-[node name="StatsGrid" type="GridContainer" parent="Row/StatsColumn"]
+[node name="VBox" type="VBoxContainer" parent="Row/StatsColumn/Margin"]
 layout_mode = 2
-theme_override_constants/h_separation = 12
+theme_override_constants/separation = 8
+
+[node name="DetailsLabel" type="Label" parent="Row/StatsColumn/Margin/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
+theme_override_font_sizes/font_size = 20
+text = "DETAILS"
+
+[node name="DetailsScroll" type="ScrollContainer" parent="Row/StatsColumn/Margin/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+size_flags_stretch_ratio = 2.0
+
+[node name="DetailsContent" type="RichTextLabel" parent="Row/StatsColumn/Margin/VBox/DetailsScroll"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_font_sizes/normal_font_size = 12
+bbcode_enabled = true
+text = "[i]Select equipment or sigil to view details.[/i]"
+fit_content = true
+
+[node name="Separator" type="HSeparator" parent="Row/StatsColumn/Margin/VBox"]
+layout_mode = 2
+
+[node name="StatsLabel" type="Label" parent="Row/StatsColumn/Margin/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
+theme_override_font_sizes/font_size = 20
+text = "STATS"
+
+[node name="StatsGrid" type="GridContainer" parent="Row/StatsColumn/Margin/VBox"]
+layout_mode = 2
+theme_override_constants/h_separation = 8
 theme_override_constants/v_separation = 8
 columns = 2

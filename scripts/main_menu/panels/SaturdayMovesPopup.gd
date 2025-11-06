@@ -26,12 +26,25 @@ signal closed
 var _moves: Array = []
 var _reveal_pairs: Array = []  # New relationships revealed on Saturday
 
+# Input cooldown to prevent multiple rapid presses
+var _input_cooldown: float = 0.0
+const INPUT_COOLDOWN_TIME: float = 0.3  # 300ms cooldown between inputs
+
+# Animation state
+var _is_animating: bool = false
+const FADE_DURATION: float = 0.2  # 200ms fade animation
+
 static func create(moves: Array, reveal_pairs: Array = []) -> SaturdayMovesPopup:
 	var popup := SaturdayMovesPopup.new()
 	popup._moves = moves
 	popup._reveal_pairs = reveal_pairs
 	popup._build_ui()
 	return popup
+
+func _process(delta: float) -> void:
+	# Update input cooldown timer
+	if _input_cooldown > 0.0:
+		_input_cooldown -= delta
 
 func _build_ui() -> void:
 	custom_minimum_size = Vector2(600, 450)
@@ -149,26 +162,62 @@ func _build_ui() -> void:
 	vbox.add_child(close_btn)
 
 	close_btn.pressed.connect(func() -> void:
-		closed.emit()
-		hide()
+		if not _is_animating:
+			_fade_out_and_close()
 	)
 
+	# Start hidden for fade in animation
+	modulate = Color(1, 1, 1, 0)
 	# Auto-position and show
 	call_deferred("_position_center")
 	close_btn.call_deferred("grab_focus")
+	call_deferred("_fade_in")
 
 func _position_center() -> void:
-	if get_parent() == null:
+	if not is_inside_tree():
+		await get_tree().process_frame
+
+	if get_viewport() == null:
+		print("[SaturdayMovesPopup._position_center] No viewport, cannot center")
 		return
-	var parent_rect: Rect2 = get_parent().get_viewport_rect()
-	position = (parent_rect.size - size) / 2
+
+	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
+	position = (viewport_size - size) / 2
+	print("[SaturdayMovesPopup._position_center] Centered at %v (viewport: %v, size: %v)" % [position, viewport_size, size])
 
 func _input(event: InputEvent) -> void:
 	if not visible:
 		return
 
-	# Close on CANCEL
-	if event.is_action_pressed("menu_back"):
-		closed.emit()
-		hide()
+	# Block input during animations or cooldown
+	if _is_animating or _input_cooldown > 0.0:
 		get_viewport().set_input_as_handled()
+		return
+
+	# Close on CANCEL or ACCEPT
+	if event.is_action_pressed("menu_back") or event.is_action_pressed("menu_accept"):
+		_input_cooldown = INPUT_COOLDOWN_TIME  # Start cooldown
+		_fade_out_and_close()
+		get_viewport().set_input_as_handled()
+
+func _fade_in() -> void:
+	"""Fade in the popup"""
+	_is_animating = true
+	var tween := create_tween()
+	tween.set_ease(Tween.EASE_OUT)
+	tween.set_trans(Tween.TRANS_CUBIC)
+	tween.tween_property(self, "modulate", Color(1, 1, 1, 1), FADE_DURATION)
+	await tween.finished
+	_is_animating = false
+
+func _fade_out_and_close() -> void:
+	"""Fade out the popup and close"""
+	_is_animating = true
+	var tween := create_tween()
+	tween.set_ease(Tween.EASE_IN)
+	tween.set_trans(Tween.TRANS_CUBIC)
+	tween.tween_property(self, "modulate", Color(1, 1, 1, 0), FADE_DURATION)
+	await tween.finished
+	_is_animating = false
+	closed.emit()
+	hide()

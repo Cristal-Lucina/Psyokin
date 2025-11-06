@@ -60,35 +60,30 @@
 extends PanelBase
 class_name LoadoutPanel
 
-@onready var _party_list: ItemList       = get_node("Row/Party/PartyList") as ItemList
-@onready var _member_name: Label         = get_node("Row/Right/MemberName") as Label
+@onready var _party_list: ItemList       = get_node("Row/Party/VBox/PartyList") as ItemList
+@onready var _member_name: Label         = get_node("Row/Middle/Margin/VBox/MemberName") as Label
 
-@onready var _w_val: Label = get_node("Row/Right/Grid/WHBox/WValue") as Label
-@onready var _a_val: Label = get_node("Row/Right/Grid/AHBox/AValue") as Label
-@onready var _h_val: Label = get_node("Row/Right/Grid/HHBox/HValue") as Label
-@onready var _f_val: Label = get_node("Row/Right/Grid/FHBox/FValue") as Label
-@onready var _b_val: Label = get_node("Row/Right/Grid/BHBox/BValue") as Label
+@onready var _w_val: Label = get_node("Row/Middle/Margin/VBox/Grid/WHBox/WValue") as Label
+@onready var _a_val: Label = get_node("Row/Middle/Margin/VBox/Grid/AHBox/AValue") as Label
+@onready var _h_val: Label = get_node("Row/Middle/Margin/VBox/Grid/HHBox/HValue") as Label
+@onready var _f_val: Label = get_node("Row/Middle/Margin/VBox/Grid/FHBox/FValue") as Label
+@onready var _b_val: Label = get_node("Row/Middle/Margin/VBox/Grid/BHBox/BValue") as Label
 
-@onready var _w_btn: Button = get_node_or_null("Row/Right/Grid/WHBox/WBtn") as Button
-@onready var _a_btn: Button = get_node_or_null("Row/Right/Grid/AHBox/ABtn") as Button
-@onready var _h_btn: Button = get_node_or_null("Row/Right/Grid/HHBox/HBtn") as Button
-@onready var _f_btn: Button = get_node_or_null("Row/Right/Grid/FHBox/FBtn") as Button
-@onready var _b_btn: Button = get_node_or_null("Row/Right/Grid/BHBox/BBtn") as Button
+@onready var _w_btn: Button = get_node_or_null("Row/Middle/Margin/VBox/Grid/WHBox/WBtn") as Button
+@onready var _a_btn: Button = get_node_or_null("Row/Middle/Margin/VBox/Grid/AHBox/ABtn") as Button
+@onready var _h_btn: Button = get_node_or_null("Row/Middle/Margin/VBox/Grid/HHBox/HBtn") as Button
+@onready var _f_btn: Button = get_node_or_null("Row/Middle/Margin/VBox/Grid/FHBox/FBtn") as Button
+@onready var _b_btn: Button = get_node_or_null("Row/Middle/Margin/VBox/Grid/BHBox/BBtn") as Button
 
-@onready var _sigils_title: Label         = get_node_or_null("Row/Right/Sigils/Title") as Label
-@onready var _sigils_list:  VBoxContainer = get_node_or_null("Row/Right/Sigils/List") as VBoxContainer
-@onready var _btn_manage:   Button        = get_node_or_null("Row/Right/Buttons/BtnManageSigils") as Button
+@onready var _sigils_title: Label         = get_node_or_null("Row/Middle/Margin/VBox/Sigils/Title") as Label
+@onready var _sigils_list:  GridContainer = get_node_or_null("Row/Middle/Margin/VBox/Sigils/List") as GridContainer
+@onready var _btn_manage:   Button        = get_node_or_null("Row/Middle/Margin/VBox/Buttons/BtnManageSigils") as Button
 
-@onready var _stats_grid:  GridContainer = get_node("Row/StatsColumn/StatsGrid") as GridContainer
-@onready var _mind_value:  Label         = get_node_or_null("Row/Right/MindSection/MindRow/Value") as Label
-@onready var _mind_section: VBoxContainer = get_node_or_null("Row/Right/MindSection") as VBoxContainer
-
-@onready var _active_section:    VBoxContainer = %ActiveSection
-@onready var _active_label:      Label         = %ActiveLabel
-@onready var _active_row:        HBoxContainer = %ActiveRow
-@onready var _active_name_lbl:   Label         = %ActiveNameLabel
-@onready var _active_value_lbl:  Label         = %ActiveValueLabel
-@onready var _active_btn:        Button        = %ActiveBtn
+@onready var _stats_grid:  GridContainer = get_node("Row/StatsColumn/Margin/VBox/StatsGrid") as GridContainer
+@onready var _details_content: RichTextLabel = %DetailsContent
+@onready var _mind_value:  Label         = get_node_or_null("Row/Middle/Margin/VBox/MindSection/MindRow/Value") as Label
+@onready var _mind_section: VBoxContainer = get_node_or_null("Row/Middle/Margin/VBox/MindSection") as VBoxContainer
+@onready var _mind_switch_btn: Button    = %SwitchBtn
 
 var _labels: PackedStringArray = PackedStringArray()
 var _tokens: PackedStringArray = PackedStringArray()
@@ -98,6 +93,7 @@ var _inv:   Node = null
 var _sig:   Node = null
 var _eq:    Node = null
 var _stats: Node = null
+var _cps:   Node = null  # CombatProfileSystem for battle stats
 
 const _SLOTS: Array[String] = ["weapon", "armor", "head", "foot", "bracelet"]
 const STATS_FONT_SIZE: int = 9
@@ -121,6 +117,7 @@ var _nav_state: NavState = NavState.PARTY_SELECT
 var _nav_elements: Array[Control] = []  # Ordered list of focusable elements in equipment mode
 var _nav_index: int = 0  # Current selection index in equipment mode
 var _active_popup: Control = null  # Currently open equipment popup panel
+var _active_overlay: CanvasLayer = null  # CanvasLayer overlay for active popup
 
 func _ready() -> void:
 	super()  # Call PanelBase._ready()
@@ -133,6 +130,7 @@ func _ready() -> void:
 	_sig   = get_node_or_null("/root/aSigilSystem")
 	_eq    = get_node_or_null("/root/aEquipmentSystem")
 	_stats = get_node_or_null("/root/aStatsSystem")
+	_cps   = get_node_or_null("/root/aCombatProfileSystem")
 
 	if _w_btn: _w_btn.pressed.connect(Callable(self, "_on_slot_button").bind("weapon"))
 	if _a_btn: _a_btn.pressed.connect(Callable(self, "_on_slot_button").bind("armor"))
@@ -157,7 +155,10 @@ func _ready() -> void:
 	# Extra refresh hooks (level ups, roster changes)
 	_wire_refresh_signals()
 
-	_setup_active_type_widgets()
+	# Connect Switch button to active type picker
+	if _mind_switch_btn and not _mind_switch_btn.pressed.is_connected(_open_active_type_picker):
+		_mind_switch_btn.pressed.connect(_open_active_type_picker)
+
 	call_deferred("_first_fill")
 
 	# polling fallback so UI never goes stale
@@ -240,7 +241,6 @@ func _refresh_all_for_current() -> void:
 	_rebuild_stats_grid(cur, equip)
 	_rebuild_sigils(cur)
 	_refresh_mind_row(cur)
-	_refresh_active_type_row(cur)
 
 	# ALWAYS rebuild navigation when UI changes (equipment/sigils)
 	# This ensures _nav_elements stays in sync even if popup is open
@@ -389,6 +389,18 @@ func _on_sigils_changed(member: String) -> void:
 	_sigils_sig = _snapshot_sigil_signature(cur)
 
 # ────────────────── equip menu ──────────────────
+func _style_popup_panel(popup_panel: Panel) -> void:
+	"""Apply ToastPopup styling to a panel"""
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.15, 0.15, 0.15, 1.0)  # Dark gray, fully opaque
+	style.border_color = Color(1.0, 0.7, 0.75, 1.0)  # Pink border
+	style.set_border_width_all(2)
+	style.corner_radius_top_left = 8
+	style.corner_radius_top_right = 8
+	style.corner_radius_bottom_left = 8
+	style.corner_radius_bottom_right = 8
+	popup_panel.add_theme_stylebox_override("panel", style)
+
 func _on_slot_button(slot: String) -> void:
 	var token: String = _current_token()
 	if token == "":
@@ -405,23 +417,45 @@ func _show_item_menu_for_slot(member_token: String, slot: String) -> void:
 	var cur: Dictionary = _fetch_equip_for(member_token)
 	var cur_id: String = String(cur.get(slot, ""))
 
+	# Create CanvasLayer overlay for proper input blocking
+	var overlay := CanvasLayer.new()
+	overlay.layer = 100
+	overlay.process_mode = Node.PROCESS_MODE_ALWAYS
+	overlay.process_priority = -1000
+	get_tree().root.add_child(overlay)
+
 	# Create custom popup using Control nodes for proper controller support
 	var popup_panel: Panel = Panel.new()
 	popup_panel.process_mode = Node.PROCESS_MODE_ALWAYS
+	popup_panel.process_priority = -1000
 	popup_panel.z_index = 100
-	add_child(popup_panel)
+	popup_panel.custom_minimum_size = Vector2(320, 280)
+	popup_panel.modulate = Color(1, 1, 1, 0)  # Start hidden to prevent flash in top-left corner
+	_style_popup_panel(popup_panel)  # Apply ToastPopup styling
+	overlay.add_child(popup_panel)
 
-	# Set active popup immediately to prevent multiple popups during async operations
+	# Set active popup and overlay immediately to prevent multiple popups during async operations
 	_active_popup = popup_panel
+	_active_overlay = overlay
+
+	# Add margin container for padding (ToastPopup style)
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 20)
+	margin.add_theme_constant_override("margin_top", 20)
+	margin.add_theme_constant_override("margin_right", 20)
+	margin.add_theme_constant_override("margin_bottom", 20)
+	popup_panel.add_child(margin)
 
 	var vbox: VBoxContainer = VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 4)
-	popup_panel.add_child(vbox)
+	vbox.add_theme_constant_override("separation", 8)
+	margin.add_child(vbox)
 
-	# Title label
+	# Title label (ToastPopup style)
 	var title: Label = Label.new()
 	title.text = "Select %s" % slot.capitalize()
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 18)
+	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	vbox.add_child(title)
 
 	# Item list
@@ -449,22 +483,26 @@ func _show_item_menu_for_slot(member_token: String, slot: String) -> void:
 			item_list.add_item(label)
 			item_ids.append(id)
 
-	# Add back button
+	# Add back button (ToastPopup style)
 	var back_btn: Button = Button.new()
 	back_btn.text = "Back"
+	back_btn.custom_minimum_size = Vector2(100, 40)
 	back_btn.pressed.connect(_popup_cancel)
 	vbox.add_child(back_btn)
 
 	# Auto-size panel to fit content - wait TWO frames for proper layout calculation
 	await get_tree().process_frame
 	await get_tree().process_frame
-	popup_panel.size = vbox.size + Vector2(20, 20)
-	vbox.position = Vector2(10, 10)
+	popup_panel.size = vbox.size + Vector2(40, 40)  # Account for 20px margins on all sides
+	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
 
 	# Center popup on screen
 	var viewport_size: Vector2 = get_viewport_rect().size
 	popup_panel.position = (viewport_size - popup_panel.size) / 2.0
 	print("[LoadoutPanel] Equipment popup centered at: %s, size: %s" % [popup_panel.position, popup_panel.size])
+
+	# Fade in popup (now that it's positioned)
+	popup_panel.modulate = Color(1, 1, 1, 1)
 
 	# Select first item and grab focus
 	if item_list.item_count > 0:
@@ -558,27 +596,24 @@ func _rebuild_sigils(member_token: String) -> void:
 		_sigils_list.add_child(none)
 		return
 
+	# Build 2x4 grid (2 columns, up to 8 sigils)
+	# GridContainer automatically wraps to next row after 2 items
 	for idx in range(cap):
-		var row: HBoxContainer = HBoxContainer.new()
-		row.add_theme_constant_override("separation", 8)
-		row.size_flags_horizontal = Control.SIZE_EXPAND_FILL  # Match equipment row expansion
-
 		var nm: Label = Label.new()
 		nm.custom_minimum_size = Vector2(180, 0)  # Match equipment label width
 		nm.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		nm.add_theme_font_size_override("font_size", 12)
 
 		var cur_id: String = (String(sockets[idx]) if idx < sockets.size() else "")
 		nm.text = (_sigil_disp(cur_id) if cur_id != "" else "(empty)")
-		row.add_child(nm)
+		_sigils_list.add_child(nm)
 
 		# Always show "Equip…" button - popup will handle unequip option
 		var btn: Button = Button.new()
 		btn.custom_minimum_size = Vector2(90, 0)  # Match equipment button width for grid alignment
 		btn.text = "Equip…"
 		btn.pressed.connect(Callable(self, "_on_equip_sigil").bind(member_token, idx))
-		row.add_child(btn)
-
-		_sigils_list.add_child(row)
+		_sigils_list.add_child(btn)
 
 	if _btn_manage:
 		_btn_manage.disabled = false
@@ -666,23 +701,45 @@ func _show_sigil_picker_for_socket(member_token: String, socket_index: int) -> v
 			var label: String = (String(_sig.call("get_display_name_for", base)) if (_sig and _sig.has_method("get_display_name_for")) else base)
 			print("[LoadoutPanel]   ✗ Filtered out: %s (school: %s)" % [label, school])
 
+	# Create CanvasLayer overlay for proper input blocking
+	var overlay := CanvasLayer.new()
+	overlay.layer = 100
+	overlay.process_mode = Node.PROCESS_MODE_ALWAYS
+	overlay.process_priority = -1000
+	get_tree().root.add_child(overlay)
+
 	# Create custom popup using Control nodes for proper controller support
 	var popup_panel: Panel = Panel.new()
 	popup_panel.process_mode = Node.PROCESS_MODE_ALWAYS
+	popup_panel.process_priority = -1000
 	popup_panel.z_index = 100
-	add_child(popup_panel)
+	popup_panel.custom_minimum_size = Vector2(340, 310)
+	popup_panel.modulate = Color(1, 1, 1, 0)  # Start hidden to prevent flash in top-left corner
+	_style_popup_panel(popup_panel)  # Apply ToastPopup styling
+	overlay.add_child(popup_panel)
 
-	# Set active popup immediately to prevent multiple popups
+	# Set active popup and overlay immediately to prevent multiple popups
 	_active_popup = popup_panel
+	_active_overlay = overlay
+
+	# Add margin container for padding (ToastPopup style)
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 20)
+	margin.add_theme_constant_override("margin_top", 20)
+	margin.add_theme_constant_override("margin_right", 20)
+	margin.add_theme_constant_override("margin_bottom", 20)
+	popup_panel.add_child(margin)
 
 	var vbox: VBoxContainer = VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 4)
-	popup_panel.add_child(vbox)
+	vbox.add_theme_constant_override("separation", 8)
+	margin.add_child(vbox)
 
-	# Title label
+	# Title label (ToastPopup style)
 	var title: Label = Label.new()
 	title.text = "Select Sigil (Socket %d)" % (socket_index + 1)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 18)
+	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	vbox.add_child(title)
 
 	# Item list
@@ -732,22 +789,26 @@ func _show_sigil_picker_for_socket(member_token: String, socket_index: int) -> v
 		item_list.set_item_disabled(0, true)
 		item_metadata.append({})
 
-	# Add back button
+	# Add back button (ToastPopup style)
 	var back_btn: Button = Button.new()
 	back_btn.text = "Back"
+	back_btn.custom_minimum_size = Vector2(100, 40)
 	back_btn.pressed.connect(_popup_cancel)
 	vbox.add_child(back_btn)
 
 	# Auto-size panel to fit content - wait TWO frames for proper layout calculation
 	await get_tree().process_frame
 	await get_tree().process_frame
-	popup_panel.size = vbox.size + Vector2(20, 20)
-	vbox.position = Vector2(10, 10)
+	popup_panel.size = vbox.size + Vector2(40, 40)  # Account for 20px margins on all sides
+	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
 
 	# Center popup on screen
 	var viewport_size: Vector2 = get_viewport_rect().size
 	popup_panel.position = (viewport_size - popup_panel.size) / 2.0
 	print("[LoadoutPanel] Sigil popup centered at: %s, size: %s" % [popup_panel.position, popup_panel.size])
+
+	# Fade in popup (now that it's positioned)
+	popup_panel.modulate = Color(1, 1, 1, 1)
 
 	# Select first enabled item and grab focus
 	if item_list.item_count > 0:
@@ -829,7 +890,18 @@ func _get_member_mind_type(member_token: String) -> String:
 func _refresh_mind_row(member_token: String) -> void:
 	if _mind_value == null: return
 	var mt: String = _get_member_mind_type(member_token)
-	_mind_value.text = (mt if mt != "" else "—")
+
+	if member_token == "hero":
+		# For player: "Omega - Active: Air"
+		var active_type: String = _get_hero_active_type()
+		_mind_value.text = "%s - Active: %s" % [mt, active_type]
+		if _mind_switch_btn:
+			_mind_switch_btn.visible = true
+	else:
+		# For other members: just "Data"
+		_mind_value.text = (mt if mt != "" else "—")
+		if _mind_switch_btn:
+			_mind_switch_btn.visible = false
 
 func _fetch_equip_for(member_token: String) -> Dictionary:
 	if _gs and _gs.has_method("get_member_equip"):
@@ -896,17 +968,69 @@ func _clear_stats_grid() -> void:
 func _label_cell(txt: String) -> Label:
 	var l: Label = Label.new()
 	l.text = txt
-	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	l.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	l.custom_minimum_size = Vector2(180, 0)  # Approximately 30 characters at 12pt
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD
-	l.add_theme_font_size_override("font_size", STATS_FONT_SIZE)
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	l.add_theme_font_size_override("font_size", 12)
 	return l
 
 func _value_cell(txt: String) -> Label:
 	var l: Label = Label.new()
 	l.text = txt
+	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD
-	l.add_theme_font_size_override("font_size", STATS_FONT_SIZE)
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	l.add_theme_font_size_override("font_size", 12)
 	return l
+
+func _create_stat_cell(stat_label: String, value: int) -> PanelContainer:
+	"""Create a rounded grey cell containing a stat label and value"""
+	var panel := PanelContainer.new()
+	panel.custom_minimum_size = Vector2(0, 30)
+
+	# Create darker grey rounded background
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.15, 0.15, 0.15, 1.0)  # Darker grey
+	style.corner_radius_top_left = 4
+	style.corner_radius_top_right = 4
+	style.corner_radius_bottom_left = 4
+	style.corner_radius_bottom_right = 4
+	panel.add_theme_stylebox_override("panel", style)
+
+	# Add margin for padding inside cell
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 8)
+	margin.add_theme_constant_override("margin_top", 4)
+	margin.add_theme_constant_override("margin_right", 8)
+	margin.add_theme_constant_override("margin_bottom", 4)
+	panel.add_child(margin)
+
+	# HBoxContainer to hold label and value side by side
+	var hbox := HBoxContainer.new()
+	hbox.add_theme_constant_override("separation", 4)
+	margin.add_child(hbox)
+
+	# Label - 25 characters wide
+	var label := Label.new()
+	label.text = stat_label
+	label.custom_minimum_size = Vector2(150, 0)  # ~25 characters at 12pt
+	label.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	label.add_theme_font_size_override("font_size", 12)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	hbox.add_child(label)
+
+	# Value - 5 characters wide, blue color
+	var value_label := Label.new()
+	value_label.text = str(value)
+	value_label.custom_minimum_size = Vector2(30, 0)  # ~5 characters at 12pt
+	value_label.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	value_label.add_theme_font_size_override("font_size", 12)
+	value_label.add_theme_color_override("font_color", Color(0.5, 0.7, 1.0))  # Blue
+	value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	hbox.add_child(value_label)
+
+	return panel
 
 func _fmt_num(n: float) -> String:
 	var as_int: int = int(round(n))
@@ -941,121 +1065,250 @@ func _eva_mods_from_other(equip: Dictionary, exclude_id: String) -> int:
 	return sum
 
 func _rebuild_stats_grid(member_token: String, equip: Dictionary) -> void:
+	"""Build battle stats grid from CombatProfileSystem (matches StatsPanel)"""
 	if _stats_grid == null: return
 	_clear_stats_grid()
 
-	var lvl: int = 1
-	var hp_max: int = 0
-	var mp_max: int = 0
-	if _gs and _gs.has_method("compute_member_pools"):
-		var pools: Dictionary = _gs.call("compute_member_pools", member_token)
-		lvl    = int(pools.get("level", 1))
-		hp_max = int(pools.get("hp_max", 0))
-		mp_max = int(pools.get("mp_max", 0))
-
-	var d_wea:  Dictionary = _item_def(String(equip.get("weapon","")))
-	var d_arm:  Dictionary = _item_def(String(equip.get("armor","")))
-	var d_head: Dictionary = _item_def(String(equip.get("head","")))
-	var d_foot: Dictionary = _item_def(String(equip.get("foot","")))
-	var d_brac: Dictionary = _item_def(String(equip.get("bracelet","")))
-
-	var brw: int = _stat_for_member(member_token, "BRW")
-	var base_watk: int   = int(d_wea.get("base_watk", 0))
-	var scale_brw: float = float(d_wea.get("scale_brw", 0.0))
-	var weapon_attack: int = base_watk + int(round(scale_brw * float(brw)))
-	var weapon_acc: int = int(d_wea.get("base_acc", 0))
-	var skill_acc_boost: int = int(d_wea.get("skill_acc_boost", 0))
-	var crit_bonus: int = int(d_wea.get("crit_bonus_pct", 0))
-	var type_raw: String = String(d_wea.get("watk_type_tag","")).strip_edges().to_lower()
-	var weapon_type: String = ("Neutral" if (type_raw == "" or type_raw == "wand") else type_raw.capitalize())
-	var special: String = ("NL" if _as_bool(d_wea.get("non_lethal", false)) else "—")
-
-	var vtl: int = _stat_for_member(member_token, "VTL")
-	var armor_flat: int = int(d_arm.get("armor_flat", 0))
-	var pdef: int = int(round(float(armor_flat) * (5.0 + 0.25 * float(vtl))))
-	var ail_res: int = int(d_arm.get("ail_resist_pct", 0))
-
-	var fcs: int = _stat_for_member(member_token, "FCS")
-	var hp_bonus: int = int(d_head.get("max_hp_boost", 0))
-	var mp_bonus: int = int(d_head.get("max_mp_boost", 0))
-	var ward_flat: int = int(d_head.get("ward_flat", 0))
-	var mdef: int = int(round(float(ward_flat) * (5.0 + 0.25 * float(fcs))))
-
-	var base_eva: int = int(d_foot.get("base_eva", 0))
-	var mods: int = _eva_mods_from_other(equip, String(equip.get("foot","")))
-	var peva: int = base_eva + int(round(0.25 * float(vtl))) + mods
-	var meva: int = base_eva + int(round(0.25 * float(fcs))) + mods
-	var speed: int = int(d_foot.get("speed", 0))
-
-	var slots: int = int(d_brac.get("sigil_slots", 0))
-
-	var _pair: Callable = func(lbl: String, val: String) -> void:
-		_stats_grid.add_child(_label_cell(lbl))
-		_stats_grid.add_child(_value_cell(val))
-
-	# Core stats
-	_pair.call("Level", str(lvl))
-	_pair.call("HP", str(hp_max))
-	_pair.call("MP", str(mp_max))
-
-	# Weapon stats
-	if not d_wea.is_empty():
-		_pair.call("W.Attack", str(weapon_attack))
-		_pair.call("W.Acc", str(weapon_acc))
-		_pair.call("W.Type", weapon_type)
-		_pair.call("Crit %", str(crit_bonus))
-		if skill_acc_boost > 0:
-			_pair.call("Skill Acc", str(skill_acc_boost))
-		if special != "—":
-			_pair.call("Special", special)
-
-	# Armor stats
-	if not d_arm.is_empty():
-		_pair.call("P.Def", str(pdef))
-		_pair.call("Ail.Res %", str(ail_res))
-
-	# Head stats
-	if not d_head.is_empty():
-		if hp_bonus > 0:
-			_pair.call("HP Bonus", str(hp_bonus))
-		if mp_bonus > 0:
-			_pair.call("MP Bonus", str(mp_bonus))
-		_pair.call("M.Def", str(mdef))
-
-	# Foot stats
-	if not d_foot.is_empty():
-		_pair.call("P.Eva", str(peva))
-		_pair.call("M.Eva", str(meva))
-		_pair.call("Speed", str(speed))
-
-	# Bracelet stats
-	if not d_brac.is_empty():
-		_pair.call("Sigils", str(slots))
-
-# ────────────────── Active Type (hero) ──────────────────
-func _setup_active_type_widgets() -> void:
-	if _active_btn != null and not _active_btn.pressed.is_connected(_open_active_type_picker):
-		_active_btn.pressed.connect(_open_active_type_picker)
-
-func _refresh_active_type_row(member_token: String) -> void:
-	var is_hero: bool = (member_token == "hero" or member_token.strip_edges().to_lower() == _hero_name().strip_edges().to_lower())
-	var do_show: bool = is_hero and _active_section != null and _active_btn != null
-	if not do_show:
-		# Hide entire Active Type section for non-player characters
-		if _active_section: _active_section.visible = false
+	if not _cps:
+		print("[LoadoutPanel] CombatProfileSystem not available")
 		return
 
-	# Show Active Type section for player character
-	var cur: String = _get_hero_active_type()
-	if _active_section:    _active_section.visible = true
-	if _active_label:      _active_label.visible = true
-	if _active_row:        _active_row.visible = true
-	if _active_name_lbl:   _active_name_lbl.visible = true
-	if _active_value_lbl:
-		_active_value_lbl.text = (cur if cur != "" else "Omega")
-		_active_value_lbl.visible = true
-	if _active_btn:        _active_btn.visible = true
+	# Get combat profile
+	var profile: Dictionary = {}
+	if _cps.has_method("get_profile"):
+		var profile_v = _cps.call("get_profile", member_token)
+		if typeof(profile_v) == TYPE_DICTIONARY:
+			profile = profile_v
 
+	# Display all battle stats in 2 columns
+	var weapon: Dictionary = profile.get("weapon", {})
+	var defense: Dictionary = profile.get("defense", {})
+	var stats: Dictionary = profile.get("stats", {})
+
+	# S ATK = MND + skill_acc_boost
+	var mnd: int = stats.get("MND", 0)
+	var skill_boost: int = weapon.get("skill_acc_boost", 0)
+	var s_atk: int = mnd + skill_boost
+
+	# Battle stats with full names in rounded grey cells (2 columns)
+	_stats_grid.add_child(_create_stat_cell("Max HP", profile.get("hp_max", 0)))
+	_stats_grid.add_child(_create_stat_cell("Max MP", profile.get("mp_max", 0)))
+	_stats_grid.add_child(_create_stat_cell("Physical Attack", weapon.get("attack", 0)))
+	_stats_grid.add_child(_create_stat_cell("Skill Attack", s_atk))
+	_stats_grid.add_child(_create_stat_cell("Physical Defense", defense.get("pdef", 0)))
+	_stats_grid.add_child(_create_stat_cell("Skill Defense", defense.get("mdef", 0)))
+	_stats_grid.add_child(_create_stat_cell("Physical Accuracy", weapon.get("accuracy", 0)))
+	_stats_grid.add_child(_create_stat_cell("Skill Accuracy", skill_boost))
+	_stats_grid.add_child(_create_stat_cell("Evasion", defense.get("peva", 0)))
+	_stats_grid.add_child(_create_stat_cell("Speed", defense.get("speed", 0)))
+	_stats_grid.add_child(_create_stat_cell("Ailment Resistance", defense.get("ail_resist_pct", 0)))
+	_stats_grid.add_child(_create_stat_cell("Critical Rate", weapon.get("crit_bonus_pct", 0)))
+
+# ────────────────── Details Display ──────────────────
+func _update_details_for_focused_element() -> void:
+	"""Update the details panel based on currently focused equipment/sigil"""
+	if not _details_content:
+		return
+
+	# Check if we're in equipment navigation mode
+	if _nav_state != NavState.EQUIPMENT_NAV or _nav_index < 0 or _nav_index >= _nav_elements.size():
+		_details_content.text = "[i]Select equipment or sigil to view details.[/i]"
+		return
+
+	var focused = _nav_elements[_nav_index]
+	if not is_instance_valid(focused):
+		return
+
+	var member_token: String = _current_token()
+	if member_token == "":
+		return
+
+	# Determine which equipment slot or sigil this button belongs to
+	var slot: String = ""
+	var sigil_index: int = -1
+
+	# Check equipment buttons
+	if focused == _w_btn:
+		slot = "weapon"
+	elif focused == _a_btn:
+		slot = "armor"
+	elif focused == _h_btn:
+		slot = "head"
+	elif focused == _f_btn:
+		slot = "foot"
+	elif focused == _b_btn:
+		slot = "bracelet"
+	elif focused == _btn_manage:
+		_details_content.text = "[b]Manage Sigils[/b]\n\nOpen the Sigil Skills menu to configure active skills for each equipped sigil."
+		return
+	elif focused == _mind_switch_btn:
+		var cur_type: String = _get_hero_active_type()
+		_details_content.text = "[b]Switch Active Type[/b]\n\nCurrent: [color=#FFC0CB]%s[/color]\n\nChange your active mind type to match different sigil schools and unlock their full potential." % cur_type
+		return
+	else:
+		# Check if it's a sigil button
+		if _sigils_list:
+			var idx_counter: int = 0
+			for child in _sigils_list.get_children():
+				if not is_instance_valid(child) or child.is_queued_for_deletion():
+					continue
+				if child is Button:
+					if child == focused:
+						sigil_index = idx_counter / 2  # Each sigil has Label + Button, so divide by 2
+						break
+					idx_counter += 1
+
+	# Show equipment details
+	if slot != "":
+		_show_equipment_details(member_token, slot)
+	# Show sigil details
+	elif sigil_index >= 0:
+		_show_sigil_details(member_token, sigil_index)
+	else:
+		_details_content.text = "[i]Select equipment or sigil to view details.[/i]"
+
+func _show_equipment_details(member_token: String, slot: String) -> void:
+	"""Display details for a specific equipment slot"""
+	var equip: Dictionary = _fetch_equip_for(member_token)
+	var item_id: String = String(equip.get(slot, ""))
+
+	if item_id == "" or item_id == "—":
+		var slot_name: String = slot.capitalize()
+		_details_content.text = "[b]%s[/b]\n\n[i]No %s equipped[/i]\n\nPress Accept to equip an item." % [slot_name, slot.to_lower()]
+		return
+
+	# Get item definition
+	var item_def: Dictionary = _item_def(item_id)
+	var display_name: String = _pretty_item(item_id)
+
+	# Build details string
+	var details: String = "[b]%s[/b]\n" % display_name
+
+	# Add item type
+	var slot_label: String = slot.capitalize()
+	details += "[color=#888888]%s[/color]\n\n" % slot_label
+
+	# Add stats based on slot type
+	match slot:
+		"weapon":
+			if item_def.has("base_attack"):
+				details += "Attack: [color=#FFC0CB]%d[/color]\n" % int(item_def.get("base_attack", 0))
+			if item_def.has("base_accuracy"):
+				details += "Accuracy: [color=#FFC0CB]%d[/color]\n" % int(item_def.get("base_accuracy", 0))
+			if item_def.has("crit_bonus_pct"):
+				details += "Critical: [color=#FFC0CB]%d%%[/color]\n" % int(item_def.get("crit_bonus_pct", 0))
+			if item_def.has("skill_acc_boost"):
+				details += "Skill Acc: [color=#FFC0CB]%d[/color]\n" % int(item_def.get("skill_acc_boost", 0))
+			if item_def.has("weapon_type"):
+				details += "Type: [color=#FFC0CB]%s[/color]\n" % String(item_def.get("weapon_type", ""))
+
+		"armor":
+			if item_def.has("base_pdef"):
+				details += "Physical Defense: [color=#FFC0CB]%d[/color]\n" % int(item_def.get("base_pdef", 0))
+			if item_def.has("base_mdef"):
+				details += "Skill Defense: [color=#FFC0CB]%d[/color]\n" % int(item_def.get("base_mdef", 0))
+			if item_def.has("ail_resist_pct"):
+				details += "Ailment Resist: [color=#FFC0CB]%d%%[/color]\n" % int(item_def.get("ail_resist_pct", 0))
+
+		"head":
+			if item_def.has("hp_bonus"):
+				details += "HP Bonus: [color=#FFC0CB]+%d[/color]\n" % int(item_def.get("hp_bonus", 0))
+			if item_def.has("mp_bonus"):
+				details += "MP Bonus: [color=#FFC0CB]+%d[/color]\n" % int(item_def.get("mp_bonus", 0))
+			if item_def.has("base_mdef"):
+				details += "Skill Defense: [color=#FFC0CB]%d[/color]\n" % int(item_def.get("base_mdef", 0))
+
+		"foot":
+			if item_def.has("base_eva"):
+				details += "Evasion: [color=#FFC0CB]%d[/color]\n" % int(item_def.get("base_eva", 0))
+			if item_def.has("base_speed"):
+				details += "Speed: [color=#FFC0CB]%d[/color]\n" % int(item_def.get("base_speed", 0))
+
+		"bracelet":
+			if item_def.has("sigil_slots"):
+				details += "Sigil Slots: [color=#FFC0CB]%d[/color]\n" % int(item_def.get("sigil_slots", 0))
+
+	# Add description if available
+	if item_def.has("description") and String(item_def.get("description", "")).strip_edges() != "":
+		details += "\n[color=#AAAAAA]%s[/color]" % String(item_def.get("description", ""))
+
+	_details_content.text = details
+
+func _show_sigil_details(member_token: String, socket_index: int) -> void:
+	"""Display details for a specific sigil socket"""
+	if not _sig:
+		return
+
+	# Get current sigil in this socket
+	var sockets: PackedStringArray = PackedStringArray()
+	if _sig.has_method("get_loadout"):
+		var v: Variant = _sig.call("get_loadout", member_token)
+		if typeof(v) == TYPE_PACKED_STRING_ARRAY:
+			sockets = v as PackedStringArray
+		elif typeof(v) == TYPE_ARRAY:
+			for s in (v as Array): sockets.append(String(s))
+
+	if socket_index >= sockets.size() or String(sockets[socket_index]) == "":
+		_details_content.text = "[b]Sigil Socket %d[/b]\n\n[i]Empty socket[/i]\n\nPress Accept to equip a sigil." % (socket_index + 1)
+		return
+
+	var inst_id: String = String(sockets[socket_index])
+
+	# Get base sigil ID
+	var base_id: String = inst_id
+	if _sig.has_method("get_base_from_instance"):
+		base_id = String(_sig.call("get_base_from_instance", inst_id))
+
+	# Get display name
+	var display_name: String = base_id
+	if _sig.has_method("get_display_name_for"):
+		var v: Variant = _sig.call("get_display_name_for", base_id)
+		if typeof(v) == TYPE_STRING:
+			display_name = String(v)
+
+	# Get level
+	var level: int = 1
+	if _sig.has_method("get_instance_level"):
+		level = int(_sig.call("get_instance_level", inst_id))
+
+	var level_str: String = "MAX" if level >= 4 else "Level %d" % level
+
+	# Get element/school
+	var school: String = ""
+	if _sig.has_method("get_element_for_instance"):
+		school = String(_sig.call("get_element_for_instance", inst_id))
+	elif _sig.has_method("get_element_for"):
+		school = String(_sig.call("get_element_for", base_id))
+
+	# Get active skill
+	var active_skill: String = ""
+	if _sig.has_method("get_active_skill_name_for_instance"):
+		var v: Variant = _sig.call("get_active_skill_name_for_instance", inst_id)
+		if typeof(v) == TYPE_STRING and String(v).strip_edges() != "":
+			active_skill = String(v)
+
+	# Build details
+	var details: String = "[b]%s[/b]\n" % display_name
+	details += "[color=#888888]Sigil - Socket %d[/color]\n\n" % (socket_index + 1)
+	details += "Level: [color=#FFC0CB]%s[/color]\n" % level_str
+
+	if school != "":
+		details += "School: [color=#FFC0CB]%s[/color]\n" % school
+
+	if active_skill != "":
+		details += "Active Skill: [color=#FFC0CB]★ %s[/color]\n" % active_skill
+	else:
+		details += "Active Skill: [color=#888888]None[/color]\n"
+
+	# Add XP if not maxed
+	if level < 4 and _sig.has_method("get_instance_xp"):
+		var xp: int = int(_sig.call("get_instance_xp", inst_id))
+		var xp_needed: int = 100  # Default, could be calculated based on level
+		details += "\nXP: [color=#FFC0CB]%d / %d[/color]" % [xp, xp_needed]
+
+	_details_content.text = details
+
+# ────────────────── Active Type (hero) ──────────────────
 func _get_hero_active_type() -> String:
 	if _gs:
 		if _gs.has_meta("hero_active_type"):
@@ -1119,23 +1372,45 @@ func _open_active_type_picker() -> void:
 	print("[LoadoutPanel] === Opening Active Type Picker ===")
 	print("[LoadoutPanel] Current active type: %s" % cur)
 
+	# Create CanvasLayer overlay for proper input blocking
+	var overlay := CanvasLayer.new()
+	overlay.layer = 100
+	overlay.process_mode = Node.PROCESS_MODE_ALWAYS
+	overlay.process_priority = -1000
+	get_tree().root.add_child(overlay)
+
 	# Create custom popup using Control nodes for proper controller support
 	var popup_panel: Panel = Panel.new()
 	popup_panel.process_mode = Node.PROCESS_MODE_ALWAYS
+	popup_panel.process_priority = -1000
 	popup_panel.z_index = 100
-	add_child(popup_panel)
+	popup_panel.custom_minimum_size = Vector2(290, 260)
+	popup_panel.modulate = Color(1, 1, 1, 0)  # Start hidden to prevent flash in top-left corner
+	_style_popup_panel(popup_panel)  # Apply ToastPopup styling
+	overlay.add_child(popup_panel)
 
-	# Set active popup immediately to prevent multiple popups
+	# Set active popup and overlay immediately to prevent multiple popups
 	_active_popup = popup_panel
+	_active_overlay = overlay
+
+	# Add margin container for padding (ToastPopup style)
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 20)
+	margin.add_theme_constant_override("margin_top", 20)
+	margin.add_theme_constant_override("margin_right", 20)
+	margin.add_theme_constant_override("margin_bottom", 20)
+	popup_panel.add_child(margin)
 
 	var vbox: VBoxContainer = VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 4)
-	popup_panel.add_child(vbox)
+	vbox.add_theme_constant_override("separation", 8)
+	margin.add_child(vbox)
 
-	# Title label
+	# Title label (ToastPopup style)
 	var title: Label = Label.new()
 	title.text = "Select Active Type"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 18)
+	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	vbox.add_child(title)
 
 	# Item list
@@ -1167,22 +1442,26 @@ func _open_active_type_picker() -> void:
 		if s.strip_edges().to_lower() == cur.strip_edges().to_lower():
 			item_list.select(item_list.item_count - 1)
 
-	# Add back button
+	# Add back button (ToastPopup style)
 	var back_btn: Button = Button.new()
 	back_btn.text = "Back"
+	back_btn.custom_minimum_size = Vector2(100, 40)
 	back_btn.pressed.connect(_popup_cancel)
 	vbox.add_child(back_btn)
 
 	# Auto-size panel to fit content - wait TWO frames for proper layout calculation
 	await get_tree().process_frame
 	await get_tree().process_frame
-	popup_panel.size = vbox.size + Vector2(20, 20)
-	vbox.position = Vector2(10, 10)
+	popup_panel.size = vbox.size + Vector2(40, 40)  # Account for 20px margins on all sides
+	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
 
 	# Center popup on screen
 	var viewport_size: Vector2 = get_viewport_rect().size
 	popup_panel.position = (viewport_size - popup_panel.size) / 2.0
 	print("[LoadoutPanel] Active type popup centered at: %s, size: %s" % [popup_panel.position, popup_panel.size])
+
+	# Fade in popup (now that it's positioned)
+	popup_panel.modulate = Color(1, 1, 1, 1)
 
 	# Select first enabled item if nothing selected, and grab focus
 	if item_list.item_count > 0:
@@ -1602,7 +1881,7 @@ func _popup_accept_active_type() -> void:
 
 	print("[LoadoutPanel] Setting hero active type to: %s" % selected_type)
 	_set_hero_active_type(selected_type)
-	_refresh_active_type_row("hero")
+	_refresh_mind_row("hero")
 
 	_popup_close_and_return_to_equipment()
 
@@ -1617,9 +1896,11 @@ func _popup_close_and_return_to_equipment() -> void:
 
 	print("[LoadoutPanel] Closing popup, returning to equipment mode")
 
-	# Store popup reference and clear BEFORE popping (prevents double-free)
+	# Store popup and overlay references and clear BEFORE popping (prevents double-free)
 	var popup_to_close = _active_popup
+	var overlay_to_close = _active_overlay
 	_active_popup = null
+	_active_overlay = null
 
 	# CRITICAL: Set state to EQUIPMENT_NAV BEFORE popping
 	# pop_panel() synchronously calls _on_panel_gained_focus(), which needs correct state
@@ -1631,6 +1912,8 @@ func _popup_close_and_return_to_equipment() -> void:
 		panel_mgr.pop_panel()
 
 	popup_to_close.queue_free()
+	if overlay_to_close and is_instance_valid(overlay_to_close):
+		overlay_to_close.queue_free()
 
 	# Focus will be restored by _on_panel_gained_focus() when panel_mgr.pop_panel() returns
 	# No need to call _restore_equipment_focus here
@@ -1644,6 +1927,9 @@ func _handle_party_select_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("move_down"):
 		_navigate_party(1)
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("move_left") or event.is_action_pressed("move_right"):
+		# Block left/right navigation in party select mode
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("menu_accept"):
 		_transition_to_equipment_nav()
@@ -1789,23 +2075,20 @@ func _rebuild_equipment_navigation() -> void:
 	if _f_btn: _nav_elements.append(_f_btn)  # Foot
 	if _b_btn: _nav_elements.append(_b_btn)  # Bracelet
 
-	# Sigil slot buttons - FILTER OUT nodes queued for deletion (dynamic count based on equipped sigils)
+	# Sigil slot buttons - GridContainer has Label and Button as direct children
+	# FILTER OUT nodes queued for deletion (dynamic count based on equipped sigils)
 	if _sigils_list:
 		for child in _sigils_list.get_children():
 			# Skip nodes queued for deletion (from queue_free())
 			if not is_instance_valid(child) or child.is_queued_for_deletion():
 				continue
-			if child is HBoxContainer:
-				for subchild in child.get_children():
-					# Skip nodes queued for deletion
-					if not is_instance_valid(subchild) or subchild.is_queued_for_deletion():
-						continue
-					if subchild is Button:
-						_nav_elements.append(subchild)  # Sigil slot equip buttons
+			# In 2x4 grid, buttons are direct children (labels are skipped)
+			if child is Button:
+				_nav_elements.append(child)  # Sigil slot equip buttons
 
 	# Special buttons (always at the end of navigation cycle)
 	if _btn_manage: _nav_elements.append(_btn_manage)  # Manage Sigil button
-	if _active_btn: _nav_elements.append(_active_btn)  # Active Type button (player only)
+	if _mind_switch_btn and _mind_switch_btn.visible: _nav_elements.append(_mind_switch_btn)  # Switch button (player only)
 
 	print("[LoadoutPanel] Built navigation: %d elements" % _nav_elements.size())
 
@@ -1820,6 +2103,8 @@ func _focus_equipment_element(index: int) -> void:
 	if is_instance_valid(element) and element is Control:
 		element.grab_focus()
 		print("[LoadoutPanel] Grabbed focus on element: %s" % element.name)
+		# Update details panel for the focused element
+		_update_details_for_focused_element()
 	else:
 		print("[LoadoutPanel] Element invalid or not a Control")
 

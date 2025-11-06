@@ -110,10 +110,21 @@ func _on_title_pressed() -> void:
 
 func _confirm_return_to_title() -> void:
 	"""Ask user to confirm before returning to title screen"""
-	var popup := ConfirmationPopup.create("Return to title screen?\n\nAll unsaved progress will be lost.")
-	add_child(popup)
+	# Create CanvasLayer overlay for popup (outside GameMenu hierarchy)
+	var overlay := CanvasLayer.new()
+	overlay.layer = 100
+	overlay.process_mode = Node.PROCESS_MODE_ALWAYS
+	overlay.process_priority = -1000  # CRITICAL: Process before GameMenu
+	get_tree().root.add_child(overlay)
+
+	var popup := ToastPopup.create("Return to title screen?\n\nAll unsaved progress will be lost.", "Confirm")
+	popup.process_mode = Node.PROCESS_MODE_ALWAYS
+	overlay.add_child(popup)
+
 	var confirmed: bool = await popup.confirmed
+
 	popup.queue_free()
+	overlay.queue_free()
 
 	if confirmed:
 		print("[SystemPanel] User confirmed - returning to title")
