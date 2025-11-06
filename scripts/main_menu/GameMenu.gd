@@ -90,12 +90,6 @@ func _process(delta: float) -> void:
 		_input_cooldown -= delta
 
 func _input(event: InputEvent) -> void:
-	# CRITICAL: Block ALL input if there's an active popup
-	# Popups handle their own input and should be the ONLY thing processing
-	if ToastPopup.has_active_popups():
-		get_viewport().set_input_as_handled()
-		return
-
 	# Skip if input already handled by popup or other node
 	if get_viewport().is_input_handled():
 		return

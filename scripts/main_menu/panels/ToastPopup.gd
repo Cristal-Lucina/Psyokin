@@ -39,13 +39,6 @@ const INPUT_COOLDOWN_TIME: float = 0.3  # 300ms cooldown between inputs
 var _is_animating: bool = false
 const FADE_DURATION: float = 0.2  # 200ms fade animation
 
-# Static counter to track active popups globally
-static var _active_popup_count: int = 0
-
-## Check if there are any active popups - used to block input in GameMenu
-static func has_active_popups() -> bool:
-	return _active_popup_count > 0
-
 static func create(message: String, title: String = "") -> ToastPopup:
 	print("[ToastPopup.create] Creating popup with message: %s" % message)
 	var popup := ToastPopup.new()
@@ -273,10 +266,6 @@ func _on_cancel() -> void:
 func _fade_in() -> void:
 	"""Fade in the popup"""
 	_is_animating = true
-	# Increment active popup counter - blocks GameMenu input
-	_active_popup_count += 1
-	print("[ToastPopup._fade_in] Active popups: %d" % _active_popup_count)
-
 	var tween := create_tween()
 	tween.set_ease(Tween.EASE_OUT)
 	tween.set_trans(Tween.TRANS_CUBIC)
@@ -293,10 +282,5 @@ func _fade_out_and_close(result: bool) -> void:
 	tween.tween_property(self, "modulate", Color(1, 1, 1, 0), FADE_DURATION)
 	await tween.finished
 	_is_animating = false
-
-	# Decrement active popup counter AFTER animation completes - re-enables GameMenu input
-	_active_popup_count -= 1
-	print("[ToastPopup._fade_out_and_close] Active popups: %d" % _active_popup_count)
-
 	confirmed.emit(result)
 	hide()
