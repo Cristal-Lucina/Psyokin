@@ -411,21 +411,21 @@ func _get_equipment_stats(item_id: String, slot: String) -> Dictionary:
 
 	match slot:
 		"weapon":
-			stats["Attack"] = int(item_def.get("base_attack", 0))
-			stats["Accuracy"] = int(item_def.get("base_accuracy", 0))
+			stats["Attack"] = int(item_def.get("base_watk", 0))
+			stats["Accuracy"] = int(item_def.get("base_acc", 0))
 			stats["Critical"] = int(item_def.get("crit_bonus_pct", 0))
 			stats["Skill Acc"] = int(item_def.get("skill_acc_boost", 0))
 		"armor":
-			stats["Phys Defense"] = int(item_def.get("base_pdef", 0))
-			stats["Skill Defense"] = int(item_def.get("base_mdef", 0))
+			stats["Phys Defense"] = int(item_def.get("armor_flat", 0))
+			stats["Skill Defense"] = int(item_def.get("ward_flat", 0))
 			stats["Ail Resist"] = int(item_def.get("ail_resist_pct", 0))
 		"head":
-			stats["HP Bonus"] = int(item_def.get("hp_bonus", 0))
-			stats["MP Bonus"] = int(item_def.get("mp_bonus", 0))
-			stats["Skill Defense"] = int(item_def.get("base_mdef", 0))
+			stats["HP Bonus"] = int(item_def.get("max_hp_boost", 0))
+			stats["MP Bonus"] = int(item_def.get("max_mp_boost", 0))
+			stats["Skill Defense"] = int(item_def.get("ward_flat", 0))
 		"foot":
 			stats["Evasion"] = int(item_def.get("base_eva", 0))
-			stats["Speed"] = int(item_def.get("base_speed", 0))
+			stats["Speed"] = int(item_def.get("speed", 0))
 		"bracelet":
 			stats["Sigil Slots"] = int(item_def.get("sigil_slots", 0))
 
