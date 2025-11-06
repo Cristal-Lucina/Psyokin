@@ -38,6 +38,8 @@ const FADE_DURATION: float = 0.2  # 200ms fade animation
 static func create(message: String) -> ConfirmationPopup:
 	var popup := ConfirmationPopup.new()
 	popup._message = message
+	# Set very high input priority (negative = processes first) to intercept input before other panels
+	popup.process_priority = -1000
 	popup._build_ui()
 	return popup
 
@@ -140,10 +142,13 @@ func _input(event: InputEvent) -> void:
 		print("[ConfirmationPopup._input] Not visible, skipping input")
 		return
 
+	# CRITICAL: Block ALL input from reaching nodes behind the popup
+	# This must be done early to prevent GameMenu from processing the event
+	get_viewport().set_input_as_handled()
+
 	# Block input during animations or cooldown
 	if _is_animating or _input_cooldown > 0.0:
 		print("[ConfirmationPopup._input] Blocked by animation or cooldown")
-		get_viewport().set_input_as_handled()
 		return
 
 	# Debug logging
