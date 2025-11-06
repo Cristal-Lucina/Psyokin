@@ -121,6 +121,7 @@ var _nav_state: NavState = NavState.PARTY_SELECT
 var _nav_elements: Array[Control] = []  # Ordered list of focusable elements in equipment mode
 var _nav_index: int = 0  # Current selection index in equipment mode
 var _active_popup: Control = null  # Currently open equipment popup panel
+var _active_overlay: CanvasLayer = null  # CanvasLayer overlay for active popup
 
 func _ready() -> void:
 	super()  # Call PanelBase._ready()
@@ -389,6 +390,18 @@ func _on_sigils_changed(member: String) -> void:
 	_sigils_sig = _snapshot_sigil_signature(cur)
 
 # ────────────────── equip menu ──────────────────
+func _style_popup_panel(popup_panel: Panel) -> void:
+	"""Apply ToastPopup styling to a panel"""
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.15, 0.15, 0.15, 1.0)  # Dark gray, fully opaque
+	style.border_color = Color(1.0, 0.7, 0.75, 1.0)  # Pink border
+	style.set_border_width_all(2)
+	style.corner_radius_top_left = 8
+	style.corner_radius_top_right = 8
+	style.corner_radius_bottom_left = 8
+	style.corner_radius_bottom_right = 8
+	popup_panel.add_theme_stylebox_override("panel", style)
+
 func _on_slot_button(slot: String) -> void:
 	var token: String = _current_token()
 	if token == "":
@@ -405,23 +418,44 @@ func _show_item_menu_for_slot(member_token: String, slot: String) -> void:
 	var cur: Dictionary = _fetch_equip_for(member_token)
 	var cur_id: String = String(cur.get(slot, ""))
 
+	# Create CanvasLayer overlay for proper input blocking
+	var overlay := CanvasLayer.new()
+	overlay.layer = 100
+	overlay.process_mode = Node.PROCESS_MODE_ALWAYS
+	overlay.process_priority = -1000
+	get_tree().root.add_child(overlay)
+
 	# Create custom popup using Control nodes for proper controller support
 	var popup_panel: Panel = Panel.new()
 	popup_panel.process_mode = Node.PROCESS_MODE_ALWAYS
+	popup_panel.process_priority = -1000
 	popup_panel.z_index = 100
-	add_child(popup_panel)
+	popup_panel.custom_minimum_size = Vector2(320, 280)
+	_style_popup_panel(popup_panel)  # Apply ToastPopup styling
+	overlay.add_child(popup_panel)
 
-	# Set active popup immediately to prevent multiple popups during async operations
+	# Set active popup and overlay immediately to prevent multiple popups during async operations
 	_active_popup = popup_panel
+	_active_overlay = overlay
+
+	# Add margin container for padding (ToastPopup style)
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 20)
+	margin.add_theme_constant_override("margin_top", 20)
+	margin.add_theme_constant_override("margin_right", 20)
+	margin.add_theme_constant_override("margin_bottom", 20)
+	popup_panel.add_child(margin)
 
 	var vbox: VBoxContainer = VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 4)
-	popup_panel.add_child(vbox)
+	vbox.add_theme_constant_override("separation", 8)
+	margin.add_child(vbox)
 
-	# Title label
+	# Title label (ToastPopup style)
 	var title: Label = Label.new()
 	title.text = "Select %s" % slot.capitalize()
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 18)
+	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	vbox.add_child(title)
 
 	# Item list
@@ -449,17 +483,18 @@ func _show_item_menu_for_slot(member_token: String, slot: String) -> void:
 			item_list.add_item(label)
 			item_ids.append(id)
 
-	# Add back button
+	# Add back button (ToastPopup style)
 	var back_btn: Button = Button.new()
 	back_btn.text = "Back"
+	back_btn.custom_minimum_size = Vector2(100, 40)
 	back_btn.pressed.connect(_popup_cancel)
 	vbox.add_child(back_btn)
 
 	# Auto-size panel to fit content - wait TWO frames for proper layout calculation
 	await get_tree().process_frame
 	await get_tree().process_frame
-	popup_panel.size = vbox.size + Vector2(20, 20)
-	vbox.position = Vector2(10, 10)
+	popup_panel.size = vbox.size + Vector2(40, 40)  # Account for 20px margins on all sides
+	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
 
 	# Center popup on screen
 	var viewport_size: Vector2 = get_viewport_rect().size
@@ -666,23 +701,44 @@ func _show_sigil_picker_for_socket(member_token: String, socket_index: int) -> v
 			var label: String = (String(_sig.call("get_display_name_for", base)) if (_sig and _sig.has_method("get_display_name_for")) else base)
 			print("[LoadoutPanel]   ✗ Filtered out: %s (school: %s)" % [label, school])
 
+	# Create CanvasLayer overlay for proper input blocking
+	var overlay := CanvasLayer.new()
+	overlay.layer = 100
+	overlay.process_mode = Node.PROCESS_MODE_ALWAYS
+	overlay.process_priority = -1000
+	get_tree().root.add_child(overlay)
+
 	# Create custom popup using Control nodes for proper controller support
 	var popup_panel: Panel = Panel.new()
 	popup_panel.process_mode = Node.PROCESS_MODE_ALWAYS
+	popup_panel.process_priority = -1000
 	popup_panel.z_index = 100
-	add_child(popup_panel)
+	popup_panel.custom_minimum_size = Vector2(340, 310)
+	_style_popup_panel(popup_panel)  # Apply ToastPopup styling
+	overlay.add_child(popup_panel)
 
-	# Set active popup immediately to prevent multiple popups
+	# Set active popup and overlay immediately to prevent multiple popups
 	_active_popup = popup_panel
+	_active_overlay = overlay
+
+	# Add margin container for padding (ToastPopup style)
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 20)
+	margin.add_theme_constant_override("margin_top", 20)
+	margin.add_theme_constant_override("margin_right", 20)
+	margin.add_theme_constant_override("margin_bottom", 20)
+	popup_panel.add_child(margin)
 
 	var vbox: VBoxContainer = VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 4)
-	popup_panel.add_child(vbox)
+	vbox.add_theme_constant_override("separation", 8)
+	margin.add_child(vbox)
 
-	# Title label
+	# Title label (ToastPopup style)
 	var title: Label = Label.new()
 	title.text = "Select Sigil (Socket %d)" % (socket_index + 1)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 18)
+	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	vbox.add_child(title)
 
 	# Item list
@@ -732,17 +788,18 @@ func _show_sigil_picker_for_socket(member_token: String, socket_index: int) -> v
 		item_list.set_item_disabled(0, true)
 		item_metadata.append({})
 
-	# Add back button
+	# Add back button (ToastPopup style)
 	var back_btn: Button = Button.new()
 	back_btn.text = "Back"
+	back_btn.custom_minimum_size = Vector2(100, 40)
 	back_btn.pressed.connect(_popup_cancel)
 	vbox.add_child(back_btn)
 
 	# Auto-size panel to fit content - wait TWO frames for proper layout calculation
 	await get_tree().process_frame
 	await get_tree().process_frame
-	popup_panel.size = vbox.size + Vector2(20, 20)
-	vbox.position = Vector2(10, 10)
+	popup_panel.size = vbox.size + Vector2(40, 40)  # Account for 20px margins on all sides
+	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
 
 	# Center popup on screen
 	var viewport_size: Vector2 = get_viewport_rect().size
@@ -1119,23 +1176,44 @@ func _open_active_type_picker() -> void:
 	print("[LoadoutPanel] === Opening Active Type Picker ===")
 	print("[LoadoutPanel] Current active type: %s" % cur)
 
+	# Create CanvasLayer overlay for proper input blocking
+	var overlay := CanvasLayer.new()
+	overlay.layer = 100
+	overlay.process_mode = Node.PROCESS_MODE_ALWAYS
+	overlay.process_priority = -1000
+	get_tree().root.add_child(overlay)
+
 	# Create custom popup using Control nodes for proper controller support
 	var popup_panel: Panel = Panel.new()
 	popup_panel.process_mode = Node.PROCESS_MODE_ALWAYS
+	popup_panel.process_priority = -1000
 	popup_panel.z_index = 100
-	add_child(popup_panel)
+	popup_panel.custom_minimum_size = Vector2(290, 260)
+	_style_popup_panel(popup_panel)  # Apply ToastPopup styling
+	overlay.add_child(popup_panel)
 
-	# Set active popup immediately to prevent multiple popups
+	# Set active popup and overlay immediately to prevent multiple popups
 	_active_popup = popup_panel
+	_active_overlay = overlay
+
+	# Add margin container for padding (ToastPopup style)
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 20)
+	margin.add_theme_constant_override("margin_top", 20)
+	margin.add_theme_constant_override("margin_right", 20)
+	margin.add_theme_constant_override("margin_bottom", 20)
+	popup_panel.add_child(margin)
 
 	var vbox: VBoxContainer = VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 4)
-	popup_panel.add_child(vbox)
+	vbox.add_theme_constant_override("separation", 8)
+	margin.add_child(vbox)
 
-	# Title label
+	# Title label (ToastPopup style)
 	var title: Label = Label.new()
 	title.text = "Select Active Type"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 18)
+	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	vbox.add_child(title)
 
 	# Item list
@@ -1167,17 +1245,18 @@ func _open_active_type_picker() -> void:
 		if s.strip_edges().to_lower() == cur.strip_edges().to_lower():
 			item_list.select(item_list.item_count - 1)
 
-	# Add back button
+	# Add back button (ToastPopup style)
 	var back_btn: Button = Button.new()
 	back_btn.text = "Back"
+	back_btn.custom_minimum_size = Vector2(100, 40)
 	back_btn.pressed.connect(_popup_cancel)
 	vbox.add_child(back_btn)
 
 	# Auto-size panel to fit content - wait TWO frames for proper layout calculation
 	await get_tree().process_frame
 	await get_tree().process_frame
-	popup_panel.size = vbox.size + Vector2(20, 20)
-	vbox.position = Vector2(10, 10)
+	popup_panel.size = vbox.size + Vector2(40, 40)  # Account for 20px margins on all sides
+	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
 
 	# Center popup on screen
 	var viewport_size: Vector2 = get_viewport_rect().size
@@ -1617,9 +1696,11 @@ func _popup_close_and_return_to_equipment() -> void:
 
 	print("[LoadoutPanel] Closing popup, returning to equipment mode")
 
-	# Store popup reference and clear BEFORE popping (prevents double-free)
+	# Store popup and overlay references and clear BEFORE popping (prevents double-free)
 	var popup_to_close = _active_popup
+	var overlay_to_close = _active_overlay
 	_active_popup = null
+	_active_overlay = null
 
 	# CRITICAL: Set state to EQUIPMENT_NAV BEFORE popping
 	# pop_panel() synchronously calls _on_panel_gained_focus(), which needs correct state
@@ -1631,6 +1712,8 @@ func _popup_close_and_return_to_equipment() -> void:
 		panel_mgr.pop_panel()
 
 	popup_to_close.queue_free()
+	if overlay_to_close and is_instance_valid(overlay_to_close):
+		overlay_to_close.queue_free()
 
 	# Focus will be restored by _on_panel_gained_focus() when panel_mgr.pop_panel() returns
 	# No need to call _restore_equipment_focus here
