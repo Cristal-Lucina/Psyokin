@@ -637,12 +637,16 @@ func _grab_party_picker_focus() -> void:
 	if _party_picker_list and is_instance_valid(_party_picker_list) and _party_picker_list.is_inside_tree():
 		_party_picker_list.grab_focus()
 
-func _unhandled_input(event: InputEvent) -> void:
-	"""Handle controller input"""
+func _input(event: InputEvent) -> void:
+	"""Handle input at same priority as GameMenu to block inputs when popup is active
+
+	Uses _input() instead of _unhandled_input() to have same priority as GameMenu,
+	allowing us to mark input as handled before GameMenu intercepts it.
+	"""
 	if not visible:
 		return
 
-	# Handle party picker popup input
+	# Handle popup input at high priority to block GameMenu from seeing it
 	if _focus_mode == "party_picker":
 		if event.is_action_pressed("menu_accept"):
 			_on_party_picker_accept()
@@ -657,12 +661,23 @@ func _unhandled_input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 			return
 		else:
-			# Block ALL other inputs from reaching the panel behind the popup
-			# This prevents category/item navigation while popup is active
-			# ItemList navigation still works because it uses ui_up/ui_down at a lower level
+			# Block all other inputs from reaching GameMenu
 			if event is InputEventKey or event is InputEventJoypadButton:
 				get_viewport().set_input_as_handled()
 			return
+
+func _unhandled_input(event: InputEvent) -> void:
+	"""Handle controller input for category and item navigation
+
+	Note: Popup input is handled in _input() at high priority to prevent
+	GameMenu from intercepting it.
+	"""
+	if not visible:
+		return
+
+	# Skip if popup is active - already handled in _input()
+	if _focus_mode == "party_picker":
+		return
 
 	# Handle focus switching
 	if _focus_mode == "category":
