@@ -211,7 +211,7 @@ func _create_header_cell(stat_id: String) -> Label:
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	label.custom_minimum_size = Vector2(120, 40)
-	label.add_theme_color_override("font_color", Color(0.9, 0.9, 0.9))
+	label.add_theme_color_override("font_color", Color(0.5, 0.8, 1.0))  # Light blue
 	return label
 
 func _create_level_cell(stat_id: String) -> Label:
@@ -356,7 +356,7 @@ func _highlight_selection() -> void:
 
 	var cell: Control = _grid_cells[_selected_row][_selected_col]
 	if cell is Button:
-		cell.modulate = Color(1.3, 1.3, 0.8, 1.0)  # Yellow glow
+		cell.modulate = Color(1.5, 1.5, 1.5, 1.0)  # White glow
 
 func _show_selected_perk_details() -> void:
 	"""Show details for currently selected perk"""
