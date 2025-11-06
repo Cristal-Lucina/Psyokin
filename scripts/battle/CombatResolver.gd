@@ -263,7 +263,7 @@ func check_critical_hit(attacker: Dictionary, options: Dictionary = {}) -> Dicti
 	Check if an attack should critically hit
 
 	Formula:
-	  CritChance = Base(5%) + TPO×0.15% + WeaponCritBonus% + SkillCritBonus%
+	  CritChance = Base(5%) + TPO×0.15% + WeaponCritBonus% + SkillCritBonus% + WandVuln%
 	  Clamped to [0%, 95%]
 
 	Args:
@@ -271,6 +271,7 @@ func check_critical_hit(attacker: Dictionary, options: Dictionary = {}) -> Dicti
 	  - options:
 		- weapon_crit_bonus: int = 0 (weapon crit bonus %)
 		- skill_crit_bonus: int = 0 (skill crit bonus %)
+		- defender: Dictionary = {} (defender combatant, for wand vulnerability check)
 
 	Returns:
 	  - crit: bool (whether it's a critical hit)
@@ -286,12 +287,20 @@ func check_critical_hit(attacker: Dictionary, options: Dictionary = {}) -> Dicti
 	var weapon_crit_bonus: int = options.get("weapon_crit_bonus", 0)
 	var skill_crit_bonus: int = options.get("skill_crit_bonus", 0)
 
+	# Get defender for wand vulnerability check
+	var defender: Dictionary = options.get("defender", {})
+
 	# Calculate crit chance
 	var base_crit: float = BASE_CRIT_CHANCE
 	var tpo_bonus: float = tpo * TPO_CRIT_MODIFIER
 	var total_bonus: float = weapon_crit_bonus + skill_crit_bonus
 
-	var final_crit: float = clamp(base_crit + tpo_bonus + total_bonus, CRIT_MIN, CRIT_MAX)
+	# Apply wand vulnerability (10% more crit chance if defender uses wand)
+	var wand_crit_bonus: float = 0.0
+	if weapon_type_system and not defender.is_empty():
+		wand_crit_bonus = weapon_type_system.get_wand_crit_bonus(defender)
+
+	var final_crit: float = clamp(base_crit + tpo_bonus + total_bonus + wand_crit_bonus, CRIT_MIN, CRIT_MAX)
 
 	# Roll d100
 	var roll: int = randi() % 100 + 1
@@ -307,6 +316,7 @@ func check_critical_hit(attacker: Dictionary, options: Dictionary = {}) -> Dicti
 			"tpo": tpo,
 			"weapon_bonus": weapon_crit_bonus,
 			"skill_bonus": skill_crit_bonus,
+			"wand_vuln_bonus": wand_crit_bonus,
 			"total": final_crit
 		}
 	}
@@ -355,7 +365,7 @@ func calculate_physical_damage(attacker: Dictionary, defender: Dictionary, optio
 	var pre_mit: float = (base_watk + brw * brw_scale) * (potency / 100.0)
 
 	# Step 2: Apply TYPE, Crit, and buffs
-	# ATK_Power = Pre × (1+TYPE) × (Crit?2:1) × (1+ATK_buffs−ATK_debuffs)
+	# ATK_Power = Pre × (1+TYPE) × (Crit?2:1) × (1+ATK_buffs−ATK_debuffs) × WandVuln
 	var type_mult: float = 1.0 + type_bonus
 	var crit_mult: float = CRIT_MULT if is_crit else 1.0
 
@@ -364,7 +374,12 @@ func calculate_physical_damage(attacker: Dictionary, defender: Dictionary, optio
 	var atk_debuff = _get_buff_modifier(attacker, "atk_down")
 	var buff_mult: float = 1.0 + atk_buff + atk_debuff  # debuffs are negative
 
-	var atk_power: float = pre_mit * type_mult * crit_mult * buff_mult
+	# Apply wand vulnerability (10% more damage if defender uses wand)
+	var wand_mult: float = 1.0
+	if weapon_type_system:
+		wand_mult = weapon_type_system.get_wand_damage_modifier(defender)
+
+	var atk_power: float = pre_mit * type_mult * crit_mult * buff_mult * wand_mult
 
 	# Step 3: Apply defense mitigation
 	# For multi-hit: PDEF_perHit = PDEF / √H

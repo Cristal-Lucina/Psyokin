@@ -1317,7 +1317,7 @@ func _execute_attack(target: Dictionary) -> void:
 			var minigame_crit = minigame_result.get("is_crit", false)
 
 			# Now roll for critical (or use minigame crit)
-			var crit_check = combat_resolver.check_critical_hit(current_combatant)
+			var crit_check = combat_resolver.check_critical_hit(current_combatant, {"defender": target})
 			var is_crit = crit_check.crit or minigame_crit
 
 			# Calculate mind type effectiveness
@@ -2668,7 +2668,7 @@ func _execute_enemy_ai() -> void:
 			print("[Battle] Enemy Miss! Hit chance: %.1f%%, Roll: %d" % [hit_check.hit_chance, hit_check.roll])
 		else:
 			# Hit! Now roll for critical
-			var crit_check = combat_resolver.check_critical_hit(current_combatant)
+			var crit_check = combat_resolver.check_critical_hit(current_combatant, {"defender": target})
 			var is_crit = crit_check.crit
 
 			# Calculate mind type effectiveness
@@ -4161,7 +4161,7 @@ func _execute_burst_on_target(target: Dictionary) -> void:
 	var minigame_crit = minigame_result.get("is_crit", false)
 
 	# Roll for crit (or use minigame crit)
-	var crit_check = combat_resolver.check_critical_hit(current_combatant, {"skill_crit_bonus": crit_bonus})
+	var crit_check = combat_resolver.check_critical_hit(current_combatant, {"skill_crit_bonus": crit_bonus, "defender": target})
 	var is_crit = crit_check.crit or minigame_crit
 
 	# Calculate type effectiveness
@@ -4411,7 +4411,7 @@ func _execute_skill_single(target: Dictionary) -> void:
 					return  # Skill ends here, original target takes no damage
 
 	# Roll for crit
-	var crit_check = combat_resolver.check_critical_hit(current_combatant, {"skill_crit_bonus": crit_bonus})
+	var crit_check = combat_resolver.check_critical_hit(current_combatant, {"skill_crit_bonus": crit_bonus, "defender": target})
 	var is_crit = crit_check.crit
 
 	# Calculate type effectiveness (use skill's element vs defender's mind type)
