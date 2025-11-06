@@ -84,13 +84,6 @@ class_name LoadoutPanel
 @onready var _mind_section: VBoxContainer = get_node_or_null("Row/Middle/MindSection") as VBoxContainer
 @onready var _mind_switch_btn: Button    = %SwitchBtn
 
-@onready var _active_section:    VBoxContainer = %ActiveSection
-@onready var _active_label:      Label         = %ActiveLabel
-@onready var _active_row:        HBoxContainer = %ActiveRow
-@onready var _active_name_lbl:   Label         = %ActiveNameLabel
-@onready var _active_value_lbl:  Label         = %ActiveValueLabel
-@onready var _active_btn:        Button        = %ActiveBtn
-
 var _labels: PackedStringArray = PackedStringArray()
 var _tokens: PackedStringArray = PackedStringArray()
 
@@ -161,7 +154,10 @@ func _ready() -> void:
 	# Extra refresh hooks (level ups, roster changes)
 	_wire_refresh_signals()
 
-	_setup_active_type_widgets()
+	# Connect Switch button to active type picker
+	if _mind_switch_btn and not _mind_switch_btn.pressed.is_connected(_open_active_type_picker):
+		_mind_switch_btn.pressed.connect(_open_active_type_picker)
+
 	call_deferred("_first_fill")
 
 	# polling fallback so UI never goes stale
@@ -244,7 +240,6 @@ func _refresh_all_for_current() -> void:
 	_rebuild_stats_grid(cur, equip)
 	_rebuild_sigils(cur)
 	_refresh_mind_row(cur)
-	_refresh_active_type_row(cur)
 
 	# ALWAYS rebuild navigation when UI changes (equipment/sigils)
 	# This ensures _nav_elements stays in sync even if popup is open
@@ -893,11 +888,18 @@ func _get_member_mind_type(member_token: String) -> String:
 func _refresh_mind_row(member_token: String) -> void:
 	if _mind_value == null: return
 	var mt: String = _get_member_mind_type(member_token)
-	_mind_value.text = (mt if mt != "" else "—")
 
-	# Show Switch button only for player (hero)
-	if _mind_switch_btn:
-		_mind_switch_btn.visible = (member_token == "hero")
+	if member_token == "hero":
+		# For player: "Omega - Active: Air"
+		var active_type: String = _get_hero_active_type()
+		_mind_value.text = "%s - Active: %s" % [mt, active_type]
+		if _mind_switch_btn:
+			_mind_switch_btn.visible = true
+	else:
+		# For other members: just "Data"
+		_mind_value.text = (mt if mt != "" else "—")
+		if _mind_switch_btn:
+			_mind_switch_btn.visible = false
 
 func _fetch_equip_for(member_token: String) -> Dictionary:
 	if _gs and _gs.has_method("get_member_equip"):
@@ -1053,29 +1055,6 @@ func _rebuild_stats_grid(member_token: String, equip: Dictionary) -> void:
 	_pair.call("CRIT", weapon.get("crit_bonus_pct", 0))
 
 # ────────────────── Active Type (hero) ──────────────────
-func _setup_active_type_widgets() -> void:
-	if _active_btn != null and not _active_btn.pressed.is_connected(_open_active_type_picker):
-		_active_btn.pressed.connect(_open_active_type_picker)
-
-func _refresh_active_type_row(member_token: String) -> void:
-	var is_hero: bool = (member_token == "hero" or member_token.strip_edges().to_lower() == _hero_name().strip_edges().to_lower())
-	var do_show: bool = is_hero and _active_section != null and _active_btn != null
-	if not do_show:
-		# Hide entire Active Type section for non-player characters
-		if _active_section: _active_section.visible = false
-		return
-
-	# Show Active Type section for player character
-	var cur: String = _get_hero_active_type()
-	if _active_section:    _active_section.visible = true
-	if _active_label:      _active_label.visible = true
-	if _active_row:        _active_row.visible = true
-	if _active_name_lbl:   _active_name_lbl.visible = true
-	if _active_value_lbl:
-		_active_value_lbl.text = (cur if cur != "" else "Omega")
-		_active_value_lbl.visible = true
-	if _active_btn:        _active_btn.visible = true
-
 func _get_hero_active_type() -> String:
 	if _gs:
 		if _gs.has_meta("hero_active_type"):
@@ -1648,7 +1627,7 @@ func _popup_accept_active_type() -> void:
 
 	print("[LoadoutPanel] Setting hero active type to: %s" % selected_type)
 	_set_hero_active_type(selected_type)
-	_refresh_active_type_row("hero")
+	_refresh_mind_row("hero")
 
 	_popup_close_and_return_to_equipment()
 
@@ -1855,7 +1834,6 @@ func _rebuild_equipment_navigation() -> void:
 
 	# Special buttons (always at the end of navigation cycle)
 	if _btn_manage: _nav_elements.append(_btn_manage)  # Manage Sigil button
-	if _active_btn: _nav_elements.append(_active_btn)  # Active Type button (player only)
 
 	print("[LoadoutPanel] Built navigation: %d elements" % _nav_elements.size())
 
