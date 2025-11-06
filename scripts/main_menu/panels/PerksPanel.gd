@@ -482,8 +482,8 @@ func _show_perk_confirmation(perk: Dictionary) -> void:
 	var overlay := CanvasLayer.new()
 	overlay.layer = 100  # High layer to ensure it's on top
 	overlay.process_mode = Node.PROCESS_MODE_ALWAYS  # Process even when paused
+	overlay.process_priority = -1000  # CRITICAL: Process before GameMenu
 	get_tree().root.add_child(overlay)
-	get_tree().root.move_child(overlay, 0)  # Move to first position so it processes input first
 
 	# Create and show popup
 	var popup := ToastPopup.create(message, "Confirm")

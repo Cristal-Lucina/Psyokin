@@ -408,6 +408,7 @@ func _show_set_current_confirmation() -> void:
 	var overlay := CanvasLayer.new()
 	overlay.layer = 100
 	overlay.process_mode = Node.PROCESS_MODE_ALWAYS
+	overlay.process_priority = -1000  # CRITICAL: Process before GameMenu
 	get_tree().root.add_child(overlay)
 
 	var popup := ToastPopup.create("Set '%s' as your current mission?" % title, "Confirm")

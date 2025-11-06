@@ -114,6 +114,7 @@ func _confirm_return_to_title() -> void:
 	var overlay := CanvasLayer.new()
 	overlay.layer = 100
 	overlay.process_mode = Node.PROCESS_MODE_ALWAYS
+	overlay.process_priority = -1000  # CRITICAL: Process before GameMenu
 	get_tree().root.add_child(overlay)
 
 	var popup := ToastPopup.create("Return to title screen?\n\nAll unsaved progress will be lost.", "Confirm")

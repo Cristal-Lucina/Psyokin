@@ -1267,6 +1267,7 @@ func _ask_confirm(msg: String) -> bool:
 	var overlay := CanvasLayer.new()
 	overlay.layer = 100
 	overlay.process_mode = Node.PROCESS_MODE_ALWAYS
+	overlay.process_priority = -1000  # CRITICAL: Process before GameMenu
 	get_tree().root.add_child(overlay)
 
 	var popup := ToastPopup.create(msg, "Confirm")
@@ -1289,6 +1290,7 @@ func _show_toast(msg: String, title: String = "") -> void:
 	var overlay := CanvasLayer.new()
 	overlay.layer = 100
 	overlay.process_mode = Node.PROCESS_MODE_ALWAYS
+	overlay.process_priority = -1000  # CRITICAL: Process before GameMenu
 	get_tree().root.add_child(overlay)
 
 	var popup := ToastPopup.create(msg, title)
