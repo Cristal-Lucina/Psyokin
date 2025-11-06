@@ -125,13 +125,6 @@ func _ready() -> void:
 	# Set process mode to work while game is paused
 	process_mode = Node.PROCESS_MODE_ALWAYS
 
-	# Set high input priority so popup input blocking happens before parent nodes
-	process_priority = 100
-
-	# Connect visibility changed to cleanup popups when hidden
-	if not visibility_changed.is_connected(_on_visibility_changed):
-		visibility_changed.connect(_on_visibility_changed)
-
 	_gs    = get_node_or_null("/root/aGameState")
 	_inv   = get_node_or_null("/root/aInventorySystem")
 	_sig   = get_node_or_null("/root/aSigilSystem")
@@ -170,41 +163,6 @@ func _ready() -> void:
 
 	# polling fallback so UI never goes stale
 	set_process(true)
-
-func _on_visibility_changed() -> void:
-	"""Cleanup popups when panel is hidden"""
-	if not visible:
-		# Clean up any active popups when panel is hidden
-		_cleanup_active_popup()
-
-func _cleanup_active_popup() -> void:
-	"""Clean up any active popup and overlay"""
-	if not _active_popup and not _active_overlay:
-		return
-
-	print("[LoadoutPanel] _cleanup_active_popup called, popup=%s, overlay=%s" % [_active_popup != null, _active_overlay != null])
-
-	# Store references locally before clearing tracking variables
-	var popup = _active_popup
-	var overlay = _active_overlay
-
-	# Clear tracking immediately to prevent re-entrance
-	_active_popup = null
-	_active_overlay = null
-
-	# Reset navigation state
-	if _nav_state == NavState.POPUP_ACTIVE:
-		_nav_state = NavState.EQUIPMENT_NAV
-
-	# Clean up popup
-	if popup and is_instance_valid(popup):
-		print("[LoadoutPanel] Queuing popup free")
-		popup.queue_free()
-
-	# Clean up overlay
-	if overlay and is_instance_valid(overlay):
-		print("[LoadoutPanel] Queuing overlay free")
-		overlay.queue_free()
 
 ## PanelBase callback - Called when LoadoutPanel gains focus
 func _on_panel_gained_focus() -> void:
@@ -1926,12 +1884,7 @@ func _handle_popup_input(event: InputEvent) -> void:
 	elif event.is_action_pressed("menu_back"):
 		_popup_cancel()
 		get_viewport().set_input_as_handled()
-	else:
-		# Block ALL other inputs from reaching the panel behind the popup
-		# This prevents equipment navigation buttons from being triggered
-		# ItemList navigation still works because it uses ui_up/ui_down at a lower level
-		if event is InputEventKey or event is InputEventJoypadButton:
-			get_viewport().set_input_as_handled()
+	# NOTE: Do NOT handle move_up/move_down here - let ItemList handle its own navigation
 
 func _has_active_sigil_menu() -> bool:
 	"""Check if SigilSkillMenu is currently open as a child"""
