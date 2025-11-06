@@ -478,6 +478,28 @@ func _build_equipment_comparison_panel(item_id: String, slot: String, current_st
 	name_label.add_theme_font_size_override("font_size", 12)
 	vbox.add_child(name_label)
 
+	# Show type for weapons and armor
+	if item_id != "" and item_id != "—":
+		var item_def: Dictionary = _item_def(item_id)
+		var type_text: String = ""
+
+		if slot == "weapon" and item_def.has("watk_type_tag"):
+			var wtype: String = String(item_def.get("watk_type_tag", "")).capitalize()
+			if wtype != "":
+				type_text = wtype
+		elif slot == "armor" and item_def.has("armor_type"):
+			var atype: String = String(item_def.get("armor_type", "")).capitalize()
+			if atype != "":
+				type_text = atype + " Armor"
+
+		if type_text != "":
+			var type_label := Label.new()
+			type_label.text = type_text
+			type_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			type_label.add_theme_font_size_override("font_size", 10)
+			type_label.add_theme_color_override("font_color", Color(0.8, 0.8, 0.8))
+			vbox.add_child(type_label)
+
 	# Separator
 	var sep := HSeparator.new()
 	vbox.add_child(sep)
