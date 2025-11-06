@@ -806,13 +806,26 @@ func _use_item_on_member(item_id: String, item_def: Dictionary, member_token: St
 
 	# Show heal confirmation toast if item had healing effect
 	if healed:
+		# Calculate actual heal amounts
+		var hp_healed: int = new_hp - hp
+		var mp_healed: int = new_mp - mp
+
+		# Build heal message
+		var heal_parts: Array[String] = []
+		if hp_healed > 0:
+			heal_parts.append("HP: +%d" % hp_healed)
+		if mp_healed > 0:
+			heal_parts.append("MP: +%d" % mp_healed)
+
+		var heal_message: String = "%s Healed %s" % [member_name, ", ".join(heal_parts)]
+
 		var overlay := CanvasLayer.new()
 		overlay.layer = 100
 		overlay.process_mode = Node.PROCESS_MODE_ALWAYS
 		get_tree().root.add_child(overlay)
 		get_tree().root.move_child(overlay, 0)
 
-		var popup := ToastPopup.create("%s Healed" % member_name, "Recovery")
+		var popup := ToastPopup.create(heal_message, "Recovery")
 		popup.process_mode = Node.PROCESS_MODE_ALWAYS
 		overlay.add_child(popup)
 		await popup.confirmed
