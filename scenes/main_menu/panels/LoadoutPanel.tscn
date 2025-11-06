@@ -231,12 +231,36 @@ layout_mode = 2
 
 [node name="VBox" type="VBoxContainer" parent="Row/StatsColumn"]
 layout_mode = 2
-theme_override_constants/separation = 4
+theme_override_constants/separation = 8
+
+[node name="DetailsLabel" type="Label" parent="Row/StatsColumn/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
+theme_override_font_sizes/font_size = 20
+text = "DETAILS"
+
+[node name="DetailsScroll" type="ScrollContainer" parent="Row/StatsColumn/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+size_flags_stretch_ratio = 2.0
+
+[node name="DetailsContent" type="RichTextLabel" parent="Row/StatsColumn/VBox/DetailsScroll"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+bbcode_enabled = true
+text = "[i]Select equipment or sigil to view details.[/i]"
+fit_content = true
+
+[node name="Separator" type="HSeparator" parent="Row/StatsColumn/VBox"]
+layout_mode = 2
 
 [node name="StatsLabel" type="Label" parent="Row/StatsColumn/VBox"]
 layout_mode = 2
-text = "Stats"
-horizontal_alignment = 1
+theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
+theme_override_font_sizes/font_size = 20
+text = "STATS"
 
 [node name="StatsGrid" type="GridContainer" parent="Row/StatsColumn/VBox"]
 layout_mode = 2

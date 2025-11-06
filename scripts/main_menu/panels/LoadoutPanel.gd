@@ -80,6 +80,7 @@ class_name LoadoutPanel
 @onready var _btn_manage:   Button        = get_node_or_null("Row/Middle/VBox/Buttons/BtnManageSigils") as Button
 
 @onready var _stats_grid:  GridContainer = get_node("Row/StatsColumn/VBox/StatsGrid") as GridContainer
+@onready var _details_content: RichTextLabel = %DetailsContent
 @onready var _mind_value:  Label         = get_node_or_null("Row/Middle/VBox/MindSection/MindRow/Value") as Label
 @onready var _mind_section: VBoxContainer = get_node_or_null("Row/Middle/VBox/MindSection") as VBoxContainer
 @onready var _mind_switch_btn: Button    = %SwitchBtn
@@ -1040,19 +1041,223 @@ func _rebuild_stats_grid(member_token: String, equip: Dictionary) -> void:
 		_stats_grid.add_child(_label_cell(lbl))
 		_stats_grid.add_child(_value_cell(str(val)))
 
-	# Battle stats (same order as StatsPanel)
-	_pair.call("MAX HP", profile.get("hp_max", 0))
-	_pair.call("MAX MP", profile.get("mp_max", 0))
-	_pair.call("P ATK", weapon.get("attack", 0))
-	_pair.call("S ATK", s_atk)
-	_pair.call("P DEF", defense.get("pdef", 0))
-	_pair.call("S DEF", defense.get("mdef", 0))
-	_pair.call("P ACC", weapon.get("accuracy", 0))
-	_pair.call("S ACC", skill_boost)
-	_pair.call("EVA", defense.get("peva", 0))
-	_pair.call("SPD", defense.get("speed", 0))
-	_pair.call("AIL R", defense.get("ail_resist_pct", 0))
-	_pair.call("CRIT", weapon.get("crit_bonus_pct", 0))
+	# Battle stats with full names
+	_pair.call("Max HP", profile.get("hp_max", 0))
+	_pair.call("Max MP", profile.get("mp_max", 0))
+	_pair.call("Physical Attack", weapon.get("attack", 0))
+	_pair.call("Skill Attack", s_atk)
+	_pair.call("Physical Defense", defense.get("pdef", 0))
+	_pair.call("Skill Defense", defense.get("mdef", 0))
+	_pair.call("Physical Accuracy", weapon.get("accuracy", 0))
+	_pair.call("Skill Accuracy", skill_boost)
+	_pair.call("Evasion", defense.get("peva", 0))
+	_pair.call("Speed", defense.get("speed", 0))
+	_pair.call("Ailment Resistance", defense.get("ail_resist_pct", 0))
+	_pair.call("Critical Rate", weapon.get("crit_bonus_pct", 0))
+
+# ────────────────── Details Display ──────────────────
+func _update_details_for_focused_element() -> void:
+	"""Update the details panel based on currently focused equipment/sigil"""
+	if not _details_content:
+		return
+
+	# Check if we're in equipment navigation mode
+	if _nav_state != NavState.EQUIPMENT_NAV or _nav_index < 0 or _nav_index >= _nav_elements.size():
+		_details_content.text = "[i]Select equipment or sigil to view details.[/i]"
+		return
+
+	var focused = _nav_elements[_nav_index]
+	if not is_instance_valid(focused):
+		return
+
+	var member_token: String = _current_token()
+	if member_token == "":
+		return
+
+	# Determine which equipment slot or sigil this button belongs to
+	var slot: String = ""
+	var sigil_index: int = -1
+
+	# Check equipment buttons
+	if focused == _w_btn:
+		slot = "weapon"
+	elif focused == _a_btn:
+		slot = "armor"
+	elif focused == _h_btn:
+		slot = "head"
+	elif focused == _f_btn:
+		slot = "foot"
+	elif focused == _b_btn:
+		slot = "bracelet"
+	elif focused == _btn_manage:
+		_details_content.text = "[b]Manage Sigils[/b]\n\nOpen the Sigil Skills menu to configure active skills for each equipped sigil."
+		return
+	elif focused == _mind_switch_btn:
+		var cur_type: String = _get_hero_active_type()
+		_details_content.text = "[b]Switch Active Type[/b]\n\nCurrent: [color=#FFC0CB]%s[/color]\n\nChange your active mind type to match different sigil schools and unlock their full potential." % cur_type
+		return
+	else:
+		# Check if it's a sigil button
+		if _sigils_list:
+			var idx_counter: int = 0
+			for child in _sigils_list.get_children():
+				if not is_instance_valid(child) or child.is_queued_for_deletion():
+					continue
+				if child is Button:
+					if child == focused:
+						sigil_index = idx_counter / 2  # Each sigil has Label + Button, so divide by 2
+						break
+					idx_counter += 1
+
+	# Show equipment details
+	if slot != "":
+		_show_equipment_details(member_token, slot)
+	# Show sigil details
+	elif sigil_index >= 0:
+		_show_sigil_details(member_token, sigil_index)
+	else:
+		_details_content.text = "[i]Select equipment or sigil to view details.[/i]"
+
+func _show_equipment_details(member_token: String, slot: String) -> void:
+	"""Display details for a specific equipment slot"""
+	var equip: Dictionary = _fetch_equip_for(member_token)
+	var item_id: String = String(equip.get(slot, ""))
+
+	if item_id == "" or item_id == "—":
+		var slot_name: String = slot.capitalize()
+		_details_content.text = "[b]%s[/b]\n\n[i]No %s equipped[/i]\n\nPress Accept to equip an item." % [slot_name, slot.to_lower()]
+		return
+
+	# Get item definition
+	var item_def: Dictionary = _item_def(item_id)
+	var display_name: String = _pretty_item(item_id)
+
+	# Build details string
+	var details: String = "[b]%s[/b]\n" % display_name
+
+	# Add item type
+	var slot_label: String = slot.capitalize()
+	details += "[color=#888888]%s[/color]\n\n" % slot_label
+
+	# Add stats based on slot type
+	match slot:
+		"weapon":
+			if item_def.has("base_attack"):
+				details += "Attack: [color=#FFC0CB]%d[/color]\n" % int(item_def.get("base_attack", 0))
+			if item_def.has("base_accuracy"):
+				details += "Accuracy: [color=#FFC0CB]%d[/color]\n" % int(item_def.get("base_accuracy", 0))
+			if item_def.has("crit_bonus_pct"):
+				details += "Critical: [color=#FFC0CB]%d%%[/color]\n" % int(item_def.get("crit_bonus_pct", 0))
+			if item_def.has("skill_acc_boost"):
+				details += "Skill Acc: [color=#FFC0CB]%d[/color]\n" % int(item_def.get("skill_acc_boost", 0))
+			if item_def.has("weapon_type"):
+				details += "Type: [color=#FFC0CB]%s[/color]\n" % String(item_def.get("weapon_type", ""))
+
+		"armor":
+			if item_def.has("base_pdef"):
+				details += "Physical Defense: [color=#FFC0CB]%d[/color]\n" % int(item_def.get("base_pdef", 0))
+			if item_def.has("base_mdef"):
+				details += "Skill Defense: [color=#FFC0CB]%d[/color]\n" % int(item_def.get("base_mdef", 0))
+			if item_def.has("ail_resist_pct"):
+				details += "Ailment Resist: [color=#FFC0CB]%d%%[/color]\n" % int(item_def.get("ail_resist_pct", 0))
+
+		"head":
+			if item_def.has("hp_bonus"):
+				details += "HP Bonus: [color=#FFC0CB]+%d[/color]\n" % int(item_def.get("hp_bonus", 0))
+			if item_def.has("mp_bonus"):
+				details += "MP Bonus: [color=#FFC0CB]+%d[/color]\n" % int(item_def.get("mp_bonus", 0))
+			if item_def.has("base_mdef"):
+				details += "Skill Defense: [color=#FFC0CB]%d[/color]\n" % int(item_def.get("base_mdef", 0))
+
+		"foot":
+			if item_def.has("base_eva"):
+				details += "Evasion: [color=#FFC0CB]%d[/color]\n" % int(item_def.get("base_eva", 0))
+			if item_def.has("base_speed"):
+				details += "Speed: [color=#FFC0CB]%d[/color]\n" % int(item_def.get("base_speed", 0))
+
+		"bracelet":
+			if item_def.has("sigil_slots"):
+				details += "Sigil Slots: [color=#FFC0CB]%d[/color]\n" % int(item_def.get("sigil_slots", 0))
+
+	# Add description if available
+	if item_def.has("description") and String(item_def.get("description", "")).strip_edges() != "":
+		details += "\n[color=#AAAAAA]%s[/color]" % String(item_def.get("description", ""))
+
+	_details_content.text = details
+
+func _show_sigil_details(member_token: String, socket_index: int) -> void:
+	"""Display details for a specific sigil socket"""
+	if not _sig:
+		return
+
+	# Get current sigil in this socket
+	var sockets: PackedStringArray = PackedStringArray()
+	if _sig.has_method("get_loadout"):
+		var v: Variant = _sig.call("get_loadout", member_token)
+		if typeof(v) == TYPE_PACKED_STRING_ARRAY:
+			sockets = v as PackedStringArray
+		elif typeof(v) == TYPE_ARRAY:
+			for s in (v as Array): sockets.append(String(s))
+
+	if socket_index >= sockets.size() or String(sockets[socket_index]) == "":
+		_details_content.text = "[b]Sigil Socket %d[/b]\n\n[i]Empty socket[/i]\n\nPress Accept to equip a sigil." % (socket_index + 1)
+		return
+
+	var inst_id: String = String(sockets[socket_index])
+
+	# Get base sigil ID
+	var base_id: String = inst_id
+	if _sig.has_method("get_base_from_instance"):
+		base_id = String(_sig.call("get_base_from_instance", inst_id))
+
+	# Get display name
+	var display_name: String = base_id
+	if _sig.has_method("get_display_name_for"):
+		var v: Variant = _sig.call("get_display_name_for", base_id)
+		if typeof(v) == TYPE_STRING:
+			display_name = String(v)
+
+	# Get level
+	var level: int = 1
+	if _sig.has_method("get_instance_level"):
+		level = int(_sig.call("get_instance_level", inst_id))
+
+	var level_str: String = "MAX" if level >= 4 else "Level %d" % level
+
+	# Get element/school
+	var school: String = ""
+	if _sig.has_method("get_element_for_instance"):
+		school = String(_sig.call("get_element_for_instance", inst_id))
+	elif _sig.has_method("get_element_for"):
+		school = String(_sig.call("get_element_for", base_id))
+
+	# Get active skill
+	var active_skill: String = ""
+	if _sig.has_method("get_active_skill_name_for_instance"):
+		var v: Variant = _sig.call("get_active_skill_name_for_instance", inst_id)
+		if typeof(v) == TYPE_STRING and String(v).strip_edges() != "":
+			active_skill = String(v)
+
+	# Build details
+	var details: String = "[b]%s[/b]\n" % display_name
+	details += "[color=#888888]Sigil - Socket %d[/color]\n\n" % (socket_index + 1)
+	details += "Level: [color=#FFC0CB]%s[/color]\n" % level_str
+
+	if school != "":
+		details += "School: [color=#FFC0CB]%s[/color]\n" % school
+
+	if active_skill != "":
+		details += "Active Skill: [color=#FFC0CB]★ %s[/color]\n" % active_skill
+	else:
+		details += "Active Skill: [color=#888888]None[/color]\n"
+
+	# Add XP if not maxed
+	if level < 4 and _sig.has_method("get_instance_xp"):
+		var xp: int = int(_sig.call("get_instance_xp", inst_id))
+		var xp_needed: int = 100  # Default, could be calculated based on level
+		details += "\nXP: [color=#FFC0CB]%d / %d[/color]" % [xp, xp_needed]
+
+	_details_content.text = details
 
 # ────────────────── Active Type (hero) ──────────────────
 func _get_hero_active_type() -> String:
@@ -1849,6 +2054,8 @@ func _focus_equipment_element(index: int) -> void:
 	if is_instance_valid(element) and element is Control:
 		element.grab_focus()
 		print("[LoadoutPanel] Grabbed focus on element: %s" % element.name)
+		# Update details panel for the focused element
+		_update_details_for_focused_element()
 	else:
 		print("[LoadoutPanel] Element invalid or not a Control")
 
