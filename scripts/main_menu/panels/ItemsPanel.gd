@@ -803,6 +803,22 @@ func _use_item_on_member(item_id: String, item_def: Dictionary, member_token: St
 	var member_name: String = _member_display_name(member_token)
 	var item_name: String = _display_name(item_id, item_def)
 	print("[ItemsPanel] Used %s on %s" % [item_name, member_name])
+
+	# Show heal confirmation toast if item had healing effect
+	if healed:
+		var overlay := CanvasLayer.new()
+		overlay.layer = 100
+		overlay.process_mode = Node.PROCESS_MODE_ALWAYS
+		get_tree().root.add_child(overlay)
+		get_tree().root.move_child(overlay, 0)
+
+		var popup := ToastPopup.create("%s Healed" % member_name, "Recovery")
+		popup.process_mode = Node.PROCESS_MODE_ALWAYS
+		overlay.add_child(popup)
+		await popup.confirmed
+		popup.queue_free()
+		overlay.queue_free()
+
 	print("[ItemsPanel] _counts size after use: %d" % _counts.size())
 	print("[ItemsPanel] === USE ITEM END ===")
 
