@@ -44,6 +44,10 @@ var _pending_saturday_moves: Array = []  # Stores moves for Saturday popup
 var _ctrl_mgr: Node = null
 
 func _ready() -> void:
+	# Set low input priority so popups can block input first
+	# Popups use -1000, so we use a positive number to process after them
+	process_priority = 100
+
 	_btn_group = ButtonGroup.new()
 
 	# Get ControllerManager reference
