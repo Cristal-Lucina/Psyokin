@@ -1006,12 +1006,28 @@ func _create_stat_cell(stat_label: String, value: int) -> PanelContainer:
 	margin.add_theme_constant_override("margin_bottom", 4)
 	panel.add_child(margin)
 
-	# Create label with "LABEL: VALUE" format
+	# HBoxContainer to hold label and value side by side
+	var hbox := HBoxContainer.new()
+	hbox.add_theme_constant_override("separation", 4)
+	margin.add_child(hbox)
+
+	# Label - 30 characters wide
 	var label := Label.new()
-	label.text = "%s: %d" % [stat_label, value]
+	label.text = stat_label
+	label.custom_minimum_size = Vector2(180, 0)  # ~30 characters at 12pt
+	label.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	label.add_theme_font_size_override("font_size", 12)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-	margin.add_child(label)
+	hbox.add_child(label)
+
+	# Value - 5 characters wide
+	var value_label := Label.new()
+	value_label.text = str(value)
+	value_label.custom_minimum_size = Vector2(30, 0)  # ~5 characters at 12pt
+	value_label.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	value_label.add_theme_font_size_override("font_size", 12)
+	value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	hbox.add_child(value_label)
 
 	return panel
 
