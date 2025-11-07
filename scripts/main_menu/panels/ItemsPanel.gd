@@ -283,6 +283,15 @@ func _add_sigil_instances() -> void:
 		_defs[inst_id] = virtual_def
 		_counts[inst_id] = 1
 
+		# Track who has this sigil equipped
+		var equipped_by: String = String(inst_dict.get("equipped_by", ""))
+		if equipped_by != "":
+			if not _equipped_by.has(inst_id):
+				_equipped_by[inst_id] = []
+			var member_name: String = _member_display_name(equipped_by)
+			if not _equipped_by[inst_id].has(member_name):
+				_equipped_by[inst_id].append(member_name)
+
 func _format_sigil_name(inst: Dictionary, base_def: Dictionary) -> String:
 	"""Format sigil instance name with level"""
 	var base_name: String = String(base_def.get("name", "Sigil"))
@@ -414,8 +423,23 @@ func _populate_items() -> void:
 		var def: Dictionary = _defs.get(item_id, {})
 		var qty: int = _counts.get(item_id, 0)
 		var name: String = _display_name(item_id, def)
-		_item_list.add_item("%s  x%d" % [name, qty])
-		_item_ids.append(item_id)
+
+		# Check if item is equipped
+		var is_equipped: bool = _equipped_by.has(item_id)
+		var equipped_members: Array = _equipped_by.get(item_id, [])
+		var equipped_count: int = equipped_members.size()
+
+		# For equipped items, show each member separately
+		if is_equipped:
+			for member in equipped_members:
+				_item_list.add_item("%s - Equipped by %s" % [name, member])
+				_item_ids.append(item_id)
+
+		# Show unequipped count if any remain
+		var unequipped_count: int = qty - equipped_count
+		if unequipped_count > 0:
+			_item_list.add_item("%s  x%d" % [name, unequipped_count])
+			_item_ids.append(item_id)
 
 	print("[ItemsPanel] Added %d items to ItemList UI" % _item_list.item_count)
 
