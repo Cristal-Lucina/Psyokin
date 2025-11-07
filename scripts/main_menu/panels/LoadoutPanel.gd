@@ -61,7 +61,7 @@ extends PanelBase
 class_name LoadoutPanel
 
 @onready var _party_list: ItemList       = get_node("Row/Party/VBox/PartyList") as ItemList
-@onready var _member_name: Label         = get_node("Row/Middle/Margin/VBox/MemberName") as Label
+# @onready var _member_name: Label         = get_node("Row/Middle/Margin/VBox/MemberName") as Label  # Removed
 
 @onready var _w_val: Label = get_node("Row/Middle/Margin/VBox/Grid/WHBox/WValue") as Label
 @onready var _a_val: Label = get_node("Row/Middle/Margin/VBox/Grid/AHBox/AValue") as Label
@@ -370,7 +370,7 @@ func _on_party_selected(index: int) -> void:
 	var label: String = "(Unknown)"
 	if index >= 0 and index < _labels.size():
 		label = _labels[index]
-	_member_name.text = label.to_upper()
+	# _member_name.text = label.to_upper()  # Removed
 
 	_refresh_all_for_current()
 	_sigils_sig = _snapshot_sigil_signature(_current_token())
