@@ -11,7 +11,7 @@ const INV_PATH            : String = "/root/aInventorySystem"
 const CPS_PATH            : String = "/root/aCombatProfileSystem"
 
 # Base stat keys
-const BASE_STATS: Array[String] = []
+const BASE_STATS: Array[String] = ["BRW", "MND", "TPO", "VTL", "FCS"]
 
 @onready var _party_list: ItemList = %PartyList
 @onready var _member_name: Label = %MemberName
@@ -221,10 +221,7 @@ func _rebuild_base_stats(token: String) -> void:
 	else:
 		_add_stat_pair(_base_grid, "XP", str(xp))
 
-	# Base stats
-	for stat_key in BASE_STATS:
-		var value = _get_stat_value(token, stat_key)
-		_add_stat_pair(_base_grid, stat_key, str(value))
+	# Base stats are not displayed in the grid, only in the radar chart
 
 func _rebuild_battle_stats(token: String) -> void:
 	"""Build battle stats grid from CombatProfileSystem"""
