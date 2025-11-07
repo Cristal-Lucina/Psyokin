@@ -87,7 +87,7 @@ text = "—"
 
 [node name="SwitchBtn" type="Button" parent="Row/Middle/Margin/VBox/MindSection/MindRow"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(90, 0)
+custom_minimum_size = Vector2(90, 24)
 layout_mode = 2
 text = "Switch"
 
@@ -121,7 +121,7 @@ size_flags_horizontal = 3
 text = "(Weapon)"
 
 [node name="WBtn" type="Button" parent="Row/Middle/Margin/VBox/Grid/WHBox"]
-custom_minimum_size = Vector2(90, 0)
+custom_minimum_size = Vector2(90, 24)
 layout_mode = 2
 text = "Equip"
 
@@ -143,7 +143,7 @@ size_flags_horizontal = 3
 text = "(Armor)"
 
 [node name="ABtn" type="Button" parent="Row/Middle/Margin/VBox/Grid/AHBox"]
-custom_minimum_size = Vector2(90, 0)
+custom_minimum_size = Vector2(90, 24)
 layout_mode = 2
 text = "Equip"
 
@@ -165,7 +165,7 @@ size_flags_horizontal = 3
 text = "(Headwear)"
 
 [node name="HBtn" type="Button" parent="Row/Middle/Margin/VBox/Grid/HHBox"]
-custom_minimum_size = Vector2(90, 0)
+custom_minimum_size = Vector2(90, 24)
 layout_mode = 2
 text = "Equip"
 
@@ -187,7 +187,7 @@ size_flags_horizontal = 3
 text = "(Footwear)"
 
 [node name="FBtn" type="Button" parent="Row/Middle/Margin/VBox/Grid/FHBox"]
-custom_minimum_size = Vector2(90, 0)
+custom_minimum_size = Vector2(90, 24)
 layout_mode = 2
 text = "Equip"
 
@@ -209,7 +209,7 @@ size_flags_horizontal = 3
 text = "(Bracelet)"
 
 [node name="BBtn" type="Button" parent="Row/Middle/Margin/VBox/Grid/BHBox"]
-custom_minimum_size = Vector2(90, 0)
+custom_minimum_size = Vector2(90, 24)
 layout_mode = 2
 text = "Equip"
 
@@ -242,7 +242,7 @@ layout_mode = 2
 size_flags_horizontal = 3
 
 [node name="BtnManageSigils" type="Button" parent="Row/Middle/Margin/VBox/Buttons"]
-custom_minimum_size = Vector2(90, 0)
+custom_minimum_size = Vector2(90, 24)
 layout_mode = 2
 text = "Manage Sigils"
 
