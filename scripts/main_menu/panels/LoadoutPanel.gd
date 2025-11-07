@@ -84,7 +84,6 @@ class_name LoadoutPanel
 @onready var _mind_value:  Label         = get_node_or_null("Row/Middle/Margin/VBox/MindSection/MindRow/Value") as Label
 @onready var _mind_section: VBoxContainer = get_node_or_null("Row/Middle/Margin/VBox/MindSection") as VBoxContainer
 @onready var _mind_switch_btn: Button    = %SwitchBtn
-@onready var _mind_switch_spacer: Control = %SwitchSpacer
 
 var _labels: PackedStringArray = PackedStringArray()
 var _tokens: PackedStringArray = PackedStringArray()
@@ -1114,15 +1113,13 @@ func _refresh_mind_row(member_token: String) -> void:
 		_mind_value.text = "%s - Active: %s" % [mt, active_type]
 		if _mind_switch_btn:
 			_mind_switch_btn.visible = true
-		if _mind_switch_spacer:
-			_mind_switch_spacer.visible = false
+			_mind_switch_btn.disabled = false
 	else:
 		# For other members: just "Data"
 		_mind_value.text = (mt if mt != "" else "—")
 		if _mind_switch_btn:
 			_mind_switch_btn.visible = false
-		if _mind_switch_spacer:
-			_mind_switch_spacer.visible = true
+			_mind_switch_btn.disabled = true
 
 func _fetch_equip_for(member_token: String) -> Dictionary:
 	if _gs and _gs.has_method("get_member_equip"):
