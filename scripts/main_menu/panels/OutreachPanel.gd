@@ -419,10 +419,6 @@ func _start_title_scroll() -> void:
 	# Wait one frame for the label to update its size
 	await get_tree().process_frame
 
-	# Use the label's visible characters count - if all chars aren't visible, we need to scroll
-	var total_chars = _title_label.text.length()
-	var visible_chars = _title_label.visible_characters
-
 	# Get font to measure text
 	var font: Font = _title_label.get_theme_default_font()
 	if font == null:
@@ -438,7 +434,9 @@ func _start_title_scroll() -> void:
 
 	print("[OutreachPanel] Title: '%s'" % _title_label.text)
 	print("[OutreachPanel] Text width: %.1f, Container width: %.1f" % [text_width, container_width])
-	print("[OutreachPanel] Total chars: %d, Visible chars: %d" % [total_chars, visible_chars])
+
+	# Set the label's width to match the text
+	_title_label.size.x = text_width
 
 	# Only scroll if text is wider than container
 	if text_width <= container_width:
