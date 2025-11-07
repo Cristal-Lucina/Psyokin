@@ -815,7 +815,7 @@ func _rebuild_sigils(member_token: String) -> void:
 
 		# Always show "Equip" button - popup will handle unequip option
 		var btn: Button = Button.new()
-		btn.custom_minimum_size = Vector2(90, 24)  # Match equipment button size for grid alignment
+		btn.custom_minimum_size = Vector2(90, 18)  # Match equipment button size for grid alignment
 		btn.text = "Equip"
 		btn.pressed.connect(Callable(self, "_on_equip_sigil").bind(member_token, idx))
 		_sigils_list.add_child(btn)
