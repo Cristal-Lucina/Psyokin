@@ -58,6 +58,7 @@ const ANIM_DURATION := 0.2  # Animation duration in seconds
 @onready var _mission_list: ItemList = %MissionList
 @onready var _mission_label: Label = %MissionLabel
 
+@onready var _title_container: Control = %TitleContainer
 @onready var _title_label: Label = %TitleLabel
 @onready var _desc_label: Label = %DescriptionLabel
 @onready var _reward_label: Label = %RewardLabel
@@ -84,6 +85,12 @@ var _selected_mission: Dictionary = {}     # Currently selected mission
 
 ## System references
 var _main_event: Node = null
+
+## Text scrolling animation
+const SCROLL_SPEED := 50.0  # Pixels per second
+const SCROLL_PAUSE := 1.5    # Seconds to pause before looping
+var _scroll_tween: Tween = null
+var _scroll_timer: Timer = null
 
 ## ═══════════════════════════════════════════════════════════════════════════
 ## INITIALIZATION
@@ -150,6 +157,10 @@ func _on_panel_gained_focus() -> void:
 	super()  # Call parent
 	print("[OutreachPanel] Panel gained focus - state: %s" % NavState.keys()[_nav_state])
 
+	# Restart title scroll if there's a selected mission
+	if not _selected_mission.is_empty():
+		call_deferred("_start_title_scroll")
+
 	# Restore focus based on current navigation state
 	match _nav_state:
 		NavState.CATEGORY_SELECT:
@@ -163,6 +174,7 @@ func _on_panel_gained_focus() -> void:
 func _on_panel_lost_focus() -> void:
 	super()  # Call parent
 	print("[OutreachPanel] Panel lost focus - state: %s" % NavState.keys()[_nav_state])
+	_stop_title_scroll()  # Stop scrolling when panel loses focus
 
 ## ═══════════════════════════════════════════════════════════════════════════
 ## CATEGORY MANAGEMENT
@@ -337,6 +349,8 @@ func _show_mission_details(mission: Dictionary) -> void:
 
 	# Title
 	_title_label.text = title
+	# Start scrolling animation if title is too long
+	_start_title_scroll()
 
 	# Description
 	if hint != "":
@@ -362,6 +376,7 @@ func _show_mission_details(mission: Dictionary) -> void:
 func _show_empty_details() -> void:
 	"""Show empty state in detail panel"""
 	_title_label.text = "No missions available"
+	_stop_title_scroll()  # Stop scrolling when no mission selected
 	_desc_label.text = ""
 	_desc_label.visible = false
 	_reward_label.visible = false
@@ -385,6 +400,80 @@ func _update_action_buttons(mission: Dictionary) -> void:
 
 	_primary_btn.visible = true
 	_back_btn.visible = true
+
+## ═══════════════════════════════════════════════════════════════════════════
+## TEXT SCROLLING ANIMATION
+## ═══════════════════════════════════════════════════════════════════════════
+
+func _start_title_scroll() -> void:
+	"""Start scrolling animation for title if it's too long"""
+	if not _title_container or not _title_label:
+		return
+
+	# Stop any existing animation
+	_stop_title_scroll()
+
+	# Wait one frame for the label to update its size
+	await get_tree().process_frame
+
+	# Get text width and container width
+	var text_size := _title_label.get_minimum_size()
+	var container_width := _title_container.size.x
+
+	# Only scroll if text is wider than container
+	if text_size.x <= container_width:
+		# Text fits - reset position and don't scroll
+		_title_label.position.x = 0
+		return
+
+	# Calculate scroll distance (text width + some padding)
+	var scroll_distance := text_size.x - container_width
+	var total_distance := text_size.x + 50  # Add 50px gap before looping
+
+	# Start at position 0
+	_title_label.position.x = 0
+
+	# Create animation sequence
+	_animate_title_scroll_loop(scroll_distance, total_distance)
+
+func _animate_title_scroll_loop(scroll_distance: float, total_distance: float) -> void:
+	"""Loop the scrolling animation: scroll -> pause -> reset -> pause -> repeat"""
+	if not _title_container or not _title_label:
+		return
+
+	# Calculate duration based on scroll speed
+	var scroll_duration := scroll_distance / SCROLL_SPEED
+
+	# Create tween for scrolling
+	_scroll_tween = create_tween()
+	_scroll_tween.set_loops(0)  # Infinite loop
+
+	# Step 1: Scroll left to reveal full text
+	_scroll_tween.tween_property(_title_label, "position:x", -scroll_distance, scroll_duration)
+
+	# Step 2: Pause at end
+	_scroll_tween.tween_interval(SCROLL_PAUSE)
+
+	# Step 3: Jump back to start position (instant)
+	_scroll_tween.tween_property(_title_label, "position:x", 0, 0)
+
+	# Step 4: Pause at start before repeating
+	_scroll_tween.tween_interval(SCROLL_PAUSE)
+
+func _stop_title_scroll() -> void:
+	"""Stop any active scrolling animation"""
+	if _scroll_tween and _scroll_tween.is_valid():
+		_scroll_tween.kill()
+		_scroll_tween = null
+
+	if _scroll_timer and is_instance_valid(_scroll_timer):
+		_scroll_timer.stop()
+		_scroll_timer.queue_free()
+		_scroll_timer = null
+
+	# Reset title position
+	if _title_label:
+		_title_label.position.x = 0
 
 ## ═══════════════════════════════════════════════════════════════════════════
 ## ACTIONS
