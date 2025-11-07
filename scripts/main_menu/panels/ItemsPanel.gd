@@ -22,11 +22,24 @@ const CATEGORIES : Array[String] = [
 	"Capture", "Material", "Gifts", "Key", "Other"
 ]
 
+# Panel animation settings
+const BASE_LEFT_RATIO := 2.0
+const BASE_CENTER_RATIO := 3.5
+const BASE_RIGHT_RATIO := 4.5
+const ACTIVE_SCALE := 1.10  # Active panel grows by 10%
+const INACTIVE_SCALE := 0.95  # Inactive panels shrink by 5%
+const ANIM_DURATION := 0.2  # Animation duration in seconds
+
+# Panel references (for animation)
+@onready var _category_panel: PanelContainer = %CategoryPanel
+@onready var _item_panel: PanelContainer = %ItemPanel
+@onready var _details_panel: PanelContainer = %DetailsPanel
+
 # Scene references
 @onready var _category_list: ItemList = %CategoryList
 @onready var _item_list: ItemList = %ItemList
 @onready var _item_label: Label = %ItemLabel  # Now in ItemColumn (moved from ItemHeader)
-@onready var _count_label: Label = %CountLabel  # Now in ItemHeader
+# @onready var _count_label: Label = %CountLabel  # Removed
 @onready var _item_name: Label = %ItemName
 @onready var _details_text: RichTextLabel = %DetailsText
 @onready var _scroll_container: ScrollContainer = %ScrollContainer
@@ -125,6 +138,7 @@ func _grab_category_focus() -> void:
 	if _category_list and _category_list.item_count > 0:
 		_focus_mode = "category"
 		_category_list.grab_focus()
+		_animate_panel_focus()
 
 func _cleanup_active_popup() -> void:
 	"""Clean up any active popup and overlay"""
@@ -255,23 +269,23 @@ func _add_sigil_instances() -> void:
 	if not _sig:
 		return
 
-	# Get all sigil instances
-	var instances: Array = []
-	if _sig.has_method("get_all_instances"):
-		var inst_data: Variant = _sig.call("get_all_instances")
-		if typeof(inst_data) == TYPE_ARRAY:
-			instances = inst_data
+	# Get all sigil instance IDs
+	var instance_ids: PackedStringArray = PackedStringArray()
+	if _sig.has_method("list_all_instances"):
+		instance_ids = _sig.call("list_all_instances", false)  # false = include equipped
 
-	for inst in instances:
-		if typeof(inst) != TYPE_DICTIONARY:
-			continue
-		var inst_dict: Dictionary = inst
-		var inst_id: String = String(inst_dict.get("instance_id", ""))
-		if inst_id == "":
+	print("[ItemsPanel] Found %d sigil instances" % instance_ids.size())
+
+	for inst_id in instance_ids:
+		var inst_dict: Dictionary = {}
+		if _sig.has_method("get_instance_info"):
+			inst_dict = _sig.call("get_instance_info", inst_id)
+
+		if inst_dict.is_empty():
 			continue
 
 		# Create virtual item def
-		var base_id: String = String(inst_dict.get("sigil_id", ""))
+		var base_id: String = String(inst_dict.get("base_id", ""))
 		var base_def: Dictionary = _defs.get(base_id, {})
 
 		var virtual_def: Dictionary = base_def.duplicate()
@@ -282,6 +296,16 @@ func _add_sigil_instances() -> void:
 
 		_defs[inst_id] = virtual_def
 		_counts[inst_id] = 1
+
+		# Track who has this sigil equipped
+		var equipped_by: String = String(inst_dict.get("equipped_by", ""))
+		if equipped_by != "":
+			if not _equipped_by.has(inst_id):
+				_equipped_by[inst_id] = []
+			var member_name: String = _member_display_name(equipped_by)
+			if not _equipped_by[inst_id].has(member_name):
+				_equipped_by[inst_id].append(member_name)
+			print("[ItemsPanel] Sigil %s equipped by %s" % [inst_id, member_name])
 
 func _format_sigil_name(inst: Dictionary, base_def: Dictionary) -> String:
 	"""Format sigil instance name with level"""
@@ -316,6 +340,10 @@ func _count_items_in_category(category: String) -> int:
 		var qty: int = _counts[item_id]
 		if qty <= 0:
 			continue
+		if category == "Acquired":
+			# For Acquired, sum total quantities of all items
+			count += qty
+			continue
 		if category == "All":
 			count += 1
 			continue
@@ -337,7 +365,7 @@ func _populate_items() -> void:
 
 	# Update header
 	if _item_label:
-		_item_label.text = "Items (%s)" % _current_category
+		_item_label.text = "ITEMS (%s)" % _current_category.to_upper()
 
 	# Gather items in category
 	var items: Array[String] = []
@@ -410,14 +438,29 @@ func _populate_items() -> void:
 		var def: Dictionary = _defs.get(item_id, {})
 		var qty: int = _counts.get(item_id, 0)
 		var name: String = _display_name(item_id, def)
-		_item_list.add_item("%s  x%d" % [name, qty])
-		_item_ids.append(item_id)
+
+		# Check if item is equipped
+		var is_equipped: bool = _equipped_by.has(item_id)
+		var equipped_members: Array = _equipped_by.get(item_id, [])
+		var equipped_count: int = equipped_members.size()
+
+		# For equipped items, show each member separately
+		if is_equipped:
+			for member in equipped_members:
+				_item_list.add_item("%s - Equipped by %s" % [name, member])
+				_item_ids.append(item_id)
+
+		# Show unequipped count if any remain
+		var unequipped_count: int = qty - equipped_count
+		if unequipped_count > 0:
+			_item_list.add_item("%s  x%d" % [name, unequipped_count])
+			_item_ids.append(item_id)
 
 	print("[ItemsPanel] Added %d items to ItemList UI" % _item_list.item_count)
 
-	# Update count
-	if _count_label:
-		_count_label.text = "Count: %d" % items.size()
+	# Update count - Removed
+	# if _count_label:
+	#	_count_label.text = "Count: %d" % items.size()
 
 	# Select first item if available
 	if _item_list.item_count > 0 and _selected_item_id == "":
@@ -703,6 +746,7 @@ func _show_member_selection_popup() -> void:
 
 	# Update focus mode
 	_focus_mode = "party_picker"
+	_animate_panel_focus()
 
 	# Track active popup and overlay for cleanup
 	_active_popup = popup_panel
@@ -794,6 +838,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			if _item_list and _item_list.item_count > 0:
 				_focus_mode = "items"
 				_item_list.grab_focus()
+				_animate_panel_focus()
 				get_viewport().set_input_as_handled()
 	elif _focus_mode == "items":
 		if event.is_action_pressed("menu_accept"):
@@ -805,6 +850,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			# Return to category list
 			_focus_mode = "category"
 			_category_list.grab_focus()
+			_animate_panel_focus()
 			get_viewport().set_input_as_handled()
 
 func _on_party_picker_accept() -> void:
@@ -868,11 +914,13 @@ func _close_member_selection_popup(popup_panel: Panel, used_item: bool) -> void:
 	# Grab focus back
 	if _item_list and _item_list.item_count > 0:
 		_item_list.grab_focus()
+		_animate_panel_focus()
 	else:
 		# No items in this category, return to category list
 		_focus_mode = "category"
 		if _category_list:
 			_category_list.grab_focus()
+			_animate_panel_focus()
 
 func _use_item_on_member(item_id: String, item_def: Dictionary, member_token: String) -> void:
 	"""Apply item effect to a party member"""
@@ -1227,3 +1275,42 @@ func _get_member_hp_mp(member_token: String) -> Dictionary:
 		stats["mp"] = stats["mp_max"]
 
 	return stats
+
+# ==============================================================================
+# Panel Animation
+# ==============================================================================
+
+func _animate_panel_focus() -> void:
+	"""Animate panels to highlight which one is currently active (only left and center animate)"""
+	if not _category_panel or not _item_panel or not _details_panel:
+		return
+
+	var left_ratio := BASE_LEFT_RATIO
+	var center_ratio := BASE_CENTER_RATIO
+	var right_ratio := BASE_RIGHT_RATIO  # Details panel always stays at base size
+
+	# Determine which panel gets the active scale (only left and center panels animate)
+	match _focus_mode:
+		"category":
+			left_ratio = BASE_LEFT_RATIO * ACTIVE_SCALE
+			center_ratio = BASE_CENTER_RATIO * INACTIVE_SCALE
+			# right_ratio stays at BASE_RIGHT_RATIO
+		"items":
+			left_ratio = BASE_LEFT_RATIO * INACTIVE_SCALE
+			center_ratio = BASE_CENTER_RATIO * ACTIVE_SCALE
+			# right_ratio stays at BASE_RIGHT_RATIO
+		"party_picker":
+			# When party picker is active, shrink both left and center
+			left_ratio = BASE_LEFT_RATIO * INACTIVE_SCALE
+			center_ratio = BASE_CENTER_RATIO * INACTIVE_SCALE
+			# right_ratio stays at BASE_RIGHT_RATIO
+
+	# Create tweens for smooth animation
+	var tween := create_tween()
+	tween.set_parallel(true)
+	tween.set_trans(Tween.TRANS_CUBIC)
+	tween.set_ease(Tween.EASE_OUT)
+
+	tween.tween_property(_category_panel, "size_flags_stretch_ratio", left_ratio, ANIM_DURATION)
+	tween.tween_property(_item_panel, "size_flags_stretch_ratio", center_ratio, ANIM_DURATION)
+	tween.tween_property(_details_panel, "size_flags_stretch_ratio", right_ratio, ANIM_DURATION)

@@ -9,14 +9,20 @@ const GS_PATH             : String = "/root/aGameState"
 const EQ_PATH             : String = "/root/aEquipmentSystem"
 const INV_PATH            : String = "/root/aInventorySystem"
 const CPS_PATH            : String = "/root/aCombatProfileSystem"
+const SIG_PATH            : String = "/root/aSigilSystem"
+const AFF_PATH            : String = "/root/aAffinitySystem"
 
 # Base stat keys
 const BASE_STATS: Array[String] = ["BRW", "MND", "TPO", "VTL", "FCS"]
+
+# Party member tokens for affinity display
+const PARTY_MEMBERS: Array[String] = ["hero", "tessa", "kai", "skye", "rise", "matcha", "douglas", "sev"]
 
 @onready var _party_list: ItemList = %PartyList
 @onready var _member_name: Label = %MemberName
 @onready var _base_grid: GridContainer = %BaseStatsGrid
 @onready var _battle_grid: GridContainer = %BattleStatsGrid
+@onready var _affinity_grid: GridContainer = %AffinityGrid
 @onready var _radar_container: VBoxContainer = %RadarContainer
 
 var _stats: Node = null
@@ -24,6 +30,8 @@ var _gs: Node = null
 var _eq: Node = null
 var _inv: Node = null
 var _cps: Node = null
+var _sig: Node = null
+var _aff: Node = null
 
 # Radar chart for stat visualization
 var _radar_chart: Control = null
@@ -41,6 +49,8 @@ func _ready() -> void:
 	_eq = get_node_or_null(EQ_PATH)
 	_inv = get_node_or_null(INV_PATH)
 	_cps = get_node_or_null(CPS_PATH)
+	_sig = get_node_or_null(SIG_PATH)
+	_aff = get_node_or_null(AFF_PATH)
 
 	# Connect signals
 	if _stats:
@@ -196,12 +206,22 @@ func _on_party_member_selected(index: int) -> void:
 	# Rebuild all stat grids
 	_rebuild_base_stats(token)
 	_rebuild_battle_stats(token)
+	_rebuild_affinity_grid(token)
 	_update_radar_chart(token)
 
 func _rebuild_base_stats(token: String) -> void:
-	"""Build the base stats grid (BRW, MND, TPO, VTL, FCS, Level, XP)"""
+	"""Build the base stats grid (Name, Mind Type, Level, XP)"""
 	_clear_grid(_base_grid)
 
+	# Get display name
+	var display_name: String = _get_display_name(token)
+	_add_stat_pair(_base_grid, "Name", display_name)
+
+	# Get mind type
+	var mind_type: String = _get_member_mind_type(token)
+	_add_stat_pair(_base_grid, "Mind Type", mind_type)
+
+	# Get level and XP
 	var level = 1
 	var xp = 0
 	var to_next = 0
@@ -217,14 +237,11 @@ func _rebuild_base_stats(token: String) -> void:
 	_add_stat_pair(_base_grid, "Level", str(level))
 
 	if to_next > 0:
-		_add_stat_pair(_base_grid, "XP", "%d / %d" % [xp, to_next])
+		_add_stat_pair(_base_grid, "LXP", "%d / %d" % [xp, to_next])
 	else:
-		_add_stat_pair(_base_grid, "XP", str(xp))
+		_add_stat_pair(_base_grid, "LXP", str(xp))
 
-	# Base stats
-	for stat_key in BASE_STATS:
-		var value = _get_stat_value(token, stat_key)
-		_add_stat_pair(_base_grid, stat_key, str(value))
+	# Base stats are not displayed in the grid, only in the radar chart
 
 func _rebuild_battle_stats(token: String) -> void:
 	"""Build battle stats grid from CombatProfileSystem"""
@@ -265,6 +282,98 @@ func _rebuild_battle_stats(token: String) -> void:
 	_add_battle_stat(_battle_grid, "Ailment Resistance", defense.get("ail_resist_pct", 0))
 	_add_battle_stat(_battle_grid, "Critical Rate", weapon.get("crit_bonus_pct", 0))
 
+func _rebuild_affinity_grid(token: String) -> void:
+	"""Build affinity grid showing relationships with all party members"""
+	_clear_grid(_affinity_grid)
+
+	# Get list of recruited party members
+	var recruited_members: Array[String] = _gather_party_tokens()
+
+	# Only show affinity for recruited members (excluding current member)
+	for member_token in recruited_members:
+		# Skip if this is the current member
+		if member_token.to_lower() == token.to_lower():
+			continue
+
+		# Get affinity value
+		var affinity: int = _get_affinity(token, member_token)
+		var tier_text: String = _get_affinity_tier_text(affinity)
+		var member_name: String = _get_display_name(member_token)
+
+		var cell = _create_affinity_cell(member_name, tier_text)
+		_affinity_grid.add_child(cell)
+
+func _get_affinity(member1: String, member2: String) -> int:
+	"""Get affinity value between two members"""
+	if not _aff:
+		return 0
+
+	if _aff.has_method("get_affinity"):
+		var v = _aff.call("get_affinity", member1, member2)
+		if typeof(v) == TYPE_INT:
+			return int(v)
+
+	return 0
+
+func _get_affinity_tier_text(affinity: int) -> String:
+	"""Convert affinity value to tier text"""
+	if affinity >= 120:
+		return "AT3"
+	elif affinity >= 60:
+		return "AT2"
+	elif affinity >= 20:
+		return "AT1"
+	else:
+		return "AT0"
+
+func _create_affinity_cell(member_name: String, tier: String) -> PanelContainer:
+	"""Create a rounded grey cell for affinity display (same style as battle stats)"""
+	var panel := PanelContainer.new()
+	panel.custom_minimum_size = Vector2(0, 30)
+
+	# Create darker grey rounded background
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.15, 0.15, 0.15, 1.0)  # Darker grey
+	style.corner_radius_top_left = 4
+	style.corner_radius_top_right = 4
+	style.corner_radius_bottom_left = 4
+	style.corner_radius_bottom_right = 4
+	panel.add_theme_stylebox_override("panel", style)
+
+	# Add margin for padding inside cell
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 8)
+	margin.add_theme_constant_override("margin_top", 4)
+	margin.add_theme_constant_override("margin_right", 8)
+	margin.add_theme_constant_override("margin_bottom", 4)
+	panel.add_child(margin)
+
+	# HBoxContainer to hold label and value side by side
+	var hbox := HBoxContainer.new()
+	hbox.add_theme_constant_override("separation", 4)
+	margin.add_child(hbox)
+
+	# Member name label - 25 characters wide
+	var label := Label.new()
+	label.text = member_name
+	label.custom_minimum_size = Vector2(150, 0)  # ~25 characters at 12pt
+	label.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	label.add_theme_font_size_override("font_size", 12)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	hbox.add_child(label)
+
+	# Tier value - 5 characters wide, blue color (matches attributes)
+	var value_label := Label.new()
+	value_label.text = tier
+	value_label.custom_minimum_size = Vector2(30, 0)  # ~5 characters at 12pt
+	value_label.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	value_label.add_theme_font_size_override("font_size", 12)
+	value_label.add_theme_color_override("font_color", Color(0.5, 0.7, 1.0))  # Blue
+	value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	hbox.add_child(value_label)
+
+	return panel
+
 func _get_equipment(token: String) -> Dictionary:
 	"""Get equipped items for a member"""
 	if _gs and _gs.has_method("get_member_equip"):
@@ -297,14 +406,28 @@ func _get_stat_value(token: String, stat_key: String) -> int:
 		return int(_gs.call("get_member_stat", token, stat_key))
 	return 1
 
+func _get_member_mind_type(member_token: String) -> String:
+	"""Get the mind type for a party member"""
+	if _sig and _sig.has_method("resolve_member_mind_base"):
+		var v: Variant = _sig.call("resolve_member_mind_base", member_token)
+		if typeof(v) == TYPE_STRING and String(v).strip_edges() != "":
+			return String(v)
+	if _gs and _gs.has_method("get_member_field"):
+		var v2: Variant = _gs.call("get_member_field", member_token, "mind_type")
+		if typeof(v2) == TYPE_STRING and String(v2).strip_edges() != "":
+			return String(v2)
+	return "Omega"
+
 func _add_stat_pair(grid: GridContainer, label: String, value: String) -> void:
 	"""Add a label/value pair to a grid"""
 	var lbl = Label.new()
 	lbl.text = label + ":"
+	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	grid.add_child(lbl)
 
 	var val = Label.new()
 	val.text = value
+	val.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	grid.add_child(val)
 
 func _add_battle_stat(grid: GridContainer, label: String, value: int) -> void:
@@ -405,7 +528,8 @@ class RadarChart extends Control:
 	"""Draws a radar/spider chart for visualizing multiple stat values"""
 
 	var _stat_labels: Array[String] = []
-	var _stat_values: Array[float] = []
+	var _stat_values: Array[float] = []  # Actual values for labels
+	var _stat_values_capped: Array[float] = []  # Capped values for visual display
 	var _max_value: float = 100.0
 
 	# Colors
@@ -417,18 +541,15 @@ class RadarChart extends Control:
 	func set_stats(labels: Array[String], values: Array[float]) -> void:
 		"""Set the stat labels and values to display"""
 		_stat_labels = labels.duplicate()
-		_stat_values = values.duplicate()
+		_stat_values = values.duplicate()  # Keep original values for labels
 
-		# Calculate max value for scaling
-		_max_value = 1.0
-		for val in _stat_values:
-			if val > _max_value:
-				_max_value = val
+		# Create capped version for visual display
+		_stat_values_capped = []
+		for val in values:
+			_stat_values_capped.append(min(val, 10.0))
 
-		# Round max to nice number
-		_max_value = ceil(_max_value / 10.0) * 10.0
-		if _max_value < 10.0:
-			_max_value = 10.0
+		# Set max value to 10 for consistent scaling
+		_max_value = 10.0
 
 		queue_redraw()
 
@@ -473,8 +594,8 @@ class RadarChart extends Control:
 			draw_line(center, point, grid_color, 1.0)
 
 	func _draw_stat_polygon(center: Vector2, radius: float, num_stats: int) -> void:
-		"""Draw the stat value polygon"""
-		if _stat_values.size() != num_stats:
+		"""Draw the stat value polygon (using capped values for visual display)"""
+		if _stat_values_capped.size() != num_stats:
 			return
 
 		var angle_step: float = TAU / float(num_stats)
@@ -482,7 +603,7 @@ class RadarChart extends Control:
 
 		for i in range(num_stats):
 			var angle: float = -PI / 2.0 + angle_step * i
-			var value_ratio: float = clamp(_stat_values[i] / _max_value, 0.0, 1.0)
+			var value_ratio: float = clamp(_stat_values_capped[i] / _max_value, 0.0, 1.0)
 			var point: Vector2 = center + Vector2(cos(angle), sin(angle)) * radius * value_ratio
 			points.append(point)
 

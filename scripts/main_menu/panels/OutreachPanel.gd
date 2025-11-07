@@ -37,14 +37,28 @@ const CATEGORIES: Array[Dictionary] = [
 	{"id": "mutual_aid", "label": "Mutual Aid"}
 ]
 
+# Panel animation settings
+const BASE_LEFT_RATIO := 2.0
+const BASE_CENTER_RATIO := 3.5
+const BASE_RIGHT_RATIO := 4.5
+const ACTIVE_SCALE := 1.10  # Active panel grows by 10%
+const INACTIVE_SCALE := 0.95  # Inactive panels shrink by 5%
+const ANIM_DURATION := 0.2  # Animation duration in seconds
+
 ## ═══════════════════════════════════════════════════════════════════════════
 ## NODE REFERENCES
 ## ═══════════════════════════════════════════════════════════════════════════
+
+# Panel containers (for animation)
+@onready var _left_panel: PanelContainer = get_node("%LeftPanel") if has_node("%LeftPanel") else null
+@onready var _center_panel: PanelContainer = get_node("%CenterPanel") if has_node("%CenterPanel") else null
+@onready var _right_panel: PanelContainer = get_node("%RightPanel") if has_node("%RightPanel") else null
 
 @onready var _category_list: ItemList = %CategoryList
 @onready var _mission_list: ItemList = %MissionList
 @onready var _mission_label: Label = %MissionLabel
 
+@onready var _title_container: Control = %TitleContainer
 @onready var _title_label: Label = %TitleLabel
 @onready var _desc_label: Label = %DescriptionLabel
 @onready var _reward_label: Label = %RewardLabel
@@ -52,7 +66,7 @@ const CATEGORIES: Array[Dictionary] = [
 
 @onready var _primary_btn: Button = %PrimaryBtn
 @onready var _back_btn: Button = %BackBtn
-@onready var _advance_btn: Button = %AdvanceBtn
+# @onready var _advance_btn: Button = %AdvanceBtn  # Removed from scene
 
 ## ═══════════════════════════════════════════════════════════════════════════
 ## STATE MACHINE
@@ -71,6 +85,12 @@ var _selected_mission: Dictionary = {}     # Currently selected mission
 
 ## System references
 var _main_event: Node = null
+
+## Text scrolling animation
+const SCROLL_SPEED := 50.0  # Pixels per second
+const SCROLL_PAUSE := 1.5    # Seconds to pause before looping
+var _scroll_tween: Tween = null
+var _scroll_timer: Timer = null
 
 ## ═══════════════════════════════════════════════════════════════════════════
 ## INITIALIZATION
@@ -108,8 +128,8 @@ func _wire_signals() -> void:
 	if _back_btn and not _back_btn.pressed.is_connected(_on_back_from_details):
 		_back_btn.pressed.connect(_on_back_from_details)
 
-	if _advance_btn and not _advance_btn.pressed.is_connected(_on_advance_event):
-		_advance_btn.pressed.connect(_on_advance_event)
+	# if _advance_btn and not _advance_btn.pressed.is_connected(_on_advance_event):
+	# 	_advance_btn.pressed.connect(_on_advance_event)  # Button removed from scene
 
 	# aMainEventSystem signals
 	if _main_event:
@@ -137,6 +157,10 @@ func _on_panel_gained_focus() -> void:
 	super()  # Call parent
 	print("[OutreachPanel] Panel gained focus - state: %s" % NavState.keys()[_nav_state])
 
+	# Restart title scroll if there's a selected mission
+	if not _selected_mission.is_empty():
+		call_deferred("_start_title_scroll")
+
 	# Restore focus based on current navigation state
 	match _nav_state:
 		NavState.CATEGORY_SELECT:
@@ -150,6 +174,7 @@ func _on_panel_gained_focus() -> void:
 func _on_panel_lost_focus() -> void:
 	super()  # Call parent
 	print("[OutreachPanel] Panel lost focus - state: %s" % NavState.keys()[_nav_state])
+	_stop_title_scroll()  # Stop scrolling when panel loses focus
 
 ## ═══════════════════════════════════════════════════════════════════════════
 ## CATEGORY MANAGEMENT
@@ -324,6 +349,8 @@ func _show_mission_details(mission: Dictionary) -> void:
 
 	# Title
 	_title_label.text = title
+	# Start scrolling animation if title is too long
+	_start_title_scroll()
 
 	# Description
 	if hint != "":
@@ -349,6 +376,7 @@ func _show_mission_details(mission: Dictionary) -> void:
 func _show_empty_details() -> void:
 	"""Show empty state in detail panel"""
 	_title_label.text = "No missions available"
+	_stop_title_scroll()  # Stop scrolling when no mission selected
 	_desc_label.text = ""
 	_desc_label.visible = false
 	_reward_label.visible = false
@@ -372,6 +400,100 @@ func _update_action_buttons(mission: Dictionary) -> void:
 
 	_primary_btn.visible = true
 	_back_btn.visible = true
+
+## ═══════════════════════════════════════════════════════════════════════════
+## TEXT SCROLLING ANIMATION
+## ═══════════════════════════════════════════════════════════════════════════
+
+func _start_title_scroll() -> void:
+	"""Start scrolling animation for title if it's too long"""
+	print("[OutreachPanel] _start_title_scroll called")
+
+	if not _title_container or not _title_label:
+		print("[OutreachPanel] Missing title_container or title_label")
+		return
+
+	# Stop any existing animation
+	_stop_title_scroll()
+
+	# Wait one frame for the label to update its size
+	await get_tree().process_frame
+
+	# Get font to measure text
+	var font: Font = _title_label.get_theme_default_font()
+	if font == null:
+		font = ThemeDB.fallback_font
+
+	var font_size: int = _title_label.get_theme_default_font_size()
+	if font_size <= 0:
+		font_size = ThemeDB.fallback_font_size
+
+	# Measure the actual text width
+	var text_width := font.get_string_size(_title_label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
+	var container_width := _title_container.size.x
+
+	print("[OutreachPanel] Title: '%s'" % _title_label.text)
+	print("[OutreachPanel] Text width: %.1f, Container width: %.1f" % [text_width, container_width])
+
+	# Set the label's width to match the text
+	_title_label.size.x = text_width
+
+	# Only scroll if text is wider than container
+	if text_width <= container_width:
+		# Text fits - reset position and don't scroll
+		print("[OutreachPanel] Text fits, no scrolling needed")
+		_title_label.position.x = 0
+		return
+
+	# Calculate scroll distance
+	var scroll_distance := text_width - container_width
+
+	print("[OutreachPanel] Starting scroll animation, distance: %.1f" % scroll_distance)
+
+	# Start at position 0
+	_title_label.position.x = 0
+
+	# Create animation sequence
+	_animate_title_scroll_loop(scroll_distance, text_width)
+
+func _animate_title_scroll_loop(scroll_distance: float, total_distance: float) -> void:
+	"""Loop the scrolling animation: scroll -> pause -> reset -> pause -> repeat"""
+	if not _title_container or not _title_label:
+		return
+
+	# Calculate duration based on scroll speed
+	var scroll_duration := scroll_distance / SCROLL_SPEED
+
+	# Create tween for scrolling
+	_scroll_tween = create_tween()
+	_scroll_tween.set_loops(0)  # Infinite loop
+
+	# Step 1: Scroll left to reveal full text
+	_scroll_tween.tween_property(_title_label, "position:x", -scroll_distance, scroll_duration)
+
+	# Step 2: Pause at end
+	_scroll_tween.tween_interval(SCROLL_PAUSE)
+
+	# Step 3: Jump back to start position (instant)
+	_scroll_tween.tween_property(_title_label, "position:x", 0, 0)
+
+	# Step 4: Pause at start before repeating
+	_scroll_tween.tween_interval(SCROLL_PAUSE)
+
+func _stop_title_scroll() -> void:
+	"""Stop any active scrolling animation"""
+	if _scroll_tween and _scroll_tween.is_valid():
+		_scroll_tween.kill()
+		_scroll_tween = null
+
+	if _scroll_timer and is_instance_valid(_scroll_timer):
+		_scroll_timer.stop()
+		_scroll_timer.queue_free()
+		_scroll_timer = null
+
+	# Reset title position
+	if _title_label:
+		_title_label.position.x = 0
 
 ## ═══════════════════════════════════════════════════════════════════════════
 ## ACTIONS
@@ -520,6 +642,7 @@ func _enter_category_select_state() -> void:
 		_category_list.grab_focus()
 		if _category_list.get_selected_items().is_empty():
 			_category_list.select(0)
+	_animate_panel_focus(NavState.CATEGORY_SELECT)
 	print("[OutreachPanel] Entered CATEGORY_SELECT state")
 
 func _enter_mission_list_state() -> void:
@@ -529,7 +652,43 @@ func _enter_mission_list_state() -> void:
 		_mission_list.grab_focus()
 		if _mission_list.get_selected_items().is_empty():
 			_mission_list.select(0)
+	_animate_panel_focus(NavState.MISSION_LIST)
 	print("[OutreachPanel] Entered MISSION_LIST state")
+
+func _animate_panel_focus(active_state: NavState) -> void:
+	"""Animate panels to highlight which one is currently active"""
+	if not _left_panel or not _center_panel or not _right_panel:
+		return
+
+	var left_ratio := BASE_LEFT_RATIO
+	var center_ratio := BASE_CENTER_RATIO
+	var right_ratio := BASE_RIGHT_RATIO  # Details panel always stays at base size
+
+	# Determine which panel gets the active scale (only left and center panels animate)
+	match active_state:
+		NavState.CATEGORY_SELECT:
+			left_ratio = BASE_LEFT_RATIO * ACTIVE_SCALE
+			center_ratio = BASE_CENTER_RATIO * INACTIVE_SCALE
+			# right_ratio stays at BASE_RIGHT_RATIO
+		NavState.MISSION_LIST:
+			left_ratio = BASE_LEFT_RATIO * INACTIVE_SCALE
+			center_ratio = BASE_CENTER_RATIO * ACTIVE_SCALE
+			# right_ratio stays at BASE_RIGHT_RATIO
+		NavState.POPUP_ACTIVE:
+			# When popup is active, still only animate left/center
+			left_ratio = BASE_LEFT_RATIO * INACTIVE_SCALE
+			center_ratio = BASE_CENTER_RATIO * INACTIVE_SCALE
+			# right_ratio stays at BASE_RIGHT_RATIO
+
+	# Create tweens for smooth animation
+	var tween := create_tween()
+	tween.set_parallel(true)
+	tween.set_trans(Tween.TRANS_CUBIC)
+	tween.set_ease(Tween.EASE_OUT)
+
+	tween.tween_property(_left_panel, "size_flags_stretch_ratio", left_ratio, ANIM_DURATION)
+	tween.tween_property(_center_panel, "size_flags_stretch_ratio", center_ratio, ANIM_DURATION)
+	tween.tween_property(_right_panel, "size_flags_stretch_ratio", right_ratio, ANIM_DURATION)
 
 ## ═══════════════════════════════════════════════════════════════════════════
 ## INPUT HANDLING - STATE MACHINE

@@ -50,15 +50,13 @@ class_name DormsPanel
 # NODE REFERENCES
 # ═══════════════════════════════════════════════════════════════════════════
 
-@onready var _refresh_btn: Button = $Root/Header/RefreshBtn
-
 # Panel containers (for animation)
 @onready var _left_panel: PanelContainer = %LeftPanel
 @onready var _center_panel: PanelContainer = %CenterPanel
 @onready var _right_panel: PanelContainer = %RightPanel
 
 # Left Panel - Roster
-@onready var _roster_list: VBoxContainer = %RosterList
+@onready var _roster_list: ItemList = %RosterList
 
 # Right Panel - Details (bottom section)
 @onready var _detail_content: RichTextLabel = %DetailContent
@@ -136,11 +134,6 @@ func _ready() -> void:
 	print("  _assign_room_btn: ", _assign_room_btn != null)
 	print("  _move_out_btn: ", _move_out_btn != null)
 	print("  _cancel_move_btn: ", _cancel_move_btn != null)
-
-	# Connect refresh button
-	if _refresh_btn and not _refresh_btn.pressed.is_connected(_rebuild):
-		_refresh_btn.pressed.connect(_rebuild)
-		print("[DormsPanel._ready] Connected refresh button")
 
 	# Connect action buttons
 	if _assign_room_btn and not _assign_room_btn.pressed.is_connected(_on_assign_room_pressed):
@@ -255,7 +248,7 @@ func _get_nav_state_name(state: NavState) -> String:
 func _navigate_up() -> void:
 	match _nav_state:
 		NavState.ROSTER_SELECT:
-			if _current_roster_index > 0:
+			if _roster_list and _current_roster_index > 0:
 				_current_roster_index -= 1
 				_focus_current_roster()
 		NavState.ROOM_SELECT:
@@ -277,7 +270,7 @@ func _navigate_up() -> void:
 func _navigate_down() -> void:
 	match _nav_state:
 		NavState.ROSTER_SELECT:
-			if _current_roster_index < _roster_buttons.size() - 1:
+			if _roster_list and _current_roster_index < _roster_list.item_count - 1:
 				_current_roster_index += 1
 				_focus_current_roster()
 		NavState.ROOM_SELECT:
@@ -350,8 +343,9 @@ func _navigate_right() -> void:
 func _on_accept_input() -> void:
 	match _nav_state:
 		NavState.ROSTER_SELECT:
-			if _current_roster_index >= 0 and _current_roster_index < _roster_buttons.size():
-				_roster_buttons[_current_roster_index].emit_signal("pressed")
+			if _roster_list and _current_roster_index >= 0 and _current_roster_index < _roster_list.item_count:
+				# Trigger selection handler
+				_on_roster_item_selected(_current_roster_index)
 		NavState.ROOM_SELECT:
 			if _current_room_index >= 0 and _current_room_index < _room_buttons.size():
 				_room_buttons[_current_room_index].emit_signal("pressed")
@@ -421,8 +415,10 @@ func _on_back_input() -> void:
 			# Do NOT call get_viewport().set_input_as_handled() - let event bubble up
 
 func _focus_current_roster() -> void:
-	if _current_roster_index >= 0 and _current_roster_index < _roster_buttons.size():
-		_roster_buttons[_current_roster_index].grab_focus()
+	if _roster_list and _current_roster_index >= 0 and _current_roster_index < _roster_list.item_count:
+		_roster_list.select(_current_roster_index)
+		_roster_list.ensure_current_is_visible()
+		_roster_list.grab_focus()
 		# Update details panel to show the focused member
 		if _current_roster_index < _all_members.size():
 			var focused_member: String = _all_members[_current_roster_index]
@@ -479,8 +475,7 @@ func _rebuild() -> void:
 func _build_roster_list() -> void:
 	print("[DormsPanel._build_roster_list] Building roster list")
 	# Clear existing roster
-	for c in _roster_list.get_children():
-		c.queue_free()
+	_roster_list.clear()
 	_roster_buttons.clear()
 
 	var ds: Node = _ds()
@@ -493,34 +488,30 @@ func _build_roster_list() -> void:
 	print("[DormsPanel._build_roster_list] Found %d members" % _all_members.size())
 
 	if _all_members.size() == 0:
-		var empty := Label.new()
-		empty.text = "— no members —"
-		_roster_list.add_child(empty)
 		return
 
-	# Create button for each member
+	# Create ItemList entry for each member
+	var selected_index: int = -1
 	for i in range(_all_members.size()):
 		var aid: String = _all_members[i]
-		var btn := Button.new()
-		btn.text = String(ds.call("display_name", aid))
-		btn.toggle_mode = true
-		btn.focus_mode = Control.FOCUS_ALL
-		btn.button_pressed = (_selected_member == aid)
-		btn.pressed.connect(func(id := aid) -> void:
-			_on_roster_member_selected(id)
-		)
-		# Add hover functionality to update details on mouse enter
-		btn.mouse_entered.connect(func(id := aid) -> void:
-			_on_roster_member_hovered(id)
-		)
-		# Restore selected member details on mouse exit
-		btn.mouse_exited.connect(func() -> void:
-			_on_roster_member_unhovered()
-		)
-		_roster_list.add_child(btn)
-		_roster_buttons.append(btn)
+		var member_name: String = String(ds.call("display_name", aid))
+		_roster_list.add_item(member_name)
+		_roster_list.set_item_metadata(i, aid)
 
-	print("[DormsPanel._build_roster_list] Created %d roster buttons" % _roster_buttons.size())
+		# Track selected index
+		if _selected_member == aid:
+			selected_index = i
+
+	# Restore selection if we found the selected member
+	if selected_index >= 0:
+		_roster_list.select(selected_index)
+		_current_roster_index = selected_index
+
+	# Connect ItemList selection signal if not already connected
+	if not _roster_list.item_selected.is_connected(_on_roster_item_selected):
+		_roster_list.item_selected.connect(_on_roster_item_selected)
+
+	print("[DormsPanel._build_roster_list] Created %d roster items" % _roster_list.item_count)
 
 func _build_rooms_grid() -> void:
 	# Clear existing rooms
@@ -602,27 +593,13 @@ func _build_common_list() -> void:
 		_common_list.add_child(empty)
 		return
 
-	# Create label for each common room member
+	# Create greyed-out label for each common room member (not clickable)
 	for i in range(_common_members.size()):
 		var aid: String = _common_members[i]
-		var btn := Button.new()
-		btn.text = String(ds.call("display_name", aid))
-		btn.toggle_mode = true
-		btn.focus_mode = Control.FOCUS_ALL
-		btn.button_pressed = (_selected_member == aid)
-		btn.pressed.connect(func(id := aid) -> void:
-			_on_common_member_selected(id)
-		)
-		# Add hover functionality to update details on mouse enter
-		btn.mouse_entered.connect(func(id := aid) -> void:
-			_on_roster_member_hovered(id)
-		)
-		# Restore selected member details on mouse exit
-		btn.mouse_exited.connect(func() -> void:
-			_on_roster_member_unhovered()
-		)
-		_common_list.add_child(btn)
-		_common_buttons.append(btn)
+		var lbl := Label.new()
+		lbl.text = String(ds.call("display_name", aid))
+		lbl.add_theme_color_override("font_color", Color(0.5, 0.5, 0.5))  # Grey color
+		_common_list.add_child(lbl)
 
 func _update_details() -> void:
 	"""Update details panel for the currently selected member"""
@@ -722,6 +699,25 @@ func _update_action_buttons() -> void:
 # ═══════════════════════════════════════════════════════════════════════════
 # SELECTION HANDLERS
 # ═══════════════════════════════════════════════════════════════════════════
+
+func _on_roster_item_selected(index: int) -> void:
+	"""Handle ItemList item selection"""
+	if not _roster_list or index < 0 or index >= _roster_list.item_count:
+		return
+
+	var aid: String = String(_roster_list.get_item_metadata(index))
+	print("[DormsPanel._on_roster_item_selected] Selected member: ", aid)
+	_selected_member = aid
+	_current_roster_index = index
+	_update_details()
+	_update_action_buttons()
+	_update_room_colors()
+
+	# Auto-navigate to Action Menu (locked navigation flow)
+	_push_nav_state(NavState.ACTION_SELECT)
+	_current_action_index = 0
+	_focus_current_action()
+	print("[DormsPanel._on_roster_item_selected] Auto-navigated to ACTION_SELECT")
 
 func _on_roster_member_selected(aid: String) -> void:
 	print("[DormsPanel._on_roster_member_selected] Selected member: ", aid)

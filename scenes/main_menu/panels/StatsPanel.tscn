@@ -28,7 +28,6 @@ theme_override_constants/separation = 16
 [node name="PartyPanel" type="PanelContainer" parent="Root"]
 custom_minimum_size = Vector2(200, 0)
 layout_mode = 2
-size_flags_horizontal = 3
 
 [node name="PartyColumn" type="VBoxContainer" parent="Root/PartyPanel"]
 layout_mode = 2
@@ -38,8 +37,8 @@ theme_override_constants/separation = 8
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
 theme_override_font_sizes/font_size = 16
-text = "Party"
-horizontal_alignment = 1
+text = "PARTY"
+horizontal_alignment = 0
 
 [node name="Separator" type="HSeparator" parent="Root/PartyPanel/PartyColumn"]
 layout_mode = 2
@@ -49,91 +48,132 @@ unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 3
 
+[node name="SeparatorAfterPartyList" type="HSeparator" parent="Root/PartyPanel/PartyColumn"]
+layout_mode = 2
+
 [node name="StatsPanel" type="PanelContainer" parent="Root"]
 layout_mode = 2
 size_flags_horizontal = 3
+size_flags_stretch_ratio = 0.7
 
-[node name="StatsColumn" type="VBoxContainer" parent="Root/StatsPanel"]
+[node name="Margin" type="MarginContainer" parent="Root/StatsPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 10
+
+[node name="StatsColumn" type="VBoxContainer" parent="Root/StatsPanel/Margin"]
 layout_mode = 2
 theme_override_constants/separation = 12
 
-[node name="MemberLabel" type="Label" parent="Root/StatsPanel/StatsColumn"]
-layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
-theme_override_font_sizes/font_size = 16
-text = "Member Stats"
-horizontal_alignment = 1
-
-[node name="Separator1" type="HSeparator" parent="Root/StatsPanel/StatsColumn"]
-layout_mode = 2
-
-[node name="MemberName" type="Label" parent="Root/StatsPanel/StatsColumn"]
+[node name="MemberName" type="Label" parent="Root/StatsPanel/Margin/StatsColumn"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 28)
 layout_mode = 2
 text = "(Select a member)"
 horizontal_alignment = 1
+visible = false
 
-[node name="Separator2" type="HSeparator" parent="Root/StatsPanel/StatsColumn"]
+[node name="Separator1" type="HSeparator" parent="Root/StatsPanel/Margin/StatsColumn"]
 layout_mode = 2
+visible = false
 
-[node name="BaseStatsLabel" type="Label" parent="Root/StatsPanel/StatsColumn"]
+[node name="BaseStatsLabel" type="Label" parent="Root/StatsPanel/Margin/StatsColumn"]
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
 theme_override_font_sizes/font_size = 16
-text = "Base Stats"
+text = "DETAILS"
+horizontal_alignment = 0
 
-[node name="Separator3" type="HSeparator" parent="Root/StatsPanel/StatsColumn"]
+[node name="Separator2" type="HSeparator" parent="Root/StatsPanel/Margin/StatsColumn"]
 layout_mode = 2
 
-[node name="BaseStatsGrid" type="GridContainer" parent="Root/StatsPanel/StatsColumn"]
+[node name="BaseStatsGrid" type="GridContainer" parent="Root/StatsPanel/Margin/StatsColumn"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_constants/h_separation = 16
 theme_override_constants/v_separation = 8
 columns = 2
 
-[node name="VisualPanel" type="PanelContainer" parent="Root"]
-custom_minimum_size = Vector2(300, 0)
+[node name="Separator3" type="HSeparator" parent="Root/StatsPanel/Margin/StatsColumn"]
 layout_mode = 2
 
-[node name="VisualColumn" type="VBoxContainer" parent="Root/VisualPanel"]
-layout_mode = 2
-theme_override_constants/separation = 12
-
-[node name="BattleStatsLabel" type="Label" parent="Root/VisualPanel/VisualColumn"]
+[node name="RadarLabel" type="Label" parent="Root/StatsPanel/Margin/StatsColumn"]
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
 theme_override_font_sizes/font_size = 16
-text = "Battle Stats"
-horizontal_alignment = 1
+text = "STAT DISTRIBUTION"
+horizontal_alignment = 0
 
-[node name="Separator1" type="HSeparator" parent="Root/VisualPanel/VisualColumn"]
+[node name="Separator4" type="HSeparator" parent="Root/StatsPanel/Margin/StatsColumn"]
 layout_mode = 2
 
-[node name="BattleStatsGrid" type="GridContainer" parent="Root/VisualPanel/VisualColumn"]
+[node name="RadarContainer" type="VBoxContainer" parent="Root/StatsPanel/Margin/StatsColumn"]
 unique_name_in_owner = true
-layout_mode = 2
-theme_override_constants/h_separation = 16
-theme_override_constants/v_separation = 8
-columns = 2
-
-[node name="Separator2" type="HSeparator" parent="Root/VisualPanel/VisualColumn"]
-layout_mode = 2
-
-[node name="RadarLabel" type="Label" parent="Root/VisualPanel/VisualColumn"]
-layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
-theme_override_font_sizes/font_size = 16
-text = "Stat Distribution"
-horizontal_alignment = 1
-
-[node name="Separator3" type="HSeparator" parent="Root/VisualPanel/VisualColumn"]
-layout_mode = 2
-
-[node name="RadarContainer" type="VBoxContainer" parent="Root/VisualPanel/VisualColumn"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(300, 300)
+custom_minimum_size = Vector2(168, 168)
 layout_mode = 2
 size_flags_horizontal = 4
 size_flags_vertical = 4
+
+[node name="Separator5" type="HSeparator" parent="Root/StatsPanel/Margin/StatsColumn"]
+layout_mode = 2
+
+[node name="VisualPanel" type="PanelContainer" parent="Root"]
+custom_minimum_size = Vector2(240, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 1.3
+
+[node name="Margin" type="MarginContainer" parent="Root/VisualPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 10
+
+[node name="VisualColumn" type="VBoxContainer" parent="Root/VisualPanel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="BattleStatsLabel" type="Label" parent="Root/VisualPanel/Margin/VisualColumn"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
+theme_override_font_sizes/font_size = 16
+text = "ATTRIBUTES"
+horizontal_alignment = 0
+
+[node name="Separator1" type="HSeparator" parent="Root/VisualPanel/Margin/VisualColumn"]
+layout_mode = 2
+
+[node name="BattleStatsGrid" type="GridContainer" parent="Root/VisualPanel/Margin/VisualColumn"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_constants/h_separation = 16
+theme_override_constants/v_separation = 8
+columns = 2
+
+[node name="Separator2" type="HSeparator" parent="Root/VisualPanel/Margin/VisualColumn"]
+layout_mode = 2
+
+[node name="AffinityLabel" type="Label" parent="Root/VisualPanel/Margin/VisualColumn"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
+theme_override_font_sizes/font_size = 16
+text = "AFFINITY"
+horizontal_alignment = 0
+
+[node name="Separator3" type="HSeparator" parent="Root/VisualPanel/Margin/VisualColumn"]
+layout_mode = 2
+
+[node name="AffinityGrid" type="GridContainer" parent="Root/VisualPanel/Margin/VisualColumn"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_constants/h_separation = 16
+theme_override_constants/v_separation = 8
+columns = 2
+
+[node name="Separator4" type="HSeparator" parent="Root/VisualPanel/Margin/VisualColumn"]
+layout_mode = 2

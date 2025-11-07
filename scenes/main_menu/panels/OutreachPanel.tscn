@@ -11,17 +11,6 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1")
 
-[node name="Backdrop" type="ColorRect" parent="."]
-unique_name_in_owner = true
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
-color = Color(0, 0, 0, 0.98)
-
 [node name="Root" type="VBoxContainer" parent="."]
 unique_name_in_owner = true
 layout_mode = 1
@@ -32,30 +21,20 @@ grow_horizontal = 2
 grow_vertical = 2
 theme_override_constants/separation = 10
 
-[node name="Header" type="HBoxContainer" parent="Root"]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="Title" type="Label" parent="Root/Header"]
-layout_mode = 2
-text = "OUTREACH"
-
-[node name="Spacer" type="Control" parent="Root/Header"]
-layout_mode = 2
-size_flags_horizontal = 3
-
-[node name="AdvanceBtn" type="Button" parent="Root/Header"]
-unique_name_in_owner = true
-layout_mode = 2
-tooltip_text = "Advance current mission (debug)"
-text = "Advance"
-
 [node name="MainContent" type="HBoxContainer" parent="Root"]
 unique_name_in_owner = true
-layout_mode = 2
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 8.0
+offset_top = 8.0
+offset_right = -8.0
+offset_bottom = -8.0
+grow_horizontal = 2
+grow_vertical = 2
 size_flags_vertical = 3
-theme_override_constants/separation = 12
+theme_override_constants/separation = 16
 
 [node name="LeftPanel" type="PanelContainer" parent="Root/MainContent"]
 unique_name_in_owner = true
@@ -63,15 +42,28 @@ layout_mode = 2
 size_flags_horizontal = 3
 size_flags_stretch_ratio = 2.0
 
-[node name="VBox" type="VBoxContainer" parent="Root/MainContent/LeftPanel"]
+[node name="Margin" type="MarginContainer" parent="Root/MainContent/LeftPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 10
+
+[node name="VBox" type="VBoxContainer" parent="Root/MainContent/LeftPanel/Margin"]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="CategoryLabel" type="Label" parent="Root/MainContent/LeftPanel/VBox"]
+[node name="CategoryLabel" type="Label" parent="Root/MainContent/LeftPanel/Margin/VBox"]
 layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
+theme_override_font_sizes/font_size = 16
 text = "CATEGORIES"
+horizontal_alignment = 0
 
-[node name="CategoryList" type="ItemList" parent="Root/MainContent/LeftPanel/VBox"]
+[node name="Separator" type="HSeparator" parent="Root/MainContent/LeftPanel/Margin/VBox"]
+layout_mode = 2
+
+[node name="CategoryList" type="ItemList" parent="Root/MainContent/LeftPanel/Margin/VBox"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 3
@@ -82,16 +74,29 @@ layout_mode = 2
 size_flags_horizontal = 3
 size_flags_stretch_ratio = 3.5
 
-[node name="VBox" type="VBoxContainer" parent="Root/MainContent/CenterPanel"]
+[node name="Margin" type="MarginContainer" parent="Root/MainContent/CenterPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 10
+
+[node name="VBox" type="VBoxContainer" parent="Root/MainContent/CenterPanel/Margin"]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="MissionLabel" type="Label" parent="Root/MainContent/CenterPanel/VBox"]
+[node name="MissionLabel" type="Label" parent="Root/MainContent/CenterPanel/Margin/VBox"]
 unique_name_in_owner = true
 layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
+theme_override_font_sizes/font_size = 16
 text = "MISSIONS"
+horizontal_alignment = 0
 
-[node name="MissionList" type="ItemList" parent="Root/MainContent/CenterPanel/VBox"]
+[node name="Separator" type="HSeparator" parent="Root/MainContent/CenterPanel/Margin/VBox"]
+layout_mode = 2
+
+[node name="MissionList" type="ItemList" parent="Root/MainContent/CenterPanel/Margin/VBox"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 3
@@ -102,69 +107,90 @@ layout_mode = 2
 size_flags_horizontal = 3
 size_flags_stretch_ratio = 4.5
 
-[node name="VBox" type="VBoxContainer" parent="Root/MainContent/RightPanel"]
+[node name="Margin" type="MarginContainer" parent="Root/MainContent/RightPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 10
+
+[node name="VBox" type="VBoxContainer" parent="Root/MainContent/RightPanel/Margin"]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="DetailLabel" type="Label" parent="Root/MainContent/RightPanel/VBox"]
+[node name="DetailLabel" type="Label" parent="Root/MainContent/RightPanel/Margin/VBox"]
 layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
+theme_override_font_sizes/font_size = 16
 text = "DETAILS"
+horizontal_alignment = 0
 
-[node name="DetailScroll" type="ScrollContainer" parent="Root/MainContent/RightPanel/VBox"]
+[node name="Separator" type="HSeparator" parent="Root/MainContent/RightPanel/Margin/VBox"]
+layout_mode = 2
+
+[node name="DetailScroll" type="ScrollContainer" parent="Root/MainContent/RightPanel/Margin/VBox"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 3
 
-[node name="DetailContent" type="VBoxContainer" parent="Root/MainContent/RightPanel/VBox/DetailScroll"]
+[node name="DetailContent" type="VBoxContainer" parent="Root/MainContent/RightPanel/Margin/VBox/DetailScroll"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 theme_override_constants/separation = 8
 
-[node name="TitleLabel" type="Label" parent="Root/MainContent/RightPanel/VBox/DetailScroll/DetailContent"]
+[node name="TitleContainer" type="Control" parent="Root/MainContent/RightPanel/Margin/VBox/DetailScroll/DetailContent"]
 unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 24)
 layout_mode = 2
-autowrap_mode = 3
+clip_contents = true
 
-[node name="Spacer1" type="Control" parent="Root/MainContent/RightPanel/VBox/DetailScroll/DetailContent"]
+[node name="TitleLabel" type="Label" parent="Root/MainContent/RightPanel/Margin/VBox/DetailScroll/DetailContent/TitleContainer"]
+unique_name_in_owner = true
+layout_mode = 0
+offset_top = 0.0
+offset_bottom = 24.0
+vertical_alignment = 1
+
+[node name="Spacer1" type="Control" parent="Root/MainContent/RightPanel/Margin/VBox/DetailScroll/DetailContent"]
 custom_minimum_size = Vector2(0, 8)
 layout_mode = 2
 
-[node name="DescriptionLabel" type="Label" parent="Root/MainContent/RightPanel/VBox/DetailScroll/DetailContent"]
+[node name="DescriptionLabel" type="Label" parent="Root/MainContent/RightPanel/Margin/VBox/DetailScroll/DetailContent"]
 unique_name_in_owner = true
 layout_mode = 2
 autowrap_mode = 3
 
-[node name="Spacer2" type="Control" parent="Root/MainContent/RightPanel/VBox/DetailScroll/DetailContent"]
+[node name="Spacer2" type="Control" parent="Root/MainContent/RightPanel/Margin/VBox/DetailScroll/DetailContent"]
 custom_minimum_size = Vector2(0, 16)
 layout_mode = 2
 
-[node name="RewardLabel" type="Label" parent="Root/MainContent/RightPanel/VBox/DetailScroll/DetailContent"]
+[node name="RewardLabel" type="Label" parent="Root/MainContent/RightPanel/Margin/VBox/DetailScroll/DetailContent"]
 unique_name_in_owner = true
 layout_mode = 2
 autowrap_mode = 3
 
-[node name="StatusLabel" type="Label" parent="Root/MainContent/RightPanel/VBox/DetailScroll/DetailContent"]
+[node name="StatusLabel" type="Label" parent="Root/MainContent/RightPanel/Margin/VBox/DetailScroll/DetailContent"]
 unique_name_in_owner = true
 layout_mode = 2
 autowrap_mode = 3
 
-[node name="Spacer3" type="Control" parent="Root/MainContent/RightPanel/VBox/DetailScroll/DetailContent"]
+[node name="Spacer3" type="Control" parent="Root/MainContent/RightPanel/Margin/VBox/DetailScroll/DetailContent"]
 custom_minimum_size = Vector2(0, 16)
 layout_mode = 2
 
-[node name="ActionButtons" type="HBoxContainer" parent="Root/MainContent/RightPanel/VBox/DetailScroll/DetailContent"]
+[node name="ActionButtons" type="HBoxContainer" parent="Root/MainContent/RightPanel/Margin/VBox/DetailScroll/DetailContent"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="PrimaryBtn" type="Button" parent="Root/MainContent/RightPanel/VBox/DetailScroll/DetailContent/ActionButtons"]
+[node name="PrimaryBtn" type="Button" parent="Root/MainContent/RightPanel/Margin/VBox/DetailScroll/DetailContent/ActionButtons"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Set Current"
 
-[node name="BackBtn" type="Button" parent="Root/MainContent/RightPanel/VBox/DetailScroll/DetailContent/ActionButtons"]
+[node name="BackBtn" type="Button" parent="Root/MainContent/RightPanel/Margin/VBox/DetailScroll/DetailContent/ActionButtons"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Back"

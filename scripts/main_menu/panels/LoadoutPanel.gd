@@ -61,7 +61,7 @@ extends PanelBase
 class_name LoadoutPanel
 
 @onready var _party_list: ItemList       = get_node("Row/Party/VBox/PartyList") as ItemList
-@onready var _member_name: Label         = get_node("Row/Middle/Margin/VBox/MemberName") as Label
+# @onready var _member_name: Label         = get_node("Row/Middle/Margin/VBox/MemberName") as Label  # Removed
 
 @onready var _w_val: Label = get_node("Row/Middle/Margin/VBox/Grid/WHBox/WValue") as Label
 @onready var _a_val: Label = get_node("Row/Middle/Margin/VBox/Grid/AHBox/AValue") as Label
@@ -370,7 +370,7 @@ func _on_party_selected(index: int) -> void:
 	var label: String = "(Unknown)"
 	if index >= 0 and index < _labels.size():
 		label = _labels[index]
-	_member_name.text = label
+	# _member_name.text = label.to_upper()  # Removed
 
 	_refresh_all_for_current()
 	_sigils_sig = _snapshot_sigil_signature(_current_token())
@@ -786,19 +786,13 @@ func _rebuild_sigils(member_token: String) -> void:
 	for s in sockets:
 		if String(s) != "": used += 1
 
+	# Title shows actual capacity from bracelet
 	if _sigils_title:
 		_sigils_title.text = "SIGILS  (%d/%d)" % [used, cap]
 
-	if cap <= 0:
-		var none: Label = Label.new()
-		none.text = "No bracelet slots"
-		none.autowrap_mode = TextServer.AUTOWRAP_WORD
-		_sigils_list.add_child(none)
-		return
-
-	# Build 2x4 grid (2 columns, up to 8 sigils)
-	# GridContainer automatically wraps to next row after 2 items
-	for idx in range(cap):
+	# Always create 8 slots, but hide ones beyond bracelet capacity
+	var total_slots: int = 8
+	for idx in range(total_slots):
 		var nm: Label = Label.new()
 		nm.custom_minimum_size = Vector2(180, 0)  # Match equipment label width
 		nm.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -806,13 +800,28 @@ func _rebuild_sigils(member_token: String) -> void:
 
 		var cur_id: String = (String(sockets[idx]) if idx < sockets.size() else "")
 		nm.text = (_sigil_disp(cur_id) if cur_id != "" else "(empty)")
+
+		# Make equipped sigil names blue
+		if cur_id != "":
+			nm.add_theme_color_override("font_color", Color(0.4, 0.7, 1.0))  # Blue color
+
+		# Hide slots beyond bracelet capacity
+		if idx >= cap:
+			nm.visible = false
+
 		_sigils_list.add_child(nm)
 
-		# Always show "Equip…" button - popup will handle unequip option
+		# Always show "Equip" button - popup will handle unequip option
 		var btn: Button = Button.new()
-		btn.custom_minimum_size = Vector2(90, 0)  # Match equipment button width for grid alignment
-		btn.text = "Equip…"
+		btn.custom_minimum_size = Vector2(90, 18)  # Match equipment button size for grid alignment
+		btn.add_theme_font_size_override("font_size", 11)
+		btn.text = "Equip"
 		btn.pressed.connect(Callable(self, "_on_equip_sigil").bind(member_token, idx))
+
+		# Hide button if slot is beyond capacity
+		if idx >= cap:
+			btn.visible = false
+
 		_sigils_list.add_child(btn)
 
 	if _btn_manage:
@@ -1096,12 +1105,14 @@ func _refresh_mind_row(member_token: String) -> void:
 		var active_type: String = _get_hero_active_type()
 		_mind_value.text = "%s - Active: %s" % [mt, active_type]
 		if _mind_switch_btn:
-			_mind_switch_btn.visible = true
+			_mind_switch_btn.text = "Switch"
+			_mind_switch_btn.disabled = false
 	else:
 		# For other members: just "Data"
 		_mind_value.text = (mt if mt != "" else "—")
 		if _mind_switch_btn:
-			_mind_switch_btn.visible = false
+			_mind_switch_btn.text = "—"
+			_mind_switch_btn.disabled = true
 
 func _fetch_equip_for(member_token: String) -> Dictionary:
 	if _gs and _gs.has_method("get_member_equip"):
@@ -1345,8 +1356,34 @@ func _update_details_for_focused_element() -> void:
 		_details_content.text = "[b]Manage Sigils[/b]\n\nOpen the Sigil Skills menu to configure active skills for each equipped sigil."
 		return
 	elif focused == _mind_switch_btn:
+		var base_type: String = _get_member_mind_type(member_token)
 		var cur_type: String = _get_hero_active_type()
-		_details_content.text = "[b]Switch Active Type[/b]\n\nCurrent: [color=#FFC0CB]%s[/color]\n\nChange your active mind type to match different sigil schools and unlock their full potential." % cur_type
+
+		# Get weakness and resistance
+		var weakness: String = _get_type_weakness(cur_type)
+		var resistance: String = _get_type_resistance(cur_type)
+
+		var details: String = "[b]Switch Active Type[/b]\n\n"
+
+		if member_token == "hero":
+			details += "[b]Omega Typing[/b]\n"
+			details += "Base Type: [color=#FFC0CB]%s[/color]\n\n" % base_type
+
+		details += "[b]Current Active Type:[/b] [color=#FFC0CB]%s[/color]\n" % cur_type
+
+		if weakness != "":
+			details += "Weak to: [color=#FF6666]%s[/color]\n" % weakness
+		else:
+			details += "Weak to: None\n"
+
+		if resistance != "":
+			details += "Resists: [color=#66FF66]%s[/color]\n" % resistance
+		else:
+			details += "Resists: None\n"
+
+		details += "\nSwitch your active type to match sigil schools and optimize type effectiveness."
+
+		_details_content.text = details
 		return
 	else:
 		# Check if it's a sigil button
@@ -1357,7 +1394,7 @@ func _update_details_for_focused_element() -> void:
 					continue
 				if child is Button:
 					if child == focused:
-						sigil_index = idx_counter / 2  # Each sigil has Label + Button, so divide by 2
+						sigil_index = idx_counter  # Button index directly corresponds to sigil slot
 						break
 					idx_counter += 1
 
@@ -1522,6 +1559,32 @@ func _show_sigil_details(member_token: String, socket_index: int) -> void:
 	_details_content.text = details
 
 # ────────────────── Active Type (hero) ──────────────────
+func _get_type_weakness(mind_type: String) -> String:
+	"""Get what type the given type is weak to"""
+	var type_lower: String = mind_type.to_lower()
+	match type_lower:
+		"fire": return "Water"
+		"water": return "Earth"
+		"earth": return "Air"
+		"air": return "Fire"
+		"data": return "Void"
+		"void": return "Data"
+		"omega": return ""
+		_: return ""
+
+func _get_type_resistance(mind_type: String) -> String:
+	"""Get what type the given type resists"""
+	var type_lower: String = mind_type.to_lower()
+	match type_lower:
+		"fire": return "Air"
+		"water": return "Fire"
+		"earth": return "Water"
+		"air": return "Earth"
+		"data": return "Void"
+		"void": return "Data"
+		"omega": return ""
+		_: return ""
+
 func _get_hero_active_type() -> String:
 	if _gs:
 		if _gs.has_meta("hero_active_type"):
@@ -2295,13 +2358,16 @@ func _rebuild_equipment_navigation() -> void:
 			# Skip nodes queued for deletion (from queue_free())
 			if not is_instance_valid(child) or child.is_queued_for_deletion():
 				continue
+			# Skip invisible elements (locked sigil slots)
+			if not child.visible:
+				continue
 			# In 2x4 grid, buttons are direct children (labels are skipped)
 			if child is Button:
 				_nav_elements.append(child)  # Sigil slot equip buttons
 
 	# Special buttons (always at the end of navigation cycle)
 	if _btn_manage: _nav_elements.append(_btn_manage)  # Manage Sigil button
-	if _mind_switch_btn and _mind_switch_btn.visible: _nav_elements.append(_mind_switch_btn)  # Switch button (player only)
+	if _mind_switch_btn and not _mind_switch_btn.disabled: _nav_elements.append(_mind_switch_btn)  # Switch button (player only)
 
 	print("[LoadoutPanel] Built navigation: %d elements" % _nav_elements.size())
 

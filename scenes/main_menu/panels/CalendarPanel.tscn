@@ -18,6 +18,10 @@ layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
+offset_left = 8.0
+offset_top = 8.0
+offset_right = -8.0
+offset_bottom = -8.0
 grow_horizontal = 2
 grow_vertical = 2
 theme_override_constants/separation = 16
@@ -27,31 +31,39 @@ layout_mode = 2
 size_flags_horizontal = 3
 size_flags_stretch_ratio = 2.0
 
-[node name="LeftContent" type="VBoxContainer" parent="Root/LeftPanel"]
+[node name="Margin" type="MarginContainer" parent="Root/LeftPanel"]
 layout_mode = 2
-theme_override_constants/separation = 12
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 10
 
-[node name="Title" type="Label" parent="Root/LeftPanel/LeftContent"]
+[node name="LeftContent" type="VBoxContainer" parent="Root/LeftPanel/Margin"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 20
+theme_override_constants/separation = 8
+
+[node name="Title" type="Label" parent="Root/LeftPanel/Margin/LeftContent"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
+theme_override_font_sizes/font_size = 16
 text = "IMPORTANT DATES"
-horizontal_alignment = 1
+horizontal_alignment = 0
 
-[node name="Separator" type="HSeparator" parent="Root/LeftPanel/LeftContent"]
+[node name="Separator" type="HSeparator" parent="Root/LeftPanel/Margin/LeftContent"]
 layout_mode = 2
 
-[node name="EventsScroll" type="ScrollContainer" parent="Root/LeftPanel/LeftContent"]
+[node name="EventsScroll" type="ScrollContainer" parent="Root/LeftPanel/Margin/LeftContent"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 3
 
-[node name="EventsList" type="VBoxContainer" parent="Root/LeftPanel/LeftContent/EventsScroll"]
+[node name="EventsList" type="VBoxContainer" parent="Root/LeftPanel/Margin/LeftContent/EventsScroll"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_constants/separation = 8
 
-[node name="Placeholder" type="Label" parent="Root/LeftPanel/LeftContent/EventsScroll/EventsList"]
+[node name="Placeholder" type="Label" parent="Root/LeftPanel/Margin/LeftContent/EventsScroll/EventsList"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.6, 0.6, 0.6, 1)
 text = "No upcoming events"
@@ -62,44 +74,52 @@ layout_mode = 2
 size_flags_horizontal = 3
 size_flags_stretch_ratio = 5.0
 
-[node name="RightContent" type="VBoxContainer" parent="Root/RightPanel"]
+[node name="Margin" type="MarginContainer" parent="Root/RightPanel"]
 layout_mode = 2
-theme_override_constants/separation = 12
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 10
 
-[node name="Header" type="HBoxContainer" parent="Root/RightPanel/RightContent"]
+[node name="RightContent" type="VBoxContainer" parent="Root/RightPanel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Header" type="HBoxContainer" parent="Root/RightPanel/Margin/RightContent"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="MonthLabel" type="Label" parent="Root/RightPanel/RightContent/Header"]
+[node name="MonthLabel" type="Label" parent="Root/RightPanel/Margin/RightContent/Header"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 28
-text = "MONTH YYYY"
+theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
+theme_override_font_sizes/font_size = 16
+text = "MONTH"
 
-[node name="Spacer" type="Control" parent="Root/RightPanel/RightContent/Header"]
+[node name="Spacer" type="Control" parent="Root/RightPanel/Margin/RightContent/Header"]
 layout_mode = 2
 size_flags_horizontal = 3
 
-[node name="PrevBtn" type="Button" parent="Root/RightPanel/RightContent/Header"]
+[node name="PrevBtn" type="Button" parent="Root/RightPanel/Margin/RightContent/Header"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "◀"
 
-[node name="TodayBtn" type="Button" parent="Root/RightPanel/RightContent/Header"]
+[node name="TodayBtn" type="Button" parent="Root/RightPanel/Margin/RightContent/Header"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Today"
 
-[node name="NextBtn" type="Button" parent="Root/RightPanel/RightContent/Header"]
+[node name="NextBtn" type="Button" parent="Root/RightPanel/Margin/RightContent/Header"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "▶"
 
-[node name="Separator" type="HSeparator" parent="Root/RightPanel/RightContent"]
+[node name="Separator" type="HSeparator" parent="Root/RightPanel/Margin/RightContent"]
 layout_mode = 2
 
-[node name="Grid" type="GridContainer" parent="Root/RightPanel/RightContent"]
+[node name="Grid" type="GridContainer" parent="Root/RightPanel/Margin/RightContent"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
