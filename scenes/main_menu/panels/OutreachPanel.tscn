@@ -1,6 +1,15 @@
-[gd_scene load_steps=2 format=3 uid="uid://dlvd2asxesoya"]
+[gd_scene load_steps=5 format=3 uid="uid://dlvd2asxesoya"]
 
 [ext_resource type="Script" uid="uid://cmxjo88rpvxwa" path="res://scripts/main_menu/panels/OutreachPanel.gd" id="1"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_1"]
+bg_color = Color(0.15, 0.15, 0.15, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_2"]
+bg_color = Color(0.15, 0.15, 0.15, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_3"]
+bg_color = Color(0.15, 0.15, 0.15, 1)
 
 [node name="OutreachPanel" type="Control"]
 layout_mode = 3
@@ -52,6 +61,7 @@ unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_stretch_ratio = 2.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_1")
 
 [node name="Margin" type="MarginContainer" parent="Root/MainContent/LeftPanel"]
 layout_mode = 2
@@ -84,6 +94,7 @@ unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_stretch_ratio = 3.5
+theme_override_styles/panel = SubResource("StyleBoxFlat_2")
 
 [node name="Margin" type="MarginContainer" parent="Root/MainContent/CenterPanel"]
 layout_mode = 2
@@ -117,6 +128,7 @@ unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_stretch_ratio = 4.5
+theme_override_styles/panel = SubResource("StyleBoxFlat_3")
 
 [node name="Margin" type="MarginContainer" parent="Root/MainContent/RightPanel"]
 layout_mode = 2
