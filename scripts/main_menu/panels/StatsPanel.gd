@@ -10,14 +10,19 @@ const EQ_PATH             : String = "/root/aEquipmentSystem"
 const INV_PATH            : String = "/root/aInventorySystem"
 const CPS_PATH            : String = "/root/aCombatProfileSystem"
 const SIG_PATH            : String = "/root/aSigilSystem"
+const AFF_PATH            : String = "/root/aAffinitySystem"
 
 # Base stat keys
 const BASE_STATS: Array[String] = ["BRW", "MND", "TPO", "VTL", "FCS"]
+
+# Party member tokens for affinity display
+const PARTY_MEMBERS: Array[String] = ["hero", "tessa", "kai", "skye", "rise", "matcha", "douglas", "sev"]
 
 @onready var _party_list: ItemList = %PartyList
 @onready var _member_name: Label = %MemberName
 @onready var _base_grid: GridContainer = %BaseStatsGrid
 @onready var _battle_grid: GridContainer = %BattleStatsGrid
+@onready var _affinity_grid: GridContainer = %AffinityGrid
 @onready var _radar_container: VBoxContainer = %RadarContainer
 
 var _stats: Node = null
@@ -26,6 +31,7 @@ var _eq: Node = null
 var _inv: Node = null
 var _cps: Node = null
 var _sig: Node = null
+var _aff: Node = null
 
 # Radar chart for stat visualization
 var _radar_chart: Control = null
@@ -44,6 +50,7 @@ func _ready() -> void:
 	_inv = get_node_or_null(INV_PATH)
 	_cps = get_node_or_null(CPS_PATH)
 	_sig = get_node_or_null(SIG_PATH)
+	_aff = get_node_or_null(AFF_PATH)
 
 	# Connect signals
 	if _stats:
@@ -199,6 +206,7 @@ func _on_party_member_selected(index: int) -> void:
 	# Rebuild all stat grids
 	_rebuild_base_stats(token)
 	_rebuild_battle_stats(token)
+	_rebuild_affinity_grid(token)
 	_update_radar_chart(token)
 
 func _rebuild_base_stats(token: String) -> void:
@@ -273,6 +281,95 @@ func _rebuild_battle_stats(token: String) -> void:
 	_add_battle_stat(_battle_grid, "Speed", defense.get("speed", 0))
 	_add_battle_stat(_battle_grid, "Ailment Resistance", defense.get("ail_resist_pct", 0))
 	_add_battle_stat(_battle_grid, "Critical Rate", weapon.get("crit_bonus_pct", 0))
+
+func _rebuild_affinity_grid(token: String) -> void:
+	"""Build affinity grid showing relationships with all party members"""
+	_clear_grid(_affinity_grid)
+
+	for member_token in PARTY_MEMBERS:
+		# Skip if this is the current member (show blank cell)
+		if member_token.to_lower() == token.to_lower():
+			var cell = _create_affinity_cell("—", "—")
+			_affinity_grid.add_child(cell)
+		else:
+			# Get affinity value
+			var affinity: int = _get_affinity(token, member_token)
+			var tier_text: String = _get_affinity_tier_text(affinity)
+			var member_name: String = _get_display_name(member_token)
+
+			var cell = _create_affinity_cell(member_name, tier_text)
+			_affinity_grid.add_child(cell)
+
+func _get_affinity(member1: String, member2: String) -> int:
+	"""Get affinity value between two members"""
+	if not _aff:
+		return 0
+
+	if _aff.has_method("get_affinity"):
+		var v = _aff.call("get_affinity", member1, member2)
+		if typeof(v) == TYPE_INT:
+			return int(v)
+
+	return 0
+
+func _get_affinity_tier_text(affinity: int) -> String:
+	"""Convert affinity value to tier text"""
+	if affinity >= 120:
+		return "AT3 (Omega)"
+	elif affinity >= 60:
+		return "AT2 (Duel)"
+	elif affinity >= 20:
+		return "AT1"
+	else:
+		return "AT0"
+
+func _create_affinity_cell(member_name: String, tier: String) -> PanelContainer:
+	"""Create a rounded grey cell for affinity display (same style as battle stats)"""
+	var panel := PanelContainer.new()
+	panel.custom_minimum_size = Vector2(0, 30)
+
+	# Create darker grey rounded background
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.15, 0.15, 0.15, 1.0)  # Darker grey
+	style.corner_radius_top_left = 4
+	style.corner_radius_top_right = 4
+	style.corner_radius_bottom_left = 4
+	style.corner_radius_bottom_right = 4
+	panel.add_theme_stylebox_override("panel", style)
+
+	# Add margin for padding inside cell
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 8)
+	margin.add_theme_constant_override("margin_top", 4)
+	margin.add_theme_constant_override("margin_right", 8)
+	margin.add_theme_constant_override("margin_bottom", 4)
+	panel.add_child(margin)
+
+	# HBoxContainer to hold label and value side by side
+	var hbox := HBoxContainer.new()
+	hbox.add_theme_constant_override("separation", 4)
+	margin.add_child(hbox)
+
+	# Member name label
+	var label := Label.new()
+	label.text = member_name
+	label.custom_minimum_size = Vector2(80, 0)
+	label.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	label.add_theme_font_size_override("font_size", 12)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	hbox.add_child(label)
+
+	# Tier value - blue color
+	var value_label := Label.new()
+	value_label.text = tier
+	value_label.custom_minimum_size = Vector2(70, 0)
+	value_label.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	value_label.add_theme_font_size_override("font_size", 12)
+	value_label.add_theme_color_override("font_color", Color(0.5, 0.7, 1.0))  # Blue
+	value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	hbox.add_child(value_label)
+
+	return panel
 
 func _get_equipment(token: String) -> Dictionary:
 	"""Get equipped items for a member"""
