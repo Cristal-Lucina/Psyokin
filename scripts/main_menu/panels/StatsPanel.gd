@@ -252,18 +252,18 @@ func _rebuild_battle_stats(token: String) -> void:
 	var skill_boost: int = weapon.get("skill_acc_boost", 0)
 	var s_atk: int = mnd + skill_boost
 
-	_add_battle_stat(_battle_grid, "MAX HP", profile.get("hp_max", 0))
-	_add_battle_stat(_battle_grid, "MAX MP", profile.get("mp_max", 0))
-	_add_battle_stat(_battle_grid, "P ATK", weapon.get("attack", 0))
-	_add_battle_stat(_battle_grid, "S ATK", s_atk)
-	_add_battle_stat(_battle_grid, "P DEF", defense.get("pdef", 0))
-	_add_battle_stat(_battle_grid, "S DEF", defense.get("mdef", 0))
-	_add_battle_stat(_battle_grid, "P ACC", weapon.get("accuracy", 0))
-	_add_battle_stat(_battle_grid, "S ACC", skill_boost)
-	_add_battle_stat(_battle_grid, "EVA", defense.get("peva", 0))  # Using physical evasion
-	_add_battle_stat(_battle_grid, "SPD", defense.get("speed", 0))
-	_add_battle_stat(_battle_grid, "AIL R", defense.get("ail_resist_pct", 0))
-	_add_battle_stat(_battle_grid, "CRIT", weapon.get("crit_bonus_pct", 0))
+	_add_battle_stat(_battle_grid, "Max HP", profile.get("hp_max", 0))
+	_add_battle_stat(_battle_grid, "Max MP", profile.get("mp_max", 0))
+	_add_battle_stat(_battle_grid, "Physical Attack", weapon.get("attack", 0))
+	_add_battle_stat(_battle_grid, "Skill Attack", s_atk)
+	_add_battle_stat(_battle_grid, "Physical Defense", defense.get("pdef", 0))
+	_add_battle_stat(_battle_grid, "Skill Defense", defense.get("mdef", 0))
+	_add_battle_stat(_battle_grid, "Physical Accuracy", weapon.get("accuracy", 0))
+	_add_battle_stat(_battle_grid, "Skill Accuracy", skill_boost)
+	_add_battle_stat(_battle_grid, "Evasion", defense.get("peva", 0))
+	_add_battle_stat(_battle_grid, "Speed", defense.get("speed", 0))
+	_add_battle_stat(_battle_grid, "Ailment Resistance", defense.get("ail_resist_pct", 0))
+	_add_battle_stat(_battle_grid, "Critical Rate", weapon.get("crit_bonus_pct", 0))
 
 func _get_equipment(token: String) -> Dictionary:
 	"""Get equipped items for a member"""
@@ -308,13 +308,57 @@ func _add_stat_pair(grid: GridContainer, label: String, value: String) -> void:
 	grid.add_child(val)
 
 func _add_battle_stat(grid: GridContainer, label: String, value: int) -> void:
-	"""Add a battle stat as a single label with 'LABEL: VALUE' format, padded to 16 chars"""
-	var stat_label = Label.new()
-	var text = "%s: %d" % [label, value]
-	# Pad to 16 characters to prevent squishing/stretching
-	stat_label.text = text.rpad(16, " ")
-	stat_label.custom_minimum_size = Vector2(120, 0)  # Ensure consistent width
-	grid.add_child(stat_label)
+	"""Add a battle stat as a rounded grey cell (matches LoadoutPanel style)"""
+	var cell = _create_stat_cell(label, value)
+	grid.add_child(cell)
+
+func _create_stat_cell(stat_label: String, value: int) -> PanelContainer:
+	"""Create a rounded grey cell containing a stat label and value"""
+	var panel := PanelContainer.new()
+	panel.custom_minimum_size = Vector2(0, 30)
+
+	# Create darker grey rounded background
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.15, 0.15, 0.15, 1.0)  # Darker grey
+	style.corner_radius_top_left = 4
+	style.corner_radius_top_right = 4
+	style.corner_radius_bottom_left = 4
+	style.corner_radius_bottom_right = 4
+	panel.add_theme_stylebox_override("panel", style)
+
+	# Add margin for padding inside cell
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 8)
+	margin.add_theme_constant_override("margin_top", 4)
+	margin.add_theme_constant_override("margin_right", 8)
+	margin.add_theme_constant_override("margin_bottom", 4)
+	panel.add_child(margin)
+
+	# HBoxContainer to hold label and value side by side
+	var hbox := HBoxContainer.new()
+	hbox.add_theme_constant_override("separation", 4)
+	margin.add_child(hbox)
+
+	# Label - 25 characters wide
+	var label := Label.new()
+	label.text = stat_label
+	label.custom_minimum_size = Vector2(150, 0)  # ~25 characters at 12pt
+	label.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	label.add_theme_font_size_override("font_size", 12)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	hbox.add_child(label)
+
+	# Value - 5 characters wide, blue color
+	var value_label := Label.new()
+	value_label.text = str(value)
+	value_label.custom_minimum_size = Vector2(30, 0)  # ~5 characters at 12pt
+	value_label.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	value_label.add_theme_font_size_override("font_size", 12)
+	value_label.add_theme_color_override("font_color", Color(0.5, 0.7, 1.0))  # Blue
+	value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	hbox.add_child(value_label)
+
+	return panel
 
 func _clear_grid(grid: GridContainer) -> void:
 	"""Clear all children from a grid"""

@@ -2013,6 +2013,28 @@ func _handle_popup_input(event: InputEvent) -> void:
 
 func _handle_menu_input(event: InputEvent) -> void:
 	"""Handle input in MENU state - tab list navigation"""
+	# Handle UP/DOWN with wrap-around
+	if event.is_action_pressed("move_up"):
+		if _tab_list.has_focus() and _tab_list.item_count > 0:
+			var selected_items = _tab_list.get_selected_items()
+			if selected_items.size() > 0:
+				var current_index = selected_items[0]
+				# If on first item (Stats), wrap to last item (System)
+				if current_index == 0:
+					_tab_list.select(_tab_list.item_count - 1)
+					get_viewport().set_input_as_handled()
+					return
+	elif event.is_action_pressed("move_down"):
+		if _tab_list.has_focus() and _tab_list.item_count > 0:
+			var selected_items = _tab_list.get_selected_items()
+			if selected_items.size() > 0:
+				var current_index = selected_items[0]
+				# If on last item (System), wrap to first item (Stats)
+				if current_index == _tab_list.item_count - 1:
+					_tab_list.select(0)
+					get_viewport().set_input_as_handled()
+					return
+
 	# Handle RIGHT: navigate to content (and hide menu)
 	if event.is_action_pressed("move_right"):
 		# If tab list has focus, navigate to first button in content area

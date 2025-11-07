@@ -149,7 +149,7 @@ text = "Equip…"
 [node name="HLabel" type="Label" parent="Row/Middle/Margin/VBox/Grid"]
 theme_override_font_sizes/font_size = 12
 layout_mode = 2
-text = "Head:"
+text = "Headwear:"
 
 [node name="HHBox" type="HBoxContainer" parent="Row/Middle/Margin/VBox/Grid"]
 layout_mode = 2
@@ -171,7 +171,7 @@ text = "Equip…"
 [node name="FLabel" type="Label" parent="Row/Middle/Margin/VBox/Grid"]
 theme_override_font_sizes/font_size = 12
 layout_mode = 2
-text = "Foot:"
+text = "Footwear:"
 
 [node name="FHBox" type="HBoxContainer" parent="Row/Middle/Margin/VBox/Grid"]
 layout_mode = 2

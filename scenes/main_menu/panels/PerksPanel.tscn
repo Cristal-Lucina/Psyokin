@@ -35,7 +35,7 @@ theme_override_constants/separation = 8
 
 [node name="PointsLabel" type="Label" parent="Root/LeftColumn/PointsRow"]
 layout_mode = 2
-text = "Perk Points:"
+text = "PERK POINTS:"
 
 [node name="PointsValue" type="Label" parent="Root/LeftColumn/PointsRow"]
 unique_name_in_owner = true
@@ -49,7 +49,7 @@ layout_mode = 2
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
 theme_override_font_sizes/font_size = 16
-text = "Acquired Perks"
+text = "ACQUIRED PERKS"
 horizontal_alignment = 1
 
 [node name="AcquiredScroll" type="ScrollContainer" parent="Root/LeftColumn"]
@@ -69,7 +69,7 @@ layout_mode = 2
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
 theme_override_font_sizes/font_size = 16
-text = "Perk Details"
+text = "PERK DETAILS"
 horizontal_alignment = 1
 
 [node name="PerkName" type="Label" parent="Root/LeftColumn"]
@@ -104,7 +104,7 @@ theme_override_constants/separation = 12
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
 theme_override_font_sizes/font_size = 16
-text = "Perks Grid"
+text = "PERKS GRID"
 horizontal_alignment = 1
 
 [node name="GridScroll" type="ScrollContainer" parent="Root/GridColumn"]

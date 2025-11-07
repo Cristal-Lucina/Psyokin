@@ -401,6 +401,165 @@ func _style_popup_panel(popup_panel: Panel) -> void:
 	style.corner_radius_bottom_right = 8
 	popup_panel.add_theme_stylebox_override("panel", style)
 
+func _get_equipment_stats(item_id: String, slot: String) -> Dictionary:
+	"""Extract relevant stats from an equipment item based on slot type"""
+	if item_id == "" or item_id == "—":
+		return {}
+
+	var item_def: Dictionary = _item_def(item_id)
+	var stats: Dictionary = {}
+
+	match slot:
+		"weapon":
+			stats["Attack"] = int(item_def.get("base_watk", 0))
+			stats["Accuracy"] = int(item_def.get("base_acc", 0))
+			stats["Critical"] = int(item_def.get("crit_bonus_pct", 0))
+			stats["Skill Atk"] = int(item_def.get("skill_atk_boost", 0))
+			stats["Skill Acc"] = int(item_def.get("skill_acc_boost", 0))
+		"armor":
+			stats["Phys Defense"] = int(item_def.get("armor_flat", 0))
+			stats["Skill Defense"] = int(item_def.get("ward_flat", 0))
+			stats["Ail Resist"] = int(item_def.get("ail_resist_pct", 0))
+		"head":
+			stats["HP Bonus"] = int(item_def.get("max_hp_boost", 0))
+			stats["MP Bonus"] = int(item_def.get("max_mp_boost", 0))
+			stats["Skill Defense"] = int(item_def.get("ward_flat", 0))
+		"foot":
+			stats["Evasion"] = int(item_def.get("base_eva", 0))
+			stats["Speed"] = int(item_def.get("speed", 0))
+		"bracelet":
+			stats["Sigil Slots"] = int(item_def.get("sigil_slots", 0))
+
+	return stats
+
+func _compare_stat_value(current_val: int, new_val: int) -> Color:
+	"""Return color based on stat comparison: white (same), green (better), red (worse)"""
+	if new_val > current_val:
+		return Color(0.4, 1.0, 0.4)  # Green - better
+	elif new_val < current_val:
+		return Color(1.0, 0.4, 0.4)  # Red - worse
+	else:
+		return Color(1.0, 1.0, 1.0)  # White - same
+
+func _build_equipment_comparison_panel(item_id: String, slot: String, current_stats: Dictionary, title: String) -> Panel:
+	"""Build a comparison panel showing equipment stats"""
+	var panel := Panel.new()
+	panel.custom_minimum_size = Vector2(220, 280)
+	_style_popup_panel(panel)
+
+	# Add margin container for padding
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 15)
+	margin.add_theme_constant_override("margin_top", 15)
+	margin.add_theme_constant_override("margin_right", 15)
+	margin.add_theme_constant_override("margin_bottom", 15)
+	panel.add_child(margin)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 8)
+	margin.add_child(vbox)
+
+	# Title
+	var title_label := Label.new()
+	title_label.text = title
+	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title_label.add_theme_font_size_override("font_size", 14)
+	title_label.add_theme_color_override("font_color", Color(1.0, 0.7, 0.75))
+	vbox.add_child(title_label)
+
+	# Item name
+	var name_label := Label.new()
+	if item_id == "" or item_id == "—":
+		name_label.text = "(Empty)"
+		name_label.add_theme_color_override("font_color", Color(0.6, 0.6, 0.6))
+	else:
+		name_label.text = _pretty_item(item_id)
+	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	name_label.add_theme_font_size_override("font_size", 12)
+	vbox.add_child(name_label)
+
+	# Show type for weapons and armor, or slot name for head/foot/bracelet
+	if item_id != "" and item_id != "—":
+		var item_def: Dictionary = _item_def(item_id)
+		var type_text: String = ""
+
+		if slot == "weapon" and item_def.has("watk_type_tag"):
+			var wtype: String = String(item_def.get("watk_type_tag", "")).capitalize()
+			if wtype != "":
+				type_text = wtype
+		elif slot == "armor" and item_def.has("armor_type"):
+			var atype: String = String(item_def.get("armor_type", "")).capitalize()
+			if atype != "":
+				type_text = atype + " Armor"
+		elif slot == "head":
+			type_text = "Headwear"
+		elif slot == "foot":
+			type_text = "Footwear"
+		elif slot == "bracelet":
+			type_text = "Bracelet"
+
+		if type_text != "":
+			var type_label := Label.new()
+			type_label.text = type_text
+			type_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			type_label.add_theme_font_size_override("font_size", 10)
+			type_label.add_theme_color_override("font_color", Color(0.8, 0.8, 0.8))
+			vbox.add_child(type_label)
+
+	# Separator
+	var sep := HSeparator.new()
+	vbox.add_child(sep)
+
+	# Stats container
+	var stats_vbox := VBoxContainer.new()
+	stats_vbox.add_theme_constant_override("separation", 4)
+	vbox.add_child(stats_vbox)
+
+	# Get stats for this item
+	var item_stats: Dictionary = _get_equipment_stats(item_id, slot)
+
+	# Display stats with color coding
+	for stat_name in item_stats.keys():
+		var value: int = item_stats[stat_name]
+		var color: Color = Color(1.0, 1.0, 1.0)  # Default white
+
+		# Compare with current stats if available
+		if current_stats.has(stat_name):
+			color = _compare_stat_value(current_stats[stat_name], value)
+
+		var stat_hbox := HBoxContainer.new()
+		stats_vbox.add_child(stat_hbox)
+
+		# Stat name
+		var stat_label := Label.new()
+		stat_label.text = stat_name + ":"
+		stat_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		stat_label.add_theme_font_size_override("font_size", 11)
+		stat_hbox.add_child(stat_label)
+
+		# Stat value with color
+		var value_label := Label.new()
+		value_label.text = str(value)
+		value_label.add_theme_font_size_override("font_size", 11)
+		value_label.add_theme_color_override("font_color", color)
+		stat_hbox.add_child(value_label)
+
+	# Add description if not empty
+	if item_id != "" and item_id != "—":
+		var item_def: Dictionary = _item_def(item_id)
+		if item_def.has("description") and String(item_def.get("description", "")).strip_edges() != "":
+			var desc_sep := HSeparator.new()
+			vbox.add_child(desc_sep)
+
+			var desc_label := Label.new()
+			desc_label.text = String(item_def.get("description", ""))
+			desc_label.autowrap_mode = TextServer.AUTOWRAP_WORD
+			desc_label.add_theme_font_size_override("font_size", 10)
+			desc_label.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))
+			vbox.add_child(desc_label)
+
+	return panel
+
 func _on_slot_button(slot: String) -> void:
 	var token: String = _current_token()
 	if token == "":
@@ -417,6 +576,9 @@ func _show_item_menu_for_slot(member_token: String, slot: String) -> void:
 	var cur: Dictionary = _fetch_equip_for(member_token)
 	var cur_id: String = String(cur.get(slot, ""))
 
+	# Get current equipment stats for comparison
+	var current_stats: Dictionary = _get_equipment_stats(cur_id, slot)
+
 	# Create CanvasLayer overlay for proper input blocking
 	var overlay := CanvasLayer.new()
 	overlay.layer = 100
@@ -424,45 +586,58 @@ func _show_item_menu_for_slot(member_token: String, slot: String) -> void:
 	overlay.process_priority = -1000
 	get_tree().root.add_child(overlay)
 
-	# Create custom popup using Control nodes for proper controller support
-	var popup_panel: Panel = Panel.new()
-	popup_panel.process_mode = Node.PROCESS_MODE_ALWAYS
-	popup_panel.process_priority = -1000
-	popup_panel.z_index = 100
-	popup_panel.custom_minimum_size = Vector2(320, 280)
-	popup_panel.modulate = Color(1, 1, 1, 0)  # Start hidden to prevent flash in top-left corner
-	_style_popup_panel(popup_panel)  # Apply ToastPopup styling
-	overlay.add_child(popup_panel)
+	# Create main container for three-panel layout
+	var main_container := Control.new()
+	main_container.process_mode = Node.PROCESS_MODE_ALWAYS
+	main_container.process_priority = -1000
+	main_container.z_index = 100
+	main_container.modulate = Color(1, 1, 1, 0)  # Start hidden to prevent flash
+	overlay.add_child(main_container)
 
-	# Set active popup and overlay immediately to prevent multiple popups during async operations
-	_active_popup = popup_panel
+	# Set active popup and overlay immediately
+	_active_popup = main_container
 	_active_overlay = overlay
 
-	# Add margin container for padding (ToastPopup style)
-	var margin := MarginContainer.new()
-	margin.add_theme_constant_override("margin_left", 20)
-	margin.add_theme_constant_override("margin_top", 20)
-	margin.add_theme_constant_override("margin_right", 20)
-	margin.add_theme_constant_override("margin_bottom", 20)
-	popup_panel.add_child(margin)
+	# HBoxContainer to hold three panels side by side
+	var hbox := HBoxContainer.new()
+	hbox.add_theme_constant_override("separation", 12)
+	main_container.add_child(hbox)
 
-	var vbox: VBoxContainer = VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 8)
-	margin.add_child(vbox)
+	# LEFT PANEL - Current Equipment
+	var left_panel: Panel = _build_equipment_comparison_panel(cur_id, slot, {}, "CURRENT")
+	hbox.add_child(left_panel)
 
-	# Title label (ToastPopup style)
-	var title: Label = Label.new()
+	# CENTER PANEL - Selection List
+	var center_panel := Panel.new()
+	center_panel.custom_minimum_size = Vector2(320, 280)
+	_style_popup_panel(center_panel)
+	hbox.add_child(center_panel)
+
+	# Center panel content
+	var center_margin := MarginContainer.new()
+	center_margin.add_theme_constant_override("margin_left", 20)
+	center_margin.add_theme_constant_override("margin_top", 20)
+	center_margin.add_theme_constant_override("margin_right", 20)
+	center_margin.add_theme_constant_override("margin_bottom", 20)
+	center_panel.add_child(center_margin)
+
+	var center_vbox := VBoxContainer.new()
+	center_vbox.add_theme_constant_override("separation", 8)
+	center_margin.add_child(center_vbox)
+
+	# Title label
+	var title := Label.new()
 	title.text = "Select %s" % slot.capitalize()
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.add_theme_font_size_override("font_size", 18)
 	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	vbox.add_child(title)
+	center_vbox.add_child(title)
 
 	# Item list
-	var item_list: ItemList = ItemList.new()
+	var item_list := ItemList.new()
 	item_list.custom_minimum_size = Vector2(280, 200)
 	item_list.focus_mode = Control.FOCUS_ALL
-	vbox.add_child(item_list)
+	center_vbox.add_child(item_list)
 
 	# Build item list data
 	var item_ids: Array[String] = []
@@ -483,26 +658,52 @@ func _show_item_menu_for_slot(member_token: String, slot: String) -> void:
 			item_list.add_item(label)
 			item_ids.append(id)
 
-	# Add back button (ToastPopup style)
-	var back_btn: Button = Button.new()
+	# Add back button
+	var back_btn := Button.new()
 	back_btn.text = "Back"
 	back_btn.custom_minimum_size = Vector2(100, 40)
 	back_btn.pressed.connect(_popup_cancel)
-	vbox.add_child(back_btn)
+	center_vbox.add_child(back_btn)
 
-	# Auto-size panel to fit content - wait TWO frames for proper layout calculation
+	# RIGHT PANEL CONTAINER - Holds the comparison panel
+	var right_container := Control.new()
+	right_container.custom_minimum_size = Vector2(220, 280)
+	hbox.add_child(right_container)
+
+	# Create initial right panel
+	var initial_item_id: String = ""
+	if not item_ids.is_empty():
+		initial_item_id = item_ids[0]
+	var right_panel: Panel = _build_equipment_comparison_panel(initial_item_id, slot, current_stats, "COMPARING")
+	right_container.add_child(right_panel)
+
+	# Connect selection change to update right panel
+	item_list.item_selected.connect(func(index: int) -> void:
+		if index < 0 or index >= item_ids.size():
+			return
+		var selected_id: String = item_ids[index]
+
+		# Clear old right panel immediately
+		for child in right_container.get_children():
+			right_container.remove_child(child)
+			child.queue_free()
+
+		# Create new right panel with selected item
+		var new_panel: Panel = _build_equipment_comparison_panel(selected_id, slot, current_stats, "COMPARING")
+		right_container.add_child(new_panel)
+	)
+
+	# Auto-size container to fit content - wait TWO frames for proper layout calculation
 	await get_tree().process_frame
 	await get_tree().process_frame
-	popup_panel.size = vbox.size + Vector2(40, 40)  # Account for 20px margins on all sides
-	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
 
-	# Center popup on screen
+	# Center container on screen
 	var viewport_size: Vector2 = get_viewport_rect().size
-	popup_panel.position = (viewport_size - popup_panel.size) / 2.0
-	print("[LoadoutPanel] Equipment popup centered at: %s, size: %s" % [popup_panel.position, popup_panel.size])
+	main_container.position = (viewport_size - hbox.size) / 2.0
+	print("[LoadoutPanel] Equipment popup centered at: %s, size: %s" % [main_container.position, hbox.size])
 
 	# Fade in popup (now that it's positioned)
-	popup_panel.modulate = Color(1, 1, 1, 1)
+	main_container.modulate = Color(1, 1, 1, 1)
 
 	# Select first item and grab focus
 	if item_list.item_count > 0:
@@ -514,18 +715,17 @@ func _show_item_menu_for_slot(member_token: String, slot: String) -> void:
 		item_list.select(first_enabled)
 		item_list.grab_focus()
 
-	# Store metadata for controller input (popup reference already set earlier)
-	popup_panel.set_meta("_item_list", item_list)
-	popup_panel.set_meta("_item_ids", item_ids)
-	popup_panel.set_meta("_member_token", member_token)
-	popup_panel.set_meta("_slot", slot)
+	# Store metadata for controller input
+	main_container.set_meta("_item_list", item_list)
+	main_container.set_meta("_item_ids", item_ids)
+	main_container.set_meta("_member_token", member_token)
+	main_container.set_meta("_slot", slot)
 
 	# Push popup to aPanelManager stack
 	var panel_mgr = get_node_or_null("/root/aPanelManager")
 	if panel_mgr:
-		# Make popup a "fake panel" that aPanelManager can track
-		popup_panel.set_meta("_is_equipment_popup", true)
-		panel_mgr.push_panel(popup_panel)
+		main_container.set_meta("_is_equipment_popup", true)
+		panel_mgr.push_panel(main_container)
 		print("[LoadoutPanel] Pushed equipment popup to aPanelManager stack")
 
 	# Set state to POPUP_ACTIVE
@@ -1085,10 +1285,13 @@ func _rebuild_stats_grid(member_token: String, equip: Dictionary) -> void:
 	var defense: Dictionary = profile.get("defense", {})
 	var stats: Dictionary = profile.get("stats", {})
 
-	# S ATK = MND + skill_acc_boost
+	# S ATK = MND + skill_atk_boost
 	var mnd: int = stats.get("MND", 0)
-	var skill_boost: int = weapon.get("skill_acc_boost", 0)
-	var s_atk: int = mnd + skill_boost
+	var skill_atk_bonus: int = weapon.get("skill_atk_boost", 0)
+	var s_atk: int = mnd + skill_atk_bonus
+
+	# Skill Accuracy comes from skill_acc_boost
+	var skill_acc: int = weapon.get("skill_acc_boost", 0)
 
 	# Battle stats with full names in rounded grey cells (2 columns)
 	_stats_grid.add_child(_create_stat_cell("Max HP", profile.get("hp_max", 0)))
@@ -1098,7 +1301,7 @@ func _rebuild_stats_grid(member_token: String, equip: Dictionary) -> void:
 	_stats_grid.add_child(_create_stat_cell("Physical Defense", defense.get("pdef", 0)))
 	_stats_grid.add_child(_create_stat_cell("Skill Defense", defense.get("mdef", 0)))
 	_stats_grid.add_child(_create_stat_cell("Physical Accuracy", weapon.get("accuracy", 0)))
-	_stats_grid.add_child(_create_stat_cell("Skill Accuracy", skill_boost))
+	_stats_grid.add_child(_create_stat_cell("Skill Accuracy", skill_acc))
 	_stats_grid.add_child(_create_stat_cell("Evasion", defense.get("peva", 0)))
 	_stats_grid.add_child(_create_stat_cell("Speed", defense.get("speed", 0)))
 	_stats_grid.add_child(_create_stat_cell("Ailment Resistance", defense.get("ail_resist_pct", 0)))
@@ -1186,43 +1389,53 @@ func _show_equipment_details(member_token: String, slot: String) -> void:
 
 	# Add item type
 	var slot_label: String = slot.capitalize()
+	if slot == "head":
+		slot_label = "Headwear"
+	elif slot == "foot":
+		slot_label = "Footwear"
 	details += "[color=#888888]%s[/color]\n\n" % slot_label
 
 	# Add stats based on slot type
 	match slot:
 		"weapon":
-			if item_def.has("base_attack"):
-				details += "Attack: [color=#FFC0CB]%d[/color]\n" % int(item_def.get("base_attack", 0))
-			if item_def.has("base_accuracy"):
-				details += "Accuracy: [color=#FFC0CB]%d[/color]\n" % int(item_def.get("base_accuracy", 0))
+			if item_def.has("base_watk"):
+				details += "Attack: [color=#FFC0CB]%d[/color]\n" % int(item_def.get("base_watk", 0))
+			if item_def.has("base_acc"):
+				details += "Accuracy: [color=#FFC0CB]%d[/color]\n" % int(item_def.get("base_acc", 0))
 			if item_def.has("crit_bonus_pct"):
 				details += "Critical: [color=#FFC0CB]%d%%[/color]\n" % int(item_def.get("crit_bonus_pct", 0))
+			if item_def.has("skill_atk_boost"):
+				details += "Skill Atk: [color=#FFC0CB]%d[/color]\n" % int(item_def.get("skill_atk_boost", 0))
 			if item_def.has("skill_acc_boost"):
 				details += "Skill Acc: [color=#FFC0CB]%d[/color]\n" % int(item_def.get("skill_acc_boost", 0))
-			if item_def.has("weapon_type"):
-				details += "Type: [color=#FFC0CB]%s[/color]\n" % String(item_def.get("weapon_type", ""))
+			if item_def.has("watk_type_tag"):
+				details += "Type: [color=#FFC0CB]%s[/color]\n" % String(item_def.get("watk_type_tag", ""))
 
 		"armor":
-			if item_def.has("base_pdef"):
-				details += "Physical Defense: [color=#FFC0CB]%d[/color]\n" % int(item_def.get("base_pdef", 0))
-			if item_def.has("base_mdef"):
-				details += "Skill Defense: [color=#FFC0CB]%d[/color]\n" % int(item_def.get("base_mdef", 0))
+			if item_def.has("armor_flat"):
+				details += "Physical Defense: [color=#FFC0CB]%d[/color]\n" % int(item_def.get("armor_flat", 0))
+			if item_def.has("ward_flat"):
+				details += "Skill Defense: [color=#FFC0CB]%d[/color]\n" % int(item_def.get("ward_flat", 0))
 			if item_def.has("ail_resist_pct"):
 				details += "Ailment Resist: [color=#FFC0CB]%d%%[/color]\n" % int(item_def.get("ail_resist_pct", 0))
+			if item_def.has("armor_type"):
+				var atype: String = String(item_def.get("armor_type", "")).capitalize()
+				if atype != "":
+					details += "Type: [color=#FFC0CB]%s[/color]\n" % atype
 
 		"head":
-			if item_def.has("hp_bonus"):
-				details += "HP Bonus: [color=#FFC0CB]+%d[/color]\n" % int(item_def.get("hp_bonus", 0))
-			if item_def.has("mp_bonus"):
-				details += "MP Bonus: [color=#FFC0CB]+%d[/color]\n" % int(item_def.get("mp_bonus", 0))
-			if item_def.has("base_mdef"):
-				details += "Skill Defense: [color=#FFC0CB]%d[/color]\n" % int(item_def.get("base_mdef", 0))
+			if item_def.has("max_hp_boost"):
+				details += "HP Bonus: [color=#FFC0CB]+%d[/color]\n" % int(item_def.get("max_hp_boost", 0))
+			if item_def.has("max_mp_boost"):
+				details += "MP Bonus: [color=#FFC0CB]+%d[/color]\n" % int(item_def.get("max_mp_boost", 0))
+			if item_def.has("ward_flat"):
+				details += "Skill Defense: [color=#FFC0CB]%d[/color]\n" % int(item_def.get("ward_flat", 0))
 
 		"foot":
 			if item_def.has("base_eva"):
 				details += "Evasion: [color=#FFC0CB]%d[/color]\n" % int(item_def.get("base_eva", 0))
-			if item_def.has("base_speed"):
-				details += "Speed: [color=#FFC0CB]%d[/color]\n" % int(item_def.get("base_speed", 0))
+			if item_def.has("speed"):
+				details += "Speed: [color=#FFC0CB]%d[/color]\n" % int(item_def.get("speed", 0))
 
 		"bracelet":
 			if item_def.has("sigil_slots"):

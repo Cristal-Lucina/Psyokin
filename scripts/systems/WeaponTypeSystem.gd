@@ -100,3 +100,55 @@ func get_weakness_description(attacker_type: String, defender_type: String) -> S
 	if is_weapon_weakness(attacker_type, defender_type):
 		return "%s beats %s!" % [attacker_type.capitalize(), defender_type.capitalize()]
 	return ""
+
+## ═══════════════════════════════════════════════════════════════
+## WAND VULNERABILITY SYSTEM
+## ═══════════════════════════════════════════════════════════════
+## Wands are not part of the weapon triangle but have a general
+## vulnerability to physical attacks:
+## - Take 10% more damage from all physical attacks
+## - 10% higher chance to be critically hit by physical attacks
+
+const WAND_DAMAGE_VULNERABILITY: float = 0.10  # 10% more damage
+const WAND_CRIT_VULNERABILITY: float = 10.0    # +10% crit chance
+
+func is_defender_using_wand(defender: Dictionary) -> bool:
+	"""
+	Check if defender is using a wand
+
+	Args:
+		defender: Combatant dictionary with equipment
+
+	Returns:
+		true if defender has a wand equipped
+	"""
+	var weapon_type = get_weapon_type_from_equipment(defender)
+	return weapon_type == "wand"
+
+func get_wand_damage_modifier(defender: Dictionary) -> float:
+	"""
+	Get damage modifier for attacking a wand user
+
+	Args:
+		defender: Combatant dictionary
+
+	Returns:
+		Damage multiplier (1.1 if wand user, 1.0 otherwise)
+	"""
+	if is_defender_using_wand(defender):
+		return 1.0 + WAND_DAMAGE_VULNERABILITY
+	return 1.0
+
+func get_wand_crit_bonus(defender: Dictionary) -> float:
+	"""
+	Get critical hit chance bonus for attacking a wand user
+
+	Args:
+		defender: Combatant dictionary
+
+	Returns:
+		Crit chance bonus (+10.0 if wand user, 0.0 otherwise)
+	"""
+	if is_defender_using_wand(defender):
+		return WAND_CRIT_VULNERABILITY
+	return 0.0

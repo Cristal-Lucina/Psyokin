@@ -18,8 +18,8 @@ const KEY_ID    : String = "item_id"
 
 # Categories
 const CATEGORIES : Array[String] = [
-	"All", "Recovery", "Consumables", "Weapons", "Armor", "Headwear", "Footwear",
-	"Bracelets", "Sigils", "Materials", "Key", "Other"
+	"Acquired", "Recovery", "Battle", "Equipment", "Sigils",
+	"Capture", "Material", "Gifts", "Key", "Other"
 ]
 
 # Scene references
@@ -28,7 +28,7 @@ const CATEGORIES : Array[String] = [
 @onready var _item_label: Label = %ItemLabel  # Now in ItemColumn (moved from ItemHeader)
 @onready var _count_label: Label = %CountLabel  # Now in ItemHeader
 @onready var _item_name: Label = %ItemName
-@onready var _details_text: Label = %DetailsText
+@onready var _details_text: RichTextLabel = %DetailsText
 @onready var _scroll_container: ScrollContainer = %ScrollContainer
 @onready var _action_buttons: VBoxContainer = %ActionButtons
 @onready var _use_button: Button = %UseButton
@@ -48,7 +48,7 @@ var _counts: Dictionary = {}        # item_id -> count
 var _equipped_by: Dictionary = {}   # item_id -> Array[member names]
 
 # State
-var _current_category: String = "All"
+var _current_category: String = "Acquired"
 var _category_ids: Array[String] = []
 var _item_ids: Array[String] = []
 var _selected_item_id: String = ""
@@ -60,9 +60,16 @@ var _party_member_tokens: Array[String] = []
 var _item_to_use_id: String = ""
 var _item_to_use_def: Dictionary = {}
 
+# Active popup tracking
+var _active_popup: Panel = null
+var _active_overlay: CanvasLayer = null
+
 func _ready() -> void:
 	# Set process mode to work while game is paused
 	process_mode = Node.PROCESS_MODE_ALWAYS
+
+	# Set high input priority so popup input blocking happens before parent nodes
+	process_priority = 100
 
 	# Get system references
 	_inv = get_node_or_null(INV_PATH)
@@ -106,15 +113,47 @@ func _first_fill() -> void:
 		call_deferred("_grab_category_focus")
 
 func _on_visibility_changed() -> void:
-	"""Grab focus when panel becomes visible"""
+	"""Grab focus when panel becomes visible, cleanup popups when hidden"""
 	if visible:
 		call_deferred("_grab_category_focus")
+	else:
+		# Clean up any active popups when panel is hidden
+		_cleanup_active_popup()
 
 func _grab_category_focus() -> void:
 	"""Helper to grab focus on category list"""
 	if _category_list and _category_list.item_count > 0:
 		_focus_mode = "category"
 		_category_list.grab_focus()
+
+func _cleanup_active_popup() -> void:
+	"""Clean up any active popup and overlay"""
+	if not _active_popup and not _active_overlay:
+		return
+
+	print("[ItemsPanel] _cleanup_active_popup called, popup=%s, overlay=%s" % [_active_popup != null, _active_overlay != null])
+
+	# Store references locally before clearing tracking variables
+	var popup = _active_popup
+	var overlay = _active_overlay
+
+	# Clear tracking immediately to prevent re-entrance
+	_active_popup = null
+	_active_overlay = null
+
+	# Reset focus mode if in party picker
+	if _focus_mode == "party_picker":
+		_focus_mode = "items"
+
+	# Clean up popup
+	if popup and is_instance_valid(popup):
+		print("[ItemsPanel] Queuing popup free")
+		popup.queue_free()
+
+	# Clean up overlay
+	if overlay and is_instance_valid(overlay):
+		print("[ItemsPanel] Queuing overlay free")
+		overlay.queue_free()
 
 func _rebuild() -> void:
 	"""Rebuild entire panel - refresh data and UI"""
@@ -307,9 +346,12 @@ func _populate_items() -> void:
 		var qty: int = _counts[item_id]
 		if qty <= 0:
 			continue
-		if _current_category == "All":
+
+		# For "Acquired" category, show all items
+		if _current_category == "Acquired":
 			items.append(item_id)
 			continue
+
 		var def: Dictionary = _defs.get(item_id, {})
 		var item_cat: String = _category_of(def)
 		# Debug first few items
@@ -321,14 +363,47 @@ func _populate_items() -> void:
 
 	print("[ItemsPanel] Gathered %d items for category '%s'" % [items.size(), _current_category])
 
-	# Sort by name
-	items.sort_custom(func(a: String, b: String) -> bool:
-		var def_a: Dictionary = _defs.get(a, {})
-		var def_b: Dictionary = _defs.get(b, {})
-		var name_a: String = _display_name(a, def_a)
-		var name_b: String = _display_name(b, def_b)
-		return name_a < name_b
-	)
+	# Sort items based on category
+	if _current_category == "Acquired":
+		# For Acquired: reverse alphabetical (newest first - approximation until we have true acquisition tracking)
+		items.sort_custom(func(a: String, b: String) -> bool:
+			var def_a: Dictionary = _defs.get(a, {})
+			var def_b: Dictionary = _defs.get(b, {})
+			var name_a: String = _display_name(a, def_a)
+			var name_b: String = _display_name(b, def_b)
+			return name_a > name_b  # Reverse order
+		)
+	elif _current_category == "Equipment":
+		# For Equipment: sort by equip_slot first, then by name
+		items.sort_custom(func(a: String, b: String) -> bool:
+			var def_a: Dictionary = _defs.get(a, {})
+			var def_b: Dictionary = _defs.get(b, {})
+			var slot_a: String = String(def_a.get("equip_slot", "")).to_lower()
+			var slot_b: String = String(def_b.get("equip_slot", "")).to_lower()
+
+			# Define slot order
+			const SLOT_ORDER: Dictionary = {"weapon": 0, "armor": 1, "head": 2, "foot": 3, "bracelet": 4}
+			var order_a: int = SLOT_ORDER.get(slot_a, 99)
+			var order_b: int = SLOT_ORDER.get(slot_b, 99)
+
+			# First sort by slot
+			if order_a != order_b:
+				return order_a < order_b
+
+			# Then sort by name within same slot
+			var name_a: String = _display_name(a, def_a)
+			var name_b: String = _display_name(b, def_b)
+			return name_a < name_b
+		)
+	else:
+		# Default: sort by name
+		items.sort_custom(func(a: String, b: String) -> bool:
+			var def_a: Dictionary = _defs.get(a, {})
+			var def_b: Dictionary = _defs.get(b, {})
+			var name_a: String = _display_name(a, def_a)
+			var name_b: String = _display_name(b, def_b)
+			return name_a < name_b
+		)
 
 	# Populate list
 	for item_id in items:
@@ -353,7 +428,7 @@ func _populate_items() -> void:
 		print("[ItemsPanel] No items to select or item already selected: %s" % _selected_item_id)
 
 func _update_details() -> void:
-	"""Update item details panel"""
+	"""Update item details panel with equipment stats and formatting"""
 	if _selected_item_id == "" or not _defs.has(_selected_item_id):
 		_clear_details()
 		return
@@ -366,28 +441,35 @@ func _update_details() -> void:
 	if _item_name:
 		_item_name.text = name
 
-	# Build details text
+	# Build details text with BBCode formatting
 	var details: String = ""
 
 	# Quantity
-	details += "Quantity: x%d\n\n" % qty
+	details += "Quantity: [color=#FFC0CB]x%d[/color]\n\n" % qty
+
+	# Get equipment slot to determine if this is equipment
+	var equip_slot: String = String(def.get("equip_slot", "")).to_lower().strip_edges()
+
+	# Show equipment stats if this is equippable gear
+	if equip_slot in ["weapon", "armor", "head", "foot", "bracelet"]:
+		details += _build_equipment_stats(def, equip_slot)
 
 	# Description
 	var desc: String = _get_description(def)
 	if desc != "":
-		details += "%s\n\n" % desc
+		details += "[color=#AAAAAA]%s[/color]\n\n" % desc
 
 	# Category
 	var cat: String = _category_of(def)
-	details += "Category: %s\n\n" % cat
+	details += "Category: [color=#888888]%s[/color]\n\n" % cat
 
 	# Equipped by
 	if _equipped_by.has(_selected_item_id):
 		var members: Array = _equipped_by[_selected_item_id]
 		if members.size() > 0:
-			details += "Equipped by: %s\n\n" % ", ".join(members)
+			details += "Equipped by: [color=#FFC0CB]%s[/color]\n\n" % ", ".join(members)
 
-	# Effects
+	# Effects (for consumables)
 	var effects: String = _get_effects(def)
 	if effects != "":
 		details += "Effects:\n%s\n" % effects
@@ -397,6 +479,71 @@ func _update_details() -> void:
 
 	# Show/hide action buttons
 	_update_action_buttons(def)
+
+func _build_equipment_stats(def: Dictionary, slot: String) -> String:
+	"""Build equipment stats section with formatting (matches LoadoutPanel style)"""
+	var stats: String = ""
+
+	# Add slot label
+	var slot_label: String = slot.capitalize()
+	if slot == "head":
+		slot_label = "Headwear"
+	elif slot == "foot":
+		slot_label = "Footwear"
+	stats += "[color=#888888]%s[/color]\n\n" % slot_label
+
+	# Add stats based on slot type
+	match slot:
+		"weapon":
+			if def.has("base_watk"):
+				stats += "Attack: [color=#FFC0CB]%d[/color]\n" % int(def.get("base_watk", 0))
+			if def.has("base_acc"):
+				stats += "Accuracy: [color=#FFC0CB]%d[/color]\n" % int(def.get("base_acc", 0))
+			if def.has("crit_bonus_pct"):
+				stats += "Critical: [color=#FFC0CB]%d%%[/color]\n" % int(def.get("crit_bonus_pct", 0))
+			if def.has("skill_atk_boost"):
+				stats += "Skill Atk: [color=#FFC0CB]%d[/color]\n" % int(def.get("skill_atk_boost", 0))
+			if def.has("skill_acc_boost"):
+				stats += "Skill Acc: [color=#FFC0CB]%d[/color]\n" % int(def.get("skill_acc_boost", 0))
+			if def.has("watk_type_tag"):
+				var wtype: String = String(def.get("watk_type_tag", "")).capitalize()
+				if wtype != "":
+					stats += "Type: [color=#FFC0CB]%s[/color]\n" % wtype
+
+		"armor":
+			if def.has("armor_flat"):
+				stats += "Physical Defense: [color=#FFC0CB]%d[/color]\n" % int(def.get("armor_flat", 0))
+			if def.has("ward_flat"):
+				stats += "Skill Defense: [color=#FFC0CB]%d[/color]\n" % int(def.get("ward_flat", 0))
+			if def.has("ail_resist_pct"):
+				stats += "Ailment Resist: [color=#FFC0CB]%d%%[/color]\n" % int(def.get("ail_resist_pct", 0))
+			if def.has("armor_type"):
+				var atype: String = String(def.get("armor_type", "")).capitalize()
+				if atype != "":
+					stats += "Type: [color=#FFC0CB]%s[/color]\n" % atype
+
+		"head":
+			if def.has("max_hp_boost"):
+				stats += "HP Bonus: [color=#FFC0CB]+%d[/color]\n" % int(def.get("max_hp_boost", 0))
+			if def.has("max_mp_boost"):
+				stats += "MP Bonus: [color=#FFC0CB]+%d[/color]\n" % int(def.get("max_mp_boost", 0))
+			if def.has("ward_flat"):
+				stats += "Skill Defense: [color=#FFC0CB]%d[/color]\n" % int(def.get("ward_flat", 0))
+
+		"foot":
+			if def.has("base_eva"):
+				stats += "Evasion: [color=#FFC0CB]%d[/color]\n" % int(def.get("base_eva", 0))
+			if def.has("speed"):
+				stats += "Speed: [color=#FFC0CB]%d[/color]\n" % int(def.get("speed", 0))
+
+		"bracelet":
+			if def.has("sigil_slots"):
+				stats += "Sigil Slots: [color=#FFC0CB]%d[/color]\n" % int(def.get("sigil_slots", 0))
+
+	if stats != "":
+		stats += "\n"
+
+	return stats
 
 func _clear_details() -> void:
 	"""Clear details panel"""
@@ -557,6 +704,10 @@ func _show_member_selection_popup() -> void:
 	# Update focus mode
 	_focus_mode = "party_picker"
 
+	# Track active popup and overlay for cleanup
+	_active_popup = popup_panel
+	_active_overlay = overlay
+
 	print("[ItemsPanel] Member selection popup shown with %d members" % _party_member_tokens.size())
 
 func _style_popup_panel(popup: Panel) -> void:
@@ -594,12 +745,16 @@ func _grab_party_picker_focus() -> void:
 	if _party_picker_list and is_instance_valid(_party_picker_list) and _party_picker_list.is_inside_tree():
 		_party_picker_list.grab_focus()
 
-func _unhandled_input(event: InputEvent) -> void:
-	"""Handle controller input"""
+func _input(event: InputEvent) -> void:
+	"""Handle input at same priority as GameMenu to block inputs when popup is active
+
+	Uses _input() instead of _unhandled_input() to have same priority as GameMenu,
+	allowing us to mark input as handled before GameMenu intercepts it.
+	"""
 	if not visible:
 		return
 
-	# Handle party picker popup input
+	# Handle popup input at high priority to block GameMenu from seeing it
 	if _focus_mode == "party_picker":
 		if event.is_action_pressed("menu_accept"):
 			_on_party_picker_accept()
@@ -613,6 +768,23 @@ func _unhandled_input(event: InputEvent) -> void:
 					_close_member_selection_popup(popup, false)
 			get_viewport().set_input_as_handled()
 			return
+		else:
+			# Block all other inputs from reaching GameMenu
+			if event is InputEventKey or event is InputEventJoypadButton:
+				get_viewport().set_input_as_handled()
+			return
+
+func _unhandled_input(event: InputEvent) -> void:
+	"""Handle controller input for category and item navigation
+
+	Note: Popup input is handled in _input() at high priority to prevent
+	GameMenu from intercepting it.
+	"""
+	if not visible:
+		return
+
+	# Skip if popup is active - already handled in _input()
+	if _focus_mode == "party_picker":
 		return
 
 	# Handle focus switching
@@ -681,6 +853,10 @@ func _close_member_selection_popup(popup_panel: Panel, used_item: bool) -> void:
 	_party_member_tokens.clear()
 	_item_to_use_id = ""
 	_item_to_use_def = {}
+
+	# Clear popup tracking
+	_active_popup = null
+	_active_overlay = null
 
 	# Return focus mode
 	_focus_mode = "items"
@@ -870,6 +1046,23 @@ func _category_of(def: Dictionary) -> String:
 	if _is_recovery_item(def):
 		return "Recovery"
 
+	# Check if it's a capture item
+	if _is_capture_item(def):
+		return "Capture"
+
+	# Check if it's a gift item
+	if _is_gift_item(def):
+		return "Gifts"
+
+	# Check if it's equipment
+	if _is_equipment(def):
+		return "Equipment"
+
+	# Check if it's a battle consumable (not recovery, not capture, not gift)
+	if _is_battle_item(def):
+		return "Battle"
+
+	# Check category field for remaining types
 	for key in ["category", "cat", "type"]:
 		if def.has(key):
 			var cat: String = String(def[key]).strip_edges()
@@ -883,15 +1076,10 @@ func _normalize_category(cat: String) -> String:
 	var key: String = cat.to_lower().strip_edges()
 
 	const MAP: Dictionary = {
-		"consumable": "Consumables", "consumables": "Consumables",
-		"weapon": "Weapons", "weapons": "Weapons",
-		"armor": "Armor",
-		"head": "Headwear", "headwear": "Headwear", "helm": "Headwear",
-		"foot": "Footwear", "footwear": "Footwear", "boots": "Footwear",
-		"bracelet": "Bracelets", "bracelets": "Bracelets", "bangle": "Bracelets",
 		"sigil": "Sigils", "sigils": "Sigils",
-		"material": "Materials", "materials": "Materials",
+		"material": "Material", "materials": "Material",
 		"key": "Key", "key item": "Key", "key items": "Key",
+		"gift": "Gifts", "gifts": "Gifts",
 		"other": "Other"
 	}
 
@@ -928,6 +1116,36 @@ func _is_recovery_item(def: Dictionary) -> bool:
 			var effect: String = String(def[key]).to_lower()
 			if (effect.contains("heal") or effect.contains("restore")) and (effect.contains("hp") or effect.contains("mp")):
 				return true
+	return false
+
+func _is_capture_item(def: Dictionary) -> bool:
+	"""Check if item is a capture item (binds)"""
+	var cat: String = String(def.get("category", "")).to_lower()
+	if cat.contains("capture") or cat.contains("bind"):
+		return true
+	var name: String = String(def.get("name", "")).to_lower()
+	if name.contains("bind"):
+		return true
+	return false
+
+func _is_gift_item(def: Dictionary) -> bool:
+	"""Check if item is a gift item"""
+	var cat: String = String(def.get("category", "")).to_lower()
+	return cat.contains("gift")
+
+func _is_equipment(def: Dictionary) -> bool:
+	"""Check if item is equipment"""
+	var equip_slot: String = String(def.get("equip_slot", "")).to_lower().strip_edges()
+	return equip_slot in ["weapon", "armor", "head", "foot", "bracelet"]
+
+func _is_battle_item(def: Dictionary) -> bool:
+	"""Check if item is a battle consumable (not recovery, not capture, not gift)"""
+	var cat: String = String(def.get("category", "")).to_lower()
+	# Check if it's consumable but not already categorized
+	if cat.contains("consumable") or cat.contains("battle"):
+		# Make sure it's not recovery, capture, or gift
+		if not _is_recovery_item(def) and not _is_capture_item(def) and not _is_gift_item(def):
+			return true
 	return false
 
 func _gather_members() -> Array[String]:
