@@ -237,9 +237,9 @@ func _rebuild_base_stats(token: String) -> void:
 	_add_stat_pair(_base_grid, "Level", str(level))
 
 	if to_next > 0:
-		_add_stat_pair(_base_grid, "XP", "%d / %d" % [xp, to_next])
+		_add_stat_pair(_base_grid, "LXP", "%d / %d" % [xp, to_next])
 	else:
-		_add_stat_pair(_base_grid, "XP", str(xp))
+		_add_stat_pair(_base_grid, "LXP", str(xp))
 
 	# Base stats are not displayed in the grid, only in the radar chart
 
@@ -422,10 +422,12 @@ func _add_stat_pair(grid: GridContainer, label: String, value: String) -> void:
 	"""Add a label/value pair to a grid"""
 	var lbl = Label.new()
 	lbl.text = label + ":"
+	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	grid.add_child(lbl)
 
 	var val = Label.new()
 	val.text = value
+	val.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	grid.add_child(val)
 
 func _add_battle_stat(grid: GridContainer, label: String, value: int) -> void:
