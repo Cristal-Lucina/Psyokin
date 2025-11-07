@@ -316,6 +316,10 @@ func _count_items_in_category(category: String) -> int:
 		var qty: int = _counts[item_id]
 		if qty <= 0:
 			continue
+		if category == "Acquired":
+			# For Acquired, sum total quantities of all items
+			count += qty
+			continue
 		if category == "All":
 			count += 1
 			continue
