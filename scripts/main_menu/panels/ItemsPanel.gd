@@ -22,6 +22,19 @@ const CATEGORIES : Array[String] = [
 	"Capture", "Material", "Gifts", "Key", "Other"
 ]
 
+# Panel animation settings
+const BASE_LEFT_RATIO := 2.0
+const BASE_CENTER_RATIO := 3.5
+const BASE_RIGHT_RATIO := 4.5
+const ACTIVE_SCALE := 1.10  # Active panel grows by 10%
+const INACTIVE_SCALE := 0.95  # Inactive panels shrink by 5%
+const ANIM_DURATION := 0.2  # Animation duration in seconds
+
+# Panel references (for animation)
+@onready var _category_panel: PanelContainer = %CategoryPanel
+@onready var _item_panel: PanelContainer = %ItemPanel
+@onready var _details_panel: PanelContainer = %DetailsPanel
+
 # Scene references
 @onready var _category_list: ItemList = %CategoryList
 @onready var _item_list: ItemList = %ItemList
@@ -125,6 +138,7 @@ func _grab_category_focus() -> void:
 	if _category_list and _category_list.item_count > 0:
 		_focus_mode = "category"
 		_category_list.grab_focus()
+		_animate_panel_focus()
 
 func _cleanup_active_popup() -> void:
 	"""Clean up any active popup and overlay"""
@@ -732,6 +746,7 @@ func _show_member_selection_popup() -> void:
 
 	# Update focus mode
 	_focus_mode = "party_picker"
+	_animate_panel_focus()
 
 	# Track active popup and overlay for cleanup
 	_active_popup = popup_panel
@@ -823,6 +838,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			if _item_list and _item_list.item_count > 0:
 				_focus_mode = "items"
 				_item_list.grab_focus()
+				_animate_panel_focus()
 				get_viewport().set_input_as_handled()
 	elif _focus_mode == "items":
 		if event.is_action_pressed("menu_accept"):
@@ -834,6 +850,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			# Return to category list
 			_focus_mode = "category"
 			_category_list.grab_focus()
+			_animate_panel_focus()
 			get_viewport().set_input_as_handled()
 
 func _on_party_picker_accept() -> void:
@@ -897,11 +914,13 @@ func _close_member_selection_popup(popup_panel: Panel, used_item: bool) -> void:
 	# Grab focus back
 	if _item_list and _item_list.item_count > 0:
 		_item_list.grab_focus()
+		_animate_panel_focus()
 	else:
 		# No items in this category, return to category list
 		_focus_mode = "category"
 		if _category_list:
 			_category_list.grab_focus()
+			_animate_panel_focus()
 
 func _use_item_on_member(item_id: String, item_def: Dictionary, member_token: String) -> void:
 	"""Apply item effect to a party member"""
@@ -1256,3 +1275,42 @@ func _get_member_hp_mp(member_token: String) -> Dictionary:
 		stats["mp"] = stats["mp_max"]
 
 	return stats
+
+# ==============================================================================
+# Panel Animation
+# ==============================================================================
+
+func _animate_panel_focus() -> void:
+	"""Animate panels to highlight which one is currently active (only left and center animate)"""
+	if not _category_panel or not _item_panel or not _details_panel:
+		return
+
+	var left_ratio := BASE_LEFT_RATIO
+	var center_ratio := BASE_CENTER_RATIO
+	var right_ratio := BASE_RIGHT_RATIO  # Details panel always stays at base size
+
+	# Determine which panel gets the active scale (only left and center panels animate)
+	match _focus_mode:
+		"category":
+			left_ratio = BASE_LEFT_RATIO * ACTIVE_SCALE
+			center_ratio = BASE_CENTER_RATIO * INACTIVE_SCALE
+			# right_ratio stays at BASE_RIGHT_RATIO
+		"items":
+			left_ratio = BASE_LEFT_RATIO * INACTIVE_SCALE
+			center_ratio = BASE_CENTER_RATIO * ACTIVE_SCALE
+			# right_ratio stays at BASE_RIGHT_RATIO
+		"party_picker":
+			# When party picker is active, shrink both left and center
+			left_ratio = BASE_LEFT_RATIO * INACTIVE_SCALE
+			center_ratio = BASE_CENTER_RATIO * INACTIVE_SCALE
+			# right_ratio stays at BASE_RIGHT_RATIO
+
+	# Create tweens for smooth animation
+	var tween := create_tween()
+	tween.set_parallel(true)
+	tween.set_trans(Tween.TRANS_CUBIC)
+	tween.set_ease(Tween.EASE_OUT)
+
+	tween.tween_property(_category_panel, "size_flags_stretch_ratio", left_ratio, ANIM_DURATION)
+	tween.tween_property(_item_panel, "size_flags_stretch_ratio", center_ratio, ANIM_DURATION)
+	tween.tween_property(_details_panel, "size_flags_stretch_ratio", right_ratio, ANIM_DURATION)
