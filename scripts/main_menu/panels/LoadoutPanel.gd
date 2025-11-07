@@ -1446,7 +1446,13 @@ func _show_equipment_details(member_token: String, slot: String) -> void:
 			if item_def.has("skill_acc_boost"):
 				details += "Skill Acc: [color=#FFC0CB]%d[/color]\n" % int(item_def.get("skill_acc_boost", 0))
 			if item_def.has("watk_type_tag"):
-				details += "Type: [color=#FFC0CB]%s[/color]\n" % String(item_def.get("watk_type_tag", ""))
+				var wtype: String = String(item_def.get("watk_type_tag", ""))
+				details += "Type: [color=#FFC0CB]%s[/color]\n" % wtype
+				var weakness: String = _get_weapon_type_weakness(wtype)
+				if weakness != "":
+					details += "Weak to: [color=#FF6666]%s[/color]\n" % weakness
+				elif wtype.to_lower() == "wand":
+					details += "[color=#FF8866]+10%% Physical Damage Taken[/color]\n"
 
 		"armor":
 			if item_def.has("armor_flat"):
@@ -1583,6 +1589,17 @@ func _get_type_resistance(mind_type: String) -> String:
 		"data": return "Data"
 		"void": return "Void"
 		"omega": return ""
+		_: return ""
+
+func _get_weapon_type_weakness(weapon_type: String) -> String:
+	"""Get what weapon type this type is weak to"""
+	var type_lower: String = weapon_type.to_lower()
+	match type_lower:
+		"slash": return "Pierce"
+		"pierce": return "Impact"
+		"impact": return "Slash"
+		"blunt": return "Slash"
+		"wand": return ""  # Wand has no triangle weakness
 		_: return ""
 
 func _get_hero_active_type() -> String:
