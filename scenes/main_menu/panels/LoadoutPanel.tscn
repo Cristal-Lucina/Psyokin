@@ -66,14 +66,6 @@ theme_override_constants/margin_bottom = 10
 layout_mode = 2
 theme_override_constants/separation = 12
 
-[node name="MemberName" type="Label" parent="Row/Middle/Margin/VBox"]
-custom_minimum_size = Vector2(0, 28)
-layout_mode = 2
-theme_override_colors/font_color = Color(1, 1, 0, 1)
-theme_override_font_sizes/font_size = 20
-text = "(Select a member)"
-horizontal_alignment = 1
-
 [node name="MindSection" type="VBoxContainer" parent="Row/Middle/Margin/VBox"]
 layout_mode = 2
 theme_override_constants/separation = 6
