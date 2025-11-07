@@ -362,10 +362,10 @@ func _create_affinity_cell(member_name: String, tier: String) -> PanelContainer:
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	hbox.add_child(label)
 
-	# Tier value - 4 characters wide, blue color
+	# Tier value - 5 characters wide, blue color (matches attributes)
 	var value_label := Label.new()
 	value_label.text = tier
-	value_label.custom_minimum_size = Vector2(24, 0)  # ~4 characters at 12pt
+	value_label.custom_minimum_size = Vector2(30, 0)  # ~5 characters at 12pt
 	value_label.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	value_label.add_theme_font_size_override("font_size", 12)
 	value_label.add_theme_color_override("font_color", Color(0.5, 0.7, 1.0))  # Blue
@@ -526,7 +526,8 @@ class RadarChart extends Control:
 	"""Draws a radar/spider chart for visualizing multiple stat values"""
 
 	var _stat_labels: Array[String] = []
-	var _stat_values: Array[float] = []
+	var _stat_values: Array[float] = []  # Actual values for labels
+	var _stat_values_capped: Array[float] = []  # Capped values for visual display
 	var _max_value: float = 100.0
 
 	# Colors
@@ -538,11 +539,12 @@ class RadarChart extends Control:
 	func set_stats(labels: Array[String], values: Array[float]) -> void:
 		"""Set the stat labels and values to display"""
 		_stat_labels = labels.duplicate()
-		_stat_values = values.duplicate()
+		_stat_values = values.duplicate()  # Keep original values for labels
 
-		# Cap all values at 10 (max for the chart)
-		for i in range(_stat_values.size()):
-			_stat_values[i] = min(_stat_values[i], 10.0)
+		# Create capped version for visual display
+		_stat_values_capped = []
+		for val in values:
+			_stat_values_capped.append(min(val, 10.0))
 
 		# Set max value to 10 for consistent scaling
 		_max_value = 10.0
@@ -590,8 +592,8 @@ class RadarChart extends Control:
 			draw_line(center, point, grid_color, 1.0)
 
 	func _draw_stat_polygon(center: Vector2, radius: float, num_stats: int) -> void:
-		"""Draw the stat value polygon"""
-		if _stat_values.size() != num_stats:
+		"""Draw the stat value polygon (using capped values for visual display)"""
+		if _stat_values_capped.size() != num_stats:
 			return
 
 		var angle_step: float = TAU / float(num_stats)
@@ -599,7 +601,7 @@ class RadarChart extends Control:
 
 		for i in range(num_stats):
 			var angle: float = -PI / 2.0 + angle_step * i
-			var value_ratio: float = clamp(_stat_values[i] / _max_value, 0.0, 1.0)
+			var value_ratio: float = clamp(_stat_values_capped[i] / _max_value, 0.0, 1.0)
 			var point: Vector2 = center + Vector2(cos(angle), sin(angle)) * radius * value_ratio
 			points.append(point)
 
