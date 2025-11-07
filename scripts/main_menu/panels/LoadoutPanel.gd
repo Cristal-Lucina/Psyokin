@@ -1112,13 +1112,13 @@ func _refresh_mind_row(member_token: String) -> void:
 		var active_type: String = _get_hero_active_type()
 		_mind_value.text = "%s - Active: %s" % [mt, active_type]
 		if _mind_switch_btn:
-			_mind_switch_btn.visible = true
+			_mind_switch_btn.text = "Switch"
 			_mind_switch_btn.disabled = false
 	else:
 		# For other members: just "Data"
 		_mind_value.text = (mt if mt != "" else "—")
 		if _mind_switch_btn:
-			_mind_switch_btn.visible = false
+			_mind_switch_btn.text = "—"
 			_mind_switch_btn.disabled = true
 
 func _fetch_equip_for(member_token: String) -> Dictionary:
