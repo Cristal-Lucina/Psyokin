@@ -50,7 +50,10 @@ layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
 theme_override_font_sizes/font_size = 16
 text = "ACQUIRED PERKS"
-horizontal_alignment = 1
+horizontal_alignment = 0
+
+[node name="SeparatorAfterAcquired" type="HSeparator" parent="Root/LeftColumn"]
+layout_mode = 2
 
 [node name="AcquiredScroll" type="ScrollContainer" parent="Root/LeftColumn"]
 custom_minimum_size = Vector2(0, 150)
@@ -70,7 +73,10 @@ layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
 theme_override_font_sizes/font_size = 16
 text = "PERK DETAILS"
-horizontal_alignment = 1
+horizontal_alignment = 0
+
+[node name="SeparatorAfterDetails" type="HSeparator" parent="Root/LeftColumn"]
+layout_mode = 2
 
 [node name="PerkName" type="Label" parent="Root/LeftColumn"]
 unique_name_in_owner = true
@@ -105,7 +111,10 @@ layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
 theme_override_font_sizes/font_size = 16
 text = "PERKS GRID"
-horizontal_alignment = 1
+horizontal_alignment = 0
+
+[node name="SeparatorAfterGrid" type="HSeparator" parent="Root/GridColumn"]
+layout_mode = 2
 
 [node name="GridScroll" type="ScrollContainer" parent="Root/GridColumn"]
 layout_mode = 2
