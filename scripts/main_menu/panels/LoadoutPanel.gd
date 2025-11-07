@@ -786,10 +786,7 @@ func _rebuild_sigils(member_token: String) -> void:
 	for s in sockets:
 		if String(s) != "": used += 1
 
-	# Ensure at least 8 slots are shown
-	if cap < 8:
-		cap = 8
-
+	# Title shows actual capacity from bracelet
 	if _sigils_title:
 		_sigils_title.text = "SIGILS  (%d/%d)" % [used, cap]
 
@@ -800,9 +797,9 @@ func _rebuild_sigils(member_token: String) -> void:
 		_sigils_list.add_child(none)
 		return
 
-	# Build 2x4 grid (2 columns, up to 8 sigils)
-	# GridContainer automatically wraps to next row after 2 items
-	for idx in range(cap):
+	# Always create 8 slots, but hide ones beyond bracelet capacity
+	var total_slots: int = 8
+	for idx in range(total_slots):
 		var nm: Label = Label.new()
 		nm.custom_minimum_size = Vector2(180, 0)  # Match equipment label width
 		nm.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -815,6 +812,10 @@ func _rebuild_sigils(member_token: String) -> void:
 		if cur_id != "":
 			nm.add_theme_color_override("font_color", Color(0.4, 0.7, 1.0))  # Blue color
 
+		# Hide slots beyond bracelet capacity
+		if idx >= cap:
+			nm.visible = false
+
 		_sigils_list.add_child(nm)
 
 		# Always show "Equip" button - popup will handle unequip option
@@ -823,6 +824,11 @@ func _rebuild_sigils(member_token: String) -> void:
 		btn.add_theme_font_size_override("font_size", 11)
 		btn.text = "Equip"
 		btn.pressed.connect(Callable(self, "_on_equip_sigil").bind(member_token, idx))
+
+		# Hide button if slot is beyond capacity
+		if idx >= cap:
+			btn.visible = false
+
 		_sigils_list.add_child(btn)
 
 	if _btn_manage:
