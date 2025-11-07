@@ -52,7 +52,7 @@ const CATEGORIES: Array[Dictionary] = [
 
 @onready var _primary_btn: Button = %PrimaryBtn
 @onready var _back_btn: Button = %BackBtn
-@onready var _advance_btn: Button = %AdvanceBtn
+# @onready var _advance_btn: Button = %AdvanceBtn  # Removed from scene
 
 ## ═══════════════════════════════════════════════════════════════════════════
 ## STATE MACHINE
@@ -108,8 +108,8 @@ func _wire_signals() -> void:
 	if _back_btn and not _back_btn.pressed.is_connected(_on_back_from_details):
 		_back_btn.pressed.connect(_on_back_from_details)
 
-	if _advance_btn and not _advance_btn.pressed.is_connected(_on_advance_event):
-		_advance_btn.pressed.connect(_on_advance_event)
+	# if _advance_btn and not _advance_btn.pressed.is_connected(_on_advance_event):
+	# 	_advance_btn.pressed.connect(_on_advance_event)  # Button removed from scene
 
 	# aMainEventSystem signals
 	if _main_event:
