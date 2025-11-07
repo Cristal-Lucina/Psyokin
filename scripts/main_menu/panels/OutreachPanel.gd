@@ -553,23 +553,23 @@ func _animate_panel_focus(active_state: NavState) -> void:
 
 	var left_ratio := BASE_LEFT_RATIO
 	var center_ratio := BASE_CENTER_RATIO
-	var right_ratio := BASE_RIGHT_RATIO
+	var right_ratio := BASE_RIGHT_RATIO  # Details panel always stays at base size
 
-	# Determine which panel gets the active scale
+	# Determine which panel gets the active scale (only left and center panels animate)
 	match active_state:
 		NavState.CATEGORY_SELECT:
 			left_ratio = BASE_LEFT_RATIO * ACTIVE_SCALE
 			center_ratio = BASE_CENTER_RATIO * INACTIVE_SCALE
-			right_ratio = BASE_RIGHT_RATIO * INACTIVE_SCALE
+			# right_ratio stays at BASE_RIGHT_RATIO
 		NavState.MISSION_LIST:
 			left_ratio = BASE_LEFT_RATIO * INACTIVE_SCALE
 			center_ratio = BASE_CENTER_RATIO * ACTIVE_SCALE
-			right_ratio = BASE_RIGHT_RATIO * INACTIVE_SCALE
+			# right_ratio stays at BASE_RIGHT_RATIO
 		NavState.POPUP_ACTIVE:
-			# When popup is active, focus the right panel
+			# When popup is active, still only animate left/center
 			left_ratio = BASE_LEFT_RATIO * INACTIVE_SCALE
 			center_ratio = BASE_CENTER_RATIO * INACTIVE_SCALE
-			right_ratio = BASE_RIGHT_RATIO * ACTIVE_SCALE
+			# right_ratio stays at BASE_RIGHT_RATIO
 
 	# Create tweens for smooth animation
 	var tween := create_tween()
