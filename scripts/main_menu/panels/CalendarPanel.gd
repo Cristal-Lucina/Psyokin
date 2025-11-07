@@ -17,9 +17,19 @@ var _label_month : Label
 var _grid        : GridContainer
 var _btn_prev    : Button
 var _btn_next    : Button
+var _btn_today   : Button
 var _events_list : VBoxContainer  # For future Important Dates functionality
 
 const WEEKDAY_HEADERS : PackedStringArray = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"]
+
+# Month navigation state
+var _current_year: int = 2025  # The actual current year/month from calendar system
+var _current_month: int = 5
+var _current_day: int = 1
+var _view_year: int = 2025     # The year/month being viewed (can navigate)
+var _view_month: int = 5
+var _earliest_year: int = 2025  # Earliest experienced month (for now, same as current)
+var _earliest_month: int = 5
 
 func _ready() -> void:
 	super()  # Call PanelBase._ready() for lifecycle management
@@ -34,6 +44,7 @@ func _ready() -> void:
 	_grid        = get_node_or_null("%Grid")
 	_btn_prev    = get_node_or_null("%PrevBtn")
 	_btn_next    = get_node_or_null("%NextBtn")
+	_btn_today   = get_node_or_null("%TodayBtn")
 	_events_list = get_node_or_null("%EventsList")
 
 	# Debug: Check if critical nodes were found
@@ -42,6 +53,7 @@ func _ready() -> void:
 	print("  _grid: ", _grid != null)
 	print("  _btn_prev: ", _btn_prev != null)
 	print("  _btn_next: ", _btn_next != null)
+	print("  _btn_today: ", _btn_today != null)
 	print("  _events_list: ", _events_list != null)
 
 	if not _grid:
@@ -49,13 +61,13 @@ func _ready() -> void:
 		push_error("[CalendarPanel._ready] Scene structure may be incorrect. Expected paths: Body/Grid, Grid, Root/Grid, or MonthGrid")
 		return
 
-	# current-month-only
+	# Wire up navigation buttons
 	if _btn_prev:
-		_btn_prev.visible = false
-		_btn_prev.disabled = true
+		_btn_prev.pressed.connect(_on_prev_month)
 	if _btn_next:
-		_btn_next.visible = false
-		_btn_next.disabled = true
+		_btn_next.pressed.connect(_on_next_month)
+	if _btn_today:
+		_btn_today.pressed.connect(_on_today_pressed)
 
 	# build a grid if missing
 	if _grid == null:
@@ -128,23 +140,33 @@ func _rebuild() -> void:
 		c.queue_free()
 
 	var cal: Node = get_node_or_null("/root/aCalendarSystem")
-	var year: int = 2025
-	var month: int = 5
-	var day: int = 1
 
+	# Get current date from calendar system (the "today" date)
 	if cal:
 		var d_v: Variant = cal.get("current_date")
 		if typeof(d_v) == TYPE_DICTIONARY:
 			var d: Dictionary = d_v
-			year  = int(d.get("year", year))
-			month = int(d.get("month", month))
-			day   = int(d.get("day", day))
+			_current_year  = int(d.get("year", 2025))
+			_current_month = int(d.get("month", 5))
+			_current_day   = int(d.get("day", 1))
 
-	# month header (no year) - uppercase for style consistency
+	# Initialize view to current month if not set
+	if _view_year == 0 or _view_month == 0:
+		_view_year = _current_year
+		_view_month = _current_month
+
+	# For now, earliest is same as current (TODO: track earliest experienced month)
+	_earliest_year = _current_year
+	_earliest_month = _current_month
+
+	# Update button states
+	_update_navigation_buttons()
+
+	# month header (uppercase for style consistency)
 	if _label_month and cal and cal.has_method("get_month_name"):
-		_label_month.text = String(cal.call("get_month_name", month)).to_upper()
+		_label_month.text = String(cal.call("get_month_name", _view_month)).to_upper()
 	elif _label_month:
-		_label_month.text = _month_name_local(month).to_upper()
+		_label_month.text = _month_name_local(_view_month).to_upper()
 
 	# weekday header
 	for i in range(7):
@@ -156,8 +178,8 @@ func _rebuild() -> void:
 		_grid.add_child(h)
 
 	# layout math
-	var first_idx: int = _weekday_0_mon(year, month, 1) # 0=Mon..6=Sun
-	var total_days: int = _days_in_month(year, month)
+	var first_idx: int = _weekday_0_mon(_view_year, _view_month, 1) # 0=Mon..6=Sun
+	var total_days: int = _days_in_month(_view_year, _view_month)
 
 	# blanks before day 1
 	for _i in range(first_idx):
@@ -165,7 +187,8 @@ func _rebuild() -> void:
 
 	# day cells
 	for dnum in range(1, total_days + 1):
-		var is_today: bool = (dnum == day)
+		# Only highlight if viewing current month
+		var is_today: bool = (_view_year == _current_year and _view_month == _current_month and dnum == _current_day)
 		_grid.add_child(_make_day_cell(dnum, is_today))
 
 	# pad to full rows (optional nicety)
@@ -247,3 +270,54 @@ static func _days_in_month(y: int, m: int) -> int:
 			var leap: bool = ((y % 4 == 0) and (y % 100 != 0)) or (y % 400 == 0)
 			return 29 if leap else 28
 		_: return 30
+
+# --- navigation handlers -------------------------------------------------------
+
+func _on_prev_month() -> void:
+	"""Navigate to previous month"""
+	_view_month -= 1
+	if _view_month < 1:
+		_view_month = 12
+		_view_year -= 1
+	_rebuild()
+
+func _on_next_month() -> void:
+	"""Navigate to next month"""
+	_view_month += 1
+	if _view_month > 12:
+		_view_month = 1
+		_view_year += 1
+	_rebuild()
+
+func _on_today_pressed() -> void:
+	"""Jump back to current month"""
+	_view_year = _current_year
+	_view_month = _current_month
+	_rebuild()
+
+func _update_navigation_buttons() -> void:
+	"""Update enabled/disabled state of navigation buttons"""
+	# Can go back to earliest experienced month
+	var at_earliest: bool = (_view_year == _earliest_year and _view_month == _earliest_month)
+
+	# Can go forward 1 month from current
+	var one_month_ahead_year: int = _current_year
+	var one_month_ahead_month: int = _current_month + 1
+	if one_month_ahead_month > 12:
+		one_month_ahead_month = 1
+		one_month_ahead_year += 1
+
+	var at_max_future: bool = (_view_year == one_month_ahead_year and _view_month == one_month_ahead_month) or \
+	                          (_view_year > one_month_ahead_year) or \
+	                          (_view_year == one_month_ahead_year and _view_month > one_month_ahead_month)
+
+	# Update button states
+	if _btn_prev:
+		_btn_prev.disabled = at_earliest
+
+	if _btn_next:
+		_btn_next.disabled = at_max_future
+
+	# Today button is disabled if already viewing current month
+	if _btn_today:
+		_btn_today.disabled = (_view_year == _current_year and _view_month == _current_month)
