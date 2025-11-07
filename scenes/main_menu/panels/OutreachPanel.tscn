@@ -32,22 +32,6 @@ grow_horizontal = 2
 grow_vertical = 2
 theme_override_constants/separation = 10
 
-[node name="Header" type="HBoxContainer" parent="Root"]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="Title" type="Label" parent="Root/Header"]
-layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
-theme_override_font_sizes/font_size = 16
-text = "OUTREACH"
-horizontal_alignment = 0
-
-[node name="Spacer" type="Control" parent="Root/Header"]
-layout_mode = 2
-size_flags_horizontal = 3
-
 [node name="MainContent" type="HBoxContainer" parent="Root"]
 unique_name_in_owner = true
 layout_mode = 2
