@@ -301,10 +301,14 @@ func _unhandled_input(event: InputEvent) -> void:
 						_button_index = 2
 				_update_button_focus()
 				get_viewport().set_input_as_handled()
+			elif event.is_action_pressed("menu_back"):
+				# Back button exits the calendar panel
+				# Let PanelBase or GameMenu handle it (don't mark as handled)
+				pass
 
 		FocusState.BUTTONS:
 			# In button navigation mode
-			if event.is_action_pressed("move_down") or event.is_action_pressed("ui_down"):
+			if event.is_action_pressed("move_down") or event.is_action_pressed("ui_down") or event.is_action_pressed("menu_back"):
 				# Go back to calendar view
 				_focus_state = FocusState.CALENDAR
 				_clear_button_focus()
