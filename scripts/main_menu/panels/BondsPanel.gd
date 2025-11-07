@@ -66,8 +66,8 @@ var _nav_index: int = 0  # Current selection index
 var _nav_detail_elements: Array[Control] = []  # Detail buttons (Story Points, Layer transitions)
 var _nav_detail_index: int = 0  # Current selection in detail view
 
-@onready var _filter    : OptionButton   = %Filter
-@onready var _refresh   : Button         = %RefreshBtn
+# @onready var _filter    : OptionButton   = %Filter  # Removed
+# @onready var _refresh   : Button         = %RefreshBtn  # Removed
 @onready var _scroll    : ScrollContainer = %Scroll
 @onready var _list_box  : VBoxContainer  = %List
 
@@ -122,16 +122,17 @@ func _ready() -> void:
 	_hide_level_cbxp_labels()
 	_wire_system_signals()
 
-	if _filter != null and _filter.item_count == 0:
-		_filter.add_item("All",    Filter.ALL)
-		_filter.add_item("Known",  Filter.KNOWN)
-		_filter.add_item("Locked", Filter.LOCKED)
-		_filter.add_item("Maxed",  Filter.MAXED)
-	if _filter != null and not _filter.item_selected.is_connected(_on_filter_changed):
-		_filter.item_selected.connect(_on_filter_changed)
+	# Filter and refresh button removed - always show all bonds
+	# if _filter != null and _filter.item_count == 0:
+	#	_filter.add_item("All",    Filter.ALL)
+	#	_filter.add_item("Known",  Filter.KNOWN)
+	#	_filter.add_item("Locked", Filter.LOCKED)
+	#	_filter.add_item("Maxed",  Filter.MAXED)
+	# if _filter != null and not _filter.item_selected.is_connected(_on_filter_changed):
+	#	_filter.item_selected.connect(_on_filter_changed)
 
-	if _refresh != null and not _refresh.pressed.is_connected(_rebuild):
-		_refresh.pressed.connect(_rebuild)
+	# if _refresh != null and not _refresh.pressed.is_connected(_rebuild):
+	#	_refresh.pressed.connect(_rebuild)
 
 	if _story_btn != null and not _story_btn.pressed.is_connected(_on_story_points_pressed):
 		_story_btn.pressed.connect(_on_story_points_pressed)
@@ -960,9 +961,11 @@ func _pretty_list(arr: PackedStringArray) -> String:
 	return txt
 
 func _get_filter_id() -> int:
-	if _filter == null:
-		return Filter.ALL
-	return int(_filter.get_selected_id())
+	# Always show all bonds (filter removed)
+	return Filter.ALL
+	# if _filter == null:
+	#	return Filter.ALL
+	# return int(_filter.get_selected_id())
 
 # ─────────────────────────────────────────────────────────────
 # Layer Unlock Rewards
