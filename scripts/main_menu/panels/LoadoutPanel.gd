@@ -790,13 +790,6 @@ func _rebuild_sigils(member_token: String) -> void:
 	if _sigils_title:
 		_sigils_title.text = "SIGILS  (%d/%d)" % [used, cap]
 
-	if cap <= 0:
-		var none: Label = Label.new()
-		none.text = "No bracelet slots"
-		none.autowrap_mode = TextServer.AUTOWRAP_WORD
-		_sigils_list.add_child(none)
-		return
-
 	# Always create 8 slots, but hide ones beyond bracelet capacity
 	var total_slots: int = 8
 	for idx in range(total_slots):
