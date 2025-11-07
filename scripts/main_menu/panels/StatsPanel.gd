@@ -286,19 +286,22 @@ func _rebuild_affinity_grid(token: String) -> void:
 	"""Build affinity grid showing relationships with all party members"""
 	_clear_grid(_affinity_grid)
 
-	for member_token in PARTY_MEMBERS:
-		# Skip if this is the current member (show blank cell)
-		if member_token.to_lower() == token.to_lower():
-			var cell = _create_affinity_cell("—", "—")
-			_affinity_grid.add_child(cell)
-		else:
-			# Get affinity value
-			var affinity: int = _get_affinity(token, member_token)
-			var tier_text: String = _get_affinity_tier_text(affinity)
-			var member_name: String = _get_display_name(member_token)
+	# Get list of recruited party members
+	var recruited_members: Array[String] = _gather_party_tokens()
 
-			var cell = _create_affinity_cell(member_name, tier_text)
-			_affinity_grid.add_child(cell)
+	# Only show affinity for recruited members (excluding current member)
+	for member_token in recruited_members:
+		# Skip if this is the current member
+		if member_token.to_lower() == token.to_lower():
+			continue
+
+		# Get affinity value
+		var affinity: int = _get_affinity(token, member_token)
+		var tier_text: String = _get_affinity_tier_text(affinity)
+		var member_name: String = _get_display_name(member_token)
+
+		var cell = _create_affinity_cell(member_name, tier_text)
+		_affinity_grid.add_child(cell)
 
 func _get_affinity(member1: String, member2: String) -> int:
 	"""Get affinity value between two members"""
