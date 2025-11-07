@@ -255,23 +255,23 @@ func _add_sigil_instances() -> void:
 	if not _sig:
 		return
 
-	# Get all sigil instances
-	var instances: Array = []
-	if _sig.has_method("get_all_instances"):
-		var inst_data: Variant = _sig.call("get_all_instances")
-		if typeof(inst_data) == TYPE_ARRAY:
-			instances = inst_data
+	# Get all sigil instance IDs
+	var instance_ids: PackedStringArray = PackedStringArray()
+	if _sig.has_method("list_all_instances"):
+		instance_ids = _sig.call("list_all_instances", false)  # false = include equipped
 
-	for inst in instances:
-		if typeof(inst) != TYPE_DICTIONARY:
-			continue
-		var inst_dict: Dictionary = inst
-		var inst_id: String = String(inst_dict.get("instance_id", ""))
-		if inst_id == "":
+	print("[ItemsPanel] Found %d sigil instances" % instance_ids.size())
+
+	for inst_id in instance_ids:
+		var inst_dict: Dictionary = {}
+		if _sig.has_method("get_instance_info"):
+			inst_dict = _sig.call("get_instance_info", inst_id)
+
+		if inst_dict.is_empty():
 			continue
 
 		# Create virtual item def
-		var base_id: String = String(inst_dict.get("sigil_id", ""))
+		var base_id: String = String(inst_dict.get("base_id", ""))
 		var base_def: Dictionary = _defs.get(base_id, {})
 
 		var virtual_def: Dictionary = base_def.duplicate()
@@ -291,6 +291,7 @@ func _add_sigil_instances() -> void:
 			var member_name: String = _member_display_name(equipped_by)
 			if not _equipped_by[inst_id].has(member_name):
 				_equipped_by[inst_id].append(member_name)
+			print("[ItemsPanel] Sigil %s equipped by %s" % [inst_id, member_name])
 
 func _format_sigil_name(inst: Dictionary, base_def: Dictionary) -> String:
 	"""Format sigil instance name with level"""
