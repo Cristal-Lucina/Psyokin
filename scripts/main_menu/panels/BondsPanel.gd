@@ -1077,87 +1077,114 @@ func _on_story_points_pressed() -> void:
 	var canvas_layer := CanvasLayer.new()
 	canvas_layer.name = "StoryOverlayLayer"
 	canvas_layer.layer = 100  # Very high layer to be on top
+	canvas_layer.process_mode = Node.PROCESS_MODE_ALWAYS
 
-	# Full-screen overlay (blocks input behind it)
+	# Full-screen overlay to center the panel
 	var overlay := Control.new()
 	overlay.name = "StoryOverlay"
 	overlay.visible = true
 	overlay.mouse_filter = Control.MOUSE_FILTER_STOP
 	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	overlay.process_mode = Node.PROCESS_MODE_ALWAYS
 
 	# Dim background
 	var dim := ColorRect.new()
-	dim.color = Color(0, 0, 0, 0.65) # darker → more opaque
+	dim.color = Color(0, 0, 0, 0.65)
 	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
 	overlay.add_child(dim)
 
-	# Margin frame to keep text off edges
-	var margins := MarginContainer.new()
-	margins.set_anchors_preset(Control.PRESET_FULL_RECT)
-	margins.add_theme_constant_override("margin_left", 32)
-	margins.add_theme_constant_override("margin_right", 32)
-	margins.add_theme_constant_override("margin_top", 32)
-	margins.add_theme_constant_override("margin_bottom", 32)
-	overlay.add_child(margins)
+	# Toast-style panel (centered)
+	var panel := Panel.new()
+	panel.custom_minimum_size = Vector2(600, 500)
+	panel.anchors_preset = Control.PRESET_CENTER
+	panel.anchor_left = 0.5
+	panel.anchor_top = 0.5
+	panel.anchor_right = 0.5
+	panel.anchor_bottom = 0.5
+	panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	panel.grow_vertical = Control.GROW_DIRECTION_BOTH
+	panel.offset_left = -300  # Half of width
+	panel.offset_top = -250   # Half of height
+	panel.offset_right = 300
+	panel.offset_bottom = 250
+	panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	panel.process_mode = Node.PROCESS_MODE_ALWAYS
 
-	# Panel + content
-	var panel := PanelContainer.new()
-	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	margins.add_child(panel)
+	# Toast-style background
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.15, 0.15, 0.15, 1.0)  # Dark gray, fully opaque
+	style.border_color = Color(1.0, 0.7, 0.75, 1.0)  # Pink border
+	style.set_border_width_all(2)
+	style.corner_radius_top_left = 8
+	style.corner_radius_top_right = 8
+	style.corner_radius_bottom_left = 8
+	style.corner_radius_bottom_right = 8
+	panel.add_theme_stylebox_override("panel", style)
 
-	var root := VBoxContainer.new()
-	root.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	root.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	panel.add_child(root)
+	overlay.add_child(panel)
 
-	# Header row: Back button + title
-	var header := HBoxContainer.new()
-	header.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	root.add_child(header)
+	# Margin container for padding
+	var margin := MarginContainer.new()
+	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+	margin.add_theme_constant_override("margin_left", 20)
+	margin.add_theme_constant_override("margin_top", 20)
+	margin.add_theme_constant_override("margin_right", 20)
+	margin.add_theme_constant_override("margin_bottom", 20)
+	panel.add_child(margin)
 
-	var back_btn := Button.new()
-	back_btn.text = "Back"
-	back_btn.focus_mode = Control.FOCUS_ALL
-	back_btn.custom_minimum_size = Vector2(80, 0)
-	back_btn.pressed.connect(func() -> void:
-		_close_story_overlay()
-		# Restore focus to detail view after closing overlay
-		call_deferred("_enter_bond_detail_state")
-	)
-	header.add_child(back_btn)
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 12)
+	margin.add_child(vbox)
 
-	var spacer := Control.new()
-	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	header.add_child(spacer)
-
+	# Title
 	var title := Label.new()
 	title.text = "%s — Story Points" % disp
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	header.add_child(title)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 18)
+	vbox.add_child(title)
 
 	# Scrollable body
 	var scroll := ScrollContainer.new()
-	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.custom_minimum_size = Vector2(560, 380)
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_ALWAYS
-	root.add_child(scroll)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	vbox.add_child(scroll)
 
 	var body := VBoxContainer.new()
-	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	body.custom_minimum_size = Vector2(560, 0)
 	scroll.add_child(body)
 
 	# Fill with bullets (or placeholder)
 	if points.is_empty():
 		var none := Label.new()
 		none.text = "No story points logged yet."
+		none.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		body.add_child(none)
 	else:
 		for p_str in points:
 			var row := Label.new()
 			row.text = "• " + p_str
+			row.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 			body.add_child(row)
+
+	# Buttons
+	var hbox := HBoxContainer.new()
+	hbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	hbox.add_theme_constant_override("separation", 12)
+	vbox.add_child(hbox)
+
+	var back_btn := Button.new()
+	back_btn.text = "Close"
+	back_btn.focus_mode = Control.FOCUS_ALL
+	back_btn.custom_minimum_size = Vector2(100, 40)
+	back_btn.process_mode = Node.PROCESS_MODE_ALWAYS
+	back_btn.pressed.connect(func() -> void:
+		_close_story_overlay()
+		# Restore focus to detail view after closing overlay
+		call_deferred("_enter_bond_detail_state")
+	)
+	hbox.add_child(back_btn)
 
 	# Add overlay to canvas layer
 	canvas_layer.add_child(overlay)
