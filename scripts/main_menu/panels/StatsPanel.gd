@@ -252,18 +252,18 @@ func _rebuild_battle_stats(token: String) -> void:
 	var skill_boost: int = weapon.get("skill_acc_boost", 0)
 	var s_atk: int = mnd + skill_boost
 
-	_add_battle_stat(_battle_grid, "MAX HP", profile.get("hp_max", 0))
-	_add_battle_stat(_battle_grid, "MAX MP", profile.get("mp_max", 0))
-	_add_battle_stat(_battle_grid, "P ATK", weapon.get("attack", 0))
-	_add_battle_stat(_battle_grid, "S ATK", s_atk)
-	_add_battle_stat(_battle_grid, "P DEF", defense.get("pdef", 0))
-	_add_battle_stat(_battle_grid, "S DEF", defense.get("mdef", 0))
-	_add_battle_stat(_battle_grid, "P ACC", weapon.get("accuracy", 0))
-	_add_battle_stat(_battle_grid, "S ACC", skill_boost)
-	_add_battle_stat(_battle_grid, "EVA", defense.get("peva", 0))  # Using physical evasion
-	_add_battle_stat(_battle_grid, "SPD", defense.get("speed", 0))
-	_add_battle_stat(_battle_grid, "AIL R", defense.get("ail_resist_pct", 0))
-	_add_battle_stat(_battle_grid, "CRIT", weapon.get("crit_bonus_pct", 0))
+	_add_battle_stat(_battle_grid, "Max HP", profile.get("hp_max", 0))
+	_add_battle_stat(_battle_grid, "Max MP", profile.get("mp_max", 0))
+	_add_battle_stat(_battle_grid, "Physical Attack", weapon.get("attack", 0))
+	_add_battle_stat(_battle_grid, "Skill Attack", s_atk)
+	_add_battle_stat(_battle_grid, "Physical Defense", defense.get("pdef", 0))
+	_add_battle_stat(_battle_grid, "Skill Defense", defense.get("mdef", 0))
+	_add_battle_stat(_battle_grid, "Physical Accuracy", weapon.get("accuracy", 0))
+	_add_battle_stat(_battle_grid, "Skill Accuracy", skill_boost)
+	_add_battle_stat(_battle_grid, "Evasion", defense.get("peva", 0))
+	_add_battle_stat(_battle_grid, "Speed", defense.get("speed", 0))
+	_add_battle_stat(_battle_grid, "Ailment Resistance", defense.get("ail_resist_pct", 0))
+	_add_battle_stat(_battle_grid, "Critical Rate", weapon.get("crit_bonus_pct", 0))
 
 func _get_equipment(token: String) -> Dictionary:
 	"""Get equipped items for a member"""
