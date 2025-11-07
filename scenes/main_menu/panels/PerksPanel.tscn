@@ -24,86 +24,6 @@ grow_horizontal = 2
 grow_vertical = 2
 theme_override_constants/separation = 16
 
-[node name="LeftColumn" type="VBoxContainer" parent="Root"]
-custom_minimum_size = Vector2(320, 0)
-layout_mode = 2
-theme_override_constants/separation = 12
-
-[node name="PointsRow" type="HBoxContainer" parent="Root/LeftColumn"]
-layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="PointsLabel" type="Label" parent="Root/LeftColumn/PointsRow"]
-layout_mode = 2
-text = "PERK POINTS:"
-
-[node name="PointsValue" type="Label" parent="Root/LeftColumn/PointsRow"]
-unique_name_in_owner = true
-layout_mode = 2
-text = "0"
-
-[node name="Separator1" type="HSeparator" parent="Root/LeftColumn"]
-layout_mode = 2
-
-[node name="AcquiredLabel" type="Label" parent="Root/LeftColumn"]
-layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
-theme_override_font_sizes/font_size = 16
-text = "ACQUIRED PERKS"
-horizontal_alignment = 0
-
-[node name="SeparatorAfterAcquired" type="HSeparator" parent="Root/LeftColumn"]
-layout_mode = 2
-
-[node name="AcquiredScroll" type="ScrollContainer" parent="Root/LeftColumn"]
-custom_minimum_size = Vector2(0, 150)
-layout_mode = 2
-
-[node name="AcquiredList" type="ItemList" parent="Root/LeftColumn/AcquiredScroll"]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_horizontal = 3
-size_flags_vertical = 3
-
-[node name="Separator2" type="HSeparator" parent="Root/LeftColumn"]
-layout_mode = 2
-
-[node name="DetailsLabel" type="Label" parent="Root/LeftColumn"]
-layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
-theme_override_font_sizes/font_size = 16
-text = "PERK DETAILS"
-horizontal_alignment = 0
-
-[node name="SeparatorAfterDetails" type="HSeparator" parent="Root/LeftColumn"]
-layout_mode = 2
-
-[node name="PerkName" type="Label" parent="Root/LeftColumn"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 28)
-layout_mode = 2
-text = "(Navigate to a perk)"
-horizontal_alignment = 1
-autowrap_mode = 2
-
-[node name="Separator3" type="HSeparator" parent="Root/LeftColumn"]
-layout_mode = 2
-
-[node name="DetailsScroll" type="ScrollContainer" parent="Root/LeftColumn"]
-layout_mode = 2
-size_flags_vertical = 3
-
-[node name="DetailsText" type="Label" parent="Root/LeftColumn/DetailsScroll"]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_horizontal = 3
-size_flags_vertical = 3
-autowrap_mode = 3
-clip_text = true
-
-[node name="Separator4" type="HSeparator" parent="Root/LeftColumn"]
-layout_mode = 2
-
 [node name="GridColumn" type="VBoxContainer" parent="Root"]
 layout_mode = 2
 size_flags_horizontal = 3
@@ -131,4 +51,84 @@ theme_override_constants/v_separation = 8
 columns = 5
 
 [node name="Separator5" type="HSeparator" parent="Root/GridColumn"]
+layout_mode = 2
+
+[node name="RightColumn" type="VBoxContainer" parent="Root"]
+custom_minimum_size = Vector2(320, 0)
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="PointsRow" type="HBoxContainer" parent="Root/RightColumn"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="PointsLabel" type="Label" parent="Root/RightColumn/PointsRow"]
+layout_mode = 2
+text = "PERK POINTS:"
+
+[node name="PointsValue" type="Label" parent="Root/RightColumn/PointsRow"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "0"
+
+[node name="Separator1" type="HSeparator" parent="Root/RightColumn"]
+layout_mode = 2
+
+[node name="AcquiredLabel" type="Label" parent="Root/RightColumn"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
+theme_override_font_sizes/font_size = 16
+text = "ACQUIRED PERKS"
+horizontal_alignment = 0
+
+[node name="SeparatorAfterAcquired" type="HSeparator" parent="Root/RightColumn"]
+layout_mode = 2
+
+[node name="AcquiredScroll" type="ScrollContainer" parent="Root/RightColumn"]
+custom_minimum_size = Vector2(0, 150)
+layout_mode = 2
+
+[node name="AcquiredList" type="ItemList" parent="Root/RightColumn/AcquiredScroll"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="Separator2" type="HSeparator" parent="Root/RightColumn"]
+layout_mode = 2
+
+[node name="DetailsLabel" type="Label" parent="Root/RightColumn"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
+theme_override_font_sizes/font_size = 16
+text = "PERK DETAILS"
+horizontal_alignment = 0
+
+[node name="SeparatorAfterDetails" type="HSeparator" parent="Root/RightColumn"]
+layout_mode = 2
+
+[node name="PerkName" type="Label" parent="Root/RightColumn"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 28)
+layout_mode = 2
+text = "(Navigate to a perk)"
+horizontal_alignment = 1
+autowrap_mode = 2
+
+[node name="Separator3" type="HSeparator" parent="Root/RightColumn"]
+layout_mode = 2
+
+[node name="DetailsScroll" type="ScrollContainer" parent="Root/RightColumn"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="DetailsText" type="Label" parent="Root/RightColumn/DetailsScroll"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+autowrap_mode = 3
+clip_text = true
+
+[node name="Separator4" type="HSeparator" parent="Root/RightColumn"]
 layout_mode = 2
