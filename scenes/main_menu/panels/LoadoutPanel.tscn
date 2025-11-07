@@ -263,9 +263,6 @@ layout_mode = 2
 theme_override_font_sizes/font_size = 10
 text = "Manage Sigils"
 
-[node name="SeparatorAfterButtons" type="HSeparator" parent="Row/Middle/Margin/VBox"]
-layout_mode = 2
-
 [node name="StatsColumn" type="PanelContainer" parent="Row"]
 custom_minimum_size = Vector2(240, 0)
 layout_mode = 2
