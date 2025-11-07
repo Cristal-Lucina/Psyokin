@@ -618,12 +618,6 @@ func _on_category_selected(index: int) -> void:
 	_populate_items()
 	_update_details()
 
-	# Auto-switch to items panel and animate
-	if _item_list and _item_list.item_count > 0:
-		_focus_mode = "items"
-		_item_list.call_deferred("grab_focus")
-		_animate_panel_focus()
-
 func _on_item_selected(index: int) -> void:
 	"""Handle item selection"""
 	if index < 0 or index >= _item_ids.size():
