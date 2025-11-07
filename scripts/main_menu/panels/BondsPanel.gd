@@ -258,6 +258,10 @@ func _select_current_bond() -> void:
 	var btn = _nav_elements[_nav_index]
 	if is_instance_valid(btn) and btn is Button:
 		var id: String = String(btn.get_meta("id", ""))
+		# Prevent selecting unknown bonds
+		if not _read_known(id):
+			print("[BondsPanel] Cannot select unknown bond: %s" % id)
+			return
 		_selected = id
 		_update_detail(id)
 		_transition_to_bond_detail()
@@ -697,7 +701,14 @@ func _on_filter_changed(_idx: int) -> void:
 
 func _on_row_pressed(btn: Button) -> void:
 	var id_v: Variant = btn.get_meta("id")
-	_selected = String(id_v)
+	var id: String = String(id_v)
+	# Prevent selecting unknown bonds
+	if not _read_known(id):
+		print("[BondsPanel] Cannot select unknown bond: %s" % id)
+		# Unpress the button since we're rejecting the selection
+		btn.button_pressed = false
+		return
+	_selected = id
 	_update_detail(_selected)
 	# Transition to detail state (works for both mouse and controller)
 	_transition_to_bond_detail()
