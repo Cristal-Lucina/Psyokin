@@ -786,6 +786,10 @@ func _rebuild_sigils(member_token: String) -> void:
 	for s in sockets:
 		if String(s) != "": used += 1
 
+	# Ensure at least 8 slots are shown
+	if cap < 8:
+		cap = 8
+
 	if _sigils_title:
 		_sigils_title.text = "SIGILS  (%d/%d)" % [used, cap]
 
@@ -1363,7 +1367,7 @@ func _update_details_for_focused_element() -> void:
 					continue
 				if child is Button:
 					if child == focused:
-						sigil_index = idx_counter / 2  # Each sigil has Label + Button, so divide by 2
+						sigil_index = idx_counter  # Button index directly corresponds to sigil slot
 						break
 					idx_counter += 1
 
