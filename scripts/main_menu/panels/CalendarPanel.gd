@@ -291,7 +291,14 @@ func _unhandled_input(event: InputEvent) -> void:
 			# In calendar view, press up to enter button navigation
 			if event.is_action_pressed("move_up") or event.is_action_pressed("ui_up"):
 				_focus_state = FocusState.BUTTONS
-				_button_index = 1  # Start on "Today" button
+				# Find first enabled button (prefer Today, then Prev, then Next)
+				_button_index = 1  # Start with "Today"
+				if not _is_button_enabled(_button_index):
+					# Try Prev
+					_button_index = 0
+					if not _is_button_enabled(_button_index):
+						# Try Next
+						_button_index = 2
 				_update_button_focus()
 				get_viewport().set_input_as_handled()
 
@@ -303,31 +310,76 @@ func _unhandled_input(event: InputEvent) -> void:
 				_clear_button_focus()
 				get_viewport().set_input_as_handled()
 			elif event.is_action_pressed("move_left") or event.is_action_pressed("ui_left"):
-				# Move left through buttons
-				_button_index = max(0, _button_index - 1)
-				_update_button_focus()
+				# Move left through buttons, skipping disabled ones
+				_navigate_buttons_left()
 				get_viewport().set_input_as_handled()
 			elif event.is_action_pressed("move_right") or event.is_action_pressed("ui_right"):
-				# Move right through buttons
-				_button_index = min(2, _button_index + 1)
-				_update_button_focus()
+				# Move right through buttons, skipping disabled ones
+				_navigate_buttons_right()
 				get_viewport().set_input_as_handled()
 			elif event.is_action_pressed("menu_accept"):
 				# Press the currently focused button
 				_press_focused_button()
 				get_viewport().set_input_as_handled()
 
+func _navigate_buttons_left() -> void:
+	"""Navigate left through buttons, skipping disabled ones"""
+	var original_index = _button_index
+
+	# Try to move left
+	for i in range(3):  # Max 3 attempts to avoid infinite loop
+		_button_index -= 1
+		if _button_index < 0:
+			_button_index = 2  # Wrap around to rightmost button
+
+		# Check if this button is enabled
+		if _is_button_enabled(_button_index):
+			_update_button_focus()
+			return
+
+	# If we couldn't find an enabled button, stay where we were
+	_button_index = original_index
+
+func _navigate_buttons_right() -> void:
+	"""Navigate right through buttons, skipping disabled ones"""
+	var original_index = _button_index
+
+	# Try to move right
+	for i in range(3):  # Max 3 attempts to avoid infinite loop
+		_button_index += 1
+		if _button_index > 2:
+			_button_index = 0  # Wrap around to leftmost button
+
+		# Check if this button is enabled
+		if _is_button_enabled(_button_index):
+			_update_button_focus()
+			return
+
+	# If we couldn't find an enabled button, stay where we were
+	_button_index = original_index
+
+func _is_button_enabled(index: int) -> bool:
+	"""Check if a button at given index is enabled"""
+	match index:
+		0:
+			return _btn_prev and not _btn_prev.disabled
+		1:
+			return _btn_today and not _btn_today.disabled
+		2:
+			return _btn_next and not _btn_next.disabled
+	return false
+
 func _update_button_focus() -> void:
 	"""Update which button has focus"""
 	match _button_index:
 		0:
-			if _btn_prev and not _btn_prev.disabled:
+			if _btn_prev:
 				_btn_prev.grab_focus()
 		1:
 			if _btn_today:
 				_btn_today.grab_focus()
 		2:
-			if _btn_next and not _btn_next.disabled:
+			if _btn_next:
 				_btn_next.grab_focus()
 
 func _clear_button_focus() -> void:
