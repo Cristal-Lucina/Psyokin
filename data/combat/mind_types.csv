@@ -3,6 +3,6 @@ Fire,Fire,Fire;Normal,Water,Air,Hot-headed attunement.
 Water,Water,Water;Normal,Earth,Fire,Flowing and reactive.
 Earth,Earth,Earth;Normal,Air,Water,Grounded and sturdy.
 Air,Air,Air;Normal,Fire,Earth,Swift and fickle.
-Data,Data,Data;Normal,Void,,Synthetic logic; niche.
-Void,Void,Void;Normal,Data,,Null attunement; niche.
+Data,Data,Data;Normal,Void,Data,Synthetic logic; niche.
+Void,Void,Void;Normal,Data,Void,Null attunement; niche.
 Omega,Omega,Fire;Water;Earth;Air;Data;Void;Normal,,,Protagonist meta-type; can use any school.
