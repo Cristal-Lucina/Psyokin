@@ -63,23 +63,23 @@ class_name LoadoutPanel
 @onready var _party_list: ItemList       = get_node("Row/Party/VBox/PartyList") as ItemList
 @onready var _member_name: Label         = get_node("Row/Middle/Margin/VBox/MemberName") as Label
 
-@onready var _w_val: Label = get_node("Row/Middle/Margin/VBox/EquipmentSection/Grid/WHBox/WValue") as Label
-@onready var _a_val: Label = get_node("Row/Middle/Margin/VBox/EquipmentSection/Grid/AHBox/AValue") as Label
-@onready var _h_val: Label = get_node("Row/Middle/Margin/VBox/EquipmentSection/Grid/HHBox/HValue") as Label
-@onready var _f_val: Label = get_node("Row/Middle/Margin/VBox/EquipmentSection/Grid/FHBox/FValue") as Label
-@onready var _b_val: Label = get_node("Row/Middle/Margin/VBox/EquipmentSection/Grid/BHBox/BValue") as Label
+@onready var _w_val: Label = get_node("Row/Middle/Margin/VBox/Grid/WHBox/WValue") as Label
+@onready var _a_val: Label = get_node("Row/Middle/Margin/VBox/Grid/AHBox/AValue") as Label
+@onready var _h_val: Label = get_node("Row/Middle/Margin/VBox/Grid/HHBox/HValue") as Label
+@onready var _f_val: Label = get_node("Row/Middle/Margin/VBox/Grid/FHBox/FValue") as Label
+@onready var _b_val: Label = get_node("Row/Middle/Margin/VBox/Grid/BHBox/BValue") as Label
 
-@onready var _w_btn: Button = get_node_or_null("Row/Middle/Margin/VBox/EquipmentSection/Grid/WHBox/WBtn") as Button
-@onready var _a_btn: Button = get_node_or_null("Row/Middle/Margin/VBox/EquipmentSection/Grid/AHBox/ABtn") as Button
-@onready var _h_btn: Button = get_node_or_null("Row/Middle/Margin/VBox/EquipmentSection/Grid/HHBox/HBtn") as Button
-@onready var _f_btn: Button = get_node_or_null("Row/Middle/Margin/VBox/EquipmentSection/Grid/FHBox/FBtn") as Button
-@onready var _b_btn: Button = get_node_or_null("Row/Middle/Margin/VBox/EquipmentSection/Grid/BHBox/BBtn") as Button
+@onready var _w_btn: Button = get_node_or_null("Row/Middle/Margin/VBox/Grid/WHBox/WBtn") as Button
+@onready var _a_btn: Button = get_node_or_null("Row/Middle/Margin/VBox/Grid/AHBox/ABtn") as Button
+@onready var _h_btn: Button = get_node_or_null("Row/Middle/Margin/VBox/Grid/HHBox/HBtn") as Button
+@onready var _f_btn: Button = get_node_or_null("Row/Middle/Margin/VBox/Grid/FHBox/FBtn") as Button
+@onready var _b_btn: Button = get_node_or_null("Row/Middle/Margin/VBox/Grid/BHBox/BBtn") as Button
 
 @onready var _sigils_title: Label         = get_node_or_null("Row/Middle/Margin/VBox/Sigils/Title") as Label
 @onready var _sigils_list:  GridContainer = get_node_or_null("Row/Middle/Margin/VBox/Sigils/List") as GridContainer
 @onready var _btn_manage:   Button        = get_node_or_null("Row/Middle/Margin/VBox/Buttons/BtnManageSigils") as Button
 
-@onready var _stats_grid:  GridContainer = get_node("Row/StatsColumn/Margin/VBox/StatsSection/StatsGrid") as GridContainer
+@onready var _stats_grid:  GridContainer = get_node("Row/StatsColumn/Margin/VBox/StatsGrid") as GridContainer
 @onready var _details_content: RichTextLabel = %DetailsContent
 @onready var _mind_value:  Label         = get_node_or_null("Row/Middle/Margin/VBox/MindSection/MindRow/Value") as Label
 @onready var _mind_section: VBoxContainer = get_node_or_null("Row/Middle/Margin/VBox/MindSection") as VBoxContainer
@@ -159,9 +159,6 @@ func _ready() -> void:
 	if _mind_switch_btn and not _mind_switch_btn.pressed.is_connected(_open_active_type_picker):
 		_mind_switch_btn.pressed.connect(_open_active_type_picker)
 
-	# Add white rounded borders to sections
-	_add_section_borders()
-
 	call_deferred("_first_fill")
 
 	# polling fallback so UI never goes stale
@@ -193,54 +190,6 @@ func _on_panel_lost_focus() -> void:
 	print("[LoadoutPanel] Panel lost focus - state: %s, is_active: %s, registered: %s" % [NavState.keys()[_nav_state], active, is_registered()])
 	# Don't auto-close popup - it's managed by panel stack
 	# Don't change state - preserve it for when we regain focus
-
-func _add_section_borders() -> void:
-	"""Add white rounded borders behind sections"""
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0, 0, 0, 0)  # Transparent background
-	style.border_color = Color(1, 1, 1, 1)  # White border
-	style.set_border_width_all(2)
-	style.corner_radius_top_left = 8
-	style.corner_radius_top_right = 8
-	style.corner_radius_bottom_left = 8
-	style.corner_radius_bottom_right = 8
-	style.set_content_margin_all(8)
-
-	# Add border to Mind Type section
-	var mind_section = get_node_or_null("Row/Middle/Margin/VBox/MindSection")
-	if mind_section:
-		_add_border_behind(mind_section, style)
-
-	# Add border to Equipment section
-	var equipment_section = get_node_or_null("Row/Middle/Margin/VBox/EquipmentSection")
-	if equipment_section:
-		_add_border_behind(equipment_section, style)
-
-	# Add border to Sigils section
-	var sigils_section = get_node_or_null("Row/Middle/Margin/VBox/Sigils")
-	if sigils_section:
-		_add_border_behind(sigils_section, style)
-
-	# Add border to Details section
-	var details_section = get_node_or_null("Row/StatsColumn/Margin/VBox/DetailsSection")
-	if details_section:
-		_add_border_behind(details_section, style)
-
-	# Add border to Stats section
-	var stats_section = get_node_or_null("Row/StatsColumn/Margin/VBox/StatsSection")
-	if stats_section:
-		_add_border_behind(stats_section, style)
-
-func _add_border_behind(container: Control, style: StyleBoxFlat) -> void:
-	"""Add a Panel with border behind a container"""
-	var panel = Panel.new()
-	panel.name = "BorderPanel"
-	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	panel.add_theme_stylebox_override("panel", style)
-	panel.set_anchors_preset(Control.PRESET_FULL_RECT)
-	panel.show_behind_parent = true
-	container.add_child(panel)
-	container.move_child(panel, 0)
 
 func _first_fill() -> void:
 	_refresh_party()
