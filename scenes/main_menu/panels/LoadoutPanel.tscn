@@ -35,11 +35,20 @@ theme_override_constants/separation = 8
 
 [node name="PartyLabel" type="Label" parent="Row/Party/VBox"]
 layout_mode = 2
-text = "Party"
+theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
+theme_override_font_sizes/font_size = 16
+text = "PARTY"
+horizontal_alignment = 0
+
+[node name="SeparatorAfterParty" type="HSeparator" parent="Row/Party/VBox"]
+layout_mode = 2
 
 [node name="PartyList" type="ItemList" parent="Row/Party/VBox"]
 layout_mode = 2
 size_flags_vertical = 3
+
+[node name="SeparatorAfterPartyList" type="HSeparator" parent="Row/Party/VBox"]
+layout_mode = 2
 
 [node name="Middle" type="PanelContainer" parent="Row"]
 layout_mode = 2
@@ -72,8 +81,12 @@ theme_override_constants/separation = 6
 [node name="MindLabel" type="Label" parent="Row/Middle/Margin/VBox/MindSection"]
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
-theme_override_font_sizes/font_size = 20
+theme_override_font_sizes/font_size = 16
 text = "MIND TYPE"
+horizontal_alignment = 0
+
+[node name="SeparatorAfterMind" type="HSeparator" parent="Row/Middle/Margin/VBox/MindSection"]
+layout_mode = 2
 
 [node name="MindRow" type="HBoxContainer" parent="Row/Middle/Margin/VBox/MindSection"]
 layout_mode = 2
@@ -92,11 +105,18 @@ layout_mode = 2
 theme_override_font_sizes/font_size = 11
 text = "Switch"
 
+[node name="SeparatorAfterMindSection" type="HSeparator" parent="Row/Middle/Margin/VBox"]
+layout_mode = 2
+
 [node name="EquipmentLabel" type="Label" parent="Row/Middle/Margin/VBox"]
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
-theme_override_font_sizes/font_size = 20
+theme_override_font_sizes/font_size = 16
 text = "EQUIPMENT"
+horizontal_alignment = 0
+
+[node name="SeparatorAfterEquipment" type="HSeparator" parent="Row/Middle/Margin/VBox"]
+layout_mode = 2
 
 [node name="Grid" type="GridContainer" parent="Row/Middle/Margin/VBox"]
 layout_mode = 2
@@ -219,6 +239,9 @@ layout_mode = 2
 theme_override_font_sizes/font_size = 11
 text = "Equip"
 
+[node name="SeparatorAfterGrid" type="HSeparator" parent="Row/Middle/Margin/VBox"]
+layout_mode = 2
+
 [node name="Sigils" type="VBoxContainer" parent="Row/Middle/Margin/VBox"]
 custom_minimum_size = Vector2(100, 0)
 layout_mode = 2
@@ -227,8 +250,12 @@ theme_override_constants/separation = 6
 [node name="Title" type="Label" parent="Row/Middle/Margin/VBox/Sigils"]
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
-theme_override_font_sizes/font_size = 20
+theme_override_font_sizes/font_size = 16
 text = "SIGILS"
+horizontal_alignment = 0
+
+[node name="SeparatorAfterSigils" type="HSeparator" parent="Row/Middle/Margin/VBox/Sigils"]
+layout_mode = 2
 
 [node name="List" type="GridContainer" parent="Row/Middle/Margin/VBox/Sigils"]
 custom_minimum_size = Vector2(300, 0)
@@ -238,6 +265,9 @@ size_flags_vertical = 3
 theme_override_constants/h_separation = 8
 theme_override_constants/v_separation = 4
 columns = 2
+
+[node name="SeparatorAfterSigilsList" type="HSeparator" parent="Row/Middle/Margin/VBox/Sigils"]
+layout_mode = 2
 
 [node name="Buttons" type="HBoxContainer" parent="Row/Middle/Margin/VBox"]
 layout_mode = 2
@@ -252,6 +282,9 @@ custom_minimum_size = Vector2(90, 18)
 layout_mode = 2
 theme_override_font_sizes/font_size = 11
 text = "Manage Sigils"
+
+[node name="SeparatorAfterButtons" type="HSeparator" parent="Row/Middle/Margin/VBox"]
+layout_mode = 2
 
 [node name="StatsColumn" type="PanelContainer" parent="Row"]
 custom_minimum_size = Vector2(240, 0)
@@ -273,8 +306,12 @@ theme_override_constants/separation = 8
 [node name="DetailsLabel" type="Label" parent="Row/StatsColumn/Margin/VBox"]
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
-theme_override_font_sizes/font_size = 20
+theme_override_font_sizes/font_size = 16
 text = "DETAILS"
+horizontal_alignment = 0
+
+[node name="SeparatorAfterDetails" type="HSeparator" parent="Row/StatsColumn/Margin/VBox"]
+layout_mode = 2
 
 [node name="DetailsScroll" type="ScrollContainer" parent="Row/StatsColumn/Margin/VBox"]
 layout_mode = 2
@@ -297,11 +334,18 @@ layout_mode = 2
 [node name="StatsLabel" type="Label" parent="Row/StatsColumn/Margin/VBox"]
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
-theme_override_font_sizes/font_size = 20
+theme_override_font_sizes/font_size = 16
 text = "ATTRIBUTES"
+horizontal_alignment = 0
+
+[node name="SeparatorAfterStats" type="HSeparator" parent="Row/StatsColumn/Margin/VBox"]
+layout_mode = 2
 
 [node name="StatsGrid" type="GridContainer" parent="Row/StatsColumn/Margin/VBox"]
 layout_mode = 2
 theme_override_constants/h_separation = 8
 theme_override_constants/v_separation = 8
 columns = 2
+
+[node name="SeparatorAfterStatsGrid" type="HSeparator" parent="Row/StatsColumn/Margin/VBox"]
+layout_mode = 2
