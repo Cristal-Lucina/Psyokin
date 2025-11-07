@@ -73,6 +73,7 @@ var _nav_detail_index: int = 0  # Current selection in detail view
 
 @onready var _name_tv   : Label          = %Name
 @onready var _desc      : RichTextLabel  = %Notes
+@onready var _profile_desc : RichTextLabel = %Description
 
 # Detail widgets (from TSCN)
 @onready var _event_tv       : Label  = %EventProgress
@@ -710,6 +711,7 @@ func _update_detail(id: String) -> void:
 		if _points_tv: _points_tv.text = "Points: —"
 		if _gift_tv: _gift_tv.text = "Gift: —"
 		if _desc: _desc.text = "[i]Select a bond to see details.[/i]"
+		if _profile_desc: _profile_desc.text = "[i]Have not met them.[/i]"
 		if _likes_tv: _likes_tv.text = "—"
 		if _dislikes_tv: _dislikes_tv.text = "—"
 		if _unlock_acq: _unlock_acq.disabled = true
@@ -740,6 +742,10 @@ func _update_detail(id: String) -> void:
 				_desc.text = hint
 			else:
 				_desc.text = "[i]This character has not been met yet.[/i]"
+
+		# Update profile description for unknown character
+		if _profile_desc:
+			_profile_desc.text = "[i]Have not met them.[/i]"
 		return
 
 	# Known bond - show all widgets and populate with data
@@ -788,6 +794,14 @@ func _update_detail(id: String) -> void:
 	if _desc:
 		var desc: String = String(rec.get("bond_description", "")).strip_edges()
 		_desc.text = desc
+
+	# Profile description (same as bond description for known characters)
+	if _profile_desc:
+		var profile_desc: String = String(rec.get("bond_description", "")).strip_edges()
+		if profile_desc != "":
+			_profile_desc.text = profile_desc
+		else:
+			_profile_desc.text = "[i]No description available.[/i]"
 
 	# Likes/Dislikes (only discovered, never show full list)
 	var likes: PackedStringArray = _read_discovered_or_full(id, true)
