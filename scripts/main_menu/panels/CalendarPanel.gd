@@ -398,8 +398,8 @@ func _update_navigation_buttons() -> void:
 		one_month_ahead_year += 1
 
 	var at_max_future: bool = (_view_year == one_month_ahead_year and _view_month == one_month_ahead_month) or \
-	                          (_view_year > one_month_ahead_year) or \
-	                          (_view_year == one_month_ahead_year and _view_month > one_month_ahead_month)
+							  (_view_year > one_month_ahead_year) or \
+							  (_view_year == one_month_ahead_year and _view_month > one_month_ahead_month)
 
 	# Update button states
 	if _btn_prev:
