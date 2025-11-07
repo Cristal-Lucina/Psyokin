@@ -101,6 +101,9 @@ size_flags_vertical = 3
 autowrap_mode = 3
 clip_text = true
 
+[node name="Separator4" type="HSeparator" parent="Root/LeftColumn"]
+layout_mode = 2
+
 [node name="GridColumn" type="VBoxContainer" parent="Root"]
 layout_mode = 2
 size_flags_horizontal = 3
@@ -126,3 +129,6 @@ layout_mode = 2
 theme_override_constants/h_separation = 8
 theme_override_constants/v_separation = 8
 columns = 5
+
+[node name="Separator5" type="HSeparator" parent="Root/GridColumn"]
+layout_mode = 2
