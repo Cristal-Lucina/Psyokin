@@ -298,7 +298,7 @@ layout_mode = 2
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
 theme_override_font_sizes/font_size = 20
-text = "STATS"
+text = "ATTRIBUTES"
 
 [node name="StatsGrid" type="GridContainer" parent="Row/StatsColumn/Margin/VBox"]
 layout_mode = 2
