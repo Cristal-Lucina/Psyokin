@@ -370,7 +370,7 @@ func _on_party_selected(index: int) -> void:
 	var label: String = "(Unknown)"
 	if index >= 0 and index < _labels.size():
 		label = _labels[index]
-	_member_name.text = label
+	_member_name.text = label.to_upper()
 
 	_refresh_all_for_current()
 	_sigils_sig = _snapshot_sigil_signature(_current_token())
@@ -806,12 +806,17 @@ func _rebuild_sigils(member_token: String) -> void:
 
 		var cur_id: String = (String(sockets[idx]) if idx < sockets.size() else "")
 		nm.text = (_sigil_disp(cur_id) if cur_id != "" else "(empty)")
+
+		# Make equipped sigil names blue
+		if cur_id != "":
+			nm.add_theme_color_override("font_color", Color(0.4, 0.7, 1.0))  # Blue color
+
 		_sigils_list.add_child(nm)
 
-		# Always show "Equip…" button - popup will handle unequip option
+		# Always show "Equip" button - popup will handle unequip option
 		var btn: Button = Button.new()
 		btn.custom_minimum_size = Vector2(90, 0)  # Match equipment button width for grid alignment
-		btn.text = "Equip…"
+		btn.text = "Equip"
 		btn.pressed.connect(Callable(self, "_on_equip_sigil").bind(member_token, idx))
 		_sigils_list.add_child(btn)
 
