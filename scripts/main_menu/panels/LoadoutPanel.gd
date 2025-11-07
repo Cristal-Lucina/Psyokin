@@ -1580,8 +1580,8 @@ func _get_type_resistance(mind_type: String) -> String:
 		"water": return "Fire"
 		"earth": return "Water"
 		"air": return "Earth"
-		"data": return "Void"
-		"void": return "Data"
+		"data": return "Data"
+		"void": return "Void"
 		"omega": return ""
 		_: return ""
 
