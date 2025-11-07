@@ -61,15 +61,13 @@ enum Filter { ALL, KNOWN, LOCKED, MAXED }
 # Controller navigation state machine
 enum NavState { BOND_LIST, BOND_DETAIL }
 var _nav_state: NavState = NavState.BOND_LIST
-var _nav_elements: Array[Control] = []  # Bond buttons in list
 var _nav_index: int = 0  # Current selection index
 var _nav_detail_elements: Array[Control] = []  # Detail buttons (Story Points, Layer transitions)
 var _nav_detail_index: int = 0  # Current selection in detail view
 
 # @onready var _filter    : OptionButton   = %Filter  # Removed
 # @onready var _refresh   : Button         = %RefreshBtn  # Removed
-@onready var _scroll    : ScrollContainer = %Scroll
-@onready var _list_box  : VBoxContainer  = %List
+@onready var _list      : ItemList       = %List
 
 @onready var _name_tv   : Label          = %Name
 @onready var _desc      : RichTextLabel  = %Notes
@@ -103,7 +101,6 @@ var _story_overlay  : CanvasLayer    = null
 var _sys  : Node = null
 var _rows : Array[Dictionary] = []
 var _selected : String = ""
-var _list_group: ButtonGroup = null  # exclusive selection group
 
 func _ready() -> void:
 	super()  # Call PanelBase._ready()
@@ -134,6 +131,10 @@ func _ready() -> void:
 
 	# if _refresh != null and not _refresh.pressed.is_connected(_rebuild):
 	#	_refresh.pressed.connect(_rebuild)
+
+	# Connect ItemList selection signal
+	if _list and not _list.item_selected.is_connected(_on_list_item_selected):
+		_list.item_selected.connect(_on_list_item_selected)
 
 	if _story_btn != null and not _story_btn.pressed.is_connected(_on_story_points_pressed):
 		_story_btn.pressed.connect(_on_story_points_pressed)
@@ -220,76 +221,52 @@ func _handle_bond_list_input(event: InputEvent) -> void:
 
 func _navigate_bond_list(delta: int) -> void:
 	"""Navigate up/down through bond list (wraps around cyclically)"""
-	if _nav_elements.is_empty():
+	if not _list or _list.item_count == 0:
 		return
 
 	# Wrap around: pressing down at bottom goes to top, pressing up at top goes to bottom
-	var size = _nav_elements.size()
+	var size = _list.item_count
 	_nav_index = (_nav_index + delta + size) % size
 	_focus_bond_element(_nav_index)
 
 	# Immediately show details for the newly focused bond
-	if _nav_index >= 0 and _nav_index < _nav_elements.size():
-		var btn = _nav_elements[_nav_index]
-		if is_instance_valid(btn) and btn is Button:
-			var id: String = String(btn.get_meta("id", ""))
-			_selected = id
-			_update_detail(id)
+	if _nav_index >= 0 and _nav_index < _list.item_count:
+		var id: String = String(_list.get_item_metadata(_nav_index))
+		_selected = id
+		_update_detail(id)
 
 func _focus_bond_element(index: int) -> void:
-	"""Focus the bond button at given index"""
-	if index < 0 or index >= _nav_elements.size():
+	"""Focus the bond item at given index"""
+	if not _list or index < 0 or index >= _list.item_count:
 		return
 
-	var element = _nav_elements[index]
-	if is_instance_valid(element) and element is Control:
-		element.grab_focus()
-		# Also update the button pressed state for visual feedback
-		if element is Button:
-			(element as Button).button_pressed = true
-		# Scroll to ensure element is visible
-		_scroll_to_element(element)
+	_list.select(index)
+	_list.ensure_current_is_visible()
+	_list.grab_focus()
 
 func _select_current_bond() -> void:
 	"""Select the currently focused bond and transition to detail view"""
-	if _nav_index < 0 or _nav_index >= _nav_elements.size():
+	if not _list or _nav_index < 0 or _nav_index >= _list.item_count:
 		return
 
-	var btn = _nav_elements[_nav_index]
-	if is_instance_valid(btn) and btn is Button:
-		var id: String = String(btn.get_meta("id", ""))
-		# Prevent selecting unknown bonds
-		if not _read_known(id):
-			print("[BondsPanel] Cannot select unknown bond: %s" % id)
-			return
-		_selected = id
-		_update_detail(id)
-		_transition_to_bond_detail()
+	var id: String = String(_list.get_item_metadata(_nav_index))
+	# Prevent selecting unknown bonds
+	if not _read_known(id):
+		print("[BondsPanel] Cannot select unknown bond: %s" % id)
+		return
+	_selected = id
+	_update_detail(id)
+	_transition_to_bond_detail()
 
 func _enter_bond_list_state() -> void:
 	"""Enter BOND_LIST state and grab focus on bond list"""
 	_nav_state = NavState.BOND_LIST
-	_rebuild_navigation()
-	if _nav_elements.size() > 0:
+	if _list and _list.item_count > 0:
+		# Clamp index to valid range
+		_nav_index = clamp(_nav_index, 0, _list.item_count - 1)
 		_focus_bond_element(_nav_index)
 	print("[BondsPanel] Entered BOND_LIST state")
 
-func _rebuild_navigation() -> void:
-	"""Build list of focusable bond buttons"""
-	_nav_elements.clear()
-
-	if _list_box:
-		for child in _list_box.get_children():
-			if is_instance_valid(child) and not child.is_queued_for_deletion() and child is Button:
-				_nav_elements.append(child)
-
-	print("[BondsPanel] Built navigation: %d bond buttons" % _nav_elements.size())
-
-	# Clamp index to valid range
-	if _nav_elements.size() > 0:
-		_nav_index = clamp(_nav_index, 0, _nav_elements.size() - 1)
-	else:
-		_nav_index = 0
 
 func _exit_bonds_panel() -> bool:
 	"""Exit BondsPanel back to previous panel (StatusPanel)
@@ -464,15 +441,9 @@ func _rebuild() -> void:
 	_rows = _read_defs()
 	_build_list()
 	_update_detail(_selected)  # keep detail synced if selection still exists
-	call_deferred("_rebuild_navigation")  # Rebuild navigation after list is built
 
 func _build_list() -> void:
-	for c in _list_box.get_children():
-		c.queue_free()
-
-	# fresh exclusive group every build
-	_list_group = ButtonGroup.new()
-	_list_group.allow_unpress = false
+	_list.clear()
 
 	var f: int = _get_filter_id()
 
@@ -514,42 +485,37 @@ func _build_list() -> void:
 		return a_name < b_name
 	)
 
-	# Create UI rows from sorted list
-	for bond_data: Dictionary in bond_list:
+	# Create ItemList entries from sorted list
+	var selected_index: int = -1
+	for i in range(bond_list.size()):
+		var bond_data: Dictionary = bond_list[i]
 		var id: String = String(bond_data.get("id", ""))
 		var disp_name: String = String(bond_data.get("disp_name", ""))
 		var known: bool = bool(bond_data.get("known", false))
 		var maxed: bool = bool(bond_data.get("maxed", false))
 
-		var row := Button.new()
 		# Show "(Unknown)" for locked bonds instead of actual name
-		row.text = "(Unknown)" if not known else disp_name
-		row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		row.toggle_mode = true
-		row.button_group = _list_group     # ← exclusive selection
-		row.focus_mode = Control.FOCUS_ALL
-		row.set_meta("id", id)
+		var display_text: String = "(Unknown)" if not known else disp_name
+		_list.add_item(display_text)
+		_list.set_item_metadata(i, id)
 
 		if not known:
-			row.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))
-			row.tooltip_text = "Unknown"
+			_list.set_item_custom_fg_color(i, Color(0.7, 0.7, 0.7))
+			_list.set_item_tooltip(i, "Unknown")
 		elif maxed:
-			row.add_theme_color_override("font_color", Color(0.6, 1.0, 0.6))
-			row.tooltip_text = "Maxed"
+			_list.set_item_custom_fg_color(i, Color(0.6, 1.0, 0.6))
+			_list.set_item_tooltip(i, "Maxed")
 		else:
-			row.tooltip_text = disp_name
+			_list.set_item_tooltip(i, disp_name)
 
-		if not row.pressed.is_connected(_on_row_pressed):
-			row.pressed.connect(_on_row_pressed.bind(row))
-
-		# Restore pressed state if this is the selected id
+		# Track selected index
 		if _selected != "" and _selected == id:
-			row.button_pressed = true
+			selected_index = i
 
-		_list_box.add_child(row)
-
-	await get_tree().process_frame
-	_list_box.queue_sort()
+	# Restore selection if we found the selected bond
+	if selected_index >= 0:
+		_list.select(selected_index)
+		_nav_index = selected_index
 
 # ─────────────────────────────────────────────────────────────
 # Reads / fallbacks
@@ -697,17 +663,21 @@ func _on_filter_changed(_idx: int) -> void:
 	# Reset to BOND_LIST state when filter changes
 	_nav_state = NavState.BOND_LIST
 	_nav_index = 0
-	call_deferred("_rebuild_navigation")
 
-func _on_row_pressed(btn: Button) -> void:
-	var id_v: Variant = btn.get_meta("id")
-	var id: String = String(id_v)
+func _on_list_item_selected(index: int) -> void:
+	"""Handle ItemList item selection"""
+	if not _list or index < 0 or index >= _list.item_count:
+		return
+
+	var id: String = String(_list.get_item_metadata(index))
 	# Prevent selecting unknown bonds
 	if not _read_known(id):
 		print("[BondsPanel] Cannot select unknown bond: %s" % id)
-		# Unpress the button since we're rejecting the selection
-		btn.button_pressed = false
+		# Deselect the item since we're rejecting the selection
+		_list.deselect(index)
 		return
+
+	_nav_index = index
 	_selected = id
 	_update_detail(_selected)
 	# Transition to detail state (works for both mouse and controller)
@@ -920,29 +890,6 @@ func _bond_def(id: String) -> Dictionary:
 # ─────────────────────────────────────────────────────────────
 # Helpers
 # ─────────────────────────────────────────────────────────────
-
-func _scroll_to_element(element: Control) -> void:
-	"""Scroll to ensure the given element is visible in the scroll container"""
-	if not _scroll or not is_instance_valid(element):
-		return
-
-	# Wait one frame for layout to be updated
-	await get_tree().process_frame
-
-	# Get the element's position relative to the scroll container
-	var element_top: float = element.position.y
-	var element_bottom: float = element.position.y + element.size.y
-
-	# Get current scroll position and visible area
-	var scroll_pos: float = _scroll.scroll_vertical
-	var scroll_height: float = _scroll.size.y
-
-	# Check if element is above visible area
-	if element_top < scroll_pos:
-		_scroll.scroll_vertical = element_top
-	# Check if element is below visible area
-	elif element_bottom > scroll_pos + scroll_height:
-		_scroll.scroll_vertical = element_bottom - scroll_height
 
 func _to_psa_local(v: Variant) -> PackedStringArray:
 	var out := PackedStringArray()
