@@ -419,23 +419,25 @@ func _start_title_scroll() -> void:
 	# Wait one frame for the label to update its size
 	await get_tree().process_frame
 
-	# Get text width and container width
-	var text_size := _title_label.get_minimum_size()
+	# Get actual text width using the font
+	var font = _title_label.get_theme_font("font")
+	var font_size = _title_label.get_theme_font_size("font_size")
+	var text_width := font.get_string_size(_title_label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
 	var container_width := _title_container.size.x
 
 	print("[OutreachPanel] Title: '%s'" % _title_label.text)
-	print("[OutreachPanel] Text width: %.1f, Container width: %.1f" % [text_size.x, container_width])
+	print("[OutreachPanel] Text width: %.1f, Container width: %.1f" % [text_width, container_width])
 
 	# Only scroll if text is wider than container
-	if text_size.x <= container_width:
+	if text_width <= container_width:
 		# Text fits - reset position and don't scroll
 		print("[OutreachPanel] Text fits, no scrolling needed")
 		_title_label.position.x = 0
 		return
 
 	# Calculate scroll distance (text width + some padding)
-	var scroll_distance := text_size.x - container_width
-	var total_distance := text_size.x + 50  # Add 50px gap before looping
+	var scroll_distance := text_width - container_width
+	var total_distance := text_width + 50  # Add 50px gap before looping
 
 	print("[OutreachPanel] Starting scroll animation, distance: %.1f" % scroll_distance)
 
