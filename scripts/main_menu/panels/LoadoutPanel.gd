@@ -1363,8 +1363,35 @@ func _update_details_for_focused_element() -> void:
 		_details_content.text = "[b]Manage Sigils[/b]\n\nOpen the Sigil Skills menu to configure active skills for each equipped sigil."
 		return
 	elif focused == _mind_switch_btn:
+		var member_token: String = _current_token()
+		var base_type: String = _get_member_mind_type(member_token)
 		var cur_type: String = _get_hero_active_type()
-		_details_content.text = "[b]Switch Active Type[/b]\n\nCurrent: [color=#FFC0CB]%s[/color]\n\nChange your active mind type to match different sigil schools and unlock their full potential." % cur_type
+
+		# Get weakness and resistance
+		var weakness: String = _get_type_weakness(cur_type)
+		var resistance: String = _get_type_resistance(cur_type)
+
+		var details: String = "[b]Switch Active Type[/b]\n\n"
+
+		if member_token == "hero":
+			details += "[b]Omega Typing[/b]\n"
+			details += "Base Type: [color=#FFC0CB]%s[/color]\n\n" % base_type
+
+		details += "[b]Current Active Type:[/b] [color=#FFC0CB]%s[/color]\n" % cur_type
+
+		if weakness != "":
+			details += "Weak to: [color=#FF6666]%s[/color]\n" % weakness
+		else:
+			details += "Weak to: None\n"
+
+		if resistance != "":
+			details += "Resists: [color=#66FF66]%s[/color]\n" % resistance
+		else:
+			details += "Resists: None\n"
+
+		details += "\nSwitch your active type to match sigil schools and optimize type effectiveness."
+
+		_details_content.text = details
 		return
 	else:
 		# Check if it's a sigil button
@@ -1540,6 +1567,32 @@ func _show_sigil_details(member_token: String, socket_index: int) -> void:
 	_details_content.text = details
 
 # ────────────────── Active Type (hero) ──────────────────
+func _get_type_weakness(mind_type: String) -> String:
+	"""Get what type the given type is weak to"""
+	var type_lower: String = mind_type.to_lower()
+	match type_lower:
+		"fire": return "Water"
+		"water": return "Earth"
+		"earth": return "Air"
+		"air": return "Fire"
+		"data": return "Void"
+		"void": return "Data"
+		"omega": return ""
+		_: return ""
+
+func _get_type_resistance(mind_type: String) -> String:
+	"""Get what type the given type resists"""
+	var type_lower: String = mind_type.to_lower()
+	match type_lower:
+		"fire": return "Air"
+		"water": return "Fire"
+		"earth": return "Water"
+		"air": return "Earth"
+		"data": return "Void"
+		"void": return "Data"
+		"omega": return ""
+		_: return ""
+
 func _get_hero_active_type() -> String:
 	if _gs:
 		if _gs.has_meta("hero_active_type"):
@@ -2322,7 +2375,7 @@ func _rebuild_equipment_navigation() -> void:
 
 	# Special buttons (always at the end of navigation cycle)
 	if _btn_manage: _nav_elements.append(_btn_manage)  # Manage Sigil button
-	if _mind_switch_btn and _mind_switch_btn.visible: _nav_elements.append(_mind_switch_btn)  # Switch button (player only)
+	if _mind_switch_btn and not _mind_switch_btn.disabled: _nav_elements.append(_mind_switch_btn)  # Switch button (player only)
 
 	print("[LoadoutPanel] Built navigation: %d elements" % _nav_elements.size())
 
