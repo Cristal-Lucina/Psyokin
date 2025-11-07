@@ -6,10 +6,11 @@ class_name CalendarPanel
 ## - No year in headers
 ## - Current day is highlighted (rounded border + subtle fill)
 ## - Rebuilds on phase/day/week signals
+## - Supports keyboard/controller navigation for month buttons
 ##
 ## ARCHITECTURE:
 ## - Extends PanelBase for lifecycle management
-## - Pure display panel (no NavState needed)
+## - Pure display panel with button navigation
 ## - No popups needed (read-only calendar display)
 ## - Reactive to CalendarSystem signals
 
@@ -30,6 +31,11 @@ var _view_year: int = 2025     # The year/month being viewed (can navigate)
 var _view_month: int = 5
 var _earliest_year: int = 2025  # Earliest experienced month (for now, same as current)
 var _earliest_month: int = 5
+
+# Button navigation state
+enum FocusState { CALENDAR, BUTTONS }
+var _focus_state: FocusState = FocusState.CALENDAR
+var _button_index: int = 1  # 0=prev, 1=today, 2=next
 
 func _ready() -> void:
 	super()  # Call PanelBase._ready() for lifecycle management
@@ -94,6 +100,8 @@ func _on_panel_gained_focus() -> void:
 	print("[CalendarPanel] Gained focus - refreshing calendar display")
 	# Refresh calendar when panel becomes active (in case date changed while away)
 	_rebuild()
+	# Start in calendar view
+	_focus_state = FocusState.CALENDAR
 
 # --- node finders --------------------------------------------------------------
 
@@ -271,6 +279,79 @@ static func _days_in_month(y: int, m: int) -> int:
 			return 29 if leap else 28
 		_: return 30
 
+# --- input handling ------------------------------------------------------------
+
+func _unhandled_input(event: InputEvent) -> void:
+	"""Handle controller/keyboard input for button navigation"""
+	if not is_active():
+		return
+
+	match _focus_state:
+		FocusState.CALENDAR:
+			# In calendar view, press up to enter button navigation
+			if event.is_action_pressed("move_up") or event.is_action_pressed("ui_up"):
+				_focus_state = FocusState.BUTTONS
+				_button_index = 1  # Start on "Today" button
+				_update_button_focus()
+				get_viewport().set_input_as_handled()
+
+		FocusState.BUTTONS:
+			# In button navigation mode
+			if event.is_action_pressed("move_down") or event.is_action_pressed("ui_down"):
+				# Go back to calendar view
+				_focus_state = FocusState.CALENDAR
+				_clear_button_focus()
+				get_viewport().set_input_as_handled()
+			elif event.is_action_pressed("move_left") or event.is_action_pressed("ui_left"):
+				# Move left through buttons
+				_button_index = max(0, _button_index - 1)
+				_update_button_focus()
+				get_viewport().set_input_as_handled()
+			elif event.is_action_pressed("move_right") or event.is_action_pressed("ui_right"):
+				# Move right through buttons
+				_button_index = min(2, _button_index + 1)
+				_update_button_focus()
+				get_viewport().set_input_as_handled()
+			elif event.is_action_pressed("menu_accept"):
+				# Press the currently focused button
+				_press_focused_button()
+				get_viewport().set_input_as_handled()
+
+func _update_button_focus() -> void:
+	"""Update which button has focus"""
+	match _button_index:
+		0:
+			if _btn_prev and not _btn_prev.disabled:
+				_btn_prev.grab_focus()
+		1:
+			if _btn_today:
+				_btn_today.grab_focus()
+		2:
+			if _btn_next and not _btn_next.disabled:
+				_btn_next.grab_focus()
+
+func _clear_button_focus() -> void:
+	"""Clear button focus when returning to calendar"""
+	if _btn_prev:
+		_btn_prev.release_focus()
+	if _btn_today:
+		_btn_today.release_focus()
+	if _btn_next:
+		_btn_next.release_focus()
+
+func _press_focused_button() -> void:
+	"""Trigger the currently focused button"""
+	match _button_index:
+		0:
+			if _btn_prev and not _btn_prev.disabled:
+				_on_prev_month()
+		1:
+			if _btn_today and not _btn_today.disabled:
+				_on_today_pressed()
+		2:
+			if _btn_next and not _btn_next.disabled:
+				_on_next_month()
+
 # --- navigation handlers -------------------------------------------------------
 
 func _on_prev_month() -> void:
@@ -280,6 +361,9 @@ func _on_prev_month() -> void:
 		_view_month = 12
 		_view_year -= 1
 	_rebuild()
+	# Keep button focus after navigation
+	if _focus_state == FocusState.BUTTONS:
+		call_deferred("_update_button_focus")
 
 func _on_next_month() -> void:
 	"""Navigate to next month"""
@@ -288,12 +372,18 @@ func _on_next_month() -> void:
 		_view_month = 1
 		_view_year += 1
 	_rebuild()
+	# Keep button focus after navigation
+	if _focus_state == FocusState.BUTTONS:
+		call_deferred("_update_button_focus")
 
 func _on_today_pressed() -> void:
 	"""Jump back to current month"""
 	_view_year = _current_year
 	_view_month = _current_month
 	_rebuild()
+	# Keep button focus after navigation
+	if _focus_state == FocusState.BUTTONS:
+		call_deferred("_update_button_focus")
 
 func _update_navigation_buttons() -> void:
 	"""Update enabled/disabled state of navigation buttons"""
