@@ -374,17 +374,36 @@ func _is_button_enabled(index: int) -> bool:
 	return false
 
 func _update_button_focus() -> void:
-	"""Update which button has focus"""
-	match _button_index:
-		0:
-			if _btn_prev:
-				_btn_prev.grab_focus()
-		1:
-			if _btn_today:
-				_btn_today.grab_focus()
-		2:
-			if _btn_next:
-				_btn_next.grab_focus()
+	"""Update which button has focus - finds first enabled button if current is disabled"""
+	# Try current button first
+	if _is_button_enabled(_button_index):
+		match _button_index:
+			0:
+				if _btn_prev:
+					_btn_prev.grab_focus()
+			1:
+				if _btn_today:
+					_btn_today.grab_focus()
+			2:
+				if _btn_next:
+					_btn_next.grab_focus()
+		return
+
+	# Current button is disabled, find first enabled one
+	for i in range(3):
+		if _is_button_enabled(i):
+			_button_index = i
+			match _button_index:
+				0:
+					if _btn_prev:
+						_btn_prev.grab_focus()
+				1:
+					if _btn_today:
+						_btn_today.grab_focus()
+				2:
+					if _btn_next:
+						_btn_next.grab_focus()
+			return
 
 func _clear_button_focus() -> void:
 	"""Clear button focus when returning to calendar"""
