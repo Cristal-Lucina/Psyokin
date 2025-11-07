@@ -67,16 +67,6 @@ horizontal_alignment = 0
 [node name="Separator" type="HSeparator" parent="Root/ItemPanel/ItemColumn"]
 layout_mode = 2
 
-[node name="ItemHeader" type="HBoxContainer" parent="Root/ItemPanel/ItemColumn"]
-layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="CountLabel" type="Label" parent="Root/ItemPanel/ItemColumn/ItemHeader"]
-unique_name_in_owner = true
-layout_mode = 2
-text = "Count: 0"
-horizontal_alignment = 1
-
 [node name="ItemList" type="ItemList" parent="Root/ItemPanel/ItemColumn"]
 unique_name_in_owner = true
 layout_mode = 2

@@ -26,7 +26,7 @@ const CATEGORIES : Array[String] = [
 @onready var _category_list: ItemList = %CategoryList
 @onready var _item_list: ItemList = %ItemList
 @onready var _item_label: Label = %ItemLabel  # Now in ItemColumn (moved from ItemHeader)
-@onready var _count_label: Label = %CountLabel  # Now in ItemHeader
+# @onready var _count_label: Label = %CountLabel  # Removed
 @onready var _item_name: Label = %ItemName
 @onready var _details_text: RichTextLabel = %DetailsText
 @onready var _scroll_container: ScrollContainer = %ScrollContainer
@@ -337,7 +337,7 @@ func _populate_items() -> void:
 
 	# Update header
 	if _item_label:
-		_item_label.text = "Items (%s)" % _current_category
+		_item_label.text = "ITEMS (%s)" % _current_category.to_upper()
 
 	# Gather items in category
 	var items: Array[String] = []
@@ -415,9 +415,9 @@ func _populate_items() -> void:
 
 	print("[ItemsPanel] Added %d items to ItemList UI" % _item_list.item_count)
 
-	# Update count
-	if _count_label:
-		_count_label.text = "Count: %d" % items.size()
+	# Update count - Removed
+	# if _count_label:
+	#	_count_label.text = "Count: %d" % items.size()
 
 	# Select first item if available
 	if _item_list.item_count > 0 and _selected_item_id == "":
