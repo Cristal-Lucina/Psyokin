@@ -40,9 +40,6 @@ theme_override_font_sizes/font_size = 16
 text = "PARTY"
 horizontal_alignment = 0
 
-[node name="SeparatorAfterParty" type="HSeparator" parent="Row/Party/VBox"]
-layout_mode = 2
-
 [node name="PartyList" type="ItemList" parent="Row/Party/VBox"]
 layout_mode = 2
 size_flags_vertical = 3
@@ -77,9 +74,6 @@ theme_override_font_sizes/font_size = 16
 text = "MIND TYPE"
 horizontal_alignment = 0
 
-[node name="SeparatorAfterMind" type="HSeparator" parent="Row/Middle/Margin/VBox/MindSection"]
-layout_mode = 2
-
 [node name="MindRow" type="HBoxContainer" parent="Row/Middle/Margin/VBox/MindSection"]
 layout_mode = 2
 theme_override_constants/separation = 8
@@ -106,9 +100,6 @@ theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
 theme_override_font_sizes/font_size = 16
 text = "EQUIPMENT"
 horizontal_alignment = 0
-
-[node name="SeparatorAfterEquipment" type="HSeparator" parent="Row/Middle/Margin/VBox"]
-layout_mode = 2
 
 [node name="Grid" type="GridContainer" parent="Row/Middle/Margin/VBox"]
 layout_mode = 2
@@ -246,9 +237,6 @@ theme_override_font_sizes/font_size = 16
 text = "SIGILS"
 horizontal_alignment = 0
 
-[node name="SeparatorAfterSigils" type="HSeparator" parent="Row/Middle/Margin/VBox/Sigils"]
-layout_mode = 2
-
 [node name="List" type="GridContainer" parent="Row/Middle/Margin/VBox/Sigils"]
 custom_minimum_size = Vector2(300, 0)
 layout_mode = 2
@@ -302,9 +290,6 @@ theme_override_font_sizes/font_size = 16
 text = "DETAILS"
 horizontal_alignment = 0
 
-[node name="SeparatorAfterDetails" type="HSeparator" parent="Row/StatsColumn/Margin/VBox"]
-layout_mode = 2
-
 [node name="DetailsScroll" type="ScrollContainer" parent="Row/StatsColumn/Margin/VBox"]
 layout_mode = 2
 size_flags_vertical = 3
@@ -329,9 +314,6 @@ theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
 theme_override_font_sizes/font_size = 16
 text = "ATTRIBUTES"
 horizontal_alignment = 0
-
-[node name="SeparatorAfterStats" type="HSeparator" parent="Row/StatsColumn/Margin/VBox"]
-layout_mode = 2
 
 [node name="StatsGrid" type="GridContainer" parent="Row/StatsColumn/Margin/VBox"]
 layout_mode = 2
