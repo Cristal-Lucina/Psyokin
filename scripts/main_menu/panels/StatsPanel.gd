@@ -199,9 +199,20 @@ func _on_party_member_selected(index: int) -> void:
 	_update_radar_chart(token)
 
 func _rebuild_base_stats(token: String) -> void:
-	"""Build the base stats grid (BRW, MND, TPO, VTL, FCS, Level, XP)"""
+	"""Build the base stats grid (Name, Mind Type, Level, XP)"""
 	_clear_grid(_base_grid)
 
+	# Get display name
+	var display_name: String = _get_display_name(token)
+	_add_stat_pair(_base_grid, "Name", display_name)
+
+	# Get mind type
+	var mind_type: String = "—"
+	if _gs and _gs.has_method("get_member_mind_type"):
+		mind_type = String(_gs.call("get_member_mind_type", token))
+	_add_stat_pair(_base_grid, "Mind Type", mind_type)
+
+	# Get level and XP
 	var level = 1
 	var xp = 0
 	var to_next = 0

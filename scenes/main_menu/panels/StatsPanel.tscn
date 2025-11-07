@@ -38,8 +38,8 @@ theme_override_constants/separation = 8
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
 theme_override_font_sizes/font_size = 16
-text = "Party"
-horizontal_alignment = 1
+text = "PARTY"
+horizontal_alignment = 0
 
 [node name="Separator" type="HSeparator" parent="Root/PartyPanel/PartyColumn"]
 layout_mode = 2
@@ -71,15 +71,18 @@ custom_minimum_size = Vector2(0, 28)
 layout_mode = 2
 text = "(Select a member)"
 horizontal_alignment = 1
+visible = false
 
 [node name="Separator1" type="HSeparator" parent="Root/StatsPanel/Margin/StatsColumn"]
 layout_mode = 2
+visible = false
 
 [node name="BaseStatsLabel" type="Label" parent="Root/StatsPanel/Margin/StatsColumn"]
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
 theme_override_font_sizes/font_size = 16
-text = "Base Stats"
+text = "DETAILS"
+horizontal_alignment = 0
 
 [node name="Separator2" type="HSeparator" parent="Root/StatsPanel/Margin/StatsColumn"]
 layout_mode = 2
@@ -98,8 +101,8 @@ layout_mode = 2
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
 theme_override_font_sizes/font_size = 16
-text = "Stat Distribution"
-horizontal_alignment = 1
+text = "STAT DISTRIBUTION"
+horizontal_alignment = 0
 
 [node name="Separator4" type="HSeparator" parent="Root/StatsPanel/Margin/StatsColumn"]
 layout_mode = 2
@@ -133,7 +136,7 @@ layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
 theme_override_font_sizes/font_size = 16
 text = "ATTRIBUTES"
-horizontal_alignment = 1
+horizontal_alignment = 0
 
 [node name="Separator1" type="HSeparator" parent="Root/VisualPanel/Margin/VisualColumn"]
 layout_mode = 2
