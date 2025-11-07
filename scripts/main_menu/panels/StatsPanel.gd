@@ -9,6 +9,7 @@ const GS_PATH             : String = "/root/aGameState"
 const EQ_PATH             : String = "/root/aEquipmentSystem"
 const INV_PATH            : String = "/root/aInventorySystem"
 const CPS_PATH            : String = "/root/aCombatProfileSystem"
+const SIG_PATH            : String = "/root/aSigilSystem"
 
 # Base stat keys
 const BASE_STATS: Array[String] = ["BRW", "MND", "TPO", "VTL", "FCS"]
@@ -24,6 +25,7 @@ var _gs: Node = null
 var _eq: Node = null
 var _inv: Node = null
 var _cps: Node = null
+var _sig: Node = null
 
 # Radar chart for stat visualization
 var _radar_chart: Control = null
@@ -41,6 +43,7 @@ func _ready() -> void:
 	_eq = get_node_or_null(EQ_PATH)
 	_inv = get_node_or_null(INV_PATH)
 	_cps = get_node_or_null(CPS_PATH)
+	_sig = get_node_or_null(SIG_PATH)
 
 	# Connect signals
 	if _stats:
@@ -207,9 +210,7 @@ func _rebuild_base_stats(token: String) -> void:
 	_add_stat_pair(_base_grid, "Name", display_name)
 
 	# Get mind type
-	var mind_type: String = "—"
-	if _gs and _gs.has_method("get_member_mind_type"):
-		mind_type = String(_gs.call("get_member_mind_type", token))
+	var mind_type: String = _get_member_mind_type(token)
 	_add_stat_pair(_base_grid, "Mind Type", mind_type)
 
 	# Get level and XP
@@ -304,6 +305,18 @@ func _get_stat_value(token: String, stat_key: String) -> int:
 	if _gs and _gs.has_method("get_member_stat"):
 		return int(_gs.call("get_member_stat", token, stat_key))
 	return 1
+
+func _get_member_mind_type(member_token: String) -> String:
+	"""Get the mind type for a party member"""
+	if _sig and _sig.has_method("resolve_member_mind_base"):
+		var v: Variant = _sig.call("resolve_member_mind_base", member_token)
+		if typeof(v) == TYPE_STRING and String(v).strip_edges() != "":
+			return String(v)
+	if _gs and _gs.has_method("get_member_field"):
+		var v2: Variant = _gs.call("get_member_field", member_token, "mind_type")
+		if typeof(v2) == TYPE_STRING and String(v2).strip_edges() != "":
+			return String(v2)
+	return "Omega"
 
 func _add_stat_pair(grid: GridContainer, label: String, value: String) -> void:
 	"""Add a label/value pair to a grid"""
