@@ -11,7 +11,7 @@ const INV_PATH            : String = "/root/aInventorySystem"
 const CPS_PATH            : String = "/root/aCombatProfileSystem"
 
 # Base stat keys
-const BASE_STATS: Array[String] = ["BRW", "MND", "TPO", "VTL", "FCS"]
+const BASE_STATS: Array[String] = []
 
 @onready var _party_list: ItemList = %PartyList
 @onready var _member_name: Label = %MemberName
