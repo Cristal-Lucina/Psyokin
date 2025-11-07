@@ -629,7 +629,7 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 
 	# Recovery button (always shown for all members)
 	var recovery_btn := Button.new()
-	recovery_btn.text = "Recovery"
+	recovery_btn.text = "RECOVERY"
 	recovery_btn.custom_minimum_size.x = 70
 	recovery_btn.add_theme_font_size_override("font_size", 10)
 	recovery_btn.focus_mode = Control.FOCUS_ALL
@@ -646,7 +646,7 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 	# Switch button (only for active members)
 	if show_switch:
 		var switch_btn := Button.new()
-		switch_btn.text = "Switch"
+		switch_btn.text = "SWITCH"
 		switch_btn.custom_minimum_size.x = 70
 		switch_btn.add_theme_font_size_override("font_size", 10)
 		switch_btn.focus_mode = Control.FOCUS_ALL
@@ -924,7 +924,7 @@ func _show_member_picker(active_slot: int) -> void:
 
 	# Add Back button
 	var back_btn: Button = Button.new()
-	back_btn.text = "Back"
+	back_btn.text = "BACK"
 	back_btn.pressed.connect(_popup_cancel_switch)
 	vbox.add_child(back_btn)
 
@@ -1173,7 +1173,7 @@ func _show_recovery_popup(member_id: String, member_name: String, hp: int, hp_ma
 
 	# Add Back button
 	var back_btn: Button = Button.new()
-	back_btn.text = "Back"
+	back_btn.text = "BACK"
 	back_btn.pressed.connect(_popup_cancel_recovery)
 	vbox.add_child(back_btn)
 
