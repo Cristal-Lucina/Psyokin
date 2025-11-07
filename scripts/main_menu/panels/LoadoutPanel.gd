@@ -159,9 +159,6 @@ func _ready() -> void:
 	if _mind_switch_btn and not _mind_switch_btn.pressed.is_connected(_open_active_type_picker):
 		_mind_switch_btn.pressed.connect(_open_active_type_picker)
 
-	# Add white rounded borders to sections
-	call_deferred("_style_sections")
-
 	call_deferred("_first_fill")
 
 	# polling fallback so UI never goes stale
@@ -193,87 +190,6 @@ func _on_panel_lost_focus() -> void:
 	print("[LoadoutPanel] Panel lost focus - state: %s, is_active: %s, registered: %s" % [NavState.keys()[_nav_state], active, is_registered()])
 	# Don't auto-close popup - it's managed by panel stack
 	# Don't change state - preserve it for when we regain focus
-
-func _style_sections() -> void:
-	"""Add white rounded borders to titled sections"""
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0, 0, 0, 0)  # Transparent background
-	style.border_color = Color(1, 1, 1, 1)  # White border
-	style.set_border_width_all(2)
-	style.corner_radius_top_left = 8
-	style.corner_radius_top_right = 8
-	style.corner_radius_bottom_left = 8
-	style.corner_radius_bottom_right = 8
-	style.set_content_margin_all(8)
-
-	# Apply to Mind Type section
-	var mind_section = get_node_or_null("Row/Middle/Margin/VBox/MindSection")
-	if mind_section:
-		_add_border_panel(mind_section, style)
-
-	# Apply to Equipment section (label + grid need to be wrapped)
-	var equipment_container = get_node_or_null("Row/Middle/Margin/VBox")
-	if equipment_container:
-		var eq_label = equipment_container.get_node_or_null("EquipmentLabel")
-		var eq_grid = equipment_container.get_node_or_null("Grid")
-		if eq_label and eq_grid:
-			# Create a container for equipment section
-			var eq_vbox = VBoxContainer.new()
-			eq_vbox.name = "EquipmentSection"
-			var eq_index = eq_label.get_index()
-			equipment_container.add_child(eq_vbox)
-			equipment_container.move_child(eq_vbox, eq_index)
-			eq_label.reparent(eq_vbox)
-			eq_grid.reparent(eq_vbox)
-			eq_vbox.add_theme_constant_override("separation", 6)
-			_add_border_panel(eq_vbox, style)
-
-	# Apply to Sigils section
-	var sigils_section = get_node_or_null("Row/Middle/Margin/VBox/Sigils")
-	if sigils_section:
-		_add_border_panel(sigils_section, style)
-
-	# Apply to Details section
-	var stats_vbox = get_node_or_null("Row/StatsColumn/Margin/VBox")
-	if stats_vbox:
-		var details_label = stats_vbox.get_node_or_null("DetailsLabel")
-		var details_scroll = stats_vbox.get_node_or_null("DetailsScroll")
-		if details_label and details_scroll:
-			var details_vbox = VBoxContainer.new()
-			details_vbox.name = "DetailsSection"
-			var details_index = details_label.get_index()
-			stats_vbox.add_child(details_vbox)
-			stats_vbox.move_child(details_vbox, details_index)
-			details_label.reparent(details_vbox)
-			details_scroll.reparent(details_vbox)
-			details_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-			details_vbox.add_theme_constant_override("separation", 6)
-			_add_border_panel(details_vbox, style)
-
-		# Apply to Stats section
-		var stats_label = stats_vbox.get_node_or_null("StatsLabel")
-		var stats_grid = stats_vbox.get_node_or_null("StatsGrid")
-		if stats_label and stats_grid:
-			var stats_section_vbox = VBoxContainer.new()
-			stats_section_vbox.name = "StatsSection"
-			var stats_index = stats_label.get_index()
-			stats_vbox.add_child(stats_section_vbox)
-			stats_vbox.move_child(stats_section_vbox, stats_index)
-			stats_label.reparent(stats_section_vbox)
-			stats_grid.reparent(stats_section_vbox)
-			stats_section_vbox.add_theme_constant_override("separation", 6)
-			_add_border_panel(stats_section_vbox, style)
-
-func _add_border_panel(container: Control, style: StyleBoxFlat) -> void:
-	"""Add a background panel with border to a container"""
-	var panel = Panel.new()
-	panel.name = "BorderPanel"
-	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	panel.add_theme_stylebox_override("panel", style)
-	panel.set_anchors_preset(Control.PRESET_FULL_RECT)
-	panel.show_behind_parent = true
-	container.add_child(panel)
-	container.move_child(panel, 0)
 
 func _first_fill() -> void:
 	_refresh_party()
