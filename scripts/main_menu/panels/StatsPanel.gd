@@ -318,9 +318,9 @@ func _get_affinity(member1: String, member2: String) -> int:
 func _get_affinity_tier_text(affinity: int) -> String:
 	"""Convert affinity value to tier text"""
 	if affinity >= 120:
-		return "AT3 (Omega)"
+		return "AT3"
 	elif affinity >= 60:
-		return "AT2 (Duel)"
+		return "AT2"
 	elif affinity >= 20:
 		return "AT1"
 	else:
@@ -353,19 +353,19 @@ func _create_affinity_cell(member_name: String, tier: String) -> PanelContainer:
 	hbox.add_theme_constant_override("separation", 4)
 	margin.add_child(hbox)
 
-	# Member name label
+	# Member name label - 25 characters wide
 	var label := Label.new()
 	label.text = member_name
-	label.custom_minimum_size = Vector2(80, 0)
+	label.custom_minimum_size = Vector2(150, 0)  # ~25 characters at 12pt
 	label.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	label.add_theme_font_size_override("font_size", 12)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	hbox.add_child(label)
 
-	# Tier value - blue color
+	# Tier value - 4 characters wide, blue color
 	var value_label := Label.new()
 	value_label.text = tier
-	value_label.custom_minimum_size = Vector2(70, 0)
+	value_label.custom_minimum_size = Vector2(24, 0)  # ~4 characters at 12pt
 	value_label.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	value_label.add_theme_font_size_override("font_size", 12)
 	value_label.add_theme_color_override("font_color", Color(0.5, 0.7, 1.0))  # Blue
@@ -540,16 +540,12 @@ class RadarChart extends Control:
 		_stat_labels = labels.duplicate()
 		_stat_values = values.duplicate()
 
-		# Calculate max value for scaling
-		_max_value = 1.0
-		for val in _stat_values:
-			if val > _max_value:
-				_max_value = val
+		# Cap all values at 10 (max for the chart)
+		for i in range(_stat_values.size()):
+			_stat_values[i] = min(_stat_values[i], 10.0)
 
-		# Round max to nice number
-		_max_value = ceil(_max_value / 10.0) * 10.0
-		if _max_value < 10.0:
-			_max_value = 10.0
+		# Set max value to 10 for consistent scaling
+		_max_value = 10.0
 
 		queue_redraw()
 
