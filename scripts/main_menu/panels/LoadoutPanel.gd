@@ -1363,7 +1363,6 @@ func _update_details_for_focused_element() -> void:
 		_details_content.text = "[b]Manage Sigils[/b]\n\nOpen the Sigil Skills menu to configure active skills for each equipped sigil."
 		return
 	elif focused == _mind_switch_btn:
-		var member_token: String = _current_token()
 		var base_type: String = _get_member_mind_type(member_token)
 		var cur_type: String = _get_hero_active_type()
 
