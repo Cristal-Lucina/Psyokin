@@ -407,7 +407,10 @@ func _update_action_buttons(mission: Dictionary) -> void:
 
 func _start_title_scroll() -> void:
 	"""Start scrolling animation for title if it's too long"""
+	print("[OutreachPanel] _start_title_scroll called")
+
 	if not _title_container or not _title_label:
+		print("[OutreachPanel] Missing title_container or title_label")
 		return
 
 	# Stop any existing animation
@@ -420,15 +423,21 @@ func _start_title_scroll() -> void:
 	var text_size := _title_label.get_minimum_size()
 	var container_width := _title_container.size.x
 
+	print("[OutreachPanel] Title: '%s'" % _title_label.text)
+	print("[OutreachPanel] Text width: %.1f, Container width: %.1f" % [text_size.x, container_width])
+
 	# Only scroll if text is wider than container
 	if text_size.x <= container_width:
 		# Text fits - reset position and don't scroll
+		print("[OutreachPanel] Text fits, no scrolling needed")
 		_title_label.position.x = 0
 		return
 
 	# Calculate scroll distance (text width + some padding)
 	var scroll_distance := text_size.x - container_width
 	var total_distance := text_size.x + 50  # Add 50px gap before looping
+
+	print("[OutreachPanel] Starting scroll animation, distance: %.1f" % scroll_distance)
 
 	# Start at position 0
 	_title_label.position.x = 0
