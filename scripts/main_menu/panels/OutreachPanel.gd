@@ -37,9 +37,22 @@ const CATEGORIES: Array[Dictionary] = [
 	{"id": "mutual_aid", "label": "Mutual Aid"}
 ]
 
+# Panel animation settings
+const BASE_LEFT_RATIO := 2.0
+const BASE_CENTER_RATIO := 3.5
+const BASE_RIGHT_RATIO := 4.5
+const ACTIVE_SCALE := 1.10  # Active panel grows by 10%
+const INACTIVE_SCALE := 0.95  # Inactive panels shrink by 5%
+const ANIM_DURATION := 0.2  # Animation duration in seconds
+
 ## ═══════════════════════════════════════════════════════════════════════════
 ## NODE REFERENCES
 ## ═══════════════════════════════════════════════════════════════════════════
+
+# Panel containers (for animation)
+@onready var _left_panel: PanelContainer = get_node("%LeftPanel") if has_node("%LeftPanel") else null
+@onready var _center_panel: PanelContainer = get_node("%CenterPanel") if has_node("%CenterPanel") else null
+@onready var _right_panel: PanelContainer = get_node("%RightPanel") if has_node("%RightPanel") else null
 
 @onready var _category_list: ItemList = %CategoryList
 @onready var _mission_list: ItemList = %MissionList
@@ -520,6 +533,7 @@ func _enter_category_select_state() -> void:
 		_category_list.grab_focus()
 		if _category_list.get_selected_items().is_empty():
 			_category_list.select(0)
+	_animate_panel_focus(NavState.CATEGORY_SELECT)
 	print("[OutreachPanel] Entered CATEGORY_SELECT state")
 
 func _enter_mission_list_state() -> void:
@@ -529,7 +543,43 @@ func _enter_mission_list_state() -> void:
 		_mission_list.grab_focus()
 		if _mission_list.get_selected_items().is_empty():
 			_mission_list.select(0)
+	_animate_panel_focus(NavState.MISSION_LIST)
 	print("[OutreachPanel] Entered MISSION_LIST state")
+
+func _animate_panel_focus(active_state: NavState) -> void:
+	"""Animate panels to highlight which one is currently active"""
+	if not _left_panel or not _center_panel or not _right_panel:
+		return
+
+	var left_ratio := BASE_LEFT_RATIO
+	var center_ratio := BASE_CENTER_RATIO
+	var right_ratio := BASE_RIGHT_RATIO
+
+	# Determine which panel gets the active scale
+	match active_state:
+		NavState.CATEGORY_SELECT:
+			left_ratio = BASE_LEFT_RATIO * ACTIVE_SCALE
+			center_ratio = BASE_CENTER_RATIO * INACTIVE_SCALE
+			right_ratio = BASE_RIGHT_RATIO * INACTIVE_SCALE
+		NavState.MISSION_LIST:
+			left_ratio = BASE_LEFT_RATIO * INACTIVE_SCALE
+			center_ratio = BASE_CENTER_RATIO * ACTIVE_SCALE
+			right_ratio = BASE_RIGHT_RATIO * INACTIVE_SCALE
+		NavState.POPUP_ACTIVE:
+			# When popup is active, focus the right panel
+			left_ratio = BASE_LEFT_RATIO * INACTIVE_SCALE
+			center_ratio = BASE_CENTER_RATIO * INACTIVE_SCALE
+			right_ratio = BASE_RIGHT_RATIO * ACTIVE_SCALE
+
+	# Create tweens for smooth animation
+	var tween := create_tween()
+	tween.set_parallel(true)
+	tween.set_trans(Tween.TRANS_CUBIC)
+	tween.set_ease(Tween.EASE_OUT)
+
+	tween.tween_property(_left_panel, "size_flags_stretch_ratio", left_ratio, ANIM_DURATION)
+	tween.tween_property(_center_panel, "size_flags_stretch_ratio", center_ratio, ANIM_DURATION)
+	tween.tween_property(_right_panel, "size_flags_stretch_ratio", right_ratio, ANIM_DURATION)
 
 ## ═══════════════════════════════════════════════════════════════════════════
 ## INPUT HANDLING - STATE MACHINE
