@@ -99,16 +99,16 @@ const ALT_MES_PATHS := [
 
 # Tab button definitions
 const TAB_DEFS: Dictionary = {
-	"stats":   {"title": "Stats"},
-	"perks":   {"title": "Perks"},
-	"items":   {"title": "Items"},
-	"loadout": {"title": "Loadout"},
-	"bonds":   {"title": "Bonds"},
-	"outreach":{"title": "Outreach"},
-	"dorms":   {"title": "Dorms"},
-	"calendar":{"title": "Calendar"},
-	"index":   {"title": "Index"},
-	"system":  {"title": "System"},
+	"stats":   {"title": "STATS"},
+	"perks":   {"title": "PERKS"},
+	"items":   {"title": "ITEMS"},
+	"loadout": {"title": "LOADOUT"},
+	"bonds":   {"title": "BONDS"},
+	"outreach":{"title": "OUTREACH"},
+	"dorms":   {"title": "DORMS"},
+	"calendar":{"title": "CALENDAR"},
+	"index":   {"title": "INDEX"},
+	"system":  {"title": "SYSTEM"},
 }
 
 const TAB_ORDER: PackedStringArray = [
