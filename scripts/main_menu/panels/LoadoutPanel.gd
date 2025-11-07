@@ -2311,6 +2311,9 @@ func _rebuild_equipment_navigation() -> void:
 			# Skip nodes queued for deletion (from queue_free())
 			if not is_instance_valid(child) or child.is_queued_for_deletion():
 				continue
+			# Skip invisible elements (locked sigil slots)
+			if not child.visible:
+				continue
 			# In 2x4 grid, buttons are direct children (labels are skipped)
 			if child is Button:
 				_nav_elements.append(child)  # Sigil slot equip buttons
