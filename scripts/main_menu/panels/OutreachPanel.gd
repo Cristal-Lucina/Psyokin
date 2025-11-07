@@ -419,14 +419,26 @@ func _start_title_scroll() -> void:
 	# Wait one frame for the label to update its size
 	await get_tree().process_frame
 
-	# Get actual text width using the font
-	var font = _title_label.get_theme_font("font")
-	var font_size = _title_label.get_theme_font_size("font_size")
+	# Use the label's visible characters count - if all chars aren't visible, we need to scroll
+	var total_chars = _title_label.text.length()
+	var visible_chars = _title_label.visible_characters
+
+	# Get font to measure text
+	var font: Font = _title_label.get_theme_default_font()
+	if font == null:
+		font = ThemeDB.fallback_font
+
+	var font_size: int = _title_label.get_theme_default_font_size()
+	if font_size <= 0:
+		font_size = ThemeDB.fallback_font_size
+
+	# Measure the actual text width
 	var text_width := font.get_string_size(_title_label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
 	var container_width := _title_container.size.x
 
 	print("[OutreachPanel] Title: '%s'" % _title_label.text)
 	print("[OutreachPanel] Text width: %.1f, Container width: %.1f" % [text_width, container_width])
+	print("[OutreachPanel] Total chars: %d, Visible chars: %d" % [total_chars, visible_chars])
 
 	# Only scroll if text is wider than container
 	if text_width <= container_width:
@@ -435,9 +447,8 @@ func _start_title_scroll() -> void:
 		_title_label.position.x = 0
 		return
 
-	# Calculate scroll distance (text width + some padding)
+	# Calculate scroll distance
 	var scroll_distance := text_width - container_width
-	var total_distance := text_width + 50  # Add 50px gap before looping
 
 	print("[OutreachPanel] Starting scroll animation, distance: %.1f" % scroll_distance)
 
@@ -445,7 +456,7 @@ func _start_title_scroll() -> void:
 	_title_label.position.x = 0
 
 	# Create animation sequence
-	_animate_title_scroll_loop(scroll_distance, total_distance)
+	_animate_title_scroll_loop(scroll_distance, text_width)
 
 func _animate_title_scroll_loop(scroll_distance: float, total_distance: float) -> void:
 	"""Loop the scrolling animation: scroll -> pause -> reset -> pause -> repeat"""
