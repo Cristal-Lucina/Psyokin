@@ -80,7 +80,7 @@ func _ensure_fallback_layout() -> void:
 	# Window frame with LoadoutPanel styling
 	_window = Panel.new()
 	_window.name = "Window"
-	_window.custom_minimum_size = Vector2(600, 500)
+	_window.custom_minimum_size = Vector2(700, 500)
 	_style_panel(_window)
 	center.add_child(_window)
 
