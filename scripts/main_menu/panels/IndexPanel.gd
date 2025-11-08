@@ -12,10 +12,9 @@ class_name IndexPanel
 
 enum Filter { TUTORIALS, ENEMIES, MISSIONS, LOCATIONS, LORE }
 
-@onready var _filter  : OptionButton  = $Root/Left/Filter
-@onready var _refresh : Button        = $Root/Left/Header/RefreshBtn
-@onready var _list    : VBoxContainer = $Root/Left/Scroll/List
-@onready var _detail  : RichTextLabel = $Root/Right/Detail
+@onready var _filter  : OptionButton  = $Root/Left/Margin/VBox/Filter
+@onready var _list    : VBoxContainer = $Root/Left/Margin/VBox/Scroll/List
+@onready var _detail  : RichTextLabel = $Root/Right/Margin/VBox/Detail
 
 func _ready() -> void:
 	super()  # Call PanelBase._ready() for lifecycle management
@@ -34,8 +33,6 @@ func _ready() -> void:
 
 	if not _filter.item_selected.is_connected(_on_filter_changed):
 		_filter.item_selected.connect(_on_filter_changed)
-	if not _refresh.pressed.is_connected(_rebuild):
-		_refresh.pressed.connect(_rebuild)
 
 	# Live updates if the system emits changes (use safe lookup, no direct symbol)
 	var idx: Node = get_node_or_null("/root/aIndexSystem")

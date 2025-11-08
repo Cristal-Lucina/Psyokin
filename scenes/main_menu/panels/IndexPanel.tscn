@@ -16,56 +16,77 @@ layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = 16.0
-offset_top = 16.0
-offset_right = -16.0
-offset_bottom = -16.0
+offset_left = 8.0
+offset_top = 8.0
+offset_right = -8.0
+offset_bottom = -8.0
 grow_horizontal = 2
 grow_vertical = 2
 theme_override_constants/separation = 16
 
-[node name="Left" type="VBoxContainer" parent="Root"]
+[node name="Left" type="PanelContainer" parent="Root"]
 custom_minimum_size = Vector2(260, 0)
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
-theme_override_constants/separation = 8
 
-[node name="Header" type="HBoxContainer" parent="Root/Left"]
+[node name="Margin" type="MarginContainer" parent="Root/Left"]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 10
+
+[node name="VBox" type="VBoxContainer" parent="Root/Left/Margin"]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="Title" type="Label" parent="Root/Left/Header"]
+[node name="Title" type="Label" parent="Root/Left/Margin/VBox"]
 layout_mode = 2
-size_flags_horizontal = 3
-text = "Index"
+theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
+theme_override_font_sizes/font_size = 16
+text = "INDEX"
+horizontal_alignment = 0
 
-[node name="RefreshBtn" type="Button" parent="Root/Left/Header"]
-layout_mode = 2
-text = "Refresh"
-
-[node name="Filter" type="OptionButton" parent="Root/Left"]
+[node name="Filter" type="OptionButton" parent="Root/Left/Margin/VBox"]
 layout_mode = 2
 
-[node name="Scroll" type="ScrollContainer" parent="Root/Left"]
+[node name="Scroll" type="ScrollContainer" parent="Root/Left/Margin/VBox"]
 custom_minimum_size = Vector2(0, 280)
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 
-[node name="List" type="VBoxContainer" parent="Root/Left/Scroll"]
+[node name="List" type="VBoxContainer" parent="Root/Left/Margin/VBox/Scroll"]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 theme_override_constants/separation = 6
 
-[node name="Right" type="VBoxContainer" parent="Root"]
+[node name="Right" type="PanelContainer" parent="Root"]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
+
+[node name="Margin" type="MarginContainer" parent="Root/Right"]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 10
+
+[node name="VBox" type="VBoxContainer" parent="Root/Right/Margin"]
+layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="Detail" type="RichTextLabel" parent="Root/Right"]
+[node name="DetailLabel" type="Label" parent="Root/Right/Margin/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
+theme_override_font_sizes/font_size = 16
+text = "DETAILS"
+horizontal_alignment = 0
+
+[node name="Detail" type="RichTextLabel" parent="Root/Right/Margin/VBox"]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
