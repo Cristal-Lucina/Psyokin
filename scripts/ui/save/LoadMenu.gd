@@ -227,15 +227,17 @@ func _on_load_pressed(slot: int) -> void:
 			if sig != null and sig.has_method("apply_save_blob"):
 				sig.call("apply_save_blob", (sb_v as Dictionary))
 
+	# Store the loaded payload and slot info for title screen to use
+	if has_node("/root/aGameState"):
+		aGameState.set_meta("pending_load_payload", payload)
+		aGameState.set_meta("pending_load_from_ingame", true)
+
 	# Schedule loading screen fade-out to happen after scene change
 	if loading:
 		loading.call_deferred("_fade_out_and_cleanup")
 
-	# Change scene (this will free the LoadMenu, so no code after this runs)
-	if has_node("/root/aSceneRouter"):
-		aSceneRouter.goto_main()
-	elif ResourceLoader.exists(MAIN_SCENE):
-		get_tree().change_scene_to_file(MAIN_SCENE)
+	# Go to title screen first (provides clean state), then title will load to main
+	get_tree().change_scene_to_file(TITLE_SCENE)
 
 	queue_free()
 
