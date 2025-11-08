@@ -21,9 +21,9 @@ const INACTIVE_SCALE := 0.95  # Inactive panels shrink by 5%
 const ANIM_DURATION := 0.2  # Animation duration in seconds
 
 # Panel references (for animation)
-@onready var _category_panel: PanelContainer = %CategoryPanel
-@onready var _content_panel: PanelContainer = %ContentPanel
-@onready var _details_panel: PanelContainer = %DetailsPanel
+@onready var _category_panel: PanelContainer = get_node("%CategoryPanel") if has_node("%CategoryPanel") else null
+@onready var _content_panel: PanelContainer = get_node("%ContentPanel") if has_node("%ContentPanel") else null
+@onready var _details_panel: PanelContainer = get_node("%DetailsPanel") if has_node("%DetailsPanel") else null
 
 @onready var _category_list : ItemList      = $Root/CategoryPanel/CategoryColumn/CategoryList
 @onready var _entry_list    : ItemList      = $Root/ContentPanel/ContentColumn/EntryList
