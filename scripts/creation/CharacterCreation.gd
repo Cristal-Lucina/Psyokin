@@ -980,7 +980,7 @@ func _input(event: InputEvent) -> void:
 		else:
 			_advance_stage()
 
-func _process_nurse_responses(delta: float) -> void:
+func _process_nurse_responses(_delta: float) -> void:
 	"""Process nurse responses one at a time"""
 	# If waiting for input, don't auto-advance
 	if waiting_for_input:
@@ -1260,11 +1260,11 @@ func _show_keyboard() -> void:
 	# Set initial focus
 	_update_keyboard_focus()
 
-func _create_keyboard_button(text: String, size: Vector2) -> Button:
+func _create_keyboard_button(text: String, btn_size: Vector2) -> Button:
 	"""Create a styled keyboard button"""
 	var btn = Button.new()
 	btn.text = text
-	btn.custom_minimum_size = size
+	btn.custom_minimum_size = btn_size
 	btn.add_theme_font_size_override("font_size", 14)
 	return btn
 
@@ -1278,9 +1278,6 @@ func _handle_keyboard_navigation(dx: int, dy: int) -> void:
 
 	var letter_rows = ceil(float(letter_button_count) / float(keyboard_grid_cols))
 	var total_rows = int(letter_rows) + 1  # +1 for action row
-
-	# Get current linear index
-	var current_index = _get_keyboard_linear_index()
 
 	if dy != 0:  # Vertical movement
 		var new_row = keyboard_focused_row + dy
@@ -1741,11 +1738,11 @@ func _build_perk_selection_ui() -> void:
 				continue
 
 			var stat = str(offer.get("stat", ""))
-			var name = str(offer.get("name", "Unknown"))
+			var perk_name = str(offer.get("name", "Unknown"))
 			var desc = str(offer.get("desc", "No description"))
 
 			var perk_button = CheckButton.new()
-			perk_button.text = "%s - %s: %s" % [stat, name, desc]
+			perk_button.text = "%s - %s: %s" % [stat, perk_name, desc]
 			perk_button.custom_minimum_size = Vector2(750, 50)
 			perk_button.add_theme_font_size_override("font_size", 14)
 			perk_button.button_pressed = false
@@ -1880,13 +1877,11 @@ func _on_perk_accepted() -> void:
 func _show_next_nurse_response() -> void:
 	"""Show the next nurse response based on stat selections"""
 	var stat_ids = ["BRW", "VTL", "TPO", "MND", "FCS"]
-	var stat_names = ["BRAWN", "VITALITY", "TEMPO", "MIND", "FOCUS"]
 
 	if nurse_response_index >= 5:
 		return
 
 	var stat_id = stat_ids[nurse_response_index]
-	var stat_name = stat_names[nurse_response_index]
 	var is_selected = _selected_order.has(stat_id)
 
 	var responses_positive = {
@@ -1916,8 +1911,7 @@ func _show_next_nurse_response() -> void:
 	stage_timer = 0.0
 
 	# Show cursor and wait for input
-	_show_cursor()
-	waiting_for_input = true
+	_show_cursor_and_wait()
 
 # ── Character Customization UI ───────────────────────────────────────────────
 func _build_customization_ui() -> void:
@@ -2087,7 +2081,7 @@ func _build_customization_ui() -> void:
 			print("[Customization] Focus set to first dropdown")
 	)
 
-func _on_cinematic_dropdown_changed(index: int, type: String, dropdown: OptionButton) -> void:
+func _on_cinematic_dropdown_changed(index: int, type: String, _dropdown: OptionButton) -> void:
 	"""Handle dropdown changes in cinematic customization UI"""
 	# Sync to the original form dropdowns to update preview
 	match type:
