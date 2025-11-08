@@ -209,6 +209,7 @@ func _ready() -> void:
 	_build_tab_buttons()
 	_create_creds_perks_display()
 	_create_next_mission_display()
+	_hide_old_ui_elements()
 
 	# Note: PanelBase handles visibility_changed, no need to connect again
 	call_deferred("_first_fill")
@@ -369,6 +370,13 @@ func _create_next_mission_display() -> void:
 
 	# Add to root
 	add_child(container)
+
+func _hide_old_ui_elements() -> void:
+	"""Hide the old player info panel, character preview, dates, morality, etc."""
+	# Hide the entire Right VBoxContainer
+	var right_panel = get_node_or_null("Root/Right")
+	if right_panel:
+		right_panel.visible = false
 
 func _create_info_cell(label_text: String, initial_value: String) -> PanelContainer:
 	"""Create a single info cell with label and value
