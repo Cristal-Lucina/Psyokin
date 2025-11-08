@@ -111,6 +111,16 @@ func _on_continue_pressed() -> void:
 	var sl: Node = get_node_or_null("/root/aSaveLoad")
 	var slot: int = _find_latest_slot(sl)
 	if slot >= 0:
+		# Create and show loading screen
+		var loading = LoadingScreen.create()
+		if loading:
+			get_tree().root.add_child(loading)
+			loading.set_text("Loading...")
+			await loading.fade_in()
+
+		# Small delay to ensure loading screen is visible
+		await get_tree().create_timer(0.1).timeout
+
 		var ok: bool = false
 		if has_node("/root/aGameState") and aGameState.has_method("load_from_slot"):
 			ok = aGameState.load_from_slot(slot)
@@ -122,9 +132,20 @@ func _on_continue_pressed() -> void:
 			if not payload.is_empty() and has_node("/root/aGameState") and aGameState.has_method("apply_loaded_save"):
 				aGameState.apply_loaded_save(payload)
 				ok = true
+
 		if ok:
+			# Fade out loading screen before scene transition
+			if loading:
+				await loading.fade_out()
+				loading.queue_free()
 			get_tree().change_scene_to_file(MAIN_SCENE)
 			return
+
+		# Failed - clean up loading screen before showing load menu
+		if loading:
+			await loading.fade_out()
+			loading.queue_free()
+
 		push_warning("[Title] Continue failed for slot %d; opening Load menu." % [slot])
 
 	_on_load_pressed()

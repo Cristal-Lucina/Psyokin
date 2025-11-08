@@ -198,6 +198,16 @@ func _make_row(slot: int) -> Control:
 	return row
 
 func _on_load_pressed(slot: int) -> void:
+	# Create and show loading screen
+	var loading = LoadingScreen.create()
+	if loading:
+		get_tree().root.add_child(loading)
+		loading.set_text("Loading save...")
+		await loading.fade_in()
+
+	# Small delay to ensure loading screen is visible
+	await get_tree().create_timer(0.1).timeout
+
 	var sl: Node = get_node_or_null("/root/aSaveLoad")
 	var payload: Dictionary = {}
 	if sl != null and sl.has_method("load_game"):
@@ -216,6 +226,11 @@ func _on_load_pressed(slot: int) -> void:
 			var sig := get_node_or_null("/root/aSigilSystem")
 			if sig != null and sig.has_method("apply_save_blob"):
 				sig.call("apply_save_blob", (sb_v as Dictionary))
+
+	# Fade out loading screen before scene transition
+	if loading:
+		await loading.fade_out()
+		loading.queue_free()
 
 	if has_node("/root/aSceneRouter"):
 		aSceneRouter.goto_main()
