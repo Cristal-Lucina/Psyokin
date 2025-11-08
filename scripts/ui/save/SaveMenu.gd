@@ -255,8 +255,7 @@ func _do_save(slot: int) -> void:
 	else:
 		push_warning("[SaveMenu] No save path available.")
 
-	if _hint:
-		_hint.text = "Saved to slot %d." % slot
+	print("[SaveMenu] Saved to slot %d" % slot)
 	_rebuild()
 
 func _do_delete(slot: int) -> void:
@@ -270,9 +269,8 @@ func _do_delete(slot: int) -> void:
 
 	if not ok:
 		push_warning("[SaveMenu] Could not delete slot %d" % slot)
-
-	if _hint:
-		_hint.text = ("Deleted slot %d." % slot) if ok else ("Could not delete slot %d." % slot)
+	else:
+		print("[SaveMenu] Deleted slot %d" % slot)
 
 	_rebuild()
 
