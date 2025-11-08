@@ -12,11 +12,13 @@ class_name LoadingScreen
 
 const FADE_DURATION := 0.3
 const SPIN_SPEED := 3.0  # Rotations per second
+const MIN_DISPLAY_TIME := 3.0  # Minimum seconds to display loading screen
 
 var _background: ColorRect
 var _label: Label
 var _spinner: Polygon2D
 var _tween: Tween
+var _display_start_time: float = 0.0
 
 static func create() -> LoadingScreen:
 	"""Create a new loading screen instance"""
@@ -79,27 +81,25 @@ func _build_ui() -> void:
 	_label = Label.new()
 	_label.name = "LoadingText"
 	_label.text = "LOADING"
-	_label.add_theme_font_size_override("font_size", 20)
+	_label.add_theme_font_size_override("font_size", 40)
 	_label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 0.9))
 	container.add_child(_label)
 
-	# Spinning shape (octagon)
+	# Spinning shape (diamond)
 	_spinner = Polygon2D.new()
 	_spinner.name = "Spinner"
-	_spinner.color = Color(1.0, 0.7, 0.75, 0.9)  # Pink to match theme
-	_spinner.polygon = _create_octagon(16.0)
+	_spinner.color = Color(0.3, 0.6, 1.0, 0.9)  # Blue
+	_spinner.polygon = _create_diamond(20.0)
 	_spinner.position = Vector2(20, 10)
 	container.add_child(_spinner)
 
-func _create_octagon(radius: float) -> PackedVector2Array:
-	"""Create an octagon shape for the spinner"""
+func _create_diamond(size: float) -> PackedVector2Array:
+	"""Create a diamond shape for the spinner"""
 	var points: PackedVector2Array = []
-	var sides := 8
-	for i in range(sides):
-		var angle := (i * TAU / sides) - PI / 2  # Start at top
-		var x := cos(angle) * radius
-		var y := sin(angle) * radius
-		points.append(Vector2(x, y))
+	points.append(Vector2(0, -size))      # Top
+	points.append(Vector2(size, 0))       # Right
+	points.append(Vector2(0, size))       # Bottom
+	points.append(Vector2(-size, 0))      # Left
 	return points
 
 func _process(delta: float) -> void:
@@ -110,6 +110,7 @@ func _process(delta: float) -> void:
 func fade_in() -> void:
 	"""Fade in the loading screen"""
 	show()
+	_display_start_time = Time.get_ticks_msec() / 1000.0  # Track when we started displaying
 
 	if not _background:
 		return
@@ -126,6 +127,13 @@ func fade_in() -> void:
 
 func fade_out() -> void:
 	"""Fade out the loading screen"""
+	# Ensure minimum display time has passed
+	var current_time := Time.get_ticks_msec() / 1000.0
+	var elapsed_time := current_time - _display_start_time
+	if elapsed_time < MIN_DISPLAY_TIME:
+		var remaining_time := MIN_DISPLAY_TIME - elapsed_time
+		await get_tree().create_timer(remaining_time).timeout
+
 	if not _background:
 		hide()
 		return

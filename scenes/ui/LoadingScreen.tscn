@@ -31,10 +31,10 @@ theme_override_constants/separation = 12
 [node name="LoadingText" type="Label" parent="Background/LoadingContainer"]
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 1, 1, 0.9)
-theme_override_font_sizes/font_size = 20
+theme_override_font_sizes/font_size = 40
 text = "LOADING"
 
 [node name="Spinner" type="Polygon2D" parent="Background/LoadingContainer"]
 position = Vector2(20, 10)
-color = Color(1, 0.7, 0.75, 0.9)
-polygon = PackedVector2Array(0, -16, 11.3137, -11.3137, 16, 0, 11.3137, 11.3137, 0, 16, -11.3137, 11.3137, -16, 0, -11.3137, -11.3137)
+color = Color(0.3, 0.6, 1, 0.9)
+polygon = PackedVector2Array(0, -20, 20, 0, 0, 20, -20, 0)
