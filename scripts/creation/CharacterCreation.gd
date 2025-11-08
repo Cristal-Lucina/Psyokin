@@ -1000,7 +1000,7 @@ func _enter_stage(stage: CinematicStage) -> void:
 			_build_name_input_ui()
 		CinematicStage.DIALOGUE_RESPONSE_1:
 			dialogue_label.text = ""
-			_start_typing("They're speaking! It seems their memory is intact.")
+			_start_typing("They are speaking!")
 		CinematicStage.DIALOGUE_RESPONSE_2:
 			_start_typing("Nurse, go check their vitals and reflexes.")
 		CinematicStage.STAT_SELECTION:
