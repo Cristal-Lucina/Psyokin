@@ -551,6 +551,90 @@ func get_hero_start_picks() -> PackedStringArray:
 	return out
 
 # ─── Save/Load ───────────────────────────────────────────────
+## Resets all systems to clear any existing state before loading a save.
+## This prevents data leakage between different save files or sessions.
+func reset_all_systems() -> void:
+	print("[GameState] Resetting all systems before load...")
+
+	# Clear GameState core data
+	party.clear()
+	bench.clear()
+	flags.clear()
+	index_blob = {"tutorials": [], "enemies": {}, "locations": {}, "lore": {}}
+	member_data.clear()
+	unlocked_perks.clear()
+	perk_points = 0
+	creds = 0
+	pacifist_score = 0
+	bloodlust_score = 0
+
+	# Clear metadata
+	for key in get_meta_list():
+		remove_meta(key)
+
+	# Reset subsystems (call reset/clear if available)
+	var stats_sys: Node = get_node_or_null(STATS_PATH)
+	if stats_sys and stats_sys.has_method("reset"):
+		stats_sys.call("reset")
+	elif stats_sys and stats_sys.has_method("clear"):
+		stats_sys.call("clear")
+
+	var inv_sys: Node = get_node_or_null(INV_PATH)
+	if inv_sys and inv_sys.has_method("reset"):
+		inv_sys.call("reset")
+	elif inv_sys and inv_sys.has_method("clear"):
+		inv_sys.call("clear")
+
+	var equip_sys: Node = get_node_or_null(EQUIP_PATH)
+	if equip_sys and equip_sys.has_method("reset"):
+		equip_sys.call("reset")
+	elif equip_sys and equip_sys.has_method("clear"):
+		equip_sys.call("clear")
+
+	var sigil_sys: Node = get_node_or_null(SIGIL_PATH)
+	if sigil_sys and sigil_sys.has_method("reset"):
+		sigil_sys.call("reset")
+	elif sigil_sys and sigil_sys.has_method("clear"):
+		sigil_sys.call("clear")
+
+	var cps: Node = get_node_or_null(CPS_PATH)
+	if cps and cps.has_method("reset"):
+		cps.call("reset")
+	elif cps and cps.has_method("clear"):
+		cps.call("clear")
+
+	# Optional systems
+	var cb_sys: Node = get_node_or_null("/root/aCircleBondSystem")
+	if cb_sys and cb_sys.has_method("reset"):
+		cb_sys.call("reset")
+
+	var dorm_sys: Node = get_node_or_null("/root/aDormSystem")
+	if dorm_sys and dorm_sys.has_method("reset"):
+		dorm_sys.call("reset")
+
+	var rom_sys: Node = get_node_or_null("/root/aRomanceSystem")
+	if rom_sys and rom_sys.has_method("reset"):
+		rom_sys.call("reset")
+
+	var aff_sys: Node = get_node_or_null("/root/aAffinitySystem")
+	if aff_sys and aff_sys.has_method("reset"):
+		aff_sys.call("reset")
+
+	var perk_sys: Node = get_node_or_null("/root/aPerkSystem")
+	if perk_sys and perk_sys.has_method("reset"):
+		perk_sys.call("reset")
+
+	var me_sys: Node = get_node_or_null("/root/aMainEventSystem")
+	if me_sys and me_sys.has_method("reset"):
+		me_sys.call("reset")
+
+	# Clear PanelManager stack to prevent stale panel references
+	var pm: Node = get_node_or_null("/root/aPanelManager")
+	if pm and pm.has_method("force_reset"):
+		pm.call("force_reset")
+
+	print("[GameState] System reset complete")
+
 ## Collects all game state into a Dictionary for saving. Calls save() on all connected systems
 ## (Calendar, Stats, Inventory, Equipment, Sigils, Bonds, Dorm, Romance, etc.). Returns the
 ## complete save payload. Note: Equipment loads BEFORE sigils to ensure bracelet capacity exists.
@@ -671,6 +755,9 @@ func save() -> Dictionary:
 func load(data: Dictionary) -> void:
 	if data.is_empty():
 		return
+
+	# Reset all systems first to prevent data leakage from previous sessions
+	reset_all_systems()
 
 	player_name     = String(data.get("player_name", player_name))
 	difficulty      = String(data.get("difficulty", difficulty))
