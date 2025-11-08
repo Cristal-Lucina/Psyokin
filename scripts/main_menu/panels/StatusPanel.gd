@@ -313,6 +313,7 @@ func _create_next_mission_display() -> void:
 	# Create container for the display
 	var container := VBoxContainer.new()
 	container.name = "NextMissionDisplay"
+	container.add_theme_constant_override("separation", 4)
 
 	# Position: 50px from top, 10px from right edge
 	# Using anchor to top-right corner
@@ -321,10 +322,50 @@ func _create_next_mission_display() -> void:
 	container.grow_horizontal = Control.GROW_DIRECTION_BEGIN  # Grow left
 	container.grow_vertical = Control.GROW_DIRECTION_END      # Grow down
 
-	# Create NEXT MISSION cell
-	var mission_cell := _create_info_cell("NEXT MISSION", "TBD")
-	container.add_child(mission_cell)
-	_mission_value_label = mission_cell.get_meta("value_label")
+	# Create "NEXT MISSION" label
+	var title_label := Label.new()
+	title_label.text = "NEXT MISSION"
+	title_label.add_theme_font_size_override("font_size", 16)
+	title_label.add_theme_color_override("font_color", Color(0.9, 0.9, 0.9))
+	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	container.add_child(title_label)
+
+	# Create grey box with white border for mission description
+	var mission_box := PanelContainer.new()
+	mission_box.custom_minimum_size = Vector2(180, 40)
+
+	# Create grey background with white border
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.3, 0.3, 0.3, 1.0)  # Grey background
+	style.border_width_left = 2
+	style.border_width_right = 2
+	style.border_width_top = 2
+	style.border_width_bottom = 2
+	style.border_color = Color(1.0, 1.0, 1.0, 1.0)  # White border
+	style.corner_radius_top_left = 4
+	style.corner_radius_top_right = 4
+	style.corner_radius_bottom_left = 4
+	style.corner_radius_bottom_right = 4
+	mission_box.add_theme_stylebox_override("panel", style)
+
+	# Add margin for padding inside box
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 8)
+	margin.add_theme_constant_override("margin_top", 6)
+	margin.add_theme_constant_override("margin_right", 8)
+	margin.add_theme_constant_override("margin_bottom", 6)
+	mission_box.add_child(margin)
+
+	# Create label for mission text
+	_mission_value_label = Label.new()
+	_mission_value_label.text = "TBD"
+	_mission_value_label.add_theme_font_size_override("font_size", 12)
+	_mission_value_label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0))
+	_mission_value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	_mission_value_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	margin.add_child(_mission_value_label)
+
+	container.add_child(mission_box)
 
 	# Add to root
 	add_child(container)
