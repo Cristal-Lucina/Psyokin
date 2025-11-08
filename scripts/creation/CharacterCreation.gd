@@ -129,6 +129,11 @@ var current_name_text: String = ""
 var first_name_label: Label = null
 var last_name_label: Label = null
 
+# Stat selection state
+var stat_focused_index: int = 0  # Which stat is currently focused (0-4)
+var stat_selected: Array[bool] = [false, false, false, false, false]  # Which stats are selected
+var stat_panels: Array = []  # References to stat panel containers
+
 # Blinking up arrow
 var arrow_label: Label = null
 var cursor_blink_timer: float = 0.0
@@ -856,8 +861,38 @@ func _process_cursor_blink(delta: float) -> void:
 			arrow_label.visible = cursor_visible
 
 func _unhandled_input(event: InputEvent) -> void:
-	"""Handle input for advancing dialogue and name input"""
+	"""Handle input for advancing dialogue, name input, and stat selection"""
 	if not cinematic_active:
+		return
+
+	# Handle stat selection navigation and toggle
+	if current_stage == CinematicStage.STAT_SELECTION:
+		if event.is_action_pressed("ui_up"):
+			get_viewport().set_input_as_handled()
+			_handle_stat_navigation(-1)
+			return
+		elif event.is_action_pressed("ui_down"):
+			get_viewport().set_input_as_handled()
+			_handle_stat_navigation(1)
+			return
+		elif event.is_action_pressed("ui_accept"):
+			get_viewport().set_input_as_handled()
+			_handle_stat_toggle()
+			return
+		# Also handle keyboard keys
+		elif event is InputEventKey and event.pressed and not event.echo:
+			if event.keycode == KEY_UP:
+				get_viewport().set_input_as_handled()
+				_handle_stat_navigation(-1)
+				return
+			elif event.keycode == KEY_DOWN:
+				get_viewport().set_input_as_handled()
+				_handle_stat_navigation(1)
+				return
+			elif event.keycode == KEY_SPACE or event.keycode == KEY_ENTER:
+				get_viewport().set_input_as_handled()
+				_handle_stat_toggle()
+				return
 		return
 
 	# Handle name input stage separately
@@ -1270,145 +1305,217 @@ func _finalize_names() -> void:
 
 # ── Stat Selection UI ────────────────────────────────────────────────────────
 func _build_stat_selection_ui() -> void:
-	"""Build the stat selection UI with ItemList and details panel"""
+	"""Build the stat selection UI with controller-friendly toggles"""
 	# Hide dialogue label
 	if dialogue_label:
 		dialogue_label.visible = false
 
+	# Reset stat selection state
+	stat_focused_index = 0
+	stat_selected = [false, false, false, false, false]
+	stat_panels.clear()
+
 	# Create stat selection container
-	stat_selection_container = Control.new()
-	stat_selection_container.set_anchors_preset(Control.PRESET_FULL_RECT)
+	stat_selection_container = VBoxContainer.new()
+	stat_selection_container.set_anchors_preset(Control.PRESET_CENTER)
+	stat_selection_container.anchor_left = 0.5
+	stat_selection_container.anchor_top = 0.5
+	stat_selection_container.anchor_right = 0.5
+	stat_selection_container.anchor_bottom = 0.5
+	stat_selection_container.offset_left = -400
+	stat_selection_container.offset_right = 400
+	stat_selection_container.offset_top = -300
+	stat_selection_container.offset_bottom = 300
+	stat_selection_container.add_theme_constant_override("separation", 15)
 	cinematic_layer.add_child(stat_selection_container)
 
 	# Title
 	var title = Label.new()
-	title.text = "What are your strengths? Choose 3."
-	title.position = Vector2(0, 50)
-	title.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	title.text = "What are your strengths? Choose 3.\nUse ↑↓ to navigate, Accept to toggle, Continue when ready."
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 20)
+	title.add_theme_font_size_override("font_size", 18)
+	title.add_theme_color_override("font_color", Color.WHITE)
 	stat_selection_container.add_child(title)
 
-	# Main content container (centered)
-	var content = HBoxContainer.new()
-	content.set_anchors_preset(Control.PRESET_CENTER)
-	content.anchor_left = 0.5
-	content.anchor_top = 0.5
-	content.anchor_right = 0.5
-	content.anchor_bottom = 0.5
-	content.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	content.grow_vertical = Control.GROW_DIRECTION_BOTH
-	content.offset_left = -400
-	content.offset_top = -200
-	content.offset_right = 400
-	content.offset_bottom = 200
-	content.add_theme_constant_override("separation", 20)
-	stat_selection_container.add_child(content)
+	# Stat names and descriptions
+	var stats = [
+		{"name": "BRAWN", "id": "BRW", "desc": "Increases physical attack power and weapon damage.\nEssential for martial combat."},
+		{"name": "VITALITY", "id": "VTL", "desc": "Increases maximum health points and physical defense.\nMax HP = 60 + (VTL × Level × 6)"},
+		{"name": "TEMPO", "id": "TPO", "desc": "Controls initiative and action speed.\nHigher tempo means more turns and faster reactions."},
+		{"name": "MIND", "id": "MND", "desc": "Increases sigil power and skill damage.\nCritical for using psychic abilities effectively."},
+		{"name": "FOCUS", "id": "FCS", "desc": "Increases maximum mental points and skill accuracy.\nMax MP = 20 + (FCS × Level × 1.5)"}
+	]
 
-	# Left panel: ItemList
-	var list_panel = _create_styled_panel()
-	list_panel.custom_minimum_size = Vector2(300, 400)
-	content.add_child(list_panel)
+	# Create stat panels
+	for i in range(stats.size()):
+		var stat_panel = PanelContainer.new()
+		stat_panel.custom_minimum_size = Vector2(750, 80)
 
-	var list = ItemList.new()
-	list.name = "StatList"
-	list.add_item("BRAWN")
-	list.add_item("VITALITY")
-	list.add_item("TEMPO")
-	list.add_item("MIND")
-	list.add_item("FOCUS")
-	list.select_mode = ItemList.SELECT_MULTI
-	list.add_theme_font_size_override("font_size", 16)
-	list.item_selected.connect(_on_stat_item_selected)
-	list_panel.add_child(list)
+		# Style based on focused/selected state
+		var style = StyleBoxFlat.new()
+		style.bg_color = Color(0.2, 0.2, 0.2, 1.0)
+		if i == 0:  # First stat starts focused
+			style.border_color = Color(1.0, 0.7, 0.75, 1.0)  # Pink - focused
+			style.border_width_left = 3
+			style.border_width_right = 3
+			style.border_width_top = 3
+			style.border_width_bottom = 3
+		else:
+			style.border_color = Color(0.5, 0.5, 0.5, 1.0)  # Gray - not focused
+			style.border_width_left = 2
+			style.border_width_right = 2
+			style.border_width_top = 2
+			style.border_width_bottom = 2
+		style.corner_radius_top_left = 8
+		style.corner_radius_top_right = 8
+		style.corner_radius_bottom_left = 8
+		style.corner_radius_bottom_right = 8
+		stat_panel.add_theme_stylebox_override("panel", style)
+		stat_panel.name = "StatPanel_%d" % i
+		stat_panels.append(stat_panel)
 
-	# Right panel: Details
-	var details_panel = _create_styled_panel()
-	details_panel.custom_minimum_size = Vector2(450, 400)
-	content.add_child(details_panel)
+		var hbox = HBoxContainer.new()
+		hbox.add_theme_constant_override("separation", 20)
+		stat_panel.add_child(hbox)
 
-	var details_label = Label.new()
-	details_label.name = "DetailsLabel"
-	details_label.text = "Select a stat to see details."
-	details_label.autowrap_mode = TextServer.AUTOWRAP_WORD
-	details_label.vertical_alignment = VERTICAL_ALIGNMENT_TOP
-	details_label.add_theme_font_size_override("font_size", 14)
-	details_panel.add_child(details_label)
+		# Checkbox indicator
+		var checkbox = Label.new()
+		checkbox.text = "☐"  # Unchecked box
+		checkbox.name = "Checkbox"
+		checkbox.add_theme_font_size_override("font_size", 32)
+		checkbox.add_theme_color_override("font_color", Color.WHITE)
+		checkbox.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		hbox.add_child(checkbox)
 
-	# Accept button
-	var accept_btn = Button.new()
-	accept_btn.text = "Accept"
-	accept_btn.position = Vector2(0, -80)
-	accept_btn.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
-	accept_btn.anchor_top = 1.0
-	accept_btn.anchor_bottom = 1.0
-	accept_btn.custom_minimum_size = Vector2(200, 50)
-	accept_btn.add_theme_font_size_override("font_size", 16)
-	accept_btn.pressed.connect(_on_stats_accepted)
-	stat_selection_container.add_child(accept_btn)
+		# Stat info
+		var info_vbox = VBoxContainer.new()
+		info_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		hbox.add_child(info_vbox)
+
+		var stat_name = Label.new()
+		stat_name.text = stats[i]["name"]
+		stat_name.add_theme_font_size_override("font_size", 20)
+		stat_name.add_theme_color_override("font_color", Color.WHITE)
+		info_vbox.add_child(stat_name)
+
+		var stat_desc = Label.new()
+		stat_desc.text = stats[i]["desc"]
+		stat_desc.autowrap_mode = TextServer.AUTOWRAP_WORD
+		stat_desc.add_theme_font_size_override("font_size", 12)
+		stat_desc.add_theme_color_override("font_color", Color(0.8, 0.8, 0.8, 1.0))
+		info_vbox.add_child(stat_desc)
+
+		stat_selection_container.add_child(stat_panel)
+
+	# Continue button
+	var continue_btn_container = CenterContainer.new()
+	stat_selection_container.add_child(continue_btn_container)
+
+	var continue_btn = Button.new()
+	continue_btn.text = "Continue"
+	continue_btn.name = "ContinueButton"
+	continue_btn.custom_minimum_size = Vector2(200, 50)
+	continue_btn.add_theme_font_size_override("font_size", 16)
+	continue_btn.disabled = true  # Disabled until 3 stats selected
+	continue_btn.pressed.connect(_on_stats_accepted)
+	continue_btn_container.add_child(continue_btn)
 
 	# Fade in
 	stat_selection_container.modulate = Color(1, 1, 1, 0)
 	var tween = create_tween()
 	tween.tween_property(stat_selection_container, "modulate", Color(1, 1, 1, 1), 0.5)
 
-func _on_stat_item_selected(index: int) -> void:
-	"""Handle stat selection and show details"""
+func _handle_stat_navigation(direction: int) -> void:
+	"""Handle up/down navigation in stat selection"""
+	# Update focused index
+	stat_focused_index += direction
+	stat_focused_index = clamp(stat_focused_index, 0, 4)
+
+	# Update visual focus
+	_update_stat_visual_states()
+
+func _handle_stat_toggle() -> void:
+	"""Toggle the currently focused stat"""
+	# Check if we can toggle
+	var selected_count = stat_selected.count(true)
+
+	if stat_selected[stat_focused_index]:
+		# Deselecting is always allowed
+		stat_selected[stat_focused_index] = false
+	else:
+		# Only allow selection if less than 3 are selected
+		if selected_count < 3:
+			stat_selected[stat_focused_index] = true
+
+	# Update visuals
+	_update_stat_visual_states()
+
+	# Update Continue button state
+	_update_continue_button()
+
+func _update_stat_visual_states() -> void:
+	"""Update the visual state of all stat panels"""
+	for i in range(stat_panels.size()):
+		var panel = stat_panels[i]
+		if not panel:
+			continue
+
+		# Update border based on focus
+		var style = StyleBoxFlat.new()
+		style.bg_color = Color(0.2, 0.2, 0.2, 1.0)
+
+		if i == stat_focused_index:
+			# Focused - pink border
+			style.border_color = Color(1.0, 0.7, 0.75, 1.0)
+			style.border_width_left = 3
+			style.border_width_right = 3
+			style.border_width_top = 3
+			style.border_width_bottom = 3
+		else:
+			# Not focused - gray border
+			style.border_color = Color(0.5, 0.5, 0.5, 1.0)
+			style.border_width_left = 2
+			style.border_width_right = 2
+			style.border_width_top = 2
+			style.border_width_bottom = 2
+
+		style.corner_radius_top_left = 8
+		style.corner_radius_top_right = 8
+		style.corner_radius_bottom_left = 8
+		style.corner_radius_bottom_right = 8
+		panel.add_theme_stylebox_override("panel", style)
+
+		# Update checkbox
+		var checkbox = panel.get_node_or_null("HBoxContainer/Checkbox")
+		if checkbox:
+			checkbox.text = "☑" if stat_selected[i] else "☐"
+			if stat_selected[i]:
+				checkbox.add_theme_color_override("font_color", Color(0.4, 1.0, 0.4, 1.0))  # Green when selected
+			else:
+				checkbox.add_theme_color_override("font_color", Color.WHITE)
+
+func _update_continue_button() -> void:
+	"""Enable/disable the Continue button based on selection count"""
 	if not stat_selection_container:
 		return
 
-	var list = stat_selection_container.get_node_or_null("StatList")
-	var details_label = stat_selection_container.get_node_or_null("DetailsLabel")
-
-	if not list or not details_label:
-		return
-
-	# Get selected items
-	var selected = list.get_selected_items()
-
-	# Limit to 3 selections
-	if selected.size() > 3:
-		# Deselect the item that was just selected
-		list.deselect(index)
-		selected = list.get_selected_items()
-
-	# Update visual feedback (highlight in green)
-	for i in range(list.item_count):
-		if i in selected:
-			list.set_item_custom_bg_color(i, Color(0.2, 0.6, 0.2, 0.5))  # Green
-		else:
-			list.set_item_custom_bg_color(i, Color(0, 0, 0, 0))  # Transparent
-
-	# Show details for the most recently selected item
-	if index >= 0:
-		var stat_descriptions = {
-			0: "BRAWN\n\nIncreases physical attack power and weapon damage. Essential for martial combat.",
-			1: "VITALITY\n\nIncreases maximum health points and physical defense. Keeps you alive longer in combat.\nMax HP = 60 + (VTL × Level × 6)",
-			2: "TEMPO\n\nControls initiative and action speed. Higher tempo means more turns and faster reactions.",
-			3: "MIND\n\nIncreases sigil power and skill damage. Critical for using psychic abilities effectively.",
-			4: "FOCUS\n\nIncreases maximum mental points and skill accuracy. Required for sustained ability usage.\nMax MP = 20 + (FCS × Level × 1.5)"
-		}
-		details_label.text = stat_descriptions.get(index, "Select a stat to see details.")
+	var continue_btn = stat_selection_container.get_node_or_null("CenterContainer/ContinueButton")
+	if continue_btn:
+		var selected_count = stat_selected.count(true)
+		continue_btn.disabled = (selected_count != 3)
 
 func _on_stats_accepted() -> void:
 	"""Handle stat selection acceptance"""
-	if not stat_selection_container:
-		return
-
-	var list = stat_selection_container.get_node_or_null("StatList")
-	if not list:
-		return
-
-	var selected = list.get_selected_items()
-	if selected.size() != 3:
-		OS.alert("Please select exactly 3 stats.", "Selection Required")
-		return
+	# Verify exactly 3 stats are selected
+	var selected_count = stat_selected.count(true)
+	if selected_count != 3:
+		return  # Button should be disabled anyway
 
 	# Convert selections to stat IDs and apply to form
 	var stat_ids = ["BRW", "VTL", "TPO", "MND", "FCS"]
 	_selected_order.clear()
 
-	# Deselect all first
+	# Deselect all checkboxes first
 	if _brw_cb: _brw_cb.set_pressed_no_signal(false)
 	if _vtl_cb: _vtl_cb.set_pressed_no_signal(false)
 	if _tpo_cb: _tpo_cb.set_pressed_no_signal(false)
@@ -1416,17 +1523,18 @@ func _on_stats_accepted() -> void:
 	if _fcs_cb: _fcs_cb.set_pressed_no_signal(false)
 
 	# Apply selections
-	for idx in selected:
-		var stat_id = stat_ids[idx]
-		_selected_order.append(stat_id)
+	for i in range(stat_selected.size()):
+		if stat_selected[i]:
+			var stat_id = stat_ids[i]
+			_selected_order.append(stat_id)
 
-		# Check the corresponding checkbox
-		match stat_id:
-			"BRW": if _brw_cb: _brw_cb.set_pressed_no_signal(true)
-			"VTL": if _vtl_cb: _vtl_cb.set_pressed_no_signal(true)
-			"TPO": if _tpo_cb: _tpo_cb.set_pressed_no_signal(true)
-			"MND": if _mnd_cb: _mnd_cb.set_pressed_no_signal(true)
-			"FCS": if _fcs_cb: _fcs_cb.set_pressed_no_signal(true)
+			# Check the corresponding checkbox
+			match stat_id:
+				"BRW": if _brw_cb: _brw_cb.set_pressed_no_signal(true)
+				"VTL": if _vtl_cb: _vtl_cb.set_pressed_no_signal(true)
+				"TPO": if _tpo_cb: _tpo_cb.set_pressed_no_signal(true)
+				"MND": if _mnd_cb: _mnd_cb.set_pressed_no_signal(true)
+				"FCS": if _fcs_cb: _fcs_cb.set_pressed_no_signal(true)
 
 	# Rebuild perk dropdown with new selections
 	_rebuild_perk_dropdown()
