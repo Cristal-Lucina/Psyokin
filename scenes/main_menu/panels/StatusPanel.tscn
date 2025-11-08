@@ -82,7 +82,7 @@ layout_mode = 2
 size_flags_horizontal = 3
 theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
 theme_override_font_sizes/font_size = 20
-text = "PARTY"
+text = "PARTY STATS"
 horizontal_alignment = 0
 
 [node name="PartySeparator" type="HSeparator" parent="Root/Left"]
