@@ -2061,8 +2061,7 @@ func _build_customization_ui() -> void:
 	accept_btn.pressed.connect(_on_customization_accepted)
 	customization_container.add_child(accept_btn)
 
-	# Set up focus neighbors
-	var dropdowns = customization_container.get_meta("dropdowns", [])
+	# Set up focus neighbors (dropdowns array already exists from earlier in function)
 	for i in range(dropdowns.size()):
 		var dd = dropdowns[i]
 		if i > 0:
