@@ -71,7 +71,7 @@ signal panel_stack_empty()
 var _panel_stack: Array[Node] = []
 
 ## Enable debug logging
-var debug_logging: bool = true
+var debug_logging: bool = false
 
 # ────────────────────────── Public API ──────────────────────────────
 
