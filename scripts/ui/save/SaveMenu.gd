@@ -77,10 +77,10 @@ func _ensure_fallback_layout() -> void:
 	center.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(center)
 
-	# Window frame with LoadoutPanel styling - no fixed width
+	# Window frame with LoadoutPanel styling
 	_window = Panel.new()
 	_window.name = "Window"
-	_window.custom_minimum_size = Vector2(0, 300)  # Only constrain height
+	_window.custom_minimum_size = Vector2(600, 500)
 	_style_panel(_window)
 	center.add_child(_window)
 
