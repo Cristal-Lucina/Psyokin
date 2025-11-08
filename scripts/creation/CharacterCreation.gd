@@ -900,49 +900,7 @@ func _input(event: InputEvent) -> void:
 			return
 		return
 
-	# Handle stat selection navigation and toggle
-	if current_stage == CinematicStage.STAT_SELECTION:
-		if event.is_action_pressed("ui_up"):
-			print("[Stat Selection] Up pressed")
-			get_viewport().set_input_as_handled()
-			_handle_stat_navigation(-1)
-			return
-		elif event.is_action_pressed("ui_down"):
-			print("[Stat Selection] Down pressed")
-			get_viewport().set_input_as_handled()
-			_handle_stat_navigation(1)
-			return
-		elif event.is_action_pressed("ui_accept"):
-			print("[Stat Selection] Accept pressed")
-			get_viewport().set_input_as_handled()
-			_handle_stat_toggle()
-			return
-		elif event is InputEventJoypadButton and event.pressed:
-			print("[Stat Selection] Joypad button pressed: ", event.button_index)
-			get_viewport().set_input_as_handled()
-			# Button 11 is D-pad up, 12 is D-pad down, 0 is A button
-			if event.button_index == 11:  # D-pad up
-				_handle_stat_navigation(-1)
-			elif event.button_index == 12:  # D-pad down
-				_handle_stat_navigation(1)
-			else:  # Any other button toggles
-				_handle_stat_toggle()
-			return
-		# Also handle keyboard keys
-		elif event is InputEventKey and event.pressed and not event.echo:
-			if event.keycode == KEY_UP:
-				get_viewport().set_input_as_handled()
-				_handle_stat_navigation(-1)
-				return
-			elif event.keycode == KEY_DOWN:
-				get_viewport().set_input_as_handled()
-				_handle_stat_navigation(1)
-				return
-			elif event.keycode == KEY_SPACE or event.keycode == KEY_ENTER:
-				get_viewport().set_input_as_handled()
-				_handle_stat_toggle()
-				return
-		return
+	# Stat selection uses built-in Godot button navigation - no manual handling needed!
 
 	# Handle name input stage separately
 	if current_stage == CinematicStage.NAME_INPUT and (name_input_stage == 0 or name_input_stage == 2):
@@ -1473,13 +1431,12 @@ func _finalize_names() -> void:
 
 # ── Stat Selection UI ────────────────────────────────────────────────────────
 func _build_stat_selection_ui() -> void:
-	"""Build the stat selection UI with controller-friendly toggles"""
+	"""Build the stat selection UI with simple toggle buttons"""
 	# Hide dialogue label
 	if dialogue_label:
 		dialogue_label.visible = false
 
 	# Reset stat selection state
-	stat_focused_index = 0
 	stat_selected = [false, false, false, false, false]
 	stat_panels.clear()
 
@@ -1494,12 +1451,12 @@ func _build_stat_selection_ui() -> void:
 	stat_selection_container.offset_right = 400
 	stat_selection_container.offset_top = -300
 	stat_selection_container.offset_bottom = 300
-	stat_selection_container.add_theme_constant_override("separation", 15)
+	stat_selection_container.add_theme_constant_override("separation", 10)
 	cinematic_layer.add_child(stat_selection_container)
 
 	# Title
 	var title = Label.new()
-	title.text = "What are your strengths? Choose 3.\nUse ↑↓ to navigate, Accept to toggle, Continue when ready."
+	title.text = "What are your strengths? Choose 3."
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.add_theme_font_size_override("font_size", 18)
 	title.add_theme_color_override("font_color", Color.WHITE)
@@ -1507,73 +1464,29 @@ func _build_stat_selection_ui() -> void:
 
 	# Stat names and descriptions
 	var stats = [
-		{"name": "BRAWN", "id": "BRW", "desc": "Increases physical attack power and weapon damage.\nEssential for martial combat."},
-		{"name": "VITALITY", "id": "VTL", "desc": "Increases maximum health points and physical defense.\nMax HP = 60 + (VTL × Level × 6)"},
-		{"name": "TEMPO", "id": "TPO", "desc": "Controls initiative and action speed.\nHigher tempo means more turns and faster reactions."},
-		{"name": "MIND", "id": "MND", "desc": "Increases sigil power and skill damage.\nCritical for using psychic abilities effectively."},
-		{"name": "FOCUS", "id": "FCS", "desc": "Increases maximum mental points and skill accuracy.\nMax MP = 20 + (FCS × Level × 1.5)"}
+		{"name": "BRAWN", "id": "BRW", "desc": "Physical attack power and weapon damage"},
+		{"name": "VITALITY", "id": "VTL", "desc": "Maximum health and physical defense"},
+		{"name": "TEMPO", "id": "TPO", "desc": "Initiative and action speed"},
+		{"name": "MIND", "id": "MND", "desc": "Sigil power and skill damage"},
+		{"name": "FOCUS", "id": "FCS", "desc": "Maximum MP and skill accuracy"}
 	]
 
-	# Create stat panels
+	# Create stat toggle buttons
 	for i in range(stats.size()):
-		var stat_panel = PanelContainer.new()
-		stat_panel.custom_minimum_size = Vector2(750, 80)
+		var stat_button = CheckButton.new()
+		stat_button.text = "%s - %s" % [stats[i]["name"], stats[i]["desc"]]
+		stat_button.custom_minimum_size = Vector2(750, 50)
+		stat_button.add_theme_font_size_override("font_size", 16)
+		stat_button.button_pressed = false
+		stat_button.name = "StatButton_%d" % i
+		stat_button.toggled.connect(_on_stat_button_toggled.bind(i))
 
-		# Style based on focused/selected state
-		var style = StyleBoxFlat.new()
-		style.bg_color = Color(0.2, 0.2, 0.2, 1.0)
-		if i == 0:  # First stat starts focused
-			style.border_color = Color(1.0, 0.7, 0.75, 1.0)  # Pink - focused
-			style.border_width_left = 3
-			style.border_width_right = 3
-			style.border_width_top = 3
-			style.border_width_bottom = 3
-		else:
-			style.border_color = Color(0.5, 0.5, 0.5, 1.0)  # Gray - not focused
-			style.border_width_left = 2
-			style.border_width_right = 2
-			style.border_width_top = 2
-			style.border_width_bottom = 2
-		style.corner_radius_top_left = 8
-		style.corner_radius_top_right = 8
-		style.corner_radius_bottom_left = 8
-		style.corner_radius_bottom_right = 8
-		stat_panel.add_theme_stylebox_override("panel", style)
-		stat_panel.name = "StatPanel_%d" % i
-		stat_panels.append(stat_panel)
+		# Set focus neighbor for controller navigation
+		if i == 0:
+			stat_button.grab_focus()  # First button gets focus
 
-		var hbox = HBoxContainer.new()
-		hbox.add_theme_constant_override("separation", 20)
-		stat_panel.add_child(hbox)
-
-		# Checkbox indicator
-		var checkbox = Label.new()
-		checkbox.text = "☐"  # Unchecked box
-		checkbox.name = "Checkbox"
-		checkbox.add_theme_font_size_override("font_size", 32)
-		checkbox.add_theme_color_override("font_color", Color.WHITE)
-		checkbox.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		hbox.add_child(checkbox)
-
-		# Stat info
-		var info_vbox = VBoxContainer.new()
-		info_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		hbox.add_child(info_vbox)
-
-		var stat_name = Label.new()
-		stat_name.text = stats[i]["name"]
-		stat_name.add_theme_font_size_override("font_size", 20)
-		stat_name.add_theme_color_override("font_color", Color.WHITE)
-		info_vbox.add_child(stat_name)
-
-		var stat_desc = Label.new()
-		stat_desc.text = stats[i]["desc"]
-		stat_desc.autowrap_mode = TextServer.AUTOWRAP_WORD
-		stat_desc.add_theme_font_size_override("font_size", 12)
-		stat_desc.add_theme_color_override("font_color", Color(0.8, 0.8, 0.8, 1.0))
-		info_vbox.add_child(stat_desc)
-
-		stat_selection_container.add_child(stat_panel)
+		stat_selection_container.add_child(stat_button)
+		stat_panels.append(stat_button)
 
 	# Continue button
 	var continue_btn_container = CenterContainer.new()
@@ -1593,102 +1506,32 @@ func _build_stat_selection_ui() -> void:
 	var tween = create_tween()
 	tween.tween_property(stat_selection_container, "modulate", Color(1, 1, 1, 1), 0.5)
 
-func _handle_stat_navigation(direction: int) -> void:
-	"""Handle up/down navigation in stat selection (0-4 for stats, 5 for Continue button)"""
-	# Update focused index
-	stat_focused_index += direction
-	stat_focused_index = clamp(stat_focused_index, 0, 5)  # 0-4 stats, 5 is Continue button
-
-	# Update visual focus
-	_update_stat_visual_states()
-
-func _handle_stat_toggle() -> void:
-	"""Toggle the currently focused stat or press Continue button"""
-	# If focused on Continue button (index 5), press it
-	if stat_focused_index == 5:
-		if stat_continue_button and not stat_continue_button.disabled:
-			print("[Stat Selection] Pressing Continue button")
-			_on_stats_accepted()
-		return
-
-	# Otherwise toggle the stat
-	# Check if we can toggle
+func _on_stat_button_toggled(button_pressed: bool, index: int) -> void:
+	"""Handle stat button toggle"""
 	var selected_count = stat_selected.count(true)
 
-	if stat_selected[stat_focused_index]:
-		# Deselecting is always allowed
-		stat_selected[stat_focused_index] = false
+	if button_pressed:
+		# Trying to turn on
+		if selected_count >= 3:
+			# Already have 3 selected, reject this
+			var btn = stat_panels[index]
+			if btn:
+				btn.set_pressed_no_signal(false)
+			return
+		else:
+			stat_selected[index] = true
 	else:
-		# Only allow selection if less than 3 are selected
-		if selected_count < 3:
-			stat_selected[stat_focused_index] = true
+		# Turning off
+		stat_selected[index] = false
 
-	# Update visuals
-	_update_stat_visual_states()
-
-	# Update Continue button state
+	# Update Continue button
 	_update_continue_button()
-
-func _update_stat_visual_states() -> void:
-	"""Update the visual state of all stat panels and Continue button"""
-	# Update stat panels
-	for i in range(stat_panels.size()):
-		var panel = stat_panels[i]
-		if not panel:
-			continue
-
-		# Update border based on focus
-		var style = StyleBoxFlat.new()
-		style.bg_color = Color(0.2, 0.2, 0.2, 1.0)
-
-		if i == stat_focused_index:
-			# Focused - pink border
-			style.border_color = Color(1.0, 0.7, 0.75, 1.0)
-			style.border_width_left = 3
-			style.border_width_right = 3
-			style.border_width_top = 3
-			style.border_width_bottom = 3
-		else:
-			# Not focused - gray border
-			style.border_color = Color(0.5, 0.5, 0.5, 1.0)
-			style.border_width_left = 2
-			style.border_width_right = 2
-			style.border_width_top = 2
-			style.border_width_bottom = 2
-
-		style.corner_radius_top_left = 8
-		style.corner_radius_top_right = 8
-		style.corner_radius_bottom_left = 8
-		style.corner_radius_bottom_right = 8
-		panel.add_theme_stylebox_override("panel", style)
-
-		# Update checkbox
-		var checkbox = panel.get_node_or_null("HBoxContainer/Checkbox")
-		if checkbox:
-			checkbox.text = "☑" if stat_selected[i] else "☐"
-			if stat_selected[i]:
-				checkbox.add_theme_color_override("font_color", Color(0.4, 1.0, 0.4, 1.0))  # Green when selected
-			else:
-				checkbox.add_theme_color_override("font_color", Color.WHITE)
-
-	# Update Continue button visual state
-	if stat_continue_button:
-		if stat_focused_index == 5:
-			# Focused - pink modulate
-			stat_continue_button.modulate = Color(1.0, 0.7, 0.75, 1.0)
-		else:
-			# Not focused - normal
-			stat_continue_button.modulate = Color.WHITE
 
 func _update_continue_button() -> void:
 	"""Enable/disable the Continue button based on selection count"""
-	if not stat_selection_container:
-		return
-
-	var continue_btn = stat_selection_container.get_node_or_null("CenterContainer/ContinueButton")
-	if continue_btn:
+	if stat_continue_button:
 		var selected_count = stat_selected.count(true)
-		continue_btn.disabled = (selected_count != 3)
+		stat_continue_button.disabled = (selected_count != 3)
 
 func _on_stats_accepted() -> void:
 	"""Handle stat selection acceptance"""
