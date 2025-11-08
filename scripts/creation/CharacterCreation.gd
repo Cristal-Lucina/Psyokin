@@ -3,6 +3,12 @@ class_name CharacterCreation
 
 signal creation_applied
 
+# Styling constants (matching LoadoutPanel)
+const PANEL_BG_COLOR := Color(0.15, 0.15, 0.15, 1.0)  # Dark gray, fully opaque
+const PANEL_BORDER_COLOR := Color(1.0, 0.7, 0.75, 1.0)  # Pink border
+const PANEL_BORDER_WIDTH := 2
+const PANEL_CORNER_RADIUS := 8
+
 # ── Autoload paths ────────────────────────────────────────────────────────────
 const GS_PATH      := "/root/aGameState"
 const STATS_PATH   := "/root/aStatsSystem"
@@ -55,9 +61,9 @@ const DIRECTIONS = {
 @onready var _cancel_btn  : Button        = %CancelBtn
 
 # Character preview
-@onready var character_layers = $MainContainer/PreviewPanel/PreviewContainer/CenterContainer/CharacterLayers
-@onready var frame_label = $MainContainer/PreviewPanel/PreviewContainer/AnimationControls/FrameLabel
-@onready var direction_label = $MainContainer/PreviewPanel/PreviewContainer/AnimationControls/DirectionLabel
+@onready var character_layers = $Margin/MainContainer/PreviewPanel/PreviewMargin/PreviewContainer/CenterContainer/CharacterLayers
+@onready var frame_label = $Margin/MainContainer/PreviewPanel/PreviewMargin/PreviewContainer/AnimationControls/FrameLabel
+@onready var direction_label = $Margin/MainContainer/PreviewPanel/PreviewMargin/PreviewContainer/AnimationControls/DirectionLabel
 
 # ── state ────────────────────────────────────────────────────────────────────
 var _selected_order : Array[String] = []       # keep order of picks (max 3)
@@ -78,6 +84,10 @@ var animation_speed = 0.135  # 135ms per frame for walk
 # ── ready ────────────────────────────────────────────────────────────────────
 func _ready() -> void:
 	print("Character Creation starting...")
+
+	# Apply LoadoutPanel styling to all panels
+	_style_panels()
+
 	scan_character_assets()
 	_fill_basics()
 	_wire_stat_toggles()
@@ -109,6 +119,73 @@ func _ready() -> void:
 	set_default_character()
 	update_preview()
 	_update_confirm_enabled()
+
+func _style_panels() -> void:
+	"""Apply LoadoutPanel styling (dark gray background with pink border) to all panels"""
+	var panels_to_style = [
+		get_node_or_null("Margin/MainContainer/PreviewPanel"),
+		get_node_or_null("Margin/MainContainer/FormPanel")
+	]
+
+	for panel in panels_to_style:
+		if panel is PanelContainer:
+			var style_box := StyleBoxFlat.new()
+			style_box.bg_color = PANEL_BG_COLOR
+			style_box.border_color = PANEL_BORDER_COLOR
+			style_box.border_width_left = PANEL_BORDER_WIDTH
+			style_box.border_width_right = PANEL_BORDER_WIDTH
+			style_box.border_width_top = PANEL_BORDER_WIDTH
+			style_box.border_width_bottom = PANEL_BORDER_WIDTH
+			style_box.corner_radius_top_left = PANEL_CORNER_RADIUS
+			style_box.corner_radius_top_right = PANEL_CORNER_RADIUS
+			style_box.corner_radius_bottom_left = PANEL_CORNER_RADIUS
+			style_box.corner_radius_bottom_right = PANEL_CORNER_RADIUS
+			panel.add_theme_stylebox_override("panel", style_box)
+
+			# Add 50px padding inside panels
+			panel.add_theme_constant_override("margin_left", 50)
+			panel.add_theme_constant_override("margin_top", 50)
+			panel.add_theme_constant_override("margin_right", 50)
+			panel.add_theme_constant_override("margin_bottom", 50)
+
+	# Apply font size hierarchy (matching LoadoutPanel)
+	_apply_font_sizes()
+
+func _apply_font_sizes() -> void:
+	"""Apply LoadoutPanel-style font size hierarchy"""
+	# Titles: 16px (like LoadoutPanel section headers)
+	var title_nodes = [
+		get_node_or_null("Margin/MainContainer/PreviewPanel/PreviewContainer/Title"),
+		get_node_or_null("Margin/MainContainer/FormPanel/Form/Title")
+	]
+	for node in title_nodes:
+		if node is Label:
+			node.add_theme_font_size_override("font_size", 16)
+
+	# Section labels and important text: 12px
+	var label_nodes = [
+		get_node_or_null("Margin/MainContainer/FormPanel/Form/ScrollContainer/Grid/NameLable"),
+		get_node_or_null("Margin/MainContainer/FormPanel/Form/ScrollContainer/Grid/SurnameLabel"),
+		get_node_or_null("Margin/MainContainer/FormPanel/Form/ScrollContainer/Grid/PronounLabel"),
+		get_node_or_null("Margin/MainContainer/FormPanel/Form/ScrollContainer/Grid/BodyLabel"),
+		get_node_or_null("Margin/MainContainer/FormPanel/Form/ScrollContainer/Grid/OutfitLabel"),
+		get_node_or_null("Margin/MainContainer/FormPanel/Form/ScrollContainer/Grid/HairLabel"),
+		get_node_or_null("Margin/MainContainer/FormPanel/Form/ScrollContainer/Grid/HatLabel"),
+		get_node_or_null("Margin/MainContainer/FormPanel/Form/StatsLabel"),
+		get_node_or_null("Margin/MainContainer/FormPanel/Form/PerkLabel")
+	]
+	for node in label_nodes:
+		if node is Label:
+			node.add_theme_font_size_override("font_size", 12)
+
+	# Small text and animation info: 10px (already the default, but set explicitly)
+	var small_nodes = [
+		get_node_or_null("Margin/MainContainer/PreviewPanel/PreviewContainer/AnimationControls/DirectionLabel"),
+		get_node_or_null("Margin/MainContainer/PreviewPanel/PreviewContainer/AnimationControls/FrameLabel")
+	]
+	for node in small_nodes:
+		if node is Label:
+			node.add_theme_font_size_override("font_size", 10)
 
 func _process(delta):
 	# Walk animation cycling (6 frames)

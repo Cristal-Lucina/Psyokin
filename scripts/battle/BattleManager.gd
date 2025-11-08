@@ -92,6 +92,11 @@ func start_random_encounter(enemy_ids: Array, return_to_scene: String) -> void:
 
 	return_scene = return_to_scene
 
+	# Save player position before battle so it can be restored after
+	var player = get_tree().get_first_node_in_group("player")
+	if player and player.has_method("save_position"):
+		player.save_position()
+
 	# Build encounter data
 	encounter_data = {
 		"enemy_ids": enemy_ids,

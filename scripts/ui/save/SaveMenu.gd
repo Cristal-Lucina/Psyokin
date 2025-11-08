@@ -9,8 +9,16 @@ class_name SaveMenu
 
 const SAVE_DIR: String = "user://saves"
 
-# Candidate paths (we’ll probe these in order)
+# Styling constants (matching LoadoutPanel)
+const PANEL_BG_COLOR := Color(0.15, 0.15, 0.15, 1.0)  # Dark gray, fully opaque
+const PANEL_BORDER_COLOR := Color(1.0, 0.7, 0.75, 1.0)  # Pink border
+const PANEL_BORDER_WIDTH := 2
+const PANEL_CORNER_RADIUS := 8
+
+# Candidate paths (we'll probe these in order)
 const PATH_SLOTS  : PackedStringArray = [
+	"Center/Window/Margin/Root/Scroll/SlotsGrid",
+	"Center/Window/Margin/Root/Scroll/Slots",
 	"Center/Window/Root/Slots",
 	"Center/Panel/Root/Slots",
 	"MarginContainer/Panel/Root/Slots",
@@ -18,32 +26,19 @@ const PATH_SLOTS  : PackedStringArray = [
 	"Root/Slots",
 	"Slots"
 ]
-const PATH_TITLE  : PackedStringArray = [
-	"Center/Window/Root/Header/Title",
-	"Center/Panel/Root/Header/Title",
-	"Panel/Root/Header/Title",
-	"Root/Header/Title",
-	"Title"
-]
-const PATH_CLOSE  : PackedStringArray = [
-	"Center/Window/Root/Header/CloseBtn",
-	"Center/Panel/Root/Header/CloseBtn",
-	"Panel/Root/Header/CloseBtn",
-	"Root/Header/CloseBtn",
-	"CloseBtn"
-]
-const PATH_HINT   : PackedStringArray = [
-	"Center/Window/Root/Hint",
-	"Center/Panel/Root/Hint",
-	"Panel/Root/Hint",
-	"Root/Hint",
-	"Hint"
-]
 
-var _slots     : VBoxContainer
-var _btn_close : Button
-var _title     : Label
-var _hint      : Label
+var _slots_grid : GridContainer
+var _backdrop   : ColorRect
+var _window     : Panel
+var _scroll     : ScrollContainer
+
+# Controller navigation - 2D grid (rows = slots, columns = save/delete)
+var _save_buttons: Array[Button] = []
+var _delete_buttons: Array[Button] = []
+var _current_row: int = 0
+var _current_column: int = 0  # 0 = Save, 1 = Delete
+var _input_cooldown: float = 0.0
+var _input_cooldown_duration: float = 0.2
 
 # --- helpers -------------------------------------------------------------------
 
@@ -59,15 +54,21 @@ func _find_node_any(paths: PackedStringArray) -> Node:
 		if f: return f
 	return null
 
-func _btn_any(paths: PackedStringArray) -> Button:
-	return _find_node_any(paths) as Button
-
-func _lbl_any(paths: PackedStringArray) -> Label:
-	return _find_node_any(paths) as Label
+func _style_panel(panel: Panel) -> void:
+	"""Apply LoadoutPanel-style styling to a panel"""
+	var style := StyleBoxFlat.new()
+	style.bg_color = PANEL_BG_COLOR
+	style.border_color = PANEL_BORDER_COLOR
+	style.set_border_width_all(PANEL_BORDER_WIDTH)
+	style.corner_radius_top_left = PANEL_CORNER_RADIUS
+	style.corner_radius_top_right = PANEL_CORNER_RADIUS
+	style.corner_radius_bottom_left = PANEL_CORNER_RADIUS
+	style.corner_radius_bottom_right = PANEL_CORNER_RADIUS
+	panel.add_theme_stylebox_override("panel", style)
 
 func _ensure_fallback_layout() -> void:
 	# Build a compact center window if required
-	if _slots != null and _title != null and _btn_close != null and _hint != null:
+	if _slots_grid != null:
 		return
 
 	# Root centerer
@@ -76,91 +77,77 @@ func _ensure_fallback_layout() -> void:
 	center.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(center)
 
-	# Window frame
-	var window := Panel.new()
-	window.name = "Window"
-	window.custom_minimum_size = Vector2(640, 360)
-	center.add_child(window)
+	# Window frame with LoadoutPanel styling
+	_window = Panel.new()
+	_window.name = "Window"
+	_window.custom_minimum_size = Vector2(700, 500)
+	_style_panel(_window)
+	center.add_child(_window)
+
+	# Add margin container for padding (matching LoadoutPanel)
+	var margin := MarginContainer.new()
+	margin.name = "Margin"
+	margin.add_theme_constant_override("margin_left", 20)
+	margin.add_theme_constant_override("margin_top", 20)
+	margin.add_theme_constant_override("margin_right", 20)
+	margin.add_theme_constant_override("margin_bottom", 20)
+	margin.anchor_left = 0.0
+	margin.anchor_right = 1.0
+	margin.anchor_top = 0.0
+	margin.anchor_bottom = 1.0
+	_window.add_child(margin)
 
 	# Root VBox
 	var root := VBoxContainer.new()
 	root.name = "Root"
-	root.anchor_left = 0.0
-	root.anchor_right = 1.0
-	root.anchor_top = 0.0
-	root.anchor_bottom = 1.0
-	root.offset_left = 16
-	root.offset_right = -16
-	root.offset_top = 16
-	root.offset_bottom = -16
-	window.add_child(root)
+	root.add_theme_constant_override("separation", 10)
+	margin.add_child(root)
 
-	# Header
-	var header := HBoxContainer.new()
-	header.name = "Header"
-	root.add_child(header)
-
-	_title = Label.new()
-	_title.name = "Title"
-	_title.text = "Save Game"
-	header.add_child(_title)
-
-	var spacer := Control.new()
-	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	header.add_child(spacer)
-
-	_btn_close = Button.new()
-	_btn_close.name = "CloseBtn"
-	_btn_close.text = "Close"
-	header.add_child(_btn_close)
-
-	_hint = Label.new()
-	_hint.name = "Hint"
-	_hint.text = "Choose a slot. Press Esc to close."
-	root.add_child(_hint)
+	# Title label (no header section, just a simple label)
+	var title := Label.new()
+	title.name = "Title"
+	title.text = "Save Game"
+	title.add_theme_font_size_override("font_size", 18)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	root.add_child(title)
 
 	var scroll := ScrollContainer.new()
 	scroll.name = "Scroll"
-	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.size_flags_horizontal = Control.SIZE_SHRINK_CENTER  # Center content
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	root.add_child(scroll)
 
-	_slots = VBoxContainer.new()
-	_slots.name = "Slots"
-	_slots.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_slots.size_flags_vertical   = Control.SIZE_EXPAND_FILL
-	scroll.add_child(_slots)
+	_slots_grid = GridContainer.new()
+	_slots_grid.name = "SlotsGrid"
+	_slots_grid.columns = 2
+	_slots_grid.add_theme_constant_override("h_separation", 12)
+	_slots_grid.add_theme_constant_override("v_separation", 8)
+	scroll.add_child(_slots_grid)
 
 # --- lifecycle ----------------------------------------------------------------
 
 func _ready() -> void:
 	print("[SaveMenu] _ready() called - initializing save menu")
 	process_mode = Node.PROCESS_MODE_ALWAYS
-	set_process_unhandled_input(true)
+
+	# Stop input from passing through
+	mouse_filter = Control.MOUSE_FILTER_STOP
+	_backdrop = get_node_or_null("Backdrop") as ColorRect
+	if _backdrop:
+		_backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
+
+	# Apply LoadoutPanel styling to window if it exists
+	_window = get_node_or_null("Center/Window") as Panel
+	if _window:
+		_style_panel(_window)
 
 	# Resolve existing nodes first
-	_slots     = _find_node_any(PATH_SLOTS)  as VBoxContainer
-	_title     = _lbl_any(PATH_TITLE)
-	_btn_close = _btn_any(PATH_CLOSE)
-	_hint      = _lbl_any(PATH_HINT)
+	_slots_grid = _find_node_any(PATH_SLOTS) as GridContainer
 
-	print("[SaveMenu] Found nodes - slots: %s, title: %s, close: %s, hint: %s" % [
-		"yes" if _slots else "no",
-		"yes" if _title else "no",
-		"yes" if _btn_close else "no",
-		"yes" if _hint else "no"
-	])
+	print("[SaveMenu] Found nodes - slots_grid: %s" % ["yes" if _slots_grid else "no"])
 
 	# If anything is missing, build a fallback (safe & centered)
 	_ensure_fallback_layout()
-
-	# Final safety: default texts
-	if _title: _title.text = "Save Game"
-	if _hint:  _hint.text  = "Choose a slot. Press Esc to close."
-
-	# Wire close
-	if _btn_close and not _btn_close.pressed.is_connected(_on_close):
-		_btn_close.pressed.connect(_on_close)
 
 	# Ensure we're visible
 	show()
@@ -170,41 +157,93 @@ func _ready() -> void:
 	_rebuild()
 	print("[SaveMenu] Ready complete - save menu visible: %s" % visible)
 
-func _unhandled_input(e: InputEvent) -> void:
-	if e.is_action_pressed("ui_cancel"):
-		_on_close()
-		get_viewport().set_input_as_handled()
+func _process(delta: float) -> void:
+	"""Handle input cooldown"""
+	if _input_cooldown > 0:
+		_input_cooldown -= delta
+
+func _input(e: InputEvent) -> void:
+	# Safety check - don't process if not in tree
+	if not is_inside_tree():
+		return
+
+	var viewport := get_viewport()
+	if viewport == null:
+		return
+
+	# Capture ALL input to prevent it from reaching panels behind this menu
+	if e is InputEventKey or e is InputEventJoypadButton or e is InputEventJoypadMotion:
+		# Back button closes menu
+		if e.is_action_pressed("ui_cancel") or e.is_action_pressed("menu_back"):
+			_on_close()
+			viewport.set_input_as_handled()
+			return
+
+		# 2D grid navigation through save slots
+		if _input_cooldown <= 0 and _save_buttons.size() > 0:
+			if e.is_action_pressed("move_up"):
+				_navigate_grid_vertical(-1)
+				_input_cooldown = _input_cooldown_duration
+				viewport.set_input_as_handled()
+				return
+			elif e.is_action_pressed("move_down"):
+				_navigate_grid_vertical(1)
+				_input_cooldown = _input_cooldown_duration
+				viewport.set_input_as_handled()
+				return
+			elif e.is_action_pressed("move_left"):
+				_navigate_grid_horizontal(-1)
+				_input_cooldown = _input_cooldown_duration
+				viewport.set_input_as_handled()
+				return
+			elif e.is_action_pressed("move_right"):
+				_navigate_grid_horizontal(1)
+				_input_cooldown = _input_cooldown_duration
+				viewport.set_input_as_handled()
+				return
+			elif e.is_action_pressed("menu_accept"):
+				_activate_current_button()
+				viewport.set_input_as_handled()
+				return
+
+		# Mark ALL other controller/keyboard input as handled to prevent passthrough
+		viewport.set_input_as_handled()
 
 # --- UI build -----------------------------------------------------------------
 
 func _rebuild() -> void:
-	for c in _slots.get_children():
+	for c in _slots_grid.get_children():
 		c.queue_free()
 
+	_save_buttons.clear()
+	_delete_buttons.clear()
+
+	# Create grid with 2 columns (Save, Delete)
 	for i in range(1, 4):
 		var idx := i  # capture per-iteration
-		var row: HBoxContainer = HBoxContainer.new()
-		row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		row.custom_minimum_size.y = 36
 
-		var lbl: Label = Label.new()
-		lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		lbl.text = _label_for_slot(idx)
-		row.add_child(lbl)
-
+		# Save button with slot label
 		var btn_save: Button = Button.new()
-		btn_save.text = "Save"
-		btn_save.custom_minimum_size.y = 28
+		btn_save.text = _label_for_slot(idx)
+		btn_save.custom_minimum_size = Vector2(350, 36)
+		btn_save.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		btn_save.focus_mode = Control.FOCUS_ALL
 		btn_save.pressed.connect(func() -> void: _do_save(idx))
-		row.add_child(btn_save)
+		_slots_grid.add_child(btn_save)
+		_save_buttons.append(btn_save)
 
+		# Delete button
 		var btn_del: Button = Button.new()
 		btn_del.text = "Delete"
-		btn_del.custom_minimum_size.y = 28
+		btn_del.custom_minimum_size = Vector2(100, 36)
+		btn_del.focus_mode = Control.FOCUS_ALL
 		btn_del.pressed.connect(func() -> void: _do_delete(idx))
-		row.add_child(btn_del)
+		_slots_grid.add_child(btn_del)
+		_delete_buttons.append(btn_del)
 
-		_slots.add_child(row)
+	# Setup controller navigation after slots are created
+	await get_tree().process_frame
+	_setup_grid_navigation()
 
 # --- labels & actions ----------------------------------------------------------
 
@@ -222,6 +261,11 @@ func _label_for_slot(slot: int) -> String:
 	return "Slot %d (empty)" % slot
 
 func _do_save(slot: int) -> void:
+	# Save player position to GameState before saving
+	var player = get_tree().get_first_node_in_group("player")
+	if player and player.has_method("save_position"):
+		player.save_position()
+
 	# Preferred: ask GameState to serialize and save itself.
 	if has_node("/root/aGameState") and aGameState.has_method("save_to_slot"):
 		aGameState.save_to_slot(slot)
@@ -234,8 +278,7 @@ func _do_save(slot: int) -> void:
 	else:
 		push_warning("[SaveMenu] No save path available.")
 
-	if _hint:
-		_hint.text = "Saved to slot %d." % slot
+	print("[SaveMenu] Saved to slot %d" % slot)
 	_rebuild()
 
 func _do_delete(slot: int) -> void:
@@ -249,14 +292,93 @@ func _do_delete(slot: int) -> void:
 
 	if not ok:
 		push_warning("[SaveMenu] Could not delete slot %d" % slot)
-
-	if _hint:
-		_hint.text = ("Deleted slot %d." % slot) if ok else ("Could not delete slot %d." % slot)
+	else:
+		print("[SaveMenu] Deleted slot %d" % slot)
 
 	_rebuild()
 
 func _on_close() -> void:
+	print("[SaveMenu] Closing save menu")
 	queue_free()
-	
-	#SAVED
-	
+
+# ------------------------------------------------------------------------------
+# 2D Grid Navigation Helpers
+# ------------------------------------------------------------------------------
+
+func _setup_grid_navigation() -> void:
+	"""Setup 2D grid navigation for save/delete buttons"""
+	# Start at first save button
+	_current_row = 0
+	_current_column = 0
+	_highlight_current_button()
+
+	print("[SaveMenu] Grid navigation setup complete. %d save buttons, %d delete buttons" % [_save_buttons.size(), _delete_buttons.size()])
+
+func _navigate_grid_vertical(direction: int) -> void:
+	"""Navigate up/down through rows in current column"""
+	if _save_buttons.is_empty():
+		return
+
+	_unhighlight_current_button()
+
+	_current_row += direction
+
+	# Wrap around within current column
+	var max_rows = _save_buttons.size()
+	if _current_row < 0:
+		_current_row = max_rows - 1
+	elif _current_row >= max_rows:
+		_current_row = 0
+
+	_highlight_current_button()
+
+func _navigate_grid_horizontal(direction: int) -> void:
+	"""Navigate left/right between columns (Save/Delete)"""
+	if _save_buttons.is_empty():
+		return
+
+	_unhighlight_current_button()
+
+	_current_column += direction
+
+	# Clamp to 2 columns (0 = Save, 1 = Delete)
+	if _current_column < 0:
+		_current_column = 1
+	elif _current_column > 1:
+		_current_column = 0
+
+	_highlight_current_button()
+
+func _activate_current_button() -> void:
+	"""Activate the currently selected button"""
+	var button: Button = _get_current_button()
+	if button:
+		print("[SaveMenu] Activating button: %s" % button.text)
+		button.emit_signal("pressed")
+
+func _get_current_button() -> Button:
+	"""Get the button at current grid position"""
+	if _current_row < 0:
+		return null
+
+	if _current_column == 0:
+		if _current_row < _save_buttons.size():
+			return _save_buttons[_current_row]
+	elif _current_column == 1:
+		if _current_row < _delete_buttons.size():
+			return _delete_buttons[_current_row]
+
+	return null
+
+func _highlight_current_button() -> void:
+	"""Highlight the button at current grid position"""
+	var button: Button = _get_current_button()
+	if button:
+		button.modulate = Color(1.2, 1.2, 0.8, 1.0)
+		button.grab_focus()
+
+func _unhighlight_current_button() -> void:
+	"""Remove highlight from the button at current grid position"""
+	var button: Button = _get_current_button()
+	if button:
+		button.modulate = Color(1.0, 1.0, 1.0, 1.0)

@@ -5,12 +5,15 @@ const SAVE_DIR   : String = "user://saves"
 const MAIN_SCENE : String = "res://scenes/main/Main.tscn"
 const TITLE_SCENE: String = "res://scenes/main_menu/Title.tscn"
 
-@onready var _title     : Label           = get_node("Center/Window/Root/Header/Title") as Label
-@onready var _btn_title : Button          = get_node("Center/Window/Root/Header/ToTitleBtn") as Button
-@onready var _btn_close : Button          = get_node("Center/Window/Root/Header/CloseBtn") as Button
-@onready var _hint      : Label           = get_node("Center/Window/Root/Hint") as Label
-@onready var _scroll    : ScrollContainer = get_node("Center/Window/Root/Scroll") as ScrollContainer
+# Styling constants (matching LoadoutPanel)
+const PANEL_BG_COLOR := Color(0.15, 0.15, 0.15, 1.0)  # Dark gray, fully opaque
+const PANEL_BORDER_COLOR := Color(1.0, 0.7, 0.75, 1.0)  # Pink border
+const PANEL_BORDER_WIDTH := 2
+const PANEL_CORNER_RADIUS := 8
+
+@onready var _scroll    : ScrollContainer = get_node("Center/Window/Margin/Root/Scroll") as ScrollContainer
 @onready var _backdrop  : ColorRect       = $Backdrop
+@onready var _window    : Panel           = get_node("Center/Window") as Panel
 
 var _slots : VBoxContainer = null
 
@@ -20,6 +23,18 @@ var _selected_button_index: int = 0
 var _input_cooldown: float = 0.0
 var _input_cooldown_duration: float = 0.2
 
+func _style_panel(panel: Panel) -> void:
+	"""Apply LoadoutPanel-style styling to a panel"""
+	var style := StyleBoxFlat.new()
+	style.bg_color = PANEL_BG_COLOR
+	style.border_color = PANEL_BORDER_COLOR
+	style.set_border_width_all(PANEL_BORDER_WIDTH)
+	style.corner_radius_top_left = PANEL_CORNER_RADIUS
+	style.corner_radius_top_right = PANEL_CORNER_RADIUS
+	style.corner_radius_bottom_left = PANEL_CORNER_RADIUS
+	style.corner_radius_bottom_right = PANEL_CORNER_RADIUS
+	panel.add_theme_stylebox_override("panel", style)
+
 func _ready() -> void:
 	# Ensure this overlay continues to process even when title is "paused"
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -28,22 +43,18 @@ func _ready() -> void:
 	if _backdrop:
 		_backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
 
+	# Apply LoadoutPanel styling to window if it exists
+	if _window:
+		_style_panel(_window)
+
 	_slots = _scroll.get_node_or_null("Slots") as VBoxContainer
 	if _slots == null:
 		_slots = VBoxContainer.new()
 		_slots.name = "Slots"
 		_slots.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		_slots.size_flags_vertical   = Control.SIZE_EXPAND_FILL
-		_slots.add_theme_constant_override("separation", 6)
+		_slots.add_theme_constant_override("separation", 8)
 		_scroll.add_child(_slots)
-
-	_title.text = "Load Game"
-	_hint.text  = "Choose a slot. Press Esc to close."
-
-	if not _btn_title.pressed.is_connected(_on_to_title):
-		_btn_title.pressed.connect(_on_to_title)
-	if not _btn_close.pressed.is_connected(_on_close):
-		_btn_close.pressed.connect(_on_close)
 
 	_rebuild()
 
@@ -60,34 +71,50 @@ func _process(delta: float) -> void:
 			_scroll.scroll_vertical += int(right_stick_y * scroll_speed * delta)
 
 func _input(e: InputEvent) -> void:
-	# Back button closes menu
-	if e.is_action_pressed("ui_cancel") or e.is_action_pressed("menu_back"):
-		_on_close()
-		get_viewport().set_input_as_handled()
+	# Safety check - don't process if not in tree
+	if not is_inside_tree():
 		return
 
-	# Controller navigation through save slots
-	if _input_cooldown <= 0 and _all_buttons.size() > 0:
-		if e.is_action_pressed("move_up"):
-			_navigate_buttons(-1)
-			_input_cooldown = _input_cooldown_duration
-			get_viewport().set_input_as_handled()
-		elif e.is_action_pressed("move_down"):
-			_navigate_buttons(1)
-			_input_cooldown = _input_cooldown_duration
-			get_viewport().set_input_as_handled()
-		elif e.is_action_pressed("menu_accept"):
-			# Activate selected button (load the save)
-			if _selected_button_index >= 0 and _selected_button_index < _all_buttons.size():
-				_all_buttons[_selected_button_index].emit_signal("pressed")
-			get_viewport().set_input_as_handled()
+	var viewport := get_viewport()
+	if viewport == null:
+		return
+
+	# Capture ALL input to prevent it from reaching panels behind this menu
+	if e is InputEventKey or e is InputEventJoypadButton or e is InputEventJoypadMotion:
+		# Back button closes menu
+		if e.is_action_pressed("ui_cancel") or e.is_action_pressed("menu_back"):
+			_on_close()
+			viewport.set_input_as_handled()
+			return
+
+		# Controller navigation through save slots
+		if _input_cooldown <= 0 and _all_buttons.size() > 0:
+			if e.is_action_pressed("move_up"):
+				_navigate_buttons(-1)
+				_input_cooldown = _input_cooldown_duration
+				viewport.set_input_as_handled()
+				return
+			elif e.is_action_pressed("move_down"):
+				_navigate_buttons(1)
+				_input_cooldown = _input_cooldown_duration
+				viewport.set_input_as_handled()
+				return
+			elif e.is_action_pressed("menu_accept"):
+				# Activate selected button (load the save)
+				if _selected_button_index >= 0 and _selected_button_index < _all_buttons.size():
+					_all_buttons[_selected_button_index].emit_signal("pressed")
+				viewport.set_input_as_handled()
+				return
+
+		# Mark ALL other controller/keyboard input as handled to prevent passthrough
+		viewport.set_input_as_handled()
 
 func _rebuild() -> void:
 	for c in _slots.get_children():
 		c.queue_free()
 
 	var slots: Array[int] = _collect_slots()
-	_hint.text = "Found %d save(s)" % [slots.size()]
+	print("[LoadMenu] Found %d save(s)" % [slots.size()])
 	if slots.is_empty():
 		return
 
@@ -171,6 +198,37 @@ func _make_row(slot: int) -> Control:
 	return row
 
 func _on_load_pressed(slot: int) -> void:
+	print("[LoadMenu] Load pressed for slot %d - closing game menu first" % slot)
+
+	# CRITICAL: Close the entire GameMenu hierarchy before loading
+	# Find and close GameMenu to clean up the UI stack
+	var game_menu := get_tree().current_scene.find_child("GameMenu", true, false)
+	if game_menu:
+		print("[LoadMenu] Found GameMenu, closing it")
+		game_menu.queue_free()
+
+	# Force reset PanelManager to clear panel stack
+	if has_node("/root/aPanelManager"):
+		print("[LoadMenu] Force resetting PanelManager")
+		aPanelManager.force_reset()
+
+	# CRITICAL: Unpause the game tree before changing scenes
+	print("[LoadMenu] Unpausing game tree")
+	get_tree().paused = false
+
+	# Wait a frame for GameMenu to be freed
+	await get_tree().process_frame
+
+	# Create and show loading screen
+	var loading = LoadingScreen.create()
+	if loading:
+		get_tree().root.add_child(loading)
+		loading.set_text("Loading save...")
+		await loading.fade_in()
+
+	# Small delay to ensure loading screen is visible
+	await get_tree().create_timer(0.1).timeout
+
 	var sl: Node = get_node_or_null("/root/aSaveLoad")
 	var payload: Dictionary = {}
 	if sl != null and sl.has_method("load_game"):
@@ -190,12 +248,20 @@ func _on_load_pressed(slot: int) -> void:
 			if sig != null and sig.has_method("apply_save_blob"):
 				sig.call("apply_save_blob", (sb_v as Dictionary))
 
-	if has_node("/root/aSceneRouter"):
-		aSceneRouter.goto_main()
-	elif ResourceLoader.exists(MAIN_SCENE):
-		get_tree().change_scene_to_file(MAIN_SCENE)
+	# Store the loaded payload and slot info for title screen to use
+	if has_node("/root/aGameState"):
+		aGameState.set_meta("pending_load_payload", payload)
+		aGameState.set_meta("pending_load_from_ingame", true)
 
-	queue_free()
+	# Schedule loading screen fade-out to happen after ALL scene changes complete
+	# The loading screen will handle the entire transition: LoadMenu → Title → Main
+	if loading:
+		loading.call_deferred("_fade_out_and_cleanup")
+
+	# Change to title screen (this will automatically free the current scene, including LoadMenu)
+	# Title will detect pending load and immediately transition to Main
+	# The loading screen persists through both scene changes and cleans itself up at the end
+	get_tree().change_scene_to_file(TITLE_SCENE)
 
 func _on_delete_pressed(slot: int) -> void:
 	var ok := false
@@ -215,12 +281,6 @@ func _on_close() -> void:
 	print("[LoadMenu] Closing load menu")
 	queue_free()
 
-func _on_to_title() -> void:
-	if has_node("/root/aSceneRouter"):
-		aSceneRouter.goto_title()
-	elif ResourceLoader.exists(TITLE_SCENE):
-		get_tree().change_scene_to_file(TITLE_SCENE)
-
 # ------------------------------------------------------------------------------
 # Controller Navigation Helpers
 # ------------------------------------------------------------------------------
@@ -235,12 +295,6 @@ func _setup_controller_navigation() -> void:
 			for child in row.get_children():
 				if child is Button:
 					_all_buttons.append(child)
-
-	# Add header buttons
-	if _btn_close:
-		_all_buttons.append(_btn_close)
-	if _btn_title:
-		_all_buttons.append(_btn_title)
 
 	# Start with first button selected
 	if _all_buttons.size() > 0:

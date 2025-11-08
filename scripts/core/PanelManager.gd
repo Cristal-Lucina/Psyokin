@@ -71,7 +71,7 @@ signal panel_stack_empty()
 var _panel_stack: Array[Node] = []
 
 ## Enable debug logging
-var debug_logging: bool = true
+var debug_logging: bool = false
 
 # ────────────────────────── Public API ──────────────────────────────
 
@@ -79,6 +79,11 @@ var debug_logging: bool = true
 func push_panel(panel: Node) -> void:
 	if panel == null:
 		push_error("[PanelManager] Cannot push null panel")
+		return
+
+	# Safety check: don't add freed panels
+	if not is_instance_valid(panel):
+		push_error("[PanelManager] Cannot push freed panel")
 		return
 
 	# Check if panel is already in stack
@@ -112,6 +117,13 @@ func pop_panel() -> void:
 
 	# Get current active panel
 	var old_active: Node = _panel_stack.pop_back()
+
+	# Safety check - if the panel is already freed, just continue
+	if not is_instance_valid(old_active):
+		push_warning("[PanelManager] Popped panel was already freed, skipping lifecycle")
+		if _panel_stack.is_empty():
+			emit_signal("panel_stack_empty")
+		return
 
 	# Check if panel allows closing
 	if _call_panel_method(old_active, "panel_can_close") == false:
@@ -161,13 +173,41 @@ func pop_to_panel(target_panel: Node) -> void:
 func get_active_panel() -> Node:
 	if _panel_stack.is_empty():
 		return null
-	return _panel_stack.back()
+
+	# Clean up any freed instances from the stack before returning
+	_clean_freed_panels()
+
+	if _panel_stack.is_empty():
+		return null
+
+	var active = _panel_stack.back()
+
+	# Final safety check - if the top panel is freed, clean and try again
+	if not is_instance_valid(active):
+		push_warning("[PanelManager] Active panel was freed, cleaning stack")
+		_clean_freed_panels()
+		if _panel_stack.is_empty():
+			return null
+		active = _panel_stack.back() if not _panel_stack.is_empty() else null
+
+	return active
 
 ## Get the previous panel (second from top)
 func get_previous_panel() -> Node:
+	# Clean up freed panels first
+	_clean_freed_panels()
+
 	if _panel_stack.size() < 2:
 		return null
-	return _panel_stack[_panel_stack.size() - 2]
+
+	var previous = _panel_stack[_panel_stack.size() - 2]
+
+	# Safety check - if previous panel is freed, return null
+	if not is_instance_valid(previous):
+		push_warning("[PanelManager] Previous panel was freed")
+		return null
+
+	return previous
 
 ## Check if a specific panel is in the stack
 func has_panel(panel: Node) -> bool:
@@ -208,9 +248,28 @@ func print_stack() -> void:
 
 # ────────────────────────── Internal Helpers ──────────────────────────────
 
+## Clean up any freed panel instances from the stack
+func _clean_freed_panels() -> void:
+	var cleaned := false
+	for i in range(_panel_stack.size() - 1, -1, -1):  # Iterate backwards
+		var panel = _panel_stack[i]
+		if panel == null or not is_instance_valid(panel):
+			_panel_stack.remove_at(i)
+			cleaned = true
+
+	if cleaned:
+		push_warning("[PanelManager] Cleaned freed panels from stack (new size: %d)" % _panel_stack.size())
+		if _panel_stack.is_empty():
+			emit_signal("panel_stack_empty")
+
 ## Call a method on a panel if it exists
 func _call_panel_method(panel: Node, method: String) -> Variant:
 	if panel == null:
+		return null
+
+	# Safety check - don't call methods on freed panels
+	if not is_instance_valid(panel):
+		push_warning("[PanelManager] Cannot call %s on freed panel" % method)
 		return null
 
 	if panel.has_method(method):

@@ -129,6 +129,14 @@ const LAYERS = {
 	"tool_b": {"code": "7tlb", "node_name": "ToolBSprite", "path": "7tlb"}
 }
 
+# Debug logging (set to false to reduce console spam)
+const DEBUG_LOGGING: bool = false
+
+# Helper function for conditional logging
+func _debug_log(message: String) -> void:
+	if DEBUG_LOGGING:
+		print("[StatusPanel] " + message)
+
 @onready var _vertical_menu_box : PanelContainer = %VerticalMenuBox
 @onready var _root_container : HBoxContainer = $Root
 @onready var _tab_column : VBoxContainer = $Root/TabColumn
@@ -598,8 +606,8 @@ func _rebuild_party() -> void:
 					bench_ids.append(String(id))
 
 	# Debug output
-	print("[StatusPanel] Party IDs: ", party_ids)
-	print("[StatusPanel] Bench IDs: ", bench_ids)
+	_debug_log("Party IDs: " + str(party_ids))
+	_debug_log("Bench IDs: " + str(bench_ids))
 
 	# Ensure hero is always at index 0
 	if party_ids.is_empty() or party_ids[0] != "hero":
@@ -861,7 +869,7 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 	recovery_btn.set_meta("mp_max", int(member_data.get("mp_max", 0)))
 	recovery_btn.pressed.connect(_on_recovery_pressed.bind(recovery_btn))
 	buttons_vbox.add_child(recovery_btn)
-	print("[StatusPanel] Created Recovery button for %s" % String(member_data.get("name", "Member")))
+	_debug_log("Created Recovery button for %s" % String(member_data.get("name", "Member")))
 
 	# Switch button (only for active members)
 	if show_switch:
@@ -1784,18 +1792,18 @@ func _update_character_preview() -> void:
 
 		if layer_key in variants and variants[layer_key] != "":
 			var variant_code = variants[layer_key]
-			print("[StatusPanel] Loading ", layer_key, " with variant: ", variant_code)
+			_debug_log("Loading " + str(layer_key) + " with variant: " + str(variant_code))
 			var texture_path = _find_character_file(layer_key, variant_code)
-			print("[StatusPanel]   -> Path: ", texture_path)
+			_debug_log("  -> Path: " + str(texture_path))
 			if texture_path != "" and FileAccess.file_exists(texture_path):
 				var texture = load(texture_path)
 				sprite.texture = texture
 				sprite.visible = true
 				# Set to idle pose (south idle = sprite 1 = frame 0)
 				sprite.frame = 0
-				print("[StatusPanel]   -> Loaded successfully, frame set to ", sprite.frame)
+				_debug_log("  -> Loaded successfully, frame set to " + str(sprite.frame))
 			else:
-				print("[StatusPanel]   -> ERROR: File not found!")
+				_debug_log("  -> ERROR: File not found!")
 				sprite.texture = null
 				sprite.visible = false
 		else:
