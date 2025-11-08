@@ -1472,10 +1472,8 @@ func _build_stat_selection_ui() -> void:
 		stat_button.button_pressed = false
 		stat_button.name = "StatButton_%d" % i
 		stat_button.toggled.connect(_on_stat_button_toggled.bind(i))
-
-		# Set focus neighbor for controller navigation
-		if i == 0:
-			stat_button.grab_focus()  # First button gets focus
+		stat_button.focus_mode = Control.FOCUS_ALL  # Enable focus for controller
+		stat_button.toggle_mode = true  # Ensure toggle mode is on
 
 		stat_selection_container.add_child(stat_button)
 		stat_panels.append(stat_button)
@@ -1491,7 +1489,29 @@ func _build_stat_selection_ui() -> void:
 	stat_continue_button.add_theme_font_size_override("font_size", 16)
 	stat_continue_button.disabled = true  # Disabled until 3 stats selected
 	stat_continue_button.pressed.connect(_on_stats_accepted)
+	stat_continue_button.focus_mode = Control.FOCUS_ALL  # Enable focus for controller
 	continue_btn_container.add_child(stat_continue_button)
+
+	# Set up focus neighbors for proper up/down navigation
+	for i in range(stat_panels.size()):
+		var btn = stat_panels[i]
+		if i > 0:
+			# Set previous button as up neighbor
+			btn.focus_neighbor_top = btn.get_path_to(stat_panels[i - 1])
+		if i < stat_panels.size() - 1:
+			# Set next button as down neighbor
+			btn.focus_neighbor_bottom = btn.get_path_to(stat_panels[i + 1])
+		else:
+			# Last stat button -> Continue button
+			btn.focus_neighbor_bottom = btn.get_path_to(stat_continue_button)
+
+	# Continue button -> back to first stat
+	if stat_panels.size() > 0:
+		stat_continue_button.focus_neighbor_top = stat_continue_button.get_path_to(stat_panels[stat_panels.size() - 1])
+		stat_continue_button.focus_neighbor_bottom = stat_continue_button.get_path_to(stat_panels[0])
+
+		# First stat gets initial focus
+		stat_panels[0].grab_focus()
 
 	# Fade in
 	stat_selection_container.modulate = Color(1, 1, 1, 0)
@@ -1627,9 +1647,8 @@ func _build_perk_selection_ui() -> void:
 			perk_button.name = "PerkButton_%d" % i
 			perk_button.set_meta("perk_data", offer)
 			perk_button.toggled.connect(_on_perk_button_toggled.bind(perk_button))
-
-			if i == 0:
-				perk_button.grab_focus()  # First perk gets focus
+			perk_button.focus_mode = Control.FOCUS_ALL  # Enable focus for controller
+			perk_button.toggle_mode = true  # Ensure toggle mode is on
 
 			perk_selection_container.add_child(perk_button)
 			perk_buttons.append(perk_button)
@@ -1648,7 +1667,29 @@ func _build_perk_selection_ui() -> void:
 	continue_btn.add_theme_font_size_override("font_size", 16)
 	continue_btn.disabled = true  # Disabled until a perk is selected
 	continue_btn.pressed.connect(_on_perk_accepted)
+	continue_btn.focus_mode = Control.FOCUS_ALL  # Enable focus for controller
 	continue_btn_container.add_child(continue_btn)
+
+	# Set up focus neighbors for proper up/down navigation
+	for i in range(perk_buttons.size()):
+		var btn = perk_buttons[i]
+		if i > 0:
+			# Set previous button as up neighbor
+			btn.focus_neighbor_top = btn.get_path_to(perk_buttons[i - 1])
+		if i < perk_buttons.size() - 1:
+			# Set next button as down neighbor
+			btn.focus_neighbor_bottom = btn.get_path_to(perk_buttons[i + 1])
+		else:
+			# Last perk button -> Continue button
+			btn.focus_neighbor_bottom = btn.get_path_to(continue_btn)
+
+	# Continue button -> back to first perk
+	if perk_buttons.size() > 0:
+		continue_btn.focus_neighbor_top = continue_btn.get_path_to(perk_buttons[perk_buttons.size() - 1])
+		continue_btn.focus_neighbor_bottom = continue_btn.get_path_to(perk_buttons[0])
+
+		# First perk gets initial focus
+		perk_buttons[0].grab_focus()
 
 	# Fade in
 	perk_selection_container.modulate = Color(1, 1, 1, 0)
