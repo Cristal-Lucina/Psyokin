@@ -40,9 +40,9 @@ func _ready() -> void:
 	if _background == null:
 		_background = get_node_or_null("Background") as ColorRect
 	if _label == null:
-		_label = get_node_or_null("Background/LoadingContainer/LoadingText") as Label
+		_label = get_node_or_null("Background/CenterContainer/LoadingContainer/LoadingText") as Label
 	if _spinner == null:
-		_spinner = get_node_or_null("Background/LoadingContainer/Spinner") as Polygon2D
+		_spinner = get_node_or_null("Background/CenterContainer/LoadingContainer/Spinner") as Polygon2D
 
 	# Build UI if background doesn't exist
 	if _background == null:
@@ -61,21 +61,16 @@ func _build_ui() -> void:
 	_background.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(_background)
 
-	# Container for loading text and spinner (bottom right)
+	# Container for loading text and spinner (centered)
+	var center := CenterContainer.new()
+	center.name = "CenterContainer"
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_background.add_child(center)
+
 	var container := HBoxContainer.new()
 	container.name = "LoadingContainer"
 	container.add_theme_constant_override("separation", 12)
-	_background.add_child(container)
-
-	# Position at bottom right with margin
-	container.anchor_left = 1.0
-	container.anchor_right = 1.0
-	container.anchor_top = 1.0
-	container.anchor_bottom = 1.0
-	container.offset_left = -200
-	container.offset_right = -40
-	container.offset_top = -60
-	container.offset_bottom = -40
+	center.add_child(container)
 
 	# "LOADING" text
 	_label = Label.new()
@@ -108,7 +103,7 @@ func _process(delta: float) -> void:
 		_spinner.rotation += SPIN_SPEED * TAU * delta
 
 func fade_in() -> void:
-	"""Fade in the loading screen"""
+	"""Fade in the loading screen and fade out the current scene"""
 	show()
 	_display_start_time = Time.get_ticks_msec() / 1000.0  # Track when we started displaying
 
@@ -121,7 +116,15 @@ func fade_in() -> void:
 	_tween = create_tween()
 	_tween.set_ease(Tween.EASE_OUT)
 	_tween.set_trans(Tween.TRANS_CUBIC)
+	_tween.set_parallel(true)  # Run both tweens in parallel
+
+	# Fade in the loading screen background
 	_tween.tween_property(_background, "modulate", Color(1, 1, 1, 1), FADE_DURATION)
+
+	# Fade out the current scene
+	var current_scene = get_tree().current_scene
+	if current_scene and current_scene != self:
+		_tween.tween_property(current_scene, "modulate", Color(1, 1, 1, 0), FADE_DURATION)
 
 	await _tween.finished
 
