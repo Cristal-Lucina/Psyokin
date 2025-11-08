@@ -692,7 +692,7 @@ func _create_empty_slot(slot_type: String, _slot_idx: int) -> PanelContainer:
 	panel.add_child(vbox)
 	return panel
 
-func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot: int) -> PanelContainer:
+func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot: int) -> HBoxContainer:
 	var panel := PanelContainer.new()
 
 	# Get member_id early for animation tracking
@@ -861,8 +861,9 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 	print("[StatusPanel] Created Recovery button for %s" % String(member_data.get("name", "Member")))
 
 	# Switch button (only for active members)
+	var switch_btn: Button = null
 	if show_switch:
-		var switch_btn := Button.new()
+		switch_btn = Button.new()
 		switch_btn.text = "SWITCH"
 		switch_btn.custom_minimum_size.x = 70
 		switch_btn.add_theme_font_size_override("font_size", 10)
@@ -903,7 +904,7 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 	recovery_btn.focus_entered.connect(func(): arrow_label.visible = true)
 	recovery_btn.focus_exited.connect(func(): arrow_label.visible = false)
 
-	if show_switch:
+	if switch_btn != null:
 		switch_btn.focus_entered.connect(func(): arrow_label.visible = true)
 		switch_btn.focus_exited.connect(func(): arrow_label.visible = false)
 
