@@ -163,12 +163,20 @@ func _process(delta: float) -> void:
 		_input_cooldown -= delta
 
 func _input(e: InputEvent) -> void:
+	# Safety check - don't process if not in tree
+	if not is_inside_tree():
+		return
+
+	var viewport := get_viewport()
+	if viewport == null:
+		return
+
 	# Capture ALL input to prevent it from reaching panels behind this menu
 	if e is InputEventKey or e is InputEventJoypadButton or e is InputEventJoypadMotion:
 		# Back button closes menu
 		if e.is_action_pressed("ui_cancel") or e.is_action_pressed("menu_back"):
 			_on_close()
-			get_viewport().set_input_as_handled()
+			viewport.set_input_as_handled()
 			return
 
 		# 2D grid navigation through save slots
@@ -176,30 +184,30 @@ func _input(e: InputEvent) -> void:
 			if e.is_action_pressed("move_up"):
 				_navigate_grid_vertical(-1)
 				_input_cooldown = _input_cooldown_duration
-				get_viewport().set_input_as_handled()
+				viewport.set_input_as_handled()
 				return
 			elif e.is_action_pressed("move_down"):
 				_navigate_grid_vertical(1)
 				_input_cooldown = _input_cooldown_duration
-				get_viewport().set_input_as_handled()
+				viewport.set_input_as_handled()
 				return
 			elif e.is_action_pressed("move_left"):
 				_navigate_grid_horizontal(-1)
 				_input_cooldown = _input_cooldown_duration
-				get_viewport().set_input_as_handled()
+				viewport.set_input_as_handled()
 				return
 			elif e.is_action_pressed("move_right"):
 				_navigate_grid_horizontal(1)
 				_input_cooldown = _input_cooldown_duration
-				get_viewport().set_input_as_handled()
+				viewport.set_input_as_handled()
 				return
 			elif e.is_action_pressed("menu_accept"):
 				_activate_current_button()
-				get_viewport().set_input_as_handled()
+				viewport.set_input_as_handled()
 				return
 
 		# Mark ALL other controller/keyboard input as handled to prevent passthrough
-		get_viewport().set_input_as_handled()
+		viewport.set_input_as_handled()
 
 # --- UI build -----------------------------------------------------------------
 
