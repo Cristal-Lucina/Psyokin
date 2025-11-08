@@ -1455,9 +1455,11 @@ func _finalize_names() -> void:
 	var tween = create_tween()
 	tween.tween_property(name_input_container, "modulate", Color(1, 1, 1, 0), 0.5)
 	tween.tween_callback(func():
-		name_input_container.queue_free()
-		name_input_container = null
-		dialogue_label.visible = true
+		if name_input_container:
+			name_input_container.queue_free()
+			name_input_container = null
+		if dialogue_label:
+			dialogue_label.visible = true
 		_advance_stage()
 	)
 
@@ -1684,9 +1686,11 @@ func _on_stats_accepted() -> void:
 	var tween = create_tween()
 	tween.tween_property(stat_selection_container, "modulate", Color(1, 1, 1, 0), 0.5)
 	tween.tween_callback(func():
-		stat_selection_container.queue_free()
-		stat_selection_container = null
-		dialogue_label.visible = true
+		if stat_selection_container:
+			stat_selection_container.queue_free()
+			stat_selection_container = null
+		if dialogue_label:
+			dialogue_label.visible = true
 		_advance_stage()
 	)
 
@@ -1868,9 +1872,11 @@ func _on_perk_accepted() -> void:
 	var tween = create_tween()
 	tween.tween_property(perk_selection_container, "modulate", Color(1, 1, 1, 0), 0.5)
 	tween.tween_callback(func():
-		perk_selection_container.queue_free()
-		perk_selection_container = null
-		dialogue_label.visible = true
+		if perk_selection_container:
+			perk_selection_container.queue_free()
+			perk_selection_container = null
+		if dialogue_label:
+			dialogue_label.visible = true
 		_advance_stage()
 	)
 
@@ -2272,9 +2278,11 @@ func _on_customization_accepted() -> void:
 	var tween = create_tween()
 	tween.tween_property(customization_container, "modulate", Color(1, 1, 1, 0), 0.5)
 	tween.tween_callback(func():
-		customization_container.queue_free()
-		customization_container = null
-		dialogue_label.visible = true
+		if customization_container:
+			customization_container.queue_free()
+			customization_container = null
+		if dialogue_label:
+			dialogue_label.visible = true
 		_advance_stage()
 	)
 
