@@ -34,12 +34,21 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	layer = 1000  # Very high layer to be on top of everything
 
-	# Build UI if not loaded from scene
+	# Get nodes from scene or build UI
+	if _background == null:
+		_background = get_node_or_null("Background") as ColorRect
+	if _label == null:
+		_label = get_node_or_null("Background/LoadingContainer/LoadingText") as Label
+	if _spinner == null:
+		_spinner = get_node_or_null("Background/LoadingContainer/Spinner") as Polygon2D
+
+	# Build UI if background doesn't exist
 	if _background == null:
 		_build_ui()
 
 	# Start invisible
-	modulate = Color(1, 1, 1, 0)
+	if _background:
+		_background.modulate = Color(1, 1, 1, 0)
 
 func _build_ui() -> void:
 	"""Build the loading screen UI programmatically"""
@@ -102,25 +111,32 @@ func fade_in() -> void:
 	"""Fade in the loading screen"""
 	show()
 
+	if not _background:
+		return
+
 	if _tween:
 		_tween.kill()
 
 	_tween = create_tween()
 	_tween.set_ease(Tween.EASE_OUT)
 	_tween.set_trans(Tween.TRANS_CUBIC)
-	_tween.tween_property(self, "modulate", Color(1, 1, 1, 1), FADE_DURATION)
+	_tween.tween_property(_background, "modulate", Color(1, 1, 1, 1), FADE_DURATION)
 
 	await _tween.finished
 
 func fade_out() -> void:
 	"""Fade out the loading screen"""
+	if not _background:
+		hide()
+		return
+
 	if _tween:
 		_tween.kill()
 
 	_tween = create_tween()
 	_tween.set_ease(Tween.EASE_IN)
 	_tween.set_trans(Tween.TRANS_CUBIC)
-	_tween.tween_property(self, "modulate", Color(1, 1, 1, 0), FADE_DURATION)
+	_tween.tween_property(_background, "modulate", Color(1, 1, 1, 0), FADE_DURATION)
 
 	await _tween.finished
 	hide()
