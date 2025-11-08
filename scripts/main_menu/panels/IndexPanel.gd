@@ -61,7 +61,19 @@ func _ready() -> void:
 # --- PanelBase Lifecycle Overrides ---------------------------------------------
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed("ui_cancel"):
+	if event.is_action_pressed("ui_accept"):
+		# Check if category list has focus
+		if _category_list and _category_list.has_focus():
+			print("[IndexPanel] Accept pressed on category list")
+			get_viewport().set_input_as_handled()
+			var selected := _category_list.get_selected_items()
+			if selected.size() > 0:
+				_on_category_activated(selected[0])
+		# Check if entry list has focus
+		elif _entry_list and _entry_list.has_focus():
+			print("[IndexPanel] Accept pressed on entry list")
+			# Entry list doesn't need special handling for accept
+	elif event.is_action_pressed("ui_cancel"):
 		print("[IndexPanel] Back button pressed")
 		get_viewport().set_input_as_handled()
 		# PanelBase will handle returning to previous panel
