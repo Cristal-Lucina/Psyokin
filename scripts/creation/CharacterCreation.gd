@@ -61,9 +61,9 @@ const DIRECTIONS = {
 @onready var _cancel_btn  : Button        = %CancelBtn
 
 # Character preview
-@onready var character_layers = $MainContainer/PreviewPanel/PreviewContainer/CenterContainer/CharacterLayers
-@onready var frame_label = $MainContainer/PreviewPanel/PreviewContainer/AnimationControls/FrameLabel
-@onready var direction_label = $MainContainer/PreviewPanel/PreviewContainer/AnimationControls/DirectionLabel
+@onready var character_layers = $Margin/MainContainer/PreviewPanel/PreviewContainer/CenterContainer/CharacterLayers
+@onready var frame_label = $Margin/MainContainer/PreviewPanel/PreviewContainer/AnimationControls/FrameLabel
+@onready var direction_label = $Margin/MainContainer/PreviewPanel/PreviewContainer/AnimationControls/DirectionLabel
 
 # ── state ────────────────────────────────────────────────────────────────────
 var _selected_order : Array[String] = []       # keep order of picks (max 3)
@@ -123,8 +123,8 @@ func _ready() -> void:
 func _style_panels() -> void:
 	"""Apply LoadoutPanel styling (dark gray background with pink border) to all panels"""
 	var panels_to_style = [
-		get_node_or_null("MainContainer/PreviewPanel"),
-		get_node_or_null("MainContainer/FormPanel")
+		get_node_or_null("Margin/MainContainer/PreviewPanel"),
+		get_node_or_null("Margin/MainContainer/FormPanel")
 	]
 
 	for panel in panels_to_style:
@@ -142,11 +142,11 @@ func _style_panels() -> void:
 			style_box.corner_radius_bottom_right = PANEL_CORNER_RADIUS
 			panel.add_theme_stylebox_override("panel", style_box)
 
-			# Add LoadoutPanel-style margins (10px on all sides)
-			panel.add_theme_constant_override("margin_left", 10)
-			panel.add_theme_constant_override("margin_top", 10)
-			panel.add_theme_constant_override("margin_right", 10)
-			panel.add_theme_constant_override("margin_bottom", 10)
+			# Add 50px padding inside panels
+			panel.add_theme_constant_override("margin_left", 50)
+			panel.add_theme_constant_override("margin_top", 50)
+			panel.add_theme_constant_override("margin_right", 50)
+			panel.add_theme_constant_override("margin_bottom", 50)
 
 	# Apply font size hierarchy (matching LoadoutPanel)
 	_apply_font_sizes()
@@ -155,8 +155,8 @@ func _apply_font_sizes() -> void:
 	"""Apply LoadoutPanel-style font size hierarchy"""
 	# Titles: 16px (like LoadoutPanel section headers)
 	var title_nodes = [
-		get_node_or_null("MainContainer/PreviewPanel/PreviewContainer/Title"),
-		get_node_or_null("MainContainer/FormPanel/FormContainer/Title")
+		get_node_or_null("Margin/MainContainer/PreviewPanel/PreviewContainer/Title"),
+		get_node_or_null("Margin/MainContainer/FormPanel/Form/Title")
 	]
 	for node in title_nodes:
 		if node is Label:
@@ -164,15 +164,15 @@ func _apply_font_sizes() -> void:
 
 	# Section labels and important text: 12px
 	var label_nodes = [
-		get_node_or_null("MainContainer/FormPanel/FormContainer/BasicInfo/NameLabel"),
-		get_node_or_null("MainContainer/FormPanel/FormContainer/BasicInfo/SurnameLabel"),
-		get_node_or_null("MainContainer/FormPanel/FormContainer/BasicInfo/PronounLabel"),
-		get_node_or_null("MainContainer/FormPanel/FormContainer/Appearance/BodyLabel"),
-		get_node_or_null("MainContainer/FormPanel/FormContainer/Appearance/OutfitLabel"),
-		get_node_or_null("MainContainer/FormPanel/FormContainer/Appearance/HairLabel"),
-		get_node_or_null("MainContainer/FormPanel/FormContainer/Appearance/HatLabel"),
-		get_node_or_null("MainContainer/FormPanel/FormContainer/StatSelection/StatsTitle"),
-		get_node_or_null("MainContainer/FormPanel/FormContainer/StatSelection/PerksTitle")
+		get_node_or_null("Margin/MainContainer/FormPanel/Form/ScrollContainer/Grid/NameLable"),
+		get_node_or_null("Margin/MainContainer/FormPanel/Form/ScrollContainer/Grid/SurnameLabel"),
+		get_node_or_null("Margin/MainContainer/FormPanel/Form/ScrollContainer/Grid/PronounLabel"),
+		get_node_or_null("Margin/MainContainer/FormPanel/Form/ScrollContainer/Grid/BodyLabel"),
+		get_node_or_null("Margin/MainContainer/FormPanel/Form/ScrollContainer/Grid/OutfitLabel"),
+		get_node_or_null("Margin/MainContainer/FormPanel/Form/ScrollContainer/Grid/HairLabel"),
+		get_node_or_null("Margin/MainContainer/FormPanel/Form/ScrollContainer/Grid/HatLabel"),
+		get_node_or_null("Margin/MainContainer/FormPanel/Form/StatsLabel"),
+		get_node_or_null("Margin/MainContainer/FormPanel/Form/PerkLabel")
 	]
 	for node in label_nodes:
 		if node is Label:
@@ -180,8 +180,8 @@ func _apply_font_sizes() -> void:
 
 	# Small text and animation info: 10px (already the default, but set explicitly)
 	var small_nodes = [
-		get_node_or_null("MainContainer/PreviewPanel/PreviewContainer/AnimationControls/DirectionLabel"),
-		get_node_or_null("MainContainer/PreviewPanel/PreviewContainer/AnimationControls/FrameLabel")
+		get_node_or_null("Margin/MainContainer/PreviewPanel/PreviewContainer/AnimationControls/DirectionLabel"),
+		get_node_or_null("Margin/MainContainer/PreviewPanel/PreviewContainer/AnimationControls/FrameLabel")
 	]
 	for node in small_nodes:
 		if node is Label:
