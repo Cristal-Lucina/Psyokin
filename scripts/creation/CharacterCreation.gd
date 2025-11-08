@@ -1958,28 +1958,40 @@ func _build_customization_ui() -> void:
 	options_panel.custom_minimum_size = Vector2(400, 500)
 	main.add_child(options_panel)
 
+	# Add margin container for 30px padding
+	var margin = MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 30)
+	margin.add_theme_constant_override("margin_right", 30)
+	margin.add_theme_constant_override("margin_top", 30)
+	margin.add_theme_constant_override("margin_bottom", 30)
+	options_panel.add_child(margin)
+
 	var options = VBoxContainer.new()
 	options.add_theme_constant_override("separation", 15)
-	options_panel.add_child(options)
+	margin.add_child(options)
 
 	# Create cycle selectors for each customization option
 	var pronoun_selector = _create_cycle_selector("pronoun", _pron_in)
 	_add_customization_cycle(options, "Pronoun:", pronoun_selector)
 
 	var body_selector = _create_cycle_selector("body", _body_in)
-	_add_customization_cycle(options, "Body Type:", body_selector)
+	_add_customization_cycle(options, "Skin Tone:", body_selector)
 
 	var outfit_selector = _create_cycle_selector("outfit", _outfit_in)
 	_add_customization_cycle(options, "Outfit:", outfit_selector)
 
-	var hair_selector = _create_cycle_selector("hair", _hair_in)
-	_add_customization_cycle(options, "Hair:", hair_selector)
+	# Hair Type - filtered to only bob1_v00 and dap1_v00
+	var hair_type_selector = _create_filtered_hair_type_selector()
+	_add_customization_cycle(options, "Hair Type:", hair_type_selector)
+	customization_container.set_meta("hair_type_selector", hair_type_selector)
 
-	var hat_selector = _create_cycle_selector("hat", _hat_in)
-	_add_customization_cycle(options, "Hat:", hat_selector)
+	# Hair Color - dynamically changes based on hair type selection
+	var hair_color_selector = _create_hair_color_selector()
+	_add_customization_cycle(options, "Hair Color:", hair_color_selector)
+	customization_container.set_meta("hair_color_selector", hair_color_selector)
 
 	# Store selector references for focus navigation
-	var selectors = [pronoun_selector, body_selector, outfit_selector, hair_selector, hat_selector]
+	var selectors = [pronoun_selector, body_selector, outfit_selector, hair_type_selector, hair_color_selector]
 	customization_container.set_meta("selectors", selectors)
 
 	# Right: Character Preview
@@ -2054,25 +2066,6 @@ func _build_customization_ui() -> void:
 			print("[Customization] Focus set to first selector")
 	)
 
-func _on_cinematic_dropdown_changed(index: int, type: String, _dropdown: OptionButton) -> void:
-	"""Handle dropdown changes in cinematic customization UI"""
-	# Sync to the original form dropdowns to update preview
-	match type:
-		"pronoun":
-			_pron_in.select(index)
-		"body":
-			_body_in.select(index)
-			_on_body_selected(index)
-		"outfit":
-			_outfit_in.select(index)
-			_on_outfit_selected(index)
-		"hair":
-			_hair_in.select(index)
-			_on_hair_selected(index)
-		"hat":
-			_hat_in.select(index)
-			_on_hat_selected(index)
-
 func _create_cycle_selector(type: String, source_option_button: OptionButton) -> Button:
 	"""Create a button that cycles through options when clicked"""
 	var button = Button.new()
@@ -2094,6 +2087,45 @@ func _create_cycle_selector(type: String, source_option_button: OptionButton) ->
 
 	return button
 
+func _create_filtered_hair_type_selector() -> Button:
+	"""Create a hair type selector with only bob1_v00 and dap1_v00"""
+	var button = Button.new()
+	button.focus_mode = Control.FOCUS_ALL
+	button.custom_minimum_size = Vector2(250, 40)
+	button.add_theme_font_size_override("font_size", 14)
+
+	# Define allowed hair types
+	var allowed_hair_types = ["bob1_v00", "dap1_v00"]
+	button.set_meta("type", "hair_type")
+	button.set_meta("allowed_options", allowed_hair_types)
+	button.set_meta("current_index", 0)
+
+	# Set initial text
+	button.text = "< %s >" % allowed_hair_types[0]
+
+	# Connect to cycle function
+	button.pressed.connect(_on_hair_type_selector_pressed.bind(button))
+
+	return button
+
+func _create_hair_color_selector() -> Button:
+	"""Create a hair color selector that shows variants based on selected hair type"""
+	var button = Button.new()
+	button.focus_mode = Control.FOCUS_ALL
+	button.custom_minimum_size = Vector2(250, 40)
+	button.add_theme_font_size_override("font_size", 14)
+
+	button.set_meta("type", "hair_color")
+	button.set_meta("current_index", 0)
+
+	# Set initial text (will be updated based on hair type)
+	button.text = "< bob1_v00 >"
+
+	# Connect to cycle function
+	button.pressed.connect(_on_hair_color_selector_pressed.bind(button))
+
+	return button
+
 func _on_cycle_selector_pressed(button: Button) -> void:
 	"""Handle cycle selector button press - advance to next option"""
 	var source = button.get_meta("source") as OptionButton
@@ -2109,6 +2141,89 @@ func _on_cycle_selector_pressed(button: Button) -> void:
 	source.select(current_idx)
 	_on_cinematic_selector_changed(current_idx, type_str)
 
+func _on_hair_type_selector_pressed(button: Button) -> void:
+	"""Handle hair type selector press - cycle between bob1_v00 and dap1_v00"""
+	var allowed_options = button.get_meta("allowed_options", [])
+	var current_idx = button.get_meta("current_index", 0)
+
+	# Cycle to next option
+	current_idx = (current_idx + 1) % allowed_options.size()
+	button.set_meta("current_index", current_idx)
+	var selected_hair = allowed_options[current_idx]
+	button.text = "< %s >" % selected_hair
+
+	# Find the index in the original hair dropdown
+	var hair_idx = -1
+	for i in range(_hair_in.item_count):
+		if _hair_in.get_item_text(i) == selected_hair:
+			hair_idx = i
+			break
+
+	if hair_idx >= 0:
+		_hair_in.select(hair_idx)
+		_on_hair_selected(hair_idx)
+		print("[Hair Type] Selected: %s (index %d)" % [selected_hair, hair_idx])
+
+	# Update hair color selector options
+	_update_hair_color_options(selected_hair)
+
+func _on_hair_color_selector_pressed(button: Button) -> void:
+	"""Handle hair color selector press - cycle through color variants"""
+	var available_colors = button.get_meta("available_colors", ["bob1_v00"])
+	var current_idx = button.get_meta("current_index", 0)
+
+	# Cycle to next color
+	current_idx = (current_idx + 1) % available_colors.size()
+	button.set_meta("current_index", current_idx)
+	var selected_color = available_colors[current_idx]
+	button.text = "< %s >" % selected_color
+
+	# Find the index in the original hair dropdown
+	var hair_idx = -1
+	for i in range(_hair_in.item_count):
+		if _hair_in.get_item_text(i) == selected_color:
+			hair_idx = i
+			break
+
+	if hair_idx >= 0:
+		_hair_in.select(hair_idx)
+		_on_hair_selected(hair_idx)
+		print("[Hair Color] Selected: %s (index %d)" % [selected_color, hair_idx])
+
+func _update_hair_color_options(hair_type: String) -> void:
+	"""Update the hair color selector based on selected hair type"""
+	if not customization_container:
+		return
+
+	var hair_color_selector = customization_container.get_meta("hair_color_selector", null)
+	if not hair_color_selector:
+		return
+
+	# Generate color variants based on hair type
+	var color_variants = []
+	var base_name = hair_type.split("_")[0]  # Get "bob1" or "dap1"
+
+	# Add variants v00 through v13
+	for i in range(14):
+		var variant = "%s_v%02d" % [base_name, i]
+		color_variants.append(variant)
+
+	# Update selector
+	hair_color_selector.set_meta("available_colors", color_variants)
+	hair_color_selector.set_meta("current_index", 0)
+	hair_color_selector.text = "< %s >" % color_variants[0]
+
+	# Apply the first color variant
+	var hair_idx = -1
+	for i in range(_hair_in.item_count):
+		if _hair_in.get_item_text(i) == color_variants[0]:
+			hair_idx = i
+			break
+
+	if hair_idx >= 0:
+		_hair_in.select(hair_idx)
+		_on_hair_selected(hair_idx)
+
 func _on_cinematic_selector_changed(index: int, type: String) -> void:
 	"""Handle selector changes in cinematic customization UI"""
 	# Sync to the original form dropdowns to update preview
@@ -2121,12 +2236,6 @@ func _on_cinematic_selector_changed(index: int, type: String) -> void:
 		"outfit":
 			_outfit_in.select(index)
 			_on_outfit_selected(index)
-		"hair":
-			_hair_in.select(index)
-			_on_hair_selected(index)
-		"hat":
-			_hat_in.select(index)
-			_on_hat_selected(index)
 
 func _add_customization_cycle(parent: VBoxContainer, label_text: String, selector_button: Button) -> void:
 	"""Add a customization cycle selector to the parent container"""
