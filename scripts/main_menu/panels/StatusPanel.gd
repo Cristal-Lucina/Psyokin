@@ -846,7 +846,7 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 
 	# Recovery button (always shown for all members)
 	var recovery_btn := Button.new()
-	recovery_btn.text = "RECOVERY"
+	recovery_btn.text = "RECOVERY ←"
 	recovery_btn.custom_minimum_size.x = 70
 	recovery_btn.add_theme_font_size_override("font_size", 10)
 	recovery_btn.focus_mode = Control.FOCUS_ALL
@@ -863,7 +863,7 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 	# Switch button (only for active members)
 	if show_switch:
 		var switch_btn := Button.new()
-		switch_btn.text = "SWITCH"
+		switch_btn.text = "SWITCH ←"
 		switch_btn.custom_minimum_size.x = 70
 		switch_btn.add_theme_font_size_override("font_size", 10)
 		switch_btn.focus_mode = Control.FOCUS_ALL
