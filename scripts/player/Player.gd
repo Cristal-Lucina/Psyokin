@@ -553,3 +553,22 @@ func enable_encounters() -> void:
 func disable_encounters() -> void:
 	"""Disable random encounters (for safe zones, cutscenes, etc)"""
 	_can_encounter = false
+
+## Save current position and direction to GameState
+func save_position() -> void:
+	"""Save player position and facing direction to GameState"""
+	var gs = get_node_or_null(GS_PATH)
+	if gs:
+		gs.player_position = position
+		gs.player_direction = _current_direction
+		print("[Player] Saved position: %s, direction: %d" % [position, _current_direction])
+
+## Restore position and direction from GameState
+func restore_position() -> void:
+	"""Restore player position and facing direction from GameState"""
+	var gs = get_node_or_null(GS_PATH)
+	if gs:
+		position = gs.player_position
+		_current_direction = gs.player_direction
+		_update_sprite_frames()
+		print("[Player] Restored position: %s, direction: %d" % [position, _current_direction])

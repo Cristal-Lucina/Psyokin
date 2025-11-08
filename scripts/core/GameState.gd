@@ -86,6 +86,10 @@ var pacifist_score: int = 0
 var bloodlust_score: int = 0
 var time_played: float = 0.0  # Total playtime in seconds
 
+# Player world position and facing direction
+var player_position: Vector2 = Vector2(287, 250)  # Default spawn position
+var player_direction: int = 0  # 0=South, 1=North, 2=East, 3=West
+
 var party: Array[String] = []
 var bench: Array[String] = []
 
@@ -648,6 +652,10 @@ func save() -> Dictionary:
 	payload["bloodlust_score"] = bloodlust_score
 	payload["time_played"]     = int(time_played)  # Save as integer seconds
 
+	# Player position and facing direction
+	payload["player_position"] = {"x": player_position.x, "y": player_position.y}
+	payload["player_direction"] = player_direction
+
 	payload["party"] = party.duplicate()
 	payload["bench"] = bench.duplicate()
 
@@ -766,6 +774,13 @@ func load(data: Dictionary) -> void:
 	pacifist_score  = int(data.get("pacifist_score", pacifist_score))
 	bloodlust_score = int(data.get("bloodlust_score", bloodlust_score))
 	time_played     = float(data.get("time_played", time_played))
+
+	# Player position and facing direction
+	var pos_v: Variant = data.get("player_position", null)
+	if typeof(pos_v) == TYPE_DICTIONARY:
+		var pos_d: Dictionary = pos_v
+		player_position = Vector2(float(pos_d.get("x", 287)), float(pos_d.get("y", 250)))
+	player_direction = int(data.get("player_direction", 0))
 
 	party.clear()
 	var party_v: Variant = data.get("party", [])

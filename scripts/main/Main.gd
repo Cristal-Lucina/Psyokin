@@ -422,6 +422,11 @@ func _ready() -> void:
 	# DISABLED - Uncomment to re-enable test items
 	# _give_test_bind_items()
 
+	# Restore player position from GameState (after returning from battle or loading save)
+	var player = get_tree().get_first_node_in_group("player")
+	if player and player.has_method("restore_position"):
+		player.restore_position()
+
 # ---------- Input ----------
 func _input(event: InputEvent) -> void:
 	"""Process input events - log ALL joypad button events for debugging"""
