@@ -81,6 +81,11 @@ func _input(event: InputEvent) -> void:
 	if not visible:
 		return
 
+	# Disable left/right presses
+	if event.is_action_pressed("ui_left") or event.is_action_pressed("ui_right"):
+		get_viewport().set_input_as_handled()
+		return
+
 	# Handle focus switching between category and entries
 	if _focus_mode == "category":
 		if event.is_action_pressed("menu_accept"):
@@ -92,7 +97,8 @@ func _input(event: InputEvent) -> void:
 				if _entry_list.item_count > 0:
 					_entry_list.select(0)
 					_on_entry_selected(0)
-				_animate_panel_focus()
+				print("[IndexPanel] Calling _animate_panel_focus - mode: entries")
+				call_deferred("_animate_panel_focus")
 				get_viewport().set_input_as_handled()
 				return
 	elif _focus_mode == "entries":
@@ -101,7 +107,8 @@ func _input(event: InputEvent) -> void:
 			# Move back to category list
 			_focus_mode = "category"
 			_category_list.grab_focus()
-			_animate_panel_focus()
+			print("[IndexPanel] Calling _animate_panel_focus - mode: category")
+			call_deferred("_animate_panel_focus")
 			get_viewport().set_input_as_handled()
 			return
 
@@ -112,7 +119,8 @@ func _on_panel_gained_focus() -> void:
 	_focus_mode = "category"
 	if _category_list:
 		_category_list.grab_focus()
-	_animate_panel_focus()
+	print("[IndexPanel] About to call _animate_panel_focus from gained_focus")
+	call_deferred("_animate_panel_focus")
 
 func _on_index_changed(_cat: String) -> void:
 	_rebuild()
@@ -129,7 +137,8 @@ func _on_category_activated(_idx: int) -> void:
 		if _entry_list.item_count > 0:
 			_entry_list.select(0)
 			_on_entry_selected(0)
-		_animate_panel_focus()
+		print("[IndexPanel] Calling _animate_panel_focus from category_activated - mode: entries")
+		call_deferred("_animate_panel_focus")
 
 func _on_entry_selected(_idx: int) -> void:
 	# Update details when entry is selected
@@ -177,7 +186,11 @@ func _rebuild() -> void:
 
 func _animate_panel_focus() -> void:
 	"""Animate panels to highlight which one is currently active"""
+	print("[IndexPanel] _animate_panel_focus called, _focus_mode: %s" % _focus_mode)
+	print("[IndexPanel] Panel refs - category: %s, content: %s, details: %s" % [_category_panel != null, _content_panel != null, _details_panel != null])
+
 	if not _category_panel or not _content_panel or not _details_panel:
+		print("[IndexPanel] ERROR: Missing panel references!")
 		return
 
 	var left_ratio := BASE_LEFT_RATIO
@@ -194,6 +207,8 @@ func _animate_panel_focus() -> void:
 		center_ratio = BASE_CENTER_RATIO * ACTIVE_SCALE
 		# right_ratio stays at BASE_RIGHT_RATIO
 
+	print("[IndexPanel] Animation ratios - left: %.2f, center: %.2f, right: %.2f" % [left_ratio, center_ratio, right_ratio])
+
 	# Create tweens for smooth animation
 	var tween := create_tween()
 	tween.set_parallel(true)
@@ -203,6 +218,8 @@ func _animate_panel_focus() -> void:
 	tween.tween_property(_category_panel, "size_flags_stretch_ratio", left_ratio, ANIM_DURATION)
 	tween.tween_property(_content_panel, "size_flags_stretch_ratio", center_ratio, ANIM_DURATION)
 	tween.tween_property(_details_panel, "size_flags_stretch_ratio", right_ratio, ANIM_DURATION)
+
+	print("[IndexPanel] Tween created and started")
 
 # --- Data source ---------------------------------------------------------------
 
