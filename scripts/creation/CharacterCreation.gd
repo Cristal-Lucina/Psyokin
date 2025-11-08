@@ -120,6 +120,13 @@ var stage_timer: float = 0.0
 var nurse_response_index: int = 0
 var cinematic_name: String = ""
 var cinematic_surname: String = ""
+var waiting_for_input: bool = false
+
+# Blinking cursor
+var cursor_label: Label = null
+var cursor_blink_timer: float = 0.0
+var cursor_visible: bool = true
+const CURSOR_BLINK_SPEED := 0.5  # Blink every 0.5 seconds
 
 # Cinematic UI references (will be created dynamically)
 var cinematic_layer: CanvasLayer = null
@@ -129,6 +136,7 @@ var stat_selection_container: Control = null
 var perk_selection_container: Control = null
 var customization_container: Control = null
 var confirmation_container: Control = null
+var continue_prompt: Label = null
 
 # ── ready ────────────────────────────────────────────────────────────────────
 func _ready() -> void:
@@ -696,6 +704,36 @@ func _setup_cinematic() -> void:
 	dialogue_label.text = ""
 	cinematic_layer.add_child(dialogue_label)
 
+	# Create blinking cursor (inline with dialogue)
+	cursor_label = Label.new()
+	cursor_label.set_anchors_preset(Control.PRESET_CENTER)
+	cursor_label.anchor_left = 0.5
+	cursor_label.anchor_top = 0.5
+	cursor_label.anchor_right = 0.5
+	cursor_label.anchor_bottom = 0.5
+	cursor_label.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	cursor_label.grow_vertical = Control.GROW_DIRECTION_BOTH
+	cursor_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	cursor_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	cursor_label.add_theme_font_size_override("font_size", 18)
+	cursor_label.add_theme_color_override("font_color", Color.WHITE)
+	cursor_label.text = ""
+	cursor_label.visible = false
+	cinematic_layer.add_child(cursor_label)
+
+	# Create continue prompt
+	continue_prompt = Label.new()
+	continue_prompt.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	continue_prompt.anchor_top = 1.0
+	continue_prompt.anchor_bottom = 1.0
+	continue_prompt.offset_top = -50
+	continue_prompt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	continue_prompt.add_theme_font_size_override("font_size", 12)
+	continue_prompt.add_theme_color_override("font_color", Color(0.8, 0.8, 0.8, 1.0))
+	continue_prompt.text = "Press Accept or Enter to continue..."
+	continue_prompt.visible = false
+	cinematic_layer.add_child(continue_prompt)
+
 	# Start first stage
 	_enter_stage(CinematicStage.OPENING_DIALOGUE_1)
 
@@ -720,6 +758,9 @@ func _start_typing(text: String, target_label: Label = null) -> void:
 	typing_timer = 0.0
 	typing_target_label = target_label if target_label else dialogue_label
 
+	# Hide cursor when starting new typing
+	_hide_cursor()
+
 	if typing_target_label:
 		typing_target_label.text = ""
 
@@ -742,8 +783,45 @@ func _process_typing(delta: float) -> void:
 
 func _on_typing_complete() -> void:
 	"""Called when typing animation finishes"""
-	# Start stage timer for auto-advance (for dialogue stages)
-	stage_timer = 0.0
+	# Show cursor and wait for input for dialogue stages
+	var is_dialogue_stage = current_stage in [
+		CinematicStage.OPENING_DIALOGUE_1,
+		CinematicStage.OPENING_DIALOGUE_2,
+		CinematicStage.OPENING_DIALOGUE_3,
+		CinematicStage.DIALOGUE_RESPONSE_1,
+		CinematicStage.DIALOGUE_RESPONSE_2,
+		CinematicStage.DIALOGUE_RESPONSE_3,
+		CinematicStage.DIALOGUE_QUESTION,
+		CinematicStage.PERK_QUESTION,
+		CinematicStage.DIALOGUE_BANDAGES,
+		CinematicStage.DIALOGUE_MEMORY,
+		CinematicStage.DIALOGUE_MIRROR
+	]
+
+	if is_dialogue_stage:
+		_show_cursor_and_wait()
+	else:
+		# For other stages, just reset timer
+		stage_timer = 0.0
+
+func _show_cursor_and_wait() -> void:
+	"""Show blinking cursor and wait for player input"""
+	waiting_for_input = true
+	if cursor_label and dialogue_label:
+		cursor_label.text = dialogue_label.text + " ●"
+		cursor_label.visible = true
+		cursor_visible = true
+	if continue_prompt:
+		continue_prompt.visible = true
+
+func _hide_cursor() -> void:
+	"""Hide the blinking cursor"""
+	waiting_for_input = false
+	if cursor_label:
+		cursor_label.visible = false
+		cursor_label.text = ""
+	if continue_prompt:
+		continue_prompt.visible = false
 
 # ── Cinematic Process Loop ───────────────────────────────────────────────────
 func _process_cinematic(delta: float) -> void:
@@ -752,28 +830,50 @@ func _process_cinematic(delta: float) -> void:
 	if typing_active:
 		_process_typing(delta)
 	else:
-		# Process stage timer (for auto-advancing dialogue)
-		stage_timer += delta
+		# Process blinking cursor
+		if waiting_for_input:
+			_process_cursor_blink(delta)
+		else:
+			# Process stage timer (for non-dialogue stages)
+			stage_timer += delta
 
-	# Handle stage-specific updates
+	# Handle stage-specific updates (only for non-dialogue stages)
 	match current_stage:
-		CinematicStage.OPENING_DIALOGUE_1, CinematicStage.OPENING_DIALOGUE_2, CinematicStage.OPENING_DIALOGUE_3:
-			if not typing_active and stage_timer >= DIALOGUE_PAUSE:
-				_advance_stage()
-		CinematicStage.DIALOGUE_RESPONSE_1, CinematicStage.DIALOGUE_RESPONSE_2, CinematicStage.DIALOGUE_RESPONSE_3:
-			if not typing_active and stage_timer >= DIALOGUE_PAUSE:
-				_advance_stage()
-		CinematicStage.DIALOGUE_QUESTION:
-			if not typing_active and stage_timer >= DIALOGUE_PAUSE:
-				_advance_stage()
-		CinematicStage.PERK_QUESTION:
-			if not typing_active and stage_timer >= DIALOGUE_PAUSE:
-				_advance_stage()
 		CinematicStage.NURSE_RESPONSES:
 			_process_nurse_responses(delta)
-		CinematicStage.DIALOGUE_BANDAGES, CinematicStage.DIALOGUE_MEMORY, CinematicStage.DIALOGUE_MIRROR:
-			if not typing_active and stage_timer >= DIALOGUE_PAUSE:
-				_advance_stage()
+
+func _process_cursor_blink(delta: float) -> void:
+	"""Handle blinking cursor animation"""
+	cursor_blink_timer += delta
+	if cursor_blink_timer >= CURSOR_BLINK_SPEED:
+		cursor_blink_timer = 0.0
+		cursor_visible = not cursor_visible
+		if cursor_label and dialogue_label:
+			if cursor_visible:
+				cursor_label.text = dialogue_label.text + " ●"
+			else:
+				cursor_label.text = dialogue_label.text + "  "
+
+func _input(event: InputEvent) -> void:
+	"""Handle input for advancing dialogue"""
+	if not cinematic_active or not waiting_for_input:
+		return
+
+	# Check for accept input (Enter, Space, ui_accept, directional buttons)
+	var should_advance = false
+	if event.is_action_pressed("ui_accept"):
+		should_advance = true
+	elif event is InputEventKey and event.pressed:
+		if event.keycode == KEY_ENTER or event.keycode == KEY_SPACE or event.keycode == KEY_KP_ENTER:
+			should_advance = true
+	# Accept directional buttons as well
+	elif event.is_action_pressed("ui_up") or event.is_action_pressed("ui_down") or event.is_action_pressed("ui_left") or event.is_action_pressed("ui_right"):
+		should_advance = true
+
+	if should_advance:
+		get_viewport().set_input_as_handled()
+		_hide_cursor()
+		_advance_stage()
 
 func _process_nurse_responses(delta: float) -> void:
 	"""Process nurse responses one at a time"""
