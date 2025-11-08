@@ -903,6 +903,23 @@ func _input(event: InputEvent) -> void:
 			return
 		return
 
+	# Handle stat and perk selection - bridge controller inputs to focus navigation
+	if current_stage == CinematicStage.STAT_SELECTION or current_stage == CinematicStage.PERK_SELECTION:
+		# Map move_up/move_down to focus navigation
+		if event.is_action_pressed("move_up"):
+			get_viewport().set_input_as_handled()
+			_navigate_focus(Vector2.UP)
+			return
+		elif event.is_action_pressed("move_down"):
+			get_viewport().set_input_as_handled()
+			_navigate_focus(Vector2.DOWN)
+			return
+		# Map menu_accept to activating the focused button
+		elif event.is_action_pressed("menu_accept"):
+			get_viewport().set_input_as_handled()
+			_activate_focused_button()
+			return
+
 	# Handle name input stage separately
 	if current_stage == CinematicStage.NAME_INPUT and (name_input_stage == 0 or name_input_stage == 2):
 		# We're on field selection, waiting for accept
@@ -1564,6 +1581,48 @@ func _update_continue_button() -> void:
 		var selected_count = stat_selected.count(true)
 		stat_continue_button.disabled = (selected_count != 3)
 
+func _navigate_focus(direction: Vector2) -> void:
+	"""Navigate focus in the given direction using focus neighbors"""
+	var focused = get_viewport().gui_get_focus_owner()
+	if not focused:
+		print("[Focus Navigation] No focused control")
+		return
+
+	var next_focus: Control = null
+	if direction == Vector2.UP and focused.focus_neighbor_top:
+		next_focus = focused.get_node_or_null(focused.focus_neighbor_top)
+	elif direction == Vector2.DOWN and focused.focus_neighbor_bottom:
+		next_focus = focused.get_node_or_null(focused.focus_neighbor_bottom)
+	elif direction == Vector2.LEFT and focused.focus_neighbor_left:
+		next_focus = focused.get_node_or_null(focused.focus_neighbor_left)
+	elif direction == Vector2.RIGHT and focused.focus_neighbor_right:
+		next_focus = focused.get_node_or_null(focused.focus_neighbor_right)
+
+	if next_focus:
+		print("[Focus Navigation] Moving focus from %s to %s" % [focused.name, next_focus.name])
+		next_focus.grab_focus()
+	else:
+		print("[Focus Navigation] No neighbor in direction %s" % direction)
+
+func _activate_focused_button() -> void:
+	"""Activate (click) the currently focused button"""
+	var focused = get_viewport().gui_get_focus_owner()
+	if not focused:
+		print("[Focus Activation] No focused control")
+		return
+
+	print("[Focus Activation] Activating %s" % focused.name)
+
+	if focused is CheckButton:
+		# Toggle the CheckButton
+		focused.button_pressed = !focused.button_pressed
+		focused.toggled.emit(focused.button_pressed)
+	elif focused is Button:
+		# Press the button
+		focused.pressed.emit()
+	else:
+		print("[Focus Activation] Focused control is not a button: %s" % focused.get_class())
+
 func _on_stats_accepted() -> void:
 	"""Handle stat selection acceptance"""
 	# Verify exactly 3 stats are selected
@@ -1692,6 +1751,9 @@ func _build_perk_selection_ui() -> void:
 	continue_btn.focus_mode = Control.FOCUS_ALL  # Enable focus for controller
 	continue_btn_container.add_child(continue_btn)
 
+	# Store continue button reference in metadata for easy access
+	perk_selection_container.set_meta("continue_button", continue_btn)
+
 	# Set up focus neighbors for proper up/down navigation
 	for i in range(perk_buttons.size()):
 		var btn = perk_buttons[i]
@@ -1741,10 +1803,12 @@ func _on_perk_button_toggled(button_pressed: bool, toggled_button: CheckButton) 
 				btn.set_pressed_no_signal(false)
 
 		# Enable Continue button
-		var continue_btn = perk_selection_container.get_node_or_null("CenterContainer/ContinueButton")
+		var continue_btn = perk_selection_container.get_meta("continue_button", null)
 		if continue_btn:
 			print("[Perk Selection] Enabling Continue button")
 			continue_btn.disabled = false
+		else:
+			print("[Perk Selection] ERROR: Could not find continue button in metadata!")
 	else:
 		print("[Perk Selection] Attempting to deselect - preventing")
 		# Don't allow deselecting - keep it selected (radio button behavior)
