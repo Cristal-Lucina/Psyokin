@@ -849,6 +849,9 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 	recovery_btn.text = "RECOVERY"
 	recovery_btn.custom_minimum_size.x = 70
 	recovery_btn.add_theme_font_size_override("font_size", 10)
+	recovery_btn.add_theme_color_override("font_color", Color(0.0, 0.8, 0.0))  # Green
+	recovery_btn.add_theme_constant_override("outline_size", 1)
+	recovery_btn.add_theme_color_override("font_outline_color", Color(0.0, 0.8, 0.0))  # Bold effect
 	recovery_btn.focus_mode = Control.FOCUS_ALL
 	recovery_btn.set_meta("member_id", member_id)
 	recovery_btn.set_meta("member_name", String(member_data.get("name", "Member")))
@@ -867,6 +870,9 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 		switch_btn.text = "SWITCH"
 		switch_btn.custom_minimum_size.x = 70
 		switch_btn.add_theme_font_size_override("font_size", 10)
+		switch_btn.add_theme_color_override("font_color", Color(0.3, 0.6, 1.0))  # Blue
+		switch_btn.add_theme_constant_override("outline_size", 1)
+		switch_btn.add_theme_color_override("font_outline_color", Color(0.3, 0.6, 1.0))  # Bold effect
 		switch_btn.focus_mode = Control.FOCUS_ALL
 		switch_btn.set_meta("active_slot", active_slot)
 		switch_btn.pressed.connect(_on_switch_pressed.bind(active_slot))
