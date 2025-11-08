@@ -78,9 +78,17 @@ func _on_index_changed(_cat: String) -> void:
 
 func _on_category_selected(_idx: int) -> void:
 	_rebuild()
+	# Move focus to entry list after rebuilding
+	if _entry_list and _entry_list.item_count > 0:
+		call_deferred("_move_to_entry_list")
 
 func _on_category_activated(_idx: int) -> void:
-	# Move focus to entry list when category is activated
+	# Move focus to entry list when category is activated (double-click or Enter)
+	if _entry_list and _entry_list.item_count > 0:
+		_move_to_entry_list()
+
+func _move_to_entry_list() -> void:
+	"""Helper to move focus to entry list and select first item"""
 	if _entry_list and _entry_list.item_count > 0:
 		_entry_list.grab_focus()
 		_entry_list.select(0)
