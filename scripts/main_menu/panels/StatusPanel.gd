@@ -282,7 +282,7 @@ func _create_creds_perks_display() -> void:
 	# Create container for the new display
 	var container := VBoxContainer.new()
 	container.name = "CredsPerksDisplay"
-	container.add_theme_constant_override("separation", 0)
+	container.add_theme_constant_override("separation", 5)  # 5px gap between cells
 
 	# Position: 40px from bottom, touching right edge
 	# Using anchor to bottom-right corner
@@ -340,10 +340,9 @@ func _create_info_cell(label_text: String, initial_value: String) -> PanelContai
 	label.add_theme_font_size_override("font_size", 16)  # Increased from 12 to 16
 	label.add_theme_color_override("font_color", Color(0.2, 0.2, 0.2))  # Dark grey
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-	# Make bold by getting the default font and setting bold variation
-	var font = label.get_theme_default_font()
-	if font:
-		label.add_theme_font_override("font", font)
+	# Make extra bold with outline effect
+	label.add_theme_constant_override("outline_size", 1)
+	label.add_theme_color_override("font_outline_color", Color(0.2, 0.2, 0.2))
 	hbox.add_child(label)
 
 	# Spacer to push value to the right
@@ -359,10 +358,9 @@ func _create_info_cell(label_text: String, initial_value: String) -> PanelContai
 	value_label.add_theme_font_size_override("font_size", 16)  # Increased from 12 to 16
 	value_label.add_theme_color_override("font_color", Color(0.2, 0.2, 0.2))  # Dark grey
 	value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	# Make bold
-	var value_font = value_label.get_theme_default_font()
-	if value_font:
-		value_label.add_theme_font_override("font", value_font)
+	# Make extra bold with outline effect
+	value_label.add_theme_constant_override("outline_size", 1)
+	value_label.add_theme_color_override("font_outline_color", Color(0.2, 0.2, 0.2))
 	hbox.add_child(value_label)
 
 	# Store reference to value label for updating
