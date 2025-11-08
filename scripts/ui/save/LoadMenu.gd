@@ -198,6 +198,30 @@ func _make_row(slot: int) -> Control:
 	return row
 
 func _on_load_pressed(slot: int) -> void:
+	print("[LoadMenu] Load pressed for slot %d - closing game menu first" % slot)
+
+	# CRITICAL: Close the entire GameMenu hierarchy before loading
+	# Find and close GameMenu to clean up the UI stack
+	var game_menu := get_tree().current_scene.find_child("GameMenu", true, false)
+	if game_menu:
+		print("[LoadMenu] Found GameMenu, closing it")
+		game_menu.queue_free()
+
+	# Force reset PanelManager to clear panel stack
+	if has_node("/root/aPanelManager"):
+		print("[LoadMenu] Force resetting PanelManager")
+		aPanelManager.force_reset()
+
+	# CRITICAL: Unpause the game tree before changing scenes
+	print("[LoadMenu] Unpausing game tree")
+	get_tree().paused = false
+
+	# Close this menu
+	queue_free()
+
+	# Wait a frame for everything to clean up
+	await get_tree().process_frame
+
 	# Create and show loading screen
 	var loading = LoadingScreen.create()
 	if loading:
@@ -238,8 +262,6 @@ func _on_load_pressed(slot: int) -> void:
 
 	# Go to title screen first (provides clean state), then title will load to main
 	get_tree().change_scene_to_file(TITLE_SCENE)
-
-	queue_free()
 
 func _on_delete_pressed(slot: int) -> void:
 	var ok := false
