@@ -378,6 +378,25 @@ func _hide_old_ui_elements() -> void:
 	if right_panel:
 		right_panel.visible = false
 
+	# Add 150px right padding to the Left panel by wrapping it in a MarginContainer
+	var left_panel = get_node_or_null("Root/Left")
+	if left_panel and left_panel is VBoxContainer:
+		# Create MarginContainer wrapper
+		var margin_wrapper := MarginContainer.new()
+		margin_wrapper.name = "LeftMarginWrapper"
+		margin_wrapper.add_theme_constant_override("margin_right", 150)
+		margin_wrapper.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		margin_wrapper.size_flags_vertical = Control.SIZE_EXPAND_FILL
+
+		# Get parent and insert wrapper
+		var parent = left_panel.get_parent()
+		if parent:
+			var index = left_panel.get_index()
+			parent.remove_child(left_panel)
+			parent.add_child(margin_wrapper)
+			parent.move_child(margin_wrapper, index)
+			margin_wrapper.add_child(left_panel)
+
 func _create_info_cell(label_text: String, initial_value: String) -> PanelContainer:
 	"""Create a single info cell with label and value
 	Returns PanelContainer with 'value_label' meta for updating"""
@@ -596,10 +615,14 @@ func _rebuild_party() -> void:
 	# === LEADER SECTION ===
 	var leader_header := Label.new()
 	leader_header.text = "LEADER"
-	leader_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	leader_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	leader_header.add_theme_font_size_override("font_size", 16)
 	leader_header.add_theme_color_override("font_color", Color(1, 0.7, 0.75, 1))
 	_party.add_child(leader_header)
+
+	# Add separator after LEADER
+	var leader_sep := HSeparator.new()
+	_party.add_child(leader_sep)
 
 	if party_ids.size() > 0:
 		var leader_data := _get_member_snapshot(party_ids[0])
@@ -610,10 +633,14 @@ func _rebuild_party() -> void:
 	# === ACTIVE SECTION ===
 	var active_header := Label.new()
 	active_header.text = "ACTIVE"
-	active_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	active_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	active_header.add_theme_font_size_override("font_size", 16)
 	active_header.add_theme_color_override("font_color", Color(1, 0.7, 0.75, 1))
 	_party.add_child(active_header)
+
+	# Add separator after ACTIVE
+	var active_sep := HSeparator.new()
+	_party.add_child(active_sep)
 
 	for slot_idx in range(1, 3):  # Slots 1 and 2
 		if party_ids.size() > slot_idx and party_ids[slot_idx] != "":
@@ -627,10 +654,14 @@ func _rebuild_party() -> void:
 	# === BENCH SECTION ===
 	var bench_header := Label.new()
 	bench_header.text = "BENCH"
-	bench_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	bench_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	bench_header.add_theme_font_size_override("font_size", 16)
 	bench_header.add_theme_color_override("font_color", Color(1, 0.7, 0.75, 1))
 	_party.add_child(bench_header)
+
+	# Add separator after BENCH
+	var bench_sep := HSeparator.new()
+	_party.add_child(bench_sep)
 
 	# Only show bench slots that have members (hide empty slots)
 	for bench_idx in range(bench_ids.size()):
