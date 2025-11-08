@@ -1580,132 +1580,129 @@ func _on_stats_accepted() -> void:
 
 # ── Perk Selection UI ────────────────────────────────────────────────────────
 func _build_perk_selection_ui() -> void:
-	"""Build the perk selection UI showing 3 perks based on chosen stats"""
+	"""Build the perk selection UI with simple toggle buttons"""
 	# Hide dialogue label
 	if dialogue_label:
 		dialogue_label.visible = false
 
 	# Create perk selection container
-	perk_selection_container = Control.new()
-	perk_selection_container.set_anchors_preset(Control.PRESET_FULL_RECT)
+	perk_selection_container = VBoxContainer.new()
+	perk_selection_container.set_anchors_preset(Control.PRESET_CENTER)
+	perk_selection_container.anchor_left = 0.5
+	perk_selection_container.anchor_top = 0.5
+	perk_selection_container.anchor_right = 0.5
+	perk_selection_container.anchor_bottom = 0.5
+	perk_selection_container.offset_left = -400
+	perk_selection_container.offset_right = 400
+	perk_selection_container.offset_top = -300
+	perk_selection_container.offset_bottom = 300
+	perk_selection_container.add_theme_constant_override("separation", 10)
 	cinematic_layer.add_child(perk_selection_container)
 
 	# Title
 	var title = Label.new()
 	title.text = "Choose a Perk"
-	title.position = Vector2(0, 50)
-	title.set_anchors_preset(Control.PRESET_TOP_WIDE)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 20)
+	title.add_theme_font_size_override("font_size", 18)
+	title.add_theme_color_override("font_color", Color.WHITE)
 	perk_selection_container.add_child(title)
 
-	# Main content container
-	var content = HBoxContainer.new()
-	content.set_anchors_preset(Control.PRESET_CENTER)
-	content.anchor_left = 0.5
-	content.anchor_top = 0.5
-	content.anchor_right = 0.5
-	content.anchor_bottom = 0.5
-	content.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	content.grow_vertical = Control.GROW_DIRECTION_BOTH
-	content.offset_left = -400
-	content.offset_top = -200
-	content.offset_right = 400
-	content.offset_bottom = 200
-	content.add_theme_constant_override("separation", 20)
-	perk_selection_container.add_child(content)
-
-	# Left panel: Perk list
-	var list_panel = _create_styled_panel()
-	list_panel.custom_minimum_size = Vector2(300, 400)
-	content.add_child(list_panel)
-
-	var list = ItemList.new()
-	list.name = "PerkList"
-	list.add_theme_font_size_override("font_size", 16)
-	list.item_selected.connect(_on_perk_item_selected)
-	list_panel.add_child(list)
-
-	# Populate with available tier-1 perks
+	# Get available perks
 	var perk_system = get_node_or_null(PERK_PATH)
+	var perk_buttons: Array = []
+
 	if perk_system and perk_system.has_method("get_starting_options"):
 		var picks: Array[String] = []
 		for s in _selected_order:
 			picks.append(s)
 		var offers: Array = perk_system.call("get_starting_options", picks)
 
-		for offer in offers:
-			if typeof(offer) == TYPE_DICTIONARY:
-				var perk_name = str(offer.get("name", "Unknown Perk"))
-				list.add_item(perk_name)
-				list.set_item_metadata(list.item_count - 1, offer)
+		# Create toggle button for each perk
+		for i in range(offers.size()):
+			var offer = offers[i]
+			if typeof(offer) != TYPE_DICTIONARY:
+				continue
 
-	# Right panel: Details
-	var details_panel = _create_styled_panel()
-	details_panel.custom_minimum_size = Vector2(450, 400)
-	content.add_child(details_panel)
+			var stat = str(offer.get("stat", ""))
+			var name = str(offer.get("name", "Unknown"))
+			var desc = str(offer.get("desc", "No description"))
 
-	var details_label = Label.new()
-	details_label.name = "PerkDetailsLabel"
-	details_label.text = "Select a perk to see details."
-	details_label.autowrap_mode = TextServer.AUTOWRAP_WORD
-	details_label.vertical_alignment = VERTICAL_ALIGNMENT_TOP
-	details_label.add_theme_font_size_override("font_size", 14)
-	details_panel.add_child(details_label)
+			var perk_button = CheckButton.new()
+			perk_button.text = "%s - %s: %s" % [stat, name, desc]
+			perk_button.custom_minimum_size = Vector2(750, 50)
+			perk_button.add_theme_font_size_override("font_size", 14)
+			perk_button.button_pressed = false
+			perk_button.name = "PerkButton_%d" % i
+			perk_button.set_meta("perk_data", offer)
+			perk_button.toggled.connect(_on_perk_button_toggled.bind(perk_button))
 
-	# Accept button
-	var accept_btn = Button.new()
-	accept_btn.text = "Accept"
-	accept_btn.position = Vector2(0, -80)
-	accept_btn.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
-	accept_btn.anchor_top = 1.0
-	accept_btn.anchor_bottom = 1.0
-	accept_btn.custom_minimum_size = Vector2(200, 50)
-	accept_btn.add_theme_font_size_override("font_size", 16)
-	accept_btn.pressed.connect(_on_perk_accepted)
-	perk_selection_container.add_child(accept_btn)
+			if i == 0:
+				perk_button.grab_focus()  # First perk gets focus
+
+			perk_selection_container.add_child(perk_button)
+			perk_buttons.append(perk_button)
+
+	# Store buttons for later use
+	perk_selection_container.set_meta("perk_buttons", perk_buttons)
+
+	# Continue button
+	var continue_btn_container = CenterContainer.new()
+	perk_selection_container.add_child(continue_btn_container)
+
+	var continue_btn = Button.new()
+	continue_btn.text = "Continue"
+	continue_btn.name = "ContinueButton"
+	continue_btn.custom_minimum_size = Vector2(200, 50)
+	continue_btn.add_theme_font_size_override("font_size", 16)
+	continue_btn.disabled = true  # Disabled until a perk is selected
+	continue_btn.pressed.connect(_on_perk_accepted)
+	continue_btn_container.add_child(continue_btn)
 
 	# Fade in
 	perk_selection_container.modulate = Color(1, 1, 1, 0)
 	var tween = create_tween()
 	tween.tween_property(perk_selection_container, "modulate", Color(1, 1, 1, 1), 0.5)
 
-func _on_perk_item_selected(index: int) -> void:
-	"""Handle perk selection and show details"""
+func _on_perk_button_toggled(button_pressed: bool, toggled_button: CheckButton) -> void:
+	"""Handle perk button toggle - only allow one selection (radio button behavior)"""
 	if not perk_selection_container:
 		return
 
-	var list = perk_selection_container.get_node_or_null("PerkList")
-	var details_label = perk_selection_container.get_node_or_null("PerkDetailsLabel")
+	if button_pressed:
+		# Deselect all other perk buttons
+		var perk_buttons = perk_selection_container.get_meta("perk_buttons", [])
+		for btn in perk_buttons:
+			if btn != toggled_button:
+				btn.set_pressed_no_signal(false)
 
-	if not list or not details_label:
-		return
-
-	var perk_data = list.get_item_metadata(index)
-	if typeof(perk_data) == TYPE_DICTIONARY:
-		var stat = str(perk_data.get("stat", ""))
-		var name = str(perk_data.get("name", "Unknown"))
-		var desc = str(perk_data.get("desc", "No description available."))
-		details_label.text = "%s - %s\n\n%s" % [stat, name, desc]
+		# Enable Continue button
+		var continue_btn = perk_selection_container.get_node_or_null("CenterContainer/ContinueButton")
+		if continue_btn:
+			continue_btn.disabled = false
+	else:
+		# Don't allow deselecting - keep it selected (radio button behavior)
+		toggled_button.set_pressed_no_signal(true)
 
 func _on_perk_accepted() -> void:
 	"""Handle perk selection acceptance"""
 	if not perk_selection_container:
 		return
 
-	var list = perk_selection_container.get_node_or_null("PerkList")
-	if not list:
-		return
+	# Find which perk button is selected
+	var perk_buttons = perk_selection_container.get_meta("perk_buttons", [])
+	var selected_perk_data = null
 
-	var selected = list.get_selected_items()
-	if selected.is_empty():
-		OS.alert("Please select a perk.", "Selection Required")
-		return
+	for btn in perk_buttons:
+		if btn.button_pressed:
+			selected_perk_data = btn.get_meta("perk_data", null)
+			break
+
+	if not selected_perk_data:
+		return  # Continue button should be disabled if nothing selected anyway
 
 	# Get selected perk and apply to form
-	var perk_data = list.get_item_metadata(selected[0])
-	if typeof(perk_data) == TYPE_DICTIONARY:
-		var perk_id = str(perk_data.get("id", ""))
+	if typeof(selected_perk_data) == TYPE_DICTIONARY:
+		var perk_id = str(selected_perk_data.get("id", ""))
 
 		# Find and select this perk in the original dropdown
 		if _perk_in:
