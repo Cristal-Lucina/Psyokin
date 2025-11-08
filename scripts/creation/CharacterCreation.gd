@@ -134,6 +134,12 @@ var stat_focused_index: int = 0  # Which stat is currently focused (0-4)
 var stat_selected: Array[bool] = [false, false, false, false, false]  # Which stats are selected
 var stat_panels: Array = []  # References to stat panel containers
 
+# Keyboard navigation state
+var keyboard_buttons: Array = []  # All keyboard buttons
+var keyboard_focused_row: int = 0  # Current row (0-3: letters, 4: actions)
+var keyboard_focused_col: int = 0  # Current column
+var keyboard_grid_cols: int = 9  # 9 columns for letters
+
 # Blinking up arrow
 var arrow_label: Label = null
 var cursor_blink_timer: float = 0.0
@@ -860,24 +866,66 @@ func _process_cursor_blink(delta: float) -> void:
 		if arrow_label:
 			arrow_label.visible = cursor_visible
 
-func _unhandled_input(event: InputEvent) -> void:
-	"""Handle input for advancing dialogue, name input, and stat selection"""
+func _input(event: InputEvent) -> void:
+	"""Handle input for advancing dialogue, name input, and stat selection (use _input to capture before ControllerManager)"""
 	if not cinematic_active:
+		return
+
+	# Handle keyboard navigation when keyboard is visible
+	if current_stage == CinematicStage.NAME_INPUT and keyboard_container:
+		if event.is_action_pressed("ui_up"):
+			get_viewport().set_input_as_handled()
+			_handle_keyboard_navigation(0, -1)
+			return
+		elif event.is_action_pressed("ui_down"):
+			get_viewport().set_input_as_handled()
+			_handle_keyboard_navigation(0, 1)
+			return
+		elif event.is_action_pressed("ui_left"):
+			get_viewport().set_input_as_handled()
+			_handle_keyboard_navigation(-1, 0)
+			return
+		elif event.is_action_pressed("ui_right"):
+			get_viewport().set_input_as_handled()
+			_handle_keyboard_navigation(1, 0)
+			return
+		elif event.is_action_pressed("ui_accept"):
+			get_viewport().set_input_as_handled()
+			_handle_keyboard_accept()
+			return
+		elif event is InputEventJoypadButton and event.pressed:
+			get_viewport().set_input_as_handled()
+			_handle_keyboard_accept()
+			return
 		return
 
 	# Handle stat selection navigation and toggle
 	if current_stage == CinematicStage.STAT_SELECTION:
 		if event.is_action_pressed("ui_up"):
+			print("[Stat Selection] Up pressed")
 			get_viewport().set_input_as_handled()
 			_handle_stat_navigation(-1)
 			return
 		elif event.is_action_pressed("ui_down"):
+			print("[Stat Selection] Down pressed")
 			get_viewport().set_input_as_handled()
 			_handle_stat_navigation(1)
 			return
 		elif event.is_action_pressed("ui_accept"):
+			print("[Stat Selection] Accept pressed")
 			get_viewport().set_input_as_handled()
 			_handle_stat_toggle()
+			return
+		elif event is InputEventJoypadButton and event.pressed:
+			print("[Stat Selection] Joypad button pressed: ", event.button_index)
+			get_viewport().set_input_as_handled()
+			# Button 11 is D-pad up, 12 is D-pad down, 0 is A button
+			if event.button_index == 11:  # D-pad up
+				_handle_stat_navigation(-1)
+			elif event.button_index == 12:  # D-pad down
+				_handle_stat_navigation(1)
+			else:  # Any other button toggles
+				_handle_stat_toggle()
 			return
 		# Also handle keyboard keys
 		elif event is InputEventKey and event.pressed and not event.echo:
@@ -1134,11 +1182,16 @@ func _handle_name_input_accept() -> void:
 			name_input_stage = 3
 
 func _show_keyboard() -> void:
-	"""Show the on-screen keyboard"""
+	"""Show the on-screen keyboard with navigable grid"""
 	# Hide instruction
 	var instruction = name_input_container.get_node_or_null("InstructionLabel")
 	if instruction:
 		instruction.visible = false
+
+	# Reset keyboard navigation state
+	keyboard_focused_row = 0
+	keyboard_focused_col = 0
+	keyboard_buttons.clear()
 
 	# Create keyboard container
 	keyboard_container = VBoxContainer.new()
@@ -1155,42 +1208,156 @@ func _show_keyboard() -> void:
 	current_text_label.add_theme_color_override("font_color", Color(1.0, 0.7, 0.75, 1.0))
 	keyboard_container.add_child(current_text_label)
 
-	# Letter buttons (A-Z)
+	# Letter grid (9 columns, 4 rows for uppercase and lowercase)
 	var letter_grid = GridContainer.new()
-	letter_grid.columns = 7
-	letter_grid.add_theme_constant_override("h_separation", 5)
-	letter_grid.add_theme_constant_override("v_separation", 5)
+	letter_grid.columns = keyboard_grid_cols
+	letter_grid.add_theme_constant_override("h_separation", 3)
+	letter_grid.add_theme_constant_override("v_separation", 3)
 	keyboard_container.add_child(letter_grid)
 
-	var letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-	for i in range(letters.length()):
-		var letter = letters[i]
-		var btn = Button.new()
-		btn.text = letter
-		btn.custom_minimum_size = Vector2(40, 40)
-		btn.add_theme_font_size_override("font_size", 14)
+	# Uppercase letters (A-Z split across 3 rows of 9)
+	var uppercase = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	for i in range(uppercase.length()):
+		var letter = uppercase[i]
+		var btn = _create_keyboard_button(letter, Vector2(40, 40))
 		btn.pressed.connect(_on_keyboard_letter_pressed.bind(letter))
 		letter_grid.add_child(btn)
+		keyboard_buttons.append({"button": btn, "value": letter, "type": "letter"})
 
-	# Bottom row with Backspace and Accept
+	# Add padding buttons to fill the grid (27 letters, need 36 for 4 rows of 9)
+	for i in range(9):  # 9 more buttons to reach 36
+		if i < 1:  # First button is spacer
+			var spacer = Control.new()
+			spacer.custom_minimum_size = Vector2(40, 40)
+			letter_grid.add_child(spacer)
+		else:  # Rest are lowercase letters
+			var lowercase_start = i - 1
+			if lowercase_start < 26:
+				var letter = uppercase[lowercase_start].to_lower()
+				var btn = _create_keyboard_button(letter, Vector2(40, 40))
+				btn.pressed.connect(_on_keyboard_letter_pressed.bind(letter))
+				letter_grid.add_child(btn)
+				keyboard_buttons.append({"button": btn, "value": letter, "type": "letter"})
+
+	# Add remaining lowercase letters
+	var lowercase_remaining = "hijklmnopqrstuvwxyz"
+	for i in range(lowercase_remaining.length()):
+		var letter = lowercase_remaining[i]
+		var btn = _create_keyboard_button(letter, Vector2(40, 40))
+		btn.pressed.connect(_on_keyboard_letter_pressed.bind(letter))
+		letter_grid.add_child(btn)
+		keyboard_buttons.append({"button": btn, "value": letter, "type": "letter"})
+
+	# Bottom row with Backspace and Accept (centered)
 	var bottom_row = HBoxContainer.new()
 	bottom_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	bottom_row.add_theme_constant_override("separation", 20)
 	keyboard_container.add_child(bottom_row)
 
-	var backspace_btn = Button.new()
-	backspace_btn.text = "⌫ Backspace"
-	backspace_btn.custom_minimum_size = Vector2(150, 50)
-	backspace_btn.add_theme_font_size_override("font_size", 14)
+	var backspace_btn = _create_keyboard_button("⌫ Backspace", Vector2(150, 50))
 	backspace_btn.pressed.connect(_on_keyboard_backspace_pressed)
 	bottom_row.add_child(backspace_btn)
+	keyboard_buttons.append({"button": backspace_btn, "value": "BACKSPACE", "type": "action"})
 
-	var accept_btn = Button.new()
-	accept_btn.text = "✓ Accept"
-	accept_btn.custom_minimum_size = Vector2(150, 50)
-	accept_btn.add_theme_font_size_override("font_size", 14)
+	var accept_btn = _create_keyboard_button("✓ Accept", Vector2(150, 50))
 	accept_btn.pressed.connect(_on_keyboard_accept_pressed)
 	bottom_row.add_child(accept_btn)
+	keyboard_buttons.append({"button": accept_btn, "value": "ACCEPT", "type": "action"})
+
+	# Set initial focus
+	_update_keyboard_focus()
+
+func _create_keyboard_button(text: String, size: Vector2) -> Button:
+	"""Create a styled keyboard button"""
+	var btn = Button.new()
+	btn.text = text
+	btn.custom_minimum_size = size
+	btn.add_theme_font_size_override("font_size", 14)
+	return btn
+
+func _handle_keyboard_navigation(dx: int, dy: int) -> void:
+	"""Handle directional navigation on keyboard"""
+	# Calculate total rows (letters in grid + action row)
+	var letter_button_count = 0
+	for kb in keyboard_buttons:
+		if kb["type"] == "letter":
+			letter_button_count += 1
+
+	var letter_rows = ceil(float(letter_button_count) / float(keyboard_grid_cols))
+	var total_rows = int(letter_rows) + 1  # +1 for action row
+
+	# Get current linear index
+	var current_index = _get_keyboard_linear_index()
+
+	if dy != 0:  # Vertical movement
+		var new_row = keyboard_focused_row + dy
+		new_row = clamp(new_row, 0, total_rows - 1)
+		keyboard_focused_row = new_row
+
+		# Adjust column if needed
+		if keyboard_focused_row < letter_rows:
+			# In letter grid
+			keyboard_focused_col = clamp(keyboard_focused_col, 0, keyboard_grid_cols - 1)
+		else:
+			# In action row (only 2 buttons)
+			keyboard_focused_col = clamp(keyboard_focused_col, 0, 1)
+
+	if dx != 0:  # Horizontal movement
+		if keyboard_focused_row < letter_rows:
+			# In letter grid
+			keyboard_focused_col += dx
+			keyboard_focused_col = wrapi(keyboard_focused_col, 0, keyboard_grid_cols)
+		else:
+			# In action row
+			keyboard_focused_col += dx
+			keyboard_focused_col = wrapi(keyboard_focused_col, 0, 2)
+
+	_update_keyboard_focus()
+
+func _get_keyboard_linear_index() -> int:
+	"""Get the linear index of currently focused keyboard button"""
+	var letter_button_count = 0
+	for kb in keyboard_buttons:
+		if kb["type"] == "letter":
+			letter_button_count += 1
+
+	var letter_rows = ceil(float(letter_button_count) / float(keyboard_grid_cols))
+
+	if keyboard_focused_row < letter_rows:
+		return keyboard_focused_row * keyboard_grid_cols + keyboard_focused_col
+	else:
+		# Action row
+		return letter_button_count + keyboard_focused_col
+
+func _update_keyboard_focus() -> void:
+	"""Update visual focus on keyboard"""
+	var focused_index = _get_keyboard_linear_index()
+
+	# Reset all buttons to normal style
+	for i in range(keyboard_buttons.size()):
+		var kb = keyboard_buttons[i]
+		var btn = kb["button"]
+		if i == focused_index:
+			# Focused - add pink modulate
+			btn.modulate = Color(1.0, 0.7, 0.75, 1.0)
+		else:
+			# Normal
+			btn.modulate = Color.WHITE
+
+func _handle_keyboard_accept() -> void:
+	"""Handle accept button press on keyboard"""
+	var focused_index = _get_keyboard_linear_index()
+	if focused_index >= 0 and focused_index < keyboard_buttons.size():
+		var kb = keyboard_buttons[focused_index]
+		var value = kb["value"]
+
+		if value == "BACKSPACE":
+			_on_keyboard_backspace_pressed()
+		elif value == "ACCEPT":
+			_on_keyboard_accept_pressed()
+		else:
+			# It's a letter
+			_on_keyboard_letter_pressed(value)
 
 func _on_keyboard_letter_pressed(letter: String) -> void:
 	"""Handle letter button press on keyboard"""
