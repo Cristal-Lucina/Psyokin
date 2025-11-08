@@ -3,6 +3,12 @@ class_name CharacterCreation
 
 signal creation_applied
 
+# Styling constants (matching LoadoutPanel)
+const PANEL_BG_COLOR := Color(0.15, 0.15, 0.15, 1.0)  # Dark gray, fully opaque
+const PANEL_BORDER_COLOR := Color(1.0, 0.7, 0.75, 1.0)  # Pink border
+const PANEL_BORDER_WIDTH := 2
+const PANEL_CORNER_RADIUS := 8
+
 # ── Autoload paths ────────────────────────────────────────────────────────────
 const GS_PATH      := "/root/aGameState"
 const STATS_PATH   := "/root/aStatsSystem"
@@ -78,6 +84,10 @@ var animation_speed = 0.135  # 135ms per frame for walk
 # ── ready ────────────────────────────────────────────────────────────────────
 func _ready() -> void:
 	print("Character Creation starting...")
+
+	# Apply LoadoutPanel styling to all panels
+	_style_panels()
+
 	scan_character_assets()
 	_fill_basics()
 	_wire_stat_toggles()
@@ -109,6 +119,28 @@ func _ready() -> void:
 	set_default_character()
 	update_preview()
 	_update_confirm_enabled()
+
+func _style_panels() -> void:
+	"""Apply LoadoutPanel styling (dark gray background with pink border) to all panels"""
+	var panels_to_style = [
+		get_node_or_null("MainContainer/PreviewPanel"),
+		get_node_or_null("MainContainer/FormPanel")
+	]
+
+	for panel in panels_to_style:
+		if panel is PanelContainer:
+			var style_box := StyleBoxFlat.new()
+			style_box.bg_color = PANEL_BG_COLOR
+			style_box.border_color = PANEL_BORDER_COLOR
+			style_box.border_width_left = PANEL_BORDER_WIDTH
+			style_box.border_width_right = PANEL_BORDER_WIDTH
+			style_box.border_width_top = PANEL_BORDER_WIDTH
+			style_box.border_width_bottom = PANEL_BORDER_WIDTH
+			style_box.corner_radius_top_left = PANEL_CORNER_RADIUS
+			style_box.corner_radius_top_right = PANEL_CORNER_RADIUS
+			style_box.corner_radius_bottom_left = PANEL_CORNER_RADIUS
+			style_box.corner_radius_bottom_right = PANEL_CORNER_RADIUS
+			panel.add_theme_stylebox_override("panel", style_box)
 
 func _process(delta):
 	# Walk animation cycling (6 frames)
