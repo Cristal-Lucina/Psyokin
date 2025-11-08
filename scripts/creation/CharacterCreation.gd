@@ -61,9 +61,9 @@ const DIRECTIONS = {
 @onready var _cancel_btn  : Button        = %CancelBtn
 
 # Character preview
-@onready var character_layers = $Margin/MainContainer/PreviewPanel/PreviewContainer/CenterContainer/CharacterLayers
-@onready var frame_label = $Margin/MainContainer/PreviewPanel/PreviewContainer/AnimationControls/FrameLabel
-@onready var direction_label = $Margin/MainContainer/PreviewPanel/PreviewContainer/AnimationControls/DirectionLabel
+@onready var character_layers = $Margin/MainContainer/PreviewPanel/PreviewMargin/PreviewContainer/CenterContainer/CharacterLayers
+@onready var frame_label = $Margin/MainContainer/PreviewPanel/PreviewMargin/PreviewContainer/AnimationControls/FrameLabel
+@onready var direction_label = $Margin/MainContainer/PreviewPanel/PreviewMargin/PreviewContainer/AnimationControls/DirectionLabel
 
 # ── state ────────────────────────────────────────────────────────────────────
 var _selected_order : Array[String] = []       # keep order of picks (max 3)

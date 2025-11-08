@@ -32,32 +32,39 @@ layout_mode = 2
 size_flags_horizontal = 3
 size_flags_stretch_ratio = 0.6
 
-[node name="Form" type="VBoxContainer" parent="Margin/MainContainer/FormPanel"]
+[node name="FormMargin" type="MarginContainer" parent="Margin/MainContainer/FormPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 50
+theme_override_constants/margin_top = 50
+theme_override_constants/margin_right = 50
+theme_override_constants/margin_bottom = 50
+
+[node name="Form" type="VBoxContainer" parent="Margin/MainContainer/FormPanel/FormMargin"]
 layout_mode = 2
 theme_override_constants/separation = 16
 
-[node name="Title" type="Label" parent="Margin/MainContainer/FormPanel/Form"]
+[node name="Title" type="Label" parent="Margin/MainContainer/FormPanel/FormMargin/Form"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 10
 text = "Create Your Protagonist"
 horizontal_alignment = 1
 
-[node name="ScrollContainer" type="ScrollContainer" parent="Margin/MainContainer/FormPanel/Form"]
+[node name="ScrollContainer" type="ScrollContainer" parent="Margin/MainContainer/FormPanel/FormMargin/Form"]
 layout_mode = 2
 size_flags_vertical = 3
 
-[node name="Grid" type="GridContainer" parent="Margin/MainContainer/FormPanel/Form/ScrollContainer"]
+[node name="Grid" type="GridContainer" parent="Margin/MainContainer/FormPanel/FormMargin/Form/ScrollContainer"]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 columns = 2
 
-[node name="NameLable" type="Label" parent="Margin/MainContainer/FormPanel/Form/ScrollContainer/Grid"]
+[node name="NameLable" type="Label" parent="Margin/MainContainer/FormPanel/FormMargin/Form/ScrollContainer/Grid"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 10
 text = "Name"
 
-[node name="NameInput" type="LineEdit" parent="Margin/MainContainer/FormPanel/Form/ScrollContainer/Grid"]
+[node name="NameInput" type="LineEdit" parent="Margin/MainContainer/FormPanel/FormMargin/Form/ScrollContainer/Grid"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
@@ -65,12 +72,12 @@ theme_override_font_sizes/font_size = 10
 placeholder_text = "First Name"
 max_length = 10
 
-[node name="SurnameLabel" type="Label" parent="Margin/MainContainer/FormPanel/Form/ScrollContainer/Grid"]
+[node name="SurnameLabel" type="Label" parent="Margin/MainContainer/FormPanel/FormMargin/Form/ScrollContainer/Grid"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 10
 text = "Surname"
 
-[node name="SurnameInput" type="LineEdit" parent="Margin/MainContainer/FormPanel/Form/ScrollContainer/Grid"]
+[node name="SurnameInput" type="LineEdit" parent="Margin/MainContainer/FormPanel/FormMargin/Form/ScrollContainer/Grid"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
@@ -78,214 +85,221 @@ theme_override_font_sizes/font_size = 10
 placeholder_text = "Last Name"
 max_length = 10
 
-[node name="PronounLabel" type="Label" parent="Margin/MainContainer/FormPanel/Form/ScrollContainer/Grid"]
+[node name="PronounLabel" type="Label" parent="Margin/MainContainer/FormPanel/FormMargin/Form/ScrollContainer/Grid"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 10
 text = "Pronoun"
 
-[node name="PronounInput" type="OptionButton" parent="Margin/MainContainer/FormPanel/Form/ScrollContainer/Grid"]
+[node name="PronounInput" type="OptionButton" parent="Margin/MainContainer/FormPanel/FormMargin/Form/ScrollContainer/Grid"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_font_sizes/font_size = 10
 
-[node name="Spacer1" type="Control" parent="Margin/MainContainer/FormPanel/Form/ScrollContainer/Grid"]
+[node name="Spacer1" type="Control" parent="Margin/MainContainer/FormPanel/FormMargin/Form/ScrollContainer/Grid"]
 custom_minimum_size = Vector2(0, 20)
 layout_mode = 2
 
-[node name="Spacer2" type="Control" parent="Margin/MainContainer/FormPanel/Form/ScrollContainer/Grid"]
+[node name="Spacer2" type="Control" parent="Margin/MainContainer/FormPanel/FormMargin/Form/ScrollContainer/Grid"]
 custom_minimum_size = Vector2(0, 20)
 layout_mode = 2
 
-[node name="BodyLabel" type="Label" parent="Margin/MainContainer/FormPanel/Form/ScrollContainer/Grid"]
+[node name="BodyLabel" type="Label" parent="Margin/MainContainer/FormPanel/FormMargin/Form/ScrollContainer/Grid"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 10
 text = "Body Type"
 
-[node name="BodyIdInput" type="OptionButton" parent="Margin/MainContainer/FormPanel/Form/ScrollContainer/Grid"]
+[node name="BodyIdInput" type="OptionButton" parent="Margin/MainContainer/FormPanel/FormMargin/Form/ScrollContainer/Grid"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_font_sizes/font_size = 10
 
-[node name="OutfitLabel" type="Label" parent="Margin/MainContainer/FormPanel/Form/ScrollContainer/Grid"]
+[node name="OutfitLabel" type="Label" parent="Margin/MainContainer/FormPanel/FormMargin/Form/ScrollContainer/Grid"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 10
 text = "Outfit"
 
-[node name="OutfitInput" type="OptionButton" parent="Margin/MainContainer/FormPanel/Form/ScrollContainer/Grid"]
+[node name="OutfitInput" type="OptionButton" parent="Margin/MainContainer/FormPanel/FormMargin/Form/ScrollContainer/Grid"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_font_sizes/font_size = 10
 
-[node name="HairLabel" type="Label" parent="Margin/MainContainer/FormPanel/Form/ScrollContainer/Grid"]
+[node name="HairLabel" type="Label" parent="Margin/MainContainer/FormPanel/FormMargin/Form/ScrollContainer/Grid"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 10
 text = "Hair"
 
-[node name="HairIdInput" type="OptionButton" parent="Margin/MainContainer/FormPanel/Form/ScrollContainer/Grid"]
+[node name="HairIdInput" type="OptionButton" parent="Margin/MainContainer/FormPanel/FormMargin/Form/ScrollContainer/Grid"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_font_sizes/font_size = 10
 
-[node name="HatLabel" type="Label" parent="Margin/MainContainer/FormPanel/Form/ScrollContainer/Grid"]
+[node name="HatLabel" type="Label" parent="Margin/MainContainer/FormPanel/FormMargin/Form/ScrollContainer/Grid"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 10
 text = "Hat"
 
-[node name="HatInput" type="OptionButton" parent="Margin/MainContainer/FormPanel/Form/ScrollContainer/Grid"]
+[node name="HatInput" type="OptionButton" parent="Margin/MainContainer/FormPanel/FormMargin/Form/ScrollContainer/Grid"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_font_sizes/font_size = 10
 
-[node name="StatsLabel" type="Label" parent="Margin/MainContainer/FormPanel/Form"]
+[node name="StatsLabel" type="Label" parent="Margin/MainContainer/FormPanel/FormMargin/Form"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 10
 text = "Choose 3 Stats to Prioritize:"
 
-[node name="StatsRow" type="HBoxContainer" parent="Margin/MainContainer/FormPanel/Form"]
+[node name="StatsRow" type="HBoxContainer" parent="Margin/MainContainer/FormPanel/FormMargin/Form"]
 layout_mode = 2
 theme_override_constants/separation = 12
 
-[node name="StatBRW" type="CheckButton" parent="Margin/MainContainer/FormPanel/Form/StatsRow"]
+[node name="StatBRW" type="CheckButton" parent="Margin/MainContainer/FormPanel/FormMargin/Form/StatsRow"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_font_sizes/font_size = 10
 text = "Brawn"
 
-[node name="StatVTL" type="CheckButton" parent="Margin/MainContainer/FormPanel/Form/StatsRow"]
+[node name="StatVTL" type="CheckButton" parent="Margin/MainContainer/FormPanel/FormMargin/Form/StatsRow"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_font_sizes/font_size = 10
 text = "Vitality"
 
-[node name="StatTPO" type="CheckButton" parent="Margin/MainContainer/FormPanel/Form/StatsRow"]
+[node name="StatTPO" type="CheckButton" parent="Margin/MainContainer/FormPanel/FormMargin/Form/StatsRow"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_font_sizes/font_size = 10
 text = "Tempo"
 
-[node name="StatMND" type="CheckButton" parent="Margin/MainContainer/FormPanel/Form/StatsRow"]
+[node name="StatMND" type="CheckButton" parent="Margin/MainContainer/FormPanel/FormMargin/Form/StatsRow"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_font_sizes/font_size = 10
 text = "Mind"
 
-[node name="StatFCS" type="CheckButton" parent="Margin/MainContainer/FormPanel/Form/StatsRow"]
+[node name="StatFCS" type="CheckButton" parent="Margin/MainContainer/FormPanel/FormMargin/Form/StatsRow"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_font_sizes/font_size = 10
 text = "Focus"
 
-[node name="PerkLabel" type="Label" parent="Margin/MainContainer/FormPanel/Form"]
+[node name="PerkLabel" type="Label" parent="Margin/MainContainer/FormPanel/FormMargin/Form"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 10
 text = "Choose a Perk:"
 
-[node name="PerkInput" type="OptionButton" parent="Margin/MainContainer/FormPanel/Form"]
+[node name="PerkInput" type="OptionButton" parent="Margin/MainContainer/FormPanel/FormMargin/Form"]
 unique_name_in_owner = true
 modulate = Color(1, 0.4, 0.4, 1)
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_font_sizes/font_size = 10
 
-[node name="Buttons" type="HBoxContainer" parent="Margin/MainContainer/FormPanel/Form"]
+[node name="Buttons" type="HBoxContainer" parent="Margin/MainContainer/FormPanel/FormMargin/Form"]
 layout_mode = 2
 theme_override_constants/separation = 12
 
-[node name="ConfirmBtn" type="Button" parent="Margin/MainContainer/FormPanel/Form/Buttons"]
+[node name="ConfirmBtn" type="Button" parent="Margin/MainContainer/FormPanel/FormMargin/Form/Buttons"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_font_sizes/font_size = 10
 text = "Start Game"
 
-[node name="CancelBtn" type="Button" parent="Margin/MainContainer/FormPanel/Form/Buttons"]
+[node name="CancelBtn" type="Button" parent="Margin/MainContainer/FormPanel/FormMargin/Form/Buttons"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_font_sizes/font_size = 10
 text = "Back"
 
-[connection signal="pressed" from="Margin/MainContainer/FormPanel/Form/Buttons/ConfirmBtn" to="." method="_on_confirm_pressed"]
+[connection signal="pressed" from="Margin/MainContainer/FormPanel/FormMargin/Form/Buttons/ConfirmBtn" to="." method="_on_confirm_pressed"]
 [node name="PreviewPanel" type="PanelContainer" parent="Margin/MainContainer"]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_stretch_ratio = 0.4
 
-[node name="PreviewContainer" type="VBoxContainer" parent="Margin/MainContainer/PreviewPanel"]
+[node name="PreviewMargin" type="MarginContainer" parent="Margin/MainContainer/PreviewPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 50
+theme_override_constants/margin_top = 50
+theme_override_constants/margin_right = 50
+theme_override_constants/margin_bottom = 50
+
+[node name="PreviewContainer" type="VBoxContainer" parent="Margin/MainContainer/PreviewPanel/PreviewMargin"]
 layout_mode = 2
 
-[node name="Title" type="Label" parent="Margin/MainContainer/PreviewPanel/PreviewContainer"]
+[node name="Title" type="Label" parent="Margin/MainContainer/PreviewPanel/PreviewMargin/PreviewContainer"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 10
 text = "Character Preview"
 horizontal_alignment = 1
 
-[node name="CenterContainer" type="CenterContainer" parent="Margin/MainContainer/PreviewPanel/PreviewContainer"]
+[node name="CenterContainer" type="CenterContainer" parent="Margin/MainContainer/PreviewPanel/PreviewMargin/PreviewContainer"]
 layout_mode = 2
 size_flags_vertical = 3
 
-[node name="CharacterLayers" type="Node2D" parent="Margin/MainContainer/PreviewPanel/PreviewContainer/CenterContainer"]
+[node name="CharacterLayers" type="Node2D" parent="Margin/MainContainer/PreviewPanel/PreviewMargin/PreviewContainer/CenterContainer"]
 position = Vector2(200, 250)
 scale = Vector2(4, 4)
 
-[node name="BaseSprite" type="Sprite2D" parent="Margin/MainContainer/PreviewPanel/PreviewContainer/CenterContainer/CharacterLayers"]
+[node name="BaseSprite" type="Sprite2D" parent="Margin/MainContainer/PreviewPanel/PreviewMargin/PreviewContainer/CenterContainer/CharacterLayers"]
 texture_filter = 1
 hframes = 8
 vframes = 8
 
-[node name="OutfitSprite" type="Sprite2D" parent="Margin/MainContainer/PreviewPanel/PreviewContainer/CenterContainer/CharacterLayers"]
+[node name="OutfitSprite" type="Sprite2D" parent="Margin/MainContainer/PreviewPanel/PreviewMargin/PreviewContainer/CenterContainer/CharacterLayers"]
 texture_filter = 1
 hframes = 8
 vframes = 8
 
-[node name="CloakSprite" type="Sprite2D" parent="Margin/MainContainer/PreviewPanel/PreviewContainer/CenterContainer/CharacterLayers"]
+[node name="CloakSprite" type="Sprite2D" parent="Margin/MainContainer/PreviewPanel/PreviewMargin/PreviewContainer/CenterContainer/CharacterLayers"]
 texture_filter = 1
 hframes = 8
 vframes = 8
 
-[node name="FaceSprite" type="Sprite2D" parent="Margin/MainContainer/PreviewPanel/PreviewContainer/CenterContainer/CharacterLayers"]
+[node name="FaceSprite" type="Sprite2D" parent="Margin/MainContainer/PreviewPanel/PreviewMargin/PreviewContainer/CenterContainer/CharacterLayers"]
 texture_filter = 1
 hframes = 8
 vframes = 8
 
-[node name="HairSprite" type="Sprite2D" parent="Margin/MainContainer/PreviewPanel/PreviewContainer/CenterContainer/CharacterLayers"]
+[node name="HairSprite" type="Sprite2D" parent="Margin/MainContainer/PreviewPanel/PreviewMargin/PreviewContainer/CenterContainer/CharacterLayers"]
 texture_filter = 1
 hframes = 8
 vframes = 8
 
-[node name="HatSprite" type="Sprite2D" parent="Margin/MainContainer/PreviewPanel/PreviewContainer/CenterContainer/CharacterLayers"]
+[node name="HatSprite" type="Sprite2D" parent="Margin/MainContainer/PreviewPanel/PreviewMargin/PreviewContainer/CenterContainer/CharacterLayers"]
 texture_filter = 1
 hframes = 8
 vframes = 8
 
-[node name="ToolASprite" type="Sprite2D" parent="Margin/MainContainer/PreviewPanel/PreviewContainer/CenterContainer/CharacterLayers"]
+[node name="ToolASprite" type="Sprite2D" parent="Margin/MainContainer/PreviewPanel/PreviewMargin/PreviewContainer/CenterContainer/CharacterLayers"]
 texture_filter = 1
 hframes = 8
 vframes = 8
 
-[node name="ToolBSprite" type="Sprite2D" parent="Margin/MainContainer/PreviewPanel/PreviewContainer/CenterContainer/CharacterLayers"]
+[node name="ToolBSprite" type="Sprite2D" parent="Margin/MainContainer/PreviewPanel/PreviewMargin/PreviewContainer/CenterContainer/CharacterLayers"]
 texture_filter = 1
 hframes = 8
 vframes = 8
 
-[node name="AnimationControls" type="HBoxContainer" parent="Margin/MainContainer/PreviewPanel/PreviewContainer"]
+[node name="AnimationControls" type="HBoxContainer" parent="Margin/MainContainer/PreviewPanel/PreviewMargin/PreviewContainer"]
 layout_mode = 2
 theme_override_constants/separation = 8
 alignment = 1
 
-[node name="DirectionLabel" type="Label" parent="Margin/MainContainer/PreviewPanel/PreviewContainer/AnimationControls"]
+[node name="DirectionLabel" type="Label" parent="Margin/MainContainer/PreviewPanel/PreviewMargin/PreviewContainer/AnimationControls"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 8
 text = "Direction: South"
 
-[node name="FrameLabel" type="Label" parent="Margin/MainContainer/PreviewPanel/PreviewContainer/AnimationControls"]
+[node name="FrameLabel" type="Label" parent="Margin/MainContainer/PreviewPanel/PreviewMargin/PreviewContainer/AnimationControls"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 8
 text = "Walk Frame: 1/6"
 
-[connection signal="pressed" from="Margin/MainContainer/FormPanel/Form/Buttons/CancelBtn" to="." method="_on_cancel_pressed"]
+[connection signal="pressed" from="Margin/MainContainer/FormPanel/FormMargin/Form/Buttons/CancelBtn" to="." method="_on_cancel_pressed"]
