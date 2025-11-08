@@ -570,5 +570,13 @@ func restore_position() -> void:
 	if gs:
 		position = gs.player_position
 		_current_direction = gs.player_direction
-		_update_sprite_frames()
+
+		# Update sprite frames to idle frame for the restored direction
+		var idle_frame = _current_direction * 8
+		for layer_key in LAYERS:
+			var layer = LAYERS[layer_key]
+			var sprite: Sprite2D = character_layers.get_node(layer.node_name)
+			if sprite and sprite.visible and sprite.texture:
+				sprite.frame = idle_frame
+
 		print("[Player] Restored position: %s, direction: %d" % [position, _current_direction])
