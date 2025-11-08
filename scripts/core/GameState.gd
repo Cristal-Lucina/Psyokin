@@ -628,10 +628,9 @@ func reset_all_systems() -> void:
 	if me_sys and me_sys.has_method("reset"):
 		me_sys.call("reset")
 
-	# Clear PanelManager stack to prevent stale panel references
-	var pm: Node = get_node_or_null("/root/aPanelManager")
-	if pm and pm.has_method("force_reset"):
-		pm.call("force_reset")
+	# Note: PanelManager is NOT reset here - it will be cleared naturally
+	# when the old scene is freed during scene change. Resetting it here
+	# would break panel registration in the new scene.
 
 	print("[GameState] System reset complete")
 
