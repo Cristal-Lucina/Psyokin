@@ -11,8 +11,6 @@ enum CinematicStage {
 	NAME_INPUT,            # Name input with validation
 	DIALOGUE_RESPONSE_1,   # "They're speaking..."
 	DIALOGUE_RESPONSE_2,   # "Nurse, go check..."
-	DIALOGUE_RESPONSE_3,   # "You got it doctor..."
-	DIALOGUE_QUESTION,     # "What does it read."
 	STAT_SELECTION,        # Choose 3 stats
 	PERK_QUESTION,         # "Choose a perk."
 	PERK_SELECTION,        # Show 3 perks based on stats
@@ -808,8 +806,6 @@ func _on_typing_complete() -> void:
 		CinematicStage.OPENING_DIALOGUE_3,
 		CinematicStage.DIALOGUE_RESPONSE_1,
 		CinematicStage.DIALOGUE_RESPONSE_2,
-		CinematicStage.DIALOGUE_RESPONSE_3,
-		CinematicStage.DIALOGUE_QUESTION,
 		CinematicStage.PERK_QUESTION,
 		CinematicStage.DIALOGUE_BANDAGES,
 		CinematicStage.DIALOGUE_MEMORY,
@@ -985,10 +981,6 @@ func _enter_stage(stage: CinematicStage) -> void:
 			_start_typing("They're speaking and it seems their memory is intact!")
 		CinematicStage.DIALOGUE_RESPONSE_2:
 			_start_typing("Nurse, go check their vitals and reflexes.")
-		CinematicStage.DIALOGUE_RESPONSE_3:
-			_start_typing("You got it doctor...")
-		CinematicStage.DIALOGUE_QUESTION:
-			_start_typing("What does it read.")
 		CinematicStage.STAT_SELECTION:
 			_build_stat_selection_ui()
 		CinematicStage.PERK_QUESTION:
