@@ -142,6 +142,10 @@ const LAYERS = {
 @onready var _phase     : Label         = $Root/Right/InfoGrid/PhaseValue
 @onready var _hint      : RichTextLabel = $Root/Right/HintSection/HintValue
 
+# New bottom-right CREDS/PERKS display
+var _creds_value_label: Label = null
+var _perks_value_label: Label = null
+
 # Character Preview UI
 @onready var character_layers = $Root/Right/CharacterPreviewBox/ViewportWrapper/CharacterLayers
 
@@ -200,6 +204,7 @@ func _ready() -> void:
 	_connect_signals()
 	_load_party_csv_cache()
 	_build_tab_buttons()
+	_create_creds_perks_display()
 
 	# Note: PanelBase handles visibility_changed, no need to connect again
 	call_deferred("_first_fill")
@@ -255,6 +260,106 @@ func _build_tab_buttons() -> void:
 	# Connect item clicked signal (single-click support)
 	if not _tab_list.item_clicked.is_connected(_on_tab_item_clicked):
 		_tab_list.item_clicked.connect(_on_tab_item_clicked)
+
+func _create_creds_perks_display() -> void:
+	"""Create the new CREDS/PERKS display in bottom right corner"""
+	# Hide old CREDS and PERKS labels in InfoGrid
+	if _creds:
+		_creds.visible = false
+		var parent = _creds.get_parent()
+		if parent:
+			var money_label = parent.get_node_or_null("MoneyLabel")
+			if money_label:
+				money_label.visible = false
+	if _perk:
+		_perk.visible = false
+		var parent = _perk.get_parent()
+		if parent:
+			var perk_label = parent.get_node_or_null("PerkLabel")
+			if perk_label:
+				perk_label.visible = false
+
+	# Create container for the new display
+	var container := VBoxContainer.new()
+	container.name = "CredsPerksDisplay"
+	container.add_theme_constant_override("separation", 0)
+
+	# Position: 40px from bottom, touching right edge
+	# Using anchor to bottom-right corner
+	container.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	container.position = Vector2(0, -40)  # 40px up from bottom
+	container.grow_horizontal = Control.GROW_DIRECTION_BEGIN  # Grow left
+	container.grow_vertical = Control.GROW_DIRECTION_BEGIN    # Grow up
+
+	# Create CREDS cell
+	var creds_cell := _create_info_cell("CREDS", "0")
+	container.add_child(creds_cell)
+	_creds_value_label = creds_cell.get_meta("value_label")
+
+	# Create PERKS cell
+	var perks_cell := _create_info_cell("PERKS", "0")
+	container.add_child(perks_cell)
+	_perks_value_label = perks_cell.get_meta("value_label")
+
+	# Add to root (not to the Right VBoxContainer, but to the root Control)
+	add_child(container)
+
+func _create_info_cell(label_text: String, initial_value: String) -> PanelContainer:
+	"""Create a single info cell with label and value
+	Returns PanelContainer with 'value_label' meta for updating"""
+	var panel := PanelContainer.new()
+	panel.custom_minimum_size = Vector2(180, 30)  # ~30 chars at 12pt font
+
+	# Create light grey rounded background
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.25, 0.25, 0.25, 1.0)  # Light grey
+	style.corner_radius_top_left = 4
+	style.corner_radius_top_right = 4
+	style.corner_radius_bottom_left = 4
+	style.corner_radius_bottom_right = 4
+	panel.add_theme_stylebox_override("panel", style)
+
+	# Add margin for padding inside cell (10px buffer on each side)
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 10)
+	margin.add_theme_constant_override("margin_top", 6)
+	margin.add_theme_constant_override("margin_right", 10)
+	margin.add_theme_constant_override("margin_bottom", 6)
+	panel.add_child(margin)
+
+	# HBoxContainer to hold label and value
+	var hbox := HBoxContainer.new()
+	hbox.add_theme_constant_override("separation", 4)
+	margin.add_child(hbox)
+
+	# Label - left justified, max 6 characters
+	var label := Label.new()
+	label.text = label_text + ":"
+	label.custom_minimum_size = Vector2(60, 0)  # ~6 chars + colon
+	label.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	label.add_theme_font_size_override("font_size", 12)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	hbox.add_child(label)
+
+	# Spacer to push value to the right
+	var spacer := Control.new()
+	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hbox.add_child(spacer)
+
+	# Value - right justified, max 16 characters
+	var value_label := Label.new()
+	value_label.text = initial_value
+	value_label.custom_minimum_size = Vector2(80, 0)  # ~16 chars max
+	value_label.size_flags_horizontal = Control.SIZE_SHRINK_END
+	value_label.add_theme_font_size_override("font_size", 12)
+	value_label.add_theme_color_override("font_color", Color(0.9, 0.9, 0.9))
+	value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	hbox.add_child(value_label)
+
+	# Store reference to value label for updating
+	panel.set_meta("value_label", value_label)
+
+	return panel
 
 func select_tab(tab_id: String) -> void:
 	"""Programmatically select a tab by tab_id and give it focus"""
@@ -1469,6 +1574,11 @@ func _get_party_snapshot() -> Array:
 # --------------------- Right column summary -------------------
 
 func _update_summary() -> void:
+	# Update new bottom-right display
+	if _creds_value_label: _creds_value_label.text = _read_creds()
+	if _perks_value_label: _perks_value_label.text = _read_perk_points()
+
+	# Keep old labels updated too (they're hidden but may be referenced elsewhere)
 	if _creds: _creds.text = _read_creds()
 	if _perk:  _perk.text  = _read_perk_points()
 
