@@ -1000,7 +1000,7 @@ func _enter_stage(stage: CinematicStage) -> void:
 			_build_name_input_ui()
 		CinematicStage.DIALOGUE_RESPONSE_1:
 			dialogue_label.text = ""
-			_start_typing("They're speaking and it seems their memory is intact!")
+			_start_typing("They're speaking! It seems their memory is intact.")
 		CinematicStage.DIALOGUE_RESPONSE_2:
 			_start_typing("Nurse, go check their vitals and reflexes.")
 		CinematicStage.STAT_SELECTION:
@@ -1614,9 +1614,10 @@ func _activate_focused_button() -> void:
 	print("[Focus Activation] Activating %s" % focused.name)
 
 	if focused is CheckButton:
-		# Toggle the CheckButton
-		focused.button_pressed = !focused.button_pressed
-		focused.toggled.emit(focused.button_pressed)
+		# Toggle the CheckButton - use set_pressed to properly update visual state
+		var new_state = !focused.button_pressed
+		print("[Focus Activation] CheckButton current state: %s, setting to: %s" % [focused.button_pressed, new_state])
+		focused.set_pressed(new_state)
 	elif focused is Button:
 		# Press the button
 		focused.pressed.emit()
@@ -1992,9 +1993,24 @@ func _build_customization_ui() -> void:
 	preview_label.add_theme_font_size_override("font_size", 16)
 	preview_container.add_child(preview_label)
 
-	# Use the existing character_layers (already displays current selection)
-	# Just make them visible in the cinematic layer by showing the preview panel
-	# The preview updates automatically as dropdowns change via existing system
+	# Reparent the existing character_layers to show in the preview
+	if character_layers:
+		var original_parent = character_layers.get_parent()
+		if original_parent:
+			# Store the original parent so we can restore later
+			customization_container.set_meta("original_preview_parent", original_parent)
+			original_parent.remove_child(character_layers)
+
+		# Add to preview with centering
+		var preview_center = CenterContainer.new()
+		preview_center.custom_minimum_size = Vector2(0, 400)
+		preview_container.add_child(preview_center)
+		preview_center.add_child(character_layers)
+
+		# Make sure character is visible and scaled appropriately
+		character_layers.visible = true
+		character_layers.scale = Vector2(2, 2)  # Scale up for better visibility
+		print("[Customization] Character preview reparented and visible")
 
 	# Accept button
 	var accept_btn = Button.new()
@@ -2052,6 +2068,18 @@ func _add_customization_option(parent: VBoxContainer, label_text: String, option
 func _on_customization_accepted() -> void:
 	"""Handle customization acceptance"""
 	# Selections are already synced to original form via _on_cinematic_dropdown_changed
+
+	# Restore character_layers to original parent before destroying container
+	if customization_container and character_layers:
+		var original_parent = customization_container.get_meta("original_preview_parent", null)
+		if original_parent:
+			var current_parent = character_layers.get_parent()
+			if current_parent:
+				current_parent.remove_child(character_layers)
+			# Reset scale
+			character_layers.scale = Vector2(1, 1)
+			original_parent.add_child(character_layers)
+			print("[Customization] Character preview restored to original parent")
 
 	# Fade out and advance
 	var tween = create_tween()
@@ -2133,6 +2161,11 @@ func _on_confirmation_no() -> void:
 
 	# Show the standard form
 	_show_form()
+
+	# Ensure character preview is visible and reset
+	if character_layers:
+		character_layers.visible = true
+		character_layers.scale = Vector2(1, 1)
 
 	# The existing _on_confirm_pressed will handle the final save
 
