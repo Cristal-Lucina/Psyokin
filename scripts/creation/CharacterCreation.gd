@@ -122,6 +122,13 @@ var cinematic_name: String = ""
 var cinematic_surname: String = ""
 var waiting_for_input: bool = false
 
+# Name input state
+var name_input_stage: int = 0  # 0 = selecting first name field, 1 = first name keyboard, 2 = selecting last name field, 3 = last name keyboard
+var keyboard_container: Control = null
+var current_name_text: String = ""
+var first_name_label: Label = null
+var last_name_label: Label = null
+
 # Blinking up arrow
 var arrow_label: Label = null
 var cursor_blink_timer: float = 0.0
@@ -687,44 +694,19 @@ func _setup_cinematic() -> void:
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	cinematic_layer.add_child(bg)
 
-	# Create chat bubble panel container
-	var bubble_container = VBoxContainer.new()
-	bubble_container.set_anchors_preset(Control.PRESET_CENTER)
-	bubble_container.anchor_left = 0.5
-	bubble_container.anchor_top = 0.5
-	bubble_container.anchor_right = 0.5
-	bubble_container.anchor_bottom = 0.5
-	bubble_container.offset_left = -400  # 800px wide bubble
-	bubble_container.offset_right = 400
-	bubble_container.offset_top = -100   # Center vertically
-	bubble_container.offset_bottom = 100
-	bubble_container.add_theme_constant_override("separation", 10)  # Space between dialogue and arrow
-	cinematic_layer.add_child(bubble_container)
-
-	# Create chat bubble panel
-	var chat_bubble = PanelContainer.new()
-	var bubble_style = StyleBoxFlat.new()
-	bubble_style.bg_color = Color(0.15, 0.15, 0.15, 0.95)  # Dark gray with slight transparency
-	bubble_style.border_color = Color(1.0, 0.7, 0.75, 1.0)  # Pink border
-	bubble_style.border_width_left = 3
-	bubble_style.border_width_right = 3
-	bubble_style.border_width_top = 3
-	bubble_style.border_width_bottom = 3
-	bubble_style.corner_radius_top_left = 15
-	bubble_style.corner_radius_top_right = 15
-	bubble_style.corner_radius_bottom_left = 15
-	bubble_style.corner_radius_bottom_right = 15
-	chat_bubble.add_theme_stylebox_override("panel", bubble_style)
-	chat_bubble.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	bubble_container.add_child(chat_bubble)
-
-	# Create margin container inside bubble for padding
-	var margin = MarginContainer.new()
-	margin.add_theme_constant_override("margin_left", 30)
-	margin.add_theme_constant_override("margin_right", 30)
-	margin.add_theme_constant_override("margin_top", 20)
-	margin.add_theme_constant_override("margin_bottom", 20)
-	chat_bubble.add_child(margin)
+	# Create container for dialogue and arrow
+	var dialogue_container = VBoxContainer.new()
+	dialogue_container.set_anchors_preset(Control.PRESET_CENTER)
+	dialogue_container.anchor_left = 0.5
+	dialogue_container.anchor_top = 0.5
+	dialogue_container.anchor_right = 0.5
+	dialogue_container.anchor_bottom = 0.5
+	dialogue_container.offset_left = -400
+	dialogue_container.offset_right = 400
+	dialogue_container.offset_top = -50
+	dialogue_container.offset_bottom = 50
+	dialogue_container.add_theme_constant_override("separation", 10)
+	cinematic_layer.add_child(dialogue_container)
 
 	# Create dialogue label (for typing text)
 	dialogue_label = Label.new()
@@ -734,16 +716,16 @@ func _setup_cinematic() -> void:
 	dialogue_label.add_theme_font_size_override("font_size", 18)
 	dialogue_label.add_theme_color_override("font_color", Color.WHITE)
 	dialogue_label.text = ""
-	margin.add_child(dialogue_label)
+	dialogue_container.add_child(dialogue_label)
 
-	# Create up arrow label (below the bubble)
+	# Create up arrow label (below the dialogue)
 	arrow_label = Label.new()
 	arrow_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	arrow_label.add_theme_font_size_override("font_size", 24)
-	arrow_label.add_theme_color_override("font_color", Color(1.0, 0.7, 0.75, 1.0))  # Pink to match border
+	arrow_label.add_theme_color_override("font_color", Color(1.0, 0.7, 0.75, 1.0))
 	arrow_label.text = "↑"
 	arrow_label.visible = false
-	bubble_container.add_child(arrow_label)
+	dialogue_container.add_child(arrow_label)
 
 	# Create continue prompt
 	continue_prompt = Label.new()
@@ -874,8 +856,30 @@ func _process_cursor_blink(delta: float) -> void:
 			arrow_label.visible = cursor_visible
 
 func _unhandled_input(event: InputEvent) -> void:
-	"""Handle input for advancing dialogue"""
-	if not cinematic_active or not waiting_for_input:
+	"""Handle input for advancing dialogue and name input"""
+	if not cinematic_active:
+		return
+
+	# Handle name input stage separately
+	if current_stage == CinematicStage.NAME_INPUT and (name_input_stage == 0 or name_input_stage == 2):
+		# We're on field selection, waiting for accept
+		var should_accept = false
+
+		if event.is_action_pressed("ui_accept"):
+			should_accept = true
+		elif event is InputEventKey and event.pressed and not event.echo:
+			if event.keycode == KEY_ENTER or event.keycode == KEY_SPACE:
+				should_accept = true
+		elif event is InputEventJoypadButton and event.pressed:
+			should_accept = true
+
+		if should_accept:
+			get_viewport().set_input_as_handled()
+			_handle_name_input_accept()
+		return
+
+	# Handle dialogue stages
+	if not waiting_for_input:
 		return
 
 	# Check for accept input (ui_accept, Enter, Space, or directional buttons)
@@ -980,10 +984,15 @@ func _complete_cinematic() -> void:
 
 # ── Name Input UI ────────────────────────────────────────────────────────────
 func _build_name_input_ui() -> void:
-	"""Build the name input UI"""
+	"""Build the name input UI with field selection"""
 	# Hide dialogue label
 	if dialogue_label:
 		dialogue_label.visible = false
+
+	# Reset name input state
+	name_input_stage = 0
+	cinematic_name = ""
+	cinematic_surname = ""
 
 	# Create name input container
 	name_input_container = VBoxContainer.new()
@@ -997,95 +1006,267 @@ func _build_name_input_ui() -> void:
 	name_input_container.add_theme_constant_override("separation", 20)
 	cinematic_layer.add_child(name_input_container)
 
-	# First name
-	var first_label = Label.new()
-	first_label.text = "First Name:"
-	first_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	first_label.add_theme_font_size_override("font_size", 14)
-	name_input_container.add_child(first_label)
+	# First name display (panel with label)
+	var first_title = Label.new()
+	first_title.text = "First Name:"
+	first_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	first_title.add_theme_font_size_override("font_size", 14)
+	first_title.add_theme_color_override("font_color", Color.WHITE)
+	name_input_container.add_child(first_title)
 
-	var first_input = LineEdit.new()
-	first_input.max_length = 8
-	first_input.placeholder_text = "Enter first name"
-	first_input.alignment = HORIZONTAL_ALIGNMENT_CENTER
-	first_input.custom_minimum_size = Vector2(300, 40)
-	first_input.add_theme_font_size_override("font_size", 16)
-	first_input.name = "FirstNameInput"
-	name_input_container.add_child(first_input)
+	var first_panel = PanelContainer.new()
+	first_panel.custom_minimum_size = Vector2(300, 50)
+	first_panel.name = "FirstNamePanel"
+	var first_style = StyleBoxFlat.new()
+	first_style.bg_color = Color(0.2, 0.2, 0.2, 1.0)
+	first_style.border_color = Color(1.0, 0.7, 0.75, 1.0)  # Pink - selected
+	first_style.border_width_left = 3
+	first_style.border_width_right = 3
+	first_style.border_width_top = 3
+	first_style.border_width_bottom = 3
+	first_style.corner_radius_top_left = 8
+	first_style.corner_radius_top_right = 8
+	first_style.corner_radius_bottom_left = 8
+	first_style.corner_radius_bottom_right = 8
+	first_panel.add_theme_stylebox_override("panel", first_style)
+	name_input_container.add_child(first_panel)
 
-	# Last name
-	var last_label = Label.new()
-	last_label.text = "Last Name:"
-	last_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	last_label.add_theme_font_size_override("font_size", 14)
-	name_input_container.add_child(last_label)
+	first_name_label = Label.new()
+	first_name_label.text = "___"
+	first_name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	first_name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	first_name_label.add_theme_font_size_override("font_size", 18)
+	first_name_label.add_theme_color_override("font_color", Color.WHITE)
+	first_panel.add_child(first_name_label)
 
-	var last_input = LineEdit.new()
-	last_input.max_length = 8
-	last_input.placeholder_text = "Enter last name"
-	last_input.alignment = HORIZONTAL_ALIGNMENT_CENTER
-	last_input.custom_minimum_size = Vector2(300, 40)
-	last_input.add_theme_font_size_override("font_size", 16)
-	last_input.name = "LastNameInput"
-	name_input_container.add_child(last_input)
+	# Last name display (panel with label)
+	var last_title = Label.new()
+	last_title.text = "Last Name:"
+	last_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	last_title.add_theme_font_size_override("font_size", 14)
+	last_title.add_theme_color_override("font_color", Color.WHITE)
+	name_input_container.add_child(last_title)
 
-	# Accept button
-	var accept_btn = Button.new()
-	accept_btn.text = "Accept"
-	accept_btn.custom_minimum_size = Vector2(200, 50)
-	accept_btn.add_theme_font_size_override("font_size", 16)
-	accept_btn.pressed.connect(_on_name_accepted)
-	var btn_container = CenterContainer.new()
-	btn_container.add_child(accept_btn)
-	name_input_container.add_child(btn_container)
+	var last_panel = PanelContainer.new()
+	last_panel.custom_minimum_size = Vector2(300, 50)
+	last_panel.name = "LastNamePanel"
+	var last_style = StyleBoxFlat.new()
+	last_style.bg_color = Color(0.2, 0.2, 0.2, 1.0)
+	last_style.border_color = Color(0.5, 0.5, 0.5, 1.0)  # Gray - not selected
+	last_style.border_width_left = 2
+	last_style.border_width_right = 2
+	last_style.border_width_top = 2
+	last_style.border_width_bottom = 2
+	last_style.corner_radius_top_left = 8
+	last_style.corner_radius_top_right = 8
+	last_style.corner_radius_bottom_left = 8
+	last_style.corner_radius_bottom_right = 8
+	last_panel.add_theme_stylebox_override("panel", last_style)
+	name_input_container.add_child(last_panel)
 
-	# Connect text changed to validate letters only
-	first_input.text_changed.connect(_validate_name_input.bind(first_input))
-	last_input.text_changed.connect(_validate_name_input.bind(last_input))
+	last_name_label = Label.new()
+	last_name_label.text = "___"
+	last_name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	last_name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	last_name_label.add_theme_font_size_override("font_size", 18)
+	last_name_label.add_theme_color_override("font_color", Color.WHITE)
+	last_panel.add_child(last_name_label)
+
+	# Instruction label
+	var instruction = Label.new()
+	instruction.text = "Press Accept to enter name"
+	instruction.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	instruction.add_theme_font_size_override("font_size", 12)
+	instruction.add_theme_color_override("font_color", Color(0.8, 0.8, 0.8, 1.0))
+	instruction.name = "InstructionLabel"
+	name_input_container.add_child(instruction)
 
 	# Fade in the container
 	name_input_container.modulate = Color(1, 1, 1, 0)
 	var tween = create_tween()
 	tween.tween_property(name_input_container, "modulate", Color(1, 1, 1, 1), 0.5)
 
-func _validate_name_input(new_text: String, line_edit: LineEdit) -> void:
-	"""Validate that input contains only letters"""
-	var regex = RegEx.new()
-	regex.compile("[^a-zA-Z]")
-	var cleaned = regex.sub(new_text, "", true)
-	if cleaned != new_text:
-		line_edit.text = cleaned
-		line_edit.caret_column = cleaned.length()
+func _handle_name_input_accept() -> void:
+	"""Handle accept button on name input field selection"""
+	match name_input_stage:
+		0:  # First name field selected - show keyboard
+			current_name_text = cinematic_name  # Start with existing text (or empty)
+			_show_keyboard()
+			name_input_stage = 1
+		2:  # Last name field selected - show keyboard
+			current_name_text = cinematic_surname  # Start with existing text (or empty)
+			_show_keyboard()
+			name_input_stage = 3
 
-func _on_name_accepted() -> void:
-	"""Handle name input acceptance"""
-	if name_input_container:
-		var first_input = name_input_container.get_node_or_null("FirstNameInput")
-		var last_input = name_input_container.get_node_or_null("LastNameInput")
+func _show_keyboard() -> void:
+	"""Show the on-screen keyboard"""
+	# Hide instruction
+	var instruction = name_input_container.get_node_or_null("InstructionLabel")
+	if instruction:
+		instruction.visible = false
 
-		if first_input and last_input:
-			cinematic_name = first_input.text.strip_edges()
-			cinematic_surname = last_input.text.strip_edges()
+	# Create keyboard container
+	keyboard_container = VBoxContainer.new()
+	keyboard_container.name = "KeyboardContainer"
+	keyboard_container.add_theme_constant_override("separation", 10)
+	name_input_container.add_child(keyboard_container)
 
-			if cinematic_name.is_empty() or cinematic_surname.is_empty():
-				OS.alert("Please enter both first and last name.", "Name Required")
-				return
+	# Current text display
+	var current_text_label = Label.new()
+	current_text_label.name = "CurrentTextLabel"
+	current_text_label.text = current_name_text if current_name_text else "___"
+	current_text_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	current_text_label.add_theme_font_size_override("font_size", 20)
+	current_text_label.add_theme_color_override("font_color", Color(1.0, 0.7, 0.75, 1.0))
+	keyboard_container.add_child(current_text_label)
 
-			# Store in the existing form fields too
-			if _name_in:
-				_name_in.text = cinematic_name
-			if _surname_in:
-				_surname_in.text = cinematic_surname
+	# Letter buttons (A-Z)
+	var letter_grid = GridContainer.new()
+	letter_grid.columns = 7
+	letter_grid.add_theme_constant_override("h_separation", 5)
+	letter_grid.add_theme_constant_override("v_separation", 5)
+	keyboard_container.add_child(letter_grid)
 
-			# Fade out and advance
-			var tween = create_tween()
-			tween.tween_property(name_input_container, "modulate", Color(1, 1, 1, 0), 0.5)
-			tween.tween_callback(func():
-				name_input_container.queue_free()
-				name_input_container = null
-				dialogue_label.visible = true
-				_advance_stage()
-			)
+	var letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	for i in range(letters.length()):
+		var letter = letters[i]
+		var btn = Button.new()
+		btn.text = letter
+		btn.custom_minimum_size = Vector2(40, 40)
+		btn.add_theme_font_size_override("font_size", 14)
+		btn.pressed.connect(_on_keyboard_letter_pressed.bind(letter))
+		letter_grid.add_child(btn)
+
+	# Bottom row with Backspace and Accept
+	var bottom_row = HBoxContainer.new()
+	bottom_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	bottom_row.add_theme_constant_override("separation", 20)
+	keyboard_container.add_child(bottom_row)
+
+	var backspace_btn = Button.new()
+	backspace_btn.text = "⌫ Backspace"
+	backspace_btn.custom_minimum_size = Vector2(150, 50)
+	backspace_btn.add_theme_font_size_override("font_size", 14)
+	backspace_btn.pressed.connect(_on_keyboard_backspace_pressed)
+	bottom_row.add_child(backspace_btn)
+
+	var accept_btn = Button.new()
+	accept_btn.text = "✓ Accept"
+	accept_btn.custom_minimum_size = Vector2(150, 50)
+	accept_btn.add_theme_font_size_override("font_size", 14)
+	accept_btn.pressed.connect(_on_keyboard_accept_pressed)
+	bottom_row.add_child(accept_btn)
+
+func _on_keyboard_letter_pressed(letter: String) -> void:
+	"""Handle letter button press on keyboard"""
+	if current_name_text.length() < 8:  # Max 8 characters
+		current_name_text += letter
+		_update_keyboard_display()
+
+func _on_keyboard_backspace_pressed() -> void:
+	"""Handle backspace on keyboard"""
+	if current_name_text.length() > 0:
+		current_name_text = current_name_text.substr(0, current_name_text.length() - 1)
+		_update_keyboard_display()
+
+func _update_keyboard_display() -> void:
+	"""Update the keyboard's current text display"""
+	if keyboard_container:
+		var text_label = keyboard_container.get_node_or_null("CurrentTextLabel")
+		if text_label:
+			text_label.text = current_name_text if current_name_text else "___"
+
+func _on_keyboard_accept_pressed() -> void:
+	"""Handle accept button on keyboard"""
+	if current_name_text.is_empty():
+		return  # Don't accept empty names
+
+	# Hide keyboard
+	if keyboard_container:
+		keyboard_container.queue_free()
+		keyboard_container = null
+
+	# Store the name in the appropriate field
+	match name_input_stage:
+		1:  # Was entering first name
+			cinematic_name = current_name_text
+			if first_name_label:
+				first_name_label.text = cinematic_name
+			# Move to last name field
+			_update_name_field_selection(false)  # Deselect first
+			_update_name_field_selection(true)   # Select last
+			name_input_stage = 2
+			# Show instruction again
+			var instruction = name_input_container.get_node_or_null("InstructionLabel")
+			if instruction:
+				instruction.visible = true
+				instruction.text = "Press Accept to enter last name"
+		3:  # Was entering last name
+			cinematic_surname = current_name_text
+			if last_name_label:
+				last_name_label.text = cinematic_surname
+			# Finalize names and advance
+			_finalize_names()
+
+func _update_name_field_selection(is_last_name: bool) -> void:
+	"""Update the visual selection of name fields"""
+	if not name_input_container:
+		return
+
+	var first_panel = name_input_container.get_node_or_null("FirstNamePanel")
+	var last_panel = name_input_container.get_node_or_null("LastNamePanel")
+
+	if first_panel and last_panel:
+		# Create pink style for selected
+		var selected_style = StyleBoxFlat.new()
+		selected_style.bg_color = Color(0.2, 0.2, 0.2, 1.0)
+		selected_style.border_color = Color(1.0, 0.7, 0.75, 1.0)
+		selected_style.border_width_left = 3
+		selected_style.border_width_right = 3
+		selected_style.border_width_top = 3
+		selected_style.border_width_bottom = 3
+		selected_style.corner_radius_top_left = 8
+		selected_style.corner_radius_top_right = 8
+		selected_style.corner_radius_bottom_left = 8
+		selected_style.corner_radius_bottom_right = 8
+
+		# Create gray style for unselected
+		var unselected_style = StyleBoxFlat.new()
+		unselected_style.bg_color = Color(0.2, 0.2, 0.2, 1.0)
+		unselected_style.border_color = Color(0.5, 0.5, 0.5, 1.0)
+		unselected_style.border_width_left = 2
+		unselected_style.border_width_right = 2
+		unselected_style.border_width_top = 2
+		unselected_style.border_width_bottom = 2
+		unselected_style.corner_radius_top_left = 8
+		unselected_style.corner_radius_top_right = 8
+		unselected_style.corner_radius_bottom_left = 8
+		unselected_style.corner_radius_bottom_right = 8
+
+		if is_last_name:
+			first_panel.add_theme_stylebox_override("panel", unselected_style)
+			last_panel.add_theme_stylebox_override("panel", selected_style)
+		else:
+			first_panel.add_theme_stylebox_override("panel", selected_style)
+			last_panel.add_theme_stylebox_override("panel", unselected_style)
+
+func _finalize_names() -> void:
+	"""Finalize name input and advance to next stage"""
+	# Store in the existing form fields too
+	if _name_in:
+		_name_in.text = cinematic_name
+	if _surname_in:
+		_surname_in.text = cinematic_surname
+
+	# Fade out and advance
+	var tween = create_tween()
+	tween.tween_property(name_input_container, "modulate", Color(1, 1, 1, 0), 0.5)
+	tween.tween_callback(func():
+		name_input_container.queue_free()
+		name_input_container = null
+		dialogue_label.visible = true
+		_advance_stage()
+	)
 
 # ── Stat Selection UI ────────────────────────────────────────────────────────
 func _build_stat_selection_ui() -> void:
