@@ -134,18 +134,12 @@ func _on_continue_pressed() -> void:
 				ok = true
 
 		if ok:
-			# Change scene first, then fade out loading screen
-			get_tree().change_scene_to_file(MAIN_SCENE)
-			await get_tree().process_frame  # Wait for scene to be ready
-
-			# Ensure new scene starts invisible so loading screen can fade it in
-			if get_tree().current_scene:
-				get_tree().current_scene.modulate = Color(1, 1, 1, 0)
-
-			# Fade out loading screen (will fade in the new scene)
+			# Schedule loading screen fade-out to happen after scene change
 			if loading:
-				await loading.fade_out()
-				loading.queue_free()
+				loading.call_deferred("_fade_out_and_cleanup")
+
+			# Change scene (this will free the Title scene, so no code after this runs)
+			get_tree().change_scene_to_file(MAIN_SCENE)
 			return
 
 		# Failed - restore title screen visibility and clean up loading screen

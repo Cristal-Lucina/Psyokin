@@ -167,3 +167,17 @@ func set_text(text: String) -> void:
 	"""Update the loading text"""
 	if _label:
 		_label.text = text
+
+func _fade_out_and_cleanup() -> void:
+	"""Deferred helper to fade out after scene change and set up new scene"""
+	# Wait for new scene to be fully loaded
+	await get_tree().process_frame
+	await get_tree().process_frame  # Extra frame for safety
+
+	# Ensure new scene starts invisible so we can fade it in
+	if get_tree().current_scene:
+		get_tree().current_scene.modulate = Color(1, 1, 1, 0)
+
+	# Fade out loading screen (will fade in the new scene)
+	await fade_out()
+	queue_free()

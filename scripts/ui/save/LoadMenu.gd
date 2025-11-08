@@ -227,22 +227,15 @@ func _on_load_pressed(slot: int) -> void:
 			if sig != null and sig.has_method("apply_save_blob"):
 				sig.call("apply_save_blob", (sb_v as Dictionary))
 
-	# Change scene first, then fade out loading screen
+	# Schedule loading screen fade-out to happen after scene change
+	if loading:
+		loading.call_deferred("_fade_out_and_cleanup")
+
+	# Change scene (this will free the LoadMenu, so no code after this runs)
 	if has_node("/root/aSceneRouter"):
 		aSceneRouter.goto_main()
 	elif ResourceLoader.exists(MAIN_SCENE):
 		get_tree().change_scene_to_file(MAIN_SCENE)
-
-	await get_tree().process_frame  # Wait for scene to be ready
-
-	# Ensure new scene starts invisible so loading screen can fade it in
-	if get_tree().current_scene:
-		get_tree().current_scene.modulate = Color(1, 1, 1, 0)
-
-	# Fade out loading screen (will fade in the new scene)
-	if loading:
-		await loading.fade_out()
-		loading.queue_free()
 
 	queue_free()
 
