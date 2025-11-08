@@ -896,28 +896,6 @@ func _input(event: InputEvent) -> void:
 			return
 		return
 
-	# Handle stat selection - need to capture input before ControllerManager
-	if current_stage == CinematicStage.STAT_SELECTION:
-		# Let Godot's focus system handle navigation, but mark input as handled
-		# so ControllerManager doesn't consume it
-		if event.is_action_pressed("ui_up") or event.is_action_pressed("ui_down"):
-			get_viewport().set_input_as_handled()
-			# Don't return - let Godot's focus system handle it
-		elif event.is_action_pressed("ui_accept") or (event is InputEventJoypadButton and event.pressed):
-			get_viewport().set_input_as_handled()
-			# Don't return - let the focused button handle the toggle
-
-	# Handle perk selection - need to capture input before ControllerManager
-	if current_stage == CinematicStage.PERK_SELECTION:
-		# Let Godot's focus system handle navigation, but mark input as handled
-		# so ControllerManager doesn't consume it
-		if event.is_action_pressed("ui_up") or event.is_action_pressed("ui_down"):
-			get_viewport().set_input_as_handled()
-			# Don't return - let Godot's focus system handle it
-		elif event.is_action_pressed("ui_accept") or (event is InputEventJoypadButton and event.pressed):
-			get_viewport().set_input_as_handled()
-			# Don't return - let the focused button handle the toggle
-
 	# Handle name input stage separately
 	if current_stage == CinematicStage.NAME_INPUT and (name_input_stage == 0 or name_input_stage == 2):
 		# We're on field selection, waiting for accept
@@ -1464,6 +1442,7 @@ func _build_stat_selection_ui() -> void:
 	stat_selection_container.offset_top = -300
 	stat_selection_container.offset_bottom = 300
 	stat_selection_container.add_theme_constant_override("separation", 10)
+	stat_selection_container.mouse_filter = Control.MOUSE_FILTER_IGNORE  # Let input pass to children
 	cinematic_layer.add_child(stat_selection_container)
 
 	# Title
@@ -1533,13 +1512,20 @@ func _build_stat_selection_ui() -> void:
 		# First stat gets initial focus
 		stat_panels[0].grab_focus()
 
-	# Fade in
+	# Fade in and then set focus
 	stat_selection_container.modulate = Color(1, 1, 1, 0)
 	var tween = create_tween()
 	tween.tween_property(stat_selection_container, "modulate", Color(1, 1, 1, 1), 0.5)
+	tween.tween_callback(func():
+		# Ensure first button has focus after fade in
+		if stat_panels.size() > 0:
+			print("[Stat Selection] Setting focus to first button after fade")
+			stat_panels[0].grab_focus()
+	)
 
 func _on_stat_button_toggled(button_pressed: bool, index: int) -> void:
 	"""Handle stat button toggle"""
+	print("[Stat Selection] Button ", index, " toggled: ", button_pressed)
 	var selected_count = stat_selected.count(true)
 
 	if button_pressed:
@@ -1629,6 +1615,7 @@ func _build_perk_selection_ui() -> void:
 	perk_selection_container.offset_top = -300
 	perk_selection_container.offset_bottom = 300
 	perk_selection_container.add_theme_constant_override("separation", 10)
+	perk_selection_container.mouse_filter = Control.MOUSE_FILTER_IGNORE  # Let input pass to children
 	cinematic_layer.add_child(perk_selection_container)
 
 	# Title
@@ -1713,10 +1700,17 @@ func _build_perk_selection_ui() -> void:
 		# First perk gets initial focus
 		perk_buttons[0].grab_focus()
 
-	# Fade in
+	# Fade in and then set focus
 	perk_selection_container.modulate = Color(1, 1, 1, 0)
 	var tween = create_tween()
 	tween.tween_property(perk_selection_container, "modulate", Color(1, 1, 1, 1), 0.5)
+	tween.tween_callback(func():
+		# Ensure first button has focus after fade in
+		var perk_buttons = perk_selection_container.get_meta("perk_buttons", [])
+		if perk_buttons.size() > 0:
+			print("[Perk Selection] Setting focus to first perk button after fade")
+			perk_buttons[0].grab_focus()
+	)
 
 func _on_perk_button_toggled(button_pressed: bool, toggled_button: CheckButton) -> void:
 	"""Handle perk button toggle - only allow one selection (radio button behavior)"""
