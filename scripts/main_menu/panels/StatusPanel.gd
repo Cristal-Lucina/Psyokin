@@ -284,10 +284,10 @@ func _create_creds_perks_display() -> void:
 	container.name = "CredsPerksDisplay"
 	container.add_theme_constant_override("separation", 5)  # 5px gap between cells
 
-	# Position: 40px from bottom, touching right edge
+	# Position: 40px from bottom, 10px from right edge
 	# Using anchor to bottom-right corner
 	container.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
-	container.position = Vector2(0, -40)  # 40px up from bottom
+	container.position = Vector2(-10, -40)  # 10px from right, 40px up from bottom
 	container.grow_horizontal = Control.GROW_DIRECTION_BEGIN  # Grow left
 	container.grow_vertical = Control.GROW_DIRECTION_BEGIN    # Grow up
 
