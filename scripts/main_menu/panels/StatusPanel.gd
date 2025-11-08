@@ -99,16 +99,16 @@ const ALT_MES_PATHS := [
 
 # Tab button definitions
 const TAB_DEFS: Dictionary = {
-	"stats":   {"title": "Stats"},
-	"perks":   {"title": "Perks"},
-	"items":   {"title": "Items"},
-	"loadout": {"title": "Loadout"},
-	"bonds":   {"title": "Bonds"},
-	"outreach":{"title": "Outreach"},
-	"dorms":   {"title": "Dorms"},
-	"calendar":{"title": "Calendar"},
-	"index":   {"title": "Index"},
-	"system":  {"title": "System"},
+	"stats":   {"title": "STATS"},
+	"perks":   {"title": "PERKS"},
+	"items":   {"title": "ITEMS"},
+	"loadout": {"title": "LOADOUT"},
+	"bonds":   {"title": "BONDS"},
+	"outreach":{"title": "OUTREACH"},
+	"dorms":   {"title": "DORMS"},
+	"calendar":{"title": "CALENDAR"},
+	"index":   {"title": "INDEX"},
+	"system":  {"title": "SYSTEM"},
 }
 
 const TAB_ORDER: PackedStringArray = [
@@ -141,6 +141,13 @@ const LAYERS = {
 @onready var _date      : Label         = $Root/Right/InfoGrid/DateValue
 @onready var _phase     : Label         = $Root/Right/InfoGrid/PhaseValue
 @onready var _hint      : RichTextLabel = $Root/Right/HintSection/HintValue
+
+# New bottom-right CREDS/PERKS display
+var _creds_value_label: Label = null
+var _perks_value_label: Label = null
+
+# New top-right NEXT MISSION display
+var _mission_value_label: Label = null
 
 # Character Preview UI
 @onready var character_layers = $Root/Right/CharacterPreviewBox/ViewportWrapper/CharacterLayers
@@ -200,6 +207,9 @@ func _ready() -> void:
 	_connect_signals()
 	_load_party_csv_cache()
 	_build_tab_buttons()
+	_create_creds_perks_display()
+	_create_next_mission_display()
+	_hide_old_ui_elements()
 
 	# Note: PanelBase handles visibility_changed, no need to connect again
 	call_deferred("_first_fill")
@@ -255,6 +265,201 @@ func _build_tab_buttons() -> void:
 	# Connect item clicked signal (single-click support)
 	if not _tab_list.item_clicked.is_connected(_on_tab_item_clicked):
 		_tab_list.item_clicked.connect(_on_tab_item_clicked)
+
+func _create_creds_perks_display() -> void:
+	"""Create the new CREDS/PERKS display in bottom right corner"""
+	# Hide old CREDS and PERKS labels in InfoGrid
+	if _creds:
+		_creds.visible = false
+		var parent = _creds.get_parent()
+		if parent:
+			var money_label = parent.get_node_or_null("MoneyLabel")
+			if money_label:
+				money_label.visible = false
+	if _perk:
+		_perk.visible = false
+		var parent = _perk.get_parent()
+		if parent:
+			var perk_label = parent.get_node_or_null("PerkLabel")
+			if perk_label:
+				perk_label.visible = false
+
+	# Create container for the new display
+	var container := VBoxContainer.new()
+	container.name = "CredsPerksDisplay"
+	container.add_theme_constant_override("separation", 5)  # 5px gap between cells
+
+	# Position: 40px from bottom, 10px from right edge
+	# Using anchor to bottom-right corner
+	container.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	container.position = Vector2(-10, -40)  # 10px from right, 40px up from bottom
+	container.grow_horizontal = Control.GROW_DIRECTION_BEGIN  # Grow left
+	container.grow_vertical = Control.GROW_DIRECTION_BEGIN    # Grow up
+
+	# Create CREDS cell
+	var creds_cell := _create_info_cell("CREDS", "0")
+	container.add_child(creds_cell)
+	_creds_value_label = creds_cell.get_meta("value_label")
+
+	# Create PERKS cell
+	var perks_cell := _create_info_cell("PERKS", "0")
+	container.add_child(perks_cell)
+	_perks_value_label = perks_cell.get_meta("value_label")
+
+	# Add to root (not to the Right VBoxContainer, but to the root Control)
+	add_child(container)
+
+func _create_next_mission_display() -> void:
+	"""Create the NEXT MISSION display at top right corner"""
+	# Create container for the display
+	var container := VBoxContainer.new()
+	container.name = "NextMissionDisplay"
+	container.add_theme_constant_override("separation", 4)
+
+	# Position: 20px from top, 10px from right edge
+	# Using anchor to top-right corner
+	container.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	container.position = Vector2(-10, 20)  # 10px from right, 20px from top
+	container.grow_horizontal = Control.GROW_DIRECTION_BEGIN  # Grow left
+	container.grow_vertical = Control.GROW_DIRECTION_END      # Grow down
+
+	# Create "NEXT MISSION" label
+	var title_label := Label.new()
+	title_label.text = "NEXT MISSION"
+	title_label.add_theme_font_size_override("font_size", 30)
+	title_label.add_theme_color_override("font_color", Color(0.9, 0.9, 0.9))
+	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	container.add_child(title_label)
+
+	# Create grey box with white border for mission description
+	var mission_box := PanelContainer.new()
+	mission_box.custom_minimum_size = Vector2(300, 72)
+
+	# Create grey background with white border
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.3, 0.3, 0.3, 1.0)  # Grey background
+	style.border_width_left = 2
+	style.border_width_right = 2
+	style.border_width_top = 2
+	style.border_width_bottom = 2
+	style.border_color = Color(1.0, 1.0, 1.0, 1.0)  # White border
+	style.corner_radius_top_left = 4
+	style.corner_radius_top_right = 4
+	style.corner_radius_bottom_left = 4
+	style.corner_radius_bottom_right = 4
+	mission_box.add_theme_stylebox_override("panel", style)
+
+	# Add margin for padding inside box
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 8)
+	margin.add_theme_constant_override("margin_top", 6)
+	margin.add_theme_constant_override("margin_right", 8)
+	margin.add_theme_constant_override("margin_bottom", 6)
+	mission_box.add_child(margin)
+
+	# Create label for mission text
+	_mission_value_label = Label.new()
+	_mission_value_label.text = "TBD"
+	_mission_value_label.add_theme_font_size_override("font_size", 14)
+	_mission_value_label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0))
+	_mission_value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	_mission_value_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	margin.add_child(_mission_value_label)
+
+	container.add_child(mission_box)
+
+	# Add to root
+	add_child(container)
+
+func _hide_old_ui_elements() -> void:
+	"""Hide the old player info panel, character preview, dates, morality, etc."""
+	# Hide the entire Right VBoxContainer
+	var right_panel = get_node_or_null("Root/Right")
+	if right_panel:
+		right_panel.visible = false
+
+	# Add 150px right padding to the Left panel by wrapping it in a MarginContainer
+	var left_panel = get_node_or_null("Root/Left")
+	if left_panel and left_panel is VBoxContainer:
+		# Create MarginContainer wrapper
+		var margin_wrapper := MarginContainer.new()
+		margin_wrapper.name = "LeftMarginWrapper"
+		margin_wrapper.add_theme_constant_override("margin_right", 300)
+		margin_wrapper.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		margin_wrapper.size_flags_vertical = Control.SIZE_EXPAND_FILL
+
+		# Get parent and insert wrapper
+		var parent = left_panel.get_parent()
+		if parent:
+			var index = left_panel.get_index()
+			parent.remove_child(left_panel)
+			parent.add_child(margin_wrapper)
+			parent.move_child(margin_wrapper, index)
+			margin_wrapper.add_child(left_panel)
+
+func _create_info_cell(label_text: String, initial_value: String) -> PanelContainer:
+	"""Create a single info cell with label and value
+	Returns PanelContainer with 'value_label' meta for updating"""
+	var panel := PanelContainer.new()
+	panel.custom_minimum_size = Vector2(180, 35)  # Increased height for larger font
+
+	# Create pale white rounded background
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.95, 0.95, 0.95, 1.0)  # Pale white
+	style.corner_radius_top_left = 4
+	style.corner_radius_top_right = 4
+	style.corner_radius_bottom_left = 4
+	style.corner_radius_bottom_right = 4
+	panel.add_theme_stylebox_override("panel", style)
+
+	# Add margin for padding inside cell (10px buffer on each side)
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 10)
+	margin.add_theme_constant_override("margin_top", 6)
+	margin.add_theme_constant_override("margin_right", 10)
+	margin.add_theme_constant_override("margin_bottom", 6)
+	panel.add_child(margin)
+
+	# HBoxContainer to hold label and value
+	var hbox := HBoxContainer.new()
+	hbox.add_theme_constant_override("separation", 4)
+	margin.add_child(hbox)
+
+	# Label - left justified, max 6 characters, bold dark grey
+	var label := Label.new()
+	label.text = label_text + ":"
+	label.custom_minimum_size = Vector2(60, 0)  # ~6 chars + colon
+	label.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	label.add_theme_font_size_override("font_size", 16)  # Increased from 12 to 16
+	label.add_theme_color_override("font_color", Color(0.2, 0.2, 0.2))  # Dark grey
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	# Make extra bold with outline effect
+	label.add_theme_constant_override("outline_size", 1)
+	label.add_theme_color_override("font_outline_color", Color(0.2, 0.2, 0.2))
+	hbox.add_child(label)
+
+	# Spacer to push value to the right
+	var spacer := Control.new()
+	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hbox.add_child(spacer)
+
+	# Value - right justified, max 16 characters, bold dark grey
+	var value_label := Label.new()
+	value_label.text = initial_value
+	value_label.custom_minimum_size = Vector2(80, 0)  # ~16 chars max
+	value_label.size_flags_horizontal = Control.SIZE_SHRINK_END
+	value_label.add_theme_font_size_override("font_size", 16)  # Increased from 12 to 16
+	value_label.add_theme_color_override("font_color", Color(0.2, 0.2, 0.2))  # Dark grey
+	value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	# Make extra bold with outline effect
+	value_label.add_theme_constant_override("outline_size", 1)
+	value_label.add_theme_color_override("font_outline_color", Color(0.2, 0.2, 0.2))
+	hbox.add_child(value_label)
+
+	# Store reference to value label for updating
+	panel.set_meta("value_label", value_label)
+
+	return panel
 
 func select_tab(tab_id: String) -> void:
 	"""Programmatically select a tab by tab_id and give it focus"""
@@ -410,10 +615,14 @@ func _rebuild_party() -> void:
 	# === LEADER SECTION ===
 	var leader_header := Label.new()
 	leader_header.text = "LEADER"
-	leader_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	leader_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	leader_header.add_theme_font_size_override("font_size", 16)
 	leader_header.add_theme_color_override("font_color", Color(1, 0.7, 0.75, 1))
 	_party.add_child(leader_header)
+
+	# Add separator after LEADER
+	var leader_sep := HSeparator.new()
+	_party.add_child(leader_sep)
 
 	if party_ids.size() > 0:
 		var leader_data := _get_member_snapshot(party_ids[0])
@@ -424,10 +633,14 @@ func _rebuild_party() -> void:
 	# === ACTIVE SECTION ===
 	var active_header := Label.new()
 	active_header.text = "ACTIVE"
-	active_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	active_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	active_header.add_theme_font_size_override("font_size", 16)
 	active_header.add_theme_color_override("font_color", Color(1, 0.7, 0.75, 1))
 	_party.add_child(active_header)
+
+	# Add separator after ACTIVE
+	var active_sep := HSeparator.new()
+	_party.add_child(active_sep)
 
 	for slot_idx in range(1, 3):  # Slots 1 and 2
 		if party_ids.size() > slot_idx and party_ids[slot_idx] != "":
@@ -441,10 +654,14 @@ func _rebuild_party() -> void:
 	# === BENCH SECTION ===
 	var bench_header := Label.new()
 	bench_header.text = "BENCH"
-	bench_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	bench_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	bench_header.add_theme_font_size_override("font_size", 16)
 	bench_header.add_theme_color_override("font_color", Color(1, 0.7, 0.75, 1))
 	_party.add_child(bench_header)
+
+	# Add separator after BENCH
+	var bench_sep := HSeparator.new()
+	_party.add_child(bench_sep)
 
 	# Only show bench slots that have members (hide empty slots)
 	for bench_idx in range(bench_ids.size()):
@@ -629,9 +846,12 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 
 	# Recovery button (always shown for all members)
 	var recovery_btn := Button.new()
-	recovery_btn.text = "Recovery"
+	recovery_btn.text = "RECOVERY"
 	recovery_btn.custom_minimum_size.x = 70
 	recovery_btn.add_theme_font_size_override("font_size", 10)
+	recovery_btn.add_theme_color_override("font_color", Color(0.0, 0.8, 0.0))  # Green
+	recovery_btn.add_theme_constant_override("outline_size", 1)
+	recovery_btn.add_theme_color_override("font_outline_color", Color(0.0, 0.8, 0.0))  # Bold effect
 	recovery_btn.focus_mode = Control.FOCUS_ALL
 	recovery_btn.set_meta("member_id", member_id)
 	recovery_btn.set_meta("member_name", String(member_data.get("name", "Member")))
@@ -646,9 +866,12 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 	# Switch button (only for active members)
 	if show_switch:
 		var switch_btn := Button.new()
-		switch_btn.text = "Switch"
+		switch_btn.text = "SWITCH"
 		switch_btn.custom_minimum_size.x = 70
 		switch_btn.add_theme_font_size_override("font_size", 10)
+		switch_btn.add_theme_color_override("font_color", Color(0.3, 0.6, 1.0))  # Blue
+		switch_btn.add_theme_constant_override("outline_size", 1)
+		switch_btn.add_theme_color_override("font_outline_color", Color(0.3, 0.6, 1.0))  # Bold effect
 		switch_btn.focus_mode = Control.FOCUS_ALL
 		switch_btn.set_meta("active_slot", active_slot)
 		switch_btn.pressed.connect(_on_switch_pressed.bind(active_slot))
@@ -924,7 +1147,7 @@ func _show_member_picker(active_slot: int) -> void:
 
 	# Add Back button
 	var back_btn: Button = Button.new()
-	back_btn.text = "Back"
+	back_btn.text = "BACK"
 	back_btn.pressed.connect(_popup_cancel_switch)
 	vbox.add_child(back_btn)
 
@@ -1173,7 +1396,7 @@ func _show_recovery_popup(member_id: String, member_name: String, hp: int, hp_ma
 
 	# Add Back button
 	var back_btn: Button = Button.new()
-	back_btn.text = "Back"
+	back_btn.text = "BACK"
 	back_btn.pressed.connect(_popup_cancel_recovery)
 	vbox.add_child(back_btn)
 
@@ -1469,6 +1692,16 @@ func _get_party_snapshot() -> Array:
 # --------------------- Right column summary -------------------
 
 func _update_summary() -> void:
+	# Update new bottom-right display
+	if _creds_value_label: _creds_value_label.text = _read_creds()
+	if _perks_value_label: _perks_value_label.text = _read_perk_points()
+
+	# Update new top-right mission display
+	if _mission_value_label:
+		var h: String = _read_mission_hint()
+		_mission_value_label.text = h if h != "" else "TBD"
+
+	# Keep old labels updated too (they're hidden but may be referenced elsewhere)
 	if _creds: _creds.text = _read_creds()
 	if _perk:  _perk.text  = _read_perk_points()
 
@@ -1655,8 +1888,14 @@ func _read_mission_hint() -> String:
 	return ""
 
 func _on_event_changed(_id: String) -> void:
+	var h: String = _read_mission_hint()
+
+	# Update new top-right mission display
+	if _mission_value_label:
+		_mission_value_label.text = h if h != "" else "TBD"
+
+	# Update old hint label
 	if _hint:
-		var h: String = _read_mission_hint()
 		_hint.text = h if h != "" else "[i]TBD[/i]"
 
 func _fmt_pair(a: int, b: int) -> String:

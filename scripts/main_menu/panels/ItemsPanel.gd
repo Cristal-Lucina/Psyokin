@@ -31,9 +31,9 @@ const INACTIVE_SCALE := 0.95  # Inactive panels shrink by 5%
 const ANIM_DURATION := 0.2  # Animation duration in seconds
 
 # Panel references (for animation)
-@onready var _category_panel: PanelContainer = %CategoryPanel
-@onready var _item_panel: PanelContainer = %ItemPanel
-@onready var _details_panel: PanelContainer = %DetailsPanel
+@onready var _category_panel: PanelContainer = get_node("%CategoryPanel") if has_node("%CategoryPanel") else null
+@onready var _item_panel: PanelContainer = get_node("%ItemPanel") if has_node("%ItemPanel") else null
+@onready var _details_panel: PanelContainer = get_node("%DetailsPanel") if has_node("%DetailsPanel") else null
 
 # Scene references
 @onready var _category_list: ItemList = %CategoryList
@@ -138,7 +138,7 @@ func _grab_category_focus() -> void:
 	if _category_list and _category_list.item_count > 0:
 		_focus_mode = "category"
 		_category_list.grab_focus()
-		_animate_panel_focus()
+		call_deferred("_animate_panel_focus")
 
 func _cleanup_active_popup() -> void:
 	"""Clean up any active popup and overlay"""
@@ -838,7 +838,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			if _item_list and _item_list.item_count > 0:
 				_focus_mode = "items"
 				_item_list.grab_focus()
-				_animate_panel_focus()
+				call_deferred("_animate_panel_focus")
 				get_viewport().set_input_as_handled()
 	elif _focus_mode == "items":
 		if event.is_action_pressed("menu_accept"):
@@ -850,7 +850,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			# Return to category list
 			_focus_mode = "category"
 			_category_list.grab_focus()
-			_animate_panel_focus()
+			call_deferred("_animate_panel_focus")
 			get_viewport().set_input_as_handled()
 
 func _on_party_picker_accept() -> void:
@@ -914,13 +914,13 @@ func _close_member_selection_popup(popup_panel: Panel, used_item: bool) -> void:
 	# Grab focus back
 	if _item_list and _item_list.item_count > 0:
 		_item_list.grab_focus()
-		_animate_panel_focus()
+		call_deferred("_animate_panel_focus")
 	else:
 		# No items in this category, return to category list
 		_focus_mode = "category"
 		if _category_list:
 			_category_list.grab_focus()
-			_animate_panel_focus()
+			call_deferred("_animate_panel_focus")
 
 func _use_item_on_member(item_id: String, item_def: Dictionary, member_token: String) -> void:
 	"""Apply item effect to a party member"""

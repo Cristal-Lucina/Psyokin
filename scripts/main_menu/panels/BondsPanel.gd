@@ -58,6 +58,19 @@ const CSV_FALLBACK: String = "res://data/circles/circle_bonds.csv"
 
 enum Filter { ALL, KNOWN, LOCKED, MAXED }
 
+# Panel animation settings
+const BASE_LEFT_RATIO := 2.0
+const BASE_CENTER_RATIO := 3.5
+const BASE_RIGHT_RATIO := 4.5
+const ACTIVE_SCALE := 1.10  # Active panel grows by 10%
+const INACTIVE_SCALE := 0.95  # Inactive panels shrink by 5%
+const ANIM_DURATION := 0.2  # Animation duration in seconds
+
+# Panel references (for animation)
+@onready var _left_panel: PanelContainer = get_node("%Left") if has_node("%Left") else null
+@onready var _right_panel: PanelContainer = get_node("%Right") if has_node("%Right") else null
+@onready var _profile_panel: PanelContainer = get_node("%ProfilePanel") if has_node("%ProfilePanel") else null
+
 # Controller navigation state machine
 enum NavState { BOND_LIST, BOND_DETAIL }
 var _nav_state: NavState = NavState.BOND_LIST
@@ -155,6 +168,7 @@ func _ready() -> void:
 func _on_panel_gained_focus() -> void:
 	super()  # Call parent
 	print("[BondsPanel] Panel gained focus - state: %s" % NavState.keys()[_nav_state])
+	print("[BondsPanel] About to call _animate_panel_focus from gained_focus")
 
 	# Restore focus based on current navigation state
 	match _nav_state:
@@ -266,6 +280,8 @@ func _enter_bond_list_state() -> void:
 		_nav_index = clamp(_nav_index, 0, _list.item_count - 1)
 		_focus_bond_element(_nav_index)
 	print("[BondsPanel] Entered BOND_LIST state")
+	print("[BondsPanel] Calling _animate_panel_focus from enter_bond_list_state")
+	call_deferred("_animate_panel_focus")
 
 
 func _exit_bonds_panel() -> bool:
@@ -380,6 +396,8 @@ func _transition_to_bond_detail() -> void:
 	print("[BondsPanel] Transition: BOND_LIST → BOND_DETAIL")
 	_nav_state = NavState.BOND_DETAIL
 	_nav_detail_index = 0  # Start at first button
+	print("[BondsPanel] Calling _animate_panel_focus from transition_to_bond_detail")
+	call_deferred("_animate_panel_focus")
 	call_deferred("_enter_bond_detail_state")
 
 func _enter_bond_detail_state() -> void:
@@ -394,6 +412,44 @@ func _transition_to_bond_list() -> void:
 	print("[BondsPanel] Transition: BOND_DETAIL → BOND_LIST")
 	_nav_state = NavState.BOND_LIST
 	call_deferred("_enter_bond_list_state")
+
+func _animate_panel_focus() -> void:
+	"""Animate panels to highlight which one is currently active"""
+	print("[BondsPanel] _animate_panel_focus called, _nav_state: %s" % NavState.keys()[_nav_state])
+	print("[BondsPanel] Panel refs - left: %s, right: %s, profile: %s" % [_left_panel != null, _right_panel != null, _profile_panel != null])
+
+	if not _left_panel or not _right_panel or not _profile_panel:
+		print("[BondsPanel] ERROR: Missing panel references!")
+		return
+
+	var left_ratio := BASE_LEFT_RATIO
+	var center_ratio := BASE_CENTER_RATIO
+	var right_ratio := BASE_RIGHT_RATIO  # Profile panel always stays at base size
+
+	# Determine which panel gets the active scale (only left and center panels animate)
+	match _nav_state:
+		NavState.BOND_LIST:
+			left_ratio = BASE_LEFT_RATIO * ACTIVE_SCALE
+			center_ratio = BASE_CENTER_RATIO * INACTIVE_SCALE
+			# right_ratio stays at BASE_RIGHT_RATIO
+		NavState.BOND_DETAIL:
+			left_ratio = BASE_LEFT_RATIO * INACTIVE_SCALE
+			center_ratio = BASE_CENTER_RATIO * ACTIVE_SCALE
+			# right_ratio stays at BASE_RIGHT_RATIO
+
+	print("[BondsPanel] Animation ratios - left: %.2f, center: %.2f, right: %.2f" % [left_ratio, center_ratio, right_ratio])
+
+	# Create tweens for smooth animation
+	var tween := create_tween()
+	tween.set_parallel(true)
+	tween.set_trans(Tween.TRANS_CUBIC)
+	tween.set_ease(Tween.EASE_OUT)
+
+	tween.tween_property(_left_panel, "size_flags_stretch_ratio", left_ratio, ANIM_DURATION)
+	tween.tween_property(_right_panel, "size_flags_stretch_ratio", center_ratio, ANIM_DURATION)
+	tween.tween_property(_profile_panel, "size_flags_stretch_ratio", right_ratio, ANIM_DURATION)
+
+	print("[BondsPanel] Tween created and started")
 
 # ─────────────────────────────────────────────────────────────
 # Scene fixes

@@ -12,10 +12,25 @@ class_name IndexPanel
 
 enum Filter { TUTORIALS, ENEMIES, MISSIONS, LOCATIONS, LORE }
 
-@onready var _filter  : OptionButton  = $Root/Left/Filter
-@onready var _refresh : Button        = $Root/Left/Header/RefreshBtn
-@onready var _list    : VBoxContainer = $Root/Left/Scroll/List
-@onready var _detail  : RichTextLabel = $Root/Right/Detail
+# Panel animation settings
+const BASE_LEFT_RATIO := 2.0
+const BASE_CENTER_RATIO := 3.5
+const BASE_RIGHT_RATIO := 4.5
+const ACTIVE_SCALE := 1.10  # Active panel grows by 10%
+const INACTIVE_SCALE := 0.95  # Inactive panels shrink by 5%
+const ANIM_DURATION := 0.2  # Animation duration in seconds
+
+# Panel references (for animation)
+@onready var _category_panel: PanelContainer = get_node("%CategoryPanel") if has_node("%CategoryPanel") else null
+@onready var _content_panel: PanelContainer = get_node("%ContentPanel") if has_node("%ContentPanel") else null
+@onready var _details_panel: PanelContainer = get_node("%DetailsPanel") if has_node("%DetailsPanel") else null
+
+@onready var _category_list : ItemList      = $Root/CategoryPanel/CategoryColumn/CategoryList
+@onready var _entry_list    : ItemList      = $Root/ContentPanel/ContentColumn/EntryList
+@onready var _detail        : RichTextLabel = $Root/DetailsPanel/DetailsColumn/Detail
+
+# Focus tracking
+var _focus_mode: String = "category"  # "category" or "entries"
 
 func _ready() -> void:
 	super()  # Call PanelBase._ready() for lifecycle management
@@ -24,18 +39,33 @@ func _ready() -> void:
 	size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	size_flags_vertical   = Control.SIZE_EXPAND_FILL
 
-	# Populate filter once
-	if _filter.item_count == 0:
-		_filter.add_item("Tutorial",      Filter.TUTORIALS)
-		_filter.add_item("Enemies",       Filter.ENEMIES)
-		_filter.add_item("Past Missions", Filter.MISSIONS)
-		_filter.add_item("Locations",     Filter.LOCATIONS)
-		_filter.add_item("World History", Filter.LORE)
+	# Populate category list once
+	if _category_list.item_count == 0:
+		_category_list.add_item("Tutorial")
+		_category_list.set_item_metadata(0, Filter.TUTORIALS)
+		_category_list.add_item("Enemies")
+		_category_list.set_item_metadata(1, Filter.ENEMIES)
+		_category_list.add_item("Past Missions")
+		_category_list.set_item_metadata(2, Filter.MISSIONS)
+		_category_list.add_item("Locations")
+		_category_list.set_item_metadata(3, Filter.LOCATIONS)
+		_category_list.add_item("World History")
+		_category_list.set_item_metadata(4, Filter.LORE)
+		_category_list.select(0)
 
-	if not _filter.item_selected.is_connected(_on_filter_changed):
-		_filter.item_selected.connect(_on_filter_changed)
-	if not _refresh.pressed.is_connected(_rebuild):
-		_refresh.pressed.connect(_rebuild)
+	if not _category_list.item_selected.is_connected(_on_category_selected):
+		_category_list.item_selected.connect(_on_category_selected)
+	if not _category_list.item_activated.is_connected(_on_category_activated):
+		_category_list.item_activated.connect(_on_category_activated)
+
+	# Connect entry list signals
+	if not _entry_list.item_selected.is_connected(_on_entry_selected):
+		_entry_list.item_selected.connect(_on_entry_selected)
+
+	# Enable hover detection by connecting to gui_input
+	_entry_list.mouse_filter = Control.MOUSE_FILTER_PASS
+	if not _entry_list.gui_input.is_connected(_on_entry_list_gui_input):
+		_entry_list.gui_input.connect(_on_entry_list_gui_input)
 
 	# Live updates if the system emits changes (use safe lookup, no direct symbol)
 	var idx: Node = get_node_or_null("/root/aIndexSystem")
@@ -46,49 +76,150 @@ func _ready() -> void:
 
 # --- PanelBase Lifecycle Overrides ---------------------------------------------
 
+func _input(event: InputEvent) -> void:
+	"""Handle input using menu_accept action like ItemsPanel"""
+	if not visible:
+		return
+
+	# Disable left/right presses
+	if event.is_action_pressed("ui_left") or event.is_action_pressed("ui_right"):
+		get_viewport().set_input_as_handled()
+		return
+
+	# Handle focus switching between category and entries
+	if _focus_mode == "category":
+		if event.is_action_pressed("menu_accept"):
+			print("[IndexPanel] menu_accept pressed in category mode")
+			# Move to entry list if available
+			if _entry_list and _entry_list.item_count > 0:
+				_focus_mode = "entries"
+				_entry_list.grab_focus()
+				if _entry_list.item_count > 0:
+					_entry_list.select(0)
+					_on_entry_selected(0)
+				print("[IndexPanel] Calling _animate_panel_focus - mode: entries")
+				call_deferred("_animate_panel_focus")
+				get_viewport().set_input_as_handled()
+				return
+	elif _focus_mode == "entries":
+		if event.is_action_pressed("menu_back"):
+			print("[IndexPanel] menu_back pressed in entries mode")
+			# Move back to category list
+			_focus_mode = "category"
+			_category_list.grab_focus()
+			print("[IndexPanel] Calling _animate_panel_focus - mode: category")
+			call_deferred("_animate_panel_focus")
+			get_viewport().set_input_as_handled()
+			return
+
 func _on_panel_gained_focus() -> void:
 	super()
-	print("[IndexPanel] Gained focus - focusing filter dropdown")
-	# Focus the filter dropdown when panel becomes active
-	if _filter:
-		_filter.grab_focus()
+	print("[IndexPanel] Gained focus - focusing category list")
+	# Focus the category list when panel becomes active
+	_focus_mode = "category"
+	if _category_list:
+		_category_list.grab_focus()
+	print("[IndexPanel] About to call _animate_panel_focus from gained_focus")
+	call_deferred("_animate_panel_focus")
 
 func _on_index_changed(_cat: String) -> void:
 	_rebuild()
 
-func _on_filter_changed(_idx: int) -> void:
+func _on_category_selected(_idx: int) -> void:
+	# Just rebuild entries, don't move focus
 	_rebuild()
 
-func _rebuild() -> void:
-	# Clear list
-	for c in _list.get_children():
-		c.queue_free()
+func _on_category_activated(_idx: int) -> void:
+	# This is called on double-click - move to entry list
+	if _entry_list and _entry_list.item_count > 0:
+		_focus_mode = "entries"
+		_entry_list.grab_focus()
+		if _entry_list.item_count > 0:
+			_entry_list.select(0)
+			_on_entry_selected(0)
+		print("[IndexPanel] Calling _animate_panel_focus from category_activated - mode: entries")
+		call_deferred("_animate_panel_focus")
 
-	var cat_id: int = _filter.get_selected_id()
-	if cat_id < 0:
-		cat_id = Filter.TUTORIALS
+func _on_entry_selected(_idx: int) -> void:
+	# Update details when entry is selected
+	if _idx < 0 or _idx >= _entry_list.item_count:
+		return
+	var entry_data: Dictionary = _entry_list.get_item_metadata(_idx)
+	_update_detail(entry_data)
+
+func _on_entry_list_gui_input(event: InputEvent) -> void:
+	# Update details on hover
+	if event is InputEventMouseMotion:
+		var hovered_idx := _entry_list.get_item_at_position(event.position, true)
+		if hovered_idx >= 0:
+			var entry_data: Dictionary = _entry_list.get_item_metadata(hovered_idx)
+			_update_detail(entry_data)
+
+func _update_detail(entry: Dictionary) -> void:
+	var title: String = String(entry.get("title", "Untitled"))
+	var body: String  = String(entry.get("body", ""))
+	_detail.text = "[b]%s[/b]\n\n%s" % [title, (body if body != "" else "[i]No details yet.[/i]")]
+
+func _rebuild() -> void:
+	# Clear entry list
+	_entry_list.clear()
+
+	var cat_id: int = Filter.TUTORIALS
+	var selected_items := _category_list.get_selected_items()
+	if selected_items.size() > 0:
+		var idx: int = selected_items[0]
+		cat_id = _category_list.get_item_metadata(idx)
 
 	var items: Array[Dictionary] = _gather_items(cat_id)
 
 	for entry in items:
 		var title: String = String(entry.get("title", "Untitled"))
-		var body: String  = String(entry.get("body", ""))
-		var b := Button.new()
-		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		b.text = title
-		b.pressed.connect(func() -> void:
-			_detail.text = "[b]%s[/b]\n\n%s" % [title, (body if body != "" else "[i]No details yet.[/i]")]
-		)
-		_list.add_child(b)
+		_entry_list.add_item(title)
+		var item_idx := _entry_list.item_count - 1
+		_entry_list.set_item_metadata(item_idx, entry)
 
 	if items.size() > 0:
-		var first: Dictionary = items[0]
-		_detail.text = "[b]%s[/b]\n\n%s" % [
-			String(first.get("title","Untitled")),
-			String(first.get("body","[i]No details yet.[/i]"))
-		]
+		_entry_list.select(0)
+		_update_detail(items[0])
 	else:
 		_detail.text = "[i]No entries yet.[/i]"
+
+func _animate_panel_focus() -> void:
+	"""Animate panels to highlight which one is currently active"""
+	print("[IndexPanel] _animate_panel_focus called, _focus_mode: %s" % _focus_mode)
+	print("[IndexPanel] Panel refs - category: %s, content: %s, details: %s" % [_category_panel != null, _content_panel != null, _details_panel != null])
+
+	if not _category_panel or not _content_panel or not _details_panel:
+		print("[IndexPanel] ERROR: Missing panel references!")
+		return
+
+	var left_ratio := BASE_LEFT_RATIO
+	var center_ratio := BASE_CENTER_RATIO
+	var right_ratio := BASE_RIGHT_RATIO  # Details panel always stays at base size
+
+	# Determine which panel gets the active scale (only left and center panels animate)
+	if _focus_mode == "category":
+		left_ratio = BASE_LEFT_RATIO * ACTIVE_SCALE
+		center_ratio = BASE_CENTER_RATIO * INACTIVE_SCALE
+		# right_ratio stays at BASE_RIGHT_RATIO
+	elif _focus_mode == "entries":
+		left_ratio = BASE_LEFT_RATIO * INACTIVE_SCALE
+		center_ratio = BASE_CENTER_RATIO * ACTIVE_SCALE
+		# right_ratio stays at BASE_RIGHT_RATIO
+
+	print("[IndexPanel] Animation ratios - left: %.2f, center: %.2f, right: %.2f" % [left_ratio, center_ratio, right_ratio])
+
+	# Create tweens for smooth animation
+	var tween := create_tween()
+	tween.set_parallel(true)
+	tween.set_trans(Tween.TRANS_CUBIC)
+	tween.set_ease(Tween.EASE_OUT)
+
+	tween.tween_property(_category_panel, "size_flags_stretch_ratio", left_ratio, ANIM_DURATION)
+	tween.tween_property(_content_panel, "size_flags_stretch_ratio", center_ratio, ANIM_DURATION)
+	tween.tween_property(_details_panel, "size_flags_stretch_ratio", right_ratio, ANIM_DURATION)
+
+	print("[IndexPanel] Tween created and started")
 
 # --- Data source ---------------------------------------------------------------
 

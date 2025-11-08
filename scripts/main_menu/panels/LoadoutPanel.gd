@@ -60,6 +60,19 @@
 extends PanelBase
 class_name LoadoutPanel
 
+# Panel animation settings
+const BASE_LEFT_RATIO := 2.0
+const BASE_CENTER_RATIO := 3.5
+const BASE_RIGHT_RATIO := 4.5
+const ACTIVE_SCALE := 1.10  # Active panel grows by 10%
+const INACTIVE_SCALE := 0.95  # Inactive panels shrink by 5%
+const ANIM_DURATION := 0.2  # Animation duration in seconds
+
+# Panel references (for animation)
+@onready var _party_panel: PanelContainer = get_node("%Party") if has_node("%Party") else null
+@onready var _middle_panel: PanelContainer = get_node("%Middle") if has_node("%Middle") else null
+@onready var _stats_panel: PanelContainer = get_node("%StatsColumn") if has_node("%StatsColumn") else null
+
 @onready var _party_list: ItemList       = get_node("Row/Party/VBox/PartyList") as ItemList
 # @onready var _member_name: Label         = get_node("Row/Middle/Margin/VBox/MemberName") as Label  # Removed
 
@@ -169,6 +182,7 @@ func _on_panel_gained_focus() -> void:
 	super()  # Call parent
 	var active = is_active()
 	print("[LoadoutPanel] Panel gained focus - state: %s, is_active: %s" % [NavState.keys()[_nav_state], active])
+	print("[LoadoutPanel] About to call _animate_panel_focus from gained_focus")
 
 	# Restore focus based on current navigation state
 	match _nav_state:
@@ -177,6 +191,7 @@ func _on_panel_gained_focus() -> void:
 			call_deferred("_enter_party_select_state")
 		NavState.EQUIPMENT_NAV:
 			print("[LoadoutPanel] Calling deferred _restore_equipment_focus")
+			call_deferred("_animate_panel_focus")
 			call_deferred("_restore_equipment_focus")
 		NavState.POPUP_ACTIVE:
 			# Popup will handle its own focus when it's the active panel
@@ -1446,7 +1461,13 @@ func _show_equipment_details(member_token: String, slot: String) -> void:
 			if item_def.has("skill_acc_boost"):
 				details += "Skill Acc: [color=#FFC0CB]%d[/color]\n" % int(item_def.get("skill_acc_boost", 0))
 			if item_def.has("watk_type_tag"):
-				details += "Type: [color=#FFC0CB]%s[/color]\n" % String(item_def.get("watk_type_tag", ""))
+				var wtype: String = String(item_def.get("watk_type_tag", ""))
+				details += "Type: [color=#FFC0CB]%s[/color]\n" % wtype
+				var weakness: String = _get_weapon_type_weakness(wtype)
+				if weakness != "":
+					details += "Weak to: [color=#FF6666]%s[/color]\n" % weakness
+				elif wtype.to_lower() == "wand":
+					details += "[color=#FF8866]+10%% Physical Damage Taken[/color]\n"
 
 		"armor":
 			if item_def.has("armor_flat"):
@@ -1580,9 +1601,20 @@ func _get_type_resistance(mind_type: String) -> String:
 		"water": return "Fire"
 		"earth": return "Water"
 		"air": return "Earth"
-		"data": return "Void"
-		"void": return "Data"
+		"data": return "Data"
+		"void": return "Void"
 		"omega": return ""
+		_: return ""
+
+func _get_weapon_type_weakness(weapon_type: String) -> String:
+	"""Get what weapon type this type is weak to"""
+	var type_lower: String = weapon_type.to_lower()
+	match type_lower:
+		"slash": return "Pierce"
+		"pierce": return "Impact"
+		"impact": return "Slash"
+		"blunt": return "Slash"
+		"wand": return ""  # Wand has no triangle weakness
 		_: return ""
 
 func _get_hero_active_type() -> String:
@@ -2234,6 +2266,8 @@ func _transition_to_equipment_nav() -> void:
 	print("[LoadoutPanel] Transition: PARTY_SELECT → EQUIPMENT_NAV")
 	_nav_state = NavState.EQUIPMENT_NAV
 	_nav_index = 0  # Start at first equipment button
+	print("[LoadoutPanel] Calling _animate_panel_focus from transition_to_equipment_nav")
+	call_deferred("_animate_panel_focus")
 	call_deferred("_rebuild_equipment_navigation_and_focus_first")
 
 func _exit_loadout_panel() -> bool:
@@ -2272,6 +2306,51 @@ func _enter_party_select_state() -> void:
 		if _party_list.get_selected_items().is_empty():
 			_party_list.select(0)
 	print("[LoadoutPanel] Entered PARTY_SELECT state")
+	print("[LoadoutPanel] Calling _animate_panel_focus from enter_party_select_state")
+	call_deferred("_animate_panel_focus")
+
+func _animate_panel_focus() -> void:
+	"""Animate panels to highlight which one is currently active"""
+	print("[LoadoutPanel] _animate_panel_focus called, _nav_state: %s" % NavState.keys()[_nav_state])
+	print("[LoadoutPanel] Panel refs - party: %s, middle: %s, stats: %s" % [_party_panel != null, _middle_panel != null, _stats_panel != null])
+
+	if not _party_panel or not _middle_panel or not _stats_panel:
+		print("[LoadoutPanel] ERROR: Missing panel references!")
+		return
+
+	var left_ratio := BASE_LEFT_RATIO
+	var center_ratio := BASE_CENTER_RATIO
+	var right_ratio := BASE_RIGHT_RATIO  # Stats panel always stays at base size
+
+	# Determine which panel gets the active scale (only left and center panels animate)
+	match _nav_state:
+		NavState.PARTY_SELECT:
+			left_ratio = BASE_LEFT_RATIO * ACTIVE_SCALE
+			center_ratio = BASE_CENTER_RATIO * INACTIVE_SCALE
+			# right_ratio stays at BASE_RIGHT_RATIO
+		NavState.EQUIPMENT_NAV:
+			left_ratio = BASE_LEFT_RATIO * INACTIVE_SCALE
+			center_ratio = BASE_CENTER_RATIO * ACTIVE_SCALE
+			# right_ratio stays at BASE_RIGHT_RATIO
+		NavState.POPUP_ACTIVE:
+			# When popup is active, shrink both left and center
+			left_ratio = BASE_LEFT_RATIO * INACTIVE_SCALE
+			center_ratio = BASE_CENTER_RATIO * INACTIVE_SCALE
+			# right_ratio stays at BASE_RIGHT_RATIO
+
+	print("[LoadoutPanel] Animation ratios - left: %.2f, center: %.2f, right: %.2f" % [left_ratio, center_ratio, right_ratio])
+
+	# Create tweens for smooth animation
+	var tween := create_tween()
+	tween.set_parallel(true)
+	tween.set_trans(Tween.TRANS_CUBIC)
+	tween.set_ease(Tween.EASE_OUT)
+
+	tween.tween_property(_party_panel, "size_flags_stretch_ratio", left_ratio, ANIM_DURATION)
+	tween.tween_property(_middle_panel, "size_flags_stretch_ratio", center_ratio, ANIM_DURATION)
+	tween.tween_property(_stats_panel, "size_flags_stretch_ratio", right_ratio, ANIM_DURATION)
+
+	print("[LoadoutPanel] Tween created and started")
 
 ## ─────────────────────── STATE 3: EQUIPMENT_NAV ───────────────────────
 
