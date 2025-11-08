@@ -60,27 +60,35 @@ func _process(delta: float) -> void:
 			_scroll.scroll_vertical += int(right_stick_y * scroll_speed * delta)
 
 func _input(e: InputEvent) -> void:
-	# Back button closes menu
-	if e.is_action_pressed("ui_cancel") or e.is_action_pressed("menu_back"):
-		_on_close()
-		get_viewport().set_input_as_handled()
-		return
+	# Capture ALL input to prevent it from reaching panels behind this menu
+	if e is InputEventKey or e is InputEventJoypadButton or e is InputEventJoypadMotion:
+		# Back button closes menu
+		if e.is_action_pressed("ui_cancel") or e.is_action_pressed("menu_back"):
+			_on_close()
+			get_viewport().set_input_as_handled()
+			return
 
-	# Controller navigation through save slots
-	if _input_cooldown <= 0 and _all_buttons.size() > 0:
-		if e.is_action_pressed("move_up"):
-			_navigate_buttons(-1)
-			_input_cooldown = _input_cooldown_duration
-			get_viewport().set_input_as_handled()
-		elif e.is_action_pressed("move_down"):
-			_navigate_buttons(1)
-			_input_cooldown = _input_cooldown_duration
-			get_viewport().set_input_as_handled()
-		elif e.is_action_pressed("menu_accept"):
-			# Activate selected button (load the save)
-			if _selected_button_index >= 0 and _selected_button_index < _all_buttons.size():
-				_all_buttons[_selected_button_index].emit_signal("pressed")
-			get_viewport().set_input_as_handled()
+		# Controller navigation through save slots
+		if _input_cooldown <= 0 and _all_buttons.size() > 0:
+			if e.is_action_pressed("move_up"):
+				_navigate_buttons(-1)
+				_input_cooldown = _input_cooldown_duration
+				get_viewport().set_input_as_handled()
+				return
+			elif e.is_action_pressed("move_down"):
+				_navigate_buttons(1)
+				_input_cooldown = _input_cooldown_duration
+				get_viewport().set_input_as_handled()
+				return
+			elif e.is_action_pressed("menu_accept"):
+				# Activate selected button (load the save)
+				if _selected_button_index >= 0 and _selected_button_index < _all_buttons.size():
+					_all_buttons[_selected_button_index].emit_signal("pressed")
+				get_viewport().set_input_as_handled()
+				return
+
+		# Mark ALL other controller/keyboard input as handled to prevent passthrough
+		get_viewport().set_input_as_handled()
 
 func _rebuild() -> void:
 	for c in _slots.get_children():
