@@ -12,9 +12,9 @@ class_name IndexPanel
 
 enum Filter { TUTORIALS, ENEMIES, MISSIONS, LOCATIONS, LORE }
 
-@onready var _filter  : OptionButton  = $Root/Left/Margin/VBox/Filter
-@onready var _list    : VBoxContainer = $Root/Left/Margin/VBox/Scroll/List
-@onready var _detail  : RichTextLabel = $Root/Right/Margin/VBox/Detail
+@onready var _filter  : OptionButton  = $Root/CategoryPanel/CategoryColumn/Filter
+@onready var _list    : VBoxContainer = $Root/ContentPanel/ContentColumn/Scroll/List
+@onready var _detail  : RichTextLabel = $Root/DetailsPanel/DetailsColumn/Detail
 
 func _ready() -> void:
 	super()  # Call PanelBase._ready() for lifecycle management

@@ -24,69 +24,82 @@ grow_horizontal = 2
 grow_vertical = 2
 theme_override_constants/separation = 16
 
-[node name="Left" type="PanelContainer" parent="Root"]
-custom_minimum_size = Vector2(260, 0)
+[node name="CategoryPanel" type="PanelContainer" parent="Root"]
+custom_minimum_size = Vector2(200, 0)
 layout_mode = 2
 size_flags_horizontal = 3
-size_flags_vertical = 3
+size_flags_stretch_ratio = 2.0
 
-[node name="Margin" type="MarginContainer" parent="Root/Left"]
-layout_mode = 2
-theme_override_constants/margin_left = 10
-theme_override_constants/margin_top = 10
-theme_override_constants/margin_right = 10
-theme_override_constants/margin_bottom = 10
-
-[node name="VBox" type="VBoxContainer" parent="Root/Left/Margin"]
+[node name="CategoryColumn" type="VBoxContainer" parent="Root/CategoryPanel"]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="Title" type="Label" parent="Root/Left/Margin/VBox"]
+[node name="CategoryLabel" type="Label" parent="Root/CategoryPanel/CategoryColumn"]
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
 theme_override_font_sizes/font_size = 16
-text = "INDEX"
+text = "CATEGORIES"
 horizontal_alignment = 0
 
-[node name="Filter" type="OptionButton" parent="Root/Left/Margin/VBox"]
+[node name="Separator" type="HSeparator" parent="Root/CategoryPanel/CategoryColumn"]
 layout_mode = 2
 
-[node name="Scroll" type="ScrollContainer" parent="Root/Left/Margin/VBox"]
+[node name="Filter" type="OptionButton" parent="Root/CategoryPanel/CategoryColumn"]
+layout_mode = 2
+
+[node name="ContentPanel" type="PanelContainer" parent="Root"]
+custom_minimum_size = Vector2(400, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 3.5
+
+[node name="ContentColumn" type="VBoxContainer" parent="Root/ContentPanel"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="ContentLabel" type="Label" parent="Root/ContentPanel/ContentColumn"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
+theme_override_font_sizes/font_size = 16
+text = "ENTRIES"
+horizontal_alignment = 0
+
+[node name="Separator" type="HSeparator" parent="Root/ContentPanel/ContentColumn"]
+layout_mode = 2
+
+[node name="Scroll" type="ScrollContainer" parent="Root/ContentPanel/ContentColumn"]
 custom_minimum_size = Vector2(0, 280)
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 
-[node name="List" type="VBoxContainer" parent="Root/Left/Margin/VBox/Scroll"]
+[node name="List" type="VBoxContainer" parent="Root/ContentPanel/ContentColumn/Scroll"]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 theme_override_constants/separation = 6
 
-[node name="Right" type="PanelContainer" parent="Root"]
+[node name="DetailsPanel" type="PanelContainer" parent="Root"]
+custom_minimum_size = Vector2(320, 0)
 layout_mode = 2
 size_flags_horizontal = 3
-size_flags_vertical = 3
+size_flags_stretch_ratio = 4.5
 
-[node name="Margin" type="MarginContainer" parent="Root/Right"]
+[node name="DetailsColumn" type="VBoxContainer" parent="Root/DetailsPanel"]
 layout_mode = 2
-theme_override_constants/margin_left = 10
-theme_override_constants/margin_top = 10
-theme_override_constants/margin_right = 10
-theme_override_constants/margin_bottom = 10
+theme_override_constants/separation = 12
 
-[node name="VBox" type="VBoxContainer" parent="Root/Right/Margin"]
-layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="DetailLabel" type="Label" parent="Root/Right/Margin/VBox"]
+[node name="DetailsLabel" type="Label" parent="Root/DetailsPanel/DetailsColumn"]
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
 theme_override_font_sizes/font_size = 16
 text = "DETAILS"
 horizontal_alignment = 0
 
-[node name="Detail" type="RichTextLabel" parent="Root/Right/Margin/VBox"]
+[node name="Separator" type="HSeparator" parent="Root/DetailsPanel/DetailsColumn"]
+layout_mode = 2
+
+[node name="Detail" type="RichTextLabel" parent="Root/DetailsPanel/DetailsColumn"]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
