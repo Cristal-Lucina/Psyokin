@@ -1,0 +1,40 @@
+[gd_scene load_steps=2 format=3 uid="uid://bvq8yjx7nxc8k"]
+
+[ext_resource type="Script" path="res://scripts/ui/LoadingScreen.gd" id="1"]
+
+[node name="LoadingScreen" type="CanvasLayer"]
+process_mode = 3
+layer = 1000
+script = ExtResource("1")
+
+[node name="Background" type="ColorRect" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.05, 0.05, 0.05, 1)
+
+[node name="LoadingContainer" type="HBoxContainer" parent="Background"]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -200.0
+offset_top = -60.0
+offset_right = -40.0
+offset_bottom = -40.0
+theme_override_constants/separation = 12
+
+[node name="LoadingText" type="Label" parent="Background/LoadingContainer"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 0.9)
+theme_override_font_sizes/font_size = 20
+text = "LOADING"
+
+[node name="Spinner" type="Polygon2D" parent="Background/LoadingContainer"]
+position = Vector2(20, 10)
+color = Color(1, 0.7, 0.75, 0.9)
+polygon = PackedVector2Array(0, -16, 11.3137, -11.3137, 16, 0, 11.3137, 11.3137, 0, 16, -11.3137, 11.3137, -16, 0, -11.3137, -11.3137)
