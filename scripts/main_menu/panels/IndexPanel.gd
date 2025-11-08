@@ -16,6 +16,9 @@ enum Filter { TUTORIALS, ENEMIES, MISSIONS, LOCATIONS, LORE }
 @onready var _entry_list    : ItemList      = $Root/ContentPanel/ContentColumn/EntryList
 @onready var _detail        : RichTextLabel = $Root/DetailsPanel/DetailsColumn/Detail
 
+# Focus tracking
+var _focus_mode: String = "category"  # "category" or "entries"
+
 func _ready() -> void:
 	super()  # Call PanelBase._ready() for lifecycle management
 
@@ -60,28 +63,38 @@ func _ready() -> void:
 
 # --- PanelBase Lifecycle Overrides ---------------------------------------------
 
-func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed("ui_accept"):
-		# Check if category list has focus
-		if _category_list and _category_list.has_focus():
-			print("[IndexPanel] Accept pressed on category list")
+func _input(event: InputEvent) -> void:
+	"""Handle input using menu_accept action like ItemsPanel"""
+	if not visible:
+		return
+
+	# Handle focus switching between category and entries
+	if _focus_mode == "category":
+		if event.is_action_pressed("menu_accept"):
+			print("[IndexPanel] menu_accept pressed in category mode")
+			# Move to entry list if available
+			if _entry_list and _entry_list.item_count > 0:
+				_focus_mode = "entries"
+				_entry_list.grab_focus()
+				if _entry_list.item_count > 0:
+					_entry_list.select(0)
+					_on_entry_selected(0)
+				get_viewport().set_input_as_handled()
+				return
+	elif _focus_mode == "entries":
+		if event.is_action_pressed("menu_back"):
+			print("[IndexPanel] menu_back pressed in entries mode")
+			# Move back to category list
+			_focus_mode = "category"
+			_category_list.grab_focus()
 			get_viewport().set_input_as_handled()
-			var selected := _category_list.get_selected_items()
-			if selected.size() > 0:
-				_on_category_activated(selected[0])
-		# Check if entry list has focus
-		elif _entry_list and _entry_list.has_focus():
-			print("[IndexPanel] Accept pressed on entry list")
-			# Entry list doesn't need special handling for accept
-	elif event.is_action_pressed("ui_cancel"):
-		print("[IndexPanel] Back button pressed")
-		get_viewport().set_input_as_handled()
-		# PanelBase will handle returning to previous panel
+			return
 
 func _on_panel_gained_focus() -> void:
 	super()
 	print("[IndexPanel] Gained focus - focusing category list")
 	# Focus the category list when panel becomes active
+	_focus_mode = "category"
 	if _category_list:
 		_category_list.grab_focus()
 
@@ -93,16 +106,13 @@ func _on_category_selected(_idx: int) -> void:
 	_rebuild()
 
 func _on_category_activated(_idx: int) -> void:
-	# Move focus to entry list ONLY when category is activated (Enter or double-click)
+	# This is called on double-click - move to entry list
 	if _entry_list and _entry_list.item_count > 0:
-		call_deferred("_move_to_entry_list")
-
-func _move_to_entry_list() -> void:
-	"""Helper to move focus to entry list and select first item"""
-	if _entry_list and _entry_list.item_count > 0:
+		_focus_mode = "entries"
 		_entry_list.grab_focus()
-		_entry_list.select(0)
-		_on_entry_selected(0)
+		if _entry_list.item_count > 0:
+			_entry_list.select(0)
+			_on_entry_selected(0)
 
 func _on_entry_selected(_idx: int) -> void:
 	# Update details when entry is selected
