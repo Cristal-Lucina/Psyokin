@@ -903,8 +903,8 @@ func _input(event: InputEvent) -> void:
 			return
 		return
 
-	# Handle stat and perk selection - bridge controller inputs to focus navigation
-	if current_stage == CinematicStage.STAT_SELECTION or current_stage == CinematicStage.PERK_SELECTION:
+	# Handle stat, perk, and customization - bridge controller inputs to focus navigation
+	if current_stage == CinematicStage.STAT_SELECTION or current_stage == CinematicStage.PERK_SELECTION or current_stage == CinematicStage.CHARACTER_CUSTOMIZATION:
 		# Map move_up/move_down to focus navigation
 		if event.is_action_pressed("move_up"):
 			get_viewport().set_input_as_handled()
@@ -914,7 +914,7 @@ func _input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 			_navigate_focus(Vector2.DOWN)
 			return
-		# Map menu_accept to activating the focused button
+		# Map menu_accept to activating the focused button/dropdown
 		elif event.is_action_pressed("menu_accept"):
 			get_viewport().set_input_as_handled()
 			_activate_focused_button()
@@ -969,16 +969,30 @@ func _input(event: InputEvent) -> void:
 	if should_advance:
 		get_viewport().set_input_as_handled()
 		_hide_cursor()
-		_advance_stage()
+		waiting_for_input = false
+
+		# Special handling for nurse responses - advance to next response instead of next stage
+		if current_stage == CinematicStage.NURSE_RESPONSES:
+			nurse_response_index += 1
+			if nurse_response_index < 5:
+				stage_timer = 0.0  # Reset timer for next response
+			# If all 5 shown, _process_nurse_responses will advance stage
+		else:
+			_advance_stage()
 
 func _process_nurse_responses(delta: float) -> void:
 	"""Process nurse responses one at a time"""
+	# If waiting for input, don't auto-advance
+	if waiting_for_input:
+		return
+
 	if not typing_active and stage_timer >= NURSE_RESPONSE_PAUSE:
 		nurse_response_index += 1
 		if nurse_response_index < 5:  # 5 stats total
 			_show_next_nurse_response()
 		else:
 			# All responses shown, advance to next stage
+			_hide_cursor()
 			_advance_stage()
 
 # ── Stage Management ─────────────────────────────────────────────────────────
@@ -1613,7 +1627,16 @@ func _activate_focused_button() -> void:
 
 	print("[Focus Activation] Activating %s" % focused.name)
 
-	if focused is CheckButton:
+	if focused is OptionButton:
+		# For OptionButtons, show the popup
+		var popup = focused.get_popup()
+		if popup and not popup.visible:
+			print("[Focus Activation] Opening OptionButton popup")
+			# Simulate a button press to open the popup
+			focused.pressed.emit()
+		else:
+			print("[Focus Activation] OptionButton popup already open")
+	elif focused is CheckButton:
 		# Toggle the CheckButton - use set_pressed to properly update visual state
 		var new_state = !focused.button_pressed
 		print("[Focus Activation] CheckButton current state: %s, setting to: %s" % [focused.button_pressed, new_state])
@@ -1892,6 +1915,10 @@ func _show_next_nurse_response() -> void:
 
 	stage_timer = 0.0
 
+	# Show cursor and wait for input
+	_show_cursor()
+	waiting_for_input = true
+
 # ── Character Customization UI ───────────────────────────────────────────────
 func _build_customization_ui() -> void:
 	"""Build character customization UI (pronoun, body, outfit, hair, hat)"""
@@ -1941,6 +1968,7 @@ func _build_customization_ui() -> void:
 	# Create new dropdowns that mirror the original ones
 	var pronoun_dd = OptionButton.new()
 	pronoun_dd.name = "CinematicPronoun"
+	pronoun_dd.focus_mode = Control.FOCUS_ALL
 	for i in range(_pron_in.item_count):
 		pronoun_dd.add_item(_pron_in.get_item_text(i))
 	pronoun_dd.select(_pron_in.get_selected())
@@ -1949,6 +1977,7 @@ func _build_customization_ui() -> void:
 
 	var body_dd = OptionButton.new()
 	body_dd.name = "CinematicBody"
+	body_dd.focus_mode = Control.FOCUS_ALL
 	for i in range(_body_in.item_count):
 		body_dd.add_item(_body_in.get_item_text(i))
 	body_dd.select(_body_in.get_selected())
@@ -1957,6 +1986,7 @@ func _build_customization_ui() -> void:
 
 	var outfit_dd = OptionButton.new()
 	outfit_dd.name = "CinematicOutfit"
+	outfit_dd.focus_mode = Control.FOCUS_ALL
 	for i in range(_outfit_in.item_count):
 		outfit_dd.add_item(_outfit_in.get_item_text(i))
 	outfit_dd.select(_outfit_in.get_selected())
@@ -1965,6 +1995,7 @@ func _build_customization_ui() -> void:
 
 	var hair_dd = OptionButton.new()
 	hair_dd.name = "CinematicHair"
+	hair_dd.focus_mode = Control.FOCUS_ALL
 	for i in range(_hair_in.item_count):
 		hair_dd.add_item(_hair_in.get_item_text(i))
 	hair_dd.select(_hair_in.get_selected())
@@ -1973,11 +2004,16 @@ func _build_customization_ui() -> void:
 
 	var hat_dd = OptionButton.new()
 	hat_dd.name = "CinematicHat"
+	hat_dd.focus_mode = Control.FOCUS_ALL
 	for i in range(_hat_in.item_count):
 		hat_dd.add_item(_hat_in.get_item_text(i))
 	hat_dd.select(_hat_in.get_selected())
 	hat_dd.item_selected.connect(_on_cinematic_dropdown_changed.bind("hat", hat_dd))
 	_add_customization_option(options, "Hat:", hat_dd)
+
+	# Store dropdown references for focus navigation
+	var dropdowns = [pronoun_dd, body_dd, outfit_dd, hair_dd, hat_dd]
+	customization_container.set_meta("dropdowns", dropdowns)
 
 	# Right: Character Preview
 	var preview_panel = _create_styled_panel()
@@ -2009,7 +2045,7 @@ func _build_customization_ui() -> void:
 
 		# Make sure character is visible and scaled appropriately
 		character_layers.visible = true
-		character_layers.scale = Vector2(2, 2)  # Scale up for better visibility
+		character_layers.scale = Vector2(5, 5)  # 500% scale for better visibility
 		print("[Customization] Character preview reparented and visible")
 
 	# Accept button
@@ -2021,13 +2057,36 @@ func _build_customization_ui() -> void:
 	accept_btn.anchor_bottom = 1.0
 	accept_btn.custom_minimum_size = Vector2(200, 50)
 	accept_btn.add_theme_font_size_override("font_size", 16)
+	accept_btn.focus_mode = Control.FOCUS_ALL
 	accept_btn.pressed.connect(_on_customization_accepted)
 	customization_container.add_child(accept_btn)
 
-	# Fade in
+	# Set up focus neighbors
+	var dropdowns = customization_container.get_meta("dropdowns", [])
+	for i in range(dropdowns.size()):
+		var dd = dropdowns[i]
+		if i > 0:
+			dd.focus_neighbor_top = dd.get_path_to(dropdowns[i - 1])
+		if i < dropdowns.size() - 1:
+			dd.focus_neighbor_bottom = dd.get_path_to(dropdowns[i + 1])
+		else:
+			# Last dropdown -> Accept button
+			dd.focus_neighbor_bottom = dd.get_path_to(accept_btn)
+
+	# Accept button -> back to first dropdown
+	if dropdowns.size() > 0:
+		accept_btn.focus_neighbor_top = accept_btn.get_path_to(dropdowns[dropdowns.size() - 1])
+		accept_btn.focus_neighbor_bottom = accept_btn.get_path_to(dropdowns[0])
+
+	# Fade in and set initial focus
 	customization_container.modulate = Color(1, 1, 1, 0)
 	var tween = create_tween()
 	tween.tween_property(customization_container, "modulate", Color(1, 1, 1, 1), 0.5)
+	tween.tween_callback(func():
+		if dropdowns.size() > 0:
+			dropdowns[0].grab_focus()
+			print("[Customization] Focus set to first dropdown")
+	)
 
 func _on_cinematic_dropdown_changed(index: int, type: String, dropdown: OptionButton) -> void:
 	"""Handle dropdown changes in cinematic customization UI"""
