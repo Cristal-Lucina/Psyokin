@@ -216,10 +216,7 @@ func _on_load_pressed(slot: int) -> void:
 	print("[LoadMenu] Unpausing game tree")
 	get_tree().paused = false
 
-	# Close this menu
-	queue_free()
-
-	# Wait a frame for everything to clean up
+	# Wait a frame for GameMenu to be freed
 	await get_tree().process_frame
 
 	# Create and show loading screen
@@ -256,11 +253,14 @@ func _on_load_pressed(slot: int) -> void:
 		aGameState.set_meta("pending_load_payload", payload)
 		aGameState.set_meta("pending_load_from_ingame", true)
 
-	# Schedule loading screen fade-out to happen after scene change
+	# Schedule loading screen fade-out to happen after ALL scene changes complete
+	# The loading screen will handle the entire transition: LoadMenu → Title → Main
 	if loading:
 		loading.call_deferred("_fade_out_and_cleanup")
 
-	# Go to title screen first (provides clean state), then title will load to main
+	# Change to title screen (this will automatically free the current scene, including LoadMenu)
+	# Title will detect pending load and immediately transition to Main
+	# The loading screen persists through both scene changes and cleans itself up at the end
 	get_tree().change_scene_to_file(TITLE_SCENE)
 
 func _on_delete_pressed(slot: int) -> void:

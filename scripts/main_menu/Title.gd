@@ -49,35 +49,13 @@ func _ready() -> void:
 		if aGameState.has_meta("pending_load_from_ingame") and aGameState.get_meta("pending_load_from_ingame"):
 			print("[Title] Detected pending load from in-game, auto-transitioning to main scene...")
 
-			# Get the payload (already applied by LoadMenu, but we have it for reference)
-			var payload: Dictionary = {}
-			if aGameState.has_meta("pending_load_payload"):
-				var payload_v: Variant = aGameState.get_meta("pending_load_payload")
-				if typeof(payload_v) == TYPE_DICTIONARY:
-					payload = payload_v as Dictionary
-
 			# Clear the metadata immediately
 			aGameState.remove_meta("pending_load_from_ingame")
 			aGameState.remove_meta("pending_load_payload")
 
-			# Wait a frame for title to fully load before transitioning
-			await get_tree().process_frame
-
-			# Create and show loading screen
-			var loading = LoadingScreen.create()
-			if loading:
-				get_tree().root.add_child(loading)
-				loading.set_text("Loading...")
-				await loading.fade_in()
-
-			# Small delay to ensure loading screen is visible
-			await get_tree().create_timer(0.1).timeout
-
-			# Schedule loading screen fade-out to happen after scene change
-			if loading:
-				loading.call_deferred("_fade_out_and_cleanup")
-
-			# Go to main scene (title will be freed, so return immediately)
+			# Don't create a new loading screen - LoadMenu already created one that will handle
+			# the entire transition from LoadMenu → Title → Main
+			# Just transition immediately to Main scene
 			get_tree().change_scene_to_file(MAIN_SCENE)
 			return
 
