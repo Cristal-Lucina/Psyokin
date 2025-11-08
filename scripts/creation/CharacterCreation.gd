@@ -122,8 +122,8 @@ var cinematic_name: String = ""
 var cinematic_surname: String = ""
 var waiting_for_input: bool = false
 
-# Blinking cursor
-var cursor_label: Label = null
+# Blinking up arrow
+var arrow_label: Label = null
 var cursor_blink_timer: float = 0.0
 var cursor_visible: bool = true
 const CURSOR_BLINK_SPEED := 0.5  # Blink every 0.5 seconds
@@ -687,22 +687,63 @@ func _setup_cinematic() -> void:
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	cinematic_layer.add_child(bg)
 
+	# Create chat bubble panel container
+	var bubble_container = VBoxContainer.new()
+	bubble_container.set_anchors_preset(Control.PRESET_CENTER)
+	bubble_container.anchor_left = 0.5
+	bubble_container.anchor_top = 0.5
+	bubble_container.anchor_right = 0.5
+	bubble_container.anchor_bottom = 0.5
+	bubble_container.offset_left = -400  # 800px wide bubble
+	bubble_container.offset_right = 400
+	bubble_container.offset_top = -100   # Center vertically
+	bubble_container.offset_bottom = 100
+	bubble_container.add_theme_constant_override("separation", 10)  # Space between dialogue and arrow
+	cinematic_layer.add_child(bubble_container)
+
+	# Create chat bubble panel
+	var chat_bubble = PanelContainer.new()
+	var bubble_style = StyleBoxFlat.new()
+	bubble_style.bg_color = Color(0.15, 0.15, 0.15, 0.95)  # Dark gray with slight transparency
+	bubble_style.border_color = Color(1.0, 0.7, 0.75, 1.0)  # Pink border
+	bubble_style.border_width_left = 3
+	bubble_style.border_width_right = 3
+	bubble_style.border_width_top = 3
+	bubble_style.border_width_bottom = 3
+	bubble_style.corner_radius_top_left = 15
+	bubble_style.corner_radius_top_right = 15
+	bubble_style.corner_radius_bottom_left = 15
+	bubble_style.corner_radius_bottom_right = 15
+	chat_bubble.add_theme_stylebox_override("panel", bubble_style)
+	chat_bubble.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bubble_container.add_child(chat_bubble)
+
+	# Create margin container inside bubble for padding
+	var margin = MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 30)
+	margin.add_theme_constant_override("margin_right", 30)
+	margin.add_theme_constant_override("margin_top", 20)
+	margin.add_theme_constant_override("margin_bottom", 20)
+	chat_bubble.add_child(margin)
+
 	# Create dialogue label (for typing text)
 	dialogue_label = Label.new()
-	dialogue_label.set_anchors_preset(Control.PRESET_CENTER)
-	dialogue_label.anchor_left = 0.5
-	dialogue_label.anchor_top = 0.5
-	dialogue_label.anchor_right = 0.5
-	dialogue_label.anchor_bottom = 0.5
-	dialogue_label.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	dialogue_label.grow_vertical = Control.GROW_DIRECTION_BOTH
-	dialogue_label.pivot_offset = dialogue_label.size / 2
 	dialogue_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	dialogue_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	dialogue_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	dialogue_label.add_theme_font_size_override("font_size", 18)
 	dialogue_label.add_theme_color_override("font_color", Color.WHITE)
 	dialogue_label.text = ""
-	cinematic_layer.add_child(dialogue_label)
+	margin.add_child(dialogue_label)
+
+	# Create up arrow label (below the bubble)
+	arrow_label = Label.new()
+	arrow_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	arrow_label.add_theme_font_size_override("font_size", 24)
+	arrow_label.add_theme_color_override("font_color", Color(1.0, 0.7, 0.75, 1.0))  # Pink to match border
+	arrow_label.text = "↑"
+	arrow_label.visible = false
+	bubble_container.add_child(arrow_label)
 
 	# Create continue prompt
 	continue_prompt = Label.new()
@@ -788,22 +829,19 @@ func _on_typing_complete() -> void:
 		stage_timer = 0.0
 
 func _show_cursor_and_wait() -> void:
-	"""Show blinking cursor and wait for player input"""
+	"""Show blinking up arrow and wait for player input"""
 	waiting_for_input = true
 	cursor_visible = true
-	if dialogue_label:
-		# Store the base text without cursor
-		typing_text = dialogue_label.text
-		dialogue_label.text = typing_text + " ●"
+	if arrow_label:
+		arrow_label.visible = true
 	if continue_prompt:
 		continue_prompt.visible = true
 
 func _hide_cursor() -> void:
-	"""Hide the blinking cursor"""
+	"""Hide the blinking up arrow"""
 	waiting_for_input = false
-	if dialogue_label:
-		# Remove cursor from text
-		dialogue_label.text = typing_text
+	if arrow_label:
+		arrow_label.visible = false
 	if continue_prompt:
 		continue_prompt.visible = false
 
@@ -827,16 +865,13 @@ func _process_cinematic(delta: float) -> void:
 			_process_nurse_responses(delta)
 
 func _process_cursor_blink(delta: float) -> void:
-	"""Handle blinking cursor animation"""
+	"""Handle blinking up arrow animation"""
 	cursor_blink_timer += delta
 	if cursor_blink_timer >= CURSOR_BLINK_SPEED:
 		cursor_blink_timer = 0.0
 		cursor_visible = not cursor_visible
-		if dialogue_label:
-			if cursor_visible:
-				dialogue_label.text = typing_text + " ●"
-			else:
-				dialogue_label.text = typing_text
+		if arrow_label:
+			arrow_label.visible = cursor_visible
 
 func _unhandled_input(event: InputEvent) -> void:
 	"""Handle input for advancing dialogue"""
