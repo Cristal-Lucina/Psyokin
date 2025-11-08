@@ -32,7 +32,7 @@ const PANEL_BORDER_WIDTH := 2
 const PANEL_CORNER_RADIUS := 8
 
 # Cinematic constants
-const LETTER_REVEAL_SPEED := 0.1   # 0.1 seconds per letter
+const LETTER_REVEAL_SPEED := 0.05  # 0.05 seconds per letter
 const DIALOGUE_PAUSE := 1.5        # Pause between dialogue lines
 const NURSE_RESPONSE_PAUSE := 2.0  # Pause between nurse responses
 
