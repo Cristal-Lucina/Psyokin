@@ -17,6 +17,7 @@ const PANEL_CORNER_RADIUS := 8
 
 # Candidate paths (we'll probe these in order)
 const PATH_SLOTS  : PackedStringArray = [
+	"Center/Window/Margin/Root/Scroll/SlotsGrid",
 	"Center/Window/Margin/Root/Scroll/Slots",
 	"Center/Window/Root/Slots",
 	"Center/Panel/Root/Slots",
@@ -26,14 +27,16 @@ const PATH_SLOTS  : PackedStringArray = [
 	"Slots"
 ]
 
-var _slots     : VBoxContainer
-var _backdrop  : ColorRect
-var _window    : Panel
-var _scroll    : ScrollContainer
+var _slots_grid : GridContainer
+var _backdrop   : ColorRect
+var _window     : Panel
+var _scroll     : ScrollContainer
 
-# Controller navigation
-var _all_buttons: Array[Button] = []
-var _selected_button_index: int = 0
+# Controller navigation - 2D grid (rows = slots, columns = save/delete)
+var _save_buttons: Array[Button] = []
+var _delete_buttons: Array[Button] = []
+var _current_row: int = 0
+var _current_column: int = 0  # 0 = Save, 1 = Delete
 var _input_cooldown: float = 0.0
 var _input_cooldown_duration: float = 0.2
 
@@ -65,7 +68,7 @@ func _style_panel(panel: Panel) -> void:
 
 func _ensure_fallback_layout() -> void:
 	# Build a compact center window if required
-	if _slots != null:
+	if _slots_grid != null:
 		return
 
 	# Root centerer
@@ -74,10 +77,10 @@ func _ensure_fallback_layout() -> void:
 	center.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(center)
 
-	# Window frame with LoadoutPanel styling
+	# Window frame with LoadoutPanel styling - no fixed width
 	_window = Panel.new()
 	_window.name = "Window"
-	_window.custom_minimum_size = Vector2(500, 300)
+	_window.custom_minimum_size = Vector2(0, 300)  # Only constrain height
 	_style_panel(_window)
 	center.add_child(_window)
 
@@ -110,16 +113,16 @@ func _ensure_fallback_layout() -> void:
 
 	var scroll := ScrollContainer.new()
 	scroll.name = "Scroll"
-	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.size_flags_horizontal = Control.SIZE_SHRINK_CENTER  # Center content
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	root.add_child(scroll)
 
-	_slots = VBoxContainer.new()
-	_slots.name = "Slots"
-	_slots.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_slots.size_flags_vertical   = Control.SIZE_EXPAND_FILL
-	_slots.add_theme_constant_override("separation", 8)
-	scroll.add_child(_slots)
+	_slots_grid = GridContainer.new()
+	_slots_grid.name = "SlotsGrid"
+	_slots_grid.columns = 2
+	_slots_grid.add_theme_constant_override("h_separation", 12)
+	_slots_grid.add_theme_constant_override("v_separation", 8)
+	scroll.add_child(_slots_grid)
 
 # --- lifecycle ----------------------------------------------------------------
 
@@ -139,9 +142,9 @@ func _ready() -> void:
 		_style_panel(_window)
 
 	# Resolve existing nodes first
-	_slots = _find_node_any(PATH_SLOTS) as VBoxContainer
+	_slots_grid = _find_node_any(PATH_SLOTS) as GridContainer
 
-	print("[SaveMenu] Found nodes - slots: %s" % ["yes" if _slots else "no"])
+	print("[SaveMenu] Found nodes - slots_grid: %s" % ["yes" if _slots_grid else "no"])
 
 	# If anything is missing, build a fallback (safe & centered)
 	_ensure_fallback_layout()
@@ -168,22 +171,30 @@ func _input(e: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 			return
 
-		# Controller navigation through save slots
-		if _input_cooldown <= 0 and _all_buttons.size() > 0:
+		# 2D grid navigation through save slots
+		if _input_cooldown <= 0 and _save_buttons.size() > 0:
 			if e.is_action_pressed("move_up"):
-				_navigate_buttons(-1)
+				_navigate_grid_vertical(-1)
 				_input_cooldown = _input_cooldown_duration
 				get_viewport().set_input_as_handled()
 				return
 			elif e.is_action_pressed("move_down"):
-				_navigate_buttons(1)
+				_navigate_grid_vertical(1)
+				_input_cooldown = _input_cooldown_duration
+				get_viewport().set_input_as_handled()
+				return
+			elif e.is_action_pressed("move_left"):
+				_navigate_grid_horizontal(-1)
+				_input_cooldown = _input_cooldown_duration
+				get_viewport().set_input_as_handled()
+				return
+			elif e.is_action_pressed("move_right"):
+				_navigate_grid_horizontal(1)
 				_input_cooldown = _input_cooldown_duration
 				get_viewport().set_input_as_handled()
 				return
 			elif e.is_action_pressed("menu_accept"):
-				# Activate selected button (save to slot or close)
-				if _selected_button_index >= 0 and _selected_button_index < _all_buttons.size():
-					_all_buttons[_selected_button_index].emit_signal("pressed")
+				_activate_current_button()
 				get_viewport().set_input_as_handled()
 				return
 
@@ -193,39 +204,38 @@ func _input(e: InputEvent) -> void:
 # --- UI build -----------------------------------------------------------------
 
 func _rebuild() -> void:
-	for c in _slots.get_children():
+	for c in _slots_grid.get_children():
 		c.queue_free()
 
+	_save_buttons.clear()
+	_delete_buttons.clear()
+
+	# Create grid with 2 columns (Save, Delete)
 	for i in range(1, 4):
 		var idx := i  # capture per-iteration
-		var row: HBoxContainer = HBoxContainer.new()
-		row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		row.custom_minimum_size.y = 36
 
-		var lbl: Label = Label.new()
-		lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		lbl.text = _label_for_slot(idx)
-		row.add_child(lbl)
-
+		# Save button with slot label
 		var btn_save: Button = Button.new()
-		btn_save.text = "Save"
-		btn_save.custom_minimum_size.y = 28
+		btn_save.text = _label_for_slot(idx)
+		btn_save.custom_minimum_size = Vector2(350, 36)
+		btn_save.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		btn_save.focus_mode = Control.FOCUS_ALL
 		btn_save.pressed.connect(func() -> void: _do_save(idx))
-		row.add_child(btn_save)
+		_slots_grid.add_child(btn_save)
+		_save_buttons.append(btn_save)
 
+		# Delete button
 		var btn_del: Button = Button.new()
 		btn_del.text = "Delete"
-		btn_del.custom_minimum_size.y = 28
+		btn_del.custom_minimum_size = Vector2(100, 36)
 		btn_del.focus_mode = Control.FOCUS_ALL
 		btn_del.pressed.connect(func() -> void: _do_delete(idx))
-		row.add_child(btn_del)
-
-		_slots.add_child(row)
+		_slots_grid.add_child(btn_del)
+		_delete_buttons.append(btn_del)
 
 	# Setup controller navigation after slots are created
 	await get_tree().process_frame
-	_setup_controller_navigation()
+	_setup_grid_navigation()
 
 # --- labels & actions ----------------------------------------------------------
 
@@ -279,51 +289,83 @@ func _on_close() -> void:
 	queue_free()
 
 # ------------------------------------------------------------------------------
-# Controller Navigation Helpers
+# 2D Grid Navigation Helpers
 # ------------------------------------------------------------------------------
 
-func _setup_controller_navigation() -> void:
-	"""Setup controller navigation for all save slot buttons"""
-	_all_buttons.clear()
+func _setup_grid_navigation() -> void:
+	"""Setup 2D grid navigation for save/delete buttons"""
+	# Start at first save button
+	_current_row = 0
+	_current_column = 0
+	_highlight_current_button()
 
-	# Collect all buttons from each slot row (Save and Delete buttons)
-	for row in _slots.get_children():
-		if row is HBoxContainer:
-			for child in row.get_children():
-				if child is Button:
-					_all_buttons.append(child)
+	print("[SaveMenu] Grid navigation setup complete. %d save buttons, %d delete buttons" % [_save_buttons.size(), _delete_buttons.size()])
 
-	# Start with first button selected
-	if _all_buttons.size() > 0:
-		_selected_button_index = 0
-		_highlight_button(_selected_button_index)
-
-	print("[SaveMenu] Navigation setup complete. ", _all_buttons.size(), " buttons")
-
-func _navigate_buttons(direction: int) -> void:
-	"""Navigate through buttons with controller"""
-	if _all_buttons.is_empty():
+func _navigate_grid_vertical(direction: int) -> void:
+	"""Navigate up/down through rows in current column"""
+	if _save_buttons.is_empty():
 		return
 
-	_unhighlight_button(_selected_button_index)
+	_unhighlight_current_button()
 
-	_selected_button_index += direction
-	if _selected_button_index < 0:
-		_selected_button_index = _all_buttons.size() - 1
-	elif _selected_button_index >= _all_buttons.size():
-		_selected_button_index = 0
+	_current_row += direction
 
-	_highlight_button(_selected_button_index)
+	# Wrap around within current column
+	var max_rows = _save_buttons.size()
+	if _current_row < 0:
+		_current_row = max_rows - 1
+	elif _current_row >= max_rows:
+		_current_row = 0
 
-func _highlight_button(index: int) -> void:
-	"""Highlight a button"""
-	if index >= 0 and index < _all_buttons.size():
-		var button = _all_buttons[index]
+	_highlight_current_button()
+
+func _navigate_grid_horizontal(direction: int) -> void:
+	"""Navigate left/right between columns (Save/Delete)"""
+	if _save_buttons.is_empty():
+		return
+
+	_unhighlight_current_button()
+
+	_current_column += direction
+
+	# Clamp to 2 columns (0 = Save, 1 = Delete)
+	if _current_column < 0:
+		_current_column = 1
+	elif _current_column > 1:
+		_current_column = 0
+
+	_highlight_current_button()
+
+func _activate_current_button() -> void:
+	"""Activate the currently selected button"""
+	var button: Button = _get_current_button()
+	if button:
+		print("[SaveMenu] Activating button: %s" % button.text)
+		button.emit_signal("pressed")
+
+func _get_current_button() -> Button:
+	"""Get the button at current grid position"""
+	if _current_row < 0:
+		return null
+
+	if _current_column == 0:
+		if _current_row < _save_buttons.size():
+			return _save_buttons[_current_row]
+	elif _current_column == 1:
+		if _current_row < _delete_buttons.size():
+			return _delete_buttons[_current_row]
+
+	return null
+
+func _highlight_current_button() -> void:
+	"""Highlight the button at current grid position"""
+	var button: Button = _get_current_button()
+	if button:
 		button.modulate = Color(1.2, 1.2, 0.8, 1.0)
 		button.grab_focus()
 
-func _unhighlight_button(index: int) -> void:
-	"""Remove highlight from a button"""
-	if index >= 0 and index < _all_buttons.size():
-		var button = _all_buttons[index]
+func _unhighlight_current_button() -> void:
+	"""Remove highlight from the button at current grid position"""
+	var button: Button = _get_current_button()
+	if button:
 		button.modulate = Color(1.0, 1.0, 1.0, 1.0)
