@@ -130,9 +130,10 @@ var first_name_label: Label = null
 var last_name_label: Label = null
 
 # Stat selection state
-var stat_focused_index: int = 0  # Which stat is currently focused (0-4)
+var stat_focused_index: int = 0  # Which stat is currently focused (0-4 for stats, 5 for Continue button)
 var stat_selected: Array[bool] = [false, false, false, false, false]  # Which stats are selected
 var stat_panels: Array = []  # References to stat panel containers
+var stat_continue_button: Button = null  # Reference to Continue button
 
 # Keyboard navigation state
 var keyboard_buttons: Array = []  # All keyboard buttons
@@ -1578,14 +1579,14 @@ func _build_stat_selection_ui() -> void:
 	var continue_btn_container = CenterContainer.new()
 	stat_selection_container.add_child(continue_btn_container)
 
-	var continue_btn = Button.new()
-	continue_btn.text = "Continue"
-	continue_btn.name = "ContinueButton"
-	continue_btn.custom_minimum_size = Vector2(200, 50)
-	continue_btn.add_theme_font_size_override("font_size", 16)
-	continue_btn.disabled = true  # Disabled until 3 stats selected
-	continue_btn.pressed.connect(_on_stats_accepted)
-	continue_btn_container.add_child(continue_btn)
+	stat_continue_button = Button.new()
+	stat_continue_button.text = "Continue"
+	stat_continue_button.name = "ContinueButton"
+	stat_continue_button.custom_minimum_size = Vector2(200, 50)
+	stat_continue_button.add_theme_font_size_override("font_size", 16)
+	stat_continue_button.disabled = true  # Disabled until 3 stats selected
+	stat_continue_button.pressed.connect(_on_stats_accepted)
+	continue_btn_container.add_child(stat_continue_button)
 
 	# Fade in
 	stat_selection_container.modulate = Color(1, 1, 1, 0)
@@ -1593,16 +1594,24 @@ func _build_stat_selection_ui() -> void:
 	tween.tween_property(stat_selection_container, "modulate", Color(1, 1, 1, 1), 0.5)
 
 func _handle_stat_navigation(direction: int) -> void:
-	"""Handle up/down navigation in stat selection"""
+	"""Handle up/down navigation in stat selection (0-4 for stats, 5 for Continue button)"""
 	# Update focused index
 	stat_focused_index += direction
-	stat_focused_index = clamp(stat_focused_index, 0, 4)
+	stat_focused_index = clamp(stat_focused_index, 0, 5)  # 0-4 stats, 5 is Continue button
 
 	# Update visual focus
 	_update_stat_visual_states()
 
 func _handle_stat_toggle() -> void:
-	"""Toggle the currently focused stat"""
+	"""Toggle the currently focused stat or press Continue button"""
+	# If focused on Continue button (index 5), press it
+	if stat_focused_index == 5:
+		if stat_continue_button and not stat_continue_button.disabled:
+			print("[Stat Selection] Pressing Continue button")
+			_on_stats_accepted()
+		return
+
+	# Otherwise toggle the stat
 	# Check if we can toggle
 	var selected_count = stat_selected.count(true)
 
@@ -1621,7 +1630,8 @@ func _handle_stat_toggle() -> void:
 	_update_continue_button()
 
 func _update_stat_visual_states() -> void:
-	"""Update the visual state of all stat panels"""
+	"""Update the visual state of all stat panels and Continue button"""
+	# Update stat panels
 	for i in range(stat_panels.size()):
 		var panel = stat_panels[i]
 		if not panel:
@@ -1660,6 +1670,15 @@ func _update_stat_visual_states() -> void:
 				checkbox.add_theme_color_override("font_color", Color(0.4, 1.0, 0.4, 1.0))  # Green when selected
 			else:
 				checkbox.add_theme_color_override("font_color", Color.WHITE)
+
+	# Update Continue button visual state
+	if stat_continue_button:
+		if stat_focused_index == 5:
+			# Focused - pink modulate
+			stat_continue_button.modulate = Color(1.0, 0.7, 0.75, 1.0)
+		else:
+			# Not focused - normal
+			stat_continue_button.modulate = Color.WHITE
 
 func _update_continue_button() -> void:
 	"""Enable/disable the Continue button based on selection count"""
