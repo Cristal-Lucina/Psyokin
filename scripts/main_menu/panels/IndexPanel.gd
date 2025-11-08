@@ -12,6 +12,19 @@ class_name IndexPanel
 
 enum Filter { TUTORIALS, ENEMIES, MISSIONS, LOCATIONS, LORE }
 
+# Panel animation settings
+const BASE_LEFT_RATIO := 2.0
+const BASE_CENTER_RATIO := 3.5
+const BASE_RIGHT_RATIO := 4.5
+const ACTIVE_SCALE := 1.10  # Active panel grows by 10%
+const INACTIVE_SCALE := 0.95  # Inactive panels shrink by 5%
+const ANIM_DURATION := 0.2  # Animation duration in seconds
+
+# Panel references (for animation)
+@onready var _category_panel: PanelContainer = %CategoryPanel
+@onready var _content_panel: PanelContainer = %ContentPanel
+@onready var _details_panel: PanelContainer = %DetailsPanel
+
 @onready var _category_list : ItemList      = $Root/CategoryPanel/CategoryColumn/CategoryList
 @onready var _entry_list    : ItemList      = $Root/ContentPanel/ContentColumn/EntryList
 @onready var _detail        : RichTextLabel = $Root/DetailsPanel/DetailsColumn/Detail
@@ -79,6 +92,7 @@ func _input(event: InputEvent) -> void:
 				if _entry_list.item_count > 0:
 					_entry_list.select(0)
 					_on_entry_selected(0)
+				_animate_panel_focus()
 				get_viewport().set_input_as_handled()
 				return
 	elif _focus_mode == "entries":
@@ -87,6 +101,7 @@ func _input(event: InputEvent) -> void:
 			# Move back to category list
 			_focus_mode = "category"
 			_category_list.grab_focus()
+			_animate_panel_focus()
 			get_viewport().set_input_as_handled()
 			return
 
@@ -97,6 +112,7 @@ func _on_panel_gained_focus() -> void:
 	_focus_mode = "category"
 	if _category_list:
 		_category_list.grab_focus()
+	_animate_panel_focus()
 
 func _on_index_changed(_cat: String) -> void:
 	_rebuild()
@@ -113,6 +129,7 @@ func _on_category_activated(_idx: int) -> void:
 		if _entry_list.item_count > 0:
 			_entry_list.select(0)
 			_on_entry_selected(0)
+		_animate_panel_focus()
 
 func _on_entry_selected(_idx: int) -> void:
 	# Update details when entry is selected
@@ -157,6 +174,35 @@ func _rebuild() -> void:
 		_update_detail(items[0])
 	else:
 		_detail.text = "[i]No entries yet.[/i]"
+
+func _animate_panel_focus() -> void:
+	"""Animate panels to highlight which one is currently active"""
+	if not _category_panel or not _content_panel or not _details_panel:
+		return
+
+	var left_ratio := BASE_LEFT_RATIO
+	var center_ratio := BASE_CENTER_RATIO
+	var right_ratio := BASE_RIGHT_RATIO  # Details panel always stays at base size
+
+	# Determine which panel gets the active scale (only left and center panels animate)
+	if _focus_mode == "category":
+		left_ratio = BASE_LEFT_RATIO * ACTIVE_SCALE
+		center_ratio = BASE_CENTER_RATIO * INACTIVE_SCALE
+		# right_ratio stays at BASE_RIGHT_RATIO
+	elif _focus_mode == "entries":
+		left_ratio = BASE_LEFT_RATIO * INACTIVE_SCALE
+		center_ratio = BASE_CENTER_RATIO * ACTIVE_SCALE
+		# right_ratio stays at BASE_RIGHT_RATIO
+
+	# Create tweens for smooth animation
+	var tween := create_tween()
+	tween.set_parallel(true)
+	tween.set_trans(Tween.TRANS_CUBIC)
+	tween.set_ease(Tween.EASE_OUT)
+
+	tween.tween_property(_category_panel, "size_flags_stretch_ratio", left_ratio, ANIM_DURATION)
+	tween.tween_property(_content_panel, "size_flags_stretch_ratio", center_ratio, ANIM_DURATION)
+	tween.tween_property(_details_panel, "size_flags_stretch_ratio", right_ratio, ANIM_DURATION)
 
 # --- Data source ---------------------------------------------------------------
 
