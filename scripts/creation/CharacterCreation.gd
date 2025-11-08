@@ -693,6 +693,13 @@ func _opt_text(ob: OptionButton) -> String:
 # ── Cinematic Setup ──────────────────────────────────────────────────────────
 func _setup_cinematic() -> void:
 	"""Initialize the cinematic layer and start the opening sequence"""
+	# Set ControllerManager context to CHARACTER_CREATION
+	# This prevents ControllerManager from interfering with UI navigation
+	var controller_manager = get_node_or_null("/root/aControllerManager")
+	if controller_manager:
+		controller_manager.set_context(controller_manager.InputContext.CHARACTER_CREATION)
+		print("[CharacterCreation] Set ControllerManager context to CHARACTER_CREATION")
+
 	# Create cinematic overlay
 	cinematic_layer = CanvasLayer.new()
 	cinematic_layer.layer = 100  # Render above everything
@@ -1011,6 +1018,12 @@ func _advance_stage() -> void:
 
 func _complete_cinematic() -> void:
 	"""Complete the cinematic and save character"""
+	# Restore ControllerManager context to OVERWORLD
+	var controller_manager = get_node_or_null("/root/aControllerManager")
+	if controller_manager:
+		controller_manager.set_context(controller_manager.InputContext.OVERWORLD)
+		print("[CharacterCreation] Restored ControllerManager context to OVERWORLD")
+
 	cinematic_active = false
 	_apply_character_creation()
 
@@ -2045,6 +2058,12 @@ func _on_confirmation_no() -> void:
 	if cinematic_layer:
 		cinematic_layer.queue_free()
 		cinematic_layer = null
+
+	# Restore ControllerManager context to OVERWORLD
+	var controller_manager = get_node_or_null("/root/aControllerManager")
+	if controller_manager:
+		controller_manager.set_context(controller_manager.InputContext.OVERWORLD)
+		print("[CharacterCreation] Restored ControllerManager context to OVERWORLD (No confirmation)")
 
 	cinematic_active = false
 
