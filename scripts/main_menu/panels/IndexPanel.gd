@@ -13,7 +13,7 @@ class_name IndexPanel
 enum Filter { TUTORIALS, ENEMIES, MISSIONS, LOCATIONS, LORE }
 
 @onready var _category_list : ItemList      = $Root/CategoryPanel/CategoryColumn/CategoryList
-@onready var _list          : VBoxContainer = $Root/ContentPanel/ContentColumn/Scroll/List
+@onready var _entry_list    : ItemList      = $Root/ContentPanel/ContentColumn/EntryList
 @onready var _detail        : RichTextLabel = $Root/DetailsPanel/DetailsColumn/Detail
 
 func _ready() -> void:
@@ -41,6 +41,15 @@ func _ready() -> void:
 		_category_list.item_selected.connect(_on_category_selected)
 	if not _category_list.item_activated.is_connected(_on_category_activated):
 		_category_list.item_activated.connect(_on_category_activated)
+
+	# Connect entry list signals
+	if not _entry_list.item_selected.is_connected(_on_entry_selected):
+		_entry_list.item_selected.connect(_on_entry_selected)
+
+	# Enable hover detection by connecting to gui_input
+	_entry_list.mouse_filter = Control.MOUSE_FILTER_PASS
+	if not _entry_list.gui_input.is_connected(_on_entry_list_gui_input):
+		_entry_list.gui_input.connect(_on_entry_list_gui_input)
 
 	# Live updates if the system emits changes (use safe lookup, no direct symbol)
 	var idx: Node = get_node_or_null("/root/aIndexSystem")
@@ -71,12 +80,35 @@ func _on_category_selected(_idx: int) -> void:
 	_rebuild()
 
 func _on_category_activated(_idx: int) -> void:
-	_rebuild()
+	# Move focus to entry list when category is activated
+	if _entry_list and _entry_list.item_count > 0:
+		_entry_list.grab_focus()
+		_entry_list.select(0)
+		_on_entry_selected(0)
+
+func _on_entry_selected(_idx: int) -> void:
+	# Update details when entry is selected
+	if _idx < 0 or _idx >= _entry_list.item_count:
+		return
+	var entry_data: Dictionary = _entry_list.get_item_metadata(_idx)
+	_update_detail(entry_data)
+
+func _on_entry_list_gui_input(event: InputEvent) -> void:
+	# Update details on hover
+	if event is InputEventMouseMotion:
+		var hovered_idx := _entry_list.get_item_at_position(event.position, true)
+		if hovered_idx >= 0:
+			var entry_data: Dictionary = _entry_list.get_item_metadata(hovered_idx)
+			_update_detail(entry_data)
+
+func _update_detail(entry: Dictionary) -> void:
+	var title: String = String(entry.get("title", "Untitled"))
+	var body: String  = String(entry.get("body", ""))
+	_detail.text = "[b]%s[/b]\n\n%s" % [title, (body if body != "" else "[i]No details yet.[/i]")]
 
 func _rebuild() -> void:
-	# Clear list
-	for c in _list.get_children():
-		c.queue_free()
+	# Clear entry list
+	_entry_list.clear()
 
 	var cat_id: int = Filter.TUTORIALS
 	var selected_items := _category_list.get_selected_items()
@@ -88,21 +120,13 @@ func _rebuild() -> void:
 
 	for entry in items:
 		var title: String = String(entry.get("title", "Untitled"))
-		var body: String  = String(entry.get("body", ""))
-		var b := Button.new()
-		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		b.text = title
-		b.pressed.connect(func() -> void:
-			_detail.text = "[b]%s[/b]\n\n%s" % [title, (body if body != "" else "[i]No details yet.[/i]")]
-		)
-		_list.add_child(b)
+		_entry_list.add_item(title)
+		var item_idx := _entry_list.item_count - 1
+		_entry_list.set_item_metadata(item_idx, entry)
 
 	if items.size() > 0:
-		var first: Dictionary = items[0]
-		_detail.text = "[b]%s[/b]\n\n%s" % [
-			String(first.get("title","Untitled")),
-			String(first.get("body","[i]No details yet.[/i]"))
-		]
+		_entry_list.select(0)
+		_update_detail(items[0])
 	else:
 		_detail.text = "[i]No entries yet.[/i]"
 

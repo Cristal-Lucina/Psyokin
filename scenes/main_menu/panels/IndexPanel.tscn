@@ -68,17 +68,9 @@ horizontal_alignment = 0
 [node name="Separator" type="HSeparator" parent="Root/ContentPanel/ContentColumn"]
 layout_mode = 2
 
-[node name="Scroll" type="ScrollContainer" parent="Root/ContentPanel/ContentColumn"]
-custom_minimum_size = Vector2(0, 280)
+[node name="EntryList" type="ItemList" parent="Root/ContentPanel/ContentColumn"]
 layout_mode = 2
-size_flags_horizontal = 3
 size_flags_vertical = 3
-
-[node name="List" type="VBoxContainer" parent="Root/ContentPanel/ContentColumn/Scroll"]
-layout_mode = 2
-size_flags_horizontal = 3
-size_flags_vertical = 3
-theme_override_constants/separation = 6
 
 [node name="DetailsPanel" type="PanelContainer" parent="Root"]
 custom_minimum_size = Vector2(320, 0)
