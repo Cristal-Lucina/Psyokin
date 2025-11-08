@@ -3,11 +3,38 @@ class_name CharacterCreation
 
 signal creation_applied
 
+# Cinematic stages
+enum CinematicStage {
+	OPENING_DIALOGUE_1,    # "Oh, I think they are regaining consciousness.."
+	OPENING_DIALOGUE_2,    # "Check if they are aware."
+	OPENING_DIALOGUE_3,    # "Hey, do you remember your name?"
+	NAME_INPUT,            # Name input with validation
+	DIALOGUE_RESPONSE_1,   # "They're speaking..."
+	DIALOGUE_RESPONSE_2,   # "Nurse, go check..."
+	DIALOGUE_RESPONSE_3,   # "You got it doctor..."
+	DIALOGUE_QUESTION,     # "What does it read."
+	STAT_SELECTION,        # Choose 3 stats
+	PERK_QUESTION,         # "Choose a perk."
+	PERK_SELECTION,        # Show 3 perks based on stats
+	NURSE_RESPONSES,       # Nurse responses based on picks
+	DIALOGUE_BANDAGES,     # "Ok, I think we can remove the bandages now."
+	DIALOGUE_MEMORY,       # "Let's check your memory."
+	DIALOGUE_MIRROR,       # "Do you recognize the person in the mirror?"
+	CHARACTER_CUSTOMIZATION, # Pronoun, body, outfit, hair, hat
+	FINAL_CONFIRMATION,    # "Does everything seem correct?"
+	COMPLETE               # End of cinematic
+}
+
 # Styling constants (matching LoadoutPanel)
 const PANEL_BG_COLOR := Color(0.15, 0.15, 0.15, 1.0)  # Dark gray, fully opaque
 const PANEL_BORDER_COLOR := Color(1.0, 0.7, 0.75, 1.0)  # Pink border
 const PANEL_BORDER_WIDTH := 2
 const PANEL_CORNER_RADIUS := 8
+
+# Cinematic constants
+const LETTER_REVEAL_SPEED := 0.3   # 0.3 seconds per letter
+const DIALOGUE_PAUSE := 1.5        # Pause between dialogue lines
+const NURSE_RESPONSE_PAUSE := 2.0  # Pause between nurse responses
 
 # ── Autoload paths ────────────────────────────────────────────────────────────
 const GS_PATH      := "/root/aGameState"
@@ -81,9 +108,31 @@ var selected_variants = {}  # Track variant codes for connecting animations
 var animation_timer = 0.0
 var animation_speed = 0.135  # 135ms per frame for walk
 
+# Cinematic state
+var current_stage: CinematicStage = CinematicStage.OPENING_DIALOGUE_1
+var cinematic_active: bool = true
+var typing_active: bool = false
+var typing_timer: float = 0.0
+var typing_text: String = ""
+var typing_index: int = 0
+var typing_target_label: Label = null
+var stage_timer: float = 0.0
+var nurse_response_index: int = 0
+var cinematic_name: String = ""
+var cinematic_surname: String = ""
+
+# Cinematic UI references (will be created dynamically)
+var cinematic_layer: CanvasLayer = null
+var dialogue_label: Label = null
+var name_input_container: Control = null
+var stat_selection_container: Control = null
+var perk_selection_container: Control = null
+var customization_container: Control = null
+var confirmation_container: Control = null
+
 # ── ready ────────────────────────────────────────────────────────────────────
 func _ready() -> void:
-	print("Character Creation starting...")
+	print("Character Creation starting with cinematic opening...")
 
 	# Apply LoadoutPanel styling to all panels
 	_style_panels()
@@ -119,6 +168,10 @@ func _ready() -> void:
 	set_default_character()
 	update_preview()
 	_update_confirm_enabled()
+
+	# Initialize cinematic opening
+	_setup_cinematic()
+	_hide_form()  # Hide the form initially - only shows if player says "No" at end
 
 func _style_panels() -> void:
 	"""Apply LoadoutPanel styling (dark gray background with pink border) to all panels"""
@@ -194,6 +247,10 @@ func _process(delta):
 		animation_timer = 0.0
 		current_frame = (current_frame + 1) % 6  # Walk has 6 frames (0-5)
 		update_frame_display()
+
+	# Handle cinematic typing effect and stage transitions
+	if cinematic_active:
+		_process_cinematic(delta)
 
 # ── Character Asset Scanning ─────────────────────────────────────────────────
 func scan_character_assets():
@@ -343,12 +400,12 @@ func _on_hat_selected(idx: int):
 
 # ── UI fill / wiring ─────────────────────────────────────────────────────────
 func _fill_basics() -> void:
-	# Name fields: max 10 characters each
+	# Name fields: max 8 characters each
 	if _name_in:
-		_name_in.max_length = 10
+		_name_in.max_length = 8
 		_name_in.placeholder_text = "First Name"
 	if _surname_in:
-		_surname_in.max_length = 10
+		_surname_in.max_length = 8
 		_surname_in.placeholder_text = "Last Name"
 
 	# Pronouns
@@ -603,6 +660,933 @@ func _opt_text(ob: OptionButton) -> String:
 	var i: int = ob.get_selected()
 	if i < 0: i = 0
 	return ob.get_item_text(i)
+
+# ══════════════════════════════════════════════════════════════════════════════
+# CINEMATIC OPENING SYSTEM
+# ══════════════════════════════════════════════════════════════════════════════
+
+# ── Cinematic Setup ──────────────────────────────────────────────────────────
+func _setup_cinematic() -> void:
+	"""Initialize the cinematic layer and start the opening sequence"""
+	# Create cinematic overlay
+	cinematic_layer = CanvasLayer.new()
+	cinematic_layer.layer = 100  # Render above everything
+	add_child(cinematic_layer)
+
+	# Create black background
+	var bg = ColorRect.new()
+	bg.color = Color.BLACK
+	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	cinematic_layer.add_child(bg)
+
+	# Create dialogue label (for typing text)
+	dialogue_label = Label.new()
+	dialogue_label.set_anchors_preset(Control.PRESET_CENTER)
+	dialogue_label.anchor_left = 0.5
+	dialogue_label.anchor_top = 0.5
+	dialogue_label.anchor_right = 0.5
+	dialogue_label.anchor_bottom = 0.5
+	dialogue_label.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	dialogue_label.grow_vertical = Control.GROW_DIRECTION_BOTH
+	dialogue_label.pivot_offset = dialogue_label.size / 2
+	dialogue_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	dialogue_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	dialogue_label.add_theme_font_size_override("font_size", 18)
+	dialogue_label.add_theme_color_override("font_color", Color.WHITE)
+	dialogue_label.text = ""
+	cinematic_layer.add_child(dialogue_label)
+
+	# Start first stage
+	_enter_stage(CinematicStage.OPENING_DIALOGUE_1)
+
+func _hide_form() -> void:
+	"""Hide the standard character creation form"""
+	var margin = get_node_or_null("Margin")
+	if margin:
+		margin.visible = false
+
+func _show_form() -> void:
+	"""Show the standard character creation form (fallback)"""
+	var margin = get_node_or_null("Margin")
+	if margin:
+		margin.visible = true
+
+# ── Typing Effect System ─────────────────────────────────────────────────────
+func _start_typing(text: String, target_label: Label = null) -> void:
+	"""Start typing effect for given text"""
+	typing_active = true
+	typing_text = text
+	typing_index = 0
+	typing_timer = 0.0
+	typing_target_label = target_label if target_label else dialogue_label
+
+	if typing_target_label:
+		typing_target_label.text = ""
+
+func _process_typing(delta: float) -> void:
+	"""Process letter-by-letter typing effect"""
+	if not typing_active:
+		return
+
+	typing_timer += delta
+	if typing_timer >= LETTER_REVEAL_SPEED:
+		typing_timer = 0.0
+		if typing_index < typing_text.length():
+			typing_index += 1
+			if typing_target_label:
+				typing_target_label.text = typing_text.substr(0, typing_index)
+		else:
+			# Typing complete
+			typing_active = false
+			_on_typing_complete()
+
+func _on_typing_complete() -> void:
+	"""Called when typing animation finishes"""
+	# Start stage timer for auto-advance (for dialogue stages)
+	stage_timer = 0.0
+
+# ── Cinematic Process Loop ───────────────────────────────────────────────────
+func _process_cinematic(delta: float) -> void:
+	"""Main cinematic update loop"""
+	# Process typing
+	if typing_active:
+		_process_typing(delta)
+	else:
+		# Process stage timer (for auto-advancing dialogue)
+		stage_timer += delta
+
+	# Handle stage-specific updates
+	match current_stage:
+		CinematicStage.OPENING_DIALOGUE_1, CinematicStage.OPENING_DIALOGUE_2, CinematicStage.OPENING_DIALOGUE_3:
+			if not typing_active and stage_timer >= DIALOGUE_PAUSE:
+				_advance_stage()
+		CinematicStage.DIALOGUE_RESPONSE_1, CinematicStage.DIALOGUE_RESPONSE_2, CinematicStage.DIALOGUE_RESPONSE_3:
+			if not typing_active and stage_timer >= DIALOGUE_PAUSE:
+				_advance_stage()
+		CinematicStage.DIALOGUE_QUESTION:
+			if not typing_active and stage_timer >= DIALOGUE_PAUSE:
+				_advance_stage()
+		CinematicStage.PERK_QUESTION:
+			if not typing_active and stage_timer >= DIALOGUE_PAUSE:
+				_advance_stage()
+		CinematicStage.NURSE_RESPONSES:
+			_process_nurse_responses(delta)
+		CinematicStage.DIALOGUE_BANDAGES, CinematicStage.DIALOGUE_MEMORY, CinematicStage.DIALOGUE_MIRROR:
+			if not typing_active and stage_timer >= DIALOGUE_PAUSE:
+				_advance_stage()
+
+func _process_nurse_responses(delta: float) -> void:
+	"""Process nurse responses one at a time"""
+	if not typing_active and stage_timer >= NURSE_RESPONSE_PAUSE:
+		nurse_response_index += 1
+		if nurse_response_index < 5:  # 5 stats total
+			_show_next_nurse_response()
+		else:
+			# All responses shown, advance to next stage
+			_advance_stage()
+
+# ── Stage Management ─────────────────────────────────────────────────────────
+func _enter_stage(stage: CinematicStage) -> void:
+	"""Enter a new cinematic stage"""
+	current_stage = stage
+	stage_timer = 0.0
+	typing_active = false
+	print("[Cinematic] Entering stage: ", CinematicStage.keys()[stage])
+
+	match stage:
+		CinematicStage.OPENING_DIALOGUE_1:
+			_start_typing("Oh, I think they are regaining consciousness..")
+		CinematicStage.OPENING_DIALOGUE_2:
+			_start_typing("Check if they are aware.")
+		CinematicStage.OPENING_DIALOGUE_3:
+			_start_typing("Hey, do you remember your name?")
+		CinematicStage.NAME_INPUT:
+			_build_name_input_ui()
+		CinematicStage.DIALOGUE_RESPONSE_1:
+			dialogue_label.text = ""
+			_start_typing("They're speaking and it seems their memory is intact!")
+		CinematicStage.DIALOGUE_RESPONSE_2:
+			_start_typing("Nurse, go check their vitals and reflexes.")
+		CinematicStage.DIALOGUE_RESPONSE_3:
+			_start_typing("You got it doctor...")
+		CinematicStage.DIALOGUE_QUESTION:
+			_start_typing("What does it read.")
+		CinematicStage.STAT_SELECTION:
+			_build_stat_selection_ui()
+		CinematicStage.PERK_QUESTION:
+			dialogue_label.text = ""
+			_start_typing("Choose a perk.")
+		CinematicStage.PERK_SELECTION:
+			_build_perk_selection_ui()
+		CinematicStage.NURSE_RESPONSES:
+			nurse_response_index = 0
+			dialogue_label.text = ""
+			_show_next_nurse_response()
+		CinematicStage.DIALOGUE_BANDAGES:
+			dialogue_label.text = ""
+			_start_typing("Ok, I think we can remove the bandages now.")
+		CinematicStage.DIALOGUE_MEMORY:
+			_start_typing("Let's check your memory.")
+		CinematicStage.DIALOGUE_MIRROR:
+			_start_typing("Do you recognize the person in the mirror?")
+		CinematicStage.CHARACTER_CUSTOMIZATION:
+			_build_customization_ui()
+		CinematicStage.FINAL_CONFIRMATION:
+			_build_confirmation_ui()
+		CinematicStage.COMPLETE:
+			_complete_cinematic()
+
+func _advance_stage() -> void:
+	"""Advance to the next cinematic stage"""
+	var next_stage = (current_stage + 1) as CinematicStage
+	_enter_stage(next_stage)
+
+func _complete_cinematic() -> void:
+	"""Complete the cinematic and save character"""
+	cinematic_active = false
+	_apply_character_creation()
+
+# ── Name Input UI ────────────────────────────────────────────────────────────
+func _build_name_input_ui() -> void:
+	"""Build the name input UI"""
+	# Hide dialogue label
+	if dialogue_label:
+		dialogue_label.visible = false
+
+	# Create name input container
+	name_input_container = VBoxContainer.new()
+	name_input_container.set_anchors_preset(Control.PRESET_CENTER)
+	name_input_container.anchor_left = 0.5
+	name_input_container.anchor_top = 0.5
+	name_input_container.anchor_right = 0.5
+	name_input_container.anchor_bottom = 0.5
+	name_input_container.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	name_input_container.grow_vertical = Control.GROW_DIRECTION_BOTH
+	name_input_container.add_theme_constant_override("separation", 20)
+	cinematic_layer.add_child(name_input_container)
+
+	# First name
+	var first_label = Label.new()
+	first_label.text = "First Name:"
+	first_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	first_label.add_theme_font_size_override("font_size", 14)
+	name_input_container.add_child(first_label)
+
+	var first_input = LineEdit.new()
+	first_input.max_length = 8
+	first_input.placeholder_text = "Enter first name"
+	first_input.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	first_input.custom_minimum_size = Vector2(300, 40)
+	first_input.add_theme_font_size_override("font_size", 16)
+	first_input.name = "FirstNameInput"
+	name_input_container.add_child(first_input)
+
+	# Last name
+	var last_label = Label.new()
+	last_label.text = "Last Name:"
+	last_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	last_label.add_theme_font_size_override("font_size", 14)
+	name_input_container.add_child(last_label)
+
+	var last_input = LineEdit.new()
+	last_input.max_length = 8
+	last_input.placeholder_text = "Enter last name"
+	last_input.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	last_input.custom_minimum_size = Vector2(300, 40)
+	last_input.add_theme_font_size_override("font_size", 16)
+	last_input.name = "LastNameInput"
+	name_input_container.add_child(last_input)
+
+	# Accept button
+	var accept_btn = Button.new()
+	accept_btn.text = "Accept"
+	accept_btn.custom_minimum_size = Vector2(200, 50)
+	accept_btn.add_theme_font_size_override("font_size", 16)
+	accept_btn.pressed.connect(_on_name_accepted)
+	var btn_container = CenterContainer.new()
+	btn_container.add_child(accept_btn)
+	name_input_container.add_child(btn_container)
+
+	# Connect text changed to validate letters only
+	first_input.text_changed.connect(_validate_name_input.bind(first_input))
+	last_input.text_changed.connect(_validate_name_input.bind(last_input))
+
+	# Fade in the container
+	name_input_container.modulate = Color(1, 1, 1, 0)
+	var tween = create_tween()
+	tween.tween_property(name_input_container, "modulate", Color(1, 1, 1, 1), 0.5)
+
+func _validate_name_input(new_text: String, line_edit: LineEdit) -> void:
+	"""Validate that input contains only letters"""
+	var regex = RegEx.new()
+	regex.compile("[^a-zA-Z]")
+	var cleaned = regex.sub(new_text, "", true)
+	if cleaned != new_text:
+		line_edit.text = cleaned
+		line_edit.caret_column = cleaned.length()
+
+func _on_name_accepted() -> void:
+	"""Handle name input acceptance"""
+	if name_input_container:
+		var first_input = name_input_container.get_node_or_null("FirstNameInput")
+		var last_input = name_input_container.get_node_or_null("LastNameInput")
+
+		if first_input and last_input:
+			cinematic_name = first_input.text.strip_edges()
+			cinematic_surname = last_input.text.strip_edges()
+
+			if cinematic_name.is_empty() or cinematic_surname.is_empty():
+				OS.alert("Please enter both first and last name.", "Name Required")
+				return
+
+			# Store in the existing form fields too
+			if _name_in:
+				_name_in.text = cinematic_name
+			if _surname_in:
+				_surname_in.text = cinematic_surname
+
+			# Fade out and advance
+			var tween = create_tween()
+			tween.tween_property(name_input_container, "modulate", Color(1, 1, 1, 0), 0.5)
+			tween.tween_callback(func():
+				name_input_container.queue_free()
+				name_input_container = null
+				dialogue_label.visible = true
+				_advance_stage()
+			)
+
+# ── Stat Selection UI ────────────────────────────────────────────────────────
+func _build_stat_selection_ui() -> void:
+	"""Build the stat selection UI with ItemList and details panel"""
+	# Hide dialogue label
+	if dialogue_label:
+		dialogue_label.visible = false
+
+	# Create stat selection container
+	stat_selection_container = Control.new()
+	stat_selection_container.set_anchors_preset(Control.PRESET_FULL_RECT)
+	cinematic_layer.add_child(stat_selection_container)
+
+	# Title
+	var title = Label.new()
+	title.text = "What are your strengths? Choose 3."
+	title.position = Vector2(0, 50)
+	title.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 20)
+	stat_selection_container.add_child(title)
+
+	# Main content container (centered)
+	var content = HBoxContainer.new()
+	content.set_anchors_preset(Control.PRESET_CENTER)
+	content.anchor_left = 0.5
+	content.anchor_top = 0.5
+	content.anchor_right = 0.5
+	content.anchor_bottom = 0.5
+	content.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	content.grow_vertical = Control.GROW_DIRECTION_BOTH
+	content.offset_left = -400
+	content.offset_top = -200
+	content.offset_right = 400
+	content.offset_bottom = 200
+	content.add_theme_constant_override("separation", 20)
+	stat_selection_container.add_child(content)
+
+	# Left panel: ItemList
+	var list_panel = _create_styled_panel()
+	list_panel.custom_minimum_size = Vector2(300, 400)
+	content.add_child(list_panel)
+
+	var list = ItemList.new()
+	list.name = "StatList"
+	list.add_item("BRAWN")
+	list.add_item("VITALITY")
+	list.add_item("TEMPO")
+	list.add_item("MIND")
+	list.add_item("FOCUS")
+	list.select_mode = ItemList.SELECT_MULTI
+	list.add_theme_font_size_override("font_size", 16)
+	list.item_selected.connect(_on_stat_item_selected)
+	list_panel.add_child(list)
+
+	# Right panel: Details
+	var details_panel = _create_styled_panel()
+	details_panel.custom_minimum_size = Vector2(450, 400)
+	content.add_child(details_panel)
+
+	var details_label = Label.new()
+	details_label.name = "DetailsLabel"
+	details_label.text = "Select a stat to see details."
+	details_label.autowrap_mode = TextServer.AUTOWRAP_WORD
+	details_label.vertical_alignment = VERTICAL_ALIGNMENT_TOP
+	details_label.add_theme_font_size_override("font_size", 14)
+	details_panel.add_child(details_label)
+
+	# Accept button
+	var accept_btn = Button.new()
+	accept_btn.text = "Accept"
+	accept_btn.position = Vector2(0, -80)
+	accept_btn.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	accept_btn.anchor_top = 1.0
+	accept_btn.anchor_bottom = 1.0
+	accept_btn.custom_minimum_size = Vector2(200, 50)
+	accept_btn.add_theme_font_size_override("font_size", 16)
+	accept_btn.pressed.connect(_on_stats_accepted)
+	stat_selection_container.add_child(accept_btn)
+
+	# Fade in
+	stat_selection_container.modulate = Color(1, 1, 1, 0)
+	var tween = create_tween()
+	tween.tween_property(stat_selection_container, "modulate", Color(1, 1, 1, 1), 0.5)
+
+func _on_stat_item_selected(index: int) -> void:
+	"""Handle stat selection and show details"""
+	if not stat_selection_container:
+		return
+
+	var list = stat_selection_container.get_node_or_null("StatList")
+	var details_label = stat_selection_container.get_node_or_null("DetailsLabel")
+
+	if not list or not details_label:
+		return
+
+	# Get selected items
+	var selected = list.get_selected_items()
+
+	# Limit to 3 selections
+	if selected.size() > 3:
+		# Deselect the item that was just selected
+		list.deselect(index)
+		selected = list.get_selected_items()
+
+	# Update visual feedback (highlight in green)
+	for i in range(list.item_count):
+		if i in selected:
+			list.set_item_custom_bg_color(i, Color(0.2, 0.6, 0.2, 0.5))  # Green
+		else:
+			list.set_item_custom_bg_color(i, Color(0, 0, 0, 0))  # Transparent
+
+	# Show details for the most recently selected item
+	if index >= 0:
+		var stat_descriptions = {
+			0: "BRAWN\n\nIncreases physical attack power and weapon damage. Essential for martial combat.",
+			1: "VITALITY\n\nIncreases maximum health points and physical defense. Keeps you alive longer in combat.\nMax HP = 60 + (VTL × Level × 6)",
+			2: "TEMPO\n\nControls initiative and action speed. Higher tempo means more turns and faster reactions.",
+			3: "MIND\n\nIncreases sigil power and skill damage. Critical for using psychic abilities effectively.",
+			4: "FOCUS\n\nIncreases maximum mental points and skill accuracy. Required for sustained ability usage.\nMax MP = 20 + (FCS × Level × 1.5)"
+		}
+		details_label.text = stat_descriptions.get(index, "Select a stat to see details.")
+
+func _on_stats_accepted() -> void:
+	"""Handle stat selection acceptance"""
+	if not stat_selection_container:
+		return
+
+	var list = stat_selection_container.get_node_or_null("StatList")
+	if not list:
+		return
+
+	var selected = list.get_selected_items()
+	if selected.size() != 3:
+		OS.alert("Please select exactly 3 stats.", "Selection Required")
+		return
+
+	# Convert selections to stat IDs and apply to form
+	var stat_ids = ["BRW", "VTL", "TPO", "MND", "FCS"]
+	_selected_order.clear()
+
+	# Deselect all first
+	if _brw_cb: _brw_cb.set_pressed_no_signal(false)
+	if _vtl_cb: _vtl_cb.set_pressed_no_signal(false)
+	if _tpo_cb: _tpo_cb.set_pressed_no_signal(false)
+	if _mnd_cb: _mnd_cb.set_pressed_no_signal(false)
+	if _fcs_cb: _fcs_cb.set_pressed_no_signal(false)
+
+	# Apply selections
+	for idx in selected:
+		var stat_id = stat_ids[idx]
+		_selected_order.append(stat_id)
+
+		# Check the corresponding checkbox
+		match stat_id:
+			"BRW": if _brw_cb: _brw_cb.set_pressed_no_signal(true)
+			"VTL": if _vtl_cb: _vtl_cb.set_pressed_no_signal(true)
+			"TPO": if _tpo_cb: _tpo_cb.set_pressed_no_signal(true)
+			"MND": if _mnd_cb: _mnd_cb.set_pressed_no_signal(true)
+			"FCS": if _fcs_cb: _fcs_cb.set_pressed_no_signal(true)
+
+	# Rebuild perk dropdown with new selections
+	_rebuild_perk_dropdown()
+
+	# Fade out and advance
+	var tween = create_tween()
+	tween.tween_property(stat_selection_container, "modulate", Color(1, 1, 1, 0), 0.5)
+	tween.tween_callback(func():
+		stat_selection_container.queue_free()
+		stat_selection_container = null
+		dialogue_label.visible = true
+		_advance_stage()
+	)
+
+# ── Perk Selection UI ────────────────────────────────────────────────────────
+func _build_perk_selection_ui() -> void:
+	"""Build the perk selection UI showing 3 perks based on chosen stats"""
+	# Hide dialogue label
+	if dialogue_label:
+		dialogue_label.visible = false
+
+	# Create perk selection container
+	perk_selection_container = Control.new()
+	perk_selection_container.set_anchors_preset(Control.PRESET_FULL_RECT)
+	cinematic_layer.add_child(perk_selection_container)
+
+	# Title
+	var title = Label.new()
+	title.text = "Choose a Perk"
+	title.position = Vector2(0, 50)
+	title.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 20)
+	perk_selection_container.add_child(title)
+
+	# Main content container
+	var content = HBoxContainer.new()
+	content.set_anchors_preset(Control.PRESET_CENTER)
+	content.anchor_left = 0.5
+	content.anchor_top = 0.5
+	content.anchor_right = 0.5
+	content.anchor_bottom = 0.5
+	content.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	content.grow_vertical = Control.GROW_DIRECTION_BOTH
+	content.offset_left = -400
+	content.offset_top = -200
+	content.offset_right = 400
+	content.offset_bottom = 200
+	content.add_theme_constant_override("separation", 20)
+	perk_selection_container.add_child(content)
+
+	# Left panel: Perk list
+	var list_panel = _create_styled_panel()
+	list_panel.custom_minimum_size = Vector2(300, 400)
+	content.add_child(list_panel)
+
+	var list = ItemList.new()
+	list.name = "PerkList"
+	list.add_theme_font_size_override("font_size", 16)
+	list.item_selected.connect(_on_perk_item_selected)
+	list_panel.add_child(list)
+
+	# Populate with available tier-1 perks
+	var perk_system = get_node_or_null(PERK_PATH)
+	if perk_system and perk_system.has_method("get_starting_options"):
+		var picks: Array[String] = []
+		for s in _selected_order:
+			picks.append(s)
+		var offers: Array = perk_system.call("get_starting_options", picks)
+
+		for offer in offers:
+			if typeof(offer) == TYPE_DICTIONARY:
+				var perk_name = str(offer.get("name", "Unknown Perk"))
+				list.add_item(perk_name)
+				list.set_item_metadata(list.item_count - 1, offer)
+
+	# Right panel: Details
+	var details_panel = _create_styled_panel()
+	details_panel.custom_minimum_size = Vector2(450, 400)
+	content.add_child(details_panel)
+
+	var details_label = Label.new()
+	details_label.name = "PerkDetailsLabel"
+	details_label.text = "Select a perk to see details."
+	details_label.autowrap_mode = TextServer.AUTOWRAP_WORD
+	details_label.vertical_alignment = VERTICAL_ALIGNMENT_TOP
+	details_label.add_theme_font_size_override("font_size", 14)
+	details_panel.add_child(details_label)
+
+	# Accept button
+	var accept_btn = Button.new()
+	accept_btn.text = "Accept"
+	accept_btn.position = Vector2(0, -80)
+	accept_btn.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	accept_btn.anchor_top = 1.0
+	accept_btn.anchor_bottom = 1.0
+	accept_btn.custom_minimum_size = Vector2(200, 50)
+	accept_btn.add_theme_font_size_override("font_size", 16)
+	accept_btn.pressed.connect(_on_perk_accepted)
+	perk_selection_container.add_child(accept_btn)
+
+	# Fade in
+	perk_selection_container.modulate = Color(1, 1, 1, 0)
+	var tween = create_tween()
+	tween.tween_property(perk_selection_container, "modulate", Color(1, 1, 1, 1), 0.5)
+
+func _on_perk_item_selected(index: int) -> void:
+	"""Handle perk selection and show details"""
+	if not perk_selection_container:
+		return
+
+	var list = perk_selection_container.get_node_or_null("PerkList")
+	var details_label = perk_selection_container.get_node_or_null("PerkDetailsLabel")
+
+	if not list or not details_label:
+		return
+
+	var perk_data = list.get_item_metadata(index)
+	if typeof(perk_data) == TYPE_DICTIONARY:
+		var stat = str(perk_data.get("stat", ""))
+		var name = str(perk_data.get("name", "Unknown"))
+		var desc = str(perk_data.get("desc", "No description available."))
+		details_label.text = "%s - %s\n\n%s" % [stat, name, desc]
+
+func _on_perk_accepted() -> void:
+	"""Handle perk selection acceptance"""
+	if not perk_selection_container:
+		return
+
+	var list = perk_selection_container.get_node_or_null("PerkList")
+	if not list:
+		return
+
+	var selected = list.get_selected_items()
+	if selected.is_empty():
+		OS.alert("Please select a perk.", "Selection Required")
+		return
+
+	# Get selected perk and apply to form
+	var perk_data = list.get_item_metadata(selected[0])
+	if typeof(perk_data) == TYPE_DICTIONARY:
+		var perk_id = str(perk_data.get("id", ""))
+
+		# Find and select this perk in the original dropdown
+		if _perk_in:
+			for i in range(_perk_in.item_count):
+				if _perk_id_by_idx.get(i, "") == perk_id:
+					_perk_in.select(i)
+					break
+
+	# Fade out and advance
+	var tween = create_tween()
+	tween.tween_property(perk_selection_container, "modulate", Color(1, 1, 1, 0), 0.5)
+	tween.tween_callback(func():
+		perk_selection_container.queue_free()
+		perk_selection_container = null
+		dialogue_label.visible = true
+		_advance_stage()
+	)
+
+# ── Nurse Responses ──────────────────────────────────────────────────────────
+func _show_next_nurse_response() -> void:
+	"""Show the next nurse response based on stat selections"""
+	var stat_ids = ["BRW", "VTL", "TPO", "MND", "FCS"]
+	var stat_names = ["BRAWN", "VITALITY", "TEMPO", "MIND", "FOCUS"]
+
+	if nurse_response_index >= 5:
+		return
+
+	var stat_id = stat_ids[nurse_response_index]
+	var stat_name = stat_names[nurse_response_index]
+	var is_selected = _selected_order.has(stat_id)
+
+	var responses_positive = {
+		"BRW": "They have a strong grip!",
+		"VTL": "I'm surprised with how fast they heal.",
+		"TPO": "Reflexes check out great.",
+		"MND": "The EEG test shows massive neural activity!",
+		"FCS": "The auditory test shows superb focus."
+	}
+
+	var responses_negative = {
+		"BRW": "Their grip is still a bit weak.",
+		"VTL": "Some of these wounds still haven't healed.",
+		"TPO": "Reflexes seem out of sync.",
+		"MND": "The EEG indicates recovering neural activity.",
+		"FCS": "Not very responsive to the auditory test."
+	}
+
+	var response = responses_positive[stat_id] if is_selected else responses_negative[stat_id]
+
+	# Add current responses to dialogue
+	if dialogue_label.text.is_empty():
+		dialogue_label.text = response
+	else:
+		dialogue_label.text += "\n\n" + response
+
+	stage_timer = 0.0
+
+# ── Character Customization UI ───────────────────────────────────────────────
+func _build_customization_ui() -> void:
+	"""Build character customization UI (pronoun, body, outfit, hair, hat)"""
+	# Hide dialogue label
+	if dialogue_label:
+		dialogue_label.visible = false
+
+	# Create customization container
+	customization_container = Control.new()
+	customization_container.set_anchors_preset(Control.PRESET_FULL_RECT)
+	cinematic_layer.add_child(customization_container)
+
+	# Title
+	var title = Label.new()
+	title.text = "Customize Your Appearance"
+	title.position = Vector2(0, 30)
+	title.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 20)
+	customization_container.add_child(title)
+
+	# Main container
+	var main = HBoxContainer.new()
+	main.set_anchors_preset(Control.PRESET_CENTER)
+	main.anchor_left = 0.5
+	main.anchor_top = 0.5
+	main.anchor_right = 0.5
+	main.anchor_bottom = 0.5
+	main.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	main.grow_vertical = Control.GROW_DIRECTION_BOTH
+	main.offset_left = -500
+	main.offset_top = -250
+	main.offset_right = 500
+	main.offset_bottom = 250
+	main.add_theme_constant_override("separation", 30)
+	customization_container.add_child(main)
+
+	# Left: Options
+	var options_panel = _create_styled_panel()
+	options_panel.custom_minimum_size = Vector2(400, 500)
+	main.add_child(options_panel)
+
+	var options = VBoxContainer.new()
+	options.add_theme_constant_override("separation", 15)
+	options_panel.add_child(options)
+
+	# Create new dropdowns that mirror the original ones
+	var pronoun_dd = OptionButton.new()
+	pronoun_dd.name = "CinematicPronoun"
+	for i in range(_pron_in.item_count):
+		pronoun_dd.add_item(_pron_in.get_item_text(i))
+	pronoun_dd.select(_pron_in.get_selected())
+	pronoun_dd.item_selected.connect(_on_cinematic_dropdown_changed.bind("pronoun", pronoun_dd))
+	_add_customization_option(options, "Pronoun:", pronoun_dd)
+
+	var body_dd = OptionButton.new()
+	body_dd.name = "CinematicBody"
+	for i in range(_body_in.item_count):
+		body_dd.add_item(_body_in.get_item_text(i))
+	body_dd.select(_body_in.get_selected())
+	body_dd.item_selected.connect(_on_cinematic_dropdown_changed.bind("body", body_dd))
+	_add_customization_option(options, "Body Type:", body_dd)
+
+	var outfit_dd = OptionButton.new()
+	outfit_dd.name = "CinematicOutfit"
+	for i in range(_outfit_in.item_count):
+		outfit_dd.add_item(_outfit_in.get_item_text(i))
+	outfit_dd.select(_outfit_in.get_selected())
+	outfit_dd.item_selected.connect(_on_cinematic_dropdown_changed.bind("outfit", outfit_dd))
+	_add_customization_option(options, "Outfit:", outfit_dd)
+
+	var hair_dd = OptionButton.new()
+	hair_dd.name = "CinematicHair"
+	for i in range(_hair_in.item_count):
+		hair_dd.add_item(_hair_in.get_item_text(i))
+	hair_dd.select(_hair_in.get_selected())
+	hair_dd.item_selected.connect(_on_cinematic_dropdown_changed.bind("hair", hair_dd))
+	_add_customization_option(options, "Hair:", hair_dd)
+
+	var hat_dd = OptionButton.new()
+	hat_dd.name = "CinematicHat"
+	for i in range(_hat_in.item_count):
+		hat_dd.add_item(_hat_in.get_item_text(i))
+	hat_dd.select(_hat_in.get_selected())
+	hat_dd.item_selected.connect(_on_cinematic_dropdown_changed.bind("hat", hat_dd))
+	_add_customization_option(options, "Hat:", hat_dd)
+
+	# Right: Character Preview
+	var preview_panel = _create_styled_panel()
+	preview_panel.custom_minimum_size = Vector2(500, 500)
+	main.add_child(preview_panel)
+
+	var preview_container = VBoxContainer.new()
+	preview_panel.add_child(preview_container)
+
+	var preview_label = Label.new()
+	preview_label.text = "Character Preview"
+	preview_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	preview_label.add_theme_font_size_override("font_size", 16)
+	preview_container.add_child(preview_label)
+
+	# Use the existing character_layers (already displays current selection)
+	# Just make them visible in the cinematic layer by showing the preview panel
+	# The preview updates automatically as dropdowns change via existing system
+
+	# Accept button
+	var accept_btn = Button.new()
+	accept_btn.text = "Accept"
+	accept_btn.position = Vector2(0, -60)
+	accept_btn.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	accept_btn.anchor_top = 1.0
+	accept_btn.anchor_bottom = 1.0
+	accept_btn.custom_minimum_size = Vector2(200, 50)
+	accept_btn.add_theme_font_size_override("font_size", 16)
+	accept_btn.pressed.connect(_on_customization_accepted)
+	customization_container.add_child(accept_btn)
+
+	# Fade in
+	customization_container.modulate = Color(1, 1, 1, 0)
+	var tween = create_tween()
+	tween.tween_property(customization_container, "modulate", Color(1, 1, 1, 1), 0.5)
+
+func _on_cinematic_dropdown_changed(index: int, type: String, dropdown: OptionButton) -> void:
+	"""Handle dropdown changes in cinematic customization UI"""
+	# Sync to the original form dropdowns to update preview
+	match type:
+		"pronoun":
+			_pron_in.select(index)
+		"body":
+			_body_in.select(index)
+			_on_body_selected(index)
+		"outfit":
+			_outfit_in.select(index)
+			_on_outfit_selected(index)
+		"hair":
+			_hair_in.select(index)
+			_on_hair_selected(index)
+		"hat":
+			_hat_in.select(index)
+			_on_hat_selected(index)
+
+func _add_customization_option(parent: VBoxContainer, label_text: String, option_button: OptionButton) -> void:
+	"""Add a customization option to the parent container"""
+	var row = HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
+
+	var label = Label.new()
+	label.text = label_text
+	label.custom_minimum_size = Vector2(120, 0)
+	label.add_theme_font_size_override("font_size", 14)
+	row.add_child(label)
+
+	option_button.custom_minimum_size = Vector2(250, 0)
+	option_button.add_theme_font_size_override("font_size", 14)
+	row.add_child(option_button)
+
+	parent.add_child(row)
+
+func _on_customization_accepted() -> void:
+	"""Handle customization acceptance"""
+	# Selections are already synced to original form via _on_cinematic_dropdown_changed
+
+	# Fade out and advance
+	var tween = create_tween()
+	tween.tween_property(customization_container, "modulate", Color(1, 1, 1, 0), 0.5)
+	tween.tween_callback(func():
+		customization_container.queue_free()
+		customization_container = null
+		dialogue_label.visible = true
+		_advance_stage()
+	)
+
+# ── Final Confirmation ───────────────────────────────────────────────────────
+func _build_confirmation_ui() -> void:
+	"""Build final confirmation UI"""
+	# Hide dialogue label initially
+	if dialogue_label:
+		dialogue_label.visible = true
+		dialogue_label.text = ""
+
+	# Type out the question
+	_start_typing("Does everything seem correct?")
+
+	# Create confirmation container
+	confirmation_container = Control.new()
+	confirmation_container.set_anchors_preset(Control.PRESET_FULL_RECT)
+	cinematic_layer.add_child(confirmation_container)
+
+	# Yes/No buttons
+	var buttons = HBoxContainer.new()
+	buttons.set_anchors_preset(Control.PRESET_CENTER)
+	buttons.anchor_left = 0.5
+	buttons.anchor_top = 0.6
+	buttons.anchor_right = 0.5
+	buttons.anchor_bottom = 0.6
+	buttons.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	buttons.grow_vertical = Control.GROW_DIRECTION_BOTH
+	buttons.add_theme_constant_override("separation", 40)
+	confirmation_container.add_child(buttons)
+
+	# Yes button
+	var yes_btn = Button.new()
+	yes_btn.text = "Yes"
+	yes_btn.custom_minimum_size = Vector2(150, 60)
+	yes_btn.add_theme_font_size_override("font_size", 18)
+	yes_btn.pressed.connect(_on_confirmation_yes)
+	buttons.add_child(yes_btn)
+
+	# No button
+	var no_btn = Button.new()
+	no_btn.text = "No"
+	no_btn.custom_minimum_size = Vector2(150, 60)
+	no_btn.add_theme_font_size_override("font_size", 18)
+	no_btn.pressed.connect(_on_confirmation_no)
+	buttons.add_child(no_btn)
+
+	# Fade in buttons
+	confirmation_container.modulate = Color(1, 1, 1, 0)
+	var tween = create_tween()
+	tween.tween_property(confirmation_container, "modulate", Color(1, 1, 1, 1), 0.5)
+
+func _on_confirmation_yes() -> void:
+	"""Handle Yes - proceed with character creation"""
+	_advance_stage()  # Go to COMPLETE
+
+func _on_confirmation_no() -> void:
+	"""Handle No - show fallback form"""
+	# Clean up cinematic layer
+	if cinematic_layer:
+		cinematic_layer.queue_free()
+		cinematic_layer = null
+
+	cinematic_active = false
+
+	# Show the standard form
+	_show_form()
+
+	# The existing _on_confirm_pressed will handle the final save
+
+# ── Apply Character Creation ─────────────────────────────────────────────────
+func _apply_character_creation() -> void:
+	"""Apply the character creation and proceed to main game"""
+	# All data is already in the form fields, just trigger the confirm
+	_on_confirm_pressed()
+
+# ── Helper Functions ─────────────────────────────────────────────────────────
+func _create_styled_panel() -> PanelContainer:
+	"""Create a styled panel container matching the LoadoutPanel style"""
+	var panel = PanelContainer.new()
+
+	var style_box = StyleBoxFlat.new()
+	style_box.bg_color = PANEL_BG_COLOR
+	style_box.border_color = PANEL_BORDER_COLOR
+	style_box.border_width_left = PANEL_BORDER_WIDTH
+	style_box.border_width_right = PANEL_BORDER_WIDTH
+	style_box.border_width_top = PANEL_BORDER_WIDTH
+	style_box.border_width_bottom = PANEL_BORDER_WIDTH
+	style_box.corner_radius_top_left = PANEL_CORNER_RADIUS
+	style_box.corner_radius_top_right = PANEL_CORNER_RADIUS
+	style_box.corner_radius_bottom_left = PANEL_CORNER_RADIUS
+	style_box.corner_radius_bottom_right = PANEL_CORNER_RADIUS
+	panel.add_theme_stylebox_override("panel", style_box)
+
+	# Add padding
+	panel.add_theme_constant_override("margin_left", 20)
+	panel.add_theme_constant_override("margin_top", 20)
+	panel.add_theme_constant_override("margin_right", 20)
+	panel.add_theme_constant_override("margin_bottom", 20)
+
+	return panel
+
+# ══════════════════════════════════════════════════════════════════════════════
+# END OF CINEMATIC SYSTEM
+# ══════════════════════════════════════════════════════════════════════════════
 
 func _on_cancel_pressed() -> void:
 	# Disabled, but kept for scene compatibility

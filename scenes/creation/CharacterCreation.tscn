@@ -70,7 +70,7 @@ layout_mode = 2
 size_flags_horizontal = 3
 theme_override_font_sizes/font_size = 10
 placeholder_text = "First Name"
-max_length = 10
+max_length = 8
 
 [node name="SurnameLabel" type="Label" parent="Margin/MainContainer/FormPanel/FormMargin/Form/ScrollContainer/Grid"]
 layout_mode = 2
@@ -83,7 +83,7 @@ layout_mode = 2
 size_flags_horizontal = 3
 theme_override_font_sizes/font_size = 10
 placeholder_text = "Last Name"
-max_length = 10
+max_length = 8
 
 [node name="PronounLabel" type="Label" parent="Margin/MainContainer/FormPanel/FormMargin/Form/ScrollContainer/Grid"]
 layout_mode = 2
