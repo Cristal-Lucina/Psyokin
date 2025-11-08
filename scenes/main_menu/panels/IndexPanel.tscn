@@ -38,14 +38,15 @@ theme_override_constants/separation = 8
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
 theme_override_font_sizes/font_size = 16
-text = "CATEGORIES"
+text = "INDEX"
 horizontal_alignment = 0
 
 [node name="Separator" type="HSeparator" parent="Root/CategoryPanel/CategoryColumn"]
 layout_mode = 2
 
-[node name="Filter" type="OptionButton" parent="Root/CategoryPanel/CategoryColumn"]
+[node name="CategoryList" type="ItemList" parent="Root/CategoryPanel/CategoryColumn"]
 layout_mode = 2
+size_flags_vertical = 3
 
 [node name="ContentPanel" type="PanelContainer" parent="Root"]
 custom_minimum_size = Vector2(400, 0)

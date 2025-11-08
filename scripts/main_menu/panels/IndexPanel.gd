@@ -12,9 +12,9 @@ class_name IndexPanel
 
 enum Filter { TUTORIALS, ENEMIES, MISSIONS, LOCATIONS, LORE }
 
-@onready var _filter  : OptionButton  = $Root/CategoryPanel/CategoryColumn/Filter
-@onready var _list    : VBoxContainer = $Root/ContentPanel/ContentColumn/Scroll/List
-@onready var _detail  : RichTextLabel = $Root/DetailsPanel/DetailsColumn/Detail
+@onready var _category_list : ItemList      = $Root/CategoryPanel/CategoryColumn/CategoryList
+@onready var _list          : VBoxContainer = $Root/ContentPanel/ContentColumn/Scroll/List
+@onready var _detail        : RichTextLabel = $Root/DetailsPanel/DetailsColumn/Detail
 
 func _ready() -> void:
 	super()  # Call PanelBase._ready() for lifecycle management
@@ -23,16 +23,24 @@ func _ready() -> void:
 	size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	size_flags_vertical   = Control.SIZE_EXPAND_FILL
 
-	# Populate filter once
-	if _filter.item_count == 0:
-		_filter.add_item("Tutorial",      Filter.TUTORIALS)
-		_filter.add_item("Enemies",       Filter.ENEMIES)
-		_filter.add_item("Past Missions", Filter.MISSIONS)
-		_filter.add_item("Locations",     Filter.LOCATIONS)
-		_filter.add_item("World History", Filter.LORE)
+	# Populate category list once
+	if _category_list.item_count == 0:
+		_category_list.add_item("Tutorial")
+		_category_list.set_item_metadata(0, Filter.TUTORIALS)
+		_category_list.add_item("Enemies")
+		_category_list.set_item_metadata(1, Filter.ENEMIES)
+		_category_list.add_item("Past Missions")
+		_category_list.set_item_metadata(2, Filter.MISSIONS)
+		_category_list.add_item("Locations")
+		_category_list.set_item_metadata(3, Filter.LOCATIONS)
+		_category_list.add_item("World History")
+		_category_list.set_item_metadata(4, Filter.LORE)
+		_category_list.select(0)
 
-	if not _filter.item_selected.is_connected(_on_filter_changed):
-		_filter.item_selected.connect(_on_filter_changed)
+	if not _category_list.item_selected.is_connected(_on_category_selected):
+		_category_list.item_selected.connect(_on_category_selected)
+	if not _category_list.item_activated.is_connected(_on_category_activated):
+		_category_list.item_activated.connect(_on_category_activated)
 
 	# Live updates if the system emits changes (use safe lookup, no direct symbol)
 	var idx: Node = get_node_or_null("/root/aIndexSystem")
@@ -43,17 +51,26 @@ func _ready() -> void:
 
 # --- PanelBase Lifecycle Overrides ---------------------------------------------
 
+func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed("ui_cancel"):
+		print("[IndexPanel] Back button pressed")
+		get_viewport().set_input_as_handled()
+		# PanelBase will handle returning to previous panel
+
 func _on_panel_gained_focus() -> void:
 	super()
-	print("[IndexPanel] Gained focus - focusing filter dropdown")
-	# Focus the filter dropdown when panel becomes active
-	if _filter:
-		_filter.grab_focus()
+	print("[IndexPanel] Gained focus - focusing category list")
+	# Focus the category list when panel becomes active
+	if _category_list:
+		_category_list.grab_focus()
 
 func _on_index_changed(_cat: String) -> void:
 	_rebuild()
 
-func _on_filter_changed(_idx: int) -> void:
+func _on_category_selected(_idx: int) -> void:
+	_rebuild()
+
+func _on_category_activated(_idx: int) -> void:
 	_rebuild()
 
 func _rebuild() -> void:
@@ -61,9 +78,11 @@ func _rebuild() -> void:
 	for c in _list.get_children():
 		c.queue_free()
 
-	var cat_id: int = _filter.get_selected_id()
-	if cat_id < 0:
-		cat_id = Filter.TUTORIALS
+	var cat_id: int = Filter.TUTORIALS
+	var selected_items := _category_list.get_selected_items()
+	if selected_items.size() > 0:
+		var idx: int = selected_items[0]
+		cat_id = _category_list.get_item_metadata(idx)
 
 	var items: Array[Dictionary] = _gather_items(cat_id)
 
