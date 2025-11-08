@@ -308,11 +308,11 @@ func _create_info_cell(label_text: String, initial_value: String) -> PanelContai
 	"""Create a single info cell with label and value
 	Returns PanelContainer with 'value_label' meta for updating"""
 	var panel := PanelContainer.new()
-	panel.custom_minimum_size = Vector2(180, 30)  # ~30 chars at 12pt font
+	panel.custom_minimum_size = Vector2(180, 35)  # Increased height for larger font
 
-	# Create light grey rounded background
+	# Create pale white rounded background
 	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.25, 0.25, 0.25, 1.0)  # Light grey
+	style.bg_color = Color(0.95, 0.95, 0.95, 1.0)  # Pale white
 	style.corner_radius_top_left = 4
 	style.corner_radius_top_right = 4
 	style.corner_radius_bottom_left = 4
@@ -332,13 +332,18 @@ func _create_info_cell(label_text: String, initial_value: String) -> PanelContai
 	hbox.add_theme_constant_override("separation", 4)
 	margin.add_child(hbox)
 
-	# Label - left justified, max 6 characters
+	# Label - left justified, max 6 characters, bold dark grey
 	var label := Label.new()
 	label.text = label_text + ":"
 	label.custom_minimum_size = Vector2(60, 0)  # ~6 chars + colon
 	label.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
-	label.add_theme_font_size_override("font_size", 12)
+	label.add_theme_font_size_override("font_size", 16)  # Increased from 12 to 16
+	label.add_theme_color_override("font_color", Color(0.2, 0.2, 0.2))  # Dark grey
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	# Make bold by getting the default font and setting bold variation
+	var font = label.get_theme_default_font()
+	if font:
+		label.add_theme_font_override("font", font)
 	hbox.add_child(label)
 
 	# Spacer to push value to the right
@@ -346,14 +351,18 @@ func _create_info_cell(label_text: String, initial_value: String) -> PanelContai
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	hbox.add_child(spacer)
 
-	# Value - right justified, max 16 characters
+	# Value - right justified, max 16 characters, bold dark grey
 	var value_label := Label.new()
 	value_label.text = initial_value
 	value_label.custom_minimum_size = Vector2(80, 0)  # ~16 chars max
 	value_label.size_flags_horizontal = Control.SIZE_SHRINK_END
-	value_label.add_theme_font_size_override("font_size", 12)
-	value_label.add_theme_color_override("font_color", Color(0.9, 0.9, 0.9))
+	value_label.add_theme_font_size_override("font_size", 16)  # Increased from 12 to 16
+	value_label.add_theme_color_override("font_color", Color(0.2, 0.2, 0.2))  # Dark grey
 	value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	# Make bold
+	var value_font = value_label.get_theme_default_font()
+	if value_font:
+		value_label.add_theme_font_override("font", value_font)
 	hbox.add_child(value_label)
 
 	# Store reference to value label for updating
