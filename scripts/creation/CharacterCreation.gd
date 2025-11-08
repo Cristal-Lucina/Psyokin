@@ -704,23 +704,6 @@ func _setup_cinematic() -> void:
 	dialogue_label.text = ""
 	cinematic_layer.add_child(dialogue_label)
 
-	# Create blinking cursor (inline with dialogue)
-	cursor_label = Label.new()
-	cursor_label.set_anchors_preset(Control.PRESET_CENTER)
-	cursor_label.anchor_left = 0.5
-	cursor_label.anchor_top = 0.5
-	cursor_label.anchor_right = 0.5
-	cursor_label.anchor_bottom = 0.5
-	cursor_label.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	cursor_label.grow_vertical = Control.GROW_DIRECTION_BOTH
-	cursor_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	cursor_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	cursor_label.add_theme_font_size_override("font_size", 18)
-	cursor_label.add_theme_color_override("font_color", Color.WHITE)
-	cursor_label.text = ""
-	cursor_label.visible = false
-	cinematic_layer.add_child(cursor_label)
-
 	# Create continue prompt
 	continue_prompt = Label.new()
 	continue_prompt.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
@@ -807,19 +790,20 @@ func _on_typing_complete() -> void:
 func _show_cursor_and_wait() -> void:
 	"""Show blinking cursor and wait for player input"""
 	waiting_for_input = true
-	if cursor_label and dialogue_label:
-		cursor_label.text = dialogue_label.text + " ●"
-		cursor_label.visible = true
-		cursor_visible = true
+	cursor_visible = true
+	if dialogue_label:
+		# Store the base text without cursor
+		typing_text = dialogue_label.text
+		dialogue_label.text = typing_text + " ●"
 	if continue_prompt:
 		continue_prompt.visible = true
 
 func _hide_cursor() -> void:
 	"""Hide the blinking cursor"""
 	waiting_for_input = false
-	if cursor_label:
-		cursor_label.visible = false
-		cursor_label.text = ""
+	if dialogue_label:
+		# Remove cursor from text
+		dialogue_label.text = typing_text
 	if continue_prompt:
 		continue_prompt.visible = false
 
@@ -848,27 +832,40 @@ func _process_cursor_blink(delta: float) -> void:
 	if cursor_blink_timer >= CURSOR_BLINK_SPEED:
 		cursor_blink_timer = 0.0
 		cursor_visible = not cursor_visible
-		if cursor_label and dialogue_label:
+		if dialogue_label:
 			if cursor_visible:
-				cursor_label.text = dialogue_label.text + " ●"
+				dialogue_label.text = typing_text + " ●"
 			else:
-				cursor_label.text = dialogue_label.text + "  "
+				dialogue_label.text = typing_text
 
-func _input(event: InputEvent) -> void:
+func _unhandled_input(event: InputEvent) -> void:
 	"""Handle input for advancing dialogue"""
 	if not cinematic_active or not waiting_for_input:
 		return
 
-	# Check for accept input (Enter, Space, ui_accept, directional buttons)
+	# Check for accept input (ui_accept, Enter, Space, or directional buttons)
 	var should_advance = false
+
+	# Check for ui_accept action (works for gamepad A button, Enter, etc.)
 	if event.is_action_pressed("ui_accept"):
 		should_advance = true
-	elif event is InputEventKey and event.pressed:
-		if event.keycode == KEY_ENTER or event.keycode == KEY_SPACE or event.keycode == KEY_KP_ENTER:
-			should_advance = true
-	# Accept directional buttons as well
-	elif event.is_action_pressed("ui_up") or event.is_action_pressed("ui_down") or event.is_action_pressed("ui_left") or event.is_action_pressed("ui_right"):
+		print("[Cinematic] Advancing via ui_accept")
+	# Check for directional buttons as alternative
+	elif event.is_action_pressed("ui_up") or event.is_action_pressed("ui_down"):
 		should_advance = true
+		print("[Cinematic] Advancing via directional button")
+	elif event.is_action_pressed("ui_left") or event.is_action_pressed("ui_right"):
+		should_advance = true
+		print("[Cinematic] Advancing via directional button")
+	# Also check for Space key explicitly
+	elif event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode == KEY_SPACE:
+			should_advance = true
+			print("[Cinematic] Advancing via Space key")
+	# Check for any joypad button
+	elif event is InputEventJoypadButton and event.pressed:
+		should_advance = true
+		print("[Cinematic] Advancing via joypad button: ", event.button_index)
 
 	if should_advance:
 		get_viewport().set_input_as_handled()
