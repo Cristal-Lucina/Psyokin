@@ -146,6 +146,9 @@ const LAYERS = {
 var _creds_value_label: Label = null
 var _perks_value_label: Label = null
 
+# New top-right NEXT MISSION display
+var _mission_value_label: Label = null
+
 # Character Preview UI
 @onready var character_layers = $Root/Right/CharacterPreviewBox/ViewportWrapper/CharacterLayers
 
@@ -205,6 +208,7 @@ func _ready() -> void:
 	_load_party_csv_cache()
 	_build_tab_buttons()
 	_create_creds_perks_display()
+	_create_next_mission_display()
 
 	# Note: PanelBase handles visibility_changed, no need to connect again
 	call_deferred("_first_fill")
@@ -302,6 +306,27 @@ func _create_creds_perks_display() -> void:
 	_perks_value_label = perks_cell.get_meta("value_label")
 
 	# Add to root (not to the Right VBoxContainer, but to the root Control)
+	add_child(container)
+
+func _create_next_mission_display() -> void:
+	"""Create the NEXT MISSION display at top right corner"""
+	# Create container for the display
+	var container := VBoxContainer.new()
+	container.name = "NextMissionDisplay"
+
+	# Position: 50px from top, 10px from right edge
+	# Using anchor to top-right corner
+	container.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	container.position = Vector2(-10, 50)  # 10px from right, 50px from top
+	container.grow_horizontal = Control.GROW_DIRECTION_BEGIN  # Grow left
+	container.grow_vertical = Control.GROW_DIRECTION_END      # Grow down
+
+	# Create NEXT MISSION cell
+	var mission_cell := _create_info_cell("NEXT MISSION", "TBD")
+	container.add_child(mission_cell)
+	_mission_value_label = mission_cell.get_meta("value_label")
+
+	# Add to root
 	add_child(container)
 
 func _create_info_cell(label_text: String, initial_value: String) -> PanelContainer:
@@ -1585,6 +1610,11 @@ func _update_summary() -> void:
 	if _creds_value_label: _creds_value_label.text = _read_creds()
 	if _perks_value_label: _perks_value_label.text = _read_perk_points()
 
+	# Update new top-right mission display
+	if _mission_value_label:
+		var h: String = _read_mission_hint()
+		_mission_value_label.text = h if h != "" else "TBD"
+
 	# Keep old labels updated too (they're hidden but may be referenced elsewhere)
 	if _creds: _creds.text = _read_creds()
 	if _perk:  _perk.text  = _read_perk_points()
@@ -1772,8 +1802,14 @@ func _read_mission_hint() -> String:
 	return ""
 
 func _on_event_changed(_id: String) -> void:
+	var h: String = _read_mission_hint()
+
+	# Update new top-right mission display
+	if _mission_value_label:
+		_mission_value_label.text = h if h != "" else "TBD"
+
+	# Update old hint label
 	if _hint:
-		var h: String = _read_mission_hint()
 		_hint.text = h if h != "" else "[i]TBD[/i]"
 
 func _fmt_pair(a: int, b: int) -> String:
