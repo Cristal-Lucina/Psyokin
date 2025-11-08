@@ -1719,10 +1719,10 @@ func _build_perk_selection_ui() -> void:
 	tween.tween_property(perk_selection_container, "modulate", Color(1, 1, 1, 1), 0.5)
 	tween.tween_callback(func():
 		# Ensure first button has focus after fade in
-		var perk_buttons = perk_selection_container.get_meta("perk_buttons", [])
-		if perk_buttons.size() > 0:
+		var focus_buttons = perk_selection_container.get_meta("perk_buttons", [])
+		if focus_buttons.size() > 0:
 			print("[Perk Selection] Setting focus to first perk button after fade")
-			perk_buttons[0].grab_focus()
+			focus_buttons[0].grab_focus()
 	)
 
 func _on_perk_button_toggled(button_pressed: bool, toggled_button: CheckButton) -> void:
