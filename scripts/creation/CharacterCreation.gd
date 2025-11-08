@@ -142,6 +142,51 @@ func _style_panels() -> void:
 			style_box.corner_radius_bottom_right = PANEL_CORNER_RADIUS
 			panel.add_theme_stylebox_override("panel", style_box)
 
+			# Add LoadoutPanel-style margins (10px on all sides)
+			panel.add_theme_constant_override("margin_left", 10)
+			panel.add_theme_constant_override("margin_top", 10)
+			panel.add_theme_constant_override("margin_right", 10)
+			panel.add_theme_constant_override("margin_bottom", 10)
+
+	# Apply font size hierarchy (matching LoadoutPanel)
+	_apply_font_sizes()
+
+func _apply_font_sizes() -> void:
+	"""Apply LoadoutPanel-style font size hierarchy"""
+	# Titles: 16px (like LoadoutPanel section headers)
+	var title_nodes = [
+		get_node_or_null("MainContainer/PreviewPanel/PreviewContainer/Title"),
+		get_node_or_null("MainContainer/FormPanel/FormContainer/Title")
+	]
+	for node in title_nodes:
+		if node is Label:
+			node.add_theme_font_size_override("font_size", 16)
+
+	# Section labels and important text: 12px
+	var label_nodes = [
+		get_node_or_null("MainContainer/FormPanel/FormContainer/BasicInfo/NameLabel"),
+		get_node_or_null("MainContainer/FormPanel/FormContainer/BasicInfo/SurnameLabel"),
+		get_node_or_null("MainContainer/FormPanel/FormContainer/BasicInfo/PronounLabel"),
+		get_node_or_null("MainContainer/FormPanel/FormContainer/Appearance/BodyLabel"),
+		get_node_or_null("MainContainer/FormPanel/FormContainer/Appearance/OutfitLabel"),
+		get_node_or_null("MainContainer/FormPanel/FormContainer/Appearance/HairLabel"),
+		get_node_or_null("MainContainer/FormPanel/FormContainer/Appearance/HatLabel"),
+		get_node_or_null("MainContainer/FormPanel/FormContainer/StatSelection/StatsTitle"),
+		get_node_or_null("MainContainer/FormPanel/FormContainer/StatSelection/PerksTitle")
+	]
+	for node in label_nodes:
+		if node is Label:
+			node.add_theme_font_size_override("font_size", 12)
+
+	# Small text and animation info: 10px (already the default, but set explicitly)
+	var small_nodes = [
+		get_node_or_null("MainContainer/PreviewPanel/PreviewContainer/AnimationControls/DirectionLabel"),
+		get_node_or_null("MainContainer/PreviewPanel/PreviewContainer/AnimationControls/FrameLabel")
+	]
+	for node in small_nodes:
+		if node is Label:
+			node.add_theme_font_size_override("font_size", 10)
+
 func _process(delta):
 	# Walk animation cycling (6 frames)
 	animation_timer += delta
