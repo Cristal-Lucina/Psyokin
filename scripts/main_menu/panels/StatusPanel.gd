@@ -326,9 +326,9 @@ func _create_next_mission_display() -> void:
 	# Create "NEXT MISSION" label
 	var title_label := Label.new()
 	title_label.text = "NEXT MISSION"
-	title_label.add_theme_font_size_override("font_size", 16)
+	title_label.add_theme_font_size_override("font_size", 20)
 	title_label.add_theme_color_override("font_color", Color(0.9, 0.9, 0.9))
-	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	container.add_child(title_label)
 
 	# Create grey box with white border for mission description
@@ -384,7 +384,7 @@ func _hide_old_ui_elements() -> void:
 		# Create MarginContainer wrapper
 		var margin_wrapper := MarginContainer.new()
 		margin_wrapper.name = "LeftMarginWrapper"
-		margin_wrapper.add_theme_constant_override("margin_right", 150)
+		margin_wrapper.add_theme_constant_override("margin_right", 300)
 		margin_wrapper.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		margin_wrapper.size_flags_vertical = Control.SIZE_EXPAND_FILL
 
