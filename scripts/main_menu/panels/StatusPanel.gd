@@ -692,7 +692,7 @@ func _create_empty_slot(slot_type: String, _slot_idx: int) -> PanelContainer:
 	panel.add_child(vbox)
 	return panel
 
-func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot: int) -> HBoxContainer:
+func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot: int) -> PanelContainer:
 	var panel := PanelContainer.new()
 
 	# Get member_id early for animation tracking
@@ -864,9 +864,8 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 	print("[StatusPanel] Created Recovery button for %s" % String(member_data.get("name", "Member")))
 
 	# Switch button (only for active members)
-	var switch_btn: Button = null
 	if show_switch:
-		switch_btn = Button.new()
+		var switch_btn := Button.new()
 		switch_btn.text = "SWITCH"
 		switch_btn.custom_minimum_size.x = 70
 		switch_btn.add_theme_font_size_override("font_size", 10)
@@ -892,29 +891,7 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 			"mp": mp_i
 		}
 
-	# Create wrapper with arrow indicator on the right
-	var wrapper := HBoxContainer.new()
-	wrapper.add_theme_constant_override("separation", 8)
-	wrapper.add_child(panel)
-
-	# Create arrow indicator (hidden by default)
-	var arrow_label := Label.new()
-	arrow_label.text = "←"
-	arrow_label.add_theme_font_size_override("font_size", 16)
-	arrow_label.add_theme_color_override("font_color", Color(0.9, 0.9, 0.9))
-	arrow_label.visible = false
-	arrow_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	wrapper.add_child(arrow_label)
-
-	# Connect focus signals to show/hide arrow
-	recovery_btn.focus_entered.connect(func(): arrow_label.visible = true)
-	recovery_btn.focus_exited.connect(func(): arrow_label.visible = false)
-
-	if switch_btn != null:
-		switch_btn.focus_entered.connect(func(): arrow_label.visible = true)
-		switch_btn.focus_exited.connect(func(): arrow_label.visible = false)
-
-	return wrapper
+	return panel
 
 func _get_member_snapshot(member_id: String) -> Dictionary:
 	# Get roster to pass to _label_for_id for accurate name lookup
