@@ -896,7 +896,27 @@ func _input(event: InputEvent) -> void:
 			return
 		return
 
-	# Stat selection uses built-in Godot button navigation - no manual handling needed!
+	# Handle stat selection - need to capture input before ControllerManager
+	if current_stage == CinematicStage.STAT_SELECTION:
+		# Let Godot's focus system handle navigation, but mark input as handled
+		# so ControllerManager doesn't consume it
+		if event.is_action_pressed("ui_up") or event.is_action_pressed("ui_down"):
+			get_viewport().set_input_as_handled()
+			# Don't return - let Godot's focus system handle it
+		elif event.is_action_pressed("ui_accept") or (event is InputEventJoypadButton and event.pressed):
+			get_viewport().set_input_as_handled()
+			# Don't return - let the focused button handle the toggle
+
+	# Handle perk selection - need to capture input before ControllerManager
+	if current_stage == CinematicStage.PERK_SELECTION:
+		# Let Godot's focus system handle navigation, but mark input as handled
+		# so ControllerManager doesn't consume it
+		if event.is_action_pressed("ui_up") or event.is_action_pressed("ui_down"):
+			get_viewport().set_input_as_handled()
+			# Don't return - let Godot's focus system handle it
+		elif event.is_action_pressed("ui_accept") or (event is InputEventJoypadButton and event.pressed):
+			get_viewport().set_input_as_handled()
+			# Don't return - let the focused button handle the toggle
 
 	# Handle name input stage separately
 	if current_stage == CinematicStage.NAME_INPUT and (name_input_stage == 0 or name_input_stage == 2):
@@ -1623,11 +1643,13 @@ func _build_perk_selection_ui() -> void:
 	var perk_system = get_node_or_null(PERK_PATH)
 	var perk_buttons: Array = []
 
+	print("[Perk Selection] Building perk selection UI")
 	if perk_system and perk_system.has_method("get_starting_options"):
 		var picks: Array[String] = []
 		for s in _selected_order:
 			picks.append(s)
 		var offers: Array = perk_system.call("get_starting_options", picks)
+		print("[Perk Selection] Got ", offers.size(), " perk offers")
 
 		# Create toggle button for each perk
 		for i in range(offers.size()):
@@ -1698,10 +1720,13 @@ func _build_perk_selection_ui() -> void:
 
 func _on_perk_button_toggled(button_pressed: bool, toggled_button: CheckButton) -> void:
 	"""Handle perk button toggle - only allow one selection (radio button behavior)"""
+	print("[Perk Selection] Button toggled: ", button_pressed)
 	if not perk_selection_container:
+		print("[Perk Selection] ERROR: No perk_selection_container!")
 		return
 
 	if button_pressed:
+		print("[Perk Selection] Perk selected, deselecting others")
 		# Deselect all other perk buttons
 		var perk_buttons = perk_selection_container.get_meta("perk_buttons", [])
 		for btn in perk_buttons:
@@ -1711,8 +1736,10 @@ func _on_perk_button_toggled(button_pressed: bool, toggled_button: CheckButton) 
 		# Enable Continue button
 		var continue_btn = perk_selection_container.get_node_or_null("CenterContainer/ContinueButton")
 		if continue_btn:
+			print("[Perk Selection] Enabling Continue button")
 			continue_btn.disabled = false
 	else:
+		print("[Perk Selection] Attempting to deselect - preventing")
 		# Don't allow deselecting - keep it selected (radio button behavior)
 		toggled_button.set_pressed_no_signal(true)
 
