@@ -316,24 +316,24 @@ func _create_next_mission_display() -> void:
 	container.name = "NextMissionDisplay"
 	container.add_theme_constant_override("separation", 4)
 
-	# Position: 50px from top, 10px from right edge
+	# Position: 20px from top, 10px from right edge
 	# Using anchor to top-right corner
 	container.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	container.position = Vector2(-10, 50)  # 10px from right, 50px from top
+	container.position = Vector2(-10, 20)  # 10px from right, 20px from top
 	container.grow_horizontal = Control.GROW_DIRECTION_BEGIN  # Grow left
 	container.grow_vertical = Control.GROW_DIRECTION_END      # Grow down
 
 	# Create "NEXT MISSION" label
 	var title_label := Label.new()
 	title_label.text = "NEXT MISSION"
-	title_label.add_theme_font_size_override("font_size", 20)
+	title_label.add_theme_font_size_override("font_size", 30)
 	title_label.add_theme_color_override("font_color", Color(0.9, 0.9, 0.9))
 	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	container.add_child(title_label)
 
 	# Create grey box with white border for mission description
 	var mission_box := PanelContainer.new()
-	mission_box.custom_minimum_size = Vector2(324, 72)  # 80% larger (180 * 1.8, 40 * 1.8)
+	mission_box.custom_minimum_size = Vector2(300, 72)
 
 	# Create grey background with white border
 	var style := StyleBoxFlat.new()
@@ -360,7 +360,7 @@ func _create_next_mission_display() -> void:
 	# Create label for mission text
 	_mission_value_label = Label.new()
 	_mission_value_label.text = "TBD"
-	_mission_value_label.add_theme_font_size_override("font_size", 16)  # Increased from 12 to 16
+	_mission_value_label.add_theme_font_size_override("font_size", 14)
 	_mission_value_label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0))
 	_mission_value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	_mission_value_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
