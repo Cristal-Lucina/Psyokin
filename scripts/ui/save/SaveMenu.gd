@@ -9,8 +9,15 @@ class_name SaveMenu
 
 const SAVE_DIR: String = "user://saves"
 
-# Candidate paths (we’ll probe these in order)
+# Styling constants (matching LoadoutPanel)
+const PANEL_BG_COLOR := Color(0.15, 0.15, 0.15, 1.0)  # Dark gray, fully opaque
+const PANEL_BORDER_COLOR := Color(1.0, 0.7, 0.75, 1.0)  # Pink border
+const PANEL_BORDER_WIDTH := 2
+const PANEL_CORNER_RADIUS := 8
+
+# Candidate paths (we'll probe these in order)
 const PATH_SLOTS  : PackedStringArray = [
+	"Center/Window/Margin/Root/Scroll/Slots",
 	"Center/Window/Root/Slots",
 	"Center/Panel/Root/Slots",
 	"MarginContainer/Panel/Root/Slots",
@@ -18,33 +25,11 @@ const PATH_SLOTS  : PackedStringArray = [
 	"Root/Slots",
 	"Slots"
 ]
-const PATH_TITLE  : PackedStringArray = [
-	"Center/Window/Root/Header/Title",
-	"Center/Panel/Root/Header/Title",
-	"Panel/Root/Header/Title",
-	"Root/Header/Title",
-	"Title"
-]
-const PATH_CLOSE  : PackedStringArray = [
-	"Center/Window/Root/Header/CloseBtn",
-	"Center/Panel/Root/Header/CloseBtn",
-	"Panel/Root/Header/CloseBtn",
-	"Root/Header/CloseBtn",
-	"CloseBtn"
-]
-const PATH_HINT   : PackedStringArray = [
-	"Center/Window/Root/Hint",
-	"Center/Panel/Root/Hint",
-	"Panel/Root/Hint",
-	"Root/Hint",
-	"Hint"
-]
 
 var _slots     : VBoxContainer
-var _btn_close : Button
-var _title     : Label
-var _hint      : Label
 var _backdrop  : ColorRect
+var _window    : Panel
+var _scroll    : ScrollContainer
 
 # Controller navigation
 var _all_buttons: Array[Button] = []
@@ -66,15 +51,21 @@ func _find_node_any(paths: PackedStringArray) -> Node:
 		if f: return f
 	return null
 
-func _btn_any(paths: PackedStringArray) -> Button:
-	return _find_node_any(paths) as Button
-
-func _lbl_any(paths: PackedStringArray) -> Label:
-	return _find_node_any(paths) as Label
+func _style_panel(panel: Panel) -> void:
+	"""Apply LoadoutPanel-style styling to a panel"""
+	var style := StyleBoxFlat.new()
+	style.bg_color = PANEL_BG_COLOR
+	style.border_color = PANEL_BORDER_COLOR
+	style.set_border_width_all(PANEL_BORDER_WIDTH)
+	style.corner_radius_top_left = PANEL_CORNER_RADIUS
+	style.corner_radius_top_right = PANEL_CORNER_RADIUS
+	style.corner_radius_bottom_left = PANEL_CORNER_RADIUS
+	style.corner_radius_bottom_right = PANEL_CORNER_RADIUS
+	panel.add_theme_stylebox_override("panel", style)
 
 func _ensure_fallback_layout() -> void:
 	# Build a compact center window if required
-	if _slots != null and _title != null and _btn_close != null and _hint != null:
+	if _slots != null:
 		return
 
 	# Root centerer
@@ -83,48 +74,39 @@ func _ensure_fallback_layout() -> void:
 	center.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(center)
 
-	# Window frame
-	var window := Panel.new()
-	window.name = "Window"
-	window.custom_minimum_size = Vector2(640, 360)
-	center.add_child(window)
+	# Window frame with LoadoutPanel styling
+	_window = Panel.new()
+	_window.name = "Window"
+	_window.custom_minimum_size = Vector2(500, 300)
+	_style_panel(_window)
+	center.add_child(_window)
+
+	# Add margin container for padding (matching LoadoutPanel)
+	var margin := MarginContainer.new()
+	margin.name = "Margin"
+	margin.add_theme_constant_override("margin_left", 20)
+	margin.add_theme_constant_override("margin_top", 20)
+	margin.add_theme_constant_override("margin_right", 20)
+	margin.add_theme_constant_override("margin_bottom", 20)
+	margin.anchor_left = 0.0
+	margin.anchor_right = 1.0
+	margin.anchor_top = 0.0
+	margin.anchor_bottom = 1.0
+	_window.add_child(margin)
 
 	# Root VBox
 	var root := VBoxContainer.new()
 	root.name = "Root"
-	root.anchor_left = 0.0
-	root.anchor_right = 1.0
-	root.anchor_top = 0.0
-	root.anchor_bottom = 1.0
-	root.offset_left = 16
-	root.offset_right = -16
-	root.offset_top = 16
-	root.offset_bottom = -16
-	window.add_child(root)
+	root.add_theme_constant_override("separation", 10)
+	margin.add_child(root)
 
-	# Header
-	var header := HBoxContainer.new()
-	header.name = "Header"
-	root.add_child(header)
-
-	_title = Label.new()
-	_title.name = "Title"
-	_title.text = "Save Game"
-	header.add_child(_title)
-
-	var spacer := Control.new()
-	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	header.add_child(spacer)
-
-	_btn_close = Button.new()
-	_btn_close.name = "CloseBtn"
-	_btn_close.text = "Close"
-	header.add_child(_btn_close)
-
-	_hint = Label.new()
-	_hint.name = "Hint"
-	_hint.text = "Choose a slot. Press Esc to close."
-	root.add_child(_hint)
+	# Title label (no header section, just a simple label)
+	var title := Label.new()
+	title.name = "Title"
+	title.text = "Save Game"
+	title.add_theme_font_size_override("font_size", 18)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	root.add_child(title)
 
 	var scroll := ScrollContainer.new()
 	scroll.name = "Scroll"
@@ -136,6 +118,7 @@ func _ensure_fallback_layout() -> void:
 	_slots.name = "Slots"
 	_slots.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_slots.size_flags_vertical   = Control.SIZE_EXPAND_FILL
+	_slots.add_theme_constant_override("separation", 8)
 	scroll.add_child(_slots)
 
 # --- lifecycle ----------------------------------------------------------------
@@ -150,29 +133,18 @@ func _ready() -> void:
 	if _backdrop:
 		_backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
 
-	# Resolve existing nodes first
-	_slots     = _find_node_any(PATH_SLOTS)  as VBoxContainer
-	_title     = _lbl_any(PATH_TITLE)
-	_btn_close = _btn_any(PATH_CLOSE)
-	_hint      = _lbl_any(PATH_HINT)
+	# Apply LoadoutPanel styling to window if it exists
+	_window = get_node_or_null("Center/Window") as Panel
+	if _window:
+		_style_panel(_window)
 
-	print("[SaveMenu] Found nodes - slots: %s, title: %s, close: %s, hint: %s" % [
-		"yes" if _slots else "no",
-		"yes" if _title else "no",
-		"yes" if _btn_close else "no",
-		"yes" if _hint else "no"
-	])
+	# Resolve existing nodes first
+	_slots = _find_node_any(PATH_SLOTS) as VBoxContainer
+
+	print("[SaveMenu] Found nodes - slots: %s" % ["yes" if _slots else "no"])
 
 	# If anything is missing, build a fallback (safe & centered)
 	_ensure_fallback_layout()
-
-	# Final safety: default texts
-	if _title: _title.text = "Save Game"
-	if _hint:  _hint.text  = "Choose a slot. Press Esc to close."
-
-	# Wire close
-	if _btn_close and not _btn_close.pressed.is_connected(_on_close):
-		_btn_close.pressed.connect(_on_close)
 
 	# Ensure we're visible
 	show()
@@ -322,10 +294,6 @@ func _setup_controller_navigation() -> void:
 			for child in row.get_children():
 				if child is Button:
 					_all_buttons.append(child)
-
-	# Add close button
-	if _btn_close:
-		_all_buttons.append(_btn_close)
 
 	# Start with first button selected
 	if _all_buttons.size() > 0:

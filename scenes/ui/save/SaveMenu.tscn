@@ -27,34 +27,38 @@ grow_horizontal = 2
 grow_vertical = 2
 
 [node name="Window" type="Panel" parent="Center"]
-custom_minimum_size = Vector2(780, 420)
+custom_minimum_size = Vector2(500, 300)
 layout_mode = 2
 
-[node name="Root" type="VBoxContainer" parent="Center/Window"]
-layout_mode = 0
+[node name="Margin" type="MarginContainer" parent="Center/Window"]
+layout_mode = 1
+anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+theme_override_constants/margin_left = 20
+theme_override_constants/margin_top = 20
+theme_override_constants/margin_right = 20
+theme_override_constants/margin_bottom = 20
 
-[node name="Header" type="HBoxContainer" parent="Center/Window/Root"]
+[node name="Root" type="VBoxContainer" parent="Center/Window/Margin"]
 layout_mode = 2
+theme_override_constants/separation = 10
 
-[node name="Title" type="Label" parent="Center/Window/Root/Header"]
+[node name="Title" type="Label" parent="Center/Window/Margin/Root"]
 layout_mode = 2
+theme_override_font_sizes/font_size = 18
 text = "Save Game"
+horizontal_alignment = 1
 
-[node name="Spacer" type="Control" parent="Center/Window/Root/Header"]
+[node name="Scroll" type="ScrollContainer" parent="Center/Window/Margin/Root"]
 layout_mode = 2
 size_flags_horizontal = 3
+size_flags_vertical = 3
 
-[node name="CloseBtn" type="Button" parent="Center/Window/Root/Header"]
+[node name="Slots" type="VBoxContainer" parent="Center/Window/Margin/Root/Scroll"]
 layout_mode = 2
-text = "Close"
-
-[node name="Hint" type="Label" parent="Center/Window/Root"]
-layout_mode = 2
-text = "Choose a slot to overwrite."
-
-[node name="Slots" type="VBoxContainer" parent="Center/Window/Root"]
-layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/separation = 8

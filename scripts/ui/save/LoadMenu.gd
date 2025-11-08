@@ -5,12 +5,15 @@ const SAVE_DIR   : String = "user://saves"
 const MAIN_SCENE : String = "res://scenes/main/Main.tscn"
 const TITLE_SCENE: String = "res://scenes/main_menu/Title.tscn"
 
-@onready var _title     : Label           = get_node("Center/Window/Root/Header/Title") as Label
-@onready var _btn_title : Button          = get_node("Center/Window/Root/Header/ToTitleBtn") as Button
-@onready var _btn_close : Button          = get_node("Center/Window/Root/Header/CloseBtn") as Button
-@onready var _hint      : Label           = get_node("Center/Window/Root/Hint") as Label
-@onready var _scroll    : ScrollContainer = get_node("Center/Window/Root/Scroll") as ScrollContainer
+# Styling constants (matching LoadoutPanel)
+const PANEL_BG_COLOR := Color(0.15, 0.15, 0.15, 1.0)  # Dark gray, fully opaque
+const PANEL_BORDER_COLOR := Color(1.0, 0.7, 0.75, 1.0)  # Pink border
+const PANEL_BORDER_WIDTH := 2
+const PANEL_CORNER_RADIUS := 8
+
+@onready var _scroll    : ScrollContainer = get_node("Center/Window/Margin/Root/Scroll") as ScrollContainer
 @onready var _backdrop  : ColorRect       = $Backdrop
+@onready var _window    : Panel           = get_node("Center/Window") as Panel
 
 var _slots : VBoxContainer = null
 
@@ -20,6 +23,18 @@ var _selected_button_index: int = 0
 var _input_cooldown: float = 0.0
 var _input_cooldown_duration: float = 0.2
 
+func _style_panel(panel: Panel) -> void:
+	"""Apply LoadoutPanel-style styling to a panel"""
+	var style := StyleBoxFlat.new()
+	style.bg_color = PANEL_BG_COLOR
+	style.border_color = PANEL_BORDER_COLOR
+	style.set_border_width_all(PANEL_BORDER_WIDTH)
+	style.corner_radius_top_left = PANEL_CORNER_RADIUS
+	style.corner_radius_top_right = PANEL_CORNER_RADIUS
+	style.corner_radius_bottom_left = PANEL_CORNER_RADIUS
+	style.corner_radius_bottom_right = PANEL_CORNER_RADIUS
+	panel.add_theme_stylebox_override("panel", style)
+
 func _ready() -> void:
 	# Ensure this overlay continues to process even when title is "paused"
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -28,22 +43,18 @@ func _ready() -> void:
 	if _backdrop:
 		_backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
 
+	# Apply LoadoutPanel styling to window if it exists
+	if _window:
+		_style_panel(_window)
+
 	_slots = _scroll.get_node_or_null("Slots") as VBoxContainer
 	if _slots == null:
 		_slots = VBoxContainer.new()
 		_slots.name = "Slots"
 		_slots.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		_slots.size_flags_vertical   = Control.SIZE_EXPAND_FILL
-		_slots.add_theme_constant_override("separation", 6)
+		_slots.add_theme_constant_override("separation", 8)
 		_scroll.add_child(_slots)
-
-	_title.text = "Load Game"
-	_hint.text  = "Choose a slot. Press Esc to close."
-
-	if not _btn_title.pressed.is_connected(_on_to_title):
-		_btn_title.pressed.connect(_on_to_title)
-	if not _btn_close.pressed.is_connected(_on_close):
-		_btn_close.pressed.connect(_on_close)
 
 	_rebuild()
 
@@ -95,7 +106,7 @@ func _rebuild() -> void:
 		c.queue_free()
 
 	var slots: Array[int] = _collect_slots()
-	_hint.text = "Found %d save(s)" % [slots.size()]
+	print("[LoadMenu] Found %d save(s)" % [slots.size()])
 	if slots.is_empty():
 		return
 
@@ -223,12 +234,6 @@ func _on_close() -> void:
 	print("[LoadMenu] Closing load menu")
 	queue_free()
 
-func _on_to_title() -> void:
-	if has_node("/root/aSceneRouter"):
-		aSceneRouter.goto_title()
-	elif ResourceLoader.exists(TITLE_SCENE):
-		get_tree().change_scene_to_file(TITLE_SCENE)
-
 # ------------------------------------------------------------------------------
 # Controller Navigation Helpers
 # ------------------------------------------------------------------------------
@@ -243,12 +248,6 @@ func _setup_controller_navigation() -> void:
 			for child in row.get_children():
 				if child is Button:
 					_all_buttons.append(child)
-
-	# Add header buttons
-	if _btn_close:
-		_all_buttons.append(_btn_close)
-	if _btn_title:
-		_all_buttons.append(_btn_title)
 
 	# Start with first button selected
 	if _all_buttons.size() > 0:
