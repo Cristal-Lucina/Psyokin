@@ -85,7 +85,7 @@ func _build_ui() -> void:
 	_spinner.name = "Spinner"
 	_spinner.color = Color(0.3, 0.6, 1.0, 0.9)  # Blue
 	_spinner.polygon = _create_diamond(20.0)
-	_spinner.position = Vector2(-20, 20)  # 40px left, 10px down from original position
+	_spinner.position = Vector2(-35, 30)  # Positioned left and down from center
 	container.add_child(_spinner)
 
 func _create_diamond(size: float) -> PackedVector2Array:
