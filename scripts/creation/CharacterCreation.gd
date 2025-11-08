@@ -903,8 +903,8 @@ func _input(event: InputEvent) -> void:
 			return
 		return
 
-	# Handle stat, perk, and customization - bridge controller inputs to focus navigation
-	if current_stage == CinematicStage.STAT_SELECTION or current_stage == CinematicStage.PERK_SELECTION or current_stage == CinematicStage.CHARACTER_CUSTOMIZATION:
+	# Handle stat, perk, customization, and confirmation - bridge controller inputs to focus navigation
+	if current_stage == CinematicStage.STAT_SELECTION or current_stage == CinematicStage.PERK_SELECTION or current_stage == CinematicStage.CHARACTER_CUSTOMIZATION or current_stage == CinematicStage.FINAL_CONFIRMATION:
 		# Map move_up/move_down to focus navigation
 		if event.is_action_pressed("move_up"):
 			get_viewport().set_input_as_handled()
@@ -913,6 +913,15 @@ func _input(event: InputEvent) -> void:
 		elif event.is_action_pressed("move_down"):
 			get_viewport().set_input_as_handled()
 			_navigate_focus(Vector2.DOWN)
+			return
+		# Map move_left/move_right to focus navigation (for confirmation buttons)
+		elif event.is_action_pressed("move_left"):
+			get_viewport().set_input_as_handled()
+			_navigate_focus(Vector2.LEFT)
+			return
+		elif event.is_action_pressed("move_right"):
+			get_viewport().set_input_as_handled()
+			_navigate_focus(Vector2.RIGHT)
 			return
 		# Map menu_accept to activating the focused button/dropdown
 		elif event.is_action_pressed("menu_accept"):
@@ -970,15 +979,7 @@ func _input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		_hide_cursor()
 		waiting_for_input = false
-
-		# Special handling for nurse responses - advance to next response instead of next stage
-		if current_stage == CinematicStage.NURSE_RESPONSES:
-			nurse_response_index += 1
-			if nurse_response_index < 5:
-				stage_timer = 0.0  # Reset timer for next response
-			# If all 5 shown, _process_nurse_responses will advance stage
-		else:
-			_advance_stage()
+		_advance_stage()
 
 func _process_nurse_responses(_delta: float) -> void:
 	"""Process nurse responses one at a time"""
@@ -1910,8 +1911,10 @@ func _show_next_nurse_response() -> void:
 
 	stage_timer = 0.0
 
-	# Show cursor and wait for input
-	_show_cursor_and_wait()
+	# Check if this is the last response (index 4 is the 5th response)
+	if nurse_response_index >= 4:
+		# All 5 responses shown - show cursor and wait for input
+		_show_cursor_and_wait()
 
 # ── Character Customization UI ───────────────────────────────────────────────
 func _build_customization_ui() -> void:
@@ -1959,55 +1962,25 @@ func _build_customization_ui() -> void:
 	options.add_theme_constant_override("separation", 15)
 	options_panel.add_child(options)
 
-	# Create new dropdowns that mirror the original ones
-	var pronoun_dd = OptionButton.new()
-	pronoun_dd.name = "CinematicPronoun"
-	pronoun_dd.focus_mode = Control.FOCUS_ALL
-	for i in range(_pron_in.item_count):
-		pronoun_dd.add_item(_pron_in.get_item_text(i))
-	pronoun_dd.select(_pron_in.get_selected())
-	pronoun_dd.item_selected.connect(_on_cinematic_dropdown_changed.bind("pronoun", pronoun_dd))
-	_add_customization_option(options, "Pronoun:", pronoun_dd)
+	# Create cycle selectors for each customization option
+	var pronoun_selector = _create_cycle_selector("pronoun", _pron_in)
+	_add_customization_cycle(options, "Pronoun:", pronoun_selector)
 
-	var body_dd = OptionButton.new()
-	body_dd.name = "CinematicBody"
-	body_dd.focus_mode = Control.FOCUS_ALL
-	for i in range(_body_in.item_count):
-		body_dd.add_item(_body_in.get_item_text(i))
-	body_dd.select(_body_in.get_selected())
-	body_dd.item_selected.connect(_on_cinematic_dropdown_changed.bind("body", body_dd))
-	_add_customization_option(options, "Body Type:", body_dd)
+	var body_selector = _create_cycle_selector("body", _body_in)
+	_add_customization_cycle(options, "Body Type:", body_selector)
 
-	var outfit_dd = OptionButton.new()
-	outfit_dd.name = "CinematicOutfit"
-	outfit_dd.focus_mode = Control.FOCUS_ALL
-	for i in range(_outfit_in.item_count):
-		outfit_dd.add_item(_outfit_in.get_item_text(i))
-	outfit_dd.select(_outfit_in.get_selected())
-	outfit_dd.item_selected.connect(_on_cinematic_dropdown_changed.bind("outfit", outfit_dd))
-	_add_customization_option(options, "Outfit:", outfit_dd)
+	var outfit_selector = _create_cycle_selector("outfit", _outfit_in)
+	_add_customization_cycle(options, "Outfit:", outfit_selector)
 
-	var hair_dd = OptionButton.new()
-	hair_dd.name = "CinematicHair"
-	hair_dd.focus_mode = Control.FOCUS_ALL
-	for i in range(_hair_in.item_count):
-		hair_dd.add_item(_hair_in.get_item_text(i))
-	hair_dd.select(_hair_in.get_selected())
-	hair_dd.item_selected.connect(_on_cinematic_dropdown_changed.bind("hair", hair_dd))
-	_add_customization_option(options, "Hair:", hair_dd)
+	var hair_selector = _create_cycle_selector("hair", _hair_in)
+	_add_customization_cycle(options, "Hair:", hair_selector)
 
-	var hat_dd = OptionButton.new()
-	hat_dd.name = "CinematicHat"
-	hat_dd.focus_mode = Control.FOCUS_ALL
-	for i in range(_hat_in.item_count):
-		hat_dd.add_item(_hat_in.get_item_text(i))
-	hat_dd.select(_hat_in.get_selected())
-	hat_dd.item_selected.connect(_on_cinematic_dropdown_changed.bind("hat", hat_dd))
-	_add_customization_option(options, "Hat:", hat_dd)
+	var hat_selector = _create_cycle_selector("hat", _hat_in)
+	_add_customization_cycle(options, "Hat:", hat_selector)
 
-	# Store dropdown references for focus navigation
-	var dropdowns = [pronoun_dd, body_dd, outfit_dd, hair_dd, hat_dd]
-	customization_container.set_meta("dropdowns", dropdowns)
+	# Store selector references for focus navigation
+	var selectors = [pronoun_selector, body_selector, outfit_selector, hair_selector, hat_selector]
+	customization_container.set_meta("selectors", selectors)
 
 	# Right: Character Preview
 	var preview_panel = _create_styled_panel()
@@ -2055,30 +2028,30 @@ func _build_customization_ui() -> void:
 	accept_btn.pressed.connect(_on_customization_accepted)
 	customization_container.add_child(accept_btn)
 
-	# Set up focus neighbors (dropdowns array already exists from earlier in function)
-	for i in range(dropdowns.size()):
-		var dd = dropdowns[i]
+	# Set up focus neighbors
+	for i in range(selectors.size()):
+		var selector = selectors[i]
 		if i > 0:
-			dd.focus_neighbor_top = dd.get_path_to(dropdowns[i - 1])
-		if i < dropdowns.size() - 1:
-			dd.focus_neighbor_bottom = dd.get_path_to(dropdowns[i + 1])
+			selector.focus_neighbor_top = selector.get_path_to(selectors[i - 1])
+		if i < selectors.size() - 1:
+			selector.focus_neighbor_bottom = selector.get_path_to(selectors[i + 1])
 		else:
-			# Last dropdown -> Accept button
-			dd.focus_neighbor_bottom = dd.get_path_to(accept_btn)
+			# Last selector -> Accept button
+			selector.focus_neighbor_bottom = selector.get_path_to(accept_btn)
 
-	# Accept button -> back to first dropdown
-	if dropdowns.size() > 0:
-		accept_btn.focus_neighbor_top = accept_btn.get_path_to(dropdowns[dropdowns.size() - 1])
-		accept_btn.focus_neighbor_bottom = accept_btn.get_path_to(dropdowns[0])
+	# Accept button -> back to first selector
+	if selectors.size() > 0:
+		accept_btn.focus_neighbor_top = accept_btn.get_path_to(selectors[selectors.size() - 1])
+		accept_btn.focus_neighbor_bottom = accept_btn.get_path_to(selectors[0])
 
 	# Fade in and set initial focus
 	customization_container.modulate = Color(1, 1, 1, 0)
 	var tween = create_tween()
 	tween.tween_property(customization_container, "modulate", Color(1, 1, 1, 1), 0.5)
 	tween.tween_callback(func():
-		if dropdowns.size() > 0:
-			dropdowns[0].grab_focus()
-			print("[Customization] Focus set to first dropdown")
+		if selectors.size() > 0:
+			selectors[0].grab_focus()
+			print("[Customization] Focus set to first selector")
 	)
 
 func _on_cinematic_dropdown_changed(index: int, type: String, _dropdown: OptionButton) -> void:
@@ -2100,8 +2073,63 @@ func _on_cinematic_dropdown_changed(index: int, type: String, _dropdown: OptionB
 			_hat_in.select(index)
 			_on_hat_selected(index)
 
-func _add_customization_option(parent: VBoxContainer, label_text: String, option_button: OptionButton) -> void:
-	"""Add a customization option to the parent container"""
+func _create_cycle_selector(type: String, source_option_button: OptionButton) -> Button:
+	"""Create a button that cycles through options when clicked"""
+	var button = Button.new()
+	button.focus_mode = Control.FOCUS_ALL
+	button.custom_minimum_size = Vector2(250, 40)
+	button.add_theme_font_size_override("font_size", 14)
+
+	# Store the type and current index
+	button.set_meta("type", type)
+	button.set_meta("current_index", source_option_button.get_selected())
+	button.set_meta("source", source_option_button)
+
+	# Set initial text
+	var current_idx = source_option_button.get_selected()
+	button.text = "< %s >" % source_option_button.get_item_text(current_idx)
+
+	# Connect to cycle function
+	button.pressed.connect(_on_cycle_selector_pressed.bind(button))
+
+	return button
+
+func _on_cycle_selector_pressed(button: Button) -> void:
+	"""Handle cycle selector button press - advance to next option"""
+	var source = button.get_meta("source") as OptionButton
+	var current_idx = button.get_meta("current_index", 0)
+	var type_str = button.get_meta("type", "")
+
+	# Cycle to next option
+	current_idx = (current_idx + 1) % source.item_count
+	button.set_meta("current_index", current_idx)
+	button.text = "< %s >" % source.get_item_text(current_idx)
+
+	# Sync to source and trigger update
+	source.select(current_idx)
+	_on_cinematic_selector_changed(current_idx, type_str)
+
+func _on_cinematic_selector_changed(index: int, type: String) -> void:
+	"""Handle selector changes in cinematic customization UI"""
+	# Sync to the original form dropdowns to update preview
+	match type:
+		"pronoun":
+			_pron_in.select(index)
+		"body":
+			_body_in.select(index)
+			_on_body_selected(index)
+		"outfit":
+			_outfit_in.select(index)
+			_on_outfit_selected(index)
+		"hair":
+			_hair_in.select(index)
+			_on_hair_selected(index)
+		"hat":
+			_hat_in.select(index)
+			_on_hat_selected(index)
+
+func _add_customization_cycle(parent: VBoxContainer, label_text: String, selector_button: Button) -> void:
+	"""Add a customization cycle selector to the parent container"""
 	var row = HBoxContainer.new()
 	row.add_theme_constant_override("separation", 10)
 
@@ -2111,9 +2139,7 @@ func _add_customization_option(parent: VBoxContainer, label_text: String, option
 	label.add_theme_font_size_override("font_size", 14)
 	row.add_child(label)
 
-	option_button.custom_minimum_size = Vector2(250, 0)
-	option_button.add_theme_font_size_override("font_size", 14)
-	row.add_child(option_button)
+	row.add_child(selector_button)
 
 	parent.add_child(row)
 
@@ -2174,23 +2200,37 @@ func _build_confirmation_ui() -> void:
 	# Yes button
 	var yes_btn = Button.new()
 	yes_btn.text = "Yes"
+	yes_btn.name = "YesButton"
 	yes_btn.custom_minimum_size = Vector2(150, 60)
 	yes_btn.add_theme_font_size_override("font_size", 18)
+	yes_btn.focus_mode = Control.FOCUS_ALL
 	yes_btn.pressed.connect(_on_confirmation_yes)
 	buttons.add_child(yes_btn)
 
 	# No button
 	var no_btn = Button.new()
 	no_btn.text = "No"
+	no_btn.name = "NoButton"
 	no_btn.custom_minimum_size = Vector2(150, 60)
 	no_btn.add_theme_font_size_override("font_size", 18)
+	no_btn.focus_mode = Control.FOCUS_ALL
 	no_btn.pressed.connect(_on_confirmation_no)
 	buttons.add_child(no_btn)
 
-	# Fade in buttons
+	# Set up focus neighbors for left/right navigation
+	yes_btn.focus_neighbor_left = yes_btn.get_path_to(no_btn)
+	yes_btn.focus_neighbor_right = yes_btn.get_path_to(no_btn)
+	no_btn.focus_neighbor_left = no_btn.get_path_to(yes_btn)
+	no_btn.focus_neighbor_right = no_btn.get_path_to(yes_btn)
+
+	# Fade in buttons and set focus
 	confirmation_container.modulate = Color(1, 1, 1, 0)
 	var tween = create_tween()
 	tween.tween_property(confirmation_container, "modulate", Color(1, 1, 1, 1), 0.5)
+	tween.tween_callback(func():
+		yes_btn.grab_focus()
+		print("[Confirmation] Focus set to Yes button")
+	)
 
 func _on_confirmation_yes() -> void:
 	"""Handle Yes - proceed with character creation"""
