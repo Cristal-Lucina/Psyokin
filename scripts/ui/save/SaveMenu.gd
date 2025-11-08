@@ -261,6 +261,11 @@ func _label_for_slot(slot: int) -> String:
 	return "Slot %d (empty)" % slot
 
 func _do_save(slot: int) -> void:
+	# Save player position to GameState before saving
+	var player = get_tree().get_first_node_in_group("player")
+	if player and player.has_method("save_position"):
+		player.save_position()
+
 	# Preferred: ask GameState to serialize and save itself.
 	if has_node("/root/aGameState") and aGameState.has_method("save_to_slot"):
 		aGameState.save_to_slot(slot)
