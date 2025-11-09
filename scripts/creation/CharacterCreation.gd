@@ -2563,9 +2563,6 @@ func _on_customization_accepted() -> void:
 	"""Handle customization acceptance"""
 	# Selections are already synced to original form via _on_cinematic_dropdown_changed
 
-	# Check if we're in protagonist creation mode
-	var in_protagonist_creation = protagonist_container != null and is_instance_valid(protagonist_container)
-
 	# Restore character_layers to original parent before destroying container
 	if customization_container and character_layers:
 		var original_parent = customization_container.get_meta("original_preview_parent", null)
@@ -2586,24 +2583,10 @@ func _on_customization_accepted() -> void:
 			customization_container.queue_free()
 			customization_container = null
 
-		if in_protagonist_creation:
-			# Protagonist creation mode - finalize and start game
-			print("[Protagonist Creation] Appearance accepted - finalizing")
-			# Clean up cinematic layer
-			if cinematic_layer:
-				cinematic_layer.queue_free()
-				cinematic_layer = null
-			# Clean up protagonist container
-			if protagonist_container:
-				protagonist_container.queue_free()
-				protagonist_container = null
-			# Submit the character creation
-			_on_confirm_pressed()
-		else:
-			# Cinematic mode - advance to next stage
-			if dialogue_label:
-				dialogue_label.visible = true
-			_advance_stage()
+		# Advance to next stage (confirmation)
+		if dialogue_label:
+			dialogue_label.visible = true
+		_advance_stage()
 	)
 
 # ── Final Confirmation ───────────────────────────────────────────────────────
