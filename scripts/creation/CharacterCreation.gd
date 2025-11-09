@@ -439,6 +439,14 @@ func _on_body_selected(idx: int):
 func _on_underwear_selected(idx: int):
 	# Underwear selection: 0=None, 1=Boxers, 2=Undies
 	# This is saved to game state for later cutscenes
+	# Keep preview toggle on when selecting underwear
+	if customization_container and is_instance_valid(customization_container):
+		var preview_toggle = customization_container.get_meta("underwear_preview_toggle", null) as CheckButton
+		if preview_toggle and not preview_toggle.button_pressed and idx > 0:
+			# Turn on preview if selecting underwear and it's off
+			preview_toggle.button_pressed = true
+			print("[Underwear Selection] Auto-toggled on underwear preview")
+
 	# If preview toggle is on, update the preview
 	if customization_container and is_instance_valid(customization_container):
 		var preview_toggle = customization_container.get_meta("underwear_preview_toggle", null) as CheckButton
@@ -466,6 +474,14 @@ func _on_underwear_selected(idx: int):
 
 func _on_outfit_selected(idx: int):
 	# Outfit selection: 0=None, 1=Vest (fstr), 2=Dress (pfpn)
+
+	# Auto-toggle off underwear preview when selecting an outfit
+	if customization_container and is_instance_valid(customization_container) and idx > 0:
+		var preview_toggle = customization_container.get_meta("underwear_preview_toggle", null) as CheckButton
+		if preview_toggle and preview_toggle.button_pressed:
+			preview_toggle.button_pressed = false
+			# The toggled signal will handle the logic
+			print("[Outfit Selection] Auto-toggled off underwear preview")
 
 	# Check if underwear preview is active
 	var underwear_preview_active = false
@@ -2269,17 +2285,18 @@ func _build_customization_ui() -> void:
 	var body_selector = _create_cycle_selector("body", _body_in)
 	_add_customization_cycle(options, "Skin Tone:", body_selector)
 
-	var underwear_selector = _create_cycle_selector("underwear", _underwear_in)
-	_add_customization_cycle(options, "Underwear:", underwear_selector)
-
-	# Underwear preview toggle
+	# Underwear preview toggle (placed before Underwear selector)
 	var underwear_preview_toggle = CheckButton.new()
 	underwear_preview_toggle.text = "Preview Underwear"
 	underwear_preview_toggle.add_theme_font_size_override("font_size", 12)
 	underwear_preview_toggle.focus_mode = Control.FOCUS_ALL
+	underwear_preview_toggle.button_pressed = true  # Toggled on by default
 	underwear_preview_toggle.toggled.connect(_on_underwear_preview_toggled)
 	options.add_child(underwear_preview_toggle)
 	customization_container.set_meta("underwear_preview_toggle", underwear_preview_toggle)
+
+	var underwear_selector = _create_cycle_selector("underwear", _underwear_in)
+	_add_customization_cycle(options, "Underwear:", underwear_selector)
 
 	var outfit_selector = _create_cycle_selector("outfit", _outfit_in)
 	_add_customization_cycle(options, "Outfit:", outfit_selector)
@@ -2301,7 +2318,7 @@ func _build_customization_ui() -> void:
 	_update_hair_color_options("")
 
 	# Store selector references for focus navigation
-	var selectors = [pronoun_selector, body_selector, underwear_selector, underwear_preview_toggle, outfit_selector, outfit_style_selector, hair_type_selector, hair_color_selector]
+	var selectors = [pronoun_selector, body_selector, underwear_preview_toggle, underwear_selector, outfit_selector, outfit_style_selector, hair_type_selector, hair_color_selector]
 	customization_container.set_meta("selectors", selectors)
 
 	# Right: Character Preview
