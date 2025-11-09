@@ -1114,7 +1114,9 @@ func _process_cursor_blink(delta: float) -> void:
 
 func _input(event: InputEvent) -> void:
 	"""Handle input for advancing dialogue, name input, and stat selection (use _input to capture before ControllerManager)"""
-	if not cinematic_active:
+	# Allow input during cinematic OR protagonist creation mode
+	var in_protagonist_mode = protagonist_container != null and is_instance_valid(protagonist_container)
+	if not cinematic_active and not in_protagonist_mode:
 		return
 
 	# Handle keyboard navigation when keyboard is visible
@@ -1169,6 +1171,58 @@ func _input(event: InputEvent) -> void:
 		elif event.is_action_pressed("menu_accept"):
 			get_viewport().set_input_as_handled()
 			_activate_focused_button()
+			return
+
+	# Handle protagonist creation pages - bridge controller inputs to focus navigation
+	if in_protagonist_mode:
+		# Handle raw joypad button inputs
+		if event is InputEventJoypadButton and event.pressed:
+			match event.button_index:
+				0:  # A button / Accept
+					get_viewport().set_input_as_handled()
+					_activate_focused_button()
+					print("[Protagonist Input] Activated focused button via button 0")
+					return
+				11:  # D-pad up
+					get_viewport().set_input_as_handled()
+					_navigate_focus(Vector2.UP)
+					return
+				12:  # D-pad down
+					get_viewport().set_input_as_handled()
+					_navigate_focus(Vector2.DOWN)
+					return
+				13:  # D-pad left
+					get_viewport().set_input_as_handled()
+					_navigate_focus(Vector2.LEFT)
+					return
+				14:  # D-pad right
+					get_viewport().set_input_as_handled()
+					_navigate_focus(Vector2.RIGHT)
+					return
+
+		# Map move_up/move_down to focus navigation (for keyboard/action inputs)
+		if event.is_action_pressed("move_up") or event.is_action_pressed("ui_up"):
+			get_viewport().set_input_as_handled()
+			_navigate_focus(Vector2.UP)
+			return
+		elif event.is_action_pressed("move_down") or event.is_action_pressed("ui_down"):
+			get_viewport().set_input_as_handled()
+			_navigate_focus(Vector2.DOWN)
+			return
+		# Map move_left/move_right to focus navigation
+		elif event.is_action_pressed("move_left") or event.is_action_pressed("ui_left"):
+			get_viewport().set_input_as_handled()
+			_navigate_focus(Vector2.LEFT)
+			return
+		elif event.is_action_pressed("move_right") or event.is_action_pressed("ui_right"):
+			get_viewport().set_input_as_handled()
+			_navigate_focus(Vector2.RIGHT)
+			return
+		# Map menu_accept to activating the focused button
+		elif event.is_action_pressed("menu_accept") or event.is_action_pressed("ui_accept"):
+			get_viewport().set_input_as_handled()
+			_activate_focused_button()
+			print("[Protagonist Input] Activated focused button via action")
 			return
 
 	# Handle name input stage separately
