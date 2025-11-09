@@ -446,9 +446,30 @@ func _on_body_selected(idx: int):
 	_on_part_selected("base", part)
 
 func _on_underwear_selected(idx: int):
-	# Underwear selection: 0=Boxers, 1=Undies
-	# This is saved to game state for later cutscenes, not displayed on character now
-	pass
+	# Underwear selection: 0=None, 1=Boxers, 2=Undies
+	# This is saved to game state for later cutscenes
+	# If preview toggle is on, update the preview
+	if customization_container and is_instance_valid(customization_container):
+		var preview_toggle = customization_container.get_meta("underwear_preview_toggle", null) as CheckButton
+		if preview_toggle and preview_toggle.button_pressed:
+			# Update preview based on new selection
+			if idx == 0:
+				# None selected, hide underwear
+				_on_part_selected("underwear", null)
+			else:
+				# Show selected underwear
+				var underwear_codes = ["boxr", "undi"]
+				var underwear_names = ["Boxers", "Undies"]
+				var adjusted_idx = idx - 1  # Adjust for None option
+
+				if adjusted_idx >= 0 and adjusted_idx < underwear_codes.size():
+					var variant_code = underwear_codes[adjusted_idx] + "_v01"
+					var part = {
+						"name": underwear_names[adjusted_idx],
+						"path": CHAR_BASE_PATH + "char_a_p1/1out/char_a_p1_1out_" + variant_code + ".png",
+						"variant": variant_code
+					}
+					_on_part_selected("underwear", part)
 
 func _on_outfit_selected(idx: int):
 	# Outfit selection: 0=None, 1=Vest (fstr), 2=Dress (pfpn)
@@ -740,10 +761,17 @@ func _on_confirm_pressed() -> void:
 
 	var pron_text: String = _opt_text(_pron_in)
 
-	# Get underwear selection
+	# Get underwear selection (0=None, 1=Boxers, 2=Undies)
 	var underwear_idx = _underwear_in.get_selected() if _underwear_in else 0
-	var underwear_codes = ["boxr_v01", "undi_v01"]
-	var selected_underwear = underwear_codes[underwear_idx] if underwear_idx < underwear_codes.size() else "boxr_v01"
+	var selected_underwear = ""
+	if underwear_idx == 0:
+		selected_underwear = "none"
+	elif underwear_idx == 1:
+		selected_underwear = "boxr_v01"
+	elif underwear_idx == 2:
+		selected_underwear = "undi_v01"
+	else:
+		selected_underwear = "none"  # Default to none if out of range
 
 	# Save character variant data to CharacterData autoload
 	print("[CharacterCreation] Saving character variants: ", selected_variants)
