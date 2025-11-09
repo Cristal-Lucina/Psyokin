@@ -1443,12 +1443,18 @@ func _show_keyboard() -> void:
 	current_text_label.add_theme_color_override("font_color", Color(1.0, 0.7, 0.75, 1.0))
 	keyboard_container.add_child(current_text_label)
 
+	# Keyboard with shift indicator container
+	var keyboard_row = HBoxContainer.new()
+	keyboard_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	keyboard_row.add_theme_constant_override("separation", 15)
+	keyboard_container.add_child(keyboard_row)
+
 	# Letter grid (QWERTY layout: 10 columns for row 1, 9 for row 2, 7 for row 3)
 	var letter_grid = GridContainer.new()
 	letter_grid.columns = keyboard_grid_cols
 	letter_grid.add_theme_constant_override("h_separation", 3)
 	letter_grid.add_theme_constant_override("v_separation", 3)
-	keyboard_container.add_child(letter_grid)
+	keyboard_row.add_child(letter_grid)
 
 	# QWERTY layout rows
 	var qwerty_rows = [
@@ -1491,6 +1497,25 @@ func _show_keyboard() -> void:
 			spacer.custom_minimum_size = Vector2(40, 40)
 			letter_grid.add_child(spacer)
 
+	# Shift indicator panel (to the right of keyboard)
+	var shift_panel = VBoxContainer.new()
+	shift_panel.add_theme_constant_override("separation", 5)
+	keyboard_row.add_child(shift_panel)
+
+	var shift_label = Label.new()
+	shift_label.text = "Shift"
+	shift_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	shift_label.add_theme_font_size_override("font_size", 12)
+	shift_label.add_theme_color_override("font_color", Color(0.8, 0.8, 0.8, 1.0))
+	shift_panel.add_child(shift_label)
+
+	var r1_label = Label.new()
+	r1_label.text = "[R1]"
+	r1_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	r1_label.add_theme_font_size_override("font_size", 14)
+	r1_label.add_theme_color_override("font_color", Color(1.0, 0.7, 0.75, 1.0))
+	shift_panel.add_child(r1_label)
+
 	# Bottom row with Backspace and Accept (centered)
 	var bottom_row = HBoxContainer.new()
 	bottom_row.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -1502,7 +1527,7 @@ func _show_keyboard() -> void:
 	bottom_row.add_child(backspace_btn)
 	keyboard_buttons.append({"button": backspace_btn, "value": "BACKSPACE", "type": "action"})
 
-	var accept_btn = _create_keyboard_button("✓ Accept", Vector2(150, 50))
+	var accept_btn = _create_keyboard_button("✓ Accept [X]", Vector2(150, 50))
 	accept_btn.pressed.connect(_on_keyboard_accept_pressed)
 	bottom_row.add_child(accept_btn)
 	keyboard_buttons.append({"button": accept_btn, "value": "ACCEPT", "type": "action"})
@@ -2636,6 +2661,66 @@ func _build_confirmation_ui() -> void:
 	confirmation_container = Control.new()
 	confirmation_container.set_anchors_preset(Control.PRESET_FULL_RECT)
 	cinematic_layer.add_child(confirmation_container)
+
+	# Create summary panel
+	var summary_panel = VBoxContainer.new()
+	summary_panel.set_anchors_preset(Control.PRESET_CENTER)
+	summary_panel.anchor_left = 0.5
+	summary_panel.anchor_top = 0.35
+	summary_panel.anchor_right = 0.5
+	summary_panel.anchor_bottom = 0.35
+	summary_panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	summary_panel.grow_vertical = Control.GROW_DIRECTION_BOTH
+	summary_panel.add_theme_constant_override("separation", 8)
+	confirmation_container.add_child(summary_panel)
+
+	# Add summary title
+	var title = Label.new()
+	title.text = "Your Choices:"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 18)
+	title.add_theme_color_override("font_color", Color(1.0, 0.7, 0.75, 1.0))
+	summary_panel.add_child(title)
+
+	# Add name
+	var name_label = Label.new()
+	name_label.text = "Name: %s %s" % [cinematic_name, cinematic_surname]
+	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	name_label.add_theme_font_size_override("font_size", 14)
+	summary_panel.add_child(name_label)
+
+	# Add stats
+	var stats_text = "Stats: "
+	var stat_names = {"BRW": "BRAWN", "VTL": "VITALITY", "TPO": "TEMPO", "MND": "MIND", "FCS": "FOCUS"}
+	for i in range(_selected_order.size()):
+		if i > 0:
+			stats_text += ", "
+		var stat_id = _selected_order[i]
+		stats_text += stat_names.get(stat_id, stat_id)
+	var stats_label = Label.new()
+	stats_label.text = stats_text
+	stats_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	stats_label.add_theme_font_size_override("font_size", 14)
+	summary_panel.add_child(stats_label)
+
+	# Add perk
+	var perk_id = _chosen_perk_id()
+	var perk_label = Label.new()
+	perk_label.text = "Perk: %s" % perk_id if perk_id != "" else "Perk: None"
+	perk_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	perk_label.add_theme_font_size_override("font_size", 14)
+	summary_panel.add_child(perk_label)
+
+	# Add appearance summary
+	var pronoun_text = ""
+	if _pron_in:
+		var idx = _pron_in.get_selected()
+		pronoun_text = _pron_in.get_item_text(idx) if idx >= 0 else "they"
+	var appearance_label = Label.new()
+	appearance_label.text = "Pronouns: %s" % pronoun_text
+	appearance_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	appearance_label.add_theme_font_size_override("font_size", 14)
+	summary_panel.add_child(appearance_label)
 
 	# Yes/No buttons
 	var buttons = HBoxContainer.new()
