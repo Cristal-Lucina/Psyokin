@@ -7,6 +7,7 @@ extends Node
 enum InputContext {
 	DISABLED,           # All input blocked
 	OVERWORLD,         # Walking around the world
+	CHARACTER_CREATION, # Character creation cinematic scene
 	BATTLE_ACTION,     # Battle: main action menu (Attack/Skill/Item/etc)
 	BATTLE_SKILL,      # Battle: skill selection submenu
 	BATTLE_ITEM,       # Battle: item selection submenu
@@ -189,6 +190,8 @@ func _route_input(event: InputEvent) -> void:
 	match current_context:
 		InputContext.OVERWORLD:
 			_handle_overworld_input(event)
+		InputContext.CHARACTER_CREATION:
+			_handle_character_creation_input(event)
 		InputContext.BATTLE_ACTION:
 			_handle_battle_action_input(event)
 		InputContext.BATTLE_SKILL:
@@ -243,6 +246,14 @@ func _handle_overworld_input(event: InputEvent) -> void:
 		action_button_pressed.emit("menu", current_context)
 		_start_cooldown()
 		# DON'T mark as handled - let existing handlers work (Main.gd opens game menu)
+
+func _handle_character_creation_input(event: InputEvent) -> void:
+	"""Handle input during character creation cinematic"""
+	# For character creation, we want to let Godot's native UI system handle everything
+	# This includes focus navigation (ui_up, ui_down) and button activation (ui_accept)
+	# We do NOT start cooldowns or mark input as handled here
+	# CharacterCreation.gd will handle its own input logic
+	pass
 
 func _handle_battle_action_input(event: InputEvent) -> void:
 	"""Handle input in battle action menu"""
