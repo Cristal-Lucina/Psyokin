@@ -5,12 +5,12 @@ signal creation_applied
 
 # Cinematic stages
 enum CinematicStage {
-	OPENING_DIALOGUE_1,    # "Oh, I think they are regaining consciousness.."
-	OPENING_DIALOGUE_2,    # "Check if they are aware."
+	OPENING_DIALOGUE_1,    # "Doctor! There's a reading!"
+	OPENING_DIALOGUE_2,    # "Is the patient aware?"
 	OPENING_DIALOGUE_3,    # "Hey, do you remember your name?"
 	NAME_INPUT,            # Name input with validation
-	DIALOGUE_RESPONSE_1,   # "They're speaking..."
-	DIALOGUE_RESPONSE_2,   # "Nurse, go check..."
+	DIALOGUE_RESPONSE_1,   # "We got a response!"
+	DIALOGUE_RESPONSE_2,   # "Wonderful, how are the vitals?"
 	STAT_SELECTION,        # Choose 3 stats
 	PERK_QUESTION,         # "Choose a perk."
 	PERK_SELECTION,        # Show 3 perks based on stats
@@ -141,7 +141,8 @@ var stat_continue_button: Button = null  # Reference to Continue button
 var keyboard_buttons: Array = []  # All keyboard buttons
 var keyboard_focused_row: int = 0  # Current row (0-3: letters, 4: actions)
 var keyboard_focused_col: int = 0  # Current column
-var keyboard_grid_cols: int = 9  # 9 columns for letters
+var keyboard_grid_cols: int = 10  # 10 columns for QWERTY layout
+var keyboard_uppercase: bool = true  # Track if keyboard is in uppercase mode
 
 # Blinking up arrow
 var arrow_label: Label = null
@@ -1126,6 +1127,16 @@ func _input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 			_handle_keyboard_accept()
 			return
+		# R1 button (JOY_BUTTON_R) to toggle uppercase/lowercase
+		elif event is InputEventJoypadButton and event.pressed and event.button_index == JOY_BUTTON_RIGHT_SHOULDER:
+			get_viewport().set_input_as_handled()
+			_toggle_keyboard_case()
+			return
+		# X button (JOY_BUTTON_X) to accept name directly
+		elif event is InputEventJoypadButton and event.pressed and event.button_index == JOY_BUTTON_X:
+			get_viewport().set_input_as_handled()
+			_on_keyboard_accept_pressed()
+			return
 		elif event is InputEventJoypadButton and event.pressed:
 			get_viewport().set_input_as_handled()
 			_handle_keyboard_accept()
@@ -1235,18 +1246,18 @@ func _enter_stage(stage: CinematicStage) -> void:
 
 	match stage:
 		CinematicStage.OPENING_DIALOGUE_1:
-			_start_typing("Oh, I think they are regaining consciousness..")
+			_start_typing("Doctor! There's a reading!")
 		CinematicStage.OPENING_DIALOGUE_2:
-			_start_typing("Check if they are aware.")
+			_start_typing("Is the patient aware?")
 		CinematicStage.OPENING_DIALOGUE_3:
 			_start_typing("Hey, do you remember your name?")
 		CinematicStage.NAME_INPUT:
 			_build_name_input_ui()
 		CinematicStage.DIALOGUE_RESPONSE_1:
 			dialogue_label.text = ""
-			_start_typing("They are speaking!")
+			_start_typing("We got a response!")
 		CinematicStage.DIALOGUE_RESPONSE_2:
-			_start_typing("Nurse, go check their vitals and reflexes.")
+			_start_typing("Wonderful, how are the vitals?")
 		CinematicStage.STAT_SELECTION:
 			_build_stat_selection_ui()
 		CinematicStage.PERK_QUESTION:
@@ -1415,6 +1426,7 @@ func _show_keyboard() -> void:
 	keyboard_focused_row = 0
 	keyboard_focused_col = 0
 	keyboard_buttons.clear()
+	keyboard_uppercase = true  # Always start in uppercase mode
 
 	# Create keyboard container
 	keyboard_container = VBoxContainer.new()
@@ -1431,45 +1443,53 @@ func _show_keyboard() -> void:
 	current_text_label.add_theme_color_override("font_color", Color(1.0, 0.7, 0.75, 1.0))
 	keyboard_container.add_child(current_text_label)
 
-	# Letter grid (9 columns, 4 rows for uppercase and lowercase)
+	# Letter grid (QWERTY layout: 10 columns for row 1, 9 for row 2, 7 for row 3)
 	var letter_grid = GridContainer.new()
 	letter_grid.columns = keyboard_grid_cols
 	letter_grid.add_theme_constant_override("h_separation", 3)
 	letter_grid.add_theme_constant_override("v_separation", 3)
 	keyboard_container.add_child(letter_grid)
 
-	# Uppercase letters (A-Z split across 3 rows of 9)
-	var uppercase = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-	for i in range(uppercase.length()):
-		var letter = uppercase[i]
-		var btn = _create_keyboard_button(letter, Vector2(40, 40))
-		btn.pressed.connect(_on_keyboard_letter_pressed.bind(letter))
-		letter_grid.add_child(btn)
-		keyboard_buttons.append({"button": btn, "value": letter, "type": "letter"})
+	# QWERTY layout rows
+	var qwerty_rows = [
+		"QWERTYUIOP",  # Row 1 (10 keys)
+		"ASDFGHJKL",   # Row 2 (9 keys)
+		"ZXCVBNM"      # Row 3 (7 keys)
+	]
 
-	# Add padding buttons to fill the grid (27 letters, need 36 for 4 rows of 9)
-	for i in range(9):  # 9 more buttons to reach 36
-		if i < 1:  # First button is spacer
+	# Build keyboard with current case
+	for row_idx in range(qwerty_rows.size()):
+		var row = qwerty_rows[row_idx]
+
+		# Add spacers for centering rows 2 and 3
+		if row_idx == 1:
+			# Center row 2 (9 keys) - add 0.5 spacer on left
+			var spacer = Control.new()
+			spacer.custom_minimum_size = Vector2(20, 40)
+			letter_grid.add_child(spacer)
+		elif row_idx == 2:
+			# Center row 3 (7 keys) - add 1.5 spacers on left
+			for i in range(2):
+				var spacer = Control.new()
+				spacer.custom_minimum_size = Vector2(30 if i == 0 else 20, 40)
+				letter_grid.add_child(spacer)
+
+		# Add letter buttons
+		for i in range(row.length()):
+			var letter = row[i] if keyboard_uppercase else row[i].to_lower()
+			var btn = _create_keyboard_button(letter, Vector2(40, 40))
+			btn.pressed.connect(_on_keyboard_letter_pressed.bind(letter))
+			letter_grid.add_child(btn)
+			keyboard_buttons.append({"button": btn, "value": letter, "type": "letter", "base_char": row[i]})
+
+		# Add spacers to complete the row
+		var keys_in_row = row.length()
+		var spacers_before = 0 if row_idx == 0 else (1 if row_idx == 1 else 2)
+		var spacers_after = keyboard_grid_cols - keys_in_row - spacers_before
+		for i in range(spacers_after):
 			var spacer = Control.new()
 			spacer.custom_minimum_size = Vector2(40, 40)
 			letter_grid.add_child(spacer)
-		else:  # Rest are lowercase letters
-			var lowercase_start = i - 1
-			if lowercase_start < 26:
-				var letter = uppercase[lowercase_start].to_lower()
-				var btn = _create_keyboard_button(letter, Vector2(40, 40))
-				btn.pressed.connect(_on_keyboard_letter_pressed.bind(letter))
-				letter_grid.add_child(btn)
-				keyboard_buttons.append({"button": btn, "value": letter, "type": "letter"})
-
-	# Add remaining lowercase letters
-	var lowercase_remaining = "hijklmnopqrstuvwxyz"
-	for i in range(lowercase_remaining.length()):
-		var letter = lowercase_remaining[i]
-		var btn = _create_keyboard_button(letter, Vector2(40, 40))
-		btn.pressed.connect(_on_keyboard_letter_pressed.bind(letter))
-		letter_grid.add_child(btn)
-		keyboard_buttons.append({"button": btn, "value": letter, "type": "letter"})
 
 	# Bottom row with Backspace and Accept (centered)
 	var bottom_row = HBoxContainer.new()
@@ -1497,6 +1517,18 @@ func _create_keyboard_button(text: String, btn_size: Vector2) -> Button:
 	btn.custom_minimum_size = btn_size
 	btn.add_theme_font_size_override("font_size", 14)
 	return btn
+
+func _toggle_keyboard_case() -> void:
+	"""Toggle between uppercase and lowercase keyboard"""
+	keyboard_uppercase = !keyboard_uppercase
+
+	# Update all letter buttons
+	for kb in keyboard_buttons:
+		if kb["type"] == "letter":
+			var base_char = kb["base_char"]
+			var new_char = base_char if keyboard_uppercase else base_char.to_lower()
+			kb["button"].text = new_char
+			kb["value"] = new_char
 
 func _handle_keyboard_navigation(dx: int, dy: int) -> void:
 	"""Handle directional navigation on keyboard"""
@@ -1728,11 +1760,11 @@ func _build_stat_selection_ui() -> void:
 
 	# Stat names and descriptions
 	var stats = [
-		{"name": "BRAWN", "id": "BRW", "desc": "Physical attack power and weapon damage"},
-		{"name": "VITALITY", "id": "VTL", "desc": "Maximum health and physical defense"},
-		{"name": "TEMPO", "id": "TPO", "desc": "Initiative and action speed"},
-		{"name": "MIND", "id": "MND", "desc": "Sigil power and skill damage"},
-		{"name": "FOCUS", "id": "FCS", "desc": "Maximum MP and skill accuracy"}
+		{"name": "BRAWN", "id": "BRW", "desc": "(Physical Power) Increases weapon damage and affects checks that represent strength."},
+		{"name": "VITALITY", "id": "VTL", "desc": "(Toughness & Stamina) Raises health points and reduces incoming physical damage."},
+		{"name": "TEMPO", "id": "TPO", "desc": "(Speed & Timing) Drives initiative and improves physical accuracy"},
+		{"name": "MIND", "id": "MND", "desc": "(Skill Power) Increases skill damage and affects knowledge checks."},
+		{"name": "FOCUS", "id": "FCS", "desc": "(Discipline & Guard) Raises mind points and reduces skill damage."}
 	]
 
 	# Create stat toggle buttons
@@ -2121,15 +2153,15 @@ func _show_next_nurse_response() -> void:
 	var is_selected = _selected_order.has(stat_id)
 
 	var responses_positive = {
-		"BRW": "They have a strong grip!",
-		"VTL": "I'm surprised with how fast they heal.",
+		"BRW": "Grip strength is amazing!",
+		"VTL": "Wounds are healing incredibly fast.",
 		"TPO": "Reflexes check out great.",
 		"MND": "The EEG test shows massive neural activity!",
 		"FCS": "The auditory test shows superb focus."
 	}
 
 	var responses_negative = {
-		"BRW": "Their grip is still a bit weak.",
+		"BRW": "Grip strength is still weak.",
 		"VTL": "Some of these wounds still haven't healed.",
 		"TPO": "Reflexes seem out of sync.",
 		"MND": "The EEG indicates recovering neural activity.",
