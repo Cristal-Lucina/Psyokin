@@ -441,16 +441,22 @@ func _on_underwear_selected(idx: int):
 	pass
 
 func _on_outfit_selected(idx: int):
-	# Outfit selection: 0=Vest (fstr), 1=Dress (pfpn)
+	# Outfit selection: 0=None, 1=Vest (fstr), 2=Dress (pfpn)
+	if idx == 0:  # None selected
+		_on_part_selected("outfit", null)
+		selected_outfit_type = ""
+		return
+
 	var outfit_codes = ["fstr", "pfpn"]
 	var outfit_names = ["Vest", "Dress"]
+	var adjusted_idx = idx - 1  # Adjust for None option
 
-	if idx >= 0 and idx < outfit_codes.size():
-		selected_outfit_type = outfit_codes[idx]
+	if adjusted_idx >= 0 and adjusted_idx < outfit_codes.size():
+		selected_outfit_type = outfit_codes[adjusted_idx]
 		# Default to v01, will be updated by outfit style selection
-		var variant_code = outfit_codes[idx] + "_v01"
+		var variant_code = outfit_codes[adjusted_idx] + "_v01"
 		var part = {
-			"name": outfit_names[idx],
+			"name": outfit_names[adjusted_idx],
 			"path": CHAR_BASE_PATH + "char_a_p1/1out/char_a_p1_1out_" + variant_code + ".png",
 			"variant": variant_code
 		}
@@ -479,12 +485,18 @@ func _update_outfit_style_preview():
 	_on_part_selected("outfit", part)
 
 func _on_hair_selected(idx: int):
-	# Hair type selection: 0=Bob (bob1), 1=Dapper (dap1)
+	# Hair type selection: 0=None, 1=Bob (bob1), 2=Dapper (dap1)
+	if idx == 0:  # None selected
+		_on_part_selected("hair", null)
+		selected_hair_type = ""
+		return
+
 	var hair_codes = ["bob1", "dap1"]
 	var hair_names = ["Bob", "Dapper"]
+	var adjusted_idx = idx - 1  # Adjust for None option
 
-	if idx >= 0 and idx < hair_codes.size():
-		selected_hair_type = hair_codes[idx]
+	if adjusted_idx >= 0 and adjusted_idx < hair_codes.size():
+		selected_hair_type = hair_codes[adjusted_idx]
 		# Update with current hair color selection
 		_update_hair_preview()
 
@@ -568,7 +580,8 @@ func _fill_underwear_dropdown() -> void:
 	if _underwear_in == null or _underwear_in.item_count > 0:
 		return
 
-	# Underwear options: Boxers and Undies
+	# Underwear options: None, Boxers, Undies
+	_underwear_in.add_item("None")
 	_underwear_in.add_item("Boxers")
 	_underwear_in.add_item("Undies")
 	_underwear_in.select(0)
@@ -577,7 +590,8 @@ func _fill_outfit_dropdown() -> void:
 	if _outfit_in == null or _outfit_in.item_count > 0:
 		return
 
-	# Outfit options: Vest and Dress
+	# Outfit options: None, Vest, Dress
+	_outfit_in.add_item("None")
 	_outfit_in.add_item("Vest")
 	_outfit_in.add_item("Dress")
 	_outfit_in.select(0)
@@ -597,7 +611,8 @@ func _fill_hair_type_dropdown() -> void:
 	if _hair_in == null or _hair_in.item_count > 0:
 		return
 
-	# Hair types: Bob and Dapper
+	# Hair types: None, Bob, Dapper
+	_hair_in.add_item("None")
 	_hair_in.add_item("Bob")
 	_hair_in.add_item("Dapper")
 	_hair_in.select(0)
@@ -2160,8 +2175,8 @@ func _build_customization_ui() -> void:
 	_add_customization_cycle(options, "Hair Color:", hair_color_selector)
 	customization_container.set_meta("hair_color_selector", hair_color_selector)
 
-	# Initialize hair color options with default hair type (Bob = bob1)
-	_update_hair_color_options("bob1")
+	# Initialize hair color options with default hair type (None)
+	_update_hair_color_options("")
 
 	# Store selector references for focus navigation
 	var selectors = [pronoun_selector, body_selector, underwear_selector, outfit_selector, outfit_style_selector, hair_type_selector, hair_color_selector]
@@ -2261,15 +2276,15 @@ func _create_cycle_selector(type: String, source_option_button: OptionButton) ->
 	return button
 
 func _create_filtered_hair_type_selector() -> Button:
-	"""Create a hair type selector with only Bob and Dapper"""
+	"""Create a hair type selector with None, Bob, and Dapper"""
 	var button = Button.new()
 	button.focus_mode = Control.FOCUS_ALL
 	button.custom_minimum_size = Vector2(250, 40)
 	button.add_theme_font_size_override("font_size", 14)
 
 	# Define allowed hair types with display names
-	var allowed_hair_types = ["Bob", "Dapper"]
-	var hair_type_codes = ["bob1", "dap1"]
+	var allowed_hair_types = ["None", "Bob", "Dapper"]
+	var hair_type_codes = ["", "bob1", "dap1"]
 	button.set_meta("type", "hair_type")
 	button.set_meta("allowed_options", allowed_hair_types)
 	button.set_meta("hair_type_codes", hair_type_codes)
@@ -2375,6 +2390,11 @@ func _update_hair_color_options(hair_type_code: String) -> void:
 
 	var hair_color_selector = customization_container.get_meta("hair_color_selector", null)
 	if not hair_color_selector:
+		return
+
+	# If hair type is None (empty string), skip color application
+	if hair_type_code == "":
+		hair_color_selector.text = "< None >"
 		return
 
 	# Generate color numbers 0-13
