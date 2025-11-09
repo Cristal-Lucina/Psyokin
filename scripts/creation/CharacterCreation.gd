@@ -76,7 +76,6 @@ const DIRECTIONS = {
 @onready var _outfit_style_in: OptionButton = %OutfitStyleInput
 @onready var _hair_in     : OptionButton  = %HairIdInput
 @onready var _hair_color_in: OptionButton = %HairColorInput
-@onready var _hat_in      : OptionButton  = %HatInput
 
 @onready var _brw_cb      : CheckButton   = %StatBRW
 @onready var _vtl_cb      : CheckButton   = %StatVTL
@@ -198,8 +197,15 @@ func _ready() -> void:
 		_hair_in.item_selected.connect(_on_hair_selected)
 	if _hair_color_in and not _hair_color_in.item_selected.is_connected(_on_hair_color_selected):
 		_hair_color_in.item_selected.connect(_on_hair_color_selected)
-	if _hat_in and not _hat_in.item_selected.is_connected(_on_hat_selected):
-		_hat_in.item_selected.connect(_on_hat_selected)
+
+	# Add click handlers to cycle through options
+	_add_cycle_on_click(_pron_in)
+	_add_cycle_on_click(_body_in)
+	_add_cycle_on_click(_underwear_in)
+	_add_cycle_on_click(_outfit_in)
+	_add_cycle_on_click(_outfit_style_in)
+	_add_cycle_on_click(_hair_in)
+	_add_cycle_on_click(_hair_color_in)
 
 	set_default_character()
 	update_preview()
@@ -501,11 +507,27 @@ func _update_hair_preview():
 	}
 	_on_part_selected("hair", part)
 
-func _on_hat_selected(idx: int):
-	if idx == 0:  # "None" option
-		_on_part_selected("hat", null)
-	elif "hat" in available_parts and idx - 1 < available_parts["hat"].size():
-		_on_part_selected("hat", available_parts["hat"][idx - 1])
+func _add_cycle_on_click(option_button: OptionButton) -> void:
+	"""Add click handler to cycle through options when OptionButton is clicked"""
+	if option_button == null:
+		return
+
+	# Connect to gui_input to detect clicks
+	if not option_button.gui_input.is_connected(_on_option_button_clicked):
+		option_button.gui_input.connect(_on_option_button_clicked.bind(option_button))
+
+func _on_option_button_clicked(event: InputEvent, option_button: OptionButton) -> void:
+	"""Handle OptionButton clicks to cycle through options"""
+	if event is InputEventMouseButton:
+		var mouse_event = event as InputEventMouseButton
+		if mouse_event.pressed and mouse_event.button_index == MOUSE_BUTTON_LEFT:
+			# Cycle to next option
+			if option_button.item_count > 0:
+				var current_idx = option_button.get_selected()
+				var next_idx = (current_idx + 1) % option_button.item_count
+				option_button.select(next_idx)
+				# Trigger the item_selected signal manually
+				option_button.item_selected.emit(next_idx)
 
 # ── UI fill / wiring ─────────────────────────────────────────────────────────
 func _fill_basics() -> void:
@@ -513,9 +535,11 @@ func _fill_basics() -> void:
 	if _name_in:
 		_name_in.max_length = 8
 		_name_in.placeholder_text = "First Name"
+		_name_in.virtual_keyboard_enabled = true
 	if _surname_in:
 		_surname_in.max_length = 8
 		_surname_in.placeholder_text = "Last Name"
+		_surname_in.virtual_keyboard_enabled = true
 
 	# Pronouns
 	if _pron_in and _pron_in.item_count == 0:
@@ -530,7 +554,6 @@ func _fill_basics() -> void:
 	_fill_outfit_style_dropdown()  # Will be populated when outfit is selected
 	_fill_hair_type_dropdown()
 	_fill_hair_color_dropdown()
-	_fill_hat_dropdown()
 
 func _fill_skin_tone_dropdown() -> void:
 	if _body_in == null or _body_in.item_count > 0:
@@ -587,19 +610,6 @@ func _fill_hair_color_dropdown() -> void:
 	for i in range(14):
 		_hair_color_in.add_item("Color %d" % i)
 	_hair_color_in.select(0)
-
-func _fill_hat_dropdown() -> void:
-	if _hat_in == null or _hat_in.item_count > 0:
-		return
-
-	# Hat: None option + scanned parts
-	_hat_in.add_item("None")
-
-	if "hat" in available_parts:
-		for part in available_parts["hat"]:
-			_hat_in.add_item(part.name)
-
-	_hat_in.select(0)
 
 func _wire_stat_toggles() -> void:
 	_wire_stat_toggle(_brw_cb, "BRW")

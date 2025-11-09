@@ -75,7 +75,7 @@ max_length = 8
 [node name="SurnameLabel" type="Label" parent="Margin/MainContainer/FormPanel/FormMargin/Form/ScrollContainer/Grid"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 10
-text = "Surname"
+text = "Last Name"
 
 [node name="SurnameInput" type="LineEdit" parent="Margin/MainContainer/FormPanel/FormMargin/Form/ScrollContainer/Grid"]
 unique_name_in_owner = true
@@ -165,17 +165,6 @@ theme_override_font_sizes/font_size = 10
 text = "Hair Color"
 
 [node name="HairColorInput" type="OptionButton" parent="Margin/MainContainer/FormPanel/FormMargin/Form/ScrollContainer/Grid"]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_font_sizes/font_size = 10
-
-[node name="HatLabel" type="Label" parent="Margin/MainContainer/FormPanel/FormMargin/Form/ScrollContainer/Grid"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 10
-text = "Hat"
-
-[node name="HatInput" type="OptionButton" parent="Margin/MainContainer/FormPanel/FormMargin/Form/ScrollContainer/Grid"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
@@ -278,7 +267,7 @@ size_flags_vertical = 3
 
 [node name="CharacterLayers" type="Node2D" parent="Margin/MainContainer/PreviewPanel/PreviewMargin/PreviewContainer/CenterContainer"]
 position = Vector2(200, 250)
-scale = Vector2(4, 4)
+scale = Vector2(10, 10)
 
 [node name="BaseSprite" type="Sprite2D" parent="Margin/MainContainer/PreviewPanel/PreviewMargin/PreviewContainer/CenterContainer/CharacterLayers"]
 texture_filter = 1
