@@ -159,6 +159,16 @@ var customization_container: Control = null
 var confirmation_container: Control = null
 var continue_prompt: Label = null
 
+# Protagonist creation state
+enum ProtagonistCreationPage {
+	NAME_ENTRY,
+	STATS_SELECTION,
+	PERK_SELECTION,
+	APPEARANCE_CUSTOMIZATION
+}
+var protagonist_creation_page: ProtagonistCreationPage = ProtagonistCreationPage.NAME_ENTRY
+var protagonist_container: Control = null
+
 # ── ready ────────────────────────────────────────────────────────────────────
 func _ready() -> void:
 	print("Character Creation starting with cinematic opening...")
@@ -2481,6 +2491,83 @@ func _on_customization_accepted() -> void:
 		_advance_stage()
 	)
 
+# ── Protagonist Creation UI ──────────────────────────────────────────────────
+func _build_protagonist_creation_ui() -> void:
+	"""Build cinematic-style protagonist creation UI"""
+	# Create container layer
+	protagonist_container = Control.new()
+	protagonist_container.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(protagonist_container)
+
+	# Start with name entry page
+	protagonist_creation_page = ProtagonistCreationPage.NAME_ENTRY
+	_build_name_entry_page()
+
+func _build_name_entry_page() -> void:
+	"""Build name entry page with keyboard"""
+	# Clear any existing content
+	for child in protagonist_container.get_children():
+		child.queue_free()
+
+	# TODO: Implement name entry UI with keyboard
+	# For now, create a simple placeholder and move to next page
+	var label = Label.new()
+	label.text = "Name Entry Page - Coming Soon"
+	label.set_anchors_preset(Control.PRESET_CENTER)
+	protagonist_container.add_child(label)
+
+	# Temporary: Auto-advance to stats after 1 second
+	await get_tree().create_timer(1.0).timeout
+	_build_stats_selection_page()
+
+func _build_stats_selection_page() -> void:
+	"""Build stats selection page with toggles"""
+	# Clear any existing content
+	for child in protagonist_container.get_children():
+		child.queue_free()
+
+	# TODO: Implement stats selection UI
+	var label = Label.new()
+	label.text = "Stats Selection Page - Coming Soon"
+	label.set_anchors_preset(Control.PRESET_CENTER)
+	protagonist_container.add_child(label)
+
+	# Temporary: Auto-advance to perks after 1 second
+	await get_tree().create_timer(1.0).timeout
+	_build_perk_selection_page()
+
+func _build_perk_selection_page() -> void:
+	"""Build perk selection page with toggles"""
+	# Clear any existing content
+	for child in protagonist_container.get_children():
+		child.queue_free()
+
+	# TODO: Implement perk selection UI
+	var label = Label.new()
+	label.text = "Perk Selection Page - Coming Soon"
+	label.set_anchors_preset(Control.PRESET_CENTER)
+	protagonist_container.add_child(label)
+
+	# Temporary: Auto-advance to appearance after 1 second
+	await get_tree().create_timer(1.0).timeout
+	_build_appearance_page()
+
+func _build_appearance_page() -> void:
+	"""Build appearance customization page"""
+	# Clear any existing content
+	for child in protagonist_container.get_children():
+		child.queue_free()
+
+	# Reuse the existing customization UI builder
+	# First, create a cinematic layer if it doesn't exist
+	if not cinematic_layer:
+		cinematic_layer = CanvasLayer.new()
+		cinematic_layer.layer = 100
+		add_child(cinematic_layer)
+
+	# Build customization UI (this will create customization_container)
+	_build_customization_ui()
+
 # ── Final Confirmation ───────────────────────────────────────────────────────
 func _build_confirmation_ui() -> void:
 	"""Build final confirmation UI"""
@@ -2549,7 +2636,7 @@ func _on_confirmation_yes() -> void:
 	_advance_stage()  # Go to COMPLETE
 
 func _on_confirmation_no() -> void:
-	"""Handle No - show fallback form"""
+	"""Handle No - show cinematic protagonist creation"""
 	# Clean up cinematic layer
 	if cinematic_layer:
 		cinematic_layer.queue_free()
@@ -2563,15 +2650,13 @@ func _on_confirmation_no() -> void:
 
 	cinematic_active = false
 
-	# Show the standard form
-	_show_form()
+	# Hide the standard form
+	_hide_form()
 
-	# Ensure character preview is visible and reset
-	if character_layers:
-		character_layers.visible = true
-		character_layers.scale = Vector2(1, 1)
+	# Build cinematic protagonist creation UI
+	_build_protagonist_creation_ui()
 
-	# The existing _on_confirm_pressed will handle the final save
+	# The UI will handle progression through name, stats, perks, and appearance
 
 # ── Apply Character Creation ─────────────────────────────────────────────────
 func _apply_character_creation() -> void:
