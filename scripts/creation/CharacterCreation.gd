@@ -2679,7 +2679,7 @@ func _build_keyboard_ui() -> void:
 			var btn = Button.new()
 			btn.text = letter
 			btn.custom_minimum_size = Vector2(45, 45)
-			btn.pressed.connect(_on_keyboard_letter_pressed.bind(letter))
+			btn.pressed.connect(_on_protagonist_keyboard_letter_pressed.bind(letter))
 			hbox.add_child(btn)
 
 	# Action row (Space, Backspace, Accept)
@@ -2691,19 +2691,19 @@ func _build_keyboard_ui() -> void:
 	var space_btn = Button.new()
 	space_btn.text = "Space"
 	space_btn.custom_minimum_size = Vector2(200, 45)
-	space_btn.pressed.connect(_on_keyboard_space_pressed)
+	space_btn.pressed.connect(_on_protagonist_keyboard_space_pressed)
 	action_row.add_child(space_btn)
 
 	var backspace_btn = Button.new()
 	backspace_btn.text = "⌫"
 	backspace_btn.custom_minimum_size = Vector2(80, 45)
-	backspace_btn.pressed.connect(_on_keyboard_backspace_pressed)
+	backspace_btn.pressed.connect(_on_protagonist_keyboard_backspace_pressed)
 	action_row.add_child(backspace_btn)
 
 	var accept_btn = Button.new()
 	accept_btn.text = "Accept"
 	accept_btn.custom_minimum_size = Vector2(100, 45)
-	accept_btn.pressed.connect(_on_keyboard_accept_pressed)
+	accept_btn.pressed.connect(_on_protagonist_keyboard_accept_pressed)
 	action_row.add_child(accept_btn)
 
 func _on_name_field_selected(field_type: String, label: Label) -> void:
@@ -2719,26 +2719,26 @@ func _on_name_field_selected(field_type: String, label: Label) -> void:
 	if input_display:
 		input_display.text = label.text
 
-func _on_keyboard_letter_pressed(letter: String) -> void:
-	"""Handle keyboard letter press"""
+func _on_protagonist_keyboard_letter_pressed(letter: String) -> void:
+	"""Handle protagonist keyboard letter press"""
 	var input_display = keyboard_container.get_meta("input_display") as Label
 	if input_display and input_display.text.length() < 8:
 		input_display.text += letter
 
-func _on_keyboard_space_pressed() -> void:
-	"""Handle space key"""
+func _on_protagonist_keyboard_space_pressed() -> void:
+	"""Handle protagonist keyboard space key"""
 	var input_display = keyboard_container.get_meta("input_display") as Label
 	if input_display and input_display.text.length() < 8:
 		input_display.text += " "
 
-func _on_keyboard_backspace_pressed() -> void:
-	"""Handle backspace key"""
+func _on_protagonist_keyboard_backspace_pressed() -> void:
+	"""Handle protagonist keyboard backspace key"""
 	var input_display = keyboard_container.get_meta("input_display") as Label
 	if input_display and input_display.text.length() > 0:
 		input_display.text = input_display.text.substr(0, input_display.text.length() - 1)
 
-func _on_keyboard_accept_pressed() -> void:
-	"""Handle keyboard accept - save text and hide keyboard"""
+func _on_protagonist_keyboard_accept_pressed() -> void:
+	"""Handle protagonist keyboard accept - save text and hide keyboard"""
 	var input_display = keyboard_container.get_meta("input_display") as Label
 	var current_label = protagonist_container.get_meta("current_editing_label") as Label
 
