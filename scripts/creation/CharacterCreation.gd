@@ -452,10 +452,14 @@ func _on_underwear_selected(idx: int):
 	if customization_container and is_instance_valid(customization_container):
 		var preview_toggle = customization_container.get_meta("underwear_preview_toggle", null) as CheckButton
 		if preview_toggle and preview_toggle.button_pressed:
+			# Hide outfit when previewing underwear
+			_on_part_selected("outfit", null)
+
 			# Update preview based on new selection
 			if idx == 0:
 				# None selected, hide underwear
 				_on_part_selected("underwear", null)
+				print("[Underwear Selection] None selected, hiding underwear")
 			else:
 				# Show selected underwear
 				var underwear_codes = ["boxr", "undi"]
@@ -470,12 +474,22 @@ func _on_underwear_selected(idx: int):
 						"variant": variant_code
 					}
 					_on_part_selected("underwear", part)
+					print("[Underwear Selection] Showing: %s at %s" % [variant_code, part["path"]])
 
 func _on_outfit_selected(idx: int):
 	# Outfit selection: 0=None, 1=Vest (fstr), 2=Dress (pfpn)
+
+	# Check if underwear preview is active
+	var underwear_preview_active = false
+	if customization_container and is_instance_valid(customization_container):
+		var preview_toggle = customization_container.get_meta("underwear_preview_toggle", null) as CheckButton
+		if preview_toggle and preview_toggle.button_pressed:
+			underwear_preview_active = true
+
 	if idx == 0:  # None selected
-		_on_part_selected("outfit", null)
 		selected_outfit_type = ""
+		if not underwear_preview_active:
+			_on_part_selected("outfit", null)
 		return
 
 	var outfit_codes = ["fstr", "pfpn"]
@@ -484,6 +498,12 @@ func _on_outfit_selected(idx: int):
 
 	if adjusted_idx >= 0 and adjusted_idx < outfit_codes.size():
 		selected_outfit_type = outfit_codes[adjusted_idx]
+
+		# If underwear preview is active, don't show outfit (but save selection)
+		if underwear_preview_active:
+			print("[Outfit Selection] Outfit selected but hidden due to underwear preview")
+			return
+
 		# Default to v01, will be updated by outfit style selection
 		var variant_code = outfit_codes[adjusted_idx] + "_v01"
 		var part = {
@@ -502,6 +522,17 @@ func _on_outfit_style_selected(idx: int):
 func _update_outfit_style_preview():
 	# Update the outfit preview with the selected style
 	if selected_outfit_type == "" or _outfit_style_in == null:
+		return
+
+	# Check if underwear preview is active
+	var underwear_preview_active = false
+	if customization_container and is_instance_valid(customization_container):
+		var preview_toggle = customization_container.get_meta("underwear_preview_toggle", null) as CheckButton
+		if preview_toggle and preview_toggle.button_pressed:
+			underwear_preview_active = true
+
+	# If underwear preview is active, don't show outfit
+	if underwear_preview_active:
 		return
 
 	var style_idx = _outfit_style_in.get_selected()
@@ -2490,7 +2521,22 @@ func _on_underwear_preview_toggled(pressed: bool) -> void:
 	if not pressed:
 		# Hide underwear preview (remove underwear layer)
 		_on_part_selected("underwear", null)
+
+		# Restore outfit if one was previously selected
+		if customization_container and customization_container.has_meta("saved_outfit_index"):
+			var saved_outfit_idx = customization_container.get_meta("saved_outfit_index")
+			if saved_outfit_idx > 0:  # If not None
+				_outfit_in.select(saved_outfit_idx)
+				_on_outfit_selected(saved_outfit_idx)
 	else:
+		# Save current outfit selection before hiding it
+		if customization_container and _outfit_in:
+			var current_outfit_idx = _outfit_in.get_selected()
+			customization_container.set_meta("saved_outfit_index", current_outfit_idx)
+
+		# Hide outfit to show underwear
+		_on_part_selected("outfit", null)
+
 		# Show underwear preview based on current selection
 		var current_idx = _underwear_in.get_selected() if _underwear_in else 0
 		if current_idx == 0:
@@ -2510,6 +2556,7 @@ func _on_underwear_preview_toggled(pressed: bool) -> void:
 					"variant": variant_code
 				}
 				_on_part_selected("underwear", part)
+				print("[Underwear Preview] Showing underwear: %s" % variant_code)
 
 func _add_customization_cycle(parent: VBoxContainer, label_text: String, selector_button: Button) -> void:
 	"""Add a customization cycle selector to the parent container"""
