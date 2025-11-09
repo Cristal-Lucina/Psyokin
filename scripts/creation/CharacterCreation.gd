@@ -253,15 +253,18 @@ func _apply_font_sizes() -> void:
 
 	# Section labels and important text: 12px
 	var label_nodes = [
-		get_node_or_null("Margin/MainContainer/FormPanel/Form/ScrollContainer/Grid/NameLable"),
-		get_node_or_null("Margin/MainContainer/FormPanel/Form/ScrollContainer/Grid/SurnameLabel"),
-		get_node_or_null("Margin/MainContainer/FormPanel/Form/ScrollContainer/Grid/PronounLabel"),
-		get_node_or_null("Margin/MainContainer/FormPanel/Form/ScrollContainer/Grid/BodyLabel"),
-		get_node_or_null("Margin/MainContainer/FormPanel/Form/ScrollContainer/Grid/OutfitLabel"),
-		get_node_or_null("Margin/MainContainer/FormPanel/Form/ScrollContainer/Grid/HairLabel"),
-		get_node_or_null("Margin/MainContainer/FormPanel/Form/ScrollContainer/Grid/HatLabel"),
-		get_node_or_null("Margin/MainContainer/FormPanel/Form/StatsLabel"),
-		get_node_or_null("Margin/MainContainer/FormPanel/Form/PerkLabel")
+		get_node_or_null("Margin/MainContainer/FormPanel/FormMargin/Form/ScrollContainer/Grid/NameLable"),
+		get_node_or_null("Margin/MainContainer/FormPanel/FormMargin/Form/ScrollContainer/Grid/SurnameLabel"),
+		get_node_or_null("Margin/MainContainer/FormPanel/FormMargin/Form/ScrollContainer/Grid/PronounLabel"),
+		get_node_or_null("Margin/MainContainer/FormPanel/FormMargin/Form/ScrollContainer/Grid/BodyLabel"),
+		get_node_or_null("Margin/MainContainer/FormPanel/FormMargin/Form/ScrollContainer/Grid/UnderwearLabel"),
+		get_node_or_null("Margin/MainContainer/FormPanel/FormMargin/Form/ScrollContainer/Grid/OutfitLabel"),
+		get_node_or_null("Margin/MainContainer/FormPanel/FormMargin/Form/ScrollContainer/Grid/OutfitStyleLabel"),
+		get_node_or_null("Margin/MainContainer/FormPanel/FormMargin/Form/ScrollContainer/Grid/HairLabel"),
+		get_node_or_null("Margin/MainContainer/FormPanel/FormMargin/Form/ScrollContainer/Grid/HairColorLabel"),
+		get_node_or_null("Margin/MainContainer/FormPanel/FormMargin/Form/ScrollContainer/Grid/HatLabel"),
+		get_node_or_null("Margin/MainContainer/FormPanel/FormMargin/Form/StatsLabel"),
+		get_node_or_null("Margin/MainContainer/FormPanel/FormMargin/Form/PerkLabel")
 	]
 	for node in label_nodes:
 		if node is Label:
@@ -524,7 +527,7 @@ func _fill_basics() -> void:
 	_fill_skin_tone_dropdown()
 	_fill_underwear_dropdown()
 	_fill_outfit_dropdown()
-	_fill_outfit_style_dropdown()
+	_fill_outfit_style_dropdown()  # Will be populated when outfit is selected
 	_fill_hair_type_dropdown()
 	_fill_hair_color_dropdown()
 	_fill_hat_dropdown()
