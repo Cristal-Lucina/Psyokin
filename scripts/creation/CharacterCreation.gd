@@ -502,7 +502,7 @@ func _on_outfit_selected(idx: int):
 		# Update outfit style dropdown (stays at current selection or defaults to first)
 		_update_outfit_style_preview()
 
-func _on_outfit_style_selected(idx: int):
+func _on_outfit_style_selected(_idx: int):
 	# Outfit style selection: Style 1-5 maps to v01-v05
 	_update_outfit_style_preview()
 
@@ -541,7 +541,7 @@ func _on_hair_selected(idx: int):
 		return
 
 	var hair_codes = ["bob1", "dap1"]
-	var hair_names = ["Bob", "Dapper"]
+	var _hair_names = ["Bob", "Dapper"]
 	var adjusted_idx = idx - 1  # Adjust for None option
 
 	if adjusted_idx >= 0 and adjusted_idx < hair_codes.size():
@@ -549,7 +549,7 @@ func _on_hair_selected(idx: int):
 		# Update with current hair color selection
 		_update_hair_preview()
 
-func _on_hair_color_selected(idx: int):
+func _on_hair_color_selected(_idx: int):
 	# Hair color selection: Color 0-13 maps to v00-v13
 	_update_hair_preview()
 
@@ -2427,7 +2427,7 @@ func _on_hair_type_selector_pressed(button: Button) -> void:
 func _on_hair_color_selector_pressed(button: Button) -> void:
 	"""Handle hair color selector press - cycle through color variants"""
 	var available_colors = button.get_meta("available_colors", [0])
-	var hair_type_code = button.get_meta("hair_type_code", "bob1")
+	var _hair_type_code = button.get_meta("hair_type_code", "bob1")
 	var current_idx = button.get_meta("current_index", 0)
 
 	# Cycle to next color
