@@ -76,7 +76,6 @@ const DIRECTIONS = {
 @onready var _outfit_style_in: OptionButton = %OutfitStyleInput
 @onready var _hair_in     : OptionButton  = %HairIdInput
 @onready var _hair_color_in: OptionButton = %HairColorInput
-@onready var _hat_in      : OptionButton  = %HatInput
 
 @onready var _brw_cb      : CheckButton   = %StatBRW
 @onready var _vtl_cb      : CheckButton   = %StatVTL
@@ -198,8 +197,15 @@ func _ready() -> void:
 		_hair_in.item_selected.connect(_on_hair_selected)
 	if _hair_color_in and not _hair_color_in.item_selected.is_connected(_on_hair_color_selected):
 		_hair_color_in.item_selected.connect(_on_hair_color_selected)
-	if _hat_in and not _hat_in.item_selected.is_connected(_on_hat_selected):
-		_hat_in.item_selected.connect(_on_hat_selected)
+
+	# Add click handlers to cycle through options
+	_add_cycle_on_click(_pron_in)
+	_add_cycle_on_click(_body_in)
+	_add_cycle_on_click(_underwear_in)
+	_add_cycle_on_click(_outfit_in)
+	_add_cycle_on_click(_outfit_style_in)
+	_add_cycle_on_click(_hair_in)
+	_add_cycle_on_click(_hair_color_in)
 
 	set_default_character()
 	update_preview()
@@ -430,21 +436,65 @@ func _on_body_selected(idx: int):
 	_on_part_selected("base", part)
 
 func _on_underwear_selected(idx: int):
-	# Underwear selection: 0=Boxers, 1=Undies
-	# This is saved to game state for later cutscenes, not displayed on character now
-	pass
+	# Underwear selection: 0=None, 1=Boxers, 2=Undies
+	# This is saved to game state for later cutscenes
+	# If preview toggle is on, update the preview
+	if customization_container and is_instance_valid(customization_container):
+		var preview_toggle = customization_container.get_meta("underwear_preview_toggle", null) as CheckButton
+		if preview_toggle and preview_toggle.button_pressed:
+			# Update preview based on new selection
+			if idx == 0:
+				# None selected, hide underwear
+				_on_part_selected("outfit", null)
+				print("[Underwear Selection] None selected, hiding underwear")
+			else:
+				# Show selected underwear on the OUTFIT layer (underwear uses 1out folder)
+				var underwear_codes = ["boxr", "undi"]
+				var underwear_names = ["Boxers", "Undies"]
+				var adjusted_idx = idx - 1  # Adjust for None option
+
+				if adjusted_idx >= 0 and adjusted_idx < underwear_codes.size():
+					var variant_code = underwear_codes[adjusted_idx] + "_v01"
+					var part = {
+						"name": underwear_names[adjusted_idx],
+						"path": CHAR_BASE_PATH + "char_a_p1/1out/char_a_p1_1out_" + variant_code + ".png",
+						"variant": variant_code
+					}
+					_on_part_selected("outfit", part)  # Use "outfit" layer, not "underwear"
+					print("[Underwear Selection] Showing: %s at %s" % [variant_code, part["path"]])
 
 func _on_outfit_selected(idx: int):
-	# Outfit selection: 0=Vest (fstr), 1=Dress (pfpn)
+	# Outfit selection: 0=None, 1=Vest (fstr), 2=Dress (pfpn)
+
+	# Check if underwear preview is active
+	var underwear_preview_active = false
+	if customization_container and is_instance_valid(customization_container):
+		var preview_toggle = customization_container.get_meta("underwear_preview_toggle", null) as CheckButton
+		if preview_toggle and preview_toggle.button_pressed:
+			underwear_preview_active = true
+
+	if idx == 0:  # None selected
+		selected_outfit_type = ""
+		if not underwear_preview_active:
+			_on_part_selected("outfit", null)
+		return
+
 	var outfit_codes = ["fstr", "pfpn"]
 	var outfit_names = ["Vest", "Dress"]
+	var adjusted_idx = idx - 1  # Adjust for None option
 
-	if idx >= 0 and idx < outfit_codes.size():
-		selected_outfit_type = outfit_codes[idx]
+	if adjusted_idx >= 0 and adjusted_idx < outfit_codes.size():
+		selected_outfit_type = outfit_codes[adjusted_idx]
+
+		# If underwear preview is active, don't show outfit (but save selection)
+		if underwear_preview_active:
+			print("[Outfit Selection] Outfit selected but hidden due to underwear preview")
+			return
+
 		# Default to v01, will be updated by outfit style selection
-		var variant_code = outfit_codes[idx] + "_v01"
+		var variant_code = outfit_codes[adjusted_idx] + "_v01"
 		var part = {
-			"name": outfit_names[idx],
+			"name": outfit_names[adjusted_idx],
 			"path": CHAR_BASE_PATH + "char_a_p1/1out/char_a_p1_1out_" + variant_code + ".png",
 			"variant": variant_code
 		}
@@ -452,13 +502,24 @@ func _on_outfit_selected(idx: int):
 		# Update outfit style dropdown (stays at current selection or defaults to first)
 		_update_outfit_style_preview()
 
-func _on_outfit_style_selected(idx: int):
+func _on_outfit_style_selected(_idx: int):
 	# Outfit style selection: Style 1-5 maps to v01-v05
 	_update_outfit_style_preview()
 
 func _update_outfit_style_preview():
 	# Update the outfit preview with the selected style
 	if selected_outfit_type == "" or _outfit_style_in == null:
+		return
+
+	# Check if underwear preview is active
+	var underwear_preview_active = false
+	if customization_container and is_instance_valid(customization_container):
+		var preview_toggle = customization_container.get_meta("underwear_preview_toggle", null) as CheckButton
+		if preview_toggle and preview_toggle.button_pressed:
+			underwear_preview_active = true
+
+	# If underwear preview is active, don't show outfit
+	if underwear_preview_active:
 		return
 
 	var style_idx = _outfit_style_in.get_selected()
@@ -473,16 +534,22 @@ func _update_outfit_style_preview():
 	_on_part_selected("outfit", part)
 
 func _on_hair_selected(idx: int):
-	# Hair type selection: 0=Bob (bob1), 1=Dapper (dap1)
-	var hair_codes = ["bob1", "dap1"]
-	var hair_names = ["Bob", "Dapper"]
+	# Hair type selection: 0=None, 1=Bob (bob1), 2=Dapper (dap1)
+	if idx == 0:  # None selected
+		_on_part_selected("hair", null)
+		selected_hair_type = ""
+		return
 
-	if idx >= 0 and idx < hair_codes.size():
-		selected_hair_type = hair_codes[idx]
+	var hair_codes = ["bob1", "dap1"]
+	var _hair_names = ["Bob", "Dapper"]
+	var adjusted_idx = idx - 1  # Adjust for None option
+
+	if adjusted_idx >= 0 and adjusted_idx < hair_codes.size():
+		selected_hair_type = hair_codes[adjusted_idx]
 		# Update with current hair color selection
 		_update_hair_preview()
 
-func _on_hair_color_selected(idx: int):
+func _on_hair_color_selected(_idx: int):
 	# Hair color selection: Color 0-13 maps to v00-v13
 	_update_hair_preview()
 
@@ -501,11 +568,27 @@ func _update_hair_preview():
 	}
 	_on_part_selected("hair", part)
 
-func _on_hat_selected(idx: int):
-	if idx == 0:  # "None" option
-		_on_part_selected("hat", null)
-	elif "hat" in available_parts and idx - 1 < available_parts["hat"].size():
-		_on_part_selected("hat", available_parts["hat"][idx - 1])
+func _add_cycle_on_click(option_button: OptionButton) -> void:
+	"""Add click handler to cycle through options when OptionButton is clicked"""
+	if option_button == null:
+		return
+
+	# Connect to gui_input to detect clicks
+	if not option_button.gui_input.is_connected(_on_option_button_clicked):
+		option_button.gui_input.connect(_on_option_button_clicked.bind(option_button))
+
+func _on_option_button_clicked(event: InputEvent, option_button: OptionButton) -> void:
+	"""Handle OptionButton clicks to cycle through options"""
+	if event is InputEventMouseButton:
+		var mouse_event = event as InputEventMouseButton
+		if mouse_event.pressed and mouse_event.button_index == MOUSE_BUTTON_LEFT:
+			# Cycle to next option
+			if option_button.item_count > 0:
+				var current_idx = option_button.get_selected()
+				var next_idx = (current_idx + 1) % option_button.item_count
+				option_button.select(next_idx)
+				# Trigger the item_selected signal manually
+				option_button.item_selected.emit(next_idx)
 
 # ── UI fill / wiring ─────────────────────────────────────────────────────────
 func _fill_basics() -> void:
@@ -513,9 +596,11 @@ func _fill_basics() -> void:
 	if _name_in:
 		_name_in.max_length = 8
 		_name_in.placeholder_text = "First Name"
+		_name_in.virtual_keyboard_enabled = true
 	if _surname_in:
 		_surname_in.max_length = 8
 		_surname_in.placeholder_text = "Last Name"
+		_surname_in.virtual_keyboard_enabled = true
 
 	# Pronouns
 	if _pron_in and _pron_in.item_count == 0:
@@ -530,7 +615,6 @@ func _fill_basics() -> void:
 	_fill_outfit_style_dropdown()  # Will be populated when outfit is selected
 	_fill_hair_type_dropdown()
 	_fill_hair_color_dropdown()
-	_fill_hat_dropdown()
 
 func _fill_skin_tone_dropdown() -> void:
 	if _body_in == null or _body_in.item_count > 0:
@@ -545,7 +629,8 @@ func _fill_underwear_dropdown() -> void:
 	if _underwear_in == null or _underwear_in.item_count > 0:
 		return
 
-	# Underwear options: Boxers and Undies
+	# Underwear options: None, Boxers, Undies
+	_underwear_in.add_item("None")
 	_underwear_in.add_item("Boxers")
 	_underwear_in.add_item("Undies")
 	_underwear_in.select(0)
@@ -554,7 +639,8 @@ func _fill_outfit_dropdown() -> void:
 	if _outfit_in == null or _outfit_in.item_count > 0:
 		return
 
-	# Outfit options: Vest and Dress
+	# Outfit options: None, Vest, Dress
+	_outfit_in.add_item("None")
 	_outfit_in.add_item("Vest")
 	_outfit_in.add_item("Dress")
 	_outfit_in.select(0)
@@ -574,7 +660,8 @@ func _fill_hair_type_dropdown() -> void:
 	if _hair_in == null or _hair_in.item_count > 0:
 		return
 
-	# Hair types: Bob and Dapper
+	# Hair types: None, Bob, Dapper
+	_hair_in.add_item("None")
 	_hair_in.add_item("Bob")
 	_hair_in.add_item("Dapper")
 	_hair_in.select(0)
@@ -587,19 +674,6 @@ func _fill_hair_color_dropdown() -> void:
 	for i in range(14):
 		_hair_color_in.add_item("Color %d" % i)
 	_hair_color_in.select(0)
-
-func _fill_hat_dropdown() -> void:
-	if _hat_in == null or _hat_in.item_count > 0:
-		return
-
-	# Hat: None option + scanned parts
-	_hat_in.add_item("None")
-
-	if "hat" in available_parts:
-		for part in available_parts["hat"]:
-			_hat_in.add_item(part.name)
-
-	_hat_in.select(0)
 
 func _wire_stat_toggles() -> void:
 	_wire_stat_toggle(_brw_cb, "BRW")
@@ -705,10 +779,17 @@ func _on_confirm_pressed() -> void:
 
 	var pron_text: String = _opt_text(_pron_in)
 
-	# Get underwear selection
+	# Get underwear selection (0=None, 1=Boxers, 2=Undies)
 	var underwear_idx = _underwear_in.get_selected() if _underwear_in else 0
-	var underwear_codes = ["boxr_v01", "undi_v01"]
-	var selected_underwear = underwear_codes[underwear_idx] if underwear_idx < underwear_codes.size() else "boxr_v01"
+	var selected_underwear = ""
+	if underwear_idx == 0:
+		selected_underwear = "none"
+	elif underwear_idx == 1:
+		selected_underwear = "boxr_v01"
+	elif underwear_idx == 2:
+		selected_underwear = "undi_v01"
+	else:
+		selected_underwear = "none"  # Default to none if out of range
 
 	# Save character variant data to CharacterData autoload
 	print("[CharacterCreation] Saving character variants: ", selected_variants)
@@ -2131,8 +2212,23 @@ func _build_customization_ui() -> void:
 	var body_selector = _create_cycle_selector("body", _body_in)
 	_add_customization_cycle(options, "Skin Tone:", body_selector)
 
+	var underwear_selector = _create_cycle_selector("underwear", _underwear_in)
+	_add_customization_cycle(options, "Underwear:", underwear_selector)
+
+	# Underwear preview toggle
+	var underwear_preview_toggle = CheckButton.new()
+	underwear_preview_toggle.text = "Preview Underwear"
+	underwear_preview_toggle.add_theme_font_size_override("font_size", 12)
+	underwear_preview_toggle.focus_mode = Control.FOCUS_ALL
+	underwear_preview_toggle.toggled.connect(_on_underwear_preview_toggled)
+	options.add_child(underwear_preview_toggle)
+	customization_container.set_meta("underwear_preview_toggle", underwear_preview_toggle)
+
 	var outfit_selector = _create_cycle_selector("outfit", _outfit_in)
 	_add_customization_cycle(options, "Outfit:", outfit_selector)
+
+	var outfit_style_selector = _create_cycle_selector("outfit_style", _outfit_style_in)
+	_add_customization_cycle(options, "Outfit Style:", outfit_style_selector)
 
 	# Hair Type - filtered to only bob1_v00 and dap1_v00
 	var hair_type_selector = _create_filtered_hair_type_selector()
@@ -2144,8 +2240,11 @@ func _build_customization_ui() -> void:
 	_add_customization_cycle(options, "Hair Color:", hair_color_selector)
 	customization_container.set_meta("hair_color_selector", hair_color_selector)
 
+	# Initialize hair color options with default hair type (None)
+	_update_hair_color_options("")
+
 	# Store selector references for focus navigation
-	var selectors = [pronoun_selector, body_selector, outfit_selector, hair_type_selector, hair_color_selector]
+	var selectors = [pronoun_selector, body_selector, underwear_selector, underwear_preview_toggle, outfit_selector, outfit_style_selector, hair_type_selector, hair_color_selector]
 	customization_container.set_meta("selectors", selectors)
 
 	# Right: Character Preview
@@ -2242,16 +2341,18 @@ func _create_cycle_selector(type: String, source_option_button: OptionButton) ->
 	return button
 
 func _create_filtered_hair_type_selector() -> Button:
-	"""Create a hair type selector with only bob1_v00 and dap1_v00"""
+	"""Create a hair type selector with None, Bob, and Dapper"""
 	var button = Button.new()
 	button.focus_mode = Control.FOCUS_ALL
 	button.custom_minimum_size = Vector2(250, 40)
 	button.add_theme_font_size_override("font_size", 14)
 
-	# Define allowed hair types
-	var allowed_hair_types = ["bob1_v00", "dap1_v00"]
+	# Define allowed hair types with display names
+	var allowed_hair_types = ["None", "Bob", "Dapper"]
+	var hair_type_codes = ["", "bob1", "dap1"]
 	button.set_meta("type", "hair_type")
 	button.set_meta("allowed_options", allowed_hair_types)
+	button.set_meta("hair_type_codes", hair_type_codes)
 	button.set_meta("current_index", 0)
 
 	# Set initial text
@@ -2273,7 +2374,7 @@ func _create_hair_color_selector() -> Button:
 	button.set_meta("current_index", 0)
 
 	# Set initial text (will be updated based on hair type)
-	button.text = "< bob1_v00 >"
+	button.text = "< Color 0 >"
 
 	# Connect to cycle function
 	button.pressed.connect(_on_hair_color_selector_pressed.bind(button))
@@ -2296,55 +2397,58 @@ func _on_cycle_selector_pressed(button: Button) -> void:
 	_on_cinematic_selector_changed(current_idx, type_str)
 
 func _on_hair_type_selector_pressed(button: Button) -> void:
-	"""Handle hair type selector press - cycle between bob1_v00 and dap1_v00"""
+	"""Handle hair type selector press - cycle between Bob and Dapper"""
 	var allowed_options = button.get_meta("allowed_options", [])
+	var hair_type_codes = button.get_meta("hair_type_codes", [])
 	var current_idx = button.get_meta("current_index", 0)
 
 	# Cycle to next option
 	current_idx = (current_idx + 1) % allowed_options.size()
 	button.set_meta("current_index", current_idx)
-	var selected_hair = allowed_options[current_idx]
-	button.text = "< %s >" % selected_hair
+	var selected_hair_name = allowed_options[current_idx]
+	var selected_hair_code = hair_type_codes[current_idx]
+	button.text = "< %s >" % selected_hair_name
 
-	# Find the index in the original hair dropdown
+	# Find the index in the original hair dropdown (which uses Bob/Dapper)
 	var hair_idx = -1
 	for i in range(_hair_in.item_count):
-		if _hair_in.get_item_text(i) == selected_hair:
+		if _hair_in.get_item_text(i) == selected_hair_name:
 			hair_idx = i
 			break
 
 	if hair_idx >= 0:
 		_hair_in.select(hair_idx)
 		_on_hair_selected(hair_idx)
-		print("[Hair Type] Selected: %s (index %d)" % [selected_hair, hair_idx])
+		print("[Hair Type] Selected: %s (index %d)" % [selected_hair_name, hair_idx])
 
-	# Update hair color selector options
-	_update_hair_color_options(selected_hair)
+	# Update hair color selector options (use the code for variant generation)
+	_update_hair_color_options(selected_hair_code)
 
 func _on_hair_color_selector_pressed(button: Button) -> void:
 	"""Handle hair color selector press - cycle through color variants"""
-	var available_colors = button.get_meta("available_colors", ["bob1_v00"])
+	var available_colors = button.get_meta("available_colors", [0])
+	var _hair_type_code = button.get_meta("hair_type_code", "bob1")
 	var current_idx = button.get_meta("current_index", 0)
 
 	# Cycle to next color
 	current_idx = (current_idx + 1) % available_colors.size()
 	button.set_meta("current_index", current_idx)
-	var selected_color = available_colors[current_idx]
-	button.text = "< %s >" % selected_color
+	var color_num = available_colors[current_idx]
+	button.text = "< Color %d >" % color_num
 
-	# Find the index in the original hair dropdown
-	var hair_idx = -1
-	for i in range(_hair_in.item_count):
-		if _hair_in.get_item_text(i) == selected_color:
-			hair_idx = i
+	# Find the index in the original hair color dropdown (which uses Color 0-13)
+	var hair_color_idx = -1
+	for i in range(_hair_color_in.item_count):
+		if _hair_color_in.get_item_text(i) == "Color %d" % color_num:
+			hair_color_idx = i
 			break
 
-	if hair_idx >= 0:
-		_hair_in.select(hair_idx)
-		_on_hair_selected(hair_idx)
-		print("[Hair Color] Selected: %s (index %d)" % [selected_color, hair_idx])
+	if hair_color_idx >= 0:
+		_hair_color_in.select(hair_color_idx)
+		_on_hair_color_selected(hair_color_idx)
+		print("[Hair Color] Selected: Color %d (index %d)" % [color_num, hair_color_idx])
 
-func _update_hair_color_options(hair_type: String) -> void:
+func _update_hair_color_options(hair_type_code: String) -> void:
 	"""Update the hair color selector based on selected hair type"""
 	if not customization_container:
 		return
@@ -2353,30 +2457,32 @@ func _update_hair_color_options(hair_type: String) -> void:
 	if not hair_color_selector:
 		return
 
-	# Generate color variants based on hair type
-	var color_variants = []
-	var base_name = hair_type.split("_")[0]  # Get "bob1" or "dap1"
+	# If hair type is None (empty string), skip color application
+	if hair_type_code == "":
+		hair_color_selector.text = "< None >"
+		return
 
-	# Add variants v00 through v13
+	# Generate color numbers 0-13
+	var color_numbers = []
 	for i in range(14):
-		var variant = "%s_v%02d" % [base_name, i]
-		color_variants.append(variant)
+		color_numbers.append(i)
 
 	# Update selector
-	hair_color_selector.set_meta("available_colors", color_variants)
+	hair_color_selector.set_meta("available_colors", color_numbers)
+	hair_color_selector.set_meta("hair_type_code", hair_type_code)
 	hair_color_selector.set_meta("current_index", 0)
-	hair_color_selector.text = "< %s >" % color_variants[0]
+	hair_color_selector.text = "< Color 0 >"
 
-	# Apply the first color variant
-	var hair_idx = -1
-	for i in range(_hair_in.item_count):
-		if _hair_in.get_item_text(i) == color_variants[0]:
-			hair_idx = i
+	# Apply the first color (Color 0)
+	var hair_color_idx = -1
+	for i in range(_hair_color_in.item_count):
+		if _hair_color_in.get_item_text(i) == "Color 0":
+			hair_color_idx = i
 			break
 
-	if hair_idx >= 0:
-		_hair_in.select(hair_idx)
-		_on_hair_selected(hair_idx)
+	if hair_color_idx >= 0:
+		_hair_color_in.select(hair_color_idx)
+		_on_hair_color_selected(hair_color_idx)
 
 func _on_cinematic_selector_changed(index: int, type: String) -> void:
 	"""Handle selector changes in cinematic customization UI"""
@@ -2387,9 +2493,56 @@ func _on_cinematic_selector_changed(index: int, type: String) -> void:
 		"body":
 			_body_in.select(index)
 			_on_body_selected(index)
+		"underwear":
+			_underwear_in.select(index)
+			_on_underwear_selected(index)
 		"outfit":
 			_outfit_in.select(index)
 			_on_outfit_selected(index)
+		"outfit_style":
+			_outfit_style_in.select(index)
+			_on_outfit_style_selected(index)
+
+func _on_underwear_preview_toggled(pressed: bool) -> void:
+	"""Handle underwear preview toggle - show/hide underwear in preview only"""
+	if not pressed:
+		# Restore outfit if one was previously selected
+		if customization_container and customization_container.has_meta("saved_outfit_index"):
+			var saved_outfit_idx = customization_container.get_meta("saved_outfit_index")
+			if saved_outfit_idx > 0:  # If not None
+				_outfit_in.select(saved_outfit_idx)
+				_on_outfit_selected(saved_outfit_idx)
+			else:
+				# No outfit was selected, just clear
+				_on_part_selected("outfit", null)
+		else:
+			_on_part_selected("outfit", null)
+	else:
+		# Save current outfit selection before hiding it
+		if customization_container and _outfit_in:
+			var current_outfit_idx = _outfit_in.get_selected()
+			customization_container.set_meta("saved_outfit_index", current_outfit_idx)
+
+		# Show underwear preview based on current selection (uses outfit layer)
+		var current_idx = _underwear_in.get_selected() if _underwear_in else 0
+		if current_idx == 0:
+			# None selected, don't show anything
+			_on_part_selected("outfit", null)
+		else:
+			# Show selected underwear on the OUTFIT layer
+			var underwear_codes = ["boxr", "undi"]
+			var underwear_names = ["Boxers", "Undies"]
+			var adjusted_idx = current_idx - 1  # Adjust for None option
+
+			if adjusted_idx >= 0 and adjusted_idx < underwear_codes.size():
+				var variant_code = underwear_codes[adjusted_idx] + "_v01"
+				var part = {
+					"name": underwear_names[adjusted_idx],
+					"path": CHAR_BASE_PATH + "char_a_p1/1out/char_a_p1_1out_" + variant_code + ".png",
+					"variant": variant_code
+				}
+				_on_part_selected("outfit", part)  # Use "outfit" layer
+				print("[Underwear Preview] Showing underwear: %s" % variant_code)
 
 func _add_customization_cycle(parent: VBoxContainer, label_text: String, selector_button: Button) -> void:
 	"""Add a customization cycle selector to the parent container"""
@@ -2422,13 +2575,15 @@ func _on_customization_accepted() -> void:
 			original_parent.add_child(character_layers)
 			print("[Customization] Character preview restored to original parent")
 
-	# Fade out and advance
+	# Fade out and finalize
 	var tween = create_tween()
 	tween.tween_property(customization_container, "modulate", Color(1, 1, 1, 0), 0.5)
 	tween.tween_callback(func():
 		if customization_container:
 			customization_container.queue_free()
 			customization_container = null
+
+		# Advance to next stage (confirmation)
 		if dialogue_label:
 			dialogue_label.visible = true
 		_advance_stage()
@@ -2502,29 +2657,17 @@ func _on_confirmation_yes() -> void:
 	_advance_stage()  # Go to COMPLETE
 
 func _on_confirmation_no() -> void:
-	"""Handle No - show fallback form"""
-	# Clean up cinematic layer
-	if cinematic_layer:
-		cinematic_layer.queue_free()
-		cinematic_layer = null
+	"""Handle No - restart character creation with interactive sections (no nurse dialogue)"""
+	# Clean up confirmation container
+	if confirmation_container:
+		confirmation_container.queue_free()
+		confirmation_container = null
 
-	# Restore ControllerManager context to OVERWORLD
-	var controller_manager = get_node_or_null("/root/aControllerManager")
-	if controller_manager:
-		controller_manager.set_context(controller_manager.InputContext.OVERWORLD)
-		print("[CharacterCreation] Restored ControllerManager context to OVERWORLD (No confirmation)")
+	# Keep cinematic active so _input works, but skip nurse dialogue
+	cinematic_active = true
 
-	cinematic_active = false
-
-	# Show the standard form
-	_show_form()
-
-	# Ensure character preview is visible and reset
-	if character_layers:
-		character_layers.visible = true
-		character_layers.scale = Vector2(1, 1)
-
-	# The existing _on_confirm_pressed will handle the final save
+	# Go directly to name input stage
+	_enter_stage(CinematicStage.NAME_INPUT)
 
 # ── Apply Character Creation ─────────────────────────────────────────────────
 func _apply_character_creation() -> void:
