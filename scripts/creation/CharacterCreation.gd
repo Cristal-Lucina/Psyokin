@@ -2467,6 +2467,9 @@ func _on_customization_accepted() -> void:
 	"""Handle customization acceptance"""
 	# Selections are already synced to original form via _on_cinematic_dropdown_changed
 
+	# Check if we're in protagonist creation mode
+	var in_protagonist_creation = protagonist_container != null and is_instance_valid(protagonist_container)
+
 	# Restore character_layers to original parent before destroying container
 	if customization_container and character_layers:
 		var original_parent = customization_container.get_meta("original_preview_parent", null)
@@ -2479,16 +2482,32 @@ func _on_customization_accepted() -> void:
 			original_parent.add_child(character_layers)
 			print("[Customization] Character preview restored to original parent")
 
-	# Fade out and advance
+	# Fade out and finalize
 	var tween = create_tween()
 	tween.tween_property(customization_container, "modulate", Color(1, 1, 1, 0), 0.5)
 	tween.tween_callback(func():
 		if customization_container:
 			customization_container.queue_free()
 			customization_container = null
-		if dialogue_label:
-			dialogue_label.visible = true
-		_advance_stage()
+
+		if in_protagonist_creation:
+			# Protagonist creation mode - finalize and start game
+			print("[Protagonist Creation] Appearance accepted - finalizing")
+			# Clean up cinematic layer
+			if cinematic_layer:
+				cinematic_layer.queue_free()
+				cinematic_layer = null
+			# Clean up protagonist container
+			if protagonist_container:
+				protagonist_container.queue_free()
+				protagonist_container = null
+			# Submit the character creation
+			_on_confirm_pressed()
+		else:
+			# Cinematic mode - advance to next stage
+			if dialogue_label:
+				dialogue_label.visible = true
+			_advance_stage()
 	)
 
 # ── Protagonist Creation UI ──────────────────────────────────────────────────
@@ -2509,15 +2528,249 @@ func _build_name_entry_page() -> void:
 	for child in protagonist_container.get_children():
 		child.queue_free()
 
-	# TODO: Implement name entry UI with keyboard
-	# For now, create a simple placeholder and move to next page
-	var label = Label.new()
-	label.text = "Name Entry Page - Coming Soon"
-	label.set_anchors_preset(Control.PRESET_CENTER)
-	protagonist_container.add_child(label)
+	# Title
+	var title = Label.new()
+	title.text = "Create Your Protagonist"
+	title.position = Vector2(0, 30)
+	title.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 20)
+	protagonist_container.add_child(title)
 
-	# Temporary: Auto-advance to stats after 1 second
-	await get_tree().create_timer(1.0).timeout
+	# Main container
+	var main = HBoxContainer.new()
+	main.set_anchors_preset(Control.PRESET_CENTER)
+	main.anchor_left = 0.5
+	main.anchor_top = 0.5
+	main.anchor_right = 0.5
+	main.anchor_bottom = 0.5
+	main.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	main.grow_vertical = Control.GROW_DIRECTION_BOTH
+	main.offset_left = -500
+	main.offset_top = -200
+	main.offset_right = 500
+	main.offset_bottom = 200
+	main.add_theme_constant_override("separation", 30)
+	protagonist_container.add_child(main)
+
+	# Left: Name inputs
+	var inputs_panel = _create_styled_panel()
+	inputs_panel.custom_minimum_size = Vector2(400, 400)
+	main.add_child(inputs_panel)
+
+	var inputs_margin = MarginContainer.new()
+	inputs_margin.add_theme_constant_override("margin_left", 30)
+	inputs_margin.add_theme_constant_override("margin_right", 30)
+	inputs_margin.add_theme_constant_override("margin_top", 30)
+	inputs_margin.add_theme_constant_override("margin_bottom", 30)
+	inputs_panel.add_child(inputs_margin)
+
+	var inputs_vbox = VBoxContainer.new()
+	inputs_vbox.add_theme_constant_override("separation", 20)
+	inputs_margin.add_child(inputs_vbox)
+
+	# First Name
+	var first_name_label_title = Label.new()
+	first_name_label_title.text = "First Name:"
+	first_name_label_title.add_theme_font_size_override("font_size", 14)
+	inputs_vbox.add_child(first_name_label_title)
+
+	first_name_label = Label.new()
+	first_name_label.text = ""
+	first_name_label.add_theme_font_size_override("font_size", 16)
+	first_name_label.set_meta("field_type", "first_name")
+	first_name_label.custom_minimum_size = Vector2(300, 40)
+	inputs_vbox.add_child(first_name_label)
+
+	var first_name_button = Button.new()
+	first_name_button.text = "Enter First Name"
+	first_name_button.custom_minimum_size = Vector2(300, 50)
+	first_name_button.focus_mode = Control.FOCUS_ALL
+	first_name_button.pressed.connect(_on_name_field_selected.bind("first_name", first_name_label))
+	inputs_vbox.add_child(first_name_button)
+
+	# Spacer
+	var spacer = Control.new()
+	spacer.custom_minimum_size = Vector2(0, 40)
+	inputs_vbox.add_child(spacer)
+
+	# Last Name
+	var last_name_label_title = Label.new()
+	last_name_label_title.text = "Last Name:"
+	last_name_label_title.add_theme_font_size_override("font_size", 14)
+	inputs_vbox.add_child(last_name_label_title)
+
+	last_name_label = Label.new()
+	last_name_label.text = ""
+	last_name_label.add_theme_font_size_override("font_size", 16)
+	last_name_label.set_meta("field_type", "last_name")
+	last_name_label.custom_minimum_size = Vector2(300, 40)
+	inputs_vbox.add_child(last_name_label)
+
+	var last_name_button = Button.new()
+	last_name_button.text = "Enter Last Name"
+	last_name_button.custom_minimum_size = Vector2(300, 50)
+	last_name_button.focus_mode = Control.FOCUS_ALL
+	last_name_button.pressed.connect(_on_name_field_selected.bind("last_name", last_name_label))
+	inputs_vbox.add_child(last_name_button)
+
+	# Right: Keyboard panel (initially hidden)
+	keyboard_container = _create_styled_panel()
+	keyboard_container.custom_minimum_size = Vector2(550, 400)
+	keyboard_container.visible = false
+	main.add_child(keyboard_container)
+
+	_build_keyboard_ui()
+
+	# Accept button
+	var accept_btn = Button.new()
+	accept_btn.text = "Continue"
+	accept_btn.position = Vector2(0, -60)
+	accept_btn.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	accept_btn.anchor_top = 1.0
+	accept_btn.anchor_bottom = 1.0
+	accept_btn.custom_minimum_size = Vector2(200, 50)
+	accept_btn.add_theme_font_size_override("font_size", 16)
+	accept_btn.focus_mode = Control.FOCUS_ALL
+	accept_btn.pressed.connect(_on_name_entry_accepted)
+	protagonist_container.add_child(accept_btn)
+
+	# Store references
+	protagonist_container.set_meta("first_name_label", first_name_label)
+	protagonist_container.set_meta("last_name_label", last_name_label)
+	protagonist_container.set_meta("current_editing_field", "")
+
+func _build_keyboard_ui() -> void:
+	"""Build the keyboard UI inside keyboard_container"""
+	var margin = MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 20)
+	margin.add_theme_constant_override("margin_right", 20)
+	margin.add_theme_constant_override("margin_top", 20)
+	margin.add_theme_constant_override("margin_bottom", 20)
+	keyboard_container.add_child(margin)
+
+	var vbox = VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 10)
+	margin.add_child(vbox)
+
+	# Display current input
+	var input_display = Label.new()
+	input_display.text = ""
+	input_display.add_theme_font_size_override("font_size", 18)
+	input_display.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	input_display.custom_minimum_size = Vector2(0, 40)
+	vbox.add_child(input_display)
+	keyboard_container.set_meta("input_display", input_display)
+
+	# Keyboard rows
+	var letters = [
+		["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"],
+		["A", "S", "D", "F", "G", "H", "J", "K", "L"],
+		["Z", "X", "C", "V", "B", "N", "M"]
+	]
+
+	for row in letters:
+		var hbox = HBoxContainer.new()
+		hbox.add_theme_constant_override("separation", 5)
+		hbox.alignment = BoxContainer.ALIGNMENT_CENTER
+		vbox.add_child(hbox)
+
+		for letter in row:
+			var btn = Button.new()
+			btn.text = letter
+			btn.custom_minimum_size = Vector2(45, 45)
+			btn.pressed.connect(_on_keyboard_letter_pressed.bind(letter))
+			hbox.add_child(btn)
+
+	# Action row (Space, Backspace, Accept)
+	var action_row = HBoxContainer.new()
+	action_row.add_theme_constant_override("separation", 10)
+	action_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	vbox.add_child(action_row)
+
+	var space_btn = Button.new()
+	space_btn.text = "Space"
+	space_btn.custom_minimum_size = Vector2(200, 45)
+	space_btn.pressed.connect(_on_keyboard_space_pressed)
+	action_row.add_child(space_btn)
+
+	var backspace_btn = Button.new()
+	backspace_btn.text = "⌫"
+	backspace_btn.custom_minimum_size = Vector2(80, 45)
+	backspace_btn.pressed.connect(_on_keyboard_backspace_pressed)
+	action_row.add_child(backspace_btn)
+
+	var accept_btn = Button.new()
+	accept_btn.text = "Accept"
+	accept_btn.custom_minimum_size = Vector2(100, 45)
+	accept_btn.pressed.connect(_on_keyboard_accept_pressed)
+	action_row.add_child(accept_btn)
+
+func _on_name_field_selected(field_type: String, label: Label) -> void:
+	"""Handle name field selection - show keyboard"""
+	protagonist_container.set_meta("current_editing_field", field_type)
+	protagonist_container.set_meta("current_editing_label", label)
+
+	# Show keyboard
+	keyboard_container.visible = true
+
+	# Set initial display to current text
+	var input_display = keyboard_container.get_meta("input_display") as Label
+	if input_display:
+		input_display.text = label.text
+
+func _on_keyboard_letter_pressed(letter: String) -> void:
+	"""Handle keyboard letter press"""
+	var input_display = keyboard_container.get_meta("input_display") as Label
+	if input_display and input_display.text.length() < 8:
+		input_display.text += letter
+
+func _on_keyboard_space_pressed() -> void:
+	"""Handle space key"""
+	var input_display = keyboard_container.get_meta("input_display") as Label
+	if input_display and input_display.text.length() < 8:
+		input_display.text += " "
+
+func _on_keyboard_backspace_pressed() -> void:
+	"""Handle backspace key"""
+	var input_display = keyboard_container.get_meta("input_display") as Label
+	if input_display and input_display.text.length() > 0:
+		input_display.text = input_display.text.substr(0, input_display.text.length() - 1)
+
+func _on_keyboard_accept_pressed() -> void:
+	"""Handle keyboard accept - save text and hide keyboard"""
+	var input_display = keyboard_container.get_meta("input_display") as Label
+	var current_label = protagonist_container.get_meta("current_editing_label") as Label
+
+	if input_display and current_label:
+		current_label.text = input_display.text
+
+	# Hide keyboard
+	keyboard_container.visible = false
+	protagonist_container.set_meta("current_editing_field", "")
+
+func _on_name_entry_accepted() -> void:
+	"""Handle name entry acceptance - validate and proceed"""
+	var first_name_label = protagonist_container.get_meta("first_name_label") as Label
+	var last_name_label = protagonist_container.get_meta("last_name_label") as Label
+
+	var first_name = first_name_label.text.strip_edges() if first_name_label else ""
+	var last_name = last_name_label.text.strip_edges() if last_name_label else ""
+
+	if first_name == "" or last_name == "":
+		# Show error - for now just print
+		print("[Name Entry] Error: Both names required")
+		return
+
+	# Save to form fields
+	if _name_in:
+		_name_in.text = first_name
+	if _surname_in:
+		_surname_in.text = last_name
+
+	print("[Name Entry] Names saved: %s %s" % [first_name, last_name])
+
+	# Proceed to stats selection
 	_build_stats_selection_page()
 
 func _build_stats_selection_page() -> void:
@@ -2526,14 +2779,120 @@ func _build_stats_selection_page() -> void:
 	for child in protagonist_container.get_children():
 		child.queue_free()
 
-	# TODO: Implement stats selection UI
-	var label = Label.new()
-	label.text = "Stats Selection Page - Coming Soon"
-	label.set_anchors_preset(Control.PRESET_CENTER)
-	protagonist_container.add_child(label)
+	# Reset stat selection state
+	_selected_order.clear()
 
-	# Temporary: Auto-advance to perks after 1 second
-	await get_tree().create_timer(1.0).timeout
+	# Title
+	var title = Label.new()
+	title.text = "Choose 3 Stats to Prioritize"
+	title.position = Vector2(0, 30)
+	title.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 20)
+	protagonist_container.add_child(title)
+
+	# Main panel
+	var panel = _create_styled_panel()
+	panel.set_anchors_preset(Control.PRESET_CENTER)
+	panel.anchor_left = 0.5
+	panel.anchor_top = 0.5
+	panel.anchor_right = 0.5
+	panel.anchor_bottom = 0.5
+	panel.offset_left = -400
+	panel.offset_top = -250
+	panel.offset_right = 400
+	panel.offset_bottom = 250
+	protagonist_container.add_child(panel)
+
+	var margin = MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 40)
+	margin.add_theme_constant_override("margin_right", 40)
+	margin.add_theme_constant_override("margin_top", 40)
+	margin.add_theme_constant_override("margin_bottom", 40)
+	panel.add_child(margin)
+
+	var vbox = VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 20)
+	margin.add_child(vbox)
+
+	# Stats list
+	var stats = [
+		{"id": "BRW", "name": "Brawn"},
+		{"id": "VTL", "name": "Vitality"},
+		{"id": "TPO", "name": "Tempo"},
+		{"id": "MND", "name": "Mind"},
+		{"id": "FCS", "name": "Focus"}
+	]
+
+	for stat in stats:
+		var stat_button = Button.new()
+		stat_button.text = stat.name
+		stat_button.custom_minimum_size = Vector2(600, 60)
+		stat_button.add_theme_font_size_override("font_size", 16)
+		stat_button.focus_mode = Control.FOCUS_ALL
+		stat_button.toggle_mode = true
+		stat_button.set_meta("stat_id", stat.id)
+		stat_button.toggled.connect(_on_stat_toggle_pressed.bind(stat.id, stat_button))
+		vbox.add_child(stat_button)
+
+	# Continue button
+	var continue_btn = Button.new()
+	continue_btn.text = "Continue"
+	continue_btn.position = Vector2(0, -60)
+	continue_btn.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	continue_btn.anchor_top = 1.0
+	continue_btn.anchor_bottom = 1.0
+	continue_btn.custom_minimum_size = Vector2(200, 50)
+	continue_btn.add_theme_font_size_override("font_size", 16)
+	continue_btn.focus_mode = Control.FOCUS_ALL
+	continue_btn.disabled = true  # Disabled until 3 stats selected
+	continue_btn.pressed.connect(_on_stats_selection_accepted)
+	protagonist_container.add_child(continue_btn)
+	protagonist_container.set_meta("stats_continue_btn", continue_btn)
+
+func _on_stat_toggle_pressed(pressed: bool, stat_id: String, button: Button) -> void:
+	"""Handle stat toggle"""
+	if pressed:
+		# Add to selection if not at max
+		if _selected_order.size() < 3:
+			_selected_order.append(stat_id)
+		else:
+			# Already have 3, reject this toggle
+			button.set_pressed_no_signal(false)
+			return
+	else:
+		# Remove from selection
+		_selected_order.erase(stat_id)
+
+	# Update continue button state
+	var continue_btn = protagonist_container.get_meta("stats_continue_btn") as Button
+	if continue_btn:
+		continue_btn.disabled = (_selected_order.size() != 3)
+
+	# Update stat checkboxes in form
+	if stat_id == "BRW" and _brw_cb:
+		_brw_cb.set_pressed_no_signal(pressed)
+	elif stat_id == "VTL" and _vtl_cb:
+		_vtl_cb.set_pressed_no_signal(pressed)
+	elif stat_id == "TPO" and _tpo_cb:
+		_tpo_cb.set_pressed_no_signal(pressed)
+	elif stat_id == "MND" and _mnd_cb:
+		_mnd_cb.set_pressed_no_signal(pressed)
+	elif stat_id == "FCS" and _fcs_cb:
+		_fcs_cb.set_pressed_no_signal(pressed)
+
+func _on_stats_selection_accepted() -> void:
+	"""Handle stats selection acceptance"""
+	if _selected_order.size() != 3:
+		print("[Stats Selection] Error: Must select exactly 3 stats")
+		return
+
+	print("[Stats Selection] Stats selected: %s" % [_selected_order])
+
+	# Rebuild perk dropdown based on selected stats
+	_rebuild_perk_dropdown()
+
+	# Proceed to perk selection
 	_build_perk_selection_page()
 
 func _build_perk_selection_page() -> void:
@@ -2542,31 +2901,187 @@ func _build_perk_selection_page() -> void:
 	for child in protagonist_container.get_children():
 		child.queue_free()
 
-	# TODO: Implement perk selection UI
-	var label = Label.new()
-	label.text = "Perk Selection Page - Coming Soon"
-	label.set_anchors_preset(Control.PRESET_CENTER)
-	protagonist_container.add_child(label)
+	# Title
+	var title = Label.new()
+	title.text = "Choose a Starting Perk"
+	title.position = Vector2(0, 30)
+	title.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 20)
+	protagonist_container.add_child(title)
 
-	# Temporary: Auto-advance to appearance after 1 second
-	await get_tree().create_timer(1.0).timeout
+	# Main panel
+	var panel = _create_styled_panel()
+	panel.set_anchors_preset(Control.PRESET_CENTER)
+	panel.anchor_left = 0.5
+	panel.anchor_top = 0.5
+	panel.anchor_right = 0.5
+	panel.anchor_bottom = 0.5
+	panel.offset_left = -400
+	panel.offset_top = -300
+	panel.offset_right = 400
+	panel.offset_bottom = 300
+	protagonist_container.add_child(panel)
+
+	var margin = MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 40)
+	margin.add_theme_constant_override("margin_right", 40)
+	margin.add_theme_constant_override("margin_top", 40)
+	margin.add_theme_constant_override("margin_bottom", 40)
+	panel.add_child(margin)
+
+	var vbox = VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 15)
+	margin.add_child(vbox)
+
+	# Get available perks based on selected stats
+	var picks: Array[String] = []
+	for i in range(_selected_order.size()):
+		picks.append(String(_selected_order[i]))
+
+	var offers: Array = []
+	var perk: Node = get_node_or_null(PERK_PATH)
+	if perk and perk.has_method("get_starting_options"):
+		var v: Variant = perk.call("get_starting_options", picks)
+		if typeof(v) == TYPE_ARRAY:
+			offers = v as Array
+
+	# If no perks available, create fallback
+	if offers.is_empty() and picks.size() > 0:
+		for i in range(picks.size()):
+			var s: String = picks[i]
+			offers.append({
+				"stat": s,
+				"tier": 0,
+				"id": "%s_t1" % s.to_lower(),
+				"name": "%s T1" % s,
+				"desc": "Tier-1 perk for %s." % s
+			})
+
+	# Create perk toggle buttons
+	var selected_perk_id: String = ""
+	for idx in range(offers.size()):
+		var perk_data = offers[idx]
+		if typeof(perk_data) != TYPE_DICTIONARY:
+			continue
+
+		var perk_dict = perk_data as Dictionary
+		var perk_id = String(perk_dict.get("id", ""))
+		var perk_name = String(perk_dict.get("name", "Unknown Perk"))
+		var perk_desc = String(perk_dict.get("desc", ""))
+		var perk_stat = String(perk_dict.get("stat", ""))
+
+		# Create perk button with description
+		var perk_panel = VBoxContainer.new()
+		perk_panel.add_theme_constant_override("separation", 5)
+		vbox.add_child(perk_panel)
+
+		var perk_button = Button.new()
+		perk_button.text = "%s — %s" % [perk_stat, perk_name]
+		perk_button.custom_minimum_size = Vector2(600, 50)
+		perk_button.add_theme_font_size_override("font_size", 14)
+		perk_button.focus_mode = Control.FOCUS_ALL
+		perk_button.toggle_mode = true
+		perk_button.set_meta("perk_id", perk_id)
+		perk_button.set_meta("perk_idx", idx)
+		perk_button.toggled.connect(_on_perk_toggle_pressed.bind(perk_id, idx, perk_button))
+		perk_panel.add_child(perk_button)
+
+		if perk_desc != "":
+			var desc_label = Label.new()
+			desc_label.text = perk_desc
+			desc_label.add_theme_font_size_override("font_size", 11)
+			desc_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			desc_label.custom_minimum_size = Vector2(600, 0)
+			perk_panel.add_child(desc_label)
+
+	# Store offers for later
+	protagonist_container.set_meta("perk_offers", offers)
+	protagonist_container.set_meta("selected_perk_id", "")
+	protagonist_container.set_meta("selected_perk_idx", -1)
+
+	# Continue button
+	var continue_btn = Button.new()
+	continue_btn.text = "Continue"
+	continue_btn.position = Vector2(0, -60)
+	continue_btn.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	continue_btn.anchor_top = 1.0
+	continue_btn.anchor_bottom = 1.0
+	continue_btn.custom_minimum_size = Vector2(200, 50)
+	continue_btn.add_theme_font_size_override("font_size", 16)
+	continue_btn.focus_mode = Control.FOCUS_ALL
+	continue_btn.disabled = true  # Disabled until perk selected
+	continue_btn.pressed.connect(_on_perk_selection_accepted)
+	protagonist_container.add_child(continue_btn)
+	protagonist_container.set_meta("perk_continue_btn", continue_btn)
+
+func _on_perk_toggle_pressed(pressed: bool, perk_id: String, perk_idx: int, button: Button) -> void:
+	"""Handle perk toggle - only one can be selected"""
+	if pressed:
+		# Deselect all other perk buttons
+		var panel = button.get_parent().get_parent() as VBoxContainer
+		if panel:
+			for child in panel.get_children():
+				if child is VBoxContainer:
+					for subchild in child.get_children():
+						if subchild is Button and subchild != button:
+							subchild.set_pressed_no_signal(false)
+
+		# Set this perk as selected
+		protagonist_container.set_meta("selected_perk_id", perk_id)
+		protagonist_container.set_meta("selected_perk_idx", perk_idx)
+
+		# Enable continue button
+		var continue_btn = protagonist_container.get_meta("perk_continue_btn") as Button
+		if continue_btn:
+			continue_btn.disabled = false
+
+		# Update perk dropdown in form
+		if _perk_in:
+			_perk_in.select(perk_idx + 1)  # +1 because first item is placeholder
+	else:
+		# If deselected, disable continue
+		protagonist_container.set_meta("selected_perk_id", "")
+		protagonist_container.set_meta("selected_perk_idx", -1)
+
+		var continue_btn = protagonist_container.get_meta("perk_continue_btn") as Button
+		if continue_btn:
+			continue_btn.disabled = true
+
+func _on_perk_selection_accepted() -> void:
+	"""Handle perk selection acceptance"""
+	var perk_id = protagonist_container.get_meta("selected_perk_id", "") as String
+	var perk_idx = protagonist_container.get_meta("selected_perk_idx", -1) as int
+
+	if perk_id == "" or perk_idx < 0:
+		print("[Perk Selection] Error: Must select a perk")
+		return
+
+	print("[Perk Selection] Perk selected: %s (index %d)" % [perk_id, perk_idx])
+
+	# Proceed to appearance customization
 	_build_appearance_page()
 
 func _build_appearance_page() -> void:
 	"""Build appearance customization page"""
-	# Clear any existing content
+	# Clear protagonist container but keep it for final submission
 	for child in protagonist_container.get_children():
 		child.queue_free()
 
-	# Reuse the existing customization UI builder
-	# First, create a cinematic layer if it doesn't exist
+	# Hide protagonist container temporarily
+	protagonist_container.visible = false
+
+	# Create a cinematic layer if it doesn't exist
 	if not cinematic_layer:
 		cinematic_layer = CanvasLayer.new()
 		cinematic_layer.layer = 100
 		add_child(cinematic_layer)
 
-	# Build customization UI (this will create customization_container)
+	# Build customization UI (reuses existing function)
 	_build_customization_ui()
+
+	# The customization UI's Accept button will call _on_customization_accepted
+	# which we need to handle differently for protagonist creation
 
 # ── Final Confirmation ───────────────────────────────────────────────────────
 func _build_confirmation_ui() -> void:
