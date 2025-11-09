@@ -71,8 +71,11 @@ const DIRECTIONS = {
 @onready var _pron_in     : OptionButton  = %PronounInput
 
 @onready var _body_in     : OptionButton  = %BodyIdInput
+@onready var _underwear_in: OptionButton  = %UnderwearInput
 @onready var _outfit_in   : OptionButton  = %OutfitInput
+@onready var _outfit_style_in: OptionButton = %OutfitStyleInput
 @onready var _hair_in     : OptionButton  = %HairIdInput
+@onready var _hair_color_in: OptionButton = %HairColorInput
 @onready var _hat_in      : OptionButton  = %HatInput
 
 @onready var _brw_cb      : CheckButton   = %StatBRW
@@ -101,6 +104,8 @@ var current_frame = 0
 var available_parts = {}
 var current_selections = {}
 var selected_variants = {}  # Track variant codes for connecting animations
+var selected_outfit_type = ""  # "fstr" or "pfpn"
+var selected_hair_type = ""  # "bob1" or "dap1"
 
 # Walk animation
 var animation_timer = 0.0
@@ -183,10 +188,16 @@ func _ready() -> void:
 	# Wire character part selectors
 	if _body_in and not _body_in.item_selected.is_connected(_on_body_selected):
 		_body_in.item_selected.connect(_on_body_selected)
+	if _underwear_in and not _underwear_in.item_selected.is_connected(_on_underwear_selected):
+		_underwear_in.item_selected.connect(_on_underwear_selected)
 	if _outfit_in and not _outfit_in.item_selected.is_connected(_on_outfit_selected):
 		_outfit_in.item_selected.connect(_on_outfit_selected)
+	if _outfit_style_in and not _outfit_style_in.item_selected.is_connected(_on_outfit_style_selected):
+		_outfit_style_in.item_selected.connect(_on_outfit_style_selected)
 	if _hair_in and not _hair_in.item_selected.is_connected(_on_hair_selected):
 		_hair_in.item_selected.connect(_on_hair_selected)
+	if _hair_color_in and not _hair_color_in.item_selected.is_connected(_on_hair_color_selected):
+		_hair_color_in.item_selected.connect(_on_hair_color_selected)
 	if _hat_in and not _hat_in.item_selected.is_connected(_on_hat_selected):
 		_hat_in.item_selected.connect(_on_hat_selected)
 
@@ -354,9 +365,15 @@ func extract_variant_code(filename: String) -> String:
 	return ""
 
 func set_default_character():
-	"""Set up a default character with base body"""
-	if "base" in available_parts and available_parts["base"].size() > 0:
-		_on_part_selected("base", available_parts["base"][0])
+	"""Set up a default character with defaults"""
+	# Set default skin tone (Tone 0)
+	_on_body_selected(0)
+	# Set default outfit (Vest)
+	selected_outfit_type = "fstr"
+	_on_outfit_selected(0)
+	# Set default hair (Bob, Color 0)
+	selected_hair_type = "bob1"
+	_on_hair_selected(0)
 
 func _on_part_selected(layer_key: String, part):
 	"""Handle part selection"""
@@ -400,22 +417,86 @@ func update_frame_display():
 
 # ── Character Part Selection Callbacks ───────────────────────────────────────
 func _on_body_selected(idx: int):
-	if idx == 0:  # "None" option
-		_on_part_selected("base", null)
-	elif "base" in available_parts and idx - 1 < available_parts["base"].size():
-		_on_part_selected("base", available_parts["base"][idx - 1])
+	# Skin tone selection (Tone 0-10 maps to humn_v00-v10)
+	var variant_code = "humn_v%02d" % idx
+	var part = {
+		"name": "Tone %d" % idx,
+		"path": CHAR_BASE_PATH + "char_a_p1/char_a_p1_0bas_" + variant_code + ".png",
+		"variant": variant_code
+	}
+	_on_part_selected("base", part)
+
+func _on_underwear_selected(idx: int):
+	# Underwear selection: 0=Boxers, 1=Undies
+	# This is saved to game state for later cutscenes, not displayed on character now
+	pass
 
 func _on_outfit_selected(idx: int):
-	if idx == 0:  # "None" option
-		_on_part_selected("outfit", null)
-	elif "outfit" in available_parts and idx - 1 < available_parts["outfit"].size():
-		_on_part_selected("outfit", available_parts["outfit"][idx - 1])
+	# Outfit selection: 0=Vest (fstr), 1=Dress (pfpn)
+	var outfit_codes = ["fstr", "pfpn"]
+	var outfit_names = ["Vest", "Dress"]
+
+	if idx >= 0 and idx < outfit_codes.size():
+		selected_outfit_type = outfit_codes[idx]
+		# Default to v01, will be updated by outfit style selection
+		var variant_code = outfit_codes[idx] + "_v01"
+		var part = {
+			"name": outfit_names[idx],
+			"path": CHAR_BASE_PATH + "char_a_p1/1out/char_a_p1_1out_" + variant_code + ".png",
+			"variant": variant_code
+		}
+		_on_part_selected("outfit", part)
+		# Update outfit style dropdown (stays at current selection or defaults to first)
+		_update_outfit_style_preview()
+
+func _on_outfit_style_selected(idx: int):
+	# Outfit style selection: Style 1-5 maps to v01-v05
+	_update_outfit_style_preview()
+
+func _update_outfit_style_preview():
+	# Update the outfit preview with the selected style
+	if selected_outfit_type == "" or _outfit_style_in == null:
+		return
+
+	var style_idx = _outfit_style_in.get_selected()
+	var variant_num = style_idx + 1  # Style 1-5 maps to v01-v05
+	var variant_code = selected_outfit_type + "_v%02d" % variant_num
+
+	var part = {
+		"name": "Style %d" % variant_num,
+		"path": CHAR_BASE_PATH + "char_a_p1/1out/char_a_p1_1out_" + variant_code + ".png",
+		"variant": variant_code
+	}
+	_on_part_selected("outfit", part)
 
 func _on_hair_selected(idx: int):
-	if idx == 0:  # "None" option
-		_on_part_selected("hair", null)
-	elif "hair" in available_parts and idx - 1 < available_parts["hair"].size():
-		_on_part_selected("hair", available_parts["hair"][idx - 1])
+	# Hair type selection: 0=Bob (bob1), 1=Dapper (dap1)
+	var hair_codes = ["bob1", "dap1"]
+	var hair_names = ["Bob", "Dapper"]
+
+	if idx >= 0 and idx < hair_codes.size():
+		selected_hair_type = hair_codes[idx]
+		# Update with current hair color selection
+		_update_hair_preview()
+
+func _on_hair_color_selected(idx: int):
+	# Hair color selection: Color 0-13 maps to v00-v13
+	_update_hair_preview()
+
+func _update_hair_preview():
+	# Update the hair preview with selected type and color
+	if selected_hair_type == "" or _hair_color_in == null:
+		return
+
+	var color_idx = _hair_color_in.get_selected()
+	var variant_code = selected_hair_type + "_v%02d" % color_idx
+
+	var part = {
+		"name": "Hair",
+		"path": CHAR_BASE_PATH + "char_a_p1/4har/char_a_p1_4har_" + variant_code + ".png",
+		"variant": variant_code
+	}
+	_on_part_selected("hair", part)
 
 func _on_hat_selected(idx: int):
 	if idx == 0:  # "None" option
@@ -439,25 +520,83 @@ func _fill_basics() -> void:
 			_pron_in.add_item(p)
 		_pron_in.select(0)
 
-	# Fill character part dropdowns
-	_fill_part_dropdown(_body_in, "base")
-	_fill_part_dropdown(_outfit_in, "outfit")
-	_fill_part_dropdown(_hair_in, "hair")
-	_fill_part_dropdown(_hat_in, "hat")
+	# Fill character part dropdowns with custom names
+	_fill_skin_tone_dropdown()
+	_fill_underwear_dropdown()
+	_fill_outfit_dropdown()
+	_fill_outfit_style_dropdown()
+	_fill_hair_type_dropdown()
+	_fill_hair_color_dropdown()
+	_fill_hat_dropdown()
 
-func _fill_part_dropdown(ob: OptionButton, layer_key: String) -> void:
-	if ob == null: return
-	if ob.item_count > 0: return
+func _fill_skin_tone_dropdown() -> void:
+	if _body_in == null or _body_in.item_count > 0:
+		return
 
-	# Add "None" option
-	ob.add_item("None")
+	# Skin tones: Tone 0 to Tone 10 (v00 to v10)
+	for i in range(11):
+		_body_in.add_item("Tone %d" % i)
+	_body_in.select(0)
 
-	# Add available parts
-	if layer_key in available_parts:
-		for part in available_parts[layer_key]:
-			ob.add_item(part.name)
+func _fill_underwear_dropdown() -> void:
+	if _underwear_in == null or _underwear_in.item_count > 0:
+		return
 
-	ob.select(0)
+	# Underwear options: Boxers and Undies
+	_underwear_in.add_item("Boxers")
+	_underwear_in.add_item("Undies")
+	_underwear_in.select(0)
+
+func _fill_outfit_dropdown() -> void:
+	if _outfit_in == null or _outfit_in.item_count > 0:
+		return
+
+	# Outfit options: Vest and Dress
+	_outfit_in.add_item("Vest")
+	_outfit_in.add_item("Dress")
+	_outfit_in.select(0)
+
+func _fill_outfit_style_dropdown() -> void:
+	if _outfit_style_in == null:
+		return
+
+	# Will be populated when outfit is selected
+	# For now, populate with Style 1-5
+	_outfit_style_in.clear()
+	for i in range(1, 6):
+		_outfit_style_in.add_item("Style %d" % i)
+	_outfit_style_in.select(0)
+
+func _fill_hair_type_dropdown() -> void:
+	if _hair_in == null or _hair_in.item_count > 0:
+		return
+
+	# Hair types: Bob and Dapper
+	_hair_in.add_item("Bob")
+	_hair_in.add_item("Dapper")
+	_hair_in.select(0)
+
+func _fill_hair_color_dropdown() -> void:
+	if _hair_color_in == null or _hair_color_in.item_count > 0:
+		return
+
+	# Hair colors: Color 0 to Color 13 (v00 to v13)
+	for i in range(14):
+		_hair_color_in.add_item("Color %d" % i)
+	_hair_color_in.select(0)
+
+func _fill_hat_dropdown() -> void:
+	if _hat_in == null or _hat_in.item_count > 0:
+		return
+
+	# Hat: None option + scanned parts
+	_hat_in.add_item("None")
+
+	if "hat" in available_parts:
+		for part in available_parts["hat"]:
+			_hat_in.add_item(part.name)
+
+	_hat_in.select(0)
 
 func _wire_stat_toggles() -> void:
 	_wire_stat_toggle(_brw_cb, "BRW")
@@ -563,6 +702,11 @@ func _on_confirm_pressed() -> void:
 
 	var pron_text: String = _opt_text(_pron_in)
 
+	# Get underwear selection
+	var underwear_idx = _underwear_in.get_selected() if _underwear_in else 0
+	var underwear_codes = ["boxr_v01", "undi_v01"]
+	var selected_underwear = underwear_codes[underwear_idx] if underwear_idx < underwear_codes.size() else "boxr_v01"
+
 	# Save character variant data to CharacterData autoload
 	print("[CharacterCreation] Saving character variants: ", selected_variants)
 	aCharacterData.set_character(selected_variants, current_selections)
@@ -578,7 +722,8 @@ func _on_confirm_pressed() -> void:
 			"name": name_text,
 			"surname": surname_text,
 			"pronoun": pron_text,
-			"character_variants": selected_variants.duplicate()
+			"character_variants": selected_variants.duplicate(),
+			"underwear": selected_underwear  # Save underwear for later cutscene
 		})
 		print("[CharacterCreation] Saved to GameState successfully")
 		var picked := PackedStringArray()
