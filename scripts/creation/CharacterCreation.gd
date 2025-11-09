@@ -2198,7 +2198,6 @@ func _build_customization_ui() -> void:
 	_update_hair_color_options("")
 
 	# Store selector references for focus navigation
-	var underwear_preview_toggle = customization_container.get_meta("underwear_preview_toggle") as CheckButton
 	var selectors = [pronoun_selector, body_selector, underwear_selector, underwear_preview_toggle, outfit_selector, outfit_style_selector, hair_type_selector, hair_color_selector]
 	customization_container.set_meta("selectors", selectors)
 
