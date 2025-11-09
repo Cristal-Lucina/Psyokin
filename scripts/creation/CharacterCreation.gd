@@ -1785,7 +1785,7 @@ func _build_stat_selection_ui() -> void:
 
 	# Stat names and descriptions
 	var stats = [
-		{"name": "BRAWN", "id": "BRW", "desc": "(Physical Power) Increases weapon damage and affects checks that represent strength."},
+		{"name": "BRAWN", "id": "BRW", "desc": "(Physical Power) Increases weapon damage and affects strength checks."},
 		{"name": "VITALITY", "id": "VTL", "desc": "(Toughness & Stamina) Raises health points and reduces incoming physical damage."},
 		{"name": "TEMPO", "id": "TPO", "desc": "(Speed & Timing) Drives initiative and improves physical accuracy"},
 		{"name": "MIND", "id": "MND", "desc": "(Skill Power) Increases skill damage and affects knowledge checks."},
