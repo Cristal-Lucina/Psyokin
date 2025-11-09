@@ -2169,6 +2169,15 @@ func _build_customization_ui() -> void:
 	var underwear_selector = _create_cycle_selector("underwear", _underwear_in)
 	_add_customization_cycle(options, "Underwear:", underwear_selector)
 
+	# Underwear preview toggle
+	var underwear_preview_toggle = CheckButton.new()
+	underwear_preview_toggle.text = "Preview Underwear"
+	underwear_preview_toggle.add_theme_font_size_override("font_size", 12)
+	underwear_preview_toggle.focus_mode = Control.FOCUS_ALL
+	underwear_preview_toggle.toggled.connect(_on_underwear_preview_toggled)
+	options.add_child(underwear_preview_toggle)
+	customization_container.set_meta("underwear_preview_toggle", underwear_preview_toggle)
+
 	var outfit_selector = _create_cycle_selector("outfit", _outfit_in)
 	_add_customization_cycle(options, "Outfit:", outfit_selector)
 
@@ -2189,7 +2198,8 @@ func _build_customization_ui() -> void:
 	_update_hair_color_options("")
 
 	# Store selector references for focus navigation
-	var selectors = [pronoun_selector, body_selector, underwear_selector, outfit_selector, outfit_style_selector, hair_type_selector, hair_color_selector]
+	var underwear_preview_toggle = customization_container.get_meta("underwear_preview_toggle") as CheckButton
+	var selectors = [pronoun_selector, body_selector, underwear_selector, underwear_preview_toggle, outfit_selector, outfit_style_selector, hair_type_selector, hair_color_selector]
 	customization_container.set_meta("selectors", selectors)
 
 	# Right: Character Preview
@@ -2448,6 +2458,32 @@ func _on_cinematic_selector_changed(index: int, type: String) -> void:
 			_outfit_style_in.select(index)
 			_on_outfit_style_selected(index)
 
+func _on_underwear_preview_toggled(pressed: bool) -> void:
+	"""Handle underwear preview toggle - show/hide underwear in preview only"""
+	if not pressed:
+		# Hide underwear preview (remove underwear layer)
+		_on_part_selected("underwear", null)
+	else:
+		# Show underwear preview based on current selection
+		var current_idx = _underwear_in.get_selected() if _underwear_in else 0
+		if current_idx == 0:
+			# None selected, don't show anything
+			_on_part_selected("underwear", null)
+		else:
+			# Show selected underwear
+			var underwear_codes = ["boxr", "undi"]
+			var underwear_names = ["Boxers", "Undies"]
+			var adjusted_idx = current_idx - 1  # Adjust for None option
+
+			if adjusted_idx >= 0 and adjusted_idx < underwear_codes.size():
+				var variant_code = underwear_codes[adjusted_idx] + "_v01"
+				var part = {
+					"name": underwear_names[adjusted_idx],
+					"path": CHAR_BASE_PATH + "char_a_p1/1out/char_a_p1_1out_" + variant_code + ".png",
+					"variant": variant_code
+				}
+				_on_part_selected("underwear", part)
+
 func _add_customization_cycle(parent: VBoxContainer, label_text: String, selector_button: Button) -> void:
 	"""Add a customization cycle selector to the parent container"""
 	var row = HBoxContainer.new()
@@ -2635,6 +2671,16 @@ func _build_name_entry_page() -> void:
 	accept_btn.pressed.connect(_on_name_entry_accepted)
 	protagonist_container.add_child(accept_btn)
 
+	# Set up focus neighbors
+	first_name_button.focus_neighbor_bottom = first_name_button.get_path_to(last_name_button)
+	last_name_button.focus_neighbor_top = last_name_button.get_path_to(first_name_button)
+	last_name_button.focus_neighbor_bottom = last_name_button.get_path_to(accept_btn)
+	accept_btn.focus_neighbor_top = accept_btn.get_path_to(last_name_button)
+	accept_btn.focus_neighbor_bottom = accept_btn.get_path_to(first_name_button)
+
+	# Set initial focus
+	first_name_button.grab_focus()
+
 	# Store references
 	protagonist_container.set_meta("first_name_label", first_name_label)
 	protagonist_container.set_meta("last_name_label", last_name_label)
@@ -2669,6 +2715,7 @@ func _build_keyboard_ui() -> void:
 		["Z", "X", "C", "V", "B", "N", "M"]
 	]
 
+	var all_keyboard_buttons = []
 	for row in letters:
 		var hbox = HBoxContainer.new()
 		hbox.add_theme_constant_override("separation", 5)
@@ -2679,8 +2726,10 @@ func _build_keyboard_ui() -> void:
 			var btn = Button.new()
 			btn.text = letter
 			btn.custom_minimum_size = Vector2(45, 45)
+			btn.focus_mode = Control.FOCUS_ALL
 			btn.pressed.connect(_on_protagonist_keyboard_letter_pressed.bind(letter))
 			hbox.add_child(btn)
+			all_keyboard_buttons.append(btn)
 
 	# Action row (Space, Backspace, Accept)
 	var action_row = HBoxContainer.new()
@@ -2691,20 +2740,30 @@ func _build_keyboard_ui() -> void:
 	var space_btn = Button.new()
 	space_btn.text = "Space"
 	space_btn.custom_minimum_size = Vector2(200, 45)
+	space_btn.focus_mode = Control.FOCUS_ALL
 	space_btn.pressed.connect(_on_protagonist_keyboard_space_pressed)
 	action_row.add_child(space_btn)
+	all_keyboard_buttons.append(space_btn)
 
 	var backspace_btn = Button.new()
 	backspace_btn.text = "⌫"
 	backspace_btn.custom_minimum_size = Vector2(80, 45)
+	backspace_btn.focus_mode = Control.FOCUS_ALL
 	backspace_btn.pressed.connect(_on_protagonist_keyboard_backspace_pressed)
 	action_row.add_child(backspace_btn)
+	all_keyboard_buttons.append(backspace_btn)
 
 	var accept_btn = Button.new()
 	accept_btn.text = "Accept"
 	accept_btn.custom_minimum_size = Vector2(100, 45)
+	accept_btn.focus_mode = Control.FOCUS_ALL
 	accept_btn.pressed.connect(_on_protagonist_keyboard_accept_pressed)
 	action_row.add_child(accept_btn)
+	all_keyboard_buttons.append(accept_btn)
+
+	# Set initial keyboard focus to first button
+	if all_keyboard_buttons.size() > 0:
+		keyboard_container.set_meta("first_keyboard_button", all_keyboard_buttons[0])
 
 func _on_name_field_selected(field_type: String, label: Label) -> void:
 	"""Handle name field selection - show keyboard"""
@@ -2718,6 +2777,11 @@ func _on_name_field_selected(field_type: String, label: Label) -> void:
 	var input_display = keyboard_container.get_meta("input_display") as Label
 	if input_display:
 		input_display.text = label.text
+
+	# Set focus to first keyboard button
+	var first_btn = keyboard_container.get_meta("first_keyboard_button") as Button
+	if first_btn:
+		first_btn.grab_focus()
 
 func _on_protagonist_keyboard_letter_pressed(letter: String) -> void:
 	"""Handle protagonist keyboard letter press"""
@@ -2824,6 +2888,7 @@ func _build_stats_selection_page() -> void:
 		{"id": "FCS", "name": "Focus"}
 	]
 
+	var stat_buttons = []
 	for stat in stats:
 		var stat_button = Button.new()
 		stat_button.text = stat.name
@@ -2834,6 +2899,7 @@ func _build_stats_selection_page() -> void:
 		stat_button.set_meta("stat_id", stat.id)
 		stat_button.toggled.connect(_on_stat_toggle_pressed.bind(stat.id, stat_button))
 		vbox.add_child(stat_button)
+		stat_buttons.append(stat_button)
 
 	# Continue button
 	var continue_btn = Button.new()
@@ -2849,6 +2915,22 @@ func _build_stats_selection_page() -> void:
 	continue_btn.pressed.connect(_on_stats_selection_accepted)
 	protagonist_container.add_child(continue_btn)
 	protagonist_container.set_meta("stats_continue_btn", continue_btn)
+
+	# Set up focus neighbors
+	for i in range(stat_buttons.size()):
+		if i > 0:
+			stat_buttons[i].focus_neighbor_top = stat_buttons[i].get_path_to(stat_buttons[i - 1])
+		if i < stat_buttons.size() - 1:
+			stat_buttons[i].focus_neighbor_bottom = stat_buttons[i].get_path_to(stat_buttons[i + 1])
+		else:
+			stat_buttons[i].focus_neighbor_bottom = stat_buttons[i].get_path_to(continue_btn)
+
+	continue_btn.focus_neighbor_top = continue_btn.get_path_to(stat_buttons[stat_buttons.size() - 1])
+	continue_btn.focus_neighbor_bottom = continue_btn.get_path_to(stat_buttons[0])
+
+	# Set initial focus
+	if stat_buttons.size() > 0:
+		stat_buttons[0].grab_focus()
 
 func _on_stat_toggle_pressed(pressed: bool, stat_id: String, button: Button) -> void:
 	"""Handle stat toggle"""
@@ -2960,6 +3042,7 @@ func _build_perk_selection_page() -> void:
 
 	# Create perk toggle buttons
 	var selected_perk_id: String = ""
+	var perk_buttons = []
 	for idx in range(offers.size()):
 		var perk_data = offers[idx]
 		if typeof(perk_data) != TYPE_DICTIONARY:
@@ -2986,6 +3069,7 @@ func _build_perk_selection_page() -> void:
 		perk_button.set_meta("perk_idx", idx)
 		perk_button.toggled.connect(_on_perk_toggle_pressed.bind(perk_id, idx, perk_button))
 		perk_panel.add_child(perk_button)
+		perk_buttons.append(perk_button)
 
 		if perk_desc != "":
 			var desc_label = Label.new()
@@ -3014,6 +3098,21 @@ func _build_perk_selection_page() -> void:
 	continue_btn.pressed.connect(_on_perk_selection_accepted)
 	protagonist_container.add_child(continue_btn)
 	protagonist_container.set_meta("perk_continue_btn", continue_btn)
+
+	# Set up focus neighbors
+	for i in range(perk_buttons.size()):
+		if i > 0:
+			perk_buttons[i].focus_neighbor_top = perk_buttons[i].get_path_to(perk_buttons[i - 1])
+		if i < perk_buttons.size() - 1:
+			perk_buttons[i].focus_neighbor_bottom = perk_buttons[i].get_path_to(perk_buttons[i + 1])
+		else:
+			perk_buttons[i].focus_neighbor_bottom = perk_buttons[i].get_path_to(continue_btn)
+
+	if perk_buttons.size() > 0:
+		continue_btn.focus_neighbor_top = continue_btn.get_path_to(perk_buttons[perk_buttons.size() - 1])
+		continue_btn.focus_neighbor_bottom = continue_btn.get_path_to(perk_buttons[0])
+		# Set initial focus
+		perk_buttons[0].grab_focus()
 
 func _on_perk_toggle_pressed(pressed: bool, perk_id: String, perk_idx: int, button: Button) -> void:
 	"""Handle perk toggle - only one can be selected"""
