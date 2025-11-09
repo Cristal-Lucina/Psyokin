@@ -3283,11 +3283,8 @@ func _on_confirmation_no() -> void:
 		cinematic_layer.queue_free()
 		cinematic_layer = null
 
-	# Restore ControllerManager context to OVERWORLD
-	var controller_manager = get_node_or_null("/root/aControllerManager")
-	if controller_manager:
-		controller_manager.set_context(controller_manager.InputContext.OVERWORLD)
-		print("[CharacterCreation] Restored ControllerManager context to OVERWORLD (No confirmation)")
+	# Keep ControllerManager context as CHARACTER_CREATION for protagonist UI
+	# (The protagonist creation UI needs controller input to work)
 
 	cinematic_active = false
 
