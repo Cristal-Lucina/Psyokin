@@ -452,16 +452,13 @@ func _on_underwear_selected(idx: int):
 	if customization_container and is_instance_valid(customization_container):
 		var preview_toggle = customization_container.get_meta("underwear_preview_toggle", null) as CheckButton
 		if preview_toggle and preview_toggle.button_pressed:
-			# Hide outfit when previewing underwear
-			_on_part_selected("outfit", null)
-
 			# Update preview based on new selection
 			if idx == 0:
 				# None selected, hide underwear
-				_on_part_selected("underwear", null)
+				_on_part_selected("outfit", null)
 				print("[Underwear Selection] None selected, hiding underwear")
 			else:
-				# Show selected underwear
+				# Show selected underwear on the OUTFIT layer (underwear uses 1out folder)
 				var underwear_codes = ["boxr", "undi"]
 				var underwear_names = ["Boxers", "Undies"]
 				var adjusted_idx = idx - 1  # Adjust for None option
@@ -473,7 +470,7 @@ func _on_underwear_selected(idx: int):
 						"path": CHAR_BASE_PATH + "char_a_p1/1out/char_a_p1_1out_" + variant_code + ".png",
 						"variant": variant_code
 					}
-					_on_part_selected("underwear", part)
+					_on_part_selected("outfit", part)  # Use "outfit" layer, not "underwear"
 					print("[Underwear Selection] Showing: %s at %s" % [variant_code, part["path"]])
 
 func _on_outfit_selected(idx: int):
@@ -2573,31 +2570,30 @@ func _on_cinematic_selector_changed(index: int, type: String) -> void:
 func _on_underwear_preview_toggled(pressed: bool) -> void:
 	"""Handle underwear preview toggle - show/hide underwear in preview only"""
 	if not pressed:
-		# Hide underwear preview (remove underwear layer)
-		_on_part_selected("underwear", null)
-
 		# Restore outfit if one was previously selected
 		if customization_container and customization_container.has_meta("saved_outfit_index"):
 			var saved_outfit_idx = customization_container.get_meta("saved_outfit_index")
 			if saved_outfit_idx > 0:  # If not None
 				_outfit_in.select(saved_outfit_idx)
 				_on_outfit_selected(saved_outfit_idx)
+			else:
+				# No outfit was selected, just clear
+				_on_part_selected("outfit", null)
+		else:
+			_on_part_selected("outfit", null)
 	else:
 		# Save current outfit selection before hiding it
 		if customization_container and _outfit_in:
 			var current_outfit_idx = _outfit_in.get_selected()
 			customization_container.set_meta("saved_outfit_index", current_outfit_idx)
 
-		# Hide outfit to show underwear
-		_on_part_selected("outfit", null)
-
-		# Show underwear preview based on current selection
+		# Show underwear preview based on current selection (uses outfit layer)
 		var current_idx = _underwear_in.get_selected() if _underwear_in else 0
 		if current_idx == 0:
 			# None selected, don't show anything
-			_on_part_selected("underwear", null)
+			_on_part_selected("outfit", null)
 		else:
-			# Show selected underwear
+			# Show selected underwear on the OUTFIT layer
 			var underwear_codes = ["boxr", "undi"]
 			var underwear_names = ["Boxers", "Undies"]
 			var adjusted_idx = current_idx - 1  # Adjust for None option
@@ -2609,7 +2605,7 @@ func _on_underwear_preview_toggled(pressed: bool) -> void:
 					"path": CHAR_BASE_PATH + "char_a_p1/1out/char_a_p1_1out_" + variant_code + ".png",
 					"variant": variant_code
 				}
-				_on_part_selected("underwear", part)
+				_on_part_selected("outfit", part)  # Use "outfit" layer
 				print("[Underwear Preview] Showing underwear: %s" % variant_code)
 
 func _add_customization_cycle(parent: VBoxContainer, label_text: String, selector_button: Button) -> void:
