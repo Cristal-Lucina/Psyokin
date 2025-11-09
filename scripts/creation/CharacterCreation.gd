@@ -966,8 +966,8 @@ func _setup_cinematic() -> void:
 	dialogue_container.anchor_bottom = 0.5
 	dialogue_container.offset_left = -400
 	dialogue_container.offset_right = 400
-	dialogue_container.offset_top = -50
-	dialogue_container.offset_bottom = 50
+	dialogue_container.offset_top = -30
+	dialogue_container.offset_bottom = 70
 	dialogue_container.add_theme_constant_override("separation", 10)
 	cinematic_layer.add_child(dialogue_container)
 
