@@ -1320,7 +1320,13 @@ func _advance_stage() -> void:
 	_enter_stage(next_stage)
 
 func _complete_cinematic() -> void:
-	"""Complete the cinematic and save character"""
+	"""Complete the cinematic and save character with fade transition"""
+	# Fade to black using TransitionManager
+	var transition_manager = get_node_or_null("/root/aTransitionManager")
+	if transition_manager and transition_manager.has_method("fade_out"):
+		transition_manager.fade_out(0.5)
+		await transition_manager.transition_finished
+
 	# Restore ControllerManager context to OVERWORLD
 	var controller_manager = get_node_or_null("/root/aControllerManager")
 	if controller_manager:
@@ -1329,6 +1335,12 @@ func _complete_cinematic() -> void:
 
 	cinematic_active = false
 	_apply_character_creation()
+
+	# Fade in from black
+	if transition_manager and transition_manager.has_method("fade_in"):
+		# Wait a brief moment before fading in
+		await get_tree().create_timer(0.2).timeout
+		transition_manager.fade_in(0.5)
 
 # ── Name Input UI ────────────────────────────────────────────────────────────
 func _build_name_input_ui() -> void:
@@ -2828,8 +2840,14 @@ func _build_confirmation_ui() -> void:
 	)
 
 func _on_confirmation_yes() -> void:
-	"""Handle Yes - proceed with character creation"""
-	_advance_stage()  # Go to COMPLETE
+	"""Handle Yes - proceed with character creation with fade out"""
+	# Fade out the confirmation UI
+	if confirmation_container:
+		var tween = create_tween()
+		tween.tween_property(confirmation_container, "modulate", Color(1, 1, 1, 0), 0.5)
+		tween.tween_callback(func():
+			_advance_stage()  # Go to COMPLETE after fade out
+		)
 
 func _on_confirmation_no() -> void:
 	"""Handle No - restart character creation with interactive sections (no nurse dialogue)"""
