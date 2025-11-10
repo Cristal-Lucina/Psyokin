@@ -450,7 +450,7 @@ func _member_pools(member: String) -> Dictionary:
 	var lvl: int = _member_level(member)
 	var vtl: int = _stat_for(member, "VTL")
 	var fcs: int = _stat_for(member, "FCS")
-	var hp_max: int = 60 + (max(1, vtl) * max(1, lvl) * 6)
+	var hp_max: int = 40 + (max(1, vtl) * max(1, lvl) * 4)
 	var mp_max: int = 20 + int(round(float(max(1, fcs)) * float(max(1, lvl)) * 1.5))
 	if st != null and st.has_method("compute_max_hp"):
 		hp_max = int(st.call("compute_max_hp", lvl, vtl))
