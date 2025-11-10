@@ -81,6 +81,12 @@ func _ready() -> void:
 	# Update action button labels with mapped keys/buttons
 	_update_action_button_labels()
 
+	# Apply Deltarune-style colors to action buttons
+	_style_action_buttons()
+
+	# Apply Deltarune-style borders to panels
+	_style_panels()
+
 	# Load skill definitions
 	_load_skills()
 
@@ -161,6 +167,141 @@ func _get_joypad_button_short_name(button_index: int) -> String:
 		JOY_BUTTON_START: return "Start"
 		JOY_BUTTON_BACK: return "Select"
 		_: return "Btn%d" % button_index
+
+func _style_action_buttons() -> void:
+	"""Apply Deltarune-style colored backgrounds to action buttons"""
+	var button_styles = [
+		{"button": "AttackButton", "color": Color(0.8, 0.2, 0.2, 1)},      # Red
+		{"button": "SkillButton", "color": Color(0.3, 0.5, 0.9, 1)},       # Blue
+		{"button": "CaptureButton", "color": Color(0.6, 0.3, 0.8, 1)},     # Purple
+		{"button": "DefendButton", "color": Color(0.2, 0.7, 0.8, 1)},      # Cyan
+		{"button": "BurstButton", "color": Color(0.9, 0.8, 0.2, 1)},       # Yellow
+		{"button": "RunButton", "color": Color(0.5, 0.5, 0.5, 1)},         # Gray
+		{"button": "ItemButton", "color": Color(0.3, 0.8, 0.3, 1)},        # Green
+		{"button": "StatusButton", "color": Color(0.9, 0.9, 0.9, 1)},      # White/Light Gray
+	]
+
+	for style_data in button_styles:
+		var btn = action_menu.get_node_or_null(style_data["button"])
+		if btn and btn is Button:
+			# Create StyleBoxFlat for normal state
+			var style_normal = StyleBoxFlat.new()
+			style_normal.bg_color = style_data["color"]
+			style_normal.border_width_left = 2
+			style_normal.border_width_right = 2
+			style_normal.border_width_top = 2
+			style_normal.border_width_bottom = 2
+			style_normal.border_color = Color(1, 1, 1, 1)  # White border
+			style_normal.corner_radius_top_left = 4
+			style_normal.corner_radius_top_right = 4
+			style_normal.corner_radius_bottom_left = 4
+			style_normal.corner_radius_bottom_right = 4
+
+			# Create StyleBoxFlat for hover state (brighter)
+			var style_hover = StyleBoxFlat.new()
+			var hover_color = style_data["color"].lightened(0.2)
+			style_hover.bg_color = hover_color
+			style_hover.border_width_left = 3
+			style_hover.border_width_right = 3
+			style_hover.border_width_top = 3
+			style_hover.border_width_bottom = 3
+			style_hover.border_color = Color(1, 1, 1, 1)
+			style_hover.corner_radius_top_left = 4
+			style_hover.corner_radius_top_right = 4
+			style_hover.corner_radius_bottom_left = 4
+			style_hover.corner_radius_bottom_right = 4
+
+			# Create StyleBoxFlat for pressed state (darker)
+			var style_pressed = StyleBoxFlat.new()
+			var pressed_color = style_data["color"].darkened(0.2)
+			style_pressed.bg_color = pressed_color
+			style_pressed.border_width_left = 2
+			style_pressed.border_width_right = 2
+			style_pressed.border_width_top = 2
+			style_pressed.border_width_bottom = 2
+			style_pressed.border_color = Color(0.8, 0.8, 0.8, 1)
+			style_pressed.corner_radius_top_left = 4
+			style_pressed.corner_radius_top_right = 4
+			style_pressed.corner_radius_bottom_left = 4
+			style_pressed.corner_radius_bottom_right = 4
+
+			# Apply styles to button
+			btn.add_theme_stylebox_override("normal", style_normal)
+			btn.add_theme_stylebox_override("hover", style_hover)
+			btn.add_theme_stylebox_override("pressed", style_pressed)
+			btn.add_theme_stylebox_override("focus", style_hover)
+
+			# Set text color to black for better contrast on light backgrounds
+			var text_color = Color(0, 0, 0, 1) if style_data["color"].v > 0.5 else Color(1, 1, 1, 1)
+			btn.add_theme_color_override("font_color", text_color)
+			btn.add_theme_color_override("font_hover_color", text_color)
+			btn.add_theme_color_override("font_pressed_color", text_color)
+			btn.add_theme_color_override("font_focus_color", text_color)
+
+func _style_panels() -> void:
+	"""Apply Deltarune-style borders to UI panels"""
+	# Style Turn Order Panel
+	var turn_order_panel = get_node_or_null("MainLayout/TurnOrderPanel")
+	if turn_order_panel and turn_order_panel is PanelContainer:
+		var style = StyleBoxFlat.new()
+		style.bg_color = Color(0.05, 0.05, 0.08, 1)  # Very dark background
+		style.border_width_left = 3
+		style.border_width_right = 3
+		style.border_width_top = 3
+		style.border_width_bottom = 3
+		style.border_color = Color(1, 1, 1, 1)  # White border
+		turn_order_panel.add_theme_stylebox_override("panel", style)
+
+		# Style title label to white
+		var title_label = turn_order_panel.get_node_or_null("VBox/Title")
+		if title_label and title_label is Label:
+			title_label.add_theme_color_override("font_color", Color(1, 1, 1, 1))
+			title_label.add_theme_font_size_override("font_size", 14)
+
+	# Style Battle Log Panel (rename conceptually to "Flavor Text")
+	var battle_log_panel = get_node_or_null("BattleLogPanel")
+	if battle_log_panel and battle_log_panel is PanelContainer:
+		var style = StyleBoxFlat.new()
+		style.bg_color = Color(0, 0, 0, 1)  # Pure black background
+		style.border_width_left = 3
+		style.border_width_right = 3
+		style.border_width_top = 3
+		style.border_width_bottom = 3
+		style.border_color = Color(1, 1, 1, 1)  # White border
+		battle_log_panel.add_theme_stylebox_override("panel", style)
+
+		# Style battle log text to white
+		var battle_log_text = battle_log
+		if battle_log_text:
+			battle_log_text.add_theme_color_override("default_color", Color(1, 1, 1, 1))
+
+	# Style Top Panel (Burst Gauge area)
+	var top_panel = get_node_or_null("MainLayout/BattleArena/TopPanel")
+	if top_panel and top_panel is PanelContainer:
+		var style = StyleBoxFlat.new()
+		style.bg_color = Color(0.05, 0.05, 0.08, 1)  # Very dark background
+		style.border_width_left = 3
+		style.border_width_right = 3
+		style.border_width_top = 3
+		style.border_width_bottom = 3
+		style.border_color = Color(1, 1, 1, 1)  # White border
+		top_panel.add_theme_stylebox_override("panel", style)
+
+		# Style burst label to white
+		var burst_label = top_panel.get_node_or_null("VBox/BurstLabel")
+		if burst_label and burst_label is Label:
+			burst_label.add_theme_color_override("font_color", Color(1, 1, 1, 1))
+
+		# Style burst gauge with yellow fill
+		var burst_gauge = burst_gauge_bar
+		if burst_gauge:
+			var gauge_bg = StyleBoxFlat.new()
+			gauge_bg.bg_color = Color(0.2, 0.2, 0.2, 1)
+			burst_gauge.add_theme_stylebox_override("background", gauge_bg)
+
+			var gauge_fill = StyleBoxFlat.new()
+			gauge_fill.bg_color = Color(1, 0.8, 0, 1)  # Orange-yellow
+			burst_gauge.add_theme_stylebox_override("fill", gauge_fill)
 
 func _load_skills() -> void:
 	"""Load skill definitions from skills.csv"""
@@ -924,56 +1065,109 @@ func _display_combatants() -> void:
 func _create_combatant_slot(combatant: Dictionary, is_ally: bool) -> PanelContainer:
 	"""Create a UI slot for a combatant"""
 	var panel = PanelContainer.new()
-	panel.custom_minimum_size = Vector2(150, 100)
 
 	# Hide KO'd enemies - move off screen and make invisible
 	if not is_ally and combatant.get("is_ko", false):
 		panel.visible = false
 		panel.position = Vector2(-1000, -1000)  # Move off screen
 
-	var vbox = VBoxContainer.new()
-	panel.add_child(vbox)
+	# Apply Deltarune-style for allies, keep simpler style for enemies
+	if is_ally:
+		panel.custom_minimum_size = Vector2(180, 80)
 
-	# Name label
-	var name_label = Label.new()
-	name_label.text = combatant.display_name
-	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vbox.add_child(name_label)
+		# Deltarune-style: Black background with white border
+		var style = StyleBoxFlat.new()
+		style.bg_color = Color(0, 0, 0, 1)  # Pure black background
+		style.border_width_left = 3
+		style.border_width_right = 3
+		style.border_width_top = 3
+		style.border_width_bottom = 3
+		style.border_color = Color(1, 1, 1, 1)  # White border
+		panel.add_theme_stylebox_override("panel", style)
 
-	# HP bar
-	var hp_bar = ProgressBar.new()
-	hp_bar.max_value = combatant.hp_max
-	hp_bar.value = combatant.hp
-	hp_bar.show_percentage = false
-	vbox.add_child(hp_bar)
+		# Horizontal layout for icon + info
+		var hbox = HBoxContainer.new()
+		hbox.add_theme_constant_override("separation", 8)
+		panel.add_child(hbox)
 
-	# HP label
-	var hp_label = Label.new()
-	hp_label.text = "HP: %d/%d" % [combatant.hp, combatant.hp_max]
-	hp_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	hp_label.add_theme_font_size_override("font_size", 10)
-	vbox.add_child(hp_label)
+		# Character icon/portrait placeholder (32x32 colored square for now)
+		var icon = ColorRect.new()
+		icon.custom_minimum_size = Vector2(32, 32)
+		icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		# Color based on character name hash for visual variety
+		var hash_val = combatant.display_name.hash()
+		icon.color = Color(
+			(hash_val % 100) / 100.0 + 0.4,
+			((hash_val >> 8) % 100) / 100.0 + 0.4,
+			((hash_val >> 16) % 100) / 100.0 + 0.4,
+			1.0
+		)
+		hbox.add_child(icon)
 
-	# MP bar (if applicable)
-	if combatant.mp_max > 0:
-		var mp_bar = ProgressBar.new()
-		mp_bar.max_value = combatant.mp_max
-		mp_bar.value = combatant.mp
-		mp_bar.show_percentage = false
-		vbox.add_child(mp_bar)
+		# Info column (name + HP)
+		var vbox = VBoxContainer.new()
+		vbox.add_theme_constant_override("separation", 2)
+		vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		hbox.add_child(vbox)
 
-		var mp_label = Label.new()
-		mp_label.text = "MP: %d/%d" % [combatant.mp, combatant.mp_max]
-		mp_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		mp_label.add_theme_font_size_override("font_size", 10)
-		vbox.add_child(mp_label)
+		# Name label (white text)
+		var name_label = Label.new()
+		name_label.text = combatant.display_name
+		name_label.add_theme_color_override("font_color", Color(1, 1, 1, 1))
+		name_label.add_theme_font_size_override("font_size", 12)
+		vbox.add_child(name_label)
 
-	# Status button to show detailed status effects
-	var status_button = Button.new()
-	status_button.text = "Status"
-	status_button.custom_minimum_size = Vector2(120, 25)
-	status_button.pressed.connect(_show_status_details.bind(combatant))
-	vbox.add_child(status_button)
+		# HP text (current/max in white)
+		var hp_label = Label.new()
+		hp_label.text = "%d / %d HP" % [combatant.hp, combatant.hp_max]
+		hp_label.add_theme_color_override("font_color", Color(1, 1, 1, 1))
+		hp_label.add_theme_font_size_override("font_size", 10)
+		vbox.add_child(hp_label)
+
+		# HP bar (white bar on black background)
+		var hp_bar = ProgressBar.new()
+		hp_bar.max_value = combatant.hp_max
+		hp_bar.value = combatant.hp
+		hp_bar.show_percentage = false
+		hp_bar.custom_minimum_size = Vector2(0, 8)
+
+		# Style HP bar with white fill
+		var hp_bar_bg = StyleBoxFlat.new()
+		hp_bar_bg.bg_color = Color(0.2, 0.2, 0.2, 1)
+		hp_bar.add_theme_stylebox_override("background", hp_bar_bg)
+
+		var hp_bar_fill = StyleBoxFlat.new()
+		hp_bar_fill.bg_color = Color(1, 1, 0, 1)  # Yellow fill (Deltarune style)
+		hp_bar.add_theme_stylebox_override("fill", hp_bar_fill)
+
+		vbox.add_child(hp_bar)
+
+	else:
+		# Enemies: Keep simpler style (for now)
+		panel.custom_minimum_size = Vector2(150, 100)
+
+		var vbox = VBoxContainer.new()
+		panel.add_child(vbox)
+
+		# Name label
+		var name_label = Label.new()
+		name_label.text = combatant.display_name
+		name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		vbox.add_child(name_label)
+
+		# HP bar
+		var hp_bar = ProgressBar.new()
+		hp_bar.max_value = combatant.hp_max
+		hp_bar.value = combatant.hp
+		hp_bar.show_percentage = false
+		vbox.add_child(hp_bar)
+
+		# HP label
+		var hp_label = Label.new()
+		hp_label.text = "HP: %d/%d" % [combatant.hp, combatant.hp_max]
+		hp_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		hp_label.add_theme_font_size_override("font_size", 10)
+		vbox.add_child(hp_label)
 
 	# Store combatant ID in metadata
 	panel.set_meta("combatant_id", combatant.id)
