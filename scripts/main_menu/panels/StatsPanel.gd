@@ -275,9 +275,9 @@ func _rebuild_battle_stats(token: String) -> void:
 	var skill_boost: int = weapon.get("skill_acc_boost", 0)
 	var s_atk: int = mnd + skill_boost
 
-	# Accuracy: Base + TPO×0.20
+	# Accuracy: Base + TPO×2.0 (each TPO point adds 0.20 percentage points)
 	var weapon_acc: int = weapon.get("accuracy", 0)
-	var tpo_acc_bonus: float = tpo * 0.20
+	var tpo_acc_bonus: float = tpo * 2.0
 	var total_acc: float = weapon_acc + tpo_acc_bonus
 
 	# Crit Rate: 5% + BRW×0.5% + weapon/equipment bonuses
@@ -288,10 +288,15 @@ func _rebuild_battle_stats(token: String) -> void:
 	# Ailment Power: MND×2%
 	var ailment_bonus: float = mnd * 2.0
 
-	# Evasion with stat contribution
+	# Evasion with stat contribution (VTL×2.0)
 	var base_eva: int = defense.get("peva", 0)
-	var vtl_eva_bonus: float = vtl * 0.20
+	var vtl_eva_bonus: float = vtl * 2.0
 	var total_eva: float = base_eva + vtl_eva_bonus
+
+	# Initiative: Get TPO tier and speed bonus
+	var speed_bonus: int = defense.get("speed", 0)
+	var init_tier: int = _get_initiative_tier(tpo)
+	var init_text: String = "Tier %d [%s + Spd %d]" % [init_tier, _get_dice_notation(init_tier), speed_bonus]
 
 	_add_battle_stat(_battle_grid, "Max HP", profile.get("hp_max", 0))
 	_add_battle_stat(_battle_grid, "Max MP", profile.get("mp_max", 0))
@@ -301,7 +306,7 @@ func _rebuild_battle_stats(token: String) -> void:
 	_add_battle_stat(_battle_grid, "Skill Defense", defense.get("mdef", 0))
 	_add_battle_stat_float(_battle_grid, "Accuracy", total_acc, "%.1f%%")
 	_add_battle_stat_float(_battle_grid, "Evasion", total_eva, "%.1f%%")
-	_add_battle_stat(_battle_grid, "Speed", defense.get("speed", 0))
+	_add_battle_stat_string(_battle_grid, "Initiative", init_text)
 	_add_battle_stat_float(_battle_grid, "Crit Rate", crit_rate, "%.1f%%")
 	_add_battle_stat_float(_battle_grid, "Ailment Power", ailment_bonus, "+%.0f%%")
 	_add_battle_stat(_battle_grid, "Ailment Resistance", defense.get("ail_resist_pct", 0))
@@ -464,6 +469,31 @@ func _add_battle_stat_float(grid: GridContainer, label: String, value: float, fo
 	var formatted_value: String = format % value
 	var cell = _create_stat_cell(label, formatted_value)
 	grid.add_child(cell)
+
+func _add_battle_stat_string(grid: GridContainer, label: String, value: String) -> void:
+	"""Add a battle stat with string value"""
+	var cell = _create_stat_cell(label, value)
+	grid.add_child(cell)
+
+func _get_initiative_tier(tpo: int) -> int:
+	"""Get initiative tier based on TPO value (1-4)"""
+	if tpo <= 3:
+		return 1
+	elif tpo <= 6:
+		return 2
+	elif tpo <= 9:
+		return 3
+	else:
+		return 4
+
+func _get_dice_notation(tier: int) -> String:
+	"""Get dice notation for initiative tier"""
+	match tier:
+		1: return "1d20"
+		2: return "2d20(H)"
+		3: return "3d20(H)"
+		4: return "4d20(H)"
+		_: return "1d20"
 
 func _create_stat_cell(stat_label: String, value: String) -> PanelContainer:
 	"""Create a rounded grey cell containing a stat label and value"""

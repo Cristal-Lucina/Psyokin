@@ -1209,6 +1209,26 @@ func _value_cell(txt: String) -> Label:
 	l.add_theme_font_size_override("font_size", 12)
 	return l
 
+func _get_initiative_tier(tpo: int) -> int:
+	"""Get initiative tier based on TPO value (1-4)"""
+	if tpo <= 3:
+		return 1
+	elif tpo <= 6:
+		return 2
+	elif tpo <= 9:
+		return 3
+	else:
+		return 4
+
+func _get_dice_notation(tier: int) -> String:
+	"""Get dice notation for initiative tier"""
+	match tier:
+		1: return "1d20"
+		2: return "2d20(H)"
+		3: return "3d20(H)"
+		4: return "4d20(H)"
+		_: return "1d20"
+
 func _create_stat_cell(stat_label: String, value: String) -> PanelContainer:
 	"""Create a rounded grey cell containing a stat label and value"""
 	var panel := PanelContainer.new()
@@ -1321,9 +1341,9 @@ func _rebuild_stats_grid(member_token: String, equip: Dictionary) -> void:
 	var skill_atk_bonus: int = weapon.get("skill_atk_boost", 0)
 	var s_atk: int = mnd + skill_atk_bonus
 
-	# Accuracy: Base + TPO×0.20
+	# Accuracy: Base + TPO×2.0 (each TPO point adds 0.20 percentage points)
 	var weapon_acc: int = weapon.get("accuracy", 0)
-	var tpo_acc_bonus: float = tpo * 0.20
+	var tpo_acc_bonus: float = tpo * 2.0
 	var total_acc: float = weapon_acc + tpo_acc_bonus
 
 	# Crit Rate: 5% + BRW×0.5% + weapon/equipment bonuses
@@ -1334,10 +1354,15 @@ func _rebuild_stats_grid(member_token: String, equip: Dictionary) -> void:
 	# Ailment Power: MND×2%
 	var ailment_bonus: float = mnd * 2.0
 
-	# Evasion with stat contribution
+	# Evasion with stat contribution (VTL×2.0)
 	var base_eva: int = defense.get("peva", 0)
-	var vtl_eva_bonus: float = vtl * 0.20
+	var vtl_eva_bonus: float = vtl * 2.0
 	var total_eva: float = base_eva + vtl_eva_bonus
+
+	# Initiative: Get TPO tier and speed bonus
+	var speed_bonus: int = defense.get("speed", 0)
+	var init_tier: int = _get_initiative_tier(tpo)
+	var init_text: String = "Tier %d [%s + Spd %d]" % [init_tier, _get_dice_notation(init_tier), speed_bonus]
 
 	# Battle stats with full names in rounded grey cells (2 columns)
 	_stats_grid.add_child(_create_stat_cell("Max HP", str(profile.get("hp_max", 0))))
@@ -1348,7 +1373,7 @@ func _rebuild_stats_grid(member_token: String, equip: Dictionary) -> void:
 	_stats_grid.add_child(_create_stat_cell("Skill Defense", str(defense.get("mdef", 0))))
 	_stats_grid.add_child(_create_stat_cell("Accuracy", "%.1f%%" % total_acc))
 	_stats_grid.add_child(_create_stat_cell("Evasion", "%.1f%%" % total_eva))
-	_stats_grid.add_child(_create_stat_cell("Speed", str(defense.get("speed", 0))))
+	_stats_grid.add_child(_create_stat_cell("Initiative", init_text))
 	_stats_grid.add_child(_create_stat_cell("Crit Rate", "%.1f%%" % crit_rate))
 	_stats_grid.add_child(_create_stat_cell("Ailment Power", "+%.0f%%" % ailment_bonus))
 	_stats_grid.add_child(_create_stat_cell("Ailment Resistance", str(defense.get("ail_resist_pct", 0))))
