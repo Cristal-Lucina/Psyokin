@@ -1210,7 +1210,7 @@ func _value_cell(txt: String) -> Label:
 	l.add_theme_font_size_override("font_size", 12)
 	return l
 
-func _create_stat_cell(stat_label: String, value: int) -> PanelContainer:
+func _create_stat_cell(stat_label: String, value: String) -> PanelContainer:
 	"""Create a rounded grey cell containing a stat label and value"""
 	var panel := PanelContainer.new()
 	panel.custom_minimum_size = Vector2(0, 30)
@@ -1248,7 +1248,7 @@ func _create_stat_cell(stat_label: String, value: int) -> PanelContainer:
 
 	# Value - 5 characters wide, blue color
 	var value_label := Label.new()
-	value_label.text = str(value)
+	value_label.text = value
 	value_label.custom_minimum_size = Vector2(30, 0)  # ~5 characters at 12pt
 	value_label.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	value_label.add_theme_font_size_override("font_size", 12)
@@ -1311,27 +1311,52 @@ func _rebuild_stats_grid(member_token: String, equip: Dictionary) -> void:
 	var defense: Dictionary = profile.get("defense", {})
 	var stats: Dictionary = profile.get("stats", {})
 
-	# S ATK = MND + skill_atk_boost
-	var mnd: int = stats.get("MND", 0)
+	# Get core stats for calculations
+	var brw: int = stats.get("BRW", 1)
+	var mnd: int = stats.get("MND", 1)
+	var tpo: int = stats.get("TPO", 1)
+	var vtl: int = stats.get("VTL", 1)
+	var fcs: int = stats.get("FCS", 1)
+
+	# Calculate derived stats with new formulas
 	var skill_atk_bonus: int = weapon.get("skill_atk_boost", 0)
 	var s_atk: int = mnd + skill_atk_bonus
 
-	# Skill Accuracy comes from skill_acc_boost
-	var skill_acc: int = weapon.get("skill_acc_boost", 0)
+	# Accuracy: Base + TPO×0.20
+	var weapon_acc: int = weapon.get("accuracy", 0)
+	var tpo_acc_bonus: float = tpo * 0.20
+	var total_acc: float = weapon_acc + tpo_acc_bonus
+
+	# Crit Rate: 5% + BRW×0.5% + weapon/equipment bonuses
+	var weapon_crit: int = weapon.get("crit_bonus_pct", 0)
+	var crit_rate: float = 5.0 + (brw * 0.5) + weapon_crit
+	crit_rate = clamp(crit_rate, 5.0, 50.0)
+
+	# Crit Damage Multiplier: 1.5× + BRW×0.1×
+	var crit_mult: float = 1.5 + (brw * 0.1)
+
+	# Ailment Power: MND×2%
+	var ailment_bonus: float = mnd * 2.0
+
+	# Evasion with stat contribution
+	var base_eva: int = defense.get("peva", 0)
+	var vtl_eva_bonus: float = vtl * 0.20
+	var total_eva: float = base_eva + vtl_eva_bonus
 
 	# Battle stats with full names in rounded grey cells (2 columns)
-	_stats_grid.add_child(_create_stat_cell("Max HP", profile.get("hp_max", 0)))
-	_stats_grid.add_child(_create_stat_cell("Max MP", profile.get("mp_max", 0)))
-	_stats_grid.add_child(_create_stat_cell("Physical Attack", weapon.get("attack", 0)))
-	_stats_grid.add_child(_create_stat_cell("Skill Attack", s_atk))
-	_stats_grid.add_child(_create_stat_cell("Physical Defense", defense.get("pdef", 0)))
-	_stats_grid.add_child(_create_stat_cell("Skill Defense", defense.get("mdef", 0)))
-	_stats_grid.add_child(_create_stat_cell("Physical Accuracy", weapon.get("accuracy", 0)))
-	_stats_grid.add_child(_create_stat_cell("Skill Accuracy", skill_acc))
-	_stats_grid.add_child(_create_stat_cell("Evasion", defense.get("peva", 0)))
-	_stats_grid.add_child(_create_stat_cell("Speed", defense.get("speed", 0)))
-	_stats_grid.add_child(_create_stat_cell("Ailment Resistance", defense.get("ail_resist_pct", 0)))
-	_stats_grid.add_child(_create_stat_cell("Critical Rate", weapon.get("crit_bonus_pct", 0)))
+	_stats_grid.add_child(_create_stat_cell("Max HP", str(profile.get("hp_max", 0))))
+	_stats_grid.add_child(_create_stat_cell("Max MP", str(profile.get("mp_max", 0))))
+	_stats_grid.add_child(_create_stat_cell("Physical Attack", str(weapon.get("attack", 0))))
+	_stats_grid.add_child(_create_stat_cell("Skill Attack", str(s_atk)))
+	_stats_grid.add_child(_create_stat_cell("Physical Defense", str(defense.get("pdef", 0))))
+	_stats_grid.add_child(_create_stat_cell("Skill Defense", str(defense.get("mdef", 0))))
+	_stats_grid.add_child(_create_stat_cell("Accuracy", "%.1f%%" % total_acc))
+	_stats_grid.add_child(_create_stat_cell("Evasion", "%.1f%%" % total_eva))
+	_stats_grid.add_child(_create_stat_cell("Speed", str(defense.get("speed", 0))))
+	_stats_grid.add_child(_create_stat_cell("Crit Rate", "%.1f%%" % crit_rate))
+	_stats_grid.add_child(_create_stat_cell("Crit Damage", "×%.1f" % crit_mult))
+	_stats_grid.add_child(_create_stat_cell("Ailment Power", "+%.0f%%" % ailment_bonus))
+	_stats_grid.add_child(_create_stat_cell("Ailment Resistance", str(defense.get("ail_resist_pct", 0))))
 
 # ────────────────── Details Display ──────────────────
 func _update_details_for_focused_element() -> void:
