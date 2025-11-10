@@ -33,6 +33,7 @@ const PANEL_CORNER_RADIUS := 8
 const LETTER_REVEAL_SPEED := 0.05  # 0.05 seconds per letter
 const DIALOGUE_PAUSE := 1.5        # Pause between dialogue lines
 const NURSE_RESPONSE_PAUSE := 2.0  # Pause between nurse responses
+const INPUT_COOLDOWN := 0.2        # Minimum delay between inputs (200ms)
 
 # ── Autoload paths ────────────────────────────────────────────────────────────
 const GS_PATH      := "/root/aGameState"
@@ -124,6 +125,7 @@ var nurse_response_index: int = 0
 var cinematic_name: String = ""
 var cinematic_surname: String = ""
 var waiting_for_input: bool = false
+var last_input_time: float = 0.0  # Track last input time for cooldown
 
 # Name input state
 var name_input_stage: int = 0  # 0 = selecting first name field, 1 = first name keyboard, 2 = selecting last name field, 3 = last name keyboard
@@ -1130,6 +1132,28 @@ func _input(event: InputEvent) -> void:
 	"""Handle input for advancing dialogue, name input, and stat selection (use _input to capture before ControllerManager)"""
 	if not cinematic_active:
 		return
+
+	# Input cooldown to prevent touchy controls
+	var current_time = Time.get_ticks_msec() / 1000.0
+	if current_time - last_input_time < INPUT_COOLDOWN:
+		return
+
+	# Only check for actual input events that we care about
+	var is_relevant_input = false
+	if event.is_action_pressed("ui_accept") or event.is_action_pressed("ui_cancel") or \
+	   event.is_action_pressed("ui_up") or event.is_action_pressed("ui_down") or \
+	   event.is_action_pressed("ui_left") or event.is_action_pressed("ui_right") or \
+	   event.is_action_pressed("move_up") or event.is_action_pressed("move_down") or \
+	   event.is_action_pressed("move_left") or event.is_action_pressed("move_right") or \
+	   event.is_action_pressed("menu_accept") or \
+	   (event is InputEventJoypadButton and event.pressed):
+		is_relevant_input = true
+
+	if not is_relevant_input:
+		return
+
+	# Update last input time
+	last_input_time = current_time
 
 	# Handle keyboard navigation when keyboard is visible
 	if current_stage == CinematicStage.NAME_INPUT and keyboard_container:
