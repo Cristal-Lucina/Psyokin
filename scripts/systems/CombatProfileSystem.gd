@@ -294,8 +294,8 @@ func _compute_for_member(member: String) -> Dictionary:
 	# EVA from foot + mods from other gear base_eva
 	var base_eva: int = int(d_foot.get("base_eva", 0))
 	var eva_mods: int = _eva_mods_from_other(equip, String(equip.get("foot","")))
-	var peva: int = base_eva + int(round(0.25 * float(vtl))) + eva_mods
-	var meva: int = base_eva + int(round(0.25 * float(fcs))) + eva_mods
+	var peva: int = base_eva + int(round(0.20 * float(vtl))) + eva_mods
+	var meva: int = base_eva + int(round(0.20 * float(fcs))) + eva_mods
 	var speed: int = int(d_foot.get("speed", 0))
 
 	# Sigils / bracelet
