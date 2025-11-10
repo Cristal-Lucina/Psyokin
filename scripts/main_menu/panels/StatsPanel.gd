@@ -298,6 +298,9 @@ func _rebuild_battle_stats(token: String) -> void:
 	var init_tier: int = _get_initiative_tier(tpo)
 	var init_text: String = "%s + %d" % [_get_dice_notation(init_tier), speed_bonus]
 
+	# Get mind type for display
+	var mind_type: String = _get_member_mind_type(token)
+
 	_add_battle_stat(_battle_grid, "Max HP", profile.get("hp_max", 0))
 	_add_battle_stat(_battle_grid, "Max MP", profile.get("mp_max", 0))
 	_add_battle_stat(_battle_grid, "Physical Attack", weapon.get("attack", 0))
@@ -309,7 +312,7 @@ func _rebuild_battle_stats(token: String) -> void:
 	_add_battle_stat_string(_battle_grid, "Initiative", init_text)
 	_add_battle_stat_float(_battle_grid, "Crit Rate", crit_rate, "%.1f%%")
 	_add_battle_stat_float(_battle_grid, "Ailment Power", ailment_bonus, "+%.0f%%")
-	_add_battle_stat(_battle_grid, "Ailment Resistance", defense.get("ail_resist_pct", 0))
+	_add_battle_stat_string(_battle_grid, "Mind Type", mind_type)
 
 func _rebuild_affinity_grid(token: String) -> void:
 	"""Build affinity grid showing relationships with all party members"""

@@ -433,7 +433,6 @@ func _get_equipment_stats(item_id: String, slot: String) -> Dictionary:
 		"armor":
 			stats["Phys Defense"] = int(item_def.get("armor_flat", 0))
 			stats["Skill Defense"] = int(item_def.get("ward_flat", 0))
-			stats["Ail Resist"] = int(item_def.get("ail_resist_pct", 0))
 		"head":
 			stats["HP Bonus"] = int(item_def.get("max_hp_boost", 0))
 			stats["MP Bonus"] = int(item_def.get("max_mp_boost", 0))
@@ -1364,6 +1363,9 @@ func _rebuild_stats_grid(member_token: String, equip: Dictionary) -> void:
 	var init_tier: int = _get_initiative_tier(tpo)
 	var init_text: String = "%s + %d" % [_get_dice_notation(init_tier), speed_bonus]
 
+	# Get mind type for display
+	var mind_type: String = _get_member_mind_type(member_token)
+
 	# Battle stats with full names in rounded grey cells (2 columns)
 	_stats_grid.add_child(_create_stat_cell("Max HP", str(profile.get("hp_max", 0))))
 	_stats_grid.add_child(_create_stat_cell("Max MP", str(profile.get("mp_max", 0))))
@@ -1376,7 +1378,7 @@ func _rebuild_stats_grid(member_token: String, equip: Dictionary) -> void:
 	_stats_grid.add_child(_create_stat_cell("Initiative", init_text))
 	_stats_grid.add_child(_create_stat_cell("Crit Rate", "%.1f%%" % crit_rate))
 	_stats_grid.add_child(_create_stat_cell("Ailment Power", "+%.0f%%" % ailment_bonus))
-	_stats_grid.add_child(_create_stat_cell("Ailment Resistance", str(defense.get("ail_resist_pct", 0))))
+	_stats_grid.add_child(_create_stat_cell("Mind Type", mind_type))
 
 # ────────────────── Details Display ──────────────────
 func _update_details_for_focused_element() -> void:
@@ -1517,8 +1519,6 @@ func _show_equipment_details(member_token: String, slot: String) -> void:
 				details += "Physical Defense: [color=#FFC0CB]%d[/color]\n" % int(item_def.get("armor_flat", 0))
 			if item_def.has("ward_flat"):
 				details += "Skill Defense: [color=#FFC0CB]%d[/color]\n" % int(item_def.get("ward_flat", 0))
-			if item_def.has("ail_resist_pct"):
-				details += "Ailment Resist: [color=#FFC0CB]%d%%[/color]\n" % int(item_def.get("ail_resist_pct", 0))
 			if item_def.has("armor_type"):
 				var atype: String = String(item_def.get("armor_type", "")).capitalize()
 				if atype != "":
