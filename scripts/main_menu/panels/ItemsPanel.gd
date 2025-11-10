@@ -558,8 +558,6 @@ func _build_equipment_stats(def: Dictionary, slot: String) -> String:
 				stats += "Physical Defense: [color=#FFC0CB]%d[/color]\n" % int(def.get("armor_flat", 0))
 			if def.has("ward_flat"):
 				stats += "Skill Defense: [color=#FFC0CB]%d[/color]\n" % int(def.get("ward_flat", 0))
-			if def.has("ail_resist_pct"):
-				stats += "Ailment Resist: [color=#FFC0CB]%d%%[/color]\n" % int(def.get("ail_resist_pct", 0))
 			if def.has("armor_type"):
 				var atype: String = String(def.get("armor_type", "")).capitalize()
 				if atype != "":

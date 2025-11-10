@@ -5,12 +5,12 @@ signal creation_applied
 
 # Cinematic stages
 enum CinematicStage {
-	OPENING_DIALOGUE_1,    # "Oh, I think they are regaining consciousness.."
-	OPENING_DIALOGUE_2,    # "Check if they are aware."
+	OPENING_DIALOGUE_1,    # "Doctor! There's a reading!"
+	OPENING_DIALOGUE_2,    # "Is the patient aware?"
 	OPENING_DIALOGUE_3,    # "Hey, do you remember your name?"
 	NAME_INPUT,            # Name input with validation
-	DIALOGUE_RESPONSE_1,   # "They're speaking..."
-	DIALOGUE_RESPONSE_2,   # "Nurse, go check..."
+	DIALOGUE_RESPONSE_1,   # "We got a response!"
+	DIALOGUE_RESPONSE_2,   # "Wonderful, how are the vitals?"
 	STAT_SELECTION,        # Choose 3 stats
 	PERK_QUESTION,         # "Choose a perk."
 	PERK_SELECTION,        # Show 3 perks based on stats
@@ -33,6 +33,7 @@ const PANEL_CORNER_RADIUS := 8
 const LETTER_REVEAL_SPEED := 0.05  # 0.05 seconds per letter
 const DIALOGUE_PAUSE := 1.5        # Pause between dialogue lines
 const NURSE_RESPONSE_PAUSE := 2.0  # Pause between nurse responses
+const INPUT_COOLDOWN := 0.2        # Minimum delay between inputs (200ms)
 
 # ── Autoload paths ────────────────────────────────────────────────────────────
 const GS_PATH      := "/root/aGameState"
@@ -96,6 +97,7 @@ const DIRECTIONS = {
 var _selected_order : Array[String] = []       # keep order of picks (max 3)
 var _perk_id_by_idx : Dictionary = {}          # index -> perk_id
 var _perk_stat_by_idx : Dictionary = {}        # index -> stat_id (help text)
+var _perk_name_by_idx : Dictionary = {}        # index -> perk_name
 
 # Character state
 var current_direction = 0  # South
@@ -123,6 +125,7 @@ var nurse_response_index: int = 0
 var cinematic_name: String = ""
 var cinematic_surname: String = ""
 var waiting_for_input: bool = false
+var last_input_time: float = 0.0  # Track last input time for cooldown
 
 # Name input state
 var name_input_stage: int = 0  # 0 = selecting first name field, 1 = first name keyboard, 2 = selecting last name field, 3 = last name keyboard
@@ -141,7 +144,8 @@ var stat_continue_button: Button = null  # Reference to Continue button
 var keyboard_buttons: Array = []  # All keyboard buttons
 var keyboard_focused_row: int = 0  # Current row (0-3: letters, 4: actions)
 var keyboard_focused_col: int = 0  # Current column
-var keyboard_grid_cols: int = 9  # 9 columns for letters
+var keyboard_grid_cols: int = 10  # 10 columns for QWERTY layout
+var keyboard_uppercase: bool = true  # Track if keyboard is in uppercase mode
 
 # Blinking up arrow
 var arrow_label: Label = null
@@ -438,6 +442,14 @@ func _on_body_selected(idx: int):
 func _on_underwear_selected(idx: int):
 	# Underwear selection: 0=None, 1=Boxers, 2=Undies
 	# This is saved to game state for later cutscenes
+	# Keep preview toggle on when selecting underwear
+	if customization_container and is_instance_valid(customization_container):
+		var preview_toggle = customization_container.get_meta("underwear_preview_toggle", null) as CheckButton
+		if preview_toggle and not preview_toggle.button_pressed and idx > 0:
+			# Turn on preview if selecting underwear and it's off
+			preview_toggle.button_pressed = true
+			print("[Underwear Selection] Auto-toggled on underwear preview")
+
 	# If preview toggle is on, update the preview
 	if customization_container and is_instance_valid(customization_container):
 		var preview_toggle = customization_container.get_meta("underwear_preview_toggle", null) as CheckButton
@@ -465,6 +477,14 @@ func _on_underwear_selected(idx: int):
 
 func _on_outfit_selected(idx: int):
 	# Outfit selection: 0=None, 1=Vest (fstr), 2=Dress (pfpn)
+
+	# Auto-toggle off underwear preview when selecting an outfit
+	if customization_container and is_instance_valid(customization_container) and idx > 0:
+		var preview_toggle = customization_container.get_meta("underwear_preview_toggle", null) as CheckButton
+		if preview_toggle and preview_toggle.button_pressed:
+			preview_toggle.button_pressed = false
+			# The toggled signal will handle the logic
+			print("[Outfit Selection] Auto-toggled off underwear preview")
 
 	# Check if underwear preview is active
 	var underwear_preview_active = false
@@ -707,6 +727,7 @@ func _rebuild_perk_dropdown() -> void:
 	_perk_in.clear()
 	_perk_id_by_idx.clear()
 	_perk_stat_by_idx.clear()
+	_perk_name_by_idx.clear()
 
 	# Build the offer list
 	var picks: Array[String] = []
@@ -735,6 +756,7 @@ func _rebuild_perk_dropdown() -> void:
 	_perk_in.add_item("— choose starting perk —")
 	_perk_id_by_idx[0] = ""
 	_perk_stat_by_idx[0] = ""
+	_perk_name_by_idx[0] = ""
 
 	var idx: int = 1
 	for j in range(offers.size()):
@@ -749,6 +771,7 @@ func _rebuild_perk_dropdown() -> void:
 		_perk_in.add_item(line)
 		_perk_id_by_idx[idx] = String(it.get("id",""))
 		_perk_stat_by_idx[idx] = String(it.get("stat",""))
+		_perk_name_by_idx[idx] = String(it.get("name","Perk"))
 		idx += 1
 
 	_perk_in.select(0)
@@ -902,6 +925,12 @@ func _chosen_perk_id() -> String:
 	var sel: int = _perk_in.get_selected()
 	return String(_perk_id_by_idx.get(sel, ""))
 
+func _chosen_perk_name() -> String:
+	if _perk_in == null:
+		return ""
+	var sel: int = _perk_in.get_selected()
+	return String(_perk_name_by_idx.get(sel, ""))
+
 func _update_confirm_enabled() -> void:
 	if _confirm_btn == null: return
 	var ready_stats: bool = (_selected_order.size() == 3)
@@ -949,8 +978,8 @@ func _setup_cinematic() -> void:
 	dialogue_container.anchor_bottom = 0.5
 	dialogue_container.offset_left = -400
 	dialogue_container.offset_right = 400
-	dialogue_container.offset_top = -50
-	dialogue_container.offset_bottom = 50
+	dialogue_container.offset_top = -30
+	dialogue_container.offset_bottom = 70
 	dialogue_container.add_theme_constant_override("separation", 10)
 	cinematic_layer.add_child(dialogue_container)
 
@@ -1104,6 +1133,28 @@ func _input(event: InputEvent) -> void:
 	if not cinematic_active:
 		return
 
+	# Input cooldown to prevent touchy controls
+	var current_time = Time.get_ticks_msec() / 1000.0
+	if current_time - last_input_time < INPUT_COOLDOWN:
+		return
+
+	# Only check for actual input events that we care about
+	var is_relevant_input = false
+	if event.is_action_pressed("ui_accept") or event.is_action_pressed("ui_cancel") or \
+	   event.is_action_pressed("ui_up") or event.is_action_pressed("ui_down") or \
+	   event.is_action_pressed("ui_left") or event.is_action_pressed("ui_right") or \
+	   event.is_action_pressed("move_up") or event.is_action_pressed("move_down") or \
+	   event.is_action_pressed("move_left") or event.is_action_pressed("move_right") or \
+	   event.is_action_pressed("menu_accept") or \
+	   (event is InputEventJoypadButton and event.pressed):
+		is_relevant_input = true
+
+	if not is_relevant_input:
+		return
+
+	# Update last input time
+	last_input_time = current_time
+
 	# Handle keyboard navigation when keyboard is visible
 	if current_stage == CinematicStage.NAME_INPUT and keyboard_container:
 		if event.is_action_pressed("ui_up"):
@@ -1125,6 +1176,21 @@ func _input(event: InputEvent) -> void:
 		elif event.is_action_pressed("ui_accept"):
 			get_viewport().set_input_as_handled()
 			_handle_keyboard_accept()
+			return
+		# B button (ui_cancel) for backspace - or go back if text is empty
+		elif event.is_action_pressed("ui_cancel") or (event is InputEventJoypadButton and event.pressed and event.button_index == JOY_BUTTON_B):
+			get_viewport().set_input_as_handled()
+			_handle_keyboard_backspace_or_back()
+			return
+		# R1 button (JOY_BUTTON_R) to toggle uppercase/lowercase
+		elif event is InputEventJoypadButton and event.pressed and event.button_index == JOY_BUTTON_RIGHT_SHOULDER:
+			get_viewport().set_input_as_handled()
+			_toggle_keyboard_case()
+			return
+		# X button (JOY_BUTTON_X) to accept name directly
+		elif event is InputEventJoypadButton and event.pressed and event.button_index == JOY_BUTTON_X:
+			get_viewport().set_input_as_handled()
+			_on_keyboard_accept_pressed()
 			return
 		elif event is InputEventJoypadButton and event.pressed:
 			get_viewport().set_input_as_handled()
@@ -1235,18 +1301,18 @@ func _enter_stage(stage: CinematicStage) -> void:
 
 	match stage:
 		CinematicStage.OPENING_DIALOGUE_1:
-			_start_typing("Oh, I think they are regaining consciousness..")
+			_start_typing("Doctor! There's a reading!")
 		CinematicStage.OPENING_DIALOGUE_2:
-			_start_typing("Check if they are aware.")
+			_start_typing("Is the patient aware?")
 		CinematicStage.OPENING_DIALOGUE_3:
 			_start_typing("Hey, do you remember your name?")
 		CinematicStage.NAME_INPUT:
 			_build_name_input_ui()
 		CinematicStage.DIALOGUE_RESPONSE_1:
 			dialogue_label.text = ""
-			_start_typing("They are speaking!")
+			_start_typing("We got a response!")
 		CinematicStage.DIALOGUE_RESPONSE_2:
-			_start_typing("Nurse, go check their vitals and reflexes.")
+			_start_typing("Wonderful, how are the vitals?")
 		CinematicStage.STAT_SELECTION:
 			_build_stat_selection_ui()
 		CinematicStage.PERK_QUESTION:
@@ -1278,7 +1344,13 @@ func _advance_stage() -> void:
 	_enter_stage(next_stage)
 
 func _complete_cinematic() -> void:
-	"""Complete the cinematic and save character"""
+	"""Complete the cinematic and save character with fade transition"""
+	# Fade to black using TransitionManager
+	var transition_manager = get_node_or_null("/root/aTransitionManager")
+	if transition_manager and transition_manager.has_method("fade_out"):
+		transition_manager.fade_out(0.5)
+		await transition_manager.transition_finished
+
 	# Restore ControllerManager context to OVERWORLD
 	var controller_manager = get_node_or_null("/root/aControllerManager")
 	if controller_manager:
@@ -1286,6 +1358,8 @@ func _complete_cinematic() -> void:
 		print("[CharacterCreation] Restored ControllerManager context to OVERWORLD")
 
 	cinematic_active = false
+	# Apply character creation and transition to main scene
+	# Note: The router will handle the scene change, so we don't fade in here
 	_apply_character_creation()
 
 # ── Name Input UI ────────────────────────────────────────────────────────────
@@ -1415,6 +1489,7 @@ func _show_keyboard() -> void:
 	keyboard_focused_row = 0
 	keyboard_focused_col = 0
 	keyboard_buttons.clear()
+	keyboard_uppercase = true  # Always start in uppercase mode
 
 	# Create keyboard container
 	keyboard_container = VBoxContainer.new()
@@ -1431,45 +1506,86 @@ func _show_keyboard() -> void:
 	current_text_label.add_theme_color_override("font_color", Color(1.0, 0.7, 0.75, 1.0))
 	keyboard_container.add_child(current_text_label)
 
-	# Letter grid (9 columns, 4 rows for uppercase and lowercase)
+	# Keyboard with shift indicator container
+	var keyboard_row = HBoxContainer.new()
+	keyboard_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	keyboard_row.add_theme_constant_override("separation", 15)
+	keyboard_container.add_child(keyboard_row)
+
+	# Letter grid (QWERTY layout: 10 columns for row 1, 9 for row 2, 7 for row 3)
 	var letter_grid = GridContainer.new()
 	letter_grid.columns = keyboard_grid_cols
 	letter_grid.add_theme_constant_override("h_separation", 3)
 	letter_grid.add_theme_constant_override("v_separation", 3)
-	keyboard_container.add_child(letter_grid)
+	keyboard_row.add_child(letter_grid)
 
-	# Uppercase letters (A-Z split across 3 rows of 9)
-	var uppercase = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-	for i in range(uppercase.length()):
-		var letter = uppercase[i]
-		var btn = _create_keyboard_button(letter, Vector2(40, 40))
-		btn.pressed.connect(_on_keyboard_letter_pressed.bind(letter))
-		letter_grid.add_child(btn)
-		keyboard_buttons.append({"button": btn, "value": letter, "type": "letter"})
+	# QWERTY layout rows
+	var qwerty_rows = [
+		"QWERTYUIOP",  # Row 1 (10 keys)
+		"ASDFGHJKL",   # Row 2 (9 keys)
+		"ZXCVBNM"      # Row 3 (7 keys)
+	]
 
-	# Add padding buttons to fill the grid (27 letters, need 36 for 4 rows of 9)
-	for i in range(9):  # 9 more buttons to reach 36
-		if i < 1:  # First button is spacer
+	# Build keyboard with current case
+	for row_idx in range(qwerty_rows.size()):
+		var row = qwerty_rows[row_idx]
+
+		# Add spacers for centering rows 2 and 3
+		if row_idx == 1:
+			# Center row 2 (9 keys) - add 0.5 spacer on left
+			var spacer = Control.new()
+			spacer.custom_minimum_size = Vector2(20, 40)
+			letter_grid.add_child(spacer)
+		elif row_idx == 2:
+			# Center row 3 (7 keys) - add 1.5 spacers on left
+			for i in range(2):
+				var spacer = Control.new()
+				spacer.custom_minimum_size = Vector2(30 if i == 0 else 20, 40)
+				letter_grid.add_child(spacer)
+
+		# Add letter buttons
+		for i in range(row.length()):
+			var letter = row[i] if keyboard_uppercase else row[i].to_lower()
+			var btn = _create_keyboard_button(letter, Vector2(40, 40))
+			btn.pressed.connect(_on_keyboard_letter_pressed.bind(letter))
+			letter_grid.add_child(btn)
+			# Store row and column position within that row
+			keyboard_buttons.append({
+				"button": btn,
+				"value": letter,
+				"type": "letter",
+				"base_char": row[i],
+				"row": row_idx,
+				"col": i
+			})
+
+		# Add spacers to complete the row
+		var keys_in_row = row.length()
+		var spacers_before = 0 if row_idx == 0 else (1 if row_idx == 1 else 2)
+		var spacers_after = keyboard_grid_cols - keys_in_row - spacers_before
+		for i in range(spacers_after):
 			var spacer = Control.new()
 			spacer.custom_minimum_size = Vector2(40, 40)
 			letter_grid.add_child(spacer)
-		else:  # Rest are lowercase letters
-			var lowercase_start = i - 1
-			if lowercase_start < 26:
-				var letter = uppercase[lowercase_start].to_lower()
-				var btn = _create_keyboard_button(letter, Vector2(40, 40))
-				btn.pressed.connect(_on_keyboard_letter_pressed.bind(letter))
-				letter_grid.add_child(btn)
-				keyboard_buttons.append({"button": btn, "value": letter, "type": "letter"})
 
-	# Add remaining lowercase letters
-	var lowercase_remaining = "hijklmnopqrstuvwxyz"
-	for i in range(lowercase_remaining.length()):
-		var letter = lowercase_remaining[i]
-		var btn = _create_keyboard_button(letter, Vector2(40, 40))
-		btn.pressed.connect(_on_keyboard_letter_pressed.bind(letter))
-		letter_grid.add_child(btn)
-		keyboard_buttons.append({"button": btn, "value": letter, "type": "letter"})
+	# Shift indicator panel (to the right of keyboard)
+	var shift_panel = VBoxContainer.new()
+	shift_panel.add_theme_constant_override("separation", 5)
+	keyboard_row.add_child(shift_panel)
+
+	var shift_label = Label.new()
+	shift_label.text = "Shift"
+	shift_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	shift_label.add_theme_font_size_override("font_size", 12)
+	shift_label.add_theme_color_override("font_color", Color(0.8, 0.8, 0.8, 1.0))
+	shift_panel.add_child(shift_label)
+
+	var r1_label = Label.new()
+	r1_label.text = "[R1]"
+	r1_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	r1_label.add_theme_font_size_override("font_size", 14)
+	r1_label.add_theme_color_override("font_color", Color(1.0, 0.7, 0.75, 1.0))
+	shift_panel.add_child(r1_label)
 
 	# Bottom row with Backspace and Accept (centered)
 	var bottom_row = HBoxContainer.new()
@@ -1480,12 +1596,12 @@ func _show_keyboard() -> void:
 	var backspace_btn = _create_keyboard_button("⌫ Backspace", Vector2(150, 50))
 	backspace_btn.pressed.connect(_on_keyboard_backspace_pressed)
 	bottom_row.add_child(backspace_btn)
-	keyboard_buttons.append({"button": backspace_btn, "value": "BACKSPACE", "type": "action"})
+	keyboard_buttons.append({"button": backspace_btn, "value": "BACKSPACE", "type": "action", "row": 3, "col": 0})
 
-	var accept_btn = _create_keyboard_button("✓ Accept", Vector2(150, 50))
+	var accept_btn = _create_keyboard_button("✓ Accept [X]", Vector2(150, 50))
 	accept_btn.pressed.connect(_on_keyboard_accept_pressed)
 	bottom_row.add_child(accept_btn)
-	keyboard_buttons.append({"button": accept_btn, "value": "ACCEPT", "type": "action"})
+	keyboard_buttons.append({"button": accept_btn, "value": "ACCEPT", "type": "action", "row": 3, "col": 1})
 
 	# Set initial focus
 	_update_keyboard_focus()
@@ -1498,56 +1614,46 @@ func _create_keyboard_button(text: String, btn_size: Vector2) -> Button:
 	btn.add_theme_font_size_override("font_size", 14)
 	return btn
 
-func _handle_keyboard_navigation(dx: int, dy: int) -> void:
-	"""Handle directional navigation on keyboard"""
-	# Calculate total rows (letters in grid + action row)
-	var letter_button_count = 0
+func _toggle_keyboard_case() -> void:
+	"""Toggle between uppercase and lowercase keyboard"""
+	keyboard_uppercase = !keyboard_uppercase
+
+	# Update all letter buttons
 	for kb in keyboard_buttons:
 		if kb["type"] == "letter":
-			letter_button_count += 1
+			var base_char = kb["base_char"]
+			var new_char = base_char if keyboard_uppercase else base_char.to_lower()
+			kb["button"].text = new_char
+			kb["value"] = new_char
 
-	var letter_rows = ceil(float(letter_button_count) / float(keyboard_grid_cols))
-	var total_rows = int(letter_rows) + 1  # +1 for action row
+func _handle_keyboard_navigation(dx: int, dy: int) -> void:
+	"""Handle directional navigation on keyboard with proper QWERTY layout"""
+	# QWERTY row lengths
+	var row_lengths = [10, 9, 7, 2]  # Rows 0-2 are letters, row 3 is action buttons
 
 	if dy != 0:  # Vertical movement
 		var new_row = keyboard_focused_row + dy
-		new_row = clamp(new_row, 0, total_rows - 1)
+		new_row = clamp(new_row, 0, 3)  # 4 total rows (0-3)
 		keyboard_focused_row = new_row
 
-		# Adjust column if needed
-		if keyboard_focused_row < letter_rows:
-			# In letter grid
-			keyboard_focused_col = clamp(keyboard_focused_col, 0, keyboard_grid_cols - 1)
-		else:
-			# In action row (only 2 buttons)
-			keyboard_focused_col = clamp(keyboard_focused_col, 0, 1)
+		# Adjust column to stay within new row's bounds
+		var max_col = row_lengths[keyboard_focused_row] - 1
+		keyboard_focused_col = clamp(keyboard_focused_col, 0, max_col)
 
 	if dx != 0:  # Horizontal movement
-		if keyboard_focused_row < letter_rows:
-			# In letter grid
-			keyboard_focused_col += dx
-			keyboard_focused_col = wrapi(keyboard_focused_col, 0, keyboard_grid_cols)
-		else:
-			# In action row
-			keyboard_focused_col += dx
-			keyboard_focused_col = wrapi(keyboard_focused_col, 0, 2)
+		keyboard_focused_col += dx
+		var max_col = row_lengths[keyboard_focused_row] - 1
+		keyboard_focused_col = wrapi(keyboard_focused_col, 0, row_lengths[keyboard_focused_row])
 
 	_update_keyboard_focus()
 
 func _get_keyboard_linear_index() -> int:
-	"""Get the linear index of currently focused keyboard button"""
-	var letter_button_count = 0
-	for kb in keyboard_buttons:
-		if kb["type"] == "letter":
-			letter_button_count += 1
-
-	var letter_rows = ceil(float(letter_button_count) / float(keyboard_grid_cols))
-
-	if keyboard_focused_row < letter_rows:
-		return keyboard_focused_row * keyboard_grid_cols + keyboard_focused_col
-	else:
-		# Action row
-		return letter_button_count + keyboard_focused_col
+	"""Get the linear index of currently focused keyboard button by matching row/col"""
+	for i in range(keyboard_buttons.size()):
+		var kb = keyboard_buttons[i]
+		if kb.get("row", -1) == keyboard_focused_row and kb.get("col", -1) == keyboard_focused_col:
+			return i
+	return 0  # Fallback to first button
 
 func _update_keyboard_focus() -> void:
 	"""Update visual focus on keyboard"""
@@ -1590,6 +1696,42 @@ func _on_keyboard_backspace_pressed() -> void:
 	if current_name_text.length() > 0:
 		current_name_text = current_name_text.substr(0, current_name_text.length() - 1)
 		_update_keyboard_display()
+
+func _handle_keyboard_backspace_or_back() -> void:
+	"""Handle B button: backspace if text exists, go back to field selection if empty"""
+	if current_name_text.length() > 0:
+		# There's text, do backspace
+		_on_keyboard_backspace_pressed()
+	else:
+		# No text, go back to previous field selection
+		# Hide keyboard
+		if keyboard_container:
+			keyboard_container.queue_free()
+			keyboard_container = null
+
+		# Reset current_name_text
+		current_name_text = ""
+
+		# Go back to field selection based on current stage
+		match name_input_stage:
+			1:  # Was entering first name, go back to first name field selection
+				name_input_stage = 0
+				_update_name_field_selection(false)  # Select first name field
+				# Show instruction again
+				var instruction = name_input_container.get_node_or_null("InstructionLabel")
+				if instruction:
+					instruction.visible = true
+					instruction.text = "Press Accept to enter first name"
+				print("[Name Input] Cancelled first name entry, back to field selection")
+			3:  # Was entering last name, go back to last name field selection
+				name_input_stage = 2
+				_update_name_field_selection(true)  # Select last name field
+				# Show instruction again
+				var instruction = name_input_container.get_node_or_null("InstructionLabel")
+				if instruction:
+					instruction.visible = true
+					instruction.text = "Press Accept to enter last name"
+				print("[Name Input] Cancelled last name entry, back to field selection")
 
 func _update_keyboard_display() -> void:
 	"""Update the keyboard's current text display"""
@@ -1728,11 +1870,11 @@ func _build_stat_selection_ui() -> void:
 
 	# Stat names and descriptions
 	var stats = [
-		{"name": "BRAWN", "id": "BRW", "desc": "Physical attack power and weapon damage"},
-		{"name": "VITALITY", "id": "VTL", "desc": "Maximum health and physical defense"},
-		{"name": "TEMPO", "id": "TPO", "desc": "Initiative and action speed"},
-		{"name": "MIND", "id": "MND", "desc": "Sigil power and skill damage"},
-		{"name": "FOCUS", "id": "FCS", "desc": "Maximum MP and skill accuracy"}
+		{"name": "BRAWN", "id": "BRW", "desc": "(Physical Power) Increases weapon damage and affects strength checks."},
+		{"name": "VITALITY", "id": "VTL", "desc": "(Toughness & Stamina) Raises health points and reduces incoming physical damage."},
+		{"name": "TEMPO", "id": "TPO", "desc": "(Speed & Timing) Drives initiative and improves physical accuracy"},
+		{"name": "MIND", "id": "MND", "desc": "(Skill Power) Increases skill damage and affects knowledge checks."},
+		{"name": "FOCUS", "id": "FCS", "desc": "(Discipline & Guard) Raises mind points and reduces skill damage."}
 	]
 
 	# Create stat toggle buttons
@@ -2121,15 +2263,15 @@ func _show_next_nurse_response() -> void:
 	var is_selected = _selected_order.has(stat_id)
 
 	var responses_positive = {
-		"BRW": "They have a strong grip!",
-		"VTL": "I'm surprised with how fast they heal.",
+		"BRW": "Grip strength is amazing!",
+		"VTL": "Wounds are healing incredibly fast.",
 		"TPO": "Reflexes check out great.",
 		"MND": "The EEG test shows massive neural activity!",
 		"FCS": "The auditory test shows superb focus."
 	}
 
 	var responses_negative = {
-		"BRW": "Their grip is still a bit weak.",
+		"BRW": "Grip strength is still weak.",
 		"VTL": "Some of these wounds still haven't healed.",
 		"TPO": "Reflexes seem out of sync.",
 		"MND": "The EEG indicates recovering neural activity.",
@@ -2212,17 +2354,18 @@ func _build_customization_ui() -> void:
 	var body_selector = _create_cycle_selector("body", _body_in)
 	_add_customization_cycle(options, "Skin Tone:", body_selector)
 
-	var underwear_selector = _create_cycle_selector("underwear", _underwear_in)
-	_add_customization_cycle(options, "Underwear:", underwear_selector)
-
-	# Underwear preview toggle
+	# Underwear preview toggle (placed before Underwear selector)
 	var underwear_preview_toggle = CheckButton.new()
 	underwear_preview_toggle.text = "Preview Underwear"
 	underwear_preview_toggle.add_theme_font_size_override("font_size", 12)
 	underwear_preview_toggle.focus_mode = Control.FOCUS_ALL
+	underwear_preview_toggle.button_pressed = true  # Toggled on by default
 	underwear_preview_toggle.toggled.connect(_on_underwear_preview_toggled)
 	options.add_child(underwear_preview_toggle)
 	customization_container.set_meta("underwear_preview_toggle", underwear_preview_toggle)
+
+	var underwear_selector = _create_cycle_selector("underwear", _underwear_in)
+	_add_customization_cycle(options, "Underwear:", underwear_selector)
 
 	var outfit_selector = _create_cycle_selector("outfit", _outfit_in)
 	_add_customization_cycle(options, "Outfit:", outfit_selector)
@@ -2244,13 +2387,17 @@ func _build_customization_ui() -> void:
 	_update_hair_color_options("")
 
 	# Store selector references for focus navigation
-	var selectors = [pronoun_selector, body_selector, underwear_selector, underwear_preview_toggle, outfit_selector, outfit_style_selector, hair_type_selector, hair_color_selector]
+	var selectors = [pronoun_selector, body_selector, underwear_preview_toggle, underwear_selector, outfit_selector, outfit_style_selector, hair_type_selector, hair_color_selector]
 	customization_container.set_meta("selectors", selectors)
 
-	# Right: Character Preview
+	# Right: Character Preview (shifted right by 50px)
+	var preview_wrapper = MarginContainer.new()
+	preview_wrapper.add_theme_constant_override("margin_left", 50)
+	main.add_child(preview_wrapper)
+
 	var preview_panel = _create_styled_panel()
 	preview_panel.custom_minimum_size = Vector2(500, 500)
-	main.add_child(preview_panel)
+	preview_wrapper.add_child(preview_panel)
 
 	var preview_container = VBoxContainer.new()
 	preview_panel.add_child(preview_container)
@@ -2280,10 +2427,10 @@ func _build_customization_ui() -> void:
 		character_layers.scale = Vector2(5, 5)  # 500% scale for better visibility
 		print("[Customization] Character preview reparented and visible")
 
-	# Accept button
+	# Accept button (center bottom, shifted left 50px)
 	var accept_btn = Button.new()
 	accept_btn.text = "Accept"
-	accept_btn.position = Vector2(0, -60)
+	accept_btn.position = Vector2(50, -60)
 	accept_btn.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
 	accept_btn.anchor_top = 1.0
 	accept_btn.anchor_bottom = 1.0
@@ -2605,6 +2752,66 @@ func _build_confirmation_ui() -> void:
 	confirmation_container.set_anchors_preset(Control.PRESET_FULL_RECT)
 	cinematic_layer.add_child(confirmation_container)
 
+	# Create summary panel
+	var summary_panel = VBoxContainer.new()
+	summary_panel.set_anchors_preset(Control.PRESET_CENTER)
+	summary_panel.anchor_left = 0.5
+	summary_panel.anchor_top = 0.35
+	summary_panel.anchor_right = 0.5
+	summary_panel.anchor_bottom = 0.35
+	summary_panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	summary_panel.grow_vertical = Control.GROW_DIRECTION_BOTH
+	summary_panel.add_theme_constant_override("separation", 8)
+	confirmation_container.add_child(summary_panel)
+
+	# Add summary title
+	var title = Label.new()
+	title.text = "Your Choices:"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 18)
+	title.add_theme_color_override("font_color", Color(1.0, 0.7, 0.75, 1.0))
+	summary_panel.add_child(title)
+
+	# Add name
+	var name_label = Label.new()
+	name_label.text = "Name: %s %s" % [cinematic_name, cinematic_surname]
+	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	name_label.add_theme_font_size_override("font_size", 14)
+	summary_panel.add_child(name_label)
+
+	# Add stats
+	var stats_text = "Stats: "
+	var stat_names = {"BRW": "BRAWN", "VTL": "VITALITY", "TPO": "TEMPO", "MND": "MIND", "FCS": "FOCUS"}
+	for i in range(_selected_order.size()):
+		if i > 0:
+			stats_text += ", "
+		var stat_id = _selected_order[i]
+		stats_text += stat_names.get(stat_id, stat_id)
+	var stats_label = Label.new()
+	stats_label.text = stats_text
+	stats_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	stats_label.add_theme_font_size_override("font_size", 14)
+	summary_panel.add_child(stats_label)
+
+	# Add perk
+	var perk_name = _chosen_perk_name()
+	var perk_label = Label.new()
+	perk_label.text = "Perk: %s" % perk_name if perk_name != "" else "Perk: None"
+	perk_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	perk_label.add_theme_font_size_override("font_size", 14)
+	summary_panel.add_child(perk_label)
+
+	# Add appearance summary
+	var pronoun_text = ""
+	if _pron_in:
+		var idx = _pron_in.get_selected()
+		pronoun_text = _pron_in.get_item_text(idx) if idx >= 0 else "they"
+	var appearance_label = Label.new()
+	appearance_label.text = "Pronouns: %s" % pronoun_text
+	appearance_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	appearance_label.add_theme_font_size_override("font_size", 14)
+	summary_panel.add_child(appearance_label)
+
 	# Yes/No buttons
 	var buttons = HBoxContainer.new()
 	buttons.set_anchors_preset(Control.PRESET_CENTER)
@@ -2653,8 +2860,14 @@ func _build_confirmation_ui() -> void:
 	)
 
 func _on_confirmation_yes() -> void:
-	"""Handle Yes - proceed with character creation"""
-	_advance_stage()  # Go to COMPLETE
+	"""Handle Yes - proceed with character creation with fade out"""
+	# Fade out the confirmation UI
+	if confirmation_container:
+		var tween = create_tween()
+		tween.tween_property(confirmation_container, "modulate", Color(1, 1, 1, 0), 0.5)
+		tween.tween_callback(func():
+			_advance_stage()  # Go to COMPLETE after fade out
+		)
 
 func _on_confirmation_no() -> void:
 	"""Handle No - restart character creation with interactive sections (no nurse dialogue)"""

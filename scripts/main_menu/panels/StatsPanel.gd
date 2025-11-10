@@ -264,23 +264,51 @@ func _rebuild_battle_stats(token: String) -> void:
 	var defense: Dictionary = profile.get("defense", {})
 	var stats: Dictionary = profile.get("stats", {})
 
-	# S ATK = MND + skill_acc_boost
-	var mnd: int = stats.get("MND", 0)
+	# Get core stats for calculations
+	var brw: int = stats.get("BRW", 1)
+	var mnd: int = stats.get("MND", 1)
+	var tpo: int = stats.get("TPO", 1)
+	var vtl: int = stats.get("VTL", 1)
+	var fcs: int = stats.get("FCS", 1)
+
+	# Calculate derived stats with new formulas
 	var skill_boost: int = weapon.get("skill_acc_boost", 0)
 	var s_atk: int = mnd + skill_boost
 
+	# Accuracy: Base + TPO×2.0 (each TPO point adds 0.20 percentage points)
+	var weapon_acc: int = weapon.get("accuracy", 0)
+	var tpo_acc_bonus: float = tpo * 2.0
+	var total_acc: float = weapon_acc + tpo_acc_bonus
+
+	# Crit Rate: 5% + BRW×0.5% + weapon/equipment bonuses
+	var weapon_crit: int = weapon.get("crit_bonus_pct", 0)
+	var crit_rate: float = 5.0 + (brw * 0.5) + weapon_crit
+	crit_rate = clamp(crit_rate, 5.0, 50.0)
+
+	# Ailment Power: MND×2%
+	var ailment_bonus: float = mnd * 2.0
+
+	# Evasion with stat contribution (VTL×2.0)
+	var base_eva: int = defense.get("peva", 0)
+	var vtl_eva_bonus: float = vtl * 2.0
+	var total_eva: float = base_eva + vtl_eva_bonus
+
+	# Initiative: Get TPO tier and speed bonus
+	var speed_bonus: int = defense.get("speed", 0)
+	var init_tier: int = _get_initiative_tier(tpo)
+	var init_text: String = "%s + %d" % [_get_dice_notation(init_tier), speed_bonus]
+
+	# Display stats in order: HP/MP/PATK/SATK/PDEF/SDEF/ACC/INIT/CRIT BOOST/AIL BOOST
 	_add_battle_stat(_battle_grid, "Max HP", profile.get("hp_max", 0))
 	_add_battle_stat(_battle_grid, "Max MP", profile.get("mp_max", 0))
 	_add_battle_stat(_battle_grid, "Physical Attack", weapon.get("attack", 0))
 	_add_battle_stat(_battle_grid, "Skill Attack", s_atk)
 	_add_battle_stat(_battle_grid, "Physical Defense", defense.get("pdef", 0))
 	_add_battle_stat(_battle_grid, "Skill Defense", defense.get("mdef", 0))
-	_add_battle_stat(_battle_grid, "Physical Accuracy", weapon.get("accuracy", 0))
-	_add_battle_stat(_battle_grid, "Skill Accuracy", skill_boost)
-	_add_battle_stat(_battle_grid, "Evasion", defense.get("peva", 0))
-	_add_battle_stat(_battle_grid, "Speed", defense.get("speed", 0))
-	_add_battle_stat(_battle_grid, "Ailment Resistance", defense.get("ail_resist_pct", 0))
-	_add_battle_stat(_battle_grid, "Critical Rate", weapon.get("crit_bonus_pct", 0))
+	_add_battle_stat_float(_battle_grid, "Accuracy", total_acc, "%.1f%%")
+	_add_battle_stat_string(_battle_grid, "Initiative", init_text)
+	_add_battle_stat_float(_battle_grid, "Crit Boost", crit_rate, "+%.1f%%")
+	_add_battle_stat_float(_battle_grid, "Ailment Boost", ailment_bonus, "+%.0f%%")
 
 func _rebuild_affinity_grid(token: String) -> void:
 	"""Build affinity grid showing relationships with all party members"""
@@ -432,10 +460,41 @@ func _add_stat_pair(grid: GridContainer, label: String, value: String) -> void:
 
 func _add_battle_stat(grid: GridContainer, label: String, value: int) -> void:
 	"""Add a battle stat as a rounded grey cell (matches LoadoutPanel style)"""
+	var cell = _create_stat_cell(label, str(value))
+	grid.add_child(cell)
+
+func _add_battle_stat_float(grid: GridContainer, label: String, value: float, format: String = "%.1f") -> void:
+	"""Add a battle stat with float value and custom formatting"""
+	var formatted_value: String = format % value
+	var cell = _create_stat_cell(label, formatted_value)
+	grid.add_child(cell)
+
+func _add_battle_stat_string(grid: GridContainer, label: String, value: String) -> void:
+	"""Add a battle stat with string value"""
 	var cell = _create_stat_cell(label, value)
 	grid.add_child(cell)
 
-func _create_stat_cell(stat_label: String, value: int) -> PanelContainer:
+func _get_initiative_tier(tpo: int) -> int:
+	"""Get initiative tier based on TPO value (1-4)"""
+	if tpo <= 3:
+		return 1
+	elif tpo <= 6:
+		return 2
+	elif tpo <= 9:
+		return 3
+	else:
+		return 4
+
+func _get_dice_notation(tier: int) -> String:
+	"""Get dice notation for initiative tier"""
+	match tier:
+		1: return "1D20"
+		2: return "2D20"
+		3: return "3D20"
+		4: return "4D20"
+		_: return "1D20"
+
+func _create_stat_cell(stat_label: String, value: String) -> PanelContainer:
 	"""Create a rounded grey cell containing a stat label and value"""
 	var panel := PanelContainer.new()
 	panel.custom_minimum_size = Vector2(0, 30)
@@ -473,7 +532,7 @@ func _create_stat_cell(stat_label: String, value: int) -> PanelContainer:
 
 	# Value - 5 characters wide, blue color
 	var value_label := Label.new()
-	value_label.text = str(value)
+	value_label.text = value
 	value_label.custom_minimum_size = Vector2(30, 0)  # ~5 characters at 12pt
 	value_label.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	value_label.add_theme_font_size_override("font_size", 12)

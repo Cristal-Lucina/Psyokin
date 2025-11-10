@@ -1394,9 +1394,9 @@ func _execute_attack(target: Dictionary) -> void:
 			print("[Battle] Hit! Chance: %.1f%% (ACC %.1f - EVA %.1f), Roll: %d" % [
 				hit_check.hit_chance, hit_breakdown.hit_percent, hit_breakdown.eva_percent, hit_check.roll
 			])
-			print("[Battle] Crit: %s | Chance: %.1f%% (Base %.1f + TPO %.1f + Weapon %d), Roll: %d" % [
+			print("[Battle] Crit: %s | Chance: %.1f%% (Base %.1f + BRW %.1f + Weapon %d), Roll: %d, Mult: %.2fx" % [
 				"YES" if is_crit else "NO", crit_check.crit_chance, crit_breakdown.base,
-				crit_breakdown.tpo_bonus, crit_breakdown.weapon_bonus, crit_check.roll
+				crit_breakdown.brw_bonus, crit_breakdown.weapon_bonus, crit_check.roll, crit_breakdown.crit_mult
 			])
 			print("[Battle] Type: %s vs %s = %.2fx (%s)" % [
 				current_combatant.get("mind_type", "none"),
@@ -2741,9 +2741,9 @@ func _execute_enemy_ai() -> void:
 			print("[Battle] Enemy Hit! Chance: %.1f%% (ACC %.1f - EVA %.1f), Roll: %d" % [
 				hit_check.hit_chance, hit_breakdown.hit_percent, hit_breakdown.eva_percent, hit_check.roll
 			])
-			print("[Battle] Enemy Crit: %s | Chance: %.1f%% (Base %.1f + TPO %.1f + Weapon %d), Roll: %d" % [
+			print("[Battle] Enemy Crit: %s | Chance: %.1f%% (Base %.1f + BRW %.1f + Weapon %d), Roll: %d, Mult: %.2fx" % [
 				"YES" if is_crit else "NO", crit_check.crit_chance, crit_breakdown.base,
-				crit_breakdown.tpo_bonus, crit_breakdown.weapon_bonus, crit_check.roll
+				crit_breakdown.brw_bonus, crit_breakdown.weapon_bonus, crit_check.roll, crit_breakdown.crit_mult
 			])
 			print("[Battle] Enemy Damage: PreMit=%.1f, AtkPower=%.1f, Raw=%.1f, Final=%d (Min=%d)" % [
 				dmg_breakdown.pre_mit, dmg_breakdown.atk_power, dmg_breakdown.raw, damage, dmg_breakdown.min_damage

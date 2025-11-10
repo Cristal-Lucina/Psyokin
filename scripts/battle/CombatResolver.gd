@@ -31,9 +31,10 @@ const HIT_EVA_MAX: float = 95.0  # Maximum 95% hit chance
 
 ## Crit chance constants
 const BASE_CRIT_CHANCE: float = 5.0   # Base 5% crit chance
-const TPO_CRIT_MODIFIER: float = 0.15 # +0.15% per TPO point
-const CRIT_MIN: float = 0.0           # Minimum 0% crit chance
-const CRIT_MAX: float = 95.0          # Maximum 95% crit chance
+const BRW_CRIT_MODIFIER: float = 0.5  # +0.5% per BRW point
+const BRW_CRIT_DAMAGE_BONUS: float = 0.1  # +0.1× per BRW point (base 1.5×)
+const CRIT_MIN: float = 5.0           # Minimum 5% crit chance
+const CRIT_MAX: float = 50.0          # Maximum 50% crit chance
 
 ## ═══════════════════════════════════════════════════════════════
 ## BUFF/DEBUFF HELPERS
@@ -143,7 +144,7 @@ func check_physical_hit(attacker: Dictionary, defender: Dictionary, _options: Di
 	var tpo = attacker.stats.get("TPO", 1)
 
 	# Calculate hit%
-	var hit_percent = base_acc + (0.25 * tpo)
+	var hit_percent = base_acc + (0.20 * tpo)
 
 	# Apply physical accuracy buffs (Eye Drops, etc.)
 	var acc_buff = _get_buff_modifier(attacker, "phys_acc")
@@ -156,8 +157,8 @@ func check_physical_hit(attacker: Dictionary, defender: Dictionary, _options: Di
 	# Get defender VTL (for physical evasion)
 	var vtl = defender.stats.get("VTL", 1)
 
-	# Calculate eva% (reduced from 0.25 to 0.15 for better hit rates)
-	var eva_percent = base_eva + (0.15 * vtl)
+	# Calculate eva%
+	var eva_percent = base_eva + (0.20 * vtl)
 
 	# Apply evasion buffs (Hyper Chews, etc.)
 	var eva_buff = _get_buff_modifier(defender, "evasion")
@@ -211,7 +212,7 @@ func check_sigil_hit(attacker: Dictionary, defender: Dictionary, options: Dictio
 	var tpo = attacker.stats.get("TPO", 1)
 
 	# Calculate hit%
-	var hit_percent = skill_acc + weapon_skill_boost + (0.25 * tpo)
+	var hit_percent = skill_acc + weapon_skill_boost + (0.20 * tpo)
 
 	# Apply mind/skill accuracy buffs (Focus Tonic, etc.)
 	var mind_acc_buff = _get_buff_modifier(attacker, "mind_acc")
@@ -224,8 +225,8 @@ func check_sigil_hit(attacker: Dictionary, defender: Dictionary, options: Dictio
 	# Get defender FCS (for sigil evasion)
 	var fcs = defender.stats.get("FCS", 1)
 
-	# Calculate eva% (reduced from 0.25 to 0.15 for better hit rates)
-	var eva_percent = base_eva + (0.15 * fcs)
+	# Calculate eva%
+	var eva_percent = base_eva + (0.20 * fcs)
 
 	# Apply evasion buffs (Hyper Chews, etc.)
 	var eva_buff = _get_buff_modifier(defender, "evasion")
@@ -263,8 +264,8 @@ func check_critical_hit(attacker: Dictionary, options: Dictionary = {}) -> Dicti
 	Check if an attack should critically hit
 
 	Formula:
-	  CritChance = Base(5%) + TPO×0.15% + WeaponCritBonus% + SkillCritBonus% + WandVuln%
-	  Clamped to [0%, 95%]
+	  CritChance = Base(5%) + BRW×0.5% + WeaponCritBonus% + SkillCritBonus% + WandVuln%
+	  Clamped to [5%, 50%]
 
 	Args:
 	  - attacker: Combatant dictionary with id and stats
@@ -276,12 +277,13 @@ func check_critical_hit(attacker: Dictionary, options: Dictionary = {}) -> Dicti
 	Returns:
 	  - crit: bool (whether it's a critical hit)
 	  - crit_chance: float (final crit chance %)
+	  - crit_multiplier: float (damage multiplier on crit, 1.5 + BRW×0.1)
 	  - roll: int (d100 roll)
 	  - breakdown: Dictionary (for debugging)
 	"""
 
-	# Get TPO stat
-	var tpo: int = attacker.stats.get("TPO", 1)
+	# Get BRW stat
+	var brw: int = attacker.stats.get("BRW", 1)
 
 	# Get crit bonuses from options
 	var weapon_crit_bonus: int = options.get("weapon_crit_bonus", 0)
@@ -292,7 +294,7 @@ func check_critical_hit(attacker: Dictionary, options: Dictionary = {}) -> Dicti
 
 	# Calculate crit chance
 	var base_crit: float = BASE_CRIT_CHANCE
-	var tpo_bonus: float = tpo * TPO_CRIT_MODIFIER
+	var brw_bonus: float = brw * BRW_CRIT_MODIFIER
 	var total_bonus: float = weapon_crit_bonus + skill_crit_bonus
 
 	# Apply wand vulnerability (10% more crit chance if defender uses wand)
@@ -300,7 +302,10 @@ func check_critical_hit(attacker: Dictionary, options: Dictionary = {}) -> Dicti
 	if weapon_type_system and not defender.is_empty():
 		wand_crit_bonus = weapon_type_system.get_wand_crit_bonus(defender)
 
-	var final_crit: float = clamp(base_crit + tpo_bonus + total_bonus + wand_crit_bonus, CRIT_MIN, CRIT_MAX)
+	var final_crit: float = clamp(base_crit + brw_bonus + total_bonus + wand_crit_bonus, CRIT_MIN, CRIT_MAX)
+
+	# Calculate crit damage multiplier based on BRW
+	var crit_multiplier: float = 1.5 + (brw * BRW_CRIT_DAMAGE_BONUS)
 
 	# Roll d100
 	var roll: int = randi() % 100 + 1
@@ -309,15 +314,17 @@ func check_critical_hit(attacker: Dictionary, options: Dictionary = {}) -> Dicti
 	return {
 		"crit": is_crit,
 		"crit_chance": final_crit,
+		"crit_multiplier": crit_multiplier,
 		"roll": roll,
 		"breakdown": {
 			"base": base_crit,
-			"tpo_bonus": tpo_bonus,
-			"tpo": tpo,
+			"brw_bonus": brw_bonus,
+			"brw": brw,
 			"weapon_bonus": weapon_crit_bonus,
 			"skill_bonus": skill_crit_bonus,
 			"wand_vuln_bonus": wand_crit_bonus,
-			"total": final_crit
+			"total": final_crit,
+			"crit_mult": crit_multiplier
 		}
 	}
 
@@ -354,7 +361,7 @@ func calculate_physical_damage(attacker: Dictionary, defender: Dictionary, optio
 	# Get equipment stats
 	var attacker_weapon = _get_weapon_stats(attacker.id)
 	var base_watk: int = attacker_weapon.get("watk", 0)
-	var brw_scale: float = attacker_weapon.get("brw_scale", 0.5)
+	var brw_scale: float = attacker_weapon.get("brw_scale", 1.0)
 
 	# Get defender defense
 	var defender_armor = _get_armor_stats(defender.id)
@@ -365,9 +372,10 @@ func calculate_physical_damage(attacker: Dictionary, defender: Dictionary, optio
 	var pre_mit: float = (base_watk + brw * brw_scale) * (potency / 100.0)
 
 	# Step 2: Apply TYPE, Crit, and buffs
-	# ATK_Power = Pre × (1+TYPE) × (Crit?2:1) × (1+ATK_buffs−ATK_debuffs) × WandVuln
+	# ATK_Power = Pre × (1+TYPE) × (Crit?(1.5+BRW×0.1):1) × (1+ATK_buffs−ATK_debuffs) × WandVuln
 	var type_mult: float = 1.0 + type_bonus
-	var crit_mult: float = CRIT_MULT if is_crit else 1.0
+	# Variable crit multiplier based on BRW
+	var crit_mult: float = (1.5 + (brw * BRW_CRIT_DAMAGE_BONUS)) if is_crit else 1.0
 
 	# Get ATK buffs/debuffs from attacker
 	var atk_buff = _get_buff_modifier(attacker, "atk_up")
@@ -459,8 +467,8 @@ func calculate_sigil_damage(attacker: Dictionary, defender: Dictionary, options:
 	var multi_hit: int = options.get("multi_hit", 1)
 	var is_crit: bool = options.get("is_crit", false)
 	var type_bonus: float = options.get("type_bonus", 0.0)
-	var base_sig: int = options.get("base_sig", 30)
-	var mnd_scale: float = options.get("mnd_scale", 1.0)
+	var base_sig: int = options.get("base_sig", 40)
+	var mnd_scale: float = options.get("mnd_scale", 1.5)
 
 	# Get attacker stats
 	var mnd: int = attacker.stats.get("MND", 1)
@@ -480,7 +488,9 @@ func calculate_sigil_damage(attacker: Dictionary, defender: Dictionary, options:
 
 	# Step 2: Apply TYPE, Crit, and buffs
 	var type_mult: float = 1.0 + type_bonus
-	var crit_mult: float = CRIT_MULT if is_crit else 1.0
+	# Variable crit multiplier based on BRW (applies to skills too)
+	var brw: int = attacker.stats.get("BRW", 1)
+	var crit_mult: float = (1.5 + (brw * BRW_CRIT_DAMAGE_BONUS)) if is_crit else 1.0
 
 	# Get SKL buffs/debuffs from attacker (skills use SKL/MND buffs)
 	var skl_buff = _get_buff_modifier(attacker, "skl_up")
@@ -546,9 +556,9 @@ func _get_weapon_stats(member_id: String) -> Dictionary:
 		var weapon = equipment_system.call("get_equipped_item", member_id, "weapon")
 		if weapon:
 			return {
-				"watk": weapon.get("watk", 10),
+				"watk": weapon.get("watk", 15),
 				"sig": weapon.get("sig", 0),
-				"brw_scale": weapon.get("brw_scale", 0.5),
+				"brw_scale": weapon.get("brw_scale", 1.0),
 				"acc": weapon.get("acc", 90),
 				"skill_acc_bonus": weapon.get("skill_acc_bonus", 0),
 				"crit_bonus": weapon.get("crit_bonus_pct", 0)
@@ -556,9 +566,9 @@ func _get_weapon_stats(member_id: String) -> Dictionary:
 
 	# Default weapon stats
 	return {
-		"watk": 10,
+		"watk": 15,
 		"sig": 0,
-		"brw_scale": 0.5,
+		"brw_scale": 1.0,
 		"acc": 90,
 		"skill_acc_bonus": 0,
 		"crit_bonus": 0
@@ -613,6 +623,45 @@ func get_type_modifier(_attacker_element: String, _defender_element: String) -> 
 	# TODO: Implement type system lookup using attacker_element and defender_element
 	# For now, return neutral
 	return 0.0
+
+## ═══════════════════════════════════════════════════════════════
+## AILMENT APPLICATION (MND-based)
+## ═══════════════════════════════════════════════════════════════
+
+func calculate_ailment_chance(attacker: Dictionary, skill_base_rate: float) -> float:
+	"""
+	Calculate the chance for an ailment to be applied
+
+	Formula:
+	  Ailment_Rate% = Skill_Base_Rate + (MND × 2%)
+	  Clamped to [5%, 95%]
+
+	Args:
+	  - attacker: Attacker combatant dictionary with stats
+	  - skill_base_rate: Base ailment rate from skill data (e.g., 30.0 for 30%)
+
+	Returns:
+	  - float: Final ailment application chance (5-95%)
+	"""
+	var mnd: int = attacker.stats.get("MND", 1)
+	var mnd_bonus: float = mnd * 2.0  # +2% per MND point
+
+	var final_rate: float = clamp(skill_base_rate + mnd_bonus, HIT_EVA_MIN, HIT_EVA_MAX)
+
+	return final_rate
+
+func attempt_ailment(ailment_chance: float) -> bool:
+	"""
+	Roll to see if ailment is applied
+
+	Args:
+	  - ailment_chance: Chance % (0-100)
+
+	Returns:
+	  - bool: true if ailment applied
+	"""
+	var roll: float = randf() * 100.0  # 0.0 - 100.0
+	return roll <= ailment_chance
 
 ## ═══════════════════════════════════════════════════════════════
 ## CAPTURE MECHANICS (§4.8)

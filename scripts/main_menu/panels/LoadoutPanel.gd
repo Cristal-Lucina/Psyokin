@@ -428,13 +428,11 @@ func _get_equipment_stats(item_id: String, slot: String) -> Dictionary:
 		"weapon":
 			stats["Attack"] = int(item_def.get("base_watk", 0))
 			stats["Accuracy"] = int(item_def.get("base_acc", 0))
-			stats["Critical"] = int(item_def.get("crit_bonus_pct", 0))
+			stats["Crit Rate"] = int(item_def.get("crit_bonus_pct", 0))
 			stats["Skill Atk"] = int(item_def.get("skill_atk_boost", 0))
-			stats["Skill Acc"] = int(item_def.get("skill_acc_boost", 0))
 		"armor":
 			stats["Phys Defense"] = int(item_def.get("armor_flat", 0))
 			stats["Skill Defense"] = int(item_def.get("ward_flat", 0))
-			stats["Ail Resist"] = int(item_def.get("ail_resist_pct", 0))
 		"head":
 			stats["HP Bonus"] = int(item_def.get("max_hp_boost", 0))
 			stats["MP Bonus"] = int(item_def.get("max_mp_boost", 0))
@@ -1210,7 +1208,27 @@ func _value_cell(txt: String) -> Label:
 	l.add_theme_font_size_override("font_size", 12)
 	return l
 
-func _create_stat_cell(stat_label: String, value: int) -> PanelContainer:
+func _get_initiative_tier(tpo: int) -> int:
+	"""Get initiative tier based on TPO value (1-4)"""
+	if tpo <= 3:
+		return 1
+	elif tpo <= 6:
+		return 2
+	elif tpo <= 9:
+		return 3
+	else:
+		return 4
+
+func _get_dice_notation(tier: int) -> String:
+	"""Get dice notation for initiative tier"""
+	match tier:
+		1: return "1D20"
+		2: return "2D20"
+		3: return "3D20"
+		4: return "4D20"
+		_: return "1D20"
+
+func _create_stat_cell(stat_label: String, value: String) -> PanelContainer:
 	"""Create a rounded grey cell containing a stat label and value"""
 	var panel := PanelContainer.new()
 	panel.custom_minimum_size = Vector2(0, 30)
@@ -1248,7 +1266,7 @@ func _create_stat_cell(stat_label: String, value: int) -> PanelContainer:
 
 	# Value - 5 characters wide, blue color
 	var value_label := Label.new()
-	value_label.text = str(value)
+	value_label.text = value
 	value_label.custom_minimum_size = Vector2(30, 0)  # ~5 characters at 12pt
 	value_label.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	value_label.add_theme_font_size_override("font_size", 12)
@@ -1311,27 +1329,51 @@ func _rebuild_stats_grid(member_token: String, equip: Dictionary) -> void:
 	var defense: Dictionary = profile.get("defense", {})
 	var stats: Dictionary = profile.get("stats", {})
 
-	# S ATK = MND + skill_atk_boost
-	var mnd: int = stats.get("MND", 0)
+	# Get core stats for calculations
+	var brw: int = stats.get("BRW", 1)
+	var mnd: int = stats.get("MND", 1)
+	var tpo: int = stats.get("TPO", 1)
+	var vtl: int = stats.get("VTL", 1)
+	var fcs: int = stats.get("FCS", 1)
+
+	# Calculate derived stats with new formulas
 	var skill_atk_bonus: int = weapon.get("skill_atk_boost", 0)
 	var s_atk: int = mnd + skill_atk_bonus
 
-	# Skill Accuracy comes from skill_acc_boost
-	var skill_acc: int = weapon.get("skill_acc_boost", 0)
+	# Accuracy: Base + TPO×2.0 (each TPO point adds 0.20 percentage points)
+	var weapon_acc: int = weapon.get("accuracy", 0)
+	var tpo_acc_bonus: float = tpo * 2.0
+	var total_acc: float = weapon_acc + tpo_acc_bonus
 
-	# Battle stats with full names in rounded grey cells (2 columns)
-	_stats_grid.add_child(_create_stat_cell("Max HP", profile.get("hp_max", 0)))
-	_stats_grid.add_child(_create_stat_cell("Max MP", profile.get("mp_max", 0)))
-	_stats_grid.add_child(_create_stat_cell("Physical Attack", weapon.get("attack", 0)))
-	_stats_grid.add_child(_create_stat_cell("Skill Attack", s_atk))
-	_stats_grid.add_child(_create_stat_cell("Physical Defense", defense.get("pdef", 0)))
-	_stats_grid.add_child(_create_stat_cell("Skill Defense", defense.get("mdef", 0)))
-	_stats_grid.add_child(_create_stat_cell("Physical Accuracy", weapon.get("accuracy", 0)))
-	_stats_grid.add_child(_create_stat_cell("Skill Accuracy", skill_acc))
-	_stats_grid.add_child(_create_stat_cell("Evasion", defense.get("peva", 0)))
-	_stats_grid.add_child(_create_stat_cell("Speed", defense.get("speed", 0)))
-	_stats_grid.add_child(_create_stat_cell("Ailment Resistance", defense.get("ail_resist_pct", 0)))
-	_stats_grid.add_child(_create_stat_cell("Critical Rate", weapon.get("crit_bonus_pct", 0)))
+	# Crit Rate: 5% + BRW×0.5% + weapon/equipment bonuses
+	var weapon_crit: int = weapon.get("crit_bonus_pct", 0)
+	var crit_rate: float = 5.0 + (brw * 0.5) + weapon_crit
+	crit_rate = clamp(crit_rate, 5.0, 50.0)
+
+	# Ailment Power: MND×2%
+	var ailment_bonus: float = mnd * 2.0
+
+	# Evasion with stat contribution (VTL×2.0)
+	var base_eva: int = defense.get("peva", 0)
+	var vtl_eva_bonus: float = vtl * 2.0
+	var total_eva: float = base_eva + vtl_eva_bonus
+
+	# Initiative: Get TPO tier and speed bonus
+	var speed_bonus: int = defense.get("speed", 0)
+	var init_tier: int = _get_initiative_tier(tpo)
+	var init_text: String = "%s + %d" % [_get_dice_notation(init_tier), speed_bonus]
+
+	# Display stats in order: HP/MP/PATK/SATK/PDEF/SDEF/ACC/INIT/CRIT BOOST/AIL BOOST
+	_stats_grid.add_child(_create_stat_cell("Max HP", str(profile.get("hp_max", 0))))
+	_stats_grid.add_child(_create_stat_cell("Max MP", str(profile.get("mp_max", 0))))
+	_stats_grid.add_child(_create_stat_cell("Physical Attack", str(weapon.get("attack", 0))))
+	_stats_grid.add_child(_create_stat_cell("Skill Attack", str(s_atk)))
+	_stats_grid.add_child(_create_stat_cell("Physical Defense", str(defense.get("pdef", 0))))
+	_stats_grid.add_child(_create_stat_cell("Skill Defense", str(defense.get("mdef", 0))))
+	_stats_grid.add_child(_create_stat_cell("Accuracy", "%.1f%%" % total_acc))
+	_stats_grid.add_child(_create_stat_cell("Initiative", init_text))
+	_stats_grid.add_child(_create_stat_cell("Crit Boost", "+%.1f%%" % crit_rate))
+	_stats_grid.add_child(_create_stat_cell("Ailment Boost", "+%.0f%%" % ailment_bonus))
 
 # ────────────────── Details Display ──────────────────
 func _update_details_for_focused_element() -> void:
@@ -1453,13 +1495,11 @@ func _show_equipment_details(member_token: String, slot: String) -> void:
 			if item_def.has("base_watk"):
 				details += "Attack: [color=#FFC0CB]%d[/color]\n" % int(item_def.get("base_watk", 0))
 			if item_def.has("base_acc"):
-				details += "Accuracy: [color=#FFC0CB]%d[/color]\n" % int(item_def.get("base_acc", 0))
+				details += "Accuracy: [color=#FFC0CB]%d%%[/color]\n" % int(item_def.get("base_acc", 0))
 			if item_def.has("crit_bonus_pct"):
-				details += "Critical: [color=#FFC0CB]%d%%[/color]\n" % int(item_def.get("crit_bonus_pct", 0))
+				details += "Crit Rate: [color=#FFC0CB]%d%%[/color]\n" % int(item_def.get("crit_bonus_pct", 0))
 			if item_def.has("skill_atk_boost"):
 				details += "Skill Atk: [color=#FFC0CB]%d[/color]\n" % int(item_def.get("skill_atk_boost", 0))
-			if item_def.has("skill_acc_boost"):
-				details += "Skill Acc: [color=#FFC0CB]%d[/color]\n" % int(item_def.get("skill_acc_boost", 0))
 			if item_def.has("watk_type_tag"):
 				var wtype: String = String(item_def.get("watk_type_tag", ""))
 				details += "Type: [color=#FFC0CB]%s[/color]\n" % wtype
@@ -1474,8 +1514,6 @@ func _show_equipment_details(member_token: String, slot: String) -> void:
 				details += "Physical Defense: [color=#FFC0CB]%d[/color]\n" % int(item_def.get("armor_flat", 0))
 			if item_def.has("ward_flat"):
 				details += "Skill Defense: [color=#FFC0CB]%d[/color]\n" % int(item_def.get("ward_flat", 0))
-			if item_def.has("ail_resist_pct"):
-				details += "Ailment Resist: [color=#FFC0CB]%d%%[/color]\n" % int(item_def.get("ail_resist_pct", 0))
 			if item_def.has("armor_type"):
 				var atype: String = String(item_def.get("armor_type", "")).capitalize()
 				if atype != "":

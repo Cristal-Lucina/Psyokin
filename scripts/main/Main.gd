@@ -307,6 +307,13 @@ func _ready() -> void:
 	# Allow input processing even when game is paused (for menu toggle)
 	process_mode = Node.PROCESS_MODE_ALWAYS
 
+	# Fade in from black if transitioning from character creation
+	var transition_manager = get_node_or_null("/root/aTransitionManager")
+	if transition_manager and transition_manager.has_method("fade_in"):
+		# Brief delay before fade in
+		await get_tree().create_timer(0.2).timeout
+		transition_manager.fade_in(0.5)
+
 	# Fix UI to stay in place with camera movement
 	_reparent_ui_to_canvas_layers()
 
