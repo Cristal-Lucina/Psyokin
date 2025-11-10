@@ -1332,9 +1332,6 @@ func _rebuild_stats_grid(member_token: String, equip: Dictionary) -> void:
 	var crit_rate: float = 5.0 + (brw * 0.5) + weapon_crit
 	crit_rate = clamp(crit_rate, 5.0, 50.0)
 
-	# Crit Damage Multiplier: 1.5× + BRW×0.1×
-	var crit_mult: float = 1.5 + (brw * 0.1)
-
 	# Ailment Power: MND×2%
 	var ailment_bonus: float = mnd * 2.0
 
@@ -1354,7 +1351,6 @@ func _rebuild_stats_grid(member_token: String, equip: Dictionary) -> void:
 	_stats_grid.add_child(_create_stat_cell("Evasion", "%.1f%%" % total_eva))
 	_stats_grid.add_child(_create_stat_cell("Speed", str(defense.get("speed", 0))))
 	_stats_grid.add_child(_create_stat_cell("Crit Rate", "%.1f%%" % crit_rate))
-	_stats_grid.add_child(_create_stat_cell("Crit Damage", "×%.1f" % crit_mult))
 	_stats_grid.add_child(_create_stat_cell("Ailment Power", "+%.0f%%" % ailment_bonus))
 	_stats_grid.add_child(_create_stat_cell("Ailment Resistance", str(defense.get("ail_resist_pct", 0))))
 

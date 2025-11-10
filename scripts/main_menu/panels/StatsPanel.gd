@@ -285,9 +285,6 @@ func _rebuild_battle_stats(token: String) -> void:
 	var crit_rate: float = 5.0 + (brw * 0.5) + weapon_crit
 	crit_rate = clamp(crit_rate, 5.0, 50.0)
 
-	# Crit Damage Multiplier: 1.5× + BRW×0.1×
-	var crit_mult: float = 1.5 + (brw * 0.1)
-
 	# Ailment Power: MND×2%
 	var ailment_bonus: float = mnd * 2.0
 
@@ -306,7 +303,6 @@ func _rebuild_battle_stats(token: String) -> void:
 	_add_battle_stat_float(_battle_grid, "Evasion", total_eva, "%.1f%%")
 	_add_battle_stat(_battle_grid, "Speed", defense.get("speed", 0))
 	_add_battle_stat_float(_battle_grid, "Crit Rate", crit_rate, "%.1f%%")
-	_add_battle_stat_float(_battle_grid, "Crit Damage", crit_mult, "×%.1f")
 	_add_battle_stat_float(_battle_grid, "Ailment Power", ailment_bonus, "+%.0f%%")
 	_add_battle_stat(_battle_grid, "Ailment Resistance", defense.get("ail_resist_pct", 0))
 
