@@ -1363,10 +1363,7 @@ func _rebuild_stats_grid(member_token: String, equip: Dictionary) -> void:
 	var init_tier: int = _get_initiative_tier(tpo)
 	var init_text: String = "%s + %d" % [_get_dice_notation(init_tier), speed_bonus]
 
-	# Get mind type for display
-	var mind_type: String = _get_member_mind_type(member_token)
-
-	# Battle stats with full names in rounded grey cells (2 columns)
+	# Display stats in order: HP/MP/PATK/SATK/PDEF/SDEF/ACC/INIT/CRIT BOOST/AIL BOOST
 	_stats_grid.add_child(_create_stat_cell("Max HP", str(profile.get("hp_max", 0))))
 	_stats_grid.add_child(_create_stat_cell("Max MP", str(profile.get("mp_max", 0))))
 	_stats_grid.add_child(_create_stat_cell("Physical Attack", str(weapon.get("attack", 0))))
@@ -1374,11 +1371,9 @@ func _rebuild_stats_grid(member_token: String, equip: Dictionary) -> void:
 	_stats_grid.add_child(_create_stat_cell("Physical Defense", str(defense.get("pdef", 0))))
 	_stats_grid.add_child(_create_stat_cell("Skill Defense", str(defense.get("mdef", 0))))
 	_stats_grid.add_child(_create_stat_cell("Accuracy", "%.1f%%" % total_acc))
-	_stats_grid.add_child(_create_stat_cell("Evasion", "%.1f%%" % total_eva))
 	_stats_grid.add_child(_create_stat_cell("Initiative", init_text))
-	_stats_grid.add_child(_create_stat_cell("Crit Rate", "%.1f%%" % crit_rate))
-	_stats_grid.add_child(_create_stat_cell("Ailment Power", "+%.0f%%" % ailment_bonus))
-	_stats_grid.add_child(_create_stat_cell("Mind Type", mind_type))
+	_stats_grid.add_child(_create_stat_cell("Crit Boost", "+%.1f%%" % crit_rate))
+	_stats_grid.add_child(_create_stat_cell("Ailment Boost", "+%.0f%%" % ailment_bonus))
 
 # ────────────────── Details Display ──────────────────
 func _update_details_for_focused_element() -> void:
