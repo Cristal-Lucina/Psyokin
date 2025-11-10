@@ -361,7 +361,7 @@ func calculate_physical_damage(attacker: Dictionary, defender: Dictionary, optio
 	# Get equipment stats
 	var attacker_weapon = _get_weapon_stats(attacker.id)
 	var base_watk: int = attacker_weapon.get("watk", 0)
-	var brw_scale: float = attacker_weapon.get("brw_scale", 0.5)
+	var brw_scale: float = attacker_weapon.get("brw_scale", 1.0)
 
 	# Get defender defense
 	var defender_armor = _get_armor_stats(defender.id)
@@ -467,8 +467,8 @@ func calculate_sigil_damage(attacker: Dictionary, defender: Dictionary, options:
 	var multi_hit: int = options.get("multi_hit", 1)
 	var is_crit: bool = options.get("is_crit", false)
 	var type_bonus: float = options.get("type_bonus", 0.0)
-	var base_sig: int = options.get("base_sig", 30)
-	var mnd_scale: float = options.get("mnd_scale", 1.0)
+	var base_sig: int = options.get("base_sig", 40)
+	var mnd_scale: float = options.get("mnd_scale", 1.5)
 
 	# Get attacker stats
 	var mnd: int = attacker.stats.get("MND", 1)
@@ -556,9 +556,9 @@ func _get_weapon_stats(member_id: String) -> Dictionary:
 		var weapon = equipment_system.call("get_equipped_item", member_id, "weapon")
 		if weapon:
 			return {
-				"watk": weapon.get("watk", 10),
+				"watk": weapon.get("watk", 15),
 				"sig": weapon.get("sig", 0),
-				"brw_scale": weapon.get("brw_scale", 0.5),
+				"brw_scale": weapon.get("brw_scale", 1.0),
 				"acc": weapon.get("acc", 90),
 				"skill_acc_bonus": weapon.get("skill_acc_bonus", 0),
 				"crit_bonus": weapon.get("crit_bonus_pct", 0)
@@ -566,9 +566,9 @@ func _get_weapon_stats(member_id: String) -> Dictionary:
 
 	# Default weapon stats
 	return {
-		"watk": 10,
+		"watk": 15,
 		"sig": 0,
-		"brw_scale": 0.5,
+		"brw_scale": 1.0,
 		"acc": 90,
 		"skill_acc_bonus": 0,
 		"crit_bonus": 0
