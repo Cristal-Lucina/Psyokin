@@ -96,6 +96,7 @@ const DIRECTIONS = {
 var _selected_order : Array[String] = []       # keep order of picks (max 3)
 var _perk_id_by_idx : Dictionary = {}          # index -> perk_id
 var _perk_stat_by_idx : Dictionary = {}        # index -> stat_id (help text)
+var _perk_name_by_idx : Dictionary = {}        # index -> perk_name
 
 # Character state
 var current_direction = 0  # South
@@ -724,6 +725,7 @@ func _rebuild_perk_dropdown() -> void:
 	_perk_in.clear()
 	_perk_id_by_idx.clear()
 	_perk_stat_by_idx.clear()
+	_perk_name_by_idx.clear()
 
 	# Build the offer list
 	var picks: Array[String] = []
@@ -752,6 +754,7 @@ func _rebuild_perk_dropdown() -> void:
 	_perk_in.add_item("— choose starting perk —")
 	_perk_id_by_idx[0] = ""
 	_perk_stat_by_idx[0] = ""
+	_perk_name_by_idx[0] = ""
 
 	var idx: int = 1
 	for j in range(offers.size()):
@@ -766,6 +769,7 @@ func _rebuild_perk_dropdown() -> void:
 		_perk_in.add_item(line)
 		_perk_id_by_idx[idx] = String(it.get("id",""))
 		_perk_stat_by_idx[idx] = String(it.get("stat",""))
+		_perk_name_by_idx[idx] = String(it.get("name","Perk"))
 		idx += 1
 
 	_perk_in.select(0)
@@ -918,6 +922,12 @@ func _chosen_perk_id() -> String:
 		return ""
 	var sel: int = _perk_in.get_selected()
 	return String(_perk_id_by_idx.get(sel, ""))
+
+func _chosen_perk_name() -> String:
+	if _perk_in == null:
+		return ""
+	var sel: int = _perk_in.get_selected()
+	return String(_perk_name_by_idx.get(sel, ""))
 
 func _update_confirm_enabled() -> void:
 	if _confirm_btn == null: return
@@ -2721,9 +2731,9 @@ func _build_confirmation_ui() -> void:
 	summary_panel.add_child(stats_label)
 
 	# Add perk
-	var perk_id = _chosen_perk_id()
+	var perk_name = _chosen_perk_name()
 	var perk_label = Label.new()
-	perk_label.text = "Perk: %s" % perk_id if perk_id != "" else "Perk: None"
+	perk_label.text = "Perk: %s" % perk_name if perk_name != "" else "Perk: None"
 	perk_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	perk_label.add_theme_font_size_override("font_size", 14)
 	summary_panel.add_child(perk_label)
