@@ -1358,13 +1358,9 @@ func _complete_cinematic() -> void:
 		print("[CharacterCreation] Restored ControllerManager context to OVERWORLD")
 
 	cinematic_active = false
+	# Apply character creation and transition to main scene
+	# Note: The router will handle the scene change, so we don't fade in here
 	_apply_character_creation()
-
-	# Fade in from black
-	if transition_manager and transition_manager.has_method("fade_in"):
-		# Wait a brief moment before fading in
-		await get_tree().create_timer(0.2).timeout
-		transition_manager.fade_in(0.5)
 
 # ── Name Input UI ────────────────────────────────────────────────────────────
 func _build_name_input_ui() -> void:
