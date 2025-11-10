@@ -428,9 +428,8 @@ func _get_equipment_stats(item_id: String, slot: String) -> Dictionary:
 		"weapon":
 			stats["Attack"] = int(item_def.get("base_watk", 0))
 			stats["Accuracy"] = int(item_def.get("base_acc", 0))
-			stats["Critical"] = int(item_def.get("crit_bonus_pct", 0))
+			stats["Crit Rate"] = int(item_def.get("crit_bonus_pct", 0))
 			stats["Skill Atk"] = int(item_def.get("skill_atk_boost", 0))
-			stats["Skill Acc"] = int(item_def.get("skill_acc_boost", 0))
 		"armor":
 			stats["Phys Defense"] = int(item_def.get("armor_flat", 0))
 			stats["Skill Defense"] = int(item_def.get("ward_flat", 0))
@@ -1474,13 +1473,11 @@ func _show_equipment_details(member_token: String, slot: String) -> void:
 			if item_def.has("base_watk"):
 				details += "Attack: [color=#FFC0CB]%d[/color]\n" % int(item_def.get("base_watk", 0))
 			if item_def.has("base_acc"):
-				details += "Accuracy: [color=#FFC0CB]%d[/color]\n" % int(item_def.get("base_acc", 0))
+				details += "Accuracy: [color=#FFC0CB]%d%%[/color]\n" % int(item_def.get("base_acc", 0))
 			if item_def.has("crit_bonus_pct"):
-				details += "Critical: [color=#FFC0CB]%d%%[/color]\n" % int(item_def.get("crit_bonus_pct", 0))
+				details += "Crit Rate: [color=#FFC0CB]%d%%[/color]\n" % int(item_def.get("crit_bonus_pct", 0))
 			if item_def.has("skill_atk_boost"):
 				details += "Skill Atk: [color=#FFC0CB]%d[/color]\n" % int(item_def.get("skill_atk_boost", 0))
-			if item_def.has("skill_acc_boost"):
-				details += "Skill Acc: [color=#FFC0CB]%d[/color]\n" % int(item_def.get("skill_acc_boost", 0))
 			if item_def.has("watk_type_tag"):
 				var wtype: String = String(item_def.get("watk_type_tag", ""))
 				details += "Type: [color=#FFC0CB]%s[/color]\n" % wtype
