@@ -1512,7 +1512,15 @@ func _show_keyboard() -> void:
 			var btn = _create_keyboard_button(letter, Vector2(40, 40))
 			btn.pressed.connect(_on_keyboard_letter_pressed.bind(letter))
 			letter_grid.add_child(btn)
-			keyboard_buttons.append({"button": btn, "value": letter, "type": "letter", "base_char": row[i]})
+			# Store row and column position within that row
+			keyboard_buttons.append({
+				"button": btn,
+				"value": letter,
+				"type": "letter",
+				"base_char": row[i],
+				"row": row_idx,
+				"col": i
+			})
 
 		# Add spacers to complete the row
 		var keys_in_row = row.length()
@@ -1551,12 +1559,12 @@ func _show_keyboard() -> void:
 	var backspace_btn = _create_keyboard_button("⌫ Backspace", Vector2(150, 50))
 	backspace_btn.pressed.connect(_on_keyboard_backspace_pressed)
 	bottom_row.add_child(backspace_btn)
-	keyboard_buttons.append({"button": backspace_btn, "value": "BACKSPACE", "type": "action"})
+	keyboard_buttons.append({"button": backspace_btn, "value": "BACKSPACE", "type": "action", "row": 3, "col": 0})
 
 	var accept_btn = _create_keyboard_button("✓ Accept [X]", Vector2(150, 50))
 	accept_btn.pressed.connect(_on_keyboard_accept_pressed)
 	bottom_row.add_child(accept_btn)
-	keyboard_buttons.append({"button": accept_btn, "value": "ACCEPT", "type": "action"})
+	keyboard_buttons.append({"button": accept_btn, "value": "ACCEPT", "type": "action", "row": 3, "col": 1})
 
 	# Set initial focus
 	_update_keyboard_focus()
@@ -1582,55 +1590,33 @@ func _toggle_keyboard_case() -> void:
 			kb["value"] = new_char
 
 func _handle_keyboard_navigation(dx: int, dy: int) -> void:
-	"""Handle directional navigation on keyboard"""
-	# Calculate total rows (letters in grid + action row)
-	var letter_button_count = 0
-	for kb in keyboard_buttons:
-		if kb["type"] == "letter":
-			letter_button_count += 1
-
-	var letter_rows = ceil(float(letter_button_count) / float(keyboard_grid_cols))
-	var total_rows = int(letter_rows) + 1  # +1 for action row
+	"""Handle directional navigation on keyboard with proper QWERTY layout"""
+	# QWERTY row lengths
+	var row_lengths = [10, 9, 7, 2]  # Rows 0-2 are letters, row 3 is action buttons
 
 	if dy != 0:  # Vertical movement
 		var new_row = keyboard_focused_row + dy
-		new_row = clamp(new_row, 0, total_rows - 1)
+		new_row = clamp(new_row, 0, 3)  # 4 total rows (0-3)
 		keyboard_focused_row = new_row
 
-		# Adjust column if needed
-		if keyboard_focused_row < letter_rows:
-			# In letter grid
-			keyboard_focused_col = clamp(keyboard_focused_col, 0, keyboard_grid_cols - 1)
-		else:
-			# In action row (only 2 buttons)
-			keyboard_focused_col = clamp(keyboard_focused_col, 0, 1)
+		# Adjust column to stay within new row's bounds
+		var max_col = row_lengths[keyboard_focused_row] - 1
+		keyboard_focused_col = clamp(keyboard_focused_col, 0, max_col)
 
 	if dx != 0:  # Horizontal movement
-		if keyboard_focused_row < letter_rows:
-			# In letter grid
-			keyboard_focused_col += dx
-			keyboard_focused_col = wrapi(keyboard_focused_col, 0, keyboard_grid_cols)
-		else:
-			# In action row
-			keyboard_focused_col += dx
-			keyboard_focused_col = wrapi(keyboard_focused_col, 0, 2)
+		keyboard_focused_col += dx
+		var max_col = row_lengths[keyboard_focused_row] - 1
+		keyboard_focused_col = wrapi(keyboard_focused_col, 0, row_lengths[keyboard_focused_row])
 
 	_update_keyboard_focus()
 
 func _get_keyboard_linear_index() -> int:
-	"""Get the linear index of currently focused keyboard button"""
-	var letter_button_count = 0
-	for kb in keyboard_buttons:
-		if kb["type"] == "letter":
-			letter_button_count += 1
-
-	var letter_rows = ceil(float(letter_button_count) / float(keyboard_grid_cols))
-
-	if keyboard_focused_row < letter_rows:
-		return keyboard_focused_row * keyboard_grid_cols + keyboard_focused_col
-	else:
-		# Action row
-		return letter_button_count + keyboard_focused_col
+	"""Get the linear index of currently focused keyboard button by matching row/col"""
+	for i in range(keyboard_buttons.size()):
+		var kb = keyboard_buttons[i]
+		if kb.get("row", -1) == keyboard_focused_row and kb.get("col", -1) == keyboard_focused_col:
+			return i
+	return 0  # Fallback to first button
 
 func _update_keyboard_focus() -> void:
 	"""Update visual focus on keyboard"""
@@ -2331,10 +2317,14 @@ func _build_customization_ui() -> void:
 	var selectors = [pronoun_selector, body_selector, underwear_preview_toggle, underwear_selector, outfit_selector, outfit_style_selector, hair_type_selector, hair_color_selector]
 	customization_container.set_meta("selectors", selectors)
 
-	# Right: Character Preview
+	# Right: Character Preview (shifted right by 50px)
+	var preview_wrapper = MarginContainer.new()
+	preview_wrapper.add_theme_constant_override("margin_left", 50)
+	main.add_child(preview_wrapper)
+
 	var preview_panel = _create_styled_panel()
 	preview_panel.custom_minimum_size = Vector2(500, 500)
-	main.add_child(preview_panel)
+	preview_wrapper.add_child(preview_panel)
 
 	var preview_container = VBoxContainer.new()
 	preview_panel.add_child(preview_container)
@@ -2364,10 +2354,10 @@ func _build_customization_ui() -> void:
 		character_layers.scale = Vector2(5, 5)  # 500% scale for better visibility
 		print("[Customization] Character preview reparented and visible")
 
-	# Accept button
+	# Accept button (center bottom, shifted left 50px)
 	var accept_btn = Button.new()
 	accept_btn.text = "Accept"
-	accept_btn.position = Vector2(0, -60)
+	accept_btn.position = Vector2(50, -60)
 	accept_btn.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
 	accept_btn.anchor_top = 1.0
 	accept_btn.anchor_bottom = 1.0
