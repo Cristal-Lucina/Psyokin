@@ -1153,6 +1153,11 @@ func _input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 			_handle_keyboard_accept()
 			return
+		# B button (ui_cancel) for backspace - or go back if text is empty
+		elif event.is_action_pressed("ui_cancel") or (event is InputEventJoypadButton and event.pressed and event.button_index == JOY_BUTTON_B):
+			get_viewport().set_input_as_handled()
+			_handle_keyboard_backspace_or_back()
+			return
 		# R1 button (JOY_BUTTON_R) to toggle uppercase/lowercase
 		elif event is InputEventJoypadButton and event.pressed and event.button_index == JOY_BUTTON_RIGHT_SHOULDER:
 			get_viewport().set_input_as_handled()
@@ -1659,6 +1664,42 @@ func _on_keyboard_backspace_pressed() -> void:
 	if current_name_text.length() > 0:
 		current_name_text = current_name_text.substr(0, current_name_text.length() - 1)
 		_update_keyboard_display()
+
+func _handle_keyboard_backspace_or_back() -> void:
+	"""Handle B button: backspace if text exists, go back to field selection if empty"""
+	if current_name_text.length() > 0:
+		# There's text, do backspace
+		_on_keyboard_backspace_pressed()
+	else:
+		# No text, go back to previous field selection
+		# Hide keyboard
+		if keyboard_container:
+			keyboard_container.queue_free()
+			keyboard_container = null
+
+		# Reset current_name_text
+		current_name_text = ""
+
+		# Go back to field selection based on current stage
+		match name_input_stage:
+			1:  # Was entering first name, go back to first name field selection
+				name_input_stage = 0
+				_update_name_field_selection(false)  # Select first name field
+				# Show instruction again
+				var instruction = name_input_container.get_node_or_null("InstructionLabel")
+				if instruction:
+					instruction.visible = true
+					instruction.text = "Press Accept to enter first name"
+				print("[Name Input] Cancelled first name entry, back to field selection")
+			3:  # Was entering last name, go back to last name field selection
+				name_input_stage = 2
+				_update_name_field_selection(true)  # Select last name field
+				# Show instruction again
+				var instruction = name_input_container.get_node_or_null("InstructionLabel")
+				if instruction:
+					instruction.visible = true
+					instruction.text = "Press Accept to enter last name"
+				print("[Name Input] Cancelled last name entry, back to field selection")
 
 func _update_keyboard_display() -> void:
 	"""Update the keyboard's current text display"""
