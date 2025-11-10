@@ -296,7 +296,7 @@ func _rebuild_battle_stats(token: String) -> void:
 	# Initiative: Get TPO tier and speed bonus
 	var speed_bonus: int = defense.get("speed", 0)
 	var init_tier: int = _get_initiative_tier(tpo)
-	var init_text: String = "Tier %d [%s + Spd %d]" % [init_tier, _get_dice_notation(init_tier), speed_bonus]
+	var init_text: String = "%s + %d" % [_get_dice_notation(init_tier), speed_bonus]
 
 	_add_battle_stat(_battle_grid, "Max HP", profile.get("hp_max", 0))
 	_add_battle_stat(_battle_grid, "Max MP", profile.get("mp_max", 0))
@@ -489,11 +489,11 @@ func _get_initiative_tier(tpo: int) -> int:
 func _get_dice_notation(tier: int) -> String:
 	"""Get dice notation for initiative tier"""
 	match tier:
-		1: return "1d20"
-		2: return "2d20(H)"
-		3: return "3d20(H)"
-		4: return "4d20(H)"
-		_: return "1d20"
+		1: return "1D20"
+		2: return "2D20"
+		3: return "3D20"
+		4: return "4D20"
+		_: return "1D20"
 
 func _create_stat_cell(stat_label: String, value: String) -> PanelContainer:
 	"""Create a rounded grey cell containing a stat label and value"""
