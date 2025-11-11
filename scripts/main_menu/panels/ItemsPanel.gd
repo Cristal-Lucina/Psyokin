@@ -115,6 +115,9 @@ func _ready() -> void:
 	# Connect visibility
 	visibility_changed.connect(_on_visibility_changed)
 
+	# Apply Core Vibe styling
+	call_deferred("_apply_core_vibe_styling")
+
 	# Initial build
 	call_deferred("_first_fill")
 
@@ -124,6 +127,66 @@ func _first_fill() -> void:
 	if _category_list and _category_list.item_count > 0:
 		_category_list.select(0)
 		call_deferred("_grab_category_focus")
+
+func _apply_core_vibe_styling() -> void:
+	"""Apply Core Vibe neon-kawaii styling to all UI elements"""
+	# Style the three main panel containers
+	if _category_panel:
+		var cat_style = aCoreVibeTheme.create_panel_style(
+			aCoreVibeTheme.COLOR_CITRUS_YELLOW,       # Citrus Yellow border (categories)
+			aCoreVibeTheme.COLOR_INK_CHARCOAL,        # Ink charcoal background
+			aCoreVibeTheme.PANEL_OPACITY_SEMI,        # Semi-transparent
+			aCoreVibeTheme.CORNER_RADIUS_MEDIUM,      # 16px corners
+			aCoreVibeTheme.BORDER_WIDTH_THIN,         # 2px border
+			aCoreVibeTheme.SHADOW_SIZE_MEDIUM         # 6px glow
+		)
+		_category_panel.add_theme_stylebox_override("panel", cat_style)
+
+	if _item_panel:
+		var item_style = aCoreVibeTheme.create_panel_style(
+			aCoreVibeTheme.COLOR_SKY_CYAN,            # Sky Cyan border (main items)
+			aCoreVibeTheme.COLOR_INK_CHARCOAL,        # Ink charcoal background
+			aCoreVibeTheme.PANEL_OPACITY_SEMI,        # Semi-transparent
+			aCoreVibeTheme.CORNER_RADIUS_MEDIUM,      # 16px corners
+			aCoreVibeTheme.BORDER_WIDTH_THIN,         # 2px border
+			aCoreVibeTheme.SHADOW_SIZE_MEDIUM         # 6px glow
+		)
+		_item_panel.add_theme_stylebox_override("panel", item_style)
+
+	if _details_panel:
+		var details_style = aCoreVibeTheme.create_panel_style(
+			aCoreVibeTheme.COLOR_GRAPE_VIOLET,        # Grape Violet border (details)
+			aCoreVibeTheme.COLOR_INK_CHARCOAL,        # Ink charcoal background
+			aCoreVibeTheme.PANEL_OPACITY_SEMI,        # Semi-transparent
+			aCoreVibeTheme.CORNER_RADIUS_MEDIUM,      # 16px corners
+			aCoreVibeTheme.BORDER_WIDTH_THIN,         # 2px border
+			aCoreVibeTheme.SHADOW_SIZE_MEDIUM         # 6px glow
+		)
+		_details_panel.add_theme_stylebox_override("panel", details_style)
+
+	# Style column header labels
+	if _category_label:
+		aCoreVibeTheme.style_label(_category_label, aCoreVibeTheme.COLOR_CITRUS_YELLOW, 18)
+	if _item_label:
+		aCoreVibeTheme.style_label(_item_label, aCoreVibeTheme.COLOR_SKY_CYAN, 18)
+	if _details_label:
+		aCoreVibeTheme.style_label(_details_label, aCoreVibeTheme.COLOR_GRAPE_VIOLET, 18)
+
+	# Style item name label
+	if _item_name:
+		aCoreVibeTheme.style_label(_item_name, aCoreVibeTheme.COLOR_MILK_WHITE, 16)
+
+	# Style details text
+	if _details_text:
+		_details_text.add_theme_color_override("default_color", aCoreVibeTheme.COLOR_MILK_WHITE)
+
+	# Style action buttons
+	if _use_button:
+		aCoreVibeTheme.style_button(_use_button, aCoreVibeTheme.COLOR_ELECTRIC_LIME, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
+		_use_button.custom_minimum_size = Vector2(120, 36)
+	if _inspect_button:
+		aCoreVibeTheme.style_button(_inspect_button, aCoreVibeTheme.COLOR_SKY_CYAN, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
+		_inspect_button.custom_minimum_size = Vector2(120, 36)
 
 func _on_visibility_changed() -> void:
 	"""Grab focus when panel becomes visible, cleanup popups when hidden"""
@@ -487,8 +550,8 @@ func _update_details() -> void:
 	# Build details text with BBCode formatting
 	var details: String = ""
 
-	# Quantity
-	details += "Quantity: [color=#FFC0CB]x%d[/color]\n\n" % qty
+	# Quantity (Core Vibe: Electric Lime for numeric values)
+	details += "Quantity: [color=#C8FF3D]x%d[/color]\n\n" % qty
 
 	# Get equipment slot to determine if this is equipment
 	var equip_slot: String = String(def.get("equip_slot", "")).to_lower().strip_edges()
@@ -500,17 +563,17 @@ func _update_details() -> void:
 	# Description
 	var desc: String = _get_description(def)
 	if desc != "":
-		details += "[color=#AAAAAA]%s[/color]\n\n" % desc
+		details += "[color=#F4F7FB]%s[/color]\n\n" % desc
 
 	# Category
 	var cat: String = _category_of(def)
-	details += "Category: [color=#888888]%s[/color]\n\n" % cat
+	details += "Category: [color=#4DE9FF]%s[/color]\n\n" % cat
 
 	# Equipped by
 	if _equipped_by.has(_selected_item_id):
 		var members: Array = _equipped_by[_selected_item_id]
 		if members.size() > 0:
-			details += "Equipped by: [color=#FFC0CB]%s[/color]\n\n" % ", ".join(members)
+			details += "Equipped by: [color=#C8FF3D]%s[/color]\n\n" % ", ".join(members)
 
 	# Effects (for consumables)
 	var effects: String = _get_effects(def)
@@ -533,53 +596,53 @@ func _build_equipment_stats(def: Dictionary, slot: String) -> String:
 		slot_label = "Headwear"
 	elif slot == "foot":
 		slot_label = "Footwear"
-	stats += "[color=#888888]%s[/color]\n\n" % slot_label
+	stats += "[color=#4DE9FF]%s[/color]\n\n" % slot_label
 
 	# Add stats based on slot type
 	match slot:
 		"weapon":
 			if def.has("base_watk"):
-				stats += "Attack: [color=#FFC0CB]%d[/color]\n" % int(def.get("base_watk", 0))
+				stats += "Attack: [color=#C8FF3D]%d[/color]\n" % int(def.get("base_watk", 0))
 			if def.has("base_acc"):
-				stats += "Accuracy: [color=#FFC0CB]%d[/color]\n" % int(def.get("base_acc", 0))
+				stats += "Accuracy: [color=#C8FF3D]%d[/color]\n" % int(def.get("base_acc", 0))
 			if def.has("crit_bonus_pct"):
-				stats += "Critical: [color=#FFC0CB]%d%%[/color]\n" % int(def.get("crit_bonus_pct", 0))
+				stats += "Critical: [color=#C8FF3D]%d%%[/color]\n" % int(def.get("crit_bonus_pct", 0))
 			if def.has("skill_atk_boost"):
-				stats += "Skill Atk: [color=#FFC0CB]%d[/color]\n" % int(def.get("skill_atk_boost", 0))
+				stats += "Skill Atk: [color=#C8FF3D]%d[/color]\n" % int(def.get("skill_atk_boost", 0))
 			if def.has("skill_acc_boost"):
-				stats += "Skill Acc: [color=#FFC0CB]%d[/color]\n" % int(def.get("skill_acc_boost", 0))
+				stats += "Skill Acc: [color=#C8FF3D]%d[/color]\n" % int(def.get("skill_acc_boost", 0))
 			if def.has("watk_type_tag"):
 				var wtype: String = String(def.get("watk_type_tag", "")).capitalize()
 				if wtype != "":
-					stats += "Type: [color=#FFC0CB]%s[/color]\n" % wtype
+					stats += "Type: [color=#C8FF3D]%s[/color]\n" % wtype
 
 		"armor":
 			if def.has("armor_flat"):
-				stats += "Physical Defense: [color=#FFC0CB]%d[/color]\n" % int(def.get("armor_flat", 0))
+				stats += "Physical Defense: [color=#C8FF3D]%d[/color]\n" % int(def.get("armor_flat", 0))
 			if def.has("ward_flat"):
-				stats += "Skill Defense: [color=#FFC0CB]%d[/color]\n" % int(def.get("ward_flat", 0))
+				stats += "Skill Defense: [color=#C8FF3D]%d[/color]\n" % int(def.get("ward_flat", 0))
 			if def.has("armor_type"):
 				var atype: String = String(def.get("armor_type", "")).capitalize()
 				if atype != "":
-					stats += "Type: [color=#FFC0CB]%s[/color]\n" % atype
+					stats += "Type: [color=#C8FF3D]%s[/color]\n" % atype
 
 		"head":
 			if def.has("max_hp_boost"):
-				stats += "HP Bonus: [color=#FFC0CB]+%d[/color]\n" % int(def.get("max_hp_boost", 0))
+				stats += "HP Bonus: [color=#C8FF3D]+%d[/color]\n" % int(def.get("max_hp_boost", 0))
 			if def.has("max_mp_boost"):
-				stats += "MP Bonus: [color=#FFC0CB]+%d[/color]\n" % int(def.get("max_mp_boost", 0))
+				stats += "MP Bonus: [color=#C8FF3D]+%d[/color]\n" % int(def.get("max_mp_boost", 0))
 			if def.has("ward_flat"):
-				stats += "Skill Defense: [color=#FFC0CB]%d[/color]\n" % int(def.get("ward_flat", 0))
+				stats += "Skill Defense: [color=#C8FF3D]%d[/color]\n" % int(def.get("ward_flat", 0))
 
 		"foot":
 			if def.has("base_eva"):
-				stats += "Evasion: [color=#FFC0CB]%d[/color]\n" % int(def.get("base_eva", 0))
+				stats += "Evasion: [color=#C8FF3D]%d[/color]\n" % int(def.get("base_eva", 0))
 			if def.has("speed"):
-				stats += "Speed: [color=#FFC0CB]%d[/color]\n" % int(def.get("speed", 0))
+				stats += "Speed: [color=#C8FF3D]%d[/color]\n" % int(def.get("speed", 0))
 
 		"bracelet":
 			if def.has("sigil_slots"):
-				stats += "Sigil Slots: [color=#FFC0CB]%d[/color]\n" % int(def.get("sigil_slots", 0))
+				stats += "Sigil Slots: [color=#C8FF3D]%d[/color]\n" % int(def.get("sigil_slots", 0))
 
 	if stats != "":
 		stats += "\n"
@@ -753,15 +816,15 @@ func _show_member_selection_popup() -> void:
 	print("[ItemsPanel] Member selection popup shown with %d members" % _party_member_tokens.size())
 
 func _style_popup_panel(popup: Panel) -> void:
-	"""Apply consistent popup styling"""
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.15, 0.15, 0.15, 1.0)
-	style.border_color = Color(1.0, 0.7, 0.75, 1.0)
-	style.set_border_width_all(2)
-	style.corner_radius_top_left = 8
-	style.corner_radius_top_right = 8
-	style.corner_radius_bottom_left = 8
-	style.corner_radius_bottom_right = 8
+	"""Apply Core Vibe neon-kawaii popup styling"""
+	var style = aCoreVibeTheme.create_panel_style(
+		aCoreVibeTheme.COLOR_SKY_CYAN,            # Sky Cyan border
+		aCoreVibeTheme.COLOR_INK_CHARCOAL,        # Ink charcoal background
+		aCoreVibeTheme.PANEL_OPACITY_FULL,        # Fully opaque
+		aCoreVibeTheme.CORNER_RADIUS_MEDIUM,      # 16px corners
+		aCoreVibeTheme.BORDER_WIDTH_THIN,         # 2px border
+		aCoreVibeTheme.SHADOW_SIZE_LARGE          # 12px glow
+	)
 	popup.add_theme_stylebox_override("panel", style)
 
 func _fade_in_popup(popup: Panel) -> void:
