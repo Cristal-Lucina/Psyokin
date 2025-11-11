@@ -130,7 +130,7 @@ func _first_fill() -> void:
 
 func _apply_core_vibe_styling() -> void:
 	"""Apply Core Vibe neon-kawaii styling to all UI elements"""
-	# Style the three main panel containers
+	# Style the three main panel containers with 10px internal padding
 	if _category_panel:
 		var cat_style = aCoreVibeTheme.create_panel_style(
 			aCoreVibeTheme.COLOR_CITRUS_YELLOW,       # Citrus Yellow border (categories)
@@ -140,6 +140,11 @@ func _apply_core_vibe_styling() -> void:
 			aCoreVibeTheme.BORDER_WIDTH_THIN,         # 2px border
 			aCoreVibeTheme.SHADOW_SIZE_MEDIUM         # 6px glow
 		)
+		# Add 10px internal padding
+		cat_style.content_margin_left = 10
+		cat_style.content_margin_top = 10
+		cat_style.content_margin_right = 10
+		cat_style.content_margin_bottom = 10
 		_category_panel.add_theme_stylebox_override("panel", cat_style)
 
 	if _item_panel:
@@ -151,6 +156,11 @@ func _apply_core_vibe_styling() -> void:
 			aCoreVibeTheme.BORDER_WIDTH_THIN,         # 2px border
 			aCoreVibeTheme.SHADOW_SIZE_MEDIUM         # 6px glow
 		)
+		# Add 10px internal padding
+		item_style.content_margin_left = 10
+		item_style.content_margin_top = 10
+		item_style.content_margin_right = 10
+		item_style.content_margin_bottom = 10
 		_item_panel.add_theme_stylebox_override("panel", item_style)
 
 	if _details_panel:
@@ -162,6 +172,11 @@ func _apply_core_vibe_styling() -> void:
 			aCoreVibeTheme.BORDER_WIDTH_THIN,         # 2px border
 			aCoreVibeTheme.SHADOW_SIZE_MEDIUM         # 6px glow
 		)
+		# Add 10px internal padding
+		details_style.content_margin_left = 10
+		details_style.content_margin_top = 10
+		details_style.content_margin_right = 10
+		details_style.content_margin_bottom = 10
 		_details_panel.add_theme_stylebox_override("panel", details_style)
 
 	# Style column header labels
