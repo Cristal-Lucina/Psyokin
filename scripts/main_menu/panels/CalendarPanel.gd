@@ -91,6 +91,9 @@ func _ready() -> void:
 		if cal.has_signal("phase_advanced"): cal.connect("phase_advanced", Callable(self, "_on_cal_update"))
 		if cal.has_signal("week_reset"):     cal.connect("week_reset",     Callable(self, "_on_cal_update"))
 
+	# Apply Core Vibe styling
+	call_deferred("_apply_core_vibe_styling")
+
 	_rebuild()
 
 # --- PanelBase Lifecycle Overrides ---------------------------------------------
@@ -102,6 +105,23 @@ func _on_panel_gained_focus() -> void:
 	_rebuild()
 	# Start in calendar view
 	_focus_state = FocusState.CALENDAR
+
+func _apply_core_vibe_styling() -> void:
+	"""Apply Core Vibe neon-kawaii styling to calendar elements"""
+	# Style month label
+	if _label_month:
+		aCoreVibeTheme.style_label(_label_month, aCoreVibeTheme.COLOR_ELECTRIC_LIME, 24)
+
+	# Style navigation buttons
+	if _btn_prev:
+		aCoreVibeTheme.style_button(_btn_prev, aCoreVibeTheme.COLOR_SKY_CYAN, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
+		_btn_prev.custom_minimum_size = Vector2(100, 36)
+	if _btn_next:
+		aCoreVibeTheme.style_button(_btn_next, aCoreVibeTheme.COLOR_SKY_CYAN, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
+		_btn_next.custom_minimum_size = Vector2(100, 36)
+	if _btn_today:
+		aCoreVibeTheme.style_button(_btn_today, aCoreVibeTheme.COLOR_ELECTRIC_LIME, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
+		_btn_today.custom_minimum_size = Vector2(100, 36)
 
 # --- node finders --------------------------------------------------------------
 
@@ -182,7 +202,9 @@ func _rebuild() -> void:
 		h.text = WEEKDAY_HEADERS[i]
 		h.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		h.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		h.add_theme_color_override("font_color", Color(1,1,1,0.8))
+		# Core Vibe: Sky Cyan weekday headers
+		h.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_SKY_CYAN)
+		h.add_theme_font_size_override("font_size", 14)
 		_grid.add_child(h)
 
 	# layout math
@@ -216,19 +238,22 @@ func _make_day_cell(num: int, is_today: bool) -> Control:
 
 	var sb: StyleBoxFlat = StyleBoxFlat.new()
 	sb.bg_color = Color(0,0,0,0)   # transparent by default
-	sb.corner_radius_top_left     = 6
-	sb.corner_radius_top_right    = 6
-	sb.corner_radius_bottom_left  = 6
-	sb.corner_radius_bottom_right = 6
+	sb.corner_radius_top_left     = aCoreVibeTheme.CORNER_RADIUS_SMALL
+	sb.corner_radius_top_right    = aCoreVibeTheme.CORNER_RADIUS_SMALL
+	sb.corner_radius_bottom_left  = aCoreVibeTheme.CORNER_RADIUS_SMALL
+	sb.corner_radius_bottom_right = aCoreVibeTheme.CORNER_RADIUS_SMALL
 
 	if is_today:
-		# Light blue highlight for current day (matching game style)
-		sb.bg_color = Color(0.4, 0.7, 1.0, 0.25)  # Light blue with transparency
-		sb.border_color = Color(0.4, 0.7, 1.0, 0.9)  # Light blue border
+		# Core Vibe: Electric Lime highlight for current day
+		sb.bg_color = Color(aCoreVibeTheme.COLOR_ELECTRIC_LIME.r, aCoreVibeTheme.COLOR_ELECTRIC_LIME.g, aCoreVibeTheme.COLOR_ELECTRIC_LIME.b, 0.2)
+		sb.border_color = aCoreVibeTheme.COLOR_ELECTRIC_LIME
 		sb.border_width_left = 2
 		sb.border_width_top = 2
 		sb.border_width_right = 2
 		sb.border_width_bottom = 2
+		# Add neon glow
+		sb.shadow_color = Color(aCoreVibeTheme.COLOR_ELECTRIC_LIME.r, aCoreVibeTheme.COLOR_ELECTRIC_LIME.g, aCoreVibeTheme.COLOR_ELECTRIC_LIME.b, 0.4)
+		sb.shadow_size = 4
 
 	wrapper.add_theme_stylebox_override("panel", sb)
 
@@ -238,7 +263,8 @@ func _make_day_cell(num: int, is_today: bool) -> Control:
 	lbl.vertical_alignment   = VERTICAL_ALIGNMENT_CENTER
 	lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	lbl.size_flags_vertical   = Control.SIZE_EXPAND_FILL
-	lbl.add_theme_color_override("font_color", Color(1,1,1,1) if is_today else Color(1,1,1,0.85))
+	# Core Vibe: Milk White for day numbers, brighter for today
+	lbl.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE if is_today else Color(aCoreVibeTheme.COLOR_MILK_WHITE.r, aCoreVibeTheme.COLOR_MILK_WHITE.g, aCoreVibeTheme.COLOR_MILK_WHITE.b, 0.7))
 
 	wrapper.add_child(lbl)
 	return wrapper
