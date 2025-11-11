@@ -30,6 +30,7 @@ var _label: Label
 var _spinner: Polygon2D
 var _tween: Tween
 var _display_start_time: float = 0.0
+var _particle_layer: Node2D = null
 
 static func create() -> LoadingScreen:
 	"""Create a new loading screen instance"""
@@ -61,6 +62,9 @@ func _ready() -> void:
 	else:
 		# Apply Core Vibe styling to existing panel
 		_apply_panel_style()
+
+	# Add ambient particles
+	_spawn_ambient_particles()
 
 	# Start invisible
 	if _background:
@@ -150,6 +154,72 @@ func _apply_panel_style() -> void:
 		panel_style.content_margin_bottom = 20
 
 		panel.add_theme_stylebox_override("panel", panel_style)
+
+func _spawn_ambient_particles() -> void:
+	"""Spawn pulsing neon squares for ambient atmosphere"""
+	# Remove old particle layer if it exists
+	if _particle_layer and is_instance_valid(_particle_layer):
+		_particle_layer.queue_free()
+
+	_particle_layer = Node2D.new()
+	_particle_layer.name = "AmbientParticles"
+	_particle_layer.z_index = -1
+	add_child(_particle_layer)
+
+	var viewport_size = get_viewport().get_visible_rect().size if get_viewport() else Vector2(1152, 648)
+
+	# Create 50 ambient particles (more than title screen)
+	for i in range(50):
+		var particle = ColorRect.new()
+		var size = randi_range(6, 12)  # Bigger than title screen (was 2-6)
+		particle.custom_minimum_size = Vector2(size, size)
+		particle.size = Vector2(size, size)
+
+		# Random neon color
+		var colors = [COLOR_SKY_CYAN, COLOR_BUBBLE_MAGENTA, COLOR_ELECTRIC_LIME, COLOR_CITRUS_YELLOW]
+		particle.color = colors[randi() % colors.size()]
+
+		# Random position
+		particle.position = Vector2(
+			randf_range(0, viewport_size.x),
+			randf_range(0, viewport_size.y)
+		)
+
+		# Set pivot to center for scaling
+		particle.pivot_offset = Vector2(size / 2.0, size / 2.0)
+
+		_particle_layer.add_child(particle)
+
+		# Animate slow drift
+		var drift_tween = create_tween()
+		drift_tween.set_loops()
+		var drift_x = randf_range(-100, 100)
+		var drift_y = randf_range(-60, 60)
+		var drift_duration = randf_range(10, 18)
+		drift_tween.tween_property(particle, "position", particle.position + Vector2(drift_x, drift_y), drift_duration)
+		drift_tween.tween_property(particle, "position", particle.position, drift_duration)
+
+		# Animate pulsing scale
+		var pulse_tween = create_tween()
+		pulse_tween.set_loops()
+		var pulse_duration = randf_range(1.5, 3.0)
+		var scale_min = randf_range(0.8, 0.9)
+		var scale_max = randf_range(1.1, 1.3)
+		pulse_tween.set_trans(Tween.TRANS_SINE)
+		pulse_tween.set_ease(Tween.EASE_IN_OUT)
+		pulse_tween.tween_property(particle, "scale", Vector2(scale_max, scale_max), pulse_duration / 2.0)
+		pulse_tween.tween_property(particle, "scale", Vector2(scale_min, scale_min), pulse_duration / 2.0)
+
+		# Animate pulsing opacity
+		var opacity_tween = create_tween()
+		opacity_tween.set_loops()
+		var opacity_duration = randf_range(2.0, 4.0)
+		var opacity_min = randf_range(0.3, 0.5)
+		var opacity_max = randf_range(0.8, 1.0)
+		opacity_tween.set_trans(Tween.TRANS_SINE)
+		opacity_tween.set_ease(Tween.EASE_IN_OUT)
+		opacity_tween.tween_property(particle, "modulate:a", opacity_max, opacity_duration / 2.0)
+		opacity_tween.tween_property(particle, "modulate:a", opacity_min, opacity_duration / 2.0)
 
 func _create_diamond(size: float) -> PackedVector2Array:
 	"""Create a diamond shape for the spinner"""
