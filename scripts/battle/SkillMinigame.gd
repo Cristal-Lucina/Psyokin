@@ -131,10 +131,14 @@ func _setup_minigame() -> void:
 		next_halt_time = randf_range(0.5, 1.5)
 
 	# Title (show focus stat for debugging)
+	const COLOR_MILK_WHITE = Color(0.96, 0.97, 0.98)
+	const COLOR_BUBBLE_MAGENTA = Color(1.0, 0.29, 0.85)
+
 	title_label = Label.new()
 	title_label.text = "SKILL! (Focus: %d - %d%% Speed)" % [focus_stat, int(speed_multiplier * 100)]
 	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title_label.add_theme_font_size_override("font_size", 28)
+	title_label.add_theme_color_override("font_color", COLOR_BUBBLE_MAGENTA)  # Pink magenta title
 	content_container.add_child(title_label)
 
 	# Overall timer bar (starts when Space is first pressed)
@@ -182,6 +186,7 @@ func _setup_minigame() -> void:
 	focus_level_label.text = "Focus Level: 0 | Hold A (Accept) to charge!"
 	focus_level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	focus_level_label.add_theme_font_size_override("font_size", 20)
+	focus_level_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
 	content_container.add_child(focus_level_label)
 
 	# Sequence display (hidden initially)
@@ -206,6 +211,7 @@ func _setup_minigame() -> void:
 	instruction_label.text = "Release A (Accept) to start casting!"
 	instruction_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	instruction_label.add_theme_font_size_override("font_size", 16)
+	instruction_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
 	content_container.add_child(instruction_label)
 
 func _start_minigame() -> void:
