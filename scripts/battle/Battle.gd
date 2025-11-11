@@ -3559,18 +3559,20 @@ func _create_instruction_popup() -> void:
 	instruction_popup = PanelContainer.new()
 	instruction_popup.custom_minimum_size = Vector2(560, 50)  # Same width as BattleLogPanel
 
-	# Style with white border
+	# Style with cyan neon border to match Core vibe
 	var style = StyleBoxFlat.new()
 	style.bg_color = COLOR_INK_CHARCOAL
-	style.border_width_left = 2
-	style.border_width_right = 2
-	style.border_width_top = 2
-	style.border_width_bottom = 2
-	style.border_color = COLOR_MILK_WHITE  # White border
+	style.border_width_left = 3
+	style.border_width_right = 3
+	style.border_width_top = 3
+	style.border_width_bottom = 3
+	style.border_color = COLOR_SKY_CYAN  # Cyan neon border
 	style.corner_radius_top_left = 12
 	style.corner_radius_top_right = 12
 	style.corner_radius_bottom_left = 12
 	style.corner_radius_bottom_right = 12
+	style.shadow_size = 6
+	style.shadow_color = Color(COLOR_SKY_CYAN.r, COLOR_SKY_CYAN.g, COLOR_SKY_CYAN.b, 0.4)  # Cyan glow
 	style.content_margin_left = 15
 	style.content_margin_right = 15
 	style.content_margin_top = 10
@@ -3646,18 +3648,20 @@ func _show_confirmation_dialog(message: String, on_confirm: Callable) -> void:
 	confirmation_panel = PanelContainer.new()
 	confirmation_panel.custom_minimum_size = Vector2(300, 120)
 
-	# Style the panel
+	# Style the panel with cyan neon border
 	var style = StyleBoxFlat.new()
 	style.bg_color = COLOR_INK_CHARCOAL
-	style.border_width_left = 2
-	style.border_width_right = 2
-	style.border_width_top = 2
-	style.border_width_bottom = 2
-	style.border_color = COLOR_CITRUS_YELLOW
+	style.border_width_left = 3
+	style.border_width_right = 3
+	style.border_width_top = 3
+	style.border_width_bottom = 3
+	style.border_color = COLOR_SKY_CYAN  # Cyan neon border
 	style.corner_radius_top_left = 12
 	style.corner_radius_top_right = 12
 	style.corner_radius_bottom_left = 12
 	style.corner_radius_bottom_right = 12
+	style.shadow_size = 6
+	style.shadow_color = Color(COLOR_SKY_CYAN.r, COLOR_SKY_CYAN.g, COLOR_SKY_CYAN.b, 0.4)  # Cyan glow
 	confirmation_panel.add_theme_stylebox_override("panel", style)
 
 	# Create VBox layout
