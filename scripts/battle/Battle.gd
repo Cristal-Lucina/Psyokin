@@ -4336,14 +4336,20 @@ func _show_item_menu(items: Array) -> void:
 	item_menu_panel = PanelContainer.new()
 	item_menu_panel.custom_minimum_size = Vector2(550, 0)
 
-	# Style the panel
+	# Style the panel with Core vibe
 	var style = StyleBoxFlat.new()
-	style.bg_color = Color(0.1, 0.1, 0.15, 0.95)
-	style.border_width_left = 2
-	style.border_width_right = 2
-	style.border_width_top = 2
-	style.border_width_bottom = 2
-	style.border_color = Color(0.5, 0.5, 0.6, 1.0)
+	style.bg_color = COLOR_INK_CHARCOAL
+	style.border_width_left = 3
+	style.border_width_right = 3
+	style.border_width_top = 3
+	style.border_width_bottom = 3
+	style.border_color = COLOR_SKY_CYAN  # Cyan neon border
+	style.corner_radius_top_left = 12
+	style.corner_radius_top_right = 12
+	style.corner_radius_bottom_left = 12
+	style.corner_radius_bottom_right = 12
+	style.shadow_size = 6
+	style.shadow_color = Color(COLOR_SKY_CYAN.r, COLOR_SKY_CYAN.g, COLOR_SKY_CYAN.b, 0.4)  # Cyan glow
 	item_menu_panel.add_theme_stylebox_override("panel", style)
 
 	# Create VBox for menu items
@@ -4354,6 +4360,7 @@ func _show_item_menu(items: Array) -> void:
 	var title = Label.new()
 	title.text = "Select an Item"
 	title.add_theme_font_size_override("font_size", 18)
+	title.add_theme_color_override("font_color", COLOR_MILK_WHITE)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vbox.add_child(title)
 
@@ -4383,6 +4390,7 @@ func _show_item_menu(items: Array) -> void:
 	item_description_label = Label.new()
 	item_description_label.text = "Hover over an item to see its description"
 	item_description_label.add_theme_font_size_override("font_size", 14)
+	item_description_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
 	item_description_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	item_description_label.custom_minimum_size = Vector2(530, 60)
 	item_description_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -4434,6 +4442,7 @@ func _add_category_tab(tab_container: TabContainer, category_name: String, categ
 		empty_label.text = "No items in this category"
 		empty_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		empty_label.add_theme_font_size_override("font_size", 14)
+		empty_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
 		grid.add_child(empty_label)
 		return
 
