@@ -331,30 +331,27 @@ func _create_next_mission_display() -> void:
 	container.grow_horizontal = Control.GROW_DIRECTION_BEGIN  # Grow left
 	container.grow_vertical = Control.GROW_DIRECTION_END      # Grow down
 
-	# Create "NEXT MISSION" label
+	# Create "NEXT MISSION" label with Core Vibe styling
 	var title_label := Label.new()
 	title_label.text = "NEXT MISSION"
-	title_label.add_theme_font_size_override("font_size", 30)
-	title_label.add_theme_color_override("font_color", Color(0.9, 0.9, 0.9))
 	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	# Core Vibe: Electric Lime title (attention/highlight)
+	aCoreVibeTheme.style_label(title_label, aCoreVibeTheme.COLOR_ELECTRIC_LIME, 28)
 	container.add_child(title_label)
 
-	# Create grey box with white border for mission description
+	# Create mission box with Core Vibe styling
 	var mission_box := PanelContainer.new()
-	mission_box.custom_minimum_size = Vector2(300, 72)
+	mission_box.custom_minimum_size = Vector2(300, 80)
 
-	# Create grey background with white border
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.3, 0.3, 0.3, 1.0)  # Grey background
-	style.border_width_left = 2
-	style.border_width_right = 2
-	style.border_width_top = 2
-	style.border_width_bottom = 2
-	style.border_color = Color(1.0, 1.0, 1.0, 1.0)  # White border
-	style.corner_radius_top_left = 4
-	style.corner_radius_top_right = 4
-	style.corner_radius_bottom_left = 4
-	style.corner_radius_bottom_right = 4
+	# Core Vibe: Electric Lime pill capsule panel
+	var style = aCoreVibeTheme.create_panel_style(
+		aCoreVibeTheme.COLOR_ELECTRIC_LIME,       # Electric Lime border (important mission)
+		aCoreVibeTheme.COLOR_INK_CHARCOAL,        # Ink charcoal background
+		aCoreVibeTheme.PANEL_OPACITY_SEMI,        # Semi-transparent
+		aCoreVibeTheme.CORNER_RADIUS_SMALL,       # 12px corners
+		aCoreVibeTheme.BORDER_WIDTH_THIN,         # 2px border
+		aCoreVibeTheme.SHADOW_SIZE_LARGE          # 12px glow
+	)
 	mission_box.add_theme_stylebox_override("panel", style)
 
 	# Add margin for padding inside box
@@ -365,13 +362,13 @@ func _create_next_mission_display() -> void:
 	margin.add_theme_constant_override("margin_bottom", 6)
 	mission_box.add_child(margin)
 
-	# Create label for mission text
+	# Create label for mission text with Core Vibe styling
 	_mission_value_label = Label.new()
 	_mission_value_label.text = "TBD"
-	_mission_value_label.add_theme_font_size_override("font_size", 14)
-	_mission_value_label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0))
 	_mission_value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	_mission_value_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	# Core Vibe: Milk White text
+	aCoreVibeTheme.style_label(_mission_value_label, aCoreVibeTheme.COLOR_MILK_WHITE, 14)
 	margin.add_child(_mission_value_label)
 
 	container.add_child(mission_box)
@@ -409,15 +406,17 @@ func _create_info_cell(label_text: String, initial_value: String) -> PanelContai
 	"""Create a single info cell with label and value
 	Returns PanelContainer with 'value_label' meta for updating"""
 	var panel := PanelContainer.new()
-	panel.custom_minimum_size = Vector2(180, 35)  # Increased height for larger font
+	panel.custom_minimum_size = Vector2(180, 40)  # Slightly increased for pill capsule
 
-	# Create pale white rounded background
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.95, 0.95, 0.95, 1.0)  # Pale white
-	style.corner_radius_top_left = 4
-	style.corner_radius_top_right = 4
-	style.corner_radius_bottom_left = 4
-	style.corner_radius_bottom_right = 4
+	# Core Vibe: Sky Cyan pill capsule panel
+	var style = aCoreVibeTheme.create_panel_style(
+		aCoreVibeTheme.COLOR_SKY_CYAN,            # Sky Cyan border
+		aCoreVibeTheme.COLOR_INK_CHARCOAL,        # Ink charcoal background
+		aCoreVibeTheme.PANEL_OPACITY_SEMI,        # Semi-transparent
+		aCoreVibeTheme.CORNER_RADIUS_SMALL,       # 12px corners
+		aCoreVibeTheme.BORDER_WIDTH_THIN,         # 2px border
+		aCoreVibeTheme.SHADOW_SIZE_MEDIUM         # 6px glow
+	)
 	panel.add_theme_stylebox_override("panel", style)
 
 	# Add margin for padding inside cell (10px buffer on each side)
@@ -433,17 +432,13 @@ func _create_info_cell(label_text: String, initial_value: String) -> PanelContai
 	hbox.add_theme_constant_override("separation", 4)
 	margin.add_child(hbox)
 
-	# Label - left justified, max 6 characters, bold dark grey
+	# Label - left justified, Core Vibe: Sky Cyan
 	var label := Label.new()
 	label.text = label_text + ":"
 	label.custom_minimum_size = Vector2(60, 0)  # ~6 chars + colon
 	label.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
-	label.add_theme_font_size_override("font_size", 16)  # Increased from 12 to 16
-	label.add_theme_color_override("font_color", Color(0.2, 0.2, 0.2))  # Dark grey
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-	# Make extra bold with outline effect
-	label.add_theme_constant_override("outline_size", 1)
-	label.add_theme_color_override("font_outline_color", Color(0.2, 0.2, 0.2))
+	aCoreVibeTheme.style_label(label, aCoreVibeTheme.COLOR_SKY_CYAN, 16)
 	hbox.add_child(label)
 
 	# Spacer to push value to the right
@@ -451,17 +446,13 @@ func _create_info_cell(label_text: String, initial_value: String) -> PanelContai
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	hbox.add_child(spacer)
 
-	# Value - right justified, max 16 characters, bold dark grey
+	# Value - right justified, Core Vibe: Milk White
 	var value_label := Label.new()
 	value_label.text = initial_value
 	value_label.custom_minimum_size = Vector2(80, 0)  # ~16 chars max
 	value_label.size_flags_horizontal = Control.SIZE_SHRINK_END
-	value_label.add_theme_font_size_override("font_size", 16)  # Increased from 12 to 16
-	value_label.add_theme_color_override("font_color", Color(0.2, 0.2, 0.2))  # Dark grey
 	value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	# Make extra bold with outline effect
-	value_label.add_theme_constant_override("outline_size", 1)
-	value_label.add_theme_color_override("font_outline_color", Color(0.2, 0.2, 0.2))
+	aCoreVibeTheme.style_label(value_label, aCoreVibeTheme.COLOR_MILK_WHITE, 16)
 	hbox.add_child(value_label)
 
 	# Store reference to value label for updating
@@ -753,15 +744,8 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 		hp_bar.custom_minimum_size.y = 8  # Half height (was ~16px default)
 		hp_bar.show_percentage = false  # Remove percentage text
 
-		# Create pale pink background (backing bar)
-		var hp_bg := StyleBoxFlat.new()
-		hp_bg.bg_color = Color(1.0, 0.8, 0.85)  # Pale pink
-		hp_bar.add_theme_stylebox_override("background", hp_bg)
-
-		# Create bright pink fill (current HP)
-		var hp_fill := StyleBoxFlat.new()
-		hp_fill.bg_color = Color(1.0, 0.3, 0.5)  # Bright pink
-		hp_bar.add_theme_stylebox_override("fill", hp_fill)
+		# Core Vibe: Bubble Magenta progress bar with neon glow
+		aCoreVibeTheme.style_progress_bar(hp_bar, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA)
 
 		hp_bar.min_value = 0.0
 		hp_bar.max_value = float(hp_max_i)
@@ -813,15 +797,8 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 		mp_bar.custom_minimum_size.y = 8  # Half height (was ~16px default)
 		mp_bar.show_percentage = false  # Remove percentage text
 
-		# Create pale light blue background (backing bar)
-		var mp_bg := StyleBoxFlat.new()
-		mp_bg.bg_color = Color(0.8, 0.9, 1.0)  # Pale light blue
-		mp_bar.add_theme_stylebox_override("background", mp_bg)
-
-		# Create bright blue fill (current MP)
-		var mp_fill := StyleBoxFlat.new()
-		mp_fill.bg_color = Color(0.3, 0.6, 1.0)  # Bright blue
-		mp_bar.add_theme_stylebox_override("fill", mp_fill)
+		# Core Vibe: Sky Cyan progress bar with neon glow
+		aCoreVibeTheme.style_progress_bar(mp_bar, aCoreVibeTheme.COLOR_SKY_CYAN)
 
 		mp_bar.min_value = 0.0
 		mp_bar.max_value = float(mp_max_i)
@@ -855,12 +832,10 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 	# Recovery button (always shown for all members)
 	var recovery_btn := Button.new()
 	recovery_btn.text = "RECOVERY"
-	recovery_btn.custom_minimum_size.x = 70
-	recovery_btn.add_theme_font_size_override("font_size", 10)
-	recovery_btn.add_theme_color_override("font_color", Color(0.0, 0.8, 0.0))  # Green
-	recovery_btn.add_theme_constant_override("outline_size", 1)
-	recovery_btn.add_theme_color_override("font_outline_color", Color(0.0, 0.8, 0.0))  # Bold effect
+	recovery_btn.custom_minimum_size = Vector2(80, 32)
 	recovery_btn.focus_mode = Control.FOCUS_ALL
+	# Core Vibe: Electric Lime button (success/recovery action)
+	aCoreVibeTheme.style_button(recovery_btn, aCoreVibeTheme.COLOR_ELECTRIC_LIME, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
 	recovery_btn.set_meta("member_id", member_id)
 	recovery_btn.set_meta("member_name", String(member_data.get("name", "Member")))
 	recovery_btn.set_meta("hp", int(member_data.get("hp", 0)))
@@ -875,12 +850,10 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 	if show_switch:
 		var switch_btn := Button.new()
 		switch_btn.text = "SWITCH"
-		switch_btn.custom_minimum_size.x = 70
-		switch_btn.add_theme_font_size_override("font_size", 10)
-		switch_btn.add_theme_color_override("font_color", Color(0.3, 0.6, 1.0))  # Blue
-		switch_btn.add_theme_constant_override("outline_size", 1)
-		switch_btn.add_theme_color_override("font_outline_color", Color(0.3, 0.6, 1.0))  # Bold effect
+		switch_btn.custom_minimum_size = Vector2(80, 32)
 		switch_btn.focus_mode = Control.FOCUS_ALL
+		# Core Vibe: Sky Cyan button (primary action)
+		aCoreVibeTheme.style_button(switch_btn, aCoreVibeTheme.COLOR_SKY_CYAN, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
 		switch_btn.set_meta("active_slot", active_slot)
 		switch_btn.pressed.connect(_on_switch_pressed.bind(active_slot))
 		buttons_vbox.add_child(switch_btn)
@@ -1030,15 +1003,15 @@ func _show_swap_confirmation(member_name: String, _member_id: String) -> void:
 	print("[StatusPanel] Swap confirmation closed")
 
 func _style_popup_panel(popup_panel: Panel) -> void:
-	"""Apply consistent styling to popup panels (matches ToastPopup)"""
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.15, 0.15, 0.15, 1.0)  # Dark gray, fully opaque
-	style.border_color = Color(1.0, 0.7, 0.75, 1.0)  # Pink border
-	style.set_border_width_all(2)
-	style.corner_radius_top_left = 8
-	style.corner_radius_top_right = 8
-	style.corner_radius_bottom_left = 8
-	style.corner_radius_bottom_right = 8
+	"""Apply Core Vibe styling to popup panels (matches ToastPopup)"""
+	var style = aCoreVibeTheme.create_panel_style(
+		aCoreVibeTheme.COLOR_SKY_CYAN,            # Sky Cyan border
+		aCoreVibeTheme.COLOR_INK_CHARCOAL,        # Ink charcoal background
+		aCoreVibeTheme.PANEL_OPACITY_FULL,        # Fully opaque
+		aCoreVibeTheme.CORNER_RADIUS_MEDIUM,      # 16px corners
+		aCoreVibeTheme.BORDER_WIDTH_THIN,         # 2px border
+		aCoreVibeTheme.SHADOW_SIZE_LARGE          # 12px glow
+	)
 	popup_panel.add_theme_stylebox_override("panel", style)
 
 func _fade_in_popup(popup_panel: Panel) -> void:
