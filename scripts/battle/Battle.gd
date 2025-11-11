@@ -2787,14 +2787,16 @@ func _on_defend_pressed() -> void:
 		return
 
 	# Show confirmation dialog
-	_show_confirmation_dialog("Do you want to guard?", _execute_defend)
+	_show_confirmation_dialog("Do you want to guard?", Callable(self, "_execute_defend"))
 
 func _execute_defend() -> void:
 	"""Execute defend action after confirmation"""
+	print("[Battle] _execute_defend called!")
 	log_message("%s moved into a defensive stance." % current_combatant.display_name)
 	current_combatant.is_defending = true
 
 	# End turn
+	print("[Battle] Calling battle_mgr.end_turn()")
 	battle_mgr.end_turn()
 
 func _on_burst_pressed() -> void:
@@ -2862,7 +2864,7 @@ func _on_run_pressed() -> void:
 		return
 
 	# Show confirmation dialog
-	_show_confirmation_dialog("Do you want to run?", _execute_run)
+	_show_confirmation_dialog("Do you want to run?", Callable(self, "_execute_run"))
 
 func _execute_run() -> void:
 	"""Execute run action after confirmation"""
@@ -3701,12 +3703,16 @@ func _show_confirmation_dialog(message: String, on_confirm: Callable) -> void:
 
 func _on_confirmation_yes() -> void:
 	"""Handle Yes button press"""
+	print("[Battle] Confirmation Yes pressed")
 	_close_confirmation_dialog()
 	_hide_instruction()
 
 	# Call the confirmation callback
+	print("[Battle] Calling confirmation callback, is_valid: ", confirmation_callback.is_valid())
 	if confirmation_callback.is_valid():
+		print("[Battle] Executing callback...")
 		confirmation_callback.call()
+		print("[Battle] Callback executed")
 
 func _on_confirmation_no() -> void:
 	"""Handle No button press"""
