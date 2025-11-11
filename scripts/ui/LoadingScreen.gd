@@ -10,6 +10,17 @@ class_name LoadingScreen
 ##   await loading.fade_out()
 ##   loading.queue_free()
 
+## Neon Orchard Color Palette
+const COLOR_ELECTRIC_LIME = Color(0.78, 1.0, 0.24)      # #C8FF3D
+const COLOR_BUBBLE_MAGENTA = Color(1.0, 0.29, 0.85)     # #FF4AD9
+const COLOR_SKY_CYAN = Color(0.30, 0.91, 1.0)           # #4DE9FF
+const COLOR_CITRUS_YELLOW = Color(1.0, 0.91, 0.30)      # #FFE84D
+const COLOR_PLASMA_TEAL = Color(0.13, 0.89, 0.70)       # #20E3B2
+const COLOR_GRAPE_VIOLET = Color(0.54, 0.25, 0.99)      # #8A3FFC
+const COLOR_NIGHT_NAVY = Color(0.04, 0.06, 0.10)        # #0A0F1A
+const COLOR_INK_CHARCOAL = Color(0.07, 0.09, 0.15)      # #111827
+const COLOR_MILK_WHITE = Color(0.96, 0.97, 0.98)        # #F4F7FB
+
 const FADE_DURATION := 0.3
 const SPIN_SPEED := 3.0  # Rotations per second
 const MIN_DISPLAY_TIME := 3.0  # Minimum seconds to display loading screen
@@ -40,24 +51,27 @@ func _ready() -> void:
 	if _background == null:
 		_background = get_node_or_null("Background") as ColorRect
 	if _label == null:
-		_label = get_node_or_null("Background/CenterContainer/LoadingContainer/LoadingText") as Label
+		_label = get_node_or_null("Background/CenterContainer/LoadingPanel/LoadingContainer/LoadingText") as Label
 	if _spinner == null:
-		_spinner = get_node_or_null("Background/CenterContainer/LoadingContainer/Spinner") as Polygon2D
+		_spinner = get_node_or_null("Background/CenterContainer/LoadingPanel/LoadingContainer/Spinner") as Polygon2D
 
 	# Build UI if background doesn't exist
 	if _background == null:
 		_build_ui()
+	else:
+		# Apply Core Vibe styling to existing panel
+		_apply_panel_style()
 
 	# Start invisible
 	if _background:
 		_background.modulate = Color(1, 1, 1, 0)
 
 func _build_ui() -> void:
-	"""Build the loading screen UI programmatically"""
-	# Full-screen dark background
+	"""Build the loading screen UI programmatically with Core Vibe styling"""
+	# Full-screen dark background with transparency
 	_background = ColorRect.new()
 	_background.name = "Background"
-	_background.color = Color(0.05, 0.05, 0.05, 1.0)  # Very dark gray
+	_background.color = Color(COLOR_NIGHT_NAVY.r, COLOR_NIGHT_NAVY.g, COLOR_NIGHT_NAVY.b, 0.92)  # 92% opacity
 	_background.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(_background)
 
@@ -67,26 +81,75 @@ func _build_ui() -> void:
 	center.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_background.add_child(center)
 
+	# Create pill capsule panel
+	var panel := PanelContainer.new()
+	panel.name = "LoadingPanel"
+
+	var panel_style := StyleBoxFlat.new()
+	panel_style.bg_color = Color(COLOR_INK_CHARCOAL.r, COLOR_INK_CHARCOAL.g, COLOR_INK_CHARCOAL.b, 0.85)  # 85% opacity
+	panel_style.border_color = COLOR_SKY_CYAN
+	panel_style.border_width_left = 3
+	panel_style.border_width_right = 3
+	panel_style.border_width_top = 3
+	panel_style.border_width_bottom = 3
+	panel_style.corner_radius_top_left = 12
+	panel_style.corner_radius_top_right = 12
+	panel_style.corner_radius_bottom_left = 12
+	panel_style.corner_radius_bottom_right = 12
+	panel_style.shadow_color = Color(COLOR_SKY_CYAN.r, COLOR_SKY_CYAN.g, COLOR_SKY_CYAN.b, 0.5)
+	panel_style.shadow_size = 8
+	panel_style.content_margin_left = 32
+	panel_style.content_margin_right = 32
+	panel_style.content_margin_top = 20
+	panel_style.content_margin_bottom = 20
+
+	panel.add_theme_stylebox_override("panel", panel_style)
+	center.add_child(panel)
+
 	var container := HBoxContainer.new()
 	container.name = "LoadingContainer"
-	container.add_theme_constant_override("separation", 12)
-	center.add_child(container)
+	container.add_theme_constant_override("separation", 16)
+	panel.add_child(container)
 
-	# "LOADING" text
+	# "LOADING" text with Core Vibe styling
 	_label = Label.new()
 	_label.name = "LoadingText"
 	_label.text = "LOADING"
-	_label.add_theme_font_size_override("font_size", 40)
-	_label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 0.9))
+	_label.add_theme_font_size_override("font_size", 36)
+	_label.add_theme_color_override("font_color", COLOR_SKY_CYAN)
 	container.add_child(_label)
 
-	# Spinning shape (diamond)
+	# Spinning shape (diamond) with neon colors
 	_spinner = Polygon2D.new()
 	_spinner.name = "Spinner"
-	_spinner.color = Color(0.3, 0.6, 1.0, 0.9)  # Blue
-	_spinner.polygon = _create_diamond(20.0)
-	_spinner.position = Vector2(-35, 30)  # Positioned left and down from center
+	_spinner.color = COLOR_BUBBLE_MAGENTA
+	_spinner.polygon = _create_diamond(16.0)
+	_spinner.position = Vector2(-30, 24)  # Positioned left and down from center
 	container.add_child(_spinner)
+
+func _apply_panel_style() -> void:
+	"""Apply Core Vibe styling to the loading panel from scene"""
+	var panel = get_node_or_null("Background/CenterContainer/LoadingPanel") as PanelContainer
+	if panel:
+		var panel_style := StyleBoxFlat.new()
+		panel_style.bg_color = Color(COLOR_INK_CHARCOAL.r, COLOR_INK_CHARCOAL.g, COLOR_INK_CHARCOAL.b, 0.85)  # 85% opacity
+		panel_style.border_color = COLOR_SKY_CYAN
+		panel_style.border_width_left = 3
+		panel_style.border_width_right = 3
+		panel_style.border_width_top = 3
+		panel_style.border_width_bottom = 3
+		panel_style.corner_radius_top_left = 12
+		panel_style.corner_radius_top_right = 12
+		panel_style.corner_radius_bottom_left = 12
+		panel_style.corner_radius_bottom_right = 12
+		panel_style.shadow_color = Color(COLOR_SKY_CYAN.r, COLOR_SKY_CYAN.g, COLOR_SKY_CYAN.b, 0.5)
+		panel_style.shadow_size = 8
+		panel_style.content_margin_left = 32
+		panel_style.content_margin_right = 32
+		panel_style.content_margin_top = 20
+		panel_style.content_margin_bottom = 20
+
+		panel.add_theme_stylebox_override("panel", panel_style)
 
 func _create_diamond(size: float) -> PackedVector2Array:
 	"""Create a diamond shape for the spinner"""

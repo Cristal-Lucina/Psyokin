@@ -617,7 +617,7 @@ func _style_date_and_phase_labels() -> void:
 	if date_label:
 		# Create pill capsule background for date label
 		var date_panel = StyleBoxFlat.new()
-		date_panel.bg_color = COLOR_INK_CHARCOAL
+		date_panel.bg_color = Color(COLOR_INK_CHARCOAL.r, COLOR_INK_CHARCOAL.g, COLOR_INK_CHARCOAL.b, 0.85)  # 85% opacity
 		date_panel.border_color = COLOR_SKY_CYAN
 		date_panel.border_width_left = 2
 		date_panel.border_width_right = 2
@@ -661,7 +661,7 @@ func _style_date_and_phase_labels() -> void:
 	if phase_label:
 		# Create pill capsule background for phase label
 		var phase_panel = StyleBoxFlat.new()
-		phase_panel.bg_color = COLOR_INK_CHARCOAL
+		phase_panel.bg_color = Color(COLOR_INK_CHARCOAL.r, COLOR_INK_CHARCOAL.g, COLOR_INK_CHARCOAL.b, 0.85)  # 85% opacity
 		phase_panel.border_color = COLOR_BUBBLE_MAGENTA
 		phase_panel.border_width_left = 2
 		phase_panel.border_width_right = 2
