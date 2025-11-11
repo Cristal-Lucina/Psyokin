@@ -11,6 +11,17 @@ class_name Battle
 @onready var burst_system = get_node("/root/aBurstSystem")
 @onready var minigame_mgr = get_node("/root/aMinigameManager")
 
+## Neon Orchard Color Palette
+const COLOR_ELECTRIC_LIME = Color(0.78, 1.0, 0.24)      # #C8FF3D
+const COLOR_BUBBLE_MAGENTA = Color(1.0, 0.29, 0.85)     # #FF4AD9
+const COLOR_SKY_CYAN = Color(0.30, 0.91, 1.0)           # #4DE9FF
+const COLOR_CITRUS_YELLOW = Color(1.0, 0.91, 0.30)      # #FFE84D
+const COLOR_PLASMA_TEAL = Color(0.13, 0.89, 0.70)       # #20E3B2
+const COLOR_GRAPE_VIOLET = Color(0.54, 0.25, 0.99)      # #8A3FFC
+const COLOR_NIGHT_NAVY = Color(0.04, 0.06, 0.10)        # #0A0F1A
+const COLOR_INK_CHARCOAL = Color(0.07, 0.09, 0.15)      # #111827
+const COLOR_MILK_WHITE = Color(0.96, 0.97, 0.98)        # #F4F7FB
+
 ## UI References
 @onready var action_menu: GridContainer = %ActionMenu
 @onready var battle_log: RichTextLabel = %BattleLog
@@ -20,6 +31,11 @@ class_name Battle
 ## Combatant display containers
 @onready var ally_slots: HBoxContainer = %AllySlots
 @onready var enemy_slots: HBoxContainer = %EnemySlots
+
+## Dynamic background elements
+var diagonal_bands: ColorRect = null
+var grid_overlay: ColorRect = null
+var particle_layer: Node2D = null
 
 ## State
 var is_battle_ready: bool = false  # True when battle is fully initialized
@@ -78,13 +94,16 @@ func _ready() -> void:
 	# Wait for next frame to ensure all autoloads are ready
 	await get_tree().process_frame
 
+	# Create neon-kawaii background elements
+	_create_diagonal_background()
+
 	# Update action button labels with mapped keys/buttons
 	_update_action_button_labels()
 
-	# Apply Deltarune-style colors to action buttons
+	# Apply neon-kawaii style to action buttons
 	_style_action_buttons()
 
-	# Apply Deltarune-style borders to panels
+	# Apply neon-kawaii style to panels
 	_style_panels()
 
 	# Load skill definitions
@@ -169,138 +188,292 @@ func _get_joypad_button_short_name(button_index: int) -> String:
 		_: return "Btn%d" % button_index
 
 func _style_action_buttons() -> void:
-	"""Apply Deltarune-style colored backgrounds to action buttons"""
+	"""Apply neon-kawaii pill capsule style to action buttons"""
 	var button_styles = [
-		{"button": "AttackButton", "color": Color(0.8, 0.2, 0.2, 1)},      # Red
-		{"button": "SkillButton", "color": Color(0.3, 0.5, 0.9, 1)},       # Blue
-		{"button": "CaptureButton", "color": Color(0.6, 0.3, 0.8, 1)},     # Purple
-		{"button": "DefendButton", "color": Color(0.2, 0.7, 0.8, 1)},      # Cyan
-		{"button": "BurstButton", "color": Color(0.9, 0.8, 0.2, 1)},       # Yellow
-		{"button": "RunButton", "color": Color(0.5, 0.5, 0.5, 1)},         # Gray
-		{"button": "ItemButton", "color": Color(0.3, 0.8, 0.3, 1)},        # Green
-		{"button": "StatusButton", "color": Color(0.9, 0.9, 0.9, 1)},      # White/Light Gray
+		{"button": "AttackButton", "neon": COLOR_BUBBLE_MAGENTA, "label": "FIGHT"},      # Magenta for damage
+		{"button": "SkillButton", "neon": COLOR_SKY_CYAN, "label": "SKILL"},             # Cyan for skills
+		{"button": "CaptureButton", "neon": COLOR_GRAPE_VIOLET, "label": "CAPTURE"},     # Violet for special
+		{"button": "DefendButton", "neon": COLOR_PLASMA_TEAL, "label": "GUARD"},         # Teal for defense
+		{"button": "BurstButton", "neon": COLOR_CITRUS_YELLOW, "label": "BURST"},        # Yellow for burst
+		{"button": "RunButton", "neon": COLOR_INK_CHARCOAL, "label": "RUN"},             # Dark for run
+		{"button": "ItemButton", "neon": COLOR_ELECTRIC_LIME, "label": "ITEMS"},         # Lime for items
+		{"button": "StatusButton", "neon": COLOR_MILK_WHITE, "label": "STATUS"},         # White for status
 	]
 
 	for style_data in button_styles:
 		var btn = action_menu.get_node_or_null(style_data["button"])
 		if btn and btn is Button:
-			# Create StyleBoxFlat for normal state
+			# Pill capsule shape with high corner radius (20px per design spec)
+			var corner_radius = 20
+
+			# Normal state: Dark fill with inner neon stroke
 			var style_normal = StyleBoxFlat.new()
-			style_normal.bg_color = style_data["color"]
+			style_normal.bg_color = COLOR_NIGHT_NAVY  # Dark glass fill
 			style_normal.border_width_left = 2
 			style_normal.border_width_right = 2
 			style_normal.border_width_top = 2
 			style_normal.border_width_bottom = 2
-			style_normal.border_color = Color(1, 1, 1, 1)  # White border
-			style_normal.corner_radius_top_left = 4
-			style_normal.corner_radius_top_right = 4
-			style_normal.corner_radius_bottom_left = 4
-			style_normal.corner_radius_bottom_right = 4
+			style_normal.border_color = style_data["neon"]  # Inner neon stroke
+			style_normal.corner_radius_top_left = corner_radius
+			style_normal.corner_radius_top_right = corner_radius
+			style_normal.corner_radius_bottom_left = corner_radius
+			style_normal.corner_radius_bottom_right = corner_radius
+			style_normal.shadow_size = 4
+			style_normal.shadow_color = Color(style_data["neon"].r, style_data["neon"].g, style_data["neon"].b, 0.4)  # Soft glow
 
-			# Create StyleBoxFlat for hover state (brighter)
+			# Hover state: Brighter fill + thicker border + stronger glow
 			var style_hover = StyleBoxFlat.new()
-			var hover_color = style_data["color"].lightened(0.2)
-			style_hover.bg_color = hover_color
+			style_hover.bg_color = COLOR_INK_CHARCOAL.lightened(0.15)  # Slightly brighter
 			style_hover.border_width_left = 3
 			style_hover.border_width_right = 3
 			style_hover.border_width_top = 3
 			style_hover.border_width_bottom = 3
-			style_hover.border_color = Color(1, 1, 1, 1)
-			style_hover.corner_radius_top_left = 4
-			style_hover.corner_radius_top_right = 4
-			style_hover.corner_radius_bottom_left = 4
-			style_hover.corner_radius_bottom_right = 4
+			style_hover.border_color = style_data["neon"].lightened(0.2)  # Brighter neon
+			style_hover.corner_radius_top_left = corner_radius
+			style_hover.corner_radius_top_right = corner_radius
+			style_hover.corner_radius_bottom_left = corner_radius
+			style_hover.corner_radius_bottom_right = corner_radius
+			style_hover.shadow_size = 8  # Stronger glow on hover
+			style_hover.shadow_color = Color(style_data["neon"].r, style_data["neon"].g, style_data["neon"].b, 0.6)
 
-			# Create StyleBoxFlat for pressed state (darker)
+			# Pressed state: Darker fill with maintained border
 			var style_pressed = StyleBoxFlat.new()
-			var pressed_color = style_data["color"].darkened(0.2)
-			style_pressed.bg_color = pressed_color
+			style_pressed.bg_color = COLOR_NIGHT_NAVY.darkened(0.2)
 			style_pressed.border_width_left = 2
 			style_pressed.border_width_right = 2
 			style_pressed.border_width_top = 2
 			style_pressed.border_width_bottom = 2
-			style_pressed.border_color = Color(0.8, 0.8, 0.8, 1)
-			style_pressed.corner_radius_top_left = 4
-			style_pressed.corner_radius_top_right = 4
-			style_pressed.corner_radius_bottom_left = 4
-			style_pressed.corner_radius_bottom_right = 4
+			style_pressed.border_color = style_data["neon"]
+			style_pressed.corner_radius_top_left = corner_radius
+			style_pressed.corner_radius_top_right = corner_radius
+			style_pressed.corner_radius_bottom_left = corner_radius
+			style_pressed.corner_radius_bottom_right = corner_radius
+			style_pressed.shadow_size = 2
+			style_pressed.shadow_color = Color(style_data["neon"].r, style_data["neon"].g, style_data["neon"].b, 0.3)
 
-			# Apply styles to button
+			# Apply styles
 			btn.add_theme_stylebox_override("normal", style_normal)
 			btn.add_theme_stylebox_override("hover", style_hover)
 			btn.add_theme_stylebox_override("pressed", style_pressed)
 			btn.add_theme_stylebox_override("focus", style_hover)
 
-			# Set text color to black for better contrast on light backgrounds
-			var text_color = Color(0, 0, 0, 1) if style_data["color"].v > 0.5 else Color(1, 1, 1, 1)
-			btn.add_theme_color_override("font_color", text_color)
-			btn.add_theme_color_override("font_hover_color", text_color)
-			btn.add_theme_color_override("font_pressed_color", text_color)
-			btn.add_theme_color_override("font_focus_color", text_color)
+			# Text in Milk White, all caps
+			btn.text = "%s" % style_data["label"]
+			btn.add_theme_color_override("font_color", COLOR_MILK_WHITE)
+			btn.add_theme_color_override("font_hover_color", COLOR_MILK_WHITE)
+			btn.add_theme_color_override("font_pressed_color", COLOR_MILK_WHITE)
+			btn.add_theme_color_override("font_focus_color", COLOR_MILK_WHITE)
+
+			# Apply diagonal tilt (10-18 degrees) using rotation
+			btn.rotation_degrees = randf_range(-3, 3)  # Subtle variation per button
+
+func _create_diagonal_background() -> void:
+	"""Create neon-kawaii diagonal band background with grid overlay"""
+	var background = get_node_or_null("Background")
+	if not background:
+		return
+
+	# Create diagonal bands using a shader
+	diagonal_bands = ColorRect.new()
+	diagonal_bands.set_anchors_preset(Control.PRESET_FULL_RECT)
+	diagonal_bands.z_index = -10
+	diagonal_bands.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	# Create shader for diagonal bands
+	var shader_code = """
+shader_type canvas_item;
+
+uniform vec3 color1 = vec3(0.04, 0.06, 0.10);  // Night Navy
+uniform vec3 color2 = vec3(0.07, 0.09, 0.15);  // Ink Charcoal
+uniform float angle = 0.21;  // ~12 degrees in radians
+uniform float band_width = 150.0;
+
+void fragment() {
+	vec2 uv = FRAGCOORD.xy;
+	float rotated = uv.x * cos(angle) - uv.y * sin(angle);
+	float band = mod(rotated, band_width * 2.0);
+	float t = smoothstep(0.0, band_width, band) * (1.0 - smoothstep(band_width, band_width * 2.0, band));
+	COLOR = vec4(mix(color1, color2, t), 1.0);
+}
+"""
+
+	var shader = Shader.new()
+	shader.code = shader_code
+	var shader_material = ShaderMaterial.new()
+	shader_material.shader = shader
+	diagonal_bands.material = shader_material
+
+	# Insert after the solid black background
+	background.add_sibling(diagonal_bands)
+
+	# Create grid overlay
+	grid_overlay = ColorRect.new()
+	grid_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	grid_overlay.z_index = -9
+	grid_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	# Create shader for grid pattern
+	var grid_shader_code = """
+shader_type canvas_item;
+
+uniform float grid_size = 12.0;
+uniform float line_width = 1.0;
+uniform vec4 grid_color = vec4(0.3, 0.91, 1.0, 0.06);  // Sky Cyan at 6% opacity
+
+void fragment() {
+	vec2 uv = FRAGCOORD.xy;
+	vec2 grid = mod(uv, grid_size);
+	float line = step(grid_size - line_width, grid.x) + step(grid_size - line_width, grid.y);
+	COLOR = vec4(grid_color.rgb, grid_color.a * min(line, 1.0));
+}
+"""
+
+	var grid_shader = Shader.new()
+	grid_shader.code = grid_shader_code
+	var grid_material = ShaderMaterial.new()
+	grid_material.shader = grid_shader
+	grid_overlay.material = grid_material
+
+	background.add_sibling(grid_overlay)
+
+	# Create particle layer for ambient stars and dots
+	particle_layer = Node2D.new()
+	particle_layer.z_index = -8
+	add_child(particle_layer)
+
+	# Spawn some ambient particles
+	_spawn_ambient_particles()
+
+func _spawn_ambient_particles() -> void:
+	"""Spawn slow-drifting star and dot particles"""
+	if not particle_layer:
+		return
+
+	var viewport_size = get_viewport_rect().size
+	var particle_count = 20
+
+	for i in range(particle_count):
+		var particle = Control.new()
+		particle.custom_minimum_size = Vector2(2, 2)
+
+		# Random position
+		particle.position = Vector2(
+			randf() * viewport_size.x,
+			randf() * viewport_size.y
+		)
+
+		# Create a small colored rect
+		var rect = ColorRect.new()
+		rect.custom_minimum_size = Vector2(2, 2)
+
+		# Random color from palette
+		var colors = [COLOR_SKY_CYAN, COLOR_ELECTRIC_LIME, COLOR_CITRUS_YELLOW]
+		rect.color = colors[randi() % colors.size()]
+		rect.modulate.a = randf_range(0.3, 0.7)
+
+		particle.add_child(rect)
+		particle_layer.add_child(particle)
+
+		# Animate slow drift
+		var tween = create_tween()
+		tween.set_loops()
+		var drift_x = randf_range(-50, 50)
+		var drift_y = randf_range(20, 60)
+		var duration = randf_range(8.0, 15.0)
+		tween.tween_property(particle, "position", particle.position + Vector2(drift_x, drift_y), duration)
+		tween.tween_property(particle, "position", particle.position, duration)
 
 func _style_panels() -> void:
-	"""Apply Deltarune-style borders to UI panels"""
-	# Style Turn Order Panel
+	"""Apply neon-kawaii style to UI panels"""
+	# Style Turn Order Panel with soft rectangle and neon border
 	var turn_order_panel = get_node_or_null("MainLayout/TurnOrderPanel")
 	if turn_order_panel and turn_order_panel is PanelContainer:
 		var style = StyleBoxFlat.new()
-		style.bg_color = Color(0.05, 0.05, 0.08, 1)  # Very dark background
-		style.border_width_left = 3
-		style.border_width_right = 3
-		style.border_width_top = 3
-		style.border_width_bottom = 3
-		style.border_color = Color(1, 1, 1, 1)  # White border
+		style.bg_color = COLOR_INK_CHARCOAL  # Dark glass fill
+		style.border_width_left = 2
+		style.border_width_right = 2
+		style.border_width_top = 2
+		style.border_width_bottom = 2
+		style.border_color = COLOR_SKY_CYAN  # Cyan neon border
+		style.corner_radius_top_left = 12
+		style.corner_radius_top_right = 12
+		style.corner_radius_bottom_left = 12
+		style.corner_radius_bottom_right = 12
+		style.shadow_size = 4
+		style.shadow_color = Color(COLOR_SKY_CYAN.r, COLOR_SKY_CYAN.g, COLOR_SKY_CYAN.b, 0.3)
 		turn_order_panel.add_theme_stylebox_override("panel", style)
 
-		# Style title label to white
+		# Style title label in Milk White all caps
 		var title_label = turn_order_panel.get_node_or_null("VBox/Title")
 		if title_label and title_label is Label:
-			title_label.add_theme_color_override("font_color", Color(1, 1, 1, 1))
-			title_label.add_theme_font_size_override("font_size", 14)
+			title_label.text = "TURN ORDER"
+			title_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
+			title_label.add_theme_font_size_override("font_size", 12)
 
-	# Style Battle Log Panel (rename conceptually to "Flavor Text")
+	# Style Battle Log Panel (flavor text box)
 	var battle_log_panel = get_node_or_null("BattleLogPanel")
 	if battle_log_panel and battle_log_panel is PanelContainer:
 		var style = StyleBoxFlat.new()
-		style.bg_color = Color(0, 0, 0, 1)  # Pure black background
-		style.border_width_left = 3
-		style.border_width_right = 3
-		style.border_width_top = 3
-		style.border_width_bottom = 3
-		style.border_color = Color(1, 1, 1, 1)  # White border
+		style.bg_color = COLOR_INK_CHARCOAL  # Dark glass fill
+		style.border_width_left = 2
+		style.border_width_right = 2
+		style.border_width_top = 2
+		style.border_width_bottom = 2
+		style.border_color = COLOR_ELECTRIC_LIME  # Lime neon border
+		style.corner_radius_top_left = 12
+		style.corner_radius_top_right = 12
+		style.corner_radius_bottom_left = 12
+		style.corner_radius_bottom_right = 12
+		style.shadow_size = 4
+		style.shadow_color = Color(COLOR_ELECTRIC_LIME.r, COLOR_ELECTRIC_LIME.g, COLOR_ELECTRIC_LIME.b, 0.3)
 		battle_log_panel.add_theme_stylebox_override("panel", style)
 
-		# Style battle log text to white
+		# Style battle log text in Milk White
 		var battle_log_text = battle_log
 		if battle_log_text:
-			battle_log_text.add_theme_color_override("default_color", Color(1, 1, 1, 1))
+			battle_log_text.add_theme_color_override("default_color", COLOR_MILK_WHITE)
 
 	# Style Top Panel (Burst Gauge area)
 	var top_panel = get_node_or_null("MainLayout/BattleArena/TopPanel")
 	if top_panel and top_panel is PanelContainer:
 		var style = StyleBoxFlat.new()
-		style.bg_color = Color(0.05, 0.05, 0.08, 1)  # Very dark background
-		style.border_width_left = 3
-		style.border_width_right = 3
-		style.border_width_top = 3
-		style.border_width_bottom = 3
-		style.border_color = Color(1, 1, 1, 1)  # White border
+		style.bg_color = COLOR_INK_CHARCOAL
+		style.border_width_left = 2
+		style.border_width_right = 2
+		style.border_width_top = 2
+		style.border_width_bottom = 2
+		style.border_color = COLOR_CITRUS_YELLOW  # Yellow neon border
+		style.corner_radius_top_left = 12
+		style.corner_radius_top_right = 12
+		style.corner_radius_bottom_left = 12
+		style.corner_radius_bottom_right = 12
+		style.shadow_size = 4
+		style.shadow_color = Color(COLOR_CITRUS_YELLOW.r, COLOR_CITRUS_YELLOW.g, COLOR_CITRUS_YELLOW.b, 0.3)
 		top_panel.add_theme_stylebox_override("panel", style)
 
-		# Style burst label to white
+		# Style burst label in Milk White all caps
 		var burst_label = top_panel.get_node_or_null("VBox/BurstLabel")
 		if burst_label and burst_label is Label:
-			burst_label.add_theme_color_override("font_color", Color(1, 1, 1, 1))
+			burst_label.text = "BURST GAUGE"
+			burst_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
 
-		# Style burst gauge with yellow fill
+		# Style burst gauge as pill with gradient fill
 		var burst_gauge = burst_gauge_bar
 		if burst_gauge:
 			var gauge_bg = StyleBoxFlat.new()
-			gauge_bg.bg_color = Color(0.2, 0.2, 0.2, 1)
+			gauge_bg.bg_color = COLOR_NIGHT_NAVY
+			gauge_bg.corner_radius_top_left = 8
+			gauge_bg.corner_radius_top_right = 8
+			gauge_bg.corner_radius_bottom_left = 8
+			gauge_bg.corner_radius_bottom_right = 8
 			burst_gauge.add_theme_stylebox_override("background", gauge_bg)
 
 			var gauge_fill = StyleBoxFlat.new()
-			gauge_fill.bg_color = Color(1, 0.8, 0, 1)  # Orange-yellow
+			gauge_fill.bg_color = COLOR_CITRUS_YELLOW  # Yellow fill
+			gauge_fill.corner_radius_top_left = 8
+			gauge_fill.corner_radius_top_right = 8
+			gauge_fill.corner_radius_bottom_left = 8
+			gauge_fill.corner_radius_bottom_right = 8
 			burst_gauge.add_theme_stylebox_override("fill", gauge_fill)
 
 func _load_skills() -> void:
@@ -1063,7 +1236,7 @@ func _display_combatants() -> void:
 		combatant_panels[enemy.id] = slot
 
 func _create_combatant_slot(combatant: Dictionary, is_ally: bool) -> PanelContainer:
-	"""Create a UI slot for a combatant"""
+	"""Create a UI slot for a combatant with neon-kawaii sticker aesthetic"""
 	var panel = PanelContainer.new()
 
 	# Hide KO'd enemies - move off screen and make invisible
@@ -1071,88 +1244,137 @@ func _create_combatant_slot(combatant: Dictionary, is_ally: bool) -> PanelContai
 		panel.visible = false
 		panel.position = Vector2(-1000, -1000)  # Move off screen
 
-	# Apply Deltarune-style for allies, keep simpler style for enemies
+	# Apply neon-kawaii sticker style for allies
 	if is_ally:
-		panel.custom_minimum_size = Vector2(180, 80)
+		panel.custom_minimum_size = Vector2(200, 70)
 
-		# Deltarune-style: Black background with white border
+		# Sticker style: Dark fill with thick white keyline (2px per design spec)
 		var style = StyleBoxFlat.new()
-		style.bg_color = Color(0, 0, 0, 1)  # Pure black background
-		style.border_width_left = 3
-		style.border_width_right = 3
-		style.border_width_top = 3
-		style.border_width_bottom = 3
-		style.border_color = Color(1, 1, 1, 1)  # White border
+		style.bg_color = COLOR_INK_CHARCOAL  # Dark glass fill
+		style.border_width_left = 2
+		style.border_width_right = 2
+		style.border_width_top = 2
+		style.border_width_bottom = 2
+		style.border_color = COLOR_MILK_WHITE  # Thick white keyline
+		style.corner_radius_top_left = 12  # Soft rectangle
+		style.corner_radius_top_right = 12
+		style.corner_radius_bottom_left = 12
+		style.corner_radius_bottom_right = 12
+		style.shadow_size = 4
+		style.shadow_color = Color(COLOR_SKY_CYAN.r, COLOR_SKY_CYAN.g, COLOR_SKY_CYAN.b, 0.3)  # Subtle cyan glow
 		panel.add_theme_stylebox_override("panel", style)
+
+		# Apply subtle diagonal tilt
+		panel.rotation_degrees = randf_range(-2, 2)
 
 		# Horizontal layout for icon + info
 		var hbox = HBoxContainer.new()
-		hbox.add_theme_constant_override("separation", 8)
+		hbox.add_theme_constant_override("separation", 10)
 		panel.add_child(hbox)
 
-		# Character icon/portrait placeholder (32x32 colored square for now)
-		var icon = ColorRect.new()
-		icon.custom_minimum_size = Vector2(32, 32)
-		icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		# Color based on character name hash for visual variety
-		var hash_val = combatant.display_name.hash()
-		icon.color = Color(
-			(hash_val % 100) / 100.0 + 0.4,
-			((hash_val >> 8) % 100) / 100.0 + 0.4,
-			((hash_val >> 16) % 100) / 100.0 + 0.4,
-			1.0
-		)
-		hbox.add_child(icon)
+		# Character icon with thick white keyline (sticker edges)
+		var icon_container = PanelContainer.new()
+		icon_container.custom_minimum_size = Vector2(40, 40)
 
-		# Info column (name + HP)
+		var icon_style = StyleBoxFlat.new()
+		# Assign a neon color based on character index for variety
+		var icon_colors = [COLOR_BUBBLE_MAGENTA, COLOR_SKY_CYAN, COLOR_ELECTRIC_LIME, COLOR_CITRUS_YELLOW]
+		var hash_val = combatant.display_name.hash()
+		var icon_color = icon_colors[abs(hash_val) % icon_colors.size()]
+
+		icon_style.bg_color = icon_color
+		icon_style.border_width_left = 2
+		icon_style.border_width_right = 2
+		icon_style.border_width_top = 2
+		icon_style.border_width_bottom = 2
+		icon_style.border_color = COLOR_MILK_WHITE  # White keyline around icon
+		icon_style.corner_radius_top_left = 8
+		icon_style.corner_radius_top_right = 8
+		icon_style.corner_radius_bottom_left = 8
+		icon_style.corner_radius_bottom_right = 8
+		icon_container.add_theme_stylebox_override("panel", icon_style)
+
+		hbox.add_child(icon_container)
+
+		# Info column (name + HP bar)
 		var vbox = VBoxContainer.new()
-		vbox.add_theme_constant_override("separation", 2)
+		vbox.add_theme_constant_override("separation", 4)
 		vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		hbox.add_child(vbox)
 
-		# Name label (white text)
+		# Name label (Milk White, all caps)
 		var name_label = Label.new()
-		name_label.text = combatant.display_name
-		name_label.add_theme_color_override("font_color", Color(1, 1, 1, 1))
-		name_label.add_theme_font_size_override("font_size", 12)
+		name_label.text = combatant.display_name.to_upper()
+		name_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
+		name_label.add_theme_font_size_override("font_size", 11)
 		vbox.add_child(name_label)
 
-		# HP text (current/max in white)
-		var hp_label = Label.new()
-		hp_label.text = "%d / %d HP" % [combatant.hp, combatant.hp_max]
-		hp_label.add_theme_color_override("font_color", Color(1, 1, 1, 1))
-		hp_label.add_theme_font_size_override("font_size", 10)
-		vbox.add_child(hp_label)
-
-		# HP bar (white bar on black background)
+		# HP bar as pill shape with gradient fill
 		var hp_bar = ProgressBar.new()
 		hp_bar.max_value = combatant.hp_max
 		hp_bar.value = combatant.hp
 		hp_bar.show_percentage = false
-		hp_bar.custom_minimum_size = Vector2(0, 8)
+		hp_bar.custom_minimum_size = Vector2(0, 10)
 
-		# Style HP bar with white fill
+		# Pill background
 		var hp_bar_bg = StyleBoxFlat.new()
-		hp_bar_bg.bg_color = Color(0.2, 0.2, 0.2, 1)
+		hp_bar_bg.bg_color = COLOR_NIGHT_NAVY
+		hp_bar_bg.corner_radius_top_left = 8
+		hp_bar_bg.corner_radius_top_right = 8
+		hp_bar_bg.corner_radius_bottom_left = 8
+		hp_bar_bg.corner_radius_bottom_right = 8
 		hp_bar.add_theme_stylebox_override("background", hp_bar_bg)
 
+		# Pill fill with gradient (Cyan to Milk White gradient)
 		var hp_bar_fill = StyleBoxFlat.new()
-		hp_bar_fill.bg_color = Color(1, 1, 0, 1)  # Yellow fill (Deltarune style)
+		# Create two-tone effect: use cyan for >25%, transition to magenta for low HP
+		var hp_percent = float(combatant.hp) / float(combatant.hp_max) if combatant.hp_max > 0 else 1.0
+		var fill_color = COLOR_SKY_CYAN if hp_percent > 0.25 else COLOR_BUBBLE_MAGENTA
+		hp_bar_fill.bg_color = fill_color
+		hp_bar_fill.corner_radius_top_left = 8
+		hp_bar_fill.corner_radius_top_right = 8
+		hp_bar_fill.corner_radius_bottom_left = 8
+		hp_bar_fill.corner_radius_bottom_right = 8
 		hp_bar.add_theme_stylebox_override("fill", hp_bar_fill)
 
 		vbox.add_child(hp_bar)
 
+		# HP text (current/max in small monospace)
+		var hp_label = Label.new()
+		hp_label.text = "%d/%d" % [combatant.hp, combatant.hp_max]
+		hp_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
+		hp_label.add_theme_font_size_override("font_size", 8)
+		vbox.add_child(hp_label)
+
 	else:
-		# Enemies: Keep simpler style (for now)
-		panel.custom_minimum_size = Vector2(150, 100)
+		# Enemies: Simpler sticker style
+		panel.custom_minimum_size = Vector2(140, 90)
+
+		var style = StyleBoxFlat.new()
+		style.bg_color = COLOR_NIGHT_NAVY
+		style.border_width_left = 2
+		style.border_width_right = 2
+		style.border_width_top = 2
+		style.border_width_bottom = 2
+		style.border_color = COLOR_BUBBLE_MAGENTA  # Magenta for enemies
+		style.corner_radius_top_left = 12
+		style.corner_radius_top_right = 12
+		style.corner_radius_bottom_left = 12
+		style.corner_radius_bottom_right = 12
+		style.shadow_size = 4
+		style.shadow_color = Color(COLOR_BUBBLE_MAGENTA.r, COLOR_BUBBLE_MAGENTA.g, COLOR_BUBBLE_MAGENTA.b, 0.3)
+		panel.add_theme_stylebox_override("panel", style)
 
 		var vbox = VBoxContainer.new()
+		vbox.add_theme_constant_override("separation", 4)
 		panel.add_child(vbox)
 
 		# Name label
 		var name_label = Label.new()
-		name_label.text = combatant.display_name
+		name_label.text = combatant.display_name.to_upper()
 		name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		name_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
+		name_label.add_theme_font_size_override("font_size", 11)
 		vbox.add_child(name_label)
 
 		# HP bar
@@ -1160,13 +1382,32 @@ func _create_combatant_slot(combatant: Dictionary, is_ally: bool) -> PanelContai
 		hp_bar.max_value = combatant.hp_max
 		hp_bar.value = combatant.hp
 		hp_bar.show_percentage = false
+		hp_bar.custom_minimum_size = Vector2(0, 10)
+
+		var hp_bar_bg = StyleBoxFlat.new()
+		hp_bar_bg.bg_color = COLOR_NIGHT_NAVY.darkened(0.2)
+		hp_bar_bg.corner_radius_top_left = 8
+		hp_bar_bg.corner_radius_top_right = 8
+		hp_bar_bg.corner_radius_bottom_left = 8
+		hp_bar_bg.corner_radius_bottom_right = 8
+		hp_bar.add_theme_stylebox_override("background", hp_bar_bg)
+
+		var hp_bar_fill = StyleBoxFlat.new()
+		hp_bar_fill.bg_color = COLOR_BUBBLE_MAGENTA
+		hp_bar_fill.corner_radius_top_left = 8
+		hp_bar_fill.corner_radius_top_right = 8
+		hp_bar_fill.corner_radius_bottom_left = 8
+		hp_bar_fill.corner_radius_bottom_right = 8
+		hp_bar.add_theme_stylebox_override("fill", hp_bar_fill)
+
 		vbox.add_child(hp_bar)
 
 		# HP label
 		var hp_label = Label.new()
-		hp_label.text = "HP: %d/%d" % [combatant.hp, combatant.hp_max]
+		hp_label.text = "%d/%d" % [combatant.hp, combatant.hp_max]
 		hp_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		hp_label.add_theme_font_size_override("font_size", 10)
+		hp_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
+		hp_label.add_theme_font_size_override("font_size", 8)
 		vbox.add_child(hp_label)
 
 	# Store combatant ID in metadata
