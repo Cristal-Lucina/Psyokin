@@ -3189,15 +3189,22 @@ func _show_status_character_picker() -> void:
 	status_picker_panel.custom_minimum_size = Vector2(500, 400)
 
 	var panel_style = StyleBoxFlat.new()
-	panel_style.bg_color = Color(0.15, 0.15, 0.2, 1.0)
+	panel_style.bg_color = COLOR_INK_CHARCOAL  # Dark background
 	panel_style.border_width_left = 3
 	panel_style.border_width_right = 3
 	panel_style.border_width_top = 3
 	panel_style.border_width_bottom = 3
-	panel_style.border_color = Color(0.4, 0.6, 0.8, 1.0)
+	panel_style.border_color = COLOR_SKY_CYAN  # Cyan neon border
+	panel_style.corner_radius_top_left = 12
+	panel_style.corner_radius_top_right = 12
+	panel_style.corner_radius_bottom_left = 12
+	panel_style.corner_radius_bottom_right = 12
+	panel_style.shadow_size = 6
+	panel_style.shadow_color = Color(COLOR_SKY_CYAN.r, COLOR_SKY_CYAN.g, COLOR_SKY_CYAN.b, 0.4)  # Cyan glow
 	status_picker_panel.add_theme_stylebox_override("panel", panel_style)
 
 	status_picker_panel.position = get_viewport_rect().size / 2 - status_picker_panel.custom_minimum_size / 2
+	status_picker_panel.position.y -= 60  # Move up 60px
 	status_picker_panel.z_index = 100
 	status_picker_panel.mouse_filter = Control.MOUSE_FILTER_STOP
 
@@ -3209,6 +3216,7 @@ func _show_status_character_picker() -> void:
 	title.text = "=== View Character Status ==="
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.add_theme_font_size_override("font_size", 18)
+	title.add_theme_color_override("font_color", COLOR_BUBBLE_MAGENTA)  # Pink magenta title
 	vbox.add_child(title)
 
 	# Instructions
@@ -3216,7 +3224,7 @@ func _show_status_character_picker() -> void:
 	instructions.text = "Use ↑↓ to navigate, A to select, B to cancel"
 	instructions.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	instructions.add_theme_font_size_override("font_size", 12)
-	instructions.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7, 1.0))
+	instructions.add_theme_color_override("font_color", COLOR_MILK_WHITE)  # White text
 	vbox.add_child(instructions)
 
 	# Scroll container for character list
@@ -3233,7 +3241,7 @@ func _show_status_character_picker() -> void:
 		var ally_header = Label.new()
 		ally_header.text = "\n--- Party Members ---"
 		ally_header.add_theme_font_size_override("font_size", 14)
-		ally_header.add_theme_color_override("font_color", Color(0.3, 1.0, 0.3, 1.0))
+		ally_header.add_theme_color_override("font_color", COLOR_ELECTRIC_LIME)  # Lime green for allies
 		character_list.add_child(ally_header)
 
 		for ally in allies:
@@ -3259,7 +3267,7 @@ func _show_status_character_picker() -> void:
 		var enemy_header = Label.new()
 		enemy_header.text = "\n--- Enemies ---"
 		enemy_header.add_theme_font_size_override("font_size", 14)
-		enemy_header.add_theme_color_override("font_color", Color(1.0, 0.3, 0.3, 1.0))
+		enemy_header.add_theme_color_override("font_color", COLOR_CITRUS_YELLOW)  # Yellow for enemies
 		character_list.add_child(enemy_header)
 
 		for enemy in enemies:
