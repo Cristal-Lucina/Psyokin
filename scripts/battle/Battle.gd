@@ -11,15 +11,36 @@ class_name Battle
 @onready var burst_system = get_node("/root/aBurstSystem")
 @onready var minigame_mgr = get_node("/root/aMinigameManager")
 
+## Neon Orchard Color Palette
+const COLOR_ELECTRIC_LIME = Color(0.78, 1.0, 0.24)      # #C8FF3D
+const COLOR_BUBBLE_MAGENTA = Color(1.0, 0.29, 0.85)     # #FF4AD9
+const COLOR_SKY_CYAN = Color(0.30, 0.91, 1.0)           # #4DE9FF
+const COLOR_CITRUS_YELLOW = Color(1.0, 0.91, 0.30)      # #FFE84D
+const COLOR_PLASMA_TEAL = Color(0.13, 0.89, 0.70)       # #20E3B2
+const COLOR_GRAPE_VIOLET = Color(0.54, 0.25, 0.99)      # #8A3FFC
+const COLOR_NIGHT_NAVY = Color(0.04, 0.06, 0.10)        # #0A0F1A
+const COLOR_INK_CHARCOAL = Color(0.07, 0.09, 0.15)      # #111827
+const COLOR_MILK_WHITE = Color(0.96, 0.97, 0.98)        # #F4F7FB
+
 ## UI References
-@onready var action_menu: GridContainer = %ActionMenu
+@onready var action_menu: Control = %ActionMenu
 @onready var battle_log: RichTextLabel = %BattleLog
 @onready var burst_gauge_bar: ProgressBar = %BurstGauge
 @onready var turn_order_display: VBoxContainer = %TurnOrderDisplay
+@onready var switch_button: Button = %SwitchButton
 
 ## Combatant display containers
-@onready var ally_slots: HBoxContainer = %AllySlots
-@onready var enemy_slots: HBoxContainer = %EnemySlots
+@onready var ally_slots: VBoxContainer = %AllySlots
+@onready var enemy_slots: VBoxContainer = %EnemySlots
+
+## Dynamic background elements
+var diagonal_bands: ColorRect = null
+var grid_overlay: ColorRect = null
+var particle_layer: Node2D = null
+
+## Action menu panel state
+var is_panel_1_active: bool = true  # Panel 1: GUARD/SKILL/CAPTURE/FIGHT, Panel 2: RUN/BURST/ITEMS/STATUS
+var is_panel_switching: bool = false  # True during panel switch animation
 
 ## State
 var is_battle_ready: bool = false  # True when battle is fully initialized
@@ -35,10 +56,18 @@ var skill_to_use: Dictionary = {}  # Selected skill data
 var skill_menu_panel: PanelContainer = null  # Skill selection menu
 var skill_menu_buttons: Array = []  # Buttons in skill menu for controller navigation
 var selected_skill_index: int = 0  # Currently selected skill in menu
+var type_menu_panel: PanelContainer = null  # Type selection menu
+var type_menu_buttons: Array = []  # Buttons in type menu for controller navigation
+var selected_type_index: int = 0  # Currently selected type in menu
 var item_menu_panel: PanelContainer = null  # Item selection menu
 var item_menu_buttons: Array = []  # Buttons in current item tab for controller navigation
 var selected_item_index: int = 0  # Currently selected item in menu
 var item_tab_container: TabContainer = null  # Reference to tab container for switching
+var confirmation_panel: PanelContainer = null  # Yes/No confirmation dialog
+var confirmation_callback: Callable = Callable()  # Callback when user confirms
+var awaiting_confirmation: bool = false  # True when confirmation dialog is shown
+var confirmation_yes_button: Button = null  # Yes button reference
+var confirmation_no_button: Button = null  # No button reference
 var item_scroll_container: ScrollContainer = null  # Current tab's scroll container for auto-scrolling
 var item_description_label: Label = null  # Item description display
 var capture_menu_panel: PanelContainer = null  # Capture selection menu
@@ -61,10 +90,14 @@ var victory_panel: PanelContainer = null  # Victory screen panel
 var victory_scroll: ScrollContainer = null  # Victory screen scroll container for controller scrolling
 var is_in_round_transition: bool = false  # True during round transition animations
 var combatant_panels: Dictionary = {}  # combatant_id -> PanelContainer for shake animations
+var instruction_popup: PanelContainer = null  # Instruction message popup
+var instruction_label: Label = null  # Label inside instruction popup
 
 # Input debouncing for joystick sensitivity
 var input_cooldown: float = 0.0  # Current cooldown timer
 var input_cooldown_duration: float = 0.15  # 150ms between inputs
+var action_cooldown: float = 0.0  # Cooldown for action button presses (FIGHT/SKILL/etc)
+var action_cooldown_duration: float = 1.0  # 1 second between action button presses
 
 func _ready() -> void:
 	print("[Battle] Battle scene loaded")
@@ -78,8 +111,20 @@ func _ready() -> void:
 	# Wait for next frame to ensure all autoloads are ready
 	await get_tree().process_frame
 
+	# Create neon-kawaii background elements
+	_create_diagonal_background()
+
 	# Update action button labels with mapped keys/buttons
 	_update_action_button_labels()
+
+	# Apply neon-kawaii style to action buttons
+	_style_action_buttons()
+
+	# Apply neon-kawaii style to panels
+	_style_panels()
+
+	# Create instruction popup
+	_create_instruction_popup()
 
 	# Load skill definitions
 	_load_skills()
@@ -96,8 +141,8 @@ func _ready() -> void:
 	if turn_order_display and turn_order_display.has_signal("animation_completed"):
 		turn_order_display.animation_completed.connect(_on_turn_order_animation_completed)
 
-	# Hide action menu initially
-	action_menu.visible = false
+	# Disable and dim action menu initially (but keep it visible)
+	_disable_action_menu()
 
 	# Initialize battle with party and enemies
 	_initialize_battle()
@@ -162,6 +207,305 @@ func _get_joypad_button_short_name(button_index: int) -> String:
 		JOY_BUTTON_BACK: return "Select"
 		_: return "Btn%d" % button_index
 
+func _style_action_buttons() -> void:
+	"""Apply neon-kawaii pill capsule style to action buttons"""
+	var button_styles = [
+		{"button": "AttackButton", "neon": COLOR_BUBBLE_MAGENTA, "label": "FIGHT"},      # Magenta for damage
+		{"button": "SkillButton", "neon": COLOR_SKY_CYAN, "label": "SKILL"},             # Cyan for skills
+		{"button": "CaptureButton", "neon": COLOR_GRAPE_VIOLET, "label": "CAPTURE"},     # Violet for special
+		{"button": "DefendButton", "neon": COLOR_PLASMA_TEAL, "label": "GUARD"},         # Teal for defense
+		{"button": "BurstButton", "neon": COLOR_CITRUS_YELLOW, "label": "BURST"},        # Yellow for burst
+		{"button": "RunButton", "neon": COLOR_INK_CHARCOAL, "label": "RUN"},             # Dark for run
+		{"button": "ItemButton", "neon": COLOR_ELECTRIC_LIME, "label": "ITEMS"},         # Lime for items
+		{"button": "StatusButton", "neon": COLOR_MILK_WHITE, "label": "STATUS"},         # White for status
+	]
+
+	for style_data in button_styles:
+		var btn = action_menu.get_node_or_null(style_data["button"])
+		if btn and btn is Button:
+			# Pill capsule shape with high corner radius (20px per design spec)
+			var corner_radius = 20
+
+			# Normal state: Dark fill with inner neon stroke
+			var style_normal = StyleBoxFlat.new()
+			style_normal.bg_color = COLOR_NIGHT_NAVY  # Dark glass fill
+			style_normal.border_width_left = 2
+			style_normal.border_width_right = 2
+			style_normal.border_width_top = 2
+			style_normal.border_width_bottom = 2
+			style_normal.border_color = style_data["neon"]  # Inner neon stroke
+			style_normal.corner_radius_top_left = corner_radius
+			style_normal.corner_radius_top_right = corner_radius
+			style_normal.corner_radius_bottom_left = corner_radius
+			style_normal.corner_radius_bottom_right = corner_radius
+			style_normal.shadow_size = 4
+			style_normal.shadow_color = Color(style_data["neon"].r, style_data["neon"].g, style_data["neon"].b, 0.4)  # Soft glow
+
+			# Hover state: Brighter fill + thicker border + stronger glow
+			var style_hover = StyleBoxFlat.new()
+			style_hover.bg_color = COLOR_INK_CHARCOAL.lightened(0.15)  # Slightly brighter
+			style_hover.border_width_left = 3
+			style_hover.border_width_right = 3
+			style_hover.border_width_top = 3
+			style_hover.border_width_bottom = 3
+			style_hover.border_color = style_data["neon"].lightened(0.2)  # Brighter neon
+			style_hover.corner_radius_top_left = corner_radius
+			style_hover.corner_radius_top_right = corner_radius
+			style_hover.corner_radius_bottom_left = corner_radius
+			style_hover.corner_radius_bottom_right = corner_radius
+			style_hover.shadow_size = 8  # Stronger glow on hover
+			style_hover.shadow_color = Color(style_data["neon"].r, style_data["neon"].g, style_data["neon"].b, 0.6)
+
+			# Pressed state: Darker fill with maintained border
+			var style_pressed = StyleBoxFlat.new()
+			style_pressed.bg_color = COLOR_NIGHT_NAVY.darkened(0.2)
+			style_pressed.border_width_left = 2
+			style_pressed.border_width_right = 2
+			style_pressed.border_width_top = 2
+			style_pressed.border_width_bottom = 2
+			style_pressed.border_color = style_data["neon"]
+			style_pressed.corner_radius_top_left = corner_radius
+			style_pressed.corner_radius_top_right = corner_radius
+			style_pressed.corner_radius_bottom_left = corner_radius
+			style_pressed.corner_radius_bottom_right = corner_radius
+			style_pressed.shadow_size = 2
+			style_pressed.shadow_color = Color(style_data["neon"].r, style_data["neon"].g, style_data["neon"].b, 0.3)
+
+			# Apply styles
+			btn.add_theme_stylebox_override("normal", style_normal)
+			btn.add_theme_stylebox_override("hover", style_hover)
+			btn.add_theme_stylebox_override("pressed", style_pressed)
+			btn.add_theme_stylebox_override("focus", style_hover)
+
+			# Text in Milk White, all caps
+			btn.text = "%s" % style_data["label"]
+			btn.add_theme_color_override("font_color", COLOR_MILK_WHITE)
+			btn.add_theme_color_override("font_hover_color", COLOR_MILK_WHITE)
+			btn.add_theme_color_override("font_pressed_color", COLOR_MILK_WHITE)
+			btn.add_theme_color_override("font_focus_color", COLOR_MILK_WHITE)
+
+			# Apply diagonal tilt (10-18 degrees) using rotation
+			btn.rotation_degrees = randf_range(-3, 3)  # Subtle variation per button
+
+func _create_diagonal_background() -> void:
+	"""Create neon-kawaii diagonal band background with grid overlay"""
+	var background = get_node_or_null("Background")
+	if not background:
+		return
+
+	# Create diagonal bands using a shader
+	diagonal_bands = ColorRect.new()
+	diagonal_bands.set_anchors_preset(Control.PRESET_FULL_RECT)
+	diagonal_bands.z_index = -10
+	diagonal_bands.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	# Create shader for diagonal bands
+	var shader_code = """
+shader_type canvas_item;
+
+uniform vec3 color1 = vec3(0.04, 0.06, 0.10);  // Night Navy
+uniform vec3 color2 = vec3(0.07, 0.09, 0.15);  // Ink Charcoal
+uniform float angle = 0.21;  // ~12 degrees in radians
+uniform float band_width = 150.0;
+
+void fragment() {
+	vec2 uv = FRAGCOORD.xy;
+	float rotated = uv.x * cos(angle) - uv.y * sin(angle);
+	float band = mod(rotated, band_width * 2.0);
+	float t = smoothstep(0.0, band_width, band) * (1.0 - smoothstep(band_width, band_width * 2.0, band));
+	COLOR = vec4(mix(color1, color2, t), 1.0);
+}
+"""
+
+	var shader = Shader.new()
+	shader.code = shader_code
+	var shader_material = ShaderMaterial.new()
+	shader_material.shader = shader
+	diagonal_bands.material = shader_material
+
+	# Insert after the solid black background
+	background.add_sibling(diagonal_bands)
+
+	# Create grid overlay
+	grid_overlay = ColorRect.new()
+	grid_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	grid_overlay.z_index = -9
+	grid_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	# Create shader for grid pattern
+	var grid_shader_code = """
+shader_type canvas_item;
+
+uniform float grid_size = 12.0;
+uniform float line_width = 1.0;
+uniform vec4 grid_color = vec4(0.3, 0.91, 1.0, 0.06);  // Sky Cyan at 6% opacity
+
+void fragment() {
+	vec2 uv = FRAGCOORD.xy;
+	vec2 grid = mod(uv, grid_size);
+	float line = step(grid_size - line_width, grid.x) + step(grid_size - line_width, grid.y);
+	COLOR = vec4(grid_color.rgb, grid_color.a * min(line, 1.0));
+}
+"""
+
+	var grid_shader = Shader.new()
+	grid_shader.code = grid_shader_code
+	var grid_material = ShaderMaterial.new()
+	grid_material.shader = grid_shader
+	grid_overlay.material = grid_material
+
+	background.add_sibling(grid_overlay)
+
+	# Create particle layer for ambient stars and dots
+	particle_layer = Node2D.new()
+	particle_layer.z_index = -8
+	add_child(particle_layer)
+
+	# Spawn some ambient particles
+	_spawn_ambient_particles()
+
+func _spawn_ambient_particles() -> void:
+	"""Spawn slow-drifting star and dot particles"""
+	if not particle_layer:
+		return
+
+	var viewport_size = get_viewport_rect().size
+	var particle_count = 20
+
+	for i in range(particle_count):
+		var particle = Control.new()
+		particle.custom_minimum_size = Vector2(2, 2)
+
+		# Random position
+		particle.position = Vector2(
+			randf() * viewport_size.x,
+			randf() * viewport_size.y
+		)
+
+		# Create a small colored rect
+		var rect = ColorRect.new()
+		rect.custom_minimum_size = Vector2(2, 2)
+
+		# Random color from palette
+		var colors = [COLOR_SKY_CYAN, COLOR_ELECTRIC_LIME, COLOR_CITRUS_YELLOW]
+		rect.color = colors[randi() % colors.size()]
+		rect.modulate.a = randf_range(0.3, 0.7)
+
+		particle.add_child(rect)
+		particle_layer.add_child(particle)
+
+		# Animate slow drift
+		var tween = create_tween()
+		tween.set_loops()
+		var drift_x = randf_range(-50, 50)
+		var drift_y = randf_range(20, 60)
+		var duration = randf_range(8.0, 15.0)
+		tween.tween_property(particle, "position", particle.position + Vector2(drift_x, drift_y), duration)
+		tween.tween_property(particle, "position", particle.position, duration)
+
+func _style_panels() -> void:
+	"""Apply neon-kawaii style to UI panels"""
+	# Style Turn Order Panel with soft rectangle and neon border
+	var turn_order_panel = get_node_or_null("TurnOrderPanel")
+	if turn_order_panel and turn_order_panel is PanelContainer:
+		var style = StyleBoxFlat.new()
+		style.bg_color = COLOR_INK_CHARCOAL  # Dark glass fill
+		style.border_width_left = 2
+		style.border_width_right = 2
+		style.border_width_top = 2
+		style.border_width_bottom = 2
+		style.border_color = COLOR_SKY_CYAN  # Cyan neon border
+		style.corner_radius_top_left = 12
+		style.corner_radius_top_right = 12
+		style.corner_radius_bottom_left = 12
+		style.corner_radius_bottom_right = 12
+		style.shadow_size = 4
+		style.shadow_color = Color(COLOR_SKY_CYAN.r, COLOR_SKY_CYAN.g, COLOR_SKY_CYAN.b, 0.3)
+		turn_order_panel.add_theme_stylebox_override("panel", style)
+
+		# Style title label in Milk White all caps
+		var title_label = turn_order_panel.get_node_or_null("VBox/Title")
+		if title_label and title_label is Label:
+			title_label.text = "TURN ORDER"
+			title_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
+			title_label.add_theme_font_size_override("font_size", 12)
+
+	# Style Battle Log Panel (flavor text box)
+	var battle_log_panel = get_node_or_null("BattleLogPanel")
+	if battle_log_panel and battle_log_panel is PanelContainer:
+		var style = StyleBoxFlat.new()
+		style.bg_color = COLOR_INK_CHARCOAL  # Dark glass fill
+		style.border_width_left = 2
+		style.border_width_right = 2
+		style.border_width_top = 2
+		style.border_width_bottom = 2
+		style.border_color = COLOR_ELECTRIC_LIME  # Lime neon border
+		style.corner_radius_top_left = 12
+		style.corner_radius_top_right = 12
+		style.corner_radius_bottom_left = 12
+		style.corner_radius_bottom_right = 12
+		style.shadow_size = 4
+		style.shadow_color = Color(COLOR_ELECTRIC_LIME.r, COLOR_ELECTRIC_LIME.g, COLOR_ELECTRIC_LIME.b, 0.3)
+		# Add 10px internal padding
+		style.content_margin_left = 10
+		style.content_margin_right = 10
+		style.content_margin_top = 10
+		style.content_margin_bottom = 10
+		battle_log_panel.add_theme_stylebox_override("panel", style)
+
+		# Style battle log text in Milk White
+		var battle_log_text = battle_log
+		if battle_log_text:
+			battle_log_text.add_theme_color_override("default_color", COLOR_MILK_WHITE)
+
+	# Style Burst Gauge Panel (Bottom of screen)
+	var burst_panel = get_node_or_null("BurstGaugePanel")
+	if burst_panel and burst_panel is PanelContainer:
+		var style = StyleBoxFlat.new()
+		style.bg_color = COLOR_INK_CHARCOAL
+		style.border_width_left = 4
+		style.border_width_right = 4
+		style.border_width_top = 4
+		style.border_width_bottom = 4
+		style.border_color = COLOR_SKY_CYAN  # Cyan neon border to match minigames
+		style.corner_radius_top_left = 12
+		style.corner_radius_top_right = 12
+		style.corner_radius_bottom_left = 12
+		style.corner_radius_bottom_right = 12
+		style.shadow_size = 4
+		style.shadow_color = Color(COLOR_CITRUS_YELLOW.r, COLOR_CITRUS_YELLOW.g, COLOR_CITRUS_YELLOW.b, 0.3)
+		burst_panel.add_theme_stylebox_override("panel", style)
+
+		# Style burst label in Milk White all caps
+		var burst_label = burst_panel.get_node_or_null("VBox/BurstLabel")
+		if burst_label and burst_label is Label:
+			burst_label.text = "BURST GAUGE"
+			burst_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
+
+		# Style burst gauge as pill with gradient fill
+		var burst_gauge = burst_gauge_bar
+		if burst_gauge:
+			var gauge_bg = StyleBoxFlat.new()
+			gauge_bg.bg_color = COLOR_INK_CHARCOAL.lightened(0.2)  # Lighter charcoal background for visibility
+			gauge_bg.corner_radius_top_left = 8
+			gauge_bg.corner_radius_top_right = 8
+			gauge_bg.corner_radius_bottom_left = 8
+			gauge_bg.corner_radius_bottom_right = 8
+			gauge_bg.border_width_left = 1
+			gauge_bg.border_width_right = 1
+			gauge_bg.border_width_top = 1
+			gauge_bg.border_width_bottom = 1
+			gauge_bg.border_color = COLOR_SKY_CYAN.darkened(0.3)  # Subtle cyan inner border
+			burst_gauge.add_theme_stylebox_override("background", gauge_bg)
+
+			var gauge_fill = StyleBoxFlat.new()
+			gauge_fill.bg_color = COLOR_BUBBLE_MAGENTA  # Pink magenta fill
+			gauge_fill.corner_radius_top_left = 8
+			gauge_fill.corner_radius_top_right = 8
+			gauge_fill.corner_radius_bottom_left = 8
+			gauge_fill.corner_radius_bottom_right = 8
+			burst_gauge.add_theme_stylebox_override("fill", gauge_fill)
+
 func _load_skills() -> void:
 	"""Load skill definitions from skills.csv"""
 	skill_definitions = csv_loader.load_csv("res://data/skills/skills.csv", "skill_id")
@@ -175,6 +519,10 @@ func _process(delta: float) -> void:
 	# Update input cooldown timer
 	if input_cooldown > 0:
 		input_cooldown -= delta
+
+	# Update action cooldown timer
+	if action_cooldown > 0:
+		action_cooldown -= delta
 
 func _input(event: InputEvent) -> void:
 	"""Handle keyboard/controller input for battle actions and target selection"""
@@ -211,10 +559,42 @@ func _input(event: InputEvent) -> void:
 	if minigame_mgr.current_minigame != null:
 		return
 
+	# CRITICAL: If confirmation dialog is showing, only allow Yes/No navigation
+	if awaiting_confirmation and confirmation_panel != null:
+		if event.is_action_pressed(aInputManager.ACTION_MOVE_LEFT) or event.is_action_pressed(aInputManager.ACTION_MOVE_RIGHT):
+			# Toggle focus between Yes and No buttons
+			if confirmation_yes_button and confirmation_no_button:
+				if confirmation_yes_button.has_focus():
+					confirmation_no_button.grab_focus()
+				else:
+					confirmation_yes_button.grab_focus()
+			get_viewport().set_input_as_handled()
+			return
+		elif event.is_action_pressed(aInputManager.ACTION_ACCEPT):
+			# Trigger the focused button
+			if confirmation_yes_button and confirmation_yes_button.has_focus():
+				_on_confirmation_yes()
+			elif confirmation_no_button and confirmation_no_button.has_focus():
+				_on_confirmation_no()
+			get_viewport().set_input_as_handled()
+			return
+		elif event.is_action_pressed(aInputManager.ACTION_BACK):
+			# Back button acts as "No"
+			_on_confirmation_no()
+			get_viewport().set_input_as_handled()
+			return
+		# Block all other input
+		get_viewport().set_input_as_handled()
+		return
+
 	# Check for back button to close any open menus
 	if event.is_action_pressed(aInputManager.ACTION_BACK):
 		# Check if any menu is open and close it
-		if skill_menu_panel != null:
+		if type_menu_panel != null:
+			_on_type_menu_cancel()
+			get_viewport().set_input_as_handled()
+			return
+		elif skill_menu_panel != null:
 			_close_skill_menu()
 			get_viewport().set_input_as_handled()
 			return
@@ -241,6 +621,33 @@ func _input(event: InputEvent) -> void:
 		# If in target selection, cancel it
 		elif awaiting_target_selection and not target_candidates.is_empty():
 			_cancel_target_selection()
+			get_viewport().set_input_as_handled()
+			return
+
+	# If type menu is open, handle controller navigation
+	if type_menu_panel != null and not type_menu_buttons.is_empty():
+		# Check cooldown to prevent rapid inputs
+		if input_cooldown > 0:
+			return
+
+		if event.is_action_pressed(aInputManager.ACTION_MOVE_UP):
+			_navigate_type_menu(-1)
+			input_cooldown = input_cooldown_duration
+			get_viewport().set_input_as_handled()
+			return
+		elif event.is_action_pressed(aInputManager.ACTION_MOVE_DOWN):
+			_navigate_type_menu(1)
+			input_cooldown = input_cooldown_duration
+			get_viewport().set_input_as_handled()
+			return
+		elif event.is_action_pressed(aInputManager.ACTION_ACCEPT):
+			_confirm_type_selection()
+			input_cooldown = input_cooldown_duration
+			get_viewport().set_input_as_handled()
+			return
+		elif event.is_action_pressed(aInputManager.ACTION_BACK):
+			_on_type_menu_cancel()
+			input_cooldown = input_cooldown_duration
 			get_viewport().set_input_as_handled()
 			return
 
@@ -418,30 +825,61 @@ func _input(event: InputEvent) -> void:
 
 	# If action menu is visible, handle direct button presses
 	if action_menu and action_menu.visible and not is_in_round_transition:
-		if event.is_action_pressed(aInputManager.ACTION_ATTACK):
-			_on_attack_pressed()
-			get_viewport().set_input_as_handled()
-		elif event.is_action_pressed(aInputManager.ACTION_SKILL):
-			_on_skill_pressed()
-			get_viewport().set_input_as_handled()
-		elif event.is_action_pressed(aInputManager.ACTION_CAPTURE):
-			_on_capture_pressed()
-			get_viewport().set_input_as_handled()
-		elif event.is_action_pressed(aInputManager.ACTION_DEFEND):
-			_on_defend_pressed()
-			get_viewport().set_input_as_handled()
-		elif event.is_action_pressed(aInputManager.ACTION_BURST):
-			_on_burst_pressed()
-			get_viewport().set_input_as_handled()
-		elif event.is_action_pressed(aInputManager.ACTION_BATTLE_RUN):
-			_on_run_pressed()
-			get_viewport().set_input_as_handled()
-		elif event.is_action_pressed(aInputManager.ACTION_ITEMS):
-			_on_item_pressed()
-			get_viewport().set_input_as_handled()
-		elif event.is_action_pressed(aInputManager.ACTION_STATUS):
-			_on_status_pressed()
-			get_viewport().set_input_as_handled()
+		# Check for panel switching with L1/R1 shoulder buttons
+		# L1 = button index 9, R1 = button index 10
+		# Block input during panel switch animation
+		if event is InputEventJoypadButton:
+			if event.pressed and (event.button_index == 9 or event.button_index == 10):  # L1 or R1
+				if not is_panel_switching:  # Only allow if not currently animating
+					_toggle_action_panel()
+				get_viewport().set_input_as_handled()
+				return
+
+		# Handle diamond button inputs based on active panel
+		# Panel 1: GUARD/SKILL/CAPTURE/FIGHT
+		# Panel 2: RUN/BURST/ITEMS/STATUS
+		# Button mapping: Y=SKILL, X=DEFEND, B=ATTACK, A=CAPTURE
+
+		# Check action cooldown to prevent button spam
+		if action_cooldown > 0:
+			return
+
+		if is_panel_1_active:
+			# Panel 1 active
+			if event.is_action_pressed(aInputManager.ACTION_SKILL):  # Y button -> Skill
+				_on_skill_pressed()
+				action_cooldown = action_cooldown_duration  # Set cooldown
+				get_viewport().set_input_as_handled()
+			elif event.is_action_pressed(aInputManager.ACTION_DEFEND):  # X button -> Guard
+				_on_defend_pressed()
+				action_cooldown = action_cooldown_duration  # Set cooldown
+				get_viewport().set_input_as_handled()
+			elif event.is_action_pressed(aInputManager.ACTION_ATTACK):  # B button -> Fight
+				_on_attack_pressed()
+				action_cooldown = action_cooldown_duration  # Set cooldown
+				get_viewport().set_input_as_handled()
+			elif event.is_action_pressed(aInputManager.ACTION_CAPTURE):  # A button -> Capture
+				_on_capture_pressed()
+				action_cooldown = action_cooldown_duration  # Set cooldown
+				get_viewport().set_input_as_handled()
+		else:
+			# Panel 2 active
+			if event.is_action_pressed(aInputManager.ACTION_SKILL):  # Y button -> Burst
+				_on_burst_pressed()
+				action_cooldown = action_cooldown_duration  # Set cooldown
+				get_viewport().set_input_as_handled()
+			elif event.is_action_pressed(aInputManager.ACTION_DEFEND):  # X button -> Run
+				_on_run_pressed()
+				action_cooldown = action_cooldown_duration  # Set cooldown
+				get_viewport().set_input_as_handled()
+			elif event.is_action_pressed(aInputManager.ACTION_ATTACK):  # B button -> Status
+				_on_status_pressed()
+				action_cooldown = action_cooldown_duration  # Set cooldown
+				get_viewport().set_input_as_handled()
+			elif event.is_action_pressed(aInputManager.ACTION_CAPTURE):  # A button -> Items
+				_on_item_pressed()
+				action_cooldown = action_cooldown_duration  # Set cooldown
+				get_viewport().set_input_as_handled()
 
 func _navigate_targets(direction: int) -> void:
 	"""Navigate through target candidates"""
@@ -473,6 +911,8 @@ func _confirm_target_selection() -> void:
 
 	# Determine what action to execute based on state
 	if awaiting_capture_target:
+		# Show CAPTURE! instruction
+		_show_instruction("CAPTURE!")
 		# Attempting capture
 		await _execute_capture(target)
 	elif awaiting_item_target:
@@ -480,6 +920,7 @@ func _confirm_target_selection() -> void:
 		_execute_item_usage(target)
 	elif awaiting_skill_selection:
 		# Using a skill
+		_hide_instruction()
 		_clear_target_highlights()
 		awaiting_target_selection = false
 		awaiting_skill_selection = false
@@ -552,6 +993,9 @@ func _on_turn_started(combatant_id: String) -> void:
 	if current_combatant.is_empty():
 		return
 
+	# Reset action cooldown at start of turn
+	action_cooldown = 0.0
+
 	log_message("%s's turn!" % current_combatant.display_name)
 
 	# Check if combatant is asleep - skip turn entirely
@@ -597,8 +1041,8 @@ func _on_turn_started(combatant_id: String) -> void:
 
 func _on_turn_ended(_combatant_id: String) -> void:
 	"""Called when a combatant's turn ends"""
-	# Hide action menu
-	action_menu.visible = false
+	# Disable and dim action menu
+	_disable_action_menu()
 
 func _on_turn_order_animation_completed() -> void:
 	"""Called when turn order display animation completes (e.g., round transitions)"""
@@ -623,25 +1067,45 @@ func _on_battle_ended(victory: bool) -> void:
 
 func _show_victory_screen() -> void:
 	"""Display victory screen with Accept button"""
+	# Create black background overlay (covers entire viewport)
+	var black_bg = ColorRect.new()
+	black_bg.color = Color(0, 0, 0, 0)  # Start transparent
+	black_bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	black_bg.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(black_bg)
+
+	# Fade in black background to fully opaque
+	var bg_tween = create_tween()
+	bg_tween.set_ease(Tween.EASE_OUT)
+	bg_tween.set_trans(Tween.TRANS_CUBIC)
+	bg_tween.tween_property(black_bg, "color:a", 1.0, 0.5)  # Fade to 100% opacity (fully black)
+
 	# Create victory panel
 	victory_panel = PanelContainer.new()
 	victory_panel.name = "VictoryPanel"
 
-	# Set up styling
+	# Set up styling with Core vibe
 	var style = StyleBoxFlat.new()
-	style.bg_color = Color(0.1, 0.1, 0.15, 0.95)
+	style.bg_color = COLOR_INK_CHARCOAL
 	style.border_width_left = 3
 	style.border_width_top = 3
 	style.border_width_right = 3
 	style.border_width_bottom = 3
-	style.border_color = Color(0.8, 0.7, 0.3, 1.0)  # Gold border
+	style.border_color = COLOR_SKY_CYAN  # Cyan neon border
+	style.corner_radius_top_left = 12
+	style.corner_radius_top_right = 12
+	style.corner_radius_bottom_left = 12
+	style.corner_radius_bottom_right = 12
+	style.shadow_size = 6
+	style.shadow_color = Color(COLOR_SKY_CYAN.r, COLOR_SKY_CYAN.g, COLOR_SKY_CYAN.b, 0.4)  # Cyan glow
 	victory_panel.add_theme_stylebox_override("panel", style)
 
-	# Position it in center of screen
+	# Position it in center of screen (200px wider)
 	victory_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER, Control.PRESET_MODE_MINSIZE)
-	victory_panel.custom_minimum_size = Vector2(500, 450)
-	victory_panel.size = Vector2(500, 450)
-	victory_panel.position = Vector2(-250, -225)  # Center the 500x450 panel
+	victory_panel.custom_minimum_size = Vector2(700, 450)  # Increased width by 200px
+	victory_panel.size = Vector2(700, 450)
+	victory_panel.position = Vector2(-350, -225)  # Center the 700x450 panel
+	victory_panel.modulate.a = 0.0  # Start transparent for fade-in
 
 	# Create vertical box for content
 	var vbox = VBoxContainer.new()
@@ -665,15 +1129,15 @@ func _show_victory_screen() -> void:
 	title_label.text = "VICTORY!"
 	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title_label.add_theme_font_size_override("font_size", 32)
-	title_label.add_theme_color_override("font_color", Color(0.9, 0.8, 0.3, 1.0))
+	title_label.add_theme_color_override("font_color", COLOR_BUBBLE_MAGENTA)  # Pink magenta title
 	content_vbox.add_child(title_label)
 
 	# Get rewards data from battle manager
 	var rewards = battle_mgr.battle_rewards
 
-	# Rewards display (scrollable)
+	# Rewards display (scrollable) - increased width for 2 columns
 	var rewards_scroll = ScrollContainer.new()
-	rewards_scroll.custom_minimum_size = Vector2(400, 200)
+	rewards_scroll.custom_minimum_size = Vector2(660, 200)  # Wider for 2 columns
 	rewards_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	rewards_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 	content_vbox.add_child(rewards_scroll)
@@ -681,16 +1145,29 @@ func _show_victory_screen() -> void:
 	# Store reference for controller scrolling
 	victory_scroll = rewards_scroll
 
-	var rewards_vbox = VBoxContainer.new()
-	rewards_vbox.add_theme_constant_override("separation", 5)
-	rewards_scroll.add_child(rewards_vbox)
+	# Create HBox for 2 columns
+	var rewards_hbox = HBoxContainer.new()
+	rewards_hbox.add_theme_constant_override("separation", 20)
+	rewards_scroll.add_child(rewards_hbox)
 
-	# CREDS (changed from Credits)
+	# Column 1: CREDS, Level Growth, Enemies
+	var column1 = VBoxContainer.new()
+	column1.add_theme_constant_override("separation", 5)
+	column1.custom_minimum_size = Vector2(320, 0)
+	rewards_hbox.add_child(column1)
+
+	# Column 2: Sigil Growth, Affinity Growth, Items
+	var column2 = VBoxContainer.new()
+	column2.add_theme_constant_override("separation", 5)
+	column2.custom_minimum_size = Vector2(320, 0)
+	rewards_hbox.add_child(column2)
+
+	# CREDS (changed from Credits) - Column 1
 	if rewards.get("creds", 0) > 0:
 		var creds_label = Label.new()
 		creds_label.text = "CREDS: +%d" % rewards.creds
-		creds_label.add_theme_color_override("font_color", Color(0.9, 0.9, 0.5, 1.0))
-		rewards_vbox.add_child(creds_label)
+		creds_label.add_theme_color_override("font_color", COLOR_CITRUS_YELLOW)  # Yellow for creds
+		column1.add_child(creds_label)
 
 	# Level Growth - Show LXP for all members who received it
 	var lxp_awarded = rewards.get("lxp_awarded", {})
@@ -699,8 +1176,8 @@ func _show_victory_screen() -> void:
 	if not lxp_awarded.is_empty():
 		var lxp_header = Label.new()
 		lxp_header.text = "\nLevel Growth:"
-		lxp_header.add_theme_color_override("font_color", Color(0.7, 0.9, 0.7, 1.0))
-		rewards_vbox.add_child(lxp_header)
+		lxp_header.add_theme_color_override("font_color", COLOR_ELECTRIC_LIME)  # Lime green header
+		column1.add_child(lxp_header)
 
 		# Show all members who got XP (they were in the battle)
 		for member_id in lxp_awarded.keys():
@@ -708,15 +1185,16 @@ func _show_victory_screen() -> void:
 			var display_name = _get_member_display_name(member_id)
 			var member_label = Label.new()
 			member_label.text = "  %s: +%d LXP" % [display_name, xp_amount]
-			rewards_vbox.add_child(member_label)
+			member_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
+			column1.add_child(member_label)
 
-	# Sigil Growth - Show each sigil individually with names
+	# Sigil Growth - Show each sigil individually with names - Column 2
 	var gxp_awarded = rewards.get("gxp_awarded", {})
 	if not gxp_awarded.is_empty():
 		var gxp_header = Label.new()
 		gxp_header.text = "\nSigil Growth:"
-		gxp_header.add_theme_color_override("font_color", Color(0.7, 0.7, 0.9, 1.0))
-		rewards_vbox.add_child(gxp_header)
+		gxp_header.add_theme_color_override("font_color", COLOR_SKY_CYAN)  # Cyan header
+		column2.add_child(gxp_header)
 
 		var sigil_sys = get_node_or_null("/root/aSigilSystem")
 		for sigil_inst_id in gxp_awarded.keys():
@@ -727,15 +1205,16 @@ func _show_victory_screen() -> void:
 
 			var sigil_label = Label.new()
 			sigil_label.text = "  %s: +%d GXP" % [sigil_name, gxp_amount]
-			rewards_vbox.add_child(sigil_label)
+			sigil_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
+			column2.add_child(sigil_label)
 
-	# Affinity Growth - Show AXP for each pair
+	# Affinity Growth - Show AXP for each pair - Column 2
 	var axp_awarded = rewards.get("axp_awarded", {})
 	if not axp_awarded.is_empty():
 		var axp_header = Label.new()
 		axp_header.text = "\nAffinity Growth:"
-		axp_header.add_theme_color_override("font_color", Color(0.9, 0.7, 0.7, 1.0))
-		rewards_vbox.add_child(axp_header)
+		axp_header.add_theme_color_override("font_color", COLOR_BUBBLE_MAGENTA)  # Pink magenta header
+		column2.add_child(axp_header)
 
 		for pair_key in axp_awarded.keys():
 			var axp_amount = axp_awarded[pair_key]
@@ -750,40 +1229,73 @@ func _show_victory_screen() -> void:
 
 			var axp_label = Label.new()
 			axp_label.text = "  %s ↔ %s: +%d AXP" % [name_a, name_b, axp_amount]
-			rewards_vbox.add_child(axp_label)
+			axp_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
+			column2.add_child(axp_label)
 
-	# Items
+	# Items - Column 2
 	var items = rewards.get("items", [])
 	if not items.is_empty():
 		var items_header = Label.new()
 		items_header.text = "\nItems Dropped:"
-		items_header.add_theme_color_override("font_color", Color(0.9, 0.7, 0.9, 1.0))
-		rewards_vbox.add_child(items_header)
+		items_header.add_theme_color_override("font_color", COLOR_GRAPE_VIOLET)  # Violet header
+		column2.add_child(items_header)
 
 		for item_id in items:
 			var item_label = Label.new()
 			item_label.text = "  %s" % item_id
-			rewards_vbox.add_child(item_label)
+			item_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
+			column2.add_child(item_label)
 
-	# Battle stats
+	# Battle stats - Column 1
 	var stats_label = Label.new()
 	var captured = rewards.get("captured_count", 0)
 	var killed = rewards.get("killed_count", 0)
 	stats_label.text = "\nEnemies: %d captured, %d defeated" % [captured, killed]
 	stats_label.add_theme_font_size_override("font_size", 14)
-	stats_label.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7, 1.0))
-	rewards_vbox.add_child(stats_label)
+	stats_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
+	column1.add_child(stats_label)
 
 	# Spacer
 	var spacer = Control.new()
 	spacer.custom_minimum_size = Vector2(0, 10)
 	content_vbox.add_child(spacer)
 
-	# Accept button
+	# Accept button with Core vibe styling
 	var accept_button = Button.new()
 	accept_button.text = "Accept"
 	accept_button.custom_minimum_size = Vector2(200, 50)
 	accept_button.pressed.connect(_on_victory_accept_pressed)
+
+	# Style the button
+	var btn_style = StyleBoxFlat.new()
+	btn_style.bg_color = COLOR_SKY_CYAN.darkened(0.3)  # Dark cyan background
+	btn_style.border_width_left = 2
+	btn_style.border_width_right = 2
+	btn_style.border_width_top = 2
+	btn_style.border_width_bottom = 2
+	btn_style.border_color = COLOR_SKY_CYAN  # Bright cyan border
+	btn_style.corner_radius_top_left = 8
+	btn_style.corner_radius_top_right = 8
+	btn_style.corner_radius_bottom_left = 8
+	btn_style.corner_radius_bottom_right = 8
+	accept_button.add_theme_stylebox_override("normal", btn_style)
+
+	var btn_style_hover = StyleBoxFlat.new()
+	btn_style_hover.bg_color = COLOR_SKY_CYAN.darkened(0.1)  # Brighter on hover
+	btn_style_hover.border_width_left = 3
+	btn_style_hover.border_width_right = 3
+	btn_style_hover.border_width_top = 3
+	btn_style_hover.border_width_bottom = 3
+	btn_style_hover.border_color = COLOR_SKY_CYAN.lightened(0.2)
+	btn_style_hover.corner_radius_top_left = 8
+	btn_style_hover.corner_radius_top_right = 8
+	btn_style_hover.corner_radius_bottom_left = 8
+	btn_style_hover.corner_radius_bottom_right = 8
+	accept_button.add_theme_stylebox_override("hover", btn_style_hover)
+	accept_button.add_theme_stylebox_override("focus", btn_style_hover)
+
+	accept_button.add_theme_color_override("font_color", COLOR_MILK_WHITE)
+	accept_button.add_theme_font_size_override("font_size", 18)
 
 	# Center the button
 	var button_center = CenterContainer.new()
@@ -792,6 +1304,12 @@ func _show_victory_screen() -> void:
 
 	# Add to scene
 	add_child(victory_panel)
+
+	# Fade in victory panel
+	var panel_tween = create_tween()
+	panel_tween.set_ease(Tween.EASE_OUT)
+	panel_tween.set_trans(Tween.TRANS_CUBIC)
+	panel_tween.tween_property(victory_panel, "modulate:a", 1.0, 0.5).set_delay(0.3)  # Slight delay after background
 
 func _on_victory_accept_pressed() -> void:
 	"""Handle Accept button press on victory screen"""
@@ -922,58 +1440,214 @@ func _display_combatants() -> void:
 		combatant_panels[enemy.id] = slot
 
 func _create_combatant_slot(combatant: Dictionary, is_ally: bool) -> PanelContainer:
-	"""Create a UI slot for a combatant"""
+	"""Create a UI slot for a combatant with neon-kawaii sticker aesthetic"""
 	var panel = PanelContainer.new()
-	panel.custom_minimum_size = Vector2(150, 100)
 
 	# Hide KO'd enemies - move off screen and make invisible
 	if not is_ally and combatant.get("is_ko", false):
 		panel.visible = false
 		panel.position = Vector2(-1000, -1000)  # Move off screen
 
-	var vbox = VBoxContainer.new()
-	panel.add_child(vbox)
+	# Apply neon-kawaii sticker style for allies
+	if is_ally:
+		panel.custom_minimum_size = Vector2(220, 110)
 
-	# Name label
-	var name_label = Label.new()
-	name_label.text = combatant.display_name
-	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vbox.add_child(name_label)
+		# Sticker style: Dark fill with thick white keyline (2px per design spec)
+		var style = StyleBoxFlat.new()
+		style.bg_color = COLOR_INK_CHARCOAL  # Dark glass fill
+		style.border_width_left = 2
+		style.border_width_right = 2
+		style.border_width_top = 2
+		style.border_width_bottom = 2
+		style.border_color = COLOR_MILK_WHITE  # Thick white keyline
+		style.corner_radius_top_left = 12  # Soft rectangle
+		style.corner_radius_top_right = 12
+		style.corner_radius_bottom_left = 12
+		style.corner_radius_bottom_right = 12
+		style.shadow_size = 4
+		style.shadow_color = Color(COLOR_SKY_CYAN.r, COLOR_SKY_CYAN.g, COLOR_SKY_CYAN.b, 0.3)  # Subtle cyan glow
+		panel.add_theme_stylebox_override("panel", style)
 
-	# HP bar
-	var hp_bar = ProgressBar.new()
-	hp_bar.max_value = combatant.hp_max
-	hp_bar.value = combatant.hp
-	hp_bar.show_percentage = false
-	vbox.add_child(hp_bar)
+		# Apply subtle diagonal tilt
+		panel.rotation_degrees = randf_range(-2, 2)
 
-	# HP label
-	var hp_label = Label.new()
-	hp_label.text = "HP: %d/%d" % [combatant.hp, combatant.hp_max]
-	hp_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	hp_label.add_theme_font_size_override("font_size", 10)
-	vbox.add_child(hp_label)
+		# Horizontal layout for icon + info
+		var hbox = HBoxContainer.new()
+		hbox.add_theme_constant_override("separation", 10)
+		panel.add_child(hbox)
 
-	# MP bar (if applicable)
-	if combatant.mp_max > 0:
-		var mp_bar = ProgressBar.new()
-		mp_bar.max_value = combatant.mp_max
-		mp_bar.value = combatant.mp
-		mp_bar.show_percentage = false
-		vbox.add_child(mp_bar)
+		# Character icon with thick white keyline (sticker edges)
+		var icon_container = PanelContainer.new()
+		icon_container.custom_minimum_size = Vector2(40, 40)
 
-		var mp_label = Label.new()
-		mp_label.text = "MP: %d/%d" % [combatant.mp, combatant.mp_max]
-		mp_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		mp_label.add_theme_font_size_override("font_size", 10)
-		vbox.add_child(mp_label)
+		var icon_style = StyleBoxFlat.new()
+		# Assign a neon color based on character index for variety
+		var icon_colors = [COLOR_BUBBLE_MAGENTA, COLOR_SKY_CYAN, COLOR_ELECTRIC_LIME, COLOR_CITRUS_YELLOW]
+		var hash_val = combatant.display_name.hash()
+		var icon_color = icon_colors[abs(hash_val) % icon_colors.size()]
 
-	# Status button to show detailed status effects
-	var status_button = Button.new()
-	status_button.text = "Status"
-	status_button.custom_minimum_size = Vector2(120, 25)
-	status_button.pressed.connect(_show_status_details.bind(combatant))
-	vbox.add_child(status_button)
+		icon_style.bg_color = icon_color
+		icon_style.border_width_left = 2
+		icon_style.border_width_right = 2
+		icon_style.border_width_top = 2
+		icon_style.border_width_bottom = 2
+		icon_style.border_color = COLOR_MILK_WHITE  # White keyline around icon
+		icon_style.corner_radius_top_left = 8
+		icon_style.corner_radius_top_right = 8
+		icon_style.corner_radius_bottom_left = 8
+		icon_style.corner_radius_bottom_right = 8
+		icon_container.add_theme_stylebox_override("panel", icon_style)
+
+		hbox.add_child(icon_container)
+
+		# Info column (name + HP bar)
+		var vbox = VBoxContainer.new()
+		vbox.add_theme_constant_override("separation", 4)
+		vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		hbox.add_child(vbox)
+
+		# Name label (Milk White, all caps)
+		var name_label = Label.new()
+		name_label.text = combatant.display_name.to_upper()
+		name_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
+		name_label.add_theme_font_size_override("font_size", 11)
+		vbox.add_child(name_label)
+
+		# HP bar as pill shape with gradient fill
+		var hp_bar = ProgressBar.new()
+		hp_bar.max_value = combatant.hp_max
+		hp_bar.value = combatant.hp
+		hp_bar.show_percentage = false
+		hp_bar.custom_minimum_size = Vector2(0, 10)
+
+		# Pill background
+		var hp_bar_bg = StyleBoxFlat.new()
+		hp_bar_bg.bg_color = COLOR_NIGHT_NAVY
+		hp_bar_bg.corner_radius_top_left = 8
+		hp_bar_bg.corner_radius_top_right = 8
+		hp_bar_bg.corner_radius_bottom_left = 8
+		hp_bar_bg.corner_radius_bottom_right = 8
+		hp_bar.add_theme_stylebox_override("background", hp_bar_bg)
+
+		# Pill fill with gradient (Cyan to Milk White gradient)
+		var hp_bar_fill = StyleBoxFlat.new()
+		# Create two-tone effect: use cyan for >25%, transition to magenta for low HP
+		var hp_percent = float(combatant.hp) / float(combatant.hp_max) if combatant.hp_max > 0 else 1.0
+		var fill_color = COLOR_SKY_CYAN if hp_percent > 0.25 else COLOR_BUBBLE_MAGENTA
+		hp_bar_fill.bg_color = fill_color
+		hp_bar_fill.corner_radius_top_left = 8
+		hp_bar_fill.corner_radius_top_right = 8
+		hp_bar_fill.corner_radius_bottom_left = 8
+		hp_bar_fill.corner_radius_bottom_right = 8
+		hp_bar.add_theme_stylebox_override("fill", hp_bar_fill)
+
+		vbox.add_child(hp_bar)
+
+		# HP text (current/max in small monospace)
+		var hp_label = Label.new()
+		hp_label.text = "%d/%d HP" % [combatant.hp, combatant.hp_max]
+		hp_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
+		hp_label.add_theme_font_size_override("font_size", 8)
+		vbox.add_child(hp_label)
+
+		# MP bar (if character has MP)
+		if combatant.mp_max > 0:
+			var mp_bar = ProgressBar.new()
+			mp_bar.max_value = combatant.mp_max
+			mp_bar.value = combatant.mp
+			mp_bar.show_percentage = false
+			mp_bar.custom_minimum_size = Vector2(0, 8)
+
+			# Pill background
+			var mp_bar_bg = StyleBoxFlat.new()
+			mp_bar_bg.bg_color = COLOR_NIGHT_NAVY
+			mp_bar_bg.corner_radius_top_left = 8
+			mp_bar_bg.corner_radius_top_right = 8
+			mp_bar_bg.corner_radius_bottom_left = 8
+			mp_bar_bg.corner_radius_bottom_right = 8
+			mp_bar.add_theme_stylebox_override("background", mp_bar_bg)
+
+			# Pill fill - use Grape Violet for MP
+			var mp_bar_fill = StyleBoxFlat.new()
+			mp_bar_fill.bg_color = COLOR_GRAPE_VIOLET
+			mp_bar_fill.corner_radius_top_left = 8
+			mp_bar_fill.corner_radius_top_right = 8
+			mp_bar_fill.corner_radius_bottom_left = 8
+			mp_bar_fill.corner_radius_bottom_right = 8
+			mp_bar.add_theme_stylebox_override("fill", mp_bar_fill)
+
+			vbox.add_child(mp_bar)
+
+			# MP text
+			var mp_label = Label.new()
+			mp_label.text = "%d/%d MP" % [combatant.mp, combatant.mp_max]
+			mp_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
+			mp_label.add_theme_font_size_override("font_size", 8)
+			vbox.add_child(mp_label)
+
+	else:
+		# Enemies: Simpler sticker style
+		panel.custom_minimum_size = Vector2(140, 90)
+
+		var style = StyleBoxFlat.new()
+		style.bg_color = COLOR_NIGHT_NAVY
+		style.border_width_left = 2
+		style.border_width_right = 2
+		style.border_width_top = 2
+		style.border_width_bottom = 2
+		style.border_color = COLOR_BUBBLE_MAGENTA  # Magenta for enemies
+		style.corner_radius_top_left = 12
+		style.corner_radius_top_right = 12
+		style.corner_radius_bottom_left = 12
+		style.corner_radius_bottom_right = 12
+		style.shadow_size = 4
+		style.shadow_color = Color(COLOR_BUBBLE_MAGENTA.r, COLOR_BUBBLE_MAGENTA.g, COLOR_BUBBLE_MAGENTA.b, 0.3)
+		panel.add_theme_stylebox_override("panel", style)
+
+		var vbox = VBoxContainer.new()
+		vbox.add_theme_constant_override("separation", 4)
+		panel.add_child(vbox)
+
+		# Name label
+		var name_label = Label.new()
+		name_label.text = combatant.display_name.to_upper()
+		name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		name_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
+		name_label.add_theme_font_size_override("font_size", 11)
+		vbox.add_child(name_label)
+
+		# HP bar
+		var hp_bar = ProgressBar.new()
+		hp_bar.max_value = combatant.hp_max
+		hp_bar.value = combatant.hp
+		hp_bar.show_percentage = false
+		hp_bar.custom_minimum_size = Vector2(0, 10)
+
+		var hp_bar_bg = StyleBoxFlat.new()
+		hp_bar_bg.bg_color = COLOR_NIGHT_NAVY.darkened(0.2)
+		hp_bar_bg.corner_radius_top_left = 8
+		hp_bar_bg.corner_radius_top_right = 8
+		hp_bar_bg.corner_radius_bottom_left = 8
+		hp_bar_bg.corner_radius_bottom_right = 8
+		hp_bar.add_theme_stylebox_override("background", hp_bar_bg)
+
+		var hp_bar_fill = StyleBoxFlat.new()
+		hp_bar_fill.bg_color = COLOR_BUBBLE_MAGENTA
+		hp_bar_fill.corner_radius_top_left = 8
+		hp_bar_fill.corner_radius_top_right = 8
+		hp_bar_fill.corner_radius_bottom_left = 8
+		hp_bar_fill.corner_radius_bottom_right = 8
+		hp_bar.add_theme_stylebox_override("fill", hp_bar_fill)
+
+		vbox.add_child(hp_bar)
+
+		# HP label
+		var hp_label = Label.new()
+		hp_label.text = "%d/%d" % [combatant.hp, combatant.hp_max]
+		hp_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		hp_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
+		hp_label.add_theme_font_size_override("font_size", 8)
+		vbox.add_child(hp_label)
 
 	# Store combatant ID in metadata
 	panel.set_meta("combatant_id", combatant.id)
@@ -1069,14 +1743,20 @@ func _show_status_details(combatant: Dictionary) -> void:
 	status_details_popup.custom_minimum_size = Vector2(400, 300)
 	status_details_popup.modulate.a = 1.0  # 100% solid, no transparency
 
-	# Add solid dark background style
+	# Add Core vibe styling
 	var panel_style = StyleBoxFlat.new()
-	panel_style.bg_color = Color(0.15, 0.15, 0.2, 1.0)  # Solid dark blue-gray
+	panel_style.bg_color = COLOR_INK_CHARCOAL  # Dark background
 	panel_style.border_width_left = 3
 	panel_style.border_width_right = 3
 	panel_style.border_width_top = 3
 	panel_style.border_width_bottom = 3
-	panel_style.border_color = Color(0.4, 0.6, 0.8, 1.0)  # Light blue border
+	panel_style.border_color = COLOR_SKY_CYAN  # Cyan neon border
+	panel_style.corner_radius_top_left = 12
+	panel_style.corner_radius_top_right = 12
+	panel_style.corner_radius_bottom_left = 12
+	panel_style.corner_radius_bottom_right = 12
+	panel_style.shadow_size = 6
+	panel_style.shadow_color = Color(COLOR_SKY_CYAN.r, COLOR_SKY_CYAN.g, COLOR_SKY_CYAN.b, 0.4)  # Cyan glow
 	status_details_popup.add_theme_stylebox_override("panel", panel_style)
 
 	# Center it on screen
@@ -1092,6 +1772,7 @@ func _show_status_details(combatant: Dictionary) -> void:
 	title.text = "=== %s Status ===" % combatant.display_name
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.add_theme_font_size_override("font_size", 16)
+	title.add_theme_color_override("font_color", COLOR_BUBBLE_MAGENTA)  # Pink magenta title
 	vbox.add_child(title)
 
 	var scroll = ScrollContainer.new()
@@ -1106,7 +1787,7 @@ func _show_status_details(combatant: Dictionary) -> void:
 	if ailment != "" and ailment != "null":
 		var ailment_label = Label.new()
 		ailment_label.text = "❌ Ailment: %s" % ailment.capitalize()
-		ailment_label.add_theme_color_override("font_color", Color(1.0, 0.3, 0.3, 1.0))
+		ailment_label.add_theme_color_override("font_color", COLOR_CITRUS_YELLOW)  # Yellow for ailments
 		content.add_child(ailment_label)
 
 	# Buffs/Debuffs
@@ -1116,6 +1797,7 @@ func _show_status_details(combatant: Dictionary) -> void:
 			var buff_title = Label.new()
 			buff_title.text = "\n--- Active Effects (%d) ---" % buffs.size()
 			buff_title.add_theme_font_size_override("font_size", 14)
+			buff_title.add_theme_color_override("font_color", COLOR_SKY_CYAN)  # Cyan section header
 			content.add_child(buff_title)
 
 			for buff in buffs:
@@ -1130,9 +1812,9 @@ func _show_status_details(combatant: Dictionary) -> void:
 
 					# Color based on positive/negative
 					if value > 0:
-						buff_label.add_theme_color_override("font_color", Color(0.3, 1.0, 0.3, 1.0))
+						buff_label.add_theme_color_override("font_color", COLOR_ELECTRIC_LIME)  # Lime green for buffs
 					else:
-						buff_label.add_theme_color_override("font_color", Color(1.0, 0.5, 0.3, 1.0))
+						buff_label.add_theme_color_override("font_color", COLOR_CITRUS_YELLOW)  # Yellow for debuffs
 
 					content.add_child(buff_label)
 
@@ -1141,7 +1823,7 @@ func _show_status_details(combatant: Dictionary) -> void:
 		if not combatant.has("buffs") or combatant.buffs.size() == 0:
 			var none_label = Label.new()
 			none_label.text = "\n✓ No status effects"
-			none_label.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7, 1.0))
+			none_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)  # White text
 			content.add_child(none_label)
 
 	# Close button
@@ -1203,7 +1885,7 @@ func _show_action_menu() -> void:
 	if is_in_round_transition:
 		_enable_all_input()
 
-	action_menu.visible = true
+	_enable_action_menu()
 
 	# Disable Run button if already attempted this round
 	var run_button = action_menu.get_node_or_null("RunButton")
@@ -1217,13 +1899,38 @@ func _show_action_menu() -> void:
 	# TODO: Enable/disable actions based on state
 	# e.g., disable skills if no MP, disable burst if gauge too low
 
+func _disable_action_menu() -> void:
+	"""Disable and dim action menu buttons (but keep visible)"""
+	if not action_menu:
+		return
+
+	# Dim the entire action menu
+	action_menu.modulate.a = 0.3
+
+	# Disable all buttons
+	for child in action_menu.get_children():
+		if child is Button:
+			child.disabled = true
+
+func _enable_action_menu() -> void:
+	"""Enable and restore action menu buttons"""
+	if not action_menu:
+		return
+
+	# Restore full opacity
+	action_menu.modulate.a = 1.0
+
+	# Enable all buttons
+	for child in action_menu.get_children():
+		if child is Button:
+			child.disabled = false
+
 func _disable_all_input() -> void:
 	"""Disable all input during round transitions to prevent glitches"""
 	is_in_round_transition = true
 
-	# Disable action menu (blocks all button clicks)
-	if action_menu:
-		action_menu.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# Disable and dim action menu
+	_disable_action_menu()
 
 	# Disable ally slots (prevent clicking on characters)
 	if ally_slots:
@@ -1259,13 +1966,14 @@ func _on_attack_pressed() -> void:
 	if is_in_round_transition:
 		return
 
-	log_message("Select a target...")
+	_show_instruction("Select an enemy.")
 
 	# Get alive enemies
 	var enemies = battle_mgr.get_enemy_combatants()
 	target_candidates = enemies.filter(func(e): return not e.is_ko)
 
 	if target_candidates.is_empty():
+		_hide_instruction()
 		log_message("No valid targets!")
 		return
 
@@ -1280,6 +1988,7 @@ func _on_attack_pressed() -> void:
 
 func _execute_attack(target: Dictionary) -> void:
 	"""Execute attack on selected target"""
+	_hide_instruction()
 	awaiting_target_selection = false
 	_clear_target_highlights()
 
@@ -1298,6 +2007,7 @@ func _execute_attack(target: Dictionary) -> void:
 
 		if not hit_check.hit:
 			# Miss!
+			_show_miss_feedback()  # Show big MISS text
 			log_message("  → Missed! (%d%% chance, rolled %d)" % [int(hit_check.hit_chance), hit_check.roll])
 			print("[Battle] Miss! Hit chance: %.1f%%, Roll: %d" % [hit_check.hit_chance, hit_check.roll])
 		else:
@@ -1310,7 +2020,9 @@ func _execute_attack(target: Dictionary) -> void:
 				status_effects.append(ailment)
 
 			log_message("  → Hit! Starting attack minigame...")
+			_show_instruction("FIGHT!")
 			var minigame_result = await minigame_mgr.launch_attack_minigame(tpo, brw, status_effects)
+			_hide_instruction()
 
 			# Apply minigame result modifiers
 			var damage_modifier = minigame_result.get("damage_modifier", 1.0)
@@ -1481,6 +2193,8 @@ func _on_skill_pressed() -> void:
 		log_message("No skills available!")
 		return
 
+	_show_instruction("Choose a skill.")
+
 	# Show skill selection menu
 	_show_skill_menu(skill_menu)
 
@@ -1600,6 +2314,8 @@ func _on_item_pressed() -> void:
 		log_message("No usable items!")
 		return
 
+	_show_instruction("Choose an item.")
+
 	# Show item selection menu
 	_show_item_menu(usable_items)
 
@@ -1654,6 +2370,8 @@ func _on_capture_pressed() -> void:
 	if bind_items.is_empty():
 		log_message("No bind items available!")
 		return
+
+	_show_instruction("Choose a bind.")
 
 	# Show bind selection menu
 	_show_capture_menu(bind_items)
@@ -2216,10 +2934,17 @@ func _on_defend_pressed() -> void:
 	if not _check_freeze_action_allowed():
 		return
 
+	# Show confirmation dialog
+	_show_confirmation_dialog("Do you want to guard?", Callable(self, "_execute_defend"))
+
+func _execute_defend() -> void:
+	"""Execute defend action after confirmation"""
+	print("[Battle] _execute_defend called!")
 	log_message("%s moved into a defensive stance." % current_combatant.display_name)
 	current_combatant.is_defending = true
 
 	# End turn
+	print("[Battle] Calling battle_mgr.end_turn()")
 	battle_mgr.end_turn()
 
 func _on_burst_pressed() -> void:
@@ -2263,8 +2988,10 @@ func _on_burst_pressed() -> void:
 	var available_bursts = burst_system.get_available_bursts(party_ids)
 
 	if available_bursts.is_empty():
-		log_message("No burst abilities unlocked yet!")
+		_show_instruction("No Bursts available.")
 		return
+
+	_show_instruction("Choose Burst Ability")
 
 	# Show burst selection menu
 	_show_burst_menu(available_bursts)
@@ -2284,6 +3011,11 @@ func _on_run_pressed() -> void:
 		log_message("Already tried to run this round!")
 		return
 
+	# Show confirmation dialog
+	_show_confirmation_dialog("Do you want to run?", Callable(self, "_execute_run"))
+
+func _execute_run() -> void:
+	"""Execute run action after confirmation"""
 	# Mark that run was attempted
 	battle_mgr.run_attempted_this_round = true
 
@@ -2334,8 +3066,108 @@ func _on_status_pressed() -> void:
 	if is_in_round_transition:
 		return
 
+	_show_instruction("Choose a character.")
+
 	# Show character picker for status viewing
 	_show_status_character_picker()
+
+func _on_switch_panel_pressed() -> void:
+	"""Handle switching between action menu panels"""
+	_toggle_action_panel()
+
+func _toggle_action_panel() -> void:
+	"""Toggle between the two action menu panels with spin animations"""
+	# Set animation flag to block further input
+	is_panel_switching = true
+
+	is_panel_1_active = not is_panel_1_active
+
+	# Get button references
+	var skill_btn = action_menu.get_node_or_null("SkillButton")
+	var defend_btn = action_menu.get_node_or_null("DefendButton")
+	var attack_btn = action_menu.get_node_or_null("AttackButton")
+	var capture_btn = action_menu.get_node_or_null("CaptureButton")
+	var burst_btn = action_menu.get_node_or_null("BurstButton")
+	var run_btn = action_menu.get_node_or_null("RunButton")
+	var status_btn = action_menu.get_node_or_null("StatusButton")
+	var item_btn = action_menu.get_node_or_null("ItemButton")
+
+	var anim_duration = 0.3
+	var spin_rotation = deg_to_rad(360)  # Full rotation
+
+	if is_panel_1_active:
+		# Hide Panel 2 with spin inward animation
+		var buttons_to_hide = [burst_btn, run_btn, status_btn, item_btn]
+		for btn in buttons_to_hide:
+			if btn:
+				_animate_button_hide(btn, anim_duration, spin_rotation)
+
+		# Wait a moment before showing new buttons
+		await get_tree().create_timer(anim_duration * 0.5).timeout
+
+		# Show Panel 1 with spin outward animation
+		var buttons_to_show = [skill_btn, defend_btn, attack_btn, capture_btn]
+		for btn in buttons_to_show:
+			if btn:
+				btn.visible = true
+				btn.modulate.a = 0.0
+				btn.scale = Vector2(0.5, 0.5)
+				btn.rotation = -spin_rotation
+				_animate_button_show(btn, anim_duration, spin_rotation)
+	else:
+		# Hide Panel 1 with spin inward animation
+		var buttons_to_hide = [skill_btn, defend_btn, attack_btn, capture_btn]
+		for btn in buttons_to_hide:
+			if btn:
+				_animate_button_hide(btn, anim_duration, spin_rotation)
+
+		# Wait a moment before showing new buttons
+		await get_tree().create_timer(anim_duration * 0.5).timeout
+
+		# Show Panel 2 with spin outward animation
+		var buttons_to_show = [burst_btn, run_btn, status_btn, item_btn]
+		for btn in buttons_to_show:
+			if btn:
+				btn.visible = true
+				btn.modulate.a = 0.0
+				btn.scale = Vector2(0.5, 0.5)
+				btn.rotation = -spin_rotation
+				_animate_button_show(btn, anim_duration, spin_rotation)
+
+	# Wait for all animations to complete, then clear animation flag
+	await get_tree().create_timer(anim_duration).timeout
+	is_panel_switching = false
+
+func _animate_button_hide(btn: Button, duration: float, rotation: float) -> void:
+	"""Animate button spinning inward and fading out"""
+	var tween = create_tween()
+	tween.set_parallel(true)
+	tween.set_ease(Tween.EASE_IN)
+	tween.set_trans(Tween.TRANS_BACK)
+
+	# Spin and scale down
+	tween.tween_property(btn, "rotation", rotation, duration)
+	tween.tween_property(btn, "scale", Vector2(0.1, 0.1), duration)
+	tween.tween_property(btn, "modulate:a", 0.0, duration * 0.7)
+
+	await tween.finished
+	btn.visible = false
+	# Reset for next time
+	btn.rotation = 0.0
+	btn.scale = Vector2(1.0, 1.0)
+	btn.modulate.a = 1.0
+
+func _animate_button_show(btn: Button, duration: float, rotation: float) -> void:
+	"""Animate button spinning outward and fading in"""
+	var tween = create_tween()
+	tween.set_parallel(true)
+	tween.set_ease(Tween.EASE_OUT)
+	tween.set_trans(Tween.TRANS_BACK)
+
+	# Spin and scale up
+	tween.tween_property(btn, "rotation", 0.0, duration)
+	tween.tween_property(btn, "scale", Vector2(1.0, 1.0), duration)
+	tween.tween_property(btn, "modulate:a", 1.0, duration * 0.7)
 
 func _show_status_character_picker() -> void:
 	"""Show a character picker to select whose status to view"""
@@ -2357,15 +3189,22 @@ func _show_status_character_picker() -> void:
 	status_picker_panel.custom_minimum_size = Vector2(500, 400)
 
 	var panel_style = StyleBoxFlat.new()
-	panel_style.bg_color = Color(0.15, 0.15, 0.2, 1.0)
+	panel_style.bg_color = COLOR_INK_CHARCOAL  # Dark background
 	panel_style.border_width_left = 3
 	panel_style.border_width_right = 3
 	panel_style.border_width_top = 3
 	panel_style.border_width_bottom = 3
-	panel_style.border_color = Color(0.4, 0.6, 0.8, 1.0)
+	panel_style.border_color = COLOR_SKY_CYAN  # Cyan neon border
+	panel_style.corner_radius_top_left = 12
+	panel_style.corner_radius_top_right = 12
+	panel_style.corner_radius_bottom_left = 12
+	panel_style.corner_radius_bottom_right = 12
+	panel_style.shadow_size = 6
+	panel_style.shadow_color = Color(COLOR_SKY_CYAN.r, COLOR_SKY_CYAN.g, COLOR_SKY_CYAN.b, 0.4)  # Cyan glow
 	status_picker_panel.add_theme_stylebox_override("panel", panel_style)
 
 	status_picker_panel.position = get_viewport_rect().size / 2 - status_picker_panel.custom_minimum_size / 2
+	status_picker_panel.position.y -= 60  # Move up 60px
 	status_picker_panel.z_index = 100
 	status_picker_panel.mouse_filter = Control.MOUSE_FILTER_STOP
 
@@ -2377,6 +3216,7 @@ func _show_status_character_picker() -> void:
 	title.text = "=== View Character Status ==="
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.add_theme_font_size_override("font_size", 18)
+	title.add_theme_color_override("font_color", COLOR_BUBBLE_MAGENTA)  # Pink magenta title
 	vbox.add_child(title)
 
 	# Instructions
@@ -2384,7 +3224,7 @@ func _show_status_character_picker() -> void:
 	instructions.text = "Use ↑↓ to navigate, A to select, B to cancel"
 	instructions.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	instructions.add_theme_font_size_override("font_size", 12)
-	instructions.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7, 1.0))
+	instructions.add_theme_color_override("font_color", COLOR_MILK_WHITE)  # White text
 	vbox.add_child(instructions)
 
 	# Scroll container for character list
@@ -2401,7 +3241,7 @@ func _show_status_character_picker() -> void:
 		var ally_header = Label.new()
 		ally_header.text = "\n--- Party Members ---"
 		ally_header.add_theme_font_size_override("font_size", 14)
-		ally_header.add_theme_color_override("font_color", Color(0.3, 1.0, 0.3, 1.0))
+		ally_header.add_theme_color_override("font_color", COLOR_ELECTRIC_LIME)  # Lime green for allies
 		character_list.add_child(ally_header)
 
 		for ally in allies:
@@ -2427,7 +3267,7 @@ func _show_status_character_picker() -> void:
 		var enemy_header = Label.new()
 		enemy_header.text = "\n--- Enemies ---"
 		enemy_header.add_theme_font_size_override("font_size", 14)
-		enemy_header.add_theme_color_override("font_color", Color(1.0, 0.3, 0.3, 1.0))
+		enemy_header.add_theme_color_override("font_color", COLOR_CITRUS_YELLOW)  # Yellow for enemies
 		character_list.add_child(enemy_header)
 
 		for enemy in enemies:
@@ -2664,6 +3504,7 @@ func _execute_enemy_ai() -> void:
 
 		if not hit_check.hit:
 			# Miss!
+			_show_miss_feedback()  # Show big MISS text
 			log_message("  → Missed! (%d%% chance, rolled %d)" % [int(hit_check.hit_chance), hit_check.roll])
 			print("[Battle] Enemy Miss! Hit chance: %.1f%%, Roll: %d" % [hit_check.hit_chance, hit_check.roll])
 		else:
@@ -2851,10 +3692,14 @@ func _execute_charm_action() -> void:
 ## ═══════════════════════════════════════════════════════════════
 
 func _update_burst_gauge() -> void:
-	"""Update burst gauge display"""
+	"""Update burst gauge display with smooth animation"""
 	if burst_gauge_bar:
 		burst_gauge_bar.max_value = battle_mgr.BURST_GAUGE_MAX
-		burst_gauge_bar.value = battle_mgr.burst_gauge
+		# Animate the burst gauge fill smoothly
+		var tween = create_tween()
+		tween.set_ease(Tween.EASE_OUT)
+		tween.set_trans(Tween.TRANS_CUBIC)
+		tween.tween_property(burst_gauge_bar, "value", battle_mgr.burst_gauge, 0.8)
 
 func log_message(message: String) -> void:
 	"""Add a message to the battle log"""
@@ -2864,14 +3709,237 @@ func log_message(message: String) -> void:
 		battle_log.scroll_to_line(battle_log.get_line_count() - 1)
 	print("[Battle] " + message)
 
+func _create_instruction_popup() -> void:
+	"""Create the instruction message popup that appears above battle log"""
+	instruction_popup = PanelContainer.new()
+	instruction_popup.custom_minimum_size = Vector2(560, 50)  # Same width as BattleLogPanel
+
+	# Style with cyan neon border to match Core vibe
+	var style = StyleBoxFlat.new()
+	style.bg_color = COLOR_INK_CHARCOAL
+	style.border_width_left = 3
+	style.border_width_right = 3
+	style.border_width_top = 3
+	style.border_width_bottom = 3
+	style.border_color = COLOR_SKY_CYAN  # Cyan neon border
+	style.corner_radius_top_left = 12
+	style.corner_radius_top_right = 12
+	style.corner_radius_bottom_left = 12
+	style.corner_radius_bottom_right = 12
+	style.shadow_size = 6
+	style.shadow_color = Color(COLOR_SKY_CYAN.r, COLOR_SKY_CYAN.g, COLOR_SKY_CYAN.b, 0.4)  # Cyan glow
+	style.content_margin_left = 15
+	style.content_margin_right = 15
+	style.content_margin_top = 10
+	style.content_margin_bottom = 10
+	instruction_popup.add_theme_stylebox_override("panel", style)
+
+	# Create label
+	instruction_label = Label.new()
+	instruction_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	instruction_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	instruction_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
+	instruction_label.add_theme_font_size_override("font_size", 16)
+	instruction_popup.add_child(instruction_label)
+
+	# Position above BattleLogPanel (starts hidden below)
+	# BattleLogPanel: offset_left=360, offset_top=-200, offset_right=920, offset_bottom=-50
+	instruction_popup.position = Vector2(360, get_viewport().get_visible_rect().size.y - 200)  # Start at battle log top
+	instruction_popup.modulate.a = 0.0  # Start invisible
+
+	add_child(instruction_popup)
+
+func _show_instruction(message: String) -> void:
+	"""Show instruction popup with animation sliding up from battle log"""
+	if not instruction_popup or not instruction_label:
+		return
+
+	instruction_label.text = message
+
+	# Starting position (at battle log top)
+	var start_y = get_viewport().get_visible_rect().size.y - 200
+	# End position (60 pixels above battle log)
+	var end_y = start_y - 60
+
+	instruction_popup.position.y = start_y
+	instruction_popup.modulate.a = 0.0
+
+	# Animate up and fade in
+	var tween = create_tween()
+	tween.set_parallel(true)
+	tween.set_ease(Tween.EASE_OUT)
+	tween.set_trans(Tween.TRANS_BACK)
+	tween.tween_property(instruction_popup, "position:y", end_y, 0.3)
+	tween.tween_property(instruction_popup, "modulate:a", 1.0, 0.2)
+
+func _hide_instruction() -> void:
+	"""Hide instruction popup with animation sliding back down"""
+	if not instruction_popup:
+		return
+
+	# Animate down and fade out
+	var tween = create_tween()
+	tween.set_parallel(true)
+	tween.set_ease(Tween.EASE_IN)
+	tween.set_trans(Tween.TRANS_BACK)
+	tween.tween_property(instruction_popup, "position:y", get_viewport().get_visible_rect().size.y - 200, 0.2)
+	tween.tween_property(instruction_popup, "modulate:a", 0.0, 0.15)
+
+func _show_miss_feedback() -> void:
+	"""Show big MISS text in center of screen that fades away in 0.5 seconds"""
+	# Create miss label
+	var miss_label = Label.new()
+	miss_label.text = "MISS!"
+	miss_label.add_theme_font_size_override("font_size", 80)  # Big font
+	miss_label.add_theme_color_override("font_color", COLOR_CITRUS_YELLOW)  # Yellow color
+	miss_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	miss_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+
+	# Center it on screen
+	miss_label.set_anchors_preset(Control.PRESET_CENTER)
+	miss_label.custom_minimum_size = Vector2(400, 100)
+	miss_label.position = Vector2(
+		get_viewport_rect().size.x / 2 - 200,
+		get_viewport_rect().size.y / 2 - 50
+	)
+	miss_label.z_index = 200  # High z-index to appear above everything
+
+	add_child(miss_label)
+
+	# Fade out and remove after 0.5 seconds
+	var tween = create_tween()
+	tween.set_ease(Tween.EASE_OUT)
+	tween.set_trans(Tween.TRANS_CUBIC)
+	tween.tween_property(miss_label, "modulate:a", 0.0, 0.5)
+
+	# Remove label after fade completes
+	await tween.finished
+	miss_label.queue_free()
+
+## ═══════════════════════════════════════════════════════════════
+## CONFIRMATION DIALOG (YES/NO)
+## ═══════════════════════════════════════════════════════════════
+
+func _show_confirmation_dialog(message: String, on_confirm: Callable) -> void:
+	"""Show a Yes/No confirmation dialog"""
+	_show_instruction(message)
+
+	awaiting_confirmation = true
+	confirmation_callback = on_confirm
+
+	# Disable action menu while showing confirmation
+	_disable_action_menu()
+
+	# Create confirmation panel
+	confirmation_panel = PanelContainer.new()
+	confirmation_panel.custom_minimum_size = Vector2(300, 120)
+
+	# Style the panel with cyan neon border
+	var style = StyleBoxFlat.new()
+	style.bg_color = COLOR_INK_CHARCOAL
+	style.border_width_left = 3
+	style.border_width_right = 3
+	style.border_width_top = 3
+	style.border_width_bottom = 3
+	style.border_color = COLOR_SKY_CYAN  # Cyan neon border
+	style.corner_radius_top_left = 12
+	style.corner_radius_top_right = 12
+	style.corner_radius_bottom_left = 12
+	style.corner_radius_bottom_right = 12
+	style.shadow_size = 6
+	style.shadow_color = Color(COLOR_SKY_CYAN.r, COLOR_SKY_CYAN.g, COLOR_SKY_CYAN.b, 0.4)  # Cyan glow
+	confirmation_panel.add_theme_stylebox_override("panel", style)
+
+	# Create VBox layout
+	var vbox = VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 10)
+	confirmation_panel.add_child(vbox)
+
+	# Add message label
+	var label = Label.new()
+	label.text = message
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
+	vbox.add_child(label)
+
+	# Add button container
+	var hbox = HBoxContainer.new()
+	hbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	hbox.add_theme_constant_override("separation", 20)
+	vbox.add_child(hbox)
+
+	# Create Yes button
+	confirmation_yes_button = Button.new()
+	confirmation_yes_button.text = "Yes"
+	confirmation_yes_button.custom_minimum_size = Vector2(100, 40)
+	confirmation_yes_button.pressed.connect(_on_confirmation_yes)
+	hbox.add_child(confirmation_yes_button)
+
+	# Create No button
+	confirmation_no_button = Button.new()
+	confirmation_no_button.text = "No"
+	confirmation_no_button.custom_minimum_size = Vector2(100, 40)
+	confirmation_no_button.pressed.connect(_on_confirmation_no)
+	hbox.add_child(confirmation_no_button)
+
+	# Position in center of screen
+	confirmation_panel.position = Vector2(
+		(get_viewport().get_visible_rect().size.x - 300) / 2,
+		(get_viewport().get_visible_rect().size.y - 120) / 2
+	)
+
+	add_child(confirmation_panel)
+
+	# Focus Yes button by default
+	confirmation_yes_button.grab_focus()
+
+func _on_confirmation_yes() -> void:
+	"""Handle Yes button press"""
+	print("[Battle] Confirmation Yes pressed")
+
+	# Save callback before closing dialog (which clears it)
+	var callback = confirmation_callback
+	print("[Battle] Saved callback, is_valid: ", callback.is_valid())
+
+	_close_confirmation_dialog()
+	_hide_instruction()
+
+	# Call the confirmation callback
+	if callback.is_valid():
+		print("[Battle] Executing callback...")
+		callback.call()
+		print("[Battle] Callback executed")
+	else:
+		print("[Battle] ERROR: Callback is not valid!")
+
+func _on_confirmation_no() -> void:
+	"""Handle No button press"""
+	_close_confirmation_dialog()
+	_hide_instruction()
+
+	# Re-enable action menu
+	_enable_action_menu()
+
+func _close_confirmation_dialog() -> void:
+	"""Close the confirmation dialog"""
+	awaiting_confirmation = false
+	confirmation_callback = Callable()
+
+	if confirmation_panel:
+		confirmation_panel.queue_free()
+		confirmation_panel = null
+
+	confirmation_yes_button = null
+	confirmation_no_button = null
+
 ## ═══════════════════════════════════════════════════════════════
 ## SKILL MENU & EXECUTION
 ## ═══════════════════════════════════════════════════════════════
 
 func _show_skill_menu(skill_menu: Array) -> void:
 	"""Show skill selection menu with sigils"""
-	# Hide action menu
-	action_menu.visible = false
+	# Disable and dim action menu
+	_disable_action_menu()
 
 	# Store current menu
 	current_skill_menu = skill_menu
@@ -2882,14 +3950,20 @@ func _show_skill_menu(skill_menu: Array) -> void:
 	skill_menu_panel = PanelContainer.new()
 	skill_menu_panel.custom_minimum_size = Vector2(400, 0)
 
-	# Style the panel
+	# Style the panel with cyan neon Core vibe
 	var style = StyleBoxFlat.new()
-	style.bg_color = Color(0.1, 0.1, 0.15, 0.95)
-	style.border_width_left = 2
-	style.border_width_right = 2
-	style.border_width_top = 2
-	style.border_width_bottom = 2
-	style.border_color = Color(0.5, 0.5, 0.6, 1.0)
+	style.bg_color = COLOR_INK_CHARCOAL
+	style.border_width_left = 3
+	style.border_width_right = 3
+	style.border_width_top = 3
+	style.border_width_bottom = 3
+	style.border_color = COLOR_SKY_CYAN  # Cyan neon border
+	style.corner_radius_top_left = 12
+	style.corner_radius_top_right = 12
+	style.corner_radius_bottom_left = 12
+	style.corner_radius_bottom_right = 12
+	style.shadow_size = 6
+	style.shadow_color = Color(COLOR_SKY_CYAN.r, COLOR_SKY_CYAN.g, COLOR_SKY_CYAN.b, 0.4)  # Cyan glow
 	skill_menu_panel.add_theme_stylebox_override("panel", style)
 
 	# Create VBox for menu items
@@ -2900,6 +3974,7 @@ func _show_skill_menu(skill_menu: Array) -> void:
 	var title = Label.new()
 	title.text = "Select a Skill"
 	title.add_theme_font_size_override("font_size", 18)
+	title.add_theme_color_override("font_color", COLOR_MILK_WHITE)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vbox.add_child(title)
 
@@ -2909,16 +3984,53 @@ func _show_skill_menu(skill_menu: Array) -> void:
 	type_label.text = "Current Type: %s" % current_type
 	type_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	type_label.add_theme_font_size_override("font_size", 14)
+	type_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
 	vbox.add_child(type_label)
 
 	# Add "Change Type" button (only for player)
 	if current_combatant.get("is_ally", false) and current_combatant.get("id") == "hero":
 		var changed_this_round = current_combatant.get("changed_type_this_round", false)
 		var change_type_btn = Button.new()
-		change_type_btn.text = "Change Mind Type" if not changed_this_round else "Change Mind Type (Used)"
-		change_type_btn.custom_minimum_size = Vector2(380, 40)
+		change_type_btn.text = "⚡ CHANGE MIND TYPE ⚡" if not changed_this_round else "Change Mind Type (Used)"
+		change_type_btn.custom_minimum_size = Vector2(380, 50)
 		change_type_btn.disabled = changed_this_round
 		change_type_btn.pressed.connect(_on_change_type_button_pressed)
+
+		# Style the button to make it stand out
+		if not changed_this_round:
+			var btn_style = StyleBoxFlat.new()
+			btn_style.bg_color = COLOR_BUBBLE_MAGENTA.darkened(0.3)  # Pink/magenta background
+			btn_style.border_width_left = 2
+			btn_style.border_width_right = 2
+			btn_style.border_width_top = 2
+			btn_style.border_width_bottom = 2
+			btn_style.border_color = COLOR_BUBBLE_MAGENTA  # Bright magenta border
+			btn_style.corner_radius_top_left = 8
+			btn_style.corner_radius_top_right = 8
+			btn_style.corner_radius_bottom_left = 8
+			btn_style.corner_radius_bottom_right = 8
+			change_type_btn.add_theme_stylebox_override("normal", btn_style)
+
+			var btn_style_hover = StyleBoxFlat.new()
+			btn_style_hover.bg_color = COLOR_BUBBLE_MAGENTA.darkened(0.1)  # Brighter on hover
+			btn_style_hover.border_width_left = 3
+			btn_style_hover.border_width_right = 3
+			btn_style_hover.border_width_top = 3
+			btn_style_hover.border_width_bottom = 3
+			btn_style_hover.border_color = COLOR_BUBBLE_MAGENTA.lightened(0.2)
+			btn_style_hover.corner_radius_top_left = 8
+			btn_style_hover.corner_radius_top_right = 8
+			btn_style_hover.corner_radius_bottom_left = 8
+			btn_style_hover.corner_radius_bottom_right = 8
+			change_type_btn.add_theme_stylebox_override("hover", btn_style_hover)
+			change_type_btn.add_theme_stylebox_override("focus", btn_style_hover)
+
+			change_type_btn.add_theme_color_override("font_color", COLOR_MILK_WHITE)
+			change_type_btn.add_theme_font_size_override("font_size", 18)
+
+			# Add to navigation array so it's selectable
+			skill_menu_buttons.append(change_type_btn)
+
 		vbox.add_child(change_type_btn)
 
 	# Add separator
@@ -2968,6 +4080,9 @@ func _show_skill_menu(skill_menu: Array) -> void:
 	cancel_btn.pressed.connect(_close_skill_menu)
 	vbox.add_child(cancel_btn)
 
+	# Add cancel to navigation array so it's selectable
+	skill_menu_buttons.append(cancel_btn)
+
 	# Add to scene
 	add_child(skill_menu_panel)
 
@@ -2977,9 +4092,11 @@ func _show_skill_menu(skill_menu: Array) -> void:
 		100
 	)
 
-	# Highlight first skill if available
+	# Highlight first button if available (Change Mind Type will be first if it exists)
 	if not skill_menu_buttons.is_empty():
 		_highlight_skill_button(0)
+		# Ensure first button grabs focus
+		skill_menu_buttons[0].grab_focus()
 
 	# Set cooldown to prevent immediate button press
 	input_cooldown = input_cooldown_duration
@@ -2996,27 +4113,38 @@ func _on_change_type_button_pressed() -> void:
 	# Close current skill menu
 	_close_skill_menu()
 
-	# Create type selection panel
-	var type_panel = PanelContainer.new()
-	type_panel.custom_minimum_size = Vector2(300, 0)
+	# Reset type menu state
+	type_menu_buttons = []
+	selected_type_index = 0
 
-	# Style the panel
+	# Create type selection panel
+	type_menu_panel = PanelContainer.new()
+	type_menu_panel.custom_minimum_size = Vector2(300, 0)
+
+	# Style the panel with cyan neon Core vibe
 	var style = StyleBoxFlat.new()
-	style.bg_color = Color(0.1, 0.1, 0.15, 0.95)
-	style.border_width_left = 2
-	style.border_width_right = 2
-	style.border_width_top = 2
-	style.border_width_bottom = 2
-	style.border_color = Color(0.5, 0.5, 0.6, 1.0)
-	type_panel.add_theme_stylebox_override("panel", style)
+	style.bg_color = COLOR_INK_CHARCOAL
+	style.border_width_left = 3
+	style.border_width_right = 3
+	style.border_width_top = 3
+	style.border_width_bottom = 3
+	style.border_color = COLOR_SKY_CYAN  # Cyan neon border
+	style.corner_radius_top_left = 12
+	style.corner_radius_top_right = 12
+	style.corner_radius_bottom_left = 12
+	style.corner_radius_bottom_right = 12
+	style.shadow_size = 6
+	style.shadow_color = Color(COLOR_SKY_CYAN.r, COLOR_SKY_CYAN.g, COLOR_SKY_CYAN.b, 0.4)  # Cyan glow
+	type_menu_panel.add_theme_stylebox_override("panel", style)
 
 	var vbox = VBoxContainer.new()
-	type_panel.add_child(vbox)
+	type_menu_panel.add_child(vbox)
 
 	# Title
 	var title = Label.new()
 	title.text = "Change Mind Type"
 	title.add_theme_font_size_override("font_size", 18)
+	title.add_theme_color_override("font_color", COLOR_MILK_WHITE)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vbox.add_child(title)
 
@@ -3024,6 +4152,7 @@ func _on_change_type_button_pressed() -> void:
 	var current_label = Label.new()
 	current_label.text = "Current: %s" % current_type
 	current_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	current_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
 	vbox.add_child(current_label)
 
 	var sep1 = HSeparator.new()
@@ -3036,7 +4165,8 @@ func _on_change_type_button_pressed() -> void:
 			var btn = Button.new()
 			btn.text = type_name
 			btn.custom_minimum_size = Vector2(280, 40)
-			btn.pressed.connect(_on_type_selected.bind(type_name, type_panel))
+			btn.pressed.connect(_on_type_selected.bind(type_name))
+			type_menu_buttons.append(btn)  # Add to navigation array
 			vbox.add_child(btn)
 
 	# Cancel button
@@ -3046,21 +4176,29 @@ func _on_change_type_button_pressed() -> void:
 	var cancel_btn = Button.new()
 	cancel_btn.text = "Cancel"
 	cancel_btn.custom_minimum_size = Vector2(280, 40)
-	cancel_btn.pressed.connect(_on_type_menu_cancel.bind(type_panel))
+	cancel_btn.pressed.connect(_on_type_menu_cancel)
+	type_menu_buttons.append(cancel_btn)  # Add to navigation array
 	vbox.add_child(cancel_btn)
 
 	# Add to scene and center
-	add_child(type_panel)
-	type_panel.position = Vector2(
-		(get_viewport_rect().size.x - type_panel.custom_minimum_size.x) / 2,
-		150
+	add_child(type_menu_panel)
+	type_menu_panel.position = Vector2(
+		(get_viewport_rect().size.x - type_menu_panel.custom_minimum_size.x) / 2,
+		100  # Moved up 50px from 150
 	)
 
-func _on_type_selected(new_type: String, type_panel: PanelContainer) -> void:
+	# Highlight first button and grab focus
+	if not type_menu_buttons.is_empty():
+		_highlight_type_button(0)
+		type_menu_buttons[0].grab_focus()
+
+	# Set cooldown to prevent immediate button press
+	input_cooldown = input_cooldown_duration
+
+func _on_type_selected(new_type: String) -> void:
 	"""Handle type selection"""
 	# Close type menu
-	if type_panel:
-		type_panel.queue_free()
+	_close_type_menu()
 
 	# Switch type (don't end turn)
 	_switch_mind_type(new_type, false)
@@ -3068,16 +4206,26 @@ func _on_type_selected(new_type: String, type_panel: PanelContainer) -> void:
 	# Reopen skill menu with new type
 	_on_skill_pressed()
 
-func _on_type_menu_cancel(type_panel: PanelContainer) -> void:
+func _on_type_menu_cancel() -> void:
 	"""Cancel type selection and return to skill menu"""
-	if type_panel:
-		type_panel.queue_free()
+	# Close type menu
+	_close_type_menu()
 
 	# Reopen skill menu
 	_on_skill_pressed()
 
+func _close_type_menu() -> void:
+	"""Close the type selection menu"""
+	if type_menu_panel:
+		type_menu_panel.queue_free()
+		type_menu_panel = null
+	type_menu_buttons = []
+	selected_type_index = 0
+
 func _close_skill_menu() -> void:
 	"""Close the skill menu"""
+	_hide_instruction()
+
 	if skill_menu_panel:
 		skill_menu_panel.queue_free()
 		skill_menu_panel = null
@@ -3085,8 +4233,8 @@ func _close_skill_menu() -> void:
 	skill_menu_buttons = []
 	selected_skill_index = 0
 
-	# Show action menu again
-	action_menu.visible = true
+	# Enable action menu again
+	_enable_action_menu()
 
 func _navigate_skill_menu(direction: int) -> void:
 	"""Navigate skill menu with controller (direction: -1 for up, 1 for down)"""
@@ -3111,9 +4259,15 @@ func _navigate_skill_menu(direction: int) -> void:
 func _confirm_skill_selection() -> void:
 	"""Confirm skill selection with A button"""
 	if selected_skill_index >= 0 and selected_skill_index < skill_menu_buttons.size():
-		# Find the actual skill index in current_skill_menu
+		# Get the selected button and trigger its pressed signal
 		var button = skill_menu_buttons[selected_skill_index]
-		# Simulate button press - need to find the index
+
+		# For special buttons (Change Mind Type, Cancel), just press them directly
+		if button.text.contains("CHANGE MIND TYPE") or button.text == "Cancel":
+			button.emit_signal("pressed")
+			return
+
+		# Find the actual skill index in current_skill_menu
 		for i in range(current_skill_menu.size()):
 			var menu_entry = current_skill_menu[i]
 			var skill_data = menu_entry.skill_data
@@ -3135,6 +4289,50 @@ func _unhighlight_skill_button(index: int) -> void:
 	"""Remove highlight from a skill button"""
 	if index >= 0 and index < skill_menu_buttons.size():
 		var button = skill_menu_buttons[index]
+		button.modulate = Color(1.0, 1.0, 1.0, 1.0)  # Normal color
+
+## ═══════════════════════════════════════════════════════════════
+## TYPE MENU NAVIGATION
+## ═══════════════════════════════════════════════════════════════
+
+func _navigate_type_menu(direction: int) -> void:
+	"""Navigate type menu with controller (direction: -1 for up, 1 for down)"""
+	if type_menu_buttons.is_empty():
+		return
+
+	# Remove highlight from current button
+	_unhighlight_type_button(selected_type_index)
+
+	# Move selection
+	selected_type_index += direction
+
+	# Wrap around
+	if selected_type_index < 0:
+		selected_type_index = type_menu_buttons.size() - 1
+	elif selected_type_index >= type_menu_buttons.size():
+		selected_type_index = 0
+
+	# Highlight new button
+	_highlight_type_button(selected_type_index)
+
+func _confirm_type_selection() -> void:
+	"""Confirm type selection with A button"""
+	if selected_type_index >= 0 and selected_type_index < type_menu_buttons.size():
+		# Get the selected button and trigger its pressed signal
+		var button = type_menu_buttons[selected_type_index]
+		button.emit_signal("pressed")
+
+func _highlight_type_button(index: int) -> void:
+	"""Highlight a type button for controller navigation"""
+	if index >= 0 and index < type_menu_buttons.size():
+		var button = type_menu_buttons[index]
+		button.modulate = Color(1.2, 1.2, 1.4, 1.0)  # Light blue highlight
+		button.grab_focus()
+
+func _unhighlight_type_button(index: int) -> void:
+	"""Remove highlight from a type button"""
+	if index >= 0 and index < type_menu_buttons.size():
+		var button = type_menu_buttons[index]
 		button.modulate = Color(1.0, 1.0, 1.0, 1.0)  # Normal color
 
 ## ═══════════════════════════════════════════════════════════════
@@ -3215,8 +4413,8 @@ func _close_status_details() -> void:
 
 func _show_item_menu(items: Array) -> void:
 	"""Show item selection menu with categorized tabs"""
-	# Hide action menu
-	action_menu.visible = false
+	# Disable and dim action menu
+	_disable_action_menu()
 
 	# Reset navigation
 	item_menu_buttons = []
@@ -3241,16 +4439,22 @@ func _show_item_menu(items: Array) -> void:
 
 	# Create item menu panel
 	item_menu_panel = PanelContainer.new()
-	item_menu_panel.custom_minimum_size = Vector2(550, 0)
+	item_menu_panel.custom_minimum_size = Vector2(440, 0)  # Reduced width by 110px total
 
-	# Style the panel
+	# Style the panel with Core vibe
 	var style = StyleBoxFlat.new()
-	style.bg_color = Color(0.1, 0.1, 0.15, 0.95)
-	style.border_width_left = 2
-	style.border_width_right = 2
-	style.border_width_top = 2
-	style.border_width_bottom = 2
-	style.border_color = Color(0.5, 0.5, 0.6, 1.0)
+	style.bg_color = COLOR_INK_CHARCOAL
+	style.border_width_left = 3
+	style.border_width_right = 3
+	style.border_width_top = 3
+	style.border_width_bottom = 3
+	style.border_color = COLOR_SKY_CYAN  # Cyan neon border
+	style.corner_radius_top_left = 12
+	style.corner_radius_top_right = 12
+	style.corner_radius_bottom_left = 12
+	style.corner_radius_bottom_right = 12
+	style.shadow_size = 6
+	style.shadow_color = Color(COLOR_SKY_CYAN.r, COLOR_SKY_CYAN.g, COLOR_SKY_CYAN.b, 0.4)  # Cyan glow
 	item_menu_panel.add_theme_stylebox_override("panel", style)
 
 	# Create VBox for menu items
@@ -3261,6 +4465,7 @@ func _show_item_menu(items: Array) -> void:
 	var title = Label.new()
 	title.text = "Select an Item"
 	title.add_theme_font_size_override("font_size", 18)
+	title.add_theme_color_override("font_color", COLOR_MILK_WHITE)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vbox.add_child(title)
 
@@ -3270,7 +4475,7 @@ func _show_item_menu(items: Array) -> void:
 
 	# Create tab container
 	var tab_container = TabContainer.new()
-	tab_container.custom_minimum_size = Vector2(530, 300)
+	tab_container.custom_minimum_size = Vector2(420, 230)  # Reduced width by 110px total, height by 70px
 	vbox.add_child(tab_container)
 
 	# Store reference for controller navigation
@@ -3290,8 +4495,9 @@ func _show_item_menu(items: Array) -> void:
 	item_description_label = Label.new()
 	item_description_label.text = "Hover over an item to see its description"
 	item_description_label.add_theme_font_size_override("font_size", 14)
+	item_description_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
 	item_description_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	item_description_label.custom_minimum_size = Vector2(530, 60)
+	item_description_label.custom_minimum_size = Vector2(420, 60)  # Reduced width by 110px total
 	item_description_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	vbox.add_child(item_description_label)
 
@@ -3302,15 +4508,15 @@ func _show_item_menu(items: Array) -> void:
 	# Add cancel button
 	var cancel_btn = Button.new()
 	cancel_btn.text = "Cancel"
-	cancel_btn.custom_minimum_size = Vector2(530, 40)
+	cancel_btn.custom_minimum_size = Vector2(420, 40)  # Reduced width by 110px total
 	cancel_btn.pressed.connect(_close_item_menu)
 	vbox.add_child(cancel_btn)
 
-	# Add to scene and center
+	# Add to scene and center (moved up 130px total)
 	add_child(item_menu_panel)
 	item_menu_panel.position = Vector2(
-		(get_viewport_rect().size.x - 550) / 2,
-		(get_viewport_rect().size.y - 400) / 2
+		(get_viewport_rect().size.x - 440) / 2,  # Adjusted for new width (440px)
+		(get_viewport_rect().size.y - 400) / 2 - 130  # Moved up 130px total (30px more)
 	)
 
 	# Rebuild button list for first tab and highlight first item
@@ -3341,6 +4547,7 @@ func _add_category_tab(tab_container: TabContainer, category_name: String, categ
 		empty_label.text = "No items in this category"
 		empty_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		empty_label.add_theme_font_size_override("font_size", 14)
+		empty_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
 		grid.add_child(empty_label)
 		return
 
@@ -3371,6 +4578,8 @@ func _add_category_tab(tab_container: TabContainer, category_name: String, categ
 
 func _close_item_menu() -> void:
 	"""Close the item menu"""
+	_hide_instruction()
+
 	if item_menu_panel:
 		item_menu_panel.queue_free()
 		item_menu_panel = null
@@ -3381,8 +4590,8 @@ func _close_item_menu() -> void:
 	item_menu_buttons = []
 	selected_item_index = 0
 
-	# Show action menu again
-	action_menu.visible = true
+	# Enable action menu again
+	_enable_action_menu()
 
 func _rebuild_item_button_list() -> void:
 	"""Rebuild the button list for the current tab"""
@@ -3666,8 +4875,8 @@ func _on_item_selected(item_data: Dictionary) -> void:
 
 func _show_capture_menu(bind_items: Array) -> void:
 	"""Show bind item selection menu for capture"""
-	# Hide action menu
-	action_menu.visible = false
+	# Disable and dim action menu
+	_disable_action_menu()
 
 	# Reset navigation
 	capture_menu_buttons = []
@@ -3677,14 +4886,20 @@ func _show_capture_menu(bind_items: Array) -> void:
 	capture_menu_panel = PanelContainer.new()
 	capture_menu_panel.custom_minimum_size = Vector2(800, 0)
 
-	# Style the panel
+	# Style the panel with Core vibe
 	var style = StyleBoxFlat.new()
-	style.bg_color = Color(0.1, 0.1, 0.15, 0.95)
-	style.border_width_left = 2
-	style.border_width_right = 2
-	style.border_width_top = 2
-	style.border_width_bottom = 2
-	style.border_color = Color(0.5, 0.5, 0.6, 1.0)
+	style.bg_color = COLOR_INK_CHARCOAL
+	style.border_width_left = 3
+	style.border_width_right = 3
+	style.border_width_top = 3
+	style.border_width_bottom = 3
+	style.border_color = COLOR_SKY_CYAN  # Cyan neon border
+	style.corner_radius_top_left = 12
+	style.corner_radius_top_right = 12
+	style.corner_radius_bottom_left = 12
+	style.corner_radius_bottom_right = 12
+	style.shadow_size = 6
+	style.shadow_color = Color(COLOR_SKY_CYAN.r, COLOR_SKY_CYAN.g, COLOR_SKY_CYAN.b, 0.4)  # Cyan glow
 	capture_menu_panel.add_theme_stylebox_override("panel", style)
 
 	# Create VBox for menu items
@@ -3695,6 +4910,7 @@ func _show_capture_menu(bind_items: Array) -> void:
 	var title = Label.new()
 	title.text = "Select a Bind Device"
 	title.add_theme_font_size_override("font_size", 18)
+	title.add_theme_color_override("font_color", COLOR_MILK_WHITE)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vbox.add_child(title)
 
@@ -3760,14 +4976,16 @@ func _show_capture_menu(bind_items: Array) -> void:
 
 func _close_capture_menu() -> void:
 	"""Close the capture menu"""
+	_hide_instruction()
+
 	if capture_menu_panel:
 		capture_menu_panel.queue_free()
 		capture_menu_panel = null
 	capture_menu_buttons = []
 	selected_capture_index = 0
 
-	# Show action menu again
-	action_menu.visible = true
+	# Enable action menu again
+	_enable_action_menu()
 
 func _navigate_capture_menu_vertical(direction: int) -> void:
 	"""Navigate capture menu vertically (direction: -2 for up, 2 for down in 2-column grid)"""
@@ -3858,6 +5076,9 @@ func _on_bind_selected(bind_data: Dictionary) -> void:
 	# Store selected bind for use after target selection
 	set_meta("pending_capture_bind", bind_data)
 
+	# Show instruction to select enemy
+	_show_instruction("Select an enemy.")
+
 	# Enable capture target selection mode
 	awaiting_target_selection = true
 	awaiting_capture_target = true
@@ -3874,8 +5095,8 @@ func _on_bind_selected(bind_data: Dictionary) -> void:
 
 func _show_burst_menu(burst_abilities: Array) -> void:
 	"""Show burst ability selection menu"""
-	# Hide action menu
-	action_menu.visible = false
+	# Disable and dim action menu
+	_disable_action_menu()
 
 	# Reset navigation
 	burst_menu_buttons = []
@@ -3890,14 +5111,20 @@ func _show_burst_menu(burst_abilities: Array) -> void:
 	burst_menu_panel = PanelContainer.new()
 	burst_menu_panel.custom_minimum_size = Vector2(450, 0)
 
-	# Style the panel
+	# Style the panel with Core vibe
 	var style = StyleBoxFlat.new()
-	style.bg_color = Color(0.1, 0.1, 0.15, 0.95)
-	style.border_width_left = 2
-	style.border_width_right = 2
-	style.border_width_top = 2
-	style.border_width_bottom = 2
-	style.border_color = Color(0.8, 0.3, 0.3, 1.0)  # Red border for bursts
+	style.bg_color = COLOR_INK_CHARCOAL  # Dark background
+	style.border_width_left = 3
+	style.border_width_right = 3
+	style.border_width_top = 3
+	style.border_width_bottom = 3
+	style.border_color = COLOR_SKY_CYAN  # Cyan neon border
+	style.corner_radius_top_left = 12
+	style.corner_radius_top_right = 12
+	style.corner_radius_bottom_left = 12
+	style.corner_radius_bottom_right = 12
+	style.shadow_size = 6
+	style.shadow_color = Color(COLOR_SKY_CYAN.r, COLOR_SKY_CYAN.g, COLOR_SKY_CYAN.b, 0.4)  # Cyan glow
 	burst_menu_panel.add_theme_stylebox_override("panel", style)
 
 	# Create VBox for menu items
@@ -3908,6 +5135,7 @@ func _show_burst_menu(burst_abilities: Array) -> void:
 	var title = Label.new()
 	title.text = "Select Burst Ability"
 	title.add_theme_font_size_override("font_size", 18)
+	title.add_theme_color_override("font_color", COLOR_BUBBLE_MAGENTA)  # Pink magenta title
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vbox.add_child(title)
 
@@ -3916,6 +5144,7 @@ func _show_burst_menu(burst_abilities: Array) -> void:
 	gauge_label.text = "Burst Gauge: %d / %d" % [battle_mgr.burst_gauge, battle_mgr.BURST_GAUGE_MAX]
 	gauge_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	gauge_label.add_theme_font_size_override("font_size", 14)
+	gauge_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)  # White text
 	vbox.add_child(gauge_label)
 
 	# Add separator
@@ -4011,14 +5240,16 @@ func _show_burst_menu(burst_abilities: Array) -> void:
 
 func _close_burst_menu() -> void:
 	"""Close the burst menu"""
+	_hide_instruction()
+
 	if burst_menu_panel:
 		burst_menu_panel.queue_free()
 		burst_menu_panel = null
 	burst_menu_buttons = []
 	selected_burst_index = 0
 
-	# Show action menu again
-	action_menu.visible = true
+	# Enable action menu again
+	_enable_action_menu()
 
 func _navigate_burst_menu(direction: int) -> void:
 	"""Navigate burst menu with controller (direction: -1 for up, 1 for down)"""
@@ -4144,6 +5375,7 @@ func _execute_burst_on_target(target: Dictionary) -> void:
 	var hit_check = combat_resolver.check_sigil_hit(current_combatant, target, {"skill_acc": acc})
 
 	if not hit_check.hit:
+		_show_miss_feedback()  # Show big MISS text
 		log_message("  → Missed %s! (%d%% chance)" % [target.display_name, int(hit_check.hit_chance)])
 		return
 
@@ -4258,6 +5490,7 @@ func _on_skill_selected(skill_entry: Dictionary) -> void:
 		else:
 			# Single target - need to select
 			log_message("Select a target...")
+			_show_instruction("Select an enemy.")
 			awaiting_target_selection = true
 			awaiting_skill_selection = true
 			selected_target_index = 0  # Start with first target
@@ -4296,6 +5529,7 @@ func _execute_skill_single(target: Dictionary) -> void:
 	var hit_check = combat_resolver.check_sigil_hit(current_combatant, target, {"skill_acc": acc})
 
 	if not hit_check.hit:
+		_show_miss_feedback()  # Show big MISS text
 		log_message("  → Missed! (%d%% chance, rolled %d)" % [int(hit_check.hit_chance), hit_check.roll])
 		# Still deduct MP even on miss
 		current_combatant.mp -= mp_cost
@@ -4320,7 +5554,9 @@ func _execute_skill_single(target: Dictionary) -> void:
 		status_effects.append(ailment)
 
 	log_message("  → %s prepares the skill..." % [current_combatant.display_name])
+	_show_instruction("SKILL!")
 	var minigame_result = await minigame_mgr.launch_skill_minigame(focus_stat, skill_sequence, skill_tier, mind_type, status_effects)
+	_hide_instruction()
 
 	# Apply minigame modifiers
 	var damage_modifier = minigame_result.get("damage_modifier", 1.0)

@@ -19,7 +19,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0.1, 0.1, 0.15, 1)
+color = Color(0, 0, 0, 1)
 
 [node name="MainLayout" type="HBoxContainer" parent="."]
 layout_mode = 1
@@ -32,128 +32,198 @@ offset_right = -20.0
 offset_bottom = -220.0
 grow_horizontal = 2
 grow_vertical = 2
+theme_override_constants/separation = 15
 
-[node name="BattleArena" type="VBoxContainer" parent="MainLayout"]
+[node name="AllyColumn" type="VBoxContainer" parent="MainLayout"]
 layout_mode = 2
 size_flags_horizontal = 3
-size_flags_stretch_ratio = 3.0
+size_flags_stretch_ratio = 1.5
+theme_override_constants/separation = 10
 
-[node name="TopPanel" type="PanelContainer" parent="MainLayout/BattleArena"]
-layout_mode = 2
-size_flags_vertical = 3
-
-[node name="VBox" type="VBoxContainer" parent="MainLayout/BattleArena/TopPanel"]
-layout_mode = 2
-
-[node name="BurstLabel" type="Label" parent="MainLayout/BattleArena/TopPanel/VBox"]
-layout_mode = 2
-text = "Burst Gauge"
-horizontal_alignment = 1
-
-[node name="BurstGauge" type="ProgressBar" parent="MainLayout/BattleArena/TopPanel/VBox"]
-unique_name_in_owner = true
-layout_mode = 2
-show_percentage = false
-
-[node name="EnemySlots" type="HBoxContainer" parent="MainLayout/BattleArena"]
+[node name="AllySlots" type="VBoxContainer" parent="MainLayout/AllyColumn"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 3
-size_flags_stretch_ratio = 3.0
+theme_override_constants/separation = 10
 alignment = 1
 
-[node name="MiddleSpace" type="Control" parent="MainLayout/BattleArena"]
-layout_mode = 2
-size_flags_vertical = 3
-
-[node name="AllySlots" type="HBoxContainer" parent="MainLayout/BattleArena"]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_vertical = 3
-size_flags_stretch_ratio = 3.0
-alignment = 1
-
-[node name="TurnOrderPanel" type="PanelContainer" parent="MainLayout"]
+[node name="BattleCenter" type="VBoxContainer" parent="MainLayout"]
 layout_mode = 2
 size_flags_horizontal = 3
+size_flags_stretch_ratio = 2.0
 
-[node name="VBox" type="VBoxContainer" parent="MainLayout/TurnOrderPanel"]
+[node name="MiddleSpace" type="Control" parent="MainLayout/BattleCenter"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="EnemyColumn" type="VBoxContainer" parent="MainLayout"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 1.5
+theme_override_constants/separation = 10
+
+[node name="EnemySlots" type="VBoxContainer" parent="MainLayout/EnemyColumn"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 10
+alignment = 1
+
+[node name="TurnOrderPanel" type="PanelContainer" parent="."]
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -200.0
+offset_top = -280.0
+offset_right = -20.0
+offset_bottom = -20.0
+grow_horizontal = 0
+grow_vertical = 0
+
+[node name="VBox" type="VBoxContainer" parent="TurnOrderPanel"]
 layout_mode = 2
 
-[node name="Title" type="Label" parent="MainLayout/TurnOrderPanel/VBox"]
+[node name="Title" type="Label" parent="TurnOrderPanel/VBox"]
 layout_mode = 2
 text = "Turn Order"
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="Separator" type="HSeparator" parent="MainLayout/TurnOrderPanel/VBox"]
+[node name="Separator" type="HSeparator" parent="TurnOrderPanel/VBox"]
 layout_mode = 2
 
-[node name="ScrollContainer" type="ScrollContainer" parent="MainLayout/TurnOrderPanel/VBox"]
+[node name="ScrollContainer" type="ScrollContainer" parent="TurnOrderPanel/VBox"]
+custom_minimum_size = Vector2(0, 260)
 layout_mode = 2
 size_flags_vertical = 3
 
-[node name="TurnOrderDisplay" type="VBoxContainer" parent="MainLayout/TurnOrderPanel/VBox/ScrollContainer"]
+[node name="TurnOrderDisplay" type="VBoxContainer" parent="TurnOrderPanel/VBox/ScrollContainer"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 script = ExtResource("2_turn_order")
 
-[node name="ActionMenu" type="GridContainer" parent="."]
+[node name="ActionMenu" type="Control" parent="."]
 unique_name_in_owner = true
 layout_mode = 1
 anchors_preset = 2
 anchor_top = 1.0
 anchor_bottom = 1.0
 offset_left = 30.0
-offset_top = -250.0
-offset_right = 330.0
-offset_bottom = -50.0
+offset_top = -270.0
+offset_right = 280.0
+offset_bottom = -30.0
 grow_vertical = 0
-theme_override_constants/h_separation = 10
-theme_override_constants/v_separation = 5
-columns = 2
 
-[node name="BurstButton" type="Button" parent="ActionMenu"]
-custom_minimum_size = Vector2(140, 45)
-layout_mode = 2
-text = "(;) BURST"
+[node name="DiamondBackground" type="ColorRect" parent="ActionMenu"]
+layout_mode = 0
+offset_left = 52.0
+offset_top = 12.0
+offset_right = 198.0
+offset_bottom = 158.0
+rotation = 0.785398
+pivot_offset = Vector2(73, 73)
+color = Color(0.96, 0.97, 0.98, 0.15)
+scale = Vector2(0.49, 0.49)
 
-[node name="RunButton" type="Button" parent="ActionMenu"]
-custom_minimum_size = Vector2(140, 45)
-layout_mode = 2
-text = "(') RUN"
-
-[node name="DefendButton" type="Button" parent="ActionMenu"]
-custom_minimum_size = Vector2(140, 45)
-layout_mode = 2
-text = "(Y) DEFEND"
+[node name="DiamondBorder" type="ColorRect" parent="ActionMenu/DiamondBackground"]
+show_behind_parent = true
+layout_mode = 0
+offset_left = 3.0
+offset_top = 3.0
+offset_right = 207.0
+offset_bottom = 207.0
+color = Color(0.96, 0.97, 0.98, 0.8)
 
 [node name="SkillButton" type="Button" parent="ActionMenu"]
-custom_minimum_size = Vector2(140, 45)
-layout_mode = 2
-text = "(X) SKILL"
+custom_minimum_size = Vector2(120, 45)
+layout_mode = 0
+offset_left = 65.0
+offset_top = 5.0
+offset_right = 185.0
+offset_bottom = 50.0
+text = "(Y) SKILL"
 
-[node name="CaptureButton" type="Button" parent="ActionMenu"]
-custom_minimum_size = Vector2(140, 45)
-layout_mode = 2
-text = "(B) CAPTURE"
+[node name="DefendButton" type="Button" parent="ActionMenu"]
+custom_minimum_size = Vector2(120, 45)
+layout_mode = 0
+offset_left = 0.0
+offset_top = 82.0
+offset_right = 120.0
+offset_bottom = 127.0
+text = "(X) GUARD"
 
 [node name="AttackButton" type="Button" parent="ActionMenu"]
-custom_minimum_size = Vector2(140, 45)
-layout_mode = 2
-text = "(A) ATTACK"
+custom_minimum_size = Vector2(120, 45)
+layout_mode = 0
+offset_left = 130.0
+offset_top = 82.0
+offset_right = 250.0
+offset_bottom = 127.0
+text = "(B) FIGHT"
 
-[node name="ItemButton" type="Button" parent="ActionMenu"]
-custom_minimum_size = Vector2(140, 45)
-layout_mode = 2
-text = "(z) ITEMS"
+[node name="CaptureButton" type="Button" parent="ActionMenu"]
+custom_minimum_size = Vector2(120, 45)
+layout_mode = 0
+offset_left = 65.0
+offset_top = 160.0
+offset_right = 185.0
+offset_bottom = 205.0
+text = "(A) CAPTURE"
+
+[node name="BurstButton" type="Button" parent="ActionMenu"]
+visible = false
+custom_minimum_size = Vector2(120, 45)
+layout_mode = 0
+offset_left = 65.0
+offset_top = 5.0
+offset_right = 185.0
+offset_bottom = 50.0
+text = "(Y) BURST"
+
+[node name="RunButton" type="Button" parent="ActionMenu"]
+visible = false
+custom_minimum_size = Vector2(120, 45)
+layout_mode = 0
+offset_left = 0.0
+offset_top = 82.0
+offset_right = 120.0
+offset_bottom = 127.0
+text = "(X) RUN"
 
 [node name="StatusButton" type="Button" parent="ActionMenu"]
-custom_minimum_size = Vector2(140, 45)
-layout_mode = 2
-text = "(x) STATUS"
+visible = false
+custom_minimum_size = Vector2(120, 45)
+layout_mode = 0
+offset_left = 130.0
+offset_top = 82.0
+offset_right = 250.0
+offset_bottom = 127.0
+text = "(B) STATUS"
+
+[node name="ItemButton" type="Button" parent="ActionMenu"]
+visible = false
+custom_minimum_size = Vector2(120, 45)
+layout_mode = 0
+offset_left = 65.0
+offset_top = 160.0
+offset_right = 185.0
+offset_bottom = 205.0
+text = "(A) ITEMS"
+
+[node name="SwitchButton" type="Button" parent="ActionMenu"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(40, 40)
+layout_mode = 0
+offset_left = 210.0
+offset_top = 170.0
+offset_right = 250.0
+offset_bottom = 210.0
+text = "⇄"
 
 [node name="BattleLogPanel" type="PanelContainer" parent="."]
 layout_mode = 1
@@ -179,11 +249,39 @@ bbcode_enabled = true
 fit_content = true
 scroll_following = true
 
+[node name="BurstGaugePanel" type="PanelContainer" parent="."]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -270.0
+offset_top = -45.0
+offset_right = 270.0
+offset_bottom = -10.0
+grow_horizontal = 2
+grow_vertical = 0
+
+[node name="VBox" type="VBoxContainer" parent="BurstGaugePanel"]
+layout_mode = 2
+
+[node name="BurstLabel" type="Label" parent="BurstGaugePanel/VBox"]
+layout_mode = 2
+text = "BURST GAUGE"
+horizontal_alignment = 1
+
+[node name="BurstGauge" type="ProgressBar" parent="BurstGaugePanel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+show_percentage = false
+
+[connection signal="pressed" from="ActionMenu/SkillButton" to="." method="_on_skill_pressed"]
+[connection signal="pressed" from="ActionMenu/DefendButton" to="." method="_on_defend_pressed"]
+[connection signal="pressed" from="ActionMenu/AttackButton" to="." method="_on_attack_pressed"]
+[connection signal="pressed" from="ActionMenu/CaptureButton" to="." method="_on_capture_pressed"]
 [connection signal="pressed" from="ActionMenu/BurstButton" to="." method="_on_burst_pressed"]
 [connection signal="pressed" from="ActionMenu/RunButton" to="." method="_on_run_pressed"]
-[connection signal="pressed" from="ActionMenu/DefendButton" to="." method="_on_defend_pressed"]
-[connection signal="pressed" from="ActionMenu/SkillButton" to="." method="_on_skill_pressed"]
-[connection signal="pressed" from="ActionMenu/CaptureButton" to="." method="_on_capture_pressed"]
-[connection signal="pressed" from="ActionMenu/AttackButton" to="." method="_on_attack_pressed"]
-[connection signal="pressed" from="ActionMenu/ItemButton" to="." method="_on_item_pressed"]
 [connection signal="pressed" from="ActionMenu/StatusButton" to="." method="_on_status_pressed"]
+[connection signal="pressed" from="ActionMenu/ItemButton" to="." method="_on_item_pressed"]
+[connection signal="pressed" from="ActionMenu/SwitchButton" to="." method="_on_switch_panel_pressed"]

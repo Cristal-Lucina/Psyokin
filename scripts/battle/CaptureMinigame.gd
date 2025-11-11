@@ -59,6 +59,10 @@ var bind_point: ColorRect  # The point to grab and drag
 var bind_trail: Line2D  # Trail showing wrap around enemy
 var prompt_label: Label  # Shows "PRESS A!" during button prompts
 
+# Core vibe color constants
+const COLOR_MILK_WHITE = Color(0.96, 0.97, 0.98)
+const COLOR_BUBBLE_MAGENTA = Color(1.0, 0.29, 0.85)
+
 func _setup_minigame() -> void:
 	base_duration = 10.0
 	current_duration = base_duration
@@ -71,6 +75,7 @@ func _setup_minigame() -> void:
 	title_label.text = "CAPTURE!"
 	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title_label.add_theme_font_size_override("font_size", 32)
+	title_label.add_theme_color_override("font_color", COLOR_BUBBLE_MAGENTA)  # Pink magenta title
 	content_container.add_child(title_label)
 
 	# Phase label
@@ -78,6 +83,7 @@ func _setup_minigame() -> void:
 	phase_label.text = "Phase: TOSS"
 	phase_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	phase_label.add_theme_font_size_override("font_size", 20)
+	phase_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
 	content_container.add_child(phase_label)
 
 	# Enemy icon (circular)
@@ -96,6 +102,7 @@ func _setup_minigame() -> void:
 	bind_result_label.text = "Rolling binds..."
 	bind_result_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	bind_result_label.add_theme_font_size_override("font_size", 18)
+	bind_result_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
 	content_container.add_child(bind_result_label)
 
 	# Break progress bar (shows breaks completed)
@@ -125,6 +132,7 @@ func _setup_minigame() -> void:
 	instruction_label.text = "Rolling binds..."
 	instruction_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	instruction_label.add_theme_font_size_override("font_size", 16)
+	instruction_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
 	content_container.add_child(instruction_label)
 
 	# Charm effect overlay (pink wavy border when enemy is charmed)
@@ -475,7 +483,7 @@ func _setup_bind_arena() -> void:
 	prompt_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	prompt_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	prompt_label.add_theme_font_size_override("font_size", 32)
-	prompt_label.add_theme_color_override("font_color", Color(1.0, 0.2, 0.2, 1.0))  # Red
+	prompt_label.add_theme_color_override("font_color", COLOR_BUBBLE_MAGENTA)  # Pink magenta for attention
 	prompt_label.position = Vector2(50, 150)  # Below arena
 	prompt_label.size = Vector2(100, 40)
 	prompt_label.visible = false

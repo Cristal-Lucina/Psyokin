@@ -76,11 +76,16 @@ func _setup_minigame() -> void:
 	_randomize_weak_spot_target()
 	weak_spot_pos = _get_random_position_in_arena()
 
+	# Neon-kawaii colors
+	const COLOR_MILK_WHITE = Color(0.96, 0.97, 0.98)
+	const COLOR_BUBBLE_MAGENTA = Color(1.0, 0.29, 0.85)
+
 	# Title
 	var title_label = Label.new()
 	title_label.text = "ATTACK!"
 	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title_label.add_theme_font_size_override("font_size", 28)
+	title_label.add_theme_color_override("font_color", COLOR_BUBBLE_MAGENTA)  # Magenta title
 	content_container.add_child(title_label)
 
 	# Arena (200x200 - circular view)
@@ -106,6 +111,7 @@ func _setup_minigame() -> void:
 	charge_label.text = "Find weak spot, then HOLD SPACE to charge!"
 	charge_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	charge_label.add_theme_font_size_override("font_size", 14)
+	charge_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
 	content_container.add_child(charge_label)
 
 	# Timer label
@@ -113,6 +119,7 @@ func _setup_minigame() -> void:
 	timer_label.text = "Move to start!"
 	timer_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	timer_label.add_theme_font_size_override("font_size", 16)
+	timer_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
 	content_container.add_child(timer_label)
 
 	# Instructions
@@ -120,6 +127,7 @@ func _setup_minigame() -> void:
 	instruction_label.text = "Directions: Move view | HOLD A (Accept): Charge when visible!"
 	instruction_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	instruction_label.add_theme_font_size_override("font_size", 11)
+	instruction_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
 	content_container.add_child(instruction_label)
 
 func _update_weak_spot_visibility() -> void:

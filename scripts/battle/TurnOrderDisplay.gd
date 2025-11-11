@@ -35,7 +35,7 @@ func _ready() -> void:
 	round_label = Label.new()
 	round_label.text = "Round 1"
 	round_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	round_label.add_theme_font_size_override("font_size", 14)
+	round_label.add_theme_font_size_override("font_size", 13)  # Scaled for 150px width
 	round_label.add_theme_color_override("font_color", Color(0.9, 0.9, 0.5, 1.0))
 	add_child(round_label)
 	move_child(round_label, 0)  # Put it at the top
@@ -138,14 +138,14 @@ func _show_round_announcement(round_num: int) -> void:
 	"""Show big 'Round X' announcement that fades in and out"""
 	print("[TurnOrderDisplay] Showing Round %d announcement..." % round_num)
 
-	# Create large announcement label
+	# Create announcement label (scaled for 150px panel)
 	round_announcement = Label.new()
-	round_announcement.text = "=== ROUND %d ===" % round_num
+	round_announcement.text = "= R%d =" % round_num  # Shorter text
 	round_announcement.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	round_announcement.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	round_announcement.add_theme_font_size_override("font_size", 32)
+	round_announcement.add_theme_font_size_override("font_size", 22)  # Scaled for 150px width
 	round_announcement.add_theme_color_override("font_color", Color(1.0, 0.9, 0.3, 1.0))  # Gold color
-	round_announcement.custom_minimum_size = Vector2(200, 60)
+	round_announcement.custom_minimum_size = Vector2(130, 50)  # Scaled for 150px width
 	round_announcement.modulate.a = 0.0  # Start invisible
 
 	add_child(round_announcement)
@@ -481,9 +481,15 @@ func _animate_position_changes(animations: Array[Dictionary]) -> void:
 func _create_turn_slot(combatant: Dictionary, index: int) -> PanelContainer:
 	"""Create a UI slot for a combatant in the turn order"""
 	var panel = PanelContainer.new()
-	panel.custom_minimum_size = Vector2(180, 40)
+	panel.custom_minimum_size = Vector2(170, 32)  # Expanded to 170px width
 	panel.set_meta("combatant_id", combatant.id)
 	panel.set_meta("turn_index", index)
+
+	# Neon Orchard Color Palette
+	const COLOR_SKY_CYAN = Color(0.30, 0.91, 1.0, 0.8)           # #4DE9FF with transparency
+	const COLOR_BUBBLE_MAGENTA = Color(1.0, 0.29, 0.85, 0.8)     # #FF4AD9 with transparency
+	const COLOR_INK_CHARCOAL = Color(0.07, 0.09, 0.15, 0.9)      # #111827
+	const COLOR_MILK_WHITE = Color(0.96, 0.97, 0.98, 1.0)        # #F4F7FB
 
 	# Style the panel
 	var style = StyleBoxFlat.new()
@@ -492,35 +498,54 @@ func _create_turn_slot(combatant: Dictionary, index: int) -> PanelContainer:
 	if is_ko:
 		# Grey out KO'd combatants
 		style.bg_color = Color(0.3, 0.3, 0.3, 0.5)  # Grey for KO'd
+		style.border_color = Color(0.5, 0.5, 0.5, 1.0)
 	elif combatant.is_ally:
-		style.bg_color = Color(0.2, 0.3, 0.5, 0.8)  # Blue-ish for allies
+		style.bg_color = COLOR_SKY_CYAN  # Cyan for allies
+		style.border_color = COLOR_MILK_WHITE  # White keyline
 	else:
-		style.bg_color = Color(0.5, 0.2, 0.2, 0.8)  # Red-ish for enemies
+		style.bg_color = COLOR_BUBBLE_MAGENTA  # Magenta for enemies
+		style.border_color = COLOR_MILK_WHITE  # White keyline
+
 	style.border_width_left = 2
 	style.border_width_right = 2
 	style.border_width_top = 2
 	style.border_width_bottom = 2
-	style.border_color = Color(0.4, 0.4, 0.4, 1.0)
+	style.corner_radius_top_left = 8
+	style.corner_radius_top_right = 8
+	style.corner_radius_bottom_left = 8
+	style.corner_radius_bottom_right = 8
+	# Reduce padding inside panel for tighter layout
+	style.content_margin_left = 4
+	style.content_margin_right = 4
+	style.content_margin_top = 2
+	style.content_margin_bottom = 2
 	panel.add_theme_stylebox_override("panel", style)
 
-	# HBox for layout
+	# HBox for layout with reduced spacing
 	var hbox = HBoxContainer.new()
+	hbox.add_theme_constant_override("separation", 2)  # Reduce spacing between elements
 	panel.add_child(hbox)
 
-	# Turn number indicator
+	# Turn number indicator (narrower)
 	var turn_label = Label.new()
 	turn_label.text = str(index + 1)
-	turn_label.custom_minimum_size = Vector2(28, 0)
+	turn_label.custom_minimum_size = Vector2(20, 0)  # Reduced from 24px
 	turn_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	turn_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	turn_label.add_theme_font_size_override("font_size", 18)
+	turn_label.add_theme_font_size_override("font_size", 16)  # Keep font size
 
 	# Check if combatant has "Revived" ailment
 	var ailment_check = str(combatant.get("ailment", ""))
 	var is_revived_check = (ailment_check == "Revived")
 
 	if is_ko or is_revived_check:
-		turn_label.modulate = Color(0.5, 0.5, 0.5, 1.0)
+		turn_label.add_theme_color_override("font_color", Color(0.5, 0.5, 0.5, 1.0))
+	else:
+		turn_label.add_theme_color_override("font_color", Color(0.0, 0.0, 0.0, 1.0))  # Black
+		turn_label.add_theme_color_override("font_shadow_color", Color(0.96, 0.97, 0.98, 0.6))  # White glow
+		turn_label.add_theme_constant_override("shadow_offset_x", 0)
+		turn_label.add_theme_constant_override("shadow_offset_y", 0)
+		turn_label.add_theme_constant_override("shadow_outline_size", 4)
 	hbox.add_child(turn_label)
 
 	# Combatant name
@@ -549,9 +574,10 @@ func _create_turn_slot(combatant: Dictionary, index: int) -> PanelContainer:
 
 	name_label.text = display_text
 
-	name_label.add_theme_font_size_override("font_size", 14)
+	name_label.add_theme_font_size_override("font_size", 12)  # Scaled for 150px width
 	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	name_label.clip_text = true  # Clip text if too long
 
 	# Color name based on status
 	# Check if combatant has "Revived" ailment
@@ -571,7 +597,13 @@ func _create_turn_slot(combatant: Dictionary, index: int) -> PanelContainer:
 		elif weakness_hits == 1:
 			# 1 hit = Yellow warning
 			name_label.add_theme_color_override("font_color", Color(1.0, 0.9, 0.0, 1.0))
-		# else: default white color
+		else:
+			# Default black with white glow
+			name_label.add_theme_color_override("font_color", Color(0.0, 0.0, 0.0, 1.0))
+			name_label.add_theme_color_override("font_shadow_color", Color(0.96, 0.97, 0.98, 0.6))
+			name_label.add_theme_constant_override("shadow_offset_x", 0)
+			name_label.add_theme_constant_override("shadow_offset_y", 0)
+			name_label.add_theme_constant_override("shadow_outline_size", 4)
 
 	hbox.add_child(name_label)
 
@@ -580,7 +612,7 @@ func _create_turn_slot(combatant: Dictionary, index: int) -> PanelContainer:
 		var buffs = combatant.get("buffs", [])
 		if typeof(buffs) == TYPE_ARRAY and buffs.size() > 0:
 			var buff_container = HBoxContainer.new()
-			buff_container.add_theme_constant_override("separation", 1)
+			buff_container.add_theme_constant_override("separation", 0)  # Tighter spacing
 
 			# Group buffs by type to show multiples
 			var buff_groups: Dictionary = {}  # type -> {display_info, count}
@@ -595,7 +627,7 @@ func _create_turn_slot(combatant: Dictionary, index: int) -> PanelContainer:
 
 			# Display grouped buffs
 			var shown_count = 0
-			var max_groups = 6  # Show up to 6 different buff types
+			var max_groups = 3  # Reduced from 6 to fit narrower panel
 			for buff_type in buff_groups:
 				if shown_count >= max_groups:
 					break
@@ -605,13 +637,13 @@ func _create_turn_slot(combatant: Dictionary, index: int) -> PanelContainer:
 				var count = group_data.count
 
 				var buff_label = Label.new()
-				# Show symbol multiple times if stacked (up to 3x)
-				var symbol_repeat = min(count, 3)
+				# Show symbol multiple times if stacked (up to 2x for space)
+				var symbol_repeat = min(count, 2)  # Limited for space
 				buff_label.text = display_info.symbol.repeat(symbol_repeat)
-				if count > 3:
-					buff_label.text += "+"  # Add + if more than 3 stacks
+				if count > 2:
+					buff_label.text += "+"  # Add + if more than 2 stacks
 
-				buff_label.add_theme_font_size_override("font_size", 12)
+				buff_label.add_theme_font_size_override("font_size", 10)  # Scaled for 150px width
 				buff_label.add_theme_color_override("font_color", display_info.color)
 				buff_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 				buff_container.add_child(buff_label)
@@ -624,12 +656,16 @@ func _create_turn_slot(combatant: Dictionary, index: int) -> PanelContainer:
 	# Show 0 for KO'd, Revived, or Fallen combatants (Fallen should already be 0)
 	if is_ko or is_revived or is_fallen:
 		init_label.text = "0"
-		init_label.modulate = Color(0.5, 0.5, 0.5, 1.0)
+		init_label.add_theme_color_override("font_color", Color(0.5, 0.5, 0.5, 1.0))
 	else:
 		init_label.text = str(combatant.initiative)
-		init_label.modulate = Color(0.8, 0.8, 0.8, 1.0)
-	init_label.add_theme_font_size_override("font_size", 12)
-	init_label.custom_minimum_size = Vector2(28, 0)
+		init_label.add_theme_color_override("font_color", Color(0.0, 0.0, 0.0, 1.0))  # Black
+		init_label.add_theme_color_override("font_shadow_color", Color(0.96, 0.97, 0.98, 0.6))  # White glow
+		init_label.add_theme_constant_override("shadow_offset_x", 0)
+		init_label.add_theme_constant_override("shadow_offset_y", 0)
+		init_label.add_theme_constant_override("shadow_outline_size", 4)
+	init_label.add_theme_font_size_override("font_size", 10)  # Scaled for 170px width
+	init_label.custom_minimum_size = Vector2(20, 0)  # Reduced from 24px
 	init_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	init_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	hbox.add_child(init_label)
@@ -642,6 +678,8 @@ func _update_highlight() -> void:
 		return
 
 	var current_turn_index = battle_mgr.current_turn_index
+	const COLOR_CITRUS_YELLOW = Color(1.0, 0.91, 0.30, 1.0)  # #FFE84D - highlight color
+	const COLOR_MILK_WHITE = Color(0.96, 0.97, 0.98, 1.0)    # #F4F7FB - default border
 
 	# Update all slots
 	for i in range(turn_slots.size()):
@@ -655,13 +693,13 @@ func _update_highlight() -> void:
 				style.border_width_right = 4
 				style.border_width_top = 4
 				style.border_width_bottom = 4
-				style.border_color = Color(1.0, 1.0, 0.0, 1.0)  # Yellow highlight
+				style.border_color = COLOR_CITRUS_YELLOW  # Citrus Yellow highlight
 			else:
 				style.border_width_left = 2
 				style.border_width_right = 2
 				style.border_width_top = 2
 				style.border_width_bottom = 2
-				style.border_color = Color(0.4, 0.4, 0.4, 1.0)
+				style.border_color = COLOR_MILK_WHITE  # Milk White default
 
 func update_combatant_hp(_combatant_id: String) -> void:
 	"""Update HP display for a specific combatant (simplified - no HP bars in turn order)"""
