@@ -163,7 +163,8 @@ func _spawn_ambient_particles() -> void:
 
 	_particle_layer = Node2D.new()
 	_particle_layer.name = "AmbientParticles"
-	_particle_layer.z_index = -1
+	_particle_layer.z_index = 10  # Bring to front, above UI elements
+	_particle_layer.modulate = Color(1, 1, 1, 0)  # Start invisible
 	add_child(_particle_layer)
 
 	var viewport_size = get_viewport().get_visible_rect().size if get_viewport() else Vector2(1152, 648)
@@ -249,10 +250,14 @@ func fade_in() -> void:
 	_tween = create_tween()
 	_tween.set_ease(Tween.EASE_OUT)
 	_tween.set_trans(Tween.TRANS_CUBIC)
-	_tween.set_parallel(true)  # Run both tweens in parallel
+	_tween.set_parallel(true)  # Run all tweens in parallel
 
 	# Fade in the loading screen background
 	_tween.tween_property(_background, "modulate", Color(1, 1, 1, 1), FADE_DURATION)
+
+	# Fade in the particle layer
+	if _particle_layer:
+		_tween.tween_property(_particle_layer, "modulate", Color(1, 1, 1, 1), FADE_DURATION)
 
 	# Fade out the current scene
 	var current_scene = get_tree().current_scene
@@ -280,10 +285,14 @@ func fade_out() -> void:
 	_tween = create_tween()
 	_tween.set_ease(Tween.EASE_IN)
 	_tween.set_trans(Tween.TRANS_CUBIC)
-	_tween.set_parallel(true)  # Run both tweens in parallel
+	_tween.set_parallel(true)  # Run all tweens in parallel
 
 	# Fade out the loading screen background
 	_tween.tween_property(_background, "modulate", Color(1, 1, 1, 0), FADE_DURATION)
+
+	# Fade out the particle layer
+	if _particle_layer:
+		_tween.tween_property(_particle_layer, "modulate", Color(1, 1, 1, 0), FADE_DURATION)
 
 	# Fade in the new scene (if it exists and is different from the old one)
 	var new_scene = get_tree().current_scene
