@@ -1874,7 +1874,9 @@ func _execute_attack(target: Dictionary) -> void:
 				status_effects.append(ailment)
 
 			log_message("  → Hit! Starting attack minigame...")
+			_show_instruction("FIGHT!")
 			var minigame_result = await minigame_mgr.launch_attack_minigame(tpo, brw, status_effects)
+			_hide_instruction()
 
 			# Apply minigame result modifiers
 			var damage_modifier = minigame_result.get("damage_modifier", 1.0)

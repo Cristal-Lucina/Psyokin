@@ -39,6 +39,11 @@ func _ready() -> void:
 
 func _setup_visuals() -> void:
 	"""Create the dimmed background and central panel"""
+	# Neon-kawaii color palette
+	const COLOR_INK_CHARCOAL = Color(0.07, 0.09, 0.15)
+	const COLOR_MILK_WHITE = Color(0.96, 0.97, 0.98)
+	const COLOR_SKY_CYAN = Color(0.30, 0.91, 1.0)
+
 	# Dimmed background
 	background_dim = ColorRect.new()
 	background_dim.color = Color(0, 0, 0, 0.7)
@@ -52,17 +57,36 @@ func _setup_visuals() -> void:
 	overlay_panel.position = get_viewport_rect().size * 0.325
 	overlay_panel.z_index = 101
 
-	# Panel style
+	# Start below screen for slide-up animation
+	overlay_panel.modulate.a = 0.0
+	var start_y = overlay_panel.position.y
+	overlay_panel.position.y = get_viewport_rect().size.y
+
+	# Neon-kawaii panel style
 	var panel_style = StyleBoxFlat.new()
-	panel_style.bg_color = Color(0.15, 0.15, 0.2, 1.0)
-	panel_style.border_width_left = 4
-	panel_style.border_width_right = 4
-	panel_style.border_width_top = 4
-	panel_style.border_width_bottom = 4
-	panel_style.border_color = Color(0.4, 0.6, 0.8, 1.0)
+	panel_style.bg_color = COLOR_INK_CHARCOAL
+	panel_style.border_width_left = 3
+	panel_style.border_width_right = 3
+	panel_style.border_width_top = 3
+	panel_style.border_width_bottom = 3
+	panel_style.border_color = COLOR_SKY_CYAN  # Cyan neon border
+	panel_style.corner_radius_top_left = 15
+	panel_style.corner_radius_top_right = 15
+	panel_style.corner_radius_bottom_left = 15
+	panel_style.corner_radius_bottom_right = 15
+	panel_style.shadow_size = 6
+	panel_style.shadow_color = Color(COLOR_SKY_CYAN.r, COLOR_SKY_CYAN.g, COLOR_SKY_CYAN.b, 0.4)
 	overlay_panel.add_theme_stylebox_override("panel", panel_style)
 
 	add_child(overlay_panel)
+
+	# Animate slide up from bottom
+	var tween = create_tween()
+	tween.set_parallel(true)
+	tween.set_ease(Tween.EASE_OUT)
+	tween.set_trans(Tween.TRANS_BACK)
+	tween.tween_property(overlay_panel, "position:y", start_y, 0.5)
+	tween.tween_property(overlay_panel, "modulate:a", 1.0, 0.3)
 
 	# Content container
 	content_container = VBoxContainer.new()
