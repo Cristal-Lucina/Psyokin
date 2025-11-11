@@ -3810,10 +3810,46 @@ func _show_skill_menu(skill_menu: Array) -> void:
 	if current_combatant.get("is_ally", false) and current_combatant.get("id") == "hero":
 		var changed_this_round = current_combatant.get("changed_type_this_round", false)
 		var change_type_btn = Button.new()
-		change_type_btn.text = "Change Mind Type" if not changed_this_round else "Change Mind Type (Used)"
-		change_type_btn.custom_minimum_size = Vector2(380, 40)
+		change_type_btn.text = "⚡ CHANGE MIND TYPE ⚡" if not changed_this_round else "Change Mind Type (Used)"
+		change_type_btn.custom_minimum_size = Vector2(380, 50)
 		change_type_btn.disabled = changed_this_round
 		change_type_btn.pressed.connect(_on_change_type_button_pressed)
+
+		# Style the button to make it stand out
+		if not changed_this_round:
+			var btn_style = StyleBoxFlat.new()
+			btn_style.bg_color = COLOR_BUBBLE_MAGENTA.darkened(0.3)  # Pink/magenta background
+			btn_style.border_width_left = 2
+			btn_style.border_width_right = 2
+			btn_style.border_width_top = 2
+			btn_style.border_width_bottom = 2
+			btn_style.border_color = COLOR_BUBBLE_MAGENTA  # Bright magenta border
+			btn_style.corner_radius_top_left = 8
+			btn_style.corner_radius_top_right = 8
+			btn_style.corner_radius_bottom_left = 8
+			btn_style.corner_radius_bottom_right = 8
+			change_type_btn.add_theme_stylebox_override("normal", btn_style)
+
+			var btn_style_hover = StyleBoxFlat.new()
+			btn_style_hover.bg_color = COLOR_BUBBLE_MAGENTA.darkened(0.1)  # Brighter on hover
+			btn_style_hover.border_width_left = 3
+			btn_style_hover.border_width_right = 3
+			btn_style_hover.border_width_top = 3
+			btn_style_hover.border_width_bottom = 3
+			btn_style_hover.border_color = COLOR_BUBBLE_MAGENTA.lightened(0.2)
+			btn_style_hover.corner_radius_top_left = 8
+			btn_style_hover.corner_radius_top_right = 8
+			btn_style_hover.corner_radius_bottom_left = 8
+			btn_style_hover.corner_radius_bottom_right = 8
+			change_type_btn.add_theme_stylebox_override("hover", btn_style_hover)
+			change_type_btn.add_theme_stylebox_override("focus", btn_style_hover)
+
+			change_type_btn.add_theme_color_override("font_color", COLOR_MILK_WHITE)
+			change_type_btn.add_theme_font_size_override("font_size", 18)
+
+			# Add to navigation array so it's selectable
+			skill_menu_buttons.append(change_type_btn)
+
 		vbox.add_child(change_type_btn)
 
 	# Add separator
@@ -3863,6 +3899,9 @@ func _show_skill_menu(skill_menu: Array) -> void:
 	cancel_btn.pressed.connect(_close_skill_menu)
 	vbox.add_child(cancel_btn)
 
+	# Add cancel to navigation array so it's selectable
+	skill_menu_buttons.append(cancel_btn)
+
 	# Add to scene
 	add_child(skill_menu_panel)
 
@@ -3872,9 +3911,11 @@ func _show_skill_menu(skill_menu: Array) -> void:
 		100
 	)
 
-	# Highlight first skill if available
+	# Highlight first button if available (Change Mind Type will be first if it exists)
 	if not skill_menu_buttons.is_empty():
 		_highlight_skill_button(0)
+		# Ensure first button grabs focus
+		skill_menu_buttons[0].grab_focus()
 
 	# Set cooldown to prevent immediate button press
 	input_cooldown = input_cooldown_duration
@@ -4016,9 +4057,15 @@ func _navigate_skill_menu(direction: int) -> void:
 func _confirm_skill_selection() -> void:
 	"""Confirm skill selection with A button"""
 	if selected_skill_index >= 0 and selected_skill_index < skill_menu_buttons.size():
-		# Find the actual skill index in current_skill_menu
+		# Get the selected button and trigger its pressed signal
 		var button = skill_menu_buttons[selected_skill_index]
-		# Simulate button press - need to find the index
+
+		# For special buttons (Change Mind Type, Cancel), just press them directly
+		if button.text.contains("CHANGE MIND TYPE") or button.text == "Cancel":
+			button.emit_signal("pressed")
+			return
+
+		# Find the actual skill index in current_skill_menu
 		for i in range(current_skill_menu.size()):
 			var menu_entry = current_skill_menu[i]
 			var skill_data = menu_entry.skill_data
