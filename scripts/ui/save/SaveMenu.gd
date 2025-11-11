@@ -9,11 +9,8 @@ class_name SaveMenu
 
 const SAVE_DIR: String = "user://saves"
 
-# Styling constants (matching LoadoutPanel)
-const PANEL_BG_COLOR := Color(0.15, 0.15, 0.15, 1.0)  # Dark gray, fully opaque
-const PANEL_BORDER_COLOR := Color(1.0, 0.7, 0.75, 1.0)  # Pink border
-const PANEL_BORDER_WIDTH := 2
-const PANEL_CORNER_RADIUS := 8
+# Core Vibe styling (neon-kawaii aesthetic)
+# Note: Uses aCoreVibeTheme autoload for consistent styling
 
 # Candidate paths (we'll probe these in order)
 const PATH_SLOTS  : PackedStringArray = [
@@ -55,15 +52,15 @@ func _find_node_any(paths: PackedStringArray) -> Node:
 	return null
 
 func _style_panel(panel: Panel) -> void:
-	"""Apply LoadoutPanel-style styling to a panel"""
-	var style := StyleBoxFlat.new()
-	style.bg_color = PANEL_BG_COLOR
-	style.border_color = PANEL_BORDER_COLOR
-	style.set_border_width_all(PANEL_BORDER_WIDTH)
-	style.corner_radius_top_left = PANEL_CORNER_RADIUS
-	style.corner_radius_top_right = PANEL_CORNER_RADIUS
-	style.corner_radius_bottom_left = PANEL_CORNER_RADIUS
-	style.corner_radius_bottom_right = PANEL_CORNER_RADIUS
+	"""Apply Core Vibe neon-kawaii styling to a panel"""
+	var style = aCoreVibeTheme.create_panel_style(
+		aCoreVibeTheme.COLOR_PLASMA_TEAL,         # Plasma Teal border (save action)
+		aCoreVibeTheme.COLOR_INK_CHARCOAL,        # Ink charcoal background
+		aCoreVibeTheme.PANEL_OPACITY_FULL,        # Fully opaque
+		aCoreVibeTheme.CORNER_RADIUS_MEDIUM,      # 16px corners
+		aCoreVibeTheme.BORDER_WIDTH_THIN,         # 2px border
+		aCoreVibeTheme.SHADOW_SIZE_LARGE          # 12px glow
+	)
 	panel.add_theme_stylebox_override("panel", style)
 
 func _ensure_fallback_layout() -> void:
@@ -103,12 +100,13 @@ func _ensure_fallback_layout() -> void:
 	root.add_theme_constant_override("separation", 10)
 	margin.add_child(root)
 
-	# Title label (no header section, just a simple label)
+	# Title label with Core Vibe styling
 	var title := Label.new()
 	title.name = "Title"
 	title.text = "Save Game"
-	title.add_theme_font_size_override("font_size", 18)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	# Core Vibe: Plasma Teal title
+	aCoreVibeTheme.style_label(title, aCoreVibeTheme.COLOR_PLASMA_TEAL, 20)
 	root.add_child(title)
 
 	var scroll := ScrollContainer.new()
@@ -222,22 +220,24 @@ func _rebuild() -> void:
 	for i in range(1, 4):
 		var idx := i  # capture per-iteration
 
-		# Save button with slot label
+		# Save button with slot label (Core Vibe: Plasma Teal)
 		var btn_save: Button = Button.new()
 		btn_save.text = _label_for_slot(idx)
-		btn_save.custom_minimum_size = Vector2(350, 36)
+		btn_save.custom_minimum_size = Vector2(350, 40)
 		btn_save.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		btn_save.focus_mode = Control.FOCUS_ALL
 		btn_save.pressed.connect(func() -> void: _do_save(idx))
+		aCoreVibeTheme.style_button(btn_save, aCoreVibeTheme.COLOR_PLASMA_TEAL, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
 		_slots_grid.add_child(btn_save)
 		_save_buttons.append(btn_save)
 
-		# Delete button
+		# Delete button (Core Vibe: Bubble Magenta)
 		var btn_del: Button = Button.new()
 		btn_del.text = "Delete"
-		btn_del.custom_minimum_size = Vector2(100, 36)
+		btn_del.custom_minimum_size = Vector2(100, 40)
 		btn_del.focus_mode = Control.FOCUS_ALL
 		btn_del.pressed.connect(func() -> void: _do_delete(idx))
+		aCoreVibeTheme.style_button(btn_del, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
 		_slots_grid.add_child(btn_del)
 		_delete_buttons.append(btn_del)
 

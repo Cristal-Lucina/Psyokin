@@ -5,11 +5,8 @@ const SAVE_DIR   : String = "user://saves"
 const MAIN_SCENE : String = "res://scenes/main/Main.tscn"
 const TITLE_SCENE: String = "res://scenes/main_menu/Title.tscn"
 
-# Styling constants (matching LoadoutPanel)
-const PANEL_BG_COLOR := Color(0.15, 0.15, 0.15, 1.0)  # Dark gray, fully opaque
-const PANEL_BORDER_COLOR := Color(1.0, 0.7, 0.75, 1.0)  # Pink border
-const PANEL_BORDER_WIDTH := 2
-const PANEL_CORNER_RADIUS := 8
+# Core Vibe styling (neon-kawaii aesthetic)
+# Note: Uses aCoreVibeTheme autoload for consistent styling
 
 @onready var _scroll    : ScrollContainer = get_node("Center/Window/Margin/Root/Scroll") as ScrollContainer
 @onready var _backdrop  : ColorRect       = $Backdrop
@@ -24,15 +21,15 @@ var _input_cooldown: float = 0.0
 var _input_cooldown_duration: float = 0.2
 
 func _style_panel(panel: Panel) -> void:
-	"""Apply LoadoutPanel-style styling to a panel"""
-	var style := StyleBoxFlat.new()
-	style.bg_color = PANEL_BG_COLOR
-	style.border_color = PANEL_BORDER_COLOR
-	style.set_border_width_all(PANEL_BORDER_WIDTH)
-	style.corner_radius_top_left = PANEL_CORNER_RADIUS
-	style.corner_radius_top_right = PANEL_CORNER_RADIUS
-	style.corner_radius_bottom_left = PANEL_CORNER_RADIUS
-	style.corner_radius_bottom_right = PANEL_CORNER_RADIUS
+	"""Apply Core Vibe neon-kawaii styling to a panel"""
+	var style = aCoreVibeTheme.create_panel_style(
+		aCoreVibeTheme.COLOR_SKY_CYAN,            # Sky Cyan border (load action)
+		aCoreVibeTheme.COLOR_INK_CHARCOAL,        # Ink charcoal background
+		aCoreVibeTheme.PANEL_OPACITY_FULL,        # Fully opaque
+		aCoreVibeTheme.CORNER_RADIUS_MEDIUM,      # 16px corners
+		aCoreVibeTheme.BORDER_WIDTH_THIN,         # 2px border
+		aCoreVibeTheme.SHADOW_SIZE_LARGE          # 12px glow
+	)
 	panel.add_theme_stylebox_override("panel", style)
 
 func _ready() -> void:
@@ -171,28 +168,35 @@ func _format_slot_meta(slot: int) -> String:
 func _make_row(slot: int) -> Control:
 	var row := HBoxContainer.new()
 	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	row.custom_minimum_size.y = 40
+	row.custom_minimum_size.y = 44
 	row.add_theme_constant_override("separation", 8)
 
+	# Main slot button (Core Vibe: Sky Cyan)
 	var row_btn := Button.new()
 	row_btn.text = _format_slot_meta(slot)
 	row_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row_btn.focus_mode = Control.FOCUS_ALL
 	row_btn.flat = false
 	row_btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	row_btn.custom_minimum_size = Vector2(350, 40)
 	row_btn.pressed.connect(_on_load_pressed.bind(slot))
+	aCoreVibeTheme.style_button(row_btn, aCoreVibeTheme.COLOR_SKY_CYAN, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
 	row.add_child(row_btn)
 
+	# Load button (Core Vibe: Electric Lime)
 	var load_b := Button.new()
 	load_b.text = "Load"
-	load_b.custom_minimum_size.y = 28
+	load_b.custom_minimum_size = Vector2(80, 40)
 	load_b.pressed.connect(_on_load_pressed.bind(slot))
+	aCoreVibeTheme.style_button(load_b, aCoreVibeTheme.COLOR_ELECTRIC_LIME, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
 	row.add_child(load_b)
 
+	# Delete button (Core Vibe: Bubble Magenta)
 	var del_b := Button.new()
 	del_b.text = "Delete"
-	del_b.custom_minimum_size.y = 28
+	del_b.custom_minimum_size = Vector2(80, 40)
 	del_b.pressed.connect(_on_delete_pressed.bind(slot))
+	aCoreVibeTheme.style_button(del_b, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
 	row.add_child(del_b)
 
 	return row
