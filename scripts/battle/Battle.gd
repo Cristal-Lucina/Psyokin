@@ -23,10 +23,11 @@ const COLOR_INK_CHARCOAL = Color(0.07, 0.09, 0.15)      # #111827
 const COLOR_MILK_WHITE = Color(0.96, 0.97, 0.98)        # #F4F7FB
 
 ## UI References
-@onready var action_menu: GridContainer = %ActionMenu
+@onready var action_menu: Control = %ActionMenu
 @onready var battle_log: RichTextLabel = %BattleLog
 @onready var burst_gauge_bar: ProgressBar = %BurstGauge
 @onready var turn_order_display: VBoxContainer = %TurnOrderDisplay
+@onready var switch_button: Button = %SwitchButton
 
 ## Combatant display containers
 @onready var ally_slots: VBoxContainer = %AllySlots
@@ -36,6 +37,9 @@ const COLOR_MILK_WHITE = Color(0.96, 0.97, 0.98)        # #F4F7FB
 var diagonal_bands: ColorRect = null
 var grid_overlay: ColorRect = null
 var particle_layer: Node2D = null
+
+## Action menu panel state
+var is_panel_1_active: bool = true  # Panel 1: GUARD/SKILL/CAPTURE/FIGHT, Panel 2: RUN/BURST/ITEMS/STATUS
 
 ## State
 var is_battle_ready: bool = false  # True when battle is fully initialized
@@ -732,30 +736,52 @@ func _input(event: InputEvent) -> void:
 
 	# If action menu is visible, handle direct button presses
 	if action_menu and action_menu.visible and not is_in_round_transition:
-		if event.is_action_pressed(aInputManager.ACTION_ATTACK):
-			_on_attack_pressed()
+		# Check for panel switching with L1/R1 (mapped to ACTION_BURST and ACTION_BATTLE_RUN for shoulder buttons)
+		# Note: We need to check if these are shoulder button presses specifically, not the Y/X face buttons
+		# In Godot input, shoulder buttons and face buttons may share action names depending on mapping
+		# For now, we'll use a simple approach: if neither burst_menu nor run is active, toggle panel
+		if event.is_action_pressed("ui_page_up"):  # L1/LB shoulder button
+			_toggle_action_panel()
 			get_viewport().set_input_as_handled()
-		elif event.is_action_pressed(aInputManager.ACTION_SKILL):
-			_on_skill_pressed()
+			return
+		elif event.is_action_pressed("ui_page_down"):  # R1/RB shoulder button
+			_toggle_action_panel()
 			get_viewport().set_input_as_handled()
-		elif event.is_action_pressed(aInputManager.ACTION_CAPTURE):
-			_on_capture_pressed()
-			get_viewport().set_input_as_handled()
-		elif event.is_action_pressed(aInputManager.ACTION_DEFEND):
-			_on_defend_pressed()
-			get_viewport().set_input_as_handled()
-		elif event.is_action_pressed(aInputManager.ACTION_BURST):
-			_on_burst_pressed()
-			get_viewport().set_input_as_handled()
-		elif event.is_action_pressed(aInputManager.ACTION_BATTLE_RUN):
-			_on_run_pressed()
-			get_viewport().set_input_as_handled()
-		elif event.is_action_pressed(aInputManager.ACTION_ITEMS):
-			_on_item_pressed()
-			get_viewport().set_input_as_handled()
-		elif event.is_action_pressed(aInputManager.ACTION_STATUS):
-			_on_status_pressed()
-			get_viewport().set_input_as_handled()
+			return
+
+		# Handle diamond button inputs based on active panel
+		# Panel 1: GUARD/SKILL/CAPTURE/FIGHT
+		# Panel 2: RUN/BURST/ITEMS/STATUS
+		# Button mapping: Y=SKILL, X=DEFEND, B=ATTACK, A=CAPTURE
+
+		if is_panel_1_active:
+			# Panel 1 active
+			if event.is_action_pressed(aInputManager.ACTION_SKILL):  # Y button -> Skill
+				_on_skill_pressed()
+				get_viewport().set_input_as_handled()
+			elif event.is_action_pressed(aInputManager.ACTION_DEFEND):  # X button -> Guard
+				_on_defend_pressed()
+				get_viewport().set_input_as_handled()
+			elif event.is_action_pressed(aInputManager.ACTION_ATTACK):  # B button -> Fight
+				_on_attack_pressed()
+				get_viewport().set_input_as_handled()
+			elif event.is_action_pressed(aInputManager.ACTION_CAPTURE):  # A button -> Capture
+				_on_capture_pressed()
+				get_viewport().set_input_as_handled()
+		else:
+			# Panel 2 active
+			if event.is_action_pressed(aInputManager.ACTION_SKILL):  # Y button -> Burst
+				_on_burst_pressed()
+				get_viewport().set_input_as_handled()
+			elif event.is_action_pressed(aInputManager.ACTION_DEFEND):  # X button -> Run
+				_on_run_pressed()
+				get_viewport().set_input_as_handled()
+			elif event.is_action_pressed(aInputManager.ACTION_ATTACK):  # B button -> Status
+				_on_status_pressed()
+				get_viewport().set_input_as_handled()
+			elif event.is_action_pressed(aInputManager.ACTION_CAPTURE):  # A button -> Items
+				_on_item_pressed()
+				get_viewport().set_input_as_handled()
 
 func _navigate_targets(direction: int) -> void:
 	"""Navigate through target candidates"""
@@ -2806,6 +2832,47 @@ func _on_status_pressed() -> void:
 
 	# Show character picker for status viewing
 	_show_status_character_picker()
+
+func _on_switch_panel_pressed() -> void:
+	"""Handle switching between action menu panels"""
+	_toggle_action_panel()
+
+func _toggle_action_panel() -> void:
+	"""Toggle between the two action menu panels"""
+	is_panel_1_active = not is_panel_1_active
+
+	# Get button references
+	var skill_btn = action_menu.get_node_or_null("SkillButton")
+	var defend_btn = action_menu.get_node_or_null("DefendButton")
+	var attack_btn = action_menu.get_node_or_null("AttackButton")
+	var capture_btn = action_menu.get_node_or_null("CaptureButton")
+	var burst_btn = action_menu.get_node_or_null("BurstButton")
+	var run_btn = action_menu.get_node_or_null("RunButton")
+	var status_btn = action_menu.get_node_or_null("StatusButton")
+	var item_btn = action_menu.get_node_or_null("ItemButton")
+
+	if is_panel_1_active:
+		# Show Panel 1: GUARD/SKILL/CAPTURE/FIGHT
+		if skill_btn: skill_btn.visible = true
+		if defend_btn: defend_btn.visible = true
+		if attack_btn: attack_btn.visible = true
+		if capture_btn: capture_btn.visible = true
+		# Hide Panel 2
+		if burst_btn: burst_btn.visible = false
+		if run_btn: run_btn.visible = false
+		if status_btn: status_btn.visible = false
+		if item_btn: item_btn.visible = false
+	else:
+		# Show Panel 2: RUN/BURST/ITEMS/STATUS
+		if burst_btn: burst_btn.visible = true
+		if run_btn: run_btn.visible = true
+		if status_btn: status_btn.visible = true
+		if item_btn: item_btn.visible = true
+		# Hide Panel 1
+		if skill_btn: skill_btn.visible = false
+		if defend_btn: defend_btn.visible = false
+		if attack_btn: attack_btn.visible = false
+		if capture_btn: capture_btn.visible = false
 
 func _show_status_character_picker() -> void:
 	"""Show a character picker to select whose status to view"""

@@ -533,7 +533,9 @@ func _create_turn_slot(combatant: Dictionary, index: int) -> PanelContainer:
 	var is_revived_check = (ailment_check == "Revived")
 
 	if is_ko or is_revived_check:
-		turn_label.modulate = Color(0.5, 0.5, 0.5, 1.0)
+		turn_label.add_theme_color_override("font_color", Color(0.5, 0.5, 0.5, 1.0))
+	else:
+		turn_label.add_theme_color_override("font_color", Color(0.4, 0.4, 0.4, 1.0))
 	hbox.add_child(turn_label)
 
 	# Combatant name
@@ -585,7 +587,9 @@ func _create_turn_slot(combatant: Dictionary, index: int) -> PanelContainer:
 		elif weakness_hits == 1:
 			# 1 hit = Yellow warning
 			name_label.add_theme_color_override("font_color", Color(1.0, 0.9, 0.0, 1.0))
-		# else: default white color
+		else:
+			# Default dark grey color for names
+			name_label.add_theme_color_override("font_color", Color(0.4, 0.4, 0.4, 1.0))
 
 	hbox.add_child(name_label)
 
@@ -638,10 +642,10 @@ func _create_turn_slot(combatant: Dictionary, index: int) -> PanelContainer:
 	# Show 0 for KO'd, Revived, or Fallen combatants (Fallen should already be 0)
 	if is_ko or is_revived or is_fallen:
 		init_label.text = "0"
-		init_label.modulate = Color(0.5, 0.5, 0.5, 1.0)
+		init_label.add_theme_color_override("font_color", Color(0.5, 0.5, 0.5, 1.0))
 	else:
 		init_label.text = str(combatant.initiative)
-		init_label.modulate = Color(0.8, 0.8, 0.8, 1.0)
+		init_label.add_theme_color_override("font_color", Color(0.4, 0.4, 0.4, 1.0))
 	init_label.add_theme_font_size_override("font_size", 10)  # Scaled for 150px width
 	init_label.custom_minimum_size = Vector2(24, 0)  # Scaled for 150px width
 	init_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
