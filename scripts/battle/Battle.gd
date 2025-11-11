@@ -3704,15 +3704,21 @@ func _show_confirmation_dialog(message: String, on_confirm: Callable) -> void:
 func _on_confirmation_yes() -> void:
 	"""Handle Yes button press"""
 	print("[Battle] Confirmation Yes pressed")
+
+	# Save callback before closing dialog (which clears it)
+	var callback = confirmation_callback
+	print("[Battle] Saved callback, is_valid: ", callback.is_valid())
+
 	_close_confirmation_dialog()
 	_hide_instruction()
 
 	# Call the confirmation callback
-	print("[Battle] Calling confirmation callback, is_valid: ", confirmation_callback.is_valid())
-	if confirmation_callback.is_valid():
+	if callback.is_valid():
 		print("[Battle] Executing callback...")
-		confirmation_callback.call()
+		callback.call()
 		print("[Battle] Callback executed")
+	else:
+		print("[Battle] ERROR: Callback is not valid!")
 
 func _on_confirmation_no() -> void:
 	"""Handle No button press"""
