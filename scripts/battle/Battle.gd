@@ -481,11 +481,16 @@ func _style_panels() -> void:
 		var burst_gauge = burst_gauge_bar
 		if burst_gauge:
 			var gauge_bg = StyleBoxFlat.new()
-			gauge_bg.bg_color = COLOR_NIGHT_NAVY
+			gauge_bg.bg_color = COLOR_INK_CHARCOAL.lightened(0.2)  # Lighter charcoal background for visibility
 			gauge_bg.corner_radius_top_left = 8
 			gauge_bg.corner_radius_top_right = 8
 			gauge_bg.corner_radius_bottom_left = 8
 			gauge_bg.corner_radius_bottom_right = 8
+			gauge_bg.border_width_left = 1
+			gauge_bg.border_width_right = 1
+			gauge_bg.border_width_top = 1
+			gauge_bg.border_width_bottom = 1
+			gauge_bg.border_color = COLOR_SKY_CYAN.darkened(0.3)  # Subtle cyan inner border
 			burst_gauge.add_theme_stylebox_override("background", gauge_bg)
 
 			var gauge_fill = StyleBoxFlat.new()
