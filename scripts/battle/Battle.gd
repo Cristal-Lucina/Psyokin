@@ -1048,14 +1048,20 @@ func _show_victory_screen() -> void:
 	victory_panel = PanelContainer.new()
 	victory_panel.name = "VictoryPanel"
 
-	# Set up styling
+	# Set up styling with Core vibe
 	var style = StyleBoxFlat.new()
-	style.bg_color = Color(0.1, 0.1, 0.15, 0.95)
+	style.bg_color = COLOR_INK_CHARCOAL
 	style.border_width_left = 3
 	style.border_width_top = 3
 	style.border_width_right = 3
 	style.border_width_bottom = 3
-	style.border_color = Color(0.8, 0.7, 0.3, 1.0)  # Gold border
+	style.border_color = COLOR_SKY_CYAN  # Cyan neon border
+	style.corner_radius_top_left = 12
+	style.corner_radius_top_right = 12
+	style.corner_radius_bottom_left = 12
+	style.corner_radius_bottom_right = 12
+	style.shadow_size = 6
+	style.shadow_color = Color(COLOR_SKY_CYAN.r, COLOR_SKY_CYAN.g, COLOR_SKY_CYAN.b, 0.4)  # Cyan glow
 	victory_panel.add_theme_stylebox_override("panel", style)
 
 	# Position it in center of screen
@@ -1086,7 +1092,7 @@ func _show_victory_screen() -> void:
 	title_label.text = "VICTORY!"
 	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title_label.add_theme_font_size_override("font_size", 32)
-	title_label.add_theme_color_override("font_color", Color(0.9, 0.8, 0.3, 1.0))
+	title_label.add_theme_color_override("font_color", COLOR_BUBBLE_MAGENTA)  # Pink magenta title
 	content_vbox.add_child(title_label)
 
 	# Get rewards data from battle manager
@@ -1110,7 +1116,7 @@ func _show_victory_screen() -> void:
 	if rewards.get("creds", 0) > 0:
 		var creds_label = Label.new()
 		creds_label.text = "CREDS: +%d" % rewards.creds
-		creds_label.add_theme_color_override("font_color", Color(0.9, 0.9, 0.5, 1.0))
+		creds_label.add_theme_color_override("font_color", COLOR_CITRUS_YELLOW)  # Yellow for creds
 		rewards_vbox.add_child(creds_label)
 
 	# Level Growth - Show LXP for all members who received it
@@ -1120,7 +1126,7 @@ func _show_victory_screen() -> void:
 	if not lxp_awarded.is_empty():
 		var lxp_header = Label.new()
 		lxp_header.text = "\nLevel Growth:"
-		lxp_header.add_theme_color_override("font_color", Color(0.7, 0.9, 0.7, 1.0))
+		lxp_header.add_theme_color_override("font_color", COLOR_ELECTRIC_LIME)  # Lime green header
 		rewards_vbox.add_child(lxp_header)
 
 		# Show all members who got XP (they were in the battle)
@@ -1129,6 +1135,7 @@ func _show_victory_screen() -> void:
 			var display_name = _get_member_display_name(member_id)
 			var member_label = Label.new()
 			member_label.text = "  %s: +%d LXP" % [display_name, xp_amount]
+			member_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
 			rewards_vbox.add_child(member_label)
 
 	# Sigil Growth - Show each sigil individually with names
@@ -1136,7 +1143,7 @@ func _show_victory_screen() -> void:
 	if not gxp_awarded.is_empty():
 		var gxp_header = Label.new()
 		gxp_header.text = "\nSigil Growth:"
-		gxp_header.add_theme_color_override("font_color", Color(0.7, 0.7, 0.9, 1.0))
+		gxp_header.add_theme_color_override("font_color", COLOR_SKY_CYAN)  # Cyan header
 		rewards_vbox.add_child(gxp_header)
 
 		var sigil_sys = get_node_or_null("/root/aSigilSystem")
@@ -1148,6 +1155,7 @@ func _show_victory_screen() -> void:
 
 			var sigil_label = Label.new()
 			sigil_label.text = "  %s: +%d GXP" % [sigil_name, gxp_amount]
+			sigil_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
 			rewards_vbox.add_child(sigil_label)
 
 	# Affinity Growth - Show AXP for each pair
@@ -1155,7 +1163,7 @@ func _show_victory_screen() -> void:
 	if not axp_awarded.is_empty():
 		var axp_header = Label.new()
 		axp_header.text = "\nAffinity Growth:"
-		axp_header.add_theme_color_override("font_color", Color(0.9, 0.7, 0.7, 1.0))
+		axp_header.add_theme_color_override("font_color", COLOR_BUBBLE_MAGENTA)  # Pink magenta header
 		rewards_vbox.add_child(axp_header)
 
 		for pair_key in axp_awarded.keys():
@@ -1171,6 +1179,7 @@ func _show_victory_screen() -> void:
 
 			var axp_label = Label.new()
 			axp_label.text = "  %s ↔ %s: +%d AXP" % [name_a, name_b, axp_amount]
+			axp_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
 			rewards_vbox.add_child(axp_label)
 
 	# Items
@@ -1178,12 +1187,13 @@ func _show_victory_screen() -> void:
 	if not items.is_empty():
 		var items_header = Label.new()
 		items_header.text = "\nItems Dropped:"
-		items_header.add_theme_color_override("font_color", Color(0.9, 0.7, 0.9, 1.0))
+		items_header.add_theme_color_override("font_color", COLOR_GRAPE_VIOLET)  # Violet header
 		rewards_vbox.add_child(items_header)
 
 		for item_id in items:
 			var item_label = Label.new()
 			item_label.text = "  %s" % item_id
+			item_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
 			rewards_vbox.add_child(item_label)
 
 	# Battle stats
@@ -1192,7 +1202,7 @@ func _show_victory_screen() -> void:
 	var killed = rewards.get("killed_count", 0)
 	stats_label.text = "\nEnemies: %d captured, %d defeated" % [captured, killed]
 	stats_label.add_theme_font_size_override("font_size", 14)
-	stats_label.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7, 1.0))
+	stats_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
 	rewards_vbox.add_child(stats_label)
 
 	# Spacer
@@ -1200,11 +1210,42 @@ func _show_victory_screen() -> void:
 	spacer.custom_minimum_size = Vector2(0, 10)
 	content_vbox.add_child(spacer)
 
-	# Accept button
+	# Accept button with Core vibe styling
 	var accept_button = Button.new()
 	accept_button.text = "Accept"
 	accept_button.custom_minimum_size = Vector2(200, 50)
 	accept_button.pressed.connect(_on_victory_accept_pressed)
+
+	# Style the button
+	var btn_style = StyleBoxFlat.new()
+	btn_style.bg_color = COLOR_SKY_CYAN.darkened(0.3)  # Dark cyan background
+	btn_style.border_width_left = 2
+	btn_style.border_width_right = 2
+	btn_style.border_width_top = 2
+	btn_style.border_width_bottom = 2
+	btn_style.border_color = COLOR_SKY_CYAN  # Bright cyan border
+	btn_style.corner_radius_top_left = 8
+	btn_style.corner_radius_top_right = 8
+	btn_style.corner_radius_bottom_left = 8
+	btn_style.corner_radius_bottom_right = 8
+	accept_button.add_theme_stylebox_override("normal", btn_style)
+
+	var btn_style_hover = StyleBoxFlat.new()
+	btn_style_hover.bg_color = COLOR_SKY_CYAN.darkened(0.1)  # Brighter on hover
+	btn_style_hover.border_width_left = 3
+	btn_style_hover.border_width_right = 3
+	btn_style_hover.border_width_top = 3
+	btn_style_hover.border_width_bottom = 3
+	btn_style_hover.border_color = COLOR_SKY_CYAN.lightened(0.2)
+	btn_style_hover.corner_radius_top_left = 8
+	btn_style_hover.corner_radius_top_right = 8
+	btn_style_hover.corner_radius_bottom_left = 8
+	btn_style_hover.corner_radius_bottom_right = 8
+	accept_button.add_theme_stylebox_override("hover", btn_style_hover)
+	accept_button.add_theme_stylebox_override("focus", btn_style_hover)
+
+	accept_button.add_theme_color_override("font_color", COLOR_MILK_WHITE)
+	accept_button.add_theme_font_size_override("font_size", 18)
 
 	# Center the button
 	var button_center = CenterContainer.new()
