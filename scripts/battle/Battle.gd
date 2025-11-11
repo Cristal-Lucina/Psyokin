@@ -2007,6 +2007,7 @@ func _execute_attack(target: Dictionary) -> void:
 
 		if not hit_check.hit:
 			# Miss!
+			_show_miss_feedback()  # Show big MISS text
 			log_message("  → Missed! (%d%% chance, rolled %d)" % [int(hit_check.hit_chance), hit_check.roll])
 			print("[Battle] Miss! Hit chance: %.1f%%, Roll: %d" % [hit_check.hit_chance, hit_check.roll])
 		else:
@@ -3495,6 +3496,7 @@ func _execute_enemy_ai() -> void:
 
 		if not hit_check.hit:
 			# Miss!
+			_show_miss_feedback()  # Show big MISS text
 			log_message("  → Missed! (%d%% chance, rolled %d)" % [int(hit_check.hit_chance), hit_check.roll])
 			print("[Battle] Enemy Miss! Hit chance: %.1f%%, Roll: %d" % [hit_check.hit_chance, hit_check.roll])
 		else:
@@ -3774,6 +3776,37 @@ func _hide_instruction() -> void:
 	tween.set_trans(Tween.TRANS_BACK)
 	tween.tween_property(instruction_popup, "position:y", get_viewport().get_visible_rect().size.y - 200, 0.2)
 	tween.tween_property(instruction_popup, "modulate:a", 0.0, 0.15)
+
+func _show_miss_feedback() -> void:
+	"""Show big MISS text in center of screen that fades away in 0.5 seconds"""
+	# Create miss label
+	var miss_label = Label.new()
+	miss_label.text = "MISS!"
+	miss_label.add_theme_font_size_override("font_size", 80)  # Big font
+	miss_label.add_theme_color_override("font_color", COLOR_CITRUS_YELLOW)  # Yellow color
+	miss_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	miss_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+
+	# Center it on screen
+	miss_label.set_anchors_preset(Control.PRESET_CENTER)
+	miss_label.custom_minimum_size = Vector2(400, 100)
+	miss_label.position = Vector2(
+		get_viewport_rect().size.x / 2 - 200,
+		get_viewport_rect().size.y / 2 - 50
+	)
+	miss_label.z_index = 200  # High z-index to appear above everything
+
+	add_child(miss_label)
+
+	# Fade out and remove after 0.5 seconds
+	var tween = create_tween()
+	tween.set_ease(Tween.EASE_OUT)
+	tween.set_trans(Tween.TRANS_CUBIC)
+	tween.tween_property(miss_label, "modulate:a", 0.0, 0.5)
+
+	# Remove label after fade completes
+	await tween.finished
+	miss_label.queue_free()
 
 ## ═══════════════════════════════════════════════════════════════
 ## CONFIRMATION DIALOG (YES/NO)
@@ -5334,6 +5367,7 @@ func _execute_burst_on_target(target: Dictionary) -> void:
 	var hit_check = combat_resolver.check_sigil_hit(current_combatant, target, {"skill_acc": acc})
 
 	if not hit_check.hit:
+		_show_miss_feedback()  # Show big MISS text
 		log_message("  → Missed %s! (%d%% chance)" % [target.display_name, int(hit_check.hit_chance)])
 		return
 
@@ -5487,6 +5521,7 @@ func _execute_skill_single(target: Dictionary) -> void:
 	var hit_check = combat_resolver.check_sigil_hit(current_combatant, target, {"skill_acc": acc})
 
 	if not hit_check.hit:
+		_show_miss_feedback()  # Show big MISS text
 		log_message("  → Missed! (%d%% chance, rolled %d)" % [int(hit_check.hit_chance), hit_check.roll])
 		# Still deduct MP even on miss
 		current_combatant.mp -= mp_cost
