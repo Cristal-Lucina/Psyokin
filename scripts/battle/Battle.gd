@@ -29,8 +29,8 @@ const COLOR_MILK_WHITE = Color(0.96, 0.97, 0.98)        # #F4F7FB
 @onready var turn_order_display: VBoxContainer = %TurnOrderDisplay
 
 ## Combatant display containers
-@onready var ally_slots: HBoxContainer = %AllySlots
-@onready var enemy_slots: HBoxContainer = %EnemySlots
+@onready var ally_slots: VBoxContainer = %AllySlots
+@onready var enemy_slots: VBoxContainer = %EnemySlots
 
 ## Dynamic background elements
 var diagonal_bands: ColorRect = null
