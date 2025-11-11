@@ -168,6 +168,53 @@ func _ready() -> void:
 
 func _apply_core_vibe_styling() -> void:
 	"""Apply Core Vibe neon-kawaii styling to DormsPanel elements"""
+
+	# Style the three main panel containers with rounded neon borders
+	if _left_panel:
+		var left_style = aCoreVibeTheme.create_panel_style(
+			aCoreVibeTheme.COLOR_SKY_CYAN,            # Sky Cyan border (roster)
+			aCoreVibeTheme.COLOR_INK_CHARCOAL,        # Ink charcoal background
+			aCoreVibeTheme.PANEL_OPACITY_SEMI,        # Semi-transparent
+			aCoreVibeTheme.CORNER_RADIUS_MEDIUM,      # 16px corners
+			aCoreVibeTheme.BORDER_WIDTH_THIN,         # 2px border
+			aCoreVibeTheme.SHADOW_SIZE_MEDIUM         # 6px glow
+		)
+		left_style.content_margin_left = 10
+		left_style.content_margin_top = 10
+		left_style.content_margin_right = 10
+		left_style.content_margin_bottom = 10
+		_left_panel.add_theme_stylebox_override("panel", left_style)
+
+	if _center_panel:
+		var center_style = aCoreVibeTheme.create_panel_style(
+			aCoreVibeTheme.COLOR_ELECTRIC_LIME,       # Electric Lime border (rooms)
+			aCoreVibeTheme.COLOR_INK_CHARCOAL,        # Ink charcoal background
+			aCoreVibeTheme.PANEL_OPACITY_SEMI,        # Semi-transparent
+			aCoreVibeTheme.CORNER_RADIUS_MEDIUM,      # 16px corners
+			aCoreVibeTheme.BORDER_WIDTH_THIN,         # 2px border
+			aCoreVibeTheme.SHADOW_SIZE_MEDIUM         # 6px glow
+		)
+		center_style.content_margin_left = 10
+		center_style.content_margin_top = 10
+		center_style.content_margin_right = 10
+		center_style.content_margin_bottom = 10
+		_center_panel.add_theme_stylebox_override("panel", center_style)
+
+	if _right_panel:
+		var right_style = aCoreVibeTheme.create_panel_style(
+			aCoreVibeTheme.COLOR_GRAPE_VIOLET,        # Grape Violet border (details)
+			aCoreVibeTheme.COLOR_INK_CHARCOAL,        # Ink charcoal background
+			aCoreVibeTheme.PANEL_OPACITY_SEMI,        # Semi-transparent
+			aCoreVibeTheme.CORNER_RADIUS_MEDIUM,      # 16px corners
+			aCoreVibeTheme.BORDER_WIDTH_THIN,         # 2px border
+			aCoreVibeTheme.SHADOW_SIZE_MEDIUM         # 6px glow
+		)
+		right_style.content_margin_left = 10
+		right_style.content_margin_top = 10
+		right_style.content_margin_right = 10
+		right_style.content_margin_bottom = 10
+		_right_panel.add_theme_stylebox_override("panel", right_style)
+
 	# Style detail content
 	if _detail_content:
 		_detail_content.add_theme_color_override("default_color", aCoreVibeTheme.COLOR_MILK_WHITE)
