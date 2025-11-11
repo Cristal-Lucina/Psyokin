@@ -4377,7 +4377,7 @@ func _show_item_menu(items: Array) -> void:
 
 	# Create item menu panel
 	item_menu_panel = PanelContainer.new()
-	item_menu_panel.custom_minimum_size = Vector2(490, 0)  # Reduced width by 60px
+	item_menu_panel.custom_minimum_size = Vector2(440, 0)  # Reduced width by 110px total
 
 	# Style the panel with Core vibe
 	var style = StyleBoxFlat.new()
@@ -4413,7 +4413,7 @@ func _show_item_menu(items: Array) -> void:
 
 	# Create tab container
 	var tab_container = TabContainer.new()
-	tab_container.custom_minimum_size = Vector2(470, 230)  # Reduced width by 60px, height by 70px
+	tab_container.custom_minimum_size = Vector2(420, 230)  # Reduced width by 110px total, height by 70px
 	vbox.add_child(tab_container)
 
 	# Store reference for controller navigation
@@ -4435,7 +4435,7 @@ func _show_item_menu(items: Array) -> void:
 	item_description_label.add_theme_font_size_override("font_size", 14)
 	item_description_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
 	item_description_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	item_description_label.custom_minimum_size = Vector2(470, 60)  # Reduced width by 60px
+	item_description_label.custom_minimum_size = Vector2(420, 60)  # Reduced width by 110px total
 	item_description_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	vbox.add_child(item_description_label)
 
@@ -4446,15 +4446,15 @@ func _show_item_menu(items: Array) -> void:
 	# Add cancel button
 	var cancel_btn = Button.new()
 	cancel_btn.text = "Cancel"
-	cancel_btn.custom_minimum_size = Vector2(470, 40)  # Reduced width by 60px
+	cancel_btn.custom_minimum_size = Vector2(420, 40)  # Reduced width by 110px total
 	cancel_btn.pressed.connect(_close_item_menu)
 	vbox.add_child(cancel_btn)
 
-	# Add to scene and center (moved up 100px)
+	# Add to scene and center (moved up 130px total)
 	add_child(item_menu_panel)
 	item_menu_panel.position = Vector2(
-		(get_viewport_rect().size.x - 490) / 2,  # Adjusted for new width
-		(get_viewport_rect().size.y - 400) / 2 - 100  # Moved up 100px
+		(get_viewport_rect().size.x - 440) / 2,  # Adjusted for new width (440px)
+		(get_viewport_rect().size.y - 400) / 2 - 130  # Moved up 130px total (30px more)
 	)
 
 	# Rebuild button list for first tab and highlight first item
