@@ -56,6 +56,9 @@ var skill_to_use: Dictionary = {}  # Selected skill data
 var skill_menu_panel: PanelContainer = null  # Skill selection menu
 var skill_menu_buttons: Array = []  # Buttons in skill menu for controller navigation
 var selected_skill_index: int = 0  # Currently selected skill in menu
+var type_menu_panel: PanelContainer = null  # Type selection menu
+var type_menu_buttons: Array = []  # Buttons in type menu for controller navigation
+var selected_type_index: int = 0  # Currently selected type in menu
 var item_menu_panel: PanelContainer = null  # Item selection menu
 var item_menu_buttons: Array = []  # Buttons in current item tab for controller navigation
 var selected_item_index: int = 0  # Currently selected item in menu
@@ -581,7 +584,11 @@ func _input(event: InputEvent) -> void:
 	# Check for back button to close any open menus
 	if event.is_action_pressed(aInputManager.ACTION_BACK):
 		# Check if any menu is open and close it
-		if skill_menu_panel != null:
+		if type_menu_panel != null:
+			_on_type_menu_cancel()
+			get_viewport().set_input_as_handled()
+			return
+		elif skill_menu_panel != null:
 			_close_skill_menu()
 			get_viewport().set_input_as_handled()
 			return
@@ -608,6 +615,33 @@ func _input(event: InputEvent) -> void:
 		# If in target selection, cancel it
 		elif awaiting_target_selection and not target_candidates.is_empty():
 			_cancel_target_selection()
+			get_viewport().set_input_as_handled()
+			return
+
+	# If type menu is open, handle controller navigation
+	if type_menu_panel != null and not type_menu_buttons.is_empty():
+		# Check cooldown to prevent rapid inputs
+		if input_cooldown > 0:
+			return
+
+		if event.is_action_pressed(aInputManager.ACTION_MOVE_UP):
+			_navigate_type_menu(-1)
+			input_cooldown = input_cooldown_duration
+			get_viewport().set_input_as_handled()
+			return
+		elif event.is_action_pressed(aInputManager.ACTION_MOVE_DOWN):
+			_navigate_type_menu(1)
+			input_cooldown = input_cooldown_duration
+			get_viewport().set_input_as_handled()
+			return
+		elif event.is_action_pressed(aInputManager.ACTION_ACCEPT):
+			_confirm_type_selection()
+			input_cooldown = input_cooldown_duration
+			get_viewport().set_input_as_handled()
+			return
+		elif event.is_action_pressed(aInputManager.ACTION_BACK):
+			_on_type_menu_cancel()
+			input_cooldown = input_cooldown_duration
 			get_viewport().set_input_as_handled()
 			return
 
@@ -3933,9 +3967,13 @@ func _on_change_type_button_pressed() -> void:
 	# Close current skill menu
 	_close_skill_menu()
 
+	# Reset type menu state
+	type_menu_buttons = []
+	selected_type_index = 0
+
 	# Create type selection panel
-	var type_panel = PanelContainer.new()
-	type_panel.custom_minimum_size = Vector2(300, 0)
+	type_menu_panel = PanelContainer.new()
+	type_menu_panel.custom_minimum_size = Vector2(300, 0)
 
 	# Style the panel with cyan neon Core vibe
 	var style = StyleBoxFlat.new()
@@ -3951,10 +3989,10 @@ func _on_change_type_button_pressed() -> void:
 	style.corner_radius_bottom_right = 12
 	style.shadow_size = 6
 	style.shadow_color = Color(COLOR_SKY_CYAN.r, COLOR_SKY_CYAN.g, COLOR_SKY_CYAN.b, 0.4)  # Cyan glow
-	type_panel.add_theme_stylebox_override("panel", style)
+	type_menu_panel.add_theme_stylebox_override("panel", style)
 
 	var vbox = VBoxContainer.new()
-	type_panel.add_child(vbox)
+	type_menu_panel.add_child(vbox)
 
 	# Title
 	var title = Label.new()
@@ -3981,7 +4019,8 @@ func _on_change_type_button_pressed() -> void:
 			var btn = Button.new()
 			btn.text = type_name
 			btn.custom_minimum_size = Vector2(280, 40)
-			btn.pressed.connect(_on_type_selected.bind(type_name, type_panel))
+			btn.pressed.connect(_on_type_selected.bind(type_name))
+			type_menu_buttons.append(btn)  # Add to navigation array
 			vbox.add_child(btn)
 
 	# Cancel button
@@ -3991,21 +4030,29 @@ func _on_change_type_button_pressed() -> void:
 	var cancel_btn = Button.new()
 	cancel_btn.text = "Cancel"
 	cancel_btn.custom_minimum_size = Vector2(280, 40)
-	cancel_btn.pressed.connect(_on_type_menu_cancel.bind(type_panel))
+	cancel_btn.pressed.connect(_on_type_menu_cancel)
+	type_menu_buttons.append(cancel_btn)  # Add to navigation array
 	vbox.add_child(cancel_btn)
 
 	# Add to scene and center
-	add_child(type_panel)
-	type_panel.position = Vector2(
-		(get_viewport_rect().size.x - type_panel.custom_minimum_size.x) / 2,
-		150
+	add_child(type_menu_panel)
+	type_menu_panel.position = Vector2(
+		(get_viewport_rect().size.x - type_menu_panel.custom_minimum_size.x) / 2,
+		100  # Moved up 50px from 150
 	)
 
-func _on_type_selected(new_type: String, type_panel: PanelContainer) -> void:
+	# Highlight first button and grab focus
+	if not type_menu_buttons.is_empty():
+		_highlight_type_button(0)
+		type_menu_buttons[0].grab_focus()
+
+	# Set cooldown to prevent immediate button press
+	input_cooldown = input_cooldown_duration
+
+func _on_type_selected(new_type: String) -> void:
 	"""Handle type selection"""
 	# Close type menu
-	if type_panel:
-		type_panel.queue_free()
+	_close_type_menu()
 
 	# Switch type (don't end turn)
 	_switch_mind_type(new_type, false)
@@ -4013,13 +4060,21 @@ func _on_type_selected(new_type: String, type_panel: PanelContainer) -> void:
 	# Reopen skill menu with new type
 	_on_skill_pressed()
 
-func _on_type_menu_cancel(type_panel: PanelContainer) -> void:
+func _on_type_menu_cancel() -> void:
 	"""Cancel type selection and return to skill menu"""
-	if type_panel:
-		type_panel.queue_free()
+	# Close type menu
+	_close_type_menu()
 
 	# Reopen skill menu
 	_on_skill_pressed()
+
+func _close_type_menu() -> void:
+	"""Close the type selection menu"""
+	if type_menu_panel:
+		type_menu_panel.queue_free()
+		type_menu_panel = null
+	type_menu_buttons = []
+	selected_type_index = 0
 
 func _close_skill_menu() -> void:
 	"""Close the skill menu"""
@@ -4088,6 +4143,50 @@ func _unhighlight_skill_button(index: int) -> void:
 	"""Remove highlight from a skill button"""
 	if index >= 0 and index < skill_menu_buttons.size():
 		var button = skill_menu_buttons[index]
+		button.modulate = Color(1.0, 1.0, 1.0, 1.0)  # Normal color
+
+## ═══════════════════════════════════════════════════════════════
+## TYPE MENU NAVIGATION
+## ═══════════════════════════════════════════════════════════════
+
+func _navigate_type_menu(direction: int) -> void:
+	"""Navigate type menu with controller (direction: -1 for up, 1 for down)"""
+	if type_menu_buttons.is_empty():
+		return
+
+	# Remove highlight from current button
+	_unhighlight_type_button(selected_type_index)
+
+	# Move selection
+	selected_type_index += direction
+
+	# Wrap around
+	if selected_type_index < 0:
+		selected_type_index = type_menu_buttons.size() - 1
+	elif selected_type_index >= type_menu_buttons.size():
+		selected_type_index = 0
+
+	# Highlight new button
+	_highlight_type_button(selected_type_index)
+
+func _confirm_type_selection() -> void:
+	"""Confirm type selection with A button"""
+	if selected_type_index >= 0 and selected_type_index < type_menu_buttons.size():
+		# Get the selected button and trigger its pressed signal
+		var button = type_menu_buttons[selected_type_index]
+		button.emit_signal("pressed")
+
+func _highlight_type_button(index: int) -> void:
+	"""Highlight a type button for controller navigation"""
+	if index >= 0 and index < type_menu_buttons.size():
+		var button = type_menu_buttons[index]
+		button.modulate = Color(1.2, 1.2, 1.4, 1.0)  # Light blue highlight
+		button.grab_focus()
+
+func _unhighlight_type_button(index: int) -> void:
+	"""Remove highlight from a type button"""
+	if index >= 0 and index < type_menu_buttons.size():
+		var button = type_menu_buttons[index]
 		button.modulate = Color(1.0, 1.0, 1.0, 1.0)  # Normal color
 
 ## ═══════════════════════════════════════════════════════════════
