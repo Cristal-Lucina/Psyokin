@@ -431,6 +431,11 @@ func _style_panels() -> void:
 		style.corner_radius_bottom_right = 12
 		style.shadow_size = 4
 		style.shadow_color = Color(COLOR_ELECTRIC_LIME.r, COLOR_ELECTRIC_LIME.g, COLOR_ELECTRIC_LIME.b, 0.3)
+		# Add 10px internal padding
+		style.content_margin_left = 10
+		style.content_margin_right = 10
+		style.content_margin_top = 10
+		style.content_margin_bottom = 10
 		battle_log_panel.add_theme_stylebox_override("panel", style)
 
 		# Style battle log text in Milk White
@@ -474,7 +479,7 @@ func _style_panels() -> void:
 			burst_gauge.add_theme_stylebox_override("background", gauge_bg)
 
 			var gauge_fill = StyleBoxFlat.new()
-			gauge_fill.bg_color = COLOR_CITRUS_YELLOW  # Yellow fill
+			gauge_fill.bg_color = COLOR_BUBBLE_MAGENTA  # Pink fill
 			gauge_fill.corner_radius_top_left = 8
 			gauge_fill.corner_radius_top_right = 8
 			gauge_fill.corner_radius_bottom_left = 8
@@ -3443,10 +3448,14 @@ func _execute_charm_action() -> void:
 ## ═══════════════════════════════════════════════════════════════
 
 func _update_burst_gauge() -> void:
-	"""Update burst gauge display"""
+	"""Update burst gauge display with smooth animation"""
 	if burst_gauge_bar:
 		burst_gauge_bar.max_value = battle_mgr.BURST_GAUGE_MAX
-		burst_gauge_bar.value = battle_mgr.burst_gauge
+		# Animate the burst gauge fill smoothly
+		var tween = create_tween()
+		tween.set_ease(Tween.EASE_OUT)
+		tween.set_trans(Tween.TRANS_CUBIC)
+		tween.tween_property(burst_gauge_bar, "value", battle_mgr.burst_gauge, 0.8)
 
 func log_message(message: String) -> void:
 	"""Add a message to the battle log"""
