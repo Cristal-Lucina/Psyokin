@@ -2838,7 +2838,7 @@ func _on_switch_panel_pressed() -> void:
 	_toggle_action_panel()
 
 func _toggle_action_panel() -> void:
-	"""Toggle between the two action menu panels"""
+	"""Toggle between the two action menu panels with spin animations"""
 	is_panel_1_active = not is_panel_1_active
 
 	# Get button references
@@ -2851,28 +2851,78 @@ func _toggle_action_panel() -> void:
 	var status_btn = action_menu.get_node_or_null("StatusButton")
 	var item_btn = action_menu.get_node_or_null("ItemButton")
 
+	var anim_duration = 0.3
+	var spin_rotation = deg_to_rad(360)  # Full rotation
+
 	if is_panel_1_active:
-		# Show Panel 1: GUARD/SKILL/CAPTURE/FIGHT
-		if skill_btn: skill_btn.visible = true
-		if defend_btn: defend_btn.visible = true
-		if attack_btn: attack_btn.visible = true
-		if capture_btn: capture_btn.visible = true
-		# Hide Panel 2
-		if burst_btn: burst_btn.visible = false
-		if run_btn: run_btn.visible = false
-		if status_btn: status_btn.visible = false
-		if item_btn: item_btn.visible = false
+		# Hide Panel 2 with spin inward animation
+		var buttons_to_hide = [burst_btn, run_btn, status_btn, item_btn]
+		for btn in buttons_to_hide:
+			if btn:
+				_animate_button_hide(btn, anim_duration, spin_rotation)
+
+		# Wait a moment before showing new buttons
+		await get_tree().create_timer(anim_duration * 0.5).timeout
+
+		# Show Panel 1 with spin outward animation
+		var buttons_to_show = [skill_btn, defend_btn, attack_btn, capture_btn]
+		for btn in buttons_to_show:
+			if btn:
+				btn.visible = true
+				btn.modulate.a = 0.0
+				btn.scale = Vector2(0.5, 0.5)
+				btn.rotation = -spin_rotation
+				_animate_button_show(btn, anim_duration, spin_rotation)
 	else:
-		# Show Panel 2: RUN/BURST/ITEMS/STATUS
-		if burst_btn: burst_btn.visible = true
-		if run_btn: run_btn.visible = true
-		if status_btn: status_btn.visible = true
-		if item_btn: item_btn.visible = true
-		# Hide Panel 1
-		if skill_btn: skill_btn.visible = false
-		if defend_btn: defend_btn.visible = false
-		if attack_btn: attack_btn.visible = false
-		if capture_btn: capture_btn.visible = false
+		# Hide Panel 1 with spin inward animation
+		var buttons_to_hide = [skill_btn, defend_btn, attack_btn, capture_btn]
+		for btn in buttons_to_hide:
+			if btn:
+				_animate_button_hide(btn, anim_duration, spin_rotation)
+
+		# Wait a moment before showing new buttons
+		await get_tree().create_timer(anim_duration * 0.5).timeout
+
+		# Show Panel 2 with spin outward animation
+		var buttons_to_show = [burst_btn, run_btn, status_btn, item_btn]
+		for btn in buttons_to_show:
+			if btn:
+				btn.visible = true
+				btn.modulate.a = 0.0
+				btn.scale = Vector2(0.5, 0.5)
+				btn.rotation = -spin_rotation
+				_animate_button_show(btn, anim_duration, spin_rotation)
+
+func _animate_button_hide(btn: Button, duration: float, rotation: float) -> void:
+	"""Animate button spinning inward and fading out"""
+	var tween = create_tween()
+	tween.set_parallel(true)
+	tween.set_ease(Tween.EASE_IN)
+	tween.set_trans(Tween.TRANS_BACK)
+
+	# Spin and scale down
+	tween.tween_property(btn, "rotation", rotation, duration)
+	tween.tween_property(btn, "scale", Vector2(0.1, 0.1), duration)
+	tween.tween_property(btn, "modulate:a", 0.0, duration * 0.7)
+
+	await tween.finished
+	btn.visible = false
+	# Reset for next time
+	btn.rotation = 0.0
+	btn.scale = Vector2(1.0, 1.0)
+	btn.modulate.a = 1.0
+
+func _animate_button_show(btn: Button, duration: float, rotation: float) -> void:
+	"""Animate button spinning outward and fading in"""
+	var tween = create_tween()
+	tween.set_parallel(true)
+	tween.set_ease(Tween.EASE_OUT)
+	tween.set_trans(Tween.TRANS_BACK)
+
+	# Spin and scale up
+	tween.tween_property(btn, "rotation", 0.0, duration)
+	tween.tween_property(btn, "scale", Vector2(1.0, 1.0), duration)
+	tween.tween_property(btn, "modulate:a", 1.0, duration * 0.7)
 
 func _show_status_character_picker() -> void:
 	"""Show a character picker to select whose status to view"""

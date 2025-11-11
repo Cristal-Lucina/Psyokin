@@ -535,7 +535,11 @@ func _create_turn_slot(combatant: Dictionary, index: int) -> PanelContainer:
 	if is_ko or is_revived_check:
 		turn_label.add_theme_color_override("font_color", Color(0.5, 0.5, 0.5, 1.0))
 	else:
-		turn_label.add_theme_color_override("font_color", Color(0.4, 0.4, 0.4, 1.0))
+		turn_label.add_theme_color_override("font_color", Color(0.0, 0.0, 0.0, 1.0))  # Black
+		turn_label.add_theme_color_override("font_shadow_color", Color(0.96, 0.97, 0.98, 0.6))  # White glow
+		turn_label.add_theme_constant_override("shadow_offset_x", 0)
+		turn_label.add_theme_constant_override("shadow_offset_y", 0)
+		turn_label.add_theme_constant_override("shadow_outline_size", 4)
 	hbox.add_child(turn_label)
 
 	# Combatant name
@@ -588,8 +592,12 @@ func _create_turn_slot(combatant: Dictionary, index: int) -> PanelContainer:
 			# 1 hit = Yellow warning
 			name_label.add_theme_color_override("font_color", Color(1.0, 0.9, 0.0, 1.0))
 		else:
-			# Default dark grey color for names
-			name_label.add_theme_color_override("font_color", Color(0.4, 0.4, 0.4, 1.0))
+			# Default black with white glow
+			name_label.add_theme_color_override("font_color", Color(0.0, 0.0, 0.0, 1.0))
+			name_label.add_theme_color_override("font_shadow_color", Color(0.96, 0.97, 0.98, 0.6))
+			name_label.add_theme_constant_override("shadow_offset_x", 0)
+			name_label.add_theme_constant_override("shadow_offset_y", 0)
+			name_label.add_theme_constant_override("shadow_outline_size", 4)
 
 	hbox.add_child(name_label)
 
@@ -645,7 +653,11 @@ func _create_turn_slot(combatant: Dictionary, index: int) -> PanelContainer:
 		init_label.add_theme_color_override("font_color", Color(0.5, 0.5, 0.5, 1.0))
 	else:
 		init_label.text = str(combatant.initiative)
-		init_label.add_theme_color_override("font_color", Color(0.4, 0.4, 0.4, 1.0))
+		init_label.add_theme_color_override("font_color", Color(0.0, 0.0, 0.0, 1.0))  # Black
+		init_label.add_theme_color_override("font_shadow_color", Color(0.96, 0.97, 0.98, 0.6))  # White glow
+		init_label.add_theme_constant_override("shadow_offset_x", 0)
+		init_label.add_theme_constant_override("shadow_offset_y", 0)
+		init_label.add_theme_constant_override("shadow_outline_size", 4)
 	init_label.add_theme_font_size_override("font_size", 10)  # Scaled for 150px width
 	init_label.custom_minimum_size = Vector2(24, 0)  # Scaled for 150px width
 	init_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
