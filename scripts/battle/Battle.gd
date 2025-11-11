@@ -3630,7 +3630,7 @@ func _hide_instruction() -> void:
 
 func _show_confirmation_dialog(message: String, on_confirm: Callable) -> void:
 	"""Show a Yes/No confirmation dialog"""
-	log_message(message)
+	_show_instruction(message)
 
 	awaiting_confirmation = true
 	confirmation_callback = on_confirm
