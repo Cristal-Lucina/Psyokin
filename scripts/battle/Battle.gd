@@ -458,11 +458,11 @@ func _style_panels() -> void:
 	if burst_panel and burst_panel is PanelContainer:
 		var style = StyleBoxFlat.new()
 		style.bg_color = COLOR_INK_CHARCOAL
-		style.border_width_left = 2
-		style.border_width_right = 2
-		style.border_width_top = 2
-		style.border_width_bottom = 2
-		style.border_color = COLOR_CITRUS_YELLOW  # Yellow neon border
+		style.border_width_left = 4
+		style.border_width_right = 4
+		style.border_width_top = 4
+		style.border_width_bottom = 4
+		style.border_color = COLOR_SKY_CYAN  # Cyan neon border to match minigames
 		style.corner_radius_top_left = 12
 		style.corner_radius_top_right = 12
 		style.corner_radius_bottom_left = 12
