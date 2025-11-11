@@ -89,6 +89,7 @@ alignment = 1
 [node name="TurnOrderPanel" type="PanelContainer" parent="MainLayout"]
 layout_mode = 2
 size_flags_horizontal = 3
+size_flags_stretch_ratio = 0.5
 
 [node name="VBox" type="VBoxContainer" parent="MainLayout/TurnOrderPanel"]
 layout_mode = 2
