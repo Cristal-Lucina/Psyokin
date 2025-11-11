@@ -68,10 +68,10 @@ func _ready() -> void:
 
 func _build_ui() -> void:
 	"""Build the loading screen UI programmatically with Core Vibe styling"""
-	# Full-screen dark background with transparency
+	# Full-screen dark background (fully opaque)
 	_background = ColorRect.new()
 	_background.name = "Background"
-	_background.color = Color(COLOR_NIGHT_NAVY.r, COLOR_NIGHT_NAVY.g, COLOR_NIGHT_NAVY.b, 0.92)  # 92% opacity
+	_background.color = COLOR_NIGHT_NAVY  # Fully opaque
 	_background.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(_background)
 
@@ -86,7 +86,7 @@ func _build_ui() -> void:
 	panel.name = "LoadingPanel"
 
 	var panel_style := StyleBoxFlat.new()
-	panel_style.bg_color = Color(COLOR_INK_CHARCOAL.r, COLOR_INK_CHARCOAL.g, COLOR_INK_CHARCOAL.b, 0.85)  # 85% opacity
+	panel_style.bg_color = COLOR_INK_CHARCOAL  # Fully opaque
 	panel_style.border_color = COLOR_SKY_CYAN
 	panel_style.border_width_left = 3
 	panel_style.border_width_right = 3
@@ -132,7 +132,7 @@ func _apply_panel_style() -> void:
 	var panel = get_node_or_null("Background/CenterContainer/LoadingPanel") as PanelContainer
 	if panel:
 		var panel_style := StyleBoxFlat.new()
-		panel_style.bg_color = Color(COLOR_INK_CHARCOAL.r, COLOR_INK_CHARCOAL.g, COLOR_INK_CHARCOAL.b, 0.85)  # 85% opacity
+		panel_style.bg_color = COLOR_INK_CHARCOAL  # Fully opaque
 		panel_style.border_color = COLOR_SKY_CYAN
 		panel_style.border_width_left = 3
 		panel_style.border_width_right = 3
