@@ -613,28 +613,94 @@ func _on_load_items_pressed() -> void:
 func _on_open_training() -> void: pass
 
 func _style_date_and_phase_labels() -> void:
-	"""Apply Core Vibe neon-kawaii styling to date and phase labels"""
+	"""Apply Core Vibe neon-kawaii styling to date and phase labels with pill backgrounds"""
 	if date_label:
-		# Date label in Sky Cyan with white glow
+		# Create pill capsule background for date label
+		var date_panel = StyleBoxFlat.new()
+		date_panel.bg_color = COLOR_INK_CHARCOAL
+		date_panel.border_color = COLOR_SKY_CYAN
+		date_panel.border_width_left = 2
+		date_panel.border_width_right = 2
+		date_panel.border_width_top = 2
+		date_panel.border_width_bottom = 2
+		date_panel.corner_radius_top_left = 12
+		date_panel.corner_radius_top_right = 12
+		date_panel.corner_radius_bottom_left = 12
+		date_panel.corner_radius_bottom_right = 12
+		date_panel.shadow_color = Color(COLOR_SKY_CYAN.r, COLOR_SKY_CYAN.g, COLOR_SKY_CYAN.b, 0.4)
+		date_panel.shadow_size = 6
+		date_panel.content_margin_left = 16
+		date_panel.content_margin_right = 16
+		date_panel.content_margin_top = 8
+		date_panel.content_margin_bottom = 8
+
+		# Convert label to panel with background
+		var date_panel_container = date_label.get_parent()
+		if date_panel_container:
+			# Remove label from current parent
+			var label_index = date_label.get_index()
+			date_panel_container.remove_child(date_label)
+
+			# Create new PanelContainer
+			var panel = PanelContainer.new()
+			panel.name = "DatePanel"
+			panel.add_theme_stylebox_override("panel", date_panel)
+			panel.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+
+			# Add label to panel
+			panel.add_child(date_label)
+
+			# Add panel back to parent at same position
+			date_panel_container.add_child(panel)
+			date_panel_container.move_child(panel, label_index)
+
+		# Style the text
 		date_label.add_theme_color_override("font_color", COLOR_SKY_CYAN)
-		date_label.add_theme_font_size_override("font_size", 20)
-		date_label.add_theme_color_override("font_outline_color", COLOR_MILK_WHITE)
-		date_label.add_theme_constant_override("outline_size", 3)
-		# Add shadow for extra depth
-		date_label.add_theme_color_override("font_shadow_color", Color(COLOR_SKY_CYAN.r, COLOR_SKY_CYAN.g, COLOR_SKY_CYAN.b, 0.5))
-		date_label.add_theme_constant_override("shadow_offset_x", 0)
-		date_label.add_theme_constant_override("shadow_offset_y", 2)
+		date_label.add_theme_font_size_override("font_size", 18)
 
 	if phase_label:
-		# Phase label in Bubble Magenta with white glow
+		# Create pill capsule background for phase label
+		var phase_panel = StyleBoxFlat.new()
+		phase_panel.bg_color = COLOR_INK_CHARCOAL
+		phase_panel.border_color = COLOR_BUBBLE_MAGENTA
+		phase_panel.border_width_left = 2
+		phase_panel.border_width_right = 2
+		phase_panel.border_width_top = 2
+		phase_panel.border_width_bottom = 2
+		phase_panel.corner_radius_top_left = 12
+		phase_panel.corner_radius_top_right = 12
+		phase_panel.corner_radius_bottom_left = 12
+		phase_panel.corner_radius_bottom_right = 12
+		phase_panel.shadow_color = Color(COLOR_BUBBLE_MAGENTA.r, COLOR_BUBBLE_MAGENTA.g, COLOR_BUBBLE_MAGENTA.b, 0.4)
+		phase_panel.shadow_size = 6
+		phase_panel.content_margin_left = 16
+		phase_panel.content_margin_right = 16
+		phase_panel.content_margin_top = 6
+		phase_panel.content_margin_bottom = 6
+
+		# Convert label to panel with background
+		var phase_panel_container = phase_label.get_parent()
+		if phase_panel_container:
+			# Remove label from current parent
+			var label_index = phase_label.get_index()
+			phase_panel_container.remove_child(phase_label)
+
+			# Create new PanelContainer
+			var panel = PanelContainer.new()
+			panel.name = "PhasePanel"
+			panel.add_theme_stylebox_override("panel", phase_panel)
+			panel.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+
+			# Add label to panel
+			panel.add_child(phase_label)
+
+			# Add panel back to parent at same position
+			phase_panel_container.add_child(panel)
+			phase_panel_container.move_child(panel, label_index)
+
+		# Style the text
 		phase_label.add_theme_color_override("font_color", COLOR_BUBBLE_MAGENTA)
-		phase_label.add_theme_font_size_override("font_size", 18)
-		phase_label.add_theme_color_override("font_outline_color", COLOR_MILK_WHITE)
-		phase_label.add_theme_constant_override("outline_size", 3)
-		# Add shadow for extra depth
-		phase_label.add_theme_color_override("font_shadow_color", Color(COLOR_BUBBLE_MAGENTA.r, COLOR_BUBBLE_MAGENTA.g, COLOR_BUBBLE_MAGENTA.b, 0.5))
-		phase_label.add_theme_constant_override("shadow_offset_x", 0)
-		phase_label.add_theme_constant_override("shadow_offset_y", 2)
+		phase_label.add_theme_font_size_override("font_size", 16)
 
 func _style_option_button(ob: OptionButton) -> void:
 	if ob == null: return
