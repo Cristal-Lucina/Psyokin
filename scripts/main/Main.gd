@@ -78,6 +78,17 @@
 
 extends Control
 
+## Neon Orchard Color Palette
+const COLOR_ELECTRIC_LIME = Color(0.78, 1.0, 0.24)      # #C8FF3D
+const COLOR_BUBBLE_MAGENTA = Color(1.0, 0.29, 0.85)     # #FF4AD9
+const COLOR_SKY_CYAN = Color(0.30, 0.91, 1.0)           # #4DE9FF
+const COLOR_CITRUS_YELLOW = Color(1.0, 0.91, 0.30)      # #FFE84D
+const COLOR_PLASMA_TEAL = Color(0.13, 0.89, 0.70)       # #20E3B2
+const COLOR_GRAPE_VIOLET = Color(0.54, 0.25, 0.99)      # #8A3FFC
+const COLOR_NIGHT_NAVY = Color(0.04, 0.06, 0.10)        # #0A0F1A
+const COLOR_INK_CHARCOAL = Color(0.07, 0.09, 0.15)      # #111827
+const COLOR_MILK_WHITE = Color(0.96, 0.97, 0.98)        # #F4F7FB
+
 # ---- Autoloads (PartySystem removed) ----
 const CALENDAR_PATH      := "/root/aCalendarSystem"
 const STATS_PATH         := "/root/aStatsSystem"
@@ -370,6 +381,7 @@ func _ready() -> void:
 	if _btn_add_sxp:   _btn_add_sxp.pressed.connect(_on_add_sxp)
 
 	# Cosmetics
+	_style_date_and_phase_labels()
 	_style_option_button(_roster_pick)
 	_style_option_button(_stat_pick)
 
@@ -599,6 +611,30 @@ func _on_load_items_pressed() -> void:
 		items_status.text = "Items: %s" % (str(table.size()) if not table.is_empty() else "(failed)")
 
 func _on_open_training() -> void: pass
+
+func _style_date_and_phase_labels() -> void:
+	"""Apply Core Vibe neon-kawaii styling to date and phase labels"""
+	if date_label:
+		# Date label in Sky Cyan with white glow
+		date_label.add_theme_color_override("font_color", COLOR_SKY_CYAN)
+		date_label.add_theme_font_size_override("font_size", 20)
+		date_label.add_theme_color_override("font_outline_color", COLOR_MILK_WHITE)
+		date_label.add_theme_constant_override("outline_size", 3)
+		# Add shadow for extra depth
+		date_label.add_theme_color_override("font_shadow_color", Color(COLOR_SKY_CYAN.r, COLOR_SKY_CYAN.g, COLOR_SKY_CYAN.b, 0.5))
+		date_label.add_theme_constant_override("shadow_offset_x", 0)
+		date_label.add_theme_constant_override("shadow_offset_y", 2)
+
+	if phase_label:
+		# Phase label in Bubble Magenta with white glow
+		phase_label.add_theme_color_override("font_color", COLOR_BUBBLE_MAGENTA)
+		phase_label.add_theme_font_size_override("font_size", 18)
+		phase_label.add_theme_color_override("font_outline_color", COLOR_MILK_WHITE)
+		phase_label.add_theme_constant_override("outline_size", 3)
+		# Add shadow for extra depth
+		phase_label.add_theme_color_override("font_shadow_color", Color(COLOR_BUBBLE_MAGENTA.r, COLOR_BUBBLE_MAGENTA.g, COLOR_BUBBLE_MAGENTA.b, 0.5))
+		phase_label.add_theme_constant_override("shadow_offset_x", 0)
+		phase_label.add_theme_constant_override("shadow_offset_y", 2)
 
 func _style_option_button(ob: OptionButton) -> void:
 	if ob == null: return
