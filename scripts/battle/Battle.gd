@@ -736,18 +736,13 @@ func _input(event: InputEvent) -> void:
 
 	# If action menu is visible, handle direct button presses
 	if action_menu and action_menu.visible and not is_in_round_transition:
-		# Check for panel switching with L1/R1 (mapped to ACTION_BURST and ACTION_BATTLE_RUN for shoulder buttons)
-		# Note: We need to check if these are shoulder button presses specifically, not the Y/X face buttons
-		# In Godot input, shoulder buttons and face buttons may share action names depending on mapping
-		# For now, we'll use a simple approach: if neither burst_menu nor run is active, toggle panel
-		if event.is_action_pressed("ui_page_up"):  # L1/LB shoulder button
-			_toggle_action_panel()
-			get_viewport().set_input_as_handled()
-			return
-		elif event.is_action_pressed("ui_page_down"):  # R1/RB shoulder button
-			_toggle_action_panel()
-			get_viewport().set_input_as_handled()
-			return
+		# Check for panel switching with L1/R1 shoulder buttons
+		# L1 = button index 9, R1 = button index 10
+		if event is InputEventJoypadButton:
+			if event.pressed and (event.button_index == 9 or event.button_index == 10):  # L1 or R1
+				_toggle_action_panel()
+				get_viewport().set_input_as_handled()
+				return
 
 		# Handle diamond button inputs based on active panel
 		# Panel 1: GUARD/SKILL/CAPTURE/FIGHT
