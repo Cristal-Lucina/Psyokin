@@ -165,12 +165,8 @@ func _apply_core_vibe_styling() -> void:
 		_details_panel.add_theme_stylebox_override("panel", details_style)
 
 	# Style column header labels
-	if _category_label:
-		aCoreVibeTheme.style_label(_category_label, aCoreVibeTheme.COLOR_CITRUS_YELLOW, 18)
 	if _item_label:
 		aCoreVibeTheme.style_label(_item_label, aCoreVibeTheme.COLOR_SKY_CYAN, 18)
-	if _details_label:
-		aCoreVibeTheme.style_label(_details_label, aCoreVibeTheme.COLOR_GRAPE_VIOLET, 18)
 
 	# Style item name label
 	if _item_name:
