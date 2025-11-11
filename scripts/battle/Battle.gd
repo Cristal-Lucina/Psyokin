@@ -4781,14 +4781,20 @@ func _show_capture_menu(bind_items: Array) -> void:
 	capture_menu_panel = PanelContainer.new()
 	capture_menu_panel.custom_minimum_size = Vector2(800, 0)
 
-	# Style the panel
+	# Style the panel with Core vibe
 	var style = StyleBoxFlat.new()
-	style.bg_color = Color(0.1, 0.1, 0.15, 0.95)
-	style.border_width_left = 2
-	style.border_width_right = 2
-	style.border_width_top = 2
-	style.border_width_bottom = 2
-	style.border_color = Color(0.5, 0.5, 0.6, 1.0)
+	style.bg_color = COLOR_INK_CHARCOAL
+	style.border_width_left = 3
+	style.border_width_right = 3
+	style.border_width_top = 3
+	style.border_width_bottom = 3
+	style.border_color = COLOR_SKY_CYAN  # Cyan neon border
+	style.corner_radius_top_left = 12
+	style.corner_radius_top_right = 12
+	style.corner_radius_bottom_left = 12
+	style.corner_radius_bottom_right = 12
+	style.shadow_size = 6
+	style.shadow_color = Color(COLOR_SKY_CYAN.r, COLOR_SKY_CYAN.g, COLOR_SKY_CYAN.b, 0.4)  # Cyan glow
 	capture_menu_panel.add_theme_stylebox_override("panel", style)
 
 	# Create VBox for menu items
@@ -4799,6 +4805,7 @@ func _show_capture_menu(bind_items: Array) -> void:
 	var title = Label.new()
 	title.text = "Select a Bind Device"
 	title.add_theme_font_size_override("font_size", 18)
+	title.add_theme_color_override("font_color", COLOR_MILK_WHITE)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vbox.add_child(title)
 
