@@ -87,6 +87,8 @@ var victory_panel: PanelContainer = null  # Victory screen panel
 var victory_scroll: ScrollContainer = null  # Victory screen scroll container for controller scrolling
 var is_in_round_transition: bool = false  # True during round transition animations
 var combatant_panels: Dictionary = {}  # combatant_id -> PanelContainer for shake animations
+var instruction_popup: PanelContainer = null  # Instruction message popup
+var instruction_label: Label = null  # Label inside instruction popup
 
 # Input debouncing for joystick sensitivity
 var input_cooldown: float = 0.0  # Current cooldown timer
@@ -115,6 +117,9 @@ func _ready() -> void:
 
 	# Apply neon-kawaii style to panels
 	_style_panels()
+
+	# Create instruction popup
+	_create_instruction_popup()
 
 	# Load skill definitions
 	_load_skills()
@@ -1788,13 +1793,14 @@ func _on_attack_pressed() -> void:
 	if is_in_round_transition:
 		return
 
-	log_message("Select an enemy.")
+	_show_instruction("Select an enemy.")
 
 	# Get alive enemies
 	var enemies = battle_mgr.get_enemy_combatants()
 	target_candidates = enemies.filter(func(e): return not e.is_ko)
 
 	if target_candidates.is_empty():
+		_hide_instruction()
 		log_message("No valid targets!")
 		return
 
@@ -1809,6 +1815,7 @@ func _on_attack_pressed() -> void:
 
 func _execute_attack(target: Dictionary) -> void:
 	"""Execute attack on selected target"""
+	_hide_instruction()
 	awaiting_target_selection = false
 	_clear_target_highlights()
 
@@ -2010,7 +2017,7 @@ func _on_skill_pressed() -> void:
 		log_message("No skills available!")
 		return
 
-	log_message("Choose a skill.")
+	_show_instruction("Choose a skill.")
 
 	# Show skill selection menu
 	_show_skill_menu(skill_menu)
@@ -2131,7 +2138,7 @@ func _on_item_pressed() -> void:
 		log_message("No usable items!")
 		return
 
-	log_message("Choose an item.")
+	_show_instruction("Choose an item.")
 
 	# Show item selection menu
 	_show_item_menu(usable_items)
@@ -2188,7 +2195,7 @@ func _on_capture_pressed() -> void:
 		log_message("No bind items available!")
 		return
 
-	log_message("Choose a bind.")
+	_show_instruction("Choose a bind.")
 
 	# Show bind selection menu
 	_show_capture_menu(bind_items)
@@ -2803,10 +2810,10 @@ func _on_burst_pressed() -> void:
 	var available_bursts = burst_system.get_available_bursts(party_ids)
 
 	if available_bursts.is_empty():
-		log_message("No Bursts available.")
+		_show_instruction("No Bursts available.")
 		return
 
-	log_message("Choose Burst Ability")
+	_show_instruction("Choose Burst Ability")
 
 	# Show burst selection menu
 	_show_burst_menu(available_bursts)
@@ -2881,7 +2888,7 @@ func _on_status_pressed() -> void:
 	if is_in_round_transition:
 		return
 
-	log_message("Choose a character.")
+	_show_instruction("Choose a character.")
 
 	# Show character picker for status viewing
 	_show_status_character_picker()
@@ -3515,6 +3522,80 @@ func log_message(message: String) -> void:
 		battle_log.scroll_to_line(battle_log.get_line_count() - 1)
 	print("[Battle] " + message)
 
+func _create_instruction_popup() -> void:
+	"""Create the instruction message popup that appears above battle log"""
+	instruction_popup = PanelContainer.new()
+	instruction_popup.custom_minimum_size = Vector2(560, 50)  # Same width as BattleLogPanel
+
+	# Style with white border
+	var style = StyleBoxFlat.new()
+	style.bg_color = COLOR_INK_CHARCOAL
+	style.border_width_left = 2
+	style.border_width_right = 2
+	style.border_width_top = 2
+	style.border_width_bottom = 2
+	style.border_color = COLOR_MILK_WHITE  # White border
+	style.corner_radius_top_left = 12
+	style.corner_radius_top_right = 12
+	style.corner_radius_bottom_left = 12
+	style.corner_radius_bottom_right = 12
+	style.content_margin_left = 15
+	style.content_margin_right = 15
+	style.content_margin_top = 10
+	style.content_margin_bottom = 10
+	instruction_popup.add_theme_stylebox_override("panel", style)
+
+	# Create label
+	instruction_label = Label.new()
+	instruction_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	instruction_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	instruction_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
+	instruction_label.add_theme_font_size_override("font_size", 16)
+	instruction_popup.add_child(instruction_label)
+
+	# Position above BattleLogPanel (starts hidden below)
+	# BattleLogPanel: offset_left=360, offset_top=-200, offset_right=920, offset_bottom=-50
+	instruction_popup.position = Vector2(360, get_viewport().get_visible_rect().size.y - 200)  # Start at battle log top
+	instruction_popup.modulate.a = 0.0  # Start invisible
+
+	add_child(instruction_popup)
+
+func _show_instruction(message: String) -> void:
+	"""Show instruction popup with animation sliding up from battle log"""
+	if not instruction_popup or not instruction_label:
+		return
+
+	instruction_label.text = message
+
+	# Starting position (at battle log top)
+	var start_y = get_viewport().get_visible_rect().size.y - 200
+	# End position (60 pixels above battle log)
+	var end_y = start_y - 60
+
+	instruction_popup.position.y = start_y
+	instruction_popup.modulate.a = 0.0
+
+	# Animate up and fade in
+	var tween = create_tween()
+	tween.set_parallel(true)
+	tween.set_ease(Tween.EASE_OUT)
+	tween.set_trans(Tween.TRANS_BACK)
+	tween.tween_property(instruction_popup, "position:y", end_y, 0.3)
+	tween.tween_property(instruction_popup, "modulate:a", 1.0, 0.2)
+
+func _hide_instruction() -> void:
+	"""Hide instruction popup with animation sliding back down"""
+	if not instruction_popup:
+		return
+
+	# Animate down and fade out
+	var tween = create_tween()
+	tween.set_parallel(true)
+	tween.set_ease(Tween.EASE_IN)
+	tween.set_trans(Tween.TRANS_BACK)
+	tween.tween_property(instruction_popup, "position:y", get_viewport().get_visible_rect().size.y - 200, 0.2)
+	tween.tween_property(instruction_popup, "modulate:a", 0.0, 0.15)
+
 ## ═══════════════════════════════════════════════════════════════
 ## CONFIRMATION DIALOG (YES/NO)
 ## ═══════════════════════════════════════════════════════════════
@@ -3593,6 +3674,7 @@ func _show_confirmation_dialog(message: String, on_confirm: Callable) -> void:
 func _on_confirmation_yes() -> void:
 	"""Handle Yes button press"""
 	_close_confirmation_dialog()
+	_hide_instruction()
 
 	# Call the confirmation callback
 	if confirmation_callback.is_valid():
@@ -3601,6 +3683,7 @@ func _on_confirmation_yes() -> void:
 func _on_confirmation_no() -> void:
 	"""Handle No button press"""
 	_close_confirmation_dialog()
+	_hide_instruction()
 
 	# Re-enable action menu
 	_enable_action_menu()
@@ -3831,6 +3914,8 @@ func _on_type_menu_cancel(type_panel: PanelContainer) -> void:
 
 func _close_skill_menu() -> void:
 	"""Close the skill menu"""
+	_hide_instruction()
+
 	if skill_menu_panel:
 		skill_menu_panel.queue_free()
 		skill_menu_panel = null
@@ -4124,6 +4209,8 @@ func _add_category_tab(tab_container: TabContainer, category_name: String, categ
 
 func _close_item_menu() -> void:
 	"""Close the item menu"""
+	_hide_instruction()
+
 	if item_menu_panel:
 		item_menu_panel.queue_free()
 		item_menu_panel = null
@@ -4513,6 +4600,8 @@ func _show_capture_menu(bind_items: Array) -> void:
 
 func _close_capture_menu() -> void:
 	"""Close the capture menu"""
+	_hide_instruction()
+
 	if capture_menu_panel:
 		capture_menu_panel.queue_free()
 		capture_menu_panel = null
@@ -4764,6 +4853,8 @@ func _show_burst_menu(burst_abilities: Array) -> void:
 
 func _close_burst_menu() -> void:
 	"""Close the burst menu"""
+	_hide_instruction()
+
 	if burst_menu_panel:
 		burst_menu_panel.queue_free()
 		burst_menu_panel = null
