@@ -40,6 +40,7 @@ var particle_layer: Node2D = null
 
 ## Action menu panel state
 var is_panel_1_active: bool = true  # Panel 1: GUARD/SKILL/CAPTURE/FIGHT, Panel 2: RUN/BURST/ITEMS/STATUS
+var is_panel_switching: bool = false  # True during panel switch animation
 
 ## State
 var is_battle_ready: bool = false  # True when battle is fully initialized
@@ -437,9 +438,9 @@ func _style_panels() -> void:
 		if battle_log_text:
 			battle_log_text.add_theme_color_override("default_color", COLOR_MILK_WHITE)
 
-	# Style Top Panel (Burst Gauge area)
-	var top_panel = get_node_or_null("MainLayout/BattleCenter/TopPanel")
-	if top_panel and top_panel is PanelContainer:
+	# Style Burst Gauge Panel (Bottom of screen)
+	var burst_panel = get_node_or_null("BurstGaugePanel")
+	if burst_panel and burst_panel is PanelContainer:
 		var style = StyleBoxFlat.new()
 		style.bg_color = COLOR_INK_CHARCOAL
 		style.border_width_left = 2
@@ -453,10 +454,10 @@ func _style_panels() -> void:
 		style.corner_radius_bottom_right = 12
 		style.shadow_size = 4
 		style.shadow_color = Color(COLOR_CITRUS_YELLOW.r, COLOR_CITRUS_YELLOW.g, COLOR_CITRUS_YELLOW.b, 0.3)
-		top_panel.add_theme_stylebox_override("panel", style)
+		burst_panel.add_theme_stylebox_override("panel", style)
 
 		# Style burst label in Milk White all caps
-		var burst_label = top_panel.get_node_or_null("VBox/BurstLabel")
+		var burst_label = burst_panel.get_node_or_null("VBox/BurstLabel")
 		if burst_label and burst_label is Label:
 			burst_label.text = "BURST GAUGE"
 			burst_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
@@ -738,9 +739,11 @@ func _input(event: InputEvent) -> void:
 	if action_menu and action_menu.visible and not is_in_round_transition:
 		# Check for panel switching with L1/R1 shoulder buttons
 		# L1 = button index 9, R1 = button index 10
+		# Block input during panel switch animation
 		if event is InputEventJoypadButton:
 			if event.pressed and (event.button_index == 9 or event.button_index == 10):  # L1 or R1
-				_toggle_action_panel()
+				if not is_panel_switching:  # Only allow if not currently animating
+					_toggle_action_panel()
 				get_viewport().set_input_as_handled()
 				return
 
@@ -2834,6 +2837,9 @@ func _on_switch_panel_pressed() -> void:
 
 func _toggle_action_panel() -> void:
 	"""Toggle between the two action menu panels with spin animations"""
+	# Set animation flag to block further input
+	is_panel_switching = true
+
 	is_panel_1_active = not is_panel_1_active
 
 	# Get button references
@@ -2887,6 +2893,10 @@ func _toggle_action_panel() -> void:
 				btn.scale = Vector2(0.5, 0.5)
 				btn.rotation = -spin_rotation
 				_animate_button_show(btn, anim_duration, spin_rotation)
+
+	# Wait for all animations to complete, then clear animation flag
+	await get_tree().create_timer(anim_duration).timeout
+	is_panel_switching = false
 
 func _animate_button_hide(btn: Button, duration: float, rotation: float) -> void:
 	"""Animate button spinning inward and fading out"""

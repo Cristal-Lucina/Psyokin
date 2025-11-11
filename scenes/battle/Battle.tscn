@@ -52,23 +52,6 @@ layout_mode = 2
 size_flags_horizontal = 3
 size_flags_stretch_ratio = 2.0
 
-[node name="TopPanel" type="PanelContainer" parent="MainLayout/BattleCenter"]
-layout_mode = 2
-size_flags_vertical = 0
-
-[node name="VBox" type="VBoxContainer" parent="MainLayout/BattleCenter/TopPanel"]
-layout_mode = 2
-
-[node name="BurstLabel" type="Label" parent="MainLayout/BattleCenter/TopPanel/VBox"]
-layout_mode = 2
-text = "Burst Gauge"
-horizontal_alignment = 1
-
-[node name="BurstGauge" type="ProgressBar" parent="MainLayout/BattleCenter/TopPanel/VBox"]
-unique_name_in_owner = true
-layout_mode = 2
-show_percentage = false
-
 [node name="MiddleSpace" type="Control" parent="MainLayout/BattleCenter"]
 layout_mode = 2
 size_flags_vertical = 3
@@ -139,9 +122,9 @@ grow_vertical = 0
 [node name="DiamondBackground" type="ColorRect" parent="ActionMenu"]
 layout_mode = 0
 offset_left = 52.0
-offset_top = 42.0
+offset_top = 12.0
 offset_right = 198.0
-offset_bottom = 188.0
+offset_bottom = 158.0
 rotation = 0.785398
 pivot_offset = Vector2(73, 73)
 color = Color(0.96, 0.97, 0.98, 0.15)
@@ -265,6 +248,33 @@ size_flags_vertical = 3
 bbcode_enabled = true
 fit_content = true
 scroll_following = true
+
+[node name="BurstGaugePanel" type="PanelContainer" parent="."]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -150.0
+offset_top = -45.0
+offset_right = 150.0
+offset_bottom = -10.0
+grow_horizontal = 2
+grow_vertical = 0
+
+[node name="VBox" type="VBoxContainer" parent="BurstGaugePanel"]
+layout_mode = 2
+
+[node name="BurstLabel" type="Label" parent="BurstGaugePanel/VBox"]
+layout_mode = 2
+text = "BURST GAUGE"
+horizontal_alignment = 1
+
+[node name="BurstGauge" type="ProgressBar" parent="BurstGaugePanel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+show_percentage = false
 
 [connection signal="pressed" from="ActionMenu/SkillButton" to="." method="_on_skill_pressed"]
 [connection signal="pressed" from="ActionMenu/DefendButton" to="." method="_on_defend_pressed"]
