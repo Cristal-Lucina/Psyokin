@@ -132,6 +132,7 @@ func _ready() -> void:
 
 	_hide_level_cbxp_labels()
 	_wire_system_signals()
+	_apply_core_vibe_styling()
 
 	# Filter and refresh button removed - always show all bonds
 	# if _filter != null and _filter.item_count == 0:
@@ -163,6 +164,57 @@ func _ready() -> void:
 		_unlock_inner.pressed.connect(_on_unlock_button_pressed.bind("inner_to_core"))
 
 	_rebuild()
+
+func _apply_core_vibe_styling() -> void:
+	"""Apply Core Vibe neon-kawaii styling to BondsPanel elements"""
+	# Style detail labels
+	if _name_tv:
+		aCoreVibeTheme.style_label(_name_tv, aCoreVibeTheme.COLOR_SKY_CYAN, 20)
+
+	if _event_tv:
+		_event_tv.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_ELECTRIC_LIME)
+		_event_tv.add_theme_font_size_override("font_size", 14)
+
+	if _layer_tv:
+		_layer_tv.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_ELECTRIC_LIME)
+		_layer_tv.add_theme_font_size_override("font_size", 14)
+
+	if _points_tv:
+		_points_tv.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_ELECTRIC_LIME)
+		_points_tv.add_theme_font_size_override("font_size", 14)
+
+	if _gift_tv:
+		_gift_tv.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_CITRUS_YELLOW)
+		_gift_tv.add_theme_font_size_override("font_size", 14)
+
+	# Style likes/dislikes values
+	if _likes_tv:
+		_likes_tv.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_PLASMA_TEAL)
+		_likes_tv.add_theme_font_size_override("font_size", 14)
+
+	if _dislikes_tv:
+		_dislikes_tv.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_BUBBLE_MAGENTA)
+		_dislikes_tv.add_theme_font_size_override("font_size", 14)
+
+	# Style unlock header
+	if _unlock_hdr:
+		aCoreVibeTheme.style_label(_unlock_hdr, aCoreVibeTheme.COLOR_SKY_CYAN, 16)
+
+	# Style description
+	if _desc:
+		_desc.add_theme_color_override("default_color", aCoreVibeTheme.COLOR_MILK_WHITE)
+		_desc.add_theme_font_size_override("normal_font_size", 14)
+
+	if _profile_desc:
+		_profile_desc.add_theme_color_override("default_color", aCoreVibeTheme.COLOR_MILK_WHITE)
+		_profile_desc.add_theme_font_size_override("normal_font_size", 14)
+
+	# Style buttons
+	if _story_btn:
+		aCoreVibeTheme.style_button(_story_btn, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
+		_story_btn.custom_minimum_size = Vector2(120, 40)
+
+	# Note: Unlock buttons styling is dynamic based on unlock status, handled in _update_detail()
 
 ## PanelBase callback - Called when BondsPanel gains focus
 func _on_panel_gained_focus() -> void:
@@ -556,12 +608,16 @@ func _build_list() -> void:
 		_list.set_item_metadata(i, id)
 
 		if not known:
-			_list.set_item_custom_fg_color(i, Color(0.7, 0.7, 0.7))
+			# Core Vibe: Dimmed Milk White for unknown bonds
+			_list.set_item_custom_fg_color(i, Color(aCoreVibeTheme.COLOR_MILK_WHITE.r, aCoreVibeTheme.COLOR_MILK_WHITE.g, aCoreVibeTheme.COLOR_MILK_WHITE.b, 0.4))
 			_list.set_item_tooltip(i, "Unknown")
 		elif maxed:
-			_list.set_item_custom_fg_color(i, Color(0.6, 1.0, 0.6))
+			# Core Vibe: Electric Lime for maxed bonds
+			_list.set_item_custom_fg_color(i, aCoreVibeTheme.COLOR_ELECTRIC_LIME)
 			_list.set_item_tooltip(i, "Maxed")
 		else:
+			# Core Vibe: Sky Cyan for known, non-maxed bonds
+			_list.set_item_custom_fg_color(i, aCoreVibeTheme.COLOR_SKY_CYAN)
 			_list.set_item_tooltip(i, disp_name)
 
 		# Track selected index
@@ -858,21 +914,34 @@ func _update_detail(id: String) -> void:
 	var inner_unlocked: bool = event_idx >= 7   # E7 complete → transitioned to Inner
 	var core_unlocked: bool = event_idx >= 9    # E9 complete → transitioned to Core
 
+	# Core Vibe: Style unlock buttons based on status
 	if _unlock_acq:
 		_unlock_acq.disabled = not outer_unlocked
 		_unlock_acq.text = "Acquaintance → Outer" + (" [UNLOCKED]" if outer_unlocked else " [LOCKED]")
+		var color = aCoreVibeTheme.COLOR_ELECTRIC_LIME if outer_unlocked else aCoreVibeTheme.COLOR_CITRUS_YELLOW
+		aCoreVibeTheme.style_button(_unlock_acq, color, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
+		_unlock_acq.custom_minimum_size = Vector2(180, 36)
 
 	if _unlock_outer:
 		_unlock_outer.disabled = not middle_unlocked
 		_unlock_outer.text = "Outer → Middle" + (" [UNLOCKED]" if middle_unlocked else " [LOCKED]")
+		var color = aCoreVibeTheme.COLOR_ELECTRIC_LIME if middle_unlocked else aCoreVibeTheme.COLOR_CITRUS_YELLOW
+		aCoreVibeTheme.style_button(_unlock_outer, color, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
+		_unlock_outer.custom_minimum_size = Vector2(180, 36)
 
 	if _unlock_middle:
 		_unlock_middle.disabled = not inner_unlocked
 		_unlock_middle.text = "Middle → Inner" + (" [UNLOCKED]" if inner_unlocked else " [LOCKED]")
+		var color = aCoreVibeTheme.COLOR_ELECTRIC_LIME if inner_unlocked else aCoreVibeTheme.COLOR_CITRUS_YELLOW
+		aCoreVibeTheme.style_button(_unlock_middle, color, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
+		_unlock_middle.custom_minimum_size = Vector2(180, 36)
 
 	if _unlock_inner:
 		_unlock_inner.disabled = not core_unlocked
 		_unlock_inner.text = "Inner → Core" + (" [UNLOCKED]" if core_unlocked else " [LOCKED]")
+		var color = aCoreVibeTheme.COLOR_ELECTRIC_LIME if core_unlocked else aCoreVibeTheme.COLOR_CITRUS_YELLOW
+		aCoreVibeTheme.style_button(_unlock_inner, color, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
+		_unlock_inner.custom_minimum_size = Vector2(180, 36)
 
 	# Story points
 	if _story_btn:
@@ -1124,15 +1193,15 @@ func _on_story_points_pressed() -> void:
 	panel.mouse_filter = Control.MOUSE_FILTER_STOP
 	panel.process_mode = Node.PROCESS_MODE_ALWAYS
 
-	# Toast-style background
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.15, 0.15, 0.15, 1.0)  # Dark gray, fully opaque
-	style.border_color = Color(1.0, 0.7, 0.75, 1.0)  # Pink border
-	style.set_border_width_all(2)
-	style.corner_radius_top_left = 8
-	style.corner_radius_top_right = 8
-	style.corner_radius_bottom_left = 8
-	style.corner_radius_bottom_right = 8
+	# Core Vibe: Story overlay panel styling
+	var style = aCoreVibeTheme.create_panel_style(
+		aCoreVibeTheme.COLOR_SKY_CYAN,            # Sky Cyan border (story content)
+		aCoreVibeTheme.COLOR_INK_CHARCOAL,        # Ink charcoal background
+		aCoreVibeTheme.PANEL_OPACITY_FULL,        # Fully opaque
+		aCoreVibeTheme.CORNER_RADIUS_MEDIUM,      # 16px corners
+		aCoreVibeTheme.BORDER_WIDTH_THIN,         # 2px border
+		aCoreVibeTheme.SHADOW_SIZE_LARGE          # 12px glow
+	)
 	panel.add_theme_stylebox_override("panel", style)
 
 	overlay.add_child(panel)
@@ -1150,11 +1219,11 @@ func _on_story_points_pressed() -> void:
 	vbox.add_theme_constant_override("separation", 12)
 	margin.add_child(vbox)
 
-	# Title
+	# Core Vibe: Story overlay title
 	var title := Label.new()
 	title.text = "%s — Story Points" % disp
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 18)
+	aCoreVibeTheme.style_label(title, aCoreVibeTheme.COLOR_SKY_CYAN, 20)
 	vbox.add_child(title)
 
 	# Scrollable body
@@ -1169,17 +1238,21 @@ func _on_story_points_pressed() -> void:
 	body.custom_minimum_size = Vector2(560, 0)
 	scroll.add_child(body)
 
-	# Fill with bullets (or placeholder)
+	# Core Vibe: Fill with bullets (or placeholder)
 	if points.is_empty():
 		var none := Label.new()
 		none.text = "No story points logged yet."
 		none.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		none.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE)
+		none.add_theme_font_size_override("font_size", 14)
 		body.add_child(none)
 	else:
 		for p_str in points:
 			var row := Label.new()
 			row.text = "• " + p_str
 			row.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			row.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE)
+			row.add_theme_font_size_override("font_size", 14)
 			body.add_child(row)
 
 	# Buttons
@@ -1188,11 +1261,13 @@ func _on_story_points_pressed() -> void:
 	hbox.add_theme_constant_override("separation", 12)
 	vbox.add_child(hbox)
 
+	# Core Vibe: Close button with Bubble Magenta styling
 	var back_btn := Button.new()
 	back_btn.text = "Close"
 	back_btn.focus_mode = Control.FOCUS_ALL
-	back_btn.custom_minimum_size = Vector2(100, 40)
+	back_btn.custom_minimum_size = Vector2(120, 44)
 	back_btn.process_mode = Node.PROCESS_MODE_ALWAYS
+	aCoreVibeTheme.style_button(back_btn, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA, aCoreVibeTheme.CORNER_RADIUS_LARGE)
 	back_btn.pressed.connect(func() -> void:
 		_close_story_overlay()
 		# Restore focus to detail view after closing overlay
