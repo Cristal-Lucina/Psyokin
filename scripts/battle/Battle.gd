@@ -489,7 +489,7 @@ func _style_panels() -> void:
 			burst_gauge.add_theme_stylebox_override("background", gauge_bg)
 
 			var gauge_fill = StyleBoxFlat.new()
-			gauge_fill.bg_color = COLOR_BUBBLE_MAGENTA  # Pink fill
+			gauge_fill.bg_color = COLOR_SKY_CYAN  # Cyan fill to match FIGHT outline
 			gauge_fill.corner_radius_top_left = 8
 			gauge_fill.corner_radius_top_right = 8
 			gauge_fill.corner_radius_bottom_left = 8
