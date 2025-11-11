@@ -32,45 +32,58 @@ offset_right = -20.0
 offset_bottom = -220.0
 grow_horizontal = 2
 grow_vertical = 2
+theme_override_constants/separation = 15
 
-[node name="BattleArena" type="VBoxContainer" parent="MainLayout"]
+[node name="AllyColumn" type="VBoxContainer" parent="MainLayout"]
 layout_mode = 2
 size_flags_horizontal = 3
-size_flags_stretch_ratio = 3.0
+size_flags_stretch_ratio = 1.5
+theme_override_constants/separation = 10
 
-[node name="TopPanel" type="PanelContainer" parent="MainLayout/BattleArena"]
+[node name="AllySlots" type="VBoxContainer" parent="MainLayout/AllyColumn"]
+unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 3
+theme_override_constants/separation = 10
+alignment = 1
 
-[node name="VBox" type="VBoxContainer" parent="MainLayout/BattleArena/TopPanel"]
+[node name="BattleCenter" type="VBoxContainer" parent="MainLayout"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 2.0
+
+[node name="TopPanel" type="PanelContainer" parent="MainLayout/BattleCenter"]
+layout_mode = 2
+size_flags_vertical = 0
+
+[node name="VBox" type="VBoxContainer" parent="MainLayout/BattleCenter/TopPanel"]
 layout_mode = 2
 
-[node name="BurstLabel" type="Label" parent="MainLayout/BattleArena/TopPanel/VBox"]
+[node name="BurstLabel" type="Label" parent="MainLayout/BattleCenter/TopPanel/VBox"]
 layout_mode = 2
 text = "Burst Gauge"
 horizontal_alignment = 1
 
-[node name="BurstGauge" type="ProgressBar" parent="MainLayout/BattleArena/TopPanel/VBox"]
+[node name="BurstGauge" type="ProgressBar" parent="MainLayout/BattleCenter/TopPanel/VBox"]
 unique_name_in_owner = true
 layout_mode = 2
 show_percentage = false
 
-[node name="EnemySlots" type="HBoxContainer" parent="MainLayout/BattleArena"]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_vertical = 3
-size_flags_stretch_ratio = 3.0
-alignment = 1
-
-[node name="MiddleSpace" type="Control" parent="MainLayout/BattleArena"]
+[node name="MiddleSpace" type="Control" parent="MainLayout/BattleCenter"]
 layout_mode = 2
 size_flags_vertical = 3
 
-[node name="AllySlots" type="HBoxContainer" parent="MainLayout/BattleArena"]
+[node name="EnemyColumn" type="VBoxContainer" parent="MainLayout"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 1.5
+theme_override_constants/separation = 10
+
+[node name="EnemySlots" type="VBoxContainer" parent="MainLayout/EnemyColumn"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 3
-size_flags_stretch_ratio = 3.0
+theme_override_constants/separation = 10
 alignment = 1
 
 [node name="TurnOrderPanel" type="PanelContainer" parent="MainLayout"]

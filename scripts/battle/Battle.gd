@@ -434,7 +434,7 @@ func _style_panels() -> void:
 			battle_log_text.add_theme_color_override("default_color", COLOR_MILK_WHITE)
 
 	# Style Top Panel (Burst Gauge area)
-	var top_panel = get_node_or_null("MainLayout/BattleArena/TopPanel")
+	var top_panel = get_node_or_null("MainLayout/BattleCenter/TopPanel")
 	if top_panel and top_panel is PanelContainer:
 		var style = StyleBoxFlat.new()
 		style.bg_color = COLOR_INK_CHARCOAL
@@ -1246,7 +1246,7 @@ func _create_combatant_slot(combatant: Dictionary, is_ally: bool) -> PanelContai
 
 	# Apply neon-kawaii sticker style for allies
 	if is_ally:
-		panel.custom_minimum_size = Vector2(200, 70)
+		panel.custom_minimum_size = Vector2(220, 110)
 
 		# Sticker style: Dark fill with thick white keyline (2px per design spec)
 		var style = StyleBoxFlat.new()
@@ -1341,10 +1341,45 @@ func _create_combatant_slot(combatant: Dictionary, is_ally: bool) -> PanelContai
 
 		# HP text (current/max in small monospace)
 		var hp_label = Label.new()
-		hp_label.text = "%d/%d" % [combatant.hp, combatant.hp_max]
+		hp_label.text = "%d/%d HP" % [combatant.hp, combatant.hp_max]
 		hp_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
 		hp_label.add_theme_font_size_override("font_size", 8)
 		vbox.add_child(hp_label)
+
+		# MP bar (if character has MP)
+		if combatant.mp_max > 0:
+			var mp_bar = ProgressBar.new()
+			mp_bar.max_value = combatant.mp_max
+			mp_bar.value = combatant.mp
+			mp_bar.show_percentage = false
+			mp_bar.custom_minimum_size = Vector2(0, 8)
+
+			# Pill background
+			var mp_bar_bg = StyleBoxFlat.new()
+			mp_bar_bg.bg_color = COLOR_NIGHT_NAVY
+			mp_bar_bg.corner_radius_top_left = 8
+			mp_bar_bg.corner_radius_top_right = 8
+			mp_bar_bg.corner_radius_bottom_left = 8
+			mp_bar_bg.corner_radius_bottom_right = 8
+			mp_bar.add_theme_stylebox_override("background", mp_bar_bg)
+
+			# Pill fill - use Grape Violet for MP
+			var mp_bar_fill = StyleBoxFlat.new()
+			mp_bar_fill.bg_color = COLOR_GRAPE_VIOLET
+			mp_bar_fill.corner_radius_top_left = 8
+			mp_bar_fill.corner_radius_top_right = 8
+			mp_bar_fill.corner_radius_bottom_left = 8
+			mp_bar_fill.corner_radius_bottom_right = 8
+			mp_bar.add_theme_stylebox_override("fill", mp_bar_fill)
+
+			vbox.add_child(mp_bar)
+
+			# MP text
+			var mp_label = Label.new()
+			mp_label.text = "%d/%d MP" % [combatant.mp, combatant.mp_max]
+			mp_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
+			mp_label.add_theme_font_size_override("font_size", 8)
+			vbox.add_child(mp_label)
 
 	else:
 		# Enemies: Simpler sticker style
