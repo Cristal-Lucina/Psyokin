@@ -893,6 +893,8 @@ func _confirm_target_selection() -> void:
 
 	# Determine what action to execute based on state
 	if awaiting_capture_target:
+		# Show CAPTURE! instruction
+		_show_instruction("CAPTURE!")
 		# Attempting capture
 		await _execute_capture(target)
 	elif awaiting_item_target:
@@ -5011,6 +5013,9 @@ func _on_bind_selected(bind_data: Dictionary) -> void:
 
 	# Store selected bind for use after target selection
 	set_meta("pending_capture_bind", bind_data)
+
+	# Show instruction to select enemy
+	_show_instruction("Select an enemy.")
 
 	# Enable capture target selection mode
 	awaiting_target_selection = true
