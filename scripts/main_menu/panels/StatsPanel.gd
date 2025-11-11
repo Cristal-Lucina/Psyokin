@@ -80,11 +80,19 @@ func _ready() -> void:
 	call_deferred("_first_fill")
 
 func _first_fill() -> void:
+	_apply_core_vibe_styling()
 	_refresh_party()
 	if _party_list.item_count > 0:
 		_party_list.select(0)
 		_party_list.grab_focus()
 		_on_party_member_selected(0)
+
+func _apply_core_vibe_styling() -> void:
+	"""Apply Core Vibe neon-kawaii styling to StatsPanel elements"""
+	# Note: Battle stat cells and affinity cells are dynamically created,
+	# so their styling is applied in their creation functions.
+	# RadarChart colors are updated in the RadarChart class itself.
+	pass
 
 func _on_visibility_changed() -> void:
 	"""Grab focus when panel becomes visible"""
@@ -355,17 +363,19 @@ func _get_affinity_tier_text(affinity: int) -> String:
 		return "AT0"
 
 func _create_affinity_cell(member_name: String, tier: String) -> PanelContainer:
-	"""Create a rounded grey cell for affinity display (same style as battle stats)"""
+	"""Create a rounded Core Vibe cell for affinity display"""
 	var panel := PanelContainer.new()
 	panel.custom_minimum_size = Vector2(0, 30)
 
-	# Create darker grey rounded background
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.15, 0.15, 0.15, 1.0)  # Darker grey
-	style.corner_radius_top_left = 4
-	style.corner_radius_top_right = 4
-	style.corner_radius_bottom_left = 4
-	style.corner_radius_bottom_right = 4
+	# Core Vibe: Sky Cyan border with Ink Charcoal background (relationships)
+	var style = aCoreVibeTheme.create_panel_style(
+		aCoreVibeTheme.COLOR_SKY_CYAN,            # Sky Cyan border (relationship)
+		aCoreVibeTheme.COLOR_INK_CHARCOAL,        # Ink charcoal background
+		aCoreVibeTheme.PANEL_OPACITY_FULL,        # Fully opaque
+		aCoreVibeTheme.CORNER_RADIUS_SMALL,       # 12px corners
+		aCoreVibeTheme.BORDER_WIDTH_THIN,         # 2px border
+		aCoreVibeTheme.SHADOW_SIZE_SMALL          # 4px glow
+	)
 	panel.add_theme_stylebox_override("panel", style)
 
 	# Add margin for padding inside cell
@@ -387,16 +397,19 @@ func _create_affinity_cell(member_name: String, tier: String) -> PanelContainer:
 	label.custom_minimum_size = Vector2(150, 0)  # ~25 characters at 12pt
 	label.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	label.add_theme_font_size_override("font_size", 12)
+	# Core Vibe: Milk White label color
+	label.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	hbox.add_child(label)
 
-	# Tier value - 5 characters wide, blue color (matches attributes)
+	# Tier value - 5 characters wide
 	var value_label := Label.new()
 	value_label.text = tier
 	value_label.custom_minimum_size = Vector2(30, 0)  # ~5 characters at 12pt
 	value_label.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	value_label.add_theme_font_size_override("font_size", 12)
-	value_label.add_theme_color_override("font_color", Color(0.5, 0.7, 1.0))  # Blue
+	# Core Vibe: Bubble Magenta for affinity tier (relationship strength)
+	value_label.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_BUBBLE_MAGENTA)
 	value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	hbox.add_child(value_label)
 
@@ -447,15 +460,21 @@ func _get_member_mind_type(member_token: String) -> String:
 	return "Omega"
 
 func _add_stat_pair(grid: GridContainer, label: String, value: String) -> void:
-	"""Add a label/value pair to a grid"""
+	"""Add a label/value pair to a grid with Core Vibe styling"""
 	var lbl = Label.new()
 	lbl.text = label + ":"
 	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	# Core Vibe: Sky Cyan label color
+	lbl.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_SKY_CYAN)
+	lbl.add_theme_font_size_override("font_size", 14)
 	grid.add_child(lbl)
 
 	var val = Label.new()
 	val.text = value
 	val.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	# Core Vibe: Electric Lime value color
+	val.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_ELECTRIC_LIME)
+	val.add_theme_font_size_override("font_size", 14)
 	grid.add_child(val)
 
 func _add_battle_stat(grid: GridContainer, label: String, value: int) -> void:
@@ -495,17 +514,19 @@ func _get_dice_notation(tier: int) -> String:
 		_: return "1D20"
 
 func _create_stat_cell(stat_label: String, value: String) -> PanelContainer:
-	"""Create a rounded grey cell containing a stat label and value"""
+	"""Create a rounded Core Vibe cell containing a stat label and value"""
 	var panel := PanelContainer.new()
 	panel.custom_minimum_size = Vector2(0, 30)
 
-	# Create darker grey rounded background
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.15, 0.15, 0.15, 1.0)  # Darker grey
-	style.corner_radius_top_left = 4
-	style.corner_radius_top_right = 4
-	style.corner_radius_bottom_left = 4
-	style.corner_radius_bottom_right = 4
+	# Core Vibe: Plasma Teal border with Ink Charcoal background
+	var style = aCoreVibeTheme.create_panel_style(
+		aCoreVibeTheme.COLOR_PLASMA_TEAL,         # Plasma Teal border (stat display)
+		aCoreVibeTheme.COLOR_INK_CHARCOAL,        # Ink charcoal background
+		aCoreVibeTheme.PANEL_OPACITY_FULL,        # Fully opaque
+		aCoreVibeTheme.CORNER_RADIUS_SMALL,       # 12px corners
+		aCoreVibeTheme.BORDER_WIDTH_THIN,         # 2px border
+		aCoreVibeTheme.SHADOW_SIZE_SMALL          # 4px glow
+	)
 	panel.add_theme_stylebox_override("panel", style)
 
 	# Add margin for padding inside cell
@@ -527,16 +548,19 @@ func _create_stat_cell(stat_label: String, value: String) -> PanelContainer:
 	label.custom_minimum_size = Vector2(150, 0)  # ~25 characters at 12pt
 	label.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	label.add_theme_font_size_override("font_size", 12)
+	# Core Vibe: Milk White label color
+	label.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	hbox.add_child(label)
 
-	# Value - 5 characters wide, blue color
+	# Value - 5 characters wide
 	var value_label := Label.new()
 	value_label.text = value
 	value_label.custom_minimum_size = Vector2(30, 0)  # ~5 characters at 12pt
 	value_label.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	value_label.add_theme_font_size_override("font_size", 12)
-	value_label.add_theme_color_override("font_color", Color(0.5, 0.7, 1.0))  # Blue
+	# Core Vibe: Electric Lime value color
+	value_label.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_ELECTRIC_LIME)
 	value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	hbox.add_child(value_label)
 
@@ -591,11 +615,11 @@ class RadarChart extends Control:
 	var _stat_values_capped: Array[float] = []  # Capped values for visual display
 	var _max_value: float = 100.0
 
-	# Colors
-	var grid_color: Color = Color(0.3, 0.3, 0.3, 0.6)
-	var stat_color: Color = Color(0.2, 0.6, 1.0, 0.4)
-	var stat_border_color: Color = Color(0.2, 0.6, 1.0, 1.0)
-	var label_color: Color = Color(1.0, 1.0, 1.0, 1.0)
+	# Core Vibe: Neon-kawaii radar chart colors
+	var grid_color: Color = Color(aCoreVibeTheme.COLOR_NIGHT_NAVY.r, aCoreVibeTheme.COLOR_NIGHT_NAVY.g, aCoreVibeTheme.COLOR_NIGHT_NAVY.b, 0.6)  # Night Navy grid
+	var stat_color: Color = Color(aCoreVibeTheme.COLOR_ELECTRIC_LIME.r, aCoreVibeTheme.COLOR_ELECTRIC_LIME.g, aCoreVibeTheme.COLOR_ELECTRIC_LIME.b, 0.3)  # Electric Lime fill
+	var stat_border_color: Color = aCoreVibeTheme.COLOR_ELECTRIC_LIME  # Electric Lime border
+	var label_color: Color = aCoreVibeTheme.COLOR_MILK_WHITE  # Milk White labels
 
 	func set_stats(labels: Array[String], values: Array[float]) -> void:
 		"""Set the stat labels and values to display"""
