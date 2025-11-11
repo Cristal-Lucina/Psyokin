@@ -485,6 +485,12 @@ func _create_turn_slot(combatant: Dictionary, index: int) -> PanelContainer:
 	panel.set_meta("combatant_id", combatant.id)
 	panel.set_meta("turn_index", index)
 
+	# Neon Orchard Color Palette
+	const COLOR_SKY_CYAN = Color(0.30, 0.91, 1.0, 0.8)           # #4DE9FF with transparency
+	const COLOR_BUBBLE_MAGENTA = Color(1.0, 0.29, 0.85, 0.8)     # #FF4AD9 with transparency
+	const COLOR_INK_CHARCOAL = Color(0.07, 0.09, 0.15, 0.9)      # #111827
+	const COLOR_MILK_WHITE = Color(0.96, 0.97, 0.98, 1.0)        # #F4F7FB
+
 	# Style the panel
 	var style = StyleBoxFlat.new()
 	var is_ko = combatant.get("is_ko", false)
@@ -492,15 +498,22 @@ func _create_turn_slot(combatant: Dictionary, index: int) -> PanelContainer:
 	if is_ko:
 		# Grey out KO'd combatants
 		style.bg_color = Color(0.3, 0.3, 0.3, 0.5)  # Grey for KO'd
+		style.border_color = Color(0.5, 0.5, 0.5, 1.0)
 	elif combatant.is_ally:
-		style.bg_color = Color(0.2, 0.3, 0.5, 0.8)  # Blue-ish for allies
+		style.bg_color = COLOR_SKY_CYAN  # Cyan for allies
+		style.border_color = COLOR_MILK_WHITE  # White keyline
 	else:
-		style.bg_color = Color(0.5, 0.2, 0.2, 0.8)  # Red-ish for enemies
+		style.bg_color = COLOR_BUBBLE_MAGENTA  # Magenta for enemies
+		style.border_color = COLOR_MILK_WHITE  # White keyline
+
 	style.border_width_left = 2
 	style.border_width_right = 2
 	style.border_width_top = 2
 	style.border_width_bottom = 2
-	style.border_color = Color(0.4, 0.4, 0.4, 1.0)
+	style.corner_radius_top_left = 8
+	style.corner_radius_top_right = 8
+	style.corner_radius_bottom_left = 8
+	style.corner_radius_bottom_right = 8
 	panel.add_theme_stylebox_override("panel", style)
 
 	# HBox for layout
@@ -642,6 +655,8 @@ func _update_highlight() -> void:
 		return
 
 	var current_turn_index = battle_mgr.current_turn_index
+	const COLOR_CITRUS_YELLOW = Color(1.0, 0.91, 0.30, 1.0)  # #FFE84D - highlight color
+	const COLOR_MILK_WHITE = Color(0.96, 0.97, 0.98, 1.0)    # #F4F7FB - default border
 
 	# Update all slots
 	for i in range(turn_slots.size()):
@@ -655,13 +670,13 @@ func _update_highlight() -> void:
 				style.border_width_right = 4
 				style.border_width_top = 4
 				style.border_width_bottom = 4
-				style.border_color = Color(1.0, 1.0, 0.0, 1.0)  # Yellow highlight
+				style.border_color = COLOR_CITRUS_YELLOW  # Citrus Yellow highlight
 			else:
 				style.border_width_left = 2
 				style.border_width_right = 2
 				style.border_width_top = 2
 				style.border_width_bottom = 2
-				style.border_color = Color(0.4, 0.4, 0.4, 1.0)
+				style.border_color = COLOR_MILK_WHITE  # Milk White default
 
 func update_combatant_hp(_combatant_id: String) -> void:
 	"""Update HP display for a specific combatant (simplified - no HP bars in turn order)"""
