@@ -386,7 +386,7 @@ func _spawn_ambient_particles() -> void:
 func _style_panels() -> void:
 	"""Apply neon-kawaii style to UI panels"""
 	# Style Turn Order Panel with soft rectangle and neon border
-	var turn_order_panel = get_node_or_null("MainLayout/TurnOrderPanel")
+	var turn_order_panel = get_node_or_null("TurnOrderPanel")
 	if turn_order_panel and turn_order_panel is PanelContainer:
 		var style = StyleBoxFlat.new()
 		style.bg_color = COLOR_INK_CHARCOAL  # Dark glass fill
