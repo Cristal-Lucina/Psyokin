@@ -126,8 +126,8 @@ func _ready() -> void:
 	if turn_order_display and turn_order_display.has_signal("animation_completed"):
 		turn_order_display.animation_completed.connect(_on_turn_order_animation_completed)
 
-	# Hide action menu initially
-	action_menu.visible = false
+	# Disable and dim action menu initially (but keep it visible)
+	_disable_action_menu()
 
 	# Initialize battle with party and enemies
 	_initialize_battle()
@@ -940,8 +940,8 @@ func _on_turn_started(combatant_id: String) -> void:
 
 func _on_turn_ended(_combatant_id: String) -> void:
 	"""Called when a combatant's turn ends"""
-	# Hide action menu
-	action_menu.visible = false
+	# Disable and dim action menu
+	_disable_action_menu()
 
 func _on_turn_order_animation_completed() -> void:
 	"""Called when turn order display animation completes (e.g., round transitions)"""
@@ -1702,7 +1702,7 @@ func _show_action_menu() -> void:
 	if is_in_round_transition:
 		_enable_all_input()
 
-	action_menu.visible = true
+	_enable_action_menu()
 
 	# Disable Run button if already attempted this round
 	var run_button = action_menu.get_node_or_null("RunButton")
@@ -1716,13 +1716,38 @@ func _show_action_menu() -> void:
 	# TODO: Enable/disable actions based on state
 	# e.g., disable skills if no MP, disable burst if gauge too low
 
+func _disable_action_menu() -> void:
+	"""Disable and dim action menu buttons (but keep visible)"""
+	if not action_menu:
+		return
+
+	# Dim the entire action menu
+	action_menu.modulate.a = 0.3
+
+	# Disable all buttons
+	for child in action_menu.get_children():
+		if child is Button:
+			child.disabled = true
+
+func _enable_action_menu() -> void:
+	"""Enable and restore action menu buttons"""
+	if not action_menu:
+		return
+
+	# Restore full opacity
+	action_menu.modulate.a = 1.0
+
+	# Enable all buttons
+	for child in action_menu.get_children():
+		if child is Button:
+			child.disabled = false
+
 func _disable_all_input() -> void:
 	"""Disable all input during round transitions to prevent glitches"""
 	is_in_round_transition = true
 
-	# Disable action menu (blocks all button clicks)
-	if action_menu:
-		action_menu.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# Disable and dim action menu
+	_disable_action_menu()
 
 	# Disable ally slots (prevent clicking on characters)
 	if ally_slots:
@@ -3471,8 +3496,8 @@ func log_message(message: String) -> void:
 
 func _show_skill_menu(skill_menu: Array) -> void:
 	"""Show skill selection menu with sigils"""
-	# Hide action menu
-	action_menu.visible = false
+	# Disable and dim action menu
+	_disable_action_menu()
 
 	# Store current menu
 	current_skill_menu = skill_menu
@@ -3686,8 +3711,8 @@ func _close_skill_menu() -> void:
 	skill_menu_buttons = []
 	selected_skill_index = 0
 
-	# Show action menu again
-	action_menu.visible = true
+	# Enable action menu again
+	_enable_action_menu()
 
 func _navigate_skill_menu(direction: int) -> void:
 	"""Navigate skill menu with controller (direction: -1 for up, 1 for down)"""
@@ -3816,8 +3841,8 @@ func _close_status_details() -> void:
 
 func _show_item_menu(items: Array) -> void:
 	"""Show item selection menu with categorized tabs"""
-	# Hide action menu
-	action_menu.visible = false
+	# Disable and dim action menu
+	_disable_action_menu()
 
 	# Reset navigation
 	item_menu_buttons = []
@@ -3982,8 +4007,8 @@ func _close_item_menu() -> void:
 	item_menu_buttons = []
 	selected_item_index = 0
 
-	# Show action menu again
-	action_menu.visible = true
+	# Enable action menu again
+	_enable_action_menu()
 
 func _rebuild_item_button_list() -> void:
 	"""Rebuild the button list for the current tab"""
@@ -4267,8 +4292,8 @@ func _on_item_selected(item_data: Dictionary) -> void:
 
 func _show_capture_menu(bind_items: Array) -> void:
 	"""Show bind item selection menu for capture"""
-	# Hide action menu
-	action_menu.visible = false
+	# Disable and dim action menu
+	_disable_action_menu()
 
 	# Reset navigation
 	capture_menu_buttons = []
@@ -4367,8 +4392,8 @@ func _close_capture_menu() -> void:
 	capture_menu_buttons = []
 	selected_capture_index = 0
 
-	# Show action menu again
-	action_menu.visible = true
+	# Enable action menu again
+	_enable_action_menu()
 
 func _navigate_capture_menu_vertical(direction: int) -> void:
 	"""Navigate capture menu vertically (direction: -2 for up, 2 for down in 2-column grid)"""
@@ -4475,8 +4500,8 @@ func _on_bind_selected(bind_data: Dictionary) -> void:
 
 func _show_burst_menu(burst_abilities: Array) -> void:
 	"""Show burst ability selection menu"""
-	# Hide action menu
-	action_menu.visible = false
+	# Disable and dim action menu
+	_disable_action_menu()
 
 	# Reset navigation
 	burst_menu_buttons = []
@@ -4618,8 +4643,8 @@ func _close_burst_menu() -> void:
 	burst_menu_buttons = []
 	selected_burst_index = 0
 
-	# Show action menu again
-	action_menu.visible = true
+	# Enable action menu again
+	_enable_action_menu()
 
 func _navigate_burst_menu(direction: int) -> void:
 	"""Navigate burst menu with controller (direction: -1 for up, 1 for down)"""
