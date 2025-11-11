@@ -161,9 +161,30 @@ func _ready() -> void:
 			ds.connect("plan_changed", Callable(self, "_on_dorms_changed"))
 			print("[DormsPanel._ready] Connected plan_changed signal")
 
+	_apply_core_vibe_styling()
 	print("[DormsPanel._ready] Calling _rebuild()")
 	_rebuild()
 	print("[DormsPanel._ready] Initialization complete")
+
+func _apply_core_vibe_styling() -> void:
+	"""Apply Core Vibe neon-kawaii styling to DormsPanel elements"""
+	# Style detail content
+	if _detail_content:
+		_detail_content.add_theme_color_override("default_color", aCoreVibeTheme.COLOR_MILK_WHITE)
+		_detail_content.add_theme_font_size_override("normal_font_size", 14)
+
+	# Style action buttons
+	if _assign_room_btn:
+		aCoreVibeTheme.style_button(_assign_room_btn, aCoreVibeTheme.COLOR_ELECTRIC_LIME, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
+		_assign_room_btn.custom_minimum_size = Vector2(140, 40)
+
+	if _move_out_btn:
+		aCoreVibeTheme.style_button(_move_out_btn, aCoreVibeTheme.COLOR_CITRUS_YELLOW, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
+		_move_out_btn.custom_minimum_size = Vector2(140, 40)
+
+	if _cancel_move_btn:
+		aCoreVibeTheme.style_button(_cancel_move_btn, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
+		_cancel_move_btn.custom_minimum_size = Vector2(140, 40)
 
 func _ds() -> Node:
 	return get_node_or_null("/root/aDormSystem")
@@ -593,12 +614,14 @@ func _build_common_list() -> void:
 		_common_list.add_child(empty)
 		return
 
-	# Create greyed-out label for each common room member (not clickable)
+	# Core Vibe: Create labels for each common room member (awaiting assignment)
 	for i in range(_common_members.size()):
 		var aid: String = _common_members[i]
 		var lbl := Label.new()
 		lbl.text = String(ds.call("display_name", aid))
-		lbl.add_theme_color_override("font_color", Color(0.5, 0.5, 0.5))  # Grey color
+		# Core Vibe: Plasma Teal for common room members (awaiting assignment)
+		lbl.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_PLASMA_TEAL)
+		lbl.add_theme_font_size_override("font_size", 14)
 		_common_list.add_child(lbl)
 
 func _update_details() -> void:
@@ -665,7 +688,8 @@ func _update_details_for_member(member_id: String) -> void:
 		var pending_room: String = _get_pending_assignment(member_id)
 		if pending_room != "":
 			lines.append("")
-			lines.append("[b][color=yellow]Pending Saturday Move:[/color][/b]")
+			# Core Vibe: Citrus Yellow for pending Saturday moves
+			lines.append("[b][color=#FFE84D]Pending Saturday Move:[/color][/b]")
 			lines.append("  • Will move to room %s" % pending_room)
 
 	_detail_content.text = _join_psa(lines, "\n")
@@ -1026,27 +1050,28 @@ func _apply_room_visual(btn: Button, room_id: String) -> void:
 
 	var state: int = int(ds.call("get_room_visual", room_id))
 
-	var col := Color(0.15, 0.17, 0.20)  # default
+	# Core Vibe: Neon-kawaii room state colors
+	var col := aCoreVibeTheme.COLOR_INK_CHARCOAL  # default
 	if state == VIS_EMPTY:
-		col = Color(0.12, 0.30, 0.12)  # green (empty)
+		col = Color(aCoreVibeTheme.COLOR_ELECTRIC_LIME.r, aCoreVibeTheme.COLOR_ELECTRIC_LIME.g, aCoreVibeTheme.COLOR_ELECTRIC_LIME.b, 0.3)  # Electric Lime (empty/available)
 	elif state == VIS_OCCUPIED:
-		col = Color(0.12, 0.18, 0.32)  # blue (occupied)
+		col = Color(aCoreVibeTheme.COLOR_SKY_CYAN.r, aCoreVibeTheme.COLOR_SKY_CYAN.g, aCoreVibeTheme.COLOR_SKY_CYAN.b, 0.3)  # Sky Cyan (occupied)
 	elif state == VIS_STAGED:
-		col = Color(0.40, 0.34, 0.08)  # yellow (staged/available)
+		col = Color(aCoreVibeTheme.COLOR_CITRUS_YELLOW.r, aCoreVibeTheme.COLOR_CITRUS_YELLOW.g, aCoreVibeTheme.COLOR_CITRUS_YELLOW.b, 0.3)  # Citrus Yellow (staged/moving)
 	elif state == VIS_LOCKED:
-		col = Color(0.38, 0.10, 0.10)  # red (locked)
+		col = Color(aCoreVibeTheme.COLOR_BUBBLE_MAGENTA.r, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA.g, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA.b, 0.3)  # Bubble Magenta (locked)
 
-	# Override with red if this is the selected member's current room
+	# Override with Bubble Magenta if this is the selected member's current room (can't select)
 	if _selected_member != "" and _get_member_room(_selected_member) == room_id:
-		col = Color(0.75, 0.15, 0.15)  # red (can't go back to current room)
+		col = Color(aCoreVibeTheme.COLOR_BUBBLE_MAGENTA.r, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA.g, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA.b, 0.4)  # Bubble Magenta (can't go back)
 
-	# Override with red if room is already targeted in pending reassignments
+	# Override with Bubble Magenta if room is already targeted in pending reassignments
 	if _is_room_targeted(room_id):
-		col = Color(0.75, 0.15, 0.15)  # red (already targeted)
+		col = Color(aCoreVibeTheme.COLOR_BUBBLE_MAGENTA.r, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA.g, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA.b, 0.4)  # Bubble Magenta (already targeted)
 
-	# Override with red if this is the selected member's previous room (before moving to common)
+	# Override with Bubble Magenta if this is the selected member's previous room (before moving to common)
 	if _selected_member != "" and _get_member_previous_room(_selected_member) == room_id:
-		col = Color(0.75, 0.15, 0.15)  # red (can't go back to previous room)
+		col = Color(aCoreVibeTheme.COLOR_BUBBLE_MAGENTA.r, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA.g, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA.b, 0.4)  # Bubble Magenta (can't go back)
 
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = col
