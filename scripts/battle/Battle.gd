@@ -60,6 +60,11 @@ var item_menu_panel: PanelContainer = null  # Item selection menu
 var item_menu_buttons: Array = []  # Buttons in current item tab for controller navigation
 var selected_item_index: int = 0  # Currently selected item in menu
 var item_tab_container: TabContainer = null  # Reference to tab container for switching
+var confirmation_panel: PanelContainer = null  # Yes/No confirmation dialog
+var confirmation_callback: Callable = Callable()  # Callback when user confirms
+var awaiting_confirmation: bool = false  # True when confirmation dialog is shown
+var confirmation_yes_button: Button = null  # Yes button reference
+var confirmation_no_button: Button = null  # No button reference
 var item_scroll_container: ScrollContainer = null  # Current tab's scroll container for auto-scrolling
 var item_description_label: Label = null  # Item description display
 var capture_menu_panel: PanelContainer = null  # Capture selection menu
@@ -1783,7 +1788,7 @@ func _on_attack_pressed() -> void:
 	if is_in_round_transition:
 		return
 
-	log_message("Select a target...")
+	log_message("Select an enemy.")
 
 	# Get alive enemies
 	var enemies = battle_mgr.get_enemy_combatants()
@@ -2005,6 +2010,8 @@ func _on_skill_pressed() -> void:
 		log_message("No skills available!")
 		return
 
+	log_message("Choose a skill.")
+
 	# Show skill selection menu
 	_show_skill_menu(skill_menu)
 
@@ -2124,6 +2131,8 @@ func _on_item_pressed() -> void:
 		log_message("No usable items!")
 		return
 
+	log_message("Choose an item.")
+
 	# Show item selection menu
 	_show_item_menu(usable_items)
 
@@ -2178,6 +2187,8 @@ func _on_capture_pressed() -> void:
 	if bind_items.is_empty():
 		log_message("No bind items available!")
 		return
+
+	log_message("Choose a bind.")
 
 	# Show bind selection menu
 	_show_capture_menu(bind_items)
@@ -2740,6 +2751,11 @@ func _on_defend_pressed() -> void:
 	if not _check_freeze_action_allowed():
 		return
 
+	# Show confirmation dialog
+	_show_confirmation_dialog("Do you want to guard?", _execute_defend)
+
+func _execute_defend() -> void:
+	"""Execute defend action after confirmation"""
 	log_message("%s moved into a defensive stance." % current_combatant.display_name)
 	current_combatant.is_defending = true
 
@@ -2787,8 +2803,10 @@ func _on_burst_pressed() -> void:
 	var available_bursts = burst_system.get_available_bursts(party_ids)
 
 	if available_bursts.is_empty():
-		log_message("No burst abilities unlocked yet!")
+		log_message("No Bursts available.")
 		return
+
+	log_message("Choose Burst Ability")
 
 	# Show burst selection menu
 	_show_burst_menu(available_bursts)
@@ -2808,6 +2826,11 @@ func _on_run_pressed() -> void:
 		log_message("Already tried to run this round!")
 		return
 
+	# Show confirmation dialog
+	_show_confirmation_dialog("Do you want to run?", _execute_run)
+
+func _execute_run() -> void:
+	"""Execute run action after confirmation"""
 	# Mark that run was attempted
 	battle_mgr.run_attempted_this_round = true
 
@@ -2857,6 +2880,8 @@ func _on_status_pressed() -> void:
 	# Block input during round transitions
 	if is_in_round_transition:
 		return
+
+	log_message("Choose a character.")
 
 	# Show character picker for status viewing
 	_show_status_character_picker()
@@ -3489,6 +3514,108 @@ func log_message(message: String) -> void:
 		# Auto-scroll to bottom
 		battle_log.scroll_to_line(battle_log.get_line_count() - 1)
 	print("[Battle] " + message)
+
+## ═══════════════════════════════════════════════════════════════
+## CONFIRMATION DIALOG (YES/NO)
+## ═══════════════════════════════════════════════════════════════
+
+func _show_confirmation_dialog(message: String, on_confirm: Callable) -> void:
+	"""Show a Yes/No confirmation dialog"""
+	log_message(message)
+
+	awaiting_confirmation = true
+	confirmation_callback = on_confirm
+
+	# Disable action menu while showing confirmation
+	_disable_action_menu()
+
+	# Create confirmation panel
+	confirmation_panel = PanelContainer.new()
+	confirmation_panel.custom_minimum_size = Vector2(300, 120)
+
+	# Style the panel
+	var style = StyleBoxFlat.new()
+	style.bg_color = COLOR_INK_CHARCOAL
+	style.border_width_left = 2
+	style.border_width_right = 2
+	style.border_width_top = 2
+	style.border_width_bottom = 2
+	style.border_color = COLOR_CITRUS_YELLOW
+	style.corner_radius_top_left = 12
+	style.corner_radius_top_right = 12
+	style.corner_radius_bottom_left = 12
+	style.corner_radius_bottom_right = 12
+	confirmation_panel.add_theme_stylebox_override("panel", style)
+
+	# Create VBox layout
+	var vbox = VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 10)
+	confirmation_panel.add_child(vbox)
+
+	# Add message label
+	var label = Label.new()
+	label.text = message
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
+	vbox.add_child(label)
+
+	# Add button container
+	var hbox = HBoxContainer.new()
+	hbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	hbox.add_theme_constant_override("separation", 20)
+	vbox.add_child(hbox)
+
+	# Create Yes button
+	confirmation_yes_button = Button.new()
+	confirmation_yes_button.text = "Yes"
+	confirmation_yes_button.custom_minimum_size = Vector2(100, 40)
+	confirmation_yes_button.pressed.connect(_on_confirmation_yes)
+	hbox.add_child(confirmation_yes_button)
+
+	# Create No button
+	confirmation_no_button = Button.new()
+	confirmation_no_button.text = "No"
+	confirmation_no_button.custom_minimum_size = Vector2(100, 40)
+	confirmation_no_button.pressed.connect(_on_confirmation_no)
+	hbox.add_child(confirmation_no_button)
+
+	# Position in center of screen
+	confirmation_panel.position = Vector2(
+		(get_viewport().get_visible_rect().size.x - 300) / 2,
+		(get_viewport().get_visible_rect().size.y - 120) / 2
+	)
+
+	add_child(confirmation_panel)
+
+	# Focus Yes button by default
+	confirmation_yes_button.grab_focus()
+
+func _on_confirmation_yes() -> void:
+	"""Handle Yes button press"""
+	_close_confirmation_dialog()
+
+	# Call the confirmation callback
+	if confirmation_callback.is_valid():
+		confirmation_callback.call()
+
+func _on_confirmation_no() -> void:
+	"""Handle No button press"""
+	_close_confirmation_dialog()
+
+	# Re-enable action menu
+	_enable_action_menu()
+
+func _close_confirmation_dialog() -> void:
+	"""Close the confirmation dialog"""
+	awaiting_confirmation = false
+	confirmation_callback = Callable()
+
+	if confirmation_panel:
+		confirmation_panel.queue_free()
+		confirmation_panel = null
+
+	confirmation_yes_button = null
+	confirmation_no_button = null
 
 ## ═══════════════════════════════════════════════════════════════
 ## SKILL MENU & EXECUTION
