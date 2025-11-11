@@ -55,7 +55,7 @@ func _setup_visuals() -> void:
 	overlay_panel = PanelContainer.new()
 	overlay_panel.custom_minimum_size = get_viewport_rect().size * 0.35
 	overlay_panel.position = get_viewport_rect().size * 0.325
-	overlay_panel.position.y -= 200  # Move up 200px
+	overlay_panel.position.y -= 160  # Move up 160px (moved down 40px from original 200px)
 	overlay_panel.z_index = 101
 
 	# Start below screen for slide-up animation
