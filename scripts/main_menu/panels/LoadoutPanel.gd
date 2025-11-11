@@ -221,6 +221,52 @@ func _first_fill() -> void:
 func _apply_core_vibe_styling() -> void:
 	"""Apply Core Vibe neon-kawaii styling to LoadoutPanel"""
 
+	# Style the three main panel containers with rounded neon borders
+	if _party_panel:
+		var party_style = aCoreVibeTheme.create_panel_style(
+			aCoreVibeTheme.COLOR_SKY_CYAN,            # Sky Cyan border (party)
+			aCoreVibeTheme.COLOR_INK_CHARCOAL,        # Ink charcoal background
+			aCoreVibeTheme.PANEL_OPACITY_SEMI,        # Semi-transparent
+			aCoreVibeTheme.CORNER_RADIUS_MEDIUM,      # 16px corners
+			aCoreVibeTheme.BORDER_WIDTH_THIN,         # 2px border
+			aCoreVibeTheme.SHADOW_SIZE_MEDIUM         # 6px glow
+		)
+		party_style.content_margin_left = 10
+		party_style.content_margin_top = 10
+		party_style.content_margin_right = 10
+		party_style.content_margin_bottom = 10
+		_party_panel.add_theme_stylebox_override("panel", party_style)
+
+	if _middle_panel:
+		var middle_style = aCoreVibeTheme.create_panel_style(
+			aCoreVibeTheme.COLOR_ELECTRIC_LIME,       # Electric Lime border (equipment)
+			aCoreVibeTheme.COLOR_INK_CHARCOAL,        # Ink charcoal background
+			aCoreVibeTheme.PANEL_OPACITY_SEMI,        # Semi-transparent
+			aCoreVibeTheme.CORNER_RADIUS_MEDIUM,      # 16px corners
+			aCoreVibeTheme.BORDER_WIDTH_THIN,         # 2px border
+			aCoreVibeTheme.SHADOW_SIZE_MEDIUM         # 6px glow
+		)
+		middle_style.content_margin_left = 10
+		middle_style.content_margin_top = 10
+		middle_style.content_margin_right = 10
+		middle_style.content_margin_bottom = 10
+		_middle_panel.add_theme_stylebox_override("panel", middle_style)
+
+	if _stats_panel:
+		var stats_style = aCoreVibeTheme.create_panel_style(
+			aCoreVibeTheme.COLOR_GRAPE_VIOLET,        # Grape Violet border (stats)
+			aCoreVibeTheme.COLOR_INK_CHARCOAL,        # Ink charcoal background
+			aCoreVibeTheme.PANEL_OPACITY_SEMI,        # Semi-transparent
+			aCoreVibeTheme.CORNER_RADIUS_MEDIUM,      # 16px corners
+			aCoreVibeTheme.BORDER_WIDTH_THIN,         # 2px border
+			aCoreVibeTheme.SHADOW_SIZE_MEDIUM         # 6px glow
+		)
+		stats_style.content_margin_left = 10
+		stats_style.content_margin_top = 10
+		stats_style.content_margin_right = 10
+		stats_style.content_margin_bottom = 10
+		_stats_panel.add_theme_stylebox_override("panel", stats_style)
+
 	# Style party list with Sky Cyan selection
 	if _party_list:
 		_party_list.add_theme_color_override("font_selected_color", aCoreVibeTheme.COLOR_SKY_CYAN)
