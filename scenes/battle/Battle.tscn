@@ -93,7 +93,7 @@ anchor_left = 1.0
 anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = -180.0
+offset_left = -200.0
 offset_top = -280.0
 offset_right = -20.0
 offset_bottom = -20.0
@@ -157,79 +157,79 @@ offset_bottom = 207.0
 color = Color(0.96, 0.97, 0.98, 0.8)
 
 [node name="SkillButton" type="Button" parent="ActionMenu"]
-custom_minimum_size = Vector2(120, 60)
+custom_minimum_size = Vector2(120, 45)
 layout_mode = 0
 offset_left = 65.0
-offset_top = 0.0
+offset_top = 5.0
 offset_right = 185.0
-offset_bottom = 60.0
+offset_bottom = 50.0
 text = "(Y) SKILL"
 
 [node name="DefendButton" type="Button" parent="ActionMenu"]
-custom_minimum_size = Vector2(120, 60)
+custom_minimum_size = Vector2(120, 45)
 layout_mode = 0
 offset_left = 0.0
-offset_top = 75.0
+offset_top = 82.0
 offset_right = 120.0
-offset_bottom = 135.0
+offset_bottom = 127.0
 text = "(X) GUARD"
 
 [node name="AttackButton" type="Button" parent="ActionMenu"]
-custom_minimum_size = Vector2(120, 60)
+custom_minimum_size = Vector2(120, 45)
 layout_mode = 0
 offset_left = 130.0
-offset_top = 75.0
+offset_top = 82.0
 offset_right = 250.0
-offset_bottom = 135.0
+offset_bottom = 127.0
 text = "(B) FIGHT"
 
 [node name="CaptureButton" type="Button" parent="ActionMenu"]
-custom_minimum_size = Vector2(120, 60)
+custom_minimum_size = Vector2(120, 45)
 layout_mode = 0
 offset_left = 65.0
-offset_top = 150.0
+offset_top = 160.0
 offset_right = 185.0
-offset_bottom = 210.0
+offset_bottom = 205.0
 text = "(A) CAPTURE"
 
 [node name="BurstButton" type="Button" parent="ActionMenu"]
 visible = false
-custom_minimum_size = Vector2(120, 60)
+custom_minimum_size = Vector2(120, 45)
 layout_mode = 0
 offset_left = 65.0
-offset_top = 0.0
+offset_top = 5.0
 offset_right = 185.0
-offset_bottom = 60.0
+offset_bottom = 50.0
 text = "(Y) BURST"
 
 [node name="RunButton" type="Button" parent="ActionMenu"]
 visible = false
-custom_minimum_size = Vector2(120, 60)
+custom_minimum_size = Vector2(120, 45)
 layout_mode = 0
 offset_left = 0.0
-offset_top = 75.0
+offset_top = 82.0
 offset_right = 120.0
-offset_bottom = 135.0
+offset_bottom = 127.0
 text = "(X) RUN"
 
 [node name="StatusButton" type="Button" parent="ActionMenu"]
 visible = false
-custom_minimum_size = Vector2(120, 60)
+custom_minimum_size = Vector2(120, 45)
 layout_mode = 0
 offset_left = 130.0
-offset_top = 75.0
+offset_top = 82.0
 offset_right = 250.0
-offset_bottom = 135.0
+offset_bottom = 127.0
 text = "(B) STATUS"
 
 [node name="ItemButton" type="Button" parent="ActionMenu"]
 visible = false
-custom_minimum_size = Vector2(120, 60)
+custom_minimum_size = Vector2(120, 45)
 layout_mode = 0
 offset_left = 65.0
-offset_top = 150.0
+offset_top = 160.0
 offset_right = 185.0
-offset_bottom = 210.0
+offset_bottom = 205.0
 text = "(A) ITEMS"
 
 [node name="SwitchButton" type="Button" parent="ActionMenu"]

@@ -481,7 +481,7 @@ func _animate_position_changes(animations: Array[Dictionary]) -> void:
 func _create_turn_slot(combatant: Dictionary, index: int) -> PanelContainer:
 	"""Create a UI slot for a combatant in the turn order"""
 	var panel = PanelContainer.new()
-	panel.custom_minimum_size = Vector2(150, 32)  # Expanded by 30px from 120px
+	panel.custom_minimum_size = Vector2(170, 32)  # Expanded to 170px width
 	panel.set_meta("combatant_id", combatant.id)
 	panel.set_meta("turn_index", index)
 
@@ -514,19 +514,25 @@ func _create_turn_slot(combatant: Dictionary, index: int) -> PanelContainer:
 	style.corner_radius_top_right = 8
 	style.corner_radius_bottom_left = 8
 	style.corner_radius_bottom_right = 8
+	# Reduce padding inside panel for tighter layout
+	style.content_margin_left = 4
+	style.content_margin_right = 4
+	style.content_margin_top = 2
+	style.content_margin_bottom = 2
 	panel.add_theme_stylebox_override("panel", style)
 
-	# HBox for layout
+	# HBox for layout with reduced spacing
 	var hbox = HBoxContainer.new()
+	hbox.add_theme_constant_override("separation", 2)  # Reduce spacing between elements
 	panel.add_child(hbox)
 
-	# Turn number indicator
+	# Turn number indicator (narrower)
 	var turn_label = Label.new()
 	turn_label.text = str(index + 1)
-	turn_label.custom_minimum_size = Vector2(24, 0)  # Scaled for 150px width
+	turn_label.custom_minimum_size = Vector2(20, 0)  # Reduced from 24px
 	turn_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	turn_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	turn_label.add_theme_font_size_override("font_size", 16)  # Scaled for 150px width
+	turn_label.add_theme_font_size_override("font_size", 16)  # Keep font size
 
 	# Check if combatant has "Revived" ailment
 	var ailment_check = str(combatant.get("ailment", ""))
@@ -658,8 +664,8 @@ func _create_turn_slot(combatant: Dictionary, index: int) -> PanelContainer:
 		init_label.add_theme_constant_override("shadow_offset_x", 0)
 		init_label.add_theme_constant_override("shadow_offset_y", 0)
 		init_label.add_theme_constant_override("shadow_outline_size", 4)
-	init_label.add_theme_font_size_override("font_size", 10)  # Scaled for 150px width
-	init_label.custom_minimum_size = Vector2(24, 0)  # Scaled for 150px width
+	init_label.add_theme_font_size_override("font_size", 10)  # Scaled for 170px width
+	init_label.custom_minimum_size = Vector2(20, 0)  # Reduced from 24px
 	init_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	init_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	hbox.add_child(init_label)
