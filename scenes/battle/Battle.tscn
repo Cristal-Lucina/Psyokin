@@ -86,28 +86,38 @@ size_flags_vertical = 3
 theme_override_constants/separation = 10
 alignment = 1
 
-[node name="TurnOrderPanel" type="PanelContainer" parent="MainLayout"]
-layout_mode = 2
-size_flags_horizontal = 3
-size_flags_stretch_ratio = 0.5
+[node name="TurnOrderPanel" type="PanelContainer" parent="."]
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -180.0
+offset_top = -300.0
+offset_right = -20.0
+offset_bottom = -20.0
+grow_horizontal = 0
+grow_vertical = 0
 
-[node name="VBox" type="VBoxContainer" parent="MainLayout/TurnOrderPanel"]
+[node name="VBox" type="VBoxContainer" parent="TurnOrderPanel"]
 layout_mode = 2
 
-[node name="Title" type="Label" parent="MainLayout/TurnOrderPanel/VBox"]
+[node name="Title" type="Label" parent="TurnOrderPanel/VBox"]
 layout_mode = 2
 text = "Turn Order"
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="Separator" type="HSeparator" parent="MainLayout/TurnOrderPanel/VBox"]
+[node name="Separator" type="HSeparator" parent="TurnOrderPanel/VBox"]
 layout_mode = 2
 
-[node name="ScrollContainer" type="ScrollContainer" parent="MainLayout/TurnOrderPanel/VBox"]
+[node name="ScrollContainer" type="ScrollContainer" parent="TurnOrderPanel/VBox"]
+custom_minimum_size = Vector2(0, 280)
 layout_mode = 2
 size_flags_vertical = 3
 
-[node name="TurnOrderDisplay" type="VBoxContainer" parent="MainLayout/TurnOrderPanel/VBox/ScrollContainer"]
+[node name="TurnOrderDisplay" type="VBoxContainer" parent="TurnOrderPanel/VBox/ScrollContainer"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3

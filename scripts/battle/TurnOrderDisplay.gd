@@ -35,7 +35,7 @@ func _ready() -> void:
 	round_label = Label.new()
 	round_label.text = "Round 1"
 	round_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	round_label.add_theme_font_size_override("font_size", 11)  # Reduced from 14
+	round_label.add_theme_font_size_override("font_size", 13)  # Scaled for 150px width
 	round_label.add_theme_color_override("font_color", Color(0.9, 0.9, 0.5, 1.0))
 	add_child(round_label)
 	move_child(round_label, 0)  # Put it at the top
@@ -138,14 +138,14 @@ func _show_round_announcement(round_num: int) -> void:
 	"""Show big 'Round X' announcement that fades in and out"""
 	print("[TurnOrderDisplay] Showing Round %d announcement..." % round_num)
 
-	# Create announcement label (scaled down for narrower panel)
+	# Create announcement label (scaled for 150px panel)
 	round_announcement = Label.new()
 	round_announcement.text = "= R%d =" % round_num  # Shorter text
 	round_announcement.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	round_announcement.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	round_announcement.add_theme_font_size_override("font_size", 18)  # Reduced from 32
+	round_announcement.add_theme_font_size_override("font_size", 22)  # Scaled for 150px width
 	round_announcement.add_theme_color_override("font_color", Color(1.0, 0.9, 0.3, 1.0))  # Gold color
-	round_announcement.custom_minimum_size = Vector2(100, 40)  # Reduced from 200x60
+	round_announcement.custom_minimum_size = Vector2(130, 50)  # Scaled for 150px width
 	round_announcement.modulate.a = 0.0  # Start invisible
 
 	add_child(round_announcement)
@@ -481,7 +481,7 @@ func _animate_position_changes(animations: Array[Dictionary]) -> void:
 func _create_turn_slot(combatant: Dictionary, index: int) -> PanelContainer:
 	"""Create a UI slot for a combatant in the turn order"""
 	var panel = PanelContainer.new()
-	panel.custom_minimum_size = Vector2(120, 32)  # Reduced from 180x40 for narrower panel
+	panel.custom_minimum_size = Vector2(150, 32)  # Expanded by 30px from 120px
 	panel.set_meta("combatant_id", combatant.id)
 	panel.set_meta("turn_index", index)
 
@@ -523,10 +523,10 @@ func _create_turn_slot(combatant: Dictionary, index: int) -> PanelContainer:
 	# Turn number indicator
 	var turn_label = Label.new()
 	turn_label.text = str(index + 1)
-	turn_label.custom_minimum_size = Vector2(20, 0)  # Reduced from 28
+	turn_label.custom_minimum_size = Vector2(24, 0)  # Scaled for 150px width
 	turn_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	turn_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	turn_label.add_theme_font_size_override("font_size", 14)  # Reduced from 18
+	turn_label.add_theme_font_size_override("font_size", 16)  # Scaled for 150px width
 
 	# Check if combatant has "Revived" ailment
 	var ailment_check = str(combatant.get("ailment", ""))
@@ -562,7 +562,7 @@ func _create_turn_slot(combatant: Dictionary, index: int) -> PanelContainer:
 
 	name_label.text = display_text
 
-	name_label.add_theme_font_size_override("font_size", 10)  # Reduced from 14
+	name_label.add_theme_font_size_override("font_size", 12)  # Scaled for 150px width
 	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	name_label.clip_text = true  # Clip text if too long
@@ -620,12 +620,12 @@ func _create_turn_slot(combatant: Dictionary, index: int) -> PanelContainer:
 
 				var buff_label = Label.new()
 				# Show symbol multiple times if stacked (up to 2x for space)
-				var symbol_repeat = min(count, 2)  # Reduced from 3
+				var symbol_repeat = min(count, 2)  # Limited for space
 				buff_label.text = display_info.symbol.repeat(symbol_repeat)
 				if count > 2:
 					buff_label.text += "+"  # Add + if more than 2 stacks
 
-				buff_label.add_theme_font_size_override("font_size", 9)  # Reduced from 12
+				buff_label.add_theme_font_size_override("font_size", 10)  # Scaled for 150px width
 				buff_label.add_theme_color_override("font_color", display_info.color)
 				buff_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 				buff_container.add_child(buff_label)
@@ -642,8 +642,8 @@ func _create_turn_slot(combatant: Dictionary, index: int) -> PanelContainer:
 	else:
 		init_label.text = str(combatant.initiative)
 		init_label.modulate = Color(0.8, 0.8, 0.8, 1.0)
-	init_label.add_theme_font_size_override("font_size", 9)  # Reduced from 12
-	init_label.custom_minimum_size = Vector2(20, 0)  # Reduced from 28
+	init_label.add_theme_font_size_override("font_size", 10)  # Scaled for 150px width
+	init_label.custom_minimum_size = Vector2(24, 0)  # Scaled for 150px width
 	init_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	init_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	hbox.add_child(init_label)
