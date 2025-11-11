@@ -866,6 +866,7 @@ func _confirm_target_selection() -> void:
 		_execute_item_usage(target)
 	elif awaiting_skill_selection:
 		# Using a skill
+		_hide_instruction()
 		_clear_target_highlights()
 		awaiting_target_selection = false
 		awaiting_skill_selection = false
@@ -5216,6 +5217,7 @@ func _on_skill_selected(skill_entry: Dictionary) -> void:
 		else:
 			# Single target - need to select
 			log_message("Select a target...")
+			_show_instruction("Select an enemy.")
 			awaiting_target_selection = true
 			awaiting_skill_selection = true
 			selected_target_index = 0  # Start with first target
@@ -5278,7 +5280,9 @@ func _execute_skill_single(target: Dictionary) -> void:
 		status_effects.append(ailment)
 
 	log_message("  → %s prepares the skill..." % [current_combatant.display_name])
+	_show_instruction("SKILL!")
 	var minigame_result = await minigame_mgr.launch_skill_minigame(focus_stat, skill_sequence, skill_tier, mind_type, status_effects)
+	_hide_instruction()
 
 	# Apply minigame modifiers
 	var damage_modifier = minigame_result.get("damage_modifier", 1.0)
