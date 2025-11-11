@@ -96,6 +96,8 @@ var instruction_label: Label = null  # Label inside instruction popup
 # Input debouncing for joystick sensitivity
 var input_cooldown: float = 0.0  # Current cooldown timer
 var input_cooldown_duration: float = 0.15  # 150ms between inputs
+var action_cooldown: float = 0.0  # Cooldown for action button presses (FIGHT/SKILL/etc)
+var action_cooldown_duration: float = 1.0  # 1 second between action button presses
 
 func _ready() -> void:
 	print("[Battle] Battle scene loaded")
@@ -518,6 +520,10 @@ func _process(delta: float) -> void:
 	if input_cooldown > 0:
 		input_cooldown -= delta
 
+	# Update action cooldown timer
+	if action_cooldown > 0:
+		action_cooldown -= delta
+
 func _input(event: InputEvent) -> void:
 	"""Handle keyboard/controller input for battle actions and target selection"""
 	# Note: Input processing is disabled until battle is fully initialized
@@ -834,33 +840,45 @@ func _input(event: InputEvent) -> void:
 		# Panel 2: RUN/BURST/ITEMS/STATUS
 		# Button mapping: Y=SKILL, X=DEFEND, B=ATTACK, A=CAPTURE
 
+		# Check action cooldown to prevent button spam
+		if action_cooldown > 0:
+			return
+
 		if is_panel_1_active:
 			# Panel 1 active
 			if event.is_action_pressed(aInputManager.ACTION_SKILL):  # Y button -> Skill
 				_on_skill_pressed()
+				action_cooldown = action_cooldown_duration  # Set cooldown
 				get_viewport().set_input_as_handled()
 			elif event.is_action_pressed(aInputManager.ACTION_DEFEND):  # X button -> Guard
 				_on_defend_pressed()
+				action_cooldown = action_cooldown_duration  # Set cooldown
 				get_viewport().set_input_as_handled()
 			elif event.is_action_pressed(aInputManager.ACTION_ATTACK):  # B button -> Fight
 				_on_attack_pressed()
+				action_cooldown = action_cooldown_duration  # Set cooldown
 				get_viewport().set_input_as_handled()
 			elif event.is_action_pressed(aInputManager.ACTION_CAPTURE):  # A button -> Capture
 				_on_capture_pressed()
+				action_cooldown = action_cooldown_duration  # Set cooldown
 				get_viewport().set_input_as_handled()
 		else:
 			# Panel 2 active
 			if event.is_action_pressed(aInputManager.ACTION_SKILL):  # Y button -> Burst
 				_on_burst_pressed()
+				action_cooldown = action_cooldown_duration  # Set cooldown
 				get_viewport().set_input_as_handled()
 			elif event.is_action_pressed(aInputManager.ACTION_DEFEND):  # X button -> Run
 				_on_run_pressed()
+				action_cooldown = action_cooldown_duration  # Set cooldown
 				get_viewport().set_input_as_handled()
 			elif event.is_action_pressed(aInputManager.ACTION_ATTACK):  # B button -> Status
 				_on_status_pressed()
+				action_cooldown = action_cooldown_duration  # Set cooldown
 				get_viewport().set_input_as_handled()
 			elif event.is_action_pressed(aInputManager.ACTION_CAPTURE):  # A button -> Items
 				_on_item_pressed()
+				action_cooldown = action_cooldown_duration  # Set cooldown
 				get_viewport().set_input_as_handled()
 
 func _navigate_targets(direction: int) -> void:
@@ -974,6 +992,9 @@ func _on_turn_started(combatant_id: String) -> void:
 
 	if current_combatant.is_empty():
 		return
+
+	# Reset action cooldown at start of turn
+	action_cooldown = 0.0
 
 	log_message("%s's turn!" % current_combatant.display_name)
 
