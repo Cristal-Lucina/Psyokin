@@ -545,6 +545,34 @@ func _input(event: InputEvent) -> void:
 	if minigame_mgr.current_minigame != null:
 		return
 
+	# CRITICAL: If confirmation dialog is showing, only allow Yes/No navigation
+	if awaiting_confirmation and confirmation_panel != null:
+		if event.is_action_pressed(aInputManager.ACTION_MOVE_LEFT) or event.is_action_pressed(aInputManager.ACTION_MOVE_RIGHT):
+			# Toggle focus between Yes and No buttons
+			if confirmation_yes_button and confirmation_no_button:
+				if confirmation_yes_button.has_focus():
+					confirmation_no_button.grab_focus()
+				else:
+					confirmation_yes_button.grab_focus()
+			get_viewport().set_input_as_handled()
+			return
+		elif event.is_action_pressed(aInputManager.ACTION_ACCEPT):
+			# Trigger the focused button
+			if confirmation_yes_button and confirmation_yes_button.has_focus():
+				_on_confirmation_yes()
+			elif confirmation_no_button and confirmation_no_button.has_focus():
+				_on_confirmation_no()
+			get_viewport().set_input_as_handled()
+			return
+		elif event.is_action_pressed(aInputManager.ACTION_BACK):
+			# Back button acts as "No"
+			_on_confirmation_no()
+			get_viewport().set_input_as_handled()
+			return
+		# Block all other input
+		get_viewport().set_input_as_handled()
+		return
+
 	# Check for back button to close any open menus
 	if event.is_action_pressed(aInputManager.ACTION_BACK):
 		# Check if any menu is open and close it
