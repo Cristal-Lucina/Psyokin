@@ -59,6 +59,10 @@ var bind_point: ColorRect  # The point to grab and drag
 var bind_trail: Line2D  # Trail showing wrap around enemy
 var prompt_label: Label  # Shows "PRESS A!" during button prompts
 
+# Core vibe color constants
+const COLOR_MILK_WHITE = Color(0.96, 0.97, 0.98)
+const COLOR_BUBBLE_MAGENTA = Color(1.0, 0.29, 0.85)
+
 func _setup_minigame() -> void:
 	base_duration = 10.0
 	current_duration = base_duration
@@ -67,9 +71,6 @@ func _setup_minigame() -> void:
 	_calculate_break_rating()
 
 	# Title
-	const COLOR_MILK_WHITE = Color(0.96, 0.97, 0.98)
-	const COLOR_BUBBLE_MAGENTA = Color(1.0, 0.29, 0.85)
-
 	title_label = Label.new()
 	title_label.text = "CAPTURE!"
 	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
