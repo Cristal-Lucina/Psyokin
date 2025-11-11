@@ -1046,18 +1046,18 @@ func _on_battle_ended(victory: bool) -> void:
 
 func _show_victory_screen() -> void:
 	"""Display victory screen with Accept button"""
-	# Create black background overlay
+	# Create black background overlay (covers entire viewport)
 	var black_bg = ColorRect.new()
 	black_bg.color = Color(0, 0, 0, 0)  # Start transparent
 	black_bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	black_bg.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(black_bg)
 
-	# Fade in black background
+	# Fade in black background to fully opaque
 	var bg_tween = create_tween()
 	bg_tween.set_ease(Tween.EASE_OUT)
 	bg_tween.set_trans(Tween.TRANS_CUBIC)
-	bg_tween.tween_property(black_bg, "color:a", 0.8, 0.5)  # Fade to 80% opacity
+	bg_tween.tween_property(black_bg, "color:a", 1.0, 0.5)  # Fade to 100% opacity (fully black)
 
 	# Create victory panel
 	victory_panel = PanelContainer.new()
