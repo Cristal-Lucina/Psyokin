@@ -43,6 +43,29 @@ func _ready() -> void:
 		if btn:
 			btn.focus_mode = Control.FOCUS_ALL
 
+	# Apply Core Vibe styling
+	_apply_core_vibe_styling()
+
+func _apply_core_vibe_styling() -> void:
+	"""Apply Core Vibe neon-kawaii styling to SystemPanel buttons"""
+
+	# Style buttons with coordinated neon colors
+	if _btn_load:
+		aCoreVibeTheme.style_button(_btn_load, aCoreVibeTheme.COLOR_SKY_CYAN, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
+		_btn_load.custom_minimum_size = Vector2(200, 50)
+
+	if _btn_save:
+		aCoreVibeTheme.style_button(_btn_save, aCoreVibeTheme.COLOR_ELECTRIC_LIME, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
+		_btn_save.custom_minimum_size = Vector2(200, 50)
+
+	if _btn_settings:
+		aCoreVibeTheme.style_button(_btn_settings, aCoreVibeTheme.COLOR_CITRUS_YELLOW, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
+		_btn_settings.custom_minimum_size = Vector2(200, 50)
+
+	if _btn_title:
+		aCoreVibeTheme.style_button(_btn_title, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
+		_btn_title.custom_minimum_size = Vector2(200, 50)
+
 # --- Input Handling -----------------------------------------------------------
 
 func _input(event: InputEvent) -> void:
