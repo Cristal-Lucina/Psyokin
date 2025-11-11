@@ -1044,6 +1044,19 @@ func _on_battle_ended(victory: bool) -> void:
 
 func _show_victory_screen() -> void:
 	"""Display victory screen with Accept button"""
+	# Create black background overlay
+	var black_bg = ColorRect.new()
+	black_bg.color = Color(0, 0, 0, 0)  # Start transparent
+	black_bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	black_bg.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(black_bg)
+
+	# Fade in black background
+	var bg_tween = create_tween()
+	bg_tween.set_ease(Tween.EASE_OUT)
+	bg_tween.set_trans(Tween.TRANS_CUBIC)
+	bg_tween.tween_property(black_bg, "color:a", 0.8, 0.5)  # Fade to 80% opacity
+
 	# Create victory panel
 	victory_panel = PanelContainer.new()
 	victory_panel.name = "VictoryPanel"
@@ -1064,11 +1077,12 @@ func _show_victory_screen() -> void:
 	style.shadow_color = Color(COLOR_SKY_CYAN.r, COLOR_SKY_CYAN.g, COLOR_SKY_CYAN.b, 0.4)  # Cyan glow
 	victory_panel.add_theme_stylebox_override("panel", style)
 
-	# Position it in center of screen
+	# Position it in center of screen (200px wider)
 	victory_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER, Control.PRESET_MODE_MINSIZE)
-	victory_panel.custom_minimum_size = Vector2(500, 450)
-	victory_panel.size = Vector2(500, 450)
-	victory_panel.position = Vector2(-250, -225)  # Center the 500x450 panel
+	victory_panel.custom_minimum_size = Vector2(700, 450)  # Increased width by 200px
+	victory_panel.size = Vector2(700, 450)
+	victory_panel.position = Vector2(-350, -225)  # Center the 700x450 panel
+	victory_panel.modulate.a = 0.0  # Start transparent for fade-in
 
 	# Create vertical box for content
 	var vbox = VBoxContainer.new()
@@ -1098,9 +1112,9 @@ func _show_victory_screen() -> void:
 	# Get rewards data from battle manager
 	var rewards = battle_mgr.battle_rewards
 
-	# Rewards display (scrollable)
+	# Rewards display (scrollable) - increased width for 2 columns
 	var rewards_scroll = ScrollContainer.new()
-	rewards_scroll.custom_minimum_size = Vector2(400, 200)
+	rewards_scroll.custom_minimum_size = Vector2(660, 200)  # Wider for 2 columns
 	rewards_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	rewards_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 	content_vbox.add_child(rewards_scroll)
@@ -1108,16 +1122,29 @@ func _show_victory_screen() -> void:
 	# Store reference for controller scrolling
 	victory_scroll = rewards_scroll
 
-	var rewards_vbox = VBoxContainer.new()
-	rewards_vbox.add_theme_constant_override("separation", 5)
-	rewards_scroll.add_child(rewards_vbox)
+	# Create HBox for 2 columns
+	var rewards_hbox = HBoxContainer.new()
+	rewards_hbox.add_theme_constant_override("separation", 20)
+	rewards_scroll.add_child(rewards_hbox)
 
-	# CREDS (changed from Credits)
+	# Column 1: CREDS, Level Growth, Enemies
+	var column1 = VBoxContainer.new()
+	column1.add_theme_constant_override("separation", 5)
+	column1.custom_minimum_size = Vector2(320, 0)
+	rewards_hbox.add_child(column1)
+
+	# Column 2: Sigil Growth, Affinity Growth, Items
+	var column2 = VBoxContainer.new()
+	column2.add_theme_constant_override("separation", 5)
+	column2.custom_minimum_size = Vector2(320, 0)
+	rewards_hbox.add_child(column2)
+
+	# CREDS (changed from Credits) - Column 1
 	if rewards.get("creds", 0) > 0:
 		var creds_label = Label.new()
 		creds_label.text = "CREDS: +%d" % rewards.creds
 		creds_label.add_theme_color_override("font_color", COLOR_CITRUS_YELLOW)  # Yellow for creds
-		rewards_vbox.add_child(creds_label)
+		column1.add_child(creds_label)
 
 	# Level Growth - Show LXP for all members who received it
 	var lxp_awarded = rewards.get("lxp_awarded", {})
@@ -1127,7 +1154,7 @@ func _show_victory_screen() -> void:
 		var lxp_header = Label.new()
 		lxp_header.text = "\nLevel Growth:"
 		lxp_header.add_theme_color_override("font_color", COLOR_ELECTRIC_LIME)  # Lime green header
-		rewards_vbox.add_child(lxp_header)
+		column1.add_child(lxp_header)
 
 		# Show all members who got XP (they were in the battle)
 		for member_id in lxp_awarded.keys():
@@ -1136,15 +1163,15 @@ func _show_victory_screen() -> void:
 			var member_label = Label.new()
 			member_label.text = "  %s: +%d LXP" % [display_name, xp_amount]
 			member_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
-			rewards_vbox.add_child(member_label)
+			column1.add_child(member_label)
 
-	# Sigil Growth - Show each sigil individually with names
+	# Sigil Growth - Show each sigil individually with names - Column 2
 	var gxp_awarded = rewards.get("gxp_awarded", {})
 	if not gxp_awarded.is_empty():
 		var gxp_header = Label.new()
 		gxp_header.text = "\nSigil Growth:"
 		gxp_header.add_theme_color_override("font_color", COLOR_SKY_CYAN)  # Cyan header
-		rewards_vbox.add_child(gxp_header)
+		column2.add_child(gxp_header)
 
 		var sigil_sys = get_node_or_null("/root/aSigilSystem")
 		for sigil_inst_id in gxp_awarded.keys():
@@ -1156,15 +1183,15 @@ func _show_victory_screen() -> void:
 			var sigil_label = Label.new()
 			sigil_label.text = "  %s: +%d GXP" % [sigil_name, gxp_amount]
 			sigil_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
-			rewards_vbox.add_child(sigil_label)
+			column2.add_child(sigil_label)
 
-	# Affinity Growth - Show AXP for each pair
+	# Affinity Growth - Show AXP for each pair - Column 2
 	var axp_awarded = rewards.get("axp_awarded", {})
 	if not axp_awarded.is_empty():
 		var axp_header = Label.new()
 		axp_header.text = "\nAffinity Growth:"
 		axp_header.add_theme_color_override("font_color", COLOR_BUBBLE_MAGENTA)  # Pink magenta header
-		rewards_vbox.add_child(axp_header)
+		column2.add_child(axp_header)
 
 		for pair_key in axp_awarded.keys():
 			var axp_amount = axp_awarded[pair_key]
@@ -1180,30 +1207,30 @@ func _show_victory_screen() -> void:
 			var axp_label = Label.new()
 			axp_label.text = "  %s ↔ %s: +%d AXP" % [name_a, name_b, axp_amount]
 			axp_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
-			rewards_vbox.add_child(axp_label)
+			column2.add_child(axp_label)
 
-	# Items
+	# Items - Column 2
 	var items = rewards.get("items", [])
 	if not items.is_empty():
 		var items_header = Label.new()
 		items_header.text = "\nItems Dropped:"
 		items_header.add_theme_color_override("font_color", COLOR_GRAPE_VIOLET)  # Violet header
-		rewards_vbox.add_child(items_header)
+		column2.add_child(items_header)
 
 		for item_id in items:
 			var item_label = Label.new()
 			item_label.text = "  %s" % item_id
 			item_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
-			rewards_vbox.add_child(item_label)
+			column2.add_child(item_label)
 
-	# Battle stats
+	# Battle stats - Column 1
 	var stats_label = Label.new()
 	var captured = rewards.get("captured_count", 0)
 	var killed = rewards.get("killed_count", 0)
 	stats_label.text = "\nEnemies: %d captured, %d defeated" % [captured, killed]
 	stats_label.add_theme_font_size_override("font_size", 14)
 	stats_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
-	rewards_vbox.add_child(stats_label)
+	column1.add_child(stats_label)
 
 	# Spacer
 	var spacer = Control.new()
@@ -1254,6 +1281,12 @@ func _show_victory_screen() -> void:
 
 	# Add to scene
 	add_child(victory_panel)
+
+	# Fade in victory panel
+	var panel_tween = create_tween()
+	panel_tween.set_ease(Tween.EASE_OUT)
+	panel_tween.set_trans(Tween.TRANS_CUBIC)
+	panel_tween.tween_property(victory_panel, "modulate:a", 1.0, 0.5).set_delay(0.3)  # Slight delay after background
 
 func _on_victory_accept_pressed() -> void:
 	"""Handle Accept button press on victory screen"""
@@ -4334,7 +4367,7 @@ func _show_item_menu(items: Array) -> void:
 
 	# Create item menu panel
 	item_menu_panel = PanelContainer.new()
-	item_menu_panel.custom_minimum_size = Vector2(550, 0)
+	item_menu_panel.custom_minimum_size = Vector2(490, 0)  # Reduced width by 60px
 
 	# Style the panel with Core vibe
 	var style = StyleBoxFlat.new()
@@ -4370,7 +4403,7 @@ func _show_item_menu(items: Array) -> void:
 
 	# Create tab container
 	var tab_container = TabContainer.new()
-	tab_container.custom_minimum_size = Vector2(530, 300)
+	tab_container.custom_minimum_size = Vector2(470, 230)  # Reduced width by 60px, height by 70px
 	vbox.add_child(tab_container)
 
 	# Store reference for controller navigation
@@ -4392,7 +4425,7 @@ func _show_item_menu(items: Array) -> void:
 	item_description_label.add_theme_font_size_override("font_size", 14)
 	item_description_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
 	item_description_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	item_description_label.custom_minimum_size = Vector2(530, 60)
+	item_description_label.custom_minimum_size = Vector2(470, 60)  # Reduced width by 60px
 	item_description_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	vbox.add_child(item_description_label)
 
@@ -4403,15 +4436,15 @@ func _show_item_menu(items: Array) -> void:
 	# Add cancel button
 	var cancel_btn = Button.new()
 	cancel_btn.text = "Cancel"
-	cancel_btn.custom_minimum_size = Vector2(530, 40)
+	cancel_btn.custom_minimum_size = Vector2(470, 40)  # Reduced width by 60px
 	cancel_btn.pressed.connect(_close_item_menu)
 	vbox.add_child(cancel_btn)
 
-	# Add to scene and center
+	# Add to scene and center (moved up 100px)
 	add_child(item_menu_panel)
 	item_menu_panel.position = Vector2(
-		(get_viewport_rect().size.x - 550) / 2,
-		(get_viewport_rect().size.y - 400) / 2
+		(get_viewport_rect().size.x - 490) / 2,  # Adjusted for new width
+		(get_viewport_rect().size.y - 400) / 2 - 100  # Moved up 100px
 	)
 
 	# Rebuild button list for first tab and highlight first item
