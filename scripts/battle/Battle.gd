@@ -1720,14 +1720,20 @@ func _show_status_details(combatant: Dictionary) -> void:
 	status_details_popup.custom_minimum_size = Vector2(400, 300)
 	status_details_popup.modulate.a = 1.0  # 100% solid, no transparency
 
-	# Add solid dark background style
+	# Add Core vibe styling
 	var panel_style = StyleBoxFlat.new()
-	panel_style.bg_color = Color(0.15, 0.15, 0.2, 1.0)  # Solid dark blue-gray
+	panel_style.bg_color = COLOR_INK_CHARCOAL  # Dark background
 	panel_style.border_width_left = 3
 	panel_style.border_width_right = 3
 	panel_style.border_width_top = 3
 	panel_style.border_width_bottom = 3
-	panel_style.border_color = Color(0.4, 0.6, 0.8, 1.0)  # Light blue border
+	panel_style.border_color = COLOR_SKY_CYAN  # Cyan neon border
+	panel_style.corner_radius_top_left = 12
+	panel_style.corner_radius_top_right = 12
+	panel_style.corner_radius_bottom_left = 12
+	panel_style.corner_radius_bottom_right = 12
+	panel_style.shadow_size = 6
+	panel_style.shadow_color = Color(COLOR_SKY_CYAN.r, COLOR_SKY_CYAN.g, COLOR_SKY_CYAN.b, 0.4)  # Cyan glow
 	status_details_popup.add_theme_stylebox_override("panel", panel_style)
 
 	# Center it on screen
@@ -1743,6 +1749,7 @@ func _show_status_details(combatant: Dictionary) -> void:
 	title.text = "=== %s Status ===" % combatant.display_name
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.add_theme_font_size_override("font_size", 16)
+	title.add_theme_color_override("font_color", COLOR_BUBBLE_MAGENTA)  # Pink magenta title
 	vbox.add_child(title)
 
 	var scroll = ScrollContainer.new()
@@ -1757,7 +1764,7 @@ func _show_status_details(combatant: Dictionary) -> void:
 	if ailment != "" and ailment != "null":
 		var ailment_label = Label.new()
 		ailment_label.text = "❌ Ailment: %s" % ailment.capitalize()
-		ailment_label.add_theme_color_override("font_color", Color(1.0, 0.3, 0.3, 1.0))
+		ailment_label.add_theme_color_override("font_color", COLOR_CITRUS_YELLOW)  # Yellow for ailments
 		content.add_child(ailment_label)
 
 	# Buffs/Debuffs
@@ -1767,6 +1774,7 @@ func _show_status_details(combatant: Dictionary) -> void:
 			var buff_title = Label.new()
 			buff_title.text = "\n--- Active Effects (%d) ---" % buffs.size()
 			buff_title.add_theme_font_size_override("font_size", 14)
+			buff_title.add_theme_color_override("font_color", COLOR_SKY_CYAN)  # Cyan section header
 			content.add_child(buff_title)
 
 			for buff in buffs:
@@ -1781,9 +1789,9 @@ func _show_status_details(combatant: Dictionary) -> void:
 
 					# Color based on positive/negative
 					if value > 0:
-						buff_label.add_theme_color_override("font_color", Color(0.3, 1.0, 0.3, 1.0))
+						buff_label.add_theme_color_override("font_color", COLOR_ELECTRIC_LIME)  # Lime green for buffs
 					else:
-						buff_label.add_theme_color_override("font_color", Color(1.0, 0.5, 0.3, 1.0))
+						buff_label.add_theme_color_override("font_color", COLOR_CITRUS_YELLOW)  # Yellow for debuffs
 
 					content.add_child(buff_label)
 
@@ -1792,7 +1800,7 @@ func _show_status_details(combatant: Dictionary) -> void:
 		if not combatant.has("buffs") or combatant.buffs.size() == 0:
 			var none_label = Label.new()
 			none_label.text = "\n✓ No status effects"
-			none_label.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7, 1.0))
+			none_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)  # White text
 			content.add_child(none_label)
 
 	# Close button
@@ -5036,14 +5044,20 @@ func _show_burst_menu(burst_abilities: Array) -> void:
 	burst_menu_panel = PanelContainer.new()
 	burst_menu_panel.custom_minimum_size = Vector2(450, 0)
 
-	# Style the panel
+	# Style the panel with Core vibe
 	var style = StyleBoxFlat.new()
-	style.bg_color = Color(0.1, 0.1, 0.15, 0.95)
-	style.border_width_left = 2
-	style.border_width_right = 2
-	style.border_width_top = 2
-	style.border_width_bottom = 2
-	style.border_color = Color(0.8, 0.3, 0.3, 1.0)  # Red border for bursts
+	style.bg_color = COLOR_INK_CHARCOAL  # Dark background
+	style.border_width_left = 3
+	style.border_width_right = 3
+	style.border_width_top = 3
+	style.border_width_bottom = 3
+	style.border_color = COLOR_SKY_CYAN  # Cyan neon border
+	style.corner_radius_top_left = 12
+	style.corner_radius_top_right = 12
+	style.corner_radius_bottom_left = 12
+	style.corner_radius_bottom_right = 12
+	style.shadow_size = 6
+	style.shadow_color = Color(COLOR_SKY_CYAN.r, COLOR_SKY_CYAN.g, COLOR_SKY_CYAN.b, 0.4)  # Cyan glow
 	burst_menu_panel.add_theme_stylebox_override("panel", style)
 
 	# Create VBox for menu items
@@ -5054,6 +5068,7 @@ func _show_burst_menu(burst_abilities: Array) -> void:
 	var title = Label.new()
 	title.text = "Select Burst Ability"
 	title.add_theme_font_size_override("font_size", 18)
+	title.add_theme_color_override("font_color", COLOR_BUBBLE_MAGENTA)  # Pink magenta title
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vbox.add_child(title)
 
@@ -5062,6 +5077,7 @@ func _show_burst_menu(burst_abilities: Array) -> void:
 	gauge_label.text = "Burst Gauge: %d / %d" % [battle_mgr.burst_gauge, battle_mgr.BURST_GAUGE_MAX]
 	gauge_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	gauge_label.add_theme_font_size_override("font_size", 14)
+	gauge_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)  # White text
 	vbox.add_child(gauge_label)
 
 	# Add separator
