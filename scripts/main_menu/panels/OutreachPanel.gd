@@ -143,9 +143,47 @@ func _wire_signals() -> void:
 
 func _first_fill() -> void:
 	"""Initial data load"""
+	# Apply Core Vibe styling
+	_apply_core_vibe_styling()
+
 	if _category_list.get_item_count() > 0:
 		_category_list.select(0)
 		_on_category_selected(0)
+
+func _apply_core_vibe_styling() -> void:
+	"""Apply Core Vibe neon-kawaii styling to OutreachPanel elements"""
+
+	# Style detail labels
+	if _title_label:
+		aCoreVibeTheme.style_label(_title_label, aCoreVibeTheme.COLOR_GRAPE_VIOLET, 20)
+
+	if _desc_label:
+		aCoreVibeTheme.style_label(_desc_label, aCoreVibeTheme.COLOR_MILK_WHITE, 14)
+
+	if _reward_label:
+		aCoreVibeTheme.style_label(_reward_label, aCoreVibeTheme.COLOR_ELECTRIC_LIME, 14)
+
+	if _status_label:
+		aCoreVibeTheme.style_label(_status_label, aCoreVibeTheme.COLOR_CITRUS_YELLOW, 14)
+
+	# Style action buttons
+	if _primary_btn:
+		aCoreVibeTheme.style_button(_primary_btn, aCoreVibeTheme.COLOR_ELECTRIC_LIME, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
+		_primary_btn.custom_minimum_size = Vector2(120, 36)
+
+	if _back_btn:
+		aCoreVibeTheme.style_button(_back_btn, aCoreVibeTheme.COLOR_SKY_CYAN, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
+		_back_btn.custom_minimum_size = Vector2(120, 36)
+
+	# Style category list with Sky Cyan selection color
+	if _category_list:
+		_category_list.add_theme_color_override("font_selected_color", aCoreVibeTheme.COLOR_SKY_CYAN)
+		_category_list.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE)
+
+	# Style mission list with Electric Lime selection color
+	if _mission_list:
+		_mission_list.add_theme_color_override("font_selected_color", aCoreVibeTheme.COLOR_ELECTRIC_LIME)
+		_mission_list.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE)
 
 	_enter_category_select_state()
 
@@ -242,10 +280,10 @@ func _refresh_mission_list(category: String) -> void:
 
 		_mission_list.add_item(display)
 
-		# Color current mission light blue
+		# Core Vibe: Color current mission with Electric Lime
 		if is_current:
 			var idx = _mission_list.item_count - 1
-			_mission_list.set_item_custom_fg_color(idx, Color(0.4, 0.7, 1.0))
+			_mission_list.set_item_custom_fg_color(idx, aCoreVibeTheme.COLOR_ELECTRIC_LIME)
 
 	# Select first mission if available
 	if _mission_data.size() > 0:
