@@ -916,7 +916,7 @@ func _create_spacer() -> Control:
 
 func _create_empty_slot(slot_type: String, _slot_idx: int) -> PanelContainer:
 	var panel := PanelContainer.new()
-	panel.size_flags_horizontal = Control.SIZE_SHRINK_CENTER  # Center the empty slot
+	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL  # Fill the panel width
 	var vbox := VBoxContainer.new()
 	vbox.add_theme_constant_override("separation", 2)
 
@@ -934,7 +934,7 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 	var btn := Button.new()
 	btn.focus_mode = Control.FOCUS_ALL
 	btn.custom_minimum_size = Vector2(0, 50)  # Sleeker: reduced from 80 to 50
-	btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER  # Center the card
+	btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL  # Fill the panel width
 
 	# Store metadata for popup menu
 	var member_id: String = String(member_data.get("_member_id", ""))
@@ -1129,27 +1129,17 @@ func _style_member_card(btn: Button, is_focused: bool) -> void:
 	"""Style a member card button based on focus state"""
 	var style = StyleBoxFlat.new()
 
-	if is_focused:
-		# Focused: White background, black text
-		style.bg_color = aCoreVibeTheme.COLOR_MILK_WHITE
-	else:
-		# Unfocused: Semi-transparent Ink Charcoal, Sky Cyan text
-		style.bg_color = Color(aCoreVibeTheme.COLOR_INK_CHARCOAL.r, aCoreVibeTheme.COLOR_INK_CHARCOAL.g, aCoreVibeTheme.COLOR_INK_CHARCOAL.b, 0.4)
-
-	style.corner_radius_top_left = 8
-	style.corner_radius_top_right = 8
-	style.corner_radius_bottom_left = 8
-	style.corner_radius_bottom_right = 8
-	# No border - we'll use arrow indicator instead
+	# No background - completely transparent
+	style.bg_color = Color(0, 0, 0, 0)
 	style.border_width_left = 0
 	style.border_width_top = 0
 	style.border_width_right = 0
 	style.border_width_bottom = 0
 	style.shadow_size = 0
-	# Asymmetric padding: 20px left/right, 5px top/bottom
-	style.content_margin_left = 20
+	# Minimal padding
+	style.content_margin_left = 5
 	style.content_margin_top = 5
-	style.content_margin_right = 20
+	style.content_margin_right = 5
 	style.content_margin_bottom = 5
 
 	btn.add_theme_stylebox_override("normal", style)
@@ -1157,12 +1147,12 @@ func _style_member_card(btn: Button, is_focused: bool) -> void:
 	btn.add_theme_stylebox_override("pressed", style)
 	btn.add_theme_stylebox_override("focus", style)
 
-	# Update label colors
+	# Keep all text white regardless of focus
 	if btn.get_child_count() > 0:
 		var main_hbox = btn.get_child(0)
 		if main_hbox.get_child_count() > 0:
 			var info_vbox = main_hbox.get_child(0)
-			_update_label_colors_recursive(info_vbox, is_focused)
+			_update_label_colors_recursive(info_vbox, false)  # Always use white
 
 	# Handle arrow indicator
 	if is_focused:
