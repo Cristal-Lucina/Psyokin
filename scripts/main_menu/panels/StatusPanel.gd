@@ -854,7 +854,7 @@ func _rebuild_party() -> void:
 	var leader_header := Label.new()
 	leader_header.text = "LEADER"
 	leader_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	leader_header.add_theme_font_size_override("font_size", 16)
+	leader_header.add_theme_font_size_override("font_size", 12)
 	leader_header.add_theme_color_override("font_color", Color(1, 0.7, 0.75, 1))
 	_party.add_child(leader_header)
 
@@ -872,7 +872,7 @@ func _rebuild_party() -> void:
 	var active_header := Label.new()
 	active_header.text = "ACTIVE"
 	active_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	active_header.add_theme_font_size_override("font_size", 16)
+	active_header.add_theme_font_size_override("font_size", 12)
 	active_header.add_theme_color_override("font_color", Color(1, 0.7, 0.75, 1))
 	_party.add_child(active_header)
 
@@ -893,7 +893,7 @@ func _rebuild_party() -> void:
 	var bench_header := Label.new()
 	bench_header.text = "BENCH"
 	bench_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	bench_header.add_theme_font_size_override("font_size", 16)
+	bench_header.add_theme_font_size_override("font_size", 12)
 	bench_header.add_theme_color_override("font_color", Color(1, 0.7, 0.75, 1))
 	_party.add_child(bench_header)
 
