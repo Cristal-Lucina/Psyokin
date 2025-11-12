@@ -77,6 +77,10 @@ var _item_to_use_def: Dictionary = {}
 var _active_popup: Panel = null
 var _active_overlay: CanvasLayer = null
 
+# Selection arrow for category list
+var _selection_arrow: Label = null
+var _debug_box: PanelContainer = null
+
 func _ready() -> void:
 	# Set process mode to work while game is paused
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -115,6 +119,9 @@ func _ready() -> void:
 	# Connect visibility
 	visibility_changed.connect(_on_visibility_changed)
 
+	# Create selection arrow for category list
+	_create_selection_arrow()
+
 	# Apply Core Vibe styling
 	call_deferred("_apply_core_vibe_styling")
 
@@ -126,7 +133,113 @@ func _first_fill() -> void:
 	_rebuild()
 	if _category_list and _category_list.item_count > 0:
 		_category_list.select(0)
+		call_deferred("_update_arrow_position")
 		call_deferred("_grab_category_focus")
+
+func _create_selection_arrow() -> void:
+	"""Create the selection arrow indicator for category list"""
+	if not _category_list:
+		return
+
+	# Create arrow label
+	_selection_arrow = Label.new()
+	_selection_arrow.text = "◄"  # Left-pointing arrow
+	_selection_arrow.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_selection_arrow.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_selection_arrow.add_theme_font_size_override("font_size", 43)  # 80% larger
+	_selection_arrow.modulate = Color(1, 1, 1, 1)  # White
+	_selection_arrow.custom_minimum_size = Vector2(54, 72)
+	_selection_arrow.size = Vector2(54, 72)
+	_selection_arrow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_selection_arrow.z_index = 100  # Well above other elements
+
+	# CRITICAL: Add to main ItemsPanel (Control) not the PanelContainer
+	# This prevents any layout containers from resizing it
+	add_child(_selection_arrow)
+
+	# Ensure size is locked after adding to tree
+	await get_tree().process_frame
+	_selection_arrow.size = Vector2(54, 72)
+
+	# Create debug box (160px wide, 20px height)
+	_debug_box = PanelContainer.new()
+	_debug_box.custom_minimum_size = Vector2(160, 20)
+	_debug_box.size = Vector2(160, 20)
+	_debug_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_debug_box.z_index = 100  # Same layer as arrow
+
+	# Create Ink Charcoal rounded style (transparent)
+	var debug_style = StyleBoxFlat.new()
+	debug_style.bg_color = Color(aCoreVibeTheme.COLOR_INK_CHARCOAL.r, aCoreVibeTheme.COLOR_INK_CHARCOAL.g, aCoreVibeTheme.COLOR_INK_CHARCOAL.b, 0.0)  # Transparent
+	debug_style.corner_radius_top_left = 8
+	debug_style.corner_radius_top_right = 8
+	debug_style.corner_radius_bottom_left = 8
+	debug_style.corner_radius_bottom_right = 8
+	_debug_box.add_theme_stylebox_override("panel", debug_style)
+
+	add_child(_debug_box)
+	await get_tree().process_frame
+	_debug_box.size = Vector2(160, 20)
+
+	# Start pulsing animation
+	_start_arrow_pulse()
+
+func _update_arrow_position() -> void:
+	"""Update arrow position to align with selected category"""
+	if not _selection_arrow or not _category_list:
+		return
+
+	var selected = _category_list.get_selected_items()
+	if selected.size() == 0:
+		_selection_arrow.visible = false
+		if _debug_box:
+			_debug_box.visible = false
+		return
+
+	_selection_arrow.visible = true
+
+	# Wait for layout to complete
+	await get_tree().process_frame
+
+	# Get the rect of the selected item in ItemList's local coordinates
+	var item_index = selected[0]
+	var item_rect = _category_list.get_item_rect(item_index)
+
+	# Convert to ItemsPanel coordinates (arrow's parent is now ItemsPanel)
+	var list_global_pos = _category_list.global_position
+	var panel_global_pos = global_position
+
+	# Calculate position in ItemsPanel coordinates
+	var list_offset_in_panel = list_global_pos - panel_global_pos
+
+	# Position arrow to the right of the category list with slight overlap for visual connection
+	# Then shift left by 80px, then shift right by 40px (same as StatsPanel)
+	var arrow_x = list_offset_in_panel.x + _category_list.size.x - 8.0 - 80.0 + 40.0
+	var arrow_y = list_offset_in_panel.y + item_rect.position.y + (item_rect.size.y / 2.0) - (_selection_arrow.size.y / 2.0)
+
+	_selection_arrow.position = Vector2(arrow_x, arrow_y)
+
+	# Position debug box to the left of arrow
+	if _debug_box:
+		_debug_box.visible = true
+		var debug_x = arrow_x - _debug_box.size.x - 4.0  # 4px gap to the left of arrow
+		var debug_y = arrow_y + (_selection_arrow.size.y / 2.0) - (_debug_box.size.y / 2.0)  # Center vertically with arrow
+		_debug_box.position = Vector2(debug_x, debug_y)
+
+func _start_arrow_pulse() -> void:
+	"""Start pulsing animation for the arrow"""
+	if not _selection_arrow:
+		return
+
+	var tween = create_tween()
+	tween.set_loops()
+	tween.set_trans(Tween.TRANS_SINE)
+	tween.set_ease(Tween.EASE_IN_OUT)
+
+	# Pulse left 6 pixels then back
+	var base_x = _selection_arrow.position.x
+	tween.tween_property(_selection_arrow, "position:x", base_x - 6, 0.6)
+	tween.tween_property(_selection_arrow, "position:x", base_x, 0.6)
 
 func _apply_core_vibe_styling() -> void:
 	"""Apply Core Vibe neon-kawaii styling to all UI elements"""
@@ -406,6 +519,7 @@ func _populate_categories() -> void:
 	if prev_selection >= 0 and prev_selection < _category_list.item_count:
 		_category_list.select(prev_selection)
 		_current_category = _category_ids[prev_selection]
+		call_deferred("_update_arrow_position")
 
 func _count_items_in_category(category: String) -> int:
 	"""Count items in a category"""
@@ -689,6 +803,7 @@ func _on_category_selected(index: int) -> void:
 	_selected_item_id = ""  # Reset item selection
 	_populate_items()
 	_update_details()
+	_update_arrow_position()
 
 func _on_item_selected(index: int) -> void:
 	"""Handle item selection"""
