@@ -1180,26 +1180,26 @@ func _show_member_arrow(btn: Button) -> void:
 	if arrow:
 		return  # Already exists
 
-	# Create arrow indicator
-	var arrow_tex := TextureRect.new()
-	arrow_tex.name = "SelectionArrow"
-	arrow_tex.texture = load("res://assets/graphics/arrow/arrow_white.png")
-	arrow_tex.custom_minimum_size = Vector2(15, 15)
-	arrow_tex.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
-	arrow_tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	arrow_tex.flip_v = false  # Original direction
-	arrow_tex.modulate = Color(1, 1, 1, 1)  # White
+	# Create arrow indicator using Label (no external asset needed)
+	var arrow_label := Label.new()
+	arrow_label.name = "SelectionArrow"
+	arrow_label.text = "▼"  # Down arrow Unicode character
+	arrow_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	arrow_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	arrow_label.add_theme_font_size_override("font_size", 20)
+	arrow_label.modulate = Color(1, 1, 1, 1)  # White
+	arrow_label.custom_minimum_size = Vector2(30, 20)
 
-	# Position at top center of button, 8px lower
-	arrow_tex.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	arrow_tex.position = Vector2(0, -12)  # Moved down from -20 to -12
-	arrow_tex.size = Vector2(15, 15)
-	arrow_tex.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# Position at top center of button
+	arrow_label.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	arrow_label.position = Vector2(0, -25)  # Above the button
+	arrow_label.size = Vector2(30, 20)
+	arrow_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
-	btn.add_child(arrow_tex)
+	btn.add_child(arrow_label)
 
 	# Start pulsing animation
-	_start_arrow_pulse(arrow_tex)
+	_start_arrow_pulse(arrow_label)
 
 func _hide_member_arrow(btn: Button) -> void:
 	"""Hide arrow indicator from party member"""
