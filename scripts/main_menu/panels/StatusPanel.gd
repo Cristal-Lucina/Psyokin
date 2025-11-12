@@ -1862,15 +1862,42 @@ func _show_recovery_popup(member_id: String, member_name: String, hp: int, hp_ma
 					# Log all owned items with their categories
 					print("[StatusPanel] Owned item: %s (category: '%s', count: %d)" % [item_id, category, count])
 
-					# Check if this is a HEALING consumable (not just any consumable)
-					# Look for "Heal" in the field_status_effect field
+					# Check if this is a recovery item by looking at multiple possible indicators
 					var field_effect = String(def_data.get("field_status_effect", "")).to_lower()
-					if category == "consumables" or category == "consumable":
-						if field_effect.contains("heal") and (field_effect.contains("hp") or field_effect.contains("mp")):
-							recovery_items.append(item_id)
-							print("[StatusPanel] ✓ This is a recovery item! (effect: '%s')" % field_effect)
-						else:
-							print("[StatusPanel] - Skipped: not a healing item (effect: '%s')" % field_effect)
+					var item_name = String(def_data.get("name", "")).to_lower()
+					var description = String(def_data.get("description", "")).to_lower()
+
+					# Print all fields for debugging
+					print("[StatusPanel]   field_effect: '%s'" % field_effect)
+					print("[StatusPanel]   name: '%s'" % item_name)
+					print("[StatusPanel]   description: '%s'" % description)
+
+					# Check multiple conditions for recovery items
+					var is_recovery = false
+
+					# Method 1: Check field_status_effect for healing keywords
+					if field_effect.contains("heal") or field_effect.contains("restore") or field_effect.contains("recover"):
+						if field_effect.contains("hp") or field_effect.contains("mp") or field_effect.contains("health") or field_effect.contains("mana"):
+							is_recovery = true
+							print("[StatusPanel] ✓ Matched via field_effect")
+
+					# Method 2: Check if category is recovery-related
+					if category == "recovery" or category == "healing" or category == "restorative":
+						is_recovery = true
+						print("[StatusPanel] ✓ Matched via category")
+
+					# Method 3: Check consumables with healing in name/description
+					if (category == "consumables" or category == "consumable"):
+						if (item_name.contains("potion") or item_name.contains("elixir") or item_name.contains("tonic") or
+						    description.contains("restore") or description.contains("heal") or description.contains("recover")):
+							is_recovery = true
+							print("[StatusPanel] ✓ Matched via consumable name/description")
+
+					if is_recovery:
+						recovery_items.append(item_id)
+						print("[StatusPanel] ✓✓ ADDED as recovery item!")
+					else:
+						print("[StatusPanel] - Skipped: not a recovery item")
 
 		print("[StatusPanel] All unique categories found: " + str(categories_found))
 		print("[StatusPanel] Total recovery items found: %d" % recovery_items.size())
