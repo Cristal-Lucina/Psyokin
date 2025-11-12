@@ -257,29 +257,68 @@ func _rebuild() -> void:
 func _load_item_defs() -> void:
 	"""Load item definitions from CSV"""
 	_defs.clear()
-	if not _csv or not _csv.has_method("load_csv"):
+
+	if not _csv:
+		print("[ItemsPanel] ERROR: CSV loader is null!")
 		return
 
-	# CSV loader returns a Dictionary keyed by item_id
+	if not _csv.has_method("load_csv"):
+		print("[ItemsPanel] ERROR: CSV loader missing load_csv method!")
+		return
+
+	print("[ItemsPanel] Calling load_csv with path: %s, key: %s" % [ITEMS_CSV, KEY_ID])
 	var defs_variant: Variant = _csv.call("load_csv", ITEMS_CSV, KEY_ID)
-	if defs_variant == null or typeof(defs_variant) != TYPE_DICTIONARY:
+	print("[ItemsPanel] load_csv returned type: %d" % typeof(defs_variant))
+
+	if defs_variant == null:
+		print("[ItemsPanel] ERROR: CSV returned null!")
 		return
 
-	_defs = defs_variant as Dictionary
+	if typeof(defs_variant) != TYPE_DICTIONARY:
+		print("[ItemsPanel] ERROR: CSV returned wrong type!")
+		return
+
+	# IMPORTANT: Duplicate to avoid modifying CSV loader's internal cache
+	_defs = (defs_variant as Dictionary).duplicate(true)
 	print("[ItemsPanel] Loaded %d item definitions" % _defs.size())
 
 func _load_inventory() -> void:
 	"""Load inventory counts"""
 	_counts.clear()
-	if not _inv or not _inv.has_method("get_counts"):
+
+	if not _inv:
+		print("[ItemsPanel] ERROR: Inventory system is null!")
 		return
 
+	if not _inv.has_method("get_counts"):
+		print("[ItemsPanel] ERROR: Inventory missing get_counts method!")
+		return
+
+	print("[ItemsPanel] Calling inventory.get_counts()")
 	var items_variant: Variant = _inv.call("get_counts")
-	if items_variant == null or typeof(items_variant) != TYPE_DICTIONARY:
+	print("[ItemsPanel] get_counts returned type: %d" % typeof(items_variant))
+
+	if items_variant == null:
+		print("[ItemsPanel] ERROR: Inventory returned null!")
 		return
 
-	_counts = items_variant as Dictionary
-	print("[ItemsPanel] Loaded %d items from inventory" % _counts.size())
+	if typeof(items_variant) != TYPE_DICTIONARY:
+		print("[ItemsPanel] ERROR: Inventory returned wrong type!")
+		return
+
+	# Filter out comment entries (start with #) and convert to proper types
+	var raw_counts: Dictionary = items_variant as Dictionary
+	for item_id in raw_counts.keys():
+		var id_str: String = String(item_id)
+		if id_str.begins_with("#"):
+			continue
+		var qty: Variant = raw_counts[item_id]
+		if typeof(qty) == TYPE_FLOAT or typeof(qty) == TYPE_INT:
+			var qty_int: int = int(qty)
+			if qty_int > 0:
+				_counts[id_str] = qty_int
+
+	print("[ItemsPanel] Loaded %d items from inventory (filtered %d comments)" % [_counts.size(), raw_counts.size() - _counts.size()])
 
 func _load_equipped() -> void:
 	"""Load equipped items"""
@@ -599,22 +638,19 @@ func _unhandled_input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 			return
 
-	# D-Pad - Grid item navigation
-	elif event.is_action_pressed("ui_up"):
-		_navigate_grid(-2)  # Up one row (2 columns)
+	# D-Pad - Simple list navigation (up/down)
+	if event.is_action_pressed("ui_up"):
+		_navigate_items(-1)
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("ui_down"):
-		_navigate_grid(2)  # Down one row
+		_navigate_items(1)
 		get_viewport().set_input_as_handled()
-	elif event.is_action_pressed("ui_left"):
-		_navigate_grid(-1)  # Left one item
-		get_viewport().set_input_as_handled()
-	elif event.is_action_pressed("ui_right"):
-		_navigate_grid(1)  # Right one item
+	elif event.is_action_pressed("menu_accept") or event.is_action_pressed("ui_accept"):
+		_on_accept_pressed()
 		get_viewport().set_input_as_handled()
 
-func _navigate_grid(delta: int) -> void:
-	"""Navigate grid items with directional input"""
+func _navigate_items(delta: int) -> void:
+	"""Navigate items with simple up/down"""
 	if _item_buttons.size() == 0:
 		return
 
@@ -631,6 +667,20 @@ func _navigate_grid(delta: int) -> void:
 		_selected_item_id = _item_ids[_selected_grid_index]
 		_update_details()
 		_update_arrow_position()
+
+func _on_accept_pressed() -> void:
+	"""Handle Accept button press"""
+	if _selected_item_id == "" or not _defs.has(_selected_item_id):
+		return
+
+	var def: Dictionary = _defs[_selected_item_id]
+
+	# If it's a recovery item, trigger use button
+	if _is_recovery_item(def) and _use_button and _use_button.visible:
+		_on_use_button_pressed()
+	# For other items, trigger inspect
+	elif _inspect_button and _inspect_button.visible:
+		_on_inspect_button_pressed()
 
 func _on_visibility_changed() -> void:
 	if visible:
