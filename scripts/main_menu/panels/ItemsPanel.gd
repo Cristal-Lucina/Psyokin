@@ -731,12 +731,12 @@ func _input(event: InputEvent) -> void:
 				_navigate_items(2)  # DOWN in column: +2
 				get_viewport().set_input_as_handled()
 				return
-			13:  # D-pad Left (CORRECT button number!)
+			13:  # D-pad Left
 				print("[ItemsPanel] D-pad Left pressed")
 				_navigate_items(-1)  # LEFT cycles BACKWARDS: -1
 				get_viewport().set_input_as_handled()
 				return
-			15:  # D-pad Right
+			14:  # D-pad Right (CORRECT button number!)
 				print("[ItemsPanel] D-pad Right pressed")
 				_navigate_items(1)  # RIGHT cycles FORWARDS: +1
 				get_viewport().set_input_as_handled()
