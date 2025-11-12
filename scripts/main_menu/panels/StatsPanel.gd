@@ -255,8 +255,8 @@ func _update_arrow_position() -> void:
 	print("  List offset in StatsPanel: %s" % list_offset_in_statspanel)
 
 	# Position arrow to the right of the party list with slight overlap for visual connection
-	# Then shift left by 80px
-	var arrow_x = list_offset_in_statspanel.x + _party_list.size.x - 8.0 - 80.0
+	# Then shift left by 80px, then shift right by 40px
+	var arrow_x = list_offset_in_statspanel.x + _party_list.size.x - 8.0 - 80.0 + 40.0
 	var arrow_y = list_offset_in_statspanel.y + item_rect.position.y + (item_rect.size.y / 2.0) - (_selection_arrow.size.y / 2.0)
 
 	print("  Arrow custom_minimum_size: %s" % _selection_arrow.custom_minimum_size)
@@ -266,10 +266,10 @@ func _update_arrow_position() -> void:
 
 	_selection_arrow.position = Vector2(arrow_x, arrow_y)
 
-	# Position debug box to the left of arrow, then shift 40px right
+	# Position debug box to the left of arrow
 	if _debug_box:
 		_debug_box.visible = true
-		var debug_x = arrow_x - _debug_box.size.x - 4.0 + 40.0  # 4px gap to the left of arrow, shift 40px right
+		var debug_x = arrow_x - _debug_box.size.x - 4.0  # 4px gap to the left of arrow
 		var debug_y = arrow_y + (_selection_arrow.size.y / 2.0) - (_debug_box.size.y / 2.0)  # Center vertically with arrow
 		_debug_box.position = Vector2(debug_x, debug_y)
 		print("  Debug box position: %s" % _debug_box.position)
