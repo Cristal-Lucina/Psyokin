@@ -233,7 +233,7 @@ func _update_arrow_position() -> void:
 
 	# Position arrow to the right of the item text
 	# Align arrow's vertical center with item's vertical center
-	var arrow_x = list_offset_in_statspanel.x + item_rect.position.x + item_rect.size.x + 10
+	var arrow_x = list_offset_in_statspanel.x + item_rect.position.x + item_rect.size.x + 40
 	var arrow_y = list_offset_in_statspanel.y + item_rect.position.y + (item_rect.size.y / 2.0) - (_selection_arrow.size.y / 2.0)
 
 	print("  Arrow custom_minimum_size: %s" % _selection_arrow.custom_minimum_size)
