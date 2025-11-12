@@ -913,7 +913,7 @@ func _rebuild_party() -> void:
 
 func _create_spacer() -> Control:
 	var spacer := Control.new()
-	spacer.custom_minimum_size.y = 8
+	spacer.custom_minimum_size.y = 2  # Reduced from 8 for tighter spacing
 	return spacer
 
 func _create_empty_slot(slot_type: String, _slot_idx: int) -> PanelContainer:
