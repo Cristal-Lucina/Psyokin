@@ -90,6 +90,11 @@ func _ready() -> void:
 
 func _first_fill() -> void:
 	_apply_core_vibe_styling()
+
+	# Set party list text to layer 200
+	if _party_list:
+		_party_list.z_index = 200
+
 	_create_selection_arrow()
 	_refresh_party()
 	if _party_list.item_count > 0:
