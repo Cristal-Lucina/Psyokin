@@ -254,67 +254,55 @@ func _load_item_defs() -> void:
 	"""Load item definitions from CSV"""
 	_defs.clear()
 	if not _csv or not _csv.has_method("load_csv"):
-		print("[ItemsPanel] CSV system not available")
 		return
 
-	var rows_variant: Variant = _csv.call("load_csv", ITEMS_CSV, KEY_ID)
-	if rows_variant == null:
-		print("[ItemsPanel] CSV load returned null")
+	# CSV loader returns a Dictionary keyed by item_id
+	var defs_variant: Variant = _csv.call("load_csv", ITEMS_CSV, KEY_ID)
+	if defs_variant == null or typeof(defs_variant) != TYPE_DICTIONARY:
 		return
 
-	# Convert to array safely
-	var rows: Array = []
-	if typeof(rows_variant) == TYPE_ARRAY:
-		rows = rows_variant as Array
-	else:
-		print("[ItemsPanel] CSV load didn't return an array, got type: %d" % typeof(rows_variant))
-		return
-
-	for row in rows:
-		if typeof(row) == TYPE_DICTIONARY:
-			var id: String = String(row.get(KEY_ID, ""))
-			if id != "":
-				_defs[id] = row
+	_defs = defs_variant as Dictionary
+	print("[ItemsPanel] Loaded %d item definitions" % _defs.size())
 
 func _load_inventory() -> void:
 	"""Load inventory counts"""
 	_counts.clear()
-	if not _inv or not _inv.has_method("get_all_items"):
-		print("[ItemsPanel] Inventory system not available")
+	if not _inv or not _inv.has_method("get_counts"):
 		return
 
-	var items_variant: Variant = _inv.call("get_all_items")
+	var items_variant: Variant = _inv.call("get_counts")
 	if items_variant == null or typeof(items_variant) != TYPE_DICTIONARY:
-		print("[ItemsPanel] Inventory returned invalid data")
 		return
 
-	var items: Dictionary = items_variant as Dictionary
-	for item_id in items.keys():
-		_counts[String(item_id)] = int(items[item_id])
+	_counts = items_variant as Dictionary
+	print("[ItemsPanel] Loaded %d items from inventory" % _counts.size())
 
 func _load_equipped() -> void:
 	"""Load equipped items"""
 	_equipped_by.clear()
-	if not _eq or not _eq.has_method("get_all_equipped"):
-		print("[ItemsPanel] Equipment system not available")
+	if not _eq or not _eq.has_method("get_member_equip") or not _gs:
 		return
 
-	var equipped_variant: Variant = _eq.call("get_all_equipped")
-	if equipped_variant == null or typeof(equipped_variant) != TYPE_DICTIONARY:
-		print("[ItemsPanel] Equipment returned invalid data")
-		return
+	# Get all party members
+	var members: Array = []
+	if _gs.has_method("get_active_party"):
+		var party_variant: Variant = _gs.call("get_active_party")
+		if typeof(party_variant) == TYPE_ARRAY:
+			members = party_variant as Array
 
-	var equipped: Dictionary = equipped_variant as Dictionary
-	for member in equipped.keys():
-		if typeof(equipped[member]) != TYPE_DICTIONARY:
+	# Load equipment for each member
+	for member in members:
+		var member_id: String = String(member)
+		var equip_variant: Variant = _eq.call("get_member_equip", member_id)
+		if typeof(equip_variant) != TYPE_DICTIONARY:
 			continue
-		var member_gear: Dictionary = equipped[member] as Dictionary
+		var member_gear: Dictionary = equip_variant as Dictionary
 		for slot in member_gear.keys():
 			var item_id: String = String(member_gear[slot])
-			if item_id != "":
+			if item_id != "" and item_id != "—":
 				if not _equipped_by.has(item_id):
 					_equipped_by[item_id] = []
-				_equipped_by[item_id].append(_member_display_name(member))
+				_equipped_by[item_id].append(_member_display_name(member_id))
 
 func _populate_items() -> void:
 	"""Populate items grid based on current category"""
