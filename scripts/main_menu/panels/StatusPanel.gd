@@ -282,11 +282,11 @@ func _build_tab_buttons() -> void:
 
 		var btn := Button.new()
 		btn.text = String(meta["title"])
-		btn.custom_minimum_size = Vector2(140, 32)  # Sleeker: reduced height from 40 to 32
-		btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		btn.custom_minimum_size = Vector2(160, 36)  # Rounded square proportions
+		btn.alignment = HORIZONTAL_ALIGNMENT_CENTER  # Center text
 
-		# Style with rounded right corners, flat left (pop-out from border)
-		_style_menu_button(btn, false)
+		# Style with rounded square and tab-specific border color
+		_style_menu_button(btn, tab_id, false)
 
 		# Connect pressed signal
 		var button_index = _tab_buttons.size()
@@ -304,66 +304,83 @@ func _build_tab_buttons() -> void:
 		if visible:
 			call_deferred("_grab_first_tab_button_focus")
 
-func _style_menu_button(btn: Button, is_selected: bool) -> void:
-	"""Style a sleek menu button with asymmetric rounded corners (flat left, rounded right)"""
+func _get_tab_border_color(tab_id: String) -> Color:
+	"""Get the neon border color for a specific tab"""
+	match tab_id:
+		"stats":     return Color(0.5, 1.0, 0.5)    # Light green
+		"perks":     return Color(1.0, 1.0, 0.0)    # Yellow
+		"items":     return Color(1.0, 0.6, 0.0)    # Orange
+		"loadout":   return Color(1.0, 0.0, 0.0)    # Red
+		"bonds":     return Color(1.0, 0.75, 0.8)   # Pink
+		"outreach":  return Color(0.6, 0.0, 1.0)    # Purple
+		"dorms":     return Color(0.0, 0.5, 1.0)    # Cobalt
+		"calendar":  return Color(0.5, 0.8, 1.0)    # Light blue
+		"index":     return Color(0.0, 0.8, 0.8)    # Teal
+		"system":    return Color(1.0, 1.0, 1.0)    # White
+		_:           return aCoreVibeTheme.COLOR_SKY_CYAN
+
+func _style_menu_button(btn: Button, tab_id: String, is_selected: bool) -> void:
+	"""Style a rounded square menu button with tab-specific neon border"""
 	var style = StyleBoxFlat.new()
 
-	# Colors based on selection - sleeker with stronger contrast
+	# Get tab-specific border color
+	var border_color = _get_tab_border_color(tab_id)
+
+	# Colors based on selection
 	if is_selected:
-		# Selected: Bright Electric Lime with higher opacity
-		style.bg_color = Color(aCoreVibeTheme.COLOR_ELECTRIC_LIME.r, aCoreVibeTheme.COLOR_ELECTRIC_LIME.g, aCoreVibeTheme.COLOR_ELECTRIC_LIME.b, 0.5)
-		style.border_color = aCoreVibeTheme.COLOR_ELECTRIC_LIME
+		# Selected: Pale white background with deep dark grey text
+		style.bg_color = Color(0.95, 0.95, 0.95)  # Pale white
+		style.border_color = border_color
 	else:
-		# Unselected: Very subtle, nearly transparent
-		style.bg_color = Color(aCoreVibeTheme.COLOR_INK_CHARCOAL.r, aCoreVibeTheme.COLOR_INK_CHARCOAL.g, aCoreVibeTheme.COLOR_INK_CHARCOAL.b, 0.2)
-		style.border_color = Color(aCoreVibeTheme.COLOR_SKY_CYAN.r, aCoreVibeTheme.COLOR_SKY_CYAN.g, aCoreVibeTheme.COLOR_SKY_CYAN.b, 0.5)
+		# Unselected: Dark greyish-blue background with white text
+		style.bg_color = Color(0.15, 0.2, 0.3)  # Dark greyish-blue
+		style.border_color = border_color
 
-	# Asymmetric corners: flat left (0px), more rounded right (16px for sleeker look)
-	style.corner_radius_top_left = 0
-	style.corner_radius_bottom_left = 0
-	style.corner_radius_top_right = 16
-	style.corner_radius_bottom_right = 16
+	# Rounded square: all corners equally rounded
+	style.corner_radius_top_left = 8
+	style.corner_radius_bottom_left = 8
+	style.corner_radius_top_right = 8
+	style.corner_radius_bottom_right = 8
 
-	# Border: only right, top, and bottom (no left border) - thinner for sleeker look
-	style.border_width_left = 0
-	style.border_width_top = 1
+	# Border: all sides equal
+	style.border_width_left = 2
+	style.border_width_top = 2
 	style.border_width_right = 2
-	style.border_width_bottom = 1
+	style.border_width_bottom = 2
 
-	# Stronger glow for selected, subtle for unselected
-	if is_selected:
-		style.shadow_color = Color(style.border_color.r, style.border_color.g, style.border_color.b, 0.8)
-		style.shadow_size = 8
-	else:
-		style.shadow_color = Color(style.border_color.r, style.border_color.g, style.border_color.b, 0.3)
-		style.shadow_size = 4
-	style.shadow_offset = Vector2(3, 0)
+	# Neon glow
+	style.shadow_color = Color(border_color.r, border_color.g, border_color.b, 0.6)
+	style.shadow_size = 6
+	style.shadow_offset = Vector2(0, 0)
 
-	# Padding - text shifted 20px to the right, tighter vertical for sleeker look
-	style.content_margin_left = 30
-	style.content_margin_top = 6
+	# Centered padding
+	style.content_margin_left = 12
+	style.content_margin_top = 8
 	style.content_margin_right = 12
-	style.content_margin_bottom = 6
+	style.content_margin_bottom = 8
 
 	btn.add_theme_stylebox_override("normal", style)
 	btn.add_theme_stylebox_override("hover", style)
 	btn.add_theme_stylebox_override("pressed", style)
 	btn.add_theme_stylebox_override("focus", style)
 
-	# Font size - slightly smaller for sleeker look
-	btn.add_theme_font_size_override("font_size", 13)
+	# Font size - increased by 3pts (was 13, now 16)
+	btn.add_theme_font_size_override("font_size", 16)
 
 	# Text color
 	if is_selected:
-		btn.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE)
-		btn.add_theme_color_override("font_hover_color", aCoreVibeTheme.COLOR_MILK_WHITE)
-		btn.add_theme_color_override("font_pressed_color", aCoreVibeTheme.COLOR_MILK_WHITE)
-		btn.add_theme_color_override("font_focus_color", aCoreVibeTheme.COLOR_MILK_WHITE)
+		# Selected: Deep dark grey
+		var dark_grey = Color(0.15, 0.15, 0.15)
+		btn.add_theme_color_override("font_color", dark_grey)
+		btn.add_theme_color_override("font_hover_color", dark_grey)
+		btn.add_theme_color_override("font_pressed_color", dark_grey)
+		btn.add_theme_color_override("font_focus_color", dark_grey)
 	else:
-		btn.add_theme_color_override("font_color", Color(aCoreVibeTheme.COLOR_SKY_CYAN.r, aCoreVibeTheme.COLOR_SKY_CYAN.g, aCoreVibeTheme.COLOR_SKY_CYAN.b, 0.7))
-		btn.add_theme_color_override("font_hover_color", aCoreVibeTheme.COLOR_ELECTRIC_LIME)
-		btn.add_theme_color_override("font_pressed_color", aCoreVibeTheme.COLOR_MILK_WHITE)
-		btn.add_theme_color_override("font_focus_color", aCoreVibeTheme.COLOR_ELECTRIC_LIME)
+		# Unselected: White
+		btn.add_theme_color_override("font_color", Color.WHITE)
+		btn.add_theme_color_override("font_hover_color", Color.WHITE)
+		btn.add_theme_color_override("font_pressed_color", Color.WHITE)
+		btn.add_theme_color_override("font_focus_color", Color.WHITE)
 
 func _on_tab_button_pressed(index: int) -> void:
 	"""Handle tab button press"""
@@ -383,27 +400,14 @@ func _on_tab_button_focused(index: int) -> void:
 	_update_button_selection()
 
 func _update_button_selection() -> void:
-	"""Update visual state and stretch for selected button"""
-	# Create tween for smooth width and position animation
-	var tween = create_tween()
-	tween.set_parallel(true)
-	tween.set_trans(Tween.TRANS_CUBIC)
-	tween.set_ease(Tween.EASE_OUT)
-
+	"""Update visual state for selected button"""
 	for i in range(_tab_buttons.size()):
 		var btn = _tab_buttons[i]
+		var tab_id = _tab_ids[i] if i < _tab_ids.size() else ""
 		var is_selected = (i == _selected_button_index)
 
-		# Restyle button
-		_style_menu_button(btn, is_selected)
-
-		# Animate stretch: selected buttons extend 20px to the right
-		var target_width = 140 if not is_selected else 160
-		tween.tween_property(btn, "custom_minimum_size:x", target_width, 0.2)
-
-		# Animate slide: unselected buttons hide 20px to the left, selected buttons reveal at 0
-		var target_x = -20 if not is_selected else 0
-		tween.tween_property(btn, "position:x", target_x, 0.2)
+		# Restyle button with tab-specific color
+		_style_menu_button(btn, tab_id, is_selected)
 
 func _grab_first_tab_button_focus() -> void:
 	"""Grab focus on first tab button"""
