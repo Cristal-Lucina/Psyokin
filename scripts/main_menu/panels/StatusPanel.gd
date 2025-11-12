@@ -297,9 +297,12 @@ func _build_tab_buttons() -> void:
 		_tab_buttons.append(btn)
 		_tab_ids.append(tab_id)
 
-	# Select and focus first button
+	# Select and focus last selected button (or first if none)
 	if _tab_buttons.size() > 0:
-		_selected_button_index = 0
+		# Preserve last selection instead of always resetting to 0
+		_selected_button_index = _last_selected_tab_index
+		if _selected_button_index >= _tab_buttons.size():
+			_selected_button_index = 0  # Fallback if index is out of bounds
 		_update_button_selection()
 		if visible:
 			call_deferred("_grab_first_tab_button_focus")
@@ -458,9 +461,9 @@ func _stop_button_pulse(btn: Button) -> void:
 	btn.scale = Vector2(1.0, 1.0)
 
 func _grab_first_tab_button_focus() -> void:
-	"""Grab focus on first tab button"""
-	if _tab_buttons.size() > 0 and is_instance_valid(_tab_buttons[0]):
-		_tab_buttons[0].grab_focus()
+	"""Grab focus on currently selected tab button"""
+	if _tab_buttons.size() > 0 and is_instance_valid(_tab_buttons[_selected_button_index]):
+		_tab_buttons[_selected_button_index].grab_focus()
 
 func _create_creds_perks_display() -> void:
 	"""Create the new CREDS/PERKS display in bottom right corner"""
