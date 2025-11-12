@@ -2175,6 +2175,7 @@ func _apply_recovery_effect(member_id: String, member_name: String, item_id: Str
 						if is_percentage:
 							heal_amount = int(float(max_hp) * float(recovery_amount) / 100.0)
 
+						# Clamp to max HP - never heal over maximum
 						var new_hp = min(current_hp + heal_amount, max_hp)
 						actual_heal_amount = new_hp - current_hp
 						member_dict["hp"] = new_hp
@@ -2189,6 +2190,7 @@ func _apply_recovery_effect(member_id: String, member_name: String, item_id: Str
 						if is_percentage:
 							heal_amount = int(float(max_mp) * float(recovery_amount) / 100.0)
 
+						# Clamp to max MP - never heal over maximum
 						var new_mp = min(current_mp + heal_amount, max_mp)
 						actual_heal_amount = new_mp - current_mp
 						member_dict["mp"] = new_mp
