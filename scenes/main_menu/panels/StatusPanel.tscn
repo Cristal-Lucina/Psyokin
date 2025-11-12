@@ -69,7 +69,7 @@ size_flags_vertical = 3
 [node name="Left" type="VBoxContainer" parent="Root"]
 custom_minimum_size = Vector2(280, 0)
 layout_mode = 2
-size_flags_horizontal = 3
+size_flags_horizontal = 4
 size_flags_vertical = 3
 theme_override_constants/separation = 8
 
@@ -82,8 +82,8 @@ layout_mode = 2
 size_flags_horizontal = 3
 theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
 theme_override_font_sizes/font_size = 20
-text = "PARTY STATS"
-horizontal_alignment = 0
+text = "PARTY"
+horizontal_alignment = 1
 
 [node name="PartySeparator" type="HSeparator" parent="Root/Left"]
 layout_mode = 2

@@ -311,7 +311,7 @@ func _get_tab_border_color(tab_id: String) -> Color:
 		"perks":     return Color(1.0, 1.0, 0.0)    # Yellow
 		"items":     return Color(1.0, 0.6, 0.0)    # Orange
 		"loadout":   return Color(1.0, 0.0, 0.0)    # Red
-		"bonds":     return Color(1.0, 0.75, 0.8)   # Pink
+		"bonds":     return Color(1.0, 0.0, 1.0)    # Magenta
 		"outreach":  return Color(0.6, 0.0, 1.0)    # Purple
 		"dorms":     return Color(0.0, 0.5, 1.0)    # Cobalt
 		"calendar":  return Color(0.5, 0.8, 1.0)    # Light blue
@@ -332,9 +332,9 @@ func _style_menu_button(btn: Button, tab_id: String, is_selected: bool) -> void:
 		style.bg_color = Color(0.95, 0.95, 0.95)  # Pale white
 		style.border_color = border_color
 	else:
-		# Unselected: Dark greyish-blue background with white text
+		# Unselected: Dark greyish-blue background with white text, NO border
 		style.bg_color = Color(0.15, 0.2, 0.3)  # Dark greyish-blue
-		style.border_color = border_color
+		style.border_color = Color(0.15, 0.2, 0.3)  # Same as background (invisible border)
 
 	# Rounded square: all corners equally rounded
 	style.corner_radius_top_left = 8
@@ -343,15 +343,26 @@ func _style_menu_button(btn: Button, tab_id: String, is_selected: bool) -> void:
 	style.corner_radius_bottom_right = 8
 
 	# Border: all sides equal
-	style.border_width_left = 2
-	style.border_width_top = 2
-	style.border_width_right = 2
-	style.border_width_bottom = 2
+	if is_selected:
+		style.border_width_left = 2
+		style.border_width_top = 2
+		style.border_width_right = 2
+		style.border_width_bottom = 2
+	else:
+		# No border when unselected
+		style.border_width_left = 0
+		style.border_width_top = 0
+		style.border_width_right = 0
+		style.border_width_bottom = 0
 
-	# Neon glow
-	style.shadow_color = Color(border_color.r, border_color.g, border_color.b, 0.6)
-	style.shadow_size = 6
-	style.shadow_offset = Vector2(0, 0)
+	# Neon glow - only when selected
+	if is_selected:
+		style.shadow_color = Color(border_color.r, border_color.g, border_color.b, 0.6)
+		style.shadow_size = 6
+		style.shadow_offset = Vector2(0, 0)
+	else:
+		style.shadow_color = Color(0, 0, 0, 0)  # No glow
+		style.shadow_size = 0
 
 	# Centered padding
 	style.content_margin_left = 12
@@ -408,6 +419,43 @@ func _update_button_selection() -> void:
 
 		# Restyle button with tab-specific color
 		_style_menu_button(btn, tab_id, is_selected)
+
+		# Add pulse animation to selected button
+		if is_selected:
+			_start_button_pulse(btn)
+		else:
+			_stop_button_pulse(btn)
+
+func _start_button_pulse(btn: Button) -> void:
+	"""Start pulsing animation for button"""
+	# Kill any existing tween
+	if btn.has_meta("pulse_tween"):
+		var old_tween = btn.get_meta("pulse_tween")
+		if old_tween and is_instance_valid(old_tween):
+			old_tween.kill()
+
+	# Create pulsing scale tween
+	var tween = create_tween()
+	tween.set_loops()
+	tween.set_trans(Tween.TRANS_SINE)
+	tween.set_ease(Tween.EASE_IN_OUT)
+
+	# Pulse between 1.0 and 1.05 scale
+	tween.tween_property(btn, "scale", Vector2(1.05, 1.05), 0.8)
+	tween.tween_property(btn, "scale", Vector2(1.0, 1.0), 0.8)
+
+	btn.set_meta("pulse_tween", tween)
+
+func _stop_button_pulse(btn: Button) -> void:
+	"""Stop pulsing animation for button"""
+	if btn.has_meta("pulse_tween"):
+		var tween = btn.get_meta("pulse_tween")
+		if tween and is_instance_valid(tween):
+			tween.kill()
+		btn.remove_meta("pulse_tween")
+
+	# Reset scale to normal
+	btn.scale = Vector2(1.0, 1.0)
 
 func _grab_first_tab_button_focus() -> void:
 	"""Grab focus on first tab button"""
