@@ -504,7 +504,11 @@ func _populate_items() -> void:
 		_items_grid.add_child(button)
 		_item_buttons.append(button)
 		_item_ids.append(item_id)
-		print("[ItemsPanel] Added button: %s" % button.text)
+		var idx = _item_buttons.size() - 1
+		var row = idx / 2
+		var col = idx % 2
+		var col_name = "LEFT" if col == 0 else "RIGHT"
+		print("[ItemsPanel] Index %d (Row %d, %s): %s" % [idx, row, col_name, button.text])
 
 	print("[ItemsPanel] Total buttons created: %d" % _item_buttons.size())
 
@@ -754,8 +758,10 @@ func _navigate_items(delta: int) -> void:
 	# Calculate row and column (2 columns)
 	var current_row = current / 2
 	var current_col = current % 2
+	var col_name = "LEFT" if current_col == 0 else "RIGHT"
+	var item_name = _item_buttons[current].text if current < _item_buttons.size() else "?"
 
-	print("[ItemsPanel] Current: idx=%d, row=%d, col=%d, total=%d, delta=%d" % [current, current_row, current_col, total, delta])
+	print("[ItemsPanel] Navigation from '%s' at index %d (Row %d, %s column), delta=%d" % [item_name, current, current_row, col_name, delta])
 
 	if delta == 2:  # Down (next row, same column)
 		new_index = current + 2
@@ -781,7 +787,12 @@ func _navigate_items(delta: int) -> void:
 			return
 		new_index = current - 1
 
-	print("[ItemsPanel]   Moving from %d to %d" % [current, new_index])
+	var new_row = new_index / 2
+	var new_col = new_index % 2
+	var new_col_name = "LEFT" if new_col == 0 else "RIGHT"
+	var new_item_name = _item_buttons[new_index].text if new_index < _item_buttons.size() else "?"
+	print("[ItemsPanel]   → Moving TO '%s' at index %d (Row %d, %s column)" % [new_item_name, new_index, new_row, new_col_name])
+
 	_selected_grid_index = new_index
 	_selected_item_id = _item_ids[_selected_grid_index]
 	_update_selection_highlight()
