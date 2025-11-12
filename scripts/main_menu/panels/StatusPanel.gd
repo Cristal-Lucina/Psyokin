@@ -1316,6 +1316,7 @@ func _show_member_action_menu(member_name: String, member_id: String, show_switc
 	var recovery_btn := Button.new()
 	recovery_btn.text = "RECOVERY"
 	recovery_btn.custom_minimum_size = Vector2(200, 0)
+	recovery_btn.focus_mode = Control.FOCUS_ALL
 	recovery_btn.pressed.connect(_on_action_menu_recovery_pressed.bind(popup_panel))
 	vbox.add_child(recovery_btn)
 
@@ -1324,12 +1325,14 @@ func _show_member_action_menu(member_name: String, member_id: String, show_switc
 		var switch_btn := Button.new()
 		switch_btn.text = "SWITCH"
 		switch_btn.custom_minimum_size = Vector2(200, 0)
+		switch_btn.focus_mode = Control.FOCUS_ALL
 		switch_btn.pressed.connect(_on_action_menu_switch_pressed.bind(popup_panel))
 		vbox.add_child(switch_btn)
 
 	# Back button
 	var back_btn: Button = Button.new()
 	back_btn.text = "BACK"
+	back_btn.focus_mode = Control.FOCUS_ALL
 	back_btn.pressed.connect(_close_member_action_menu.bind(popup_panel))
 	vbox.add_child(back_btn)
 
@@ -2777,7 +2780,13 @@ func _handle_popup_input(event: InputEvent) -> void:
 		elif _active_popup and _active_popup.get_meta("_is_switch_popup", false):
 			_popup_accept_switch()
 			get_viewport().set_input_as_handled()
-		# For action menu popup, don't mark as handled - let buttons handle it
+		elif _active_popup and _active_popup.name == "MemberActionMenu":
+			# Handle accept for action menu - activate focused button
+			var focused_control = get_viewport().gui_get_focus_owner()
+			if focused_control is Button:
+				print("[StatusPanel] Activating action menu button: %s" % (focused_control as Button).text)
+				(focused_control as Button).emit_signal("pressed")
+				get_viewport().set_input_as_handled()
 		# Notice, heal confirmation, and swap confirmation now use ToastPopup (self-handling)
 	elif event.is_action_pressed("menu_back"):
 		# Cancel popup - all popups can be cancelled with back
