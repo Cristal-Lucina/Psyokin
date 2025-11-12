@@ -201,6 +201,14 @@ func _update_arrow_position() -> void:
 
 	var arrow_x = button_offset.x + selected_button.size.x - 8.0 - 80.0 + 40.0
 	var arrow_y = button_offset.y + (selected_button.size.y / 2.0) - (_selection_arrow.size.y / 2.0)
+
+	print("[ItemsPanel] Arrow position update:")
+	print("  Selected index: %d" % _selected_grid_index)
+	print("  Button global pos: %s" % str(button_global_pos))
+	print("  Panel global pos: %s" % str(panel_global_pos))
+	print("  Button offset: %s" % str(button_offset))
+	print("  Arrow position: (%f, %f)" % [arrow_x, arrow_y])
+
 	_selection_arrow.position = Vector2(arrow_x, arrow_y)
 
 	if _debug_box:
