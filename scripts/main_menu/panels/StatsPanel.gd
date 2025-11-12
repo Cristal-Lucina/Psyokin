@@ -203,15 +203,21 @@ func _update_arrow_position() -> void:
 	# Wait for layout to complete
 	await get_tree().process_frame
 
-	# Get the rect of the selected item
+	# Get the rect of the selected item in ItemList's local coordinates
 	var item_index = selected[0]
 	var item_rect = _party_list.get_item_rect(item_index)
 
-	# Position arrow to the right of the item text
-	# Account for party list position relative to party panel
-	var list_pos = _party_list.position
-	var arrow_x = list_pos.x + item_rect.position.x + item_rect.size.x + 10
-	var arrow_y = list_pos.y + item_rect.position.y + (item_rect.size.y - 72) / 2.0
+	# Convert ItemList position to party panel coordinates
+	# ItemList is a child of party panel, so we need its position + margins
+	var list_global_pos = _party_list.global_position
+	var panel_global_pos = _party_panel.global_position if _party_panel else Vector2.ZERO
+
+	# Calculate position in panel coordinates
+	var list_offset_in_panel = list_global_pos - panel_global_pos
+
+	# Position arrow to the right of the item text, aligned vertically with item center
+	var arrow_x = list_offset_in_panel.x + item_rect.position.x + item_rect.size.x + 10
+	var arrow_y = list_offset_in_panel.y + item_rect.position.y + (item_rect.size.y / 2.0) - (36)  # Center on text line
 
 	_selection_arrow.position = Vector2(arrow_x, arrow_y)
 
