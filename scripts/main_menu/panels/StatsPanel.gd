@@ -177,19 +177,19 @@ func _create_selection_arrow() -> void:
 	_selection_arrow.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_selection_arrow.add_theme_font_size_override("font_size", 43)  # 80% larger
 	_selection_arrow.modulate = Color(1, 1, 1, 1)  # White
-	_selection_arrow.custom_minimum_size = Vector2(54, 72)
 	_selection_arrow.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_selection_arrow.z_index = 10  # Above other elements
 
-	# Prevent size expansion from parent PanelContainer layout
-	_selection_arrow.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	_selection_arrow.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	# CRITICAL: Use absolute positioning (layout_mode 0) to prevent PanelContainer from resizing
+	# This must be set BEFORE adding to tree
+	_selection_arrow.set("layout_mode", 0)  # LAYOUT_MODE_POSITION - use absolute position
+	_selection_arrow.size = Vector2(54, 72)  # Set fixed size
 
 	# Add to party panel
 	if _party_panel:
 		_party_panel.add_child(_selection_arrow)
 
-	# Force set size after adding to tree
+	# Ensure size is locked after adding to tree
 	await get_tree().process_frame
 	_selection_arrow.size = Vector2(54, 72)
 
