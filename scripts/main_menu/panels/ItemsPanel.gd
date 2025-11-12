@@ -67,6 +67,7 @@ var _selected_grid_index: int = 0
 # Selection arrow
 var _selection_arrow: Label = null
 var _debug_box: PanelContainer = null
+var _arrow_tween: Tween = null
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -199,16 +200,25 @@ func _update_arrow_position() -> void:
 		var debug_y = arrow_y + (_selection_arrow.size.y / 2.0) - (_debug_box.size.y / 2.0)
 		_debug_box.position = Vector2(debug_x, debug_y)
 
+	# Restart pulse animation at new position
+	_start_arrow_pulse()
+
 func _start_arrow_pulse() -> void:
 	if not _selection_arrow:
 		return
-	var tween = create_tween()
-	tween.set_loops()
-	tween.set_trans(Tween.TRANS_SINE)
-	tween.set_ease(Tween.EASE_IN_OUT)
+
+	# Kill existing tween if it exists
+	if _arrow_tween and is_instance_valid(_arrow_tween):
+		_arrow_tween.kill()
+
+	# Create new tween at current position
+	_arrow_tween = create_tween()
+	_arrow_tween.set_loops()
+	_arrow_tween.set_trans(Tween.TRANS_SINE)
+	_arrow_tween.set_ease(Tween.EASE_IN_OUT)
 	var base_x = _selection_arrow.position.x
-	tween.tween_property(_selection_arrow, "position:x", base_x - 6, 0.6)
-	tween.tween_property(_selection_arrow, "position:x", base_x, 0.6)
+	_arrow_tween.tween_property(_selection_arrow, "position:x", base_x - 6, 0.6)
+	_arrow_tween.tween_property(_selection_arrow, "position:x", base_x, 0.6)
 
 func _apply_styling() -> void:
 	if _item_panel:
