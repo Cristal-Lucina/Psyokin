@@ -1380,10 +1380,13 @@ func _on_action_menu_recovery_pressed(popup: Control) -> void:
 
 	print("[StatusPanel] Action menu - Recovery selected for: %s" % member_name)
 
-	# Close action menu first
+	# Clear active popup immediately to allow new popup to open
+	_active_popup = null
+
+	# Close action menu (fade out and cleanup)
 	_close_member_action_menu(popup)
 
-	# Then show recovery popup (reuse existing recovery logic)
+	# Show recovery popup
 	_show_recovery_popup(member_id, member_name, hp, hp_max, mp, mp_max)
 
 func _on_action_menu_switch_pressed(popup: Control) -> void:
@@ -1392,10 +1395,13 @@ func _on_action_menu_switch_pressed(popup: Control) -> void:
 
 	print("[StatusPanel] Action menu - Switch selected for slot: %d" % active_slot)
 
-	# Close action menu first
+	# Clear active popup immediately to allow new popup to open
+	_active_popup = null
+
+	# Close action menu (fade out and cleanup)
 	_close_member_action_menu(popup)
 
-	# Then show switch popup (reuse existing switch logic)
+	# Show switch popup
 	_on_switch_pressed(active_slot)
 
 func _close_member_action_menu(popup: Control) -> void:
@@ -1410,9 +1416,10 @@ func _close_member_action_menu(popup: Control) -> void:
 
 	# Fade out popup, then clean up
 	_fade_out_popup(popup_to_close, func():
-		# Clear active popup and change state
-		_active_popup = null
-		_nav_state = NavState.CONTENT
+		# Only clear active popup if it's still this popup (not a new one opened since)
+		if _active_popup == popup_to_close:
+			_active_popup = null
+			_nav_state = NavState.CONTENT
 
 		# Free the popup and its CanvasLayer parent
 		if is_instance_valid(popup_to_close):
@@ -1422,8 +1429,9 @@ func _close_member_action_menu(popup: Control) -> void:
 			else:
 				popup_to_close.queue_free()
 
-		# Restore focus to first button in content
-		call_deferred("_navigate_to_content")
+		# Only restore focus if we're actually going back to content (not opening another popup)
+		if _nav_state == NavState.CONTENT:
+			call_deferred("_navigate_to_content")
 	)
 
 	print("[StatusPanel] Member action menu closed")
