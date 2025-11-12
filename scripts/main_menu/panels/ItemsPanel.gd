@@ -241,6 +241,9 @@ func _apply_styling() -> void:
 		aCoreVibeTheme.style_button(_inspect_button, aCoreVibeTheme.COLOR_SKY_CYAN, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
 
 func _rebuild() -> void:
+	"""Rebuild all data from systems"""
+	if not is_inside_tree():
+		return
 	_load_item_defs()
 	_load_inventory()
 	_load_equipped()
@@ -248,10 +251,25 @@ func _rebuild() -> void:
 	_update_details()
 
 func _load_item_defs() -> void:
+	"""Load item definitions from CSV"""
 	_defs.clear()
 	if not _csv or not _csv.has_method("load_csv"):
+		print("[ItemsPanel] CSV system not available")
 		return
-	var rows: Array = _csv.call("load_csv", ITEMS_CSV, KEY_ID)
+
+	var rows_variant: Variant = _csv.call("load_csv", ITEMS_CSV, KEY_ID)
+	if rows_variant == null:
+		print("[ItemsPanel] CSV load returned null")
+		return
+
+	# Convert to array safely
+	var rows: Array = []
+	if typeof(rows_variant) == TYPE_ARRAY:
+		rows = rows_variant as Array
+	else:
+		print("[ItemsPanel] CSV load didn't return an array, got type: %d" % typeof(rows_variant))
+		return
+
 	for row in rows:
 		if typeof(row) == TYPE_DICTIONARY:
 			var id: String = String(row.get(KEY_ID, ""))
@@ -259,20 +277,38 @@ func _load_item_defs() -> void:
 				_defs[id] = row
 
 func _load_inventory() -> void:
+	"""Load inventory counts"""
 	_counts.clear()
 	if not _inv or not _inv.has_method("get_all_items"):
+		print("[ItemsPanel] Inventory system not available")
 		return
-	var items: Dictionary = _inv.call("get_all_items")
+
+	var items_variant: Variant = _inv.call("get_all_items")
+	if items_variant == null or typeof(items_variant) != TYPE_DICTIONARY:
+		print("[ItemsPanel] Inventory returned invalid data")
+		return
+
+	var items: Dictionary = items_variant as Dictionary
 	for item_id in items.keys():
 		_counts[String(item_id)] = int(items[item_id])
 
 func _load_equipped() -> void:
+	"""Load equipped items"""
 	_equipped_by.clear()
 	if not _eq or not _eq.has_method("get_all_equipped"):
+		print("[ItemsPanel] Equipment system not available")
 		return
-	var equipped: Dictionary = _eq.call("get_all_equipped")
+
+	var equipped_variant: Variant = _eq.call("get_all_equipped")
+	if equipped_variant == null or typeof(equipped_variant) != TYPE_DICTIONARY:
+		print("[ItemsPanel] Equipment returned invalid data")
+		return
+
+	var equipped: Dictionary = equipped_variant as Dictionary
 	for member in equipped.keys():
-		var member_gear: Dictionary = equipped[member]
+		if typeof(equipped[member]) != TYPE_DICTIONARY:
+			continue
+		var member_gear: Dictionary = equipped[member] as Dictionary
 		for slot in member_gear.keys():
 			var item_id: String = String(member_gear[slot])
 			if item_id != "":
