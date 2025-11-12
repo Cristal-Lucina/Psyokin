@@ -1185,10 +1185,12 @@ func _show_member_arrow(btn: Button) -> void:
 	arrow_tex.custom_minimum_size = Vector2(15, 15)
 	arrow_tex.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
 	arrow_tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	arrow_tex.flip_v = true  # Flip vertically (invert)
+	arrow_tex.modulate = Color(1, 1, 1, 1)  # White
 
-	# Position at top center of button
+	# Position at top center of button, 8px lower
 	arrow_tex.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	arrow_tex.position = Vector2(0, -20)  # Above the button
+	arrow_tex.position = Vector2(0, -12)  # Moved down from -20 to -12
 	arrow_tex.size = Vector2(15, 15)
 	arrow_tex.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
@@ -1253,9 +1255,31 @@ func _on_member_card_pressed(btn: Button) -> void:
 	_show_member_action_menu(member_name, member_id, show_switch, active_slot, hp, hp_max, mp, mp_max)
 
 func _show_member_action_menu(member_name: String, member_id: String, show_switch: bool, active_slot: int, hp: int, hp_max: int, mp: int, mp_max: int) -> void:
-	"""Show popup menu with RECOVERY and optionally SWITCH"""
-	var popup_panel := PanelContainer.new()
+	"""Show popup menu with RECOVERY and optionally SWITCH - matches Recovery popup pattern"""
+	# Prevent multiple popups
+	if _active_popup and is_instance_valid(_active_popup):
+		print("[StatusPanel] Popup already open, ignoring request")
+		return
+
+	# Create CanvasLayer to ensure popup is centered on viewport
+	var canvas_layer := CanvasLayer.new()
+	canvas_layer.layer = 100
+	add_child(canvas_layer)
+
+	# Create popup panel using same pattern as Recovery popup
+	var popup_panel: Panel = Panel.new()
 	popup_panel.name = "MemberActionMenu"
+	popup_panel.process_mode = Node.PROCESS_MODE_ALWAYS
+	popup_panel.set_anchors_preset(Control.PRESET_CENTER)
+	popup_panel.modulate.a = 0.0  # Start fully transparent
+	popup_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE  # Block input until fade completes
+	canvas_layer.add_child(popup_panel)
+
+	# Apply consistent styling (matches Recovery popup)
+	_style_popup_panel(popup_panel)
+
+	# Set active popup immediately
+	_active_popup = popup_panel
 
 	# Store metadata
 	popup_panel.set_meta("member_name", member_name)
@@ -1267,43 +1291,29 @@ func _show_member_action_menu(member_name: String, member_id: String, show_switc
 	popup_panel.set_meta("mp", mp)
 	popup_panel.set_meta("mp_max", mp_max)
 
-	# Style popup
-	var popup_style = aCoreVibeTheme.create_panel_style(
-		aCoreVibeTheme.COLOR_ELECTRIC_LIME,
-		aCoreVibeTheme.COLOR_INK_CHARCOAL,
-		0.95,
-		aCoreVibeTheme.CORNER_RADIUS_MEDIUM,
-		aCoreVibeTheme.BORDER_WIDTH_THIN,
-		aCoreVibeTheme.SHADOW_SIZE_LARGE
-	)
-	popup_panel.add_theme_stylebox_override("panel", popup_style)
+	# Create content container
+	var vbox: VBoxContainer = VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 8)
+	popup_panel.add_child(vbox)
 
-	var margin := MarginContainer.new()
-	margin.add_theme_constant_override("margin_left", 16)
-	margin.add_theme_constant_override("margin_top", 16)
-	margin.add_theme_constant_override("margin_right", 16)
-	margin.add_theme_constant_override("margin_bottom", 16)
-	popup_panel.add_child(margin)
-
-	var vbox := VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 12)
-	margin.add_child(vbox)
-
-	# Title
-	var title := Label.new()
+	# Title label
+	var title: Label = Label.new()
 	title.text = member_name
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	aCoreVibeTheme.style_label(title, aCoreVibeTheme.COLOR_ELECTRIC_LIME, 18)
+	title.add_theme_font_size_override("font_size", 14)
 	vbox.add_child(title)
 
-	var separator := HSeparator.new()
-	vbox.add_child(separator)
+	# Member status display
+	var status_label: Label = Label.new()
+	status_label.text = "HP: %d/%d  |  MP: %d/%d" % [hp, hp_max, mp, mp_max]
+	status_label.add_theme_font_size_override("font_size", 10)
+	status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(status_label)
 
 	# Recovery button
 	var recovery_btn := Button.new()
 	recovery_btn.text = "RECOVERY"
-	recovery_btn.custom_minimum_size = Vector2(160, 40)
-	aCoreVibeTheme.style_button(recovery_btn, aCoreVibeTheme.COLOR_ELECTRIC_LIME, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
+	recovery_btn.custom_minimum_size = Vector2(200, 0)
 	recovery_btn.pressed.connect(_on_action_menu_recovery_pressed.bind(popup_panel))
 	vbox.add_child(recovery_btn)
 
@@ -1311,28 +1321,32 @@ func _show_member_action_menu(member_name: String, member_id: String, show_switc
 	if show_switch:
 		var switch_btn := Button.new()
 		switch_btn.text = "SWITCH"
-		switch_btn.custom_minimum_size = Vector2(160, 40)
-		aCoreVibeTheme.style_button(switch_btn, aCoreVibeTheme.COLOR_SKY_CYAN, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
+		switch_btn.custom_minimum_size = Vector2(200, 0)
 		switch_btn.pressed.connect(_on_action_menu_switch_pressed.bind(popup_panel))
 		vbox.add_child(switch_btn)
 
-	# Cancel button
-	var cancel_btn := Button.new()
-	cancel_btn.text = "CANCEL"
-	cancel_btn.custom_minimum_size = Vector2(160, 40)
-	aCoreVibeTheme.style_button(cancel_btn, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
-	cancel_btn.pressed.connect(_close_member_action_menu.bind(popup_panel))
-	vbox.add_child(cancel_btn)
+	# Back button
+	var back_btn: Button = Button.new()
+	back_btn.text = "BACK"
+	back_btn.pressed.connect(_close_member_action_menu.bind(popup_panel))
+	vbox.add_child(back_btn)
 
-	# Add to scene and center
-	add_child(popup_panel)
-	popup_panel.set_anchors_preset(Control.PRESET_CENTER)
-	popup_panel.position = -popup_panel.size / 2.0
+	# Auto-size panel - wait two frames
+	await get_tree().process_frame
+	await get_tree().process_frame
+	popup_panel.size = vbox.size + Vector2(20, 20)
+	vbox.position = Vector2(10, 10)
+
+	# Center popup on screen
+	var viewport_size: Vector2 = get_viewport_rect().size
+	popup_panel.position = (viewport_size - popup_panel.size) / 2.0
+
+	# Fade in popup
+	_fade_in_popup(popup_panel)
 
 	# Change nav state and grab focus
 	_nav_state = NavState.POPUP_ACTIVE
-	_active_popup = popup_panel
-	recovery_btn.grab_focus()
+	recovery_btn.call_deferred("grab_focus")
 
 	print("[StatusPanel] Member action menu shown for: %s" % member_name)
 
@@ -1366,12 +1380,32 @@ func _on_action_menu_switch_pressed(popup: Control) -> void:
 	_on_switch_pressed(active_slot)
 
 func _close_member_action_menu(popup: Control) -> void:
-	"""Close the member action menu"""
-	if popup and is_instance_valid(popup):
-		popup.queue_free()
+	"""Close the member action menu - matches Recovery popup pattern"""
+	if not popup or not is_instance_valid(popup):
+		return
 
-	_nav_state = NavState.CONTENT
-	_active_popup = null
+	print("[StatusPanel] Closing member action menu with fade-out, returning to content mode")
+
+	# Store popup reference but DON'T clear _active_popup yet (prevents double-close during fade)
+	var popup_to_close = popup
+
+	# Fade out popup, then clean up
+	_fade_out_popup(popup_to_close, func():
+		# Clear active popup and change state
+		_active_popup = null
+		_nav_state = NavState.CONTENT
+
+		# Free the popup and its CanvasLayer parent
+		if is_instance_valid(popup_to_close):
+			var canvas_layer = popup_to_close.get_parent()
+			if canvas_layer and is_instance_valid(canvas_layer):
+				canvas_layer.queue_free()  # This also frees the popup
+			else:
+				popup_to_close.queue_free()
+
+		# Restore focus to first button in content
+		call_deferred("_navigate_to_content")
+	)
 
 	print("[StatusPanel] Member action menu closed")
 
