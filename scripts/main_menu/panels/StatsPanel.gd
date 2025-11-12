@@ -181,9 +181,17 @@ func _create_selection_arrow() -> void:
 	_selection_arrow.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_selection_arrow.z_index = 10  # Above other elements
 
+	# Prevent size expansion from parent PanelContainer layout
+	_selection_arrow.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	_selection_arrow.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+
 	# Add to party panel
 	if _party_panel:
 		_party_panel.add_child(_selection_arrow)
+
+	# Force set size after adding to tree
+	await get_tree().process_frame
+	_selection_arrow.size = Vector2(54, 72)
 
 	# Start pulsing animation
 	_start_arrow_pulse()
