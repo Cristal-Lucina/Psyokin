@@ -838,7 +838,7 @@ class RadarChart extends Control:
 	var _max_value: float = 100.0
 
 	# Core Vibe: Neon-kawaii radar chart colors
-	var grid_color: Color = aCoreVibeTheme.COLOR_MILK_WHITE  # White grid lines
+	var grid_color: Color = Color(aCoreVibeTheme.COLOR_MILK_WHITE.r, aCoreVibeTheme.COLOR_MILK_WHITE.g, aCoreVibeTheme.COLOR_MILK_WHITE.b, 0.5)  # White grid lines at 50% transparency
 	var stat_color: Color = Color(aCoreVibeTheme.COLOR_ELECTRIC_LIME.r, aCoreVibeTheme.COLOR_ELECTRIC_LIME.g, aCoreVibeTheme.COLOR_ELECTRIC_LIME.b, 0.3)  # Electric Lime fill
 	var stat_border_color: Color = aCoreVibeTheme.COLOR_ELECTRIC_LIME  # Electric Lime border
 	var label_color: Color = aCoreVibeTheme.COLOR_MILK_WHITE  # Milk White labels
