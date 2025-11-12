@@ -73,7 +73,7 @@ const ANIM_DURATION := 0.2  # Animation duration in seconds
 @onready var _middle_panel: PanelContainer = get_node("%Middle") if has_node("%Middle") else null
 @onready var _stats_panel: PanelContainer = get_node("%StatsColumn") if has_node("%StatsColumn") else null
 
-@onready var _party_list: ItemList       = get_node("Row/Party/VBox/PartyList") as ItemList
+@onready var _party_list: ItemList       = get_node("Row/Party/Margin/VBox/PartyList") as ItemList
 # @onready var _member_name: Label         = get_node("Row/Middle/Margin/VBox/MemberName") as Label  # Removed
 
 @onready var _w_val: Label = get_node("Row/Middle/Margin/VBox/Grid/WHBox/WValue") as Label
@@ -1352,10 +1352,10 @@ func _create_stat_cell(stat_label: String, value: String) -> PanelContainer:
 	hbox.add_theme_constant_override("separation", 4)
 	margin.add_child(hbox)
 
-	# Label - 25 characters wide (Core Vibe: Milk White)
+	# Label - 20 characters wide (Core Vibe: Milk White)
 	var label := Label.new()
 	label.text = stat_label
-	label.custom_minimum_size = Vector2(150, 0)  # ~25 characters at 12pt
+	label.custom_minimum_size = Vector2(120, 0)  # ~20 characters at 12pt
 	label.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	label.add_theme_font_size_override("font_size", 12)
 	label.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE)

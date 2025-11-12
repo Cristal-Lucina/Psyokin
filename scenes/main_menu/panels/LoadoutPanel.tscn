@@ -31,22 +31,29 @@ layout_mode = 2
 size_flags_horizontal = 3
 size_flags_stretch_ratio = 2.0
 
-[node name="VBox" type="VBoxContainer" parent="Row/Party"]
+[node name="Margin" type="MarginContainer" parent="Row/Party"]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 10
+
+[node name="VBox" type="VBoxContainer" parent="Row/Party/Margin"]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="PartyLabel" type="Label" parent="Row/Party/VBox"]
+[node name="PartyLabel" type="Label" parent="Row/Party/Margin/VBox"]
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
 theme_override_font_sizes/font_size = 16
 text = "PARTY LOADOUT"
 horizontal_alignment = 0
 
-[node name="PartyList" type="ItemList" parent="Row/Party/VBox"]
+[node name="PartyList" type="ItemList" parent="Row/Party/Margin/VBox"]
 layout_mode = 2
 size_flags_vertical = 3
 
-[node name="SeparatorAfterPartyList" type="HSeparator" parent="Row/Party/VBox"]
+[node name="SeparatorAfterPartyList" type="HSeparator" parent="Row/Party/Margin/VBox"]
 layout_mode = 2
 
 [node name="Middle" type="PanelContainer" parent="Row"]
