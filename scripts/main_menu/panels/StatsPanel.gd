@@ -233,14 +233,15 @@ func _update_arrow_position() -> void:
 	var list_offset_in_panel = list_global_pos - panel_global_pos
 	print("  List offset in panel: %s" % list_offset_in_panel)
 
-	# Position arrow to the right of the item text, aligned vertically with item center
+	# Position arrow to the right of the item text
+	# Align arrow top with item top (simpler and more consistent)
 	var arrow_x = list_offset_in_panel.x + item_rect.position.x + item_rect.size.x + 10
-	var arrow_y = list_offset_in_panel.y + item_rect.position.y + (item_rect.size.y / 2.0) - (36)  # Center on text line
+	var arrow_y = list_offset_in_panel.y + item_rect.position.y - 23  # Align with text line (adjusted for 72px arrow)
 
 	print("  Arrow custom_minimum_size: %s" % _selection_arrow.custom_minimum_size)
 	print("  Arrow size: %s" % _selection_arrow.size)
 	print("  Calculated arrow pos: x=%f y=%f" % [arrow_x, arrow_y])
-	print("  Arrow vertical calc: item_y=%f + (item_h=%f / 2.0) - 36 = %f" % [item_rect.position.y, item_rect.size.y, arrow_y - list_offset_in_panel.y])
+	print("  Arrow vertical calc: item_top=%f - 23px offset = %f" % [item_rect.position.y, arrow_y - list_offset_in_panel.y])
 
 	_selection_arrow.position = Vector2(arrow_x, arrow_y)
 
