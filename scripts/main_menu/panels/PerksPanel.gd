@@ -150,9 +150,9 @@ func _create_selection_arrow() -> void:
 	_debug_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_debug_box.z_index = 100  # Same layer as arrow
 
-	# Create Ink Charcoal rounded style
+	# Create transparent rounded style
 	var debug_style = StyleBoxFlat.new()
-	debug_style.bg_color = aCoreVibeTheme.COLOR_INK_CHARCOAL
+	debug_style.bg_color = Color(aCoreVibeTheme.COLOR_INK_CHARCOAL.r, aCoreVibeTheme.COLOR_INK_CHARCOAL.g, aCoreVibeTheme.COLOR_INK_CHARCOAL.b, 0.0)  # Transparent
 	debug_style.corner_radius_top_left = 8
 	debug_style.corner_radius_top_right = 8
 	debug_style.corner_radius_bottom_left = 8
@@ -589,8 +589,8 @@ func _update_arrow_position() -> void:
 	# Calculate position in PerksPanel coordinates
 	var cell_offset_in_panel = cell_global_pos - panel_global_pos
 
-	# Position arrow to the right center of the cell with offset
-	var arrow_x = cell_offset_in_panel.x + cell.size.x - 8.0 - 80.0 + 40.0
+	# Position arrow to the right center of the cell with offset, then shift right 40px more
+	var arrow_x = cell_offset_in_panel.x + cell.size.x - 8.0 - 80.0 + 40.0 + 40.0
 	var arrow_y = cell_offset_in_panel.y + (cell.size.y / 2.0) - (_selection_arrow.size.y / 2.0)
 
 	_selection_arrow.position = Vector2(arrow_x, arrow_y)
