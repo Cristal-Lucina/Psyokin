@@ -43,6 +43,7 @@ var _selected_col: int = 0
 # Selection arrow
 var _selection_arrow: Label = null
 var _debug_box: PanelContainer = null
+var _arrow_tween: Tween = null
 
 # Active popup tracking (needed for cleanup when panel is hidden)
 var _active_popup: ToastPopup = null
@@ -162,6 +163,28 @@ func _create_selection_arrow() -> void:
 	add_child(_debug_box)
 	await get_tree().process_frame
 	_debug_box.size = Vector2(160, 20)
+
+	# Start pulsing animation
+	_start_arrow_pulse()
+
+func _start_arrow_pulse() -> void:
+	"""Start pulsing animation for the arrow"""
+	if not _selection_arrow:
+		return
+
+	# Kill existing tween if any
+	if _arrow_tween and is_instance_valid(_arrow_tween):
+		_arrow_tween.kill()
+
+	_arrow_tween = create_tween()
+	_arrow_tween.set_loops()
+	_arrow_tween.set_trans(Tween.TRANS_SINE)
+	_arrow_tween.set_ease(Tween.EASE_IN_OUT)
+
+	# Pulse left 6 pixels then back
+	var base_x = _selection_arrow.position.x
+	_arrow_tween.tween_property(_selection_arrow, "position:x", base_x - 6, 0.6)
+	_arrow_tween.tween_property(_selection_arrow, "position:x", base_x, 0.6)
 
 func _wrap_in_styled_panel(container: Control, border_color: Color) -> PanelContainer:
 	"""Wrap a container in a styled PanelContainer with rounded neon borders"""
@@ -589,8 +612,8 @@ func _update_arrow_position() -> void:
 	# Calculate position in PerksPanel coordinates
 	var cell_offset_in_panel = cell_global_pos - panel_global_pos
 
-	# Position arrow to the right center of the cell with offset, then shift right 40px more
-	var arrow_x = cell_offset_in_panel.x + cell.size.x - 8.0 - 80.0 + 40.0 + 40.0
+	# Position arrow to the right center of the cell with offset, then shift right 40px more, then left 8px
+	var arrow_x = cell_offset_in_panel.x + cell.size.x - 8.0 - 80.0 + 40.0 + 40.0 - 8.0
 	var arrow_y = cell_offset_in_panel.y + (cell.size.y / 2.0) - (_selection_arrow.size.y / 2.0)
 
 	_selection_arrow.position = Vector2(arrow_x, arrow_y)
@@ -601,6 +624,9 @@ func _update_arrow_position() -> void:
 		var debug_x = arrow_x - _debug_box.size.x - 4.0  # 4px gap to the left of arrow
 		var debug_y = arrow_y + (_selection_arrow.size.y / 2.0) - (_debug_box.size.y / 2.0)  # Center vertically with arrow
 		_debug_box.position = Vector2(debug_x, debug_y)
+
+	# Restart pulsing animation with new position
+	_start_arrow_pulse()
 
 func _show_selected_perk_details() -> void:
 	"""Show details for currently selected perk"""
