@@ -722,22 +722,22 @@ func _input(event: InputEvent) -> void:
 				return
 			12:  # D-pad Up
 				print("[ItemsPanel] D-pad Up pressed")
-				_navigate_items(-2)  # Flipped with button 13
+				_navigate_items(-2)  # UP in column: -2
 				get_viewport().set_input_as_handled()
 				return
 			13:  # D-pad Down
 				print("[ItemsPanel] D-pad Down pressed")
-				_navigate_items(2)  # Flipped with button 12
+				_navigate_items(2)  # DOWN in column: +2
 				get_viewport().set_input_as_handled()
 				return
 			14:  # D-pad Left
 				print("[ItemsPanel] D-pad Left pressed")
-				_navigate_items(1)  # Left button: +1 (WORKING - no change)
+				_navigate_items(-1)  # LEFT cycles BACKWARDS: -1
 				get_viewport().set_input_as_handled()
 				return
 			15:  # D-pad Right
 				print("[ItemsPanel] D-pad Right pressed")
-				_navigate_items(1)  # Reversed from -1 to +1
+				_navigate_items(1)  # RIGHT cycles FORWARDS: +1
 				get_viewport().set_input_as_handled()
 				return
 			0:  # Accept button (A/Cross)
