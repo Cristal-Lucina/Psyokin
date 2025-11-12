@@ -655,8 +655,15 @@ func _is_battle_item(def: Dictionary) -> bool:
 	return false
 
 func _display_name(item_id: String, def: Dictionary) -> String:
-	var name: String = String(def.get("name", item_id))
-	return name if name != "" else item_id
+	"""Get display name for an item"""
+	if def.has("sigil_instance") and def.has("name"):
+		return String(def["name"])
+	for key in ["name", "display_name", "label", "title"]:
+		if def.has(key):
+			var val: String = String(def[key]).strip_edges()
+			if val != "":
+				return val
+	return item_id.replace("_", " ").capitalize()
 
 func _get_description(def: Dictionary) -> String:
 	return String(def.get("description", ""))
@@ -1190,14 +1197,3 @@ func _get_member_hp_mp(member_token: String) -> Dictionary:
 
 	print("[ItemsPanel]   Final stats: HP %d/%d, MP %d/%d" % [stats["hp"], stats["hp_max"], stats["mp"], stats["mp_max"]])
 	return stats
-
-func _display_name(item_id: String, def: Dictionary) -> String:
-	"""Get display name for an item"""
-	if def.has("sigil_instance") and def.has("name"):
-		return String(def["name"])
-	for key in ["name", "display_name", "label", "title"]:
-		if def.has(key):
-			var val: String = String(def[key]).strip_edges()
-			if val != "":
-				return val
-	return item_id.replace("_", " ").capitalize()
