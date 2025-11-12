@@ -854,7 +854,7 @@ func _rebuild_party() -> void:
 	var leader_header := Label.new()
 	leader_header.text = "LEADER"
 	leader_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	leader_header.add_theme_font_size_override("font_size", 16)
+	leader_header.add_theme_font_size_override("font_size", 12)
 	leader_header.add_theme_color_override("font_color", Color(1, 0.7, 0.75, 1))
 	_party.add_child(leader_header)
 
@@ -872,7 +872,7 @@ func _rebuild_party() -> void:
 	var active_header := Label.new()
 	active_header.text = "ACTIVE"
 	active_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	active_header.add_theme_font_size_override("font_size", 16)
+	active_header.add_theme_font_size_override("font_size", 12)
 	active_header.add_theme_color_override("font_color", Color(1, 0.7, 0.75, 1))
 	_party.add_child(active_header)
 
@@ -893,7 +893,7 @@ func _rebuild_party() -> void:
 	var bench_header := Label.new()
 	bench_header.text = "BENCH"
 	bench_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	bench_header.add_theme_font_size_override("font_size", 16)
+	bench_header.add_theme_font_size_override("font_size", 12)
 	bench_header.add_theme_color_override("font_color", Color(1, 0.7, 0.75, 1))
 	_party.add_child(bench_header)
 
@@ -913,7 +913,7 @@ func _rebuild_party() -> void:
 
 func _create_spacer() -> Control:
 	var spacer := Control.new()
-	spacer.custom_minimum_size.y = 8
+	spacer.custom_minimum_size.y = 0  # No gap - sections directly adjacent
 	return spacer
 
 func _create_empty_slot(slot_type: String, _slot_idx: int) -> PanelContainer:
@@ -935,7 +935,7 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 	# Create a button instead of PanelContainer for clickability
 	var btn := Button.new()
 	btn.focus_mode = Control.FOCUS_ALL
-	btn.custom_minimum_size = Vector2(0, 50)  # Sleeker: reduced from 80 to 50
+	btn.custom_minimum_size = Vector2(0, 40)  # Compact: name/level left, bars right
 	btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL  # Fill the panel width
 
 	# Store metadata for popup menu
@@ -954,69 +954,60 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 	btn.focus_entered.connect(_on_member_card_focused.bind(btn))
 	btn.focus_exited.connect(_on_member_card_unfocused.bind(btn))
 
-	# Main horizontal container: member info
+	# Main horizontal container: name/level on left, stats on right
 	var main_hbox := HBoxContainer.new()
-	main_hbox.add_theme_constant_override("separation", 12)
+	main_hbox.add_theme_constant_override("separation", 8)
 	main_hbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
-	# Member info (name + stats)
-	var info_vbox := VBoxContainer.new()
-	info_vbox.add_theme_constant_override("separation", 2)
-	info_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	info_vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
-
-	# Name and level row
-	var name_row := HBoxContainer.new()
-	name_row.add_theme_constant_override("separation", 8)
-	name_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# Left side: Name and Level (20 character width)
+	var name_level_vbox := VBoxContainer.new()
+	name_level_vbox.add_theme_constant_override("separation", 0)
+	name_level_vbox.custom_minimum_size.x = 160  # ~20 characters at default font
+	name_level_vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	var name_lbl := Label.new()
 	name_lbl.text = String(member_data.get("name", "Member"))
-	name_lbl.add_theme_font_size_override("font_size", 12)
+	name_lbl.add_theme_font_size_override("font_size", 11)
 	name_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	name_row.add_child(name_lbl)
+	name_level_vbox.add_child(name_lbl)
 
 	var lvl_lbl := Label.new()
 	lvl_lbl.text = "Lv %d" % int(member_data.get("level", 1))
-	lvl_lbl.add_theme_font_size_override("font_size", 10)
+	lvl_lbl.add_theme_font_size_override("font_size", 9)
 	lvl_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	name_row.add_child(lvl_lbl)
+	name_level_vbox.add_child(lvl_lbl)
 
-	info_vbox.add_child(name_row)
+	main_hbox.add_child(name_level_vbox)
 
-	# HP/MP stats row (side by side)
-	var stats_row := HBoxContainer.new()
-	stats_row.add_theme_constant_override("separation", 12)
-	stats_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-
-	# HP Section
-	var hp_section := VBoxContainer.new()
-	hp_section.add_theme_constant_override("separation", 2)
-	hp_section.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	# Right side: HP/MP bars stacked vertically
+	var bars_vbox := VBoxContainer.new()
+	bars_vbox.add_theme_constant_override("separation", 4)
+	bars_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bars_vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	var hp_i: int = int(member_data.get("hp", -1))
 	var hp_max_i: int = int(member_data.get("hp_max", -1))
+	var mp_i: int = int(member_data.get("mp", -1))
+	var mp_max_i: int = int(member_data.get("mp_max", -1))
 
-	var hp_label_box := HBoxContainer.new()
-	hp_label_box.add_theme_constant_override("separation", 4)
-	hp_label_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	# HP bar with label
+	var hp_row := HBoxContainer.new()
+	hp_row.add_theme_constant_override("separation", 4)
+	hp_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hp_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
 	var hp_lbl := Label.new()
 	hp_lbl.text = "HP"
-	hp_lbl.custom_minimum_size.x = 24
-	hp_lbl.add_theme_font_size_override("font_size", 10)
-	var hp_val := Label.new()
-	hp_val.text = _fmt_pair(hp_i, hp_max_i)
-	hp_val.add_theme_font_size_override("font_size", 10)
-	hp_val.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	hp_label_box.add_child(hp_lbl)
-	hp_label_box.add_child(hp_val)
-	hp_section.add_child(hp_label_box)
+	hp_lbl.custom_minimum_size.x = 20
+	hp_lbl.add_theme_font_size_override("font_size", 9)
+	hp_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hp_row.add_child(hp_lbl)
 
 	if hp_i >= 0 and hp_max_i > 0:
 		var hp_bar := ProgressBar.new()
 		hp_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		hp_bar.custom_minimum_size = Vector2(200, 8)  # Minimum 200px wide, 8px tall
-		hp_bar.show_percentage = false  # Remove percentage text
+		hp_bar.custom_minimum_size = Vector2(220, 8)  # Compact bar
+		hp_bar.show_percentage = false
 
 		# Core Vibe: Bubble Magenta progress bar with neon glow
 		aCoreVibeTheme.style_progress_bar(hp_bar, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA)
@@ -1040,38 +1031,35 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 		else:
 			hp_bar.value = new_hp
 
-		hp_section.add_child(hp_bar)
+		hp_row.add_child(hp_bar)
 
-	stats_row.add_child(hp_section)
+	var hp_val := Label.new()
+	hp_val.text = _fmt_pair(hp_i, hp_max_i)
+	hp_val.add_theme_font_size_override("font_size", 9)
+	hp_val.custom_minimum_size.x = 60
+	hp_val.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hp_row.add_child(hp_val)
 
-	# MP Section
-	var mp_section := VBoxContainer.new()
-	mp_section.add_theme_constant_override("separation", 2)
-	mp_section.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bars_vbox.add_child(hp_row)
 
-	var mp_i: int = int(member_data.get("mp", -1))
-	var mp_max_i: int = int(member_data.get("mp_max", -1))
+	# MP bar with label
+	var mp_row := HBoxContainer.new()
+	mp_row.add_theme_constant_override("separation", 4)
+	mp_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	mp_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
-	var mp_label_box := HBoxContainer.new()
-	mp_label_box.add_theme_constant_override("separation", 4)
-	mp_label_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var mp_lbl := Label.new()
 	mp_lbl.text = "MP"
-	mp_lbl.custom_minimum_size.x = 24
-	mp_lbl.add_theme_font_size_override("font_size", 10)
-	var mp_val := Label.new()
-	mp_val.text = _fmt_pair(mp_i, mp_max_i)
-	mp_val.add_theme_font_size_override("font_size", 10)
-	mp_val.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	mp_label_box.add_child(mp_lbl)
-	mp_label_box.add_child(mp_val)
-	mp_section.add_child(mp_label_box)
+	mp_lbl.custom_minimum_size.x = 20
+	mp_lbl.add_theme_font_size_override("font_size", 9)
+	mp_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	mp_row.add_child(mp_lbl)
 
 	if mp_i >= 0 and mp_max_i > 0:
 		var mp_bar := ProgressBar.new()
 		mp_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		mp_bar.custom_minimum_size = Vector2(200, 8)  # Minimum 200px wide, 8px tall
-		mp_bar.show_percentage = false  # Remove percentage text
+		mp_bar.custom_minimum_size = Vector2(220, 8)  # Compact bar
+		mp_bar.show_percentage = false
 
 		# Core Vibe: Sky Cyan progress bar with neon glow
 		aCoreVibeTheme.style_progress_bar(mp_bar, aCoreVibeTheme.COLOR_SKY_CYAN)
@@ -1095,24 +1083,18 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 		else:
 			mp_bar.value = new_mp
 
-		mp_section.add_child(mp_bar)
+		mp_row.add_child(mp_bar)
 
-	stats_row.add_child(mp_section)
-	stats_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	hp_section.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	mp_section.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	hp_label_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	mp_label_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var mp_val := Label.new()
+	mp_val.text = _fmt_pair(mp_i, mp_max_i)
+	mp_val.add_theme_font_size_override("font_size", 9)
+	mp_val.custom_minimum_size.x = 60
+	mp_val.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	mp_row.add_child(mp_val)
 
-	# Wrap stats_row in MarginContainer for 10px margins on each side
-	var stats_margin := MarginContainer.new()
-	stats_margin.add_theme_constant_override("margin_left", 10)
-	stats_margin.add_theme_constant_override("margin_right", 10)
-	stats_margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	stats_margin.add_child(stats_row)
+	bars_vbox.add_child(mp_row)
 
-	info_vbox.add_child(stats_margin)
-	main_hbox.add_child(info_vbox)
+	main_hbox.add_child(bars_vbox)
 	btn.add_child(main_hbox)
 
 	# Style button (default unfocused state)
@@ -1174,32 +1156,40 @@ func _update_label_colors_recursive(node: Node, is_focused: bool) -> void:
 		_update_label_colors_recursive(child, is_focused)
 
 func _show_member_arrow(btn: Button) -> void:
-	"""Show arrow indicator above selected party member"""
+	"""Show arrow indicator to the right of selected party member"""
 	# Check if arrow already exists
 	var arrow = btn.get_node_or_null("SelectionArrow")
 	if arrow:
 		return  # Already exists
 
-	# Create arrow indicator
-	var arrow_tex := TextureRect.new()
-	arrow_tex.name = "SelectionArrow"
-	arrow_tex.texture = load("res://assets/graphics/arrow/arrow.png")
-	arrow_tex.custom_minimum_size = Vector2(15, 15)
-	arrow_tex.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
-	arrow_tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	arrow_tex.flip_v = false  # Original direction
-	arrow_tex.modulate = Color(1, 1, 1, 1)  # White
+	print("[StatusPanel] Creating arrow for button: %s" % btn.get_meta("member_name", "Unknown"))
 
-	# Position at top center of button, 8px lower
-	arrow_tex.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	arrow_tex.position = Vector2(0, -12)  # Moved down from -20 to -12
-	arrow_tex.size = Vector2(15, 15)
-	arrow_tex.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# Create arrow indicator using Label (no external asset needed)
+	var arrow_label := Label.new()
+	arrow_label.name = "SelectionArrow"
+	arrow_label.text = "◄"  # Left-pointing arrow (90° counter-clockwise from down arrow)
+	arrow_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	arrow_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	arrow_label.add_theme_font_size_override("font_size", 43)
+	arrow_label.modulate = Color(1, 1, 1, 1)  # White
+	arrow_label.custom_minimum_size = Vector2(54, 72)
+	arrow_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
-	btn.add_child(arrow_tex)
+	# Position manually to the right inside the button
+	# Wait for button to be ready, then position
+	btn.add_child(arrow_label)
+
+	await get_tree().process_frame
+
+	# Position to the right side, vertically centered (shifted up 6px)
+	var btn_size = btn.size
+	arrow_label.position = Vector2(btn_size.x - 54, (btn_size.y - 72) / 2.0 - 6)
+	arrow_label.size = Vector2(54, 72)
+
+	print("[StatusPanel] Arrow created at position: %s (button size: %s)" % [arrow_label.position, btn_size])
 
 	# Start pulsing animation
-	_start_arrow_pulse(arrow_tex)
+	_start_arrow_pulse(arrow_label)
 
 func _hide_member_arrow(btn: Button) -> void:
 	"""Hide arrow indicator from party member"""
@@ -1213,8 +1203,8 @@ func _hide_member_arrow(btn: Button) -> void:
 			arrow.remove_meta("pulse_tween")
 		arrow.queue_free()
 
-func _start_arrow_pulse(arrow: TextureRect) -> void:
-	"""Start pulsing animation for arrow - moves up and down"""
+func _start_arrow_pulse(arrow: Control) -> void:
+	"""Start pulsing animation for arrow - moves left and right"""
 	if arrow.has_meta("pulse_tween"):
 		var old_tween = arrow.get_meta("pulse_tween")
 		if old_tween and is_instance_valid(old_tween):
@@ -1225,10 +1215,10 @@ func _start_arrow_pulse(arrow: TextureRect) -> void:
 	tween.set_trans(Tween.TRANS_SINE)
 	tween.set_ease(Tween.EASE_IN_OUT)
 
-	# Pulse down 4 pixels then back up
-	var base_y = arrow.position.y
-	tween.tween_property(arrow, "position:y", base_y + 4, 0.6)
-	tween.tween_property(arrow, "position:y", base_y, 0.6)
+	# Pulse left 6 pixels then back to base position
+	var base_x = arrow.position.x
+	tween.tween_property(arrow, "position:x", base_x - 6, 0.6)
+	tween.tween_property(arrow, "position:x", base_x, 0.6)
 
 	arrow.set_meta("pulse_tween", tween)
 
@@ -1316,6 +1306,7 @@ func _show_member_action_menu(member_name: String, member_id: String, show_switc
 	var recovery_btn := Button.new()
 	recovery_btn.text = "RECOVERY"
 	recovery_btn.custom_minimum_size = Vector2(200, 0)
+	recovery_btn.focus_mode = Control.FOCUS_ALL
 	recovery_btn.pressed.connect(_on_action_menu_recovery_pressed.bind(popup_panel))
 	vbox.add_child(recovery_btn)
 
@@ -1324,12 +1315,28 @@ func _show_member_action_menu(member_name: String, member_id: String, show_switc
 		var switch_btn := Button.new()
 		switch_btn.text = "SWITCH"
 		switch_btn.custom_minimum_size = Vector2(200, 0)
+		switch_btn.focus_mode = Control.FOCUS_ALL
 		switch_btn.pressed.connect(_on_action_menu_switch_pressed.bind(popup_panel))
+
+		# Check if bench is empty and disable button if so
+		var bench_ids: Array = []
+		if _gs and _gs.has_method("get"):
+			var b_v: Variant = _gs.get("bench")
+			if typeof(b_v) == TYPE_ARRAY:
+				for id in (b_v as Array):
+					bench_ids.append(String(id))
+
+		if bench_ids.is_empty():
+			switch_btn.disabled = true
+			switch_btn.modulate = Color(0.5, 0.5, 0.5, 1.0)  # Grey out
+			print("[StatusPanel] Switch button disabled - bench is empty")
+
 		vbox.add_child(switch_btn)
 
 	# Back button
 	var back_btn: Button = Button.new()
 	back_btn.text = "BACK"
+	back_btn.focus_mode = Control.FOCUS_ALL
 	back_btn.pressed.connect(_close_member_action_menu.bind(popup_panel))
 	vbox.add_child(back_btn)
 
@@ -1363,10 +1370,13 @@ func _on_action_menu_recovery_pressed(popup: Control) -> void:
 
 	print("[StatusPanel] Action menu - Recovery selected for: %s" % member_name)
 
-	# Close action menu first
+	# Clear active popup immediately to allow new popup to open
+	_active_popup = null
+
+	# Close action menu (fade out and cleanup)
 	_close_member_action_menu(popup)
 
-	# Then show recovery popup (reuse existing recovery logic)
+	# Show recovery popup
 	_show_recovery_popup(member_id, member_name, hp, hp_max, mp, mp_max)
 
 func _on_action_menu_switch_pressed(popup: Control) -> void:
@@ -1375,10 +1385,13 @@ func _on_action_menu_switch_pressed(popup: Control) -> void:
 
 	print("[StatusPanel] Action menu - Switch selected for slot: %d" % active_slot)
 
-	# Close action menu first
+	# Clear active popup immediately to allow new popup to open
+	_active_popup = null
+
+	# Close action menu (fade out and cleanup)
 	_close_member_action_menu(popup)
 
-	# Then show switch popup (reuse existing switch logic)
+	# Show switch popup
 	_on_switch_pressed(active_slot)
 
 func _close_member_action_menu(popup: Control) -> void:
@@ -1393,9 +1406,10 @@ func _close_member_action_menu(popup: Control) -> void:
 
 	# Fade out popup, then clean up
 	_fade_out_popup(popup_to_close, func():
-		# Clear active popup and change state
-		_active_popup = null
-		_nav_state = NavState.CONTENT
+		# Only clear active popup if it's still this popup (not a new one opened since)
+		if _active_popup == popup_to_close:
+			_active_popup = null
+			_nav_state = NavState.CONTENT
 
 		# Free the popup and its CanvasLayer parent
 		if is_instance_valid(popup_to_close):
@@ -1405,8 +1419,9 @@ func _close_member_action_menu(popup: Control) -> void:
 			else:
 				popup_to_close.queue_free()
 
-		# Restore focus to first button in content
-		call_deferred("_navigate_to_content")
+		# Only restore focus if we're actually going back to content (not opening another popup)
+		if _nav_state == NavState.CONTENT:
+			call_deferred("_navigate_to_content")
 	)
 
 	print("[StatusPanel] Member action menu closed")
@@ -1845,15 +1860,42 @@ func _show_recovery_popup(member_id: String, member_name: String, hp: int, hp_ma
 					# Log all owned items with their categories
 					print("[StatusPanel] Owned item: %s (category: '%s', count: %d)" % [item_id, category, count])
 
-					# Check if this is a HEALING consumable (not just any consumable)
-					# Look for "Heal" in the field_status_effect field
+					# Check if this is a recovery item by looking at multiple possible indicators
 					var field_effect = String(def_data.get("field_status_effect", "")).to_lower()
-					if category == "consumables" or category == "consumable":
-						if field_effect.contains("heal") and (field_effect.contains("hp") or field_effect.contains("mp")):
-							recovery_items.append(item_id)
-							print("[StatusPanel] ✓ This is a recovery item! (effect: '%s')" % field_effect)
-						else:
-							print("[StatusPanel] - Skipped: not a healing item (effect: '%s')" % field_effect)
+					var item_name = String(def_data.get("name", "")).to_lower()
+					var description = String(def_data.get("description", "")).to_lower()
+
+					# Print all fields for debugging
+					print("[StatusPanel]   field_effect: '%s'" % field_effect)
+					print("[StatusPanel]   name: '%s'" % item_name)
+					print("[StatusPanel]   description: '%s'" % description)
+
+					# Check multiple conditions for recovery items
+					var is_recovery = false
+
+					# Method 1: Check field_status_effect for healing keywords
+					if field_effect.contains("heal") or field_effect.contains("restore") or field_effect.contains("recover"):
+						if field_effect.contains("hp") or field_effect.contains("mp") or field_effect.contains("health") or field_effect.contains("mana"):
+							is_recovery = true
+							print("[StatusPanel] ✓ Matched via field_effect")
+
+					# Method 2: Check if category is recovery-related
+					if category == "recovery" or category == "healing" or category == "restorative":
+						is_recovery = true
+						print("[StatusPanel] ✓ Matched via category")
+
+					# Method 3: Check consumables with healing in name/description
+					if (category == "consumables" or category == "consumable"):
+						if (item_name.contains("potion") or item_name.contains("elixir") or item_name.contains("tonic") or
+							description.contains("restore") or description.contains("heal") or description.contains("recover")):
+							is_recovery = true
+							print("[StatusPanel] ✓ Matched via consumable name/description")
+
+					if is_recovery:
+						recovery_items.append(item_id)
+						print("[StatusPanel] ✓✓ ADDED as recovery item!")
+					else:
+						print("[StatusPanel] - Skipped: not a recovery item")
 
 		print("[StatusPanel] All unique categories found: " + str(categories_found))
 		print("[StatusPanel] Total recovery items found: %d" % recovery_items.size())
@@ -2116,28 +2158,70 @@ func _apply_recovery_effect(member_id: String, member_name: String, item_id: Str
 				if typeof(member_dict) == TYPE_DICTIONARY:
 					if item_type == "hp":
 						var current_hp = int(member_dict.get("hp", 0))
-						var max_hp = int(member_dict.get("hp_max", 100))
+						var base_max_hp = int(member_dict.get("hp_max", 100))
+
+						# Get TRUE max HP including equipment bonuses (from CombatProfileSystem)
+						var max_hp = base_max_hp
+						if _cps and _cps.has_method("get_profile"):
+							var prof_v: Variant = _cps.call("get_profile", member_id)
+							if typeof(prof_v) == TYPE_DICTIONARY:
+								var prof: Dictionary = prof_v
+								max_hp = int(prof.get("hp_max", base_max_hp))
+
+						print("[StatusPanel] HP Heal Debug - Before:")
+						print("  current_hp: %d" % current_hp)
+						print("  base_max_hp: %d" % base_max_hp)
+						print("  true_max_hp (with equipment): %d" % max_hp)
+						print("  recovery_amount: %d" % recovery_amount)
 
 						# Calculate actual heal amount
 						var heal_amount = recovery_amount
 						if is_percentage:
 							heal_amount = int(float(max_hp) * float(recovery_amount) / 100.0)
+							print("  percentage heal calculated: %d" % heal_amount)
 
+						var unclamped_hp = current_hp + heal_amount
+						print("  unclamped would be: %d" % unclamped_hp)
+
+						# Clamp to TRUE max HP (including equipment bonuses) - never heal over maximum
 						var new_hp = min(current_hp + heal_amount, max_hp)
+						print("  clamped to: %d (max: %d)" % [new_hp, max_hp])
+
 						actual_heal_amount = new_hp - current_hp
 						member_dict["hp"] = new_hp
 						print("[StatusPanel] ✓ Restored %d HP to %s (now: %d/%d)" % [actual_heal_amount, member_name, member_dict["hp"], max_hp])
 
 					elif item_type == "mp":
 						var current_mp = int(member_dict.get("mp", 0))
-						var max_mp = int(member_dict.get("mp_max", 100))
+						var base_max_mp = int(member_dict.get("mp_max", 100))
+
+						# Get TRUE max MP including equipment bonuses (from CombatProfileSystem)
+						var max_mp = base_max_mp
+						if _cps and _cps.has_method("get_profile"):
+							var prof_v: Variant = _cps.call("get_profile", member_id)
+							if typeof(prof_v) == TYPE_DICTIONARY:
+								var prof: Dictionary = prof_v
+								max_mp = int(prof.get("mp_max", base_max_mp))
+
+						print("[StatusPanel] MP Heal Debug - Before:")
+						print("  current_mp: %d" % current_mp)
+						print("  base_max_mp: %d" % base_max_mp)
+						print("  true_max_mp (with equipment): %d" % max_mp)
+						print("  recovery_amount: %d" % recovery_amount)
 
 						# Calculate actual heal amount
 						var heal_amount = recovery_amount
 						if is_percentage:
 							heal_amount = int(float(max_mp) * float(recovery_amount) / 100.0)
+							print("  percentage heal calculated: %d" % heal_amount)
 
+						var unclamped_mp = current_mp + heal_amount
+						print("  unclamped would be: %d" % unclamped_mp)
+
+						# Clamp to TRUE max MP (including equipment bonuses) - never heal over maximum
 						var new_mp = min(current_mp + heal_amount, max_mp)
+						print("  clamped to: %d (max: %d)" % [new_mp, max_mp])
+
 						actual_heal_amount = new_mp - current_mp
 						member_dict["mp"] = new_mp
 						print("[StatusPanel] ✓ Restored %d MP to %s (now: %d/%d)" % [actual_heal_amount, member_name, member_dict["mp"], max_mp])
@@ -2773,19 +2857,32 @@ func _handle_popup_input(event: InputEvent) -> void:
 		# Note: ToastPopup handles its own input, so we only handle custom popups here
 		if _active_popup and _active_popup.get_meta("_is_recovery_popup", false):
 			_popup_accept_recovery()
+			get_viewport().set_input_as_handled()
 		elif _active_popup and _active_popup.get_meta("_is_switch_popup", false):
 			_popup_accept_switch()
+			get_viewport().set_input_as_handled()
+		elif _active_popup and _active_popup.name == "MemberActionMenu":
+			# Handle accept for action menu - activate focused button
+			var focused_control = get_viewport().gui_get_focus_owner()
+			if focused_control is Button:
+				print("[StatusPanel] Activating action menu button: %s" % (focused_control as Button).text)
+				(focused_control as Button).emit_signal("pressed")
+				get_viewport().set_input_as_handled()
 		# Notice, heal confirmation, and swap confirmation now use ToastPopup (self-handling)
-		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("menu_back"):
 		# Cancel popup - all popups can be cancelled with back
 		# Note: ToastPopup handles its own input, so we only handle custom popups here
 		if _active_popup and _active_popup.get_meta("_is_recovery_popup", false):
 			_popup_cancel_recovery()
+			get_viewport().set_input_as_handled()
 		elif _active_popup and _active_popup.get_meta("_is_switch_popup", false):
 			_popup_cancel_switch()
+			get_viewport().set_input_as_handled()
+		elif _active_popup and _active_popup.name == "MemberActionMenu":
+			# Handle back for action menu - close it
+			_close_member_action_menu(_active_popup)
+			get_viewport().set_input_as_handled()
 		# Notice, heal confirmation, and swap confirmation now use ToastPopup (self-handling)
-		get_viewport().set_input_as_handled()
 	# UP/DOWN navigation is NOT handled - let ItemList/Button handle it
 
 ## ─────────────────────── STATE 2: MENU ───────────────────────

@@ -45,6 +45,9 @@ var _radar_chart: Control = null
 var _party_tokens: Array[String] = []
 var _party_labels: Array[String] = []
 
+# Selection arrow
+var _selection_arrow: Label = null
+
 func _ready() -> void:
 	# Set process mode to work while game is paused
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -86,11 +89,13 @@ func _ready() -> void:
 
 func _first_fill() -> void:
 	_apply_core_vibe_styling()
+	_create_selection_arrow()
 	_refresh_party()
 	if _party_list.item_count > 0:
 		_party_list.select(0)
 		_party_list.grab_focus()
 		_on_party_member_selected(0)
+		_update_arrow_position()
 
 func _apply_core_vibe_styling() -> void:
 	"""Apply Core Vibe neon-kawaii styling to StatsPanel elements"""
@@ -113,7 +118,7 @@ func _apply_core_vibe_styling() -> void:
 
 	if _stats_panel:
 		var stats_style = aCoreVibeTheme.create_panel_style(
-			aCoreVibeTheme.COLOR_ELECTRIC_LIME,       # Electric Lime border (stats)
+			aCoreVibeTheme.COLOR_GRAPE_VIOLET,        # Grape Violet border (stats)
 			aCoreVibeTheme.COLOR_INK_CHARCOAL,        # Ink charcoal background
 			aCoreVibeTheme.PANEL_OPACITY_SEMI,        # Semi-transparent
 			aCoreVibeTheme.CORNER_RADIUS_MEDIUM,      # 16px corners
@@ -128,7 +133,7 @@ func _apply_core_vibe_styling() -> void:
 
 	if _visual_panel:
 		var visual_style = aCoreVibeTheme.create_panel_style(
-			aCoreVibeTheme.COLOR_GRAPE_VIOLET,        # Grape Violet border (visual/radar)
+			aCoreVibeTheme.COLOR_SKY_CYAN,            # Sky Cyan border (visual/radar)
 			aCoreVibeTheme.COLOR_INK_CHARCOAL,        # Ink charcoal background
 			aCoreVibeTheme.PANEL_OPACITY_SEMI,        # Semi-transparent
 			aCoreVibeTheme.CORNER_RADIUS_MEDIUM,      # 16px corners
@@ -141,9 +146,118 @@ func _apply_core_vibe_styling() -> void:
 		visual_style.content_margin_bottom = 10
 		_visual_panel.add_theme_stylebox_override("panel", visual_style)
 
+	# Style party list colors
+	if _party_list:
+		# Set normal and selected colors for party list
+		_party_list.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE)
+		_party_list.add_theme_color_override("font_selected_color", aCoreVibeTheme.COLOR_CITRUS_YELLOW)
+		_party_list.add_theme_color_override("font_hovered_color", aCoreVibeTheme.COLOR_CITRUS_YELLOW)
+		# Increase font size by 2pts
+		_party_list.add_theme_font_size_override("font_size", 18)
+		# Remove all borders and backgrounds by making them transparent
+		var empty_stylebox = StyleBoxEmpty.new()
+		_party_list.add_theme_stylebox_override("panel", empty_stylebox)
+		_party_list.add_theme_stylebox_override("focus", empty_stylebox)
+		_party_list.add_theme_stylebox_override("selected", empty_stylebox)
+		_party_list.add_theme_stylebox_override("selected_focus", empty_stylebox)
+		_party_list.add_theme_stylebox_override("cursor", empty_stylebox)
+		_party_list.add_theme_stylebox_override("cursor_unfocused", empty_stylebox)
+
 	# Note: Battle stat cells and affinity cells are dynamically created,
 	# so their styling is applied in their creation functions.
 	# RadarChart colors are updated in the RadarChart class itself.
+
+func _create_selection_arrow() -> void:
+	"""Create the selection arrow indicator for party list"""
+	if not _party_list:
+		return
+
+	# Create arrow label
+	_selection_arrow = Label.new()
+	_selection_arrow.text = "◄"  # Left-pointing arrow
+	_selection_arrow.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_selection_arrow.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_selection_arrow.add_theme_font_size_override("font_size", 43)  # 80% larger
+	_selection_arrow.modulate = Color(1, 1, 1, 1)  # White
+	_selection_arrow.custom_minimum_size = Vector2(54, 72)
+	_selection_arrow.size = Vector2(54, 72)
+	_selection_arrow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_selection_arrow.z_index = 100  # Well above other elements
+
+	# CRITICAL: Add to main StatsPanel (Control) not the PanelContainer
+	# This prevents any layout containers from resizing it
+	add_child(_selection_arrow)
+
+	# Ensure size is locked after adding to tree
+	await get_tree().process_frame
+	_selection_arrow.size = Vector2(54, 72)
+
+	# Start pulsing animation
+	_start_arrow_pulse()
+
+func _update_arrow_position() -> void:
+	"""Update arrow position to align with selected item"""
+	if not _selection_arrow or not _party_list:
+		return
+
+	var selected = _party_list.get_selected_items()
+	if selected.size() == 0:
+		_selection_arrow.visible = false
+		return
+
+	_selection_arrow.visible = true
+
+	# Wait for layout to complete
+	await get_tree().process_frame
+
+	# Get the rect of the selected item in ItemList's local coordinates
+	var item_index = selected[0]
+	var item_rect = _party_list.get_item_rect(item_index)
+
+	print("[StatsPanel] Arrow Position Debug:")
+	print("  Selected index: %d" % item_index)
+	print("  Item rect: pos=%s size=%s" % [item_rect.position, item_rect.size])
+
+	# Convert to StatsPanel coordinates (arrow's parent is now StatsPanel)
+	var list_global_pos = _party_list.global_position
+	var panel_global_pos = global_position
+
+	print("  List global pos: %s" % list_global_pos)
+	print("  StatsPanel global pos: %s" % panel_global_pos)
+	print("  List position (local): %s" % _party_list.position)
+	print("  List size: %s" % _party_list.size)
+
+	# Calculate position in StatsPanel coordinates
+	var list_offset_in_statspanel = list_global_pos - panel_global_pos
+	print("  List offset in StatsPanel: %s" % list_offset_in_statspanel)
+
+	# Position arrow at fixed x=200, aligned vertically with item center
+	var arrow_x = 200.0
+	var arrow_y = list_offset_in_statspanel.y + item_rect.position.y + (item_rect.size.y / 2.0) - (_selection_arrow.size.y / 2.0)
+
+	print("  Arrow custom_minimum_size: %s" % _selection_arrow.custom_minimum_size)
+	print("  Arrow size: %s" % _selection_arrow.size)
+	print("  Calculated arrow pos: x=%f y=%f" % [arrow_x, arrow_y])
+	print("  Arrow vertical calc: item_center=%f - arrow_half=%f = %f" % [item_rect.position.y + item_rect.size.y / 2.0, _selection_arrow.size.y / 2.0, arrow_y - list_offset_in_statspanel.y])
+
+	_selection_arrow.position = Vector2(arrow_x, arrow_y)
+
+	print("  Final arrow position: %s" % _selection_arrow.position)
+
+func _start_arrow_pulse() -> void:
+	"""Start pulsing animation for the arrow"""
+	if not _selection_arrow:
+		return
+
+	var tween = create_tween()
+	tween.set_loops()
+	tween.set_trans(Tween.TRANS_SINE)
+	tween.set_ease(Tween.EASE_IN_OUT)
+
+	# Pulse left 6 pixels then back
+	var base_x = _selection_arrow.position.x
+	tween.tween_property(_selection_arrow, "position:x", base_x - 6, 0.6)
+	tween.tween_property(_selection_arrow, "position:x", base_x, 0.6)
 
 func _on_visibility_changed() -> void:
 	"""Grab focus when panel becomes visible"""
@@ -170,6 +284,9 @@ func _on_party_changed(_arg = null) -> void:
 	elif _party_list.item_count > 0:
 		_party_list.select(0)
 		_on_party_member_selected(0)
+
+	# Update arrow position after party change
+	call_deferred("_update_arrow_position")
 
 func _on_stats_changed(_arg1 = null, _arg2 = null) -> void:
 	# Refresh current member stats
@@ -267,6 +384,9 @@ func _on_party_member_selected(index: int) -> void:
 	_rebuild_battle_stats(token)
 	_rebuild_affinity_grid(token)
 	_update_radar_chart(token)
+
+	# Update arrow position
+	_update_arrow_position()
 
 func _rebuild_base_stats(token: String) -> void:
 	"""Build the base stats grid (Name, Mind Type, Level, XP)"""
@@ -418,14 +538,14 @@ func _create_affinity_cell(member_name: String, tier: String) -> PanelContainer:
 	var panel := PanelContainer.new()
 	panel.custom_minimum_size = Vector2(0, 30)
 
-	# Core Vibe: Sky Cyan border with Ink Charcoal background (relationships)
+	# Core Vibe: Ink Charcoal background with no border
 	var style = aCoreVibeTheme.create_panel_style(
-		aCoreVibeTheme.COLOR_SKY_CYAN,            # Sky Cyan border (relationship)
+		aCoreVibeTheme.COLOR_INK_CHARCOAL,        # Ink charcoal border (same as bg = no visible border)
 		aCoreVibeTheme.COLOR_INK_CHARCOAL,        # Ink charcoal background
 		aCoreVibeTheme.PANEL_OPACITY_FULL,        # Fully opaque
 		aCoreVibeTheme.CORNER_RADIUS_SMALL,       # 12px corners
-		aCoreVibeTheme.BORDER_WIDTH_THIN,         # 2px border
-		aCoreVibeTheme.SHADOW_SIZE_SMALL          # 4px glow
+		0,                                         # No border
+		0                                          # No glow
 	)
 	panel.add_theme_stylebox_override("panel", style)
 
@@ -513,7 +633,7 @@ func _get_member_mind_type(member_token: String) -> String:
 func _add_stat_pair(grid: GridContainer, label: String, value: String) -> void:
 	"""Add a label/value pair to a grid with Core Vibe styling"""
 	var lbl = Label.new()
-	lbl.text = label + ":"
+	lbl.text = label.to_upper() + ":"  # Make labels uppercase
 	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	# Core Vibe: Sky Cyan label color
 	lbl.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_SKY_CYAN)
@@ -523,8 +643,8 @@ func _add_stat_pair(grid: GridContainer, label: String, value: String) -> void:
 	var val = Label.new()
 	val.text = value
 	val.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-	# Core Vibe: Electric Lime value color
-	val.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_ELECTRIC_LIME)
+	# Core Vibe: Milk White value color
+	val.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE)
 	val.add_theme_font_size_override("font_size", 14)
 	grid.add_child(val)
 
@@ -569,14 +689,14 @@ func _create_stat_cell(stat_label: String, value: String) -> PanelContainer:
 	var panel := PanelContainer.new()
 	panel.custom_minimum_size = Vector2(0, 30)
 
-	# Core Vibe: Plasma Teal border with Ink Charcoal background
+	# Core Vibe: Ink Charcoal background with no border
 	var style = aCoreVibeTheme.create_panel_style(
-		aCoreVibeTheme.COLOR_PLASMA_TEAL,         # Plasma Teal border (stat display)
+		aCoreVibeTheme.COLOR_INK_CHARCOAL,        # Ink charcoal border (same as bg = no visible border)
 		aCoreVibeTheme.COLOR_INK_CHARCOAL,        # Ink charcoal background
 		aCoreVibeTheme.PANEL_OPACITY_FULL,        # Fully opaque
 		aCoreVibeTheme.CORNER_RADIUS_SMALL,       # 12px corners
-		aCoreVibeTheme.BORDER_WIDTH_THIN,         # 2px border
-		aCoreVibeTheme.SHADOW_SIZE_SMALL          # 4px glow
+		0,                                         # No border
+		0                                          # No glow
 	)
 	panel.add_theme_stylebox_override("panel", style)
 
@@ -610,8 +730,8 @@ func _create_stat_cell(stat_label: String, value: String) -> PanelContainer:
 	value_label.custom_minimum_size = Vector2(30, 0)  # ~5 characters at 12pt
 	value_label.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	value_label.add_theme_font_size_override("font_size", 12)
-	# Core Vibe: Electric Lime value color
-	value_label.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_ELECTRIC_LIME)
+	# Core Vibe: Plasma Teal value color
+	value_label.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_PLASMA_TEAL)
 	value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	hbox.add_child(value_label)
 
@@ -750,9 +870,27 @@ class RadarChart extends Control:
 			draw_polyline(points, stat_border_color, 2.0)
 
 	func _draw_labels(center: Vector2, radius: float, num_stats: int) -> void:
-		"""Draw stat labels around the chart"""
+		"""Draw stat labels around the chart with individual colors"""
 		if _stat_labels.size() != num_stats:
 			return
+
+		# Map short names to full names
+		var stat_full_names: Dictionary = {
+			"BRW": "BRAWN",
+			"MND": "MIND",
+			"TPO": "TEMPO",
+			"VTL": "VITALITY",
+			"FCS": "FOCUS"
+		}
+
+		# Map stat names to colors
+		var stat_colors: Dictionary = {
+			"BRW": aCoreVibeTheme.COLOR_BUBBLE_MAGENTA,   # BRAWN: Bubble Magenta
+			"MND": aCoreVibeTheme.COLOR_SKY_CYAN,          # MIND: Sky Cyan
+			"TPO": aCoreVibeTheme.COLOR_ELECTRIC_LIME,     # TEMPO: Electric Lime
+			"VTL": aCoreVibeTheme.COLOR_PLASMA_TEAL,       # VITALITY: Plasma Teal
+			"FCS": aCoreVibeTheme.COLOR_GRAPE_VIOLET       # FOCUS: Grape Violet
+		}
 
 		var angle_step: float = TAU / float(num_stats)
 		var font: Font = get_theme_default_font()
@@ -761,10 +899,19 @@ class RadarChart extends Control:
 		for i in range(num_stats):
 			var angle: float = -PI / 2.0 + angle_step * i
 			var label_pos: Vector2 = center + Vector2(cos(angle), sin(angle)) * radius
-			var label: String = "%s: %d" % [_stat_labels[i], int(_stat_values[i])]
+
+			# Get full name and color
+			var stat_key: String = _stat_labels[i]
+			var full_name: String = stat_full_names.get(stat_key, stat_key)
+			var color: Color = stat_colors.get(stat_key, label_color)
+			var label: String = "%s: %d" % [full_name, int(_stat_values[i])]
 
 			# Get text size for centering
 			var text_size: Vector2 = font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size)
 			label_pos -= text_size / 2.0
 
-			draw_string(font, label_pos, label, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, label_color)
+			# Move VITALITY and TEMPO down 15px
+			if stat_key == "VTL" or stat_key == "TPO":
+				label_pos.y += 15
+
+			draw_string(font, label_pos, label, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, color)

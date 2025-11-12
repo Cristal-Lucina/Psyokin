@@ -51,7 +51,7 @@ func _build_ui() -> void:
 
 	# Core Vibe: Pill capsule panel with neon border
 	var panel_style := aCoreVibeTheme.create_panel_style(
-		aCoreVibeTheme.COLOR_CITRUS_YELLOW,       # Yellow border for attention
+		aCoreVibeTheme.COLOR_SKY_CYAN,            # Sky Cyan border
 		aCoreVibeTheme.COLOR_INK_CHARCOAL,        # Ink charcoal background
 		aCoreVibeTheme.PANEL_OPACITY_FULL,        # Fully opaque
 		aCoreVibeTheme.CORNER_RADIUS_MEDIUM,      # 16px corners

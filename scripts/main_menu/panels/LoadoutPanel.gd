@@ -236,7 +236,7 @@ func _apply_core_vibe_styling() -> void:
 
 	if _middle_panel:
 		var middle_style = aCoreVibeTheme.create_panel_style(
-			aCoreVibeTheme.COLOR_ELECTRIC_LIME,       # Electric Lime border (equipment)
+			aCoreVibeTheme.COLOR_GRAPE_VIOLET,        # Grape Violet border (equipment)
 			aCoreVibeTheme.COLOR_INK_CHARCOAL,        # Ink charcoal background
 			aCoreVibeTheme.PANEL_OPACITY_SEMI,        # Semi-transparent
 			aCoreVibeTheme.CORNER_RADIUS_MEDIUM,      # 16px corners
@@ -247,7 +247,7 @@ func _apply_core_vibe_styling() -> void:
 
 	if _stats_panel:
 		var stats_style = aCoreVibeTheme.create_panel_style(
-			aCoreVibeTheme.COLOR_GRAPE_VIOLET,        # Grape Violet border (stats)
+			aCoreVibeTheme.COLOR_SKY_CYAN,            # Sky Cyan border (stats)
 			aCoreVibeTheme.COLOR_INK_CHARCOAL,        # Ink charcoal background
 			aCoreVibeTheme.PANEL_OPACITY_SEMI,        # Semi-transparent
 			aCoreVibeTheme.CORNER_RADIUS_MEDIUM,      # 16px corners

@@ -133,7 +133,7 @@ func _apply_core_vibe_styling() -> void:
 	# Style the three main panel containers with 10px internal padding
 	if _category_panel:
 		var cat_style = aCoreVibeTheme.create_panel_style(
-			aCoreVibeTheme.COLOR_CITRUS_YELLOW,       # Citrus Yellow border (categories)
+			aCoreVibeTheme.COLOR_SKY_CYAN,            # Sky Cyan border (categories)
 			aCoreVibeTheme.COLOR_INK_CHARCOAL,        # Ink charcoal background
 			aCoreVibeTheme.PANEL_OPACITY_SEMI,        # Semi-transparent
 			aCoreVibeTheme.CORNER_RADIUS_MEDIUM,      # 16px corners
@@ -149,7 +149,7 @@ func _apply_core_vibe_styling() -> void:
 
 	if _item_panel:
 		var item_style = aCoreVibeTheme.create_panel_style(
-			aCoreVibeTheme.COLOR_SKY_CYAN,            # Sky Cyan border (main items)
+			aCoreVibeTheme.COLOR_GRAPE_VIOLET,        # Grape Violet border (main items)
 			aCoreVibeTheme.COLOR_INK_CHARCOAL,        # Ink charcoal background
 			aCoreVibeTheme.PANEL_OPACITY_SEMI,        # Semi-transparent
 			aCoreVibeTheme.CORNER_RADIUS_MEDIUM,      # 16px corners
@@ -165,7 +165,7 @@ func _apply_core_vibe_styling() -> void:
 
 	if _details_panel:
 		var details_style = aCoreVibeTheme.create_panel_style(
-			aCoreVibeTheme.COLOR_GRAPE_VIOLET,        # Grape Violet border (details)
+			aCoreVibeTheme.COLOR_SKY_CYAN,            # Sky Cyan border (details)
 			aCoreVibeTheme.COLOR_INK_CHARCOAL,        # Ink charcoal background
 			aCoreVibeTheme.PANEL_OPACITY_SEMI,        # Semi-transparent
 			aCoreVibeTheme.CORNER_RADIUS_MEDIUM,      # 16px corners

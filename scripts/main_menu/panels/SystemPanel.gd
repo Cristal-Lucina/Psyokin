@@ -18,6 +18,8 @@ const TITLE_SCENE     : String = "res://scenes/main_menu/Title.tscn"
 @onready var _btn_save     : Button = %SaveBtn
 @onready var _btn_settings : Button = %SettingsBtn
 @onready var _btn_title    : Button = %TitleBtn
+@onready var _frame_panel  : Panel = %Frame
+@onready var _title_label  : Label = get_node("Root/Header/Title")
 
 var _buttons: Array[Button] = []
 var _current_button_index: int = 0
@@ -47,7 +49,30 @@ func _ready() -> void:
 	_apply_core_vibe_styling()
 
 func _apply_core_vibe_styling() -> void:
-	"""Apply Core Vibe neon-kawaii styling to SystemPanel buttons"""
+	"""Apply Core Vibe neon-kawaii styling to SystemPanel buttons and panel"""
+
+	# Style the main frame panel with Sky Cyan border
+	if _frame_panel:
+		var panel_style = aCoreVibeTheme.create_panel_style(
+			aCoreVibeTheme.COLOR_SKY_CYAN,            # Sky Cyan border
+			aCoreVibeTheme.COLOR_INK_CHARCOAL,        # Ink charcoal background
+			aCoreVibeTheme.PANEL_OPACITY_SEMI,        # Semi-transparent
+			aCoreVibeTheme.CORNER_RADIUS_MEDIUM,      # 16px corners
+			aCoreVibeTheme.BORDER_WIDTH_THIN,         # 2px border
+			aCoreVibeTheme.SHADOW_SIZE_MEDIUM         # 6px glow
+		)
+		panel_style.content_margin_left = 10
+		panel_style.content_margin_top = 10
+		panel_style.content_margin_right = 10
+		panel_style.content_margin_bottom = 10
+		_frame_panel.add_theme_stylebox_override("panel", panel_style)
+
+	# Style the title label: uppercase, centered, larger font
+	if _title_label:
+		_title_label.text = "SYSTEM"
+		_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_title_label.add_theme_font_size_override("font_size", 22)  # 16 + 6 = 22
+		_title_label.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_SKY_CYAN)
 
 	# Style buttons with coordinated neon colors
 	if _btn_load:

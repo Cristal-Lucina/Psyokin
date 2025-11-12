@@ -34,14 +34,13 @@ theme_override_constants/separation = 10
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_constants/separation = 8
+alignment = 1
 
 [node name="Title" type="Label" parent="Root/Header"]
 layout_mode = 2
-text = "System"
-
-[node name="Spacer" type="Control" parent="Root/Header"]
-layout_mode = 2
 size_flags_horizontal = 3
+text = "System"
+horizontal_alignment = 1
 
 [node name="Center" type="CenterContainer" parent="Root"]
 unique_name_in_owner = true

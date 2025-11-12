@@ -86,12 +86,12 @@ func _apply_core_vibe_styling() -> void:
 
 	# Wrap columns in styled PanelContainers for the neon border look
 	if _grid_column:
-		var grid_panel = _wrap_in_styled_panel(_grid_column, aCoreVibeTheme.COLOR_ELECTRIC_LIME)
+		var grid_panel = _wrap_in_styled_panel(_grid_column, aCoreVibeTheme.COLOR_SKY_CYAN)
 		if grid_panel:
 			print("[PerksPanel] Grid column wrapped in styled panel")
 
 	if _right_column:
-		var right_panel = _wrap_in_styled_panel(_right_column, aCoreVibeTheme.COLOR_SKY_CYAN)
+		var right_panel = _wrap_in_styled_panel(_right_column, aCoreVibeTheme.COLOR_GRAPE_VIOLET)
 		if right_panel:
 			print("[PerksPanel] Right column wrapped in styled panel")
 
