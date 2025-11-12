@@ -2773,19 +2773,26 @@ func _handle_popup_input(event: InputEvent) -> void:
 		# Note: ToastPopup handles its own input, so we only handle custom popups here
 		if _active_popup and _active_popup.get_meta("_is_recovery_popup", false):
 			_popup_accept_recovery()
+			get_viewport().set_input_as_handled()
 		elif _active_popup and _active_popup.get_meta("_is_switch_popup", false):
 			_popup_accept_switch()
+			get_viewport().set_input_as_handled()
+		# For action menu popup, don't mark as handled - let buttons handle it
 		# Notice, heal confirmation, and swap confirmation now use ToastPopup (self-handling)
-		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("menu_back"):
 		# Cancel popup - all popups can be cancelled with back
 		# Note: ToastPopup handles its own input, so we only handle custom popups here
 		if _active_popup and _active_popup.get_meta("_is_recovery_popup", false):
 			_popup_cancel_recovery()
+			get_viewport().set_input_as_handled()
 		elif _active_popup and _active_popup.get_meta("_is_switch_popup", false):
 			_popup_cancel_switch()
+			get_viewport().set_input_as_handled()
+		elif _active_popup and _active_popup.name == "MemberActionMenu":
+			# Handle back for action menu - close it
+			_close_member_action_menu(_active_popup)
+			get_viewport().set_input_as_handled()
 		# Notice, heal confirmation, and swap confirmation now use ToastPopup (self-handling)
-		get_viewport().set_input_as_handled()
 	# UP/DOWN navigation is NOT handled - let ItemList/Button handle it
 
 ## ─────────────────────── STATE 2: MENU ───────────────────────
