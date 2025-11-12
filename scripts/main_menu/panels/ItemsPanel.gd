@@ -718,22 +718,22 @@ func _input(event: InputEvent) -> void:
 				return
 			12:  # D-pad Up
 				print("[ItemsPanel] D-pad Up pressed")
-				_navigate_items(2)  # Up one row in 2-column grid (reversed sign)
+				_navigate_items(-2)  # Up one row in 2-column grid
 				get_viewport().set_input_as_handled()
 				return
 			13:  # D-pad Down
 				print("[ItemsPanel] D-pad Down pressed")
-				_navigate_items(-2)  # Down one row in 2-column grid (reversed sign)
+				_navigate_items(2)  # Down one row in 2-column grid
 				get_viewport().set_input_as_handled()
 				return
 			14:  # D-pad Left
 				print("[ItemsPanel] D-pad Left pressed")
-				_navigate_items(1)  # Left one column (reversed sign)
+				_navigate_items(-1)  # Left one column
 				get_viewport().set_input_as_handled()
 				return
 			15:  # D-pad Right
 				print("[ItemsPanel] D-pad Right pressed")
-				_navigate_items(-1)  # Right one column (reversed sign)
+				_navigate_items(1)  # Right one column
 				get_viewport().set_input_as_handled()
 				return
 			0:  # Accept button (A/Cross)
@@ -757,17 +757,17 @@ func _navigate_items(delta: int) -> void:
 
 	print("[ItemsPanel] Current: idx=%d, row=%d, col=%d, total=%d, delta=%d" % [current, current_row, current_col, total, delta])
 
-	if delta == -2:  # Down (next row, same column)
+	if delta == 2:  # Down (next row, same column)
 		new_index = current + 2
 		if new_index >= total:
 			print("[ItemsPanel]   Down blocked: would go to %d (>= %d)" % [new_index, total])
 			return  # Don't move if out of bounds
-	elif delta == 2:  # Up (previous row, same column)
+	elif delta == -2:  # Up (previous row, same column)
 		new_index = current - 2
 		if new_index < 0:
 			print("[ItemsPanel]   Up blocked: would go to %d (< 0)" % new_index)
 			return  # Don't move if out of bounds
-	elif delta == -1:  # Right (same row, next column)
+	elif delta == 1:  # Right (same row, next column)
 		if current_col == 1:  # Already in right column
 			print("[ItemsPanel]   Right blocked: already in right column")
 			return
@@ -775,7 +775,7 @@ func _navigate_items(delta: int) -> void:
 		if new_index >= total:
 			print("[ItemsPanel]   Right blocked: would go to %d (>= %d)" % [new_index, total])
 			return
-	elif delta == 1:  # Left (same row, previous column)
+	elif delta == -1:  # Left (same row, previous column)
 		if current_col == 0:  # Already in left column
 			print("[ItemsPanel]   Left blocked: already in left column")
 			return
