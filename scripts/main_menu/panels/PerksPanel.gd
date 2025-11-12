@@ -19,7 +19,7 @@ const DEFAULT_THRESHOLDS: PackedInt32Array = [1, 3, 5, 7, 10, 11]  # Including T
 @onready var _points_value: Label = %PointsValue
 @onready var _acquired_list: ItemList = %AcquiredList
 @onready var _perk_name: Label = %PerkName
-@onready var _details_text: Label = %DetailsText
+@onready var _details_text: Control = %DetailsText  # Can be Label or RichTextLabel
 
 # Container references for styling
 @onready var _grid_column: VBoxContainer = get_node("Root/GridColumn") if has_node("Root/GridColumn") else null
@@ -109,10 +109,15 @@ func _apply_core_vibe_styling() -> void:
 	if _perk_name:
 		aCoreVibeTheme.style_label(_perk_name, aCoreVibeTheme.COLOR_SKY_CYAN, 18)
 
-	# Style details text
+	# Style details text (works for both Label and RichTextLabel)
 	if _details_text:
-		_details_text.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE)
-		_details_text.add_theme_font_size_override("font_size", 14)
+		if _details_text is RichTextLabel:
+			var rtl: RichTextLabel = _details_text as RichTextLabel
+			rtl.add_theme_color_override("default_color", aCoreVibeTheme.COLOR_MILK_WHITE)
+			rtl.add_theme_font_size_override("normal_font_size", 14)
+		else:
+			_details_text.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE)
+			_details_text.add_theme_font_size_override("font_size", 14)
 
 func _create_selection_arrow() -> void:
 	"""Create the selection arrow indicator for perk grid"""
@@ -616,36 +621,67 @@ func _show_perk_details(perk: Dictionary) -> void:
 	if _perk_name:
 		_perk_name.text = perk["name"]
 
-	# Enable BBCode for Sky Cyan labels
-	if _details_text and not _details_text.bbcode_enabled:
-		_details_text.bbcode_enabled = true
+	if not _details_text:
+		return
 
-	var sky_cyan_hex: String = "#4DE9FF"
+	# Check if it's a RichTextLabel (supports BBCode) or regular Label
+	var is_rich_text: bool = _details_text is RichTextLabel
+
+	# Enable BBCode if it's a RichTextLabel
+	if is_rich_text:
+		var rtl: RichTextLabel = _details_text as RichTextLabel
+		if not rtl.bbcode_enabled:
+			rtl.bbcode_enabled = true
+
 	var details: String = ""
-	details += "[color=%s]Tier:[/color] %d\n\n" % [sky_cyan_hex, perk["tier"] + 1]
-
-	if perk["description"] != "":
-		details += "%s\n\n" % perk["description"]
-
 	var stat_level: int = _stat_levels.get(perk["stat_id"], 0)
 	var threshold: int = perk["threshold"]
-	details += "[color=%s]Requires:[/color] %s ≥ %d\n" % [sky_cyan_hex, _pretty_stat(perk["stat_id"]), threshold]
-	details += "[color=%s]Current:[/color] %s = %d\n\n" % [sky_cyan_hex, _pretty_stat(perk["stat_id"]), stat_level]
 
-	if perk["unlocked"]:
-		details += "[color=%s]Status:[/color] ✔ Unlocked\n" % sky_cyan_hex
-	elif perk["available"]:
-		details += "[color=%s]Status:[/color] Available!\n" % sky_cyan_hex
-		details += "[color=%s]Cost:[/color] 1 Perk Point\n" % sky_cyan_hex
-		details += "[color=%s]Press A to unlock[/color]\n" % sky_cyan_hex
-	else:
-		if stat_level < threshold:
-			details += "[color=%s]Status:[/color] Locked (need %d more %s)\n" % [sky_cyan_hex, threshold - stat_level, _pretty_stat(perk["stat_id"])]
+	# Format with BBCode if supported, plain text otherwise
+	if is_rich_text:
+		var sky_cyan_hex: String = "#4DE9FF"
+		details += "[color=%s]Tier:[/color] %d\n\n" % [sky_cyan_hex, perk["tier"] + 1]
+
+		if perk["description"] != "":
+			details += "%s\n\n" % perk["description"]
+
+		details += "[color=%s]Requires:[/color] %s ≥ %d\n" % [sky_cyan_hex, _pretty_stat(perk["stat_id"]), threshold]
+		details += "[color=%s]Current:[/color] %s = %d\n\n" % [sky_cyan_hex, _pretty_stat(perk["stat_id"]), stat_level]
+
+		if perk["unlocked"]:
+			details += "[color=%s]Status:[/color] ✔ Unlocked\n" % sky_cyan_hex
+		elif perk["available"]:
+			details += "[color=%s]Status:[/color] Available!\n" % sky_cyan_hex
+			details += "[color=%s]Cost:[/color] 1 Perk Point\n" % sky_cyan_hex
+			details += "[color=%s]Press A to unlock[/color]\n" % sky_cyan_hex
 		else:
-			details += "[color=%s]Status:[/color] Need perk points\n" % sky_cyan_hex
+			if stat_level < threshold:
+				details += "[color=%s]Status:[/color] Locked (need %d more %s)\n" % [sky_cyan_hex, threshold - stat_level, _pretty_stat(perk["stat_id"])]
+			else:
+				details += "[color=%s]Status:[/color] Need perk points\n" % sky_cyan_hex
+	else:
+		# Plain text format for regular Label
+		details += "Tier: %d\n\n" % (perk["tier"] + 1)
 
-	if _details_text:
-		_details_text.text = details
+		if perk["description"] != "":
+			details += "%s\n\n" % perk["description"]
+
+		details += "Requires: %s ≥ %d\n" % [_pretty_stat(perk["stat_id"]), threshold]
+		details += "Current: %s = %d\n\n" % [_pretty_stat(perk["stat_id"]), stat_level]
+
+		if perk["unlocked"]:
+			details += "Status: ✔ Unlocked\n"
+		elif perk["available"]:
+			details += "Status: Available!\n"
+			details += "Cost: 1 Perk Point\n"
+			details += "Press A to unlock\n"
+		else:
+			if stat_level < threshold:
+				details += "Status: Locked (need %d more %s)\n" % [threshold - stat_level, _pretty_stat(perk["stat_id"])]
+			else:
+				details += "Status: Need perk points\n"
+
+	_details_text.text = details
 
 func _on_tier_cell_hovered(stat_id: String, tier_index: int) -> void:
 	"""Handle mouse hover over tier cell"""
