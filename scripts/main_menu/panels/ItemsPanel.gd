@@ -329,12 +329,19 @@ func _load_equipped() -> void:
 	if not _eq or not _eq.has_method("get_member_equip") or not _gs:
 		return
 
-	# Get all party members
+	# Get all party members - try multiple method names
 	var members: Array = []
-	if _gs.has_method("get_active_party"):
-		var party_variant: Variant = _gs.call("get_active_party")
-		if typeof(party_variant) == TYPE_ARRAY:
-			members = party_variant as Array
+	for method in ["get_active_party_ids", "get_party_ids", "list_active_party", "get_active_party"]:
+		if _gs.has_method(method):
+			var party_variant: Variant = _gs.call(method)
+			if typeof(party_variant) == TYPE_PACKED_STRING_ARRAY:
+				for s in (party_variant as PackedStringArray):
+					members.append(String(s))
+			elif typeof(party_variant) == TYPE_ARRAY:
+				for s in (party_variant as Array):
+					members.append(String(s))
+			if members.size() > 0:
+				break
 
 	# Load equipment for each member
 	for member in members:
@@ -618,7 +625,8 @@ func _member_display_name(token: String) -> String:
 		return _gs.call("_first_name_for_id", token)
 	return token
 
-func _unhandled_input(event: InputEvent) -> void:
+func _input(event: InputEvent) -> void:
+	"""Use _input() instead of _unhandled_input() for higher priority than GameMenu"""
 	if not visible:
 		return
 
@@ -706,15 +714,25 @@ func _on_use_button_pressed() -> void:
 
 	var def: Dictionary = _defs[_selected_item_id]
 
-	# Get first party member
+	# Get first party member - try multiple method names
 	var members: Array = []
-	if _gs and _gs.has_method("get_active_party"):
-		var party_variant: Variant = _gs.call("get_active_party")
-		if typeof(party_variant) == TYPE_ARRAY:
-			members = party_variant as Array
+	if _gs:
+		for method in ["get_active_party_ids", "get_party_ids", "list_active_party", "get_active_party"]:
+			if _gs.has_method(method):
+				var party_variant: Variant = _gs.call(method)
+				print("[ItemsPanel] Tried method %s, got type %d" % [method, typeof(party_variant)])
+				if typeof(party_variant) == TYPE_PACKED_STRING_ARRAY:
+					for s in (party_variant as PackedStringArray):
+						members.append(String(s))
+				elif typeof(party_variant) == TYPE_ARRAY:
+					for s in (party_variant as Array):
+						members.append(String(s))
+				if members.size() > 0:
+					print("[ItemsPanel] Got %d party members from %s" % [members.size(), method])
+					break
 
 	if members.size() == 0:
-		print("[ItemsPanel] No party members available")
+		print("[ItemsPanel] No party members available after trying all methods")
 		return
 
 	var first_member: String = String(members[0])
