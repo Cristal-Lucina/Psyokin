@@ -1327,6 +1327,20 @@ func _show_member_action_menu(member_name: String, member_id: String, show_switc
 		switch_btn.custom_minimum_size = Vector2(200, 0)
 		switch_btn.focus_mode = Control.FOCUS_ALL
 		switch_btn.pressed.connect(_on_action_menu_switch_pressed.bind(popup_panel))
+
+		# Check if bench is empty and disable button if so
+		var bench_ids: Array = []
+		if _gs and _gs.has_method("get"):
+			var b_v: Variant = _gs.get("bench")
+			if typeof(b_v) == TYPE_ARRAY:
+				for id in (b_v as Array):
+					bench_ids.append(String(id))
+
+		if bench_ids.is_empty():
+			switch_btn.disabled = true
+			switch_btn.modulate = Color(0.5, 0.5, 0.5, 1.0)  # Grey out
+			print("[StatusPanel] Switch button disabled - bench is empty")
+
 		vbox.add_child(switch_btn)
 
 	# Back button
