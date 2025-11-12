@@ -185,11 +185,23 @@ func _create_selection_arrow() -> void:
 	_start_arrow_pulse()
 
 func _update_arrow_position() -> void:
-	"""Update arrow position to align with selected category"""
-	if not _selection_arrow or not _category_list:
+	"""Update arrow position to align with selected category or item based on focus mode"""
+	if not _selection_arrow:
 		return
 
-	var selected = _category_list.get_selected_items()
+	# Determine which list to track based on focus mode
+	var target_list: ItemList = null
+	if _focus_mode == "category" and _category_list:
+		target_list = _category_list
+	elif _focus_mode == "items" and _item_list:
+		target_list = _item_list
+	else:
+		_selection_arrow.visible = false
+		if _debug_box:
+			_debug_box.visible = false
+		return
+
+	var selected = target_list.get_selected_items()
 	if selected.size() == 0:
 		_selection_arrow.visible = false
 		if _debug_box:
@@ -203,18 +215,18 @@ func _update_arrow_position() -> void:
 
 	# Get the rect of the selected item in ItemList's local coordinates
 	var item_index = selected[0]
-	var item_rect = _category_list.get_item_rect(item_index)
+	var item_rect = target_list.get_item_rect(item_index)
 
 	# Convert to ItemsPanel coordinates (arrow's parent is now ItemsPanel)
-	var list_global_pos = _category_list.global_position
+	var list_global_pos = target_list.global_position
 	var panel_global_pos = global_position
 
 	# Calculate position in ItemsPanel coordinates
 	var list_offset_in_panel = list_global_pos - panel_global_pos
 
-	# Position arrow to the right of the category list with slight overlap for visual connection
+	# Position arrow to the right of the target list with slight overlap for visual connection
 	# Then shift left by 80px, then shift right by 40px (same as StatsPanel)
-	var arrow_x = list_offset_in_panel.x + _category_list.size.x - 8.0 - 80.0 + 40.0
+	var arrow_x = list_offset_in_panel.x + target_list.size.x - 8.0 - 80.0 + 40.0
 	var arrow_y = list_offset_in_panel.y + item_rect.position.y + (item_rect.size.y / 2.0) - (_selection_arrow.size.y / 2.0)
 
 	_selection_arrow.position = Vector2(arrow_x, arrow_y)
@@ -655,8 +667,10 @@ func _populate_items() -> void:
 		_item_list.select(0)
 		_selected_item_id = _item_ids[0]
 		print("[ItemsPanel] Selected first item: %s" % _selected_item_id)
+		call_deferred("_update_arrow_position")
 	else:
 		print("[ItemsPanel] No items to select or item already selected: %s" % _selected_item_id)
+		call_deferred("_update_arrow_position")
 
 func _update_details() -> void:
 	"""Update item details panel with equipment stats and formatting"""
@@ -807,6 +821,7 @@ func _on_category_selected(index: int) -> void:
 
 func _on_item_selected(index: int) -> void:
 	"""Handle item selection"""
+	_update_arrow_position()
 	if index < 0 or index >= _item_ids.size():
 		return
 
@@ -1026,6 +1041,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				_focus_mode = "items"
 				_item_list.grab_focus()
 				call_deferred("_animate_panel_focus")
+				call_deferred("_update_arrow_position")
 				get_viewport().set_input_as_handled()
 	elif _focus_mode == "items":
 		if event.is_action_pressed("menu_accept"):
@@ -1038,6 +1054,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			_focus_mode = "category"
 			_category_list.grab_focus()
 			call_deferred("_animate_panel_focus")
+			call_deferred("_update_arrow_position")
 			get_viewport().set_input_as_handled()
 
 func _on_party_picker_accept() -> void:
