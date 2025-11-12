@@ -654,32 +654,27 @@ func _show_perk_details(perk: Dictionary) -> void:
 	var threshold: int = perk["threshold"]
 	var sky_cyan_hex: String = "#4DE9FF"
 
-	# Build LEFT column: Tier, Description, Requires, Current
+	# Build LEFT column: Tier, Description
 	var left_text: String = ""
 	left_text += "[color=%s]Tier:[/color] %d\n\n" % [sky_cyan_hex, perk["tier"] + 1]
 
 	if perk["description"] != "":
-		left_text += "[color=%s]Description:[/color]\n%s\n\n" % [sky_cyan_hex, perk["description"]]
+		left_text += "[color=%s]Description:[/color]\n%s" % [sky_cyan_hex, perk["description"]]
 
-	left_text += "[color=%s]Requires:[/color]\n%s ≥ %d\n\n" % [sky_cyan_hex, _pretty_stat(perk["stat_id"]), threshold]
-	left_text += "[color=%s]Current:[/color]\n%s = %d" % [sky_cyan_hex, _pretty_stat(perk["stat_id"]), stat_level]
-
-	# Build RIGHT column: Status, Cost, Unlockable
+	# Build RIGHT column: Requires, Status, Cost
 	var right_text: String = ""
+	right_text += "[color=%s]Requires:[/color]\n%s ≥ %d\n\n" % [sky_cyan_hex, _pretty_stat(perk["stat_id"]), threshold]
 
 	if perk["unlocked"]:
-		right_text += "[color=%s]Status:[/color]\n✔ Unlocked\n\n" % sky_cyan_hex
+		right_text += "[color=%s]Status:[/color]\n✔ Unlocked" % sky_cyan_hex
 	elif perk["available"]:
 		right_text += "[color=%s]Status:[/color]\nAvailable!\n\n" % sky_cyan_hex
-		right_text += "[color=%s]Cost:[/color]\n1 Perk Point\n\n" % sky_cyan_hex
-		right_text += "[color=%s]Unlockable:[/color]\nPress A to unlock" % sky_cyan_hex
+		right_text += "[color=%s]Cost:[/color]\n1 Perk Point" % sky_cyan_hex
 	else:
 		if stat_level < threshold:
-			right_text += "[color=%s]Status:[/color]\nLocked\n\n" % sky_cyan_hex
-			right_text += "[color=%s]Unlockable:[/color]\nNeed %d more %s" % [sky_cyan_hex, threshold - stat_level, _pretty_stat(perk["stat_id"])]
+			right_text += "[color=%s]Status:[/color]\nLocked (need %d more %s)" % [sky_cyan_hex, threshold - stat_level, _pretty_stat(perk["stat_id"])]
 		else:
-			right_text += "[color=%s]Status:[/color]\nLocked\n\n" % sky_cyan_hex
-			right_text += "[color=%s]Unlockable:[/color]\nNeed perk points" % sky_cyan_hex
+			right_text += "[color=%s]Status:[/color]\nLocked (need perk points)" % sky_cyan_hex
 
 	_details_left_column.text = left_text
 	_details_right_column.text = right_text
