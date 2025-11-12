@@ -207,19 +207,36 @@ func _update_arrow_position() -> void:
 	var item_index = selected[0]
 	var item_rect = _party_list.get_item_rect(item_index)
 
+	print("[StatsPanel] Arrow Position Debug:")
+	print("  Selected index: %d" % item_index)
+	print("  Item rect: pos=%s size=%s" % [item_rect.position, item_rect.size])
+
 	# Convert ItemList position to party panel coordinates
 	# ItemList is a child of party panel, so we need its position + margins
 	var list_global_pos = _party_list.global_position
 	var panel_global_pos = _party_panel.global_position if _party_panel else Vector2.ZERO
 
+	print("  List global pos: %s" % list_global_pos)
+	print("  Panel global pos: %s" % panel_global_pos)
+	print("  List position (local): %s" % _party_list.position)
+	print("  List size: %s" % _party_list.size)
+
 	# Calculate position in panel coordinates
 	var list_offset_in_panel = list_global_pos - panel_global_pos
+	print("  List offset in panel: %s" % list_offset_in_panel)
 
 	# Position arrow to the right of the item text, aligned vertically with item center
 	var arrow_x = list_offset_in_panel.x + item_rect.position.x + item_rect.size.x + 10
 	var arrow_y = list_offset_in_panel.y + item_rect.position.y + (item_rect.size.y / 2.0) - (36)  # Center on text line
 
+	print("  Arrow custom_minimum_size: %s" % _selection_arrow.custom_minimum_size)
+	print("  Arrow size: %s" % _selection_arrow.size)
+	print("  Calculated arrow pos: x=%f y=%f" % [arrow_x, arrow_y])
+	print("  Arrow vertical calc: item_y=%f + (item_h=%f / 2.0) - 36 = %f" % [item_rect.position.y, item_rect.size.y, arrow_y - list_offset_in_panel.y])
+
 	_selection_arrow.position = Vector2(arrow_x, arrow_y)
+
+	print("  Final arrow position: %s" % _selection_arrow.position)
 
 func _start_arrow_pulse() -> void:
 	"""Start pulsing animation for the arrow"""
