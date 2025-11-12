@@ -1213,7 +1213,7 @@ func _hide_member_arrow(btn: Button) -> void:
 			arrow.remove_meta("pulse_tween")
 		arrow.queue_free()
 
-func _start_arrow_pulse(arrow: TextureRect) -> void:
+func _start_arrow_pulse(arrow: Control) -> void:
 	"""Start pulsing animation for arrow - moves up and down"""
 	if arrow.has_meta("pulse_tween"):
 		var old_tween = arrow.get_meta("pulse_tween")
