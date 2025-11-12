@@ -78,6 +78,17 @@
 
 extends Control
 
+## Neon Orchard Color Palette
+const COLOR_ELECTRIC_LIME = Color(0.78, 1.0, 0.24)      # #C8FF3D
+const COLOR_BUBBLE_MAGENTA = Color(1.0, 0.29, 0.85)     # #FF4AD9
+const COLOR_SKY_CYAN = Color(0.30, 0.91, 1.0)           # #4DE9FF
+const COLOR_CITRUS_YELLOW = Color(1.0, 0.91, 0.30)      # #FFE84D
+const COLOR_PLASMA_TEAL = Color(0.13, 0.89, 0.70)       # #20E3B2
+const COLOR_GRAPE_VIOLET = Color(0.54, 0.25, 0.99)      # #8A3FFC
+const COLOR_NIGHT_NAVY = Color(0.04, 0.06, 0.10)        # #0A0F1A
+const COLOR_INK_CHARCOAL = Color(0.07, 0.09, 0.15)      # #111827
+const COLOR_MILK_WHITE = Color(0.96, 0.97, 0.98)        # #F4F7FB
+
 # ---- Autoloads (PartySystem removed) ----
 const CALENDAR_PATH      := "/root/aCalendarSystem"
 const STATS_PATH         := "/root/aStatsSystem"
@@ -370,6 +381,7 @@ func _ready() -> void:
 	if _btn_add_sxp:   _btn_add_sxp.pressed.connect(_on_add_sxp)
 
 	# Cosmetics
+	_style_date_and_phase_labels()
 	_style_option_button(_roster_pick)
 	_style_option_button(_stat_pick)
 
@@ -599,6 +611,96 @@ func _on_load_items_pressed() -> void:
 		items_status.text = "Items: %s" % (str(table.size()) if not table.is_empty() else "(failed)")
 
 func _on_open_training() -> void: pass
+
+func _style_date_and_phase_labels() -> void:
+	"""Apply Core Vibe neon-kawaii styling to date and phase labels with pill backgrounds"""
+	if date_label:
+		# Create pill capsule background for date label
+		var date_panel = StyleBoxFlat.new()
+		date_panel.bg_color = Color(COLOR_INK_CHARCOAL.r, COLOR_INK_CHARCOAL.g, COLOR_INK_CHARCOAL.b, 0.85)  # 85% opacity
+		date_panel.border_color = COLOR_SKY_CYAN
+		date_panel.border_width_left = 2
+		date_panel.border_width_right = 2
+		date_panel.border_width_top = 2
+		date_panel.border_width_bottom = 2
+		date_panel.corner_radius_top_left = 12
+		date_panel.corner_radius_top_right = 12
+		date_panel.corner_radius_bottom_left = 12
+		date_panel.corner_radius_bottom_right = 12
+		date_panel.shadow_color = Color(COLOR_SKY_CYAN.r, COLOR_SKY_CYAN.g, COLOR_SKY_CYAN.b, 0.4)
+		date_panel.shadow_size = 6
+		date_panel.content_margin_left = 16
+		date_panel.content_margin_right = 16
+		date_panel.content_margin_top = 8
+		date_panel.content_margin_bottom = 8
+
+		# Convert label to panel with background
+		var date_panel_container = date_label.get_parent()
+		if date_panel_container:
+			# Remove label from current parent
+			var label_index = date_label.get_index()
+			date_panel_container.remove_child(date_label)
+
+			# Create new PanelContainer
+			var panel = PanelContainer.new()
+			panel.name = "DatePanel"
+			panel.add_theme_stylebox_override("panel", date_panel)
+			panel.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+
+			# Add label to panel
+			panel.add_child(date_label)
+
+			# Add panel back to parent at same position
+			date_panel_container.add_child(panel)
+			date_panel_container.move_child(panel, label_index)
+
+		# Style the text
+		date_label.add_theme_color_override("font_color", COLOR_SKY_CYAN)
+		date_label.add_theme_font_size_override("font_size", 18)
+
+	if phase_label:
+		# Create pill capsule background for phase label
+		var phase_panel = StyleBoxFlat.new()
+		phase_panel.bg_color = Color(COLOR_INK_CHARCOAL.r, COLOR_INK_CHARCOAL.g, COLOR_INK_CHARCOAL.b, 0.85)  # 85% opacity
+		phase_panel.border_color = COLOR_BUBBLE_MAGENTA
+		phase_panel.border_width_left = 2
+		phase_panel.border_width_right = 2
+		phase_panel.border_width_top = 2
+		phase_panel.border_width_bottom = 2
+		phase_panel.corner_radius_top_left = 12
+		phase_panel.corner_radius_top_right = 12
+		phase_panel.corner_radius_bottom_left = 12
+		phase_panel.corner_radius_bottom_right = 12
+		phase_panel.shadow_color = Color(COLOR_BUBBLE_MAGENTA.r, COLOR_BUBBLE_MAGENTA.g, COLOR_BUBBLE_MAGENTA.b, 0.4)
+		phase_panel.shadow_size = 6
+		phase_panel.content_margin_left = 16
+		phase_panel.content_margin_right = 16
+		phase_panel.content_margin_top = 6
+		phase_panel.content_margin_bottom = 6
+
+		# Convert label to panel with background
+		var phase_panel_container = phase_label.get_parent()
+		if phase_panel_container:
+			# Remove label from current parent
+			var label_index = phase_label.get_index()
+			phase_panel_container.remove_child(phase_label)
+
+			# Create new PanelContainer
+			var panel = PanelContainer.new()
+			panel.name = "PhasePanel"
+			panel.add_theme_stylebox_override("panel", phase_panel)
+			panel.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+
+			# Add label to panel
+			panel.add_child(phase_label)
+
+			# Add panel back to parent at same position
+			phase_panel_container.add_child(panel)
+			phase_panel_container.move_child(panel, label_index)
+
+		# Style the text
+		phase_label.add_theme_color_override("font_color", COLOR_BUBBLE_MAGENTA)
+		phase_label.add_theme_font_size_override("font_size", 16)
 
 func _style_option_button(ob: OptionButton) -> void:
 	if ob == null: return

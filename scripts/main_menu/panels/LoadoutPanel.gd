@@ -73,7 +73,7 @@ const ANIM_DURATION := 0.2  # Animation duration in seconds
 @onready var _middle_panel: PanelContainer = get_node("%Middle") if has_node("%Middle") else null
 @onready var _stats_panel: PanelContainer = get_node("%StatsColumn") if has_node("%StatsColumn") else null
 
-@onready var _party_list: ItemList       = get_node("Row/Party/VBox/PartyList") as ItemList
+@onready var _party_list: ItemList       = get_node("Row/Party/Margin/VBox/PartyList") as ItemList
 # @onready var _member_name: Label         = get_node("Row/Middle/Margin/VBox/MemberName") as Label  # Removed
 
 @onready var _w_val: Label = get_node("Row/Middle/Margin/VBox/Grid/WHBox/WValue") as Label
@@ -207,6 +207,9 @@ func _on_panel_lost_focus() -> void:
 	# Don't change state - preserve it for when we regain focus
 
 func _first_fill() -> void:
+	# Apply Core Vibe styling
+	_apply_core_vibe_styling()
+
 	_refresh_party()
 	if _party_list.get_item_count() > 0:
 		_party_list.select(0)
@@ -214,6 +217,94 @@ func _first_fill() -> void:
 	_party_sig = _snapshot_party_signature()
 	var cur := _current_token()
 	_sigils_sig = _snapshot_sigil_signature(cur) if cur != "" else ""
+
+func _apply_core_vibe_styling() -> void:
+	"""Apply Core Vibe neon-kawaii styling to LoadoutPanel"""
+
+	# Style the three main panel containers with rounded neon borders
+	# Note: No content_margin here - scene already has MarginContainers
+	if _party_panel:
+		var party_style = aCoreVibeTheme.create_panel_style(
+			aCoreVibeTheme.COLOR_SKY_CYAN,            # Sky Cyan border (party)
+			aCoreVibeTheme.COLOR_INK_CHARCOAL,        # Ink charcoal background
+			aCoreVibeTheme.PANEL_OPACITY_SEMI,        # Semi-transparent
+			aCoreVibeTheme.CORNER_RADIUS_MEDIUM,      # 16px corners
+			aCoreVibeTheme.BORDER_WIDTH_THIN,         # 2px border
+			aCoreVibeTheme.SHADOW_SIZE_MEDIUM         # 6px glow
+		)
+		_party_panel.add_theme_stylebox_override("panel", party_style)
+
+	if _middle_panel:
+		var middle_style = aCoreVibeTheme.create_panel_style(
+			aCoreVibeTheme.COLOR_ELECTRIC_LIME,       # Electric Lime border (equipment)
+			aCoreVibeTheme.COLOR_INK_CHARCOAL,        # Ink charcoal background
+			aCoreVibeTheme.PANEL_OPACITY_SEMI,        # Semi-transparent
+			aCoreVibeTheme.CORNER_RADIUS_MEDIUM,      # 16px corners
+			aCoreVibeTheme.BORDER_WIDTH_THIN,         # 2px border
+			aCoreVibeTheme.SHADOW_SIZE_MEDIUM         # 6px glow
+		)
+		_middle_panel.add_theme_stylebox_override("panel", middle_style)
+
+	if _stats_panel:
+		var stats_style = aCoreVibeTheme.create_panel_style(
+			aCoreVibeTheme.COLOR_GRAPE_VIOLET,        # Grape Violet border (stats)
+			aCoreVibeTheme.COLOR_INK_CHARCOAL,        # Ink charcoal background
+			aCoreVibeTheme.PANEL_OPACITY_SEMI,        # Semi-transparent
+			aCoreVibeTheme.CORNER_RADIUS_MEDIUM,      # 16px corners
+			aCoreVibeTheme.BORDER_WIDTH_THIN,         # 2px border
+			aCoreVibeTheme.SHADOW_SIZE_MEDIUM         # 6px glow
+		)
+		_stats_panel.add_theme_stylebox_override("panel", stats_style)
+
+	# Style party list with Sky Cyan selection
+	if _party_list:
+		_party_list.add_theme_color_override("font_selected_color", aCoreVibeTheme.COLOR_SKY_CYAN)
+		_party_list.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE)
+
+	# Style equipment slot labels
+	if _w_val:
+		aCoreVibeTheme.style_label(_w_val, aCoreVibeTheme.COLOR_ELECTRIC_LIME, 12)
+	if _a_val:
+		aCoreVibeTheme.style_label(_a_val, aCoreVibeTheme.COLOR_ELECTRIC_LIME, 12)
+	if _h_val:
+		aCoreVibeTheme.style_label(_h_val, aCoreVibeTheme.COLOR_ELECTRIC_LIME, 12)
+	if _f_val:
+		aCoreVibeTheme.style_label(_f_val, aCoreVibeTheme.COLOR_ELECTRIC_LIME, 12)
+	if _b_val:
+		aCoreVibeTheme.style_label(_b_val, aCoreVibeTheme.COLOR_ELECTRIC_LIME, 12)
+
+	# Style equipment buttons
+	if _w_btn:
+		aCoreVibeTheme.style_button(_w_btn, aCoreVibeTheme.COLOR_SKY_CYAN, aCoreVibeTheme.CORNER_RADIUS_SMALL)
+	if _a_btn:
+		aCoreVibeTheme.style_button(_a_btn, aCoreVibeTheme.COLOR_SKY_CYAN, aCoreVibeTheme.CORNER_RADIUS_SMALL)
+	if _h_btn:
+		aCoreVibeTheme.style_button(_h_btn, aCoreVibeTheme.COLOR_SKY_CYAN, aCoreVibeTheme.CORNER_RADIUS_SMALL)
+	if _f_btn:
+		aCoreVibeTheme.style_button(_f_btn, aCoreVibeTheme.COLOR_SKY_CYAN, aCoreVibeTheme.CORNER_RADIUS_SMALL)
+	if _b_btn:
+		aCoreVibeTheme.style_button(_b_btn, aCoreVibeTheme.COLOR_SKY_CYAN, aCoreVibeTheme.CORNER_RADIUS_SMALL)
+
+	# Style sigils title
+	if _sigils_title:
+		aCoreVibeTheme.style_label(_sigils_title, aCoreVibeTheme.COLOR_GRAPE_VIOLET, 16)
+
+	# Style manage sigils button
+	if _btn_manage:
+		aCoreVibeTheme.style_button(_btn_manage, aCoreVibeTheme.COLOR_ELECTRIC_LIME, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
+
+	# Style mind section
+	if _mind_value:
+		aCoreVibeTheme.style_label(_mind_value, aCoreVibeTheme.COLOR_CITRUS_YELLOW, 14)
+
+	# Style switch button
+	if _mind_switch_btn:
+		aCoreVibeTheme.style_button(_mind_switch_btn, aCoreVibeTheme.COLOR_PLASMA_TEAL, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
+
+	# Style details content
+	if _details_content:
+		_details_content.add_theme_color_override("default_color", aCoreVibeTheme.COLOR_MILK_WHITE)
+		_details_content.add_theme_font_size_override("normal_font_size", 12)
 
 # ────────────────── tiny util ──────────────────
 func _connect_if(n: Object, sig: String, cb: Callable) -> void:
@@ -405,16 +496,16 @@ func _on_sigils_changed(member: String) -> void:
 
 # ────────────────── equip menu ──────────────────
 func _style_popup_panel(popup_panel: Panel) -> void:
-	"""Apply ToastPopup styling to a panel"""
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.15, 0.15, 0.15, 1.0)  # Dark gray, fully opaque
-	style.border_color = Color(1.0, 0.7, 0.75, 1.0)  # Pink border
-	style.set_border_width_all(2)
-	style.corner_radius_top_left = 8
-	style.corner_radius_top_right = 8
-	style.corner_radius_bottom_left = 8
-	style.corner_radius_bottom_right = 8
-	popup_panel.add_theme_stylebox_override("panel", style)
+	"""Apply Core Vibe styling to a panel"""
+	var panel_style = aCoreVibeTheme.create_panel_style(
+		aCoreVibeTheme.COLOR_SKY_CYAN,            # Sky Cyan border (general popup)
+		aCoreVibeTheme.COLOR_INK_CHARCOAL,        # Ink charcoal background
+		aCoreVibeTheme.PANEL_OPACITY_FULL,        # Fully opaque
+		aCoreVibeTheme.CORNER_RADIUS_MEDIUM,      # 16px corners
+		aCoreVibeTheme.BORDER_WIDTH_THIN,         # 2px border
+		aCoreVibeTheme.SHADOW_SIZE_LARGE          # 12px glow
+	)
+	popup_panel.add_theme_stylebox_override("panel", panel_style)
 
 func _get_equipment_stats(item_id: String, slot: String) -> Dictionary:
 	"""Extract relevant stats from an equipment item based on slot type"""
@@ -446,13 +537,13 @@ func _get_equipment_stats(item_id: String, slot: String) -> Dictionary:
 	return stats
 
 func _compare_stat_value(current_val: int, new_val: int) -> Color:
-	"""Return color based on stat comparison: white (same), green (better), red (worse)"""
+	"""Return color based on stat comparison: Core Vibe colors"""
 	if new_val > current_val:
-		return Color(0.4, 1.0, 0.4)  # Green - better
+		return aCoreVibeTheme.COLOR_ELECTRIC_LIME  # Electric Lime - better
 	elif new_val < current_val:
-		return Color(1.0, 0.4, 0.4)  # Red - worse
+		return aCoreVibeTheme.COLOR_BUBBLE_MAGENTA  # Bubble Magenta - worse
 	else:
-		return Color(1.0, 1.0, 1.0)  # White - same
+		return aCoreVibeTheme.COLOR_MILK_WHITE  # Milk White - same
 
 func _build_equipment_comparison_panel(item_id: String, slot: String, current_stats: Dictionary, title: String) -> Panel:
 	"""Build a comparison panel showing equipment stats"""
@@ -472,21 +563,22 @@ func _build_equipment_comparison_panel(item_id: String, slot: String, current_st
 	vbox.add_theme_constant_override("separation", 8)
 	margin.add_child(vbox)
 
-	# Title
+	# Title (Core Vibe: Sky Cyan for popup titles)
 	var title_label := Label.new()
 	title_label.text = title
 	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title_label.add_theme_font_size_override("font_size", 14)
-	title_label.add_theme_color_override("font_color", Color(1.0, 0.7, 0.75))
+	title_label.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_SKY_CYAN)
 	vbox.add_child(title_label)
 
-	# Item name
+	# Item name (Core Vibe: Dimmed Milk White for empty, Electric Lime for filled)
 	var name_label := Label.new()
 	if item_id == "" or item_id == "—":
 		name_label.text = "(Empty)"
-		name_label.add_theme_color_override("font_color", Color(0.6, 0.6, 0.6))
+		name_label.add_theme_color_override("font_color", Color(aCoreVibeTheme.COLOR_MILK_WHITE.r, aCoreVibeTheme.COLOR_MILK_WHITE.g, aCoreVibeTheme.COLOR_MILK_WHITE.b, 0.4))
 	else:
 		name_label.text = _pretty_item(item_id)
+		name_label.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_ELECTRIC_LIME)
 	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	name_label.add_theme_font_size_override("font_size", 12)
 	vbox.add_child(name_label)
@@ -516,7 +608,8 @@ func _build_equipment_comparison_panel(item_id: String, slot: String, current_st
 			type_label.text = type_text
 			type_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			type_label.add_theme_font_size_override("font_size", 10)
-			type_label.add_theme_color_override("font_color", Color(0.8, 0.8, 0.8))
+			# Core Vibe: Citrus Yellow for type/category labels
+			type_label.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_CITRUS_YELLOW)
 			vbox.add_child(type_label)
 
 	# Separator
@@ -543,11 +636,12 @@ func _build_equipment_comparison_panel(item_id: String, slot: String, current_st
 		var stat_hbox := HBoxContainer.new()
 		stats_vbox.add_child(stat_hbox)
 
-		# Stat name
+		# Stat name (Core Vibe: Milk White for stat labels)
 		var stat_label := Label.new()
 		stat_label.text = stat_name + ":"
 		stat_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		stat_label.add_theme_font_size_override("font_size", 11)
+		stat_label.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE)
 		stat_hbox.add_child(stat_label)
 
 		# Stat value with color
@@ -568,7 +662,8 @@ func _build_equipment_comparison_panel(item_id: String, slot: String, current_st
 			desc_label.text = String(item_def.get("description", ""))
 			desc_label.autowrap_mode = TextServer.AUTOWRAP_WORD
 			desc_label.add_theme_font_size_override("font_size", 10)
-			desc_label.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))
+			# Core Vibe: Semi-transparent Milk White for descriptions
+			desc_label.add_theme_color_override("font_color", Color(aCoreVibeTheme.COLOR_MILK_WHITE.r, aCoreVibeTheme.COLOR_MILK_WHITE.g, aCoreVibeTheme.COLOR_MILK_WHITE.b, 0.7))
 			vbox.add_child(desc_label)
 
 	return panel
@@ -814,9 +909,9 @@ func _rebuild_sigils(member_token: String) -> void:
 		var cur_id: String = (String(sockets[idx]) if idx < sockets.size() else "")
 		nm.text = (_sigil_disp(cur_id) if cur_id != "" else "(empty)")
 
-		# Make equipped sigil names blue
+		# Core Vibe: Make equipped sigil names Electric Lime
 		if cur_id != "":
-			nm.add_theme_color_override("font_color", Color(0.4, 0.7, 1.0))  # Blue color
+			nm.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_ELECTRIC_LIME)
 
 		# Hide slots beyond bracelet capacity
 		if idx >= cap:
@@ -829,6 +924,8 @@ func _rebuild_sigils(member_token: String) -> void:
 		btn.custom_minimum_size = Vector2(90, 18)  # Match equipment button size for grid alignment
 		btn.add_theme_font_size_override("font_size", 11)
 		btn.text = "Equip"
+		# Core Vibe: Plasma Teal for action buttons
+		aCoreVibeTheme.style_button(btn, aCoreVibeTheme.COLOR_PLASMA_TEAL, aCoreVibeTheme.CORNER_RADIUS_SMALL)
 		btn.pressed.connect(Callable(self, "_on_equip_sigil").bind(member_token, idx))
 
 		# Hide button if slot is beyond capacity
@@ -1161,18 +1258,18 @@ func _set_slot_value(label: Label, id: String, slot: String) -> void:
 			_: placeholder = "—"
 
 		label.text = placeholder
-		# Set grey color using theme override
-		label.add_theme_color_override("font_color", Color(0.533, 0.533, 0.533))
+		# Core Vibe: Dimmed Milk White for empty slots
+		label.add_theme_color_override("font_color", Color(aCoreVibeTheme.COLOR_MILK_WHITE.r, aCoreVibeTheme.COLOR_MILK_WHITE.g, aCoreVibeTheme.COLOR_MILK_WHITE.b, 0.4))
 	else:
-		# Has equipment - show item name with light blue color
+		# Has equipment - show item name
 		var item_name: String = id
 		if _eq and _eq.has_method("get_item_display_name"):
 			var v: Variant = _eq.call("get_item_display_name", id)
 			if typeof(v) == TYPE_STRING: item_name = String(v)
 
 		label.text = item_name
-		# Set light blue color for equipped items
-		label.add_theme_color_override("font_color", Color(0.4, 0.7, 1.0))
+		# Core Vibe: Electric Lime for equipped items
+		label.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_ELECTRIC_LIME)
 
 func _list_equippable(member_token: String, slot: String) -> PackedStringArray:
 	if _eq and _eq.has_method("list_equippable"):
@@ -1229,13 +1326,13 @@ func _get_dice_notation(tier: int) -> String:
 		_: return "1D20"
 
 func _create_stat_cell(stat_label: String, value: String) -> PanelContainer:
-	"""Create a rounded grey cell containing a stat label and value"""
+	"""Create a rounded Core Vibe stat cell"""
 	var panel := PanelContainer.new()
 	panel.custom_minimum_size = Vector2(0, 30)
 
-	# Create darker grey rounded background
+	# Core Vibe: Ink Charcoal background with rounded corners
 	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.15, 0.15, 0.15, 1.0)  # Darker grey
+	style.bg_color = aCoreVibeTheme.COLOR_INK_CHARCOAL
 	style.corner_radius_top_left = 4
 	style.corner_radius_top_right = 4
 	style.corner_radius_bottom_left = 4
@@ -1255,22 +1352,23 @@ func _create_stat_cell(stat_label: String, value: String) -> PanelContainer:
 	hbox.add_theme_constant_override("separation", 4)
 	margin.add_child(hbox)
 
-	# Label - 25 characters wide
+	# Label - 20 characters wide (Core Vibe: Milk White)
 	var label := Label.new()
 	label.text = stat_label
-	label.custom_minimum_size = Vector2(150, 0)  # ~25 characters at 12pt
+	label.custom_minimum_size = Vector2(120, 0)  # ~20 characters at 12pt
 	label.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	label.add_theme_font_size_override("font_size", 12)
+	label.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	hbox.add_child(label)
 
-	# Value - 5 characters wide, blue color
+	# Value - 5 characters wide (Core Vibe: Sky Cyan for stat values)
 	var value_label := Label.new()
 	value_label.text = value
 	value_label.custom_minimum_size = Vector2(30, 0)  # ~5 characters at 12pt
 	value_label.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	value_label.add_theme_font_size_override("font_size", 12)
-	value_label.add_theme_color_override("font_color", Color(0.5, 0.7, 1.0))  # Blue
+	value_label.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_SKY_CYAN)
 	value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	hbox.add_child(value_label)
 

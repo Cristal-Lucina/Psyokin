@@ -23,12 +23,65 @@ var _qty   : int = 0
 var _inv   : Node = null
 
 func _ready() -> void:
+	_apply_core_vibe_styling()
 	if _close and not _close.pressed.is_connected(_on_close):
 		_close.pressed.connect(_on_close)
 	if _use and not _use.pressed.is_connected(_on_use):
 		_use.pressed.connect(_on_use)
 	_ensure_extra_buttons()
 	_update_ui()
+
+func _apply_core_vibe_styling() -> void:
+	"""Apply Core Vibe neon-kawaii styling to all UI elements"""
+	# Style the backdrop
+	var backdrop = get_node_or_null("%Backdrop") as ColorRect
+	if backdrop:
+		# Semi-transparent Night Navy backdrop
+		backdrop.color = Color(aCoreVibeTheme.COLOR_NIGHT_NAVY.r, aCoreVibeTheme.COLOR_NIGHT_NAVY.g, aCoreVibeTheme.COLOR_NIGHT_NAVY.b, 0.95)
+
+	# Style the main panel
+	var panel = get_node_or_null("%Panel") as Panel
+	if panel:
+		var panel_style = aCoreVibeTheme.create_panel_style(
+			aCoreVibeTheme.COLOR_GRAPE_VIOLET,        # Grape Violet border (special item)
+			aCoreVibeTheme.COLOR_INK_CHARCOAL,        # Ink charcoal background
+			aCoreVibeTheme.PANEL_OPACITY_FULL,        # Fully opaque
+			aCoreVibeTheme.CORNER_RADIUS_MEDIUM,      # 16px corners
+			aCoreVibeTheme.BORDER_WIDTH_THIN,         # 2px border
+			aCoreVibeTheme.SHADOW_SIZE_LARGE          # 12px glow
+		)
+		panel.add_theme_stylebox_override("panel", panel_style)
+
+	# Style title label
+	if _title:
+		aCoreVibeTheme.style_label(_title, aCoreVibeTheme.COLOR_GRAPE_VIOLET, 20)
+
+	# Style category/count labels
+	var cat_label = get_node_or_null("Center/Panel/Margin/Root/MetaRow/CategoryLabel") as Label
+	var count_label = get_node_or_null("Center/Panel/Margin/Root/MetaRow/CountLabel") as Label
+	if cat_label:
+		aCoreVibeTheme.style_label(cat_label, Color(aCoreVibeTheme.COLOR_MILK_WHITE.r, aCoreVibeTheme.COLOR_MILK_WHITE.g, aCoreVibeTheme.COLOR_MILK_WHITE.b, 0.7), 14)
+	if count_label:
+		aCoreVibeTheme.style_label(count_label, Color(aCoreVibeTheme.COLOR_MILK_WHITE.r, aCoreVibeTheme.COLOR_MILK_WHITE.g, aCoreVibeTheme.COLOR_MILK_WHITE.b, 0.7), 14)
+
+	# Style category/count values
+	if _cat:
+		aCoreVibeTheme.style_label(_cat, aCoreVibeTheme.COLOR_SKY_CYAN, 14)
+	if _count:
+		aCoreVibeTheme.style_label(_count, aCoreVibeTheme.COLOR_ELECTRIC_LIME, 14)
+
+	# Style description
+	if _desc:
+		_desc.add_theme_color_override("default_color", aCoreVibeTheme.COLOR_MILK_WHITE)
+		_desc.add_theme_font_size_override("normal_font_size", 14)
+
+	# Style buttons
+	if _use:
+		aCoreVibeTheme.style_button(_use, aCoreVibeTheme.COLOR_ELECTRIC_LIME, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
+		_use.custom_minimum_size = Vector2(100, 36)
+	if _close:
+		aCoreVibeTheme.style_button(_close, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
+		_close.custom_minimum_size = Vector2(100, 36)
 
 func set_item(id: String, def: Dictionary, count: int, inv: Node) -> void:
 	_id  = id
@@ -49,6 +102,9 @@ func _ensure_extra_buttons() -> void:
 		_discard_btn = Button.new()
 		_discard_btn.name = "DiscardBtn"
 		_discard_btn.text = "Discard"
+		_discard_btn.custom_minimum_size = Vector2(100, 36)
+		# Core Vibe: Citrus Yellow button for discard
+		aCoreVibeTheme.style_button(_discard_btn, aCoreVibeTheme.COLOR_CITRUS_YELLOW, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
 		parent.add_child(_discard_btn)
 	if not _discard_btn.pressed.is_connected(_on_discard):
 		_discard_btn.pressed.connect(_on_discard)
@@ -58,6 +114,9 @@ func _ensure_extra_buttons() -> void:
 		_add_btn = Button.new()
 		_add_btn.name = "AddBtn"
 		_add_btn.text = "Give +1"
+		_add_btn.custom_minimum_size = Vector2(100, 36)
+		# Core Vibe: Plasma Teal button for adding
+		aCoreVibeTheme.style_button(_add_btn, aCoreVibeTheme.COLOR_PLASMA_TEAL, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
 		parent.add_child(_add_btn)
 	if not _add_btn.pressed.is_connected(_on_add):
 		_add_btn.pressed.connect(_on_add)

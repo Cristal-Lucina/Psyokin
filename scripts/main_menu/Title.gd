@@ -5,6 +5,17 @@ extends Control
 ## Finds buttons by common paths, then by name, then by label text.
 ## Hides Continue/Load when no saves exist.
 
+## Neon Orchard Color Palette
+const COLOR_ELECTRIC_LIME = Color(0.78, 1.0, 0.24)      # #C8FF3D
+const COLOR_BUBBLE_MAGENTA = Color(1.0, 0.29, 0.85)     # #FF4AD9
+const COLOR_SKY_CYAN = Color(0.30, 0.91, 1.0)           # #4DE9FF
+const COLOR_CITRUS_YELLOW = Color(1.0, 0.91, 0.30)      # #FFE84D
+const COLOR_PLASMA_TEAL = Color(0.13, 0.89, 0.70)       # #20E3B2
+const COLOR_GRAPE_VIOLET = Color(0.54, 0.25, 0.99)      # #8A3FFC
+const COLOR_NIGHT_NAVY = Color(0.04, 0.06, 0.10)        # #0A0F1A
+const COLOR_INK_CHARCOAL = Color(0.07, 0.09, 0.15)      # #111827
+const COLOR_MILK_WHITE = Color(0.96, 0.97, 0.98)        # #F4F7FB
+
 const SAVE_DIR               : String = "user://saves"
 const MAIN_SCENE             : String = "res://scenes/main/Main.tscn"
 const OPTIONS_SCENE          : String = "res://scenes/main_menu/Options.tscn"
@@ -39,10 +50,19 @@ var selected_button_index: int = 0
 var input_cooldown: float = 0.0
 var input_cooldown_duration: float = 0.15  # 150ms between inputs
 
+# Dynamic background elements
+var diagonal_bands: ColorRect = null
+var grid_overlay: ColorRect = null
+var particle_layer: Node2D = null
+
 # ------------------------------------------------------------------------------
 
 func _ready() -> void:
 	"""Wire buttons defensively and decorate Continue."""
+
+	# Create neon-kawaii background
+	_create_diagonal_background()
+	_spawn_ambient_particles()
 
 	# Check if we're auto-loading from in-game (two-step loading process)
 	if has_node("/root/aGameState"):
@@ -100,6 +120,11 @@ func _ready() -> void:
 
 	# Setup controller navigation
 	_setup_controller_navigation(new_btn, continue_btn, load_btn, options_btn, quit_btn, has_save)
+
+	# Apply Core Vibe styling
+	_style_panel()
+	_style_title()
+	_style_buttons(new_btn, continue_btn, load_btn, options_btn, quit_btn)
 
 # ------------------------------------------------------------------------------
 # Button handlers
@@ -463,19 +488,188 @@ func _navigate_menu(direction: int) -> void:
 	_highlight_button(selected_button_index)
 
 func _highlight_button(index: int) -> void:
-	"""Highlight a button - resets all buttons first to ensure only one is selected"""
+	"""Highlight a button with Core Vibe animation - resets all buttons first"""
 	# First, unhighlight ALL buttons to ensure only one is highlighted
 	for i in range(navigable_buttons.size()):
-		navigable_buttons[i].modulate = Color(1.0, 1.0, 1.0, 1.0)
+		var btn = navigable_buttons[i]
+		btn.modulate = Color(1.0, 1.0, 1.0, 1.0)
+		btn.scale = Vector2.ONE
 
 	# Now highlight the selected button
 	if index >= 0 and index < navigable_buttons.size():
 		var button = navigable_buttons[index]
-		button.modulate = Color(1.2, 1.2, 0.8, 1.0)
 		button.grab_focus()
 
+		# Animate with elastic bounce
+		var tween = create_tween()
+		tween.set_parallel(true)
+		tween.set_ease(Tween.EASE_OUT)
+		tween.set_trans(Tween.TRANS_BACK)
+
+		# Scale up slightly with overshoot
+		tween.tween_property(button, "scale", Vector2(1.08, 1.08), 0.3)
+
+		# Brighten slightly
+		tween.tween_property(button, "modulate", Color(1.1, 1.1, 1.1, 1.0), 0.3)
+
 func _unhighlight_button(index: int) -> void:
-	"""Remove highlight from a button"""
+	"""Remove highlight from a button with smooth animation"""
 	if index >= 0 and index < navigable_buttons.size():
 		var button = navigable_buttons[index]
-		button.modulate = Color(1.0, 1.0, 1.0, 1.0)
+
+		var tween = create_tween()
+		tween.set_parallel(true)
+		tween.set_ease(Tween.EASE_OUT)
+		tween.set_trans(Tween.TRANS_CUBIC)
+
+		tween.tween_property(button, "scale", Vector2.ONE, 0.2)
+		tween.tween_property(button, "modulate", Color(1.0, 1.0, 1.0, 1.0), 0.2)
+
+# ------------------------------------------------------------------------------
+# Core Vibe Styling
+# ------------------------------------------------------------------------------
+
+func _create_diagonal_background() -> void:
+	"""Create diagonal striped background with grid overlay"""
+	# Create diagonal bands
+	diagonal_bands = ColorRect.new()
+	diagonal_bands.name = "DiagonalBands"
+	diagonal_bands.color = COLOR_NIGHT_NAVY
+	diagonal_bands.z_index = -2
+	add_child(diagonal_bands)
+	diagonal_bands.set_anchors_preset(Control.PRESET_FULL_RECT)
+
+	# Create grid overlay
+	grid_overlay = ColorRect.new()
+	grid_overlay.name = "GridOverlay"
+	grid_overlay.color = Color(COLOR_SKY_CYAN.r, COLOR_SKY_CYAN.g, COLOR_SKY_CYAN.b, 0.06)
+	grid_overlay.z_index = -1
+	add_child(grid_overlay)
+	grid_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+
+func _spawn_ambient_particles() -> void:
+	"""Spawn slow-drifting neon stars and dots"""
+	particle_layer = Node2D.new()
+	particle_layer.name = "AmbientParticles"
+	particle_layer.z_index = -1
+	add_child(particle_layer)
+
+	# Create 30 ambient particles
+	for i in range(30):
+		var particle = ColorRect.new()
+		var size = randi_range(2, 6)
+		particle.custom_minimum_size = Vector2(size, size)
+		particle.size = Vector2(size, size)
+
+		# Random neon color
+		var colors = [COLOR_SKY_CYAN, COLOR_BUBBLE_MAGENTA, COLOR_ELECTRIC_LIME, COLOR_CITRUS_YELLOW]
+		particle.color = colors[randi() % colors.size()]
+
+		# Random position
+		particle.position = Vector2(
+			randf_range(0, get_viewport_rect().size.x),
+			randf_range(0, get_viewport_rect().size.y)
+		)
+
+		particle_layer.add_child(particle)
+
+		# Animate slow drift
+		var tween = create_tween()
+		tween.set_loops()
+		var drift_x = randf_range(-50, 50)
+		var drift_y = randf_range(-30, 30)
+		var duration = randf_range(8, 15)
+		tween.tween_property(particle, "position", particle.position + Vector2(drift_x, drift_y), duration)
+		tween.tween_property(particle, "position", particle.position, duration)
+
+func _style_panel() -> void:
+	"""Apply Core Vibe styling to main menu panel"""
+	var frame = get_node_or_null("Center/Frame")
+	if not frame:
+		return
+
+	if frame is Panel:
+		var panel = frame as Panel
+		var style = StyleBoxFlat.new()
+		style.bg_color = COLOR_INK_CHARCOAL
+		style.border_color = COLOR_SKY_CYAN
+		style.border_width_left = 3
+		style.border_width_right = 3
+		style.border_width_top = 3
+		style.border_width_bottom = 3
+		style.corner_radius_top_left = 12
+		style.corner_radius_top_right = 12
+		style.corner_radius_bottom_left = 12
+		style.corner_radius_bottom_right = 12
+		style.shadow_color = Color(COLOR_SKY_CYAN.r, COLOR_SKY_CYAN.g, COLOR_SKY_CYAN.b, 0.5)
+		style.shadow_size = 6
+		panel.add_theme_stylebox_override("panel", style)
+
+func _style_title() -> void:
+	"""Apply Core Vibe styling to PSYOKIN title"""
+	var title = get_node_or_null("Center/Frame/Root/TitleLabel")
+	if not title or not title is Label:
+		return
+
+	var label = title as Label
+	label.add_theme_color_override("font_color", COLOR_BUBBLE_MAGENTA)
+	label.add_theme_font_size_override("font_size", 48)
+
+	# Add white outline glow
+	label.add_theme_color_override("font_outline_color", COLOR_MILK_WHITE)
+	label.add_theme_constant_override("outline_size", 4)
+
+func _style_buttons(new_btn: Button, continue_btn: Button, load_btn: Button, options_btn: Button, quit_btn: Button) -> void:
+	"""Apply pill capsule styling to all buttons"""
+	var buttons = [new_btn, continue_btn, load_btn, options_btn, quit_btn]
+	var colors = [COLOR_BUBBLE_MAGENTA, COLOR_SKY_CYAN, COLOR_ELECTRIC_LIME, COLOR_CITRUS_YELLOW, COLOR_INK_CHARCOAL]
+
+	for i in range(buttons.size()):
+		var btn = buttons[i]
+		if not btn:
+			continue
+
+		var color = colors[i % colors.size()]
+
+		# Normal state - pill capsule with dark fill and neon border
+		var style_normal = StyleBoxFlat.new()
+		style_normal.bg_color = COLOR_NIGHT_NAVY
+		style_normal.border_color = color
+		style_normal.border_width_left = 2
+		style_normal.border_width_right = 2
+		style_normal.border_width_top = 2
+		style_normal.border_width_bottom = 2
+		style_normal.corner_radius_top_left = 20
+		style_normal.corner_radius_top_right = 20
+		style_normal.corner_radius_bottom_left = 20
+		style_normal.corner_radius_bottom_right = 20
+		style_normal.shadow_color = Color(color.r, color.g, color.b, 0.4)
+		style_normal.shadow_size = 4
+		btn.add_theme_stylebox_override("normal", style_normal)
+
+		# Hover state - brighter glow
+		var style_hover = style_normal.duplicate()
+		style_hover.shadow_color = Color(color.r, color.g, color.b, 0.7)
+		style_hover.shadow_size = 8
+		btn.add_theme_stylebox_override("hover", style_hover)
+
+		# Pressed state - inner glow
+		var style_pressed = style_normal.duplicate()
+		style_pressed.bg_color = Color(color.r, color.g, color.b, 0.2)
+		btn.add_theme_stylebox_override("pressed", style_pressed)
+
+		# Focus state (controller navigation) - thick border
+		var style_focus = style_normal.duplicate()
+		style_focus.border_width_left = 4
+		style_focus.border_width_right = 4
+		style_focus.border_width_top = 4
+		style_focus.border_width_bottom = 4
+		style_focus.shadow_color = Color(color.r, color.g, color.b, 0.8)
+		style_focus.shadow_size = 12
+		btn.add_theme_stylebox_override("focus", style_focus)
+
+		# Text color - Milk White
+		btn.add_theme_color_override("font_color", COLOR_MILK_WHITE)
+		btn.add_theme_color_override("font_hover_color", COLOR_MILK_WHITE)
+		btn.add_theme_color_override("font_pressed_color", COLOR_MILK_WHITE)
+		btn.add_theme_color_override("font_focus_color", COLOR_MILK_WHITE)

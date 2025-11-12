@@ -72,7 +72,70 @@ func _ready() -> void:
 	if idx and idx.has_signal("index_changed"):
 		idx.connect("index_changed", Callable(self, "_on_index_changed"))
 
+	_apply_core_vibe_styling()
 	_rebuild()
+
+func _apply_core_vibe_styling() -> void:
+	"""Apply Core Vibe neon-kawaii styling to IndexPanel"""
+
+	# Style the three main panel containers with rounded neon borders
+	if _category_panel:
+		var cat_style = aCoreVibeTheme.create_panel_style(
+			aCoreVibeTheme.COLOR_CITRUS_YELLOW,       # Citrus Yellow border (categories)
+			aCoreVibeTheme.COLOR_INK_CHARCOAL,        # Ink charcoal background
+			aCoreVibeTheme.PANEL_OPACITY_SEMI,        # Semi-transparent
+			aCoreVibeTheme.CORNER_RADIUS_MEDIUM,      # 16px corners
+			aCoreVibeTheme.BORDER_WIDTH_THIN,         # 2px border
+			aCoreVibeTheme.SHADOW_SIZE_MEDIUM         # 6px glow
+		)
+		cat_style.content_margin_left = 10
+		cat_style.content_margin_top = 10
+		cat_style.content_margin_right = 10
+		cat_style.content_margin_bottom = 10
+		_category_panel.add_theme_stylebox_override("panel", cat_style)
+
+	if _content_panel:
+		var content_style = aCoreVibeTheme.create_panel_style(
+			aCoreVibeTheme.COLOR_SKY_CYAN,            # Sky Cyan border (entries)
+			aCoreVibeTheme.COLOR_INK_CHARCOAL,        # Ink charcoal background
+			aCoreVibeTheme.PANEL_OPACITY_SEMI,        # Semi-transparent
+			aCoreVibeTheme.CORNER_RADIUS_MEDIUM,      # 16px corners
+			aCoreVibeTheme.BORDER_WIDTH_THIN,         # 2px border
+			aCoreVibeTheme.SHADOW_SIZE_MEDIUM         # 6px glow
+		)
+		content_style.content_margin_left = 10
+		content_style.content_margin_top = 10
+		content_style.content_margin_right = 10
+		content_style.content_margin_bottom = 10
+		_content_panel.add_theme_stylebox_override("panel", content_style)
+
+	if _details_panel:
+		var details_style = aCoreVibeTheme.create_panel_style(
+			aCoreVibeTheme.COLOR_GRAPE_VIOLET,        # Grape Violet border (details)
+			aCoreVibeTheme.COLOR_INK_CHARCOAL,        # Ink charcoal background
+			aCoreVibeTheme.PANEL_OPACITY_SEMI,        # Semi-transparent
+			aCoreVibeTheme.CORNER_RADIUS_MEDIUM,      # 16px corners
+			aCoreVibeTheme.BORDER_WIDTH_THIN,         # 2px border
+			aCoreVibeTheme.SHADOW_SIZE_MEDIUM         # 6px glow
+		)
+		details_style.content_margin_left = 10
+		details_style.content_margin_top = 10
+		details_style.content_margin_right = 10
+		details_style.content_margin_bottom = 10
+		_details_panel.add_theme_stylebox_override("panel", details_style)
+
+	# Style list selections
+	if _category_list:
+		_category_list.add_theme_color_override("font_selected_color", aCoreVibeTheme.COLOR_CITRUS_YELLOW)
+		_category_list.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE)
+
+	if _entry_list:
+		_entry_list.add_theme_color_override("font_selected_color", aCoreVibeTheme.COLOR_SKY_CYAN)
+		_entry_list.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE)
+
+	# Style details text
+	if _detail:
+		_detail.add_theme_color_override("default_color", aCoreVibeTheme.COLOR_MILK_WHITE)
 
 # --- PanelBase Lifecycle Overrides ---------------------------------------------
 

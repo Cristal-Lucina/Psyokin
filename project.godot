@@ -54,6 +54,7 @@ aMinigameManager="*res://scripts/battle/MinigameManager.gd"
 aInputManager="*res://scripts/core/InputManager.gd"
 aControllerManager="*res://scripts/core/ControllerManager.gd"
 aPanelManager="*res://scripts/core/PanelManager.gd"
+aCoreVibeTheme="*res://scripts/core/CoreVibeTheme.gd"
 
 [display]
 

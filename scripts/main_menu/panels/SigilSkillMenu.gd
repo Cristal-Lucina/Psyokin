@@ -43,30 +43,8 @@ func _ready() -> void:
 
 	_sig = get_node_or_null("/root/aSigilSystem")
 
-	# Apply ToastPopup styling to card panel
-	if _card:
-		var style := StyleBoxFlat.new()
-		style.bg_color = Color(0.15, 0.15, 0.15, 1.0)  # Dark gray, fully opaque
-		style.border_color = Color(1.0, 0.7, 0.75, 1.0)  # Pink border
-		style.set_border_width_all(2)
-		style.corner_radius_top_left = 8
-		style.corner_radius_top_right = 8
-		style.corner_radius_bottom_left = 8
-		style.corner_radius_bottom_right = 8
-		_card.add_theme_stylebox_override("panel", style)
-
-	# Apply ToastPopup title styling (18px font)
-	if _title:
-		_title.add_theme_font_size_override("font_size", 18)
-
-	# Apply ToastPopup button styling
-	if _btn_close:
-		_btn_close.custom_minimum_size = Vector2(100, 40)
-
-	# Softer dimmer so the game behind isn't shouting
-	if _backdrop:
-		_backdrop.color = Color(0, 0, 0, 0.35)
-		_backdrop.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# Apply Core Vibe styling
+	_apply_core_vibe_styling()
 
 	# CRITICAL: Process even when tree is paused!
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -124,6 +102,78 @@ func _ready() -> void:
 	print("  - is_visible_in_tree: %s" % is_visible_in_tree())
 	print("  - mouse_filter: %d" % mouse_filter)
 	print("  - Clicking anywhere should now show input logs...")
+
+func _apply_core_vibe_styling() -> void:
+	"""Apply Core Vibe neon-kawaii styling to SigilSkillMenu"""
+
+	# Style the card panel with Grape Violet border (special item menu)
+	if _card:
+		var panel_style = aCoreVibeTheme.create_panel_style(
+			aCoreVibeTheme.COLOR_GRAPE_VIOLET,        # Grape Violet border (special menu)
+			aCoreVibeTheme.COLOR_INK_CHARCOAL,        # Ink charcoal background
+			aCoreVibeTheme.PANEL_OPACITY_FULL,        # Fully opaque
+			aCoreVibeTheme.CORNER_RADIUS_MEDIUM,      # 16px corners
+			aCoreVibeTheme.BORDER_WIDTH_THIN,         # 2px border
+			aCoreVibeTheme.SHADOW_SIZE_LARGE          # 12px glow
+		)
+		_card.add_theme_stylebox_override("panel", panel_style)
+
+	# Style backdrop with semi-transparent Night Navy
+	if _backdrop:
+		_backdrop.color = Color(aCoreVibeTheme.COLOR_NIGHT_NAVY.r, aCoreVibeTheme.COLOR_NIGHT_NAVY.g, aCoreVibeTheme.COLOR_NIGHT_NAVY.b, 0.5)
+		_backdrop.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	# Style title and subtitle
+	if _title:
+		aCoreVibeTheme.style_label(_title, aCoreVibeTheme.COLOR_GRAPE_VIOLET, 20)
+
+	if _sub:
+		aCoreVibeTheme.style_label(_sub, aCoreVibeTheme.COLOR_SKY_CYAN, 14)
+
+	# Style level/XP display
+	if _lv:
+		aCoreVibeTheme.style_label(_lv, aCoreVibeTheme.COLOR_ELECTRIC_LIME, 14)
+
+	if _xpval:
+		aCoreVibeTheme.style_label(_xpval, aCoreVibeTheme.COLOR_CITRUS_YELLOW, 12)
+
+	# Style XP progress bar with Electric Lime fill
+	if _xpbar:
+		var bar_bg = StyleBoxFlat.new()
+		bar_bg.bg_color = Color(aCoreVibeTheme.COLOR_INK_CHARCOAL.r, aCoreVibeTheme.COLOR_INK_CHARCOAL.g, aCoreVibeTheme.COLOR_INK_CHARCOAL.b, 0.5)
+		bar_bg.corner_radius_top_left = 4
+		bar_bg.corner_radius_top_right = 4
+		bar_bg.corner_radius_bottom_left = 4
+		bar_bg.corner_radius_bottom_right = 4
+		_xpbar.add_theme_stylebox_override("background", bar_bg)
+
+		var bar_fill = StyleBoxFlat.new()
+		bar_fill.bg_color = aCoreVibeTheme.COLOR_ELECTRIC_LIME
+		bar_fill.corner_radius_top_left = 4
+		bar_fill.corner_radius_top_right = 4
+		bar_fill.corner_radius_bottom_left = 4
+		bar_fill.corner_radius_bottom_right = 4
+		_xpbar.add_theme_stylebox_override("fill", bar_fill)
+
+	# Style sockets list with Sky Cyan selection
+	if _sockets:
+		_sockets.add_theme_color_override("font_selected_color", aCoreVibeTheme.COLOR_SKY_CYAN)
+		_sockets.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE)
+
+	# Style skills list with Electric Lime selection
+	if _skills:
+		_skills.add_theme_color_override("font_selected_color", aCoreVibeTheme.COLOR_ELECTRIC_LIME)
+		_skills.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE)
+
+	# Style close button with Bubble Magenta
+	if _btn_close:
+		aCoreVibeTheme.style_button(_btn_close, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
+		_btn_close.custom_minimum_size = Vector2(100, 40)
+
+	# Style set active button with Electric Lime (even though it's hidden)
+	if _btn_set:
+		aCoreVibeTheme.style_button(_btn_set, aCoreVibeTheme.COLOR_ELECTRIC_LIME, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
+		_btn_set.custom_minimum_size = Vector2(100, 40)
 
 # --- PanelBase Lifecycle Overrides ---------------------------------------------
 

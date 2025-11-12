@@ -49,6 +49,17 @@ func _process(delta: float) -> void:
 func _build_ui() -> void:
 	custom_minimum_size = Vector2(600, 450)
 
+	# Core Vibe: Pill capsule panel with neon border
+	var panel_style := aCoreVibeTheme.create_panel_style(
+		aCoreVibeTheme.COLOR_CITRUS_YELLOW,       # Yellow border for attention
+		aCoreVibeTheme.COLOR_INK_CHARCOAL,        # Ink charcoal background
+		aCoreVibeTheme.PANEL_OPACITY_FULL,        # Fully opaque
+		aCoreVibeTheme.CORNER_RADIUS_MEDIUM,      # 16px corners
+		aCoreVibeTheme.BORDER_WIDTH_THIN,         # 2px border
+		aCoreVibeTheme.SHADOW_SIZE_LARGE          # 12px glow
+	)
+	add_theme_stylebox_override("panel", panel_style)
+
 	var vbox := VBoxContainer.new()
 	vbox.set_anchors_preset(Control.PRESET_FULL_RECT)
 	vbox.add_theme_constant_override("separation", 16)
@@ -63,7 +74,8 @@ func _build_ui() -> void:
 	var title := Label.new()
 	title.text = "SATURDAY MORNING - ROOM REASSIGNMENTS"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 20)
+	# Core Vibe: Citrus Yellow title
+	aCoreVibeTheme.style_label(title, aCoreVibeTheme.COLOR_CITRUS_YELLOW, 20)
 	vbox.add_child(title)
 
 	# Divider
@@ -86,6 +98,9 @@ func _build_ui() -> void:
 	moves_title.bbcode_enabled = true
 	moves_title.fit_content = true
 	moves_title.scroll_active = false
+	# Core Vibe: Milk White text
+	moves_title.add_theme_color_override("default_color", aCoreVibeTheme.COLOR_MILK_WHITE)
+	moves_title.add_theme_font_size_override("normal_font_size", 16)
 	content_vbox.add_child(moves_title)
 
 	if _moves.size() == 0:
@@ -93,8 +108,13 @@ func _build_ui() -> void:
 		no_moves.text = "• No room reassignments this week."
 		no_moves.fit_content = true
 		no_moves.scroll_active = false
+		no_moves.add_theme_color_override("default_color", aCoreVibeTheme.COLOR_MILK_WHITE)
 		content_vbox.add_child(no_moves)
 	else:
+		# Core Vibe: Use Sky Cyan for "from" and Electric Lime for "to"
+		var from_color = "#4DE9FF"  # Sky Cyan
+		var to_color = "#C8FF3D"    # Electric Lime
+
 		for move_v in _moves:
 			if typeof(move_v) != TYPE_DICTIONARY:
 				continue
@@ -105,16 +125,17 @@ func _build_ui() -> void:
 
 			var move_label := RichTextLabel.new()
 			if from_room != "" and to_room != "":
-				move_label.text = "• [b]%s[/b] moved from [color=#2196F3]%s[/color] to [color=#4CAF50]%s[/color]" % [member_name, from_room, to_room]
+				move_label.text = "• [b]%s[/b] moved from [color=%s]%s[/color] to [color=%s]%s[/color]" % [member_name, from_color, from_room, to_color, to_room]
 			elif from_room != "":
-				move_label.text = "• [b]%s[/b] moved from [color=#2196F3]%s[/color]" % [member_name, from_room]
+				move_label.text = "• [b]%s[/b] moved from [color=%s]%s[/color]" % [member_name, from_color, from_room]
 			elif to_room != "":
-				move_label.text = "• [b]%s[/b] moved to [color=#4CAF50]%s[/color]" % [member_name, to_room]
+				move_label.text = "• [b]%s[/b] moved to [color=%s]%s[/color]" % [member_name, to_color, to_room]
 			else:
 				move_label.text = "• [b]%s[/b] moved (details unavailable)" % member_name
 			move_label.bbcode_enabled = true
 			move_label.fit_content = true
 			move_label.scroll_active = false
+			move_label.add_theme_color_override("default_color", aCoreVibeTheme.COLOR_MILK_WHITE)
 			content_vbox.add_child(move_label)
 
 	# Section 2: New Neighbor Relationships (if any)
@@ -128,13 +149,18 @@ func _build_ui() -> void:
 		reveals_title.bbcode_enabled = true
 		reveals_title.fit_content = true
 		reveals_title.scroll_active = false
+		# Core Vibe: Milk White text
+		reveals_title.add_theme_color_override("default_color", aCoreVibeTheme.COLOR_MILK_WHITE)
+		reveals_title.add_theme_font_size_override("normal_font_size", 16)
 		content_vbox.add_child(reveals_title)
 
 		var reveals_note := RichTextLabel.new()
 		reveals_note.text = "(These relationships are now 'Unknown Connection' until next Friday)"
-		reveals_note.add_theme_font_size_override("normal_font_size", 11)
 		reveals_note.fit_content = true
 		reveals_note.scroll_active = false
+		# Core Vibe: Dimmed Milk White for note
+		reveals_note.add_theme_color_override("default_color", Color(aCoreVibeTheme.COLOR_MILK_WHITE.r, aCoreVibeTheme.COLOR_MILK_WHITE.g, aCoreVibeTheme.COLOR_MILK_WHITE.b, 0.7))
+		reveals_note.add_theme_font_size_override("normal_font_size", 12)
 		content_vbox.add_child(reveals_note)
 
 		for pair_v in _reveal_pairs:
@@ -148,6 +174,8 @@ func _build_ui() -> void:
 			pair_label.text = "• %s and %s are now neighbors" % [a_name, b_name]
 			pair_label.fit_content = true
 			pair_label.scroll_active = false
+			# Core Vibe: Plasma Teal for relationship text
+			pair_label.add_theme_color_override("default_color", aCoreVibeTheme.COLOR_PLASMA_TEAL)
 			content_vbox.add_child(pair_label)
 
 	# Divider
@@ -159,6 +187,9 @@ func _build_ui() -> void:
 	close_btn.text = "Acknowledge"
 	close_btn.focus_mode = Control.FOCUS_ALL
 	close_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	close_btn.custom_minimum_size = Vector2(160, 44)
+	# Core Vibe: Citrus Yellow button
+	aCoreVibeTheme.style_button(close_btn, aCoreVibeTheme.COLOR_CITRUS_YELLOW, aCoreVibeTheme.CORNER_RADIUS_LARGE)
 	vbox.add_child(close_btn)
 
 	close_btn.pressed.connect(func() -> void:

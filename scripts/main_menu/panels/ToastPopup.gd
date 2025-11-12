@@ -71,15 +71,15 @@ func _build_ui() -> void:
 	# Set minimum size for the panel
 	custom_minimum_size = Vector2(500, 400)
 
-	# Add solid background (no transparency)
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.15, 0.15, 0.15, 1.0)  # Dark gray, fully opaque
-	style.border_color = Color(1.0, 0.7, 0.75, 1.0)  # Pink border
-	style.set_border_width_all(2)
-	style.corner_radius_top_left = 8
-	style.corner_radius_top_right = 8
-	style.corner_radius_bottom_left = 8
-	style.corner_radius_bottom_right = 8
+	# Core Vibe: Pill capsule panel with neon border
+	var style := aCoreVibeTheme.create_panel_style(
+		aCoreVibeTheme.COLOR_SKY_CYAN,           # Sky cyan border
+		aCoreVibeTheme.COLOR_INK_CHARCOAL,       # Ink charcoal background
+		aCoreVibeTheme.PANEL_OPACITY_FULL,       # Fully opaque (0.95)
+		aCoreVibeTheme.CORNER_RADIUS_MEDIUM,     # 16px corners
+		aCoreVibeTheme.BORDER_WIDTH_THIN,        # 2px border
+		aCoreVibeTheme.SHADOW_SIZE_LARGE         # 12px glow
+	)
 	add_theme_stylebox_override("panel", style)
 
 	# Create margin container for padding
@@ -99,8 +99,9 @@ func _build_ui() -> void:
 		var title := Label.new()
 		title.text = _title
 		title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		title.add_theme_font_size_override("font_size", 18)
 		title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		# Core Vibe: Sky Cyan title
+		aCoreVibeTheme.style_label(title, aCoreVibeTheme.COLOR_SKY_CYAN, 20)
 		vbox.add_child(title)
 
 	# Message with ScrollContainer for long content
@@ -116,6 +117,8 @@ func _build_ui() -> void:
 	msg_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	msg_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	msg_label.custom_minimum_size = Vector2(460, 0)
+	# Core Vibe: Milk White message text
+	aCoreVibeTheme.style_label(msg_label, aCoreVibeTheme.COLOR_MILK_WHITE, 16)
 	scroll.add_child(msg_label)
 
 	# Buttons
@@ -127,15 +130,19 @@ func _build_ui() -> void:
 	_accept_btn = Button.new()
 	_accept_btn.text = "Accept"
 	_accept_btn.focus_mode = Control.FOCUS_ALL
-	_accept_btn.custom_minimum_size = Vector2(100, 40)
+	_accept_btn.custom_minimum_size = Vector2(120, 44)
 	_accept_btn.process_mode = Node.PROCESS_MODE_ALWAYS  # Process even when paused
+	# Core Vibe: Electric Lime button (success/confirm)
+	aCoreVibeTheme.style_button(_accept_btn, aCoreVibeTheme.COLOR_ELECTRIC_LIME, aCoreVibeTheme.CORNER_RADIUS_LARGE)
 	hbox.add_child(_accept_btn)
 
 	_cancel_btn = Button.new()
 	_cancel_btn.text = "Cancel"
 	_cancel_btn.focus_mode = Control.FOCUS_ALL
-	_cancel_btn.custom_minimum_size = Vector2(100, 40)
+	_cancel_btn.custom_minimum_size = Vector2(120, 44)
 	_cancel_btn.process_mode = Node.PROCESS_MODE_ALWAYS  # Process even when paused
+	# Core Vibe: Bubble Magenta button (warning/cancel)
+	aCoreVibeTheme.style_button(_cancel_btn, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA, aCoreVibeTheme.CORNER_RADIUS_LARGE)
 	hbox.add_child(_cancel_btn)
 
 	# Connect buttons

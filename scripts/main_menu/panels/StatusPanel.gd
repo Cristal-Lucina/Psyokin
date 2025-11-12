@@ -141,8 +141,15 @@ func _debug_log(message: String) -> void:
 @onready var _root_container : HBoxContainer = $Root
 @onready var _tab_column : VBoxContainer = $Root/TabColumn
 @onready var _tab_list  : ItemList      = %TabList
-# Note: _left_panel and _right_panel removed - unused
+# Container references for Core Vibe styling
+@onready var _left_container : VBoxContainer = $Root/Left if has_node("Root/Left") else null
+@onready var _right_container : VBoxContainer = $Root/Right if has_node("Root/Right") else null
 @onready var _party     : VBoxContainer = $Root/Left/PartyScroll/PartyList
+
+# Tab button tracking for new button-based menu
+var _tab_buttons: Array[Button] = []
+var _tab_button_container: VBoxContainer = null
+var _selected_button_index: int = 0
 @onready var _creds     : Label         = $Root/Right/InfoGrid/MoneyValue
 @onready var _perk      : Label         = $Root/Right/InfoGrid/PerkValue
 @onready var _morality  : Label         = $Root/Right/InfoGrid/MoralityValue
@@ -218,6 +225,7 @@ func _ready() -> void:
 	_create_creds_perks_display()
 	_create_next_mission_display()
 	_hide_old_ui_elements()
+	_apply_core_vibe_styling()
 
 	# Note: PanelBase handles visibility_changed, no need to connect again
 	call_deferred("_first_fill")
@@ -236,15 +244,35 @@ func _first_fill() -> void:
 	_rebuild_all()
 
 func _build_tab_buttons() -> void:
-	"""Build the menu tab items in ItemList"""
-	if not _tab_list:
-		return
+	"""Build individual menu tab buttons with pop-out styling"""
+	# Hide old ItemList
+	if _tab_list:
+		_tab_list.visible = false
 
-	# Clear existing items
-	_tab_list.clear()
+	# Create or get button container
+	if not _tab_button_container:
+		_tab_button_container = VBoxContainer.new()
+		_tab_button_container.name = "TabButtons"
+		_tab_button_container.add_theme_constant_override("separation", 8)
+		# No container shift - buttons handle their own positioning
+
+		# Find TabList and replace it with our button container
+		if _tab_list and _tab_list.get_parent():
+			var parent = _tab_list.get_parent()
+			var index = _tab_list.get_index()
+			parent.add_child(_tab_button_container)
+			parent.move_child(_tab_button_container, index)
+		else:
+			_tab_column.add_child(_tab_button_container)
+
+	# Clear existing buttons
+	for btn in _tab_buttons:
+		if is_instance_valid(btn):
+			btn.queue_free()
+	_tab_buttons.clear()
 	_tab_ids.clear()
 
-	# Add items for each tab
+	# Create buttons for each tab
 	var ids: Array = Array(TAB_ORDER)
 	for tab_id_any in ids:
 		var tab_id: String = String(tab_id_any)
@@ -252,27 +280,192 @@ func _build_tab_buttons() -> void:
 			continue
 		var meta: Dictionary = TAB_DEFS[tab_id]
 
-		_tab_list.add_item(String(meta["title"]))
+		var btn := Button.new()
+		btn.text = String(meta["title"])
+		btn.custom_minimum_size = Vector2(160, 36)  # Rounded square proportions
+		btn.alignment = HORIZONTAL_ALIGNMENT_CENTER  # Center text
+
+		# Style with rounded square and tab-specific border color
+		_style_menu_button(btn, tab_id, false)
+
+		# Connect pressed signal
+		var button_index = _tab_buttons.size()
+		btn.pressed.connect(func(): _on_tab_button_pressed(button_index))
+		btn.focus_entered.connect(func(): _on_tab_button_focused(button_index))
+
+		_tab_button_container.add_child(btn)
+		_tab_buttons.append(btn)
 		_tab_ids.append(tab_id)
 
-	# Select first item and connect signal
-	if _tab_list.item_count > 0:
-		_tab_list.select(0)
-		# Grab focus if panel is visible
+	# Select and focus last selected button (or first if none)
+	if _tab_buttons.size() > 0:
+		# Preserve last selection instead of always resetting to 0
+		_selected_button_index = _last_selected_tab_index
+		if _selected_button_index >= _tab_buttons.size():
+			_selected_button_index = 0  # Fallback if index is out of bounds
+		_update_button_selection()
 		if visible:
-			call_deferred("_grab_tab_list_focus")
+			call_deferred("_grab_first_tab_button_focus")
 
-	# Connect item selection signal
-	if not _tab_list.item_selected.is_connected(_on_tab_item_selected):
-		_tab_list.item_selected.connect(_on_tab_item_selected)
+func _get_tab_border_color(tab_id: String) -> Color:
+	"""Get the neon border color for a specific tab"""
+	match tab_id:
+		"stats":     return Color(0.5, 1.0, 0.5)    # Light green
+		"perks":     return Color(1.0, 1.0, 0.0)    # Yellow
+		"items":     return Color(1.0, 0.6, 0.0)    # Orange
+		"loadout":   return Color(1.0, 0.0, 0.0)    # Red
+		"bonds":     return Color(1.0, 0.0, 1.0)    # Magenta
+		"outreach":  return Color(0.6, 0.0, 1.0)    # Purple
+		"dorms":     return Color(0.0, 0.5, 1.0)    # Cobalt
+		"calendar":  return Color(0.5, 0.8, 1.0)    # Light blue
+		"index":     return Color(0.0, 0.8, 0.8)    # Teal
+		"system":    return Color(1.0, 1.0, 1.0)    # White
+		_:           return aCoreVibeTheme.COLOR_SKY_CYAN
 
-	# Connect item activation signal (double-click or Enter)
-	if not _tab_list.item_activated.is_connected(_on_tab_item_activated):
-		_tab_list.item_activated.connect(_on_tab_item_activated)
+func _style_menu_button(btn: Button, tab_id: String, is_selected: bool) -> void:
+	"""Style a rounded square menu button with tab-specific neon border"""
+	var style = StyleBoxFlat.new()
 
-	# Connect item clicked signal (single-click support)
-	if not _tab_list.item_clicked.is_connected(_on_tab_item_clicked):
-		_tab_list.item_clicked.connect(_on_tab_item_clicked)
+	# Get tab-specific border color
+	var border_color = _get_tab_border_color(tab_id)
+
+	# Colors based on selection
+	if is_selected:
+		# Selected: Pale white background with deep dark grey text
+		style.bg_color = Color(0.95, 0.95, 0.95)  # Pale white
+		style.border_color = border_color
+	else:
+		# Unselected: Dark greyish-blue background with white text, NO border
+		style.bg_color = Color(0.15, 0.2, 0.3)  # Dark greyish-blue
+		style.border_color = Color(0.15, 0.2, 0.3)  # Same as background (invisible border)
+
+	# Rounded square: all corners equally rounded
+	style.corner_radius_top_left = 8
+	style.corner_radius_bottom_left = 8
+	style.corner_radius_top_right = 8
+	style.corner_radius_bottom_right = 8
+
+	# Border: all sides equal
+	if is_selected:
+		style.border_width_left = 2
+		style.border_width_top = 2
+		style.border_width_right = 2
+		style.border_width_bottom = 2
+	else:
+		# No border when unselected
+		style.border_width_left = 0
+		style.border_width_top = 0
+		style.border_width_right = 0
+		style.border_width_bottom = 0
+
+	# Neon glow - only when selected
+	if is_selected:
+		style.shadow_color = Color(border_color.r, border_color.g, border_color.b, 0.6)
+		style.shadow_size = 6
+		style.shadow_offset = Vector2(0, 0)
+	else:
+		style.shadow_color = Color(0, 0, 0, 0)  # No glow
+		style.shadow_size = 0
+
+	# Centered padding
+	style.content_margin_left = 12
+	style.content_margin_top = 8
+	style.content_margin_right = 12
+	style.content_margin_bottom = 8
+
+	btn.add_theme_stylebox_override("normal", style)
+	btn.add_theme_stylebox_override("hover", style)
+	btn.add_theme_stylebox_override("pressed", style)
+	btn.add_theme_stylebox_override("focus", style)
+
+	# Font size - increased by 3pts (was 13, now 16)
+	btn.add_theme_font_size_override("font_size", 16)
+
+	# Text color
+	if is_selected:
+		# Selected: Deep dark grey
+		var dark_grey = Color(0.15, 0.15, 0.15)
+		btn.add_theme_color_override("font_color", dark_grey)
+		btn.add_theme_color_override("font_hover_color", dark_grey)
+		btn.add_theme_color_override("font_pressed_color", dark_grey)
+		btn.add_theme_color_override("font_focus_color", dark_grey)
+	else:
+		# Unselected: White
+		btn.add_theme_color_override("font_color", Color.WHITE)
+		btn.add_theme_color_override("font_hover_color", Color.WHITE)
+		btn.add_theme_color_override("font_pressed_color", Color.WHITE)
+		btn.add_theme_color_override("font_focus_color", Color.WHITE)
+
+func _on_tab_button_pressed(index: int) -> void:
+	"""Handle tab button press"""
+	if index < 0 or index >= _tab_ids.size():
+		return
+
+	_selected_button_index = index
+	_last_selected_tab_index = index  # Remember for when panel reopens
+	_update_button_selection()
+
+	var tab_id: String = _tab_ids[index]
+	print("[StatusPanel] Tab button pressed: %s" % tab_id)
+	tab_selected.emit(tab_id)
+
+func _on_tab_button_focused(index: int) -> void:
+	"""Handle tab button receiving focus"""
+	_selected_button_index = index
+	_last_selected_tab_index = index  # Remember for when panel reopens
+	_update_button_selection()
+
+func _update_button_selection() -> void:
+	"""Update visual state for selected button"""
+	for i in range(_tab_buttons.size()):
+		var btn = _tab_buttons[i]
+		var tab_id = _tab_ids[i] if i < _tab_ids.size() else ""
+		var is_selected = (i == _selected_button_index)
+
+		# Restyle button with tab-specific color
+		_style_menu_button(btn, tab_id, is_selected)
+
+		# Add pulse animation to selected button
+		if is_selected:
+			_start_button_pulse(btn)
+		else:
+			_stop_button_pulse(btn)
+
+func _start_button_pulse(btn: Button) -> void:
+	"""Start pulsing animation for button"""
+	# Kill any existing tween
+	if btn.has_meta("pulse_tween"):
+		var old_tween = btn.get_meta("pulse_tween")
+		if old_tween and is_instance_valid(old_tween):
+			old_tween.kill()
+
+	# Create pulsing scale tween
+	var tween = create_tween()
+	tween.set_loops()
+	tween.set_trans(Tween.TRANS_SINE)
+	tween.set_ease(Tween.EASE_IN_OUT)
+
+	# Pulse between 1.0 and 1.05 scale
+	tween.tween_property(btn, "scale", Vector2(1.05, 1.05), 0.8)
+	tween.tween_property(btn, "scale", Vector2(1.0, 1.0), 0.8)
+
+	btn.set_meta("pulse_tween", tween)
+
+func _stop_button_pulse(btn: Button) -> void:
+	"""Stop pulsing animation for button"""
+	if btn.has_meta("pulse_tween"):
+		var tween = btn.get_meta("pulse_tween")
+		if tween and is_instance_valid(tween):
+			tween.kill()
+		btn.remove_meta("pulse_tween")
+
+	# Reset scale to normal
+	btn.scale = Vector2(1.0, 1.0)
+
+func _grab_first_tab_button_focus() -> void:
+	"""Grab focus on currently selected tab button"""
+	if _tab_buttons.size() > 0 and is_instance_valid(_tab_buttons[_selected_button_index]):
+		_tab_buttons[_selected_button_index].grab_focus()
 
 func _create_creds_perks_display() -> void:
 	"""Create the new CREDS/PERKS display in bottom right corner"""
@@ -331,30 +524,30 @@ func _create_next_mission_display() -> void:
 	container.grow_horizontal = Control.GROW_DIRECTION_BEGIN  # Grow left
 	container.grow_vertical = Control.GROW_DIRECTION_END      # Grow down
 
-	# Create "NEXT MISSION" label
+	# Create "NEXT MISSION" label - light blue
 	var title_label := Label.new()
 	title_label.text = "NEXT MISSION"
-	title_label.add_theme_font_size_override("font_size", 30)
-	title_label.add_theme_color_override("font_color", Color(0.9, 0.9, 0.9))
 	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	title_label.add_theme_font_size_override("font_size", 28)
+	title_label.add_theme_color_override("font_color", Color(0.5, 0.8, 1.0))  # Light blue
 	container.add_child(title_label)
 
-	# Create grey box with white border for mission description
+	# Create mission box - dark greyish-blue background, no glow
 	var mission_box := PanelContainer.new()
-	mission_box.custom_minimum_size = Vector2(300, 72)
+	mission_box.custom_minimum_size = Vector2(300, 80)
 
-	# Create grey background with white border
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.3, 0.3, 0.3, 1.0)  # Grey background
-	style.border_width_left = 2
-	style.border_width_right = 2
-	style.border_width_top = 2
-	style.border_width_bottom = 2
-	style.border_color = Color(1.0, 1.0, 1.0, 1.0)  # White border
-	style.corner_radius_top_left = 4
-	style.corner_radius_top_right = 4
-	style.corner_radius_bottom_left = 4
-	style.corner_radius_bottom_right = 4
+	# Dark greyish-blue background matching unselected menu buttons
+	var style = StyleBoxFlat.new()
+	style.bg_color = Color(0.15, 0.2, 0.3)  # Dark greyish-blue
+	style.corner_radius_top_left = 8
+	style.corner_radius_top_right = 8
+	style.corner_radius_bottom_left = 8
+	style.corner_radius_bottom_right = 8
+	style.border_width_left = 0
+	style.border_width_top = 0
+	style.border_width_right = 0
+	style.border_width_bottom = 0
+	style.shadow_size = 0  # No glow
 	mission_box.add_theme_stylebox_override("panel", style)
 
 	# Add margin for padding inside box
@@ -365,13 +558,13 @@ func _create_next_mission_display() -> void:
 	margin.add_theme_constant_override("margin_bottom", 6)
 	mission_box.add_child(margin)
 
-	# Create label for mission text
+	# Create label for mission text with Core Vibe styling
 	_mission_value_label = Label.new()
 	_mission_value_label.text = "TBD"
-	_mission_value_label.add_theme_font_size_override("font_size", 14)
-	_mission_value_label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0))
 	_mission_value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	_mission_value_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	# Core Vibe: Milk White text
+	aCoreVibeTheme.style_label(_mission_value_label, aCoreVibeTheme.COLOR_MILK_WHITE, 14)
 	margin.add_child(_mission_value_label)
 
 	container.add_child(mission_box)
@@ -409,15 +602,17 @@ func _create_info_cell(label_text: String, initial_value: String) -> PanelContai
 	"""Create a single info cell with label and value
 	Returns PanelContainer with 'value_label' meta for updating"""
 	var panel := PanelContainer.new()
-	panel.custom_minimum_size = Vector2(180, 35)  # Increased height for larger font
+	panel.custom_minimum_size = Vector2(180, 40)  # Slightly increased for pill capsule
 
-	# Create pale white rounded background
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.95, 0.95, 0.95, 1.0)  # Pale white
-	style.corner_radius_top_left = 4
-	style.corner_radius_top_right = 4
-	style.corner_radius_bottom_left = 4
-	style.corner_radius_bottom_right = 4
+	# Core Vibe: Sky Cyan pill capsule panel
+	var style = aCoreVibeTheme.create_panel_style(
+		aCoreVibeTheme.COLOR_SKY_CYAN,            # Sky Cyan border
+		aCoreVibeTheme.COLOR_INK_CHARCOAL,        # Ink charcoal background
+		aCoreVibeTheme.PANEL_OPACITY_SEMI,        # Semi-transparent
+		aCoreVibeTheme.CORNER_RADIUS_SMALL,       # 12px corners
+		aCoreVibeTheme.BORDER_WIDTH_THIN,         # 2px border
+		aCoreVibeTheme.SHADOW_SIZE_MEDIUM         # 6px glow
+	)
 	panel.add_theme_stylebox_override("panel", style)
 
 	# Add margin for padding inside cell (10px buffer on each side)
@@ -433,17 +628,13 @@ func _create_info_cell(label_text: String, initial_value: String) -> PanelContai
 	hbox.add_theme_constant_override("separation", 4)
 	margin.add_child(hbox)
 
-	# Label - left justified, max 6 characters, bold dark grey
+	# Label - left justified, Core Vibe: Sky Cyan
 	var label := Label.new()
 	label.text = label_text + ":"
 	label.custom_minimum_size = Vector2(60, 0)  # ~6 chars + colon
 	label.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
-	label.add_theme_font_size_override("font_size", 16)  # Increased from 12 to 16
-	label.add_theme_color_override("font_color", Color(0.2, 0.2, 0.2))  # Dark grey
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-	# Make extra bold with outline effect
-	label.add_theme_constant_override("outline_size", 1)
-	label.add_theme_color_override("font_outline_color", Color(0.2, 0.2, 0.2))
+	aCoreVibeTheme.style_label(label, aCoreVibeTheme.COLOR_SKY_CYAN, 16)
 	hbox.add_child(label)
 
 	# Spacer to push value to the right
@@ -451,17 +642,13 @@ func _create_info_cell(label_text: String, initial_value: String) -> PanelContai
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	hbox.add_child(spacer)
 
-	# Value - right justified, max 16 characters, bold dark grey
+	# Value - right justified, Core Vibe: Milk White
 	var value_label := Label.new()
 	value_label.text = initial_value
 	value_label.custom_minimum_size = Vector2(80, 0)  # ~16 chars max
 	value_label.size_flags_horizontal = Control.SIZE_SHRINK_END
-	value_label.add_theme_font_size_override("font_size", 16)  # Increased from 12 to 16
-	value_label.add_theme_color_override("font_color", Color(0.2, 0.2, 0.2))  # Dark grey
 	value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	# Make extra bold with outline effect
-	value_label.add_theme_constant_override("outline_size", 1)
-	value_label.add_theme_color_override("font_outline_color", Color(0.2, 0.2, 0.2))
+	aCoreVibeTheme.style_label(value_label, aCoreVibeTheme.COLOR_MILK_WHITE, 16)
 	hbox.add_child(value_label)
 
 	# Store reference to value label for updating
@@ -469,17 +656,60 @@ func _create_info_cell(label_text: String, initial_value: String) -> PanelContai
 
 	return panel
 
+func _apply_core_vibe_styling() -> void:
+	"""Apply Core Vibe neon-kawaii styling to StatusPanel columns"""
+	# Only style left column - right column stays hidden
+
+	# Left column (party stats): Sky Cyan border (party/lists)
+	if _left_container:
+		_wrap_in_styled_panel(_left_container, aCoreVibeTheme.COLOR_SKY_CYAN)
+
+func _wrap_in_styled_panel(container: Control, border_color: Color) -> PanelContainer:
+	"""Wrap a container in a styled PanelContainer with rounded neon borders"""
+	if not container or not container.get_parent():
+		return null
+
+	var parent = container.get_parent()
+	var index = container.get_index()
+
+	# Create styled panel
+	var panel = PanelContainer.new()
+	var panel_style = aCoreVibeTheme.create_panel_style(
+		border_color,
+		aCoreVibeTheme.COLOR_INK_CHARCOAL,
+		aCoreVibeTheme.PANEL_OPACITY_SEMI,
+		aCoreVibeTheme.CORNER_RADIUS_MEDIUM,
+		aCoreVibeTheme.BORDER_WIDTH_THIN,
+		aCoreVibeTheme.SHADOW_SIZE_MEDIUM
+	)
+	# Add 10px internal padding
+	panel_style.content_margin_left = 10
+	panel_style.content_margin_top = 10
+	panel_style.content_margin_right = 10
+	panel_style.content_margin_bottom = 10
+	panel.add_theme_stylebox_override("panel", panel_style)
+
+	# Preserve size flags and reparent
+	panel.size_flags_horizontal = container.size_flags_horizontal
+	panel.size_flags_vertical = container.size_flags_vertical
+	panel.custom_minimum_size = container.custom_minimum_size
+
+	parent.remove_child(container)
+	panel.add_child(container)
+	parent.add_child(panel)
+	parent.move_child(panel, index)
+
+	return panel
+
 func select_tab(tab_id: String) -> void:
 	"""Programmatically select a tab by tab_id and give it focus"""
-	if not _tab_list:
-		return
-
 	# Find the index of the tab_id
 	var index: int = _tab_ids.find(tab_id)
-	if index >= 0 and index < _tab_list.item_count:
-		_tab_list.select(index)
-		if visible:
-			call_deferred("_grab_tab_list_focus")
+	if index >= 0 and index < _tab_buttons.size():
+		_selected_button_index = index
+		_update_button_selection()
+		if visible and is_instance_valid(_tab_buttons[index]):
+			call_deferred("_tab_buttons[%d].grab_focus" % index)
 		print("[StatusPanel] Selected tab: %s (index %d)" % [tab_id, index])
 	else:
 		print("[StatusPanel] WARNING: Tab not found: %s" % tab_id)
@@ -623,7 +853,7 @@ func _rebuild_party() -> void:
 	# === LEADER SECTION ===
 	var leader_header := Label.new()
 	leader_header.text = "LEADER"
-	leader_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	leader_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	leader_header.add_theme_font_size_override("font_size", 16)
 	leader_header.add_theme_color_override("font_color", Color(1, 0.7, 0.75, 1))
 	_party.add_child(leader_header)
@@ -641,7 +871,7 @@ func _rebuild_party() -> void:
 	# === ACTIVE SECTION ===
 	var active_header := Label.new()
 	active_header.text = "ACTIVE"
-	active_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	active_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	active_header.add_theme_font_size_override("font_size", 16)
 	active_header.add_theme_color_override("font_color", Color(1, 0.7, 0.75, 1))
 	_party.add_child(active_header)
@@ -662,7 +892,7 @@ func _rebuild_party() -> void:
 	# === BENCH SECTION ===
 	var bench_header := Label.new()
 	bench_header.text = "BENCH"
-	bench_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	bench_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	bench_header.add_theme_font_size_override("font_size", 16)
 	bench_header.add_theme_color_override("font_color", Color(1, 0.7, 0.75, 1))
 	_party.add_child(bench_header)
@@ -688,6 +918,7 @@ func _create_spacer() -> Control:
 
 func _create_empty_slot(slot_type: String, _slot_idx: int) -> PanelContainer:
 	var panel := PanelContainer.new()
+	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL  # Fill the panel width
 	var vbox := VBoxContainer.new()
 	vbox.add_theme_constant_override("separation", 2)
 
@@ -700,26 +931,58 @@ func _create_empty_slot(slot_type: String, _slot_idx: int) -> PanelContainer:
 	panel.add_child(vbox)
 	return panel
 
-func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot: int) -> PanelContainer:
-	var panel := PanelContainer.new()
+func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot: int) -> Button:
+	# Create a button instead of PanelContainer for clickability
+	var btn := Button.new()
+	btn.focus_mode = Control.FOCUS_ALL
+	btn.custom_minimum_size = Vector2(0, 50)  # Sleeker: reduced from 80 to 50
+	btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL  # Fill the panel width
 
-	# Get member_id early for animation tracking
+	# Store metadata for popup menu
 	var member_id: String = String(member_data.get("_member_id", ""))
+	btn.set_meta("member_id", member_id)
+	btn.set_meta("member_name", String(member_data.get("name", "Member")))
+	btn.set_meta("show_switch", show_switch)
+	btn.set_meta("active_slot", active_slot)
+	btn.set_meta("hp", int(member_data.get("hp", 0)))
+	btn.set_meta("hp_max", int(member_data.get("hp_max", 0)))
+	btn.set_meta("mp", int(member_data.get("mp", 0)))
+	btn.set_meta("mp_max", int(member_data.get("mp_max", 0)))
 
-	# Main horizontal container: member info on left, buttons on right
+	# Connect to member card pressed
+	btn.pressed.connect(_on_member_card_pressed.bind(btn))
+	btn.focus_entered.connect(_on_member_card_focused.bind(btn))
+	btn.focus_exited.connect(_on_member_card_unfocused.bind(btn))
+
+	# Main horizontal container: member info
 	var main_hbox := HBoxContainer.new()
 	main_hbox.add_theme_constant_override("separation", 12)
+	main_hbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
-	# Left side: Member info (name + stats)
+	# Member info (name + stats)
 	var info_vbox := VBoxContainer.new()
 	info_vbox.add_theme_constant_override("separation", 2)
 	info_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	info_vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
-	# Name label
+	# Name and level row
+	var name_row := HBoxContainer.new()
+	name_row.add_theme_constant_override("separation", 8)
+	name_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
 	var name_lbl := Label.new()
 	name_lbl.text = String(member_data.get("name", "Member"))
-	name_lbl.add_theme_font_size_override("font_size", 10)
-	info_vbox.add_child(name_lbl)
+	name_lbl.add_theme_font_size_override("font_size", 12)
+	name_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	name_row.add_child(name_lbl)
+
+	var lvl_lbl := Label.new()
+	lvl_lbl.text = "Lv %d" % int(member_data.get("level", 1))
+	lvl_lbl.add_theme_font_size_override("font_size", 10)
+	lvl_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	name_row.add_child(lvl_lbl)
+
+	info_vbox.add_child(name_row)
 
 	# HP/MP stats row (side by side)
 	var stats_row := HBoxContainer.new()
@@ -736,6 +999,7 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 
 	var hp_label_box := HBoxContainer.new()
 	hp_label_box.add_theme_constant_override("separation", 4)
+	hp_label_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var hp_lbl := Label.new()
 	hp_lbl.text = "HP"
 	hp_lbl.custom_minimum_size.x = 24
@@ -743,6 +1007,7 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 	var hp_val := Label.new()
 	hp_val.text = _fmt_pair(hp_i, hp_max_i)
 	hp_val.add_theme_font_size_override("font_size", 10)
+	hp_val.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	hp_label_box.add_child(hp_lbl)
 	hp_label_box.add_child(hp_val)
 	hp_section.add_child(hp_label_box)
@@ -750,18 +1015,11 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 	if hp_i >= 0 and hp_max_i > 0:
 		var hp_bar := ProgressBar.new()
 		hp_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		hp_bar.custom_minimum_size.y = 8  # Half height (was ~16px default)
+		hp_bar.custom_minimum_size = Vector2(200, 8)  # Minimum 200px wide, 8px tall
 		hp_bar.show_percentage = false  # Remove percentage text
 
-		# Create pale pink background (backing bar)
-		var hp_bg := StyleBoxFlat.new()
-		hp_bg.bg_color = Color(1.0, 0.8, 0.85)  # Pale pink
-		hp_bar.add_theme_stylebox_override("background", hp_bg)
-
-		# Create bright pink fill (current HP)
-		var hp_fill := StyleBoxFlat.new()
-		hp_fill.bg_color = Color(1.0, 0.3, 0.5)  # Bright pink
-		hp_bar.add_theme_stylebox_override("fill", hp_fill)
+		# Core Vibe: Bubble Magenta progress bar with neon glow
+		aCoreVibeTheme.style_progress_bar(hp_bar, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA)
 
 		hp_bar.min_value = 0.0
 		hp_bar.max_value = float(hp_max_i)
@@ -796,6 +1054,7 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 
 	var mp_label_box := HBoxContainer.new()
 	mp_label_box.add_theme_constant_override("separation", 4)
+	mp_label_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var mp_lbl := Label.new()
 	mp_lbl.text = "MP"
 	mp_lbl.custom_minimum_size.x = 24
@@ -803,6 +1062,7 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 	var mp_val := Label.new()
 	mp_val.text = _fmt_pair(mp_i, mp_max_i)
 	mp_val.add_theme_font_size_override("font_size", 10)
+	mp_val.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	mp_label_box.add_child(mp_lbl)
 	mp_label_box.add_child(mp_val)
 	mp_section.add_child(mp_label_box)
@@ -810,18 +1070,11 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 	if mp_i >= 0 and mp_max_i > 0:
 		var mp_bar := ProgressBar.new()
 		mp_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		mp_bar.custom_minimum_size.y = 8  # Half height (was ~16px default)
+		mp_bar.custom_minimum_size = Vector2(200, 8)  # Minimum 200px wide, 8px tall
 		mp_bar.show_percentage = false  # Remove percentage text
 
-		# Create pale light blue background (backing bar)
-		var mp_bg := StyleBoxFlat.new()
-		mp_bg.bg_color = Color(0.8, 0.9, 1.0)  # Pale light blue
-		mp_bar.add_theme_stylebox_override("background", mp_bg)
-
-		# Create bright blue fill (current MP)
-		var mp_fill := StyleBoxFlat.new()
-		mp_fill.bg_color = Color(0.3, 0.6, 1.0)  # Bright blue
-		mp_bar.add_theme_stylebox_override("fill", mp_fill)
+		# Core Vibe: Sky Cyan progress bar with neon glow
+		aCoreVibeTheme.style_progress_bar(mp_bar, aCoreVibeTheme.COLOR_SKY_CYAN)
 
 		mp_bar.min_value = 0.0
 		mp_bar.max_value = float(mp_max_i)
@@ -845,52 +1098,25 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 		mp_section.add_child(mp_bar)
 
 	stats_row.add_child(mp_section)
-	info_vbox.add_child(stats_row)
+	stats_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hp_section.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	mp_section.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hp_label_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	mp_label_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	# Wrap stats_row in MarginContainer for 10px margins on each side
+	var stats_margin := MarginContainer.new()
+	stats_margin.add_theme_constant_override("margin_left", 10)
+	stats_margin.add_theme_constant_override("margin_right", 10)
+	stats_margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	stats_margin.add_child(stats_row)
+
+	info_vbox.add_child(stats_margin)
 	main_hbox.add_child(info_vbox)
+	btn.add_child(main_hbox)
 
-	# Right side: Buttons (stacked vertically)
-	var buttons_vbox := VBoxContainer.new()
-	buttons_vbox.add_theme_constant_override("separation", 4)
-
-	# Recovery button (always shown for all members)
-	var recovery_btn := Button.new()
-	recovery_btn.text = "RECOVERY"
-	recovery_btn.custom_minimum_size.x = 70
-	recovery_btn.add_theme_font_size_override("font_size", 10)
-	recovery_btn.add_theme_color_override("font_color", Color(0.0, 0.8, 0.0))  # Green
-	recovery_btn.add_theme_constant_override("outline_size", 1)
-	recovery_btn.add_theme_color_override("font_outline_color", Color(0.0, 0.8, 0.0))  # Bold effect
-	recovery_btn.focus_mode = Control.FOCUS_ALL
-	recovery_btn.set_meta("member_id", member_id)
-	recovery_btn.set_meta("member_name", String(member_data.get("name", "Member")))
-	recovery_btn.set_meta("hp", int(member_data.get("hp", 0)))
-	recovery_btn.set_meta("hp_max", int(member_data.get("hp_max", 0)))
-	recovery_btn.set_meta("mp", int(member_data.get("mp", 0)))
-	recovery_btn.set_meta("mp_max", int(member_data.get("mp_max", 0)))
-	recovery_btn.pressed.connect(_on_recovery_pressed.bind(recovery_btn))
-	buttons_vbox.add_child(recovery_btn)
-	_debug_log("Created Recovery button for %s" % String(member_data.get("name", "Member")))
-
-	# Switch button (only for active members)
-	if show_switch:
-		var switch_btn := Button.new()
-		switch_btn.text = "SWITCH"
-		switch_btn.custom_minimum_size.x = 70
-		switch_btn.add_theme_font_size_override("font_size", 10)
-		switch_btn.add_theme_color_override("font_color", Color(0.3, 0.6, 1.0))  # Blue
-		switch_btn.add_theme_constant_override("outline_size", 1)
-		switch_btn.add_theme_color_override("font_outline_color", Color(0.3, 0.6, 1.0))  # Bold effect
-		switch_btn.focus_mode = Control.FOCUS_ALL
-		switch_btn.set_meta("active_slot", active_slot)
-		switch_btn.pressed.connect(_on_switch_pressed.bind(active_slot))
-		buttons_vbox.add_child(switch_btn)
-
-		# Set up left/right navigation between Recovery and Switch buttons
-		recovery_btn.focus_neighbor_right = recovery_btn.get_path_to(switch_btn)
-		switch_btn.focus_neighbor_left = switch_btn.get_path_to(recovery_btn)
-
-	main_hbox.add_child(buttons_vbox)
-	panel.add_child(main_hbox)
+	# Style button (default unfocused state)
+	_style_member_card(btn, false)
 
 	# Store current HP/MP values for next rebuild animation
 	if member_id != "":
@@ -899,7 +1125,291 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 			"mp": mp_i
 		}
 
-	return panel
+	return btn
+
+func _style_member_card(btn: Button, is_focused: bool) -> void:
+	"""Style a member card button based on focus state"""
+	var style = StyleBoxFlat.new()
+
+	# No background - completely transparent
+	style.bg_color = Color(0, 0, 0, 0)
+	style.border_width_left = 0
+	style.border_width_top = 0
+	style.border_width_right = 0
+	style.border_width_bottom = 0
+	style.shadow_size = 0
+	# Minimal padding
+	style.content_margin_left = 5
+	style.content_margin_top = 5
+	style.content_margin_right = 5
+	style.content_margin_bottom = 5
+
+	btn.add_theme_stylebox_override("normal", style)
+	btn.add_theme_stylebox_override("hover", style)
+	btn.add_theme_stylebox_override("pressed", style)
+	btn.add_theme_stylebox_override("focus", style)
+
+	# Keep all text white regardless of focus
+	if btn.get_child_count() > 0:
+		var main_hbox = btn.get_child(0)
+		if main_hbox.get_child_count() > 0:
+			var info_vbox = main_hbox.get_child(0)
+			_update_label_colors_recursive(info_vbox, false)  # Always use white
+
+	# Handle arrow indicator
+	if is_focused:
+		_show_member_arrow(btn)
+	else:
+		_hide_member_arrow(btn)
+
+func _update_label_colors_recursive(node: Node, is_focused: bool) -> void:
+	"""Recursively update label colors in a node tree"""
+	if node is Label:
+		if is_focused:
+			node.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_INK_CHARCOAL)
+		else:
+			node.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE)
+
+	for child in node.get_children():
+		_update_label_colors_recursive(child, is_focused)
+
+func _show_member_arrow(btn: Button) -> void:
+	"""Show arrow indicator above selected party member"""
+	# Check if arrow already exists
+	var arrow = btn.get_node_or_null("SelectionArrow")
+	if arrow:
+		return  # Already exists
+
+	# Create arrow indicator
+	var arrow_tex := TextureRect.new()
+	arrow_tex.name = "SelectionArrow"
+	arrow_tex.texture = load("res://assets/graphics/arrow/arrow.png")
+	arrow_tex.custom_minimum_size = Vector2(15, 15)
+	arrow_tex.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+	arrow_tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	arrow_tex.flip_v = false  # Original direction
+	arrow_tex.modulate = Color(1, 1, 1, 1)  # White
+
+	# Position at top center of button, 8px lower
+	arrow_tex.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	arrow_tex.position = Vector2(0, -12)  # Moved down from -20 to -12
+	arrow_tex.size = Vector2(15, 15)
+	arrow_tex.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	btn.add_child(arrow_tex)
+
+	# Start pulsing animation
+	_start_arrow_pulse(arrow_tex)
+
+func _hide_member_arrow(btn: Button) -> void:
+	"""Hide arrow indicator from party member"""
+	var arrow = btn.get_node_or_null("SelectionArrow")
+	if arrow:
+		# Stop any running tween
+		if arrow.has_meta("pulse_tween"):
+			var tween = arrow.get_meta("pulse_tween")
+			if tween and is_instance_valid(tween):
+				tween.kill()
+			arrow.remove_meta("pulse_tween")
+		arrow.queue_free()
+
+func _start_arrow_pulse(arrow: TextureRect) -> void:
+	"""Start pulsing animation for arrow - moves up and down"""
+	if arrow.has_meta("pulse_tween"):
+		var old_tween = arrow.get_meta("pulse_tween")
+		if old_tween and is_instance_valid(old_tween):
+			old_tween.kill()
+
+	var tween = create_tween()
+	tween.set_loops()
+	tween.set_trans(Tween.TRANS_SINE)
+	tween.set_ease(Tween.EASE_IN_OUT)
+
+	# Pulse down 4 pixels then back up
+	var base_y = arrow.position.y
+	tween.tween_property(arrow, "position:y", base_y + 4, 0.6)
+	tween.tween_property(arrow, "position:y", base_y, 0.6)
+
+	arrow.set_meta("pulse_tween", tween)
+
+func _on_member_card_focused(btn: Button) -> void:
+	"""Handle member card gaining focus"""
+	_style_member_card(btn, true)
+
+func _on_member_card_unfocused(btn: Button) -> void:
+	"""Handle member card losing focus"""
+	_style_member_card(btn, false)
+
+func _on_member_card_pressed(btn: Button) -> void:
+	"""Handle member card being pressed - show action menu"""
+	var member_name = btn.get_meta("member_name", "Member")
+	var show_switch = btn.get_meta("show_switch", false)
+	var active_slot = btn.get_meta("active_slot", -1)
+	var member_id = btn.get_meta("member_id", "")
+	var hp = btn.get_meta("hp", 0)
+	var hp_max = btn.get_meta("hp_max", 0)
+	var mp = btn.get_meta("mp", 0)
+	var mp_max = btn.get_meta("mp_max", 0)
+
+	print("[StatusPanel] Member card pressed: %s (show_switch: %s)" % [member_name, show_switch])
+
+	# Create action menu popup
+	_show_member_action_menu(member_name, member_id, show_switch, active_slot, hp, hp_max, mp, mp_max)
+
+func _show_member_action_menu(member_name: String, member_id: String, show_switch: bool, active_slot: int, hp: int, hp_max: int, mp: int, mp_max: int) -> void:
+	"""Show popup menu with RECOVERY and optionally SWITCH - matches Recovery popup pattern"""
+	# Prevent multiple popups
+	if _active_popup and is_instance_valid(_active_popup):
+		print("[StatusPanel] Popup already open, ignoring request")
+		return
+
+	# Create CanvasLayer to ensure popup is centered on viewport
+	var canvas_layer := CanvasLayer.new()
+	canvas_layer.layer = 100
+	add_child(canvas_layer)
+
+	# Create popup panel using same pattern as Recovery popup
+	var popup_panel: Panel = Panel.new()
+	popup_panel.name = "MemberActionMenu"
+	popup_panel.process_mode = Node.PROCESS_MODE_ALWAYS
+	popup_panel.set_anchors_preset(Control.PRESET_CENTER)
+	popup_panel.modulate.a = 0.0  # Start fully transparent
+	popup_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE  # Block input until fade completes
+	canvas_layer.add_child(popup_panel)
+
+	# Apply consistent styling (matches Recovery popup)
+	_style_popup_panel(popup_panel)
+
+	# Set active popup immediately
+	_active_popup = popup_panel
+
+	# Store metadata
+	popup_panel.set_meta("member_name", member_name)
+	popup_panel.set_meta("member_id", member_id)
+	popup_panel.set_meta("show_switch", show_switch)
+	popup_panel.set_meta("active_slot", active_slot)
+	popup_panel.set_meta("hp", hp)
+	popup_panel.set_meta("hp_max", hp_max)
+	popup_panel.set_meta("mp", mp)
+	popup_panel.set_meta("mp_max", mp_max)
+
+	# Create content container
+	var vbox: VBoxContainer = VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 8)
+	popup_panel.add_child(vbox)
+
+	# Title label
+	var title: Label = Label.new()
+	title.text = member_name
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 14)
+	vbox.add_child(title)
+
+	# Member status display
+	var status_label: Label = Label.new()
+	status_label.text = "HP: %d/%d  |  MP: %d/%d" % [hp, hp_max, mp, mp_max]
+	status_label.add_theme_font_size_override("font_size", 10)
+	status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(status_label)
+
+	# Recovery button
+	var recovery_btn := Button.new()
+	recovery_btn.text = "RECOVERY"
+	recovery_btn.custom_minimum_size = Vector2(200, 0)
+	recovery_btn.pressed.connect(_on_action_menu_recovery_pressed.bind(popup_panel))
+	vbox.add_child(recovery_btn)
+
+	# Switch button (only for active slots)
+	if show_switch:
+		var switch_btn := Button.new()
+		switch_btn.text = "SWITCH"
+		switch_btn.custom_minimum_size = Vector2(200, 0)
+		switch_btn.pressed.connect(_on_action_menu_switch_pressed.bind(popup_panel))
+		vbox.add_child(switch_btn)
+
+	# Back button
+	var back_btn: Button = Button.new()
+	back_btn.text = "BACK"
+	back_btn.pressed.connect(_close_member_action_menu.bind(popup_panel))
+	vbox.add_child(back_btn)
+
+	# Auto-size panel - wait two frames
+	await get_tree().process_frame
+	await get_tree().process_frame
+	popup_panel.size = vbox.size + Vector2(20, 20)
+	vbox.position = Vector2(10, 10)
+
+	# Center popup on screen
+	var viewport_size: Vector2 = get_viewport_rect().size
+	popup_panel.position = (viewport_size - popup_panel.size) / 2.0
+
+	# Fade in popup
+	_fade_in_popup(popup_panel)
+
+	# Change nav state and grab focus
+	_nav_state = NavState.POPUP_ACTIVE
+	recovery_btn.call_deferred("grab_focus")
+
+	print("[StatusPanel] Member action menu shown for: %s" % member_name)
+
+func _on_action_menu_recovery_pressed(popup: Control) -> void:
+	"""Handle RECOVERY pressed from action menu"""
+	var member_id = popup.get_meta("member_id", "")
+	var member_name = popup.get_meta("member_name", "Member")
+	var hp = popup.get_meta("hp", 0)
+	var hp_max = popup.get_meta("hp_max", 0)
+	var mp = popup.get_meta("mp", 0)
+	var mp_max = popup.get_meta("mp_max", 0)
+
+	print("[StatusPanel] Action menu - Recovery selected for: %s" % member_name)
+
+	# Close action menu first
+	_close_member_action_menu(popup)
+
+	# Then show recovery popup (reuse existing recovery logic)
+	_show_recovery_popup(member_id, member_name, hp, hp_max, mp, mp_max)
+
+func _on_action_menu_switch_pressed(popup: Control) -> void:
+	"""Handle SWITCH pressed from action menu"""
+	var active_slot = popup.get_meta("active_slot", -1)
+
+	print("[StatusPanel] Action menu - Switch selected for slot: %d" % active_slot)
+
+	# Close action menu first
+	_close_member_action_menu(popup)
+
+	# Then show switch popup (reuse existing switch logic)
+	_on_switch_pressed(active_slot)
+
+func _close_member_action_menu(popup: Control) -> void:
+	"""Close the member action menu - matches Recovery popup pattern"""
+	if not popup or not is_instance_valid(popup):
+		return
+
+	print("[StatusPanel] Closing member action menu with fade-out, returning to content mode")
+
+	# Store popup reference but DON'T clear _active_popup yet (prevents double-close during fade)
+	var popup_to_close = popup
+
+	# Fade out popup, then clean up
+	_fade_out_popup(popup_to_close, func():
+		# Clear active popup and change state
+		_active_popup = null
+		_nav_state = NavState.CONTENT
+
+		# Free the popup and its CanvasLayer parent
+		if is_instance_valid(popup_to_close):
+			var canvas_layer = popup_to_close.get_parent()
+			if canvas_layer and is_instance_valid(canvas_layer):
+				canvas_layer.queue_free()  # This also frees the popup
+			else:
+				popup_to_close.queue_free()
+
+		# Restore focus to first button in content
+		call_deferred("_navigate_to_content")
+	)
+
+	print("[StatusPanel] Member action menu closed")
 
 func _get_member_snapshot(member_id: String) -> Dictionary:
 	# Get roster to pass to _label_for_id for accurate name lookup
@@ -1030,15 +1540,15 @@ func _show_swap_confirmation(member_name: String, _member_id: String) -> void:
 	print("[StatusPanel] Swap confirmation closed")
 
 func _style_popup_panel(popup_panel: Panel) -> void:
-	"""Apply consistent styling to popup panels (matches ToastPopup)"""
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.15, 0.15, 0.15, 1.0)  # Dark gray, fully opaque
-	style.border_color = Color(1.0, 0.7, 0.75, 1.0)  # Pink border
-	style.set_border_width_all(2)
-	style.corner_radius_top_left = 8
-	style.corner_radius_top_right = 8
-	style.corner_radius_bottom_left = 8
-	style.corner_radius_bottom_right = 8
+	"""Apply Core Vibe styling to popup panels (matches ToastPopup)"""
+	var style = aCoreVibeTheme.create_panel_style(
+		aCoreVibeTheme.COLOR_SKY_CYAN,            # Sky Cyan border
+		aCoreVibeTheme.COLOR_INK_CHARCOAL,        # Ink charcoal background
+		aCoreVibeTheme.PANEL_OPACITY_FULL,        # Fully opaque
+		aCoreVibeTheme.CORNER_RADIUS_MEDIUM,      # 16px corners
+		aCoreVibeTheme.BORDER_WIDTH_THIN,         # 2px border
+		aCoreVibeTheme.SHADOW_SIZE_LARGE          # 12px glow
+	)
 	popup_panel.add_theme_stylebox_override("panel", style)
 
 func _fade_in_popup(popup_panel: Panel) -> void:
@@ -1102,13 +1612,18 @@ func _show_member_picker(active_slot: int) -> void:
 		_show_no_bench_notice()
 		return
 
+	# Create CanvasLayer to ensure popup is centered on viewport
+	var canvas_layer := CanvasLayer.new()
+	canvas_layer.layer = 100
+	add_child(canvas_layer)
+
 	# Create popup panel using LoadoutPanel pattern
 	var popup_panel: Panel = Panel.new()
 	popup_panel.process_mode = Node.PROCESS_MODE_ALWAYS
-	popup_panel.z_index = 100
+	popup_panel.set_anchors_preset(Control.PRESET_CENTER)
 	popup_panel.modulate.a = 0.0  # Start fully transparent
 	popup_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE  # Block input until fade completes
-	add_child(popup_panel)
+	canvas_layer.add_child(popup_panel)
 
 	# Apply consistent styling (matches ToastPopup)
 	_style_popup_panel(popup_panel)
@@ -1343,13 +1858,18 @@ func _show_recovery_popup(member_id: String, member_name: String, hp: int, hp_ma
 		print("[StatusPanel] All unique categories found: " + str(categories_found))
 		print("[StatusPanel] Total recovery items found: %d" % recovery_items.size())
 
+	# Create CanvasLayer to ensure popup is centered on viewport
+	var canvas_layer := CanvasLayer.new()
+	canvas_layer.layer = 100
+	add_child(canvas_layer)
+
 	# Create popup panel using LoadoutPanel pattern
 	var popup_panel: Panel = Panel.new()
 	popup_panel.process_mode = Node.PROCESS_MODE_ALWAYS
-	popup_panel.z_index = 100
+	popup_panel.set_anchors_preset(Control.PRESET_CENTER)
 	popup_panel.modulate.a = 0.0  # Start fully transparent
 	popup_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE  # Block input until fade completes
-	add_child(popup_panel)
+	canvas_layer.add_child(popup_panel)
 
 	# Apply consistent styling (matches ToastPopup)
 	_style_popup_panel(popup_panel)
@@ -2132,23 +2652,35 @@ func _safe_hero_level() -> int:
 # --------------------- Dev dump/hotkey ------------------------
 
 func _on_visibility_changed() -> void:
-	# Select first tab when panel becomes visible
-	if visible and _tab_list:
-		# Defer to ensure ItemList is ready
-		call_deferred("_grab_tab_list_focus")
+	# Select tab when panel becomes visible
+	if visible and _tab_buttons.size() > 0:
+		# Wait for slide animation to complete (0.5s) before applying selection
+		await get_tree().create_timer(0.5).timeout
+
+		# Now apply the correct selection after slide completes - stay on menu, don't navigate away
+		if visible and _tab_buttons.size() > 0:  # Check still visible
+			var index_to_select = _last_selected_tab_index
+			if index_to_select >= _tab_buttons.size():
+				index_to_select = 0  # Fallback if index is out of bounds
+			_selected_button_index = index_to_select
+			_update_button_selection()
+			if is_instance_valid(_tab_buttons[index_to_select]):
+				_tab_buttons[index_to_select].grab_focus()
 
 	if not OS.is_debug_build(): return
 	_dev_dump_profiles()
 
 func _grab_tab_list_focus() -> void:
-	"""Helper to grab focus on tab list"""
-	if _tab_list and _tab_list.item_count > 0:
+	"""Helper to grab focus on first tab button"""
+	if _tab_buttons.size() > 0:
 		# Restore last selected tab instead of always selecting first tab
 		var index_to_select = _last_selected_tab_index
-		if index_to_select >= _tab_list.item_count:
+		if index_to_select >= _tab_buttons.size():
 			index_to_select = 0  # Fallback if index is out of bounds
-		_tab_list.select(index_to_select)
-		_tab_list.grab_focus()
+		_selected_button_index = index_to_select
+		_update_button_selection()
+		if is_instance_valid(_tab_buttons[index_to_select]):
+			_tab_buttons[index_to_select].grab_focus()
 
 func _navigate_to_content() -> void:
 	"""Navigate from tab list to first focusable button in content area"""
@@ -2259,44 +2791,62 @@ func _handle_popup_input(event: InputEvent) -> void:
 ## ─────────────────────── STATE 2: MENU ───────────────────────
 
 func _handle_menu_input(event: InputEvent) -> void:
-	"""Handle input in MENU state - tab list navigation"""
+	"""Handle input in MENU state - tab button navigation"""
 	# Handle UP/DOWN with wrap-around
 	if event.is_action_pressed("move_up"):
-		if _tab_list.has_focus() and _tab_list.item_count > 0:
-			var selected_items = _tab_list.get_selected_items()
-			if selected_items.size() > 0:
-				var current_index = selected_items[0]
-				# If on first item (Stats), wrap to last item (System)
-				if current_index == 0:
-					_tab_list.select(_tab_list.item_count - 1)
-					get_viewport().set_input_as_handled()
-					return
+		if _tab_buttons.size() > 0:
+			# Check if any tab button has focus
+			var has_focus = false
+			for btn in _tab_buttons:
+				if btn.has_focus():
+					has_focus = true
+					break
+
+			if has_focus:
+				# Move to previous button with wrap-around
+				_selected_button_index -= 1
+				if _selected_button_index < 0:
+					_selected_button_index = _tab_buttons.size() - 1
+				_update_button_selection()
+				if is_instance_valid(_tab_buttons[_selected_button_index]):
+					_tab_buttons[_selected_button_index].grab_focus()
+				get_viewport().set_input_as_handled()
+				return
+
 	elif event.is_action_pressed("move_down"):
-		if _tab_list.has_focus() and _tab_list.item_count > 0:
-			var selected_items = _tab_list.get_selected_items()
-			if selected_items.size() > 0:
-				var current_index = selected_items[0]
-				# If on last item (System), wrap to first item (Stats)
-				if current_index == _tab_list.item_count - 1:
-					_tab_list.select(0)
-					get_viewport().set_input_as_handled()
-					return
+		if _tab_buttons.size() > 0:
+			# Check if any tab button has focus
+			var has_focus = false
+			for btn in _tab_buttons:
+				if btn.has_focus():
+					has_focus = true
+					break
 
-	# Handle RIGHT: navigate to content (and hide menu)
+			if has_focus:
+				# Move to next button with wrap-around
+				_selected_button_index += 1
+				if _selected_button_index >= _tab_buttons.size():
+					_selected_button_index = 0
+				_update_button_selection()
+				if is_instance_valid(_tab_buttons[_selected_button_index]):
+					_tab_buttons[_selected_button_index].grab_focus()
+				get_viewport().set_input_as_handled()
+				return
+
+	# Handle RIGHT: navigate to content (no longer hiding menu)
 	if event.is_action_pressed("move_right"):
-		# If tab list has focus, navigate to first button in content area
-		if _tab_list.has_focus():
-			# Save current tab selection before hiding menu
-			var selected_items = _tab_list.get_selected_items()
-			if selected_items.size() > 0:
-				_last_selected_tab_index = selected_items[0]
-				print("[StatusPanel] Saved tab selection: %d" % _last_selected_tab_index)
+		# Check if any tab button has focus
+		var has_tab_button_focus = false
+		for btn in _tab_buttons:
+			if btn.has_focus():
+				has_tab_button_focus = true
+				break
 
-			print("[StatusPanel] MENU → CONTENT transition (hiding menu)")
+		# If tab button has focus, navigate to first button in content area
+		if has_tab_button_focus:
+			print("[StatusPanel] MENU → CONTENT transition (keeping menu visible)")
 			_nav_state = NavState.CONTENT
-			# Hide menu when transitioning to content
-			if _menu_visible:
-				_hide_menu()
+			# Don't hide menu anymore - keep it visible
 			_navigate_to_content()
 			get_viewport().set_input_as_handled()
 			return
@@ -2339,9 +2889,9 @@ func _handle_content_input(event: InputEvent) -> void:
 					# No left neighbor - navigate back to menu
 					print("[StatusPanel] CONTENT → MENU transition (showing menu)")
 					_nav_state = NavState.MENU
-					if not _menu_visible:
-						_show_menu()
-					_tab_list.grab_focus()
+					# Focus on selected tab button
+					if _tab_buttons.size() > 0 and is_instance_valid(_tab_buttons[_selected_button_index]):
+						_tab_buttons[_selected_button_index].grab_focus()
 					get_viewport().set_input_as_handled()
 					return
 			elif event.is_action_pressed("move_right"):
@@ -2355,10 +2905,9 @@ func _handle_content_input(event: InputEvent) -> void:
 	if event.is_action_pressed("menu_back"):
 		print("[StatusPanel] Back pressed in CONTENT state - going to MENU")
 		_nav_state = NavState.MENU
-		# Show menu when going back
-		if not _menu_visible:
-			_show_menu()
-		_tab_list.grab_focus()
+		# Focus on selected tab button
+		if _tab_buttons.size() > 0 and is_instance_valid(_tab_buttons[_selected_button_index]):
+			_tab_buttons[_selected_button_index].grab_focus()
 		get_viewport().set_input_as_handled()
 		return
 
@@ -2369,7 +2918,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 
 	# Only handle when visible
-	if not visible or not _tab_list:
+	if not visible:
 		return
 
 	# Check if we're in MENU_MAIN context
@@ -2402,15 +2951,15 @@ func _unhandled_input(event: InputEvent) -> void:
 			else:
 				print("[StatusPanel] WARNING: A pressed but no button has focus")
 
-		# STATE: MENU - Activate selected tab
+		# STATE: MENU - Activate selected tab button
 		elif _nav_state == NavState.MENU:
-			if _tab_list.has_focus():
-				var selected_items = _tab_list.get_selected_items()
-				if selected_items.size() > 0:
-					var index = selected_items[0]
-					print("[StatusPanel] A button - confirming tab selection: %d" % index)
-					_on_tab_item_activated(index)
+			# Check if any tab button has focus
+			for i in range(_tab_buttons.size()):
+				if _tab_buttons[i].has_focus():
+					print("[StatusPanel] A button - confirming tab button: %d" % i)
+					_on_tab_button_pressed(i)
 					get_viewport().set_input_as_handled()
+					return
 
 	# Debug key handling (F9 to dump profiles)
 	if not OS.is_debug_build(): return

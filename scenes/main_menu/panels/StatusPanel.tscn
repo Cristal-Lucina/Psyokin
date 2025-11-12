@@ -1,6 +1,17 @@
-[gd_scene load_steps=2 format=3 uid="uid://crt84ftcxj55h"]
+[gd_scene load_steps=3 format=3 uid="uid://crt84ftcxj55h"]
 
 [ext_resource type="Script" uid="uid://chvung4jj6la3" path="res://scripts/main_menu/panels/StatusPanel.gd" id="1"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_mission"]
+bg_color = Color(0.15, 0.2, 0.3, 1)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+content_margin_left = 10.0
+content_margin_top = 10.0
+content_margin_right = 10.0
+content_margin_bottom = 10.0
 
 [node name="StatusPanel" type="Control"]
 layout_mode = 3
@@ -67,9 +78,9 @@ layout_mode = 2
 size_flags_vertical = 3
 
 [node name="Left" type="VBoxContainer" parent="Root"]
-custom_minimum_size = Vector2(280, 0)
+custom_minimum_size = Vector2(500, 0)
 layout_mode = 2
-size_flags_horizontal = 3
+size_flags_horizontal = 4
 size_flags_vertical = 3
 theme_override_constants/separation = 8
 
@@ -82,8 +93,8 @@ layout_mode = 2
 size_flags_horizontal = 3
 theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
 theme_override_font_sizes/font_size = 20
-text = "PARTY STATS"
-horizontal_alignment = 0
+text = "PARTY"
+horizontal_alignment = 1
 
 [node name="PartySeparator" type="HSeparator" parent="Root/Left"]
 layout_mode = 2
@@ -166,12 +177,14 @@ theme_override_constants/separation = 4
 
 [node name="HintHeader" type="Label" parent="Root/Right/HintSection"]
 layout_mode = 2
+theme_override_colors/font_color = Color(0.5, 0.8, 1, 1)
 text = "Next Mission"
 
 [node name="HintValue" type="RichTextLabel" parent="Root/Right/HintSection"]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
+theme_override_styles/normal = SubResource("StyleBoxFlat_mission")
 bbcode_enabled = true
 text = "[i]TBD[/i]"
 fit_content = true
