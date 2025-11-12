@@ -2168,11 +2168,20 @@ func _apply_recovery_effect(member_id: String, member_name: String, item_id: Str
 				if typeof(member_dict) == TYPE_DICTIONARY:
 					if item_type == "hp":
 						var current_hp = int(member_dict.get("hp", 0))
-						var max_hp = int(member_dict.get("hp_max", 100))
+						var base_max_hp = int(member_dict.get("hp_max", 100))
+
+						# Get TRUE max HP including equipment bonuses (from CombatProfileSystem)
+						var max_hp = base_max_hp
+						if _cps and _cps.has_method("get_profile"):
+							var prof_v: Variant = _cps.call("get_profile", member_id)
+							if typeof(prof_v) == TYPE_DICTIONARY:
+								var prof: Dictionary = prof_v
+								max_hp = int(prof.get("hp_max", base_max_hp))
 
 						print("[StatusPanel] HP Heal Debug - Before:")
 						print("  current_hp: %d" % current_hp)
-						print("  max_hp: %d" % max_hp)
+						print("  base_max_hp: %d" % base_max_hp)
+						print("  true_max_hp (with equipment): %d" % max_hp)
 						print("  recovery_amount: %d" % recovery_amount)
 
 						# Calculate actual heal amount
@@ -2184,7 +2193,7 @@ func _apply_recovery_effect(member_id: String, member_name: String, item_id: Str
 						var unclamped_hp = current_hp + heal_amount
 						print("  unclamped would be: %d" % unclamped_hp)
 
-						# Clamp to max HP - never heal over maximum
+						# Clamp to TRUE max HP (including equipment bonuses) - never heal over maximum
 						var new_hp = min(current_hp + heal_amount, max_hp)
 						print("  clamped to: %d (max: %d)" % [new_hp, max_hp])
 
@@ -2194,11 +2203,20 @@ func _apply_recovery_effect(member_id: String, member_name: String, item_id: Str
 
 					elif item_type == "mp":
 						var current_mp = int(member_dict.get("mp", 0))
-						var max_mp = int(member_dict.get("mp_max", 100))
+						var base_max_mp = int(member_dict.get("mp_max", 100))
+
+						# Get TRUE max MP including equipment bonuses (from CombatProfileSystem)
+						var max_mp = base_max_mp
+						if _cps and _cps.has_method("get_profile"):
+							var prof_v: Variant = _cps.call("get_profile", member_id)
+							if typeof(prof_v) == TYPE_DICTIONARY:
+								var prof: Dictionary = prof_v
+								max_mp = int(prof.get("mp_max", base_max_mp))
 
 						print("[StatusPanel] MP Heal Debug - Before:")
 						print("  current_mp: %d" % current_mp)
-						print("  max_mp: %d" % max_mp)
+						print("  base_max_mp: %d" % base_max_mp)
+						print("  true_max_mp (with equipment): %d" % max_mp)
 						print("  recovery_amount: %d" % recovery_amount)
 
 						# Calculate actual heal amount
@@ -2210,7 +2228,7 @@ func _apply_recovery_effect(member_id: String, member_name: String, item_id: Str
 						var unclamped_mp = current_mp + heal_amount
 						print("  unclamped would be: %d" % unclamped_mp)
 
-						# Clamp to max MP - never heal over maximum
+						# Clamp to TRUE max MP (including equipment bonuses) - never heal over maximum
 						var new_mp = min(current_mp + heal_amount, max_mp)
 						print("  clamped to: %d (max: %d)" % [new_mp, max_mp])
 
