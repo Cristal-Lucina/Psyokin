@@ -9,6 +9,7 @@ const CSV_PATH   : String = "/root/aCSVLoader"
 const EQUIP_PATH : String = "/root/aEquipmentSystem"
 const GS_PATH    : String = "/root/aGameState"
 const SIGIL_PATH : String = "/root/aSigilSystem"
+const CPS_PATH   : String = "/root/aCombatProfileSystem"
 
 # CSV data
 const ITEMS_CSV : String = "res://data/items/items.csv"
@@ -48,6 +49,7 @@ var _csv: Node = null
 var _eq: Node = null
 var _gs: Node = null
 var _sig: Node = null
+var _cps: Node = null
 
 # Data
 var _defs: Dictionary = {}
@@ -73,6 +75,7 @@ func _ready() -> void:
 	_eq = get_node_or_null(EQUIP_PATH)
 	_gs = get_node_or_null(GS_PATH)
 	_sig = get_node_or_null(SIGIL_PATH)
+	_cps = get_node_or_null(CPS_PATH)
 
 	if _use_button:
 		_use_button.pressed.connect(_on_use_button_pressed)
@@ -619,35 +622,40 @@ func _unhandled_input(event: InputEvent) -> void:
 	if not visible:
 		return
 
-	# L1/R1 - Category navigation (JOY_BUTTON_LEFT_SHOULDER = 9, JOY_BUTTON_RIGHT_SHOULDER = 10)
-	if event is InputEventJoypadButton:
-		if event.pressed and event.button_index == 9:  # L1
-			_current_category_index -= 1
-			if _current_category_index < 0:
-				_current_category_index = CATEGORIES.size() - 1
-			_update_category_selection()
-			_populate_items()
-			get_viewport().set_input_as_handled()
-			return
-		elif event.pressed and event.button_index == 10:  # R1
-			_current_category_index += 1
-			if _current_category_index >= CATEGORIES.size():
-				_current_category_index = 0
-			_update_category_selection()
-			_populate_items()
-			get_viewport().set_input_as_handled()
-			return
-
-	# D-Pad - Simple list navigation (up/down)
-	if event.is_action_pressed("ui_up"):
-		_navigate_items(-1)
-		get_viewport().set_input_as_handled()
-	elif event.is_action_pressed("ui_down"):
-		_navigate_items(1)
-		get_viewport().set_input_as_handled()
-	elif event.is_action_pressed("menu_accept") or event.is_action_pressed("ui_accept"):
-		_on_accept_pressed()
-		get_viewport().set_input_as_handled()
+	# Use direct joypad button checks to avoid GameMenu interception
+	if event is InputEventJoypadButton and event.pressed:
+		match event.button_index:
+			9:  # L1
+				_current_category_index -= 1
+				if _current_category_index < 0:
+					_current_category_index = CATEGORIES.size() - 1
+				_update_category_selection()
+				_populate_items()
+				get_viewport().set_input_as_handled()
+				return
+			10:  # R1
+				_current_category_index += 1
+				if _current_category_index >= CATEGORIES.size():
+					_current_category_index = 0
+				_update_category_selection()
+				_populate_items()
+				get_viewport().set_input_as_handled()
+				return
+			12:  # D-pad Up
+				print("[ItemsPanel] D-pad Up pressed")
+				_navigate_items(-1)
+				get_viewport().set_input_as_handled()
+				return
+			13:  # D-pad Down
+				print("[ItemsPanel] D-pad Down pressed")
+				_navigate_items(1)
+				get_viewport().set_input_as_handled()
+				return
+			0:  # Accept button (A/Cross)
+				print("[ItemsPanel] Accept button pressed")
+				_on_accept_pressed()
+				get_viewport().set_input_as_handled()
+				return
 
 func _navigate_items(delta: int) -> void:
 	"""Navigate items with simple up/down"""
@@ -690,7 +698,92 @@ func _on_equipment_changed(_member: String) -> void:
 	_rebuild()
 
 func _on_use_button_pressed() -> void:
+	"""Use recovery item - for now, heal first party member"""
 	print("[ItemsPanel] Use button pressed for: %s" % _selected_item_id)
+
+	if _selected_item_id == "" or not _defs.has(_selected_item_id):
+		return
+
+	var def: Dictionary = _defs[_selected_item_id]
+
+	# Get first party member
+	var members: Array = []
+	if _gs and _gs.has_method("get_active_party"):
+		var party_variant: Variant = _gs.call("get_active_party")
+		if typeof(party_variant) == TYPE_ARRAY:
+			members = party_variant as Array
+
+	if members.size() == 0:
+		print("[ItemsPanel] No party members available")
+		return
+
+	var first_member: String = String(members[0])
+	print("[ItemsPanel] Using item on: %s" % first_member)
+
+	# Get effect text
+	var effect: String = String(def.get("field_status_effect", ""))
+	if effect == "":
+		effect = String(def.get("battle_status_effect", ""))
+
+	print("[ItemsPanel] Effect: %s" % effect)
+
+	# Get current HP/MP
+	var hp: int = 0
+	var mp: int = 0
+	var hp_max: int = 1
+	var mp_max: int = 1
+
+	if _cps and _cps.has_method("get_stats"):
+		var stats_variant: Variant = _cps.call("get_stats", first_member)
+		if typeof(stats_variant) == TYPE_DICTIONARY:
+			var stats: Dictionary = stats_variant as Dictionary
+			hp = int(stats.get("hp", 0))
+			mp = int(stats.get("mp", 0))
+			hp_max = int(stats.get("hp_max", 1))
+			mp_max = int(stats.get("mp_max", 1))
+
+	print("[ItemsPanel] Current HP: %d/%d, MP: %d/%d" % [hp, hp_max, mp, mp_max])
+
+	# Parse healing amount from effect string
+	var effect_lower: String = effect.to_lower()
+	var new_hp: int = hp
+	var new_mp: int = mp
+	var healed: bool = false
+
+	# Simple number extraction using regex
+	var regex := RegEx.new()
+	regex.compile("\\d+")
+
+	if effect_lower.contains("heal") and effect_lower.contains("hp"):
+		var match_result := regex.search(effect)
+		if match_result:
+			var heal_amount: int = int(match_result.get_string())
+			new_hp = min(hp + heal_amount, hp_max)
+			healed = true
+			print("[ItemsPanel] Healing HP by %d: %d -> %d" % [heal_amount, hp, new_hp])
+
+	if effect_lower.contains("heal") and effect_lower.contains("mp"):
+		var match_result := regex.search(effect)
+		if match_result:
+			var heal_amount: int = int(match_result.get_string())
+			new_mp = min(mp + heal_amount, mp_max)
+			healed = true
+			print("[ItemsPanel] Healing MP by %d: %d -> %d" % [heal_amount, mp, new_mp])
+
+	# Apply healing
+	if healed and _cps:
+		if _cps.has_method("set_hp"):
+			_cps.call("set_hp", first_member, new_hp)
+			print("[ItemsPanel] Set HP to: %d" % new_hp)
+		if _cps.has_method("set_mp"):
+			_cps.call("set_mp", first_member, new_mp)
+			print("[ItemsPanel] Set MP to: %d" % new_mp)
+
+		# Consume the item
+		if _inv and _inv.has_method("remove_item"):
+			_inv.call("remove_item", _selected_item_id, 1)
+			print("[ItemsPanel] Consumed 1x %s" % _selected_item_id)
+			# Rebuild will happen automatically via inventory_changed signal
 
 func _on_inspect_button_pressed() -> void:
 	print("[ItemsPanel] Inspect button pressed for: %s" % _selected_item_id)
