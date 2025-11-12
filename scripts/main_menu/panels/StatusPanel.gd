@@ -282,7 +282,7 @@ func _build_tab_buttons() -> void:
 
 		var btn := Button.new()
 		btn.text = String(meta["title"])
-		btn.custom_minimum_size = Vector2(140, 40)
+		btn.custom_minimum_size = Vector2(140, 32)  # Sleeker: reduced height from 40 to 32
 		btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
 
 		# Style with rounded right corners, flat left (pop-out from border)
@@ -305,44 +305,53 @@ func _build_tab_buttons() -> void:
 			call_deferred("_grab_first_tab_button_focus")
 
 func _style_menu_button(btn: Button, is_selected: bool) -> void:
-	"""Style a menu button with asymmetric rounded corners (flat left, rounded right)"""
+	"""Style a sleek menu button with asymmetric rounded corners (flat left, rounded right)"""
 	var style = StyleBoxFlat.new()
 
-	# Colors based on selection
+	# Colors based on selection - sleeker with stronger contrast
 	if is_selected:
-		style.bg_color = Color(aCoreVibeTheme.COLOR_ELECTRIC_LIME.r, aCoreVibeTheme.COLOR_ELECTRIC_LIME.g, aCoreVibeTheme.COLOR_ELECTRIC_LIME.b, 0.3)
+		# Selected: Bright Electric Lime with higher opacity
+		style.bg_color = Color(aCoreVibeTheme.COLOR_ELECTRIC_LIME.r, aCoreVibeTheme.COLOR_ELECTRIC_LIME.g, aCoreVibeTheme.COLOR_ELECTRIC_LIME.b, 0.5)
 		style.border_color = aCoreVibeTheme.COLOR_ELECTRIC_LIME
 	else:
-		style.bg_color = Color(aCoreVibeTheme.COLOR_INK_CHARCOAL.r, aCoreVibeTheme.COLOR_INK_CHARCOAL.g, aCoreVibeTheme.COLOR_INK_CHARCOAL.b, 0.4)
-		style.border_color = aCoreVibeTheme.COLOR_SKY_CYAN
+		# Unselected: Very subtle, nearly transparent
+		style.bg_color = Color(aCoreVibeTheme.COLOR_INK_CHARCOAL.r, aCoreVibeTheme.COLOR_INK_CHARCOAL.g, aCoreVibeTheme.COLOR_INK_CHARCOAL.b, 0.2)
+		style.border_color = Color(aCoreVibeTheme.COLOR_SKY_CYAN.r, aCoreVibeTheme.COLOR_SKY_CYAN.g, aCoreVibeTheme.COLOR_SKY_CYAN.b, 0.5)
 
-	# Asymmetric corners: flat left (0px), rounded right (12px)
+	# Asymmetric corners: flat left (0px), more rounded right (16px for sleeker look)
 	style.corner_radius_top_left = 0
 	style.corner_radius_bottom_left = 0
-	style.corner_radius_top_right = 12
-	style.corner_radius_bottom_right = 12
+	style.corner_radius_top_right = 16
+	style.corner_radius_bottom_right = 16
 
-	# Border: only right, top, and bottom (no left border)
+	# Border: only right, top, and bottom (no left border) - thinner for sleeker look
 	style.border_width_left = 0
-	style.border_width_top = 2
+	style.border_width_top = 1
 	style.border_width_right = 2
-	style.border_width_bottom = 2
+	style.border_width_bottom = 1
 
-	# Glow on right side
-	style.shadow_color = Color(style.border_color.r, style.border_color.g, style.border_color.b, 0.5)
-	style.shadow_size = 6
-	style.shadow_offset = Vector2(2, 0)
+	# Stronger glow for selected, subtle for unselected
+	if is_selected:
+		style.shadow_color = Color(style.border_color.r, style.border_color.g, style.border_color.b, 0.8)
+		style.shadow_size = 8
+	else:
+		style.shadow_color = Color(style.border_color.r, style.border_color.g, style.border_color.b, 0.3)
+		style.shadow_size = 4
+	style.shadow_offset = Vector2(3, 0)
 
-	# Padding - text shifted 20px to the right (10 + 20 = 30)
+	# Padding - text shifted 20px to the right, tighter vertical for sleeker look
 	style.content_margin_left = 30
-	style.content_margin_top = 8
-	style.content_margin_right = 10
-	style.content_margin_bottom = 8
+	style.content_margin_top = 6
+	style.content_margin_right = 12
+	style.content_margin_bottom = 6
 
 	btn.add_theme_stylebox_override("normal", style)
 	btn.add_theme_stylebox_override("hover", style)
 	btn.add_theme_stylebox_override("pressed", style)
 	btn.add_theme_stylebox_override("focus", style)
+
+	# Font size - slightly smaller for sleeker look
+	btn.add_theme_font_size_override("font_size", 13)
 
 	# Text color
 	if is_selected:
@@ -351,7 +360,7 @@ func _style_menu_button(btn: Button, is_selected: bool) -> void:
 		btn.add_theme_color_override("font_pressed_color", aCoreVibeTheme.COLOR_MILK_WHITE)
 		btn.add_theme_color_override("font_focus_color", aCoreVibeTheme.COLOR_MILK_WHITE)
 	else:
-		btn.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_SKY_CYAN)
+		btn.add_theme_color_override("font_color", Color(aCoreVibeTheme.COLOR_SKY_CYAN.r, aCoreVibeTheme.COLOR_SKY_CYAN.g, aCoreVibeTheme.COLOR_SKY_CYAN.b, 0.7))
 		btn.add_theme_color_override("font_hover_color", aCoreVibeTheme.COLOR_ELECTRIC_LIME)
 		btn.add_theme_color_override("font_pressed_color", aCoreVibeTheme.COLOR_MILK_WHITE)
 		btn.add_theme_color_override("font_focus_color", aCoreVibeTheme.COLOR_ELECTRIC_LIME)
@@ -944,7 +953,7 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 	if hp_i >= 0 and hp_max_i > 0:
 		var hp_bar := ProgressBar.new()
 		hp_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		hp_bar.custom_minimum_size.y = 8  # Half height (was ~16px default)
+		hp_bar.custom_minimum_size = Vector2(200, 8)  # Minimum 200px wide, 8px tall
 		hp_bar.show_percentage = false  # Remove percentage text
 
 		# Core Vibe: Bubble Magenta progress bar with neon glow
@@ -999,7 +1008,7 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 	if mp_i >= 0 and mp_max_i > 0:
 		var mp_bar := ProgressBar.new()
 		mp_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		mp_bar.custom_minimum_size.y = 8  # Half height (was ~16px default)
+		mp_bar.custom_minimum_size = Vector2(200, 8)  # Minimum 200px wide, 8px tall
 		mp_bar.show_percentage = false  # Remove percentage text
 
 		# Core Vibe: Sky Cyan progress bar with neon glow
