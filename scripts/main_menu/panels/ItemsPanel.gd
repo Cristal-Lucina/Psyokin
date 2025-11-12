@@ -732,12 +732,12 @@ func _input(event: InputEvent) -> void:
 				return
 			14:  # D-pad Left
 				print("[ItemsPanel] D-pad Left pressed")
-				_navigate_items(-1)  # Left one column
+				_navigate_items(1)  # Left button: +1 (moves right in grid with wrapping)
 				get_viewport().set_input_as_handled()
 				return
 			15:  # D-pad Right
 				print("[ItemsPanel] D-pad Right pressed")
-				_navigate_items(1)  # Right one column
+				_navigate_items(-1)  # Right button: -1 (moves left in grid with wrapping)
 				get_viewport().set_input_as_handled()
 				return
 			0:  # Accept button (A/Cross)
@@ -747,15 +747,14 @@ func _input(event: InputEvent) -> void:
 				return
 
 func _navigate_items(delta: int) -> void:
-	"""Navigate items in 2-column grid with proper boundary checks"""
+	"""Navigate items with wrapping in 2-column grid"""
 	if _item_buttons.size() == 0:
 		return
 
 	var current = _selected_grid_index
 	var total = _item_buttons.size()
-	var new_index = current
 
-	# Calculate row and column (2 columns)
+	# Calculate row and column (2 columns) for logging
 	var current_row = current / 2
 	var current_col = current % 2
 	var col_name = "LEFT" if current_col == 0 else "RIGHT"
@@ -763,29 +762,12 @@ func _navigate_items(delta: int) -> void:
 
 	print("[ItemsPanel] Navigation from '%s' at index %d (Row %d, %s column), delta=%d" % [item_name, current, current_row, col_name, delta])
 
-	if delta == 2:  # Down (next row, same column)
-		new_index = current + 2
-		if new_index >= total:
-			print("[ItemsPanel]   Down blocked: would go to %d (>= %d)" % [new_index, total])
-			return  # Don't move if out of bounds
-	elif delta == -2:  # Up (previous row, same column)
-		new_index = current - 2
-		if new_index < 0:
-			print("[ItemsPanel]   Up blocked: would go to %d (< 0)" % new_index)
-			return  # Don't move if out of bounds
-	elif delta == 1:  # Right (same row, next column)
-		if current_col == 1:  # Already in right column
-			print("[ItemsPanel]   Right blocked: already in right column")
-			return
-		new_index = current + 1
-		if new_index >= total:
-			print("[ItemsPanel]   Right blocked: would go to %d (>= %d)" % [new_index, total])
-			return
-	elif delta == -1:  # Left (same row, previous column)
-		if current_col == 0:  # Already in left column
-			print("[ItemsPanel]   Left blocked: already in left column")
-			return
-		new_index = current - 1
+	# Apply delta with wrapping
+	var new_index = (current + delta) % total
+
+	# Handle negative wrapping (e.g., -1 from index 0 should go to last item)
+	if new_index < 0:
+		new_index = total + new_index
 
 	var new_row = new_index / 2
 	var new_col = new_index % 2
