@@ -193,10 +193,10 @@ func _create_selection_arrow() -> void:
 	await get_tree().process_frame
 	_selection_arrow.size = Vector2(54, 72)
 
-	# Create debug box (120px wide, 20px height)
+	# Create debug box (160px wide, 20px height)
 	_debug_box = PanelContainer.new()
-	_debug_box.custom_minimum_size = Vector2(120, 20)
-	_debug_box.size = Vector2(120, 20)
+	_debug_box.custom_minimum_size = Vector2(160, 20)
+	_debug_box.size = Vector2(160, 20)
 	_debug_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_debug_box.z_index = -1  # Behind text
 
@@ -211,7 +211,7 @@ func _create_selection_arrow() -> void:
 
 	add_child(_debug_box)
 	await get_tree().process_frame
-	_debug_box.size = Vector2(120, 20)
+	_debug_box.size = Vector2(160, 20)
 
 	# Start pulsing animation
 	_start_arrow_pulse()
