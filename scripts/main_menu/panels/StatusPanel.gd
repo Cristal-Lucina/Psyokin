@@ -1006,7 +1006,7 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 	if hp_i >= 0 and hp_max_i > 0:
 		var hp_bar := ProgressBar.new()
 		hp_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		hp_bar.custom_minimum_size = Vector2(280, 8)  # Compact bar
+		hp_bar.custom_minimum_size = Vector2(220, 8)  # Compact bar
 		hp_bar.show_percentage = false
 
 		# Core Vibe: Bubble Magenta progress bar with neon glow
@@ -1058,7 +1058,7 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 	if mp_i >= 0 and mp_max_i > 0:
 		var mp_bar := ProgressBar.new()
 		mp_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		mp_bar.custom_minimum_size = Vector2(280, 8)  # Compact bar
+		mp_bar.custom_minimum_size = Vector2(220, 8)  # Compact bar
 		mp_bar.show_percentage = false
 
 		# Core Vibe: Sky Cyan progress bar with neon glow
