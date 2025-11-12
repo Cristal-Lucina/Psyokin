@@ -69,6 +69,15 @@ var _selection_arrow: Label = null
 var _debug_box: PanelContainer = null
 var _arrow_tween: Tween = null
 
+# Party picker popup
+var _party_picker_list: ItemList = null
+var _party_member_tokens: Array[String] = []
+var _item_to_use_id: String = ""
+var _item_to_use_def: Dictionary = {}
+var _focus_mode: String = "items"  # "items" or "party_picker"
+var _active_popup: Panel = null
+var _active_overlay: CanvasLayer = null
+
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_inv = get_node_or_null(INV_PATH)
@@ -654,6 +663,25 @@ func _input(event: InputEvent) -> void:
 	if not visible:
 		return
 
+	# Handle popup input at high priority to block GameMenu from seeing it
+	if _focus_mode == "party_picker":
+		if event is InputEventJoypadButton and event.pressed:
+			match event.button_index:
+				0:  # Accept button
+					_on_party_picker_accept()
+					get_viewport().set_input_as_handled()
+					return
+				1:  # Back button (B/Circle)
+					# Find the popup panel to close
+					if _active_popup and is_instance_valid(_active_popup):
+						_close_member_selection_popup(_active_popup, false)
+					get_viewport().set_input_as_handled()
+					return
+				_:
+					# Block all other inputs from reaching GameMenu
+					get_viewport().set_input_as_handled()
+					return
+
 	# Use direct joypad button checks to avoid GameMenu interception
 	if event is InputEventJoypadButton and event.pressed:
 		match event.button_index:
@@ -772,102 +800,387 @@ func _on_equipment_changed(_member: String) -> void:
 	_rebuild()
 
 func _on_use_button_pressed() -> void:
-	"""Use recovery item - for now, heal first party member"""
+	"""Use recovery item - show party picker popup"""
 	print("[ItemsPanel] Use button pressed for: %s" % _selected_item_id)
+	_show_member_selection_popup()
 
-	if _selected_item_id == "" or not _defs.has(_selected_item_id):
+func _on_inspect_button_pressed() -> void:
+	print("[ItemsPanel] Inspect button pressed for: %s" % _selected_item_id)
+
+# ==============================================================================
+# Party Picker Popup Functions
+# ==============================================================================
+
+func _show_member_selection_popup() -> void:
+	"""Show popup to select which party member to use item on - matches StatusPanel pattern"""
+	if _selected_item_id == "":
 		return
 
-	var def: Dictionary = _defs[_selected_item_id]
+	var def: Dictionary = _defs.get(_selected_item_id, {})
+	var item_name: String = _display_name(_selected_item_id, def)
 
-	# Get first party member - try multiple method names
-	var members: Array = []
-	if _gs:
-		for method in ["get_active_party_ids", "get_party_ids", "list_active_party", "get_active_party"]:
-			if _gs.has_method(method):
-				var party_variant: Variant = _gs.call(method)
-				print("[ItemsPanel] Tried method %s, got type %d" % [method, typeof(party_variant)])
-				if typeof(party_variant) == TYPE_PACKED_STRING_ARRAY:
-					for s in (party_variant as PackedStringArray):
-						members.append(String(s))
-				elif typeof(party_variant) == TYPE_ARRAY:
-					for s in (party_variant as Array):
-						members.append(String(s))
-				if members.size() > 0:
-					print("[ItemsPanel] Got %d party members from %s" % [members.size(), method])
-					break
+	print("[ItemsPanel] Showing member selection popup for: %s" % item_name)
 
-	if members.size() == 0:
-		print("[ItemsPanel] No party members available after trying all methods")
+	# Create CanvasLayer overlay (for paused context)
+	var overlay := CanvasLayer.new()
+	overlay.layer = 100
+	overlay.process_mode = Node.PROCESS_MODE_ALWAYS
+	overlay.process_priority = -1000  # CRITICAL: Process before GameMenu
+	get_tree().root.add_child(overlay)
+	get_tree().root.move_child(overlay, 0)
+
+	# Create popup panel
+	var popup_panel: Panel = Panel.new()
+	popup_panel.process_mode = Node.PROCESS_MODE_ALWAYS
+	popup_panel.z_index = 100
+	popup_panel.modulate = Color(1, 1, 1, 0)  # Start transparent for fade in
+	overlay.add_child(popup_panel)
+
+	# Apply consistent styling
+	_style_popup_panel(popup_panel)
+
+	# Store overlay reference
+	popup_panel.set_meta("_overlay", overlay)
+
+	# Create content container
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 8)
+	popup_panel.add_child(vbox)
+
+	# Title label
+	var title := Label.new()
+	title.text = "Use %s on..." % item_name
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 14)
+	vbox.add_child(title)
+
+	# Member list
+	_party_picker_list = ItemList.new()
+	_party_picker_list.custom_minimum_size = Vector2(300, 250)
+	_party_picker_list.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_party_picker_list.focus_mode = Control.FOCUS_ALL
+	vbox.add_child(_party_picker_list)
+
+	# Populate members
+	var members: Array[String] = _gather_members()
+	_party_member_tokens.clear()
+
+	for member_token in members:
+		var member_name: String = _member_display_name(member_token)
+		var stats: Dictionary = _get_member_hp_mp(member_token)
+		_party_picker_list.add_item("%s  HP:%d/%d  MP:%d/%d" % [
+			member_name,
+			stats["hp"], stats["hp_max"],
+			stats["mp"], stats["mp_max"]
+		])
+		_party_member_tokens.append(member_token)
+
+	# Add Cancel button
+	var cancel_btn := Button.new()
+	cancel_btn.text = "Cancel"
+	cancel_btn.pressed.connect(func(): _close_member_selection_popup(popup_panel, false))
+	vbox.add_child(cancel_btn)
+
+	# Auto-size panel
+	await get_tree().process_frame
+	await get_tree().process_frame
+	popup_panel.size = vbox.size + Vector2(20, 20)
+	vbox.position = Vector2(10, 10)
+
+	# Center popup on screen
+	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
+	popup_panel.position = (viewport_size - popup_panel.size) / 2.0
+
+	# Store item info for use
+	_item_to_use_id = _selected_item_id
+	_item_to_use_def = def
+
+	# Store popup reference
+	popup_panel.set_meta("_item_list", _party_picker_list)
+
+	# Fade in
+	_fade_in_popup(popup_panel)
+
+	# Select first and grab focus
+	if _party_picker_list.item_count > 0:
+		_party_picker_list.select(0)
+		_party_picker_list.call_deferred("grab_focus")
+
+	# Update focus mode
+	_focus_mode = "party_picker"
+
+	# Track active popup and overlay for cleanup
+	_active_popup = popup_panel
+	_active_overlay = overlay
+
+	print("[ItemsPanel] Member selection popup shown with %d members" % _party_member_tokens.size())
+
+func _style_popup_panel(popup: Panel) -> void:
+	"""Apply Core Vibe neon-kawaii popup styling"""
+	var style = aCoreVibeTheme.create_panel_style(
+		aCoreVibeTheme.COLOR_SKY_CYAN,            # Sky Cyan border
+		aCoreVibeTheme.COLOR_INK_CHARCOAL,        # Ink charcoal background
+		aCoreVibeTheme.PANEL_OPACITY_FULL,        # Fully opaque
+		aCoreVibeTheme.CORNER_RADIUS_MEDIUM,      # 16px corners
+		aCoreVibeTheme.BORDER_WIDTH_THIN,         # 2px border
+		aCoreVibeTheme.SHADOW_SIZE_LARGE          # 12px glow
+	)
+	popup.add_theme_stylebox_override("panel", style)
+
+func _fade_in_popup(popup: Panel) -> void:
+	"""Fade in popup"""
+	var tween := create_tween()
+	tween.set_ease(Tween.EASE_OUT)
+	tween.set_trans(Tween.TRANS_CUBIC)
+	tween.tween_property(popup, "modulate", Color(1, 1, 1, 1), 0.2)
+	await tween.finished
+	popup.mouse_filter = Control.MOUSE_FILTER_STOP  # Enable input after fade
+
+func _fade_out_popup(popup: Panel) -> void:
+	"""Fade out popup"""
+	popup.mouse_filter = Control.MOUSE_FILTER_IGNORE  # Block input during fade
+	var tween := create_tween()
+	tween.set_ease(Tween.EASE_IN)
+	tween.set_trans(Tween.TRANS_CUBIC)
+	tween.tween_property(popup, "modulate", Color(1, 1, 1, 0), 0.2)
+	await tween.finished
+
+func _on_party_picker_accept() -> void:
+	"""Handle A button in party picker popup"""
+	if not _party_picker_list or not is_instance_valid(_party_picker_list):
 		return
 
-	var first_member: String = String(members[0])
-	print("[ItemsPanel] Using item on: %s" % first_member)
+	var selected_indices: Array = _party_picker_list.get_selected_items()
+	if selected_indices.size() == 0:
+		return
 
-	# Get effect text
-	var effect: String = String(def.get("field_status_effect", ""))
+	var index: int = selected_indices[0]
+	if index < 0 or index >= _party_member_tokens.size():
+		return
+
+	var member_token: String = _party_member_tokens[index]
+
+	# Use item on member
+	_use_item_on_member(_item_to_use_id, _item_to_use_def, member_token)
+
+	# Close popup
+	if _active_popup and is_instance_valid(_active_popup):
+		_close_member_selection_popup(_active_popup, true)
+
+func _close_member_selection_popup(popup_panel: Panel, used_item: bool) -> void:
+	"""Close member selection popup and clean up"""
+	print("[ItemsPanel] Closing member selection popup (used_item: %s)" % used_item)
+
+	# Fade out
+	await _fade_out_popup(popup_panel)
+
+	# Get overlay reference
+	var overlay = popup_panel.get_meta("_overlay", null)
+
+	# Clean up popup
+	if popup_panel and is_instance_valid(popup_panel):
+		popup_panel.queue_free()
+
+	# Clean up overlay
+	if overlay and is_instance_valid(overlay):
+		overlay.queue_free()
+
+	# Clear references
+	_party_picker_list = null
+	_party_member_tokens.clear()
+	_item_to_use_id = ""
+	_item_to_use_def = {}
+
+	# Clear popup tracking
+	_active_popup = null
+	_active_overlay = null
+
+	# Return focus mode
+	_focus_mode = "items"
+
+	# If item was used, rebuild happens automatically via inventory_changed signal
+	# No need to manually rebuild here
+
+func _use_item_on_member(item_id: String, item_def: Dictionary, member_token: String) -> void:
+	"""Apply item effect to a party member"""
+	print("[ItemsPanel] === USE ITEM START ===")
+	print("[ItemsPanel] Item ID: %s, Member: %s" % [item_id, member_token])
+	print("[ItemsPanel] Current _counts size: %d" % _counts.size())
+
+	var effect: String = String(item_def.get("field_status_effect", ""))
 	if effect == "":
-		effect = String(def.get("battle_status_effect", ""))
+		effect = String(item_def.get("battle_status_effect", ""))
 
-	print("[ItemsPanel] Effect: %s" % effect)
+	print("[ItemsPanel] Using %s on %s: %s" % [item_id, member_token, effect])
 
-	# Get current HP/MP
-	var hp: int = 0
-	var mp: int = 0
-	var hp_max: int = 1
-	var mp_max: int = 1
+	# Get member's current stats
+	var stats: Dictionary = _get_member_hp_mp(member_token)
+	var hp: int = stats["hp"]
+	var hp_max: int = stats["hp_max"]
+	var mp: int = stats["mp"]
+	var mp_max: int = stats["mp_max"]
 
-	if _cps and _cps.has_method("get_stats"):
-		var stats_variant: Variant = _cps.call("get_stats", first_member)
-		if typeof(stats_variant) == TYPE_DICTIONARY:
-			var stats: Dictionary = stats_variant as Dictionary
-			hp = int(stats.get("hp", 0))
-			mp = int(stats.get("mp", 0))
-			hp_max = int(stats.get("hp_max", 1))
-			mp_max = int(stats.get("mp_max", 1))
-
-	print("[ItemsPanel] Current HP: %d/%d, MP: %d/%d" % [hp, hp_max, mp, mp_max])
-
-	# Parse healing amount from effect string
+	# Parse and apply healing effects
 	var effect_lower: String = effect.to_lower()
 	var new_hp: int = hp
 	var new_mp: int = mp
 	var healed: bool = false
 
-	# Simple number extraction using regex
-	var regex := RegEx.new()
-	regex.compile("\\d+")
-
+	# Parse HP healing
 	if effect_lower.contains("heal") and effect_lower.contains("hp"):
-		var match_result := regex.search(effect)
-		if match_result:
-			var heal_amount: int = int(match_result.get_string())
-			new_hp = min(hp + heal_amount, hp_max)
+		if effect_lower.contains("100%") or effect_lower.contains("full"):
+			# Full HP restore
+			new_hp = hp_max
 			healed = true
-			print("[ItemsPanel] Healing HP by %d: %d -> %d" % [heal_amount, hp, new_hp])
+			print("[ItemsPanel] Full HP restore: %d -> %d" % [hp, new_hp])
+		elif effect_lower.contains("%"):
+			# Percentage HP heal
+			var percent_match: RegExMatch = _extract_percentage(effect)
+			if percent_match:
+				var percent: float = float(percent_match.get_string()) / 100.0
+				var heal_amount: int = int(hp_max * percent)
+				new_hp = min(hp + heal_amount, hp_max)
+				healed = true
+				print("[ItemsPanel] %d%% HP heal: %d -> %d (+%d)" % [int(percent * 100), hp, new_hp, heal_amount])
+		else:
+			# Flat HP heal
+			var amount_match: RegExMatch = _extract_number(effect)
+			if amount_match:
+				var heal_amount: int = int(amount_match.get_string())
+				new_hp = min(hp + heal_amount, hp_max)
+				healed = true
+				print("[ItemsPanel] Flat HP heal: %d -> %d (+%d)" % [hp, new_hp, heal_amount])
 
+	# Parse MP healing
 	if effect_lower.contains("heal") and effect_lower.contains("mp"):
-		var match_result := regex.search(effect)
-		if match_result:
-			var heal_amount: int = int(match_result.get_string())
-			new_mp = min(mp + heal_amount, mp_max)
+		if effect_lower.contains("100%") or effect_lower.contains("full"):
+			# Full MP restore
+			new_mp = mp_max
 			healed = true
-			print("[ItemsPanel] Healing MP by %d: %d -> %d" % [heal_amount, mp, new_mp])
+			print("[ItemsPanel] Full MP restore: %d -> %d" % [mp, new_mp])
+		elif effect_lower.contains("%"):
+			# Percentage MP heal
+			var percent_match: RegExMatch = _extract_percentage(effect)
+			if percent_match:
+				var percent: float = float(percent_match.get_string()) / 100.0
+				var heal_amount: int = int(mp_max * percent)
+				new_mp = min(mp + heal_amount, mp_max)
+				healed = true
+				print("[ItemsPanel] %d%% MP heal: %d -> %d (+%d)" % [int(percent * 100), mp, new_mp, heal_amount])
+		else:
+			# Flat MP heal
+			var amount_match: RegExMatch = _extract_number(effect)
+			if amount_match:
+				var heal_amount: int = int(amount_match.get_string())
+				new_mp = min(mp + heal_amount, mp_max)
+				healed = true
+				print("[ItemsPanel] Flat MP heal: %d -> %d (+%d)" % [mp, new_mp, heal_amount])
 
-	# Apply healing
-	if healed and _cps:
-		if _cps.has_method("set_hp"):
-			_cps.call("set_hp", first_member, new_hp)
-			print("[ItemsPanel] Set HP to: %d" % new_hp)
-		if _cps.has_method("set_mp"):
-			_cps.call("set_mp", first_member, new_mp)
-			print("[ItemsPanel] Set MP to: %d" % new_mp)
+	# Apply healing to member_data in GameState for persistence
+	if healed and _gs:
+		var member_data: Variant = _gs.get("member_data") if _gs.has_method("get") else {}
+		if typeof(member_data) == TYPE_DICTIONARY:
+			if not member_data.has(member_token):
+				member_data[member_token] = {}
+			var gs_rec: Dictionary = member_data[member_token]
+			gs_rec["hp"] = new_hp
+			gs_rec["mp"] = new_mp
+			member_data[member_token] = gs_rec
 
-		# Consume the item
-		if _inv and _inv.has_method("remove_item"):
-			_inv.call("remove_item", _selected_item_id, 1)
-			print("[ItemsPanel] Consumed 1x %s" % _selected_item_id)
-			# Rebuild will happen automatically via inventory_changed signal
+			# Write back to GameState
+			if _gs.has_method("set"):
+				_gs.set("member_data", member_data)
 
-func _on_inspect_button_pressed() -> void:
-	print("[ItemsPanel] Inspect button pressed for: %s" % _selected_item_id)
+			# Refresh combat profile to show updates
+			if _cps and _cps.has_method("refresh_member"):
+				_cps.call("refresh_member", member_token)
+
+			print("[ItemsPanel] Updated GameState.member_data: HP=%d/%d, MP=%d/%d" % [new_hp, hp_max, new_mp, mp_max])
+
+	# Consume the item
+	print("[ItemsPanel] About to consume item: %s" % item_id)
+	if _inv and _inv.has_method("remove_item"):
+		_inv.call("remove_item", item_id, 1)
+		print("[ItemsPanel] Item consumed, inventory should emit signal now")
+
+	print("[ItemsPanel] _counts size after use: %d" % _counts.size())
+	print("[ItemsPanel] === USE ITEM END ===")
+
+func _extract_number(text: String) -> RegExMatch:
+	"""Extract first number from text"""
+	var regex: RegEx = RegEx.new()
+	regex.compile("\\d+")
+	return regex.search(text)
+
+func _extract_percentage(text: String) -> RegExMatch:
+	"""Extract percentage number from text (e.g., '25' from '25%')"""
+	var regex: RegEx = RegEx.new()
+	regex.compile("(\\d+)\\s*%")
+	return regex.search(text)
+
+func _gather_members() -> Array[String]:
+	"""Get all party member tokens"""
+	var members: Array[String] = []
+	if not _gs:
+		return members
+
+	# Try active party methods
+	for method in ["get_active_party_ids", "get_party_ids", "list_active_party"]:
+		if _gs.has_method(method):
+			var result: Variant = _gs.call(method)
+			if typeof(result) == TYPE_PACKED_STRING_ARRAY:
+				for s in (result as PackedStringArray):
+					members.append(String(s))
+			elif typeof(result) == TYPE_ARRAY:
+				for s in (result as Array):
+					members.append(String(s))
+			if members.size() > 0:
+				break
+
+	# Add bench if needed
+	if _gs.has_method("get"):
+		var bench: Variant = _gs.get("bench")
+		if typeof(bench) == TYPE_PACKED_STRING_ARRAY:
+			for s in (bench as PackedStringArray):
+				if not members.has(String(s)):
+					members.append(String(s))
+		elif typeof(bench) == TYPE_ARRAY:
+			for s in (bench as Array):
+				if not members.has(String(s)):
+					members.append(String(s))
+
+	return members
+
+func _get_member_hp_mp(member_token: String) -> Dictionary:
+	"""Get member HP/MP stats"""
+	var stats: Dictionary = {"hp": 0, "hp_max": 0, "mp": 0, "mp_max": 0}
+
+	# Get max HP/MP from pools
+	if _gs and _gs.has_method("compute_member_pools"):
+		var pools: Variant = _gs.call("compute_member_pools", member_token)
+		if typeof(pools) == TYPE_DICTIONARY:
+			stats["hp_max"] = int(pools.get("hp_max", 0))
+			stats["mp_max"] = int(pools.get("mp_max", 0))
+
+	# Get current HP/MP from combat profiles
+	if _cps and _cps.has_method("get_profile"):
+		var profile: Variant = _cps.call("get_profile", member_token)
+		if typeof(profile) == TYPE_DICTIONARY:
+			stats["hp"] = int(profile.get("hp", stats["hp_max"]))
+			stats["mp"] = int(profile.get("mp", stats["mp_max"]))
+	else:
+		stats["hp"] = stats["hp_max"]
+		stats["mp"] = stats["mp_max"]
+
+	return stats
+
+func _display_name(item_id: String, def: Dictionary) -> String:
+	"""Get display name for an item"""
+	if def.has("sigil_instance") and def.has("name"):
+		return String(def["name"])
+	for key in ["name", "display_name", "label", "title"]:
+		if def.has(key):
+			var val: String = String(def[key]).strip_edges()
+			if val != "":
+				return val
+	return item_id.replace("_", " ").capitalize()
