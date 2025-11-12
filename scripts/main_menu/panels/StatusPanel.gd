@@ -254,8 +254,7 @@ func _build_tab_buttons() -> void:
 		_tab_button_container = VBoxContainer.new()
 		_tab_button_container.name = "TabButtons"
 		_tab_button_container.add_theme_constant_override("separation", 8)
-		# Shift all buttons 20px to the left
-		_tab_button_container.position.x = -20
+		# No container shift - buttons handle their own positioning
 
 		# Find TabList and replace it with our button container
 		if _tab_list and _tab_list.get_parent():
@@ -393,8 +392,8 @@ func _update_button_selection() -> void:
 		var target_width = 140 if not is_selected else 160
 		tween.tween_property(btn, "custom_minimum_size:x", target_width, 0.2)
 
-		# Animate slide: selected buttons slide 20px to the right, unselected slide back to 0
-		var target_x = 0 if not is_selected else 20
+		# Animate slide: unselected buttons hide 20px to the left, selected buttons reveal at 0
+		var target_x = -20 if not is_selected else 0
 		tween.tween_property(btn, "position:x", target_x, 0.2)
 
 func _grab_first_tab_button_focus() -> void:
