@@ -231,8 +231,8 @@ func _update_arrow_position() -> void:
 	var list_offset_in_statspanel = list_global_pos - panel_global_pos
 	print("  List offset in StatsPanel: %s" % list_offset_in_statspanel)
 
-	# Position arrow at fixed x=200, aligned vertically with item center
-	var arrow_x = 200.0
+	# Position arrow right-justified: at the right edge of the party list minus padding
+	var arrow_x = list_offset_in_statspanel.x + _party_list.size.x - _selection_arrow.size.x - 10.0
 	var arrow_y = list_offset_in_statspanel.y + item_rect.position.y + (item_rect.size.y / 2.0) - (_selection_arrow.size.y / 2.0)
 
 	print("  Arrow custom_minimum_size: %s" % _selection_arrow.custom_minimum_size)
