@@ -229,6 +229,10 @@ func _update_arrow_position() -> void:
 	var arrow_x = list_offset_in_panel.x + target_list.size.x - 8.0 - 80.0 + 40.0
 	var arrow_y = list_offset_in_panel.y + item_rect.position.y + (item_rect.size.y / 2.0) - (_selection_arrow.size.y / 2.0)
 
+	# Add 300px offset when tracking items list
+	if _focus_mode == "items":
+		arrow_x += 300.0
+
 	_selection_arrow.position = Vector2(arrow_x, arrow_y)
 
 	# Position debug box to the left of arrow
