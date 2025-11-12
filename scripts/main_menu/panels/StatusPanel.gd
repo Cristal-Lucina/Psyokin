@@ -1094,7 +1094,14 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 	hp_label_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	mp_label_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
-	info_vbox.add_child(stats_row)
+	# Wrap stats_row in MarginContainer for 10px margins on each side
+	var stats_margin := MarginContainer.new()
+	stats_margin.add_theme_constant_override("margin_left", 10)
+	stats_margin.add_theme_constant_override("margin_right", 10)
+	stats_margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	stats_margin.add_child(stats_row)
+
+	info_vbox.add_child(stats_margin)
 	main_hbox.add_child(info_vbox)
 	btn.add_child(main_hbox)
 
