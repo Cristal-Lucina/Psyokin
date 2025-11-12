@@ -1167,33 +1167,48 @@ func _gather_members() -> Array[String]:
 	return members
 
 func _get_member_hp_mp(member_token: String) -> Dictionary:
-	"""Get member HP/MP stats"""
+	"""Get member HP/MP stats - matches StatusPanel implementation"""
 	print("[ItemsPanel] Getting HP/MP for member: %s" % member_token)
-	var stats: Dictionary = {"hp": 0, "hp_max": 0, "mp": 0, "mp_max": 0}
 
-	# Get max HP/MP from pools
-	if _gs and _gs.has_method("compute_member_pools"):
-		var pools: Variant = _gs.call("compute_member_pools", member_token)
-		print("[ItemsPanel]   compute_member_pools returned type: %d, value: %s" % [typeof(pools), str(pools)])
-		if typeof(pools) == TYPE_DICTIONARY:
-			stats["hp_max"] = int(pools.get("hp_max", 0))
-			stats["mp_max"] = int(pools.get("mp_max", 0))
-			print("[ItemsPanel]   Extracted hp_max: %d, mp_max: %d" % [stats["hp_max"], stats["mp_max"]])
-	else:
-		print("[ItemsPanel]   GameState or compute_member_pools not available")
+	# Default values
+	var hp_max: int = 150
+	var mp_max: int = 20
 
-	# Get current HP/MP from combat profiles
+	# Try to get combat profile for HP/MP (includes both current and max)
 	if _cps and _cps.has_method("get_profile"):
-		var profile: Variant = _cps.call("get_profile", member_token)
-		print("[ItemsPanel]   get_profile returned type: %d, value: %s" % [typeof(profile), str(profile)])
-		if typeof(profile) == TYPE_DICTIONARY:
-			stats["hp"] = int(profile.get("hp", stats["hp_max"]))
-			stats["mp"] = int(profile.get("mp", stats["mp_max"]))
-			print("[ItemsPanel]   Extracted hp: %d, mp: %d" % [stats["hp"], stats["mp"]])
-	else:
-		print("[ItemsPanel]   CombatProfileSystem or get_profile not available, using max values")
-		stats["hp"] = stats["hp_max"]
-		stats["mp"] = stats["mp_max"]
+		var p_v: Variant = _cps.call("get_profile", member_token)
+		print("[ItemsPanel]   get_profile returned type: %d, value: %s" % [typeof(p_v), str(p_v)])
+		if typeof(p_v) == TYPE_DICTIONARY:
+			var p: Dictionary = p_v
+			var hp_cur: int = int(p.get("hp", -1))
+			hp_max = int(p.get("hp_max", -1))
+			var mp_cur: int = int(p.get("mp", -1))
+			mp_max = int(p.get("mp_max", -1))
 
-	print("[ItemsPanel]   Final stats: HP %d/%d, MP %d/%d" % [stats["hp"], stats["hp_max"], stats["mp"], stats["mp_max"]])
-	return stats
+			print("[ItemsPanel]   Extracted from profile: HP %d/%d, MP %d/%d" % [hp_cur, hp_max, mp_cur, mp_max])
+
+			return {
+				"hp": hp_cur,
+				"hp_max": hp_max,
+				"mp": mp_cur,
+				"mp_max": mp_max
+			}
+
+	# Fallback: no profile data, compute max stats and assume full HP/MP
+	print("[ItemsPanel]   No profile found, using fallback")
+	if _gs and _gs.has_method("compute_member_pools"):
+		var pools_v: Variant = _gs.call("compute_member_pools", member_token)
+		print("[ItemsPanel]   compute_member_pools returned type: %d, value: %s" % [typeof(pools_v), str(pools_v)])
+		if typeof(pools_v) == TYPE_DICTIONARY:
+			var pools: Dictionary = pools_v
+			hp_max = int(pools.get("hp_max", hp_max))
+			mp_max = int(pools.get("mp_max", mp_max))
+			print("[ItemsPanel]   Extracted from pools: hp_max=%d, mp_max=%d" % [hp_max, mp_max])
+
+	print("[ItemsPanel]   Final fallback stats: HP %d/%d, MP %d/%d" % [hp_max, hp_max, mp_max, mp_max])
+	return {
+		"hp": hp_max,
+		"hp_max": hp_max,
+		"mp": mp_max,
+		"mp_max": mp_max
+	}
