@@ -254,6 +254,7 @@ func _build_tab_buttons() -> void:
 		_tab_button_container = VBoxContainer.new()
 		_tab_button_container.name = "TabButtons"
 		_tab_button_container.add_theme_constant_override("separation", 8)
+		_tab_button_container.modulate.a = 0.0  # Start invisible for fade-in animation
 		# No container shift - buttons handle their own positioning
 
 		# Find TabList and replace it with our button container
@@ -2562,8 +2563,19 @@ func _safe_hero_level() -> int:
 func _on_visibility_changed() -> void:
 	# Select first tab when panel becomes visible
 	if visible and _tab_buttons.size() > 0:
+		# Fade in menu buttons for smooth appearance
+		if _tab_button_container:
+			var tween := create_tween()
+			tween.set_ease(Tween.EASE_OUT)
+			tween.set_trans(Tween.TRANS_CUBIC)
+			tween.tween_property(_tab_button_container, "modulate:a", 1.0, 0.3)
+
 		# Defer to ensure buttons are ready
 		call_deferred("_grab_tab_list_focus")
+	else:
+		# Reset alpha when panel becomes hidden (for next fade-in)
+		if _tab_button_container:
+			_tab_button_container.modulate.a = 0.0
 
 	if not OS.is_debug_build(): return
 	_dev_dump_profiles()
