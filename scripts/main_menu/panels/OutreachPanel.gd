@@ -156,7 +156,7 @@ func _apply_core_vibe_styling() -> void:
 	# Style the three main panel containers with rounded neon borders
 	if _left_panel:
 		var left_style = aCoreVibeTheme.create_panel_style(
-			aCoreVibeTheme.COLOR_CITRUS_YELLOW,       # Citrus Yellow border (categories)
+			aCoreVibeTheme.COLOR_SKY_CYAN,            # Sky Cyan border (categories)
 			aCoreVibeTheme.COLOR_INK_CHARCOAL,        # Ink charcoal background
 			aCoreVibeTheme.PANEL_OPACITY_SEMI,        # Semi-transparent
 			aCoreVibeTheme.CORNER_RADIUS_MEDIUM,      # 16px corners
@@ -171,7 +171,7 @@ func _apply_core_vibe_styling() -> void:
 
 	if _center_panel:
 		var center_style = aCoreVibeTheme.create_panel_style(
-			aCoreVibeTheme.COLOR_SKY_CYAN,            # Sky Cyan border (missions)
+			aCoreVibeTheme.COLOR_GRAPE_VIOLET,        # Grape Violet border (missions)
 			aCoreVibeTheme.COLOR_INK_CHARCOAL,        # Ink charcoal background
 			aCoreVibeTheme.PANEL_OPACITY_SEMI,        # Semi-transparent
 			aCoreVibeTheme.CORNER_RADIUS_MEDIUM,      # 16px corners
@@ -186,7 +186,7 @@ func _apply_core_vibe_styling() -> void:
 
 	if _right_panel:
 		var right_style = aCoreVibeTheme.create_panel_style(
-			aCoreVibeTheme.COLOR_GRAPE_VIOLET,        # Grape Violet border (details)
+			aCoreVibeTheme.COLOR_SKY_CYAN,            # Sky Cyan border (details)
 			aCoreVibeTheme.COLOR_INK_CHARCOAL,        # Ink charcoal background
 			aCoreVibeTheme.PANEL_OPACITY_SEMI,        # Semi-transparent
 			aCoreVibeTheme.CORNER_RADIUS_MEDIUM,      # 16px corners
