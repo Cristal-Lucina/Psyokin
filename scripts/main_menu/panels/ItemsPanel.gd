@@ -721,12 +721,12 @@ func _input(event: InputEvent) -> void:
 				_populate_items()
 				get_viewport().set_input_as_handled()
 				return
-			11:  # D-pad Up (CORRECT button number!)
+			11:  # D-pad Up
 				print("[ItemsPanel] D-pad Up pressed")
 				_navigate_items(-2)  # UP in column: -2
 				get_viewport().set_input_as_handled()
 				return
-			13:  # D-pad Down
+			12:  # D-pad Down (CORRECT button number!)
 				print("[ItemsPanel] D-pad Down pressed")
 				_navigate_items(2)  # DOWN in column: +2
 				get_viewport().set_input_as_handled()
