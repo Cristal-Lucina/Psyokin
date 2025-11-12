@@ -743,24 +743,50 @@ func _input(event: InputEvent) -> void:
 				return
 
 func _navigate_items(delta: int) -> void:
-	"""Navigate items with simple up/down"""
+	"""Navigate items in 2-column grid with proper boundary checks"""
 	if _item_buttons.size() == 0:
 		return
 
-	var new_index = _selected_grid_index + delta
+	var current = _selected_grid_index
+	var total = _item_buttons.size()
+	var new_index = current
 
-	# Clamp to valid range
-	if new_index < 0:
-		new_index = 0
-	elif new_index >= _item_buttons.size():
-		new_index = _item_buttons.size() - 1
+	# Calculate row and column (2 columns)
+	var current_row = current / 2
+	var current_col = current % 2
 
-	if new_index != _selected_grid_index:
-		_selected_grid_index = new_index
-		_selected_item_id = _item_ids[_selected_grid_index]
-		_update_selection_highlight()
-		_update_details()
-		_update_arrow_position()
+	print("[ItemsPanel] Current: idx=%d, row=%d, col=%d, total=%d, delta=%d" % [current, current_row, current_col, total, delta])
+
+	if delta == -2:  # Down (next row, same column)
+		new_index = current + 2
+		if new_index >= total:
+			print("[ItemsPanel]   Down blocked: would go to %d (>= %d)" % [new_index, total])
+			return  # Don't move if out of bounds
+	elif delta == 2:  # Up (previous row, same column)
+		new_index = current - 2
+		if new_index < 0:
+			print("[ItemsPanel]   Up blocked: would go to %d (< 0)" % new_index)
+			return  # Don't move if out of bounds
+	elif delta == -1:  # Right (same row, next column)
+		if current_col == 1:  # Already in right column
+			print("[ItemsPanel]   Right blocked: already in right column")
+			return
+		new_index = current + 1
+		if new_index >= total:
+			print("[ItemsPanel]   Right blocked: would go to %d (>= %d)" % [new_index, total])
+			return
+	elif delta == 1:  # Left (same row, previous column)
+		if current_col == 0:  # Already in left column
+			print("[ItemsPanel]   Left blocked: already in left column")
+			return
+		new_index = current - 1
+
+	print("[ItemsPanel]   Moving from %d to %d" % [current, new_index])
+	_selected_grid_index = new_index
+	_selected_item_id = _item_ids[_selected_grid_index]
+	_update_selection_highlight()
+	_update_details()
+	_update_arrow_position()
 
 func _update_selection_highlight() -> void:
 	"""Update visual highlight on selected button"""
