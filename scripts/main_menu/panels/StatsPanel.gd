@@ -625,8 +625,8 @@ func _create_stat_cell(stat_label: String, value: String) -> PanelContainer:
 	value_label.custom_minimum_size = Vector2(30, 0)  # ~5 characters at 12pt
 	value_label.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	value_label.add_theme_font_size_override("font_size", 12)
-	# Core Vibe: Electric Lime value color
-	value_label.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_ELECTRIC_LIME)
+	# Core Vibe: Plasma Teal value color
+	value_label.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_PLASMA_TEAL)
 	value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	hbox.add_child(value_label)
 
