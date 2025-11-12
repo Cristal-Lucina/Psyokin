@@ -612,8 +612,8 @@ func _update_arrow_position() -> void:
 	# Calculate position in PerksPanel coordinates
 	var cell_offset_in_panel = cell_global_pos - panel_global_pos
 
-	# Position arrow to the right center of the cell with offset, then shift right 40px more, then left 8px
-	var arrow_x = cell_offset_in_panel.x + cell.size.x - 8.0 - 80.0 + 40.0 + 40.0 - 8.0
+	# Position arrow to the right center of the cell with offset, then shift right 40px more, then left 16px
+	var arrow_x = cell_offset_in_panel.x + cell.size.x - 8.0 - 80.0 + 40.0 + 40.0 - 8.0 - 8.0
 	var arrow_y = cell_offset_in_panel.y + (cell.size.y / 2.0) - (_selection_arrow.size.y / 2.0)
 
 	_selection_arrow.position = Vector2(arrow_x, arrow_y)
