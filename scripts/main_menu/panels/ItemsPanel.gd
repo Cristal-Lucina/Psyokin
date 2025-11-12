@@ -462,6 +462,18 @@ func _populate_items() -> void:
 		button.set_meta("item_id", item_id)
 		button.set_meta("grid_index", _item_buttons.size())
 		button.pressed.connect(_on_grid_item_pressed.bind(_item_buttons.size()))
+
+		# Style button
+		var style_normal = StyleBoxFlat.new()
+		style_normal.bg_color = Color(0.1, 0.1, 0.15, 0.8)  # Dark background
+		style_normal.corner_radius_top_left = 4
+		style_normal.corner_radius_top_right = 4
+		style_normal.corner_radius_bottom_left = 4
+		style_normal.corner_radius_bottom_right = 4
+		button.add_theme_stylebox_override("normal", style_normal)
+		button.add_theme_stylebox_override("hover", style_normal)
+		button.add_theme_stylebox_override("pressed", style_normal)
+
 		_items_grid.add_child(button)
 		_item_buttons.append(button)
 		_item_ids.append(item_id)
@@ -473,6 +485,7 @@ func _populate_items() -> void:
 		_selected_grid_index = 0
 		_selected_item_id = _item_ids[0]
 		print("[ItemsPanel] Selected first item: %s" % _selected_item_id)
+		call_deferred("_update_selection_highlight")
 		_update_details()
 		call_deferred("_update_arrow_position")
 	else:
@@ -484,6 +497,7 @@ func _on_grid_item_pressed(index: int) -> void:
 		return
 	_selected_grid_index = index
 	_selected_item_id = _item_ids[index]
+	_update_selection_highlight()
 	_update_details()
 	_update_arrow_position()
 
@@ -681,8 +695,40 @@ func _navigate_items(delta: int) -> void:
 	if new_index != _selected_grid_index:
 		_selected_grid_index = new_index
 		_selected_item_id = _item_ids[_selected_grid_index]
+		_update_selection_highlight()
 		_update_details()
 		_update_arrow_position()
+
+func _update_selection_highlight() -> void:
+	"""Update visual highlight on selected button"""
+	for i in range(_item_buttons.size()):
+		var button: Button = _item_buttons[i]
+		var is_selected: bool = (i == _selected_grid_index)
+
+		# Create style based on selection state
+		var style = StyleBoxFlat.new()
+		if is_selected:
+			# Selected: Sky Cyan background
+			style.bg_color = aCoreVibeTheme.COLOR_SKY_CYAN
+			style.border_width_left = 2
+			style.border_width_right = 2
+			style.border_width_top = 2
+			style.border_width_bottom = 2
+			style.border_color = aCoreVibeTheme.COLOR_ELECTRIC_LIME
+			button.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_INK_CHARCOAL)
+		else:
+			# Normal: Dark background
+			style.bg_color = Color(0.1, 0.1, 0.15, 0.8)
+			button.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE)
+
+		style.corner_radius_top_left = 4
+		style.corner_radius_top_right = 4
+		style.corner_radius_bottom_left = 4
+		style.corner_radius_bottom_right = 4
+
+		button.add_theme_stylebox_override("normal", style)
+		button.add_theme_stylebox_override("hover", style)
+		button.add_theme_stylebox_override("pressed", style)
 
 func _on_accept_pressed() -> void:
 	"""Handle Accept button press"""
