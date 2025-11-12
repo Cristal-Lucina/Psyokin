@@ -47,6 +47,7 @@ var _party_labels: Array[String] = []
 
 # Selection arrow
 var _selection_arrow: Label = null
+var _debug_box: PanelContainer = null
 
 func _ready() -> void:
 	# Set process mode to work while game is paused
@@ -192,6 +193,26 @@ func _create_selection_arrow() -> void:
 	await get_tree().process_frame
 	_selection_arrow.size = Vector2(54, 72)
 
+	# Create debug box (same size as arrow, positioned to its left)
+	_debug_box = PanelContainer.new()
+	_debug_box.custom_minimum_size = Vector2(54, 72)
+	_debug_box.size = Vector2(54, 72)
+	_debug_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_debug_box.z_index = 99  # Below arrow but above other elements
+
+	# Create grey rounded style
+	var debug_style = StyleBoxFlat.new()
+	debug_style.bg_color = Color(0.5, 0.5, 0.5, 0.8)  # Grey with transparency
+	debug_style.corner_radius_top_left = 8
+	debug_style.corner_radius_top_right = 8
+	debug_style.corner_radius_bottom_left = 8
+	debug_style.corner_radius_bottom_right = 8
+	_debug_box.add_theme_stylebox_override("panel", debug_style)
+
+	add_child(_debug_box)
+	await get_tree().process_frame
+	_debug_box.size = Vector2(54, 72)
+
 	# Start pulsing animation
 	_start_arrow_pulse()
 
@@ -203,6 +224,8 @@ func _update_arrow_position() -> void:
 	var selected = _party_list.get_selected_items()
 	if selected.size() == 0:
 		_selection_arrow.visible = false
+		if _debug_box:
+			_debug_box.visible = false
 		return
 
 	_selection_arrow.visible = true
@@ -241,6 +264,13 @@ func _update_arrow_position() -> void:
 	print("  Arrow vertical calc: item_center=%f - arrow_half=%f = %f" % [item_rect.position.y + item_rect.size.y / 2.0, _selection_arrow.size.y / 2.0, arrow_y - list_offset_in_statspanel.y])
 
 	_selection_arrow.position = Vector2(arrow_x, arrow_y)
+
+	# Position debug box to the left of arrow
+	if _debug_box:
+		_debug_box.visible = true
+		var debug_x = arrow_x - _debug_box.size.x - 4.0  # 4px gap between box and arrow
+		_debug_box.position = Vector2(debug_x, arrow_y)
+		print("  Debug box position: %s" % _debug_box.position)
 
 	print("  Final arrow position: %s" % _selection_arrow.position)
 
