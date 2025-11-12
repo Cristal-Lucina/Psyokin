@@ -254,6 +254,8 @@ func _build_tab_buttons() -> void:
 		_tab_button_container = VBoxContainer.new()
 		_tab_button_container.name = "TabButtons"
 		_tab_button_container.add_theme_constant_override("separation", 8)
+		# Shift all buttons 20px to the left
+		_tab_button_container.position.x = -20
 
 		# Find TabList and replace it with our button container
 		if _tab_list and _tab_list.get_parent():
@@ -332,8 +334,8 @@ func _style_menu_button(btn: Button, is_selected: bool) -> void:
 	style.shadow_size = 6
 	style.shadow_offset = Vector2(2, 0)
 
-	# Padding
-	style.content_margin_left = 10
+	# Padding - text shifted 20px to the right (10 + 20 = 30)
+	style.content_margin_left = 30
 	style.content_margin_top = 8
 	style.content_margin_right = 10
 	style.content_margin_bottom = 8
@@ -374,7 +376,7 @@ func _on_tab_button_focused(index: int) -> void:
 
 func _update_button_selection() -> void:
 	"""Update visual state and stretch for selected button"""
-	# Create tween for smooth width animation
+	# Create tween for smooth width and position animation
 	var tween = create_tween()
 	tween.set_parallel(true)
 	tween.set_trans(Tween.TRANS_CUBIC)
@@ -390,6 +392,10 @@ func _update_button_selection() -> void:
 		# Animate stretch: selected buttons extend 20px to the right
 		var target_width = 140 if not is_selected else 160
 		tween.tween_property(btn, "custom_minimum_size:x", target_width, 0.2)
+
+		# Animate slide: selected buttons slide 20px to the right, unselected slide back to 0
+		var target_x = 0 if not is_selected else 20
+		tween.tween_property(btn, "position:x", target_x, 0.2)
 
 func _grab_first_tab_button_focus() -> void:
 	"""Grab focus on first tab button"""
