@@ -866,7 +866,7 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 	# Create a button instead of PanelContainer for clickability
 	var btn := Button.new()
 	btn.focus_mode = Control.FOCUS_ALL
-	btn.custom_minimum_size = Vector2(0, 80)
+	btn.custom_minimum_size = Vector2(0, 50)  # Sleeker: reduced from 80 to 50
 
 	# Store metadata for popup menu
 	var member_id: String = String(member_data.get("_member_id", ""))
@@ -929,6 +929,7 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 
 	var hp_label_box := HBoxContainer.new()
 	hp_label_box.add_theme_constant_override("separation", 4)
+	hp_label_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var hp_lbl := Label.new()
 	hp_lbl.text = "HP"
 	hp_lbl.custom_minimum_size.x = 24
@@ -936,6 +937,7 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 	var hp_val := Label.new()
 	hp_val.text = _fmt_pair(hp_i, hp_max_i)
 	hp_val.add_theme_font_size_override("font_size", 10)
+	hp_val.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	hp_label_box.add_child(hp_lbl)
 	hp_label_box.add_child(hp_val)
 	hp_section.add_child(hp_label_box)
@@ -982,6 +984,7 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 
 	var mp_label_box := HBoxContainer.new()
 	mp_label_box.add_theme_constant_override("separation", 4)
+	mp_label_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var mp_lbl := Label.new()
 	mp_lbl.text = "MP"
 	mp_lbl.custom_minimum_size.x = 24
@@ -989,6 +992,7 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 	var mp_val := Label.new()
 	mp_val.text = _fmt_pair(mp_i, mp_max_i)
 	mp_val.add_theme_font_size_override("font_size", 10)
+	mp_val.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	mp_label_box.add_child(mp_lbl)
 	mp_label_box.add_child(mp_val)
 	mp_section.add_child(mp_label_box)
@@ -1446,13 +1450,18 @@ func _show_member_picker(active_slot: int) -> void:
 		_show_no_bench_notice()
 		return
 
+	# Create CanvasLayer to ensure popup is centered on viewport
+	var canvas_layer := CanvasLayer.new()
+	canvas_layer.layer = 100
+	add_child(canvas_layer)
+
 	# Create popup panel using LoadoutPanel pattern
 	var popup_panel: Panel = Panel.new()
 	popup_panel.process_mode = Node.PROCESS_MODE_ALWAYS
-	popup_panel.z_index = 100
+	popup_panel.set_anchors_preset(Control.PRESET_CENTER)
 	popup_panel.modulate.a = 0.0  # Start fully transparent
 	popup_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE  # Block input until fade completes
-	add_child(popup_panel)
+	canvas_layer.add_child(popup_panel)
 
 	# Apply consistent styling (matches ToastPopup)
 	_style_popup_panel(popup_panel)
@@ -1687,13 +1696,18 @@ func _show_recovery_popup(member_id: String, member_name: String, hp: int, hp_ma
 		print("[StatusPanel] All unique categories found: " + str(categories_found))
 		print("[StatusPanel] Total recovery items found: %d" % recovery_items.size())
 
+	# Create CanvasLayer to ensure popup is centered on viewport
+	var canvas_layer := CanvasLayer.new()
+	canvas_layer.layer = 100
+	add_child(canvas_layer)
+
 	# Create popup panel using LoadoutPanel pattern
 	var popup_panel: Panel = Panel.new()
 	popup_panel.process_mode = Node.PROCESS_MODE_ALWAYS
-	popup_panel.z_index = 100
+	popup_panel.set_anchors_preset(Control.PRESET_CENTER)
 	popup_panel.modulate.a = 0.0  # Start fully transparent
 	popup_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE  # Block input until fade completes
-	add_child(popup_panel)
+	canvas_layer.add_child(popup_panel)
 
 	# Apply consistent styling (matches ToastPopup)
 	_style_popup_panel(popup_panel)
@@ -2703,9 +2717,9 @@ func _handle_content_input(event: InputEvent) -> void:
 					# No left neighbor - navigate back to menu
 					print("[StatusPanel] CONTENT → MENU transition (showing menu)")
 					_nav_state = NavState.MENU
-					if not _menu_visible:
-						_show_menu()
-					_tab_list.grab_focus()
+					# Focus on selected tab button
+					if _tab_buttons.size() > 0 and is_instance_valid(_tab_buttons[_selected_button_index]):
+						_tab_buttons[_selected_button_index].grab_focus()
 					get_viewport().set_input_as_handled()
 					return
 			elif event.is_action_pressed("move_right"):
