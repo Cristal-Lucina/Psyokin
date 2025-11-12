@@ -145,6 +145,11 @@ func _debug_log(message: String) -> void:
 @onready var _left_container : VBoxContainer = $Root/Left if has_node("Root/Left") else null
 @onready var _right_container : VBoxContainer = $Root/Right if has_node("Root/Right") else null
 @onready var _party     : VBoxContainer = $Root/Left/PartyScroll/PartyList
+
+# Tab button tracking for new button-based menu
+var _tab_buttons: Array[Button] = []
+var _tab_button_container: VBoxContainer = null
+var _selected_button_index: int = 0
 @onready var _creds     : Label         = $Root/Right/InfoGrid/MoneyValue
 @onready var _perk      : Label         = $Root/Right/InfoGrid/PerkValue
 @onready var _morality  : Label         = $Root/Right/InfoGrid/MoralityValue
@@ -239,15 +244,34 @@ func _first_fill() -> void:
 	_rebuild_all()
 
 func _build_tab_buttons() -> void:
-	"""Build the menu tab items in ItemList"""
-	if not _tab_list:
-		return
+	"""Build individual menu tab buttons with pop-out styling"""
+	# Hide old ItemList
+	if _tab_list:
+		_tab_list.visible = false
 
-	# Clear existing items
-	_tab_list.clear()
+	# Create or get button container
+	if not _tab_button_container:
+		_tab_button_container = VBoxContainer.new()
+		_tab_button_container.name = "TabButtons"
+		_tab_button_container.add_theme_constant_override("separation", 8)
+
+		# Find TabList and replace it with our button container
+		if _tab_list and _tab_list.get_parent():
+			var parent = _tab_list.get_parent()
+			var index = _tab_list.get_index()
+			parent.add_child(_tab_button_container)
+			parent.move_child(_tab_button_container, index)
+		else:
+			_tab_column.add_child(_tab_button_container)
+
+	# Clear existing buttons
+	for btn in _tab_buttons:
+		if is_instance_valid(btn):
+			btn.queue_free()
+	_tab_buttons.clear()
 	_tab_ids.clear()
 
-	# Add items for each tab
+	# Create buttons for each tab
 	var ids: Array = Array(TAB_ORDER)
 	for tab_id_any in ids:
 		var tab_id: String = String(tab_id_any)
@@ -255,27 +279,116 @@ func _build_tab_buttons() -> void:
 			continue
 		var meta: Dictionary = TAB_DEFS[tab_id]
 
-		_tab_list.add_item(String(meta["title"]))
+		var btn := Button.new()
+		btn.text = String(meta["title"])
+		btn.custom_minimum_size = Vector2(140, 40)
+		btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
+
+		# Style with rounded right corners, flat left (pop-out from border)
+		_style_menu_button(btn, false)
+
+		# Connect pressed signal
+		var button_index = _tab_buttons.size()
+		btn.pressed.connect(func(): _on_tab_button_pressed(button_index))
+		btn.focus_entered.connect(func(): _on_tab_button_focused(button_index))
+
+		_tab_button_container.add_child(btn)
+		_tab_buttons.append(btn)
 		_tab_ids.append(tab_id)
 
-	# Select first item and connect signal
-	if _tab_list.item_count > 0:
-		_tab_list.select(0)
-		# Grab focus if panel is visible
+	# Select and focus first button
+	if _tab_buttons.size() > 0:
+		_selected_button_index = 0
+		_update_button_selection()
 		if visible:
-			call_deferred("_grab_tab_list_focus")
+			call_deferred("_grab_first_tab_button_focus")
 
-	# Connect item selection signal
-	if not _tab_list.item_selected.is_connected(_on_tab_item_selected):
-		_tab_list.item_selected.connect(_on_tab_item_selected)
+func _style_menu_button(btn: Button, is_selected: bool) -> void:
+	"""Style a menu button with asymmetric rounded corners (flat left, rounded right)"""
+	var style = StyleBoxFlat.new()
 
-	# Connect item activation signal (double-click or Enter)
-	if not _tab_list.item_activated.is_connected(_on_tab_item_activated):
-		_tab_list.item_activated.connect(_on_tab_item_activated)
+	# Colors based on selection
+	if is_selected:
+		style.bg_color = Color(aCoreVibeTheme.COLOR_ELECTRIC_LIME.r, aCoreVibeTheme.COLOR_ELECTRIC_LIME.g, aCoreVibeTheme.COLOR_ELECTRIC_LIME.b, 0.3)
+		style.border_color = aCoreVibeTheme.COLOR_ELECTRIC_LIME
+	else:
+		style.bg_color = Color(aCoreVibeTheme.COLOR_INK_CHARCOAL.r, aCoreVibeTheme.COLOR_INK_CHARCOAL.g, aCoreVibeTheme.COLOR_INK_CHARCOAL.b, 0.4)
+		style.border_color = aCoreVibeTheme.COLOR_SKY_CYAN
 
-	# Connect item clicked signal (single-click support)
-	if not _tab_list.item_clicked.is_connected(_on_tab_item_clicked):
-		_tab_list.item_clicked.connect(_on_tab_item_clicked)
+	# Asymmetric corners: flat left (0px), rounded right (12px)
+	style.corner_radius_top_left = 0
+	style.corner_radius_bottom_left = 0
+	style.corner_radius_top_right = 12
+	style.corner_radius_bottom_right = 12
+
+	# Border: only right, top, and bottom (no left border)
+	style.border_width_left = 0
+	style.border_width_top = 2
+	style.border_width_right = 2
+	style.border_width_bottom = 2
+
+	# Glow on right side
+	style.shadow_color = Color(style.border_color.r, style.border_color.g, style.border_color.b, 0.5)
+	style.shadow_size = 6
+	style.shadow_offset = Vector2(2, 0)
+
+	# Padding
+	style.content_margin_left = 10
+	style.content_margin_top = 8
+	style.content_margin_right = 10
+	style.content_margin_bottom = 8
+
+	btn.add_theme_stylebox_override("normal", style)
+	btn.add_theme_stylebox_override("hover", style)
+	btn.add_theme_stylebox_override("pressed", style)
+	btn.add_theme_stylebox_override("focus", style)
+
+	# Text color
+	if is_selected:
+		btn.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE)
+		btn.add_theme_color_override("font_hover_color", aCoreVibeTheme.COLOR_MILK_WHITE)
+		btn.add_theme_color_override("font_pressed_color", aCoreVibeTheme.COLOR_MILK_WHITE)
+		btn.add_theme_color_override("font_focus_color", aCoreVibeTheme.COLOR_MILK_WHITE)
+	else:
+		btn.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_SKY_CYAN)
+		btn.add_theme_color_override("font_hover_color", aCoreVibeTheme.COLOR_ELECTRIC_LIME)
+		btn.add_theme_color_override("font_pressed_color", aCoreVibeTheme.COLOR_MILK_WHITE)
+		btn.add_theme_color_override("font_focus_color", aCoreVibeTheme.COLOR_ELECTRIC_LIME)
+
+func _on_tab_button_pressed(index: int) -> void:
+	"""Handle tab button press"""
+	if index < 0 or index >= _tab_ids.size():
+		return
+
+	_selected_button_index = index
+	_update_button_selection()
+
+	var tab_id: String = _tab_ids[index]
+	print("[StatusPanel] Tab button pressed: %s" % tab_id)
+	tab_selected.emit(tab_id)
+
+func _on_tab_button_focused(index: int) -> void:
+	"""Handle tab button receiving focus"""
+	_selected_button_index = index
+	_update_button_selection()
+
+func _update_button_selection() -> void:
+	"""Update visual state and stretch for selected button"""
+	for i in range(_tab_buttons.size()):
+		var btn = _tab_buttons[i]
+		var is_selected = (i == _selected_button_index)
+
+		# Restyle button
+		_style_menu_button(btn, is_selected)
+
+		# Animate stretch: selected buttons extend 20px to the right
+		var target_width = 140 if not is_selected else 160
+		btn.custom_minimum_size.x = target_width
+
+func _grab_first_tab_button_focus() -> void:
+	"""Grab focus on first tab button"""
+	if _tab_buttons.size() > 0 and is_instance_valid(_tab_buttons[0]):
+		_tab_buttons[0].grab_focus()
 
 func _create_creds_perks_display() -> void:
 	"""Create the new CREDS/PERKS display in bottom right corner"""
@@ -465,19 +578,11 @@ func _create_info_cell(label_text: String, initial_value: String) -> PanelContai
 
 func _apply_core_vibe_styling() -> void:
 	"""Apply Core Vibe neon-kawaii styling to StatusPanel columns"""
-	# Wrap the three main columns in styled PanelContainers
-
-	# Tab column (menu): Electric Lime border (menu/navigation)
-	if _tab_column:
-		_wrap_in_styled_panel(_tab_column, aCoreVibeTheme.COLOR_ELECTRIC_LIME)
+	# Only style left column - right column stays hidden
 
 	# Left column (party stats): Sky Cyan border (party/lists)
 	if _left_container:
 		_wrap_in_styled_panel(_left_container, aCoreVibeTheme.COLOR_SKY_CYAN)
-
-	# Right column (player info): Grape Violet border (details/info)
-	if _right_container:
-		_wrap_in_styled_panel(_right_container, aCoreVibeTheme.COLOR_GRAPE_VIOLET)
 
 func _wrap_in_styled_panel(container: Control, border_color: Color) -> PanelContainer:
 	"""Wrap a container in a styled PanelContainer with rounded neon borders"""
@@ -518,15 +623,13 @@ func _wrap_in_styled_panel(container: Control, border_color: Color) -> PanelCont
 
 func select_tab(tab_id: String) -> void:
 	"""Programmatically select a tab by tab_id and give it focus"""
-	if not _tab_list:
-		return
-
 	# Find the index of the tab_id
 	var index: int = _tab_ids.find(tab_id)
-	if index >= 0 and index < _tab_list.item_count:
-		_tab_list.select(index)
-		if visible:
-			call_deferred("_grab_tab_list_focus")
+	if index >= 0 and index < _tab_buttons.size():
+		_selected_button_index = index
+		_update_button_selection()
+		if visible and is_instance_valid(_tab_buttons[index]):
+			call_deferred("_tab_buttons[%d].grab_focus" % index)
 		print("[StatusPanel] Selected tab: %s (index %d)" % [tab_id, index])
 	else:
 		print("[StatusPanel] WARNING: Tab not found: %s" % tab_id)
@@ -2162,22 +2265,24 @@ func _safe_hero_level() -> int:
 
 func _on_visibility_changed() -> void:
 	# Select first tab when panel becomes visible
-	if visible and _tab_list:
-		# Defer to ensure ItemList is ready
+	if visible and _tab_buttons.size() > 0:
+		# Defer to ensure buttons are ready
 		call_deferred("_grab_tab_list_focus")
 
 	if not OS.is_debug_build(): return
 	_dev_dump_profiles()
 
 func _grab_tab_list_focus() -> void:
-	"""Helper to grab focus on tab list"""
-	if _tab_list and _tab_list.item_count > 0:
+	"""Helper to grab focus on first tab button"""
+	if _tab_buttons.size() > 0:
 		# Restore last selected tab instead of always selecting first tab
 		var index_to_select = _last_selected_tab_index
-		if index_to_select >= _tab_list.item_count:
+		if index_to_select >= _tab_buttons.size():
 			index_to_select = 0  # Fallback if index is out of bounds
-		_tab_list.select(index_to_select)
-		_tab_list.grab_focus()
+		_selected_button_index = index_to_select
+		_update_button_selection()
+		if is_instance_valid(_tab_buttons[index_to_select]):
+			_tab_buttons[index_to_select].grab_focus()
 
 func _navigate_to_content() -> void:
 	"""Navigate from tab list to first focusable button in content area"""
@@ -2288,44 +2393,62 @@ func _handle_popup_input(event: InputEvent) -> void:
 ## ─────────────────────── STATE 2: MENU ───────────────────────
 
 func _handle_menu_input(event: InputEvent) -> void:
-	"""Handle input in MENU state - tab list navigation"""
+	"""Handle input in MENU state - tab button navigation"""
 	# Handle UP/DOWN with wrap-around
 	if event.is_action_pressed("move_up"):
-		if _tab_list.has_focus() and _tab_list.item_count > 0:
-			var selected_items = _tab_list.get_selected_items()
-			if selected_items.size() > 0:
-				var current_index = selected_items[0]
-				# If on first item (Stats), wrap to last item (System)
-				if current_index == 0:
-					_tab_list.select(_tab_list.item_count - 1)
-					get_viewport().set_input_as_handled()
-					return
+		if _tab_buttons.size() > 0:
+			# Check if any tab button has focus
+			var has_focus = false
+			for btn in _tab_buttons:
+				if btn.has_focus():
+					has_focus = true
+					break
+
+			if has_focus:
+				# Move to previous button with wrap-around
+				_selected_button_index -= 1
+				if _selected_button_index < 0:
+					_selected_button_index = _tab_buttons.size() - 1
+				_update_button_selection()
+				if is_instance_valid(_tab_buttons[_selected_button_index]):
+					_tab_buttons[_selected_button_index].grab_focus()
+				get_viewport().set_input_as_handled()
+				return
+
 	elif event.is_action_pressed("move_down"):
-		if _tab_list.has_focus() and _tab_list.item_count > 0:
-			var selected_items = _tab_list.get_selected_items()
-			if selected_items.size() > 0:
-				var current_index = selected_items[0]
-				# If on last item (System), wrap to first item (Stats)
-				if current_index == _tab_list.item_count - 1:
-					_tab_list.select(0)
-					get_viewport().set_input_as_handled()
-					return
+		if _tab_buttons.size() > 0:
+			# Check if any tab button has focus
+			var has_focus = false
+			for btn in _tab_buttons:
+				if btn.has_focus():
+					has_focus = true
+					break
 
-	# Handle RIGHT: navigate to content (and hide menu)
+			if has_focus:
+				# Move to next button with wrap-around
+				_selected_button_index += 1
+				if _selected_button_index >= _tab_buttons.size():
+					_selected_button_index = 0
+				_update_button_selection()
+				if is_instance_valid(_tab_buttons[_selected_button_index]):
+					_tab_buttons[_selected_button_index].grab_focus()
+				get_viewport().set_input_as_handled()
+				return
+
+	# Handle RIGHT: navigate to content (no longer hiding menu)
 	if event.is_action_pressed("move_right"):
-		# If tab list has focus, navigate to first button in content area
-		if _tab_list.has_focus():
-			# Save current tab selection before hiding menu
-			var selected_items = _tab_list.get_selected_items()
-			if selected_items.size() > 0:
-				_last_selected_tab_index = selected_items[0]
-				print("[StatusPanel] Saved tab selection: %d" % _last_selected_tab_index)
+		# Check if any tab button has focus
+		var has_tab_button_focus = false
+		for btn in _tab_buttons:
+			if btn.has_focus():
+				has_tab_button_focus = true
+				break
 
-			print("[StatusPanel] MENU → CONTENT transition (hiding menu)")
+		# If tab button has focus, navigate to first button in content area
+		if has_tab_button_focus:
+			print("[StatusPanel] MENU → CONTENT transition (keeping menu visible)")
 			_nav_state = NavState.CONTENT
-			# Hide menu when transitioning to content
-			if _menu_visible:
-				_hide_menu()
+			# Don't hide menu anymore - keep it visible
 			_navigate_to_content()
 			get_viewport().set_input_as_handled()
 			return
@@ -2384,10 +2507,9 @@ func _handle_content_input(event: InputEvent) -> void:
 	if event.is_action_pressed("menu_back"):
 		print("[StatusPanel] Back pressed in CONTENT state - going to MENU")
 		_nav_state = NavState.MENU
-		# Show menu when going back
-		if not _menu_visible:
-			_show_menu()
-		_tab_list.grab_focus()
+		# Focus on selected tab button
+		if _tab_buttons.size() > 0 and is_instance_valid(_tab_buttons[_selected_button_index]):
+			_tab_buttons[_selected_button_index].grab_focus()
 		get_viewport().set_input_as_handled()
 		return
 
@@ -2398,7 +2520,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 
 	# Only handle when visible
-	if not visible or not _tab_list:
+	if not visible:
 		return
 
 	# Check if we're in MENU_MAIN context
@@ -2431,15 +2553,15 @@ func _unhandled_input(event: InputEvent) -> void:
 			else:
 				print("[StatusPanel] WARNING: A pressed but no button has focus")
 
-		# STATE: MENU - Activate selected tab
+		# STATE: MENU - Activate selected tab button
 		elif _nav_state == NavState.MENU:
-			if _tab_list.has_focus():
-				var selected_items = _tab_list.get_selected_items()
-				if selected_items.size() > 0:
-					var index = selected_items[0]
-					print("[StatusPanel] A button - confirming tab selection: %d" % index)
-					_on_tab_item_activated(index)
+			# Check if any tab button has focus
+			for i in range(_tab_buttons.size()):
+				if _tab_buttons[i].has_focus():
+					print("[StatusPanel] A button - confirming tab button: %d" % i)
+					_on_tab_button_pressed(i)
 					get_viewport().set_input_as_handled()
+					return
 
 	# Debug key handling (F9 to dump profiles)
 	if not OS.is_debug_build(): return
