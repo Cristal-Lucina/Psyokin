@@ -162,6 +162,15 @@ func _create_selection_arrow() -> void:
 	_selection_arrow.size = Vector2(54, 72)
 	_selection_arrow.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_selection_arrow.z_index = 100
+
+	# Add shadow using LabelSettings
+	var label_settings = LabelSettings.new()
+	label_settings.font_size = 43
+	label_settings.shadow_size = 8  # Shadow blur radius
+	label_settings.shadow_color = Color(0, 0, 0, 0.7)  # Black shadow with 70% opacity
+	label_settings.shadow_offset = Vector2(2, 2)  # Offset the shadow slightly
+	_selection_arrow.label_settings = label_settings
+
 	add_child(_selection_arrow)
 	await get_tree().process_frame
 	_selection_arrow.size = Vector2(54, 72)
