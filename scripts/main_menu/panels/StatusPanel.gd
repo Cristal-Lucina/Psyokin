@@ -935,7 +935,7 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 	# Create a button instead of PanelContainer for clickability
 	var btn := Button.new()
 	btn.focus_mode = Control.FOCUS_ALL
-	btn.custom_minimum_size = Vector2(0, 50)  # Sleeker: reduced from 80 to 50
+	btn.custom_minimum_size = Vector2(0, 40)  # Compact: name/level left, bars right
 	btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL  # Fill the panel width
 
 	# Store metadata for popup menu
@@ -954,69 +954,60 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 	btn.focus_entered.connect(_on_member_card_focused.bind(btn))
 	btn.focus_exited.connect(_on_member_card_unfocused.bind(btn))
 
-	# Main horizontal container: member info
+	# Main horizontal container: name/level on left, stats on right
 	var main_hbox := HBoxContainer.new()
-	main_hbox.add_theme_constant_override("separation", 12)
+	main_hbox.add_theme_constant_override("separation", 8)
 	main_hbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
-	# Member info (name + stats)
-	var info_vbox := VBoxContainer.new()
-	info_vbox.add_theme_constant_override("separation", 2)
-	info_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	info_vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
-
-	# Name and level row
-	var name_row := HBoxContainer.new()
-	name_row.add_theme_constant_override("separation", 8)
-	name_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# Left side: Name and Level (20 character width)
+	var name_level_vbox := VBoxContainer.new()
+	name_level_vbox.add_theme_constant_override("separation", 0)
+	name_level_vbox.custom_minimum_size.x = 160  # ~20 characters at default font
+	name_level_vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	var name_lbl := Label.new()
 	name_lbl.text = String(member_data.get("name", "Member"))
-	name_lbl.add_theme_font_size_override("font_size", 12)
+	name_lbl.add_theme_font_size_override("font_size", 11)
 	name_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	name_row.add_child(name_lbl)
+	name_level_vbox.add_child(name_lbl)
 
 	var lvl_lbl := Label.new()
 	lvl_lbl.text = "Lv %d" % int(member_data.get("level", 1))
-	lvl_lbl.add_theme_font_size_override("font_size", 10)
+	lvl_lbl.add_theme_font_size_override("font_size", 9)
 	lvl_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	name_row.add_child(lvl_lbl)
+	name_level_vbox.add_child(lvl_lbl)
 
-	info_vbox.add_child(name_row)
+	main_hbox.add_child(name_level_vbox)
 
-	# HP/MP stats row (side by side)
-	var stats_row := HBoxContainer.new()
-	stats_row.add_theme_constant_override("separation", 12)
-	stats_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-
-	# HP Section
-	var hp_section := VBoxContainer.new()
-	hp_section.add_theme_constant_override("separation", 2)
-	hp_section.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	# Right side: HP/MP bars stacked vertically
+	var bars_vbox := VBoxContainer.new()
+	bars_vbox.add_theme_constant_override("separation", 4)
+	bars_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bars_vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	var hp_i: int = int(member_data.get("hp", -1))
 	var hp_max_i: int = int(member_data.get("hp_max", -1))
+	var mp_i: int = int(member_data.get("mp", -1))
+	var mp_max_i: int = int(member_data.get("mp_max", -1))
 
-	var hp_label_box := HBoxContainer.new()
-	hp_label_box.add_theme_constant_override("separation", 4)
-	hp_label_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	# HP bar with label
+	var hp_row := HBoxContainer.new()
+	hp_row.add_theme_constant_override("separation", 4)
+	hp_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hp_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
 	var hp_lbl := Label.new()
 	hp_lbl.text = "HP"
-	hp_lbl.custom_minimum_size.x = 24
-	hp_lbl.add_theme_font_size_override("font_size", 10)
-	var hp_val := Label.new()
-	hp_val.text = _fmt_pair(hp_i, hp_max_i)
-	hp_val.add_theme_font_size_override("font_size", 10)
-	hp_val.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	hp_label_box.add_child(hp_lbl)
-	hp_label_box.add_child(hp_val)
-	hp_section.add_child(hp_label_box)
+	hp_lbl.custom_minimum_size.x = 20
+	hp_lbl.add_theme_font_size_override("font_size", 9)
+	hp_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hp_row.add_child(hp_lbl)
 
 	if hp_i >= 0 and hp_max_i > 0:
 		var hp_bar := ProgressBar.new()
 		hp_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		hp_bar.custom_minimum_size = Vector2(200, 8)  # Minimum 200px wide, 8px tall
-		hp_bar.show_percentage = false  # Remove percentage text
+		hp_bar.custom_minimum_size = Vector2(150, 8)  # Compact bar
+		hp_bar.show_percentage = false
 
 		# Core Vibe: Bubble Magenta progress bar with neon glow
 		aCoreVibeTheme.style_progress_bar(hp_bar, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA)
@@ -1040,38 +1031,35 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 		else:
 			hp_bar.value = new_hp
 
-		hp_section.add_child(hp_bar)
+		hp_row.add_child(hp_bar)
 
-	stats_row.add_child(hp_section)
+	var hp_val := Label.new()
+	hp_val.text = _fmt_pair(hp_i, hp_max_i)
+	hp_val.add_theme_font_size_override("font_size", 9)
+	hp_val.custom_minimum_size.x = 60
+	hp_val.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hp_row.add_child(hp_val)
 
-	# MP Section
-	var mp_section := VBoxContainer.new()
-	mp_section.add_theme_constant_override("separation", 2)
-	mp_section.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bars_vbox.add_child(hp_row)
 
-	var mp_i: int = int(member_data.get("mp", -1))
-	var mp_max_i: int = int(member_data.get("mp_max", -1))
+	# MP bar with label
+	var mp_row := HBoxContainer.new()
+	mp_row.add_theme_constant_override("separation", 4)
+	mp_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	mp_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
-	var mp_label_box := HBoxContainer.new()
-	mp_label_box.add_theme_constant_override("separation", 4)
-	mp_label_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var mp_lbl := Label.new()
 	mp_lbl.text = "MP"
-	mp_lbl.custom_minimum_size.x = 24
-	mp_lbl.add_theme_font_size_override("font_size", 10)
-	var mp_val := Label.new()
-	mp_val.text = _fmt_pair(mp_i, mp_max_i)
-	mp_val.add_theme_font_size_override("font_size", 10)
-	mp_val.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	mp_label_box.add_child(mp_lbl)
-	mp_label_box.add_child(mp_val)
-	mp_section.add_child(mp_label_box)
+	mp_lbl.custom_minimum_size.x = 20
+	mp_lbl.add_theme_font_size_override("font_size", 9)
+	mp_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	mp_row.add_child(mp_lbl)
 
 	if mp_i >= 0 and mp_max_i > 0:
 		var mp_bar := ProgressBar.new()
 		mp_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		mp_bar.custom_minimum_size = Vector2(200, 8)  # Minimum 200px wide, 8px tall
-		mp_bar.show_percentage = false  # Remove percentage text
+		mp_bar.custom_minimum_size = Vector2(150, 8)  # Compact bar
+		mp_bar.show_percentage = false
 
 		# Core Vibe: Sky Cyan progress bar with neon glow
 		aCoreVibeTheme.style_progress_bar(mp_bar, aCoreVibeTheme.COLOR_SKY_CYAN)
@@ -1095,24 +1083,18 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 		else:
 			mp_bar.value = new_mp
 
-		mp_section.add_child(mp_bar)
+		mp_row.add_child(mp_bar)
 
-	stats_row.add_child(mp_section)
-	stats_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	hp_section.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	mp_section.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	hp_label_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	mp_label_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var mp_val := Label.new()
+	mp_val.text = _fmt_pair(mp_i, mp_max_i)
+	mp_val.add_theme_font_size_override("font_size", 9)
+	mp_val.custom_minimum_size.x = 60
+	mp_val.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	mp_row.add_child(mp_val)
 
-	# Wrap stats_row in MarginContainer for 10px margins on each side
-	var stats_margin := MarginContainer.new()
-	stats_margin.add_theme_constant_override("margin_left", 10)
-	stats_margin.add_theme_constant_override("margin_right", 10)
-	stats_margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	stats_margin.add_child(stats_row)
+	bars_vbox.add_child(mp_row)
 
-	info_vbox.add_child(stats_margin)
-	main_hbox.add_child(info_vbox)
+	main_hbox.add_child(bars_vbox)
 	btn.add_child(main_hbox)
 
 	# Style button (default unfocused state)
