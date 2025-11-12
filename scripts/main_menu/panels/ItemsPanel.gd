@@ -722,12 +722,12 @@ func _input(event: InputEvent) -> void:
 				return
 			12:  # D-pad Up
 				print("[ItemsPanel] D-pad Up pressed")
-				_navigate_items(2)  # Copied from down (was -2, now +2)
+				_navigate_items(-2)  # Flipped with button 13
 				get_viewport().set_input_as_handled()
 				return
 			13:  # D-pad Down
 				print("[ItemsPanel] D-pad Down pressed")
-				_navigate_items(-2)  # Reversed (was +2, now -2)
+				_navigate_items(2)  # Flipped with button 12
 				get_viewport().set_input_as_handled()
 				return
 			14:  # D-pad Left
