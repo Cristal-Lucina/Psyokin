@@ -402,6 +402,7 @@ func _on_tab_button_pressed(index: int) -> void:
 		return
 
 	_selected_button_index = index
+	_last_selected_tab_index = index  # Remember for when panel reopens
 	_update_button_selection()
 
 	var tab_id: String = _tab_ids[index]
@@ -411,6 +412,7 @@ func _on_tab_button_pressed(index: int) -> void:
 func _on_tab_button_focused(index: int) -> void:
 	"""Handle tab button receiving focus"""
 	_selected_button_index = index
+	_last_selected_tab_index = index  # Remember for when panel reopens
 	_update_button_selection()
 
 func _update_button_selection() -> void:
@@ -1185,7 +1187,7 @@ func _show_member_arrow(btn: Button) -> void:
 	arrow_tex.custom_minimum_size = Vector2(15, 15)
 	arrow_tex.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
 	arrow_tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	arrow_tex.flip_v = true  # Flip vertically (invert)
+	arrow_tex.flip_v = false  # Original direction
 	arrow_tex.modulate = Color(1, 1, 1, 1)  # White
 
 	# Position at top center of button, 8px lower
