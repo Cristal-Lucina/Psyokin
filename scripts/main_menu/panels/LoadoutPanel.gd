@@ -222,6 +222,7 @@ func _apply_core_vibe_styling() -> void:
 	"""Apply Core Vibe neon-kawaii styling to LoadoutPanel"""
 
 	# Style the three main panel containers with rounded neon borders
+	# Note: No content_margin here - scene already has MarginContainers
 	if _party_panel:
 		var party_style = aCoreVibeTheme.create_panel_style(
 			aCoreVibeTheme.COLOR_SKY_CYAN,            # Sky Cyan border (party)
@@ -231,10 +232,6 @@ func _apply_core_vibe_styling() -> void:
 			aCoreVibeTheme.BORDER_WIDTH_THIN,         # 2px border
 			aCoreVibeTheme.SHADOW_SIZE_MEDIUM         # 6px glow
 		)
-		party_style.content_margin_left = 10
-		party_style.content_margin_top = 10
-		party_style.content_margin_right = 10
-		party_style.content_margin_bottom = 10
 		_party_panel.add_theme_stylebox_override("panel", party_style)
 
 	if _middle_panel:
@@ -246,10 +243,6 @@ func _apply_core_vibe_styling() -> void:
 			aCoreVibeTheme.BORDER_WIDTH_THIN,         # 2px border
 			aCoreVibeTheme.SHADOW_SIZE_MEDIUM         # 6px glow
 		)
-		middle_style.content_margin_left = 10
-		middle_style.content_margin_top = 10
-		middle_style.content_margin_right = 10
-		middle_style.content_margin_bottom = 10
 		_middle_panel.add_theme_stylebox_override("panel", middle_style)
 
 	if _stats_panel:
@@ -261,10 +254,6 @@ func _apply_core_vibe_styling() -> void:
 			aCoreVibeTheme.BORDER_WIDTH_THIN,         # 2px border
 			aCoreVibeTheme.SHADOW_SIZE_MEDIUM         # 6px glow
 		)
-		stats_style.content_margin_left = 10
-		stats_style.content_margin_top = 10
-		stats_style.content_margin_right = 10
-		stats_style.content_margin_bottom = 10
 		_stats_panel.add_theme_stylebox_override("panel", stats_style)
 
 	# Style party list with Sky Cyan selection
