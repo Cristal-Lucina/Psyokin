@@ -1170,9 +1170,9 @@ func _show_member_arrow(btn: Button) -> void:
 	arrow_label.text = "◄"  # Left-pointing arrow (90° counter-clockwise from down arrow)
 	arrow_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	arrow_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	arrow_label.add_theme_font_size_override("font_size", 24)
+	arrow_label.add_theme_font_size_override("font_size", 43)
 	arrow_label.modulate = Color(1, 1, 1, 1)  # White
-	arrow_label.custom_minimum_size = Vector2(30, 40)
+	arrow_label.custom_minimum_size = Vector2(54, 72)
 	arrow_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	# Position manually to the right inside the button
@@ -1181,10 +1181,10 @@ func _show_member_arrow(btn: Button) -> void:
 
 	await get_tree().process_frame
 
-	# Position to the right side, vertically centered (shifted up 4px)
+	# Position to the right side, vertically centered (shifted up 6px)
 	var btn_size = btn.size
-	arrow_label.position = Vector2(btn_size.x - 40, (btn_size.y - 40) / 2.0 - 4)
-	arrow_label.size = Vector2(30, 40)
+	arrow_label.position = Vector2(btn_size.x - 54, (btn_size.y - 72) / 2.0 - 6)
+	arrow_label.size = Vector2(54, 72)
 
 	print("[StatusPanel] Arrow created at position: %s (button size: %s)" % [arrow_label.position, btn_size])
 
