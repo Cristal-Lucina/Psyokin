@@ -1897,7 +1897,7 @@ func _show_recovery_popup(member_id: String, member_name: String, hp: int, hp_ma
 					# Method 3: Check consumables with healing in name/description
 					if (category == "consumables" or category == "consumable"):
 						if (item_name.contains("potion") or item_name.contains("elixir") or item_name.contains("tonic") or
-						    description.contains("restore") or description.contains("heal") or description.contains("recover")):
+							description.contains("restore") or description.contains("heal") or description.contains("recover")):
 							is_recovery = true
 							print("[StatusPanel] ✓ Matched via consumable name/description")
 
