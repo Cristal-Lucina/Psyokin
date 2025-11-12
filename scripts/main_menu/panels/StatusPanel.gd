@@ -1156,7 +1156,7 @@ func _update_label_colors_recursive(node: Node, is_focused: bool) -> void:
 		_update_label_colors_recursive(child, is_focused)
 
 func _show_member_arrow(btn: Button) -> void:
-	"""Show arrow indicator above selected party member"""
+	"""Show arrow indicator to the right of selected party member"""
 	# Check if arrow already exists
 	var arrow = btn.get_node_or_null("SelectionArrow")
 	if arrow:
@@ -1165,17 +1165,17 @@ func _show_member_arrow(btn: Button) -> void:
 	# Create arrow indicator using Label (no external asset needed)
 	var arrow_label := Label.new()
 	arrow_label.name = "SelectionArrow"
-	arrow_label.text = "▼"  # Down arrow Unicode character
+	arrow_label.text = "◄"  # Left-pointing arrow (90° counter-clockwise from down arrow)
 	arrow_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	arrow_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	arrow_label.add_theme_font_size_override("font_size", 20)
 	arrow_label.modulate = Color(1, 1, 1, 1)  # White
-	arrow_label.custom_minimum_size = Vector2(30, 20)
+	arrow_label.custom_minimum_size = Vector2(30, 40)
 
-	# Position at top center of button
-	arrow_label.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	arrow_label.position = Vector2(0, -25)  # Above the button
-	arrow_label.size = Vector2(30, 20)
+	# Position to the right side of button, vertically centered
+	arrow_label.set_anchors_preset(Control.PRESET_CENTER_RIGHT)
+	arrow_label.position = Vector2(5, 0)  # 5px to the right of button edge
+	arrow_label.size = Vector2(30, 40)
 	arrow_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	btn.add_child(arrow_label)
@@ -1196,7 +1196,7 @@ func _hide_member_arrow(btn: Button) -> void:
 		arrow.queue_free()
 
 func _start_arrow_pulse(arrow: Control) -> void:
-	"""Start pulsing animation for arrow - moves up and down"""
+	"""Start pulsing animation for arrow - moves left and right"""
 	if arrow.has_meta("pulse_tween"):
 		var old_tween = arrow.get_meta("pulse_tween")
 		if old_tween and is_instance_valid(old_tween):
@@ -1207,10 +1207,10 @@ func _start_arrow_pulse(arrow: Control) -> void:
 	tween.set_trans(Tween.TRANS_SINE)
 	tween.set_ease(Tween.EASE_IN_OUT)
 
-	# Pulse down 4 pixels then back up
-	var base_y = arrow.position.y
-	tween.tween_property(arrow, "position:y", base_y + 4, 0.6)
-	tween.tween_property(arrow, "position:y", base_y, 0.6)
+	# Pulse left 6 pixels then back to base position
+	var base_x = arrow.position.x
+	tween.tween_property(arrow, "position:x", base_x - 6, 0.6)
+	tween.tween_property(arrow, "position:x", base_x, 0.6)
 
 	arrow.set_meta("pulse_tween", tween)
 
