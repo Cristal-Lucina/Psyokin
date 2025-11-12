@@ -45,6 +45,9 @@ var _radar_chart: Control = null
 var _party_tokens: Array[String] = []
 var _party_labels: Array[String] = []
 
+# Selection arrow
+var _selection_arrow: Label = null
+
 func _ready() -> void:
 	# Set process mode to work while game is paused
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -86,11 +89,13 @@ func _ready() -> void:
 
 func _first_fill() -> void:
 	_apply_core_vibe_styling()
+	_create_selection_arrow()
 	_refresh_party()
 	if _party_list.item_count > 0:
 		_party_list.select(0)
 		_party_list.grab_focus()
 		_on_party_member_selected(0)
+		_update_arrow_position()
 
 func _apply_core_vibe_styling() -> void:
 	"""Apply Core Vibe neon-kawaii styling to StatsPanel elements"""
@@ -160,6 +165,71 @@ func _apply_core_vibe_styling() -> void:
 	# so their styling is applied in their creation functions.
 	# RadarChart colors are updated in the RadarChart class itself.
 
+func _create_selection_arrow() -> void:
+	"""Create the selection arrow indicator for party list"""
+	if not _party_list:
+		return
+
+	# Create arrow label
+	_selection_arrow = Label.new()
+	_selection_arrow.text = "◄"  # Left-pointing arrow
+	_selection_arrow.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_selection_arrow.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_selection_arrow.add_theme_font_size_override("font_size", 43)  # 80% larger
+	_selection_arrow.modulate = Color(1, 1, 1, 1)  # White
+	_selection_arrow.custom_minimum_size = Vector2(54, 72)
+	_selection_arrow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_selection_arrow.z_index = 10  # Above other elements
+
+	# Add to party panel
+	if _party_panel:
+		_party_panel.add_child(_selection_arrow)
+
+	# Start pulsing animation
+	_start_arrow_pulse()
+
+func _update_arrow_position() -> void:
+	"""Update arrow position to align with selected item"""
+	if not _selection_arrow or not _party_list:
+		return
+
+	var selected = _party_list.get_selected_items()
+	if selected.size() == 0:
+		_selection_arrow.visible = false
+		return
+
+	_selection_arrow.visible = true
+
+	# Wait for layout to complete
+	await get_tree().process_frame
+
+	# Get the rect of the selected item
+	var item_index = selected[0]
+	var item_rect = _party_list.get_item_rect(item_index)
+
+	# Position arrow to the right of the item text
+	# Account for party list position relative to party panel
+	var list_pos = _party_list.position
+	var arrow_x = list_pos.x + item_rect.position.x + item_rect.size.x + 10
+	var arrow_y = list_pos.y + item_rect.position.y + (item_rect.size.y - 72) / 2.0
+
+	_selection_arrow.position = Vector2(arrow_x, arrow_y)
+
+func _start_arrow_pulse() -> void:
+	"""Start pulsing animation for the arrow"""
+	if not _selection_arrow:
+		return
+
+	var tween = create_tween()
+	tween.set_loops()
+	tween.set_trans(Tween.TRANS_SINE)
+	tween.set_ease(Tween.EASE_IN_OUT)
+
+	# Pulse left 6 pixels then back
+	var base_x = _selection_arrow.position.x
+	tween.tween_property(_selection_arrow, "position:x", base_x - 6, 0.6)
+	tween.tween_property(_selection_arrow, "position:x", base_x, 0.6)
+
 func _on_visibility_changed() -> void:
 	"""Grab focus when panel becomes visible"""
 	if visible and _party_list:
@@ -185,6 +255,9 @@ func _on_party_changed(_arg = null) -> void:
 	elif _party_list.item_count > 0:
 		_party_list.select(0)
 		_on_party_member_selected(0)
+
+	# Update arrow position after party change
+	call_deferred("_update_arrow_position")
 
 func _on_stats_changed(_arg1 = null, _arg2 = null) -> void:
 	# Refresh current member stats
@@ -282,6 +355,9 @@ func _on_party_member_selected(index: int) -> void:
 	_rebuild_battle_stats(token)
 	_rebuild_affinity_grid(token)
 	_update_radar_chart(token)
+
+	# Update arrow position
+	_update_arrow_position()
 
 func _rebuild_base_stats(token: String) -> void:
 	"""Build the base stats grid (Name, Mind Type, Level, XP)"""
