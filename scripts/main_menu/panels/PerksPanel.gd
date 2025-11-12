@@ -111,15 +111,14 @@ func _apply_core_vibe_styling() -> void:
 	if _perk_name:
 		aCoreVibeTheme.style_label(_perk_name, aCoreVibeTheme.COLOR_SKY_CYAN, 18)
 
-	# Style details text (works for both Label and RichTextLabel)
-	if _details_text:
-		if _details_text is RichTextLabel:
-			var rtl: RichTextLabel = _details_text as RichTextLabel
-			rtl.add_theme_color_override("default_color", aCoreVibeTheme.COLOR_MILK_WHITE)
-			rtl.add_theme_font_size_override("normal_font_size", 14)
-		else:
-			_details_text.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE)
-			_details_text.add_theme_font_size_override("font_size", 14)
+	# Style details columns
+	if _details_left_column:
+		_details_left_column.add_theme_color_override("default_color", aCoreVibeTheme.COLOR_MILK_WHITE)
+		_details_left_column.add_theme_font_size_override("normal_font_size", 14)
+
+	if _details_right_column:
+		_details_right_column.add_theme_color_override("default_color", aCoreVibeTheme.COLOR_MILK_WHITE)
+		_details_right_column.add_theme_font_size_override("normal_font_size", 14)
 
 func _create_selection_arrow() -> void:
 	"""Create the selection arrow indicator for perk grid"""
