@@ -179,17 +179,14 @@ func _create_selection_arrow() -> void:
 	_selection_arrow.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_selection_arrow.add_theme_font_size_override("font_size", 43)  # 80% larger
 	_selection_arrow.modulate = Color(1, 1, 1, 1)  # White
+	_selection_arrow.custom_minimum_size = Vector2(54, 72)
+	_selection_arrow.size = Vector2(54, 72)
 	_selection_arrow.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_selection_arrow.z_index = 10  # Above other elements
+	_selection_arrow.z_index = 100  # Well above other elements
 
-	# CRITICAL: Use absolute positioning (layout_mode 0) to prevent PanelContainer from resizing
-	# This must be set BEFORE adding to tree
-	_selection_arrow.set("layout_mode", 0)  # LAYOUT_MODE_POSITION - use absolute position
-	_selection_arrow.size = Vector2(54, 72)  # Set fixed size
-
-	# Add to party panel
-	if _party_panel:
-		_party_panel.add_child(_selection_arrow)
+	# CRITICAL: Add to main StatsPanel (Control) not the PanelContainer
+	# This prevents any layout containers from resizing it
+	add_child(_selection_arrow)
 
 	# Ensure size is locked after adding to tree
 	await get_tree().process_frame
@@ -221,29 +218,28 @@ func _update_arrow_position() -> void:
 	print("  Selected index: %d" % item_index)
 	print("  Item rect: pos=%s size=%s" % [item_rect.position, item_rect.size])
 
-	# Convert ItemList position to party panel coordinates
-	# ItemList is a child of party panel, so we need its position + margins
+	# Convert to StatsPanel coordinates (arrow's parent is now StatsPanel)
 	var list_global_pos = _party_list.global_position
-	var panel_global_pos = _party_panel.global_position if _party_panel else Vector2.ZERO
+	var panel_global_pos = global_position
 
 	print("  List global pos: %s" % list_global_pos)
-	print("  Panel global pos: %s" % panel_global_pos)
+	print("  StatsPanel global pos: %s" % panel_global_pos)
 	print("  List position (local): %s" % _party_list.position)
 	print("  List size: %s" % _party_list.size)
 
-	# Calculate position in panel coordinates
-	var list_offset_in_panel = list_global_pos - panel_global_pos
-	print("  List offset in panel: %s" % list_offset_in_panel)
+	# Calculate position in StatsPanel coordinates
+	var list_offset_in_statspanel = list_global_pos - panel_global_pos
+	print("  List offset in StatsPanel: %s" % list_offset_in_statspanel)
 
 	# Position arrow to the right of the item text
-	# Align arrow top with item top (simpler and more consistent)
-	var arrow_x = list_offset_in_panel.x + item_rect.position.x + item_rect.size.x + 10
-	var arrow_y = list_offset_in_panel.y + item_rect.position.y - 23  # Align with text line (adjusted for 72px arrow)
+	# Align arrow's vertical center with item's vertical center
+	var arrow_x = list_offset_in_statspanel.x + item_rect.position.x + item_rect.size.x + 10
+	var arrow_y = list_offset_in_statspanel.y + item_rect.position.y + (item_rect.size.y / 2.0) - (_selection_arrow.size.y / 2.0)
 
 	print("  Arrow custom_minimum_size: %s" % _selection_arrow.custom_minimum_size)
 	print("  Arrow size: %s" % _selection_arrow.size)
 	print("  Calculated arrow pos: x=%f y=%f" % [arrow_x, arrow_y])
-	print("  Arrow vertical calc: item_top=%f - 23px offset = %f" % [item_rect.position.y, arrow_y - list_offset_in_panel.y])
+	print("  Arrow vertical calc: item_center=%f - arrow_half=%f = %f" % [item_rect.position.y + item_rect.size.y / 2.0, _selection_arrow.size.y / 2.0, arrow_y - list_offset_in_statspanel.y])
 
 	_selection_arrow.position = Vector2(arrow_x, arrow_y)
 
