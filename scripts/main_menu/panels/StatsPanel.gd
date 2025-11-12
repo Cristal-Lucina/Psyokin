@@ -198,7 +198,7 @@ func _create_selection_arrow() -> void:
 	_debug_box.custom_minimum_size = Vector2(160, 20)
 	_debug_box.size = Vector2(160, 20)
 	_debug_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_debug_box.z_index = 99  # Above other elements but below arrow
+	_debug_box.z_index = 100  # Same layer as arrow
 
 	# Create grey rounded style
 	var debug_style = StyleBoxFlat.new()
