@@ -8,6 +8,7 @@ const INV_PATH   : String = "/root/aInventorySystem"
 const CSV_PATH   : String = "/root/aCSVLoader"
 const EQUIP_PATH : String = "/root/aEquipmentSystem"
 const GS_PATH    : String = "/root/aGameState"
+const SIGIL_PATH : String = "/root/aSigilSystem"
 
 # CSV data
 const ITEMS_CSV : String = "res://data/items/items.csv"
@@ -46,6 +47,7 @@ var _inv: Node = null
 var _csv: Node = null
 var _eq: Node = null
 var _gs: Node = null
+var _sig: Node = null
 
 # Data
 var _defs: Dictionary = {}
@@ -70,6 +72,7 @@ func _ready() -> void:
 	_csv = get_node_or_null(CSV_PATH)
 	_eq = get_node_or_null(EQUIP_PATH)
 	_gs = get_node_or_null(GS_PATH)
+	_sig = get_node_or_null(SIGIL_PATH)
 
 	if _use_button:
 		_use_button.pressed.connect(_on_use_button_pressed)
@@ -247,6 +250,7 @@ func _rebuild() -> void:
 	_load_item_defs()
 	_load_inventory()
 	_load_equipped()
+	_add_sigil_instances()  # Add sigil instances as virtual items
 	_populate_items()
 	_update_details()
 
@@ -303,6 +307,54 @@ func _load_equipped() -> void:
 				if not _equipped_by.has(item_id):
 					_equipped_by[item_id] = []
 				_equipped_by[item_id].append(_member_display_name(member_id))
+
+func _add_sigil_instances() -> void:
+	"""Add sigil instances as virtual items"""
+	if not _sig:
+		return
+
+	# Get all sigil instance IDs
+	var instance_ids: PackedStringArray = PackedStringArray()
+	if _sig.has_method("list_all_instances"):
+		instance_ids = _sig.call("list_all_instances", false)  # false = include equipped
+
+	print("[ItemsPanel] Found %d sigil instances" % instance_ids.size())
+
+	for inst_id in instance_ids:
+		var inst_dict: Dictionary = {}
+		if _sig.has_method("get_instance_info"):
+			inst_dict = _sig.call("get_instance_info", inst_id)
+
+		if inst_dict.is_empty():
+			continue
+
+		# Create virtual item def
+		var base_id: String = String(inst_dict.get("base_id", ""))
+		var base_def: Dictionary = _defs.get(base_id, {})
+
+		var virtual_def: Dictionary = base_def.duplicate()
+		virtual_def["sigil_instance"] = true
+		virtual_def["instance_id"] = inst_id
+		virtual_def["name"] = _format_sigil_name(inst_dict, base_def)
+		virtual_def["category"] = "Sigils"
+
+		_defs[inst_id] = virtual_def
+		_counts[inst_id] = 1
+
+		# Track who has this sigil equipped
+		var equipped_by: String = String(inst_dict.get("equipped_by", ""))
+		if equipped_by != "":
+			if not _equipped_by.has(inst_id):
+				_equipped_by[inst_id] = []
+			var member_name: String = _member_display_name(equipped_by)
+			if not _equipped_by[inst_id].has(member_name):
+				_equipped_by[inst_id].append(member_name)
+
+func _format_sigil_name(inst: Dictionary, base_def: Dictionary) -> String:
+	"""Format sigil instance name with level"""
+	var base_name: String = String(base_def.get("name", "Sigil"))
+	var level: int = int(inst.get("level", 1))
+	return "%s Lv.%d" % [base_name, level]
 
 func _populate_items() -> void:
 	"""Populate items grid based on current category"""
@@ -424,17 +476,93 @@ func _clear_details() -> void:
 		_inspect_button.visible = false
 
 func _category_of(def: Dictionary) -> String:
-	var type: String = String(def.get("type", "")).to_lower()
-	match type:
-		"recovery": return "Recovery"
-		"battle": return "Battle"
-		"equipment": return "Equipment"
-		"sigil": return "Sigils"
-		"capture": return "Capture"
-		"material": return "Material"
-		"gift": return "Gifts"
-		"key": return "Key"
+	"""Get category of an item - checks multiple fields with priority"""
+	# Check if it's a recovery item first (HP/MP healing)
+	if _is_recovery_item(def):
+		return "Recovery"
+
+	# Check if it's a capture item
+	if _is_capture_item(def):
+		return "Capture"
+
+	# Check if it's a gift item
+	if _is_gift_item(def):
+		return "Gifts"
+
+	# Check if it's equipment (has equip_slot field)
+	if _is_equipment(def):
+		return "Equipment"
+
+	# Check if it's a battle consumable
+	if _is_battle_item(def):
+		return "Battle"
+
+	# Check category field for remaining types (Sigils, Material, Key, Other)
+	for key in ["category", "cat", "type"]:
+		if def.has(key):
+			var cat: String = String(def[key]).strip_edges()
+			var norm: String = _normalize_category(cat)
+			if norm != "":
+				return norm
 	return "Other"
+
+func _normalize_category(cat: String) -> String:
+	"""Normalize category name"""
+	var key: String = cat.to_lower().strip_edges()
+	const MAP: Dictionary = {
+		"sigil": "Sigils", "sigils": "Sigils",
+		"material": "Material", "materials": "Material",
+		"key": "Key", "key item": "Key", "key items": "Key",
+		"gift": "Gifts", "gifts": "Gifts",
+		"other": "Other",
+		"weapon": "Equipment", "weapons": "Equipment",
+		"armor": "Equipment",
+		"consumable": "Recovery", "consumables": "Recovery"
+	}
+	if MAP.has(key):
+		return MAP[key]
+	# Check if it matches any category ID
+	for cat_dict in CATEGORIES:
+		if cat_dict["id"] == cat:
+			return cat
+	return ""
+
+func _is_recovery_item(def: Dictionary) -> bool:
+	"""Check if item is a recovery item (HP/MP healing)"""
+	for key in ["field_status_effect", "battle_status_effect"]:
+		if def.has(key):
+			var effect: String = String(def[key]).to_lower()
+			if (effect.contains("heal") or effect.contains("restore")) and (effect.contains("hp") or effect.contains("mp")):
+				return true
+	return false
+
+func _is_capture_item(def: Dictionary) -> bool:
+	"""Check if item is a capture item"""
+	var cat: String = String(def.get("category", "")).to_lower()
+	if cat.contains("capture") or cat.contains("bind"):
+		return true
+	var name: String = String(def.get("name", "")).to_lower()
+	if name.contains("bind"):
+		return true
+	return false
+
+func _is_gift_item(def: Dictionary) -> bool:
+	"""Check if item is a gift item"""
+	var cat: String = String(def.get("category", "")).to_lower()
+	return cat.contains("gift")
+
+func _is_equipment(def: Dictionary) -> bool:
+	"""Check if item is equipment"""
+	var equip_slot: String = String(def.get("equip_slot", "")).to_lower().strip_edges()
+	return equip_slot in ["weapon", "armor", "head", "foot", "bracelet"]
+
+func _is_battle_item(def: Dictionary) -> bool:
+	"""Check if item is a battle consumable"""
+	var cat: String = String(def.get("category", "")).to_lower()
+	if cat.contains("consumable") or cat.contains("battle"):
+		if not _is_recovery_item(def) and not _is_capture_item(def) and not _is_gift_item(def):
+			return true
+	return false
 
 func _display_name(item_id: String, def: Dictionary) -> String:
 	var name: String = String(def.get("name", item_id))
@@ -452,21 +580,24 @@ func _unhandled_input(event: InputEvent) -> void:
 	if not visible:
 		return
 
-	# L1/R1 - Category navigation
-	if event.is_action_pressed("ui_shoulder_left") or event.is_action_pressed("menu_page_left"):
-		_current_category_index -= 1
-		if _current_category_index < 0:
-			_current_category_index = CATEGORIES.size() - 1
-		_update_category_selection()
-		_populate_items()
-		get_viewport().set_input_as_handled()
-	elif event.is_action_pressed("ui_shoulder_right") or event.is_action_pressed("menu_page_right"):
-		_current_category_index += 1
-		if _current_category_index >= CATEGORIES.size():
-			_current_category_index = 0
-		_update_category_selection()
-		_populate_items()
-		get_viewport().set_input_as_handled()
+	# L1/R1 - Category navigation (JOY_BUTTON_LEFT_SHOULDER = 9, JOY_BUTTON_RIGHT_SHOULDER = 10)
+	if event is InputEventJoypadButton:
+		if event.pressed and event.button_index == 9:  # L1
+			_current_category_index -= 1
+			if _current_category_index < 0:
+				_current_category_index = CATEGORIES.size() - 1
+			_update_category_selection()
+			_populate_items()
+			get_viewport().set_input_as_handled()
+			return
+		elif event.pressed and event.button_index == 10:  # R1
+			_current_category_index += 1
+			if _current_category_index >= CATEGORIES.size():
+				_current_category_index = 0
+			_update_category_selection()
+			_populate_items()
+			get_viewport().set_input_as_handled()
+			return
 
 	# D-Pad - Grid item navigation
 	elif event.is_action_pressed("ui_up"):
