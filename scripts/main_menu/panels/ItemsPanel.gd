@@ -485,7 +485,7 @@ func _populate_items() -> void:
 		var name: String = _display_name(item_id, def)
 		var button = Button.new()
 		button.text = "%s x%d" % [name, qty]
-		button.custom_minimum_size = Vector2(250, 40)  # Increased width from 200 to 250
+		button.custom_minimum_size = Vector2(290, 40)  # Increased width to 290
 		button.focus_mode = Control.FOCUS_NONE  # Disable built-in focus navigation
 		button.set_meta("item_id", item_id)
 		button.set_meta("grid_index", _item_buttons.size())
