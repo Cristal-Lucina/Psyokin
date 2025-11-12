@@ -374,6 +374,12 @@ func _on_tab_button_focused(index: int) -> void:
 
 func _update_button_selection() -> void:
 	"""Update visual state and stretch for selected button"""
+	# Create tween for smooth width animation
+	var tween = create_tween()
+	tween.set_parallel(true)
+	tween.set_trans(Tween.TRANS_CUBIC)
+	tween.set_ease(Tween.EASE_OUT)
+
 	for i in range(_tab_buttons.size()):
 		var btn = _tab_buttons[i]
 		var is_selected = (i == _selected_button_index)
@@ -383,7 +389,7 @@ func _update_button_selection() -> void:
 
 		# Animate stretch: selected buttons extend 20px to the right
 		var target_width = 140 if not is_selected else 160
-		btn.custom_minimum_size.x = target_width
+		tween.tween_property(btn, "custom_minimum_size:x", target_width, 0.2)
 
 func _grab_first_tab_button_focus() -> void:
 	"""Grab focus on first tab button"""
@@ -850,26 +856,57 @@ func _create_empty_slot(slot_type: String, _slot_idx: int) -> PanelContainer:
 	panel.add_child(vbox)
 	return panel
 
-func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot: int) -> PanelContainer:
-	var panel := PanelContainer.new()
+func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot: int) -> Button:
+	# Create a button instead of PanelContainer for clickability
+	var btn := Button.new()
+	btn.focus_mode = Control.FOCUS_ALL
+	btn.custom_minimum_size = Vector2(0, 80)
 
-	# Get member_id early for animation tracking
+	# Store metadata for popup menu
 	var member_id: String = String(member_data.get("_member_id", ""))
+	btn.set_meta("member_id", member_id)
+	btn.set_meta("member_name", String(member_data.get("name", "Member")))
+	btn.set_meta("show_switch", show_switch)
+	btn.set_meta("active_slot", active_slot)
+	btn.set_meta("hp", int(member_data.get("hp", 0)))
+	btn.set_meta("hp_max", int(member_data.get("hp_max", 0)))
+	btn.set_meta("mp", int(member_data.get("mp", 0)))
+	btn.set_meta("mp_max", int(member_data.get("mp_max", 0)))
 
-	# Main horizontal container: member info on left, buttons on right
+	# Connect to member card pressed
+	btn.pressed.connect(_on_member_card_pressed.bind(btn))
+	btn.focus_entered.connect(_on_member_card_focused.bind(btn))
+	btn.focus_exited.connect(_on_member_card_unfocused.bind(btn))
+
+	# Main horizontal container: member info
 	var main_hbox := HBoxContainer.new()
 	main_hbox.add_theme_constant_override("separation", 12)
+	main_hbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
-	# Left side: Member info (name + stats)
+	# Member info (name + stats)
 	var info_vbox := VBoxContainer.new()
 	info_vbox.add_theme_constant_override("separation", 2)
 	info_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	info_vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
-	# Name label
+	# Name and level row
+	var name_row := HBoxContainer.new()
+	name_row.add_theme_constant_override("separation", 8)
+	name_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
 	var name_lbl := Label.new()
 	name_lbl.text = String(member_data.get("name", "Member"))
-	name_lbl.add_theme_font_size_override("font_size", 10)
-	info_vbox.add_child(name_lbl)
+	name_lbl.add_theme_font_size_override("font_size", 12)
+	name_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	name_row.add_child(name_lbl)
+
+	var lvl_lbl := Label.new()
+	lvl_lbl.text = "Lv %d" % int(member_data.get("level", 1))
+	lvl_lbl.add_theme_font_size_override("font_size", 10)
+	lvl_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	name_row.add_child(lvl_lbl)
+
+	info_vbox.add_child(name_row)
 
 	# HP/MP stats row (side by side)
 	var stats_row := HBoxContainer.new()
@@ -981,48 +1018,18 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 		mp_section.add_child(mp_bar)
 
 	stats_row.add_child(mp_section)
+	stats_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hp_section.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	mp_section.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hp_label_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	mp_label_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
 	info_vbox.add_child(stats_row)
 	main_hbox.add_child(info_vbox)
+	btn.add_child(main_hbox)
 
-	# Right side: Buttons (stacked vertically)
-	var buttons_vbox := VBoxContainer.new()
-	buttons_vbox.add_theme_constant_override("separation", 4)
-
-	# Recovery button (always shown for all members)
-	var recovery_btn := Button.new()
-	recovery_btn.text = "RECOVERY"
-	recovery_btn.custom_minimum_size = Vector2(80, 32)
-	recovery_btn.focus_mode = Control.FOCUS_ALL
-	# Core Vibe: Electric Lime button (success/recovery action)
-	aCoreVibeTheme.style_button(recovery_btn, aCoreVibeTheme.COLOR_ELECTRIC_LIME, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
-	recovery_btn.set_meta("member_id", member_id)
-	recovery_btn.set_meta("member_name", String(member_data.get("name", "Member")))
-	recovery_btn.set_meta("hp", int(member_data.get("hp", 0)))
-	recovery_btn.set_meta("hp_max", int(member_data.get("hp_max", 0)))
-	recovery_btn.set_meta("mp", int(member_data.get("mp", 0)))
-	recovery_btn.set_meta("mp_max", int(member_data.get("mp_max", 0)))
-	recovery_btn.pressed.connect(_on_recovery_pressed.bind(recovery_btn))
-	buttons_vbox.add_child(recovery_btn)
-	_debug_log("Created Recovery button for %s" % String(member_data.get("name", "Member")))
-
-	# Switch button (only for active members)
-	if show_switch:
-		var switch_btn := Button.new()
-		switch_btn.text = "SWITCH"
-		switch_btn.custom_minimum_size = Vector2(80, 32)
-		switch_btn.focus_mode = Control.FOCUS_ALL
-		# Core Vibe: Sky Cyan button (primary action)
-		aCoreVibeTheme.style_button(switch_btn, aCoreVibeTheme.COLOR_SKY_CYAN, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
-		switch_btn.set_meta("active_slot", active_slot)
-		switch_btn.pressed.connect(_on_switch_pressed.bind(active_slot))
-		buttons_vbox.add_child(switch_btn)
-
-		# Set up left/right navigation between Recovery and Switch buttons
-		recovery_btn.focus_neighbor_right = recovery_btn.get_path_to(switch_btn)
-		switch_btn.focus_neighbor_left = switch_btn.get_path_to(recovery_btn)
-
-	main_hbox.add_child(buttons_vbox)
-	panel.add_child(main_hbox)
+	# Style button (default unfocused state)
+	_style_member_card(btn, false)
 
 	# Store current HP/MP values for next rebuild animation
 	if member_id != "":
@@ -1031,7 +1038,205 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 			"mp": mp_i
 		}
 
-	return panel
+	return btn
+
+func _style_member_card(btn: Button, is_focused: bool) -> void:
+	"""Style a member card button based on focus state"""
+	var style = StyleBoxFlat.new()
+
+	if is_focused:
+		# Focused: White background, black text
+		style.bg_color = aCoreVibeTheme.COLOR_MILK_WHITE
+		style.border_color = aCoreVibeTheme.COLOR_ELECTRIC_LIME
+	else:
+		# Unfocused: Semi-transparent Ink Charcoal, Sky Cyan text
+		style.bg_color = Color(aCoreVibeTheme.COLOR_INK_CHARCOAL.r, aCoreVibeTheme.COLOR_INK_CHARCOAL.g, aCoreVibeTheme.COLOR_INK_CHARCOAL.b, 0.4)
+		style.border_color = aCoreVibeTheme.COLOR_SKY_CYAN
+
+	style.corner_radius_top_left = 8
+	style.corner_radius_top_right = 8
+	style.corner_radius_bottom_left = 8
+	style.corner_radius_bottom_right = 8
+	style.border_width_left = 2
+	style.border_width_top = 2
+	style.border_width_right = 2
+	style.border_width_bottom = 2
+	style.shadow_color = Color(style.border_color.r, style.border_color.g, style.border_color.b, 0.5)
+	style.shadow_size = 4
+	style.content_margin_left = 8
+	style.content_margin_top = 8
+	style.content_margin_right = 8
+	style.content_margin_bottom = 8
+
+	btn.add_theme_stylebox_override("normal", style)
+	btn.add_theme_stylebox_override("hover", style)
+	btn.add_theme_stylebox_override("pressed", style)
+	btn.add_theme_stylebox_override("focus", style)
+
+	# Update label colors
+	if btn.get_child_count() > 0:
+		var main_hbox = btn.get_child(0)
+		if main_hbox.get_child_count() > 0:
+			var info_vbox = main_hbox.get_child(0)
+			_update_label_colors_recursive(info_vbox, is_focused)
+
+func _update_label_colors_recursive(node: Node, is_focused: bool) -> void:
+	"""Recursively update label colors in a node tree"""
+	if node is Label:
+		if is_focused:
+			node.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_INK_CHARCOAL)
+		else:
+			node.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE)
+
+	for child in node.get_children():
+		_update_label_colors_recursive(child, is_focused)
+
+func _on_member_card_focused(btn: Button) -> void:
+	"""Handle member card gaining focus"""
+	_style_member_card(btn, true)
+
+func _on_member_card_unfocused(btn: Button) -> void:
+	"""Handle member card losing focus"""
+	_style_member_card(btn, false)
+
+func _on_member_card_pressed(btn: Button) -> void:
+	"""Handle member card being pressed - show action menu"""
+	var member_name = btn.get_meta("member_name", "Member")
+	var show_switch = btn.get_meta("show_switch", false)
+	var active_slot = btn.get_meta("active_slot", -1)
+	var member_id = btn.get_meta("member_id", "")
+	var hp = btn.get_meta("hp", 0)
+	var hp_max = btn.get_meta("hp_max", 0)
+	var mp = btn.get_meta("mp", 0)
+	var mp_max = btn.get_meta("mp_max", 0)
+
+	print("[StatusPanel] Member card pressed: %s (show_switch: %s)" % [member_name, show_switch])
+
+	# Create action menu popup
+	_show_member_action_menu(member_name, member_id, show_switch, active_slot, hp, hp_max, mp, mp_max)
+
+func _show_member_action_menu(member_name: String, member_id: String, show_switch: bool, active_slot: int, hp: int, hp_max: int, mp: int, mp_max: int) -> void:
+	"""Show popup menu with RECOVERY and optionally SWITCH"""
+	var popup_panel := PanelContainer.new()
+	popup_panel.name = "MemberActionMenu"
+
+	# Store metadata
+	popup_panel.set_meta("member_name", member_name)
+	popup_panel.set_meta("member_id", member_id)
+	popup_panel.set_meta("show_switch", show_switch)
+	popup_panel.set_meta("active_slot", active_slot)
+	popup_panel.set_meta("hp", hp)
+	popup_panel.set_meta("hp_max", hp_max)
+	popup_panel.set_meta("mp", mp)
+	popup_panel.set_meta("mp_max", mp_max)
+
+	# Style popup
+	var popup_style = aCoreVibeTheme.create_panel_style(
+		aCoreVibeTheme.COLOR_ELECTRIC_LIME,
+		aCoreVibeTheme.COLOR_INK_CHARCOAL,
+		0.95,
+		aCoreVibeTheme.CORNER_RADIUS_MEDIUM,
+		aCoreVibeTheme.BORDER_WIDTH_THIN,
+		aCoreVibeTheme.SHADOW_SIZE_LARGE
+	)
+	popup_panel.add_theme_stylebox_override("panel", popup_style)
+
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 16)
+	margin.add_theme_constant_override("margin_top", 16)
+	margin.add_theme_constant_override("margin_right", 16)
+	margin.add_theme_constant_override("margin_bottom", 16)
+	popup_panel.add_child(margin)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 12)
+	margin.add_child(vbox)
+
+	# Title
+	var title := Label.new()
+	title.text = member_name
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	aCoreVibeTheme.style_label(title, aCoreVibeTheme.COLOR_ELECTRIC_LIME, 18)
+	vbox.add_child(title)
+
+	var separator := HSeparator.new()
+	vbox.add_child(separator)
+
+	# Recovery button
+	var recovery_btn := Button.new()
+	recovery_btn.text = "RECOVERY"
+	recovery_btn.custom_minimum_size = Vector2(160, 40)
+	aCoreVibeTheme.style_button(recovery_btn, aCoreVibeTheme.COLOR_ELECTRIC_LIME, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
+	recovery_btn.pressed.connect(_on_action_menu_recovery_pressed.bind(popup_panel))
+	vbox.add_child(recovery_btn)
+
+	# Switch button (only for active slots)
+	if show_switch:
+		var switch_btn := Button.new()
+		switch_btn.text = "SWITCH"
+		switch_btn.custom_minimum_size = Vector2(160, 40)
+		aCoreVibeTheme.style_button(switch_btn, aCoreVibeTheme.COLOR_SKY_CYAN, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
+		switch_btn.pressed.connect(_on_action_menu_switch_pressed.bind(popup_panel))
+		vbox.add_child(switch_btn)
+
+	# Cancel button
+	var cancel_btn := Button.new()
+	cancel_btn.text = "CANCEL"
+	cancel_btn.custom_minimum_size = Vector2(160, 40)
+	aCoreVibeTheme.style_button(cancel_btn, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
+	cancel_btn.pressed.connect(_close_member_action_menu.bind(popup_panel))
+	vbox.add_child(cancel_btn)
+
+	# Add to scene and center
+	add_child(popup_panel)
+	popup_panel.set_anchors_preset(Control.PRESET_CENTER)
+	popup_panel.position = -popup_panel.size / 2.0
+
+	# Change nav state and grab focus
+	_nav_state = NavState.POPUP_ACTIVE
+	_active_popup = popup_panel
+	recovery_btn.grab_focus()
+
+	print("[StatusPanel] Member action menu shown for: %s" % member_name)
+
+func _on_action_menu_recovery_pressed(popup: Control) -> void:
+	"""Handle RECOVERY pressed from action menu"""
+	var member_id = popup.get_meta("member_id", "")
+	var member_name = popup.get_meta("member_name", "Member")
+	var hp = popup.get_meta("hp", 0)
+	var hp_max = popup.get_meta("hp_max", 0)
+	var mp = popup.get_meta("mp", 0)
+	var mp_max = popup.get_meta("mp_max", 0)
+
+	print("[StatusPanel] Action menu - Recovery selected for: %s" % member_name)
+
+	# Close action menu first
+	_close_member_action_menu(popup)
+
+	# Then show recovery popup (reuse existing recovery logic)
+	_show_recovery_popup(member_id, member_name, hp, hp_max, mp, mp_max)
+
+func _on_action_menu_switch_pressed(popup: Control) -> void:
+	"""Handle SWITCH pressed from action menu"""
+	var active_slot = popup.get_meta("active_slot", -1)
+
+	print("[StatusPanel] Action menu - Switch selected for slot: %d" % active_slot)
+
+	# Close action menu first
+	_close_member_action_menu(popup)
+
+	# Then show switch popup (reuse existing switch logic)
+	_on_switch_pressed(active_slot)
+
+func _close_member_action_menu(popup: Control) -> void:
+	"""Close the member action menu"""
+	if popup and is_instance_valid(popup):
+		popup.queue_free()
+
+	_nav_state = NavState.CONTENT
+	_active_popup = null
+
+	print("[StatusPanel] Member action menu closed")
 
 func _get_member_snapshot(member_id: String) -> Dictionary:
 	# Get roster to pass to _label_for_id for accurate name lookup
