@@ -656,19 +656,19 @@ func _show_perk_details(perk: Dictionary) -> void:
 
 	# Build LEFT column: Tier, Description
 	var left_text: String = ""
-	left_text += "[color=%s]Tier:[/color] %d\n\n" % [sky_cyan_hex, perk["tier"] + 1]
+	left_text += "[color=%s]Tier:[/color] %d\n" % [sky_cyan_hex, perk["tier"] + 1]
 
 	if perk["description"] != "":
 		left_text += "[color=%s]Description:[/color]\n%s" % [sky_cyan_hex, perk["description"]]
 
 	# Build RIGHT column: Requires, Status, Cost
 	var right_text: String = ""
-	right_text += "[color=%s]Requires:[/color]\n%s ≥ %d\n\n" % [sky_cyan_hex, _pretty_stat(perk["stat_id"]), threshold]
+	right_text += "[color=%s]Requires:[/color]\n%s ≥ %d\n" % [sky_cyan_hex, _pretty_stat(perk["stat_id"]), threshold]
 
 	if perk["unlocked"]:
 		right_text += "[color=%s]Status:[/color]\n✔ Unlocked" % sky_cyan_hex
 	elif perk["available"]:
-		right_text += "[color=%s]Status:[/color]\nAvailable!\n\n" % sky_cyan_hex
+		right_text += "[color=%s]Status:[/color]\nAvailable!\n" % sky_cyan_hex
 		right_text += "[color=%s]Cost:[/color]\n1 Perk Point" % sky_cyan_hex
 	else:
 		if stat_level < threshold:
