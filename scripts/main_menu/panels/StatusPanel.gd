@@ -2170,13 +2170,24 @@ func _apply_recovery_effect(member_id: String, member_name: String, item_id: Str
 						var current_hp = int(member_dict.get("hp", 0))
 						var max_hp = int(member_dict.get("hp_max", 100))
 
+						print("[StatusPanel] HP Heal Debug - Before:")
+						print("  current_hp: %d" % current_hp)
+						print("  max_hp: %d" % max_hp)
+						print("  recovery_amount: %d" % recovery_amount)
+
 						# Calculate actual heal amount
 						var heal_amount = recovery_amount
 						if is_percentage:
 							heal_amount = int(float(max_hp) * float(recovery_amount) / 100.0)
+							print("  percentage heal calculated: %d" % heal_amount)
+
+						var unclamped_hp = current_hp + heal_amount
+						print("  unclamped would be: %d" % unclamped_hp)
 
 						# Clamp to max HP - never heal over maximum
 						var new_hp = min(current_hp + heal_amount, max_hp)
+						print("  clamped to: %d (max: %d)" % [new_hp, max_hp])
+
 						actual_heal_amount = new_hp - current_hp
 						member_dict["hp"] = new_hp
 						print("[StatusPanel] ✓ Restored %d HP to %s (now: %d/%d)" % [actual_heal_amount, member_name, member_dict["hp"], max_hp])
@@ -2185,13 +2196,24 @@ func _apply_recovery_effect(member_id: String, member_name: String, item_id: Str
 						var current_mp = int(member_dict.get("mp", 0))
 						var max_mp = int(member_dict.get("mp_max", 100))
 
+						print("[StatusPanel] MP Heal Debug - Before:")
+						print("  current_mp: %d" % current_mp)
+						print("  max_mp: %d" % max_mp)
+						print("  recovery_amount: %d" % recovery_amount)
+
 						# Calculate actual heal amount
 						var heal_amount = recovery_amount
 						if is_percentage:
 							heal_amount = int(float(max_mp) * float(recovery_amount) / 100.0)
+							print("  percentage heal calculated: %d" % heal_amount)
+
+						var unclamped_mp = current_mp + heal_amount
+						print("  unclamped would be: %d" % unclamped_mp)
 
 						# Clamp to max MP - never heal over maximum
 						var new_mp = min(current_mp + heal_amount, max_mp)
+						print("  clamped to: %d (max: %d)" % [new_mp, max_mp])
+
 						actual_heal_amount = new_mp - current_mp
 						member_dict["mp"] = new_mp
 						print("[StatusPanel] ✓ Restored %d MP to %s (now: %d/%d)" % [actual_heal_amount, member_name, member_dict["mp"], max_mp])
