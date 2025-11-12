@@ -266,10 +266,10 @@ func _update_arrow_position() -> void:
 
 	_selection_arrow.position = Vector2(arrow_x, arrow_y)
 
-	# Position debug box to the left of arrow, then shift 50px right
+	# Position debug box to the left of arrow
 	if _debug_box:
 		_debug_box.visible = true
-		var debug_x = arrow_x - _debug_box.size.x - 4.0 + 50.0  # 4px gap, then shift 50px right
+		var debug_x = arrow_x - _debug_box.size.x - 4.0  # 4px gap to the left of arrow
 		var debug_y = arrow_y + (_selection_arrow.size.y / 2.0) - (_debug_box.size.y / 2.0)  # Center vertically with arrow
 		_debug_box.position = Vector2(debug_x, debug_y)
 		print("  Debug box position: %s" % _debug_box.position)
