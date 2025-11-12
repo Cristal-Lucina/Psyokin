@@ -718,22 +718,22 @@ func _input(event: InputEvent) -> void:
 				return
 			12:  # D-pad Up
 				print("[ItemsPanel] D-pad Up pressed")
-				_navigate_items(-2)  # Up one row in 2-column grid
+				_navigate_items(2)  # Up one row in 2-column grid (reversed sign)
 				get_viewport().set_input_as_handled()
 				return
 			13:  # D-pad Down
 				print("[ItemsPanel] D-pad Down pressed")
-				_navigate_items(2)  # Down one row in 2-column grid
+				_navigate_items(-2)  # Down one row in 2-column grid (reversed sign)
 				get_viewport().set_input_as_handled()
 				return
 			14:  # D-pad Left
 				print("[ItemsPanel] D-pad Left pressed")
-				_navigate_items(-1)  # Left one column
+				_navigate_items(1)  # Left one column (reversed sign)
 				get_viewport().set_input_as_handled()
 				return
 			15:  # D-pad Right
 				print("[ItemsPanel] D-pad Right pressed")
-				_navigate_items(1)  # Right one column
+				_navigate_items(-1)  # Right one column (reversed sign)
 				get_viewport().set_input_as_handled()
 				return
 			0:  # Accept button (A/Cross)
