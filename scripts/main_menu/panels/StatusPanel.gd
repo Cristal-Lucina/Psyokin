@@ -2612,15 +2612,31 @@ func _read_roster() -> Dictionary:
 
 func _label_for_id(pid: String, roster: Dictionary = {}) -> String:
 	if pid == "hero": return _safe_hero_name()
+
+	# Use first name only from GameState if available
+	if _gs and _gs.has_method("_first_name_for_id"):
+		var v: Variant = _gs.call("_first_name_for_id", pid)
+		if typeof(v) == TYPE_STRING and String(v) != "":
+			return String(v)
+
+	# Fallback: extract first name from roster or CSV
+	var full_name: String = ""
 	if roster.has(pid):
 		var rec: Dictionary = roster[pid]
 		if rec.has("name") and typeof(rec["name"]) == TYPE_STRING and String(rec["name"]).strip_edges() != "":
-			return String(rec["name"])
+			full_name = String(rec["name"])
 	# CSV fallback
-	if _csv_by_id.has(pid):
+	if full_name == "" and _csv_by_id.has(pid):
 		var row: Dictionary = _csv_by_id[pid]
-		var nm: String = String(row.get("name",""))
-		if nm != "": return nm
+		full_name = String(row.get("name",""))
+
+	# Extract first name
+	if full_name != "":
+		var space_index: int = full_name.find(" ")
+		if space_index > 0:
+			return full_name.substr(0, space_index)
+		return full_name
+
 	return (pid.capitalize() if pid != "" else "")
 
 func _gather_active_entries(roster: Dictionary) -> Array:
@@ -2720,7 +2736,12 @@ func _safe_hero_name() -> String:
 	if _gs and _gs.has_method("get"):
 		var v: Variant = _gs.get("player_name")
 		if typeof(v) == TYPE_STRING and String(v).strip_edges() != "":
-			return String(v)
+			var full_name: String = String(v)
+			# Extract first name only
+			var space_index: int = full_name.find(" ")
+			if space_index > 0:
+				return full_name.substr(0, space_index)
+			return full_name
 	return "Player"
 
 func _safe_hero_level() -> int:

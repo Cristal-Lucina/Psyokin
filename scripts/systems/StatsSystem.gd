@@ -547,7 +547,8 @@ func get_member_stat_level(member_id: String, stat: String) -> int:
 	return base + bonus
 
 ## Returns the display name for a member (from CSV or capitalized ID). For hero, returns player_name from GameState
-func get_member_display_name(member_id: String) -> String:
+## Gets full display name for a member (used only in specific UI contexts like Details section)
+func get_member_full_display_name(member_id: String) -> String:
 	var pid: String = _resolve_id(member_id)
 	if pid == "hero":
 		# Check for player's custom name from character creation
@@ -561,6 +562,22 @@ func get_member_display_name(member_id: String) -> String:
 	if typeof(label_v) == TYPE_STRING and String(label_v).strip_edges() != "":
 		return String(label_v)
 	return pid.capitalize()
+
+## Gets first name only for a member (use this for most displays)
+func get_member_display_name(member_id: String) -> String:
+	# Use GameState's first name function if available
+	if _gs and _gs.has_method("_first_name_for_id"):
+		var pid: String = _resolve_id(member_id)
+		var v: Variant = _gs.call("_first_name_for_id", pid)
+		if typeof(v) == TYPE_STRING and String(v) != "":
+			return String(v)
+
+	# Fallback: extract first name from full name
+	var full_name: String = get_member_full_display_name(member_id)
+	var space_index: int = full_name.find(" ")
+	if space_index > 0:
+		return full_name.substr(0, space_index)
+	return full_name
 
 ## Gets a member's mind type from party.csv
 func get_member_mind_type(member_id: String) -> String:

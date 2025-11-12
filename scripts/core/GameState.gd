@@ -240,6 +240,15 @@ func _display_name_for_id(id: String) -> String:
 						return nm2
 	return id.capitalize()
 
+## Get first name only (first word) from display name
+## Use this for most UI displays. Use _display_name_for_id() for full names only when explicitly needed.
+func _first_name_for_id(id: String) -> String:
+	var full_name: String = _display_name_for_id(id)
+	var space_index: int = full_name.find(" ")
+	if space_index > 0:
+		return full_name.substr(0, space_index)
+	return full_name
+
 # Equipment snapshot (optional)
 ## Returns the equipped items for a party member (weapon, armor, head, foot, bracelet)
 func get_member_equip(member: String) -> Dictionary:

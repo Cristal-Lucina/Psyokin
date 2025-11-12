@@ -1302,18 +1302,23 @@ func _gather_members() -> Array[String]:
 	return members
 
 func _member_display_name(token: String) -> String:
-	"""Get display name for a party member"""
-	if token == "hero":
-		if _gs and _gs.has_method("get"):
-			var name: String = String(_gs.get("player_name"))
-			if name.strip_edges() != "":
-				return name
-		return "Player"
-
-	if _gs and _gs.has_method("_display_name_for_id"):
-		var name: Variant = _gs.call("_display_name_for_id", token)
+	"""Get first name for a party member"""
+	# Use first name only for display
+	if _gs and _gs.has_method("_first_name_for_id"):
+		var name: Variant = _gs.call("_first_name_for_id", token)
 		if typeof(name) == TYPE_STRING and String(name) != "":
 			return String(name)
+
+	# Fallback for hero
+	if token == "hero":
+		if _gs and _gs.has_method("get"):
+			var full_name: String = String(_gs.get("player_name"))
+			if full_name.strip_edges() != "":
+				var space_index: int = full_name.find(" ")
+				if space_index > 0:
+					return full_name.substr(0, space_index)
+				return full_name
+		return "Player"
 
 	return token.capitalize()
 

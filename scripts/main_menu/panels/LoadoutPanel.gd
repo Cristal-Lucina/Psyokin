@@ -379,6 +379,10 @@ func _hero_name() -> String:
 		s = String(_gs.get("player_name"))
 	if s.strip_edges() == "":
 		s = "Player"
+	# Extract first name only
+	var space_index: int = s.find(" ")
+	if space_index > 0:
+		return s.substr(0, space_index)
 	return s
 
 func _gather_party_tokens() -> Array[String]:
@@ -459,8 +463,9 @@ func _refresh_party() -> void:
 func _display_for_token(token: String) -> String:
 	if token == "hero":
 		return _hero_name()
-	if _gs and _gs.has_method("_display_name_for_id"):
-		var v: Variant = _gs.call("_display_name_for_id", token)
+	# Use first name only for display
+	if _gs and _gs.has_method("_first_name_for_id"):
+		var v: Variant = _gs.call("_first_name_for_id", token)
 		if typeof(v) == TYPE_STRING and String(v) != "":
 			return String(v)
 	return token.capitalize()

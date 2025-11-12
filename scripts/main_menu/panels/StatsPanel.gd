@@ -352,10 +352,10 @@ func _refresh_party() -> void:
 		tokens.append("hero")
 
 	for token in tokens:
-		var display_name = _get_display_name(token)
-		_party_list.add_item(display_name)
+		var first_name = _get_first_name(token)
+		_party_list.add_item(first_name)
 		_party_tokens.append(token)
-		_party_labels.append(display_name)
+		_party_labels.append(first_name)
 
 func _gather_party_tokens() -> Array[String]:
 	"""Get all party member tokens"""
@@ -391,7 +391,7 @@ func _gather_party_tokens() -> Array[String]:
 	return out
 
 func _get_display_name(token: String) -> String:
-	"""Get display name for a party member"""
+	"""Get full display name for a party member"""
 	if token == "hero":
 		if _gs and _gs.has_method("get"):
 			var name = String(_gs.get("player_name"))
@@ -405,6 +405,20 @@ func _get_display_name(token: String) -> String:
 			return String(v)
 
 	return token.capitalize()
+
+func _get_first_name(token: String) -> String:
+	"""Get first name only for a party member"""
+	if _gs and _gs.has_method("_first_name_for_id"):
+		var v: Variant = _gs.call("_first_name_for_id", token)
+		if typeof(v) == TYPE_STRING and String(v) != "":
+			return String(v)
+
+	# Fallback: extract first word from full name
+	var full_name: String = _get_display_name(token)
+	var space_index: int = full_name.find(" ")
+	if space_index > 0:
+		return full_name.substr(0, space_index)
+	return full_name
 
 func _on_party_member_selected(index: int) -> void:
 	"""Handle party member selection"""
@@ -542,7 +556,7 @@ func _rebuild_affinity_grid(token: String) -> void:
 		# Get affinity value
 		var affinity: int = _get_affinity(token, member_token)
 		var tier_text: String = _get_affinity_tier_text(affinity)
-		var member_name: String = _get_display_name(member_token)
+		var member_name: String = _get_first_name(member_token)
 
 		var cell = _create_affinity_cell(member_name, tier_text)
 		_affinity_grid.add_child(cell)
