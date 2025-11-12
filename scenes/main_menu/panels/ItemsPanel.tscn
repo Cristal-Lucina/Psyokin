@@ -25,62 +25,69 @@ grow_horizontal = 2
 grow_vertical = 2
 theme_override_constants/separation = 16
 
-[node name="CategoryPanel" type="PanelContainer" parent="Root"]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_horizontal = 3
-size_flags_stretch_ratio = 2.0
-
-[node name="CategoryColumn" type="VBoxContainer" parent="Root/CategoryPanel"]
-layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="CategoryLabel" type="Label" parent="Root/CategoryPanel/CategoryColumn"]
-layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
-theme_override_font_sizes/font_size = 16
-text = "CATEGORIES"
-horizontal_alignment = 0
-
-[node name="Separator" type="HSeparator" parent="Root/CategoryPanel/CategoryColumn"]
-layout_mode = 2
-
-[node name="CategoryList" type="ItemList" parent="Root/CategoryPanel/CategoryColumn"]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_vertical = 3
-
 [node name="ItemPanel" type="PanelContainer" parent="Root"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
-size_flags_stretch_ratio = 3.5
+size_flags_stretch_ratio = 6.0
 
 [node name="ItemColumn" type="VBoxContainer" parent="Root/ItemPanel"]
 layout_mode = 2
 theme_override_constants/separation = 12
 
-[node name="ItemLabel" type="Label" parent="Root/ItemPanel/ItemColumn"]
+[node name="CategoryRow" type="HBoxContainer" parent="Root/ItemPanel/ItemColumn"]
+layout_mode = 2
+theme_override_constants/separation = 8
+alignment = 1
+
+[node name="L1Label" type="Label" parent="Root/ItemPanel/ItemColumn/CategoryRow"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
-theme_override_font_sizes/font_size = 16
-text = "ITEMS (ALL)"
-horizontal_alignment = 0
+text = "L1"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="CategoryIconsContainer" type="HBoxContainer" parent="Root/ItemPanel/ItemColumn/CategoryRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_constants/separation = 8
+
+[node name="R1Label" type="Label" parent="Root/ItemPanel/ItemColumn/CategoryRow"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "R1"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="CategoryName" type="Label" parent="Root/ItemPanel/ItemColumn"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "ACQUIRED"
+horizontal_alignment = 1
 
 [node name="Separator" type="HSeparator" parent="Root/ItemPanel/ItemColumn"]
 layout_mode = 2
 
-[node name="ItemList" type="ItemList" parent="Root/ItemPanel/ItemColumn"]
+[node name="ItemsScroll" type="ScrollContainer" parent="Root/ItemPanel/ItemColumn"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 3
+
+[node name="ItemsGrid" type="GridContainer" parent="Root/ItemPanel/ItemColumn/ItemsScroll"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/h_separation = 8
+theme_override_constants/v_separation = 8
+columns = 2
 
 [node name="DetailsPanel" type="PanelContainer" parent="Root"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
-size_flags_stretch_ratio = 4.5
+size_flags_stretch_ratio = 4.0
 
 [node name="DetailsColumn" type="VBoxContainer" parent="Root/DetailsPanel"]
 layout_mode = 2
