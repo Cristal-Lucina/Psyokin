@@ -238,6 +238,15 @@ func _update_arrow_position() -> void:
 	# Position debug box to the left of arrow
 	if _debug_box:
 		_debug_box.visible = true
+
+		# Resize box based on focus mode
+		var box_width: float = 160.0  # Default for category list
+		if _focus_mode == "items":
+			box_width = 400.0  # Wider box for items list
+
+		_debug_box.custom_minimum_size = Vector2(box_width, 20)
+		_debug_box.size = Vector2(box_width, 20)
+
 		var debug_x = arrow_x - _debug_box.size.x - 4.0  # 4px gap to the left of arrow
 		var debug_y = arrow_y + (_selection_arrow.size.y / 2.0) - (_debug_box.size.y / 2.0)  # Center vertically with arrow
 		_debug_box.position = Vector2(debug_x, debug_y)
