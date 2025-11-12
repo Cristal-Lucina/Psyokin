@@ -1183,7 +1183,7 @@ func _show_member_arrow(btn: Button) -> void:
 	# Create arrow indicator
 	var arrow_tex := TextureRect.new()
 	arrow_tex.name = "SelectionArrow"
-	arrow_tex.texture = load("res://assets/graphics/arrow/arrow.png")
+	arrow_tex.texture = load("res://assets/graphics/arrow/arrow_white.png")
 	arrow_tex.custom_minimum_size = Vector2(15, 15)
 	arrow_tex.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
 	arrow_tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
