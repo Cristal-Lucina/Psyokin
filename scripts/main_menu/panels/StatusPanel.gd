@@ -1132,22 +1132,20 @@ func _style_member_card(btn: Button, is_focused: bool) -> void:
 	if is_focused:
 		# Focused: White background, black text
 		style.bg_color = aCoreVibeTheme.COLOR_MILK_WHITE
-		style.border_color = aCoreVibeTheme.COLOR_ELECTRIC_LIME
 	else:
 		# Unfocused: Semi-transparent Ink Charcoal, Sky Cyan text
 		style.bg_color = Color(aCoreVibeTheme.COLOR_INK_CHARCOAL.r, aCoreVibeTheme.COLOR_INK_CHARCOAL.g, aCoreVibeTheme.COLOR_INK_CHARCOAL.b, 0.4)
-		style.border_color = aCoreVibeTheme.COLOR_SKY_CYAN
 
 	style.corner_radius_top_left = 8
 	style.corner_radius_top_right = 8
 	style.corner_radius_bottom_left = 8
 	style.corner_radius_bottom_right = 8
-	style.border_width_left = 2
-	style.border_width_top = 2
-	style.border_width_right = 2
-	style.border_width_bottom = 2
-	style.shadow_color = Color(style.border_color.r, style.border_color.g, style.border_color.b, 0.5)
-	style.shadow_size = 4
+	# No border - we'll use arrow indicator instead
+	style.border_width_left = 0
+	style.border_width_top = 0
+	style.border_width_right = 0
+	style.border_width_bottom = 0
+	style.shadow_size = 0
 	# Asymmetric padding: 20px left/right, 5px top/bottom
 	style.content_margin_left = 20
 	style.content_margin_top = 5
@@ -1166,6 +1164,12 @@ func _style_member_card(btn: Button, is_focused: bool) -> void:
 			var info_vbox = main_hbox.get_child(0)
 			_update_label_colors_recursive(info_vbox, is_focused)
 
+	# Handle arrow indicator
+	if is_focused:
+		_show_member_arrow(btn)
+	else:
+		_hide_member_arrow(btn)
+
 func _update_label_colors_recursive(node: Node, is_focused: bool) -> void:
 	"""Recursively update label colors in a node tree"""
 	if node is Label:
@@ -1176,6 +1180,63 @@ func _update_label_colors_recursive(node: Node, is_focused: bool) -> void:
 
 	for child in node.get_children():
 		_update_label_colors_recursive(child, is_focused)
+
+func _show_member_arrow(btn: Button) -> void:
+	"""Show arrow indicator above selected party member"""
+	# Check if arrow already exists
+	var arrow = btn.get_node_or_null("SelectionArrow")
+	if arrow:
+		return  # Already exists
+
+	# Create arrow indicator
+	var arrow_tex := TextureRect.new()
+	arrow_tex.name = "SelectionArrow"
+	arrow_tex.texture = load("res://assets/graphics/arrow/arrow.png")
+	arrow_tex.custom_minimum_size = Vector2(15, 15)
+	arrow_tex.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+	arrow_tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+
+	# Position at top center of button
+	arrow_tex.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	arrow_tex.position = Vector2(0, -20)  # Above the button
+	arrow_tex.size = Vector2(15, 15)
+	arrow_tex.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	btn.add_child(arrow_tex)
+
+	# Start pulsing animation
+	_start_arrow_pulse(arrow_tex)
+
+func _hide_member_arrow(btn: Button) -> void:
+	"""Hide arrow indicator from party member"""
+	var arrow = btn.get_node_or_null("SelectionArrow")
+	if arrow:
+		# Stop any running tween
+		if arrow.has_meta("pulse_tween"):
+			var tween = arrow.get_meta("pulse_tween")
+			if tween and is_instance_valid(tween):
+				tween.kill()
+			arrow.remove_meta("pulse_tween")
+		arrow.queue_free()
+
+func _start_arrow_pulse(arrow: TextureRect) -> void:
+	"""Start pulsing animation for arrow - moves up and down"""
+	if arrow.has_meta("pulse_tween"):
+		var old_tween = arrow.get_meta("pulse_tween")
+		if old_tween and is_instance_valid(old_tween):
+			old_tween.kill()
+
+	var tween = create_tween()
+	tween.set_loops()
+	tween.set_trans(Tween.TRANS_SINE)
+	tween.set_ease(Tween.EASE_IN_OUT)
+
+	# Pulse down 4 pixels then back up
+	var base_y = arrow.position.y
+	tween.tween_property(arrow, "position:y", base_y + 4, 0.6)
+	tween.tween_property(arrow, "position:y", base_y, 0.6)
+
+	arrow.set_meta("pulse_tween", tween)
 
 func _on_member_card_focused(btn: Button) -> void:
 	"""Handle member card gaining focus"""
@@ -2567,17 +2628,18 @@ func _safe_hero_level() -> int:
 func _on_visibility_changed() -> void:
 	# Select tab when panel becomes visible
 	if visible and _tab_buttons.size() > 0:
-		# Clear all button selections immediately to avoid glitch during slide animation
-		for btn in _tab_buttons:
-			if is_instance_valid(btn):
-				btn.release_focus()
-
 		# Wait for slide animation to complete (0.5s) before applying selection
 		await get_tree().create_timer(0.5).timeout
 
-		# Now apply the correct selection after slide completes
-		if visible:  # Check still visible
-			call_deferred("_grab_tab_list_focus")
+		# Now apply the correct selection after slide completes - stay on menu, don't navigate away
+		if visible and _tab_buttons.size() > 0:  # Check still visible
+			var index_to_select = _last_selected_tab_index
+			if index_to_select >= _tab_buttons.size():
+				index_to_select = 0  # Fallback if index is out of bounds
+			_selected_button_index = index_to_select
+			_update_button_selection()
+			if is_instance_valid(_tab_buttons[index_to_select]):
+				_tab_buttons[index_to_select].grab_focus()
 
 	if not OS.is_debug_build(): return
 	_dev_dump_profiles()
