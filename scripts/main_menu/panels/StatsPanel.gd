@@ -205,9 +205,9 @@ func _create_selection_arrow() -> void:
 	_debug_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_debug_box.z_index = 100  # Same layer as arrow
 
-	# Create grey rounded style
+	# Create Ink Charcoal rounded style
 	var debug_style = StyleBoxFlat.new()
-	debug_style.bg_color = Color(0.5, 0.5, 0.5, 0.8)  # Grey with transparency
+	debug_style.bg_color = aCoreVibeTheme.COLOR_INK_CHARCOAL  # Ink Charcoal (#111827)
 	debug_style.corner_radius_top_left = 8
 	debug_style.corner_radius_top_right = 8
 	debug_style.corner_radius_bottom_left = 8
