@@ -1162,23 +1162,31 @@ func _show_member_arrow(btn: Button) -> void:
 	if arrow:
 		return  # Already exists
 
+	print("[StatusPanel] Creating arrow for button: %s" % btn.get_meta("member_name", "Unknown"))
+
 	# Create arrow indicator using Label (no external asset needed)
 	var arrow_label := Label.new()
 	arrow_label.name = "SelectionArrow"
 	arrow_label.text = "◄"  # Left-pointing arrow (90° counter-clockwise from down arrow)
 	arrow_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	arrow_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	arrow_label.add_theme_font_size_override("font_size", 20)
+	arrow_label.add_theme_font_size_override("font_size", 24)
 	arrow_label.modulate = Color(1, 1, 1, 1)  # White
 	arrow_label.custom_minimum_size = Vector2(30, 40)
-
-	# Position to the right side of button, vertically centered
-	arrow_label.set_anchors_preset(Control.PRESET_CENTER_RIGHT)
-	arrow_label.position = Vector2(5, 0)  # 5px to the right of button edge
-	arrow_label.size = Vector2(30, 40)
 	arrow_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
+	# Position manually to the right inside the button
+	# Wait for button to be ready, then position
 	btn.add_child(arrow_label)
+
+	await get_tree().process_frame
+
+	# Position to the right side, vertically centered
+	var btn_size = btn.size
+	arrow_label.position = Vector2(btn_size.x - 40, (btn_size.y - 40) / 2.0)
+	arrow_label.size = Vector2(30, 40)
+
+	print("[StatusPanel] Arrow created at position: %s (button size: %s)" % [arrow_label.position, btn_size])
 
 	# Start pulsing animation
 	_start_arrow_pulse(arrow_label)
