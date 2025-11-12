@@ -25,6 +25,11 @@ const PARTY_MEMBERS: Array[String] = ["hero", "tessa", "kai", "skye", "rise", "m
 @onready var _affinity_grid: GridContainer = %AffinityGrid
 @onready var _radar_container: VBoxContainer = %RadarContainer
 
+# Panel containers for styling
+@onready var _party_panel: PanelContainer = get_node("Root/PartyPanel") if has_node("Root/PartyPanel") else null
+@onready var _stats_panel: PanelContainer = get_node("Root/StatsPanel") if has_node("Root/StatsPanel") else null
+@onready var _visual_panel: PanelContainer = get_node("Root/VisualPanel") if has_node("Root/VisualPanel") else null
+
 var _stats: Node = null
 var _gs: Node = null
 var _eq: Node = null
@@ -89,10 +94,56 @@ func _first_fill() -> void:
 
 func _apply_core_vibe_styling() -> void:
 	"""Apply Core Vibe neon-kawaii styling to StatsPanel elements"""
+
+	# Style the three main panel containers with rounded neon borders
+	if _party_panel:
+		var party_style = aCoreVibeTheme.create_panel_style(
+			aCoreVibeTheme.COLOR_SKY_CYAN,            # Sky Cyan border (party)
+			aCoreVibeTheme.COLOR_INK_CHARCOAL,        # Ink charcoal background
+			aCoreVibeTheme.PANEL_OPACITY_SEMI,        # Semi-transparent
+			aCoreVibeTheme.CORNER_RADIUS_MEDIUM,      # 16px corners
+			aCoreVibeTheme.BORDER_WIDTH_THIN,         # 2px border
+			aCoreVibeTheme.SHADOW_SIZE_MEDIUM         # 6px glow
+		)
+		party_style.content_margin_left = 10
+		party_style.content_margin_top = 10
+		party_style.content_margin_right = 10
+		party_style.content_margin_bottom = 10
+		_party_panel.add_theme_stylebox_override("panel", party_style)
+
+	if _stats_panel:
+		var stats_style = aCoreVibeTheme.create_panel_style(
+			aCoreVibeTheme.COLOR_ELECTRIC_LIME,       # Electric Lime border (stats)
+			aCoreVibeTheme.COLOR_INK_CHARCOAL,        # Ink charcoal background
+			aCoreVibeTheme.PANEL_OPACITY_SEMI,        # Semi-transparent
+			aCoreVibeTheme.CORNER_RADIUS_MEDIUM,      # 16px corners
+			aCoreVibeTheme.BORDER_WIDTH_THIN,         # 2px border
+			aCoreVibeTheme.SHADOW_SIZE_MEDIUM         # 6px glow
+		)
+		stats_style.content_margin_left = 10
+		stats_style.content_margin_top = 10
+		stats_style.content_margin_right = 10
+		stats_style.content_margin_bottom = 10
+		_stats_panel.add_theme_stylebox_override("panel", stats_style)
+
+	if _visual_panel:
+		var visual_style = aCoreVibeTheme.create_panel_style(
+			aCoreVibeTheme.COLOR_GRAPE_VIOLET,        # Grape Violet border (visual/radar)
+			aCoreVibeTheme.COLOR_INK_CHARCOAL,        # Ink charcoal background
+			aCoreVibeTheme.PANEL_OPACITY_SEMI,        # Semi-transparent
+			aCoreVibeTheme.CORNER_RADIUS_MEDIUM,      # 16px corners
+			aCoreVibeTheme.BORDER_WIDTH_THIN,         # 2px border
+			aCoreVibeTheme.SHADOW_SIZE_MEDIUM         # 6px glow
+		)
+		visual_style.content_margin_left = 10
+		visual_style.content_margin_top = 10
+		visual_style.content_margin_right = 10
+		visual_style.content_margin_bottom = 10
+		_visual_panel.add_theme_stylebox_override("panel", visual_style)
+
 	# Note: Battle stat cells and affinity cells are dynamically created,
 	# so their styling is applied in their creation functions.
 	# RadarChart colors are updated in the RadarChart class itself.
-	pass
 
 func _on_visibility_changed() -> void:
 	"""Grab focus when panel becomes visible"""

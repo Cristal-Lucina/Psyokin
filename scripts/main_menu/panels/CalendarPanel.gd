@@ -21,6 +21,10 @@ var _btn_next    : Button
 var _btn_today   : Button
 var _events_list : VBoxContainer  # For future Important Dates functionality
 
+# Panel containers for styling
+var _left_panel: PanelContainer = null
+var _right_panel: PanelContainer = null
+
 const WEEKDAY_HEADERS : PackedStringArray = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"]
 
 # Month navigation state
@@ -52,6 +56,10 @@ func _ready() -> void:
 	_btn_next    = get_node_or_null("%NextBtn")
 	_btn_today   = get_node_or_null("%TodayBtn")
 	_events_list = get_node_or_null("%EventsList")
+
+	# Get panel containers for styling
+	_left_panel = get_node_or_null("Root/LeftPanel")
+	_right_panel = get_node_or_null("Root/RightPanel")
 
 	# Debug: Check if critical nodes were found
 	print("[CalendarPanel._ready] Node check:")
@@ -108,6 +116,38 @@ func _on_panel_gained_focus() -> void:
 
 func _apply_core_vibe_styling() -> void:
 	"""Apply Core Vibe neon-kawaii styling to calendar elements"""
+
+	# Style the two main panel containers with rounded neon borders
+	if _left_panel:
+		var left_style = aCoreVibeTheme.create_panel_style(
+			aCoreVibeTheme.COLOR_SKY_CYAN,            # Sky Cyan border (calendar)
+			aCoreVibeTheme.COLOR_INK_CHARCOAL,        # Ink charcoal background
+			aCoreVibeTheme.PANEL_OPACITY_SEMI,        # Semi-transparent
+			aCoreVibeTheme.CORNER_RADIUS_MEDIUM,      # 16px corners
+			aCoreVibeTheme.BORDER_WIDTH_THIN,         # 2px border
+			aCoreVibeTheme.SHADOW_SIZE_MEDIUM         # 6px glow
+		)
+		left_style.content_margin_left = 10
+		left_style.content_margin_top = 10
+		left_style.content_margin_right = 10
+		left_style.content_margin_bottom = 10
+		_left_panel.add_theme_stylebox_override("panel", left_style)
+
+	if _right_panel:
+		var right_style = aCoreVibeTheme.create_panel_style(
+			aCoreVibeTheme.COLOR_GRAPE_VIOLET,        # Grape Violet border (events)
+			aCoreVibeTheme.COLOR_INK_CHARCOAL,        # Ink charcoal background
+			aCoreVibeTheme.PANEL_OPACITY_SEMI,        # Semi-transparent
+			aCoreVibeTheme.CORNER_RADIUS_MEDIUM,      # 16px corners
+			aCoreVibeTheme.BORDER_WIDTH_THIN,         # 2px border
+			aCoreVibeTheme.SHADOW_SIZE_MEDIUM         # 6px glow
+		)
+		right_style.content_margin_left = 10
+		right_style.content_margin_top = 10
+		right_style.content_margin_right = 10
+		right_style.content_margin_bottom = 10
+		_right_panel.add_theme_stylebox_override("panel", right_style)
+
 	# Style month label
 	if _label_month:
 		aCoreVibeTheme.style_label(_label_month, aCoreVibeTheme.COLOR_ELECTRIC_LIME, 24)

@@ -21,6 +21,10 @@ const DEFAULT_THRESHOLDS: PackedInt32Array = [1, 3, 5, 7, 10, 11]  # Including T
 @onready var _perk_name: Label = %PerkName
 @onready var _details_text: Label = %DetailsText
 
+# Container references for styling
+@onready var _grid_column: VBoxContainer = get_node("Root/GridColumn") if has_node("Root/GridColumn") else null
+@onready var _right_column: VBoxContainer = get_node("Root/RightColumn") if has_node("Root/RightColumn") else null
+
 # System references
 var _stats: Node = null
 var _perk: Node = null
@@ -79,6 +83,18 @@ func _first_fill() -> void:
 
 func _apply_core_vibe_styling() -> void:
 	"""Apply Core Vibe neon-kawaii styling to PerksPanel elements"""
+
+	# Wrap columns in styled PanelContainers for the neon border look
+	if _grid_column:
+		var grid_panel = _wrap_in_styled_panel(_grid_column, aCoreVibeTheme.COLOR_ELECTRIC_LIME)
+		if grid_panel:
+			print("[PerksPanel] Grid column wrapped in styled panel")
+
+	if _right_column:
+		var right_panel = _wrap_in_styled_panel(_right_column, aCoreVibeTheme.COLOR_SKY_CYAN)
+		if right_panel:
+			print("[PerksPanel] Right column wrapped in styled panel")
+
 	# Style perk points value
 	if _points_value:
 		aCoreVibeTheme.style_label(_points_value, aCoreVibeTheme.COLOR_ELECTRIC_LIME, 18)
@@ -91,6 +107,42 @@ func _apply_core_vibe_styling() -> void:
 	if _details_text:
 		_details_text.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE)
 		_details_text.add_theme_font_size_override("font_size", 14)
+
+func _wrap_in_styled_panel(container: Control, border_color: Color) -> PanelContainer:
+	"""Wrap a container in a styled PanelContainer with rounded neon borders"""
+	if not container or not container.get_parent():
+		return null
+
+	var parent = container.get_parent()
+	var index = container.get_index()
+
+	# Create styled panel
+	var panel = PanelContainer.new()
+	var panel_style = aCoreVibeTheme.create_panel_style(
+		border_color,                             # Border color
+		aCoreVibeTheme.COLOR_INK_CHARCOAL,        # Ink charcoal background
+		aCoreVibeTheme.PANEL_OPACITY_SEMI,        # Semi-transparent
+		aCoreVibeTheme.CORNER_RADIUS_MEDIUM,      # 16px corners
+		aCoreVibeTheme.BORDER_WIDTH_THIN,         # 2px border
+		aCoreVibeTheme.SHADOW_SIZE_MEDIUM         # 6px glow
+	)
+	panel_style.content_margin_left = 10
+	panel_style.content_margin_top = 10
+	panel_style.content_margin_right = 10
+	panel_style.content_margin_bottom = 10
+	panel.add_theme_stylebox_override("panel", panel_style)
+
+	# Preserve size flags
+	panel.size_flags_horizontal = container.size_flags_horizontal
+	panel.size_flags_vertical = container.size_flags_vertical
+
+	# Reparent container into panel
+	parent.remove_child(container)
+	panel.add_child(container)
+	parent.add_child(panel)
+	parent.move_child(panel, index)
+
+	return panel
 
 func _on_visibility_changed() -> void:
 	"""Highlight selection when panel becomes visible, cleanup popups when hidden"""
