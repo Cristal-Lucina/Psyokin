@@ -141,7 +141,9 @@ func _debug_log(message: String) -> void:
 @onready var _root_container : HBoxContainer = $Root
 @onready var _tab_column : VBoxContainer = $Root/TabColumn
 @onready var _tab_list  : ItemList      = %TabList
-# Note: _left_panel and _right_panel removed - unused
+# Container references for Core Vibe styling
+@onready var _left_container : VBoxContainer = $Root/Left if has_node("Root/Left") else null
+@onready var _right_container : VBoxContainer = $Root/Right if has_node("Root/Right") else null
 @onready var _party     : VBoxContainer = $Root/Left/PartyScroll/PartyList
 @onready var _creds     : Label         = $Root/Right/InfoGrid/MoneyValue
 @onready var _perk      : Label         = $Root/Right/InfoGrid/PerkValue
@@ -218,6 +220,7 @@ func _ready() -> void:
 	_create_creds_perks_display()
 	_create_next_mission_display()
 	_hide_old_ui_elements()
+	_apply_core_vibe_styling()
 
 	# Note: PanelBase handles visibility_changed, no need to connect again
 	call_deferred("_first_fill")
@@ -457,6 +460,59 @@ func _create_info_cell(label_text: String, initial_value: String) -> PanelContai
 
 	# Store reference to value label for updating
 	panel.set_meta("value_label", value_label)
+
+	return panel
+
+func _apply_core_vibe_styling() -> void:
+	"""Apply Core Vibe neon-kawaii styling to StatusPanel columns"""
+	# Wrap the three main columns in styled PanelContainers
+
+	# Tab column (menu): Electric Lime border (menu/navigation)
+	if _tab_column:
+		_wrap_in_styled_panel(_tab_column, aCoreVibeTheme.COLOR_ELECTRIC_LIME)
+
+	# Left column (party stats): Sky Cyan border (party/lists)
+	if _left_container:
+		_wrap_in_styled_panel(_left_container, aCoreVibeTheme.COLOR_SKY_CYAN)
+
+	# Right column (player info): Grape Violet border (details/info)
+	if _right_container:
+		_wrap_in_styled_panel(_right_container, aCoreVibeTheme.COLOR_GRAPE_VIOLET)
+
+func _wrap_in_styled_panel(container: Control, border_color: Color) -> PanelContainer:
+	"""Wrap a container in a styled PanelContainer with rounded neon borders"""
+	if not container or not container.get_parent():
+		return null
+
+	var parent = container.get_parent()
+	var index = container.get_index()
+
+	# Create styled panel
+	var panel = PanelContainer.new()
+	var panel_style = aCoreVibeTheme.create_panel_style(
+		border_color,
+		aCoreVibeTheme.COLOR_INK_CHARCOAL,
+		aCoreVibeTheme.PANEL_OPACITY_SEMI,
+		aCoreVibeTheme.CORNER_RADIUS_MEDIUM,
+		aCoreVibeTheme.BORDER_WIDTH_THIN,
+		aCoreVibeTheme.SHADOW_SIZE_MEDIUM
+	)
+	# Add 10px internal padding
+	panel_style.content_margin_left = 10
+	panel_style.content_margin_top = 10
+	panel_style.content_margin_right = 10
+	panel_style.content_margin_bottom = 10
+	panel.add_theme_stylebox_override("panel", panel_style)
+
+	# Preserve size flags and reparent
+	panel.size_flags_horizontal = container.size_flags_horizontal
+	panel.size_flags_vertical = container.size_flags_vertical
+	panel.custom_minimum_size = container.custom_minimum_size
+
+	parent.remove_child(container)
+	panel.add_child(container)
+	parent.add_child(panel)
+	parent.move_child(panel, index)
 
 	return panel
 
