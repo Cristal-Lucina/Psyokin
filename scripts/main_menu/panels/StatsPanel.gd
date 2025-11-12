@@ -152,6 +152,8 @@ func _apply_core_vibe_styling() -> void:
 		_party_list.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE)
 		_party_list.add_theme_color_override("font_selected_color", aCoreVibeTheme.COLOR_CITRUS_YELLOW)
 		_party_list.add_theme_color_override("font_hovered_color", aCoreVibeTheme.COLOR_CITRUS_YELLOW)
+		# Increase font size by 2pts
+		_party_list.add_theme_font_size_override("font_size", 18)
 		# Remove all borders and backgrounds by making them transparent
 		var empty_stylebox = StyleBoxEmpty.new()
 		_party_list.add_theme_stylebox_override("panel", empty_stylebox)
