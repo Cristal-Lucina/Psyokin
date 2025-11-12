@@ -147,10 +147,14 @@ func _apply_core_vibe_styling() -> void:
 		_party_list.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE)
 		_party_list.add_theme_color_override("font_selected_color", aCoreVibeTheme.COLOR_CITRUS_YELLOW)
 		_party_list.add_theme_color_override("font_hovered_color", aCoreVibeTheme.COLOR_CITRUS_YELLOW)
-		# Remove selection border by making it transparent
+		# Remove all borders and backgrounds by making them transparent
 		var empty_stylebox = StyleBoxEmpty.new()
+		_party_list.add_theme_stylebox_override("panel", empty_stylebox)
+		_party_list.add_theme_stylebox_override("focus", empty_stylebox)
 		_party_list.add_theme_stylebox_override("selected", empty_stylebox)
 		_party_list.add_theme_stylebox_override("selected_focus", empty_stylebox)
+		_party_list.add_theme_stylebox_override("cursor", empty_stylebox)
+		_party_list.add_theme_stylebox_override("cursor_unfocused", empty_stylebox)
 
 	# Note: Battle stat cells and affinity cells are dynamically created,
 	# so their styling is applied in their creation functions.
