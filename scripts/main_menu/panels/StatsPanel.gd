@@ -141,6 +141,17 @@ func _apply_core_vibe_styling() -> void:
 		visual_style.content_margin_bottom = 10
 		_visual_panel.add_theme_stylebox_override("panel", visual_style)
 
+	# Style party list colors
+	if _party_list:
+		# Set normal and selected colors for party list
+		_party_list.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE)
+		_party_list.add_theme_color_override("font_selected_color", aCoreVibeTheme.COLOR_CITRUS_YELLOW)
+		_party_list.add_theme_color_override("font_hovered_color", aCoreVibeTheme.COLOR_CITRUS_YELLOW)
+		# Remove selection border by making it transparent
+		var empty_stylebox = StyleBoxEmpty.new()
+		_party_list.add_theme_stylebox_override("selected", empty_stylebox)
+		_party_list.add_theme_stylebox_override("selected_focus", empty_stylebox)
+
 	# Note: Battle stat cells and affinity cells are dynamically created,
 	# so their styling is applied in their creation functions.
 	# RadarChart colors are updated in the RadarChart class itself.
@@ -418,14 +429,14 @@ func _create_affinity_cell(member_name: String, tier: String) -> PanelContainer:
 	var panel := PanelContainer.new()
 	panel.custom_minimum_size = Vector2(0, 30)
 
-	# Core Vibe: Sky Cyan border with Ink Charcoal background (relationships)
+	# Core Vibe: Ink Charcoal background with no border
 	var style = aCoreVibeTheme.create_panel_style(
-		aCoreVibeTheme.COLOR_SKY_CYAN,            # Sky Cyan border (relationship)
+		aCoreVibeTheme.COLOR_INK_CHARCOAL,        # Ink charcoal border (same as bg = no visible border)
 		aCoreVibeTheme.COLOR_INK_CHARCOAL,        # Ink charcoal background
 		aCoreVibeTheme.PANEL_OPACITY_FULL,        # Fully opaque
 		aCoreVibeTheme.CORNER_RADIUS_SMALL,       # 12px corners
-		aCoreVibeTheme.BORDER_WIDTH_THIN,         # 2px border
-		aCoreVibeTheme.SHADOW_SIZE_SMALL          # 4px glow
+		0,                                         # No border
+		0                                          # No glow
 	)
 	panel.add_theme_stylebox_override("panel", style)
 
@@ -513,7 +524,7 @@ func _get_member_mind_type(member_token: String) -> String:
 func _add_stat_pair(grid: GridContainer, label: String, value: String) -> void:
 	"""Add a label/value pair to a grid with Core Vibe styling"""
 	var lbl = Label.new()
-	lbl.text = label + ":"
+	lbl.text = label.to_upper() + ":"  # Make labels uppercase
 	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	# Core Vibe: Sky Cyan label color
 	lbl.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_SKY_CYAN)
@@ -523,8 +534,8 @@ func _add_stat_pair(grid: GridContainer, label: String, value: String) -> void:
 	var val = Label.new()
 	val.text = value
 	val.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-	# Core Vibe: Electric Lime value color
-	val.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_ELECTRIC_LIME)
+	# Core Vibe: Milk White value color
+	val.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE)
 	val.add_theme_font_size_override("font_size", 14)
 	grid.add_child(val)
 
@@ -569,14 +580,14 @@ func _create_stat_cell(stat_label: String, value: String) -> PanelContainer:
 	var panel := PanelContainer.new()
 	panel.custom_minimum_size = Vector2(0, 30)
 
-	# Core Vibe: Plasma Teal border with Ink Charcoal background
+	# Core Vibe: Ink Charcoal background with no border
 	var style = aCoreVibeTheme.create_panel_style(
-		aCoreVibeTheme.COLOR_PLASMA_TEAL,         # Plasma Teal border (stat display)
+		aCoreVibeTheme.COLOR_INK_CHARCOAL,        # Ink charcoal border (same as bg = no visible border)
 		aCoreVibeTheme.COLOR_INK_CHARCOAL,        # Ink charcoal background
 		aCoreVibeTheme.PANEL_OPACITY_FULL,        # Fully opaque
 		aCoreVibeTheme.CORNER_RADIUS_SMALL,       # 12px corners
-		aCoreVibeTheme.BORDER_WIDTH_THIN,         # 2px border
-		aCoreVibeTheme.SHADOW_SIZE_SMALL          # 4px glow
+		0,                                         # No border
+		0                                          # No glow
 	)
 	panel.add_theme_stylebox_override("panel", style)
 
@@ -750,9 +761,27 @@ class RadarChart extends Control:
 			draw_polyline(points, stat_border_color, 2.0)
 
 	func _draw_labels(center: Vector2, radius: float, num_stats: int) -> void:
-		"""Draw stat labels around the chart"""
+		"""Draw stat labels around the chart with individual colors"""
 		if _stat_labels.size() != num_stats:
 			return
+
+		# Map short names to full names
+		var stat_full_names: Dictionary = {
+			"BRW": "BRAWN",
+			"MND": "MIND",
+			"TPO": "TEMPO",
+			"VTL": "VITALITY",
+			"FCS": "FOCUS"
+		}
+
+		# Map stat names to colors
+		var stat_colors: Dictionary = {
+			"BRW": aCoreVibeTheme.COLOR_BUBBLE_MAGENTA,   # BRAWN: Bubble Magenta
+			"MND": aCoreVibeTheme.COLOR_GRAPE_VIOLET,      # MIND: Grape Violet
+			"TPO": aCoreVibeTheme.COLOR_CITRUS_YELLOW,     # TEMPO: Citrus Yellow
+			"VTL": aCoreVibeTheme.COLOR_ELECTRIC_LIME,     # VITALITY: Electric Lime
+			"FCS": aCoreVibeTheme.COLOR_PLASMA_TEAL        # FOCUS: Plasma Teal
+		}
 
 		var angle_step: float = TAU / float(num_stats)
 		var font: Font = get_theme_default_font()
@@ -761,10 +790,19 @@ class RadarChart extends Control:
 		for i in range(num_stats):
 			var angle: float = -PI / 2.0 + angle_step * i
 			var label_pos: Vector2 = center + Vector2(cos(angle), sin(angle)) * radius
-			var label: String = "%s: %d" % [_stat_labels[i], int(_stat_values[i])]
+
+			# Get full name and color
+			var stat_key: String = _stat_labels[i]
+			var full_name: String = stat_full_names.get(stat_key, stat_key)
+			var color: Color = stat_colors.get(stat_key, label_color)
+			var label: String = "%s: %d" % [full_name, int(_stat_values[i])]
 
 			# Get text size for centering
 			var text_size: Vector2 = font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size)
 			label_pos -= text_size / 2.0
 
-			draw_string(font, label_pos, label, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, label_color)
+			# Move VITALITY and TEMPO down 15px
+			if stat_key == "VTL" or stat_key == "TPO":
+				label_pos.y += 15
+
+			draw_string(font, label_pos, label, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, color)
