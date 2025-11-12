@@ -317,8 +317,14 @@ func _load_equipped() -> void:
 				_equipped_by[item_id].append(_member_display_name(member))
 
 func _populate_items() -> void:
+	"""Populate items grid based on current category"""
+	print("[ItemsPanel] _populate_items() called")
+
 	if not _items_grid:
+		print("[ItemsPanel] ERROR: _items_grid is null!")
 		return
+
+	# Clear existing buttons
 	for button in _item_buttons:
 		button.queue_free()
 	_item_buttons.clear()
@@ -326,9 +332,14 @@ func _populate_items() -> void:
 	_selected_grid_index = 0
 
 	if _current_category_index < 0 or _current_category_index >= CATEGORIES.size():
+		print("[ItemsPanel] ERROR: Invalid category index: %d" % _current_category_index)
 		return
 
 	var category: String = CATEGORIES[_current_category_index]["id"]
+	print("[ItemsPanel] Current category: %s" % category)
+	print("[ItemsPanel] Total item counts: %d" % _counts.size())
+	print("[ItemsPanel] Total definitions: %d" % _defs.size())
+
 	var items: Array[String] = []
 	for item_id in _counts.keys():
 		var qty: int = _counts[item_id]
@@ -341,6 +352,8 @@ func _populate_items() -> void:
 		var item_cat: String = _category_of(def)
 		if item_cat == category:
 			items.append(item_id)
+
+	print("[ItemsPanel] Found %d items in category '%s'" % [items.size(), category])
 
 	items.sort_custom(func(a: String, b: String) -> bool:
 		var def_a: Dictionary = _defs.get(a, {})
@@ -363,12 +376,19 @@ func _populate_items() -> void:
 		_items_grid.add_child(button)
 		_item_buttons.append(button)
 		_item_ids.append(item_id)
+		print("[ItemsPanel] Added button: %s" % button.text)
+
+	print("[ItemsPanel] Total buttons created: %d" % _item_buttons.size())
 
 	if _item_buttons.size() > 0:
 		_selected_grid_index = 0
 		_selected_item_id = _item_ids[0]
+		print("[ItemsPanel] Selected first item: %s" % _selected_item_id)
 		_update_details()
 		call_deferred("_update_arrow_position")
+	else:
+		print("[ItemsPanel] WARNING: No items to display!")
+		_clear_details()
 
 func _on_grid_item_pressed(index: int) -> void:
 	if index < 0 or index >= _item_ids.size():
@@ -444,20 +464,54 @@ func _unhandled_input(event: InputEvent) -> void:
 	if not visible:
 		return
 
-	if event.is_action_pressed("ui_shoulder_left"):
+	# L1/R1 - Category navigation
+	if event.is_action_pressed("ui_shoulder_left") or event.is_action_pressed("menu_page_left"):
 		_current_category_index -= 1
 		if _current_category_index < 0:
 			_current_category_index = CATEGORIES.size() - 1
 		_update_category_selection()
 		_populate_items()
 		get_viewport().set_input_as_handled()
-	elif event.is_action_pressed("ui_shoulder_right"):
+	elif event.is_action_pressed("ui_shoulder_right") or event.is_action_pressed("menu_page_right"):
 		_current_category_index += 1
 		if _current_category_index >= CATEGORIES.size():
 			_current_category_index = 0
 		_update_category_selection()
 		_populate_items()
 		get_viewport().set_input_as_handled()
+
+	# D-Pad - Grid item navigation
+	elif event.is_action_pressed("ui_up"):
+		_navigate_grid(-2)  # Up one row (2 columns)
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("ui_down"):
+		_navigate_grid(2)  # Down one row
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("ui_left"):
+		_navigate_grid(-1)  # Left one item
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("ui_right"):
+		_navigate_grid(1)  # Right one item
+		get_viewport().set_input_as_handled()
+
+func _navigate_grid(delta: int) -> void:
+	"""Navigate grid items with directional input"""
+	if _item_buttons.size() == 0:
+		return
+
+	var new_index = _selected_grid_index + delta
+
+	# Clamp to valid range
+	if new_index < 0:
+		new_index = 0
+	elif new_index >= _item_buttons.size():
+		new_index = _item_buttons.size() - 1
+
+	if new_index != _selected_grid_index:
+		_selected_grid_index = new_index
+		_selected_item_id = _item_ids[_selected_grid_index]
+		_update_details()
+		_update_arrow_position()
 
 func _on_visibility_changed() -> void:
 	if visible:
