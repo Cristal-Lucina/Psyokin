@@ -1063,10 +1063,11 @@ func _style_member_card(btn: Button, is_focused: bool) -> void:
 	style.border_width_bottom = 2
 	style.shadow_color = Color(style.border_color.r, style.border_color.g, style.border_color.b, 0.5)
 	style.shadow_size = 4
-	style.content_margin_left = 8
-	style.content_margin_top = 8
-	style.content_margin_right = 8
-	style.content_margin_bottom = 8
+	# Asymmetric padding: 20px left/right, 5px top/bottom
+	style.content_margin_left = 20
+	style.content_margin_top = 5
+	style.content_margin_right = 20
+	style.content_margin_bottom = 5
 
 	btn.add_theme_stylebox_override("normal", style)
 	btn.add_theme_stylebox_override("hover", style)
