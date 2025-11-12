@@ -777,10 +777,10 @@ class RadarChart extends Control:
 		# Map stat names to colors
 		var stat_colors: Dictionary = {
 			"BRW": aCoreVibeTheme.COLOR_BUBBLE_MAGENTA,   # BRAWN: Bubble Magenta
-			"MND": aCoreVibeTheme.COLOR_GRAPE_VIOLET,      # MIND: Grape Violet
-			"TPO": aCoreVibeTheme.COLOR_CITRUS_YELLOW,     # TEMPO: Citrus Yellow
-			"VTL": aCoreVibeTheme.COLOR_ELECTRIC_LIME,     # VITALITY: Electric Lime
-			"FCS": aCoreVibeTheme.COLOR_PLASMA_TEAL        # FOCUS: Plasma Teal
+			"MND": aCoreVibeTheme.COLOR_SKY_CYAN,          # MIND: Sky Cyan
+			"TPO": aCoreVibeTheme.COLOR_ELECTRIC_LIME,     # TEMPO: Electric Lime
+			"VTL": aCoreVibeTheme.COLOR_PLASMA_TEAL,       # VITALITY: Plasma Teal
+			"FCS": aCoreVibeTheme.COLOR_GRAPE_VIOLET       # FOCUS: Grape Violet
 		}
 
 		var angle_step: float = TAU / float(num_stats)
