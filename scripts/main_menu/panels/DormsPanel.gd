@@ -50,6 +50,9 @@ class_name DormsPanel
 # NODE REFERENCES
 # ═══════════════════════════════════════════════════════════════════════════
 
+# Background panel (opaque)
+var _background_panel: PanelContainer = null
+
 # Panel containers (for animation)
 @onready var _left_panel: PanelContainer = %LeftPanel
 @onready var _center_panel: PanelContainer = %CenterPanel
@@ -125,6 +128,9 @@ func _ready() -> void:
 
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 
+	# Create opaque background panel behind all content
+	_create_background_panel()
+
 	# Verify node references
 	print("[DormsPanel._ready] Node checks:")
 	print("  _roster_list: ", _roster_list != null)
@@ -166,8 +172,31 @@ func _ready() -> void:
 	_rebuild()
 	print("[DormsPanel._ready] Initialization complete")
 
+func _create_background_panel() -> void:
+	"""Create an opaque background panel behind all content"""
+	_background_panel = PanelContainer.new()
+	_background_panel.name = "BackgroundPanel"
+	_background_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_background_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE  # Don't block input
+
+	# Insert as first child so it's behind everything
+	add_child(_background_panel)
+	move_child(_background_panel, 0)
+
 func _apply_core_vibe_styling() -> void:
 	"""Apply Core Vibe neon-kawaii styling to DormsPanel elements"""
+
+	# Style opaque background panel (blocks transparency)
+	if _background_panel:
+		var bg_style = aCoreVibeTheme.create_panel_style(
+			aCoreVibeTheme.COLOR_NIGHT_NAVY,          # Night Navy border (subtle)
+			aCoreVibeTheme.COLOR_NIGHT_NAVY,          # Night Navy background
+			1.0,                                       # FULLY OPAQUE (not semi-transparent)
+			0,                                         # No rounded corners (full screen)
+			0,                                         # No border
+			0                                          # No glow
+		)
+		_background_panel.add_theme_stylebox_override("panel", bg_style)
 
 	# Style the three main panel containers with rounded neon borders
 	if _left_panel:
