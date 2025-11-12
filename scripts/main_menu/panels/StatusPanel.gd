@@ -254,7 +254,6 @@ func _build_tab_buttons() -> void:
 		_tab_button_container = VBoxContainer.new()
 		_tab_button_container.name = "TabButtons"
 		_tab_button_container.add_theme_constant_override("separation", 8)
-		_tab_button_container.modulate.a = 0.0  # Start invisible for fade-in animation
 		# No container shift - buttons handle their own positioning
 
 		# Find TabList and replace it with our button container
@@ -523,27 +522,30 @@ func _create_next_mission_display() -> void:
 	container.grow_horizontal = Control.GROW_DIRECTION_BEGIN  # Grow left
 	container.grow_vertical = Control.GROW_DIRECTION_END      # Grow down
 
-	# Create "NEXT MISSION" label with Core Vibe styling
+	# Create "NEXT MISSION" label - light blue
 	var title_label := Label.new()
 	title_label.text = "NEXT MISSION"
 	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	# Core Vibe: Electric Lime title (attention/highlight)
-	aCoreVibeTheme.style_label(title_label, aCoreVibeTheme.COLOR_ELECTRIC_LIME, 28)
+	title_label.add_theme_font_size_override("font_size", 28)
+	title_label.add_theme_color_override("font_color", Color(0.5, 0.8, 1.0))  # Light blue
 	container.add_child(title_label)
 
-	# Create mission box with Core Vibe styling
+	# Create mission box - dark greyish-blue background, no glow
 	var mission_box := PanelContainer.new()
 	mission_box.custom_minimum_size = Vector2(300, 80)
 
-	# Core Vibe: Electric Lime pill capsule panel
-	var style = aCoreVibeTheme.create_panel_style(
-		aCoreVibeTheme.COLOR_ELECTRIC_LIME,       # Electric Lime border (important mission)
-		aCoreVibeTheme.COLOR_INK_CHARCOAL,        # Ink charcoal background
-		aCoreVibeTheme.PANEL_OPACITY_SEMI,        # Semi-transparent
-		aCoreVibeTheme.CORNER_RADIUS_SMALL,       # 12px corners
-		aCoreVibeTheme.BORDER_WIDTH_THIN,         # 2px border
-		aCoreVibeTheme.SHADOW_SIZE_LARGE          # 12px glow
-	)
+	# Dark greyish-blue background matching unselected menu buttons
+	var style = StyleBoxFlat.new()
+	style.bg_color = Color(0.15, 0.2, 0.3)  # Dark greyish-blue
+	style.corner_radius_top_left = 8
+	style.corner_radius_top_right = 8
+	style.corner_radius_bottom_left = 8
+	style.corner_radius_bottom_right = 8
+	style.border_width_left = 0
+	style.border_width_top = 0
+	style.border_width_right = 0
+	style.border_width_bottom = 0
+	style.shadow_size = 0  # No glow
 	mission_box.add_theme_stylebox_override("panel", style)
 
 	# Add margin for padding inside box
@@ -849,7 +851,7 @@ func _rebuild_party() -> void:
 	# === LEADER SECTION ===
 	var leader_header := Label.new()
 	leader_header.text = "LEADER"
-	leader_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	leader_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	leader_header.add_theme_font_size_override("font_size", 16)
 	leader_header.add_theme_color_override("font_color", Color(1, 0.7, 0.75, 1))
 	_party.add_child(leader_header)
@@ -867,7 +869,7 @@ func _rebuild_party() -> void:
 	# === ACTIVE SECTION ===
 	var active_header := Label.new()
 	active_header.text = "ACTIVE"
-	active_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	active_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	active_header.add_theme_font_size_override("font_size", 16)
 	active_header.add_theme_color_override("font_color", Color(1, 0.7, 0.75, 1))
 	_party.add_child(active_header)
@@ -888,7 +890,7 @@ func _rebuild_party() -> void:
 	# === BENCH SECTION ===
 	var bench_header := Label.new()
 	bench_header.text = "BENCH"
-	bench_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	bench_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	bench_header.add_theme_font_size_override("font_size", 16)
 	bench_header.add_theme_color_override("font_color", Color(1, 0.7, 0.75, 1))
 	_party.add_child(bench_header)
@@ -914,6 +916,7 @@ func _create_spacer() -> Control:
 
 func _create_empty_slot(slot_type: String, _slot_idx: int) -> PanelContainer:
 	var panel := PanelContainer.new()
+	panel.size_flags_horizontal = Control.SIZE_SHRINK_CENTER  # Center the empty slot
 	var vbox := VBoxContainer.new()
 	vbox.add_theme_constant_override("separation", 2)
 
@@ -931,6 +934,7 @@ func _create_member_card(member_data: Dictionary, show_switch: bool, active_slot
 	var btn := Button.new()
 	btn.focus_mode = Control.FOCUS_ALL
 	btn.custom_minimum_size = Vector2(0, 50)  # Sleeker: reduced from 80 to 50
+	btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER  # Center the card
 
 	# Store metadata for popup menu
 	var member_id: String = String(member_data.get("_member_id", ""))
@@ -2561,21 +2565,19 @@ func _safe_hero_level() -> int:
 # --------------------- Dev dump/hotkey ------------------------
 
 func _on_visibility_changed() -> void:
-	# Select first tab when panel becomes visible
+	# Select tab when panel becomes visible
 	if visible and _tab_buttons.size() > 0:
-		# Fade in menu buttons for smooth appearance
-		if _tab_button_container:
-			var tween := create_tween()
-			tween.set_ease(Tween.EASE_OUT)
-			tween.set_trans(Tween.TRANS_CUBIC)
-			tween.tween_property(_tab_button_container, "modulate:a", 1.0, 0.3)
+		# Clear all button selections immediately to avoid glitch during slide animation
+		for btn in _tab_buttons:
+			if is_instance_valid(btn):
+				btn.release_focus()
 
-		# Defer to ensure buttons are ready
-		call_deferred("_grab_tab_list_focus")
-	else:
-		# Reset alpha when panel becomes hidden (for next fade-in)
-		if _tab_button_container:
-			_tab_button_container.modulate.a = 0.0
+		# Wait for slide animation to complete (0.5s) before applying selection
+		await get_tree().create_timer(0.5).timeout
+
+		# Now apply the correct selection after slide completes
+		if visible:  # Check still visible
+			call_deferred("_grab_tab_list_focus")
 
 	if not OS.is_debug_build(): return
 	_dev_dump_profiles()
