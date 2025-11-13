@@ -717,7 +717,16 @@ func _populate_items() -> void:
 		var qty: int = _counts.get(item_id, 0)
 		var name: String = _display_name(item_id, def)
 		var button = Button.new()
-		button.text = "%s x%d" % [name, qty]
+
+		# Build button text - for Sigils, show equipped member
+		var button_text: String = "%s x%d" % [name, qty]
+		if CATEGORIES[_current_category_index]["id"] == "Sigils":
+			var equipped_by: String = _get_sigil_equipped_by(item_id)
+			if equipped_by != "":
+				var member_name: String = _member_display_name(equipped_by)
+				button_text = "%s x%d [%s]" % [name, qty, member_name]
+
+		button.text = button_text
 		button.custom_minimum_size = Vector2(284, 40)  # Decreased width by 10px to 284
 		button.alignment = HORIZONTAL_ALIGNMENT_LEFT  # Left-justify text
 		button.focus_mode = Control.FOCUS_NONE  # Disable built-in focus navigation
@@ -822,6 +831,14 @@ func _update_details() -> void:
 	# Sigil info
 	if def.has("sigil_instance") and def.get("sigil_instance", false):
 		details += "[color=#00D9FF]Type:[/color] [color=#F4F7FB]Sigil Instance[/color]\n\n"
+
+		# Check who has this sigil equipped
+		var equipped_by: String = _get_sigil_equipped_by(_selected_item_id)
+		if equipped_by != "":
+			var member_name: String = _member_display_name(equipped_by)
+			details += "[color=#00D9FF]Equipped By:[/color] [color=#FF3D8A]%s[/color]\n\n" % member_name
+		else:
+			details += "[color=#00D9FF]Equipped By:[/color] [color=#888888]Not equipped[/color]\n\n"
 
 	if _details_text:
 		_details_text.text = details
@@ -949,6 +966,33 @@ func _member_display_name(token: String) -> String:
 	if _gs and _gs.has_method("_first_name_for_id"):
 		return _gs.call("_first_name_for_id", token)
 	return token
+
+func _get_sigil_equipped_by(sigil_instance_id: String) -> String:
+	"""Check which party member (if any) has this sigil equipped. Returns member token or empty string."""
+	if not _sig:
+		return ""
+
+	# Get all party members
+	var members: Array[String] = _gather_members()
+
+	# Check each member's loadout
+	for member in members:
+		if _sig.has_method("get_loadout"):
+			var loadout: Variant = _sig.call("get_loadout", member)
+			# Convert to array if it's a PackedStringArray
+			var loadout_array: Array[String] = []
+			if typeof(loadout) == TYPE_PACKED_STRING_ARRAY:
+				for inst_id in (loadout as PackedStringArray):
+					loadout_array.append(String(inst_id))
+			elif typeof(loadout) == TYPE_ARRAY:
+				for inst_id in (loadout as Array):
+					loadout_array.append(String(inst_id))
+
+			# Check if this sigil instance is in the loadout
+			if loadout_array.has(sigil_instance_id):
+				return member
+
+	return ""
 
 func _input(event: InputEvent) -> void:
 	"""Use _input() instead of _unhandled_input() for higher priority than GameMenu"""
