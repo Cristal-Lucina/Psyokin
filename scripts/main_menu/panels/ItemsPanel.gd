@@ -404,8 +404,9 @@ func _apply_styling() -> void:
 	# Style L1 and R1 labels with grey circles
 	if _l1_label:
 		aCoreVibeTheme.style_label(_l1_label, aCoreVibeTheme.COLOR_MILK_WHITE, 12)
+		_l1_label.modulate = Color(1, 1, 1, 0.5)  # 50% transparency for text
 		var l1_style = StyleBoxFlat.new()
-		l1_style.bg_color = Color(0.5, 0.5, 0.5, 0.8)  # Grey
+		l1_style.bg_color = Color(0.3, 0.3, 0.3, 0.4)  # Darker grey with 50% less opacity
 		l1_style.corner_radius_top_left = 12
 		l1_style.corner_radius_top_right = 12
 		l1_style.corner_radius_bottom_left = 12
@@ -418,8 +419,9 @@ func _apply_styling() -> void:
 
 	if _r1_label:
 		aCoreVibeTheme.style_label(_r1_label, aCoreVibeTheme.COLOR_MILK_WHITE, 12)
+		_r1_label.modulate = Color(1, 1, 1, 0.5)  # 50% transparency for text
 		var r1_style = StyleBoxFlat.new()
-		r1_style.bg_color = Color(0.5, 0.5, 0.5, 0.8)  # Grey
+		r1_style.bg_color = Color(0.3, 0.3, 0.3, 0.4)  # Darker grey with 50% less opacity
 		r1_style.corner_radius_top_left = 12
 		r1_style.corner_radius_top_right = 12
 		r1_style.corner_radius_bottom_left = 12
