@@ -159,7 +159,7 @@ func _create_category_icons() -> void:
 
 		# Create panel container for background
 		var panel = PanelContainer.new()
-		panel.custom_minimum_size = Vector2(38, 38)  # Padding around 29px icon
+		panel.custom_minimum_size = Vector2(41, 41)  # 6px padding on all sides around 29px icon
 		panel.mouse_filter = Control.MOUSE_FILTER_IGNORE  # Let clicks pass through to button
 
 		# Create button inside panel
