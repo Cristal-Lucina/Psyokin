@@ -584,16 +584,10 @@ func _update_details() -> void:
 			details += "[color=#00D9FF]Slot:[/color] [color=#F4F7FB]%s[/color]\n\n" % equip_slot
 
 		# Check who has it equipped
-		var equipped_by: Array[String] = []
-		for member in _equipped_by.keys():
-			var member_equip: Dictionary = _equipped_by[member]
-			for slot in member_equip.values():
-				if slot == _selected_item_id:
-					equipped_by.append(_member_display_name(member))
-					break
-
-		if equipped_by.size() > 0:
-			details += "[color=#00D9FF]Equipped By:[/color] [color=#FF3D8A]%s[/color]\n\n" % ", ".join(equipped_by)
+		if _equipped_by.has(_selected_item_id):
+			var equipped_members: Array = _equipped_by[_selected_item_id]
+			if equipped_members.size() > 0:
+				details += "[color=#00D9FF]Equipped By:[/color] [color=#FF3D8A]%s[/color]\n\n" % ", ".join(equipped_members)
 
 	# Sigil info
 	if def.has("sigil_instance") and def.get("sigil_instance", false):
