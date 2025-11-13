@@ -999,6 +999,10 @@ func _input(event: InputEvent) -> void:
 	if not visible:
 		return
 
+	# Debug logging for party picker
+	if _focus_mode == "party_picker" and event is InputEventJoypadButton:
+		print("[ItemsPanel._input] party_picker mode, button: %d, pressed: %s" % [event.button_index, event.pressed])
+
 	# Handle popup input at high priority to block GameMenu from seeing it
 	if _focus_mode == "recovery_confirmation":
 		if event is InputEventJoypadButton and event.pressed:
@@ -1028,8 +1032,11 @@ func _input(event: InputEvent) -> void:
 						_close_member_selection_popup(_active_popup, false)
 					get_viewport().set_input_as_handled()
 					return
+				12, 13, 14, 15:  # D-pad (up, down, left, right) - let ItemList handle these
+					# Don't handle these - let them pass through to the ItemList for navigation
+					return
 				_:
-					# Block all other inputs from reaching GameMenu
+					# Block all other inputs from reaching GameMenu (but don't handle navigation)
 					get_viewport().set_input_as_handled()
 					return
 
@@ -1313,18 +1320,25 @@ func _fade_out_popup(popup: Panel) -> void:
 
 func _on_party_picker_accept() -> void:
 	"""Handle A button in party picker popup"""
+	print("[ItemsPanel] _on_party_picker_accept called")
+
 	if not _party_picker_list or not is_instance_valid(_party_picker_list):
+		print("[ItemsPanel] Party picker list is null or invalid")
 		return
 
 	var selected_indices: Array = _party_picker_list.get_selected_items()
+	print("[ItemsPanel] Selected indices: %s" % str(selected_indices))
 	if selected_indices.size() == 0:
+		print("[ItemsPanel] No items selected in party picker")
 		return
 
 	var index: int = selected_indices[0]
 	if index < 0 or index >= _party_member_tokens.size():
+		print("[ItemsPanel] Invalid index: %d (tokens size: %d)" % [index, _party_member_tokens.size()])
 		return
 
 	var member_token: String = _party_member_tokens[index]
+	print("[ItemsPanel] Using item on member: %s" % member_token)
 
 	# Use item on member
 	_use_item_on_member(_item_to_use_id, _item_to_use_def, member_token)
