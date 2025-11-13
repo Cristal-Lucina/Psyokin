@@ -74,8 +74,8 @@ const CATEGORIES : Array[Dictionary] = [
 @onready var _details_panel: PanelContainer = %DetailsPanel
 @onready var _category_icons_container: HBoxContainer = %CategoryIconsContainer
 @onready var _category_name: Label = %CategoryName
-@onready var _l1_container: Control = %L1Label  # Will replace with icon container
-@onready var _r1_container: Control = %R1Label  # Will replace with icon container
+@onready var _l1_label: Label = %L1Label
+@onready var _r1_label: Label = %R1Label
 @onready var _items_grid: GridContainer = %ItemsGrid
 @onready var _items_scroll: ScrollContainer = %ItemsScroll
 @onready var _item_name: Label = %ItemName
@@ -143,7 +143,6 @@ func _ready() -> void:
 
 	visibility_changed.connect(_on_visibility_changed)
 	_create_category_icons()
-	_setup_shoulder_button_icons()
 	_create_selection_arrow()
 	call_deferred("_apply_styling")
 	call_deferred("_rebuild")
@@ -195,37 +194,6 @@ func _create_category_icons() -> void:
 		_category_panels.append(panel)
 
 	_update_category_selection()
-
-func _setup_shoulder_button_icons() -> void:
-	"""Replace L1/R1 labels with icon graphics"""
-	# Setup L1: Just the L1 icon
-	if _l1_container:
-		# Clear existing content
-		for child in _l1_container.get_children():
-			child.queue_free()
-
-		# L1 icon (Asset 94)
-		var l1_icon = TextureRect.new()
-		l1_icon.texture = load("res://assets/graphics/icons/UI/PNG and PSD - Light/Controller/1x/Asset 94.png")
-		l1_icon.custom_minimum_size = Vector2(24, 24)
-		l1_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		l1_icon.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
-		l1_icon.position.x = -25  # Move 25px to the left
-		_l1_container.add_child(l1_icon)
-
-	# Setup R1: Just the R1 icon
-	if _r1_container:
-		# Clear existing content
-		for child in _r1_container.get_children():
-			child.queue_free()
-
-		# R1 icon (Asset 93)
-		var r1_icon = TextureRect.new()
-		r1_icon.texture = load("res://assets/graphics/icons/UI/PNG and PSD - Light/Controller/1x/Asset 93.png")
-		r1_icon.custom_minimum_size = Vector2(24, 24)
-		r1_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		r1_icon.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
-		_r1_container.add_child(r1_icon)
 
 func _on_category_icon_pressed(index: int) -> void:
 	_current_category_index = index
@@ -432,6 +400,36 @@ func _apply_styling() -> void:
 		aCoreVibeTheme.style_label(_category_name, aCoreVibeTheme.COLOR_SKY_CYAN, 18)
 	if _item_name:
 		aCoreVibeTheme.style_label(_item_name, aCoreVibeTheme.COLOR_MILK_WHITE, 16)
+
+	# Style L1 and R1 labels with grey circles
+	if _l1_label:
+		aCoreVibeTheme.style_label(_l1_label, aCoreVibeTheme.COLOR_MILK_WHITE, 12)
+		var l1_style = StyleBoxFlat.new()
+		l1_style.bg_color = Color(0.5, 0.5, 0.5, 0.8)  # Grey
+		l1_style.corner_radius_top_left = 12
+		l1_style.corner_radius_top_right = 12
+		l1_style.corner_radius_bottom_left = 12
+		l1_style.corner_radius_bottom_right = 12
+		l1_style.content_margin_left = 8
+		l1_style.content_margin_right = 8
+		l1_style.content_margin_top = 4
+		l1_style.content_margin_bottom = 4
+		_l1_label.add_theme_stylebox_override("normal", l1_style)
+
+	if _r1_label:
+		aCoreVibeTheme.style_label(_r1_label, aCoreVibeTheme.COLOR_MILK_WHITE, 12)
+		var r1_style = StyleBoxFlat.new()
+		r1_style.bg_color = Color(0.5, 0.5, 0.5, 0.8)  # Grey
+		r1_style.corner_radius_top_left = 12
+		r1_style.corner_radius_top_right = 12
+		r1_style.corner_radius_bottom_left = 12
+		r1_style.corner_radius_bottom_right = 12
+		r1_style.content_margin_left = 8
+		r1_style.content_margin_right = 8
+		r1_style.content_margin_top = 4
+		r1_style.content_margin_bottom = 4
+		_r1_label.add_theme_stylebox_override("normal", r1_style)
+
 	if _use_button:
 		aCoreVibeTheme.style_button(_use_button, aCoreVibeTheme.COLOR_ELECTRIC_LIME, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
 	if _inspect_button:
