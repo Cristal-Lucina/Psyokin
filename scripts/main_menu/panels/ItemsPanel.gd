@@ -732,6 +732,11 @@ func _populate_items() -> void:
 		style_normal.corner_radius_top_right = 4
 		style_normal.corner_radius_bottom_left = 4
 		style_normal.corner_radius_bottom_right = 4
+		# Add 5px internal padding
+		style_normal.content_margin_left = 5
+		style_normal.content_margin_right = 5
+		style_normal.content_margin_top = 5
+		style_normal.content_margin_bottom = 5
 		button.add_theme_stylebox_override("normal", style_normal)
 		button.add_theme_stylebox_override("hover", style_normal)
 		button.add_theme_stylebox_override("pressed", style_normal)
