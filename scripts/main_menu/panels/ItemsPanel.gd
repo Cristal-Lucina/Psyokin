@@ -718,13 +718,20 @@ func _populate_items() -> void:
 		var name: String = _display_name(item_id, def)
 		var button = Button.new()
 
-		# Build button text - for Sigils, show equipped member
+		# Build button text - for Sigils and Equipment, show equipped member
 		var button_text: String = "%s x%d" % [name, qty]
-		if CATEGORIES[_current_category_index]["id"] == "Sigils":
+		var current_category: String = CATEGORIES[_current_category_index]["id"]
+
+		if current_category == "Sigils":
 			var equipped_by: String = _get_sigil_equipped_by(item_id)
 			if equipped_by != "":
 				var member_name: String = _member_display_name(equipped_by)
 				button_text = "%s x%d [%s]" % [name, qty, member_name]
+		elif current_category == "Equipment":
+			# Check _equipped_by dictionary for equipment
+			if _equipped_by.has(item_id) and _equipped_by[item_id].size() > 0:
+				var equipped_members: String = ", ".join(_equipped_by[item_id])
+				button_text = "%s x%d [%s]" % [name, qty, equipped_members]
 
 		button.text = button_text
 		button.custom_minimum_size = Vector2(284, 40)  # Decreased width by 10px to 284
@@ -827,6 +834,10 @@ func _update_details() -> void:
 			var equipped_members: Array = _equipped_by[_selected_item_id]
 			if equipped_members.size() > 0:
 				details += "[color=#00D9FF]Equipped By:[/color] [color=#FF3D8A]%s[/color]\n\n" % ", ".join(equipped_members)
+			else:
+				details += "[color=#00D9FF]Equipped By:[/color] [color=#888888]Not equipped[/color]\n\n"
+		else:
+			details += "[color=#00D9FF]Equipped By:[/color] [color=#888888]Not equipped[/color]\n\n"
 
 	# Sigil info
 	if def.has("sigil_instance") and def.get("sigil_instance", false):
