@@ -152,15 +152,15 @@ func _create_category_icons() -> void:
 	if not _category_icons_container:
 		return
 
-	# Set spacing between icons
-	_category_icons_container.add_theme_constant_override("separation", 3)
+	# Set spacing between icons - increased by 10px
+	_category_icons_container.add_theme_constant_override("separation", 13)
 
 	for i in range(CATEGORIES.size()):
 		var cat_data: Dictionary = CATEGORIES[i]
 
 		# Create panel container for background
 		var panel = PanelContainer.new()
-		panel.custom_minimum_size = Vector2(41, 41)  # 6px padding on all sides around 29px icon
+		panel.custom_minimum_size = Vector2(27, 27)  # 6px padding on all sides around 15px icon
 		panel.mouse_filter = Control.MOUSE_FILTER_IGNORE  # Let clicks pass through to button
 
 		# Create button inside panel
@@ -179,8 +179,8 @@ func _create_category_icons() -> void:
 		button.set_meta("icon_light", icon_light)
 		button.set_meta("icon_dark", icon_dark)
 
-		# Size settings - 24px increased by 20% = 29px
-		button.custom_minimum_size = Vector2(29, 29)
+		# Size settings - shrunk by 50% (29px -> 15px)
+		button.custom_minimum_size = Vector2(15, 15)
 		button.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
 		button.ignore_texture_size = true
 
@@ -717,7 +717,8 @@ func _populate_items() -> void:
 		var name: String = _display_name(item_id, def)
 		var button = Button.new()
 		button.text = "%s x%d" % [name, qty]
-		button.custom_minimum_size = Vector2(294, 40)  # Increased width to 294
+		button.custom_minimum_size = Vector2(284, 40)  # Decreased width by 10px to 284
+		button.alignment = HORIZONTAL_ALIGNMENT_LEFT  # Left-justify text
 		button.focus_mode = Control.FOCUS_NONE  # Disable built-in focus navigation
 		button.set_meta("item_id", item_id)
 		button.set_meta("grid_index", _item_buttons.size())
