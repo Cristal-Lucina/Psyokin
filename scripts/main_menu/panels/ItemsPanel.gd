@@ -99,6 +99,7 @@ var _equipped_by: Dictionary = {}
 # State
 var _current_category_index: int = 0
 var _category_buttons: Array[TextureButton] = []
+var _category_panels: Array[PanelContainer] = []  # Background panels for category icons
 var _item_buttons: Array[Button] = []
 var _item_ids: Array[String] = []
 var _selected_item_id: String = ""
@@ -152,6 +153,13 @@ func _create_category_icons() -> void:
 
 	for i in range(CATEGORIES.size()):
 		var cat_data: Dictionary = CATEGORIES[i]
+
+		# Create panel container for background
+		var panel = PanelContainer.new()
+		panel.custom_minimum_size = Vector2(32, 32)  # Padding around 24px icon
+		panel.mouse_filter = Control.MOUSE_FILTER_IGNORE  # Let clicks pass through to button
+
+		# Create button inside panel
 		var button = TextureButton.new()
 
 		# Load icon textures
@@ -174,8 +182,13 @@ func _create_category_icons() -> void:
 
 		button.set_meta("category_index", i)
 		button.pressed.connect(_on_category_icon_pressed.bind(i))
-		_category_icons_container.add_child(button)
+
+		# Add button to panel, panel to container
+		panel.add_child(button)
+		_category_icons_container.add_child(panel)
+
 		_category_buttons.append(button)
+		_category_panels.append(panel)
 
 	_update_category_selection()
 
@@ -187,6 +200,7 @@ func _on_category_icon_pressed(index: int) -> void:
 func _update_category_selection() -> void:
 	for i in range(_category_buttons.size()):
 		var button: TextureButton = _category_buttons[i]
+		var panel: PanelContainer = _category_panels[i]
 		var is_selected: bool = (i == _current_category_index)
 
 		# Get stored textures
@@ -217,26 +231,24 @@ func _update_category_selection() -> void:
 		style.corner_radius_bottom_left = 8
 		style.corner_radius_bottom_right = 8
 
-		# Apply background to all states
-		button.add_theme_stylebox_override("normal", style)
-		button.add_theme_stylebox_override("hover", style)
-		button.add_theme_stylebox_override("pressed", style)
+		# Apply background to panel (not button)
+		panel.add_theme_stylebox_override("panel", style)
 
 		# No scale change
 		button.scale = Vector2(1.0, 1.0)
 
-		# Start pulse animation for selected button
+		# Start pulse animation for selected panel
 		if is_selected:
-			_start_category_pulse(button)
+			_start_category_pulse(panel)
 
 	if _category_name and _current_category_index < CATEGORIES.size():
 		_category_name.text = CATEGORIES[_current_category_index]["id"].to_upper()
 
-func _start_category_pulse(button: TextureButton) -> void:
+func _start_category_pulse(panel: PanelContainer) -> void:
 	"""Pulse animation for selected category icon"""
-	# Kill any existing tween on this button
-	if button.has_meta("pulse_tween"):
-		var old_tween = button.get_meta("pulse_tween")
+	# Kill any existing tween on this panel
+	if panel.has_meta("pulse_tween"):
+		var old_tween = panel.get_meta("pulse_tween")
 		if old_tween and is_instance_valid(old_tween):
 			old_tween.kill()
 
@@ -247,18 +259,18 @@ func _start_category_pulse(button: TextureButton) -> void:
 
 	# Pulse the shadow/glow size
 	tween.tween_method(func(value: int):
-		var style = button.get_theme_stylebox("normal") as StyleBoxFlat
+		var style = panel.get_theme_stylebox("panel") as StyleBoxFlat
 		if style:
 			style.shadow_size = value
 	, 8, 12, 0.6)
 
 	tween.tween_method(func(value: int):
-		var style = button.get_theme_stylebox("normal") as StyleBoxFlat
+		var style = panel.get_theme_stylebox("panel") as StyleBoxFlat
 		if style:
 			style.shadow_size = value
 	, 12, 8, 0.6)
 
-	button.set_meta("pulse_tween", tween)
+	panel.set_meta("pulse_tween", tween)
 
 func _create_selection_arrow() -> void:
 	_selection_arrow = Label.new()
