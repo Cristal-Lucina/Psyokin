@@ -210,6 +210,7 @@ func _setup_shoulder_button_icons() -> void:
 		l1_icon.custom_minimum_size = Vector2(24, 24)
 		l1_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		l1_icon.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+		l1_icon.position.x = -15  # Move 15px to the left
 		_l1_container.add_child(l1_icon)
 
 	# Setup R1: Just the R1 icon
