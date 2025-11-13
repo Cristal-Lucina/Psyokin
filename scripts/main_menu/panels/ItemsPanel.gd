@@ -216,9 +216,9 @@ func _update_category_selection() -> void:
 		# Create rounded box background
 		var style = StyleBoxFlat.new()
 		if is_selected:
-			# Selected: Milk White background with Citrus Yellow glow
+			# Selected: Milk White background with Sky Cyan glow
 			style.bg_color = Color("#F4F7FB")  # Milk White
-			style.shadow_color = Color("#FFE84D")  # Citrus Yellow
+			style.shadow_color = Color("#4DE9FF")  # Sky Cyan
 			style.shadow_size = 8
 			style.shadow_offset = Vector2(0, 0)
 		else:
