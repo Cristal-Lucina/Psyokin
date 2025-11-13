@@ -198,15 +198,11 @@ func _create_category_icons() -> void:
 
 func _setup_shoulder_button_icons() -> void:
 	"""Replace L1/R1 labels with icon graphics"""
-	# Setup L1: [L1 icon] [Right arrow]
+	# Setup L1: Just the L1 icon
 	if _l1_container:
 		# Clear existing content
 		for child in _l1_container.get_children():
 			child.queue_free()
-
-		# Create HBoxContainer
-		var l1_hbox = HBoxContainer.new()
-		l1_hbox.add_theme_constant_override("separation", 4)
 
 		# L1 icon (Asset 94)
 		var l1_icon = TextureRect.new()
@@ -214,35 +210,13 @@ func _setup_shoulder_button_icons() -> void:
 		l1_icon.custom_minimum_size = Vector2(24, 24)
 		l1_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		l1_icon.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
-		l1_hbox.add_child(l1_icon)
+		_l1_container.add_child(l1_icon)
 
-		# Right arrow (Asset 53)
-		var l1_arrow = TextureRect.new()
-		l1_arrow.texture = load("res://assets/graphics/icons/UI/PNG and PSD - Light/Controller/1x/Asset 53.png")
-		l1_arrow.custom_minimum_size = Vector2(24, 24)
-		l1_arrow.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		l1_arrow.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
-		l1_hbox.add_child(l1_arrow)
-
-		_l1_container.add_child(l1_hbox)
-
-	# Setup R1: [Left arrow] [R1 icon]
+	# Setup R1: Just the R1 icon
 	if _r1_container:
 		# Clear existing content
 		for child in _r1_container.get_children():
 			child.queue_free()
-
-		# Create HBoxContainer
-		var r1_hbox = HBoxContainer.new()
-		r1_hbox.add_theme_constant_override("separation", 4)
-
-		# Left arrow (Asset 54)
-		var r1_arrow = TextureRect.new()
-		r1_arrow.texture = load("res://assets/graphics/icons/UI/PNG and PSD - Light/Controller/1x/Asset 54.png")
-		r1_arrow.custom_minimum_size = Vector2(24, 24)
-		r1_arrow.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		r1_arrow.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
-		r1_hbox.add_child(r1_arrow)
 
 		# R1 icon (Asset 93)
 		var r1_icon = TextureRect.new()
@@ -250,9 +224,7 @@ func _setup_shoulder_button_icons() -> void:
 		r1_icon.custom_minimum_size = Vector2(24, 24)
 		r1_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		r1_icon.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
-		r1_hbox.add_child(r1_icon)
-
-		_r1_container.add_child(r1_hbox)
+		_r1_container.add_child(r1_icon)
 
 func _on_category_icon_pressed(index: int) -> void:
 	_current_category_index = index
