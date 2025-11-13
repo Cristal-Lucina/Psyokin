@@ -1018,9 +1018,11 @@ func _input(event: InputEvent) -> void:
 	if _focus_mode == "recovery_confirmation":
 		# Block ALL input when recovery confirmation is showing
 		if event is InputEventJoypadButton:
+			print("[ItemsPanel._input] recovery_confirmation blocking button: %d, pressed: %s" % [event.button_index, event.pressed])
 			if event.pressed:
 				match event.button_index:
 					0:  # Accept button
+						print("[ItemsPanel._input] Accept button pressed on recovery confirmation")
 						if _active_popup and is_instance_valid(_active_popup):
 							var ok_btn = _active_popup.get_meta("ok_button", null)
 							if ok_btn and is_instance_valid(ok_btn):
@@ -1228,11 +1230,20 @@ func _show_member_selection_popup() -> void:
 	get_tree().root.add_child(overlay)
 	get_tree().root.move_child(overlay, 0)
 
+	# Create background blocker to prevent clicking and controller input through
+	var blocker := ColorRect.new()
+	blocker.color = Color(0, 0, 0, 0.5)  # Semi-transparent black
+	blocker.mouse_filter = Control.MOUSE_FILTER_STOP  # Block all mouse input
+	blocker.set_anchors_preset(Control.PRESET_FULL_RECT)  # Fill entire screen
+	blocker.focus_mode = Control.FOCUS_ALL  # Allow it to receive input events
+	overlay.add_child(blocker)
+
 	# Create popup panel
 	var popup_panel: Panel = Panel.new()
 	popup_panel.process_mode = Node.PROCESS_MODE_ALWAYS
 	popup_panel.z_index = 100
 	popup_panel.modulate = Color(1, 1, 1, 0)  # Start transparent for fade in
+	popup_panel.mouse_filter = Control.MOUSE_FILTER_STOP  # Block input to elements behind
 	overlay.add_child(popup_panel)
 
 	# Apply consistent styling
@@ -1578,18 +1589,20 @@ func _show_recovery_confirmation(message: String) -> void:
 	"""Show recovery confirmation popup"""
 	print("[ItemsPanel] Showing recovery confirmation: %s" % message)
 
-	# Create CanvasLayer overlay
+	# Create CanvasLayer overlay (for paused context)
 	var overlay := CanvasLayer.new()
 	overlay.layer = 100
 	overlay.process_mode = Node.PROCESS_MODE_ALWAYS
-	overlay.process_priority = -1000
+	overlay.process_priority = -1000  # CRITICAL: Process before GameMenu
 	get_tree().root.add_child(overlay)
+	get_tree().root.move_child(overlay, 0)  # Move to front of processing order
 
 	# Create background blocker to prevent clicking through
 	var blocker := ColorRect.new()
 	blocker.color = Color(0, 0, 0, 0.5)  # Semi-transparent black
 	blocker.mouse_filter = Control.MOUSE_FILTER_STOP  # Block all mouse input
 	blocker.set_anchors_preset(Control.PRESET_FULL_RECT)  # Fill entire screen
+	blocker.focus_mode = Control.FOCUS_ALL  # Allow it to receive input events
 	overlay.add_child(blocker)
 
 	# Create popup panel
