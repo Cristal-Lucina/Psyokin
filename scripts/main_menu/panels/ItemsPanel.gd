@@ -1016,21 +1016,36 @@ func _input(event: InputEvent) -> void:
 
 	# Handle popup input at high priority to block GameMenu from seeing it
 	if _focus_mode == "recovery_confirmation":
-		if event is InputEventJoypadButton and event.pressed:
-			match event.button_index:
-				0:  # Accept button
-					if _active_popup and is_instance_valid(_active_popup):
-						var ok_btn = _active_popup.get_meta("ok_button", null)
-						if ok_btn and is_instance_valid(ok_btn):
-							ok_btn.emit_signal("pressed")
-					get_viewport().set_input_as_handled()
-					return
-				_:
-					# Block all other inputs from reaching GameMenu
-					get_viewport().set_input_as_handled()
-					return
+		# Block ALL input when recovery confirmation is showing
+		if event is InputEventJoypadButton:
+			if event.pressed:
+				match event.button_index:
+					0:  # Accept button
+						if _active_popup and is_instance_valid(_active_popup):
+							var ok_btn = _active_popup.get_meta("ok_button", null)
+							if ok_btn and is_instance_valid(ok_btn):
+								ok_btn.emit_signal("pressed")
+						get_viewport().set_input_as_handled()
+						return
+					_:
+						# Block all other button presses from reaching GameMenu
+						get_viewport().set_input_as_handled()
+						return
+			else:
+				# Block button releases too
+				get_viewport().set_input_as_handled()
+				return
+		elif event is InputEventJoypadMotion:
+			# Block joystick motion
+			get_viewport().set_input_as_handled()
+			return
 
 	if _focus_mode == "party_picker":
+		# Allow joystick motion for ItemList navigation
+		if event is InputEventJoypadMotion:
+			# Let joystick motion pass through to ItemList for up/down navigation
+			return
+
 		if event is InputEventJoypadButton and event.pressed:
 			match event.button_index:
 				0:  # Accept button
