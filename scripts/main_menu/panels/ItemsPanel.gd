@@ -151,6 +151,9 @@ func _create_category_icons() -> void:
 	if not _category_icons_container:
 		return
 
+	# Set spacing between icons
+	_category_icons_container.add_theme_constant_override("separation", 3)
+
 	for i in range(CATEGORIES.size()):
 		var cat_data: Dictionary = CATEGORIES[i]
 
