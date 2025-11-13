@@ -555,10 +555,49 @@ func _update_details() -> void:
 		_item_name.text = name
 
 	var details: String = ""
-	details += "Quantity: [color=#C8FF3D]x%d[/color]\n\n" % qty
+
+	# Category/Type
+	var item_category: String = _category_of(def)
+	details += "[color=#00D9FF]Type:[/color] [color=#F4F7FB]%s[/color]\n\n" % item_category
+
+	# Quantity
+	details += "[color=#00D9FF]Quantity:[/color] [color=#C8FF3D]x%d[/color]\n\n" % qty
+
+	# Description
 	var desc: String = _get_description(def)
 	if desc != "":
-		details += "[color=#F4F7FB]%s[/color]\n\n" % desc
+		details += "[color=#00D9FF]Description:[/color]\n[color=#F4F7FB]%s[/color]\n\n" % desc
+
+	# Healing effects (if recovery item)
+	if _is_recovery_item(def):
+		var field_effect: String = String(def.get("field_status_effect", ""))
+		var battle_effect: String = String(def.get("battle_status_effect", ""))
+		if field_effect != "":
+			details += "[color=#00D9FF]Field Effect:[/color]\n[color=#C8FF3D]%s[/color]\n\n" % field_effect
+		if battle_effect != "":
+			details += "[color=#00D9FF]Battle Effect:[/color]\n[color=#C8FF3D]%s[/color]\n\n" % battle_effect
+
+	# Equipment info (if equipment)
+	if _is_equipment(def):
+		var equip_slot: String = String(def.get("equip_slot", "")).capitalize()
+		if equip_slot != "":
+			details += "[color=#00D9FF]Slot:[/color] [color=#F4F7FB]%s[/color]\n\n" % equip_slot
+
+		# Check who has it equipped
+		var equipped_by: Array[String] = []
+		for member in _equipped_by.keys():
+			var member_equip: Dictionary = _equipped_by[member]
+			for slot in member_equip.values():
+				if slot == _selected_item_id:
+					equipped_by.append(_member_display_name(member))
+					break
+
+		if equipped_by.size() > 0:
+			details += "[color=#00D9FF]Equipped By:[/color] [color=#FF3D8A]%s[/color]\n\n" % ", ".join(equipped_by)
+
+	# Sigil info
+	if def.has("sigil_instance") and def.get("sigil_instance", false):
+		details += "[color=#00D9FF]Type:[/color] [color=#F4F7FB]Sigil Instance[/color]\n\n"
 
 	if _details_text:
 		_details_text.text = details
