@@ -956,6 +956,21 @@ func _input(event: InputEvent) -> void:
 		return
 
 	# Handle popup input at high priority to block GameMenu from seeing it
+	if _focus_mode == "recovery_confirmation":
+		if event is InputEventJoypadButton and event.pressed:
+			match event.button_index:
+				0:  # Accept button
+					if _active_popup and is_instance_valid(_active_popup):
+						var ok_btn = _active_popup.get_meta("ok_button", null)
+						if ok_btn and is_instance_valid(ok_btn):
+							ok_btn.emit_signal("pressed")
+					get_viewport().set_input_as_handled()
+					return
+				_:
+					# Block all other inputs from reaching GameMenu
+					get_viewport().set_input_as_handled()
+					return
+
 	if _focus_mode == "party_picker":
 		if event is InputEventJoypadButton and event.pressed:
 			match event.button_index:
@@ -1523,6 +1538,7 @@ func _show_recovery_confirmation(message: String) -> void:
 	var ok_btn := Button.new()
 	ok_btn.text = "OK"
 	ok_btn.custom_minimum_size = Vector2(100, 40)
+	ok_btn.focus_mode = Control.FOCUS_ALL
 	vbox.add_child(ok_btn)
 
 	# Auto-size panel
@@ -1535,11 +1551,24 @@ func _show_recovery_confirmation(message: String) -> void:
 	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
 	popup_panel.position = (viewport_size - popup_panel.size) / 2.0
 
+	# Store reference for input handling
+	popup_panel.set_meta("ok_button", ok_btn)
+	popup_panel.set_meta("is_recovery_confirmation", true)
+	_active_popup = popup_panel
+	_focus_mode = "recovery_confirmation"
+
 	# Fade in
 	_fade_in_popup(popup_panel)
 
+	# Give focus to OK button
+	ok_btn.call_deferred("grab_focus")
+
 	# Wait for OK button press
 	await ok_btn.pressed
+
+	# Clear focus mode
+	_focus_mode = "items"
+	_active_popup = null
 
 	# Fade out
 	await _fade_out_popup(popup_panel)
