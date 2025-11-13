@@ -17,16 +17,56 @@ const KEY_ID    : String = "item_id"
 
 # Categories with icons
 const CATEGORIES : Array[Dictionary] = [
-	{"id": "Acquired", "icon": "A"},
-	{"id": "Recovery", "icon": "♥"},
-	{"id": "Battle", "icon": "💣"},
-	{"id": "Equipment", "icon": "⚔"},
-	{"id": "Sigils", "icon": "◆"},
-	{"id": "Capture", "icon": "⛓"},
-	{"id": "Material", "icon": "▪"},
-	{"id": "Gifts", "icon": "🎁"},
-	{"id": "Key", "icon": "🗝"},
-	{"id": "Other", "icon": "O"}
+	{
+		"id": "Acquired",
+		"icon_light": "res://assets/graphics/icons/UI/PNG and PSD - Light/Icon set 1/1x/Asset 33.png",
+		"icon_dark": "res://assets/graphics/icons/UI/PNG and PSD - Dark/Icon set 1/1x/Asset 33.png"
+	},
+	{
+		"id": "Recovery",
+		"icon_light": "res://assets/graphics/icons/UI/PNG and PSD - Light/Icon set 2/1x/Asset 85.png",
+		"icon_dark": "res://assets/graphics/icons/UI/PNG and PSD - Dark/Icon set 2/1x/Asset 85.png"
+	},
+	{
+		"id": "Battle",
+		"icon_light": "res://assets/graphics/icons/UI/PNG and PSD - Light/Icon set 2/1x/Asset 83.png",
+		"icon_dark": "res://assets/graphics/icons/UI/PNG and PSD - Dark/Icon set 2/1x/Asset 83.png"
+	},
+	{
+		"id": "Equipment",
+		"icon_light": "res://assets/graphics/icons/UI/PNG and PSD - Light/Icon set 2/1x/Asset 54.png",
+		"icon_dark": "res://assets/graphics/icons/UI/PNG and PSD - Dark/Icon set 2/1x/Asset 54.png"
+	},
+	{
+		"id": "Sigils",
+		"icon_light": "res://assets/graphics/icons/UI/PNG and PSD - Light/Icon set 2/1x/Asset 71.png",
+		"icon_dark": "res://assets/graphics/icons/UI/PNG and PSD - Dark/Icon set 2/1x/Asset 71.png"
+	},
+	{
+		"id": "Capture",
+		"icon_light": "res://assets/graphics/icons/UI/PNG and PSD - Light/Icon set 2/1x/Asset 61.png",
+		"icon_dark": "res://assets/graphics/icons/UI/PNG and PSD - Dark/Icon set 2/1x/Asset 61.png"
+	},
+	{
+		"id": "Material",
+		"icon_light": "res://assets/graphics/icons/UI/PNG and PSD - Light/Icon set 3/1x/Asset 8.png",
+		"icon_dark": "res://assets/graphics/icons/UI/PNG and PSD - Dark/Icon set 3/1x/Asset 8.png"
+	},
+	{
+		"id": "Gifts",
+		"icon_light": "res://assets/graphics/icons/UI/PNG and PSD - Light/Icon set 1/1x/Asset 8.png",
+		"icon_dark": "res://assets/graphics/icons/UI/PNG and PSD - Dark/Icon set 1/1x/Asset 8.png"
+	},
+	{
+		"id": "Key",
+		"icon_light": "res://assets/graphics/icons/UI/PNG and PSD - Light/Icon set 1/1x/Asset 72.png",
+		"icon_dark": "res://assets/graphics/icons/UI/PNG and PSD - Dark/Icon set 1/1x/Asset 72.png"
+	},
+	{
+		"id": "Other",
+		"icon_light": "res://assets/graphics/icons/UI/PNG and PSD - Light/Icon set 1/1x/Asset 86.png",
+		"icon_dark": "res://assets/graphics/icons/UI/PNG and PSD - Dark/Icon set 1/1x/Asset 86.png"
+	}
 ]
 
 # Scene references
@@ -58,7 +98,7 @@ var _equipped_by: Dictionary = {}
 
 # State
 var _current_category_index: int = 0
-var _category_buttons: Array[Button] = []
+var _category_buttons: Array[TextureButton] = []
 var _item_buttons: Array[Button] = []
 var _item_ids: Array[String] = []
 var _selected_item_id: String = ""
@@ -112,10 +152,26 @@ func _create_category_icons() -> void:
 
 	for i in range(CATEGORIES.size()):
 		var cat_data: Dictionary = CATEGORIES[i]
-		var button = Button.new()
-		button.text = cat_data["icon"]
+		var button = TextureButton.new()
+
+		# Load icon textures
+		var icon_light = load(cat_data["icon_light"]) as Texture2D
+		var icon_dark = load(cat_data["icon_dark"]) as Texture2D
+
+		# Set initial texture (light when not selected)
+		button.texture_normal = icon_light
+		button.texture_hover = icon_light
+		button.texture_pressed = icon_light
+
+		# Store both textures as metadata
+		button.set_meta("icon_light", icon_light)
+		button.set_meta("icon_dark", icon_dark)
+
+		# Size settings
 		button.custom_minimum_size = Vector2(48, 48)
-		button.add_theme_font_size_override("font_size", 24)
+		button.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
+		button.ignore_texture_size = true
+
 		button.set_meta("category_index", i)
 		button.pressed.connect(_on_category_icon_pressed.bind(i))
 		_category_icons_container.add_child(button)
@@ -130,21 +186,20 @@ func _on_category_icon_pressed(index: int) -> void:
 
 func _update_category_selection() -> void:
 	for i in range(_category_buttons.size()):
-		var button: Button = _category_buttons[i]
+		var button: TextureButton = _category_buttons[i]
 		var is_selected: bool = (i == _current_category_index)
-		var style = StyleBoxFlat.new()
-		style.bg_color = aCoreVibeTheme.COLOR_NIGHT_NAVY if not is_selected else aCoreVibeTheme.COLOR_MILK_WHITE
-		style.corner_radius_top_left = 8
-		style.corner_radius_top_right = 8
-		style.corner_radius_bottom_left = 8
-		style.corner_radius_bottom_right = 8
-		button.add_theme_stylebox_override("normal", style)
-		button.add_theme_stylebox_override("hover", style)
-		button.add_theme_stylebox_override("pressed", style)
-		var text_color: Color = aCoreVibeTheme.COLOR_MILK_WHITE if not is_selected else aCoreVibeTheme.COLOR_NIGHT_NAVY
-		button.add_theme_color_override("font_color", text_color)
-		button.add_theme_color_override("font_hover_color", text_color)
-		button.add_theme_color_override("font_pressed_color", text_color)
+
+		# Get stored textures
+		var icon_light: Texture2D = button.get_meta("icon_light")
+		var icon_dark: Texture2D = button.get_meta("icon_dark")
+
+		# Use dark theme when selected, light theme when not selected
+		var texture: Texture2D = icon_dark if is_selected else icon_light
+		button.texture_normal = texture
+		button.texture_hover = texture
+		button.texture_pressed = texture
+
+		# Scale selected icon slightly larger
 		var scale_factor: float = 1.1 if is_selected else 1.0
 		button.scale = Vector2(scale_factor, scale_factor)
 
