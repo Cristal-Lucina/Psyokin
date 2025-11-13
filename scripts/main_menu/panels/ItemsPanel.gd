@@ -1262,11 +1262,19 @@ func _show_recovery_confirmation(message: String) -> void:
 	overlay.process_priority = -1000
 	get_tree().root.add_child(overlay)
 
+	# Create background blocker to prevent clicking through
+	var blocker := ColorRect.new()
+	blocker.color = Color(0, 0, 0, 0.5)  # Semi-transparent black
+	blocker.mouse_filter = Control.MOUSE_FILTER_STOP  # Block all mouse input
+	blocker.set_anchors_preset(Control.PRESET_FULL_RECT)  # Fill entire screen
+	overlay.add_child(blocker)
+
 	# Create popup panel
 	var popup_panel: Panel = Panel.new()
 	popup_panel.process_mode = Node.PROCESS_MODE_ALWAYS
 	popup_panel.z_index = 100
 	popup_panel.modulate = Color(1, 1, 1, 0)
+	popup_panel.mouse_filter = Control.MOUSE_FILTER_STOP  # Block input to elements behind
 	overlay.add_child(popup_panel)
 
 	# Apply styling
