@@ -167,8 +167,8 @@ func _create_category_icons() -> void:
 		button.set_meta("icon_light", icon_light)
 		button.set_meta("icon_dark", icon_dark)
 
-		# Size settings
-		button.custom_minimum_size = Vector2(48, 48)
+		# Size settings - shrink icons by 50% (48 -> 24)
+		button.custom_minimum_size = Vector2(24, 24)
 		button.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
 		button.ignore_texture_size = true
 
@@ -199,12 +199,66 @@ func _update_category_selection() -> void:
 		button.texture_hover = texture
 		button.texture_pressed = texture
 
-		# Scale selected icon slightly larger
-		var scale_factor: float = 1.1 if is_selected else 1.0
-		button.scale = Vector2(scale_factor, scale_factor)
+		# Create rounded box background
+		var style = StyleBoxFlat.new()
+		if is_selected:
+			# Selected: Milk White background with Citrus Yellow glow
+			style.bg_color = Color("#F4F7FB")  # Milk White
+			style.shadow_color = Color("#FFE84D")  # Citrus Yellow
+			style.shadow_size = 8
+			style.shadow_offset = Vector2(0, 0)
+		else:
+			# Unselected: Night Navy background
+			style.bg_color = Color("#0A0F1A")  # Night Navy
+
+		# Rounded corners
+		style.corner_radius_top_left = 8
+		style.corner_radius_top_right = 8
+		style.corner_radius_bottom_left = 8
+		style.corner_radius_bottom_right = 8
+
+		# Apply background to all states
+		button.add_theme_stylebox_override("normal", style)
+		button.add_theme_stylebox_override("hover", style)
+		button.add_theme_stylebox_override("pressed", style)
+
+		# No scale change
+		button.scale = Vector2(1.0, 1.0)
+
+		# Start pulse animation for selected button
+		if is_selected:
+			_start_category_pulse(button)
 
 	if _category_name and _current_category_index < CATEGORIES.size():
 		_category_name.text = CATEGORIES[_current_category_index]["id"].to_upper()
+
+func _start_category_pulse(button: TextureButton) -> void:
+	"""Pulse animation for selected category icon"""
+	# Kill any existing tween on this button
+	if button.has_meta("pulse_tween"):
+		var old_tween = button.get_meta("pulse_tween")
+		if old_tween and is_instance_valid(old_tween):
+			old_tween.kill()
+
+	# Create pulsing glow effect
+	var tween = create_tween()
+	tween.set_loops()
+	tween.set_parallel(false)
+
+	# Pulse the shadow/glow size
+	tween.tween_method(func(value: int):
+		var style = button.get_theme_stylebox("normal") as StyleBoxFlat
+		if style:
+			style.shadow_size = value
+	, 8, 12, 0.6)
+
+	tween.tween_method(func(value: int):
+		var style = button.get_theme_stylebox("normal") as StyleBoxFlat
+		if style:
+			style.shadow_size = value
+	, 12, 8, 0.6)
+
+	button.set_meta("pulse_tween", tween)
 
 func _create_selection_arrow() -> void:
 	_selection_arrow = Label.new()
