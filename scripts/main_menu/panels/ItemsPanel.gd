@@ -1147,6 +1147,23 @@ func _use_item_on_member(item_id: String, item_def: Dictionary, member_token: St
 		_inv.call("remove_item", item_id, 1)
 		print("[ItemsPanel] Item consumed, inventory should emit signal now")
 
+	# Show recovery confirmation popup if item had healing effect
+	if healed:
+		var member_name: String = _member_display_name(member_token)
+		var hp_healed: int = new_hp - hp
+		var mp_healed: int = new_mp - mp
+
+		# Build recovery message
+		var recovery_parts: Array[String] = []
+		if hp_healed > 0:
+			recovery_parts.append("%d HP" % hp_healed)
+		if mp_healed > 0:
+			recovery_parts.append("%d MP" % mp_healed)
+
+		if recovery_parts.size() > 0:
+			var recovery_message: String = "%s recovered %s" % [member_name, " and ".join(recovery_parts)]
+			await _show_recovery_confirmation(recovery_message)
+
 	print("[ItemsPanel] _counts size after use: %d" % _counts.size())
 	print("[ItemsPanel] === USE ITEM END ===")
 
@@ -1194,6 +1211,75 @@ func _gather_members() -> Array[String]:
 					members.append(String(s))
 
 	return members
+
+func _show_recovery_confirmation(message: String) -> void:
+	"""Show recovery confirmation popup"""
+	print("[ItemsPanel] Showing recovery confirmation: %s" % message)
+
+	# Create CanvasLayer overlay
+	var overlay := CanvasLayer.new()
+	overlay.layer = 100
+	overlay.process_mode = Node.PROCESS_MODE_ALWAYS
+	overlay.process_priority = -1000
+	get_tree().root.add_child(overlay)
+
+	# Create popup panel
+	var popup_panel: Panel = Panel.new()
+	popup_panel.process_mode = Node.PROCESS_MODE_ALWAYS
+	popup_panel.z_index = 100
+	popup_panel.modulate = Color(1, 1, 1, 0)
+	overlay.add_child(popup_panel)
+
+	# Apply styling
+	_style_popup_panel(popup_panel)
+
+	# Store overlay reference
+	popup_panel.set_meta("_overlay", overlay)
+
+	# Create content container
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 12)
+	popup_panel.add_child(vbox)
+
+	# Message label
+	var message_label := Label.new()
+	message_label.text = message
+	message_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	message_label.add_theme_font_size_override("font_size", 16)
+	vbox.add_child(message_label)
+
+	# OK button
+	var ok_btn := Button.new()
+	ok_btn.text = "OK"
+	ok_btn.custom_minimum_size = Vector2(100, 40)
+	vbox.add_child(ok_btn)
+
+	# Auto-size panel
+	await get_tree().process_frame
+	await get_tree().process_frame
+	popup_panel.size = vbox.size + Vector2(40, 40)
+	vbox.position = Vector2(20, 20)
+
+	# Center popup on screen
+	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
+	popup_panel.position = (viewport_size - popup_panel.size) / 2.0
+
+	# Fade in
+	_fade_in_popup(popup_panel)
+
+	# Wait for OK button press
+	await ok_btn.pressed
+
+	# Fade out
+	await _fade_out_popup(popup_panel)
+
+	# Clean up
+	if popup_panel and is_instance_valid(popup_panel):
+		popup_panel.queue_free()
+	if overlay and is_instance_valid(overlay):
+		overlay.queue_free()
+
+	print("[ItemsPanel] Recovery confirmation closed")
 
 func _get_member_hp_mp(member_token: String) -> Dictionary:
 	"""Get member HP/MP stats - matches StatusPanel implementation"""
