@@ -290,6 +290,7 @@ func _rebuild() -> void:
 	_load_inventory()
 	_load_equipped()
 	_add_sigil_instances()  # Add sigil instances as virtual items
+	_add_equipment_instances()  # Convert equipment to individual instances
 	_populate_items()
 	_update_details()
 
@@ -434,6 +435,74 @@ func _add_sigil_instances() -> void:
 			var member_name: String = _member_display_name(equipped_by)
 			if not _equipped_by[inst_id].has(member_name):
 				_equipped_by[inst_id].append(member_name)
+
+func _add_equipment_instances() -> void:
+	"""Convert equipment items to individual instances (no stacking)"""
+	var equipment_items: Array[String] = []
+
+	# Find all equipment items
+	for item_id in _counts.keys():
+		if not _defs.has(item_id):
+			continue
+		var def: Dictionary = _defs[item_id]
+		if _is_equipment(def):
+			equipment_items.append(item_id)
+
+	# Create individual instances for each equipment item
+	for base_id in equipment_items:
+		var base_def: Dictionary = _defs[base_id]
+		var total_count: int = _counts.get(base_id, 0)
+
+		# Get list of who has this equipped
+		var equipped_members: Array = _equipped_by.get(base_id, [])
+		var equipped_count: int = equipped_members.size()
+
+		# Total instances = inventory count + equipped count
+		var total_instances: int = total_count + equipped_count
+
+		# Remove the base item from counts
+		_counts.erase(base_id)
+
+		# Create individual instances
+		var instance_index: int = 0
+
+		# First create instances for equipped items
+		for member_name in equipped_members:
+			var inst_id: String = "%s_inst_%d" % [base_id, instance_index]
+			instance_index += 1
+
+			# Create virtual item def
+			var virtual_def: Dictionary = base_def.duplicate()
+			virtual_def["equipment_instance"] = true
+			virtual_def["instance_id"] = inst_id
+			virtual_def["base_id"] = base_id
+
+			_defs[inst_id] = virtual_def
+			_counts[inst_id] = 1
+
+			# Track who has this equipped
+			_equipped_by[inst_id] = [member_name]
+
+		# Then create instances for unequipped items in inventory
+		var unequipped_count: int = total_count
+		for i in range(unequipped_count):
+			var inst_id: String = "%s_inst_%d" % [base_id, instance_index]
+			instance_index += 1
+
+			# Create virtual item def
+			var virtual_def: Dictionary = base_def.duplicate()
+			virtual_def["equipment_instance"] = true
+			virtual_def["instance_id"] = inst_id
+			virtual_def["base_id"] = base_id
+
+			_defs[inst_id] = virtual_def
+			_counts[inst_id] = 1
+			# Not equipped, so don't add to _equipped_by
+
+		# Clear old equipment tracking for base item
+		_equipped_by.erase(base_id)
+
+		print("[ItemsPanel] Created %d instances for %s (%d equipped, %d in inventory)" % [total_instances, base_id, equipped_count, unequipped_count])
 
 func _format_sigil_name(inst: Dictionary, base_def: Dictionary) -> String:
 	"""Format sigil instance name with level"""
@@ -592,12 +661,6 @@ func _update_details() -> void:
 	# Sigil info
 	if def.has("sigil_instance") and def.get("sigil_instance", false):
 		details += "[color=#00D9FF]Type:[/color] [color=#F4F7FB]Sigil Instance[/color]\n\n"
-
-	# Add party equipment summary for equipment items
-	if _is_equipment(def) or item_category == "Equipment":
-		var party_equipment: String = _get_party_equipment_summary()
-		if party_equipment != "":
-			details += party_equipment
 
 	if _details_text:
 		_details_text.text = details
@@ -1250,46 +1313,6 @@ func _gather_members() -> Array[String]:
 					members.append(String(s))
 
 	return members
-
-func _get_party_equipment_summary() -> String:
-	"""Get formatted summary of all party members' equipped items"""
-	if not _eq or not _eq.has_method("get_member_equip"):
-		return ""
-
-	var members: Array[String] = _gather_members()
-	if members.size() == 0:
-		return ""
-
-	var summary: String = "[color=#00D9FF]Party Equipment:[/color]\n"
-
-	for member_token in members:
-		var member_name: String = _member_display_name(member_token)
-		var equip_variant: Variant = _eq.call("get_member_equip", member_token)
-
-		if typeof(equip_variant) != TYPE_DICTIONARY:
-			continue
-
-		var member_gear: Dictionary = equip_variant as Dictionary
-		var equipment_list: Array[String] = []
-
-		# Gather all equipped items for this member
-		for slot in member_gear.keys():
-			var item_id: String = String(member_gear[slot])
-			if item_id != "" and item_id != "—":
-				var item_name: String = item_id
-				if _defs.has(item_id):
-					item_name = _display_name(item_id, _defs[item_id])
-				var slot_name: String = String(slot).capitalize()
-				equipment_list.append("  %s: %s" % [slot_name, item_name])
-
-		# Add member's equipment to summary
-		if equipment_list.size() > 0:
-			summary += "[color=#FF3D8A]%s:[/color]\n" % member_name
-			summary += "[color=#F4F7FB]%s[/color]\n" % "\n".join(equipment_list)
-		else:
-			summary += "[color=#FF3D8A]%s:[/color] [color=#F4F7FB]No equipment[/color]\n"
-
-	return summary + "\n"
 
 func _show_recovery_confirmation(message: String) -> void:
 	"""Show recovery confirmation popup"""
