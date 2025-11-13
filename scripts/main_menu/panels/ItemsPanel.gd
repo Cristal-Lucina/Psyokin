@@ -216,6 +216,9 @@ func _update_category_selection() -> void:
 		button.texture_hover = texture
 		button.texture_pressed = texture
 
+		# Set opacity to 80% (20% reduction)
+		button.modulate = Color(1.0, 1.0, 1.0, 0.8)
+
 		# Create rounded box background
 		var style = StyleBoxFlat.new()
 		if is_selected:
