@@ -156,7 +156,7 @@ func _create_category_icons() -> void:
 
 		# Create panel container for background
 		var panel = PanelContainer.new()
-		panel.custom_minimum_size = Vector2(32, 32)  # Padding around 24px icon
+		panel.custom_minimum_size = Vector2(38, 38)  # Padding around 29px icon
 		panel.mouse_filter = Control.MOUSE_FILTER_IGNORE  # Let clicks pass through to button
 
 		# Create button inside panel
@@ -175,8 +175,8 @@ func _create_category_icons() -> void:
 		button.set_meta("icon_light", icon_light)
 		button.set_meta("icon_dark", icon_dark)
 
-		# Size settings - shrink icons by 50% (48 -> 24)
-		button.custom_minimum_size = Vector2(24, 24)
+		# Size settings - 24px increased by 20% = 29px
+		button.custom_minimum_size = Vector2(29, 29)
 		button.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
 		button.ignore_texture_size = true
 
