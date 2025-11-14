@@ -343,7 +343,8 @@ func _build_tab_buttons() -> void:
 			var icon_rect := TextureRect.new()
 			icon_rect.texture = icon_light  # Start with light (unselected)
 			icon_rect.custom_minimum_size = Vector2(22, 22)  # 22x22 icon size (30% smaller than 32x32)
-			icon_rect.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+			icon_rect.size = Vector2(22, 22)  # Explicitly set size to constrain it
+			icon_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 			icon_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 			icon_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			# Store both textures in metadata
@@ -735,7 +736,8 @@ func _create_info_cell(label_text: String, initial_value: String, icon_path: Str
 		var icon_rect := TextureRect.new()
 		icon_rect.texture = icon_texture
 		icon_rect.custom_minimum_size = Vector2(22, 22)  # 22x22 icon size (30% smaller than 32x32)
-		icon_rect.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+		icon_rect.size = Vector2(22, 22)  # Explicitly set size to constrain it
+		icon_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		icon_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		hbox.add_child(icon_rect)
 
