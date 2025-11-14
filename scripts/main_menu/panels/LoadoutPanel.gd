@@ -537,7 +537,7 @@ func _create_party_member_card(token: String, display_name: String) -> Button:
 	# Create label for name
 	var name_label := Label.new()
 	name_label.text = display_name
-	name_label.add_theme_font_size_override("font_size", 13)
+	name_label.add_theme_font_size_override("font_size", 17)
 	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
