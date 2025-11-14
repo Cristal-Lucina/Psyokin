@@ -137,6 +137,11 @@ func _create_selection_arrow() -> void:
 	_selection_arrow.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_selection_arrow.z_index = 100  # Above other elements
 
+	# Add shadow effect
+	_selection_arrow.add_theme_constant_override("shadow_offset_x", 2)
+	_selection_arrow.add_theme_constant_override("shadow_offset_y", 2)
+	_selection_arrow.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.5))
+
 	# Add to main PerksPanel (Control) not the PanelContainer
 	add_child(_selection_arrow)
 
