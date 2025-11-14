@@ -137,6 +137,11 @@ func _create_selection_arrow() -> void:
 	_selection_arrow.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_selection_arrow.z_index = 100  # Above other elements
 
+	# Add shadow effect
+	_selection_arrow.add_theme_constant_override("shadow_offset_x", 2)
+	_selection_arrow.add_theme_constant_override("shadow_offset_y", 2)
+	_selection_arrow.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.5))
+
 	# Add to main PerksPanel (Control) not the PanelContainer
 	add_child(_selection_arrow)
 
@@ -379,7 +384,7 @@ func _create_tier_cell(stat_id: String, tier_index: int) -> Button:
 	"""Create tier cell button with perk name"""
 	var button: Button = Button.new()
 	button.custom_minimum_size = Vector2(120, 40)
-	button.add_theme_font_size_override("font_size", 9)
+	button.add_theme_font_size_override("font_size", 11)
 
 	var perk_info: Dictionary = _get_perk_info(stat_id, tier_index)
 
@@ -409,9 +414,11 @@ func _create_tier_cell(stat_id: String, tier_index: int) -> Button:
 
 	# Core Vibe: Color-code by status with neon colors and borders
 	if perk_info["unlocked"]:
-		# Unlocked: Electric Lime text, no border
-		button.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_ELECTRIC_LIME)
+		# Unlocked: Night Navy text on Sky Cyan background, no border
+		button.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_NIGHT_NAVY)
+		button.add_theme_color_override("font_disabled_color", aCoreVibeTheme.COLOR_NIGHT_NAVY)
 		button.disabled = true
+		button_style.bg_color = aCoreVibeTheme.COLOR_SKY_CYAN
 		button_style.border_width_left = 0
 		button_style.border_width_top = 0
 		button_style.border_width_right = 0

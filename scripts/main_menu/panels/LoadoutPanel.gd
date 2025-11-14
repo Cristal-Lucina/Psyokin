@@ -334,32 +334,32 @@ func _apply_core_vibe_styling() -> void:
 	if _b_val:
 		aCoreVibeTheme.style_label(_b_val, aCoreVibeTheme.COLOR_SKY_CYAN, 12)
 
-	# Style equipment buttons
+	# Style equipment buttons - normal dark style, but inverted when focused
 	if _w_btn:
-		aCoreVibeTheme.style_button(_w_btn, aCoreVibeTheme.COLOR_SKY_CYAN, aCoreVibeTheme.CORNER_RADIUS_SMALL)
+		aCoreVibeTheme.style_button_with_focus_invert(_w_btn, aCoreVibeTheme.COLOR_SKY_CYAN, aCoreVibeTheme.CORNER_RADIUS_SMALL)
 	if _a_btn:
-		aCoreVibeTheme.style_button(_a_btn, aCoreVibeTheme.COLOR_SKY_CYAN, aCoreVibeTheme.CORNER_RADIUS_SMALL)
+		aCoreVibeTheme.style_button_with_focus_invert(_a_btn, aCoreVibeTheme.COLOR_SKY_CYAN, aCoreVibeTheme.CORNER_RADIUS_SMALL)
 	if _h_btn:
-		aCoreVibeTheme.style_button(_h_btn, aCoreVibeTheme.COLOR_SKY_CYAN, aCoreVibeTheme.CORNER_RADIUS_SMALL)
+		aCoreVibeTheme.style_button_with_focus_invert(_h_btn, aCoreVibeTheme.COLOR_SKY_CYAN, aCoreVibeTheme.CORNER_RADIUS_SMALL)
 	if _f_btn:
-		aCoreVibeTheme.style_button(_f_btn, aCoreVibeTheme.COLOR_SKY_CYAN, aCoreVibeTheme.CORNER_RADIUS_SMALL)
+		aCoreVibeTheme.style_button_with_focus_invert(_f_btn, aCoreVibeTheme.COLOR_SKY_CYAN, aCoreVibeTheme.CORNER_RADIUS_SMALL)
 	if _b_btn:
-		aCoreVibeTheme.style_button(_b_btn, aCoreVibeTheme.COLOR_SKY_CYAN, aCoreVibeTheme.CORNER_RADIUS_SMALL)
+		aCoreVibeTheme.style_button_with_focus_invert(_b_btn, aCoreVibeTheme.COLOR_SKY_CYAN, aCoreVibeTheme.CORNER_RADIUS_SMALL)
 
 	# Style sigils title (Bubble Magenta)
 	if _sigils_title:
 		aCoreVibeTheme.style_label(_sigils_title, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA, 16)
 
-	# Style manage sigils button
+	# Style manage sigils button - normal dark style, but inverted when focused
 	if _btn_manage:
-		aCoreVibeTheme.style_button(_btn_manage, aCoreVibeTheme.COLOR_ELECTRIC_LIME, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
+		aCoreVibeTheme.style_button_with_focus_invert(_btn_manage, aCoreVibeTheme.COLOR_ELECTRIC_LIME, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
 
 	# Style mind section - will be set per-text in _refresh_mind_row
 	# (Base color Milk White, with Sky Cyan for player active type)
 
-	# Style switch button
+	# Style switch button - normal dark style, but inverted when focused
 	if _mind_switch_btn:
-		aCoreVibeTheme.style_button(_mind_switch_btn, aCoreVibeTheme.COLOR_SKY_CYAN, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
+		aCoreVibeTheme.style_button_with_focus_invert(_mind_switch_btn, aCoreVibeTheme.COLOR_SKY_CYAN, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
 
 	# Style details content
 	if _details_content:
@@ -1189,8 +1189,8 @@ func _rebuild_sigils(member_token: String) -> void:
 		btn.custom_minimum_size = Vector2(90, 18)  # Match equipment button size for grid alignment
 		btn.add_theme_font_size_override("font_size", 11)
 		btn.text = "Equip"
-		# Core Vibe: Sky Cyan for sigil equip buttons
-		aCoreVibeTheme.style_button(btn, aCoreVibeTheme.COLOR_SKY_CYAN, aCoreVibeTheme.CORNER_RADIUS_SMALL)
+		# Core Vibe: Sky Cyan for sigil equip buttons - normal dark style, but inverted when focused
+		aCoreVibeTheme.style_button_with_focus_invert(btn, aCoreVibeTheme.COLOR_SKY_CYAN, aCoreVibeTheme.CORNER_RADIUS_SMALL)
 		btn.pressed.connect(Callable(self, "_on_equip_sigil").bind(member_token, idx))
 
 		# Hide button if slot is beyond capacity
