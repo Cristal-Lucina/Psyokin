@@ -1377,12 +1377,81 @@ func _on_party_picker_accept() -> void:
 	var member_token: String = _party_member_tokens[index]
 	print("[ItemsPanel] Using item on member: %s" % member_token)
 
-	# Use item on member
-	_use_item_on_member(_item_to_use_id, _item_to_use_def, member_token)
+	# Use item on member and get recovery message
+	var recovery_message: String = await _use_item_on_member(_item_to_use_id, _item_to_use_def, member_token)
+
+	# If there's a recovery message, convert the popup to show it
+	if recovery_message != "" and _active_popup and is_instance_valid(_active_popup):
+		await _show_recovery_in_popup(recovery_message)
 
 	# Close popup
 	if _active_popup and is_instance_valid(_active_popup):
 		_close_member_selection_popup(_active_popup, true)
+
+func _show_recovery_in_popup(message: String) -> void:
+	"""Convert the party picker popup to show recovery message in the same popup"""
+	print("[ItemsPanel] Converting popup to show recovery message: %s" % message)
+
+	if not _active_popup or not is_instance_valid(_active_popup):
+		return
+
+	# Get the VBox container from the popup
+	var vbox: VBoxContainer = null
+	for child in _active_popup.get_children():
+		if child is VBoxContainer:
+			vbox = child
+			break
+
+	if not vbox:
+		print("[ItemsPanel] Could not find VBox in popup")
+		return
+
+	# Clear all existing children from VBox
+	for child in vbox.get_children():
+		child.queue_free()
+
+	# Add recovery message label
+	var message_label := Label.new()
+	message_label.text = message
+	message_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	message_label.add_theme_font_size_override("font_size", 16)
+	vbox.add_child(message_label)
+
+	# Add OK button
+	var ok_btn := Button.new()
+	ok_btn.text = "OK"
+	ok_btn.custom_minimum_size = Vector2(100, 40)
+	ok_btn.focus_mode = Control.FOCUS_ALL
+	vbox.add_child(ok_btn)
+
+	# Wait for layout to update
+	await get_tree().process_frame
+	await get_tree().process_frame
+
+	# Resize popup
+	_active_popup.size = vbox.size + Vector2(40, 40)
+	vbox.position = Vector2(20, 20)
+
+	# Re-center popup
+	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
+	_active_popup.position = (viewport_size - _active_popup.size) / 2.0
+
+	# Give focus to OK button
+	ok_btn.call_deferred("grab_focus")
+
+	# Set focus mode for input handling
+	_focus_mode = "recovery_confirmation"
+	_active_popup.set_meta("ok_button", ok_btn)
+
+	print("[ItemsPanel] Popup converted to recovery confirmation, waiting for OK")
+
+	# Wait for OK button press
+	await ok_btn.pressed
+
+	print("[ItemsPanel] Recovery confirmation accepted")
+
+	# Reset focus mode back to party picker (will be cleaned up by close function)
+	_focus_mode = "party_picker"
 
 func _close_member_selection_popup(popup_panel: Panel, used_item: bool) -> void:
 	"""Close member selection popup and clean up"""
@@ -1418,8 +1487,8 @@ func _close_member_selection_popup(popup_panel: Panel, used_item: bool) -> void:
 	# If item was used, rebuild happens automatically via inventory_changed signal
 	# No need to manually rebuild here
 
-func _use_item_on_member(item_id: String, item_def: Dictionary, member_token: String) -> void:
-	"""Apply item effect to a party member"""
+func _use_item_on_member(item_id: String, item_def: Dictionary, member_token: String) -> String:
+	"""Apply item effect to a party member and return recovery message"""
 	print("[ItemsPanel] === USE ITEM START ===")
 	print("[ItemsPanel] Item ID: %s, Member: %s" % [item_id, member_token])
 	print("[ItemsPanel] Current _counts size: %d" % _counts.size())
@@ -1520,7 +1589,8 @@ func _use_item_on_member(item_id: String, item_def: Dictionary, member_token: St
 		_inv.call("remove_item", item_id, 1)
 		print("[ItemsPanel] Item consumed, inventory should emit signal now")
 
-	# Show recovery confirmation popup if item had healing effect
+	# Build recovery message if item had healing effect
+	var recovery_message: String = ""
 	if healed:
 		var member_name: String = _member_display_name(member_token)
 		var hp_healed: int = new_hp - hp
@@ -1534,11 +1604,11 @@ func _use_item_on_member(item_id: String, item_def: Dictionary, member_token: St
 			recovery_parts.append("%d MP" % mp_healed)
 
 		if recovery_parts.size() > 0:
-			var recovery_message: String = "%s recovered %s" % [member_name, " and ".join(recovery_parts)]
-			await _show_recovery_confirmation(recovery_message)
+			recovery_message = "%s recovered %s" % [member_name, " and ".join(recovery_parts)]
 
 	print("[ItemsPanel] _counts size after use: %d" % _counts.size())
 	print("[ItemsPanel] === USE ITEM END ===")
+	return recovery_message
 
 func _extract_number(text: String) -> RegExMatch:
 	"""Extract first number from text"""
@@ -1584,107 +1654,6 @@ func _gather_members() -> Array[String]:
 					members.append(String(s))
 
 	return members
-
-func _show_recovery_confirmation(message: String) -> void:
-	"""Show recovery confirmation popup"""
-	print("[ItemsPanel] Showing recovery confirmation: %s" % message)
-
-	# PAUSE THE GAME TREE
-	get_tree().paused = true
-	print("[ItemsPanel] Game tree PAUSED")
-
-	# Create CanvasLayer overlay (for paused context)
-	var overlay := CanvasLayer.new()
-	overlay.layer = 100
-	overlay.process_mode = Node.PROCESS_MODE_ALWAYS
-	overlay.process_priority = -1000  # CRITICAL: Process before GameMenu
-	get_tree().root.add_child(overlay)
-	get_tree().root.move_child(overlay, 0)  # Move to front of processing order
-
-	# Create background blocker to prevent clicking through
-	var blocker := ColorRect.new()
-	blocker.color = Color(0, 0, 0, 0.5)  # Semi-transparent black
-	blocker.mouse_filter = Control.MOUSE_FILTER_STOP  # Block all mouse input
-	blocker.set_anchors_preset(Control.PRESET_FULL_RECT)  # Fill entire screen
-	blocker.focus_mode = Control.FOCUS_ALL  # Allow it to receive input events
-	overlay.add_child(blocker)
-
-	# Create popup panel
-	var popup_panel: Panel = Panel.new()
-	popup_panel.process_mode = Node.PROCESS_MODE_ALWAYS
-	popup_panel.z_index = 100
-	popup_panel.modulate = Color(1, 1, 1, 0)
-	popup_panel.mouse_filter = Control.MOUSE_FILTER_STOP  # Block input to elements behind
-	overlay.add_child(popup_panel)
-
-	# Apply styling
-	_style_popup_panel(popup_panel)
-
-	# Store overlay reference
-	popup_panel.set_meta("_overlay", overlay)
-
-	# Create content container
-	var vbox := VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 12)
-	popup_panel.add_child(vbox)
-
-	# Message label
-	var message_label := Label.new()
-	message_label.text = message
-	message_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	message_label.add_theme_font_size_override("font_size", 16)
-	vbox.add_child(message_label)
-
-	# OK button
-	var ok_btn := Button.new()
-	ok_btn.text = "OK"
-	ok_btn.custom_minimum_size = Vector2(100, 40)
-	ok_btn.focus_mode = Control.FOCUS_ALL
-	vbox.add_child(ok_btn)
-
-	# Auto-size panel
-	await get_tree().process_frame
-	await get_tree().process_frame
-	popup_panel.size = vbox.size + Vector2(40, 40)
-	vbox.position = Vector2(20, 20)
-
-	# Center popup on screen
-	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
-	popup_panel.position = (viewport_size - popup_panel.size) / 2.0
-
-	# Store reference for input handling
-	popup_panel.set_meta("ok_button", ok_btn)
-	popup_panel.set_meta("is_recovery_confirmation", true)
-	_active_popup = popup_panel
-	_focus_mode = "recovery_confirmation"
-
-	# Fade in
-	_fade_in_popup(popup_panel)
-
-	# Give focus to OK button
-	ok_btn.call_deferred("grab_focus")
-
-	# Wait for OK button press
-	await ok_btn.pressed
-
-	# Clear focus mode
-	_focus_mode = "items"
-	_active_popup = null
-
-	# Fade out
-	await _fade_out_popup(popup_panel)
-
-	# Clean up
-	if popup_panel and is_instance_valid(popup_panel):
-		popup_panel.queue_free()
-	if overlay and is_instance_valid(overlay):
-		overlay.queue_free()
-
-	# UNPAUSE THE GAME TREE
-	get_tree().paused = false
-	print("[ItemsPanel] Game tree UNPAUSED")
-
-	print("[ItemsPanel] Recovery confirmation closed")
 
 func _get_member_hp_mp(member_token: String) -> Dictionary:
 	"""Get member HP/MP stats - matches StatusPanel implementation"""
