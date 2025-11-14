@@ -368,7 +368,13 @@ func _navigate_bond_list(delta: int) -> void:
 
 	# Wrap around: pressing down at bottom goes to top, pressing up at top goes to bottom
 	var size = _list.item_count
+	var old_index = _nav_index
 	_nav_index = (_nav_index + delta + size) % size
+
+	# Debug wrapping behavior
+	if (old_index == 0 and delta < 0) or (old_index == size - 1 and delta > 0):
+		print("[BondsPanel] Wrapping: %d -> %d (size: %d)" % [old_index, _nav_index, size])
+
 	_focus_bond_element(_nav_index)
 
 	# Immediately show details for the newly focused bond
@@ -378,13 +384,21 @@ func _navigate_bond_list(delta: int) -> void:
 		_update_detail(id)
 
 func _focus_bond_element(index: int) -> void:
-	"""Focus the bond item at given index"""
+	"""Focus the bond item at given index and ensure it's visible in the scroll area"""
 	if not _list or index < 0 or index >= _list.item_count:
 		return
 
+	# Select the item
 	_list.select(index)
+
+	# Ensure the selected item is scrolled into view
+	# Using both methods for maximum compatibility
 	_list.ensure_current_is_visible()
+
+	# Grab focus to enable keyboard/controller input
 	_list.grab_focus()
+
+	# Update arrow position to match new selection
 	call_deferred("_update_arrow_position")
 
 func _select_current_bond() -> void:
@@ -405,9 +419,11 @@ func _enter_bond_list_state() -> void:
 	"""Enter BOND_LIST state and grab focus on bond list"""
 	_nav_state = NavState.BOND_LIST
 	if _list and _list.item_count > 0:
-		# Clamp index to valid range
+		# Clamp index to valid range to prevent out-of-bounds
 		_nav_index = clamp(_nav_index, 0, _list.item_count - 1)
+		# Focus and scroll to the current selection
 		_focus_bond_element(_nav_index)
+		print("[BondsPanel] Focused bond at index %d" % _nav_index)
 	print("[BondsPanel] Entered BOND_LIST state")
 	print("[BondsPanel] Calling _animate_panel_focus from enter_bond_list_state")
 	call_deferred("_animate_panel_focus")
@@ -704,8 +720,17 @@ func _build_list() -> void:
 
 	# Restore selection if we found the selected bond
 	if selected_index >= 0:
-		_list.select(selected_index)
 		_nav_index = selected_index
+		# Use _focus_bond_element to ensure item is visible in scroll area
+		# But don't grab focus if we're not currently active
+		_list.select(selected_index)
+		_list.ensure_current_is_visible()
+		call_deferred("_update_arrow_position")
+	elif _list.item_count > 0:
+		# No previous selection or it's gone - select first item
+		_nav_index = 0
+		_list.select(0)
+		_list.ensure_current_is_visible()
 		call_deferred("_update_arrow_position")
 
 # ─────────────────────────────────────────────────────────────
