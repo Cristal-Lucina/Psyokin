@@ -109,8 +109,7 @@ const ANIM_DURATION := 0.2  # Animation duration in seconds
 
 @onready var _stats_grid:  GridContainer = get_node("Row/StatsColumn/Margin/VBox/StatsGrid") as GridContainer
 @onready var _details_content: RichTextLabel = %DetailsContent
-@onready var _mind_value:  Label         = get_node_or_null("Row/Middle/Margin/VBox/MindSection/MindRow/Value") as Label
-@onready var _mind_section: VBoxContainer = get_node_or_null("Row/Middle/Margin/VBox/MindSection") as VBoxContainer
+@onready var _mind_value:  Control       = get_node_or_null("Row/Middle/Margin/VBox/MindSection/MindRow/Value") as Control  # Can be Label or RichTextLabel
 @onready var _mind_switch_btn: Button    = %SwitchBtn
 
 var _labels: PackedStringArray = PackedStringArray()
@@ -2958,7 +2957,7 @@ func _debug_print_panel_sizes() -> void:
 					for child in _sigils_list.get_children():
 						if child.visible:
 							visible_sigils += 1
-					print("  - Visible Sigil Rows: %d" % (visible_sigils / 2))  # Divide by 2 because each row has label + button
+					print("  - Visible Sigil Rows: %d" % (visible_sigils / 2.0))  # Divide by 2 because each row has label + button
 
 	if _stats_panel:
 		print("[DEBUG] Stats Panel:")
