@@ -287,6 +287,8 @@ func _apply_core_vibe_styling() -> void:
 		_party_list.add_theme_color_override("font_hovered_color", aCoreVibeTheme.COLOR_SKY_CYAN)
 		# Increase font size to 18 (matching StatsPanel)
 		_party_list.add_theme_font_size_override("font_size", 18)
+		# Set party list text to layer 200 (above arrow and box at 100)
+		_party_list.z_index = 200
 		# Remove all borders and backgrounds by making them transparent
 		var empty_stylebox = StyleBoxEmpty.new()
 		_party_list.add_theme_stylebox_override("panel", empty_stylebox)
