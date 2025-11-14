@@ -101,43 +101,53 @@ const ALT_MES_PATHS := [
 const TAB_DEFS: Dictionary = {
 	"stats":   {
 		"title": "STATS",
-		"icon": "res://assets/graphics/icons/UI/PNG and PSD - Dark/Icon set 1/2x/Asset 28@2x.png"
+		"icon_dark": "res://assets/graphics/icons/UI/PNG and PSD - Dark/Icon set 1/2x/Asset 28@2x.png",
+		"icon_light": "res://assets/graphics/icons/UI/PNG and PSD - Light/Icon set 1/2x/Asset 28@2x.png"
 	},
 	"perks":   {
 		"title": "PERKS",
-		"icon": "res://assets/graphics/icons/UI/PNG and PSD - Dark/Icon set 1/2x/Asset 83@2x.png"
+		"icon_dark": "res://assets/graphics/icons/UI/PNG and PSD - Dark/Icon set 2/2x/Asset 83@2x.png",
+		"icon_light": "res://assets/graphics/icons/UI/PNG and PSD - Light/Icon set 2/2x/Asset 83@2x.png"
 	},
 	"items":   {
 		"title": "ITEMS",
-		"icon": "res://assets/graphics/icons/UI/PNG and PSD - Dark/Icon set 2/2x/Asset 92@2x.png"
+		"icon_dark": "res://assets/graphics/icons/UI/PNG and PSD - Dark/Icon set 2/2x/Asset 92@2x.png",
+		"icon_light": "res://assets/graphics/icons/UI/PNG and PSD - Light/Icon set 2/2x/Asset 92@2x.png"
 	},
 	"loadout": {
 		"title": "LOADOUT",
-		"icon": "res://assets/graphics/icons/UI/PNG and PSD - Dark/Icon set 2/2x/Asset 54@2x.png"
+		"icon_dark": "res://assets/graphics/icons/UI/PNG and PSD - Dark/Icon set 2/2x/Asset 54@2x.png",
+		"icon_light": "res://assets/graphics/icons/UI/PNG and PSD - Light/Icon set 2/2x/Asset 54@2x.png"
 	},
 	"bonds":   {
 		"title": "BONDS",
-		"icon": "res://assets/graphics/icons/UI/PNG and PSD - Dark/Icon set 1/2x/Asset 73@2x.png"
+		"icon_dark": "res://assets/graphics/icons/UI/PNG and PSD - Dark/Icon set 1/2x/Asset 73@2x.png",
+		"icon_light": "res://assets/graphics/icons/UI/PNG and PSD - Light/Icon set 1/2x/Asset 73@2x.png"
 	},
 	"outreach":{
 		"title": "OUTREACH",
-		"icon": "res://assets/graphics/icons/UI/PNG and PSD - Dark/Icon set 2/2x/Asset 4@2x.png"
+		"icon_dark": "res://assets/graphics/icons/UI/PNG and PSD - Dark/Icon set 2/2x/Asset 4@2x.png",
+		"icon_light": "res://assets/graphics/icons/UI/PNG and PSD - Light/Icon set 2/2x/Asset 4@2x.png"
 	},
 	"dorms":   {
 		"title": "DORMS",
-		"icon": "res://assets/graphics/icons/UI/PNG and PSD - Dark/Icon set 1/2x/Asset 83@2x.png"
+		"icon_dark": "res://assets/graphics/icons/UI/PNG and PSD - Dark/Icon set 1/2x/Asset 83@2x.png",
+		"icon_light": "res://assets/graphics/icons/UI/PNG and PSD - Light/Icon set 1/2x/Asset 83@2x.png"
 	},
 	"calendar":{
 		"title": "CALENDAR",
-		"icon": "res://assets/graphics/icons/UI/PNG and PSD - Dark/Icon set 1/2x/Asset 49@2x.png"
+		"icon_dark": "res://assets/graphics/icons/UI/PNG and PSD - Dark/Icon set 1/2x/Asset 49@2x.png",
+		"icon_light": "res://assets/graphics/icons/UI/PNG and PSD - Light/Icon set 1/2x/Asset 49@2x.png"
 	},
 	"index":   {
 		"title": "INDEX",
-		"icon": "res://assets/graphics/icons/UI/PNG and PSD - Dark/Icon set 3/2x/Asset 73@2x.png"
+		"icon_dark": "res://assets/graphics/icons/UI/PNG and PSD - Dark/Icon set 3/2x/Asset 73@2x.png",
+		"icon_light": "res://assets/graphics/icons/UI/PNG and PSD - Light/Icon set 3/2x/Asset 73@2x.png"
 	},
 	"system":  {
 		"title": "SYSTEM",
-		"icon": "res://assets/graphics/icons/UI/PNG and PSD - Dark/Icon set 1/2x/Asset 71@2x.png"
+		"icon_dark": "res://assets/graphics/icons/UI/PNG and PSD - Dark/Icon set 1/2x/Asset 71@2x.png",
+		"icon_light": "res://assets/graphics/icons/UI/PNG and PSD - Light/Icon set 1/2x/Asset 71@2x.png"
 	},
 }
 
@@ -327,14 +337,18 @@ func _build_tab_buttons() -> void:
 		hbox.offset_bottom = 0
 
 		# Add icon
-		if meta.has("icon"):
-			var icon_texture: Texture2D = load(String(meta["icon"]))
+		if meta.has("icon_dark") and meta.has("icon_light"):
+			var icon_dark: Texture2D = load(String(meta["icon_dark"]))
+			var icon_light: Texture2D = load(String(meta["icon_light"]))
 			var icon_rect := TextureRect.new()
-			icon_rect.texture = icon_texture
-			icon_rect.custom_minimum_size = Vector2(24, 24)
+			icon_rect.texture = icon_light  # Start with light (unselected)
+			icon_rect.custom_minimum_size = Vector2(32, 32)  # 32x32 icon size
 			icon_rect.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
 			icon_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 			icon_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			# Store both textures in metadata
+			icon_rect.set_meta("icon_dark", icon_dark)
+			icon_rect.set_meta("icon_light", icon_light)
 			hbox.add_child(icon_rect)
 
 		# Add text label
@@ -469,6 +483,19 @@ func _style_menu_button(btn: Button, tab_id: String, is_selected: bool) -> void:
 		var label = btn.get_meta("label")
 		if label and is_instance_valid(label):
 			label.add_theme_color_override("font_color", text_color)
+
+	# Swap icon texture based on selection
+	if btn.has_meta("icon_rect"):
+		var icon_rect = btn.get_meta("icon_rect")
+		if icon_rect and is_instance_valid(icon_rect):
+			if is_selected:
+				# Selected: Use dark icon
+				if icon_rect.has_meta("icon_dark"):
+					icon_rect.texture = icon_rect.get_meta("icon_dark")
+			else:
+				# Unselected: Use light icon
+				if icon_rect.has_meta("icon_light"):
+					icon_rect.texture = icon_rect.get_meta("icon_light")
 
 func _on_tab_button_pressed(index: int) -> void:
 	"""Handle tab button press"""
@@ -707,7 +734,7 @@ func _create_info_cell(label_text: String, initial_value: String, icon_path: Str
 		var icon_texture: Texture2D = load(icon_path)
 		var icon_rect := TextureRect.new()
 		icon_rect.texture = icon_texture
-		icon_rect.custom_minimum_size = Vector2(20, 20)
+		icon_rect.custom_minimum_size = Vector2(32, 32)  # 32x32 icon size
 		icon_rect.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
 		icon_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		hbox.add_child(icon_rect)
