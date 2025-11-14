@@ -1048,23 +1048,25 @@ func _input(event: InputEvent) -> void:
 			# Let joystick motion pass through to ItemList for up/down navigation
 			return
 
-		if event is InputEventJoypadButton and event.pressed:
+		if event is InputEventJoypadButton:
 			match event.button_index:
 				0:  # Accept button
-					_on_party_picker_accept()
+					if event.pressed:
+						_on_party_picker_accept()
 					get_viewport().set_input_as_handled()
 					return
 				1:  # Back button (B/Circle)
-					# Find the popup panel to close
-					if _active_popup and is_instance_valid(_active_popup):
-						_close_member_selection_popup(_active_popup, false)
+					if event.pressed:
+						# Find the popup panel to close
+						if _active_popup and is_instance_valid(_active_popup):
+							_close_member_selection_popup(_active_popup, false)
 					get_viewport().set_input_as_handled()
 					return
-				12, 13, 14, 15:  # D-pad (up, down, left, right) - let ItemList handle these
+				11, 12, 13, 14:  # D-pad (up=11, down=12, left=13, right=14) - let ItemList handle these
 					# Don't handle these - let them pass through to the ItemList for navigation
 					return
 				_:
-					# Block all other inputs from reaching GameMenu (but don't handle navigation)
+					# Block all other inputs from reaching GameMenu
 					get_viewport().set_input_as_handled()
 					return
 
