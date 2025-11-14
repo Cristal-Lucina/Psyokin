@@ -368,7 +368,12 @@ func _auto_scroll_to_selection() -> void:
 	# Calculate button position relative to scroll container
 	var button_pos_in_grid: float = selected_button.position.y
 	var button_height: float = selected_button.size.y
-	var row_height: float = button_height  # Each row is one button height
+
+	# Get grid vertical spacing (gap between rows)
+	var grid_v_gap: int = _items_grid.get_theme_constant("v_separation")
+
+	# Row height = button height + gap between rows
+	var row_height: float = button_height + grid_v_gap
 
 	# Visible area
 	var visible_top: float = current_scroll
@@ -382,6 +387,8 @@ func _auto_scroll_to_selection() -> void:
 	print("  Selected index: %d" % _selected_grid_index)
 	print("  Button pos in grid: %f" % button_pos_in_grid)
 	print("  Button height: %f" % button_height)
+	print("  Grid v_gap: %d" % grid_v_gap)
+	print("  Row height (button + gap): %f" % row_height)
 	print("  Current scroll: %f" % current_scroll)
 	print("  Visible area: %f to %f" % [visible_top, visible_bottom])
 	print("  Button bounds: %f to %f" % [button_top, button_bottom])
