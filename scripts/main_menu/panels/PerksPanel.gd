@@ -411,6 +411,7 @@ func _create_tier_cell(stat_id: String, tier_index: int) -> Button:
 	if perk_info["unlocked"]:
 		# Unlocked: Night Navy text on Sky Cyan background, no border
 		button.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_NIGHT_NAVY)
+		button.add_theme_color_override("font_disabled_color", aCoreVibeTheme.COLOR_NIGHT_NAVY)
 		button.disabled = true
 		button_style.bg_color = aCoreVibeTheme.COLOR_SKY_CYAN
 		button_style.border_width_left = 0
