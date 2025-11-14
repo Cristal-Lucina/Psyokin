@@ -244,6 +244,9 @@ func _apply_core_vibe_styling() -> void:
 			aCoreVibeTheme.SHADOW_SIZE_MEDIUM         # 6px glow
 		)
 		_middle_panel.add_theme_stylebox_override("panel", middle_style)
+		# Set minimum size to prevent squashing when equipment icons aren't present
+		# Icons are taller than text, so we lock it to the "full equipment" size
+		_middle_panel.custom_minimum_size = Vector2(405, 585)
 
 	if _stats_panel:
 		var stats_style = aCoreVibeTheme.create_panel_style(
