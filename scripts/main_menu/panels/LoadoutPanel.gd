@@ -76,6 +76,21 @@ const ANIM_DURATION := 0.2  # Animation duration in seconds
 @onready var _party_list: ItemList       = get_node("Row/Party/Margin/VBox/PartyList") as ItemList
 # @onready var _member_name: Label         = get_node("Row/Middle/Margin/VBox/MemberName") as Label  # Removed
 
+# Section header labels
+@onready var _party_label: Label = get_node_or_null("Row/Party/Margin/VBox/PartyLabel") as Label
+@onready var _mind_type_label: Label = get_node_or_null("Row/Middle/Margin/VBox/MindSection/MindLabel") as Label
+@onready var _equipment_label: Label = get_node_or_null("Row/Middle/Margin/VBox/EquipmentLabel") as Label
+@onready var _details_label: Label = get_node_or_null("Row/StatsColumn/Margin/VBox/DetailsLabel") as Label
+@onready var _attributes_label: Label = get_node_or_null("Row/StatsColumn/Margin/VBox/StatsLabel") as Label
+
+# Equipment slot labels (Weapon:, Armor:, etc.)
+@onready var _w_label: Label = get_node_or_null("Row/Middle/Margin/VBox/Grid/WLabel") as Label
+@onready var _a_label: Label = get_node_or_null("Row/Middle/Margin/VBox/Grid/ALabel") as Label
+@onready var _h_label: Label = get_node_or_null("Row/Middle/Margin/VBox/Grid/HLabel") as Label
+@onready var _f_label: Label = get_node_or_null("Row/Middle/Margin/VBox/Grid/FLabel") as Label
+@onready var _b_label: Label = get_node_or_null("Row/Middle/Margin/VBox/Grid/BLabel") as Label
+
+# Equipment value labels (item names)
 @onready var _w_val: Label = get_node("Row/Middle/Margin/VBox/Grid/WHBox/WValue") as Label
 @onready var _a_val: Label = get_node("Row/Middle/Margin/VBox/Grid/AHBox/AValue") as Label
 @onready var _h_val: Label = get_node("Row/Middle/Margin/VBox/Grid/HHBox/HValue") as Label
@@ -264,17 +279,41 @@ func _apply_core_vibe_styling() -> void:
 		_party_list.add_theme_color_override("font_selected_color", aCoreVibeTheme.COLOR_SKY_CYAN)
 		_party_list.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE)
 
-	# Style equipment slot labels
+	# Style section headers (Bubble Magenta)
+	if _party_label:
+		aCoreVibeTheme.style_label(_party_label, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA, 16)
+	if _mind_type_label:
+		aCoreVibeTheme.style_label(_mind_type_label, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA, 16)
+	if _equipment_label:
+		aCoreVibeTheme.style_label(_equipment_label, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA, 16)
+	if _details_label:
+		aCoreVibeTheme.style_label(_details_label, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA, 16)
+	if _attributes_label:
+		aCoreVibeTheme.style_label(_attributes_label, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA, 16)
+
+	# Style equipment slot labels (Sky Cyan)
+	if _w_label:
+		aCoreVibeTheme.style_label(_w_label, aCoreVibeTheme.COLOR_SKY_CYAN, 12)
+	if _a_label:
+		aCoreVibeTheme.style_label(_a_label, aCoreVibeTheme.COLOR_SKY_CYAN, 12)
+	if _h_label:
+		aCoreVibeTheme.style_label(_h_label, aCoreVibeTheme.COLOR_SKY_CYAN, 12)
+	if _f_label:
+		aCoreVibeTheme.style_label(_f_label, aCoreVibeTheme.COLOR_SKY_CYAN, 12)
+	if _b_label:
+		aCoreVibeTheme.style_label(_b_label, aCoreVibeTheme.COLOR_SKY_CYAN, 12)
+
+	# Style equipment value labels / item names (Milk White)
 	if _w_val:
-		aCoreVibeTheme.style_label(_w_val, aCoreVibeTheme.COLOR_ELECTRIC_LIME, 12)
+		aCoreVibeTheme.style_label(_w_val, aCoreVibeTheme.COLOR_MILK_WHITE, 12)
 	if _a_val:
-		aCoreVibeTheme.style_label(_a_val, aCoreVibeTheme.COLOR_ELECTRIC_LIME, 12)
+		aCoreVibeTheme.style_label(_a_val, aCoreVibeTheme.COLOR_MILK_WHITE, 12)
 	if _h_val:
-		aCoreVibeTheme.style_label(_h_val, aCoreVibeTheme.COLOR_ELECTRIC_LIME, 12)
+		aCoreVibeTheme.style_label(_h_val, aCoreVibeTheme.COLOR_MILK_WHITE, 12)
 	if _f_val:
-		aCoreVibeTheme.style_label(_f_val, aCoreVibeTheme.COLOR_ELECTRIC_LIME, 12)
+		aCoreVibeTheme.style_label(_f_val, aCoreVibeTheme.COLOR_MILK_WHITE, 12)
 	if _b_val:
-		aCoreVibeTheme.style_label(_b_val, aCoreVibeTheme.COLOR_ELECTRIC_LIME, 12)
+		aCoreVibeTheme.style_label(_b_val, aCoreVibeTheme.COLOR_MILK_WHITE, 12)
 
 	# Style equipment buttons
 	if _w_btn:
@@ -288,9 +327,9 @@ func _apply_core_vibe_styling() -> void:
 	if _b_btn:
 		aCoreVibeTheme.style_button(_b_btn, aCoreVibeTheme.COLOR_SKY_CYAN, aCoreVibeTheme.CORNER_RADIUS_SMALL)
 
-	# Style sigils title
+	# Style sigils title (Bubble Magenta)
 	if _sigils_title:
-		aCoreVibeTheme.style_label(_sigils_title, aCoreVibeTheme.COLOR_GRAPE_VIOLET, 16)
+		aCoreVibeTheme.style_label(_sigils_title, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA, 16)
 
 	# Style manage sigils button
 	if _btn_manage:
