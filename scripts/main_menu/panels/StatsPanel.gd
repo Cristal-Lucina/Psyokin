@@ -955,7 +955,7 @@ class RadarChart extends Control:
 
 		# Map stat names to colors
 		var stat_colors: Dictionary = {
-			"BRW": aCoreVibeTheme.COLOR_BUBBLE_MAGENTA,   # BRAWN: Bubble Magenta
+			"BRW": aCoreVibeTheme.COLOR_CITRUS_YELLOW,     # BRAWN: Citrus Yellow
 			"MND": aCoreVibeTheme.COLOR_SKY_CYAN,          # MIND: Sky Cyan
 			"TPO": aCoreVibeTheme.COLOR_ELECTRIC_LIME,     # TEMPO: Electric Lime
 			"VTL": aCoreVibeTheme.COLOR_PLASMA_TEAL,       # VITALITY: Plasma Teal
