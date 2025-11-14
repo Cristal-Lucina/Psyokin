@@ -1325,7 +1325,7 @@ func _set_slot_value(label: Label, id: String, slot: String) -> void:
 	var parent_hbox: HBoxContainer = label.get_parent() as HBoxContainer
 
 	if id == "" or id == "—":
-		# Empty slot - show item_1906 with placeholder
+		# Empty slot - show item_1906 icon with placeholder
 		var placeholder: String = ""
 		match slot:
 			"weapon": placeholder = "(Weapon)"
@@ -1335,12 +1335,12 @@ func _set_slot_value(label: Label, id: String, slot: String) -> void:
 			"bracelet": placeholder = "(Bracelet)"
 			_: placeholder = "—"
 
-		label.text = "item_1906 " + placeholder
+		label.text = placeholder
 		# Core Vibe: Dimmed Milk White for empty slots
 		label.add_theme_color_override("font_color", Color(aCoreVibeTheme.COLOR_MILK_WHITE.r, aCoreVibeTheme.COLOR_MILK_WHITE.g, aCoreVibeTheme.COLOR_MILK_WHITE.b, 0.4))
 
-		# Hide icon if exists
-		_hide_equipment_icon(parent_hbox)
+		# Show item_1906 icon for empty slots
+		_set_empty_slot_icon(parent_hbox)
 	else:
 		# Has equipment - show item name
 		var item_name: String = id
@@ -1442,6 +1442,36 @@ func _set_equipment_icon(hbox: HBoxContainer, item_id: String) -> void:
 	var icon_path: String = "res://assets/graphics/items/individual/item_%s.png" % icon_num
 
 	if not ResourceLoader.exists(icon_path):
+		_hide_equipment_icon(hbox)
+		return
+
+	# Get or create icon TextureRect
+	var icon: TextureRect = hbox.get_node_or_null("EquipIcon")
+	if not icon:
+		icon = TextureRect.new()
+		icon.name = "EquipIcon"
+		icon.custom_minimum_size = Vector2(24, 24)  # Small icon
+		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		# Add icon before the label
+		hbox.add_child(icon)
+		hbox.move_child(icon, 0)
+
+	# Load and set texture
+	var icon_texture: Texture2D = load(icon_path)
+	icon.texture = icon_texture
+	icon.visible = true
+
+func _set_empty_slot_icon(hbox: HBoxContainer) -> void:
+	"""Set the item_1906 icon for an empty equipment slot"""
+	if not hbox:
+		return
+
+	var icon_path: String = "res://assets/graphics/items/individual/item_1906.png"
+
+	if not ResourceLoader.exists(icon_path):
+		print("[LoadoutPanel] Warning: item_1906.png not found at %s" % icon_path)
 		_hide_equipment_icon(hbox)
 		return
 
