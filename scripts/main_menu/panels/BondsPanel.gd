@@ -81,6 +81,11 @@ var _nav_detail_index: int = 0  # Current selection in detail view
 # @onready var _filter    : OptionButton   = %Filter  # Removed
 # @onready var _refresh   : Button         = %RefreshBtn  # Removed
 @onready var _list      : ItemList       = %List
+@onready var _bonds_label : Label = get_node_or_null("Row/Left/Margin/VBox/BondsLabel") as Label
+
+# Selection arrow and dark box (matching LoadoutPanel/StatsPanel)
+var _selection_arrow: Label = null
+var _dark_box: PanelContainer = null
 
 @onready var _name_tv   : Label          = %Name
 @onready var _desc      : RichTextLabel  = %Notes
@@ -133,6 +138,7 @@ func _ready() -> void:
 	_hide_level_cbxp_labels()
 	_wire_system_signals()
 	_apply_core_vibe_styling()
+	_create_selection_arrow()
 
 	# Filter and refresh button removed - always show all bonds
 	# if _filter != null and _filter.item_count == 0:
@@ -213,6 +219,29 @@ func _apply_core_vibe_styling() -> void:
 		profile_style.content_margin_right = 10
 		profile_style.content_margin_bottom = 10
 		_profile_panel.add_theme_stylebox_override("panel", profile_style)
+
+	# Style bonds label (section header - Bubble Magenta like LoadoutPanel)
+	if _bonds_label:
+		aCoreVibeTheme.style_label(_bonds_label, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA, 16)
+
+	# Style bonds list like LoadoutPanel's party list
+	if _list:
+		# Set colors - Sky Cyan for selection (matching LoadoutPanel)
+		_list.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE)
+		_list.add_theme_color_override("font_selected_color", aCoreVibeTheme.COLOR_SKY_CYAN)
+		_list.add_theme_color_override("font_hovered_color", aCoreVibeTheme.COLOR_SKY_CYAN)
+		# Increase font size to 18 (matching LoadoutPanel)
+		_list.add_theme_font_size_override("font_size", 18)
+		# Set list text to layer 200 (above arrow and box at 100)
+		_list.z_index = 200
+		# Remove all borders and backgrounds by making them transparent
+		var empty_stylebox = StyleBoxEmpty.new()
+		_list.add_theme_stylebox_override("panel", empty_stylebox)
+		_list.add_theme_stylebox_override("focus", empty_stylebox)
+		_list.add_theme_stylebox_override("selected", empty_stylebox)
+		_list.add_theme_stylebox_override("selected_focus", empty_stylebox)
+		_list.add_theme_stylebox_override("cursor", empty_stylebox)
+		_list.add_theme_stylebox_override("cursor_unfocused", empty_stylebox)
 
 	# Style detail labels
 	if _name_tv:
@@ -356,6 +385,7 @@ func _focus_bond_element(index: int) -> void:
 	_list.select(index)
 	_list.ensure_current_is_visible()
 	_list.grab_focus()
+	call_deferred("_update_arrow_position")
 
 func _select_current_bond() -> void:
 	"""Select the currently focused bond and transition to detail view"""
@@ -596,6 +626,7 @@ func _rebuild() -> void:
 	_rows = _read_defs()
 	_build_list()
 	_update_detail(_selected)  # keep detail synced if selection still exists
+	call_deferred("_update_arrow_position")  # Update arrow after list rebuild
 
 func _build_list() -> void:
 	_list.clear()
@@ -675,6 +706,7 @@ func _build_list() -> void:
 	if selected_index >= 0:
 		_list.select(selected_index)
 		_nav_index = selected_index
+		call_deferred("_update_arrow_position")
 
 # ─────────────────────────────────────────────────────────────
 # Reads / fallbacks
@@ -1334,3 +1366,108 @@ func _close_story_overlay() -> void:
 	if _story_overlay != null and is_instance_valid(_story_overlay):
 		_story_overlay.queue_free()
 	_story_overlay = null
+
+# ─────────────────────────────────────────────────────────────
+# Selection Arrow & Dark Box (matching LoadoutPanel)
+# ─────────────────────────────────────────────────────────────
+
+func _create_selection_arrow() -> void:
+	"""Create the selection arrow indicator and dark box for bonds list (matching LoadoutPanel)"""
+	if not _list:
+		return
+
+	# Create arrow label
+	_selection_arrow = Label.new()
+	_selection_arrow.text = "◄"  # Left-pointing arrow
+	_selection_arrow.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_selection_arrow.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_selection_arrow.add_theme_font_size_override("font_size", 43)
+	_selection_arrow.modulate = Color(1, 1, 1, 1)  # White
+	_selection_arrow.custom_minimum_size = Vector2(54, 72)
+	_selection_arrow.size = Vector2(54, 72)
+	_selection_arrow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_selection_arrow.z_index = 100  # Well above other elements
+
+	# Add to main BondsPanel (not the ItemList or PanelContainer)
+	add_child(_selection_arrow)
+
+	# Ensure size is locked after adding to tree
+	await get_tree().process_frame
+	_selection_arrow.size = Vector2(54, 72)
+
+	# Create dark box (160px wide, 20px height - matching LoadoutPanel)
+	_dark_box = PanelContainer.new()
+	_dark_box.custom_minimum_size = Vector2(160, 20)
+	_dark_box.size = Vector2(160, 20)
+	_dark_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_dark_box.z_index = 100  # Same layer as arrow
+
+	# Create Ink Charcoal rounded style
+	var box_style = StyleBoxFlat.new()
+	box_style.bg_color = aCoreVibeTheme.COLOR_INK_CHARCOAL  # Ink Charcoal
+	box_style.corner_radius_top_left = 8
+	box_style.corner_radius_top_right = 8
+	box_style.corner_radius_bottom_left = 8
+	box_style.corner_radius_bottom_right = 8
+	_dark_box.add_theme_stylebox_override("panel", box_style)
+
+	add_child(_dark_box)
+	await get_tree().process_frame
+	_dark_box.size = Vector2(160, 20)
+
+	# Start pulsing animation
+	_start_arrow_pulse()
+
+func _update_arrow_position() -> void:
+	"""Update arrow and dark box position to align with selected item"""
+	if not _selection_arrow or not _list:
+		return
+
+	var selected = _list.get_selected_items()
+	if selected.size() == 0:
+		_selection_arrow.visible = false
+		if _dark_box:
+			_dark_box.visible = false
+		return
+
+	_selection_arrow.visible = true
+
+	# Wait for layout to complete
+	await get_tree().process_frame
+
+	# Get the rect of the selected item in ItemList's local coordinates
+	var item_index = selected[0]
+	var item_rect = _list.get_item_rect(item_index)
+
+	# Convert to BondsPanel coordinates
+	var list_global_pos = _list.global_position
+	var panel_global_pos = global_position
+	var list_offset_in_panel = list_global_pos - panel_global_pos
+
+	# Position arrow to the right of the bonds list
+	var arrow_x = list_offset_in_panel.x + _list.size.x - 8.0 - 80.0 + 40.0
+	var arrow_y = list_offset_in_panel.y + item_rect.position.y + (item_rect.size.y / 2.0) - (_selection_arrow.size.y / 2.0)
+
+	_selection_arrow.position = Vector2(arrow_x, arrow_y)
+
+	# Position dark box to the left of arrow
+	if _dark_box:
+		_dark_box.visible = true
+		var box_x = arrow_x - _dark_box.size.x - 4.0  # 4px gap to the left of arrow
+		var box_y = arrow_y + (_selection_arrow.size.y / 2.0) - (_dark_box.size.y / 2.0)  # Center vertically with arrow
+		_dark_box.position = Vector2(box_x, box_y)
+
+func _start_arrow_pulse() -> void:
+	"""Start pulsing animation for the arrow"""
+	if not _selection_arrow:
+		return
+
+	var tween = create_tween()
+	tween.set_loops()
+	tween.set_trans(Tween.TRANS_SINE)
+	tween.set_ease(Tween.EASE_IN_OUT)
+
+	# Pulse left 6 pixels then back
+	var base_x = _selection_arrow.position.x
+	tween.tween_property(_selection_arrow, "position:x", base_x - 6, 0.6)
+	tween.tween_property(_selection_arrow, "position:x", base_x, 0.6)

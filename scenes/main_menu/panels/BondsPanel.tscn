@@ -31,21 +31,28 @@ layout_mode = 2
 size_flags_horizontal = 3
 size_flags_stretch_ratio = 2.0
 
-[node name="VBox" type="VBoxContainer" parent="Row/Left"]
+[node name="Margin" type="MarginContainer" parent="Row/Left"]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 10
+
+[node name="VBox" type="VBoxContainer" parent="Row/Left/Margin"]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="BondsLabel" type="Label" parent="Row/Left/VBox"]
+[node name="BondsLabel" type="Label" parent="Row/Left/Margin/VBox"]
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
 theme_override_font_sizes/font_size = 16
 text = "BONDS"
 horizontal_alignment = 0
 
-[node name="Separator" type="HSeparator" parent="Row/Left/VBox"]
+[node name="Separator" type="HSeparator" parent="Row/Left/Margin/VBox"]
 layout_mode = 2
 
-[node name="List" type="ItemList" parent="Row/Left/VBox"]
+[node name="List" type="ItemList" parent="Row/Left/Margin/VBox"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 3
