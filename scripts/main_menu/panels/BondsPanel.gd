@@ -156,6 +156,9 @@ func _ready() -> void:
 	if _list and not _list.item_selected.is_connected(_on_list_item_selected):
 		_list.item_selected.connect(_on_list_item_selected)
 
+	# Connect to scroll changes to update arrow position when scrolling
+	call_deferred("_connect_scroll_signals")
+
 	if _story_btn != null and not _story_btn.pressed.is_connected(_on_story_points_pressed):
 		_story_btn.pressed.connect(_on_story_points_pressed)
 
@@ -386,14 +389,29 @@ func _navigate_bond_list(delta: int) -> void:
 func _focus_bond_element(index: int) -> void:
 	"""Focus the bond item at given index and ensure it's visible in the scroll area"""
 	if not _list or index < 0 or index >= _list.item_count:
+		print("[BondsPanel] _focus_bond_element: Invalid index %d (count: %d)" % [index, _list.item_count if _list else 0])
 		return
+
+	print("[BondsPanel] Focusing bond at index %d" % index)
 
 	# Select the item
 	_list.select(index)
 
+	# Get scroll info before
+	var scroll_before = 0.0
+	if _list.get_v_scroll_bar():
+		scroll_before = _list.get_v_scroll_bar().value
+
 	# Ensure the selected item is scrolled into view
 	# Using both methods for maximum compatibility
 	_list.ensure_current_is_visible()
+
+	# Get scroll info after
+	var scroll_after = 0.0
+	if _list.get_v_scroll_bar():
+		scroll_after = _list.get_v_scroll_bar().value
+
+	print("[BondsPanel] Scroll change: %.1f -> %.1f (delta: %.1f)" % [scroll_before, scroll_after, scroll_after - scroll_before])
 
 	# Grab focus to enable keyboard/controller input
 	_list.grab_focus()
@@ -1396,6 +1414,24 @@ func _close_story_overlay() -> void:
 # Selection Arrow & Dark Box (matching LoadoutPanel)
 # ─────────────────────────────────────────────────────────────
 
+func _connect_scroll_signals() -> void:
+	"""Connect to the ItemList's scrollbar to update arrow on scroll"""
+	if not _list:
+		return
+
+	# Wait for the scroll bar to be ready
+	await get_tree().process_frame
+
+	var vscroll = _list.get_v_scroll_bar()
+	if vscroll and not vscroll.value_changed.is_connected(_on_list_scrolled):
+		vscroll.value_changed.connect(_on_list_scrolled)
+		print("[BondsPanel] Connected to scroll bar value_changed signal")
+
+func _on_list_scrolled(_value: float) -> void:
+	"""Called when the list is scrolled - update arrow position"""
+	print("[BondsPanel] List scrolled to: %.1f" % _value)
+	call_deferred("_update_arrow_position")
+
 func _create_selection_arrow() -> void:
 	"""Create the selection arrow indicator and dark box for bonds list (matching LoadoutPanel)"""
 	if not _list:
@@ -1446,10 +1482,12 @@ func _create_selection_arrow() -> void:
 func _update_arrow_position() -> void:
 	"""Update arrow and dark box position to align with selected item"""
 	if not _selection_arrow or not _list:
+		print("[BondsPanel] _update_arrow_position: Missing arrow or list")
 		return
 
 	var selected = _list.get_selected_items()
 	if selected.size() == 0:
+		print("[BondsPanel] _update_arrow_position: No selection, hiding arrow")
 		_selection_arrow.visible = false
 		if _dark_box:
 			_dark_box.visible = false
@@ -1469,9 +1507,19 @@ func _update_arrow_position() -> void:
 	var panel_global_pos = global_position
 	var list_offset_in_panel = list_global_pos - panel_global_pos
 
+	# Get scroll offset - item_rect is in content space, we need to adjust for scroll
+	var scroll_offset = 0.0
+	if _list.get_v_scroll_bar():
+		var vscroll = _list.get_v_scroll_bar()
+		scroll_offset = vscroll.value
+		print("[BondsPanel] Arrow Update - Index: %d, Scroll: %.1f, ItemRect: %s" % [item_index, scroll_offset, item_rect])
+
 	# Position arrow to the right of the bonds list
 	var arrow_x = list_offset_in_panel.x + _list.size.x - 8.0 - 80.0 + 40.0
-	var arrow_y = list_offset_in_panel.y + item_rect.position.y + (item_rect.size.y / 2.0) - (_selection_arrow.size.y / 2.0)
+	# Subtract scroll offset to position arrow correctly in viewport space
+	var arrow_y = list_offset_in_panel.y + item_rect.position.y - scroll_offset + (item_rect.size.y / 2.0) - (_selection_arrow.size.y / 2.0)
+
+	print("[BondsPanel] Arrow Position - X: %.1f, Y: %.1f (item_y: %.1f, scroll: %.1f, adjusted_y: %.1f)" % [arrow_x, arrow_y, item_rect.position.y, scroll_offset, item_rect.position.y - scroll_offset])
 
 	_selection_arrow.position = Vector2(arrow_x, arrow_y)
 
@@ -1481,6 +1529,7 @@ func _update_arrow_position() -> void:
 		var box_x = arrow_x - _dark_box.size.x - 4.0  # 4px gap to the left of arrow
 		var box_y = arrow_y + (_selection_arrow.size.y / 2.0) - (_dark_box.size.y / 2.0)  # Center vertically with arrow
 		_dark_box.position = Vector2(box_x, box_y)
+		print("[BondsPanel] Dark Box Position - X: %.1f, Y: %.1f" % [box_x, box_y])
 
 func _start_arrow_pulse() -> void:
 	"""Start pulsing animation for the arrow"""
