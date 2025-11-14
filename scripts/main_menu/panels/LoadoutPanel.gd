@@ -339,6 +339,15 @@ func _refresh_all_for_current() -> void:
 		return
 
 	var equip: Dictionary = _fetch_equip_for(cur)
+
+	# DEBUG: Print equipment loadout
+	print("[DEBUG] Refreshing loadout for %s" % cur)
+	print("  Weapon: %s" % equip.get("weapon", "(none)"))
+	print("  Armor: %s" % equip.get("armor", "(none)"))
+	print("  Head: %s" % equip.get("head", "(none)"))
+	print("  Foot: %s" % equip.get("foot", "(none)"))
+	print("  Bracelet: %s" % equip.get("bracelet", "(none)"))
+
 	_set_slot_value(_w_val, String(equip.get("weapon","")), "weapon")
 	_set_slot_value(_a_val, String(equip.get("armor","")), "armor")
 	_set_slot_value(_h_val, String(equip.get("head","")), "head")
@@ -356,6 +365,9 @@ func _refresh_all_for_current() -> void:
 	# Only restore focus if we're actively in equipment mode
 	if _nav_state == NavState.EQUIPMENT_NAV:
 		call_deferred("_restore_equipment_focus")
+
+	# DEBUG: Print panel sizes after layout
+	call_deferred("_debug_print_panel_sizes")
 
 func _on_sigil_instances_updated(_a=null,_b=null,_c=null) -> void:
 	_refresh_all_for_current()
@@ -898,6 +910,9 @@ func _rebuild_sigils(member_token: String) -> void:
 	var used: int = 0
 	for s in sockets:
 		if String(s) != "": used += 1
+
+	# DEBUG: Print sigil rebuild info
+	print("[DEBUG] Rebuilding sigils for %s: capacity=%d, used=%d, total_slots=8" % [member_token, cap, used])
 
 	# Title shows actual capacity from bracelet
 	if _sigils_title:
@@ -2749,3 +2764,44 @@ func _restore_equipment_focus() -> void:
 		if _nav_index < _nav_elements.size():
 			var elem = _nav_elements[_nav_index]
 			print("[LoadoutPanel] Element valid: %s, is Control: %s" % [is_instance_valid(elem), str(elem is Control) if is_instance_valid(elem) else "N/A"])
+
+func _debug_print_panel_sizes() -> void:
+	"""Debug function to print panel sizes after layout"""
+	print("\n=== LOADOUT PANEL DEBUG - Panel Sizes ===")
+
+	if _party_panel:
+		print("[DEBUG] Party Panel:")
+		print("  - Size: %s" % _party_panel.size)
+		print("  - Position: %s" % _party_panel.position)
+		print("  - Custom Min Size: %s" % _party_panel.custom_minimum_size)
+
+	if _middle_panel:
+		print("[DEBUG] Middle/Center Panel (Equipment & Sigils):")
+		print("  - Size: %s" % _middle_panel.size)
+		print("  - Position: %s" % _middle_panel.position)
+		print("  - Custom Min Size: %s" % _middle_panel.custom_minimum_size)
+
+		# Get child container info for more detail
+		var margin = _middle_panel.get_node_or_null("Margin")
+		if margin:
+			print("  - Margin Container Size: %s" % margin.size)
+			var vbox = margin.get_node_or_null("VBox")
+			if vbox:
+				print("  - VBox Size: %s" % vbox.size)
+				print("  - VBox Children Count: %d" % vbox.get_child_count())
+
+				# Count sigils displayed
+				if _sigils_list:
+					var visible_sigils = 0
+					for child in _sigils_list.get_children():
+						if child.visible:
+							visible_sigils += 1
+					print("  - Visible Sigil Rows: %d" % (visible_sigils / 2))  # Divide by 2 because each row has label + button
+
+	if _stats_panel:
+		print("[DEBUG] Stats Panel:")
+		print("  - Size: %s" % _stats_panel.size)
+		print("  - Position: %s" % _stats_panel.position)
+		print("  - Custom Min Size: %s" % _stats_panel.custom_minimum_size)
+
+	print("=== END PANEL DEBUG ===\n")
