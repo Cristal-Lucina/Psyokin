@@ -356,6 +356,41 @@ func _update_arrow_position() -> void:
 	# Restart pulse animation at new position
 	_start_arrow_pulse()
 
+func _auto_scroll_to_selection() -> void:
+	"""Auto-scroll to keep selected item visible with buffer rows"""
+	if not _items_scroll or _selected_grid_index < 0 or _selected_grid_index >= _item_buttons.size():
+		return
+
+	var selected_button: Button = _item_buttons[_selected_grid_index]
+	var scroll_rect: Rect2 = _items_scroll.get_rect()
+	var current_scroll: float = _items_scroll.scroll_vertical
+
+	# Calculate button position relative to scroll container
+	var button_pos_in_grid: float = selected_button.position.y
+	var button_height: float = selected_button.size.y
+
+	# Calculate how many rows to keep visible (10 rows = 20 items in 2-column grid)
+	var buffer_rows: int = 10
+	var row_height: float = button_height  # Each row is one button height
+	var buffer_pixels: float = buffer_rows * row_height
+
+	# Visible area
+	var visible_top: float = current_scroll
+	var visible_bottom: float = current_scroll + scroll_rect.size.y
+
+	# Button boundaries with buffer
+	var button_top: float = button_pos_in_grid
+	var button_bottom: float = button_pos_in_grid + button_height
+
+	# Check if we need to scroll up (selected item too high)
+	if button_top < visible_top + buffer_pixels:
+		var target_scroll: float = max(0, button_top - buffer_pixels)
+		_items_scroll.scroll_vertical = int(target_scroll)
+	# Check if we need to scroll down (selected item too low)
+	elif button_bottom > visible_bottom - buffer_pixels:
+		var target_scroll: float = button_bottom - scroll_rect.size.y + buffer_pixels
+		_items_scroll.scroll_vertical = int(target_scroll)
+
 func _start_arrow_pulse() -> void:
 	if not _selection_arrow:
 		return
@@ -966,7 +1001,7 @@ func _is_gift_item(def: Dictionary) -> bool:
 func _is_equipment(def: Dictionary) -> bool:
 	"""Check if item is equipment"""
 	var equip_slot: String = String(def.get("equip_slot", "")).to_lower().strip_edges()
-	return equip_slot in ["weapon", "armor", "head", "foot", "bracelet"]
+	return equip_slot in ["weapon", "armor", "head", "headwear", "foot", "footwear", "bracelet"]
 
 func _is_battle_item(def: Dictionary) -> bool:
 	"""Check if item is a battle consumable"""
@@ -1166,6 +1201,7 @@ func _navigate_items(delta: int) -> void:
 	_update_selection_highlight()
 	_update_details()
 	_update_arrow_position()
+	_auto_scroll_to_selection()
 
 func _update_selection_highlight() -> void:
 	"""Update visual highlight on selected button"""
