@@ -291,29 +291,29 @@ func _apply_core_vibe_styling() -> void:
 	if _attributes_label:
 		aCoreVibeTheme.style_label(_attributes_label, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA, 16)
 
-	# Style equipment slot labels (Sky Cyan)
+	# Style equipment slot labels (Milk White)
 	if _w_label:
-		aCoreVibeTheme.style_label(_w_label, aCoreVibeTheme.COLOR_SKY_CYAN, 12)
+		aCoreVibeTheme.style_label(_w_label, aCoreVibeTheme.COLOR_MILK_WHITE, 12)
 	if _a_label:
-		aCoreVibeTheme.style_label(_a_label, aCoreVibeTheme.COLOR_SKY_CYAN, 12)
+		aCoreVibeTheme.style_label(_a_label, aCoreVibeTheme.COLOR_MILK_WHITE, 12)
 	if _h_label:
-		aCoreVibeTheme.style_label(_h_label, aCoreVibeTheme.COLOR_SKY_CYAN, 12)
+		aCoreVibeTheme.style_label(_h_label, aCoreVibeTheme.COLOR_MILK_WHITE, 12)
 	if _f_label:
-		aCoreVibeTheme.style_label(_f_label, aCoreVibeTheme.COLOR_SKY_CYAN, 12)
+		aCoreVibeTheme.style_label(_f_label, aCoreVibeTheme.COLOR_MILK_WHITE, 12)
 	if _b_label:
-		aCoreVibeTheme.style_label(_b_label, aCoreVibeTheme.COLOR_SKY_CYAN, 12)
+		aCoreVibeTheme.style_label(_b_label, aCoreVibeTheme.COLOR_MILK_WHITE, 12)
 
-	# Style equipment value labels / item names (Milk White)
+	# Style equipment value labels / item names (Sky Cyan)
 	if _w_val:
-		aCoreVibeTheme.style_label(_w_val, aCoreVibeTheme.COLOR_MILK_WHITE, 12)
+		aCoreVibeTheme.style_label(_w_val, aCoreVibeTheme.COLOR_SKY_CYAN, 12)
 	if _a_val:
-		aCoreVibeTheme.style_label(_a_val, aCoreVibeTheme.COLOR_MILK_WHITE, 12)
+		aCoreVibeTheme.style_label(_a_val, aCoreVibeTheme.COLOR_SKY_CYAN, 12)
 	if _h_val:
-		aCoreVibeTheme.style_label(_h_val, aCoreVibeTheme.COLOR_MILK_WHITE, 12)
+		aCoreVibeTheme.style_label(_h_val, aCoreVibeTheme.COLOR_SKY_CYAN, 12)
 	if _f_val:
-		aCoreVibeTheme.style_label(_f_val, aCoreVibeTheme.COLOR_MILK_WHITE, 12)
+		aCoreVibeTheme.style_label(_f_val, aCoreVibeTheme.COLOR_SKY_CYAN, 12)
 	if _b_val:
-		aCoreVibeTheme.style_label(_b_val, aCoreVibeTheme.COLOR_MILK_WHITE, 12)
+		aCoreVibeTheme.style_label(_b_val, aCoreVibeTheme.COLOR_SKY_CYAN, 12)
 
 	# Style equipment buttons
 	if _w_btn:
@@ -335,9 +335,8 @@ func _apply_core_vibe_styling() -> void:
 	if _btn_manage:
 		aCoreVibeTheme.style_button(_btn_manage, aCoreVibeTheme.COLOR_ELECTRIC_LIME, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
 
-	# Style mind section
-	if _mind_value:
-		aCoreVibeTheme.style_label(_mind_value, aCoreVibeTheme.COLOR_CITRUS_YELLOW, 14)
+	# Style mind section - will be set per-text in _refresh_mind_row
+	# (Base color Milk White, with Sky Cyan for player active type)
 
 	# Style switch button
 	if _mind_switch_btn:
@@ -637,7 +636,7 @@ func _build_equipment_comparison_panel(item_id: String, slot: String, current_st
 		name_label.add_theme_color_override("font_color", Color(aCoreVibeTheme.COLOR_MILK_WHITE.r, aCoreVibeTheme.COLOR_MILK_WHITE.g, aCoreVibeTheme.COLOR_MILK_WHITE.b, 0.4))
 	else:
 		name_label.text = _pretty_item(item_id)
-		name_label.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE)
+		name_label.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_SKY_CYAN)
 	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	name_label.add_theme_font_size_override("font_size", 12)
 	vbox.add_child(name_label)
@@ -932,6 +931,61 @@ func _sigil_disp(inst_id: String) -> String:
 	result = "%s  (%s)%s" % [disp_name, lv_str, star]
 	return result
 
+func _sigil_disp_formatted(inst_id: String) -> String:
+	"""Format sigil display with BBCode colors: name (Milk White) + level (Milk White) + active skill (Sky Cyan)"""
+	if inst_id == "":
+		return "(empty)"
+
+	# Get base and instance data
+	var base_id: String = inst_id
+	if _sig and _sig.has_method("get_base_from_instance"):
+		base_id = String(_sig.call("get_base_from_instance", inst_id))
+
+	var disp_name: String = base_id
+	if _sig and _sig.has_method("get_display_name_for"):
+		var n_v: Variant = _sig.call("get_display_name_for", base_id)
+		if typeof(n_v) == TYPE_STRING:
+			disp_name = String(n_v)
+
+	var lv: int = 1
+	if _sig and _sig.has_method("get_instance_level"):
+		lv = int(_sig.call("get_instance_level", inst_id))
+
+	var lv_str: String = ("MAX" if lv >= 4 else "Lv %d" % lv)
+
+	# Build formatted string with colors
+	var milk_white_hex: String = "#F4F7FB"
+	var sky_cyan_hex: String = "#4DE9FF"
+
+	var result: String = "[color=%s]%s  (%s)[/color]" % [milk_white_hex, disp_name, lv_str]
+
+	# Add active skill in Sky Cyan
+	if _sig and _sig.has_method("get_active_skill_name_for_instance"):
+		var a_v: Variant = _sig.call("get_active_skill_name_for_instance", inst_id)
+		if typeof(a_v) == TYPE_STRING and String(a_v).strip_edges() != "":
+			result += "  —  [color=%s]★ %s[/color]" % [sky_cyan_hex, String(a_v)]
+
+	return result
+
+func _create_empty_sigil_icon() -> TextureRect:
+	"""Create item_1906 icon for empty sigil slot"""
+	var icon_path: String = "res://assets/graphics/items/individual/item_1906.png"
+
+	if not ResourceLoader.exists(icon_path):
+		return null
+
+	var icon: TextureRect = TextureRect.new()
+	icon.name = "SigilIcon"
+	icon.custom_minimum_size = Vector2(24, 24)
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	var icon_texture: Texture2D = load(icon_path)
+	icon.texture = icon_texture
+
+	return icon
+
 func _rebuild_sigils(member_token: String) -> void:
 	if _sigils_list == null:
 		return
@@ -970,21 +1024,33 @@ func _rebuild_sigils(member_token: String) -> void:
 		hbox.custom_minimum_size = Vector2(180, 0)
 		hbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
-		# Add icon if sigil is equipped
+		# Add icon if sigil is equipped or show item_1906 for empty
 		if cur_id != "":
 			var icon: TextureRect = _create_sigil_icon(cur_id)
 			if icon:
 				hbox.add_child(icon)
+		else:
+			# Show item_1906 icon for empty slots
+			var empty_icon: TextureRect = _create_empty_sigil_icon()
+			if empty_icon:
+				hbox.add_child(empty_icon)
 
-		# Create label
-		var nm: Label = Label.new()
+		# Create label with color formatting
+		var nm: RichTextLabel = RichTextLabel.new()
 		nm.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		nm.add_theme_font_size_override("font_size", 12)
-		nm.text = (_sigil_disp(cur_id) if cur_id != "" else "(empty)")
+		nm.custom_minimum_size = Vector2(0, 24)  # Minimum height
+		nm.fit_content = true
+		nm.scroll_active = false
+		nm.bbcode_enabled = true
+		nm.add_theme_font_size_override("normal_font_size", 12)
+		nm.add_theme_color_override("default_color", aCoreVibeTheme.COLOR_MILK_WHITE)
 
-		# Core Vibe: Make equipped sigil names Milk White
 		if cur_id != "":
-			nm.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE)
+			nm.text = _sigil_disp_formatted(cur_id)
+		else:
+			# Empty slot - grey text
+			nm.add_theme_color_override("default_color", Color(aCoreVibeTheme.COLOR_MILK_WHITE.r, aCoreVibeTheme.COLOR_MILK_WHITE.g, aCoreVibeTheme.COLOR_MILK_WHITE.b, 0.4))
+			nm.text = "(empty)"
 
 		hbox.add_child(nm)
 
@@ -1285,16 +1351,40 @@ func _refresh_mind_row(member_token: String) -> void:
 	if _mind_value == null: return
 	var mt: String = _get_member_mind_type(member_token)
 
+	var milk_white_hex: String = "#F4F7FB"
+	var sky_cyan_hex: String = "#4DE9FF"
+
+	# Convert to RichTextLabel if needed
+	if not (_mind_value is RichTextLabel):
+		var parent = _mind_value.get_parent()
+		if parent:
+			var old_pos = _mind_value.get_index()
+			var rtl = RichTextLabel.new()
+			rtl.name = "Value"
+			rtl.size_flags_horizontal = _mind_value.size_flags_horizontal
+			rtl.size_flags_vertical = _mind_value.size_flags_vertical
+			rtl.custom_minimum_size = _mind_value.custom_minimum_size
+			rtl.fit_content = true
+			rtl.scroll_active = false
+			rtl.bbcode_enabled = true
+			rtl.add_theme_font_size_override("normal_font_size", 14)
+
+			parent.remove_child(_mind_value)
+			_mind_value.queue_free()
+			parent.add_child(rtl)
+			parent.move_child(rtl, old_pos)
+			_mind_value = rtl
+
 	if member_token == "hero":
-		# For player: "Omega - Active: Air"
+		# For player: "Omega" (Milk White) " - Active: " (Milk White) "Void" (Sky Cyan)
 		var active_type: String = _get_hero_active_type()
-		_mind_value.text = "%s - Active: %s" % [mt, active_type]
+		_mind_value.text = "[color=%s]%s  —  Active: [/color][color=%s]%s[/color]" % [milk_white_hex, mt, sky_cyan_hex, active_type]
 		if _mind_switch_btn:
 			_mind_switch_btn.text = "Switch"
 			_mind_switch_btn.disabled = false
 	else:
-		# For other members: just "Data"
-		_mind_value.text = (mt if mt != "" else "—")
+		# For other members: just "Data" (Milk White)
+		_mind_value.text = "[color=%s]%s[/color]" % [milk_white_hex, (mt if mt != "" else "—")]
 		if _mind_switch_btn:
 			_mind_switch_btn.text = "—"
 			_mind_switch_btn.disabled = true
@@ -1349,8 +1439,8 @@ func _set_slot_value(label: Label, id: String, slot: String) -> void:
 			if typeof(v) == TYPE_STRING: item_name = String(v)
 
 		label.text = item_name
-		# Core Vibe: Milk White for equipped items
-		label.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE)
+		# Core Vibe: Sky Cyan for equipped items
+		label.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_SKY_CYAN)
 
 		# Add/update icon
 		_set_equipment_icon(parent_hbox, id)
