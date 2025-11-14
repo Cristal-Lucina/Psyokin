@@ -25,6 +25,13 @@ const PARTY_MEMBERS: Array[String] = ["hero", "tessa", "kai", "skye", "rise", "m
 @onready var _affinity_grid: GridContainer = %AffinityGrid
 @onready var _radar_container: VBoxContainer = %RadarContainer
 
+# Title labels
+@onready var _party_label: Label = get_node("Root/PartyPanel/PartyColumn/PartyLabel") if has_node("Root/PartyPanel/PartyColumn/PartyLabel") else null
+@onready var _details_label: Label = get_node("Root/StatsPanel/Margin/StatsColumn/BaseStatsLabel") if has_node("Root/StatsPanel/Margin/StatsColumn/BaseStatsLabel") else null
+@onready var _stat_dist_label: Label = get_node("Root/StatsPanel/Margin/StatsColumn/RadarLabel") if has_node("Root/StatsPanel/Margin/StatsColumn/RadarLabel") else null
+@onready var _attributes_label: Label = get_node("Root/VisualPanel/Margin/VisualColumn/BattleStatsLabel") if has_node("Root/VisualPanel/Margin/VisualColumn/BattleStatsLabel") else null
+@onready var _affinity_label: Label = get_node("Root/VisualPanel/Margin/VisualColumn/AffinityLabel") if has_node("Root/VisualPanel/Margin/VisualColumn/AffinityLabel") else null
+
 # Panel containers for styling
 @onready var _party_panel: PanelContainer = get_node("Root/PartyPanel") if has_node("Root/PartyPanel") else null
 @onready var _stats_panel: PanelContainer = get_node("Root/StatsPanel") if has_node("Root/StatsPanel") else null
@@ -156,8 +163,8 @@ func _apply_core_vibe_styling() -> void:
 	if _party_list:
 		# Set normal and selected colors for party list
 		_party_list.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE)
-		_party_list.add_theme_color_override("font_selected_color", aCoreVibeTheme.COLOR_CITRUS_YELLOW)
-		_party_list.add_theme_color_override("font_hovered_color", aCoreVibeTheme.COLOR_CITRUS_YELLOW)
+		_party_list.add_theme_color_override("font_selected_color", aCoreVibeTheme.COLOR_SKY_CYAN)
+		_party_list.add_theme_color_override("font_hovered_color", aCoreVibeTheme.COLOR_SKY_CYAN)
 		# Increase font size by 2pts
 		_party_list.add_theme_font_size_override("font_size", 18)
 		# Remove all borders and backgrounds by making them transparent
@@ -168,6 +175,18 @@ func _apply_core_vibe_styling() -> void:
 		_party_list.add_theme_stylebox_override("selected_focus", empty_stylebox)
 		_party_list.add_theme_stylebox_override("cursor", empty_stylebox)
 		_party_list.add_theme_stylebox_override("cursor_unfocused", empty_stylebox)
+
+	# Style title labels with Bubble Magenta
+	if _party_label:
+		aCoreVibeTheme.style_label(_party_label, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA, 16)
+	if _details_label:
+		aCoreVibeTheme.style_label(_details_label, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA, 16)
+	if _stat_dist_label:
+		aCoreVibeTheme.style_label(_stat_dist_label, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA, 16)
+	if _attributes_label:
+		aCoreVibeTheme.style_label(_attributes_label, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA, 16)
+	if _affinity_label:
+		aCoreVibeTheme.style_label(_affinity_label, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA, 16)
 
 	# Note: Battle stat cells and affinity cells are dynamically created,
 	# so their styling is applied in their creation functions.
