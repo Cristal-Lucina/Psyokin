@@ -73,7 +73,7 @@ const ANIM_DURATION := 0.2  # Animation duration in seconds
 @onready var _middle_panel: PanelContainer = get_node("%Middle") if has_node("%Middle") else null
 @onready var _stats_panel: PanelContainer = get_node("%StatsColumn") if has_node("%StatsColumn") else null
 
-@onready var _party_list: ItemList       = get_node("Row/Party/Margin/VBox/PartyList") as ItemList
+@onready var _party_list: ItemList = %PartyList
 # @onready var _member_name: Label         = get_node("Row/Middle/Margin/VBox/MemberName") as Label  # Removed
 
 # Section header labels
@@ -114,6 +114,10 @@ const ANIM_DURATION := 0.2  # Animation duration in seconds
 
 var _labels: PackedStringArray = PackedStringArray()
 var _tokens: PackedStringArray = PackedStringArray()
+
+# Selection arrow and dark box (matching StatsPanel)
+var _selection_arrow: Label = null
+var _dark_box: PanelContainer = null
 
 var _gs:    Node = null
 var _inv:   Node = null
@@ -165,7 +169,7 @@ func _ready() -> void:
 	if _f_btn: _f_btn.pressed.connect(Callable(self, "_on_slot_button").bind("foot"))
 	if _b_btn: _b_btn.pressed.connect(Callable(self, "_on_slot_button").bind("bracelet"))
 
-	if not _party_list.item_selected.is_connected(Callable(self, "_on_party_selected")):
+	if _party_list and not _party_list.item_selected.is_connected(Callable(self, "_on_party_selected")):
 		_party_list.item_selected.connect(Callable(self, "_on_party_selected"))
 
 	if _btn_manage and not _btn_manage.pressed.is_connected(Callable(self, "_on_manage_sigils")):
@@ -224,10 +228,12 @@ func _first_fill() -> void:
 	# Apply Core Vibe styling
 	_apply_core_vibe_styling()
 
+	_create_selection_arrow()
 	_refresh_party()
-	if _party_list.get_item_count() > 0:
+	if _party_list.item_count > 0:
 		_party_list.select(0)
 		_on_party_selected(0)
+		_update_arrow_position()
 	_party_sig = _snapshot_party_signature()
 	var cur := _current_token()
 	_sigils_sig = _snapshot_sigil_signature(cur) if cur != "" else ""
@@ -273,10 +279,24 @@ func _apply_core_vibe_styling() -> void:
 		)
 		_stats_panel.add_theme_stylebox_override("panel", stats_style)
 
-	# Style party list with Sky Cyan selection
+	# Style party list like StatsPanel
 	if _party_list:
-		_party_list.add_theme_color_override("font_selected_color", aCoreVibeTheme.COLOR_SKY_CYAN)
+		# Set colors matching StatsPanel approach - Sky Cyan for selection (user requested)
 		_party_list.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE)
+		_party_list.add_theme_color_override("font_selected_color", aCoreVibeTheme.COLOR_SKY_CYAN)
+		_party_list.add_theme_color_override("font_hovered_color", aCoreVibeTheme.COLOR_SKY_CYAN)
+		# Increase font size to 18 (matching StatsPanel)
+		_party_list.add_theme_font_size_override("font_size", 18)
+		# Set party list text to layer 200 (above arrow and box at 100)
+		_party_list.z_index = 200
+		# Remove all borders and backgrounds by making them transparent
+		var empty_stylebox = StyleBoxEmpty.new()
+		_party_list.add_theme_stylebox_override("panel", empty_stylebox)
+		_party_list.add_theme_stylebox_override("focus", empty_stylebox)
+		_party_list.add_theme_stylebox_override("selected", empty_stylebox)
+		_party_list.add_theme_stylebox_override("selected_focus", empty_stylebox)
+		_party_list.add_theme_stylebox_override("cursor", empty_stylebox)
+		_party_list.add_theme_stylebox_override("cursor_unfocused", empty_stylebox)
 
 	# Style section headers (Bubble Magenta)
 	if _party_label:
@@ -419,9 +439,11 @@ func _on_party_roster_changed(_arg=null) -> void:
 	var keep: String = _current_token()
 	_refresh_party()
 	var idx: int = max(0, _tokens.find(keep))
-	if _party_list.get_item_count() > 0:
+	if _party_list.item_count > 0:
+		idx = clamp(idx, 0, _party_list.item_count - 1)
 		_party_list.select(idx)
 		_on_party_selected(idx)
+		call_deferred("_update_arrow_position")
 	_party_sig = _snapshot_party_signature()
 
 # ────────────────── party ──────────────────
@@ -507,10 +529,110 @@ func _refresh_party() -> void:
 		_tokens.append("hero")
 		_labels.append(_hero_name())
 
+	# Add items to ItemList
 	for i in range(_labels.size()):
 		_party_list.add_item(_labels[i])
 
-	_party_list.queue_redraw()
+func _create_selection_arrow() -> void:
+	"""Create the selection arrow indicator and dark box for party list (matching StatsPanel)"""
+	if not _party_list:
+		return
+
+	# Create arrow label
+	_selection_arrow = Label.new()
+	_selection_arrow.text = "◄"  # Left-pointing arrow
+	_selection_arrow.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_selection_arrow.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_selection_arrow.add_theme_font_size_override("font_size", 43)
+	_selection_arrow.modulate = Color(1, 1, 1, 1)  # White
+	_selection_arrow.custom_minimum_size = Vector2(54, 72)
+	_selection_arrow.size = Vector2(54, 72)
+	_selection_arrow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_selection_arrow.z_index = 100  # Well above other elements
+
+	# Add to main LoadoutPanel (not the ItemList or PanelContainer)
+	add_child(_selection_arrow)
+
+	# Ensure size is locked after adding to tree
+	await get_tree().process_frame
+	_selection_arrow.size = Vector2(54, 72)
+
+	# Create dark box (160px wide, 20px height - matching StatsPanel)
+	_dark_box = PanelContainer.new()
+	_dark_box.custom_minimum_size = Vector2(160, 20)
+	_dark_box.size = Vector2(160, 20)
+	_dark_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_dark_box.z_index = 100  # Same layer as arrow
+
+	# Create Ink Charcoal rounded style
+	var box_style = StyleBoxFlat.new()
+	box_style.bg_color = aCoreVibeTheme.COLOR_INK_CHARCOAL  # Ink Charcoal
+	box_style.corner_radius_top_left = 8
+	box_style.corner_radius_top_right = 8
+	box_style.corner_radius_bottom_left = 8
+	box_style.corner_radius_bottom_right = 8
+	_dark_box.add_theme_stylebox_override("panel", box_style)
+
+	add_child(_dark_box)
+	await get_tree().process_frame
+	_dark_box.size = Vector2(160, 20)
+
+	# Start pulsing animation
+	_start_arrow_pulse()
+
+func _update_arrow_position() -> void:
+	"""Update arrow and dark box position to align with selected item"""
+	if not _selection_arrow or not _party_list:
+		return
+
+	var selected = _party_list.get_selected_items()
+	if selected.size() == 0:
+		_selection_arrow.visible = false
+		if _dark_box:
+			_dark_box.visible = false
+		return
+
+	_selection_arrow.visible = true
+
+	# Wait for layout to complete
+	await get_tree().process_frame
+
+	# Get the rect of the selected item in ItemList's local coordinates
+	var item_index = selected[0]
+	var item_rect = _party_list.get_item_rect(item_index)
+
+	# Convert to LoadoutPanel coordinates
+	var list_global_pos = _party_list.global_position
+	var panel_global_pos = global_position
+	var list_offset_in_panel = list_global_pos - panel_global_pos
+
+	# Position arrow to the right of the party list
+	var arrow_x = list_offset_in_panel.x + _party_list.size.x - 8.0 - 80.0 + 40.0
+	var arrow_y = list_offset_in_panel.y + item_rect.position.y + (item_rect.size.y / 2.0) - (_selection_arrow.size.y / 2.0)
+
+	_selection_arrow.position = Vector2(arrow_x, arrow_y)
+
+	# Position dark box to the left of arrow
+	if _dark_box:
+		_dark_box.visible = true
+		var box_x = arrow_x - _dark_box.size.x - 4.0  # 4px gap to the left of arrow
+		var box_y = arrow_y + (_selection_arrow.size.y / 2.0) - (_dark_box.size.y / 2.0)  # Center vertically with arrow
+		_dark_box.position = Vector2(box_x, box_y)
+
+func _start_arrow_pulse() -> void:
+	"""Start pulsing animation for the arrow"""
+	if not _selection_arrow:
+		return
+
+	var tween = create_tween()
+	tween.set_loops()
+	tween.set_trans(Tween.TRANS_SINE)
+	tween.set_ease(Tween.EASE_IN_OUT)
+
+	# Pulse left 6 pixels then back
+	var base_x = _selection_arrow.position.x
+	tween.tween_property(_selection_arrow, "position:x", base_x - 6, 0.6)
+	tween.tween_property(_selection_arrow, "position:x", base_x, 0.6)
 
 func _display_for_token(token: String) -> String:
 	if token == "hero":
@@ -537,6 +659,9 @@ func _on_party_selected(index: int) -> void:
 
 	_refresh_all_for_current()
 	_sigils_sig = _snapshot_sigil_signature(_current_token())
+
+	# Update arrow position when selection changes
+	call_deferred("_update_arrow_position")
 
 func _on_equipment_changed(member: String) -> void:
 	var cur: String = _current_token()
@@ -2697,12 +2822,12 @@ func _handle_party_select_input(event: InputEvent) -> void:
 
 func _navigate_party(delta: int) -> void:
 	"""Navigate up/down in party list"""
-	if not _party_list or _party_list.get_item_count() == 0:
+	if not _party_list or _party_list.item_count == 0:
 		return
 
 	var current = _party_list.get_selected_items()
 	var idx = current[0] if current.size() > 0 else 0
-	idx = clamp(idx + delta, 0, _party_list.get_item_count() - 1)
+	idx = clamp(idx + delta, 0, _party_list.item_count - 1)
 
 	_party_list.select(idx)
 	_party_list.ensure_current_is_visible()
@@ -2748,7 +2873,7 @@ func _exit_loadout_panel() -> bool:
 func _enter_party_select_state() -> void:
 	"""Enter PARTY_SELECT state and grab focus on party list"""
 	_nav_state = NavState.PARTY_SELECT
-	if _party_list and _party_list.get_item_count() > 0:
+	if _party_list and _party_list.item_count > 0:
 		_party_list.grab_focus()
 		if _party_list.get_selected_items().is_empty():
 			_party_list.select(0)
