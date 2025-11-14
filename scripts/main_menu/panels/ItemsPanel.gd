@@ -1219,13 +1219,34 @@ func _navigate_items(delta: int) -> void:
 	var new_item_name = _item_buttons[new_index].text if new_index < _item_buttons.size() else "?"
 	print("[ItemsPanel]   → Moving TO '%s' at index %d (Row %d, %s column)" % [new_item_name, new_index, new_row, new_col_name])
 
+	# Detect if we wrapped around (going down from bottom or up from top)
+	var wrapped_to_top: bool = delta > 0 and new_index < current  # Going down, wrapped to top
+	var wrapped_to_bottom: bool = delta < 0 and new_index > current  # Going up, wrapped to bottom
+
 	_selected_grid_index = new_index
 	_selected_item_id = _item_ids[_selected_grid_index]
 	_update_selection_highlight()
 	_update_details()
-	# Auto-scroll first, then update arrow position (arrow depends on scroll position)
-	await _auto_scroll_to_selection()
-	_update_arrow_position()
+
+	# If we wrapped, jump scroll to appropriate end
+	if wrapped_to_top:
+		print("[ItemsPanel]   → Wrapped to TOP, scrolling to top")
+		_items_scroll.scroll_vertical = 0
+		await get_tree().process_frame
+		await get_tree().process_frame
+		_update_arrow_position()
+	elif wrapped_to_bottom:
+		print("[ItemsPanel]   → Wrapped to BOTTOM, scrolling to bottom")
+		# Get the max scroll value
+		var max_scroll: int = _items_scroll.get_v_scroll_bar().max_value
+		_items_scroll.scroll_vertical = max_scroll
+		await get_tree().process_frame
+		await get_tree().process_frame
+		_update_arrow_position()
+	else:
+		# Normal navigation, auto-scroll first, then update arrow position
+		await _auto_scroll_to_selection()
+		_update_arrow_position()
 
 func _update_selection_highlight() -> void:
 	"""Update visual highlight on selected button"""
