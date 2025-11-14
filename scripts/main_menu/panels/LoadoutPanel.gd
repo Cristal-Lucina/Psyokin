@@ -478,10 +478,10 @@ func _current_token() -> String:
 	return (_tokens[i] if i >= 0 and i < _tokens.size() else "")
 
 func _on_party_selected(index: int) -> void:
-	var label: String = "(Unknown)"
+	var _label: String = "(Unknown)"
 	if index >= 0 and index < _labels.size():
-		label = _labels[index]
-	# _member_name.text = label.to_upper()  # Removed
+		_label = _labels[index]
+	# _member_name.text = _label.to_upper()  # Removed
 
 	_refresh_all_for_current()
 	_sigils_sig = _snapshot_sigil_signature(_current_token())
@@ -1315,8 +1315,8 @@ func _create_sigil_icon(instance_id: String) -> TextureRect:
 
 	# Get item definition to find icon number
 	var item_def: Dictionary = {}
-	if _csv and _csv.has_method("get_item"):
-		var v: Variant = _csv.call("get_item", base_id)
+	if _eq and _eq.has_method("get_item_def"):
+		var v: Variant = _eq.get_item_def(base_id)
 		if typeof(v) == TYPE_DICTIONARY:
 			item_def = v as Dictionary
 
@@ -1364,8 +1364,8 @@ func _set_equipment_icon(hbox: HBoxContainer, item_id: String) -> void:
 
 	# Get item definition to find icon number
 	var item_def: Dictionary = {}
-	if _csv and _csv.has_method("get_item"):
-		var v: Variant = _csv.call("get_item", item_id)
+	if _eq and _eq.has_method("get_item_def"):
+		var v: Variant = _eq.get_item_def(item_id)
 		if typeof(v) == TYPE_DICTIONARY:
 			item_def = v as Dictionary
 
@@ -1541,7 +1541,7 @@ func _eva_mods_from_other(equip: Dictionary, exclude_id: String) -> int:
 			sum += int(d.get("base_eva",0))
 	return sum
 
-func _rebuild_stats_grid(member_token: String, equip: Dictionary) -> void:
+func _rebuild_stats_grid(member_token: String, _equip: Dictionary) -> void:
 	"""Build battle stats grid from CombatProfileSystem (matches StatsPanel)"""
 	if _stats_grid == null: return
 	_clear_stats_grid()
@@ -1567,7 +1567,7 @@ func _rebuild_stats_grid(member_token: String, equip: Dictionary) -> void:
 	var mnd: int = stats.get("MND", 1)
 	var tpo: int = stats.get("TPO", 1)
 	var vtl: int = stats.get("VTL", 1)
-	var fcs: int = stats.get("FCS", 1)
+	var _fcs: int = stats.get("FCS", 1)
 
 	# Calculate derived stats with new formulas
 	var skill_atk_bonus: int = weapon.get("skill_atk_boost", 0)
@@ -1589,7 +1589,7 @@ func _rebuild_stats_grid(member_token: String, equip: Dictionary) -> void:
 	# Evasion with stat contribution (VTL×2.0)
 	var base_eva: int = defense.get("peva", 0)
 	var vtl_eva_bonus: float = vtl * 2.0
-	var total_eva: float = base_eva + vtl_eva_bonus
+	var _total_eva: float = base_eva + vtl_eva_bonus
 
 	# Initiative: Get TPO tier and speed bonus
 	var speed_bonus: int = defense.get("speed", 0)
@@ -2649,8 +2649,8 @@ func _navigate_equipment(delta: int) -> void:
 		return
 
 	# Wrap around: pressing down at bottom goes to top, pressing up at top goes to bottom
-	var size = _nav_elements.size()
-	_nav_index = (_nav_index + delta + size) % size
+	var nav_size = _nav_elements.size()
+	_nav_index = (_nav_index + delta + nav_size) % nav_size
 	_focus_equipment_element(_nav_index)
 
 func _activate_current_equipment_button() -> void:
@@ -2748,4 +2748,4 @@ func _restore_equipment_focus() -> void:
 		_focus_equipment_element(_nav_index)
 		if _nav_index < _nav_elements.size():
 			var elem = _nav_elements[_nav_index]
-			print("[LoadoutPanel] Element valid: %s, is Control: %s" % [is_instance_valid(elem), elem is Control if is_instance_valid(elem) else "N/A"])
+			print("[LoadoutPanel] Element valid: %s, is Control: %s" % [is_instance_valid(elem), str(elem is Control) if is_instance_valid(elem) else "N/A"])
