@@ -2215,6 +2215,13 @@ func _input(event: InputEvent) -> void:
 	allowing us to mark input as handled before GameMenu intercepts it.
 	"""
 
+	# DEBUG: Press T key to equip test items to empty slots
+	if event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode == KEY_T:
+			_debug_equip_test_items()
+			get_viewport().set_input_as_handled()
+			return
+
 	# STATE 1: POPUP_ACTIVE - Handle even when not "active" (popup is on top in panel stack)
 	if _nav_state == NavState.POPUP_ACTIVE:
 		_handle_popup_input(event)
@@ -2808,3 +2815,36 @@ func _debug_print_panel_sizes() -> void:
 		print("  - Custom Min Size: %s" % _stats_panel.custom_minimum_size)
 
 	print("=== END PANEL DEBUG ===\n")
+
+func _debug_equip_test_items() -> void:
+	"""DEBUG: Equip item_1906 to all empty equipment slots for current character"""
+	var cur: String = _current_token()
+	if cur == "":
+		print("[DEBUG] No character selected")
+		return
+
+	print("[DEBUG] Equipping test items to empty slots for %s" % cur)
+
+	# Add test items to inventory if not present
+	if _inv and _inv.has_method("add"):
+		_inv.call("add", "item_1906", 10)
+		print("[DEBUG] Added 10x item_1906 to inventory")
+
+	# Get current equipment
+	var equip: Dictionary = _fetch_equip_for(cur)
+
+	# Equip to empty slots
+	var slots_filled: int = 0
+	for slot in _SLOTS:
+		var current_item: String = String(equip.get(slot, ""))
+		if current_item == "" or current_item == "—":
+			if _eq and _eq.has_method("equip_item"):
+				var success: bool = _eq.call("equip_item", cur, "item_1906")
+				if success:
+					print("[DEBUG] Equipped item_1906 to %s slot" % slot)
+					slots_filled += 1
+				else:
+					print("[DEBUG] Failed to equip item_1906 to %s slot" % slot)
+
+	print("[DEBUG] Filled %d empty slots with item_1906" % slots_filled)
+	_refresh_all_for_current()
