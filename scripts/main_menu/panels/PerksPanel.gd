@@ -19,7 +19,8 @@ const DEFAULT_THRESHOLDS: PackedInt32Array = [1, 3, 5, 7, 10, 11]  # Including T
 @onready var _points_value: Label = %PointsValue
 @onready var _acquired_list: ItemList = %AcquiredList
 @onready var _perk_name: Label = %PerkName
-@onready var _details_text: Label = %DetailsText
+@onready var _details_left_column: RichTextLabel = %LeftColumn
+@onready var _details_right_column: RichTextLabel = %RightColumn
 
 # Container references for styling
 @onready var _grid_column: VBoxContainer = get_node("Root/GridColumn") if has_node("Root/GridColumn") else null
@@ -39,6 +40,11 @@ var _acquired_perks: Array[Dictionary] = []  # All unlocked perks
 var _grid_cells: Array[Array] = []  # 8×5 array of Controls
 var _selected_row: int = 2  # Start at first tier row
 var _selected_col: int = 0
+
+# Selection arrow
+var _selection_arrow: Label = null
+var _debug_box: PanelContainer = null
+var _arrow_tween: Tween = null
 
 # Active popup tracking (needed for cleanup when panel is hidden)
 var _active_popup: ToastPopup = null
@@ -77,9 +83,11 @@ func _ready() -> void:
 func _first_fill() -> void:
 	"""Initial population of UI"""
 	_apply_core_vibe_styling()
+	_create_selection_arrow()
 	_rebuild()
 	_find_first_selectable_perk()
 	_show_selected_perk_details()
+	_update_arrow_position()
 
 func _apply_core_vibe_styling() -> void:
 	"""Apply Core Vibe neon-kawaii styling to PerksPanel elements"""
@@ -103,10 +111,80 @@ func _apply_core_vibe_styling() -> void:
 	if _perk_name:
 		aCoreVibeTheme.style_label(_perk_name, aCoreVibeTheme.COLOR_SKY_CYAN, 18)
 
-	# Style details text
-	if _details_text:
-		_details_text.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE)
-		_details_text.add_theme_font_size_override("font_size", 14)
+	# Style details columns
+	if _details_left_column:
+		_details_left_column.add_theme_color_override("default_color", aCoreVibeTheme.COLOR_MILK_WHITE)
+		_details_left_column.add_theme_font_size_override("normal_font_size", 14)
+
+	if _details_right_column:
+		_details_right_column.add_theme_color_override("default_color", aCoreVibeTheme.COLOR_MILK_WHITE)
+		_details_right_column.add_theme_font_size_override("normal_font_size", 14)
+
+func _create_selection_arrow() -> void:
+	"""Create the selection arrow indicator for perk grid"""
+	if not _perk_grid:
+		return
+
+	# Create arrow label
+	_selection_arrow = Label.new()
+	_selection_arrow.text = "◄"  # Left-pointing arrow
+	_selection_arrow.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_selection_arrow.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_selection_arrow.add_theme_font_size_override("font_size", 43)
+	_selection_arrow.modulate = Color(1, 1, 1, 1)  # White
+	_selection_arrow.custom_minimum_size = Vector2(54, 72)
+	_selection_arrow.size = Vector2(54, 72)
+	_selection_arrow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_selection_arrow.z_index = 100  # Above other elements
+
+	# Add to main PerksPanel (Control) not the PanelContainer
+	add_child(_selection_arrow)
+
+	# Ensure size is locked after adding to tree
+	await get_tree().process_frame
+	_selection_arrow.size = Vector2(54, 72)
+
+	# Create debug box (160px wide, 20px height)
+	_debug_box = PanelContainer.new()
+	_debug_box.custom_minimum_size = Vector2(160, 20)
+	_debug_box.size = Vector2(160, 20)
+	_debug_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_debug_box.z_index = 100  # Same layer as arrow
+
+	# Create transparent rounded style
+	var debug_style = StyleBoxFlat.new()
+	debug_style.bg_color = Color(aCoreVibeTheme.COLOR_INK_CHARCOAL.r, aCoreVibeTheme.COLOR_INK_CHARCOAL.g, aCoreVibeTheme.COLOR_INK_CHARCOAL.b, 0.0)  # Transparent
+	debug_style.corner_radius_top_left = 8
+	debug_style.corner_radius_top_right = 8
+	debug_style.corner_radius_bottom_left = 8
+	debug_style.corner_radius_bottom_right = 8
+	_debug_box.add_theme_stylebox_override("panel", debug_style)
+
+	add_child(_debug_box)
+	await get_tree().process_frame
+	_debug_box.size = Vector2(160, 20)
+
+	# Start pulsing animation
+	_start_arrow_pulse()
+
+func _start_arrow_pulse() -> void:
+	"""Start pulsing animation for the arrow"""
+	if not _selection_arrow:
+		return
+
+	# Kill existing tween if any
+	if _arrow_tween and is_instance_valid(_arrow_tween):
+		_arrow_tween.kill()
+
+	_arrow_tween = create_tween()
+	_arrow_tween.set_loops()
+	_arrow_tween.set_trans(Tween.TRANS_SINE)
+	_arrow_tween.set_ease(Tween.EASE_IN_OUT)
+
+	# Pulse left 6 pixels then back
+	var base_x = _selection_arrow.position.x
+	_arrow_tween.tween_property(_selection_arrow, "position:x", base_x - 6, 0.6)
+	_arrow_tween.tween_property(_selection_arrow, "position:x", base_x, 0.6)
 
 func _wrap_in_styled_panel(container: Control, border_color: Color) -> PanelContainer:
 	"""Wrap a container in a styled PanelContainer with rounded neon borders"""
@@ -317,19 +395,50 @@ func _create_tier_cell(stat_id: String, tier_index: int) -> Button:
 	button.set_meta("tier", tier_index)
 	button.set_meta("perk_info", perk_info)
 
-	# Core Vibe: Color-code by status with neon colors
+	# Create styled button with borders
+	var button_style = StyleBoxFlat.new()
+	button_style.bg_color = aCoreVibeTheme.COLOR_INK_CHARCOAL
+	button_style.corner_radius_top_left = 8
+	button_style.corner_radius_top_right = 8
+	button_style.corner_radius_bottom_left = 8
+	button_style.corner_radius_bottom_right = 8
+	button_style.content_margin_left = 4
+	button_style.content_margin_top = 4
+	button_style.content_margin_right = 4
+	button_style.content_margin_bottom = 4
+
+	# Core Vibe: Color-code by status with neon colors and borders
 	if perk_info["unlocked"]:
-		# Unlocked: Electric Lime (success/achievement)
+		# Unlocked: Electric Lime text, no border
 		button.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_ELECTRIC_LIME)
 		button.disabled = true
+		button_style.border_width_left = 0
+		button_style.border_width_top = 0
+		button_style.border_width_right = 0
+		button_style.border_width_bottom = 0
 	elif perk_info["available"]:
-		# Available: Citrus Yellow (can unlock now!)
-		button.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_CITRUS_YELLOW)
+		# Available: Milk White text, Plasma Teal border
+		button.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE)
 		button.disabled = false
+		button_style.border_width_left = 2
+		button_style.border_width_top = 2
+		button_style.border_width_right = 2
+		button_style.border_width_bottom = 2
+		button_style.border_color = aCoreVibeTheme.COLOR_PLASMA_TEAL
 	else:
-		# Locked: Dimmed Milk White (disabled)
+		# Locked: Dimmed Milk White (disabled), no border
 		button.add_theme_color_override("font_color", Color(aCoreVibeTheme.COLOR_MILK_WHITE.r, aCoreVibeTheme.COLOR_MILK_WHITE.g, aCoreVibeTheme.COLOR_MILK_WHITE.b, 0.3))
 		button.disabled = true
+		button_style.border_width_left = 0
+		button_style.border_width_top = 0
+		button_style.border_width_right = 0
+		button_style.border_width_bottom = 0
+
+	# Apply style
+	button.add_theme_stylebox_override("normal", button_style)
+	button.add_theme_stylebox_override("hover", button_style.duplicate())
+	button.add_theme_stylebox_override("pressed", button_style.duplicate())
+	button.add_theme_stylebox_override("disabled", button_style.duplicate())
 
 	# Hide Tier 6 if stat level < 11
 	if tier_index == 5:  # Tier 6
@@ -413,8 +522,8 @@ func _find_first_selectable_perk() -> void:
 				return
 
 func _highlight_selection() -> void:
-	"""Highlight the currently selected grid cell"""
-	# Clear all highlights first
+	"""Highlight the currently selected grid cell and update arrow position"""
+	# Clear all highlights and restore original styles
 	for row in range(2, GRID_ROWS):
 		for col in range(GRID_COLS):
 			if row >= _grid_cells.size() or col >= _grid_cells[row].size():
@@ -422,17 +531,102 @@ func _highlight_selection() -> void:
 			var grid_cell: Control = _grid_cells[row][col]
 			if grid_cell is Button:
 				grid_cell.modulate = Color(1.0, 1.0, 1.0, 1.0)
+				# Restore original border based on perk status
+				if grid_cell.has_meta("perk_info"):
+					var perk_info: Dictionary = grid_cell.get_meta("perk_info")
+					var button_style = grid_cell.get_theme_stylebox("normal")
+					if button_style and button_style is StyleBoxFlat:
+						var style: StyleBoxFlat = button_style as StyleBoxFlat
+						if perk_info["available"]:
+							# Restore Plasma Teal border
+							style.border_color = aCoreVibeTheme.COLOR_PLASMA_TEAL
 
 	# Highlight selected
 	if _selected_row < 0 or _selected_row >= _grid_cells.size():
+		if _selection_arrow:
+			_selection_arrow.visible = false
+		if _debug_box:
+			_debug_box.visible = false
 		return
 	if _selected_col < 0 or _selected_col >= _grid_cells[_selected_row].size():
+		if _selection_arrow:
+			_selection_arrow.visible = false
+		if _debug_box:
+			_debug_box.visible = false
 		return
 
 	var cell: Control = _grid_cells[_selected_row][_selected_col]
 	if cell is Button:
-		# Core Vibe: Bubble Magenta glow for selection
+		# Core Vibe: Bubble Magenta glow and border for selection
 		cell.modulate = Color(1.8, 1.2, 1.6, 1.0)  # Bubble Magenta glow
+
+		# Change border to Bubble Magenta
+		var button_style = cell.get_theme_stylebox("normal")
+		if button_style and button_style is StyleBoxFlat:
+			var style: StyleBoxFlat = button_style as StyleBoxFlat
+			if cell.has_meta("perk_info"):
+				var perk_info: Dictionary = cell.get_meta("perk_info")
+				if perk_info["available"]:
+					style.border_color = aCoreVibeTheme.COLOR_BUBBLE_MAGENTA
+					style.border_width_left = 2
+					style.border_width_top = 2
+					style.border_width_right = 2
+					style.border_width_bottom = 2
+
+	# Update arrow position
+	_update_arrow_position()
+
+func _update_arrow_position() -> void:
+	"""Update arrow position to align with selected perk cell"""
+	if not _selection_arrow or not _perk_grid:
+		return
+
+	if _selected_row < 2 or _selected_row >= _grid_cells.size():
+		_selection_arrow.visible = false
+		if _debug_box:
+			_debug_box.visible = false
+		return
+
+	if _selected_col < 0 or _selected_col >= _grid_cells[_selected_row].size():
+		_selection_arrow.visible = false
+		if _debug_box:
+			_debug_box.visible = false
+		return
+
+	var cell: Control = _grid_cells[_selected_row][_selected_col]
+	if not cell is Button or not cell.visible:
+		_selection_arrow.visible = false
+		if _debug_box:
+			_debug_box.visible = false
+		return
+
+	_selection_arrow.visible = true
+
+	# Wait for layout to complete
+	await get_tree().process_frame
+
+	# Get cell global position
+	var cell_global_pos = cell.global_position
+	var panel_global_pos = global_position
+
+	# Calculate position in PerksPanel coordinates
+	var cell_offset_in_panel = cell_global_pos - panel_global_pos
+
+	# Position arrow to the right center of the cell with offset, then shift right 40px more, then left 16px
+	var arrow_x = cell_offset_in_panel.x + cell.size.x - 8.0 - 80.0 + 40.0 + 40.0 - 8.0 - 8.0
+	var arrow_y = cell_offset_in_panel.y + (cell.size.y / 2.0) - (_selection_arrow.size.y / 2.0)
+
+	_selection_arrow.position = Vector2(arrow_x, arrow_y)
+
+	# Position debug box to the left of arrow
+	if _debug_box:
+		_debug_box.visible = true
+		var debug_x = arrow_x - _debug_box.size.x - 4.0  # 4px gap to the left of arrow
+		var debug_y = arrow_y + (_selection_arrow.size.y / 2.0) - (_debug_box.size.y / 2.0)  # Center vertically with arrow
+		_debug_box.position = Vector2(debug_x, debug_y)
+
+	# Restart pulsing animation with new position
+	_start_arrow_pulse()
 
 func _show_selected_perk_details() -> void:
 	"""Show details for currently selected perk"""
@@ -449,35 +643,41 @@ func _show_selected_perk_details() -> void:
 	_show_perk_details(perk)
 
 func _show_perk_details(perk: Dictionary) -> void:
-	"""Show perk details in left panel"""
+	"""Show perk details in two-column layout"""
 	if _perk_name:
 		_perk_name.text = perk["name"]
 
-	var details: String = ""
-	details += "Tier: %d\n\n" % (perk["tier"] + 1)
-
-	if perk["description"] != "":
-		details += "%s\n\n" % perk["description"]
+	if not _details_left_column or not _details_right_column:
+		return
 
 	var stat_level: int = _stat_levels.get(perk["stat_id"], 0)
 	var threshold: int = perk["threshold"]
-	details += "Requires: %s ≥ %d\n" % [_pretty_stat(perk["stat_id"]), threshold]
-	details += "Current: %s = %d\n\n" % [_pretty_stat(perk["stat_id"]), stat_level]
+	var sky_cyan_hex: String = "#4DE9FF"
+
+	# Build LEFT column: Tier, Description
+	var left_text: String = ""
+	left_text += "[color=%s]Tier:[/color] %d\n" % [sky_cyan_hex, perk["tier"] + 1]
+
+	if perk["description"] != "":
+		left_text += "[color=%s]Description:[/color]\n%s" % [sky_cyan_hex, perk["description"]]
+
+	# Build RIGHT column: Requires, Status, Cost
+	var right_text: String = ""
+	right_text += "[color=%s]Requires:[/color]\n%s ≥ %d\n" % [sky_cyan_hex, _pretty_stat(perk["stat_id"]), threshold]
 
 	if perk["unlocked"]:
-		details += "Status: ✔ Unlocked\n"
+		right_text += "[color=%s]Status:[/color]\n✔ Unlocked" % sky_cyan_hex
 	elif perk["available"]:
-		details += "Status: Available!\n"
-		details += "Cost: 1 Perk Point\n"
-		details += "Press A to unlock\n"
+		right_text += "[color=%s]Status:[/color]\nAvailable!\n" % sky_cyan_hex
+		right_text += "[color=%s]Cost:[/color]\n1 Perk Point" % sky_cyan_hex
 	else:
 		if stat_level < threshold:
-			details += "Status: Locked (need %d more %s)\n" % [threshold - stat_level, _pretty_stat(perk["stat_id"])]
+			right_text += "[color=%s]Status:[/color]\nLocked (need %d more %s)" % [sky_cyan_hex, threshold - stat_level, _pretty_stat(perk["stat_id"])]
 		else:
-			details += "Status: Need perk points\n"
+			right_text += "[color=%s]Status:[/color]\nLocked (need perk points)" % sky_cyan_hex
 
-	if _details_text:
-		_details_text.text = details
+	_details_left_column.text = left_text
+	_details_right_column.text = right_text
 
 func _on_tier_cell_hovered(stat_id: String, tier_index: int) -> void:
 	"""Handle mouse hover over tier cell"""

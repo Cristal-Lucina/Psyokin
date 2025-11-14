@@ -47,6 +47,7 @@ var _party_labels: Array[String] = []
 
 # Selection arrow
 var _selection_arrow: Label = null
+var _debug_box: PanelContainer = null
 
 func _ready() -> void:
 	# Set process mode to work while game is paused
@@ -89,6 +90,11 @@ func _ready() -> void:
 
 func _first_fill() -> void:
 	_apply_core_vibe_styling()
+
+	# Set party list text to layer 200
+	if _party_list:
+		_party_list.z_index = 200
+
 	_create_selection_arrow()
 	_refresh_party()
 	if _party_list.item_count > 0:
@@ -192,6 +198,26 @@ func _create_selection_arrow() -> void:
 	await get_tree().process_frame
 	_selection_arrow.size = Vector2(54, 72)
 
+	# Create debug box (160px wide, 20px height)
+	_debug_box = PanelContainer.new()
+	_debug_box.custom_minimum_size = Vector2(160, 20)
+	_debug_box.size = Vector2(160, 20)
+	_debug_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_debug_box.z_index = 100  # Same layer as arrow
+
+	# Create Ink Charcoal rounded style
+	var debug_style = StyleBoxFlat.new()
+	debug_style.bg_color = aCoreVibeTheme.COLOR_INK_CHARCOAL  # Ink Charcoal (#111827)
+	debug_style.corner_radius_top_left = 8
+	debug_style.corner_radius_top_right = 8
+	debug_style.corner_radius_bottom_left = 8
+	debug_style.corner_radius_bottom_right = 8
+	_debug_box.add_theme_stylebox_override("panel", debug_style)
+
+	add_child(_debug_box)
+	await get_tree().process_frame
+	_debug_box.size = Vector2(160, 20)
+
 	# Start pulsing animation
 	_start_arrow_pulse()
 
@@ -203,6 +229,8 @@ func _update_arrow_position() -> void:
 	var selected = _party_list.get_selected_items()
 	if selected.size() == 0:
 		_selection_arrow.visible = false
+		if _debug_box:
+			_debug_box.visible = false
 		return
 
 	_selection_arrow.visible = true
@@ -231,8 +259,9 @@ func _update_arrow_position() -> void:
 	var list_offset_in_statspanel = list_global_pos - panel_global_pos
 	print("  List offset in StatsPanel: %s" % list_offset_in_statspanel)
 
-	# Position arrow at fixed x=200, aligned vertically with item center
-	var arrow_x = 200.0
+	# Position arrow to the right of the party list with slight overlap for visual connection
+	# Then shift left by 80px, then shift right by 40px
+	var arrow_x = list_offset_in_statspanel.x + _party_list.size.x - 8.0 - 80.0 + 40.0
 	var arrow_y = list_offset_in_statspanel.y + item_rect.position.y + (item_rect.size.y / 2.0) - (_selection_arrow.size.y / 2.0)
 
 	print("  Arrow custom_minimum_size: %s" % _selection_arrow.custom_minimum_size)
@@ -241,6 +270,14 @@ func _update_arrow_position() -> void:
 	print("  Arrow vertical calc: item_center=%f - arrow_half=%f = %f" % [item_rect.position.y + item_rect.size.y / 2.0, _selection_arrow.size.y / 2.0, arrow_y - list_offset_in_statspanel.y])
 
 	_selection_arrow.position = Vector2(arrow_x, arrow_y)
+
+	# Position debug box to the left of arrow
+	if _debug_box:
+		_debug_box.visible = true
+		var debug_x = arrow_x - _debug_box.size.x - 4.0  # 4px gap to the left of arrow
+		var debug_y = arrow_y + (_selection_arrow.size.y / 2.0) - (_debug_box.size.y / 2.0)  # Center vertically with arrow
+		_debug_box.position = Vector2(debug_x, debug_y)
+		print("  Debug box position: %s" % _debug_box.position)
 
 	print("  Final arrow position: %s" % _selection_arrow.position)
 
@@ -315,10 +352,10 @@ func _refresh_party() -> void:
 		tokens.append("hero")
 
 	for token in tokens:
-		var display_name = _get_display_name(token)
-		_party_list.add_item(display_name)
+		var first_name = _get_first_name(token)
+		_party_list.add_item(first_name)
 		_party_tokens.append(token)
-		_party_labels.append(display_name)
+		_party_labels.append(first_name)
 
 func _gather_party_tokens() -> Array[String]:
 	"""Get all party member tokens"""
@@ -354,7 +391,7 @@ func _gather_party_tokens() -> Array[String]:
 	return out
 
 func _get_display_name(token: String) -> String:
-	"""Get display name for a party member"""
+	"""Get full display name for a party member"""
 	if token == "hero":
 		if _gs and _gs.has_method("get"):
 			var name = String(_gs.get("player_name"))
@@ -368,6 +405,20 @@ func _get_display_name(token: String) -> String:
 			return String(v)
 
 	return token.capitalize()
+
+func _get_first_name(token: String) -> String:
+	"""Get first name only for a party member"""
+	if _gs and _gs.has_method("_first_name_for_id"):
+		var v: Variant = _gs.call("_first_name_for_id", token)
+		if typeof(v) == TYPE_STRING and String(v) != "":
+			return String(v)
+
+	# Fallback: extract first word from full name
+	var full_name: String = _get_display_name(token)
+	var space_index: int = full_name.find(" ")
+	if space_index > 0:
+		return full_name.substr(0, space_index)
+	return full_name
 
 func _on_party_member_selected(index: int) -> void:
 	"""Handle party member selection"""
@@ -505,7 +556,7 @@ func _rebuild_affinity_grid(token: String) -> void:
 		# Get affinity value
 		var affinity: int = _get_affinity(token, member_token)
 		var tier_text: String = _get_affinity_tier_text(affinity)
-		var member_name: String = _get_display_name(member_token)
+		var member_name: String = _get_first_name(member_token)
 
 		var cell = _create_affinity_cell(member_name, tier_text)
 		_affinity_grid.add_child(cell)
@@ -787,7 +838,7 @@ class RadarChart extends Control:
 	var _max_value: float = 100.0
 
 	# Core Vibe: Neon-kawaii radar chart colors
-	var grid_color: Color = aCoreVibeTheme.COLOR_MILK_WHITE  # White grid lines
+	var grid_color: Color = Color(aCoreVibeTheme.COLOR_MILK_WHITE.r, aCoreVibeTheme.COLOR_MILK_WHITE.g, aCoreVibeTheme.COLOR_MILK_WHITE.b, 0.5)  # White grid lines at 50% transparency
 	var stat_color: Color = Color(aCoreVibeTheme.COLOR_ELECTRIC_LIME.r, aCoreVibeTheme.COLOR_ELECTRIC_LIME.g, aCoreVibeTheme.COLOR_ELECTRIC_LIME.b, 0.3)  # Electric Lime fill
 	var stat_border_color: Color = aCoreVibeTheme.COLOR_ELECTRIC_LIME  # Electric Lime border
 	var label_color: Color = aCoreVibeTheme.COLOR_MILK_WHITE  # Milk White labels

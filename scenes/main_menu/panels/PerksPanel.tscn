@@ -122,13 +122,29 @@ layout_mode = 2
 layout_mode = 2
 size_flags_vertical = 3
 
-[node name="DetailsText" type="Label" parent="Root/RightColumn/DetailsScroll"]
+[node name="DetailsContainer" type="HBoxContainer" parent="Root/RightColumn/DetailsScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/separation = 16
+
+[node name="LeftColumn" type="RichTextLabel" parent="Root/RightColumn/DetailsScroll/DetailsContainer"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
-autowrap_mode = 3
-clip_text = true
+bbcode_enabled = true
+fit_content = true
+scroll_active = false
+
+[node name="RightColumn" type="RichTextLabel" parent="Root/RightColumn/DetailsScroll/DetailsContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+bbcode_enabled = true
+fit_content = true
+scroll_active = false
 
 [node name="Separator4" type="HSeparator" parent="Root/RightColumn"]
 layout_mode = 2

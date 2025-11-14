@@ -1,342 +1,611 @@
 extends Control
 class_name ItemsPanel
 
-## Items Panel - Clean 3-Column Controller-First Design
-## LEFT: Category selection | MIDDLE: Item list | RIGHT: Item details + actions
+## Items Panel - Redesigned with Category Icons and 2-Column Grid
 
 # Autoload paths
 const INV_PATH   : String = "/root/aInventorySystem"
 const CSV_PATH   : String = "/root/aCSVLoader"
-const SIGIL_PATH : String = "/root/aSigilSystem"
 const EQUIP_PATH : String = "/root/aEquipmentSystem"
 const GS_PATH    : String = "/root/aGameState"
+const SIGIL_PATH : String = "/root/aSigilSystem"
 const CPS_PATH   : String = "/root/aCombatProfileSystem"
 
 # CSV data
 const ITEMS_CSV : String = "res://data/items/items.csv"
 const KEY_ID    : String = "item_id"
 
-# Categories
-const CATEGORIES : Array[String] = [
-	"Acquired", "Recovery", "Battle", "Equipment", "Sigils",
-	"Capture", "Material", "Gifts", "Key", "Other"
+# Categories with icons
+const CATEGORIES : Array[Dictionary] = [
+	{
+		"id": "Acquired",
+		"icon_light": "res://assets/graphics/icons/UI/PNG and PSD - Light/Icon set 1/1x/Asset 33.png",
+		"icon_dark": "res://assets/graphics/icons/UI/PNG and PSD - Dark/Icon set 1/1x/Asset 33.png"
+	},
+	{
+		"id": "Recovery",
+		"icon_light": "res://assets/graphics/icons/UI/PNG and PSD - Light/Icon set 2/1x/Asset 85.png",
+		"icon_dark": "res://assets/graphics/icons/UI/PNG and PSD - Dark/Icon set 2/1x/Asset 85.png"
+	},
+	{
+		"id": "Battle",
+		"icon_light": "res://assets/graphics/icons/UI/PNG and PSD - Light/Icon set 2/1x/Asset 83.png",
+		"icon_dark": "res://assets/graphics/icons/UI/PNG and PSD - Dark/Icon set 2/1x/Asset 83.png"
+	},
+	{
+		"id": "Equipment",
+		"icon_light": "res://assets/graphics/icons/UI/PNG and PSD - Light/Icon set 2/1x/Asset 54.png",
+		"icon_dark": "res://assets/graphics/icons/UI/PNG and PSD - Dark/Icon set 2/1x/Asset 54.png"
+	},
+	{
+		"id": "Sigils",
+		"icon_light": "res://assets/graphics/icons/UI/PNG and PSD - Light/Icon set 2/1x/Asset 71.png",
+		"icon_dark": "res://assets/graphics/icons/UI/PNG and PSD - Dark/Icon set 2/1x/Asset 71.png"
+	},
+	{
+		"id": "Capture",
+		"icon_light": "res://assets/graphics/icons/UI/PNG and PSD - Light/Icon set 2/1x/Asset 61.png",
+		"icon_dark": "res://assets/graphics/icons/UI/PNG and PSD - Dark/Icon set 2/1x/Asset 61.png"
+	},
+	{
+		"id": "Material",
+		"icon_light": "res://assets/graphics/icons/UI/PNG and PSD - Light/Icon set 3/1x/Asset 8.png",
+		"icon_dark": "res://assets/graphics/icons/UI/PNG and PSD - Dark/Icon set 3/1x/Asset 8.png"
+	},
+	{
+		"id": "Gifts",
+		"icon_light": "res://assets/graphics/icons/UI/PNG and PSD - Light/Icon set 1/1x/Asset 8.png",
+		"icon_dark": "res://assets/graphics/icons/UI/PNG and PSD - Dark/Icon set 1/1x/Asset 8.png"
+	},
+	{
+		"id": "Key",
+		"icon_light": "res://assets/graphics/icons/UI/PNG and PSD - Light/Icon set 1/1x/Asset 72.png",
+		"icon_dark": "res://assets/graphics/icons/UI/PNG and PSD - Dark/Icon set 1/1x/Asset 72.png"
+	},
+	{
+		"id": "Other",
+		"icon_light": "res://assets/graphics/icons/UI/PNG and PSD - Light/Icon set 1/1x/Asset 86.png",
+		"icon_dark": "res://assets/graphics/icons/UI/PNG and PSD - Dark/Icon set 1/1x/Asset 86.png"
+	}
 ]
 
-# Panel animation settings
-const BASE_LEFT_RATIO := 2.0
-const BASE_CENTER_RATIO := 3.5
-const BASE_RIGHT_RATIO := 4.5
-const ACTIVE_SCALE := 1.10  # Active panel grows by 10%
-const INACTIVE_SCALE := 0.95  # Inactive panels shrink by 5%
-const ANIM_DURATION := 0.2  # Animation duration in seconds
-
-# Panel references (for animation)
-@onready var _category_panel: PanelContainer = get_node("%CategoryPanel") if has_node("%CategoryPanel") else null
-@onready var _item_panel: PanelContainer = get_node("%ItemPanel") if has_node("%ItemPanel") else null
-@onready var _details_panel: PanelContainer = get_node("%DetailsPanel") if has_node("%DetailsPanel") else null
-
 # Scene references
-@onready var _category_list: ItemList = %CategoryList
-@onready var _item_list: ItemList = %ItemList
-@onready var _item_label: Label = %ItemLabel  # Now in ItemColumn (moved from ItemHeader)
-# @onready var _count_label: Label = %CountLabel  # Removed
+@onready var _item_panel: PanelContainer = %ItemPanel
+@onready var _details_panel: PanelContainer = %DetailsPanel
+@onready var _category_icons_container: HBoxContainer = %CategoryIconsContainer
+@onready var _category_name: Label = %CategoryName
+@onready var _l1_label: Label = %L1Label
+@onready var _r1_label: Label = %R1Label
+@onready var _items_grid: GridContainer = %ItemsGrid
+@onready var _items_scroll: ScrollContainer = %ItemsScroll
 @onready var _item_name: Label = %ItemName
 @onready var _details_text: RichTextLabel = %DetailsText
-@onready var _scroll_container: ScrollContainer = %ScrollContainer
-@onready var _action_buttons: VBoxContainer = %ActionButtons
 @onready var _use_button: Button = %UseButton
 @onready var _inspect_button: Button = %InspectButton
 
 # System references
 var _inv: Node = null
 var _csv: Node = null
-var _sig: Node = null
 var _eq: Node = null
 var _gs: Node = null
+var _sig: Node = null
 var _cps: Node = null
 
 # Data
-var _defs: Dictionary = {}          # item_id -> item definition dict
-var _counts: Dictionary = {}        # item_id -> count
-var _equipped_by: Dictionary = {}   # item_id -> Array[member names]
+var _defs: Dictionary = {}
+var _counts: Dictionary = {}
+var _equipped_by: Dictionary = {}
 
 # State
-var _current_category: String = "Acquired"
-var _category_ids: Array[String] = []
+var _current_category_index: int = 0
+var _category_buttons: Array[TextureButton] = []
+var _category_panels: Array[PanelContainer] = []  # Background panels for category icons
+var _item_buttons: Array[Button] = []
 var _item_ids: Array[String] = []
 var _selected_item_id: String = ""
-var _focus_mode: String = "category"  # "category", "items", or "party_picker"
+var _selected_grid_index: int = 0
 
-# Party picker state
+# Selection arrow
+var _selection_arrow: Label = null
+var _debug_box: PanelContainer = null
+var _arrow_tween: Tween = null
+
+# Party picker popup
 var _party_picker_list: ItemList = null
 var _party_member_tokens: Array[String] = []
 var _item_to_use_id: String = ""
 var _item_to_use_def: Dictionary = {}
-
-# Active popup tracking
+var _focus_mode: String = "items"  # "items" or "party_picker"
 var _active_popup: Panel = null
 var _active_overlay: CanvasLayer = null
 
 func _ready() -> void:
-	# Set process mode to work while game is paused
 	process_mode = Node.PROCESS_MODE_ALWAYS
-
-	# Set high input priority so popup input blocking happens before parent nodes
-	process_priority = 100
-
-	# Get system references
 	_inv = get_node_or_null(INV_PATH)
 	_csv = get_node_or_null(CSV_PATH)
-	_sig = get_node_or_null(SIGIL_PATH)
 	_eq = get_node_or_null(EQUIP_PATH)
 	_gs = get_node_or_null(GS_PATH)
+	_sig = get_node_or_null(SIGIL_PATH)
 	_cps = get_node_or_null(CPS_PATH)
 
-	# Connect signals
-	if _category_list:
-		_category_list.item_selected.connect(_on_category_selected)
-	if _item_list:
-		_item_list.item_selected.connect(_on_item_selected)
 	if _use_button:
 		_use_button.pressed.connect(_on_use_button_pressed)
 	if _inspect_button:
 		_inspect_button.pressed.connect(_on_inspect_button_pressed)
 
-	# Connect inventory changes
 	if _inv and _inv.has_signal("inventory_changed"):
 		if not _inv.is_connected("inventory_changed", Callable(self, "_rebuild")):
 			_inv.connect("inventory_changed", Callable(self, "_rebuild"))
 
-	# Connect equipment changes
 	if _eq and _eq.has_signal("equipment_changed"):
 		if not _eq.is_connected("equipment_changed", Callable(self, "_on_equipment_changed")):
 			_eq.connect("equipment_changed", Callable(self, "_on_equipment_changed"))
 
-	# Connect visibility
 	visibility_changed.connect(_on_visibility_changed)
+	_create_category_icons()
+	_create_selection_arrow()
+	call_deferred("_apply_styling")
+	call_deferred("_rebuild")
 
-	# Apply Core Vibe styling
-	call_deferred("_apply_core_vibe_styling")
+func _create_category_icons() -> void:
+	if not _category_icons_container:
+		return
 
-	# Initial build
-	call_deferred("_first_fill")
+	# Set spacing between icons - increased by 10px
+	_category_icons_container.add_theme_constant_override("separation", 13)
 
-func _first_fill() -> void:
-	"""Initial population of UI"""
-	_rebuild()
-	if _category_list and _category_list.item_count > 0:
-		_category_list.select(0)
-		call_deferred("_grab_category_focus")
+	for i in range(CATEGORIES.size()):
+		var cat_data: Dictionary = CATEGORIES[i]
 
-func _apply_core_vibe_styling() -> void:
-	"""Apply Core Vibe neon-kawaii styling to all UI elements"""
-	# Style the three main panel containers with 10px internal padding
-	if _category_panel:
-		var cat_style = aCoreVibeTheme.create_panel_style(
-			aCoreVibeTheme.COLOR_SKY_CYAN,            # Sky Cyan border (categories)
-			aCoreVibeTheme.COLOR_INK_CHARCOAL,        # Ink charcoal background
-			aCoreVibeTheme.PANEL_OPACITY_SEMI,        # Semi-transparent
-			aCoreVibeTheme.CORNER_RADIUS_MEDIUM,      # 16px corners
-			aCoreVibeTheme.BORDER_WIDTH_THIN,         # 2px border
-			aCoreVibeTheme.SHADOW_SIZE_MEDIUM         # 6px glow
-		)
-		# Add 10px internal padding
-		cat_style.content_margin_left = 10
-		cat_style.content_margin_top = 10
-		cat_style.content_margin_right = 10
-		cat_style.content_margin_bottom = 10
-		_category_panel.add_theme_stylebox_override("panel", cat_style)
+		# Create panel container for background
+		var panel = PanelContainer.new()
+		panel.custom_minimum_size = Vector2(27, 27)  # 6px padding on all sides around 15px icon
+		panel.mouse_filter = Control.MOUSE_FILTER_IGNORE  # Let clicks pass through to button
 
+		# Create button inside panel
+		var button = TextureButton.new()
+
+		# Load icon textures
+		var icon_light = load(cat_data["icon_light"]) as Texture2D
+		var icon_dark = load(cat_data["icon_dark"]) as Texture2D
+
+		# Set initial texture (light when not selected)
+		button.texture_normal = icon_light
+		button.texture_hover = icon_light
+		button.texture_pressed = icon_light
+
+		# Store both textures as metadata
+		button.set_meta("icon_light", icon_light)
+		button.set_meta("icon_dark", icon_dark)
+
+		# Size settings - shrunk by 50% (29px -> 15px)
+		button.custom_minimum_size = Vector2(15, 15)
+		button.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
+		button.ignore_texture_size = true
+
+		button.set_meta("category_index", i)
+		button.pressed.connect(_on_category_icon_pressed.bind(i))
+
+		# Add button to panel, panel to container
+		panel.add_child(button)
+		_category_icons_container.add_child(panel)
+
+		_category_buttons.append(button)
+		_category_panels.append(panel)
+
+	_update_category_selection()
+
+func _on_category_icon_pressed(index: int) -> void:
+	_current_category_index = index
+	_update_category_selection()
+	_populate_items()
+
+func _update_category_selection() -> void:
+	for i in range(_category_buttons.size()):
+		var button: TextureButton = _category_buttons[i]
+		var panel: PanelContainer = _category_panels[i]
+		var is_selected: bool = (i == _current_category_index)
+
+		# Get stored textures
+		var icon_light: Texture2D = button.get_meta("icon_light")
+		var icon_dark: Texture2D = button.get_meta("icon_dark")
+
+		# Use dark theme when selected, light theme when not selected
+		var texture: Texture2D = icon_dark if is_selected else icon_light
+		button.texture_normal = texture
+		button.texture_hover = texture
+		button.texture_pressed = texture
+
+		# Set opacity to 80% (20% reduction)
+		button.modulate = Color(1.0, 1.0, 1.0, 0.8)
+
+		# Create rounded box background
+		var style = StyleBoxFlat.new()
+		if is_selected:
+			# Selected: Milk White background with Sky Cyan glow
+			style.bg_color = Color("#F4F7FB")  # Milk White
+			style.shadow_color = Color("#4DE9FF")  # Sky Cyan
+			style.shadow_size = 8
+			style.shadow_offset = Vector2(0, 0)
+		else:
+			# Unselected: Night Navy background
+			style.bg_color = Color("#0A0F1A")  # Night Navy
+
+		# Rounded corners
+		style.corner_radius_top_left = 8
+		style.corner_radius_top_right = 8
+		style.corner_radius_bottom_left = 8
+		style.corner_radius_bottom_right = 8
+
+		# Apply background to panel (not button)
+		panel.add_theme_stylebox_override("panel", style)
+
+		# No scale change
+		button.scale = Vector2(1.0, 1.0)
+
+		# Start pulse animation for selected panel
+		if is_selected:
+			_start_category_pulse(panel)
+
+	if _category_name and _current_category_index < CATEGORIES.size():
+		_category_name.text = CATEGORIES[_current_category_index]["id"].to_upper()
+
+func _start_category_pulse(panel: PanelContainer) -> void:
+	"""Pulse animation for selected category icon"""
+	# Kill any existing tween on this panel
+	if panel.has_meta("pulse_tween"):
+		var old_tween = panel.get_meta("pulse_tween")
+		if old_tween and is_instance_valid(old_tween):
+			old_tween.kill()
+
+	# Create pulsing glow effect
+	var tween = create_tween()
+	tween.set_loops()
+	tween.set_parallel(false)
+
+	# Pulse the shadow/glow size
+	tween.tween_method(func(value: int):
+		var style = panel.get_theme_stylebox("panel") as StyleBoxFlat
+		if style:
+			style.shadow_size = value
+	, 8, 12, 0.6)
+
+	tween.tween_method(func(value: int):
+		var style = panel.get_theme_stylebox("panel") as StyleBoxFlat
+		if style:
+			style.shadow_size = value
+	, 12, 8, 0.6)
+
+	panel.set_meta("pulse_tween", tween)
+
+func _create_selection_arrow() -> void:
+	_selection_arrow = Label.new()
+	_selection_arrow.text = "◄"
+	_selection_arrow.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_selection_arrow.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_selection_arrow.add_theme_font_size_override("font_size", 43)
+	_selection_arrow.modulate = Color(1, 1, 1, 1)
+	_selection_arrow.custom_minimum_size = Vector2(54, 72)
+	_selection_arrow.size = Vector2(54, 72)
+	_selection_arrow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_selection_arrow.z_index = 100
+
+	# Add shadow using LabelSettings
+	var label_settings = LabelSettings.new()
+	label_settings.font_size = 43
+	label_settings.shadow_size = 8  # Shadow blur radius
+	label_settings.shadow_color = Color(0, 0, 0, 0.7)  # Black shadow with 70% opacity
+	label_settings.shadow_offset = Vector2(2, 2)  # Offset the shadow slightly
+	_selection_arrow.label_settings = label_settings
+
+	add_child(_selection_arrow)
+	await get_tree().process_frame
+	_selection_arrow.size = Vector2(54, 72)
+
+	_debug_box = PanelContainer.new()
+	_debug_box.custom_minimum_size = Vector2(400, 20)
+	_debug_box.size = Vector2(400, 20)
+	_debug_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_debug_box.z_index = 100
+	var debug_style = StyleBoxFlat.new()
+	debug_style.bg_color = Color(aCoreVibeTheme.COLOR_INK_CHARCOAL.r, aCoreVibeTheme.COLOR_INK_CHARCOAL.g, aCoreVibeTheme.COLOR_INK_CHARCOAL.b, 0.0)
+	debug_style.corner_radius_top_left = 8
+	debug_style.corner_radius_top_right = 8
+	debug_style.corner_radius_bottom_left = 8
+	debug_style.corner_radius_bottom_right = 8
+	_debug_box.add_theme_stylebox_override("panel", debug_style)
+	add_child(_debug_box)
+	await get_tree().process_frame
+	_debug_box.size = Vector2(400, 20)
+	_start_arrow_pulse()
+
+func _update_arrow_position() -> void:
+	if not _selection_arrow or _selected_grid_index < 0 or _selected_grid_index >= _item_buttons.size():
+		if _selection_arrow:
+			_selection_arrow.visible = false
+		if _debug_box:
+			_debug_box.visible = false
+		return
+
+	_selection_arrow.visible = true
+	await get_tree().process_frame
+
+	var selected_button: Button = _item_buttons[_selected_grid_index]
+	var button_global_pos = selected_button.global_position
+	var panel_global_pos = global_position
+	var button_offset = button_global_pos - panel_global_pos
+
+	var arrow_x = button_offset.x + selected_button.size.x - 8.0 - 80.0 + 40.0
+	var arrow_y = button_offset.y + (selected_button.size.y / 2.0) - (_selection_arrow.size.y / 2.0)
+
+	print("[ItemsPanel] Arrow position update:")
+	print("  Selected index: %d" % _selected_grid_index)
+	print("  Button global pos: %s" % str(button_global_pos))
+	print("  Panel global pos: %s" % str(panel_global_pos))
+	print("  Button offset: %s" % str(button_offset))
+	print("  Arrow position: (%f, %f)" % [arrow_x, arrow_y])
+
+	_selection_arrow.position = Vector2(arrow_x, arrow_y)
+
+	if _debug_box:
+		_debug_box.visible = true
+		var debug_x = arrow_x - _debug_box.size.x - 4.0
+		var debug_y = arrow_y + (_selection_arrow.size.y / 2.0) - (_debug_box.size.y / 2.0)
+		_debug_box.position = Vector2(debug_x, debug_y)
+
+	# Restart pulse animation at new position
+	_start_arrow_pulse()
+
+func _auto_scroll_to_selection() -> void:
+	"""Auto-scroll to keep selected item visible, scrolling 1 row at a time"""
+	if not _items_scroll or _selected_grid_index < 0 or _selected_grid_index >= _item_buttons.size():
+		return
+
+	var selected_button: Button = _item_buttons[_selected_grid_index]
+	var scroll_rect: Rect2 = _items_scroll.get_rect()
+	var current_scroll: float = _items_scroll.scroll_vertical
+
+	# Calculate button position relative to scroll container
+	var button_pos_in_grid: float = selected_button.position.y
+	var button_height: float = selected_button.size.y
+
+	# Get grid vertical spacing (gap between rows)
+	var grid_v_gap: int = _items_grid.get_theme_constant("v_separation")
+
+	# Row height = button height + gap between rows
+	var row_height: float = button_height + grid_v_gap
+
+	# Visible area
+	var visible_top: float = current_scroll
+	var visible_bottom: float = current_scroll + scroll_rect.size.y
+
+	# Button boundaries
+	var button_top: float = button_pos_in_grid
+	var button_bottom: float = button_pos_in_grid + button_height
+
+	print("[ItemsPanel] Auto-scroll check:")
+	print("  Selected index: %d" % _selected_grid_index)
+	print("  Button pos in grid: %f" % button_pos_in_grid)
+	print("  Button height: %f" % button_height)
+	print("  Grid v_gap: %d" % grid_v_gap)
+	print("  Row height (button + gap): %f" % row_height)
+	print("  Current scroll: %f" % current_scroll)
+	print("  Visible area: %f to %f" % [visible_top, visible_bottom])
+	print("  Button bounds: %f to %f" % [button_top, button_bottom])
+
+	# Check if we need to scroll up (selected item going off top)
+	if button_top < visible_top:
+		# Scroll up by exactly 1 row
+		var target_scroll: float = max(0, current_scroll - row_height)
+		print("  → Scrolling UP from %f to %f" % [current_scroll, target_scroll])
+		_items_scroll.scroll_vertical = int(target_scroll)
+		# Wait for scroll to complete
+		await get_tree().process_frame
+		await get_tree().process_frame
+	# Check if we need to scroll down (selected item going off bottom)
+	elif button_bottom > visible_bottom:
+		# Scroll down by exactly 1 row
+		var target_scroll: float = current_scroll + row_height
+		print("  → Scrolling DOWN from %f to %f" % [current_scroll, target_scroll])
+		_items_scroll.scroll_vertical = int(target_scroll)
+		# Wait for scroll to complete
+		await get_tree().process_frame
+		await get_tree().process_frame
+	else:
+		print("  → No scroll needed, item visible")
+
+func _start_arrow_pulse() -> void:
+	if not _selection_arrow:
+		return
+
+	# Kill existing tween if it exists
+	if _arrow_tween and is_instance_valid(_arrow_tween):
+		_arrow_tween.kill()
+
+	# Create new tween at current position
+	_arrow_tween = create_tween()
+	_arrow_tween.set_loops()
+	_arrow_tween.set_trans(Tween.TRANS_SINE)
+	_arrow_tween.set_ease(Tween.EASE_IN_OUT)
+	var base_x = _selection_arrow.position.x
+	_arrow_tween.tween_property(_selection_arrow, "position:x", base_x - 6, 0.6)
+	_arrow_tween.tween_property(_selection_arrow, "position:x", base_x, 0.6)
+
+func _apply_styling() -> void:
 	if _item_panel:
-		var item_style = aCoreVibeTheme.create_panel_style(
-			aCoreVibeTheme.COLOR_GRAPE_VIOLET,        # Grape Violet border (main items)
-			aCoreVibeTheme.COLOR_INK_CHARCOAL,        # Ink charcoal background
-			aCoreVibeTheme.PANEL_OPACITY_SEMI,        # Semi-transparent
-			aCoreVibeTheme.CORNER_RADIUS_MEDIUM,      # 16px corners
-			aCoreVibeTheme.BORDER_WIDTH_THIN,         # 2px border
-			aCoreVibeTheme.SHADOW_SIZE_MEDIUM         # 6px glow
-		)
-		# Add 10px internal padding
-		item_style.content_margin_left = 10
-		item_style.content_margin_top = 10
-		item_style.content_margin_right = 10
-		item_style.content_margin_bottom = 10
-		_item_panel.add_theme_stylebox_override("panel", item_style)
+		var style = aCoreVibeTheme.create_panel_style(
+			aCoreVibeTheme.COLOR_SKY_CYAN, aCoreVibeTheme.COLOR_INK_CHARCOAL,
+			aCoreVibeTheme.PANEL_OPACITY_SEMI, aCoreVibeTheme.CORNER_RADIUS_MEDIUM,
+			aCoreVibeTheme.BORDER_WIDTH_THIN, aCoreVibeTheme.SHADOW_SIZE_MEDIUM)
+		style.content_margin_left = 10
+		style.content_margin_top = 10
+		style.content_margin_right = 10
+		style.content_margin_bottom = 10
+		_item_panel.add_theme_stylebox_override("panel", style)
 
 	if _details_panel:
-		var details_style = aCoreVibeTheme.create_panel_style(
-			aCoreVibeTheme.COLOR_SKY_CYAN,            # Sky Cyan border (details)
-			aCoreVibeTheme.COLOR_INK_CHARCOAL,        # Ink charcoal background
-			aCoreVibeTheme.PANEL_OPACITY_SEMI,        # Semi-transparent
-			aCoreVibeTheme.CORNER_RADIUS_MEDIUM,      # 16px corners
-			aCoreVibeTheme.BORDER_WIDTH_THIN,         # 2px border
-			aCoreVibeTheme.SHADOW_SIZE_MEDIUM         # 6px glow
-		)
-		# Add 10px internal padding
-		details_style.content_margin_left = 10
-		details_style.content_margin_top = 10
-		details_style.content_margin_right = 10
-		details_style.content_margin_bottom = 10
-		_details_panel.add_theme_stylebox_override("panel", details_style)
+		var style = aCoreVibeTheme.create_panel_style(
+			aCoreVibeTheme.COLOR_GRAPE_VIOLET, aCoreVibeTheme.COLOR_INK_CHARCOAL,
+			aCoreVibeTheme.PANEL_OPACITY_SEMI, aCoreVibeTheme.CORNER_RADIUS_MEDIUM,
+			aCoreVibeTheme.BORDER_WIDTH_THIN, aCoreVibeTheme.SHADOW_SIZE_MEDIUM)
+		style.content_margin_left = 10
+		style.content_margin_top = 10
+		style.content_margin_right = 10
+		style.content_margin_bottom = 10
+		_details_panel.add_theme_stylebox_override("panel", style)
 
-	# Style column header labels
-	if _item_label:
-		aCoreVibeTheme.style_label(_item_label, aCoreVibeTheme.COLOR_SKY_CYAN, 18)
-
-	# Style item name label
+	if _category_name:
+		aCoreVibeTheme.style_label(_category_name, aCoreVibeTheme.COLOR_SKY_CYAN, 18)
 	if _item_name:
 		aCoreVibeTheme.style_label(_item_name, aCoreVibeTheme.COLOR_MILK_WHITE, 16)
 
-	# Style details text
-	if _details_text:
-		_details_text.add_theme_color_override("default_color", aCoreVibeTheme.COLOR_MILK_WHITE)
+	# Style L1 and R1 labels with grey circles
+	if _l1_label:
+		aCoreVibeTheme.style_label(_l1_label, aCoreVibeTheme.COLOR_MILK_WHITE, 12)
+		_l1_label.modulate = Color(1, 1, 1, 0.5)  # 50% transparency for text
+		var l1_style = StyleBoxFlat.new()
+		l1_style.bg_color = Color(0.3, 0.3, 0.3, 0.4)  # Darker grey with 50% less opacity
+		l1_style.corner_radius_top_left = 12
+		l1_style.corner_radius_top_right = 12
+		l1_style.corner_radius_bottom_left = 12
+		l1_style.corner_radius_bottom_right = 12
+		l1_style.content_margin_left = 8
+		l1_style.content_margin_right = 8
+		l1_style.content_margin_top = 4
+		l1_style.content_margin_bottom = 4
+		_l1_label.add_theme_stylebox_override("normal", l1_style)
 
-	# Style action buttons
+	if _r1_label:
+		aCoreVibeTheme.style_label(_r1_label, aCoreVibeTheme.COLOR_MILK_WHITE, 12)
+		_r1_label.modulate = Color(1, 1, 1, 0.5)  # 50% transparency for text
+		var r1_style = StyleBoxFlat.new()
+		r1_style.bg_color = Color(0.3, 0.3, 0.3, 0.4)  # Darker grey with 50% less opacity
+		r1_style.corner_radius_top_left = 12
+		r1_style.corner_radius_top_right = 12
+		r1_style.corner_radius_bottom_left = 12
+		r1_style.corner_radius_bottom_right = 12
+		r1_style.content_margin_left = 8
+		r1_style.content_margin_right = 8
+		r1_style.content_margin_top = 4
+		r1_style.content_margin_bottom = 4
+		_r1_label.add_theme_stylebox_override("normal", r1_style)
+
 	if _use_button:
 		aCoreVibeTheme.style_button(_use_button, aCoreVibeTheme.COLOR_ELECTRIC_LIME, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
-		_use_button.custom_minimum_size = Vector2(120, 36)
 	if _inspect_button:
 		aCoreVibeTheme.style_button(_inspect_button, aCoreVibeTheme.COLOR_SKY_CYAN, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
-		_inspect_button.custom_minimum_size = Vector2(120, 36)
-
-func _on_visibility_changed() -> void:
-	"""Grab focus when panel becomes visible, cleanup popups when hidden"""
-	if visible:
-		call_deferred("_grab_category_focus")
-	else:
-		# Clean up any active popups when panel is hidden
-		_cleanup_active_popup()
-
-func _grab_category_focus() -> void:
-	"""Helper to grab focus on category list"""
-	if _category_list and _category_list.item_count > 0:
-		_focus_mode = "category"
-		_category_list.grab_focus()
-		call_deferred("_animate_panel_focus")
-
-func _cleanup_active_popup() -> void:
-	"""Clean up any active popup and overlay"""
-	if not _active_popup and not _active_overlay:
-		return
-
-	print("[ItemsPanel] _cleanup_active_popup called, popup=%s, overlay=%s" % [_active_popup != null, _active_overlay != null])
-
-	# Store references locally before clearing tracking variables
-	var popup = _active_popup
-	var overlay = _active_overlay
-
-	# Clear tracking immediately to prevent re-entrance
-	_active_popup = null
-	_active_overlay = null
-
-	# Reset focus mode if in party picker
-	if _focus_mode == "party_picker":
-		_focus_mode = "items"
-
-	# Clean up popup
-	if popup and is_instance_valid(popup):
-		print("[ItemsPanel] Queuing popup free")
-		popup.queue_free()
-
-	# Clean up overlay
-	if overlay and is_instance_valid(overlay):
-		print("[ItemsPanel] Queuing overlay free")
-		overlay.queue_free()
 
 func _rebuild() -> void:
-	"""Rebuild entire panel - refresh data and UI"""
-	print("[ItemsPanel] === REBUILD CALLED ===")
-	print("[ItemsPanel] Current focus_mode: %s" % _focus_mode)
-
-	# Don't rebuild while party picker is active - it will rebuild when closed
-	if _focus_mode == "party_picker":
-		print("[ItemsPanel] Skipping rebuild - party picker is active")
+	"""Rebuild all data from systems"""
+	if not is_inside_tree():
 		return
-
-	_load_data()
-	_populate_categories()
+	_load_item_defs()
+	_load_inventory()
+	_load_equipped()
+	_add_sigil_instances()  # Add sigil instances as virtual items
+	_add_equipment_instances()  # Convert equipment to individual instances
 	_populate_items()
 	_update_details()
-	print("[ItemsPanel] === REBUILD COMPLETE ===")
 
-func _load_data() -> void:
-	"""Load item definitions and counts"""
-	# Load definitions from CSV
+func _load_item_defs() -> void:
+	"""Load item definitions from CSV"""
 	_defs.clear()
 
-	print("[ItemsPanel] _csv is null: %s" % (_csv == null))
-	if _csv:
-		print("[ItemsPanel] _csv has load_csv: %s" % _csv.has_method("load_csv"))
-
-	if _csv and _csv.has_method("load_csv"):
-		print("[ItemsPanel] Calling load_csv with path: %s, key: %s" % [ITEMS_CSV, KEY_ID])
-		var loaded: Variant = _csv.call("load_csv", ITEMS_CSV, KEY_ID)
-		print("[ItemsPanel] load_csv returned type: %d" % typeof(loaded))
-
-		if typeof(loaded) == TYPE_DICTIONARY:
-			# IMPORTANT: Duplicate to avoid modifying CSV loader's internal cache!
-			_defs = (loaded as Dictionary).duplicate(true)
-			print("[ItemsPanel] Loaded %d item definitions from CSV" % _defs.size())
-			# Check a sample item definition
-			if _defs.has("HP_002"):
-				var sample: Dictionary = _defs["HP_002"]
-				print("[ItemsPanel] Sample HP_002 def keys: %s" % str(sample.keys()))
-				print("[ItemsPanel] Sample HP_002 category: %s" % sample.get("category", "MISSING"))
-		else:
-			print("[ItemsPanel] ERROR: CSV load returned wrong type! Expected Dictionary (27), got type %d" % typeof(loaded))
-
-	# Load counts from inventory
-	_counts.clear()
-	if _inv:
-		if _inv.has_method("get_counts"):
-			var counts_data: Variant = _inv.call("get_counts")
-			print("[ItemsPanel] get_counts returned type: ", typeof(counts_data))
-			if typeof(counts_data) == TYPE_DICTIONARY:
-				# Deep duplicate to avoid any reference issues
-				var raw_counts: Dictionary = counts_data
-				for item_id in raw_counts.keys():
-					# Skip comment entries (start with #)
-					var id_str: String = String(item_id)
-					if id_str.begins_with("#"):
-						continue
-					var qty: Variant = raw_counts[item_id]
-					if typeof(qty) == TYPE_FLOAT or typeof(qty) == TYPE_INT:
-						var qty_int: int = int(qty)
-						if qty_int > 0:
-							_counts[id_str] = qty_int
-				print("[ItemsPanel] Loaded %d items from get_counts (filtered %d comments)" % [_counts.size(), raw_counts.size() - _counts.size()])
-		elif _inv.has_method("get_inventory"):
-			var inv_data: Variant = _inv.call("get_inventory")
-			print("[ItemsPanel] get_inventory returned type: ", typeof(inv_data))
-			if typeof(inv_data) == TYPE_DICTIONARY:
-				_counts = inv_data.duplicate()
-				print("[ItemsPanel] Loaded %d items from get_inventory" % _counts.size())
-
-	print("[ItemsPanel] After loading, _counts has %d items" % _counts.size())
-
-	# Load equipped items
-	_equipped_by.clear()
-	_load_equipped_items()
-
-	# Add sigil instances
-	_add_sigil_instances()
-
-func _load_equipped_items() -> void:
-	"""Build map of which items are equipped by which members"""
-	if not _eq or not _gs:
+	if not _csv:
+		print("[ItemsPanel] ERROR: CSV loader is null!")
 		return
 
-	var members: Array[String] = _gather_members()
+	if not _csv.has_method("load_csv"):
+		print("[ItemsPanel] ERROR: CSV loader missing load_csv method!")
+		return
+
+	print("[ItemsPanel] Calling load_csv with path: %s, key: %s" % [ITEMS_CSV, KEY_ID])
+	var defs_variant: Variant = _csv.call("load_csv", ITEMS_CSV, KEY_ID)
+	print("[ItemsPanel] load_csv returned type: %d" % typeof(defs_variant))
+
+	if defs_variant == null:
+		print("[ItemsPanel] ERROR: CSV returned null!")
+		return
+
+	if typeof(defs_variant) != TYPE_DICTIONARY:
+		print("[ItemsPanel] ERROR: CSV returned wrong type!")
+		return
+
+	# IMPORTANT: Duplicate to avoid modifying CSV loader's internal cache
+	_defs = (defs_variant as Dictionary).duplicate(true)
+	print("[ItemsPanel] Loaded %d item definitions" % _defs.size())
+
+func _load_inventory() -> void:
+	"""Load inventory counts"""
+	_counts.clear()
+
+	if not _inv:
+		print("[ItemsPanel] ERROR: Inventory system is null!")
+		return
+
+	if not _inv.has_method("get_counts"):
+		print("[ItemsPanel] ERROR: Inventory missing get_counts method!")
+		return
+
+	print("[ItemsPanel] Calling inventory.get_counts()")
+	var items_variant: Variant = _inv.call("get_counts")
+	print("[ItemsPanel] get_counts returned type: %d" % typeof(items_variant))
+
+	if items_variant == null:
+		print("[ItemsPanel] ERROR: Inventory returned null!")
+		return
+
+	if typeof(items_variant) != TYPE_DICTIONARY:
+		print("[ItemsPanel] ERROR: Inventory returned wrong type!")
+		return
+
+	# Filter out comment entries (start with #) and convert to proper types
+	var raw_counts: Dictionary = items_variant as Dictionary
+	for item_id in raw_counts.keys():
+		var id_str: String = String(item_id)
+		if id_str.begins_with("#"):
+			continue
+		var qty: Variant = raw_counts[item_id]
+		if typeof(qty) == TYPE_FLOAT or typeof(qty) == TYPE_INT:
+			var qty_int: int = int(qty)
+			if qty_int > 0:
+				_counts[id_str] = qty_int
+
+	print("[ItemsPanel] Loaded %d items from inventory (filtered %d comments)" % [_counts.size(), raw_counts.size() - _counts.size()])
+
+func _load_equipped() -> void:
+	"""Load equipped items"""
+	_equipped_by.clear()
+	if not _eq or not _eq.has_method("get_member_equip") or not _gs:
+		return
+
+	# Get all party members - try multiple method names
+	var members: Array = []
+	for method in ["get_active_party_ids", "get_party_ids", "list_active_party", "get_active_party"]:
+		if _gs.has_method(method):
+			var party_variant: Variant = _gs.call(method)
+			if typeof(party_variant) == TYPE_PACKED_STRING_ARRAY:
+				for s in (party_variant as PackedStringArray):
+					members.append(String(s))
+			elif typeof(party_variant) == TYPE_ARRAY:
+				for s in (party_variant as Array):
+					members.append(String(s))
+			if members.size() > 0:
+				break
+
+	# Load equipment for each member
 	for member in members:
-		var equip: Dictionary = _get_equipment(member)
-		for slot in ["weapon", "armor", "head", "foot", "bracelet"]:
-			var item_id: String = String(equip.get(slot, ""))
+		var member_id: String = String(member)
+		var equip_variant: Variant = _eq.call("get_member_equip", member_id)
+		if typeof(equip_variant) != TYPE_DICTIONARY:
+			continue
+		var member_gear: Dictionary = equip_variant as Dictionary
+		for slot in member_gear.keys():
+			var item_id: String = String(member_gear[slot])
 			if item_id != "" and item_id != "—":
 				if not _equipped_by.has(item_id):
 					_equipped_by[item_id] = []
-				var member_name: String = _member_display_name(member)
-				if not _equipped_by[item_id].has(member_name):
-					_equipped_by[item_id].append(member_name)
+				_equipped_by[item_id].append(_member_display_name(member_id))
 
 func _add_sigil_instances() -> void:
 	"""Add sigil instances as virtual items"""
@@ -379,7 +648,74 @@ func _add_sigil_instances() -> void:
 			var member_name: String = _member_display_name(equipped_by)
 			if not _equipped_by[inst_id].has(member_name):
 				_equipped_by[inst_id].append(member_name)
-			print("[ItemsPanel] Sigil %s equipped by %s" % [inst_id, member_name])
+
+func _add_equipment_instances() -> void:
+	"""Convert equipment items to individual instances (no stacking)"""
+	var equipment_items: Array[String] = []
+
+	# Find all equipment items
+	for item_id in _counts.keys():
+		if not _defs.has(item_id):
+			continue
+		var def: Dictionary = _defs[item_id]
+		if _is_equipment(def):
+			equipment_items.append(item_id)
+
+	# Create individual instances for each equipment item
+	for base_id in equipment_items:
+		var base_def: Dictionary = _defs[base_id]
+		var total_count: int = _counts.get(base_id, 0)
+
+		# Get list of who has this equipped
+		var equipped_members: Array = _equipped_by.get(base_id, [])
+		var equipped_count: int = equipped_members.size()
+
+		# Total instances = inventory count + equipped count
+		var total_instances: int = total_count + equipped_count
+
+		# Remove the base item from counts
+		_counts.erase(base_id)
+
+		# Create individual instances
+		var instance_index: int = 0
+
+		# First create instances for equipped items
+		for member_name in equipped_members:
+			var inst_id: String = "%s_inst_%d" % [base_id, instance_index]
+			instance_index += 1
+
+			# Create virtual item def
+			var virtual_def: Dictionary = base_def.duplicate()
+			virtual_def["equipment_instance"] = true
+			virtual_def["instance_id"] = inst_id
+			virtual_def["base_id"] = base_id
+
+			_defs[inst_id] = virtual_def
+			_counts[inst_id] = 1
+
+			# Track who has this equipped
+			_equipped_by[inst_id] = [member_name]
+
+		# Then create instances for unequipped items in inventory
+		var unequipped_count: int = total_count
+		for i in range(unequipped_count):
+			var inst_id: String = "%s_inst_%d" % [base_id, instance_index]
+			instance_index += 1
+
+			# Create virtual item def
+			var virtual_def: Dictionary = base_def.duplicate()
+			virtual_def["equipment_instance"] = true
+			virtual_def["instance_id"] = inst_id
+			virtual_def["base_id"] = base_id
+
+			_defs[inst_id] = virtual_def
+			_counts[inst_id] = 1
+			# Not equipped, so don't add to _equipped_by
+
+		# Clear old equipment tracking for base item
+		_equipped_by.erase(base_id)
+
+		print("[ItemsPanel] Created %d instances for %s (%d equipped, %d in inventory)" % [total_instances, base_id, equipped_count, unequipped_count])
 
 func _format_sigil_name(inst: Dictionary, base_def: Dictionary) -> String:
 	"""Format sigil instance name with level"""
@@ -387,165 +723,147 @@ func _format_sigil_name(inst: Dictionary, base_def: Dictionary) -> String:
 	var level: int = int(inst.get("level", 1))
 	return "%s Lv.%d" % [base_name, level]
 
-func _populate_categories() -> void:
-	"""Populate category list"""
-	if not _category_list:
+func _populate_items() -> void:
+	"""Populate items grid based on current category"""
+	print("[ItemsPanel] _populate_items() called")
+
+	if not _items_grid:
+		print("[ItemsPanel] ERROR: _items_grid is null!")
 		return
 
-	var prev_selection: int = _category_list.get_selected_items()[0] if _category_list.get_selected_items().size() > 0 else 0
+	# Clear existing buttons
+	for button in _item_buttons:
+		button.queue_free()
+	_item_buttons.clear()
+	_item_ids.clear()
+	_selected_grid_index = 0
 
-	_category_list.clear()
-	_category_ids.clear()
+	if _current_category_index < 0 or _current_category_index >= CATEGORIES.size():
+		print("[ItemsPanel] ERROR: Invalid category index: %d" % _current_category_index)
+		return
 
-	for cat in CATEGORIES:
-		var count: int = _count_items_in_category(cat)
-		_category_list.add_item("%s (%d)" % [cat, count])
-		_category_ids.append(cat)
+	var category: String = CATEGORIES[_current_category_index]["id"]
+	print("[ItemsPanel] Current category: %s" % category)
+	print("[ItemsPanel] Total item counts: %d" % _counts.size())
+	print("[ItemsPanel] Total definitions: %d" % _defs.size())
 
-	# Restore selection
-	if prev_selection >= 0 and prev_selection < _category_list.item_count:
-		_category_list.select(prev_selection)
-		_current_category = _category_ids[prev_selection]
-
-func _count_items_in_category(category: String) -> int:
-	"""Count items in a category"""
-	var count: int = 0
+	var items: Array[String] = []
 	for item_id in _counts.keys():
 		var qty: int = _counts[item_id]
 		if qty <= 0:
 			continue
 		if category == "Acquired":
-			# For Acquired, sum total quantities of all items
-			count += qty
-			continue
-		if category == "All":
-			count += 1
+			items.append(item_id)
 			continue
 		var def: Dictionary = _defs.get(item_id, {})
 		var item_cat: String = _category_of(def)
 		if item_cat == category:
-			count += 1
-	return count
-
-func _populate_items() -> void:
-	"""Populate item list based on current category"""
-	print("[ItemsPanel] _populate_items() called, category: %s" % _current_category)
-	if not _item_list:
-		print("[ItemsPanel] ERROR: _item_list is null!")
-		return
-
-	_item_list.clear()
-	_item_ids.clear()
-
-	# Update header
-	if _item_label:
-		_item_label.text = "ITEMS (%s)" % _current_category.to_upper()
-
-	# Gather items in category
-	var items: Array[String] = []
-	print("[ItemsPanel] Starting to gather items from %d entries in _counts" % _counts.size())
-	for item_id in _counts.keys():
-		var qty: int = _counts[item_id]
-		if qty <= 0:
-			continue
-
-		# For "Acquired" category, show all items
-		if _current_category == "Acquired":
 			items.append(item_id)
-			continue
 
-		var def: Dictionary = _defs.get(item_id, {})
-		var item_cat: String = _category_of(def)
-		# Debug first few items
-		if items.size() < 3:
-			print("[ItemsPanel] DEBUG: item_id=%s, has_def=%s, def_size=%d, category=%s" % [item_id, _defs.has(item_id), def.size(), item_cat])
-		if item_cat == _current_category:
-			items.append(item_id)
-			print("[ItemsPanel] Added %s (cat: %s, qty: %d)" % [item_id, item_cat, qty])
+	print("[ItemsPanel] Found %d items in category '%s'" % [items.size(), category])
 
-	print("[ItemsPanel] Gathered %d items for category '%s'" % [items.size(), _current_category])
+	items.sort_custom(func(a: String, b: String) -> bool:
+		var def_a: Dictionary = _defs.get(a, {})
+		var def_b: Dictionary = _defs.get(b, {})
+		var name_a: String = _display_name(a, def_a)
+		var name_b: String = _display_name(b, def_b)
+		return name_a < name_b
+	)
 
-	# Sort items based on category
-	if _current_category == "Acquired":
-		# For Acquired: reverse alphabetical (newest first - approximation until we have true acquisition tracking)
-		items.sort_custom(func(a: String, b: String) -> bool:
-			var def_a: Dictionary = _defs.get(a, {})
-			var def_b: Dictionary = _defs.get(b, {})
-			var name_a: String = _display_name(a, def_a)
-			var name_b: String = _display_name(b, def_b)
-			return name_a > name_b  # Reverse order
-		)
-	elif _current_category == "Equipment":
-		# For Equipment: sort by equip_slot first, then by name
-		items.sort_custom(func(a: String, b: String) -> bool:
-			var def_a: Dictionary = _defs.get(a, {})
-			var def_b: Dictionary = _defs.get(b, {})
-			var slot_a: String = String(def_a.get("equip_slot", "")).to_lower()
-			var slot_b: String = String(def_b.get("equip_slot", "")).to_lower()
-
-			# Define slot order
-			const SLOT_ORDER: Dictionary = {"weapon": 0, "armor": 1, "head": 2, "foot": 3, "bracelet": 4}
-			var order_a: int = SLOT_ORDER.get(slot_a, 99)
-			var order_b: int = SLOT_ORDER.get(slot_b, 99)
-
-			# First sort by slot
-			if order_a != order_b:
-				return order_a < order_b
-
-			# Then sort by name within same slot
-			var name_a: String = _display_name(a, def_a)
-			var name_b: String = _display_name(b, def_b)
-			return name_a < name_b
-		)
-	else:
-		# Default: sort by name
-		items.sort_custom(func(a: String, b: String) -> bool:
-			var def_a: Dictionary = _defs.get(a, {})
-			var def_b: Dictionary = _defs.get(b, {})
-			var name_a: String = _display_name(a, def_a)
-			var name_b: String = _display_name(b, def_b)
-			return name_a < name_b
-		)
-
-	# Populate list
 	for item_id in items:
 		var def: Dictionary = _defs.get(item_id, {})
 		var qty: int = _counts.get(item_id, 0)
 		var name: String = _display_name(item_id, def)
+		var button = Button.new()
 
-		# Check if item is equipped
-		var is_equipped: bool = _equipped_by.has(item_id)
-		var equipped_members: Array = _equipped_by.get(item_id, [])
-		var equipped_count: int = equipped_members.size()
+		# Build button text - for Sigils and Equipment, show equipped member
+		var button_text: String = "%s x%d" % [name, qty]
+		var current_category: String = CATEGORIES[_current_category_index]["id"]
 
-		# For equipped items, show each member separately
-		if is_equipped:
-			for member in equipped_members:
-				_item_list.add_item("%s - Equipped by %s" % [name, member])
-				_item_ids.append(item_id)
+		if current_category == "Sigils":
+			var equipped_by: String = _get_sigil_equipped_by(item_id)
+			if equipped_by != "":
+				var member_name: String = _member_display_name(equipped_by)
+				button_text = "%s x%d [%s]" % [name, qty, member_name]
+		elif current_category == "Equipment":
+			# Check _equipped_by dictionary for equipment
+			if _equipped_by.has(item_id) and _equipped_by[item_id].size() > 0:
+				var equipped_members: String = ", ".join(_equipped_by[item_id])
+				button_text = "%s x%d [%s]" % [name, qty, equipped_members]
 
-		# Show unequipped count if any remain
-		var unequipped_count: int = qty - equipped_count
-		if unequipped_count > 0:
-			_item_list.add_item("%s  x%d" % [name, unequipped_count])
-			_item_ids.append(item_id)
+		button.text = button_text
 
-	print("[ItemsPanel] Added %d items to ItemList UI" % _item_list.item_count)
+		# Load and set item icon if available
+		if def.has("icon") and def["icon"] != null:
+			var icon_value = def["icon"]
+			# Skip if icon is empty string or "null" string
+			if typeof(icon_value) == TYPE_STRING and (icon_value == "" or icon_value == "null"):
+				pass  # No icon
+			else:
+				# Convert to string and pad to 4 digits
+				var icon_num: String = str(icon_value).pad_zeros(4)
+				var icon_path: String = "res://assets/graphics/items/individual/item_%s.png" % icon_num
+				if ResourceLoader.exists(icon_path):
+					var icon_texture: Texture2D = load(icon_path)
+					button.icon = icon_texture
+					button.icon_alignment = HORIZONTAL_ALIGNMENT_LEFT
+					button.expand_icon = true
 
-	# Update count - Removed
-	# if _count_label:
-	#	_count_label.text = "Count: %d" % items.size()
+		button.custom_minimum_size = Vector2(284, 40)  # Decreased width by 10px to 284
+		button.alignment = HORIZONTAL_ALIGNMENT_LEFT  # Left-justify text
+		button.focus_mode = Control.FOCUS_NONE  # Disable built-in focus navigation
+		button.set_meta("item_id", item_id)
+		button.set_meta("grid_index", _item_buttons.size())
+		button.pressed.connect(_on_grid_item_pressed.bind(_item_buttons.size()))
 
-	# Select first item if available
-	if _item_list.item_count > 0 and _selected_item_id == "":
-		_item_list.select(0)
+		# Style button
+		var style_normal = StyleBoxFlat.new()
+		style_normal.bg_color = Color(0.1, 0.1, 0.15, 0.8)  # Dark background
+		style_normal.corner_radius_top_left = 4
+		style_normal.corner_radius_top_right = 4
+		style_normal.corner_radius_bottom_left = 4
+		style_normal.corner_radius_bottom_right = 4
+		# Add 5px internal padding
+		style_normal.content_margin_left = 5
+		style_normal.content_margin_right = 5
+		style_normal.content_margin_top = 5
+		style_normal.content_margin_bottom = 5
+		button.add_theme_stylebox_override("normal", style_normal)
+		button.add_theme_stylebox_override("hover", style_normal)
+		button.add_theme_stylebox_override("pressed", style_normal)
+
+		_items_grid.add_child(button)
+		_item_buttons.append(button)
+		_item_ids.append(item_id)
+		var idx = _item_buttons.size() - 1
+		var row = idx / 2
+		var col = idx % 2
+		var col_name = "LEFT" if col == 0 else "RIGHT"
+		print("[ItemsPanel] Index %d (Row %d, %s): %s" % [idx, row, col_name, button.text])
+
+	print("[ItemsPanel] Total buttons created: %d" % _item_buttons.size())
+
+	if _item_buttons.size() > 0:
+		_selected_grid_index = 0
 		_selected_item_id = _item_ids[0]
 		print("[ItemsPanel] Selected first item: %s" % _selected_item_id)
+		call_deferred("_update_selection_highlight")
+		_update_details()
+		call_deferred("_update_arrow_position")
 	else:
-		print("[ItemsPanel] No items to select or item already selected: %s" % _selected_item_id)
+		print("[ItemsPanel] WARNING: No items to display!")
+		_clear_details()
+
+func _on_grid_item_pressed(index: int) -> void:
+	if index < 0 or index >= _item_ids.size():
+		return
+	_selected_grid_index = index
+	_selected_item_id = _item_ids[index]
+	_update_selection_highlight()
+	_update_details()
+	_update_arrow_position()
 
 func _update_details() -> void:
-	"""Update item details panel with equipment stats and formatting"""
 	if _selected_item_id == "" or not _defs.has(_selected_item_id):
 		_clear_details()
 		return
@@ -554,114 +872,70 @@ func _update_details() -> void:
 	var qty: int = _counts.get(_selected_item_id, 0)
 	var name: String = _display_name(_selected_item_id, def)
 
-	# Update name
 	if _item_name:
 		_item_name.text = name
 
-	# Build details text with BBCode formatting
 	var details: String = ""
 
-	# Quantity (Core Vibe: Electric Lime for numeric values)
-	details += "Quantity: [color=#C8FF3D]x%d[/color]\n\n" % qty
+	# Category/Type
+	var item_category: String = _category_of(def)
+	details += "[color=#00D9FF]Type:[/color] [color=#F4F7FB]%s[/color]\n\n" % item_category
 
-	# Get equipment slot to determine if this is equipment
-	var equip_slot: String = String(def.get("equip_slot", "")).to_lower().strip_edges()
-
-	# Show equipment stats if this is equippable gear
-	if equip_slot in ["weapon", "armor", "head", "foot", "bracelet"]:
-		details += _build_equipment_stats(def, equip_slot)
+	# Quantity
+	details += "[color=#00D9FF]Quantity:[/color] [color=#C8FF3D]x%d[/color]\n\n" % qty
 
 	# Description
 	var desc: String = _get_description(def)
 	if desc != "":
-		details += "[color=#F4F7FB]%s[/color]\n\n" % desc
+		details += "[color=#00D9FF]Description:[/color]\n[color=#F4F7FB]%s[/color]\n\n" % desc
 
-	# Category
-	var cat: String = _category_of(def)
-	details += "Category: [color=#4DE9FF]%s[/color]\n\n" % cat
+	# Healing effects (if recovery item)
+	if _is_recovery_item(def):
+		var field_effect: String = String(def.get("field_status_effect", ""))
+		var battle_effect: String = String(def.get("battle_status_effect", ""))
+		if field_effect != "":
+			details += "[color=#00D9FF]Field Effect:[/color]\n[color=#C8FF3D]%s[/color]\n\n" % field_effect
+		if battle_effect != "":
+			details += "[color=#00D9FF]Battle Effect:[/color]\n[color=#C8FF3D]%s[/color]\n\n" % battle_effect
 
-	# Equipped by
-	if _equipped_by.has(_selected_item_id):
-		var members: Array = _equipped_by[_selected_item_id]
-		if members.size() > 0:
-			details += "Equipped by: [color=#C8FF3D]%s[/color]\n\n" % ", ".join(members)
+	# Equipment info (if equipment)
+	if _is_equipment(def):
+		var equip_slot: String = String(def.get("equip_slot", "")).capitalize()
+		if equip_slot != "":
+			details += "[color=#00D9FF]Slot:[/color] [color=#F4F7FB]%s[/color]\n\n" % equip_slot
 
-	# Effects (for consumables)
-	var effects: String = _get_effects(def)
-	if effects != "":
-		details += "Effects:\n%s\n" % effects
+		# Check who has it equipped
+		if _equipped_by.has(_selected_item_id):
+			var equipped_members: Array = _equipped_by[_selected_item_id]
+			if equipped_members.size() > 0:
+				details += "[color=#00D9FF]Equipped By:[/color] [color=#FF3D8A]%s[/color]\n\n" % ", ".join(equipped_members)
+			else:
+				details += "[color=#00D9FF]Equipped By:[/color] [color=#888888]Not equipped[/color]\n\n"
+		else:
+			details += "[color=#00D9FF]Equipped By:[/color] [color=#888888]Not equipped[/color]\n\n"
+
+	# Sigil info
+	if def.has("sigil_instance") and def.get("sigil_instance", false):
+		details += "[color=#00D9FF]Type:[/color] [color=#F4F7FB]Sigil Instance[/color]\n\n"
+
+		# Check who has this sigil equipped
+		var equipped_by: String = _get_sigil_equipped_by(_selected_item_id)
+		if equipped_by != "":
+			var member_name: String = _member_display_name(equipped_by)
+			details += "[color=#00D9FF]Equipped By:[/color] [color=#FF3D8A]%s[/color]\n\n" % member_name
+		else:
+			details += "[color=#00D9FF]Equipped By:[/color] [color=#888888]Not equipped[/color]\n\n"
 
 	if _details_text:
 		_details_text.text = details
 
-	# Show/hide action buttons
-	_update_action_buttons(def)
-
-func _build_equipment_stats(def: Dictionary, slot: String) -> String:
-	"""Build equipment stats section with formatting (matches LoadoutPanel style)"""
-	var stats: String = ""
-
-	# Add slot label
-	var slot_label: String = slot.capitalize()
-	if slot == "head":
-		slot_label = "Headwear"
-	elif slot == "foot":
-		slot_label = "Footwear"
-	stats += "[color=#4DE9FF]%s[/color]\n\n" % slot_label
-
-	# Add stats based on slot type
-	match slot:
-		"weapon":
-			if def.has("base_watk"):
-				stats += "Attack: [color=#C8FF3D]%d[/color]\n" % int(def.get("base_watk", 0))
-			if def.has("base_acc"):
-				stats += "Accuracy: [color=#C8FF3D]%d[/color]\n" % int(def.get("base_acc", 0))
-			if def.has("crit_bonus_pct"):
-				stats += "Critical: [color=#C8FF3D]%d%%[/color]\n" % int(def.get("crit_bonus_pct", 0))
-			if def.has("skill_atk_boost"):
-				stats += "Skill Atk: [color=#C8FF3D]%d[/color]\n" % int(def.get("skill_atk_boost", 0))
-			if def.has("skill_acc_boost"):
-				stats += "Skill Acc: [color=#C8FF3D]%d[/color]\n" % int(def.get("skill_acc_boost", 0))
-			if def.has("watk_type_tag"):
-				var wtype: String = String(def.get("watk_type_tag", "")).capitalize()
-				if wtype != "":
-					stats += "Type: [color=#C8FF3D]%s[/color]\n" % wtype
-
-		"armor":
-			if def.has("armor_flat"):
-				stats += "Physical Defense: [color=#C8FF3D]%d[/color]\n" % int(def.get("armor_flat", 0))
-			if def.has("ward_flat"):
-				stats += "Skill Defense: [color=#C8FF3D]%d[/color]\n" % int(def.get("ward_flat", 0))
-			if def.has("armor_type"):
-				var atype: String = String(def.get("armor_type", "")).capitalize()
-				if atype != "":
-					stats += "Type: [color=#C8FF3D]%s[/color]\n" % atype
-
-		"head":
-			if def.has("max_hp_boost"):
-				stats += "HP Bonus: [color=#C8FF3D]+%d[/color]\n" % int(def.get("max_hp_boost", 0))
-			if def.has("max_mp_boost"):
-				stats += "MP Bonus: [color=#C8FF3D]+%d[/color]\n" % int(def.get("max_mp_boost", 0))
-			if def.has("ward_flat"):
-				stats += "Skill Defense: [color=#C8FF3D]%d[/color]\n" % int(def.get("ward_flat", 0))
-
-		"foot":
-			if def.has("base_eva"):
-				stats += "Evasion: [color=#C8FF3D]%d[/color]\n" % int(def.get("base_eva", 0))
-			if def.has("speed"):
-				stats += "Speed: [color=#C8FF3D]%d[/color]\n" % int(def.get("speed", 0))
-
-		"bracelet":
-			if def.has("sigil_slots"):
-				stats += "Sigil Slots: [color=#C8FF3D]%d[/color]\n" % int(def.get("sigil_slots", 0))
-
-	if stats != "":
-		stats += "\n"
-
-	return stats
+	var category: String = CATEGORIES[_current_category_index]["id"]
+	if _use_button:
+		_use_button.visible = (category == "Recovery")
+	if _inspect_button:
+		_inspect_button.visible = true
 
 func _clear_details() -> void:
-	"""Clear details panel"""
 	if _item_name:
 		_item_name.text = "(Select an item)"
 	if _details_text:
@@ -671,55 +945,372 @@ func _clear_details() -> void:
 	if _inspect_button:
 		_inspect_button.visible = false
 
-func _update_action_buttons(def: Dictionary) -> void:
-	"""Show/hide action buttons based on item type"""
-	var is_recovery: bool = _is_recovery_item(def)
+func _category_of(def: Dictionary) -> String:
+	"""Get category of an item - checks multiple fields with priority"""
+	# Check if it's a recovery item first (HP/MP healing)
+	if _is_recovery_item(def):
+		return "Recovery"
 
-	if _use_button:
-		_use_button.visible = is_recovery
-	if _inspect_button:
-		_inspect_button.visible = true
+	# Check if it's a capture item
+	if _is_capture_item(def):
+		return "Capture"
 
-func _on_category_selected(index: int) -> void:
-	"""Handle category selection"""
-	if index < 0 or index >= _category_ids.size():
+	# Check if it's a gift item
+	if _is_gift_item(def):
+		return "Gifts"
+
+	# Check if it's equipment (has equip_slot field)
+	if _is_equipment(def):
+		return "Equipment"
+
+	# Check if it's a battle consumable
+	if _is_battle_item(def):
+		return "Battle"
+
+	# Check category field for remaining types (Sigils, Material, Key, Other)
+	for key in ["category", "cat", "type"]:
+		if def.has(key):
+			var cat: String = String(def[key]).strip_edges()
+			var norm: String = _normalize_category(cat)
+			if norm != "":
+				return norm
+	return "Other"
+
+func _normalize_category(cat: String) -> String:
+	"""Normalize category name"""
+	var key: String = cat.to_lower().strip_edges()
+	const MAP: Dictionary = {
+		"sigil": "Sigils", "sigils": "Sigils",
+		"material": "Material", "materials": "Material",
+		"key": "Key", "key item": "Key", "key items": "Key",
+		"gift": "Gifts", "gifts": "Gifts",
+		"other": "Other",
+		"weapon": "Equipment", "weapons": "Equipment",
+		"armor": "Equipment",
+		"consumable": "Recovery", "consumables": "Recovery"
+	}
+	if MAP.has(key):
+		return MAP[key]
+	# Check if it matches any category ID
+	for cat_dict in CATEGORIES:
+		if cat_dict["id"] == cat:
+			return cat
+	return ""
+
+func _is_recovery_item(def: Dictionary) -> bool:
+	"""Check if item is a recovery item (HP/MP healing)"""
+	for key in ["field_status_effect", "battle_status_effect"]:
+		if def.has(key):
+			var effect: String = String(def[key]).to_lower()
+			if (effect.contains("heal") or effect.contains("restore")) and (effect.contains("hp") or effect.contains("mp")):
+				return true
+	return false
+
+func _is_capture_item(def: Dictionary) -> bool:
+	"""Check if item is a capture item"""
+	var cat: String = String(def.get("category", "")).to_lower()
+	if cat.contains("capture") or cat.contains("bind"):
+		return true
+	var name: String = String(def.get("name", "")).to_lower()
+	if name.contains("bind"):
+		return true
+	return false
+
+func _is_gift_item(def: Dictionary) -> bool:
+	"""Check if item is a gift item"""
+	var cat: String = String(def.get("category", "")).to_lower()
+	return cat.contains("gift")
+
+func _is_equipment(def: Dictionary) -> bool:
+	"""Check if item is equipment"""
+	var equip_slot: String = String(def.get("equip_slot", "")).to_lower().strip_edges()
+	return equip_slot in ["weapon", "armor", "head", "headwear", "foot", "footwear", "bracelet"]
+
+func _is_battle_item(def: Dictionary) -> bool:
+	"""Check if item is a battle consumable"""
+	var cat: String = String(def.get("category", "")).to_lower()
+	if cat.contains("consumable") or cat.contains("battle"):
+		if not _is_recovery_item(def) and not _is_capture_item(def) and not _is_gift_item(def):
+			return true
+	return false
+
+func _display_name(item_id: String, def: Dictionary) -> String:
+	"""Get display name for an item"""
+	if def.has("sigil_instance") and def.has("name"):
+		return String(def["name"])
+	for key in ["name", "display_name", "label", "title"]:
+		if def.has(key):
+			var val: String = String(def[key]).strip_edges()
+			if val != "":
+				return val
+	return item_id.replace("_", " ").capitalize()
+
+func _get_description(def: Dictionary) -> String:
+	return String(def.get("description", ""))
+
+func _member_display_name(token: String) -> String:
+	if _gs and _gs.has_method("_first_name_for_id"):
+		return _gs.call("_first_name_for_id", token)
+	return token
+
+func _get_sigil_equipped_by(sigil_instance_id: String) -> String:
+	"""Check which party member (if any) has this sigil equipped. Returns member token or empty string."""
+	if not _sig:
+		return ""
+
+	# Get all party members
+	var members: Array[String] = _gather_members()
+
+	# Check each member's loadout
+	for member in members:
+		if _sig.has_method("get_loadout"):
+			var loadout: Variant = _sig.call("get_loadout", member)
+			# Convert to array if it's a PackedStringArray
+			var loadout_array: Array[String] = []
+			if typeof(loadout) == TYPE_PACKED_STRING_ARRAY:
+				for inst_id in (loadout as PackedStringArray):
+					loadout_array.append(String(inst_id))
+			elif typeof(loadout) == TYPE_ARRAY:
+				for inst_id in (loadout as Array):
+					loadout_array.append(String(inst_id))
+
+			# Check if this sigil instance is in the loadout
+			if loadout_array.has(sigil_instance_id):
+				return member
+
+	return ""
+
+func _input(event: InputEvent) -> void:
+	"""Use _input() instead of _unhandled_input() for higher priority than GameMenu"""
+	if not visible:
 		return
 
-	_current_category = _category_ids[index]
-	_selected_item_id = ""  # Reset item selection
-	_populate_items()
-	_update_details()
+	# Debug logging for party picker
+	if _focus_mode == "party_picker" and event is InputEventJoypadButton:
+		print("[ItemsPanel._input] party_picker mode, button: %d, pressed: %s" % [event.button_index, event.pressed])
 
-func _on_item_selected(index: int) -> void:
-	"""Handle item selection"""
-	if index < 0 or index >= _item_ids.size():
+	# Handle popup input at high priority to block GameMenu from seeing it
+	if _focus_mode == "recovery_confirmation":
+		# Block ALL input when recovery confirmation is showing
+		if event is InputEventJoypadButton:
+			print("[ItemsPanel._input] recovery_confirmation blocking button: %d, pressed: %s" % [event.button_index, event.pressed])
+			if event.pressed:
+				match event.button_index:
+					0:  # Accept button
+						print("[ItemsPanel._input] Accept button pressed on recovery confirmation")
+						if _active_popup and is_instance_valid(_active_popup):
+							var ok_btn = _active_popup.get_meta("ok_button", null)
+							if ok_btn and is_instance_valid(ok_btn):
+								ok_btn.emit_signal("pressed")
+						get_viewport().set_input_as_handled()
+						return
+					_:
+						# Block all other button presses from reaching GameMenu
+						get_viewport().set_input_as_handled()
+						return
+			else:
+				# Block button releases too
+				get_viewport().set_input_as_handled()
+				return
+		elif event is InputEventJoypadMotion:
+			# Block joystick motion
+			get_viewport().set_input_as_handled()
+			return
+
+	if _focus_mode == "party_picker":
+		# Allow joystick motion for ItemList navigation
+		if event is InputEventJoypadMotion:
+			# Let joystick motion pass through to ItemList for up/down navigation
+			return
+
+		if event is InputEventJoypadButton:
+			match event.button_index:
+				0:  # Accept button
+					if event.pressed:
+						_on_party_picker_accept()
+					get_viewport().set_input_as_handled()
+					return
+				1:  # Back button (B/Circle)
+					if event.pressed:
+						# Find the popup panel to close
+						if _active_popup and is_instance_valid(_active_popup):
+							_close_member_selection_popup(_active_popup, false)
+					get_viewport().set_input_as_handled()
+					return
+				11, 12, 13, 14:  # D-pad (up=11, down=12, left=13, right=14) - let ItemList handle these
+					# Don't handle these - let them pass through to the ItemList for navigation
+					return
+				_:
+					# Block all other inputs from reaching GameMenu
+					get_viewport().set_input_as_handled()
+					return
+
+	# Use direct joypad button checks to avoid GameMenu interception
+	if event is InputEventJoypadButton and event.pressed:
+		match event.button_index:
+			9:  # L1
+				_current_category_index -= 1
+				if _current_category_index < 0:
+					_current_category_index = CATEGORIES.size() - 1
+				_update_category_selection()
+				_populate_items()
+				get_viewport().set_input_as_handled()
+				return
+			10:  # R1
+				_current_category_index += 1
+				if _current_category_index >= CATEGORIES.size():
+					_current_category_index = 0
+				_update_category_selection()
+				_populate_items()
+				get_viewport().set_input_as_handled()
+				return
+			11:  # D-pad Up
+				print("[ItemsPanel] D-pad Up pressed")
+				_navigate_items(-2)  # UP in column: -2
+				get_viewport().set_input_as_handled()
+				return
+			12:  # D-pad Down
+				print("[ItemsPanel] D-pad Down pressed")
+				_navigate_items(2)  # DOWN in column: +2
+				get_viewport().set_input_as_handled()
+				return
+			13:  # D-pad Left
+				print("[ItemsPanel] D-pad Left pressed")
+				_navigate_items(-1)  # LEFT cycles BACKWARDS: -1
+				get_viewport().set_input_as_handled()
+				return
+			14:  # D-pad Right (CORRECT button number!)
+				print("[ItemsPanel] D-pad Right pressed")
+				_navigate_items(1)  # RIGHT cycles FORWARDS: +1
+				get_viewport().set_input_as_handled()
+				return
+			0:  # Accept button (A/Cross)
+				print("[ItemsPanel] Accept button pressed")
+				_on_accept_pressed()
+				get_viewport().set_input_as_handled()
+				return
+
+func _navigate_items(delta: int) -> void:
+	"""Navigate items with wrapping in 2-column grid"""
+	if _item_buttons.size() == 0:
 		return
 
-	_selected_item_id = _item_ids[index]
+	var current = _selected_grid_index
+	var total = _item_buttons.size()
+
+	# Calculate row and column (2 columns) for logging
+	var current_row = current / 2
+	var current_col = current % 2
+	var col_name = "LEFT" if current_col == 0 else "RIGHT"
+	var item_name = _item_buttons[current].text if current < _item_buttons.size() else "?"
+
+	print("[ItemsPanel] Navigation from '%s' at index %d (Row %d, %s column), delta=%d" % [item_name, current, current_row, col_name, delta])
+
+	# Apply delta with wrapping
+	var new_index = (current + delta) % total
+
+	# Handle negative wrapping (e.g., -1 from index 0 should go to last item)
+	if new_index < 0:
+		new_index = total + new_index
+
+	var new_row = new_index / 2
+	var new_col = new_index % 2
+	var new_col_name = "LEFT" if new_col == 0 else "RIGHT"
+	var new_item_name = _item_buttons[new_index].text if new_index < _item_buttons.size() else "?"
+	print("[ItemsPanel]   → Moving TO '%s' at index %d (Row %d, %s column)" % [new_item_name, new_index, new_row, new_col_name])
+
+	# Detect if we wrapped around (going down from bottom or up from top)
+	var wrapped_to_top: bool = delta > 0 and new_index < current  # Going down, wrapped to top
+	var wrapped_to_bottom: bool = delta < 0 and new_index > current  # Going up, wrapped to bottom
+
+	_selected_grid_index = new_index
+	_selected_item_id = _item_ids[_selected_grid_index]
+	_update_selection_highlight()
 	_update_details()
+
+	# If we wrapped, jump scroll to appropriate end
+	if wrapped_to_top:
+		print("[ItemsPanel]   → Wrapped to TOP, scrolling to top")
+		_items_scroll.scroll_vertical = 0
+		await get_tree().process_frame
+		await get_tree().process_frame
+		_update_arrow_position()
+	elif wrapped_to_bottom:
+		print("[ItemsPanel]   → Wrapped to BOTTOM, scrolling to bottom")
+		# Get the max scroll value
+		var max_scroll: int = _items_scroll.get_v_scroll_bar().max_value
+		_items_scroll.scroll_vertical = max_scroll
+		await get_tree().process_frame
+		await get_tree().process_frame
+		_update_arrow_position()
+	else:
+		# Normal navigation, auto-scroll first, then update arrow position
+		await _auto_scroll_to_selection()
+		_update_arrow_position()
+
+func _update_selection_highlight() -> void:
+	"""Update visual highlight on selected button"""
+	for i in range(_item_buttons.size()):
+		var button: Button = _item_buttons[i]
+		var is_selected: bool = (i == _selected_grid_index)
+
+		# Create style based on selection state
+		var style = StyleBoxFlat.new()
+		if is_selected:
+			# Selected: Sky Cyan background
+			style.bg_color = aCoreVibeTheme.COLOR_SKY_CYAN
+			style.border_width_left = 2
+			style.border_width_right = 2
+			style.border_width_top = 2
+			style.border_width_bottom = 2
+			style.border_color = aCoreVibeTheme.COLOR_ELECTRIC_LIME
+			button.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_INK_CHARCOAL)
+		else:
+			# Normal: Dark background
+			style.bg_color = Color(0.1, 0.1, 0.15, 0.8)
+			button.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE)
+
+		style.corner_radius_top_left = 4
+		style.corner_radius_top_right = 4
+		style.corner_radius_bottom_left = 4
+		style.corner_radius_bottom_right = 4
+
+		button.add_theme_stylebox_override("normal", style)
+		button.add_theme_stylebox_override("hover", style)
+		button.add_theme_stylebox_override("pressed", style)
+
+func _on_accept_pressed() -> void:
+	"""Handle Accept button press"""
+	if _selected_item_id == "" or not _defs.has(_selected_item_id):
+		return
+
+	var def: Dictionary = _defs[_selected_item_id]
+
+	# If it's a recovery item, trigger use button
+	if _is_recovery_item(def) and _use_button and _use_button.visible:
+		_on_use_button_pressed()
+	# For other items, trigger inspect
+	elif _inspect_button and _inspect_button.visible:
+		_on_inspect_button_pressed()
+
+func _on_visibility_changed() -> void:
+	if visible:
+		_rebuild()
+
+func _on_equipment_changed(_member: String) -> void:
+	_rebuild()
 
 func _on_use_button_pressed() -> void:
-	"""Handle Use button press"""
-	if _selected_item_id == "":
-		return
-
-	var def: Dictionary = _defs.get(_selected_item_id, {})
-	if not _is_recovery_item(def):
-		return
-
+	"""Use recovery item - show party picker popup"""
+	print("[ItemsPanel] Use button pressed for: %s" % _selected_item_id)
 	_show_member_selection_popup()
 
 func _on_inspect_button_pressed() -> void:
-	"""Handle Inspect button press"""
-	if _selected_item_id == "":
-		return
+	print("[ItemsPanel] Inspect button pressed for: %s" % _selected_item_id)
 
-	# TODO: Show detailed inspect dialog
-	print("[ItemsPanel] Inspect: ", _selected_item_id)
-
-func _on_equipment_changed(_member: String) -> void:
-	"""Handle equipment change"""
-	_rebuild()
+# ==============================================================================
+# Party Picker Popup Functions
+# ==============================================================================
 
 func _show_member_selection_popup() -> void:
 	"""Show popup to select which party member to use item on - matches StatusPanel pattern"""
@@ -739,11 +1330,20 @@ func _show_member_selection_popup() -> void:
 	get_tree().root.add_child(overlay)
 	get_tree().root.move_child(overlay, 0)
 
+	# Create background blocker to prevent clicking and controller input through
+	var blocker := ColorRect.new()
+	blocker.color = Color(0, 0, 0, 0.5)  # Semi-transparent black
+	blocker.mouse_filter = Control.MOUSE_FILTER_STOP  # Block all mouse input
+	blocker.set_anchors_preset(Control.PRESET_FULL_RECT)  # Fill entire screen
+	blocker.focus_mode = Control.FOCUS_ALL  # Allow it to receive input events
+	overlay.add_child(blocker)
+
 	# Create popup panel
 	var popup_panel: Panel = Panel.new()
 	popup_panel.process_mode = Node.PROCESS_MODE_ALWAYS
 	popup_panel.z_index = 100
 	popup_panel.modulate = Color(1, 1, 1, 0)  # Start transparent for fade in
+	popup_panel.mouse_filter = Control.MOUSE_FILTER_STOP  # Block input to elements behind
 	overlay.add_child(popup_panel)
 
 	# Apply consistent styling
@@ -818,7 +1418,6 @@ func _show_member_selection_popup() -> void:
 
 	# Update focus mode
 	_focus_mode = "party_picker"
-	_animate_panel_focus()
 
 	# Track active popup and overlay for cleanup
 	_active_popup = popup_panel
@@ -856,97 +1455,103 @@ func _fade_out_popup(popup: Panel) -> void:
 	tween.tween_property(popup, "modulate", Color(1, 1, 1, 0), 0.2)
 	await tween.finished
 
-func _grab_party_picker_focus() -> void:
-	"""Helper to grab focus on party picker"""
-	if _party_picker_list and is_instance_valid(_party_picker_list) and _party_picker_list.is_inside_tree():
-		_party_picker_list.grab_focus()
-
-func _input(event: InputEvent) -> void:
-	"""Handle input at same priority as GameMenu to block inputs when popup is active
-
-	Uses _input() instead of _unhandled_input() to have same priority as GameMenu,
-	allowing us to mark input as handled before GameMenu intercepts it.
-	"""
-	if not visible:
-		return
-
-	# Handle popup input at high priority to block GameMenu from seeing it
-	if _focus_mode == "party_picker":
-		if event.is_action_pressed("menu_accept"):
-			_on_party_picker_accept()
-			get_viewport().set_input_as_handled()
-			return
-		elif event.is_action_pressed("menu_back"):
-			# Find the popup panel to close
-			if _party_picker_list and is_instance_valid(_party_picker_list):
-				var popup = _party_picker_list.get_parent().get_parent()  # vbox -> popup_panel
-				if popup is Panel:
-					_close_member_selection_popup(popup, false)
-			get_viewport().set_input_as_handled()
-			return
-		else:
-			# Block all other inputs from reaching GameMenu
-			if event is InputEventKey or event is InputEventJoypadButton:
-				get_viewport().set_input_as_handled()
-			return
-
-func _unhandled_input(event: InputEvent) -> void:
-	"""Handle controller input for category and item navigation
-
-	Note: Popup input is handled in _input() at high priority to prevent
-	GameMenu from intercepting it.
-	"""
-	if not visible:
-		return
-
-	# Skip if popup is active - already handled in _input()
-	if _focus_mode == "party_picker":
-		return
-
-	# Handle focus switching
-	if _focus_mode == "category":
-		if event.is_action_pressed("menu_accept") or event.is_action_pressed("ui_right"):
-			# Move to item list if available
-			if _item_list and _item_list.item_count > 0:
-				_focus_mode = "items"
-				_item_list.grab_focus()
-				call_deferred("_animate_panel_focus")
-				get_viewport().set_input_as_handled()
-	elif _focus_mode == "items":
-		if event.is_action_pressed("menu_accept"):
-			# If Use button is visible (recovery item), trigger it
-			if _use_button and _use_button.visible:
-				_on_use_button_pressed()
-				get_viewport().set_input_as_handled()
-		elif event.is_action_pressed("menu_back") or event.is_action_pressed("ui_left"):
-			# Return to category list
-			_focus_mode = "category"
-			_category_list.grab_focus()
-			call_deferred("_animate_panel_focus")
-			get_viewport().set_input_as_handled()
-
 func _on_party_picker_accept() -> void:
 	"""Handle A button in party picker popup"""
+	print("[ItemsPanel] _on_party_picker_accept called")
+
 	if not _party_picker_list or not is_instance_valid(_party_picker_list):
+		print("[ItemsPanel] Party picker list is null or invalid")
 		return
 
 	var selected_indices: Array = _party_picker_list.get_selected_items()
+	print("[ItemsPanel] Selected indices: %s" % str(selected_indices))
 	if selected_indices.size() == 0:
+		print("[ItemsPanel] No items selected in party picker")
 		return
 
 	var index: int = selected_indices[0]
 	if index < 0 or index >= _party_member_tokens.size():
+		print("[ItemsPanel] Invalid index: %d (tokens size: %d)" % [index, _party_member_tokens.size()])
 		return
 
 	var member_token: String = _party_member_tokens[index]
+	print("[ItemsPanel] Using item on member: %s" % member_token)
 
-	# Find the popup panel to close
-	var popup = _party_picker_list.get_parent().get_parent()  # vbox -> popup_panel
-	if popup is Panel:
-		# Use item on member
-		_use_item_on_member(_item_to_use_id, _item_to_use_def, member_token)
-		# Close popup
-		_close_member_selection_popup(popup, true)
+	# Use item on member and get recovery message
+	var recovery_message: String = await _use_item_on_member(_item_to_use_id, _item_to_use_def, member_token)
+
+	# If there's a recovery message, convert the popup to show it
+	if recovery_message != "" and _active_popup and is_instance_valid(_active_popup):
+		await _show_recovery_in_popup(recovery_message)
+
+	# Close popup
+	if _active_popup and is_instance_valid(_active_popup):
+		_close_member_selection_popup(_active_popup, true)
+
+func _show_recovery_in_popup(message: String) -> void:
+	"""Convert the party picker popup to show recovery message in the same popup"""
+	print("[ItemsPanel] Converting popup to show recovery message: %s" % message)
+
+	if not _active_popup or not is_instance_valid(_active_popup):
+		return
+
+	# Get the VBox container from the popup
+	var vbox: VBoxContainer = null
+	for child in _active_popup.get_children():
+		if child is VBoxContainer:
+			vbox = child
+			break
+
+	if not vbox:
+		print("[ItemsPanel] Could not find VBox in popup")
+		return
+
+	# Clear all existing children from VBox
+	for child in vbox.get_children():
+		child.queue_free()
+
+	# Add recovery message label
+	var message_label := Label.new()
+	message_label.text = message
+	message_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	message_label.add_theme_font_size_override("font_size", 16)
+	vbox.add_child(message_label)
+
+	# Add OK button
+	var ok_btn := Button.new()
+	ok_btn.text = "OK"
+	ok_btn.custom_minimum_size = Vector2(100, 40)
+	ok_btn.focus_mode = Control.FOCUS_ALL
+	vbox.add_child(ok_btn)
+
+	# Wait for layout to update
+	await get_tree().process_frame
+	await get_tree().process_frame
+
+	# Resize popup
+	_active_popup.size = vbox.size + Vector2(40, 40)
+	vbox.position = Vector2(20, 20)
+
+	# Re-center popup
+	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
+	_active_popup.position = (viewport_size - _active_popup.size) / 2.0
+
+	# Give focus to OK button
+	ok_btn.call_deferred("grab_focus")
+
+	# Set focus mode for input handling
+	_focus_mode = "recovery_confirmation"
+	_active_popup.set_meta("ok_button", ok_btn)
+
+	print("[ItemsPanel] Popup converted to recovery confirmation, waiting for OK")
+
+	# Wait for OK button press
+	await ok_btn.pressed
+
+	print("[ItemsPanel] Recovery confirmation accepted")
+
+	# Reset focus mode back to party picker (will be cleaned up by close function)
+	_focus_mode = "party_picker"
 
 func _close_member_selection_popup(popup_panel: Panel, used_item: bool) -> void:
 	"""Close member selection popup and clean up"""
@@ -979,23 +1584,11 @@ func _close_member_selection_popup(popup_panel: Panel, used_item: bool) -> void:
 	# Return focus mode
 	_focus_mode = "items"
 
-	# If item was used, rebuild to refresh counts
-	if used_item:
-		_rebuild()
+	# If item was used, rebuild happens automatically via inventory_changed signal
+	# No need to manually rebuild here
 
-	# Grab focus back
-	if _item_list and _item_list.item_count > 0:
-		_item_list.grab_focus()
-		call_deferred("_animate_panel_focus")
-	else:
-		# No items in this category, return to category list
-		_focus_mode = "category"
-		if _category_list:
-			_category_list.grab_focus()
-			call_deferred("_animate_panel_focus")
-
-func _use_item_on_member(item_id: String, item_def: Dictionary, member_token: String) -> void:
-	"""Apply item effect to a party member"""
+func _use_item_on_member(item_id: String, item_def: Dictionary, member_token: String) -> String:
+	"""Apply item effect to a party member and return recovery message"""
 	print("[ItemsPanel] === USE ITEM START ===")
 	print("[ItemsPanel] Item ID: %s, Member: %s" % [item_id, member_token])
 	print("[ItemsPanel] Current _counts size: %d" % _counts.size())
@@ -1069,7 +1662,7 @@ func _use_item_on_member(item_id: String, item_def: Dictionary, member_token: St
 				healed = true
 				print("[ItemsPanel] Flat MP heal: %d -> %d (+%d)" % [mp, new_mp, heal_amount])
 
-	# Apply healing to GameState.member_data for persistence
+	# Apply healing to member_data in GameState for persistence
 	if healed and _gs:
 		var member_data: Variant = _gs.get("member_data") if _gs.has_method("get") else {}
 		if typeof(member_data) == TYPE_DICTIONARY:
@@ -1096,42 +1689,26 @@ func _use_item_on_member(item_id: String, item_def: Dictionary, member_token: St
 		_inv.call("remove_item", item_id, 1)
 		print("[ItemsPanel] Item consumed, inventory should emit signal now")
 
-	# Show confirmation
-	var member_name: String = _member_display_name(member_token)
-	var item_name: String = _display_name(item_id, item_def)
-	print("[ItemsPanel] Used %s on %s" % [item_name, member_name])
-
-	# Show heal confirmation toast if item had healing effect
+	# Build recovery message if item had healing effect
+	var recovery_message: String = ""
 	if healed:
-		# Calculate actual heal amounts
+		var member_name: String = _member_display_name(member_token)
 		var hp_healed: int = new_hp - hp
 		var mp_healed: int = new_mp - mp
 
-		# Build heal message
-		var heal_parts: Array[String] = []
+		# Build recovery message
+		var recovery_parts: Array[String] = []
 		if hp_healed > 0:
-			heal_parts.append("HP: +%d" % hp_healed)
+			recovery_parts.append("%d HP" % hp_healed)
 		if mp_healed > 0:
-			heal_parts.append("MP: +%d" % mp_healed)
+			recovery_parts.append("%d MP" % mp_healed)
 
-		var heal_message: String = "%s Healed %s" % [member_name, ", ".join(heal_parts)]
-
-		var overlay := CanvasLayer.new()
-		overlay.layer = 100
-		overlay.process_mode = Node.PROCESS_MODE_ALWAYS
-		overlay.process_priority = -1000  # CRITICAL: Process before GameMenu
-		get_tree().root.add_child(overlay)
-		get_tree().root.move_child(overlay, 0)
-
-		var popup := ToastPopup.create(heal_message, "Recovery")
-		popup.process_mode = Node.PROCESS_MODE_ALWAYS
-		overlay.add_child(popup)
-		await popup.confirmed
-		popup.queue_free()
-		overlay.queue_free()
+		if recovery_parts.size() > 0:
+			recovery_message = "%s recovered %s" % [member_name, " and ".join(recovery_parts)]
 
 	print("[ItemsPanel] _counts size after use: %d" % _counts.size())
 	print("[ItemsPanel] === USE ITEM END ===")
+	return recovery_message
 
 func _extract_number(text: String) -> RegExMatch:
 	"""Extract first number from text"""
@@ -1144,129 +1721,6 @@ func _extract_percentage(text: String) -> RegExMatch:
 	var regex: RegEx = RegEx.new()
 	regex.compile("(\\d+)\\s*%")
 	return regex.search(text)
-
-# ==============================================================================
-# Helper Functions
-# ==============================================================================
-
-func _display_name(item_id: String, def: Dictionary) -> String:
-	"""Get display name for an item"""
-	if def.has("sigil_instance") and def.has("name"):
-		return String(def["name"])
-	for key in ["name", "display_name", "label", "title"]:
-		if def.has(key):
-			var val: String = String(def[key]).strip_edges()
-			if val != "":
-				return val
-	return item_id.replace("_", " ").capitalize()
-
-func _category_of(def: Dictionary) -> String:
-	"""Get category of an item"""
-	# Check if it's a recovery item first (HP/MP healing)
-	if _is_recovery_item(def):
-		return "Recovery"
-
-	# Check if it's a capture item
-	if _is_capture_item(def):
-		return "Capture"
-
-	# Check if it's a gift item
-	if _is_gift_item(def):
-		return "Gifts"
-
-	# Check if it's equipment
-	if _is_equipment(def):
-		return "Equipment"
-
-	# Check if it's a battle consumable (not recovery, not capture, not gift)
-	if _is_battle_item(def):
-		return "Battle"
-
-	# Check category field for remaining types
-	for key in ["category", "cat", "type"]:
-		if def.has(key):
-			var cat: String = String(def[key]).strip_edges()
-			var norm: String = _normalize_category(cat)
-			if norm != "":
-				return norm
-	return "Other"
-
-func _normalize_category(cat: String) -> String:
-	"""Normalize category name"""
-	var key: String = cat.to_lower().strip_edges()
-
-	const MAP: Dictionary = {
-		"sigil": "Sigils", "sigils": "Sigils",
-		"material": "Material", "materials": "Material",
-		"key": "Key", "key item": "Key", "key items": "Key",
-		"gift": "Gifts", "gifts": "Gifts",
-		"other": "Other"
-	}
-
-	if MAP.has(key):
-		return MAP[key]
-	if CATEGORIES.has(cat):
-		return cat
-	return ""
-
-func _get_description(def: Dictionary) -> String:
-	"""Get item description"""
-	for key in ["description", "desc", "text", "info"]:
-		if def.has(key):
-			var val: String = String(def[key]).strip_edges()
-			if val != "":
-				return val
-	return ""
-
-func _get_effects(def: Dictionary) -> String:
-	"""Get item effects text"""
-	var effects: String = ""
-
-	if def.has("field_status_effect"):
-		effects += "Field: %s\n" % String(def["field_status_effect"])
-	if def.has("battle_status_effect"):
-		effects += "Battle: %s\n" % String(def["battle_status_effect"])
-
-	return effects.strip_edges()
-
-func _is_recovery_item(def: Dictionary) -> bool:
-	"""Check if item is a recovery item (HP/MP healing)"""
-	for key in ["field_status_effect", "battle_status_effect"]:
-		if def.has(key):
-			var effect: String = String(def[key]).to_lower()
-			if (effect.contains("heal") or effect.contains("restore")) and (effect.contains("hp") or effect.contains("mp")):
-				return true
-	return false
-
-func _is_capture_item(def: Dictionary) -> bool:
-	"""Check if item is a capture item (binds)"""
-	var cat: String = String(def.get("category", "")).to_lower()
-	if cat.contains("capture") or cat.contains("bind"):
-		return true
-	var name: String = String(def.get("name", "")).to_lower()
-	if name.contains("bind"):
-		return true
-	return false
-
-func _is_gift_item(def: Dictionary) -> bool:
-	"""Check if item is a gift item"""
-	var cat: String = String(def.get("category", "")).to_lower()
-	return cat.contains("gift")
-
-func _is_equipment(def: Dictionary) -> bool:
-	"""Check if item is equipment"""
-	var equip_slot: String = String(def.get("equip_slot", "")).to_lower().strip_edges()
-	return equip_slot in ["weapon", "armor", "head", "foot", "bracelet"]
-
-func _is_battle_item(def: Dictionary) -> bool:
-	"""Check if item is a battle consumable (not recovery, not capture, not gift)"""
-	var cat: String = String(def.get("category", "")).to_lower()
-	# Check if it's consumable but not already categorized
-	if cat.contains("consumable") or cat.contains("battle"):
-		# Make sure it's not recovery, capture, or gift
-		if not _is_recovery_item(def) and not _is_capture_item(def) and not _is_gift_item(def):
-			return true
-	return false
 
 func _gather_members() -> Array[String]:
 	"""Get all party member tokens"""
@@ -1301,88 +1755,49 @@ func _gather_members() -> Array[String]:
 
 	return members
 
-func _member_display_name(token: String) -> String:
-	"""Get display name for a party member"""
-	if token == "hero":
-		if _gs and _gs.has_method("get"):
-			var name: String = String(_gs.get("player_name"))
-			if name.strip_edges() != "":
-				return name
-		return "Player"
-
-	if _gs and _gs.has_method("_display_name_for_id"):
-		var name: Variant = _gs.call("_display_name_for_id", token)
-		if typeof(name) == TYPE_STRING and String(name) != "":
-			return String(name)
-
-	return token.capitalize()
-
-func _get_equipment(member: String) -> Dictionary:
-	"""Get equipped items for a member"""
-	if _gs and _gs.has_method("get_member_equip"):
-		var equip: Variant = _gs.call("get_member_equip", member)
-		if typeof(equip) == TYPE_DICTIONARY:
-			return equip
-	return {}
-
 func _get_member_hp_mp(member_token: String) -> Dictionary:
-	"""Get member HP/MP stats"""
-	var stats: Dictionary = {"hp": 0, "hp_max": 0, "mp": 0, "mp_max": 0}
+	"""Get member HP/MP stats - matches StatusPanel implementation"""
+	print("[ItemsPanel] Getting HP/MP for member: %s" % member_token)
 
-	# Get max HP/MP from pools
-	if _gs and _gs.has_method("compute_member_pools"):
-		var pools: Variant = _gs.call("compute_member_pools", member_token)
-		if typeof(pools) == TYPE_DICTIONARY:
-			stats["hp_max"] = int(pools.get("hp_max", 0))
-			stats["mp_max"] = int(pools.get("mp_max", 0))
+	# Default values
+	var hp_max: int = 150
+	var mp_max: int = 20
 
-	# Get current HP/MP from combat profiles
+	# Try to get combat profile for HP/MP (includes both current and max)
 	if _cps and _cps.has_method("get_profile"):
-		var profile: Variant = _cps.call("get_profile", member_token)
-		if typeof(profile) == TYPE_DICTIONARY:
-			stats["hp"] = int(profile.get("hp", stats["hp_max"]))
-			stats["mp"] = int(profile.get("mp", stats["mp_max"]))
-	else:
-		stats["hp"] = stats["hp_max"]
-		stats["mp"] = stats["mp_max"]
+		var p_v: Variant = _cps.call("get_profile", member_token)
+		print("[ItemsPanel]   get_profile returned type: %d, value: %s" % [typeof(p_v), str(p_v)])
+		if typeof(p_v) == TYPE_DICTIONARY:
+			var p: Dictionary = p_v
+			var hp_cur: int = int(p.get("hp", -1))
+			hp_max = int(p.get("hp_max", -1))
+			var mp_cur: int = int(p.get("mp", -1))
+			mp_max = int(p.get("mp_max", -1))
 
-	return stats
+			print("[ItemsPanel]   Extracted from profile: HP %d/%d, MP %d/%d" % [hp_cur, hp_max, mp_cur, mp_max])
 
-# ==============================================================================
-# Panel Animation
-# ==============================================================================
+			return {
+				"hp": hp_cur,
+				"hp_max": hp_max,
+				"mp": mp_cur,
+				"mp_max": mp_max
+			}
 
-func _animate_panel_focus() -> void:
-	"""Animate panels to highlight which one is currently active (only left and center animate)"""
-	if not _category_panel or not _item_panel or not _details_panel:
-		return
+	# Fallback: no profile data, compute max stats and assume full HP/MP
+	print("[ItemsPanel]   No profile found, using fallback")
+	if _gs and _gs.has_method("compute_member_pools"):
+		var pools_v: Variant = _gs.call("compute_member_pools", member_token)
+		print("[ItemsPanel]   compute_member_pools returned type: %d, value: %s" % [typeof(pools_v), str(pools_v)])
+		if typeof(pools_v) == TYPE_DICTIONARY:
+			var pools: Dictionary = pools_v
+			hp_max = int(pools.get("hp_max", hp_max))
+			mp_max = int(pools.get("mp_max", mp_max))
+			print("[ItemsPanel]   Extracted from pools: hp_max=%d, mp_max=%d" % [hp_max, mp_max])
 
-	var left_ratio := BASE_LEFT_RATIO
-	var center_ratio := BASE_CENTER_RATIO
-	var right_ratio := BASE_RIGHT_RATIO  # Details panel always stays at base size
-
-	# Determine which panel gets the active scale (only left and center panels animate)
-	match _focus_mode:
-		"category":
-			left_ratio = BASE_LEFT_RATIO * ACTIVE_SCALE
-			center_ratio = BASE_CENTER_RATIO * INACTIVE_SCALE
-			# right_ratio stays at BASE_RIGHT_RATIO
-		"items":
-			left_ratio = BASE_LEFT_RATIO * INACTIVE_SCALE
-			center_ratio = BASE_CENTER_RATIO * ACTIVE_SCALE
-			# right_ratio stays at BASE_RIGHT_RATIO
-		"party_picker":
-			# When party picker is active, shrink both left and center
-			left_ratio = BASE_LEFT_RATIO * INACTIVE_SCALE
-			center_ratio = BASE_CENTER_RATIO * INACTIVE_SCALE
-			# right_ratio stays at BASE_RIGHT_RATIO
-
-	# Create tweens for smooth animation
-	var tween := create_tween()
-	tween.set_parallel(true)
-	tween.set_trans(Tween.TRANS_CUBIC)
-	tween.set_ease(Tween.EASE_OUT)
-
-	tween.tween_property(_category_panel, "size_flags_stretch_ratio", left_ratio, ANIM_DURATION)
-	tween.tween_property(_item_panel, "size_flags_stretch_ratio", center_ratio, ANIM_DURATION)
-	tween.tween_property(_details_panel, "size_flags_stretch_ratio", right_ratio, ANIM_DURATION)
+	print("[ItemsPanel]   Final fallback stats: HP %d/%d, MP %d/%d" % [hp_max, hp_max, mp_max, mp_max])
+	return {
+		"hp": hp_max,
+		"hp_max": hp_max,
+		"mp": mp_max,
+		"mp_max": mp_max
+	}

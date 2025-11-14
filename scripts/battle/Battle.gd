@@ -1335,16 +1335,20 @@ func _get_member_display_name(member_id: String) -> String:
 	return member_id
 
 func _get_hero_display_name() -> String:
-	"""Get the hero/player character's display name"""
+	"""Get the hero/player character's first name"""
 	# Try to get from GameState
 	if gs and gs.has_method("get"):
 		var player_name_var = gs.get("player_name")
 		if player_name_var and typeof(player_name_var) == TYPE_STRING:
 			var player_name = String(player_name_var).strip_edges()
 			if player_name != "":
+				# Extract first name only
+				var space_index: int = player_name.find(" ")
+				if space_index > 0:
+					return player_name.substr(0, space_index)
 				return player_name
 
-	# Try current combatant
+	# Try current combatant (already has first name from BattleManager)
 	if current_combatant.get("id", "") == "hero":
 		var display = current_combatant.get("display_name", "")
 		if display != "":

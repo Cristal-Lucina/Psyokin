@@ -537,14 +537,29 @@ func recompute_now() -> void:
 	dorms_changed.emit()
 
 func display_name(aid: String) -> String:
+	# Use GameState's first name function if available
+	var gs: Node = get_node_or_null("/root/aGameState")
+	if gs and gs.has_method("_first_name_for_id"):
+		var v: Variant = gs.call("_first_name_for_id", aid)
+		if typeof(v) == TYPE_STRING and String(v) != "":
+			return String(v)
+
+	# Fallback: extract first name from full name
+	var full_name: String = ""
 	if aid == "hero":
-		var gs: Node = get_node_or_null("/root/aGameState")
 		if gs != null:
 			var nm_v: Variant = (gs.get("player_name") if gs.has_method("get") else "")
-			var nm: String = String(nm_v)
-			if nm.strip_edges() != "":
-				return nm
-	return String(_name_by_id.get(aid, aid.capitalize()))
+			full_name = String(nm_v).strip_edges()
+	else:
+		full_name = String(_name_by_id.get(aid, ""))
+
+	if full_name != "":
+		var space_index: int = full_name.find(" ")
+		if space_index > 0:
+			return full_name.substr(0, space_index)
+		return full_name
+
+	return aid.capitalize()
 
 # ───────────── queries ─────────────
 func list_rooms() -> PackedStringArray:

@@ -99,16 +99,56 @@ const ALT_MES_PATHS := [
 
 # Tab button definitions
 const TAB_DEFS: Dictionary = {
-	"stats":   {"title": "STATS"},
-	"perks":   {"title": "PERKS"},
-	"items":   {"title": "ITEMS"},
-	"loadout": {"title": "LOADOUT"},
-	"bonds":   {"title": "BONDS"},
-	"outreach":{"title": "OUTREACH"},
-	"dorms":   {"title": "DORMS"},
-	"calendar":{"title": "CALENDAR"},
-	"index":   {"title": "INDEX"},
-	"system":  {"title": "SYSTEM"},
+	"stats":   {
+		"title": "STATS",
+		"icon_dark": "res://assets/graphics/icons/UI/PNG and PSD - Dark/Icon set 1/2x/Asset 28@2x.png",
+		"icon_light": "res://assets/graphics/icons/UI/PNG and PSD - Light/Icon set 1/2x/Asset 28@2x.png"
+	},
+	"perks":   {
+		"title": "PERKS",
+		"icon_dark": "res://assets/graphics/icons/UI/PNG and PSD - Dark/Icon set 2/2x/Asset 83@2x.png",
+		"icon_light": "res://assets/graphics/icons/UI/PNG and PSD - Light/Icon set 2/2x/Asset 83@2x.png"
+	},
+	"items":   {
+		"title": "ITEMS",
+		"icon_dark": "res://assets/graphics/icons/UI/PNG and PSD - Dark/Icon set 2/2x/Asset 92@2x.png",
+		"icon_light": "res://assets/graphics/icons/UI/PNG and PSD - Light/Icon set 2/2x/Asset 92@2x.png"
+	},
+	"loadout": {
+		"title": "LOADOUT",
+		"icon_dark": "res://assets/graphics/icons/UI/PNG and PSD - Dark/Icon set 2/2x/Asset 54@2x.png",
+		"icon_light": "res://assets/graphics/icons/UI/PNG and PSD - Light/Icon set 2/2x/Asset 54@2x.png"
+	},
+	"bonds":   {
+		"title": "BONDS",
+		"icon_dark": "res://assets/graphics/icons/UI/PNG and PSD - Dark/Icon set 1/2x/Asset 73@2x.png",
+		"icon_light": "res://assets/graphics/icons/UI/PNG and PSD - Light/Icon set 1/2x/Asset 73@2x.png"
+	},
+	"outreach":{
+		"title": "OUTREACH",
+		"icon_dark": "res://assets/graphics/icons/UI/PNG and PSD - Dark/Icon set 2/2x/Asset 4@2x.png",
+		"icon_light": "res://assets/graphics/icons/UI/PNG and PSD - Light/Icon set 2/2x/Asset 4@2x.png"
+	},
+	"dorms":   {
+		"title": "DORMS",
+		"icon_dark": "res://assets/graphics/icons/UI/PNG and PSD - Dark/Icon set 1/2x/Asset 83@2x.png",
+		"icon_light": "res://assets/graphics/icons/UI/PNG and PSD - Light/Icon set 1/2x/Asset 83@2x.png"
+	},
+	"calendar":{
+		"title": "CALENDAR",
+		"icon_dark": "res://assets/graphics/icons/UI/PNG and PSD - Dark/Icon set 1/2x/Asset 49@2x.png",
+		"icon_light": "res://assets/graphics/icons/UI/PNG and PSD - Light/Icon set 1/2x/Asset 49@2x.png"
+	},
+	"index":   {
+		"title": "INDEX",
+		"icon_dark": "res://assets/graphics/icons/UI/PNG and PSD - Dark/Icon set 3/2x/Asset 73@2x.png",
+		"icon_light": "res://assets/graphics/icons/UI/PNG and PSD - Light/Icon set 3/2x/Asset 73@2x.png"
+	},
+	"system":  {
+		"title": "SYSTEM",
+		"icon_dark": "res://assets/graphics/icons/UI/PNG and PSD - Dark/Icon set 1/2x/Asset 71@2x.png",
+		"icon_light": "res://assets/graphics/icons/UI/PNG and PSD - Light/Icon set 1/2x/Asset 71@2x.png"
+	},
 }
 
 const TAB_ORDER: PackedStringArray = [
@@ -281,9 +321,46 @@ func _build_tab_buttons() -> void:
 		var meta: Dictionary = TAB_DEFS[tab_id]
 
 		var btn := Button.new()
-		btn.text = String(meta["title"])
+		btn.text = ""  # Clear text, we'll add icon+text as children
 		btn.custom_minimum_size = Vector2(160, 36)  # Rounded square proportions
-		btn.alignment = HORIZONTAL_ALIGNMENT_CENTER  # Center text
+		btn.alignment = HORIZONTAL_ALIGNMENT_LEFT  # Left-justify
+		btn.clip_contents = false  # Allow icon to be visible
+
+		# Create HBoxContainer for icon + text layout
+		var hbox := HBoxContainer.new()
+		hbox.add_theme_constant_override("separation", 8)
+		hbox.mouse_filter = Control.MOUSE_FILTER_IGNORE  # Let button handle clicks
+		hbox.set_anchors_preset(Control.PRESET_FULL_RECT)
+		hbox.offset_left = 8
+		hbox.offset_right = -8
+		hbox.offset_top = 0
+		hbox.offset_bottom = 0
+
+		# Add icon
+		if meta.has("icon_dark") and meta.has("icon_light"):
+			var icon_dark: Texture2D = load(String(meta["icon_dark"]))
+			var icon_light: Texture2D = load(String(meta["icon_light"]))
+			var icon_rect := TextureRect.new()
+			icon_rect.texture = icon_light  # Start with light (unselected)
+			icon_rect.custom_minimum_size = Vector2(22, 22)  # 22x22 icon size (30% smaller than 32x32)
+			icon_rect.size = Vector2(22, 22)  # Explicitly set size to constrain it
+			icon_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			icon_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			icon_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			# Store both textures in metadata
+			icon_rect.set_meta("icon_dark", icon_dark)
+			icon_rect.set_meta("icon_light", icon_light)
+			hbox.add_child(icon_rect)
+
+		# Add text label
+		var label := Label.new()
+		label.text = String(meta["title"])
+		label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		label.add_theme_font_size_override("font_size", 14)
+		hbox.add_child(label)
+
+		btn.add_child(hbox)
 
 		# Style with rounded square and tab-specific border color
 		_style_menu_button(btn, tab_id, false)
@@ -292,6 +369,10 @@ func _build_tab_buttons() -> void:
 		var button_index = _tab_buttons.size()
 		btn.pressed.connect(func(): _on_tab_button_pressed(button_index))
 		btn.focus_entered.connect(func(): _on_tab_button_focused(button_index))
+
+		# Store metadata for icon and label
+		btn.set_meta("icon_rect", hbox.get_child(0) if hbox.get_child_count() > 1 else null)
+		btn.set_meta("label", hbox.get_child(1) if hbox.get_child_count() > 1 else hbox.get_child(0))
 
 		_tab_button_container.add_child(btn)
 		_tab_buttons.append(btn)
@@ -381,20 +462,41 @@ func _style_menu_button(btn: Button, tab_id: String, is_selected: bool) -> void:
 	# Font size - increased by 3pts (was 13, now 16)
 	btn.add_theme_font_size_override("font_size", 16)
 
-	# Text color
+	# Text color (both for button font and label)
+	var text_color: Color
 	if is_selected:
 		# Selected: Deep dark grey
-		var dark_grey = Color(0.15, 0.15, 0.15)
-		btn.add_theme_color_override("font_color", dark_grey)
-		btn.add_theme_color_override("font_hover_color", dark_grey)
-		btn.add_theme_color_override("font_pressed_color", dark_grey)
-		btn.add_theme_color_override("font_focus_color", dark_grey)
+		text_color = Color(0.15, 0.15, 0.15)
+		btn.add_theme_color_override("font_color", text_color)
+		btn.add_theme_color_override("font_hover_color", text_color)
+		btn.add_theme_color_override("font_pressed_color", text_color)
+		btn.add_theme_color_override("font_focus_color", text_color)
 	else:
 		# Unselected: White
+		text_color = Color.WHITE
 		btn.add_theme_color_override("font_color", Color.WHITE)
 		btn.add_theme_color_override("font_hover_color", Color.WHITE)
 		btn.add_theme_color_override("font_pressed_color", Color.WHITE)
 		btn.add_theme_color_override("font_focus_color", Color.WHITE)
+
+	# Apply color to label if it exists
+	if btn.has_meta("label"):
+		var label = btn.get_meta("label")
+		if label and is_instance_valid(label):
+			label.add_theme_color_override("font_color", text_color)
+
+	# Swap icon texture based on selection
+	if btn.has_meta("icon_rect"):
+		var icon_rect = btn.get_meta("icon_rect")
+		if icon_rect and is_instance_valid(icon_rect):
+			if is_selected:
+				# Selected: Use dark icon
+				if icon_rect.has_meta("icon_dark"):
+					icon_rect.texture = icon_rect.get_meta("icon_dark")
+			else:
+				# Unselected: Use light icon
+				if icon_rect.has_meta("icon_light"):
+					icon_rect.texture = icon_rect.get_meta("icon_light")
 
 func _on_tab_button_pressed(index: int) -> void:
 	"""Handle tab button press"""
@@ -497,13 +599,13 @@ func _create_creds_perks_display() -> void:
 	container.grow_horizontal = Control.GROW_DIRECTION_BEGIN  # Grow left
 	container.grow_vertical = Control.GROW_DIRECTION_BEGIN    # Grow up
 
-	# Create CREDS cell
-	var creds_cell := _create_info_cell("CREDS", "0")
+	# Create CREDS cell with icon (light version)
+	var creds_cell := _create_info_cell("CREDS", "0", "res://assets/graphics/icons/UI/PNG and PSD - Light/Icon set 3/2x/Asset 12@2x.png")
 	container.add_child(creds_cell)
 	_creds_value_label = creds_cell.get_meta("value_label")
 
-	# Create PERKS cell
-	var perks_cell := _create_info_cell("PERKS", "0")
+	# Create PERKS cell with icon (light version, Icon set 2)
+	var perks_cell := _create_info_cell("PERKS", "0", "res://assets/graphics/icons/UI/PNG and PSD - Light/Icon set 2/2x/Asset 83@2x.png")
 	container.add_child(perks_cell)
 	_perks_value_label = perks_cell.get_meta("value_label")
 
@@ -598,8 +700,8 @@ func _hide_old_ui_elements() -> void:
 			parent.move_child(margin_wrapper, index)
 			margin_wrapper.add_child(left_panel)
 
-func _create_info_cell(label_text: String, initial_value: String) -> PanelContainer:
-	"""Create a single info cell with label and value
+func _create_info_cell(label_text: String, initial_value: String, icon_path: String = "") -> PanelContainer:
+	"""Create a single info cell with optional icon, label and value
 	Returns PanelContainer with 'value_label' meta for updating"""
 	var panel := PanelContainer.new()
 	panel.custom_minimum_size = Vector2(180, 40)  # Slightly increased for pill capsule
@@ -623,10 +725,21 @@ func _create_info_cell(label_text: String, initial_value: String) -> PanelContai
 	margin.add_theme_constant_override("margin_bottom", 6)
 	panel.add_child(margin)
 
-	# HBoxContainer to hold label and value
+	# HBoxContainer to hold icon, label and value
 	var hbox := HBoxContainer.new()
 	hbox.add_theme_constant_override("separation", 4)
 	margin.add_child(hbox)
+
+	# Icon (optional) - left side
+	if icon_path != "":
+		var icon_texture: Texture2D = load(icon_path)
+		var icon_rect := TextureRect.new()
+		icon_rect.texture = icon_texture
+		icon_rect.custom_minimum_size = Vector2(22, 22)  # 22x22 icon size (30% smaller than 32x32)
+		icon_rect.size = Vector2(22, 22)  # Explicitly set size to constrain it
+		icon_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		icon_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		hbox.add_child(icon_rect)
 
 	# Label - left justified, Core Vibe: Sky Cyan
 	var label := Label.new()
@@ -2612,15 +2725,31 @@ func _read_roster() -> Dictionary:
 
 func _label_for_id(pid: String, roster: Dictionary = {}) -> String:
 	if pid == "hero": return _safe_hero_name()
+
+	# Use first name only from GameState if available
+	if _gs and _gs.has_method("_first_name_for_id"):
+		var v: Variant = _gs.call("_first_name_for_id", pid)
+		if typeof(v) == TYPE_STRING and String(v) != "":
+			return String(v)
+
+	# Fallback: extract first name from roster or CSV
+	var full_name: String = ""
 	if roster.has(pid):
 		var rec: Dictionary = roster[pid]
 		if rec.has("name") and typeof(rec["name"]) == TYPE_STRING and String(rec["name"]).strip_edges() != "":
-			return String(rec["name"])
+			full_name = String(rec["name"])
 	# CSV fallback
-	if _csv_by_id.has(pid):
+	if full_name == "" and _csv_by_id.has(pid):
 		var row: Dictionary = _csv_by_id[pid]
-		var nm: String = String(row.get("name",""))
-		if nm != "": return nm
+		full_name = String(row.get("name",""))
+
+	# Extract first name
+	if full_name != "":
+		var space_index: int = full_name.find(" ")
+		if space_index > 0:
+			return full_name.substr(0, space_index)
+		return full_name
+
 	return (pid.capitalize() if pid != "" else "")
 
 func _gather_active_entries(roster: Dictionary) -> Array:
@@ -2720,7 +2849,12 @@ func _safe_hero_name() -> String:
 	if _gs and _gs.has_method("get"):
 		var v: Variant = _gs.get("player_name")
 		if typeof(v) == TYPE_STRING and String(v).strip_edges() != "":
-			return String(v)
+			var full_name: String = String(v)
+			# Extract first name only
+			var space_index: int = full_name.find(" ")
+			if space_index > 0:
+				return full_name.substr(0, space_index)
+			return full_name
 	return "Player"
 
 func _safe_hero_level() -> int:
