@@ -906,23 +906,36 @@ func _rebuild_sigils(member_token: String) -> void:
 	# Always create 8 slots, but hide ones beyond bracelet capacity
 	var total_slots: int = 8
 	for idx in range(total_slots):
+		var cur_id: String = (String(sockets[idx]) if idx < sockets.size() else "")
+
+		# Create HBox to hold icon + label
+		var hbox: HBoxContainer = HBoxContainer.new()
+		hbox.custom_minimum_size = Vector2(180, 0)
+		hbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+
+		# Add icon if sigil is equipped
+		if cur_id != "":
+			var icon: TextureRect = _create_sigil_icon(cur_id)
+			if icon:
+				hbox.add_child(icon)
+
+		# Create label
 		var nm: Label = Label.new()
-		nm.custom_minimum_size = Vector2(180, 0)  # Match equipment label width
 		nm.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		nm.add_theme_font_size_override("font_size", 12)
-
-		var cur_id: String = (String(sockets[idx]) if idx < sockets.size() else "")
 		nm.text = (_sigil_disp(cur_id) if cur_id != "" else "(empty)")
 
 		# Core Vibe: Make equipped sigil names Electric Lime
 		if cur_id != "":
 			nm.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_ELECTRIC_LIME)
 
+		hbox.add_child(nm)
+
 		# Hide slots beyond bracelet capacity
 		if idx >= cap:
-			nm.visible = false
+			hbox.visible = false
 
-		_sigils_list.add_child(nm)
+		_sigils_list.add_child(hbox)
 
 		# Always show "Equip" button - popup will handle unequip option
 		var btn: Button = Button.new()
@@ -1251,6 +1264,9 @@ func _set_slot_value(label: Label, id: String, slot: String) -> void:
 	if label == null:
 		return
 
+	# Get the parent HBox to add icon to
+	var parent_hbox: HBoxContainer = label.get_parent() as HBoxContainer
+
 	if id == "" or id == "—":
 		# Empty slot - show placeholder with grey color
 		var placeholder: String = ""
@@ -1265,6 +1281,9 @@ func _set_slot_value(label: Label, id: String, slot: String) -> void:
 		label.text = placeholder
 		# Core Vibe: Dimmed Milk White for empty slots
 		label.add_theme_color_override("font_color", Color(aCoreVibeTheme.COLOR_MILK_WHITE.r, aCoreVibeTheme.COLOR_MILK_WHITE.g, aCoreVibeTheme.COLOR_MILK_WHITE.b, 0.4))
+
+		# Hide icon if exists
+		_hide_equipment_icon(parent_hbox)
 	else:
 		# Has equipment - show item name
 		var item_name: String = id
@@ -1275,6 +1294,117 @@ func _set_slot_value(label: Label, id: String, slot: String) -> void:
 		label.text = item_name
 		# Core Vibe: Electric Lime for equipped items
 		label.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_ELECTRIC_LIME)
+
+		# Add/update icon
+		_set_equipment_icon(parent_hbox, id)
+
+func _create_sigil_icon(instance_id: String) -> TextureRect:
+	"""Create an icon TextureRect for a sigil instance"""
+	if not _sig:
+		return null
+
+	# Get the base sigil ID from the instance
+	var base_id: String = ""
+	if _sig.has_method("get_base_id"):
+		var v: Variant = _sig.call("get_base_id", instance_id)
+		if typeof(v) == TYPE_STRING:
+			base_id = String(v)
+
+	if base_id == "":
+		return null
+
+	# Get item definition to find icon number
+	var item_def: Dictionary = {}
+	if _csv and _csv.has_method("get_item"):
+		var v: Variant = _csv.call("get_item", base_id)
+		if typeof(v) == TYPE_DICTIONARY:
+			item_def = v as Dictionary
+
+	# Check if item has icon
+	if not item_def.has("icon") or item_def["icon"] == null:
+		return null
+
+	var icon_value = item_def["icon"]
+	# Skip if icon is empty string or "null" string
+	if typeof(icon_value) == TYPE_STRING and (icon_value == "" or icon_value == "null"):
+		return null
+
+	# Convert to string and pad to 4 digits
+	var icon_num: String = str(icon_value).pad_zeros(4)
+	var icon_path: String = "res://assets/graphics/items/individual/item_%s.png" % icon_num
+
+	if not ResourceLoader.exists(icon_path):
+		return null
+
+	# Create icon TextureRect
+	var icon: TextureRect = TextureRect.new()
+	icon.custom_minimum_size = Vector2(24, 24)  # Small icon
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	# Load and set texture
+	var icon_texture: Texture2D = load(icon_path)
+	icon.texture = icon_texture
+
+	return icon
+
+func _hide_equipment_icon(hbox: HBoxContainer) -> void:
+	"""Hide or remove the icon from equipment slot"""
+	if not hbox:
+		return
+	var icon: TextureRect = hbox.get_node_or_null("EquipIcon")
+	if icon:
+		icon.visible = false
+
+func _set_equipment_icon(hbox: HBoxContainer, item_id: String) -> void:
+	"""Set the icon for an equipped item"""
+	if not hbox:
+		return
+
+	# Get item definition to find icon number
+	var item_def: Dictionary = {}
+	if _csv and _csv.has_method("get_item"):
+		var v: Variant = _csv.call("get_item", item_id)
+		if typeof(v) == TYPE_DICTIONARY:
+			item_def = v as Dictionary
+
+	# Check if item has icon
+	if not item_def.has("icon") or item_def["icon"] == null:
+		_hide_equipment_icon(hbox)
+		return
+
+	var icon_value = item_def["icon"]
+	# Skip if icon is empty string or "null" string
+	if typeof(icon_value) == TYPE_STRING and (icon_value == "" or icon_value == "null"):
+		_hide_equipment_icon(hbox)
+		return
+
+	# Convert to string and pad to 4 digits
+	var icon_num: String = str(icon_value).pad_zeros(4)
+	var icon_path: String = "res://assets/graphics/items/individual/item_%s.png" % icon_num
+
+	if not ResourceLoader.exists(icon_path):
+		_hide_equipment_icon(hbox)
+		return
+
+	# Get or create icon TextureRect
+	var icon: TextureRect = hbox.get_node_or_null("EquipIcon")
+	if not icon:
+		icon = TextureRect.new()
+		icon.name = "EquipIcon"
+		icon.custom_minimum_size = Vector2(24, 24)  # Small icon
+		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		# Add icon before the label
+		hbox.add_child(icon)
+		hbox.move_child(icon, 0)
+
+	# Load and set texture
+	var icon_texture: Texture2D = load(icon_path)
+	icon.texture = icon_texture
+	icon.visible = true
 
 func _list_equippable(member_token: String, slot: String) -> PackedStringArray:
 	if _eq and _eq.has_method("list_equippable"):
