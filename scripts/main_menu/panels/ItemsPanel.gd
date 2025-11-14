@@ -734,6 +734,19 @@ func _populate_items() -> void:
 				button_text = "%s x%d [%s]" % [name, qty, equipped_members]
 
 		button.text = button_text
+
+		# Load and set item icon if available
+		if def.has("icon") and def["icon"] != null and def["icon"] != "null" and def["icon"] != "":
+			var icon_num: String = str(def["icon"])
+			# Pad icon number to 4 digits
+			icon_num = icon_num.pad_zeros(4)
+			var icon_path: String = "res://assets/graphics/items/individual/item_%s.png" % icon_num
+			if ResourceLoader.exists(icon_path):
+				var icon_texture: Texture2D = load(icon_path)
+				button.icon = icon_texture
+				button.icon_alignment = HORIZONTAL_ALIGNMENT_LEFT
+				button.expand_icon = true
+
 		button.custom_minimum_size = Vector2(284, 40)  # Decreased width by 10px to 284
 		button.alignment = HORIZONTAL_ALIGNMENT_LEFT  # Left-justify text
 		button.focus_mode = Control.FOCUS_NONE  # Disable built-in focus navigation
