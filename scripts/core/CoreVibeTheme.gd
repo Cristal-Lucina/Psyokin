@@ -154,6 +154,44 @@ func style_button(
 	button.add_theme_color_override("font_pressed_color", COLOR_MILK_WHITE)
 	button.add_theme_color_override("font_disabled_color", Color(0.5, 0.5, 0.5))
 
+## Apply button styles with inverted focus state (normal dark button, bright when focused)
+func style_button_with_focus_invert(
+	button: Button,
+	accent_color: Color = COLOR_SKY_CYAN,
+	corner_radius: int = CORNER_RADIUS_LARGE
+) -> void:
+	var styles = create_button_styles(accent_color, corner_radius)
+
+	# Normal, hover, pressed, disabled - use standard dark button styles
+	button.add_theme_stylebox_override("normal", styles.normal)
+	button.add_theme_stylebox_override("hover", styles.hover)
+	button.add_theme_stylebox_override("pressed", styles.pressed)
+	button.add_theme_stylebox_override("disabled", styles.disabled)
+
+	# Focus state - inverted (bright background, dark text)
+	var focus = StyleBoxFlat.new()
+	focus.bg_color = accent_color
+	focus.border_width_left = 0
+	focus.border_width_right = 0
+	focus.border_width_top = 0
+	focus.border_width_bottom = 0
+	focus.corner_radius_top_left = corner_radius
+	focus.corner_radius_top_right = corner_radius
+	focus.corner_radius_bottom_left = corner_radius
+	focus.corner_radius_bottom_right = corner_radius
+	focus.shadow_color = Color(accent_color.r, accent_color.g, accent_color.b, 0.6)
+	focus.shadow_size = SHADOW_SIZE_MEDIUM
+	button.add_theme_stylebox_override("focus", focus)
+
+	# Font colors - normal states use white text
+	button.add_theme_color_override("font_color", COLOR_MILK_WHITE)
+	button.add_theme_color_override("font_hover_color", accent_color)
+	button.add_theme_color_override("font_pressed_color", COLOR_MILK_WHITE)
+	button.add_theme_color_override("font_disabled_color", Color(0.5, 0.5, 0.5))
+
+	# Focus state uses dark text
+	button.add_theme_color_override("font_focus_color", COLOR_NIGHT_NAVY)
+
 ## ═══════════════════════════════════════════════════════════════════════════════
 ## TAB STYLE CREATION
 ## ═══════════════════════════════════════════════════════════════════════════════
