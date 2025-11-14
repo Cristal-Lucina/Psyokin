@@ -598,13 +598,13 @@ func _create_creds_perks_display() -> void:
 	container.grow_horizontal = Control.GROW_DIRECTION_BEGIN  # Grow left
 	container.grow_vertical = Control.GROW_DIRECTION_BEGIN    # Grow up
 
-	# Create CREDS cell with icon
-	var creds_cell := _create_info_cell("CREDS", "0", "res://assets/graphics/icons/UI/PNG and PSD - Dark/Icon set 3/2x/Asset 12@2x.png")
+	# Create CREDS cell with icon (light version)
+	var creds_cell := _create_info_cell("CREDS", "0", "res://assets/graphics/icons/UI/PNG and PSD - Light/Icon set 3/2x/Asset 12@2x.png")
 	container.add_child(creds_cell)
 	_creds_value_label = creds_cell.get_meta("value_label")
 
-	# Create PERKS cell with icon
-	var perks_cell := _create_info_cell("PERKS", "0", "res://assets/graphics/icons/UI/PNG and PSD - Dark/Icon set 1/2x/Asset 83@2x.png")
+	# Create PERKS cell with icon (light version, Icon set 2)
+	var perks_cell := _create_info_cell("PERKS", "0", "res://assets/graphics/icons/UI/PNG and PSD - Light/Icon set 2/2x/Asset 83@2x.png")
 	container.add_child(perks_cell)
 	_perks_value_label = perks_cell.get_meta("value_label")
 
