@@ -1589,6 +1589,10 @@ func _show_recovery_confirmation(message: String) -> void:
 	"""Show recovery confirmation popup"""
 	print("[ItemsPanel] Showing recovery confirmation: %s" % message)
 
+	# PAUSE THE GAME TREE
+	get_tree().paused = true
+	print("[ItemsPanel] Game tree PAUSED")
+
 	# Create CanvasLayer overlay (for paused context)
 	var overlay := CanvasLayer.new()
 	overlay.layer = 100
@@ -1675,6 +1679,10 @@ func _show_recovery_confirmation(message: String) -> void:
 		popup_panel.queue_free()
 	if overlay and is_instance_valid(overlay):
 		overlay.queue_free()
+
+	# UNPAUSE THE GAME TREE
+	get_tree().paused = false
+	print("[ItemsPanel] Game tree UNPAUSED")
 
 	print("[ItemsPanel] Recovery confirmation closed")
 
