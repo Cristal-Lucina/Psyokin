@@ -76,6 +76,21 @@ const ANIM_DURATION := 0.2  # Animation duration in seconds
 @onready var _party_list: ItemList       = get_node("Row/Party/Margin/VBox/PartyList") as ItemList
 # @onready var _member_name: Label         = get_node("Row/Middle/Margin/VBox/MemberName") as Label  # Removed
 
+# Section header labels
+@onready var _party_label: Label = get_node_or_null("Row/Party/Margin/VBox/PartyLabel") as Label
+@onready var _mind_type_label: Label = get_node_or_null("Row/Middle/Margin/VBox/MindSection/MindLabel") as Label
+@onready var _equipment_label: Label = get_node_or_null("Row/Middle/Margin/VBox/EquipmentLabel") as Label
+@onready var _details_label: Label = get_node_or_null("Row/StatsColumn/Margin/VBox/DetailsLabel") as Label
+@onready var _attributes_label: Label = get_node_or_null("Row/StatsColumn/Margin/VBox/StatsLabel") as Label
+
+# Equipment slot labels (Weapon:, Armor:, etc.)
+@onready var _w_label: Label = get_node_or_null("Row/Middle/Margin/VBox/Grid/WLabel") as Label
+@onready var _a_label: Label = get_node_or_null("Row/Middle/Margin/VBox/Grid/ALabel") as Label
+@onready var _h_label: Label = get_node_or_null("Row/Middle/Margin/VBox/Grid/HLabel") as Label
+@onready var _f_label: Label = get_node_or_null("Row/Middle/Margin/VBox/Grid/FLabel") as Label
+@onready var _b_label: Label = get_node_or_null("Row/Middle/Margin/VBox/Grid/BLabel") as Label
+
+# Equipment value labels (item names)
 @onready var _w_val: Label = get_node("Row/Middle/Margin/VBox/Grid/WHBox/WValue") as Label
 @onready var _a_val: Label = get_node("Row/Middle/Margin/VBox/Grid/AHBox/AValue") as Label
 @onready var _h_val: Label = get_node("Row/Middle/Margin/VBox/Grid/HHBox/HValue") as Label
@@ -94,8 +109,7 @@ const ANIM_DURATION := 0.2  # Animation duration in seconds
 
 @onready var _stats_grid:  GridContainer = get_node("Row/StatsColumn/Margin/VBox/StatsGrid") as GridContainer
 @onready var _details_content: RichTextLabel = %DetailsContent
-@onready var _mind_value:  Label         = get_node_or_null("Row/Middle/Margin/VBox/MindSection/MindRow/Value") as Label
-@onready var _mind_section: VBoxContainer = get_node_or_null("Row/Middle/Margin/VBox/MindSection") as VBoxContainer
+@onready var _mind_value:  Control       = get_node_or_null("Row/Middle/Margin/VBox/MindSection/MindRow/Value") as Control  # Can be Label or RichTextLabel
 @onready var _mind_switch_btn: Button    = %SwitchBtn
 
 var _labels: PackedStringArray = PackedStringArray()
@@ -244,6 +258,9 @@ func _apply_core_vibe_styling() -> void:
 			aCoreVibeTheme.SHADOW_SIZE_MEDIUM         # 6px glow
 		)
 		_middle_panel.add_theme_stylebox_override("panel", middle_style)
+		# Set minimum size to prevent squashing when equipment icons aren't present
+		# Icons are taller than text, so we lock it to the "full equipment" size
+		_middle_panel.custom_minimum_size = Vector2(405, 585)
 
 	if _stats_panel:
 		var stats_style = aCoreVibeTheme.create_panel_style(
@@ -261,17 +278,41 @@ func _apply_core_vibe_styling() -> void:
 		_party_list.add_theme_color_override("font_selected_color", aCoreVibeTheme.COLOR_SKY_CYAN)
 		_party_list.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE)
 
-	# Style equipment slot labels
+	# Style section headers (Bubble Magenta)
+	if _party_label:
+		aCoreVibeTheme.style_label(_party_label, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA, 16)
+	if _mind_type_label:
+		aCoreVibeTheme.style_label(_mind_type_label, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA, 16)
+	if _equipment_label:
+		aCoreVibeTheme.style_label(_equipment_label, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA, 16)
+	if _details_label:
+		aCoreVibeTheme.style_label(_details_label, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA, 16)
+	if _attributes_label:
+		aCoreVibeTheme.style_label(_attributes_label, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA, 16)
+
+	# Style equipment slot labels (Milk White)
+	if _w_label:
+		aCoreVibeTheme.style_label(_w_label, aCoreVibeTheme.COLOR_MILK_WHITE, 12)
+	if _a_label:
+		aCoreVibeTheme.style_label(_a_label, aCoreVibeTheme.COLOR_MILK_WHITE, 12)
+	if _h_label:
+		aCoreVibeTheme.style_label(_h_label, aCoreVibeTheme.COLOR_MILK_WHITE, 12)
+	if _f_label:
+		aCoreVibeTheme.style_label(_f_label, aCoreVibeTheme.COLOR_MILK_WHITE, 12)
+	if _b_label:
+		aCoreVibeTheme.style_label(_b_label, aCoreVibeTheme.COLOR_MILK_WHITE, 12)
+
+	# Style equipment value labels / item names (Sky Cyan)
 	if _w_val:
-		aCoreVibeTheme.style_label(_w_val, aCoreVibeTheme.COLOR_ELECTRIC_LIME, 12)
+		aCoreVibeTheme.style_label(_w_val, aCoreVibeTheme.COLOR_SKY_CYAN, 12)
 	if _a_val:
-		aCoreVibeTheme.style_label(_a_val, aCoreVibeTheme.COLOR_ELECTRIC_LIME, 12)
+		aCoreVibeTheme.style_label(_a_val, aCoreVibeTheme.COLOR_SKY_CYAN, 12)
 	if _h_val:
-		aCoreVibeTheme.style_label(_h_val, aCoreVibeTheme.COLOR_ELECTRIC_LIME, 12)
+		aCoreVibeTheme.style_label(_h_val, aCoreVibeTheme.COLOR_SKY_CYAN, 12)
 	if _f_val:
-		aCoreVibeTheme.style_label(_f_val, aCoreVibeTheme.COLOR_ELECTRIC_LIME, 12)
+		aCoreVibeTheme.style_label(_f_val, aCoreVibeTheme.COLOR_SKY_CYAN, 12)
 	if _b_val:
-		aCoreVibeTheme.style_label(_b_val, aCoreVibeTheme.COLOR_ELECTRIC_LIME, 12)
+		aCoreVibeTheme.style_label(_b_val, aCoreVibeTheme.COLOR_SKY_CYAN, 12)
 
 	# Style equipment buttons
 	if _w_btn:
@@ -285,21 +326,20 @@ func _apply_core_vibe_styling() -> void:
 	if _b_btn:
 		aCoreVibeTheme.style_button(_b_btn, aCoreVibeTheme.COLOR_SKY_CYAN, aCoreVibeTheme.CORNER_RADIUS_SMALL)
 
-	# Style sigils title
+	# Style sigils title (Bubble Magenta)
 	if _sigils_title:
-		aCoreVibeTheme.style_label(_sigils_title, aCoreVibeTheme.COLOR_GRAPE_VIOLET, 16)
+		aCoreVibeTheme.style_label(_sigils_title, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA, 16)
 
 	# Style manage sigils button
 	if _btn_manage:
 		aCoreVibeTheme.style_button(_btn_manage, aCoreVibeTheme.COLOR_ELECTRIC_LIME, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
 
-	# Style mind section
-	if _mind_value:
-		aCoreVibeTheme.style_label(_mind_value, aCoreVibeTheme.COLOR_CITRUS_YELLOW, 14)
+	# Style mind section - will be set per-text in _refresh_mind_row
+	# (Base color Milk White, with Sky Cyan for player active type)
 
 	# Style switch button
 	if _mind_switch_btn:
-		aCoreVibeTheme.style_button(_mind_switch_btn, aCoreVibeTheme.COLOR_PLASMA_TEAL, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
+		aCoreVibeTheme.style_button(_mind_switch_btn, aCoreVibeTheme.COLOR_SKY_CYAN, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
 
 	# Style details content
 	if _details_content:
@@ -339,6 +379,15 @@ func _refresh_all_for_current() -> void:
 		return
 
 	var equip: Dictionary = _fetch_equip_for(cur)
+
+	# DEBUG: Print equipment loadout
+	print("[DEBUG] Refreshing loadout for %s" % cur)
+	print("  Weapon: %s" % equip.get("weapon", "(none)"))
+	print("  Armor: %s" % equip.get("armor", "(none)"))
+	print("  Head: %s" % equip.get("head", "(none)"))
+	print("  Foot: %s" % equip.get("foot", "(none)"))
+	print("  Bracelet: %s" % equip.get("bracelet", "(none)"))
+
 	_set_slot_value(_w_val, String(equip.get("weapon","")), "weapon")
 	_set_slot_value(_a_val, String(equip.get("armor","")), "armor")
 	_set_slot_value(_h_val, String(equip.get("head","")), "head")
@@ -356,6 +405,9 @@ func _refresh_all_for_current() -> void:
 	# Only restore focus if we're actively in equipment mode
 	if _nav_state == NavState.EQUIPMENT_NAV:
 		call_deferred("_restore_equipment_focus")
+
+	# DEBUG: Print panel sizes after layout
+	call_deferred("_debug_print_panel_sizes")
 
 func _on_sigil_instances_updated(_a=null,_b=null,_c=null) -> void:
 	_refresh_all_for_current()
@@ -478,10 +530,10 @@ func _current_token() -> String:
 	return (_tokens[i] if i >= 0 and i < _tokens.size() else "")
 
 func _on_party_selected(index: int) -> void:
-	var label: String = "(Unknown)"
+	var _label: String = "(Unknown)"
 	if index >= 0 and index < _labels.size():
-		label = _labels[index]
-	# _member_name.text = label.to_upper()  # Removed
+		_label = _labels[index]
+	# _member_name.text = _label.to_upper()  # Removed
 
 	_refresh_all_for_current()
 	_sigils_sig = _snapshot_sigil_signature(_current_token())
@@ -583,7 +635,7 @@ func _build_equipment_comparison_panel(item_id: String, slot: String, current_st
 		name_label.add_theme_color_override("font_color", Color(aCoreVibeTheme.COLOR_MILK_WHITE.r, aCoreVibeTheme.COLOR_MILK_WHITE.g, aCoreVibeTheme.COLOR_MILK_WHITE.b, 0.4))
 	else:
 		name_label.text = _pretty_item(item_id)
-		name_label.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_ELECTRIC_LIME)
+		name_label.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_SKY_CYAN)
 	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	name_label.add_theme_font_size_override("font_size", 12)
 	vbox.add_child(name_label)
@@ -878,6 +930,61 @@ func _sigil_disp(inst_id: String) -> String:
 	result = "%s  (%s)%s" % [disp_name, lv_str, star]
 	return result
 
+func _sigil_disp_formatted(inst_id: String) -> String:
+	"""Format sigil display with BBCode colors: name (Milk White) + level (Milk White) + active skill (Sky Cyan)"""
+	if inst_id == "":
+		return "(empty)"
+
+	# Get base and instance data
+	var base_id: String = inst_id
+	if _sig and _sig.has_method("get_base_from_instance"):
+		base_id = String(_sig.call("get_base_from_instance", inst_id))
+
+	var disp_name: String = base_id
+	if _sig and _sig.has_method("get_display_name_for"):
+		var n_v: Variant = _sig.call("get_display_name_for", base_id)
+		if typeof(n_v) == TYPE_STRING:
+			disp_name = String(n_v)
+
+	var lv: int = 1
+	if _sig and _sig.has_method("get_instance_level"):
+		lv = int(_sig.call("get_instance_level", inst_id))
+
+	var lv_str: String = ("MAX" if lv >= 4 else "Lv %d" % lv)
+
+	# Build formatted string with colors
+	var milk_white_hex: String = "#F4F7FB"
+	var sky_cyan_hex: String = "#4DE9FF"
+
+	var result: String = "[color=%s]%s  (%s)[/color]" % [milk_white_hex, disp_name, lv_str]
+
+	# Add active skill in Sky Cyan
+	if _sig and _sig.has_method("get_active_skill_name_for_instance"):
+		var a_v: Variant = _sig.call("get_active_skill_name_for_instance", inst_id)
+		if typeof(a_v) == TYPE_STRING and String(a_v).strip_edges() != "":
+			result += "  —  [color=%s]★ %s[/color]" % [sky_cyan_hex, String(a_v)]
+
+	return result
+
+func _create_empty_sigil_icon() -> TextureRect:
+	"""Create item_1906 icon for empty sigil slot"""
+	var icon_path: String = "res://assets/graphics/items/individual/item_1906.png"
+
+	if not ResourceLoader.exists(icon_path):
+		return null
+
+	var icon: TextureRect = TextureRect.new()
+	icon.name = "SigilIcon"
+	icon.custom_minimum_size = Vector2(24, 24)
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	var icon_texture: Texture2D = load(icon_path)
+	icon.texture = icon_texture
+
+	return icon
+
 func _rebuild_sigils(member_token: String) -> void:
 	if _sigils_list == null:
 		return
@@ -899,6 +1006,9 @@ func _rebuild_sigils(member_token: String) -> void:
 	for s in sockets:
 		if String(s) != "": used += 1
 
+	# DEBUG: Print sigil rebuild info
+	print("[DEBUG] Rebuilding sigils for %s: capacity=%d, used=%d, total_slots=8" % [member_token, cap, used])
+
 	# Title shows actual capacity from bracelet
 	if _sigils_title:
 		_sigils_title.text = "SIGILS  (%d/%d)" % [used, cap]
@@ -913,21 +1023,33 @@ func _rebuild_sigils(member_token: String) -> void:
 		hbox.custom_minimum_size = Vector2(180, 0)
 		hbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
-		# Add icon if sigil is equipped
+		# Add icon if sigil is equipped or show item_1906 for empty
 		if cur_id != "":
 			var icon: TextureRect = _create_sigil_icon(cur_id)
 			if icon:
 				hbox.add_child(icon)
+		else:
+			# Show item_1906 icon for empty slots
+			var empty_icon: TextureRect = _create_empty_sigil_icon()
+			if empty_icon:
+				hbox.add_child(empty_icon)
 
-		# Create label
-		var nm: Label = Label.new()
+		# Create label with color formatting
+		var nm: RichTextLabel = RichTextLabel.new()
 		nm.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		nm.add_theme_font_size_override("font_size", 12)
-		nm.text = (_sigil_disp(cur_id) if cur_id != "" else "(empty)")
+		nm.custom_minimum_size = Vector2(0, 24)  # Minimum height
+		nm.fit_content = true
+		nm.scroll_active = false
+		nm.bbcode_enabled = true
+		nm.add_theme_font_size_override("normal_font_size", 12)
+		nm.add_theme_color_override("default_color", aCoreVibeTheme.COLOR_MILK_WHITE)
 
-		# Core Vibe: Make equipped sigil names Electric Lime
 		if cur_id != "":
-			nm.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_ELECTRIC_LIME)
+			nm.text = _sigil_disp_formatted(cur_id)
+		else:
+			# Empty slot - grey text
+			nm.add_theme_color_override("default_color", Color(aCoreVibeTheme.COLOR_MILK_WHITE.r, aCoreVibeTheme.COLOR_MILK_WHITE.g, aCoreVibeTheme.COLOR_MILK_WHITE.b, 0.4))
+			nm.text = "(empty)"
 
 		hbox.add_child(nm)
 
@@ -942,8 +1064,8 @@ func _rebuild_sigils(member_token: String) -> void:
 		btn.custom_minimum_size = Vector2(90, 18)  # Match equipment button size for grid alignment
 		btn.add_theme_font_size_override("font_size", 11)
 		btn.text = "Equip"
-		# Core Vibe: Plasma Teal for action buttons
-		aCoreVibeTheme.style_button(btn, aCoreVibeTheme.COLOR_PLASMA_TEAL, aCoreVibeTheme.CORNER_RADIUS_SMALL)
+		# Core Vibe: Sky Cyan for sigil equip buttons
+		aCoreVibeTheme.style_button(btn, aCoreVibeTheme.COLOR_SKY_CYAN, aCoreVibeTheme.CORNER_RADIUS_SMALL)
 		btn.pressed.connect(Callable(self, "_on_equip_sigil").bind(member_token, idx))
 
 		# Hide button if slot is beyond capacity
@@ -1228,16 +1350,40 @@ func _refresh_mind_row(member_token: String) -> void:
 	if _mind_value == null: return
 	var mt: String = _get_member_mind_type(member_token)
 
+	var milk_white_hex: String = "#F4F7FB"
+	var sky_cyan_hex: String = "#4DE9FF"
+
+	# Convert to RichTextLabel if needed
+	if not (_mind_value is RichTextLabel):
+		var parent = _mind_value.get_parent()
+		if parent:
+			var old_pos = _mind_value.get_index()
+			var rtl = RichTextLabel.new()
+			rtl.name = "Value"
+			rtl.size_flags_horizontal = _mind_value.size_flags_horizontal
+			rtl.size_flags_vertical = _mind_value.size_flags_vertical
+			rtl.custom_minimum_size = _mind_value.custom_minimum_size
+			rtl.fit_content = true
+			rtl.scroll_active = false
+			rtl.bbcode_enabled = true
+			rtl.add_theme_font_size_override("normal_font_size", 14)
+
+			parent.remove_child(_mind_value)
+			_mind_value.queue_free()
+			parent.add_child(rtl)
+			parent.move_child(rtl, old_pos)
+			_mind_value = rtl
+
 	if member_token == "hero":
-		# For player: "Omega - Active: Air"
+		# For player: "Omega" (Milk White) " - Active: " (Milk White) "Void" (Sky Cyan)
 		var active_type: String = _get_hero_active_type()
-		_mind_value.text = "%s - Active: %s" % [mt, active_type]
+		_mind_value.text = "[color=%s]%s  —  Active: [/color][color=%s]%s[/color]" % [milk_white_hex, mt, sky_cyan_hex, active_type]
 		if _mind_switch_btn:
 			_mind_switch_btn.text = "Switch"
 			_mind_switch_btn.disabled = false
 	else:
-		# For other members: just "Data"
-		_mind_value.text = (mt if mt != "" else "—")
+		# For other members: just "Data" (Milk White)
+		_mind_value.text = "[color=%s]%s[/color]" % [milk_white_hex, (mt if mt != "" else "—")]
 		if _mind_switch_btn:
 			_mind_switch_btn.text = "—"
 			_mind_switch_btn.disabled = true
@@ -1268,7 +1414,7 @@ func _set_slot_value(label: Label, id: String, slot: String) -> void:
 	var parent_hbox: HBoxContainer = label.get_parent() as HBoxContainer
 
 	if id == "" or id == "—":
-		# Empty slot - show placeholder with grey color
+		# Empty slot - show item_1906 icon with placeholder
 		var placeholder: String = ""
 		match slot:
 			"weapon": placeholder = "(Weapon)"
@@ -1282,8 +1428,8 @@ func _set_slot_value(label: Label, id: String, slot: String) -> void:
 		# Core Vibe: Dimmed Milk White for empty slots
 		label.add_theme_color_override("font_color", Color(aCoreVibeTheme.COLOR_MILK_WHITE.r, aCoreVibeTheme.COLOR_MILK_WHITE.g, aCoreVibeTheme.COLOR_MILK_WHITE.b, 0.4))
 
-		# Hide icon if exists
-		_hide_equipment_icon(parent_hbox)
+		# Show item_1906 icon for empty slots
+		_set_empty_slot_icon(parent_hbox)
 	else:
 		# Has equipment - show item name
 		var item_name: String = id
@@ -1292,8 +1438,8 @@ func _set_slot_value(label: Label, id: String, slot: String) -> void:
 			if typeof(v) == TYPE_STRING: item_name = String(v)
 
 		label.text = item_name
-		# Core Vibe: Electric Lime for equipped items
-		label.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_ELECTRIC_LIME)
+		# Core Vibe: Sky Cyan for equipped items
+		label.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_SKY_CYAN)
 
 		# Add/update icon
 		_set_equipment_icon(parent_hbox, id)
@@ -1315,8 +1461,8 @@ func _create_sigil_icon(instance_id: String) -> TextureRect:
 
 	# Get item definition to find icon number
 	var item_def: Dictionary = {}
-	if _csv and _csv.has_method("get_item"):
-		var v: Variant = _csv.call("get_item", base_id)
+	if _eq and _eq.has_method("get_item_def"):
+		var v: Variant = _eq.get_item_def(base_id)
 		if typeof(v) == TYPE_DICTIONARY:
 			item_def = v as Dictionary
 
@@ -1364,8 +1510,8 @@ func _set_equipment_icon(hbox: HBoxContainer, item_id: String) -> void:
 
 	# Get item definition to find icon number
 	var item_def: Dictionary = {}
-	if _csv and _csv.has_method("get_item"):
-		var v: Variant = _csv.call("get_item", item_id)
+	if _eq and _eq.has_method("get_item_def"):
+		var v: Variant = _eq.get_item_def(item_id)
 		if typeof(v) == TYPE_DICTIONARY:
 			item_def = v as Dictionary
 
@@ -1385,6 +1531,36 @@ func _set_equipment_icon(hbox: HBoxContainer, item_id: String) -> void:
 	var icon_path: String = "res://assets/graphics/items/individual/item_%s.png" % icon_num
 
 	if not ResourceLoader.exists(icon_path):
+		_hide_equipment_icon(hbox)
+		return
+
+	# Get or create icon TextureRect
+	var icon: TextureRect = hbox.get_node_or_null("EquipIcon")
+	if not icon:
+		icon = TextureRect.new()
+		icon.name = "EquipIcon"
+		icon.custom_minimum_size = Vector2(24, 24)  # Small icon
+		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		# Add icon before the label
+		hbox.add_child(icon)
+		hbox.move_child(icon, 0)
+
+	# Load and set texture
+	var icon_texture: Texture2D = load(icon_path)
+	icon.texture = icon_texture
+	icon.visible = true
+
+func _set_empty_slot_icon(hbox: HBoxContainer) -> void:
+	"""Set the item_1906 icon for an empty equipment slot"""
+	if not hbox:
+		return
+
+	var icon_path: String = "res://assets/graphics/items/individual/item_1906.png"
+
+	if not ResourceLoader.exists(icon_path):
+		print("[LoadoutPanel] Warning: item_1906.png not found at %s" % icon_path)
 		_hide_equipment_icon(hbox)
 		return
 
@@ -1541,7 +1717,7 @@ func _eva_mods_from_other(equip: Dictionary, exclude_id: String) -> int:
 			sum += int(d.get("base_eva",0))
 	return sum
 
-func _rebuild_stats_grid(member_token: String, equip: Dictionary) -> void:
+func _rebuild_stats_grid(member_token: String, _equip: Dictionary) -> void:
 	"""Build battle stats grid from CombatProfileSystem (matches StatsPanel)"""
 	if _stats_grid == null: return
 	_clear_stats_grid()
@@ -1567,7 +1743,7 @@ func _rebuild_stats_grid(member_token: String, equip: Dictionary) -> void:
 	var mnd: int = stats.get("MND", 1)
 	var tpo: int = stats.get("TPO", 1)
 	var vtl: int = stats.get("VTL", 1)
-	var fcs: int = stats.get("FCS", 1)
+	var _fcs: int = stats.get("FCS", 1)
 
 	# Calculate derived stats with new formulas
 	var skill_atk_bonus: int = weapon.get("skill_atk_boost", 0)
@@ -1589,7 +1765,7 @@ func _rebuild_stats_grid(member_token: String, equip: Dictionary) -> void:
 	# Evasion with stat contribution (VTL×2.0)
 	var base_eva: int = defense.get("peva", 0)
 	var vtl_eva_bonus: float = vtl * 2.0
-	var total_eva: float = base_eva + vtl_eva_bonus
+	var _total_eva: float = base_eva + vtl_eva_bonus
 
 	# Initiative: Get TPO tier and speed bonus
 	var speed_bonus: int = defense.get("speed", 0)
@@ -2649,8 +2825,8 @@ func _navigate_equipment(delta: int) -> void:
 		return
 
 	# Wrap around: pressing down at bottom goes to top, pressing up at top goes to bottom
-	var size = _nav_elements.size()
-	_nav_index = (_nav_index + delta + size) % size
+	var nav_size = _nav_elements.size()
+	_nav_index = (_nav_index + delta + nav_size) % nav_size
 	_focus_equipment_element(_nav_index)
 
 func _activate_current_equipment_button() -> void:
@@ -2748,4 +2924,45 @@ func _restore_equipment_focus() -> void:
 		_focus_equipment_element(_nav_index)
 		if _nav_index < _nav_elements.size():
 			var elem = _nav_elements[_nav_index]
-			print("[LoadoutPanel] Element valid: %s, is Control: %s" % [is_instance_valid(elem), elem is Control if is_instance_valid(elem) else "N/A"])
+			print("[LoadoutPanel] Element valid: %s, is Control: %s" % [is_instance_valid(elem), str(elem is Control) if is_instance_valid(elem) else "N/A"])
+
+func _debug_print_panel_sizes() -> void:
+	"""Debug function to print panel sizes after layout"""
+	print("\n=== LOADOUT PANEL DEBUG - Panel Sizes ===")
+
+	if _party_panel:
+		print("[DEBUG] Party Panel:")
+		print("  - Size: %s" % _party_panel.size)
+		print("  - Position: %s" % _party_panel.position)
+		print("  - Custom Min Size: %s" % _party_panel.custom_minimum_size)
+
+	if _middle_panel:
+		print("[DEBUG] Middle/Center Panel (Equipment & Sigils):")
+		print("  - Size: %s" % _middle_panel.size)
+		print("  - Position: %s" % _middle_panel.position)
+		print("  - Custom Min Size: %s" % _middle_panel.custom_minimum_size)
+
+		# Get child container info for more detail
+		var margin = _middle_panel.get_node_or_null("Margin")
+		if margin:
+			print("  - Margin Container Size: %s" % margin.size)
+			var vbox = margin.get_node_or_null("VBox")
+			if vbox:
+				print("  - VBox Size: %s" % vbox.size)
+				print("  - VBox Children Count: %d" % vbox.get_child_count())
+
+				# Count sigils displayed
+				if _sigils_list:
+					var visible_sigils = 0
+					for child in _sigils_list.get_children():
+						if child.visible:
+							visible_sigils += 1
+					print("  - Visible Sigil Rows: %d" % (visible_sigils / 2.0))  # Divide by 2 because each row has label + button
+
+	if _stats_panel:
+		print("[DEBUG] Stats Panel:")
+		print("  - Size: %s" % _stats_panel.size)
+		print("  - Position: %s" % _stats_panel.position)
+		print("  - Custom Min Size: %s" % _stats_panel.custom_minimum_size)
+
+	print("=== END PANEL DEBUG ===\n")
