@@ -637,7 +637,7 @@ func _build_equipment_comparison_panel(item_id: String, slot: String, current_st
 		name_label.add_theme_color_override("font_color", Color(aCoreVibeTheme.COLOR_MILK_WHITE.r, aCoreVibeTheme.COLOR_MILK_WHITE.g, aCoreVibeTheme.COLOR_MILK_WHITE.b, 0.4))
 	else:
 		name_label.text = _pretty_item(item_id)
-		name_label.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_ELECTRIC_LIME)
+		name_label.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE)
 	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	name_label.add_theme_font_size_override("font_size", 12)
 	vbox.add_child(name_label)
@@ -982,9 +982,9 @@ func _rebuild_sigils(member_token: String) -> void:
 		nm.add_theme_font_size_override("font_size", 12)
 		nm.text = (_sigil_disp(cur_id) if cur_id != "" else "(empty)")
 
-		# Core Vibe: Make equipped sigil names Electric Lime
+		# Core Vibe: Make equipped sigil names Milk White
 		if cur_id != "":
-			nm.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_ELECTRIC_LIME)
+			nm.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE)
 
 		hbox.add_child(nm)
 
@@ -1349,8 +1349,8 @@ func _set_slot_value(label: Label, id: String, slot: String) -> void:
 			if typeof(v) == TYPE_STRING: item_name = String(v)
 
 		label.text = item_name
-		# Core Vibe: Electric Lime for equipped items
-		label.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_ELECTRIC_LIME)
+		# Core Vibe: Milk White for equipped items
+		label.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE)
 
 		# Add/update icon
 		_set_equipment_icon(parent_hbox, id)
