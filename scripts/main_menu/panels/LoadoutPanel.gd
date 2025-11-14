@@ -73,7 +73,8 @@ const ANIM_DURATION := 0.2  # Animation duration in seconds
 @onready var _middle_panel: PanelContainer = get_node("%Middle") if has_node("%Middle") else null
 @onready var _stats_panel: PanelContainer = get_node("%StatsColumn") if has_node("%StatsColumn") else null
 
-@onready var _party_list: ItemList       = get_node("Row/Party/Margin/VBox/PartyList") as ItemList
+@onready var _party_scroll: ScrollContainer = get_node("Row/Party/Margin/VBox/PartyScroll") as ScrollContainer
+@onready var _party_list: VBoxContainer     = get_node("Row/Party/Margin/VBox/PartyScroll/PartyList") as VBoxContainer
 # @onready var _member_name: Label         = get_node("Row/Middle/Margin/VBox/MemberName") as Label  # Removed
 
 # Section header labels
@@ -114,6 +115,7 @@ const ANIM_DURATION := 0.2  # Animation duration in seconds
 
 var _labels: PackedStringArray = PackedStringArray()
 var _tokens: PackedStringArray = PackedStringArray()
+var _current_party_button: Button = null  # Currently selected party member button
 
 var _gs:    Node = null
 var _inv:   Node = null
@@ -165,8 +167,7 @@ func _ready() -> void:
 	if _f_btn: _f_btn.pressed.connect(Callable(self, "_on_slot_button").bind("foot"))
 	if _b_btn: _b_btn.pressed.connect(Callable(self, "_on_slot_button").bind("bracelet"))
 
-	if not _party_list.item_selected.is_connected(Callable(self, "_on_party_selected")):
-		_party_list.item_selected.connect(Callable(self, "_on_party_selected"))
+	# Party list is now button-based, signals connected per button
 
 	if _btn_manage and not _btn_manage.pressed.is_connected(Callable(self, "_on_manage_sigils")):
 		_btn_manage.pressed.connect(Callable(self, "_on_manage_sigils"))
@@ -225,9 +226,11 @@ func _first_fill() -> void:
 	_apply_core_vibe_styling()
 
 	_refresh_party()
-	if _party_list.get_item_count() > 0:
-		_party_list.select(0)
-		_on_party_selected(0)
+	if _party_list.get_child_count() > 0:
+		var first_btn = _party_list.get_child(0) as Button
+		if first_btn:
+			first_btn.grab_focus()
+			_on_party_button_focused(first_btn)
 	_party_sig = _snapshot_party_signature()
 	var cur := _current_token()
 	_sigils_sig = _snapshot_sigil_signature(cur) if cur != "" else ""
@@ -273,10 +276,7 @@ func _apply_core_vibe_styling() -> void:
 		)
 		_stats_panel.add_theme_stylebox_override("panel", stats_style)
 
-	# Style party list with Sky Cyan selection
-	if _party_list:
-		_party_list.add_theme_color_override("font_selected_color", aCoreVibeTheme.COLOR_SKY_CYAN)
-		_party_list.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE)
+	# Party list is now button-based, styling handled per-button in _create_party_member_card()
 
 	# Style section headers (Bubble Magenta)
 	if _party_label:
@@ -419,9 +419,12 @@ func _on_party_roster_changed(_arg=null) -> void:
 	var keep: String = _current_token()
 	_refresh_party()
 	var idx: int = max(0, _tokens.find(keep))
-	if _party_list.get_item_count() > 0:
-		_party_list.select(idx)
-		_on_party_selected(idx)
+	if _party_list.get_child_count() > 0:
+		idx = clamp(idx, 0, _party_list.get_child_count() - 1)
+		var btn = _party_list.get_child(idx) as Button
+		if btn:
+			btn.grab_focus()
+			_on_party_button_focused(btn)
 	_party_sig = _snapshot_party_signature()
 
 # ────────────────── party ──────────────────
@@ -476,7 +479,10 @@ func _gather_party_tokens() -> Array[String]:
 	return out
 
 func _refresh_party() -> void:
-	_party_list.clear()
+	# Clear existing buttons
+	for child in _party_list.get_children():
+		child.queue_free()
+
 	_labels = PackedStringArray()
 	_tokens = PackedStringArray()
 
@@ -507,10 +513,155 @@ func _refresh_party() -> void:
 		_tokens.append("hero")
 		_labels.append(_hero_name())
 
+	# Create button for each party member
 	for i in range(_labels.size()):
-		_party_list.add_item(_labels[i])
+		var btn = _create_party_member_card(_tokens[i], _labels[i])
+		_party_list.add_child(btn)
 
-	_party_list.queue_redraw()
+func _create_party_member_card(token: String, display_name: String) -> Button:
+	"""Create a styled button for a party member - matches StatusPanel style"""
+	var btn := Button.new()
+	btn.focus_mode = Control.FOCUS_ALL
+	btn.custom_minimum_size = Vector2(0, 40)  # Same height as StatusPanel
+	btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+
+	# Store metadata
+	btn.set_meta("member_token", token)
+	btn.set_meta("member_name", display_name)
+
+	# Connect signals
+	btn.pressed.connect(_on_party_button_pressed.bind(btn))
+	btn.focus_entered.connect(_on_party_button_focused.bind(btn))
+	btn.focus_exited.connect(_on_party_button_unfocused.bind(btn))
+
+	# Create label for name
+	var name_label := Label.new()
+	name_label.text = display_name
+	name_label.add_theme_font_size_override("font_size", 13)
+	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	btn.add_child(name_label)
+
+	# Style button (default unfocused state)
+	_style_party_member_card(btn, false)
+
+	return btn
+
+func _style_party_member_card(btn: Button, is_focused: bool) -> void:
+	"""Style a party member button based on focus state"""
+	var style = StyleBoxFlat.new()
+
+	# No background - completely transparent (matching StatusPanel)
+	style.bg_color = Color(0, 0, 0, 0)
+	style.border_width_left = 0
+	style.border_width_top = 0
+	style.border_width_right = 0
+	style.border_width_bottom = 0
+	style.shadow_size = 0
+	# Minimal padding
+	style.content_margin_left = 5
+	style.content_margin_top = 5
+	style.content_margin_right = 5
+	style.content_margin_bottom = 5
+
+	btn.add_theme_stylebox_override("normal", style)
+	btn.add_theme_stylebox_override("hover", style)
+	btn.add_theme_stylebox_override("pressed", style)
+	btn.add_theme_stylebox_override("focus", style)
+
+	# Update text color
+	if btn.get_child_count() > 0:
+		var label = btn.get_child(0) as Label
+		if label:
+			label.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE)
+
+	# Handle arrow indicator
+	if is_focused:
+		_show_party_member_arrow(btn)
+	else:
+		_hide_party_member_arrow(btn)
+
+func _show_party_member_arrow(btn: Button) -> void:
+	"""Show arrow indicator to the right of selected party member"""
+	# Check if arrow already exists
+	var arrow = btn.get_node_or_null("SelectionArrow")
+	if arrow:
+		return  # Already exists
+
+	# Create arrow indicator using Label (same as StatusPanel)
+	var arrow_label := Label.new()
+	arrow_label.name = "SelectionArrow"
+	arrow_label.text = "◄"  # Left-pointing arrow
+	arrow_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	arrow_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	arrow_label.add_theme_font_size_override("font_size", 43)
+	arrow_label.modulate = Color(1, 1, 1, 1)  # White
+	arrow_label.custom_minimum_size = Vector2(54, 72)
+	arrow_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	# Position manually to the right inside the button
+	btn.add_child(arrow_label)
+
+	await get_tree().process_frame
+
+	# Position to the right side, vertically centered (shifted up 6px)
+	var btn_size = btn.size
+	arrow_label.position = Vector2(btn_size.x - 54, (btn_size.y - 72) / 2.0 - 6)
+	arrow_label.size = Vector2(54, 72)
+
+	# Start pulsing animation
+	_start_party_arrow_pulse(arrow_label)
+
+func _hide_party_member_arrow(btn: Button) -> void:
+	"""Hide arrow indicator from party member"""
+	var arrow = btn.get_node_or_null("SelectionArrow")
+	if arrow:
+		# Stop any running tween
+		if arrow.has_meta("pulse_tween"):
+			var tween = arrow.get_meta("pulse_tween")
+			if tween and is_instance_valid(tween):
+				tween.kill()
+			arrow.remove_meta("pulse_tween")
+		arrow.queue_free()
+
+func _start_party_arrow_pulse(arrow: Control) -> void:
+	"""Start pulsing animation for arrow - moves left and right"""
+	if arrow.has_meta("pulse_tween"):
+		var old_tween = arrow.get_meta("pulse_tween")
+		if old_tween and is_instance_valid(old_tween):
+			old_tween.kill()
+
+	var tween = create_tween()
+	tween.set_loops()
+	tween.set_trans(Tween.TRANS_SINE)
+	tween.set_ease(Tween.EASE_IN_OUT)
+
+	# Pulse left 6 pixels then back to base position (matching StatusPanel)
+	var base_x = arrow.position.x
+	tween.tween_property(arrow, "position:x", base_x - 6, 0.6)
+	tween.tween_property(arrow, "position:x", base_x, 0.6)
+
+	arrow.set_meta("pulse_tween", tween)
+
+func _on_party_button_pressed(btn: Button) -> void:
+	"""Handle party member button being pressed"""
+	btn.grab_focus()
+
+func _on_party_button_focused(btn: Button) -> void:
+	"""Handle party member button gaining focus"""
+	_current_party_button = btn
+	_style_party_member_card(btn, true)
+
+	# Trigger the selection callback
+	var token = String(btn.get_meta("member_token", ""))
+	var idx = _tokens.find(token)
+	if idx >= 0:
+		_on_party_selected(idx)
+
+func _on_party_button_unfocused(btn: Button) -> void:
+	"""Handle party member button losing focus"""
+	_style_party_member_card(btn, false)
 
 func _display_for_token(token: String) -> String:
 	if token == "hero":
@@ -523,11 +674,9 @@ func _display_for_token(token: String) -> String:
 	return token.capitalize()
 
 func _current_token() -> String:
-	var sel: PackedInt32Array = _party_list.get_selected_items()
-	if sel.size() == 0:
-		return (_tokens[0] if _tokens.size() > 0 else "")
-	var i: int = sel[0]
-	return (_tokens[i] if i >= 0 and i < _tokens.size() else "")
+	if _current_party_button and _current_party_button.has_meta("member_token"):
+		return String(_current_party_button.get_meta("member_token"))
+	return (_tokens[0] if _tokens.size() > 0 else "")
 
 func _on_party_selected(index: int) -> void:
 	var _label: String = "(Unknown)"
@@ -2697,16 +2846,25 @@ func _handle_party_select_input(event: InputEvent) -> void:
 
 func _navigate_party(delta: int) -> void:
 	"""Navigate up/down in party list"""
-	if not _party_list or _party_list.get_item_count() == 0:
+	if not _party_list or _party_list.get_child_count() == 0:
 		return
 
-	var current = _party_list.get_selected_items()
-	var idx = current[0] if current.size() > 0 else 0
-	idx = clamp(idx + delta, 0, _party_list.get_item_count() - 1)
+	# Find current button index
+	var idx = 0
+	if _current_party_button:
+		for i in range(_party_list.get_child_count()):
+			if _party_list.get_child(i) == _current_party_button:
+				idx = i
+				break
 
-	_party_list.select(idx)
-	_party_list.ensure_current_is_visible()
-	_on_party_selected(idx)  # Manually trigger signal
+	# Navigate to new index
+	idx = clamp(idx + delta, 0, _party_list.get_child_count() - 1)
+
+	# Grab focus on new button
+	var btn = _party_list.get_child(idx) as Button
+	if btn:
+		btn.grab_focus()
+		_on_party_button_focused(btn)
 
 func _transition_to_equipment_nav() -> void:
 	"""Transition from PARTY_SELECT to EQUIPMENT_NAV"""
@@ -2748,10 +2906,13 @@ func _exit_loadout_panel() -> bool:
 func _enter_party_select_state() -> void:
 	"""Enter PARTY_SELECT state and grab focus on party list"""
 	_nav_state = NavState.PARTY_SELECT
-	if _party_list and _party_list.get_item_count() > 0:
-		_party_list.grab_focus()
-		if _party_list.get_selected_items().is_empty():
-			_party_list.select(0)
+	if _party_list and _party_list.get_child_count() > 0:
+		# Find current button or grab first one
+		var btn_to_focus: Button = _current_party_button
+		if not btn_to_focus or not is_instance_valid(btn_to_focus):
+			btn_to_focus = _party_list.get_child(0) as Button
+		if btn_to_focus:
+			btn_to_focus.grab_focus()
 	print("[LoadoutPanel] Entered PARTY_SELECT state")
 	print("[LoadoutPanel] Calling _animate_panel_focus from enter_party_select_state")
 	call_deferred("_animate_panel_focus")
