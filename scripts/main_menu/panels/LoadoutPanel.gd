@@ -334,17 +334,17 @@ func _apply_core_vibe_styling() -> void:
 	if _b_val:
 		aCoreVibeTheme.style_label(_b_val, aCoreVibeTheme.COLOR_SKY_CYAN, 12)
 
-	# Style equipment buttons
+	# Style equipment buttons with inverted style (Sky Cyan background, Night Navy text, no focus border)
 	if _w_btn:
-		aCoreVibeTheme.style_button(_w_btn, aCoreVibeTheme.COLOR_SKY_CYAN, aCoreVibeTheme.CORNER_RADIUS_SMALL)
+		aCoreVibeTheme.style_button_inverted(_w_btn, aCoreVibeTheme.COLOR_SKY_CYAN, aCoreVibeTheme.COLOR_NIGHT_NAVY, aCoreVibeTheme.CORNER_RADIUS_SMALL)
 	if _a_btn:
-		aCoreVibeTheme.style_button(_a_btn, aCoreVibeTheme.COLOR_SKY_CYAN, aCoreVibeTheme.CORNER_RADIUS_SMALL)
+		aCoreVibeTheme.style_button_inverted(_a_btn, aCoreVibeTheme.COLOR_SKY_CYAN, aCoreVibeTheme.COLOR_NIGHT_NAVY, aCoreVibeTheme.CORNER_RADIUS_SMALL)
 	if _h_btn:
-		aCoreVibeTheme.style_button(_h_btn, aCoreVibeTheme.COLOR_SKY_CYAN, aCoreVibeTheme.CORNER_RADIUS_SMALL)
+		aCoreVibeTheme.style_button_inverted(_h_btn, aCoreVibeTheme.COLOR_SKY_CYAN, aCoreVibeTheme.COLOR_NIGHT_NAVY, aCoreVibeTheme.CORNER_RADIUS_SMALL)
 	if _f_btn:
-		aCoreVibeTheme.style_button(_f_btn, aCoreVibeTheme.COLOR_SKY_CYAN, aCoreVibeTheme.CORNER_RADIUS_SMALL)
+		aCoreVibeTheme.style_button_inverted(_f_btn, aCoreVibeTheme.COLOR_SKY_CYAN, aCoreVibeTheme.COLOR_NIGHT_NAVY, aCoreVibeTheme.CORNER_RADIUS_SMALL)
 	if _b_btn:
-		aCoreVibeTheme.style_button(_b_btn, aCoreVibeTheme.COLOR_SKY_CYAN, aCoreVibeTheme.CORNER_RADIUS_SMALL)
+		aCoreVibeTheme.style_button_inverted(_b_btn, aCoreVibeTheme.COLOR_SKY_CYAN, aCoreVibeTheme.COLOR_NIGHT_NAVY, aCoreVibeTheme.CORNER_RADIUS_SMALL)
 
 	# Style sigils title (Bubble Magenta)
 	if _sigils_title:

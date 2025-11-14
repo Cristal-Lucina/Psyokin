@@ -154,6 +154,59 @@ func style_button(
 	button.add_theme_color_override("font_pressed_color", COLOR_MILK_WHITE)
 	button.add_theme_color_override("font_disabled_color", Color(0.5, 0.5, 0.5))
 
+## Apply inverted button styles (bright background, dark text, no focus border)
+func style_button_inverted(
+	button: Button,
+	bg_color: Color = COLOR_SKY_CYAN,
+	text_color: Color = COLOR_NIGHT_NAVY,
+	corner_radius: int = CORNER_RADIUS_SMALL
+) -> void:
+	# Normal state - bright fill, no border, subtle shadow
+	var normal = StyleBoxFlat.new()
+	normal.bg_color = bg_color
+	normal.border_width_left = 0
+	normal.border_width_right = 0
+	normal.border_width_top = 0
+	normal.border_width_bottom = 0
+	normal.corner_radius_top_left = corner_radius
+	normal.corner_radius_top_right = corner_radius
+	normal.corner_radius_bottom_left = corner_radius
+	normal.corner_radius_bottom_right = corner_radius
+	normal.shadow_color = Color(bg_color.r, bg_color.g, bg_color.b, SHADOW_OPACITY)
+	normal.shadow_size = SHADOW_SIZE_SMALL
+
+	# Hover state - brighter glow
+	var hover = normal.duplicate()
+	hover.shadow_size = SHADOW_SIZE_MEDIUM
+	hover.shadow_color = Color(bg_color.r, bg_color.g, bg_color.b, 0.7)
+	hover.bg_color = Color(bg_color.r * 1.1, bg_color.g * 1.1, bg_color.b * 1.1)  # Slightly brighter
+
+	# Pressed state - slightly darker
+	var pressed = normal.duplicate()
+	pressed.bg_color = Color(bg_color.r * 0.8, bg_color.g * 0.8, bg_color.b * 0.8)
+	pressed.shadow_size = SHADOW_SIZE_SMALL
+
+	# Disabled state - dimmed
+	var disabled = normal.duplicate()
+	disabled.bg_color = Color(bg_color.r * 0.5, bg_color.g * 0.5, bg_color.b * 0.5, 0.5)
+	disabled.shadow_size = 0
+
+	# Focus state - same as normal (no ugly white box)
+	var focus = normal.duplicate()
+
+	# Apply all styles
+	button.add_theme_stylebox_override("normal", normal)
+	button.add_theme_stylebox_override("hover", hover)
+	button.add_theme_stylebox_override("pressed", pressed)
+	button.add_theme_stylebox_override("disabled", disabled)
+	button.add_theme_stylebox_override("focus", focus)
+
+	# Set font colors
+	button.add_theme_color_override("font_color", text_color)
+	button.add_theme_color_override("font_hover_color", text_color)
+	button.add_theme_color_override("font_pressed_color", text_color)
+	button.add_theme_color_override("font_disabled_color", Color(text_color.r, text_color.g, text_color.b, 0.5))
+
 ## ═══════════════════════════════════════════════════════════════════════════════
 ## TAB STYLE CREATION
 ## ═══════════════════════════════════════════════════════════════════════════════
