@@ -339,7 +339,7 @@ func _apply_core_vibe_styling() -> void:
 
 	# Style switch button
 	if _mind_switch_btn:
-		aCoreVibeTheme.style_button(_mind_switch_btn, aCoreVibeTheme.COLOR_PLASMA_TEAL, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
+		aCoreVibeTheme.style_button(_mind_switch_btn, aCoreVibeTheme.COLOR_SKY_CYAN, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
 
 	# Style details content
 	if _details_content:
