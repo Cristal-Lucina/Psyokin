@@ -384,7 +384,7 @@ func _create_tier_cell(stat_id: String, tier_index: int) -> Button:
 	"""Create tier cell button with perk name"""
 	var button: Button = Button.new()
 	button.custom_minimum_size = Vector2(120, 40)
-	button.add_theme_font_size_override("font_size", 9)
+	button.add_theme_font_size_override("font_size", 11)
 
 	var perk_info: Dictionary = _get_perk_info(stat_id, tier_index)
 
