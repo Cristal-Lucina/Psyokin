@@ -552,25 +552,19 @@ func _style_party_member_card(btn: Button, is_focused: bool) -> void:
 	"""Style a party member button based on focus state"""
 	var style = StyleBoxFlat.new()
 
-	# Dark rounded box background (INK_CHARCOAL)
-	style.bg_color = aCoreVibeTheme.COLOR_INK_CHARCOAL
+	# Transparent background - let the panel background show through
+	style.bg_color = Color(0, 0, 0, 0)
 	style.border_width_left = 0
 	style.border_width_top = 0
 	style.border_width_right = 0
 	style.border_width_bottom = 0
 	style.shadow_size = 0
 
-	# Rounded corners
-	style.corner_radius_top_left = 12
-	style.corner_radius_top_right = 12
-	style.corner_radius_bottom_left = 12
-	style.corner_radius_bottom_right = 12
-
-	# Padding
-	style.content_margin_left = 8
-	style.content_margin_top = 6
-	style.content_margin_right = 8
-	style.content_margin_bottom = 6
+	# Minimal padding
+	style.content_margin_left = 5
+	style.content_margin_top = 5
+	style.content_margin_right = 5
+	style.content_margin_bottom = 5
 
 	btn.add_theme_stylebox_override("normal", style)
 	btn.add_theme_stylebox_override("hover", style)
