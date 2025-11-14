@@ -378,16 +378,34 @@ func _auto_scroll_to_selection() -> void:
 	var button_top: float = button_pos_in_grid
 	var button_bottom: float = button_pos_in_grid + button_height
 
+	print("[ItemsPanel] Auto-scroll check:")
+	print("  Selected index: %d" % _selected_grid_index)
+	print("  Button pos in grid: %f" % button_pos_in_grid)
+	print("  Button height: %f" % button_height)
+	print("  Current scroll: %f" % current_scroll)
+	print("  Visible area: %f to %f" % [visible_top, visible_bottom])
+	print("  Button bounds: %f to %f" % [button_top, button_bottom])
+
 	# Check if we need to scroll up (selected item going off top)
 	if button_top < visible_top:
 		# Scroll up by exactly 1 row
 		var target_scroll: float = max(0, current_scroll - row_height)
+		print("  → Scrolling UP from %f to %f" % [current_scroll, target_scroll])
 		_items_scroll.scroll_vertical = int(target_scroll)
+		# Wait for scroll to complete
+		await get_tree().process_frame
+		await get_tree().process_frame
 	# Check if we need to scroll down (selected item going off bottom)
 	elif button_bottom > visible_bottom:
 		# Scroll down by exactly 1 row
 		var target_scroll: float = current_scroll + row_height
+		print("  → Scrolling DOWN from %f to %f" % [current_scroll, target_scroll])
 		_items_scroll.scroll_vertical = int(target_scroll)
+		# Wait for scroll to complete
+		await get_tree().process_frame
+		await get_tree().process_frame
+	else:
+		print("  → No scroll needed, item visible")
 
 func _start_arrow_pulse() -> void:
 	if not _selection_arrow:
@@ -1198,8 +1216,9 @@ func _navigate_items(delta: int) -> void:
 	_selected_item_id = _item_ids[_selected_grid_index]
 	_update_selection_highlight()
 	_update_details()
+	# Auto-scroll first, then update arrow position (arrow depends on scroll position)
+	await _auto_scroll_to_selection()
 	_update_arrow_position()
-	_auto_scroll_to_selection()
 
 func _update_selection_highlight() -> void:
 	"""Update visual highlight on selected button"""
