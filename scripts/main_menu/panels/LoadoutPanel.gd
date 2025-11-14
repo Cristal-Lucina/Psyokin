@@ -1189,8 +1189,8 @@ func _rebuild_sigils(member_token: String) -> void:
 		btn.custom_minimum_size = Vector2(90, 18)  # Match equipment button size for grid alignment
 		btn.add_theme_font_size_override("font_size", 11)
 		btn.text = "Equip"
-		# Core Vibe: Sky Cyan for sigil equip buttons
-		aCoreVibeTheme.style_button(btn, aCoreVibeTheme.COLOR_SKY_CYAN, aCoreVibeTheme.CORNER_RADIUS_SMALL)
+		# Core Vibe: Sky Cyan for sigil equip buttons - normal dark style, but inverted when focused
+		aCoreVibeTheme.style_button_with_focus_invert(btn, aCoreVibeTheme.COLOR_SKY_CYAN, aCoreVibeTheme.CORNER_RADIUS_SMALL)
 		btn.pressed.connect(Callable(self, "_on_equip_sigil").bind(member_token, idx))
 
 		# Hide button if slot is beyond capacity
