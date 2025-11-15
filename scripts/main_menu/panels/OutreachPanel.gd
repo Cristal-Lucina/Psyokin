@@ -903,6 +903,7 @@ func _create_selection_arrows() -> void:
 		_mission_selection_arrow.size = Vector2(54, 72)
 		_mission_selection_arrow.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_mission_selection_arrow.z_index = 100
+		_mission_selection_arrow.visible = false  # Start hidden (CATEGORY_SELECT is initial state)
 		add_child(_mission_selection_arrow)
 		await get_tree().process_frame
 		_mission_selection_arrow.size = Vector2(54, 72)
@@ -912,6 +913,7 @@ func _create_selection_arrows() -> void:
 		_mission_dark_box.size = Vector2(160, 20)
 		_mission_dark_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_mission_dark_box.z_index = 99
+		_mission_dark_box.visible = false  # Start hidden (CATEGORY_SELECT is initial state)
 		var box_style2 = StyleBoxFlat.new()
 		box_style2.bg_color = aCoreVibeTheme.COLOR_INK_CHARCOAL
 		box_style2.corner_radius_top_left = 8
@@ -925,13 +927,19 @@ func _create_selection_arrows() -> void:
 
 		_start_arrow_pulse(_mission_selection_arrow)
 
-	# Initial arrow positions
+	# Initial arrow positions (category arrow visible, mission arrow hidden)
 	call_deferred("_update_category_arrow_position")
-	call_deferred("_update_mission_arrow_position")
 
 func _update_category_arrow_position() -> void:
 	"""Update category arrow and dark box position"""
 	if not _category_selection_arrow or not _category_list:
+		return
+
+	# Only show category arrow in CATEGORY_SELECT state
+	if _nav_state != NavState.CATEGORY_SELECT:
+		_category_selection_arrow.visible = false
+		if _category_dark_box:
+			_category_dark_box.visible = false
 		return
 
 	var selected = _category_list.get_selected_items()
@@ -968,6 +976,13 @@ func _update_category_arrow_position() -> void:
 func _update_mission_arrow_position() -> void:
 	"""Update mission arrow and dark box position"""
 	if not _mission_selection_arrow or not _mission_list:
+		return
+
+	# Only show mission arrow in MISSION_LIST state
+	if _nav_state != NavState.MISSION_LIST:
+		_mission_selection_arrow.visible = false
+		if _mission_dark_box:
+			_mission_dark_box.visible = false
 		return
 
 	var selected = _mission_list.get_selected_items()
@@ -1068,6 +1083,10 @@ func _update_category_arrow_position_immediate() -> void:
 	if not _category_selection_arrow or not _category_list:
 		return
 
+	# Only update category arrow in CATEGORY_SELECT state
+	if _nav_state != NavState.CATEGORY_SELECT:
+		return
+
 	var selected = _category_list.get_selected_items()
 	if selected.size() == 0:
 		return
@@ -1095,6 +1114,10 @@ func _update_category_arrow_position_immediate() -> void:
 func _update_mission_arrow_position_immediate() -> void:
 	"""Immediate mission arrow position update without await"""
 	if not _mission_selection_arrow or not _mission_list:
+		return
+
+	# Only update mission arrow in MISSION_LIST state
+	if _nav_state != NavState.MISSION_LIST:
 		return
 
 	var selected = _mission_list.get_selected_items()
@@ -1139,7 +1162,19 @@ func _enter_category_select_state() -> void:
 		_category_list.grab_focus()
 		if _category_list.get_selected_items().is_empty():
 			_category_list.select(0)
+
+	# Show category arrow, hide mission arrow
+	if _category_selection_arrow:
+		_category_selection_arrow.visible = true
+	if _category_dark_box:
+		_category_dark_box.visible = true
+	if _mission_selection_arrow:
+		_mission_selection_arrow.visible = false
+	if _mission_dark_box:
+		_mission_dark_box.visible = false
+
 	_animate_panel_focus(NavState.CATEGORY_SELECT)
+	call_deferred("_update_category_arrow_position")
 	print("[OutreachPanel] Entered CATEGORY_SELECT state")
 
 func _enter_mission_list_state() -> void:
@@ -1149,7 +1184,19 @@ func _enter_mission_list_state() -> void:
 		_mission_list.grab_focus()
 		if _mission_list.get_selected_items().is_empty():
 			_mission_list.select(0)
+
+	# Hide category arrow, show mission arrow
+	if _category_selection_arrow:
+		_category_selection_arrow.visible = false
+	if _category_dark_box:
+		_category_dark_box.visible = false
+	if _mission_selection_arrow:
+		_mission_selection_arrow.visible = true
+	if _mission_dark_box:
+		_mission_dark_box.visible = true
+
 	_animate_panel_focus(NavState.MISSION_LIST)
+	call_deferred("_update_mission_arrow_position")
 	print("[OutreachPanel] Entered MISSION_LIST state")
 
 func _animate_panel_focus(active_state: NavState) -> void:
