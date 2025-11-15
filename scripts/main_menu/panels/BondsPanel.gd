@@ -309,9 +309,33 @@ func _apply_core_vibe_styling() -> void:
 		_profile_desc.add_theme_color_override("default_color", aCoreVibeTheme.COLOR_MILK_WHITE)
 		_profile_desc.add_theme_font_size_override("normal_font_size", 14)
 
-	# Style buttons
+	# Style Story Points button with Bubble Magenta background and Night Navy text
 	if _story_btn:
-		aCoreVibeTheme.style_button(_story_btn, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
+		var story_style_normal = StyleBoxFlat.new()
+		story_style_normal.bg_color = aCoreVibeTheme.COLOR_BUBBLE_MAGENTA
+		story_style_normal.corner_radius_top_left = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+		story_style_normal.corner_radius_top_right = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+		story_style_normal.corner_radius_bottom_left = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+		story_style_normal.corner_radius_bottom_right = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+		story_style_normal.content_margin_left = 12
+		story_style_normal.content_margin_right = 12
+		story_style_normal.content_margin_top = 8
+		story_style_normal.content_margin_bottom = 8
+
+		var story_style_hover = story_style_normal.duplicate()
+		story_style_hover.bg_color = Color(aCoreVibeTheme.COLOR_BUBBLE_MAGENTA.r * 1.2, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA.g * 1.2, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA.b * 1.2)
+
+		var story_style_pressed = story_style_normal.duplicate()
+		story_style_pressed.bg_color = Color(aCoreVibeTheme.COLOR_BUBBLE_MAGENTA.r * 0.8, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA.g * 0.8, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA.b * 0.8)
+
+		_story_btn.add_theme_stylebox_override("normal", story_style_normal)
+		_story_btn.add_theme_stylebox_override("hover", story_style_hover)
+		_story_btn.add_theme_stylebox_override("pressed", story_style_pressed)
+		_story_btn.add_theme_stylebox_override("focus", StyleBoxEmpty.new())  # Remove grey focus box
+		_story_btn.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_NIGHT_NAVY)
+		_story_btn.add_theme_color_override("font_hover_color", aCoreVibeTheme.COLOR_NIGHT_NAVY)
+		_story_btn.add_theme_color_override("font_pressed_color", aCoreVibeTheme.COLOR_NIGHT_NAVY)
+		_story_btn.add_theme_font_size_override("font_size", 14)
 		_story_btn.custom_minimum_size = Vector2(120, 40)
 
 	# Note: Unlock buttons styling is dynamic based on unlock status, handled in _update_detail()
@@ -1035,6 +1059,7 @@ func _update_detail(id: String) -> void:
 		_unlock_acq.text = "Acquaintance → Outer" + (" [UNLOCKED]" if outer_unlocked else " [LOCKED]")
 		var color = aCoreVibeTheme.COLOR_ELECTRIC_LIME if outer_unlocked else aCoreVibeTheme.COLOR_CITRUS_YELLOW
 		aCoreVibeTheme.style_button(_unlock_acq, color, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
+		_unlock_acq.add_theme_stylebox_override("focus", StyleBoxEmpty.new())  # Remove grey focus box
 		_unlock_acq.custom_minimum_size = Vector2(180, 36)
 
 	if _unlock_outer:
@@ -1042,6 +1067,7 @@ func _update_detail(id: String) -> void:
 		_unlock_outer.text = "Outer → Middle" + (" [UNLOCKED]" if middle_unlocked else " [LOCKED]")
 		var color = aCoreVibeTheme.COLOR_ELECTRIC_LIME if middle_unlocked else aCoreVibeTheme.COLOR_CITRUS_YELLOW
 		aCoreVibeTheme.style_button(_unlock_outer, color, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
+		_unlock_outer.add_theme_stylebox_override("focus", StyleBoxEmpty.new())  # Remove grey focus box
 		_unlock_outer.custom_minimum_size = Vector2(180, 36)
 
 	if _unlock_middle:
@@ -1049,6 +1075,7 @@ func _update_detail(id: String) -> void:
 		_unlock_middle.text = "Middle → Inner" + (" [UNLOCKED]" if inner_unlocked else " [LOCKED]")
 		var color = aCoreVibeTheme.COLOR_ELECTRIC_LIME if inner_unlocked else aCoreVibeTheme.COLOR_CITRUS_YELLOW
 		aCoreVibeTheme.style_button(_unlock_middle, color, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
+		_unlock_middle.add_theme_stylebox_override("focus", StyleBoxEmpty.new())  # Remove grey focus box
 		_unlock_middle.custom_minimum_size = Vector2(180, 36)
 
 	if _unlock_inner:
@@ -1056,6 +1083,7 @@ func _update_detail(id: String) -> void:
 		_unlock_inner.text = "Inner → Core" + (" [UNLOCKED]" if core_unlocked else " [LOCKED]")
 		var color = aCoreVibeTheme.COLOR_ELECTRIC_LIME if core_unlocked else aCoreVibeTheme.COLOR_CITRUS_YELLOW
 		aCoreVibeTheme.style_button(_unlock_inner, color, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
+		_unlock_inner.add_theme_stylebox_override("focus", StyleBoxEmpty.new())  # Remove grey focus box
 		_unlock_inner.custom_minimum_size = Vector2(180, 36)
 
 	# Story points
@@ -1383,6 +1411,7 @@ func _on_story_points_pressed() -> void:
 	back_btn.custom_minimum_size = Vector2(120, 44)
 	back_btn.process_mode = Node.PROCESS_MODE_ALWAYS
 	aCoreVibeTheme.style_button(back_btn, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA, aCoreVibeTheme.CORNER_RADIUS_LARGE)
+	back_btn.add_theme_stylebox_override("focus", StyleBoxEmpty.new())  # Remove grey focus box
 	back_btn.pressed.connect(func() -> void:
 		_close_story_overlay()
 		# Restore focus to detail view after closing overlay
