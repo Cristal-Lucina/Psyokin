@@ -1438,9 +1438,9 @@ func _create_selection_arrows() -> void:
 
 		_start_arrow_pulse(_roster_selection_arrow)
 
-	# Create action menu arrow
+	# Create action menu arrow (to the right of the action panel, facing left)
 	_action_selection_arrow = Label.new()
-	_action_selection_arrow.text = "►"
+	_action_selection_arrow.text = "◄"
 	_action_selection_arrow.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_action_selection_arrow.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_action_selection_arrow.add_theme_font_size_override("font_size", 43)
@@ -1492,8 +1492,8 @@ func _update_roster_arrow_position() -> void:
 		_roster_dark_box.position = Vector2(box_x, box_y)
 
 func _update_action_arrow_position() -> void:
-	"""Update action menu arrow position"""
-	if not _action_selection_arrow:
+	"""Update action menu arrow position - to the right of the center panel, facing left"""
+	if not _action_selection_arrow or not _center_panel:
 		return
 
 	# Only show arrow if we're in ACTION_SELECT state
@@ -1511,14 +1511,19 @@ func _update_action_arrow_position() -> void:
 		_action_selection_arrow.visible = false
 		return
 
-	# Show arrow and position it to the right of the button
+	# Show arrow and position it to the right of the center panel, vertically aligned with button
 	_action_selection_arrow.visible = true
 
-	var btn_global_pos = current_btn.global_position
+	var center_panel_global_pos = _center_panel.global_position
 	var panel_global_pos = global_position
+	var center_panel_offset = center_panel_global_pos - panel_global_pos
+
+	var btn_global_pos = current_btn.global_position
 	var btn_offset_in_panel = btn_global_pos - panel_global_pos
 
-	var arrow_x = btn_offset_in_panel.x + current_btn.size.x + 8.0
+	# Position to the right of the center panel
+	var arrow_x = center_panel_offset.x + _center_panel.size.x + 8.0
+	# Vertically align with the current button
 	var arrow_y = btn_offset_in_panel.y + (current_btn.size.y / 2.0) - (_action_selection_arrow.size.y / 2.0)
 
 	_action_selection_arrow.position = Vector2(arrow_x, arrow_y)
