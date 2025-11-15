@@ -65,6 +65,9 @@ var _background_panel: PanelContainer = null
 var _roster_selection_arrow: Label = null
 var _roster_dark_box: PanelContainer = null
 
+# Selection arrow for action menu
+var _action_selection_arrow: Label = null
+
 # Right Panel - Details (bottom section)
 @onready var _detail_content: RichTextLabel = %DetailContent
 
@@ -798,11 +801,29 @@ func _focus_current_roster() -> void:
 			var focused_member: String = _all_members[_current_roster_index]
 			print("[DormsPanel._focus_current_roster] Focused member: ", focused_member)
 			_update_details_for_member(focused_member)
+
+	# Show roster arrow, hide action arrow
+	if _roster_selection_arrow:
+		_roster_selection_arrow.visible = true
+	if _roster_dark_box:
+		_roster_dark_box.visible = true
+	if _action_selection_arrow:
+		_action_selection_arrow.visible = false
+
 	_animate_panel_focus(NavState.ROSTER_SELECT)
 
 func _focus_current_room() -> void:
 	if _current_room_index >= 0 and _current_room_index < _room_buttons.size():
 		_room_buttons[_current_room_index].grab_focus()
+
+	# Hide both arrows when focusing on rooms
+	if _roster_selection_arrow:
+		_roster_selection_arrow.visible = false
+	if _roster_dark_box:
+		_roster_dark_box.visible = false
+	if _action_selection_arrow:
+		_action_selection_arrow.visible = false
+
 	_animate_panel_focus(NavState.ROOM_SELECT)
 
 func _focus_current_common() -> void:
@@ -813,11 +834,28 @@ func _focus_current_common() -> void:
 			var focused_member: String = _common_members[_current_common_index]
 			print("[DormsPanel._focus_current_common] Focused member: ", focused_member)
 			_update_details_for_member(focused_member)
+
+	# Hide both arrows when focusing on common room
+	if _roster_selection_arrow:
+		_roster_selection_arrow.visible = false
+	if _roster_dark_box:
+		_roster_dark_box.visible = false
+	if _action_selection_arrow:
+		_action_selection_arrow.visible = false
+
 	_animate_panel_focus(NavState.COMMON_SELECT)
 
 func _focus_current_action() -> void:
 	if _current_action_index >= 0 and _current_action_index < _action_buttons.size():
 		_action_buttons[_current_action_index].grab_focus()
+
+	# Hide roster arrow, update action arrow (will show only if button is enabled)
+	if _roster_selection_arrow:
+		_roster_selection_arrow.visible = false
+	if _roster_dark_box:
+		_roster_dark_box.visible = false
+	call_deferred("_update_action_arrow_position")
+
 	_animate_panel_focus(NavState.ACTION_SELECT)
 
 func _push_nav_state(new_state: NavState) -> void:
@@ -1383,8 +1421,8 @@ func _create_selection_arrows() -> void:
 		_roster_selection_arrow.size = Vector2(54, 72)
 
 		_roster_dark_box = PanelContainer.new()
-		_roster_dark_box.custom_minimum_size = Vector2(200, 20)
-		_roster_dark_box.size = Vector2(200, 20)
+		_roster_dark_box.custom_minimum_size = Vector2(240, 20)
+		_roster_dark_box.size = Vector2(240, 20)
 		_roster_dark_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_roster_dark_box.z_index = 99
 		var box_style = StyleBoxFlat.new()
@@ -1396,9 +1434,27 @@ func _create_selection_arrows() -> void:
 		_roster_dark_box.add_theme_stylebox_override("panel", box_style)
 		add_child(_roster_dark_box)
 		await get_tree().process_frame
-		_roster_dark_box.size = Vector2(200, 20)
+		_roster_dark_box.size = Vector2(240, 20)
 
 		_start_arrow_pulse(_roster_selection_arrow)
+
+	# Create action menu arrow
+	_action_selection_arrow = Label.new()
+	_action_selection_arrow.text = "►"
+	_action_selection_arrow.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_action_selection_arrow.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_action_selection_arrow.add_theme_font_size_override("font_size", 43)
+	_action_selection_arrow.modulate = Color(1, 1, 1, 1)
+	_action_selection_arrow.custom_minimum_size = Vector2(54, 40)
+	_action_selection_arrow.size = Vector2(54, 40)
+	_action_selection_arrow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_action_selection_arrow.z_index = 100
+	_action_selection_arrow.visible = false  # Initially hidden
+	add_child(_action_selection_arrow)
+	await get_tree().process_frame
+	_action_selection_arrow.size = Vector2(54, 40)
+
+	_start_arrow_pulse(_action_selection_arrow)
 
 	# Initial arrow position
 	call_deferred("_update_roster_arrow_position")
@@ -1434,6 +1490,38 @@ func _update_roster_arrow_position() -> void:
 		var box_x = arrow_x - _roster_dark_box.size.x - 4.0
 		var box_y = arrow_y + (_roster_selection_arrow.size.y / 2.0) - (_roster_dark_box.size.y / 2.0)
 		_roster_dark_box.position = Vector2(box_x, box_y)
+
+func _update_action_arrow_position() -> void:
+	"""Update action menu arrow position"""
+	if not _action_selection_arrow:
+		return
+
+	# Only show arrow if we're in ACTION_SELECT state
+	if _nav_state != NavState.ACTION_SELECT:
+		_action_selection_arrow.visible = false
+		return
+
+	# Only show if current button is enabled
+	if _current_action_index < 0 or _current_action_index >= _action_buttons.size():
+		_action_selection_arrow.visible = false
+		return
+
+	var current_btn: Button = _action_buttons[_current_action_index]
+	if not current_btn or current_btn.disabled:
+		_action_selection_arrow.visible = false
+		return
+
+	# Show arrow and position it to the right of the button
+	_action_selection_arrow.visible = true
+
+	var btn_global_pos = current_btn.global_position
+	var panel_global_pos = global_position
+	var btn_offset_in_panel = btn_global_pos - panel_global_pos
+
+	var arrow_x = btn_offset_in_panel.x + current_btn.size.x + 8.0
+	var arrow_y = btn_offset_in_panel.y + (current_btn.size.y / 2.0) - (_action_selection_arrow.size.y / 2.0)
+
+	_action_selection_arrow.position = Vector2(arrow_x, arrow_y)
 
 func _start_arrow_pulse(arrow: Label) -> void:
 	"""Start pulsing animation for arrow"""
