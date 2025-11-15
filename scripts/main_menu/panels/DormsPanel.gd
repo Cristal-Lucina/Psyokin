@@ -67,6 +67,7 @@ var _roster_dark_box: PanelContainer = null
 
 # Selection arrow for action menu
 var _action_selection_arrow: Label = null
+var _action_arrow_pulse_tween: Tween = null
 
 # Right Panel - Details (bottom section)
 @onready var _detail_content: RichTextLabel = %DetailContent
@@ -330,29 +331,12 @@ func _apply_core_vibe_styling() -> void:
 		assign_style_disabled.content_margin_top = 8
 		assign_style_disabled.content_margin_bottom = 8
 
-		# Disabled+Focused state: Same as disabled but with white border
-		var assign_style_disabled_focused = StyleBoxFlat.new()
-		assign_style_disabled_focused.bg_color = aCoreVibeTheme.COLOR_INK_CHARCOAL
-		assign_style_disabled_focused.border_color = aCoreVibeTheme.COLOR_MILK_WHITE
-		assign_style_disabled_focused.border_width_left = 2
-		assign_style_disabled_focused.border_width_right = 2
-		assign_style_disabled_focused.border_width_top = 2
-		assign_style_disabled_focused.border_width_bottom = 2
-		assign_style_disabled_focused.corner_radius_top_left = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
-		assign_style_disabled_focused.corner_radius_top_right = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
-		assign_style_disabled_focused.corner_radius_bottom_left = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
-		assign_style_disabled_focused.corner_radius_bottom_right = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
-		assign_style_disabled_focused.content_margin_left = 12
-		assign_style_disabled_focused.content_margin_right = 12
-		assign_style_disabled_focused.content_margin_top = 8
-		assign_style_disabled_focused.content_margin_bottom = 8
-
 		_assign_room_btn.add_theme_stylebox_override("normal", assign_style_normal)
 		_assign_room_btn.add_theme_stylebox_override("hover", assign_style_normal.duplicate())
 		_assign_room_btn.add_theme_stylebox_override("pressed", assign_style_normal.duplicate())
 		_assign_room_btn.add_theme_stylebox_override("focus", assign_style_focus)
 		_assign_room_btn.add_theme_stylebox_override("disabled", assign_style_disabled)
-		_assign_room_btn.add_theme_stylebox_override("disabled_focused", assign_style_disabled_focused)
+		_assign_room_btn.add_theme_stylebox_override("disabled_focused", assign_style_disabled.duplicate())
 
 		_assign_room_btn.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_ELECTRIC_LIME)
 		_assign_room_btn.add_theme_color_override("font_hover_color", aCoreVibeTheme.COLOR_ELECTRIC_LIME)
@@ -414,29 +398,12 @@ func _apply_core_vibe_styling() -> void:
 		move_style_disabled.content_margin_top = 8
 		move_style_disabled.content_margin_bottom = 8
 
-		# Disabled+Focused state: Same as disabled but with white border
-		var move_style_disabled_focused = StyleBoxFlat.new()
-		move_style_disabled_focused.bg_color = aCoreVibeTheme.COLOR_INK_CHARCOAL
-		move_style_disabled_focused.border_color = aCoreVibeTheme.COLOR_MILK_WHITE
-		move_style_disabled_focused.border_width_left = 2
-		move_style_disabled_focused.border_width_right = 2
-		move_style_disabled_focused.border_width_top = 2
-		move_style_disabled_focused.border_width_bottom = 2
-		move_style_disabled_focused.corner_radius_top_left = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
-		move_style_disabled_focused.corner_radius_top_right = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
-		move_style_disabled_focused.corner_radius_bottom_left = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
-		move_style_disabled_focused.corner_radius_bottom_right = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
-		move_style_disabled_focused.content_margin_left = 12
-		move_style_disabled_focused.content_margin_right = 12
-		move_style_disabled_focused.content_margin_top = 8
-		move_style_disabled_focused.content_margin_bottom = 8
-
 		_move_out_btn.add_theme_stylebox_override("normal", move_style_normal)
 		_move_out_btn.add_theme_stylebox_override("hover", move_style_normal.duplicate())
 		_move_out_btn.add_theme_stylebox_override("pressed", move_style_normal.duplicate())
 		_move_out_btn.add_theme_stylebox_override("focus", move_style_focus)
 		_move_out_btn.add_theme_stylebox_override("disabled", move_style_disabled)
-		_move_out_btn.add_theme_stylebox_override("disabled_focused", move_style_disabled_focused)
+		_move_out_btn.add_theme_stylebox_override("disabled_focused", move_style_disabled.duplicate())
 
 		_move_out_btn.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_CITRUS_YELLOW)
 		_move_out_btn.add_theme_color_override("font_hover_color", aCoreVibeTheme.COLOR_CITRUS_YELLOW)
@@ -498,29 +465,12 @@ func _apply_core_vibe_styling() -> void:
 		cancel_style_disabled.content_margin_top = 8
 		cancel_style_disabled.content_margin_bottom = 8
 
-		# Disabled+Focused state: Same as disabled but with white border
-		var cancel_style_disabled_focused = StyleBoxFlat.new()
-		cancel_style_disabled_focused.bg_color = aCoreVibeTheme.COLOR_INK_CHARCOAL
-		cancel_style_disabled_focused.border_color = aCoreVibeTheme.COLOR_MILK_WHITE
-		cancel_style_disabled_focused.border_width_left = 2
-		cancel_style_disabled_focused.border_width_right = 2
-		cancel_style_disabled_focused.border_width_top = 2
-		cancel_style_disabled_focused.border_width_bottom = 2
-		cancel_style_disabled_focused.corner_radius_top_left = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
-		cancel_style_disabled_focused.corner_radius_top_right = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
-		cancel_style_disabled_focused.corner_radius_bottom_left = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
-		cancel_style_disabled_focused.corner_radius_bottom_right = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
-		cancel_style_disabled_focused.content_margin_left = 12
-		cancel_style_disabled_focused.content_margin_right = 12
-		cancel_style_disabled_focused.content_margin_top = 8
-		cancel_style_disabled_focused.content_margin_bottom = 8
-
 		_cancel_move_btn.add_theme_stylebox_override("normal", cancel_style_normal)
 		_cancel_move_btn.add_theme_stylebox_override("hover", cancel_style_normal.duplicate())
 		_cancel_move_btn.add_theme_stylebox_override("pressed", cancel_style_normal.duplicate())
 		_cancel_move_btn.add_theme_stylebox_override("focus", cancel_style_focus)
 		_cancel_move_btn.add_theme_stylebox_override("disabled", cancel_style_disabled)
-		_cancel_move_btn.add_theme_stylebox_override("disabled_focused", cancel_style_disabled_focused)
+		_cancel_move_btn.add_theme_stylebox_override("disabled_focused", cancel_style_disabled.duplicate())
 
 		_cancel_move_btn.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_BUBBLE_MAGENTA)
 		_cancel_move_btn.add_theme_color_override("font_hover_color", aCoreVibeTheme.COLOR_BUBBLE_MAGENTA)
@@ -1454,8 +1404,6 @@ func _create_selection_arrows() -> void:
 	await get_tree().process_frame
 	_action_selection_arrow.size = Vector2(54, 40)
 
-	_start_arrow_pulse(_action_selection_arrow)
-
 	# Initial arrow position
 	call_deferred("_update_roster_arrow_position")
 
@@ -1499,16 +1447,28 @@ func _update_action_arrow_position() -> void:
 	# Only show arrow if we're in ACTION_SELECT state
 	if _nav_state != NavState.ACTION_SELECT:
 		_action_selection_arrow.visible = false
+		# Stop pulse animation when hiding arrow
+		if _action_arrow_pulse_tween and is_instance_valid(_action_arrow_pulse_tween):
+			_action_arrow_pulse_tween.kill()
+			_action_arrow_pulse_tween = null
 		return
 
 	# Only show if current button is enabled
 	if _current_action_index < 0 or _current_action_index >= _action_buttons.size():
 		_action_selection_arrow.visible = false
+		# Stop pulse animation when hiding arrow
+		if _action_arrow_pulse_tween and is_instance_valid(_action_arrow_pulse_tween):
+			_action_arrow_pulse_tween.kill()
+			_action_arrow_pulse_tween = null
 		return
 
 	var current_btn: Button = _action_buttons[_current_action_index]
 	if not current_btn or current_btn.disabled:
 		_action_selection_arrow.visible = false
+		# Stop pulse animation when hiding arrow
+		if _action_arrow_pulse_tween and is_instance_valid(_action_arrow_pulse_tween):
+			_action_arrow_pulse_tween.kill()
+			_action_arrow_pulse_tween = null
 		return
 
 	# Show arrow and position it to the right of the center panel, vertically aligned with button
@@ -1527,6 +1487,19 @@ func _update_action_arrow_position() -> void:
 	var arrow_y = btn_offset_in_panel.y + (current_btn.size.y / 2.0) - (_action_selection_arrow.size.y / 2.0)
 
 	_action_selection_arrow.position = Vector2(arrow_x, arrow_y)
+
+	# Restart pulse animation with new base position
+	if _action_arrow_pulse_tween and is_instance_valid(_action_arrow_pulse_tween):
+		_action_arrow_pulse_tween.kill()
+
+	_action_arrow_pulse_tween = create_tween()
+	_action_arrow_pulse_tween.set_loops()
+	_action_arrow_pulse_tween.set_trans(Tween.TRANS_SINE)
+	_action_arrow_pulse_tween.set_ease(Tween.EASE_IN_OUT)
+
+	# Pulse left (toward the panel it's pointing at)
+	_action_arrow_pulse_tween.tween_property(_action_selection_arrow, "position:x", arrow_x - 6, 0.6)
+	_action_arrow_pulse_tween.tween_property(_action_selection_arrow, "position:x", arrow_x, 0.6)
 
 func _start_arrow_pulse(arrow: Label) -> void:
 	"""Start pulsing animation for arrow"""
