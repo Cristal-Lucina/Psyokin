@@ -92,10 +92,9 @@ var _dark_box: PanelContainer = null
 @onready var _profile_desc : RichTextLabel = %Description
 
 # Detail widgets (from TSCN)
-@onready var _event_tv       : Label  = %EventProgress
-@onready var _layer_tv       : Label  = %LayerStage
-@onready var _points_tv      : Label  = %PointsBank
-@onready var _gift_tv        : Label  = %GiftStatus
+@onready var _event_tv       : Label  = %EventValue
+@onready var _layer_tv       : Label  = %LayerValue
+@onready var _points_tv      : Label  = %PointsValue
 @onready var _likes_tv       : Label  = %LikesValue
 @onready var _dislikes_tv    : Label  = %DislikesValue
 @onready var _unlock_hdr     : Label  = %UnlockHeader
@@ -108,6 +107,14 @@ var _dark_box: PanelContainer = null
 # Likes/Dislikes rows (containers with labels)
 var _likes_row      : HBoxContainer = null
 var _dislikes_row   : HBoxContainer = null
+
+# Event/Layer/Points rows and labels
+var _event_row      : HBoxContainer = null
+var _event_label    : Label = null
+var _layer_row      : HBoxContainer = null
+var _layer_label    : Label = null
+var _points_row     : HBoxContainer = null
+var _points_label   : Label = null
 
 # Old scene labels (may not exist - optional)
 var _lvl_tv    : Label          = null
@@ -134,6 +141,17 @@ func _ready() -> void:
 		_likes_row = _likes_tv.get_parent()
 	if _dislikes_tv:
 		_dislikes_row = _dislikes_tv.get_parent()
+
+	# Get event/layer/points row containers and labels
+	if _event_tv:
+		_event_row = _event_tv.get_parent()
+		_event_label = _event_row.get_node_or_null("EventLabel") if _event_row else null
+	if _layer_tv:
+		_layer_row = _layer_tv.get_parent()
+		_layer_label = _layer_row.get_node_or_null("LayerLabel") if _layer_row else null
+	if _points_tv:
+		_points_row = _points_tv.get_parent()
+		_points_label = _points_row.get_node_or_null("PointsLabel") if _points_row else null
 
 	_hide_level_cbxp_labels()
 	_wire_system_signals()
@@ -250,21 +268,29 @@ func _apply_core_vibe_styling() -> void:
 	if _name_tv:
 		aCoreVibeTheme.style_label(_name_tv, aCoreVibeTheme.COLOR_SKY_CYAN, 20)
 
+	# Style Event label (Milk White) and value (Sky Cyan)
+	if _event_label:
+		_event_label.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE)
+		_event_label.add_theme_font_size_override("font_size", 14)
 	if _event_tv:
-		_event_tv.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_ELECTRIC_LIME)
+		_event_tv.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_SKY_CYAN)
 		_event_tv.add_theme_font_size_override("font_size", 14)
 
+	# Style Layer label (Milk White) and value (Sky Cyan)
+	if _layer_label:
+		_layer_label.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE)
+		_layer_label.add_theme_font_size_override("font_size", 14)
 	if _layer_tv:
-		_layer_tv.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_ELECTRIC_LIME)
+		_layer_tv.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_SKY_CYAN)
 		_layer_tv.add_theme_font_size_override("font_size", 14)
 
+	# Style Points label (Milk White) and value (Sky Cyan)
+	if _points_label:
+		_points_label.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE)
+		_points_label.add_theme_font_size_override("font_size", 14)
 	if _points_tv:
-		_points_tv.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_ELECTRIC_LIME)
+		_points_tv.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_SKY_CYAN)
 		_points_tv.add_theme_font_size_override("font_size", 14)
-
-	if _gift_tv:
-		_gift_tv.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_CITRUS_YELLOW)
-		_gift_tv.add_theme_font_size_override("font_size", 14)
 
 	# Style likes/dislikes values
 	if _likes_tv:
@@ -921,10 +947,9 @@ func _update_detail(id: String) -> void:
 	# Handle empty selection
 	if id == "":
 		_name_tv.text = "—"
-		if _event_tv: _event_tv.text = "Event: —"
-		if _layer_tv: _layer_tv.text = "Layer: —"
-		if _points_tv: _points_tv.text = "Points: —"
-		if _gift_tv: _gift_tv.text = "Gift: —"
+		if _event_tv: _event_tv.text = "—"
+		if _layer_tv: _layer_tv.text = "—"
+		if _points_tv: _points_tv.text = "—"
 		if _desc: _desc.text = "[i]Select a bond to see details.[/i]"
 		if _profile_desc: _profile_desc.text = "[i]Have not met them.[/i]"
 		if _likes_tv: _likes_tv.text = "—"
@@ -975,34 +1000,25 @@ func _update_detail(id: String) -> void:
 	var layer_name: String = _read_layer_name(id)
 	var gift_used: bool = _read_gift_used(id)
 
-	# Event progress
+	# Event progress (value only, label is separate)
 	if _event_tv:
 		if event_idx == 0:
-			_event_tv.text = "Event: Not Started"
+			_event_tv.text = "Not Started"
 		else:
-			_event_tv.text = "Event: E%d Complete" % event_idx
+			_event_tv.text = "E%d Complete" % event_idx
 
-	# Layer stage
+	# Layer stage (value only, label is separate)
 	if _layer_tv:
-		_layer_tv.text = "Layer: %s" % layer_name
+		_layer_tv.text = "%s" % layer_name
 
-	# Points bank / threshold
+	# Points bank / threshold (value only, label is separate)
 	if _points_tv:
 		if event_idx == 0:
-			_points_tv.text = "Points: —"
+			_points_tv.text = "—"
 		elif threshold > 0:
-			_points_tv.text = "Points: %d / %d" % [points, threshold]
+			_points_tv.text = "%d / %d" % [points, threshold]
 		else:
-			_points_tv.text = "Points: %d (Max)" % points
-
-	# Gift status
-	if _gift_tv:
-		if event_idx == 0:
-			_gift_tv.text = "Gift: —"
-		elif gift_used:
-			_gift_tv.text = "Gift: Used this layer"
-		else:
-			_gift_tv.text = "Gift: Available"
+			_points_tv.text = "%d (Max)" % points
 
 	# Description
 	var rec: Dictionary = _bond_def(id)
@@ -1071,10 +1087,10 @@ func _update_detail(id: String) -> void:
 
 func _hide_all_detail_widgets() -> void:
 	if _name_tv: _name_tv.visible = false
-	if _event_tv: _event_tv.visible = false
-	if _layer_tv: _layer_tv.visible = false
-	if _points_tv: _points_tv.visible = false
-	if _gift_tv: _gift_tv.visible = false
+	# Hide the entire event/layer/points rows (includes labels and values)
+	if _event_row: _event_row.visible = false
+	if _layer_row: _layer_row.visible = false
+	if _points_row: _points_row.visible = false
 	# Hide the entire likes/dislikes rows (includes labels and values)
 	if _likes_row: _likes_row.visible = false
 	if _dislikes_row: _dislikes_row.visible = false
@@ -1088,10 +1104,10 @@ func _hide_all_detail_widgets() -> void:
 
 func _show_all_detail_widgets() -> void:
 	if _name_tv: _name_tv.visible = true
-	if _event_tv: _event_tv.visible = true
-	if _layer_tv: _layer_tv.visible = true
-	if _points_tv: _points_tv.visible = true
-	if _gift_tv: _gift_tv.visible = true
+	# Show the entire event/layer/points rows (includes labels and values)
+	if _event_row: _event_row.visible = true
+	if _layer_row: _layer_row.visible = true
+	if _points_row: _points_row.visible = true
 	# Show the entire likes/dislikes rows (includes labels and values)
 	if _likes_row: _likes_row.visible = true
 	if _dislikes_row: _dislikes_row.visible = true
@@ -1461,7 +1477,7 @@ func _create_selection_arrow() -> void:
 	_dark_box.custom_minimum_size = Vector2(160, 20)
 	_dark_box.size = Vector2(160, 20)
 	_dark_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_dark_box.z_index = 100  # Same layer as arrow
+	_dark_box.z_index = 99  # Behind arrow (arrow is at 100)
 
 	# Create Ink Charcoal rounded style
 	var box_style = StyleBoxFlat.new()

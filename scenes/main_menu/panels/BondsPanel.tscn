@@ -76,7 +76,7 @@ theme_override_constants/separation = 8
 
 [node name="DetailsLabel" type="Label" parent="Row/Right/Margin/VBox"]
 layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
+theme_override_colors/font_color = Color(1, 0.290196, 0.850980, 1)
 theme_override_font_sizes/font_size = 16
 text = "DETAILS"
 horizontal_alignment = 0
@@ -89,25 +89,44 @@ unique_name_in_owner = true
 layout_mode = 2
 text = "—"
 
-[node name="EventProgress" type="Label" parent="Row/Right/Margin/VBox"]
-unique_name_in_owner = true
+[node name="EventRow" type="HBoxContainer" parent="Row/Right/Margin/VBox"]
 layout_mode = 2
-text = "Event: —"
+theme_override_constants/separation = 6
 
-[node name="LayerStage" type="Label" parent="Row/Right/Margin/VBox"]
-unique_name_in_owner = true
+[node name="EventLabel" type="Label" parent="Row/Right/Margin/VBox/EventRow"]
 layout_mode = 2
-text = "Layer: —"
+text = "Event:"
 
-[node name="PointsBank" type="Label" parent="Row/Right/Margin/VBox"]
+[node name="EventValue" type="Label" parent="Row/Right/Margin/VBox/EventRow"]
 unique_name_in_owner = true
 layout_mode = 2
-text = "Points: —"
+text = "—"
 
-[node name="GiftStatus" type="Label" parent="Row/Right/Margin/VBox"]
+[node name="LayerRow" type="HBoxContainer" parent="Row/Right/Margin/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="LayerLabel" type="Label" parent="Row/Right/Margin/VBox/LayerRow"]
+layout_mode = 2
+text = "Layer:"
+
+[node name="LayerValue" type="Label" parent="Row/Right/Margin/VBox/LayerRow"]
 unique_name_in_owner = true
 layout_mode = 2
-text = "Gift: —"
+text = "—"
+
+[node name="PointsRow" type="HBoxContainer" parent="Row/Right/Margin/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="PointsLabel" type="Label" parent="Row/Right/Margin/VBox/PointsRow"]
+layout_mode = 2
+text = "Points:"
+
+[node name="PointsValue" type="Label" parent="Row/Right/Margin/VBox/PointsRow"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "—"
 
 [node name="Notes" type="RichTextLabel" parent="Row/Right/Margin/VBox"]
 unique_name_in_owner = true
@@ -151,7 +170,7 @@ text = "—"
 [node name="UnlockHeader" type="Label" parent="Row/Right/Margin/VBox"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
+theme_override_colors/font_color = Color(1, 0.290196, 0.850980, 1)
 theme_override_font_sizes/font_size = 16
 text = "LAYER TRANSITIONS"
 horizontal_alignment = 0
@@ -206,7 +225,7 @@ theme_override_constants/separation = 8
 
 [node name="ProfileLabel" type="Label" parent="Row/ProfilePanel/Margin/VBox"]
 layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
+theme_override_colors/font_color = Color(1, 0.290196, 0.850980, 1)
 theme_override_font_sizes/font_size = 16
 text = "PROFILE"
 horizontal_alignment = 0
