@@ -935,21 +935,10 @@ func _update_category_arrow_position() -> void:
 	if not _category_selection_arrow or not _category_list:
 		return
 
-	# Only show category arrow in CATEGORY_SELECT state
-	if _nav_state != NavState.CATEGORY_SELECT:
-		_category_selection_arrow.visible = false
-		if _category_dark_box:
-			_category_dark_box.visible = false
-		return
-
 	var selected = _category_list.get_selected_items()
 	if selected.size() == 0:
-		_category_selection_arrow.visible = false
-		if _category_dark_box:
-			_category_dark_box.visible = false
 		return
 
-	_category_selection_arrow.visible = true
 	await get_tree().process_frame
 
 	var item_index = selected[0]
@@ -978,21 +967,10 @@ func _update_mission_arrow_position() -> void:
 	if not _mission_selection_arrow or not _mission_list:
 		return
 
-	# Only show mission arrow in MISSION_LIST state
-	if _nav_state != NavState.MISSION_LIST:
-		_mission_selection_arrow.visible = false
-		if _mission_dark_box:
-			_mission_dark_box.visible = false
-		return
-
 	var selected = _mission_list.get_selected_items()
 	if selected.size() == 0:
-		_mission_selection_arrow.visible = false
-		if _mission_dark_box:
-			_mission_dark_box.visible = false
 		return
 
-	_mission_selection_arrow.visible = true
 	await get_tree().process_frame
 
 	var item_index = selected[0]
@@ -1083,10 +1061,6 @@ func _update_category_arrow_position_immediate() -> void:
 	if not _category_selection_arrow or not _category_list:
 		return
 
-	# Only update category arrow in CATEGORY_SELECT state
-	if _nav_state != NavState.CATEGORY_SELECT:
-		return
-
 	var selected = _category_list.get_selected_items()
 	if selected.size() == 0:
 		return
@@ -1114,10 +1088,6 @@ func _update_category_arrow_position_immediate() -> void:
 func _update_mission_arrow_position_immediate() -> void:
 	"""Immediate mission arrow position update without await"""
 	if not _mission_selection_arrow or not _mission_list:
-		return
-
-	# Only update mission arrow in MISSION_LIST state
-	if _nav_state != NavState.MISSION_LIST:
 		return
 
 	var selected = _mission_list.get_selected_items()
