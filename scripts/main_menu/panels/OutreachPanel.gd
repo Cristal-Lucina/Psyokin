@@ -988,11 +988,9 @@ func _update_mission_arrow_position() -> void:
 
 	_mission_selection_arrow.position = Vector2(arrow_x, arrow_y)
 
+	# Mission dark box is never shown
 	if _mission_dark_box:
-		_mission_dark_box.visible = true
-		var box_x = arrow_x - _mission_dark_box.size.x - 4.0
-		var box_y = arrow_y + (_mission_selection_arrow.size.y / 2.0) - (_mission_dark_box.size.y / 2.0)
-		_mission_dark_box.position = Vector2(box_x, box_y)
+		_mission_dark_box.visible = false
 
 func _start_arrow_pulse(arrow: Label) -> void:
 	"""Start pulsing animation for an arrow"""
@@ -1109,10 +1107,9 @@ func _update_mission_arrow_position_immediate() -> void:
 
 	_mission_selection_arrow.position = Vector2(arrow_x, arrow_y)
 
+	# Mission dark box is never shown
 	if _mission_dark_box:
-		var box_x = arrow_x - _mission_dark_box.size.x - 4.0
-		var box_y = arrow_y + (_mission_selection_arrow.size.y / 2.0) - (_mission_dark_box.size.y / 2.0)
-		_mission_dark_box.position = Vector2(box_x, box_y)
+		_mission_dark_box.visible = false
 
 func _on_panel_animation_finished() -> void:
 	"""Called when panel animation completes"""
@@ -1136,12 +1133,10 @@ func _enter_category_select_state() -> void:
 	# Show category arrow, hide mission arrow
 	if _category_selection_arrow:
 		_category_selection_arrow.visible = true
-	if _category_dark_box:
-		_category_dark_box.visible = true
+	# Category dark box always stays visible
 	if _mission_selection_arrow:
 		_mission_selection_arrow.visible = false
-	if _mission_dark_box:
-		_mission_dark_box.visible = false
+	# Mission dark box always stays hidden
 
 	_animate_panel_focus(NavState.CATEGORY_SELECT)
 	call_deferred("_update_category_arrow_position")
@@ -1155,15 +1150,13 @@ func _enter_mission_list_state() -> void:
 		if _mission_list.get_selected_items().is_empty():
 			_mission_list.select(0)
 
-	# Hide category arrow, show mission arrow
+	# Hide category arrow, show mission arrow (but not mission dark box)
 	if _category_selection_arrow:
 		_category_selection_arrow.visible = false
-	if _category_dark_box:
-		_category_dark_box.visible = false
+	# Category dark box always stays visible
 	if _mission_selection_arrow:
 		_mission_selection_arrow.visible = true
-	if _mission_dark_box:
-		_mission_dark_box.visible = true
+	# Mission dark box always stays hidden
 
 	_animate_panel_focus(NavState.MISSION_LIST)
 	call_deferred("_update_mission_arrow_position")
