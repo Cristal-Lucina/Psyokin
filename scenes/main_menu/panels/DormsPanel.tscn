@@ -56,7 +56,7 @@ theme_override_constants/separation = 8
 
 [node name="RosterLabel" type="Label" parent="Root/MainContent/LeftPanel/Margin/VBox"]
 layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
+theme_override_colors/font_color = Color(1, 0.290196, 0.850980, 1)
 theme_override_font_sizes/font_size = 16
 text = "DORM ROSTER"
 horizontal_alignment = 0
@@ -74,7 +74,7 @@ layout_mode = 2
 
 [node name="CommonLabel" type="Label" parent="Root/MainContent/LeftPanel/Margin/VBox"]
 layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
+theme_override_colors/font_color = Color(1, 0.290196, 0.850980, 1)
 theme_override_font_sizes/font_size = 16
 text = "COMMON ROOM"
 horizontal_alignment = 0
@@ -113,7 +113,7 @@ theme_override_constants/separation = 8
 
 [node name="ActionLabel" type="Label" parent="Root/MainContent/CenterPanel/Margin/VBox"]
 layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
+theme_override_colors/font_color = Color(1, 0.290196, 0.850980, 1)
 theme_override_font_sizes/font_size = 16
 text = "ACTION MENU"
 horizontal_alignment = 0
@@ -165,7 +165,7 @@ theme_override_constants/separation = 8
 
 [node name="RoomsLabel" type="Label" parent="Root/MainContent/RightPanel/Margin/VBox/RoomsSection"]
 layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
+theme_override_colors/font_color = Color(1, 0.290196, 0.850980, 1)
 theme_override_font_sizes/font_size = 16
 text = "ROOMS (301-308)"
 horizontal_alignment = 0
@@ -197,7 +197,7 @@ theme_override_constants/separation = 8
 
 [node name="DetailsLabel" type="Label" parent="Root/MainContent/RightPanel/Margin/VBox/DetailsSection"]
 layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
+theme_override_colors/font_color = Color(1, 0.290196, 0.850980, 1)
 theme_override_font_sizes/font_size = 16
 text = "DETAILS"
 horizontal_alignment = 0

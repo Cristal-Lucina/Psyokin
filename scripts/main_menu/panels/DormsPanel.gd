@@ -61,6 +61,10 @@ var _background_panel: PanelContainer = null
 # Left Panel - Roster
 @onready var _roster_list: ItemList = %RosterList
 
+# Selection arrow and dark box for roster
+var _roster_selection_arrow: Label = null
+var _roster_dark_box: PanelContainer = null
+
 # Right Panel - Details (bottom section)
 @onready var _detail_content: RichTextLabel = %DetailContent
 
@@ -114,6 +118,13 @@ const ACTIVE_SCALE := 1.10  # Active panel grows by 10%
 const INACTIVE_SCALE := 0.95  # Inactive panels shrink by 5%
 const ANIM_DURATION := 0.2  # Animation duration in seconds
 
+# Button pulse animation
+var _button_pulse_tween: Tween = null
+var _button_pulse_target: Button = null
+
+# Panel animation tracking
+var _panel_animating: bool = false
+
 # ═══════════════════════════════════════════════════════════════════════════
 # INITIALIZATION
 # ═══════════════════════════════════════════════════════════════════════════
@@ -123,6 +134,9 @@ func _ready() -> void:
 
 	# Set process mode to work while game is paused
 	process_mode = Node.PROCESS_MODE_ALWAYS
+
+	# Disable process by default (enabled during panel animations)
+	set_process(false)
 
 	print("[DormsPanel._ready] Starting initialization")
 
@@ -249,18 +263,166 @@ func _apply_core_vibe_styling() -> void:
 		_detail_content.add_theme_color_override("default_color", aCoreVibeTheme.COLOR_MILK_WHITE)
 		_detail_content.add_theme_font_size_override("normal_font_size", 14)
 
-	# Style action buttons
+	# Style roster list like BondsPanel/OutreachPanel
+	if _roster_list:
+		_roster_list.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE)
+		_roster_list.add_theme_color_override("font_selected_color", aCoreVibeTheme.COLOR_SKY_CYAN)
+		_roster_list.add_theme_color_override("font_hovered_color", aCoreVibeTheme.COLOR_SKY_CYAN)
+		_roster_list.add_theme_font_size_override("font_size", 18)
+		_roster_list.z_index = 200  # Above arrow and box
+		# Remove all borders and backgrounds
+		var empty_stylebox = StyleBoxEmpty.new()
+		_roster_list.add_theme_stylebox_override("panel", empty_stylebox)
+		_roster_list.add_theme_stylebox_override("focus", empty_stylebox)
+		_roster_list.add_theme_stylebox_override("selected", empty_stylebox)
+		_roster_list.add_theme_stylebox_override("selected_focus", empty_stylebox)
+		_roster_list.add_theme_stylebox_override("cursor", empty_stylebox)
+		_roster_list.add_theme_stylebox_override("cursor_unfocused", empty_stylebox)
+
+	# Style action buttons with focus states and pulse
 	if _assign_room_btn:
-		aCoreVibeTheme.style_button(_assign_room_btn, aCoreVibeTheme.COLOR_ELECTRIC_LIME, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
+		# Normal state: Outlined Electric Lime
+		var assign_style_normal = StyleBoxFlat.new()
+		assign_style_normal.bg_color = Color(0, 0, 0, 0)
+		assign_style_normal.border_color = aCoreVibeTheme.COLOR_ELECTRIC_LIME
+		assign_style_normal.border_width_left = 2
+		assign_style_normal.border_width_right = 2
+		assign_style_normal.border_width_top = 2
+		assign_style_normal.border_width_bottom = 2
+		assign_style_normal.corner_radius_top_left = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+		assign_style_normal.corner_radius_top_right = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+		assign_style_normal.corner_radius_bottom_left = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+		assign_style_normal.corner_radius_bottom_right = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+		assign_style_normal.content_margin_left = 12
+		assign_style_normal.content_margin_right = 12
+		assign_style_normal.content_margin_top = 8
+		assign_style_normal.content_margin_bottom = 8
+
+		# Focus state: Filled Electric Lime
+		var assign_style_focus = StyleBoxFlat.new()
+		assign_style_focus.bg_color = aCoreVibeTheme.COLOR_ELECTRIC_LIME
+		assign_style_focus.corner_radius_top_left = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+		assign_style_focus.corner_radius_top_right = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+		assign_style_focus.corner_radius_bottom_left = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+		assign_style_focus.corner_radius_bottom_right = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+		assign_style_focus.content_margin_left = 12
+		assign_style_focus.content_margin_right = 12
+		assign_style_focus.content_margin_top = 8
+		assign_style_focus.content_margin_bottom = 8
+
+		_assign_room_btn.add_theme_stylebox_override("normal", assign_style_normal)
+		_assign_room_btn.add_theme_stylebox_override("hover", assign_style_normal.duplicate())
+		_assign_room_btn.add_theme_stylebox_override("pressed", assign_style_normal.duplicate())
+		_assign_room_btn.add_theme_stylebox_override("focus", assign_style_focus)
+
+		_assign_room_btn.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_ELECTRIC_LIME)
+		_assign_room_btn.add_theme_color_override("font_hover_color", aCoreVibeTheme.COLOR_ELECTRIC_LIME)
+		_assign_room_btn.add_theme_color_override("font_pressed_color", aCoreVibeTheme.COLOR_ELECTRIC_LIME)
+		_assign_room_btn.add_theme_color_override("font_focus_color", aCoreVibeTheme.COLOR_NIGHT_NAVY)
 		_assign_room_btn.custom_minimum_size = Vector2(140, 40)
 
+		# Connect focus signals for pulse
+		if not _assign_room_btn.focus_entered.is_connected(_on_button_focus_entered):
+			_assign_room_btn.focus_entered.connect(_on_button_focus_entered.bind(_assign_room_btn))
+		if not _assign_room_btn.focus_exited.is_connected(_on_button_focus_exited):
+			_assign_room_btn.focus_exited.connect(_on_button_focus_exited)
+
 	if _move_out_btn:
-		aCoreVibeTheme.style_button(_move_out_btn, aCoreVibeTheme.COLOR_CITRUS_YELLOW, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
+		# Normal state: Outlined Citrus Yellow
+		var move_style_normal = StyleBoxFlat.new()
+		move_style_normal.bg_color = Color(0, 0, 0, 0)
+		move_style_normal.border_color = aCoreVibeTheme.COLOR_CITRUS_YELLOW
+		move_style_normal.border_width_left = 2
+		move_style_normal.border_width_right = 2
+		move_style_normal.border_width_top = 2
+		move_style_normal.border_width_bottom = 2
+		move_style_normal.corner_radius_top_left = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+		move_style_normal.corner_radius_top_right = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+		move_style_normal.corner_radius_bottom_left = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+		move_style_normal.corner_radius_bottom_right = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+		move_style_normal.content_margin_left = 12
+		move_style_normal.content_margin_right = 12
+		move_style_normal.content_margin_top = 8
+		move_style_normal.content_margin_bottom = 8
+
+		# Focus state: Filled Citrus Yellow
+		var move_style_focus = StyleBoxFlat.new()
+		move_style_focus.bg_color = aCoreVibeTheme.COLOR_CITRUS_YELLOW
+		move_style_focus.corner_radius_top_left = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+		move_style_focus.corner_radius_top_right = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+		move_style_focus.corner_radius_bottom_left = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+		move_style_focus.corner_radius_bottom_right = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+		move_style_focus.content_margin_left = 12
+		move_style_focus.content_margin_right = 12
+		move_style_focus.content_margin_top = 8
+		move_style_focus.content_margin_bottom = 8
+
+		_move_out_btn.add_theme_stylebox_override("normal", move_style_normal)
+		_move_out_btn.add_theme_stylebox_override("hover", move_style_normal.duplicate())
+		_move_out_btn.add_theme_stylebox_override("pressed", move_style_normal.duplicate())
+		_move_out_btn.add_theme_stylebox_override("focus", move_style_focus)
+
+		_move_out_btn.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_CITRUS_YELLOW)
+		_move_out_btn.add_theme_color_override("font_hover_color", aCoreVibeTheme.COLOR_CITRUS_YELLOW)
+		_move_out_btn.add_theme_color_override("font_pressed_color", aCoreVibeTheme.COLOR_CITRUS_YELLOW)
+		_move_out_btn.add_theme_color_override("font_focus_color", aCoreVibeTheme.COLOR_NIGHT_NAVY)
 		_move_out_btn.custom_minimum_size = Vector2(140, 40)
 
+		# Connect focus signals for pulse
+		if not _move_out_btn.focus_entered.is_connected(_on_button_focus_entered):
+			_move_out_btn.focus_entered.connect(_on_button_focus_entered.bind(_move_out_btn))
+		if not _move_out_btn.focus_exited.is_connected(_on_button_focus_exited):
+			_move_out_btn.focus_exited.connect(_on_button_focus_exited)
+
 	if _cancel_move_btn:
-		aCoreVibeTheme.style_button(_cancel_move_btn, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
+		# Normal state: Outlined Bubble Magenta
+		var cancel_style_normal = StyleBoxFlat.new()
+		cancel_style_normal.bg_color = Color(0, 0, 0, 0)
+		cancel_style_normal.border_color = aCoreVibeTheme.COLOR_BUBBLE_MAGENTA
+		cancel_style_normal.border_width_left = 2
+		cancel_style_normal.border_width_right = 2
+		cancel_style_normal.border_width_top = 2
+		cancel_style_normal.border_width_bottom = 2
+		cancel_style_normal.corner_radius_top_left = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+		cancel_style_normal.corner_radius_top_right = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+		cancel_style_normal.corner_radius_bottom_left = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+		cancel_style_normal.corner_radius_bottom_right = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+		cancel_style_normal.content_margin_left = 12
+		cancel_style_normal.content_margin_right = 12
+		cancel_style_normal.content_margin_top = 8
+		cancel_style_normal.content_margin_bottom = 8
+
+		# Focus state: Filled Bubble Magenta
+		var cancel_style_focus = StyleBoxFlat.new()
+		cancel_style_focus.bg_color = aCoreVibeTheme.COLOR_BUBBLE_MAGENTA
+		cancel_style_focus.corner_radius_top_left = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+		cancel_style_focus.corner_radius_top_right = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+		cancel_style_focus.corner_radius_bottom_left = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+		cancel_style_focus.corner_radius_bottom_right = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+		cancel_style_focus.content_margin_left = 12
+		cancel_style_focus.content_margin_right = 12
+		cancel_style_focus.content_margin_top = 8
+		cancel_style_focus.content_margin_bottom = 8
+
+		_cancel_move_btn.add_theme_stylebox_override("normal", cancel_style_normal)
+		_cancel_move_btn.add_theme_stylebox_override("hover", cancel_style_normal.duplicate())
+		_cancel_move_btn.add_theme_stylebox_override("pressed", cancel_style_normal.duplicate())
+		_cancel_move_btn.add_theme_stylebox_override("focus", cancel_style_focus)
+
+		_cancel_move_btn.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_BUBBLE_MAGENTA)
+		_cancel_move_btn.add_theme_color_override("font_hover_color", aCoreVibeTheme.COLOR_BUBBLE_MAGENTA)
+		_cancel_move_btn.add_theme_color_override("font_pressed_color", aCoreVibeTheme.COLOR_BUBBLE_MAGENTA)
+		_cancel_move_btn.add_theme_color_override("font_focus_color", aCoreVibeTheme.COLOR_NIGHT_NAVY)
 		_cancel_move_btn.custom_minimum_size = Vector2(140, 40)
+
+		# Connect focus signals for pulse
+		if not _cancel_move_btn.focus_entered.is_connected(_on_button_focus_entered):
+			_cancel_move_btn.focus_entered.connect(_on_button_focus_entered.bind(_cancel_move_btn))
+		if not _cancel_move_btn.focus_exited.is_connected(_on_button_focus_exited):
+			_cancel_move_btn.focus_exited.connect(_on_button_focus_exited)
+
+	# Create selection arrows and dark box for roster
+	call_deferred("_create_selection_arrows")
 
 func _ds() -> Node:
 	return get_node_or_null("/root/aDormSystem")
@@ -348,6 +510,8 @@ func _navigate_up() -> void:
 			if _roster_list and _current_roster_index > 0:
 				_current_roster_index -= 1
 				_focus_current_roster()
+				# Update arrow position after selection change
+				call_deferred("_update_roster_arrow_position")
 		NavState.ROOM_SELECT:
 			# 2x4 grid: move up one row (subtract 4)
 			var new_index: int = _current_room_index - 4
@@ -370,6 +534,8 @@ func _navigate_down() -> void:
 			if _roster_list and _current_roster_index < _roster_list.item_count - 1:
 				_current_roster_index += 1
 				_focus_current_roster()
+				# Update arrow position after selection change
+				call_deferred("_update_roster_arrow_position")
 		NavState.ROOM_SELECT:
 			# 2x4 grid: move down one row (add 4)
 			var new_index: int = _current_room_index + 4
@@ -1082,6 +1248,176 @@ func _try_assign_to_room(room_id: String) -> void:
 	_focus_current_roster()
 
 # ═══════════════════════════════════════════════════════════════════════════
+# SELECTION ARROWS & DARK BOX
+# ═══════════════════════════════════════════════════════════════════════════
+
+func _create_selection_arrows() -> void:
+	"""Create selection arrow and dark box for roster list"""
+	if _roster_list:
+		_roster_selection_arrow = Label.new()
+		_roster_selection_arrow.text = "◄"
+		_roster_selection_arrow.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_roster_selection_arrow.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		_roster_selection_arrow.add_theme_font_size_override("font_size", 43)
+		_roster_selection_arrow.modulate = Color(1, 1, 1, 1)
+		_roster_selection_arrow.custom_minimum_size = Vector2(54, 72)
+		_roster_selection_arrow.size = Vector2(54, 72)
+		_roster_selection_arrow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_roster_selection_arrow.z_index = 100
+		add_child(_roster_selection_arrow)
+		await get_tree().process_frame
+		_roster_selection_arrow.size = Vector2(54, 72)
+
+		_roster_dark_box = PanelContainer.new()
+		_roster_dark_box.custom_minimum_size = Vector2(160, 20)
+		_roster_dark_box.size = Vector2(160, 20)
+		_roster_dark_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_roster_dark_box.z_index = 99
+		var box_style = StyleBoxFlat.new()
+		box_style.bg_color = aCoreVibeTheme.COLOR_INK_CHARCOAL
+		box_style.corner_radius_top_left = 8
+		box_style.corner_radius_top_right = 8
+		box_style.corner_radius_bottom_left = 8
+		box_style.corner_radius_bottom_right = 8
+		_roster_dark_box.add_theme_stylebox_override("panel", box_style)
+		add_child(_roster_dark_box)
+		await get_tree().process_frame
+		_roster_dark_box.size = Vector2(160, 20)
+
+		_start_arrow_pulse(_roster_selection_arrow)
+
+	# Initial arrow position
+	call_deferred("_update_roster_arrow_position")
+
+func _update_roster_arrow_position() -> void:
+	"""Update roster arrow and dark box position"""
+	if not _roster_selection_arrow or not _roster_list:
+		return
+
+	var selected = _roster_list.get_selected_items()
+	if selected.size() == 0:
+		return
+
+	await get_tree().process_frame
+
+	var item_index = selected[0]
+	var item_rect = _roster_list.get_item_rect(item_index)
+	var list_global_pos = _roster_list.global_position
+	var panel_global_pos = global_position
+	var list_offset_in_panel = list_global_pos - panel_global_pos
+
+	var scroll_offset = 0.0
+	if _roster_list.get_v_scroll_bar():
+		scroll_offset = _roster_list.get_v_scroll_bar().value
+
+	var arrow_x = list_offset_in_panel.x + _roster_list.size.x - 8.0 - 80.0 + 40.0
+	var arrow_y = list_offset_in_panel.y + item_rect.position.y - scroll_offset + (item_rect.size.y / 2.0) - (_roster_selection_arrow.size.y / 2.0)
+
+	_roster_selection_arrow.position = Vector2(arrow_x, arrow_y)
+
+	if _roster_dark_box:
+		_roster_dark_box.visible = true
+		var box_x = arrow_x - _roster_dark_box.size.x - 4.0
+		var box_y = arrow_y + (_roster_selection_arrow.size.y / 2.0) - (_roster_dark_box.size.y / 2.0)
+		_roster_dark_box.position = Vector2(box_x, box_y)
+
+func _start_arrow_pulse(arrow: Label) -> void:
+	"""Start pulsing animation for arrow"""
+	if not arrow:
+		return
+
+	var tween = create_tween()
+	tween.set_loops()
+	tween.set_trans(Tween.TRANS_SINE)
+	tween.set_ease(Tween.EASE_IN_OUT)
+
+	var base_x = arrow.position.x
+	tween.tween_property(arrow, "position:x", base_x - 6, 0.6)
+	tween.tween_property(arrow, "position:x", base_x, 0.6)
+
+# ═══════════════════════════════════════════════════════════════════════════
+# BUTTON PULSE ANIMATION
+# ═══════════════════════════════════════════════════════════════════════════
+
+func _on_button_focus_entered(button: Button) -> void:
+	"""Start pulsing animation when button gains focus"""
+	_start_button_pulse(button)
+
+func _on_button_focus_exited() -> void:
+	"""Stop pulsing animation when button loses focus"""
+	_stop_button_pulse()
+
+func _start_button_pulse(button: Button) -> void:
+	"""Start pulsing animation for a button"""
+	if not button:
+		return
+
+	_stop_button_pulse()
+	_button_pulse_target = button
+
+	_button_pulse_tween = create_tween()
+	_button_pulse_tween.set_loops()
+	_button_pulse_tween.set_trans(Tween.TRANS_SINE)
+	_button_pulse_tween.set_ease(Tween.EASE_IN_OUT)
+
+	_button_pulse_tween.tween_property(button, "scale", Vector2(1.05, 1.05), 0.6)
+	_button_pulse_tween.tween_property(button, "scale", Vector2(1.0, 1.0), 0.6)
+
+func _stop_button_pulse() -> void:
+	"""Stop button pulsing animation"""
+	if _button_pulse_tween and is_instance_valid(_button_pulse_tween):
+		_button_pulse_tween.kill()
+		_button_pulse_tween = null
+
+	if _button_pulse_target and is_instance_valid(_button_pulse_target):
+		_button_pulse_target.scale = Vector2(1.0, 1.0)
+		_button_pulse_target = null
+
+# ═══════════════════════════════════════════════════════════════════════════
+# CONTINUOUS ARROW UPDATE DURING PANEL ANIMATION
+# ═══════════════════════════════════════════════════════════════════════════
+
+func _process(_delta: float) -> void:
+	"""Update arrow position during panel animations"""
+	if _panel_animating:
+		call_deferred("_update_roster_arrow_position_immediate")
+
+func _update_roster_arrow_position_immediate() -> void:
+	"""Immediate roster arrow position update without await"""
+	if not _roster_selection_arrow or not _roster_list:
+		return
+
+	var selected = _roster_list.get_selected_items()
+	if selected.size() == 0:
+		return
+
+	var item_index = selected[0]
+	var item_rect = _roster_list.get_item_rect(item_index)
+	var list_global_pos = _roster_list.global_position
+	var panel_global_pos = global_position
+	var list_offset_in_panel = list_global_pos - panel_global_pos
+
+	var scroll_offset = 0.0
+	if _roster_list.get_v_scroll_bar():
+		scroll_offset = _roster_list.get_v_scroll_bar().value
+
+	var arrow_x = list_offset_in_panel.x + _roster_list.size.x - 8.0 - 80.0 + 40.0
+	var arrow_y = list_offset_in_panel.y + item_rect.position.y - scroll_offset + (item_rect.size.y / 2.0) - (_roster_selection_arrow.size.y / 2.0)
+
+	_roster_selection_arrow.position = Vector2(arrow_x, arrow_y)
+
+	if _roster_dark_box:
+		var box_x = arrow_x - _roster_dark_box.size.x - 4.0
+		var box_y = arrow_y + (_roster_selection_arrow.size.y / 2.0) - (_roster_dark_box.size.y / 2.0)
+		_roster_dark_box.position = Vector2(box_x, box_y)
+
+func _on_panel_animation_finished() -> void:
+	"""Called when panel animation completes"""
+	_panel_animating = false
+	set_process(false)
+	call_deferred("_update_roster_arrow_position")
+
+# ═══════════════════════════════════════════════════════════════════════════
 # VISUAL HELPERS
 # ═══════════════════════════════════════════════════════════════════════════
 
@@ -1089,6 +1425,10 @@ func _animate_panel_focus(active_panel: NavState) -> void:
 	"""Animate panels to highlight which one is currently active"""
 	if not _left_panel or not _center_panel or not _right_panel:
 		return
+
+	# Set animation flag to enable continuous arrow position updates
+	_panel_animating = true
+	set_process(true)
 
 	var left_ratio := BASE_LEFT_RATIO
 	var center_ratio := BASE_CENTER_RATIO
@@ -1118,6 +1458,9 @@ func _animate_panel_focus(active_panel: NavState) -> void:
 	tween.tween_property(_left_panel, "size_flags_stretch_ratio", left_ratio, ANIM_DURATION)
 	tween.tween_property(_center_panel, "size_flags_stretch_ratio", center_ratio, ANIM_DURATION)
 	tween.tween_property(_right_panel, "size_flags_stretch_ratio", right_ratio, ANIM_DURATION)
+
+	# Connect to finished signal to stop arrow updates
+	tween.finished.connect(_on_panel_animation_finished)
 
 func _apply_room_visual(btn: Button, room_id: String) -> void:
 	var ds: Node = _ds()

@@ -88,14 +88,12 @@ var _selection_arrow: Label = null
 var _dark_box: PanelContainer = null
 
 @onready var _name_tv   : Label          = %Name
-@onready var _desc      : RichTextLabel  = %Notes
 @onready var _profile_desc : RichTextLabel = %Description
 
 # Detail widgets (from TSCN)
-@onready var _event_tv       : Label  = %EventProgress
-@onready var _layer_tv       : Label  = %LayerStage
-@onready var _points_tv      : Label  = %PointsBank
-@onready var _gift_tv        : Label  = %GiftStatus
+@onready var _event_tv       : Label  = %EventValue
+@onready var _layer_tv       : Label  = %LayerValue
+@onready var _points_tv      : Label  = %PointsValue
 @onready var _likes_tv       : Label  = %LikesValue
 @onready var _dislikes_tv    : Label  = %DislikesValue
 @onready var _unlock_hdr     : Label  = %UnlockHeader
@@ -109,11 +107,26 @@ var _dark_box: PanelContainer = null
 var _likes_row      : HBoxContainer = null
 var _dislikes_row   : HBoxContainer = null
 
+# Event/Layer/Points rows and labels
+var _event_row      : HBoxContainer = null
+var _event_label    : Label = null
+var _layer_row      : HBoxContainer = null
+var _layer_label    : Label = null
+var _points_row     : HBoxContainer = null
+var _points_label   : Label = null
+
 # Old scene labels (may not exist - optional)
 var _lvl_tv    : Label          = null
 var _xp_tv     : Label          = null
 
 var _story_overlay  : CanvasLayer    = null
+
+# Button pulse animation
+var _button_pulse_tween: Tween = null
+var _button_pulse_target: Button = null
+
+# Panel animation tracking
+var _panel_animating: bool = false
 
 # Data / state
 var _sys  : Node = null
@@ -122,6 +135,9 @@ var _selected : String = ""
 
 func _ready() -> void:
 	super()  # Call PanelBase._ready()
+
+	# Disable process by default (enabled during panel animations)
+	set_process(false)
 
 	_sys = get_node_or_null(SYS_PATH)
 
@@ -134,6 +150,17 @@ func _ready() -> void:
 		_likes_row = _likes_tv.get_parent()
 	if _dislikes_tv:
 		_dislikes_row = _dislikes_tv.get_parent()
+
+	# Get event/layer/points row containers and labels
+	if _event_tv:
+		_event_row = _event_tv.get_parent()
+		_event_label = _event_row.get_node_or_null("EventLabel") if _event_row else null
+	if _layer_tv:
+		_layer_row = _layer_tv.get_parent()
+		_layer_label = _layer_row.get_node_or_null("LayerLabel") if _layer_row else null
+	if _points_tv:
+		_points_row = _points_tv.get_parent()
+		_points_label = _points_row.get_node_or_null("PointsLabel") if _points_row else null
 
 	_hide_level_cbxp_labels()
 	_wire_system_signals()
@@ -173,6 +200,56 @@ func _ready() -> void:
 		_unlock_inner.pressed.connect(_on_unlock_button_pressed.bind("inner_to_core"))
 
 	_rebuild()
+
+func _process(_delta: float) -> void:
+	"""Update arrow position during panel animations"""
+	if _panel_animating and _selection_arrow and _selection_arrow.visible:
+		# Update arrow position to follow the list during panel resize
+		# Use call_deferred to avoid layout issues
+		call_deferred("_update_arrow_position_immediate")
+
+func _update_arrow_position_immediate() -> void:
+	"""Immediate arrow position update without await (for use in _process)"""
+	if not _selection_arrow or not _list:
+		return
+
+	var selected = _list.get_selected_items()
+	if selected.size() == 0:
+		return
+
+	# Get the rect of the selected item in ItemList's local coordinates
+	var item_index = selected[0]
+	var item_rect = _list.get_item_rect(item_index)
+
+	# Convert to BondsPanel coordinates
+	var list_global_pos = _list.global_position
+	var panel_global_pos = global_position
+	var list_offset_in_panel = list_global_pos - panel_global_pos
+
+	# Get scroll offset
+	var scroll_offset = 0.0
+	if _list.get_v_scroll_bar():
+		var vscroll = _list.get_v_scroll_bar()
+		scroll_offset = vscroll.value
+
+	# Position arrow to the right of the bonds list
+	var arrow_x = list_offset_in_panel.x + _list.size.x - 8.0 - 80.0 + 40.0
+	var arrow_y = list_offset_in_panel.y + item_rect.position.y - scroll_offset + (item_rect.size.y / 2.0) - (_selection_arrow.size.y / 2.0)
+
+	_selection_arrow.position = Vector2(arrow_x, arrow_y)
+
+	# Position dark box to the left of arrow
+	if _dark_box:
+		var box_x = arrow_x - _dark_box.size.x - 4.0
+		var box_y = arrow_y + (_selection_arrow.size.y / 2.0) - (_dark_box.size.y / 2.0)
+		_dark_box.position = Vector2(box_x, box_y)
+
+func _on_panel_animation_finished() -> void:
+	"""Called when panel animation completes"""
+	_panel_animating = false
+	set_process(false)
+	# Do a final arrow position update
+	call_deferred("_update_arrow_position")
 
 func _apply_core_vibe_styling() -> void:
 	"""Apply Core Vibe neon-kawaii styling to BondsPanel elements"""
@@ -250,21 +327,29 @@ func _apply_core_vibe_styling() -> void:
 	if _name_tv:
 		aCoreVibeTheme.style_label(_name_tv, aCoreVibeTheme.COLOR_SKY_CYAN, 20)
 
+	# Style Event label (Milk White) and value (Sky Cyan)
+	if _event_label:
+		_event_label.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE)
+		_event_label.add_theme_font_size_override("font_size", 14)
 	if _event_tv:
-		_event_tv.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_ELECTRIC_LIME)
+		_event_tv.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_SKY_CYAN)
 		_event_tv.add_theme_font_size_override("font_size", 14)
 
+	# Style Layer label (Milk White) and value (Sky Cyan)
+	if _layer_label:
+		_layer_label.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE)
+		_layer_label.add_theme_font_size_override("font_size", 14)
 	if _layer_tv:
-		_layer_tv.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_ELECTRIC_LIME)
+		_layer_tv.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_SKY_CYAN)
 		_layer_tv.add_theme_font_size_override("font_size", 14)
 
+	# Style Points label (Milk White) and value (Sky Cyan)
+	if _points_label:
+		_points_label.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE)
+		_points_label.add_theme_font_size_override("font_size", 14)
 	if _points_tv:
-		_points_tv.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_ELECTRIC_LIME)
+		_points_tv.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_SKY_CYAN)
 		_points_tv.add_theme_font_size_override("font_size", 14)
-
-	if _gift_tv:
-		_gift_tv.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_CITRUS_YELLOW)
-		_gift_tv.add_theme_font_size_override("font_size", 14)
 
 	# Style likes/dislikes values
 	if _likes_tv:
@@ -277,21 +362,69 @@ func _apply_core_vibe_styling() -> void:
 
 	# Style unlock header
 	if _unlock_hdr:
-		aCoreVibeTheme.style_label(_unlock_hdr, aCoreVibeTheme.COLOR_SKY_CYAN, 16)
+		aCoreVibeTheme.style_label(_unlock_hdr, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA, 16)
 
-	# Style description
-	if _desc:
-		_desc.add_theme_color_override("default_color", aCoreVibeTheme.COLOR_MILK_WHITE)
-		_desc.add_theme_font_size_override("normal_font_size", 14)
-
+	# Style profile description
 	if _profile_desc:
 		_profile_desc.add_theme_color_override("default_color", aCoreVibeTheme.COLOR_MILK_WHITE)
 		_profile_desc.add_theme_font_size_override("normal_font_size", 14)
 
-	# Style buttons
+	# Style Story Points button with outlined normal state and filled focused state
 	if _story_btn:
-		aCoreVibeTheme.style_button(_story_btn, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
+		# Normal state: Outlined Bubble Magenta with transparent background
+		var story_style_normal = StyleBoxFlat.new()
+		story_style_normal.bg_color = Color(0, 0, 0, 0)  # Transparent background
+		story_style_normal.border_color = aCoreVibeTheme.COLOR_BUBBLE_MAGENTA
+		story_style_normal.border_width_left = 2
+		story_style_normal.border_width_right = 2
+		story_style_normal.border_width_top = 2
+		story_style_normal.border_width_bottom = 2
+		story_style_normal.corner_radius_top_left = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+		story_style_normal.corner_radius_top_right = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+		story_style_normal.corner_radius_bottom_left = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+		story_style_normal.corner_radius_bottom_right = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+		story_style_normal.content_margin_left = 12
+		story_style_normal.content_margin_right = 12
+		story_style_normal.content_margin_top = 8
+		story_style_normal.content_margin_bottom = 8
+
+		# Hover state: Same as normal
+		var story_style_hover = story_style_normal.duplicate()
+
+		# Pressed state: Same as normal
+		var story_style_pressed = story_style_normal.duplicate()
+
+		# Focus state: Filled Bubble Magenta background with Night Navy text
+		var story_style_focus = StyleBoxFlat.new()
+		story_style_focus.bg_color = aCoreVibeTheme.COLOR_BUBBLE_MAGENTA
+		story_style_focus.corner_radius_top_left = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+		story_style_focus.corner_radius_top_right = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+		story_style_focus.corner_radius_bottom_left = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+		story_style_focus.corner_radius_bottom_right = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+		story_style_focus.content_margin_left = 12
+		story_style_focus.content_margin_right = 12
+		story_style_focus.content_margin_top = 8
+		story_style_focus.content_margin_bottom = 8
+
+		_story_btn.add_theme_stylebox_override("normal", story_style_normal)
+		_story_btn.add_theme_stylebox_override("hover", story_style_hover)
+		_story_btn.add_theme_stylebox_override("pressed", story_style_pressed)
+		_story_btn.add_theme_stylebox_override("focus", story_style_focus)
+
+		# Font colors: Bubble Magenta when not focused, Night Navy when focused
+		_story_btn.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_BUBBLE_MAGENTA)
+		_story_btn.add_theme_color_override("font_hover_color", aCoreVibeTheme.COLOR_BUBBLE_MAGENTA)
+		_story_btn.add_theme_color_override("font_pressed_color", aCoreVibeTheme.COLOR_BUBBLE_MAGENTA)
+		_story_btn.add_theme_color_override("font_focus_color", aCoreVibeTheme.COLOR_NIGHT_NAVY)
+
+		_story_btn.add_theme_font_size_override("font_size", 14)
 		_story_btn.custom_minimum_size = Vector2(120, 40)
+
+		# Connect focus signals for pulsing animation
+		if not _story_btn.focus_entered.is_connected(_on_story_btn_focus_entered):
+			_story_btn.focus_entered.connect(_on_story_btn_focus_entered)
+		if not _story_btn.focus_exited.is_connected(_on_story_btn_focus_exited):
+			_story_btn.focus_exited.connect(_on_story_btn_focus_exited)
 
 	# Note: Unlock buttons styling is dynamic based on unlock status, handled in _update_detail()
 
@@ -602,6 +735,10 @@ func _animate_panel_focus() -> void:
 
 	print("[BondsPanel] Animation ratios - left: %.2f, center: %.2f, right: %.2f" % [left_ratio, center_ratio, right_ratio])
 
+	# Set animation flag to enable continuous arrow position updates
+	_panel_animating = true
+	set_process(true)
+
 	# Create tweens for smooth animation
 	var tween := create_tween()
 	tween.set_parallel(true)
@@ -611,6 +748,9 @@ func _animate_panel_focus() -> void:
 	tween.tween_property(_left_panel, "size_flags_stretch_ratio", left_ratio, ANIM_DURATION)
 	tween.tween_property(_right_panel, "size_flags_stretch_ratio", center_ratio, ANIM_DURATION)
 	tween.tween_property(_profile_panel, "size_flags_stretch_ratio", right_ratio, ANIM_DURATION)
+
+	# Connect to finished signal to stop arrow updates
+	tween.finished.connect(_on_panel_animation_finished)
 
 	print("[BondsPanel] Tween created and started")
 
@@ -720,16 +860,16 @@ func _build_list() -> void:
 		_list.set_item_metadata(i, id)
 
 		if not known:
-			# Core Vibe: Dimmed Milk White for unknown bonds
-			_list.set_item_custom_fg_color(i, Color(aCoreVibeTheme.COLOR_MILK_WHITE.r, aCoreVibeTheme.COLOR_MILK_WHITE.g, aCoreVibeTheme.COLOR_MILK_WHITE.b, 0.4))
+			# Core Vibe: Dimmed grey for unknown bonds (stays grey when highlighted)
+			_list.set_item_custom_fg_color(i, Color(0.5, 0.5, 0.5, 0.6))
 			_list.set_item_tooltip(i, "Unknown")
 		elif maxed:
 			# Core Vibe: Electric Lime for maxed bonds
 			_list.set_item_custom_fg_color(i, aCoreVibeTheme.COLOR_ELECTRIC_LIME)
 			_list.set_item_tooltip(i, "Maxed")
 		else:
-			# Core Vibe: Sky Cyan for known, non-maxed bonds
-			_list.set_item_custom_fg_color(i, aCoreVibeTheme.COLOR_SKY_CYAN)
+			# Core Vibe: Milk White for known, non-maxed bonds
+			_list.set_item_custom_fg_color(i, aCoreVibeTheme.COLOR_MILK_WHITE)
 			_list.set_item_tooltip(i, disp_name)
 
 		# Track selected index
@@ -921,11 +1061,9 @@ func _update_detail(id: String) -> void:
 	# Handle empty selection
 	if id == "":
 		_name_tv.text = "—"
-		if _event_tv: _event_tv.text = "Event: —"
-		if _layer_tv: _layer_tv.text = "Layer: —"
-		if _points_tv: _points_tv.text = "Points: —"
-		if _gift_tv: _gift_tv.text = "Gift: —"
-		if _desc: _desc.text = "[i]Select a bond to see details.[/i]"
+		if _event_tv: _event_tv.text = "—"
+		if _layer_tv: _layer_tv.text = "—"
+		if _points_tv: _points_tv.text = "—"
 		if _profile_desc: _profile_desc.text = "[i]Have not met them.[/i]"
 		if _likes_tv: _likes_tv.text = "—"
 		if _dislikes_tv: _dislikes_tv.text = "—"
@@ -941,22 +1079,10 @@ func _update_detail(id: String) -> void:
 	# Check if bond is known
 	var known: bool = _read_known(id)
 
-	# If unknown, hide all detail widgets and only show hint
+	# If unknown, hide all detail widgets
 	if not known:
 		# Hide all detail widgets
 		_hide_all_detail_widgets()
-
-		# Only show the description with hint
-		if _desc:
-			_desc.visible = true
-			var rec: Dictionary = _bond_def(id)
-			var hint: String = String(rec.get("bond_hint", "")).strip_edges()
-			print("[BondsPanel] Unknown bond '%s' - hint: '%s'" % [id, hint])
-			print("[BondsPanel] Bond def keys: ", rec.keys())
-			if hint != "":
-				_desc.text = hint
-			else:
-				_desc.text = "[i]This character has not been met yet.[/i]"
 
 		# Update profile description for unknown character
 		if _profile_desc:
@@ -975,42 +1101,28 @@ func _update_detail(id: String) -> void:
 	var layer_name: String = _read_layer_name(id)
 	var gift_used: bool = _read_gift_used(id)
 
-	# Event progress
+	# Event progress (value only, label is separate)
 	if _event_tv:
 		if event_idx == 0:
-			_event_tv.text = "Event: Not Started"
+			_event_tv.text = "Not Started"
 		else:
-			_event_tv.text = "Event: E%d Complete" % event_idx
+			_event_tv.text = "E%d Complete" % event_idx
 
-	# Layer stage
+	# Layer stage (value only, label is separate)
 	if _layer_tv:
-		_layer_tv.text = "Layer: %s" % layer_name
+		_layer_tv.text = "%s" % layer_name
 
-	# Points bank / threshold
+	# Points bank / threshold (value only, label is separate)
 	if _points_tv:
 		if event_idx == 0:
-			_points_tv.text = "Points: —"
+			_points_tv.text = "—"
 		elif threshold > 0:
-			_points_tv.text = "Points: %d / %d" % [points, threshold]
+			_points_tv.text = "%d / %d" % [points, threshold]
 		else:
-			_points_tv.text = "Points: %d (Max)" % points
-
-	# Gift status
-	if _gift_tv:
-		if event_idx == 0:
-			_gift_tv.text = "Gift: —"
-		elif gift_used:
-			_gift_tv.text = "Gift: Used this layer"
-		else:
-			_gift_tv.text = "Gift: Available"
-
-	# Description
-	var rec: Dictionary = _bond_def(id)
-	if _desc:
-		var desc: String = String(rec.get("bond_description", "")).strip_edges()
-		_desc.text = desc
+			_points_tv.text = "%d (Max)" % points
 
 	# Profile description (same as bond description for known characters)
+	var rec: Dictionary = _bond_def(id)
 	if _profile_desc:
 		var profile_desc: String = String(rec.get("bond_description", "")).strip_edges()
 		if profile_desc != "":
@@ -1042,28 +1154,52 @@ func _update_detail(id: String) -> void:
 		_unlock_acq.text = "Acquaintance → Outer" + (" [UNLOCKED]" if outer_unlocked else " [LOCKED]")
 		var color = aCoreVibeTheme.COLOR_ELECTRIC_LIME if outer_unlocked else aCoreVibeTheme.COLOR_CITRUS_YELLOW
 		aCoreVibeTheme.style_button(_unlock_acq, color, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
+		_unlock_acq.add_theme_stylebox_override("focus", StyleBoxEmpty.new())  # Remove grey focus box
 		_unlock_acq.custom_minimum_size = Vector2(180, 36)
+		# Connect focus signals for pulsing animation
+		if not _unlock_acq.focus_entered.is_connected(_on_unlock_btn_focus_entered):
+			_unlock_acq.focus_entered.connect(_on_unlock_btn_focus_entered.bind(_unlock_acq))
+		if not _unlock_acq.focus_exited.is_connected(_on_unlock_btn_focus_exited):
+			_unlock_acq.focus_exited.connect(_on_unlock_btn_focus_exited)
 
 	if _unlock_outer:
 		_unlock_outer.disabled = not middle_unlocked
 		_unlock_outer.text = "Outer → Middle" + (" [UNLOCKED]" if middle_unlocked else " [LOCKED]")
 		var color = aCoreVibeTheme.COLOR_ELECTRIC_LIME if middle_unlocked else aCoreVibeTheme.COLOR_CITRUS_YELLOW
 		aCoreVibeTheme.style_button(_unlock_outer, color, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
+		_unlock_outer.add_theme_stylebox_override("focus", StyleBoxEmpty.new())  # Remove grey focus box
 		_unlock_outer.custom_minimum_size = Vector2(180, 36)
+		# Connect focus signals for pulsing animation
+		if not _unlock_outer.focus_entered.is_connected(_on_unlock_btn_focus_entered):
+			_unlock_outer.focus_entered.connect(_on_unlock_btn_focus_entered.bind(_unlock_outer))
+		if not _unlock_outer.focus_exited.is_connected(_on_unlock_btn_focus_exited):
+			_unlock_outer.focus_exited.connect(_on_unlock_btn_focus_exited)
 
 	if _unlock_middle:
 		_unlock_middle.disabled = not inner_unlocked
 		_unlock_middle.text = "Middle → Inner" + (" [UNLOCKED]" if inner_unlocked else " [LOCKED]")
 		var color = aCoreVibeTheme.COLOR_ELECTRIC_LIME if inner_unlocked else aCoreVibeTheme.COLOR_CITRUS_YELLOW
 		aCoreVibeTheme.style_button(_unlock_middle, color, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
+		_unlock_middle.add_theme_stylebox_override("focus", StyleBoxEmpty.new())  # Remove grey focus box
 		_unlock_middle.custom_minimum_size = Vector2(180, 36)
+		# Connect focus signals for pulsing animation
+		if not _unlock_middle.focus_entered.is_connected(_on_unlock_btn_focus_entered):
+			_unlock_middle.focus_entered.connect(_on_unlock_btn_focus_entered.bind(_unlock_middle))
+		if not _unlock_middle.focus_exited.is_connected(_on_unlock_btn_focus_exited):
+			_unlock_middle.focus_exited.connect(_on_unlock_btn_focus_exited)
 
 	if _unlock_inner:
 		_unlock_inner.disabled = not core_unlocked
 		_unlock_inner.text = "Inner → Core" + (" [UNLOCKED]" if core_unlocked else " [LOCKED]")
 		var color = aCoreVibeTheme.COLOR_ELECTRIC_LIME if core_unlocked else aCoreVibeTheme.COLOR_CITRUS_YELLOW
 		aCoreVibeTheme.style_button(_unlock_inner, color, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
+		_unlock_inner.add_theme_stylebox_override("focus", StyleBoxEmpty.new())  # Remove grey focus box
 		_unlock_inner.custom_minimum_size = Vector2(180, 36)
+		# Connect focus signals for pulsing animation
+		if not _unlock_inner.focus_entered.is_connected(_on_unlock_btn_focus_entered):
+			_unlock_inner.focus_entered.connect(_on_unlock_btn_focus_entered.bind(_unlock_inner))
+		if not _unlock_inner.focus_exited.is_connected(_on_unlock_btn_focus_exited):
+			_unlock_inner.focus_exited.connect(_on_unlock_btn_focus_exited)
 
 	# Story points
 	if _story_btn:
@@ -1071,10 +1207,10 @@ func _update_detail(id: String) -> void:
 
 func _hide_all_detail_widgets() -> void:
 	if _name_tv: _name_tv.visible = false
-	if _event_tv: _event_tv.visible = false
-	if _layer_tv: _layer_tv.visible = false
-	if _points_tv: _points_tv.visible = false
-	if _gift_tv: _gift_tv.visible = false
+	# Hide the entire event/layer/points rows (includes labels and values)
+	if _event_row: _event_row.visible = false
+	if _layer_row: _layer_row.visible = false
+	if _points_row: _points_row.visible = false
 	# Hide the entire likes/dislikes rows (includes labels and values)
 	if _likes_row: _likes_row.visible = false
 	if _dislikes_row: _dislikes_row.visible = false
@@ -1084,14 +1220,14 @@ func _hide_all_detail_widgets() -> void:
 	if _unlock_middle: _unlock_middle.visible = false
 	if _unlock_inner: _unlock_inner.visible = false
 	if _story_btn: _story_btn.visible = false
-	if _desc: _desc.visible = false
+	# Notes/description removed from Details panel
 
 func _show_all_detail_widgets() -> void:
 	if _name_tv: _name_tv.visible = true
-	if _event_tv: _event_tv.visible = true
-	if _layer_tv: _layer_tv.visible = true
-	if _points_tv: _points_tv.visible = true
-	if _gift_tv: _gift_tv.visible = true
+	# Show the entire event/layer/points rows (includes labels and values)
+	if _event_row: _event_row.visible = true
+	if _layer_row: _layer_row.visible = true
+	if _points_row: _points_row.visible = true
 	# Show the entire likes/dislikes rows (includes labels and values)
 	if _likes_row: _likes_row.visible = true
 	if _dislikes_row: _dislikes_row.visible = true
@@ -1101,7 +1237,7 @@ func _show_all_detail_widgets() -> void:
 	if _unlock_middle: _unlock_middle.visible = true
 	if _unlock_inner: _unlock_inner.visible = true
 	if _story_btn: _story_btn.visible = true
-	if _desc: _desc.visible = true
+	# Notes/description removed from Details panel
 
 func _display_name(id: String) -> String:
 	if _sys and _sys.has_method("get_bond_name"):
@@ -1390,6 +1526,7 @@ func _on_story_points_pressed() -> void:
 	back_btn.custom_minimum_size = Vector2(120, 44)
 	back_btn.process_mode = Node.PROCESS_MODE_ALWAYS
 	aCoreVibeTheme.style_button(back_btn, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA, aCoreVibeTheme.CORNER_RADIUS_LARGE)
+	back_btn.add_theme_stylebox_override("focus", StyleBoxEmpty.new())  # Remove grey focus box
 	back_btn.pressed.connect(func() -> void:
 		_close_story_overlay()
 		# Restore focus to detail view after closing overlay
@@ -1461,7 +1598,7 @@ func _create_selection_arrow() -> void:
 	_dark_box.custom_minimum_size = Vector2(160, 20)
 	_dark_box.size = Vector2(160, 20)
 	_dark_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_dark_box.z_index = 100  # Same layer as arrow
+	_dark_box.z_index = 99  # Behind arrow (arrow is at 100)
 
 	# Create Ink Charcoal rounded style
 	var box_style = StyleBoxFlat.new()
@@ -1545,3 +1682,55 @@ func _start_arrow_pulse() -> void:
 	var base_x = _selection_arrow.position.x
 	tween.tween_property(_selection_arrow, "position:x", base_x - 6, 0.6)
 	tween.tween_property(_selection_arrow, "position:x", base_x, 0.6)
+
+# ─────────────────────────────────────────────────────────────
+# Button Pulse Animation (for focused buttons)
+# ─────────────────────────────────────────────────────────────
+
+func _on_story_btn_focus_entered() -> void:
+	"""Start pulsing animation when Story Points button gains focus"""
+	_start_button_pulse(_story_btn)
+
+func _on_story_btn_focus_exited() -> void:
+	"""Stop pulsing animation when Story Points button loses focus"""
+	_stop_button_pulse()
+
+func _on_unlock_btn_focus_entered(button: Button) -> void:
+	"""Start pulsing animation when unlock button gains focus"""
+	_start_button_pulse(button)
+
+func _on_unlock_btn_focus_exited() -> void:
+	"""Stop pulsing animation when unlock button loses focus"""
+	_stop_button_pulse()
+
+func _start_button_pulse(button: Button) -> void:
+	"""Start pulsing animation for a button"""
+	if not button:
+		return
+
+	# Stop any existing pulse
+	_stop_button_pulse()
+
+	# Track the button being pulsed
+	_button_pulse_target = button
+
+	# Create pulsing scale animation
+	_button_pulse_tween = create_tween()
+	_button_pulse_tween.set_loops()
+	_button_pulse_tween.set_trans(Tween.TRANS_SINE)
+	_button_pulse_tween.set_ease(Tween.EASE_IN_OUT)
+
+	# Pulse scale slightly (1.0 -> 1.05 -> 1.0)
+	_button_pulse_tween.tween_property(button, "scale", Vector2(1.05, 1.05), 0.6)
+	_button_pulse_tween.tween_property(button, "scale", Vector2(1.0, 1.0), 0.6)
+
+func _stop_button_pulse() -> void:
+	"""Stop button pulsing animation"""
+	if _button_pulse_tween and is_instance_valid(_button_pulse_tween):
+		_button_pulse_tween.kill()
+		_button_pulse_tween = null
+
+	# Reset button scale
+	if _button_pulse_target and is_instance_valid(_button_pulse_target):
+		_button_pulse_target.scale = Vector2(1.0, 1.0)
+		_button_pulse_target = null
