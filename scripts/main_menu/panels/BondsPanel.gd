@@ -121,6 +121,10 @@ var _xp_tv     : Label          = null
 
 var _story_overlay  : CanvasLayer    = null
 
+# Button pulse animation
+var _button_pulse_tween: Tween = null
+var _button_pulse_target: Button = null
+
 # Data / state
 var _sys  : Node = null
 var _rows : Array[Dictionary] = []
@@ -309,10 +313,16 @@ func _apply_core_vibe_styling() -> void:
 		_profile_desc.add_theme_color_override("default_color", aCoreVibeTheme.COLOR_MILK_WHITE)
 		_profile_desc.add_theme_font_size_override("normal_font_size", 14)
 
-	# Style Story Points button with Bubble Magenta background and Night Navy text
+	# Style Story Points button with outlined normal state and filled focused state
 	if _story_btn:
+		# Normal state: Outlined Bubble Magenta with transparent background
 		var story_style_normal = StyleBoxFlat.new()
-		story_style_normal.bg_color = aCoreVibeTheme.COLOR_BUBBLE_MAGENTA
+		story_style_normal.bg_color = Color(0, 0, 0, 0)  # Transparent background
+		story_style_normal.border_color = aCoreVibeTheme.COLOR_BUBBLE_MAGENTA
+		story_style_normal.border_width_left = 2
+		story_style_normal.border_width_right = 2
+		story_style_normal.border_width_top = 2
+		story_style_normal.border_width_bottom = 2
 		story_style_normal.corner_radius_top_left = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
 		story_style_normal.corner_radius_top_right = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
 		story_style_normal.corner_radius_bottom_left = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
@@ -322,21 +332,43 @@ func _apply_core_vibe_styling() -> void:
 		story_style_normal.content_margin_top = 8
 		story_style_normal.content_margin_bottom = 8
 
+		# Hover state: Same as normal
 		var story_style_hover = story_style_normal.duplicate()
-		story_style_hover.bg_color = Color(aCoreVibeTheme.COLOR_BUBBLE_MAGENTA.r * 1.2, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA.g * 1.2, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA.b * 1.2)
 
+		# Pressed state: Same as normal
 		var story_style_pressed = story_style_normal.duplicate()
-		story_style_pressed.bg_color = Color(aCoreVibeTheme.COLOR_BUBBLE_MAGENTA.r * 0.8, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA.g * 0.8, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA.b * 0.8)
+
+		# Focus state: Filled Bubble Magenta background with Night Navy text
+		var story_style_focus = StyleBoxFlat.new()
+		story_style_focus.bg_color = aCoreVibeTheme.COLOR_BUBBLE_MAGENTA
+		story_style_focus.corner_radius_top_left = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+		story_style_focus.corner_radius_top_right = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+		story_style_focus.corner_radius_bottom_left = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+		story_style_focus.corner_radius_bottom_right = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+		story_style_focus.content_margin_left = 12
+		story_style_focus.content_margin_right = 12
+		story_style_focus.content_margin_top = 8
+		story_style_focus.content_margin_bottom = 8
 
 		_story_btn.add_theme_stylebox_override("normal", story_style_normal)
 		_story_btn.add_theme_stylebox_override("hover", story_style_hover)
 		_story_btn.add_theme_stylebox_override("pressed", story_style_pressed)
-		_story_btn.add_theme_stylebox_override("focus", StyleBoxEmpty.new())  # Remove grey focus box
-		_story_btn.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_NIGHT_NAVY)
-		_story_btn.add_theme_color_override("font_hover_color", aCoreVibeTheme.COLOR_NIGHT_NAVY)
-		_story_btn.add_theme_color_override("font_pressed_color", aCoreVibeTheme.COLOR_NIGHT_NAVY)
+		_story_btn.add_theme_stylebox_override("focus", story_style_focus)
+
+		# Font colors: Bubble Magenta when not focused, Night Navy when focused
+		_story_btn.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_BUBBLE_MAGENTA)
+		_story_btn.add_theme_color_override("font_hover_color", aCoreVibeTheme.COLOR_BUBBLE_MAGENTA)
+		_story_btn.add_theme_color_override("font_pressed_color", aCoreVibeTheme.COLOR_BUBBLE_MAGENTA)
+		_story_btn.add_theme_color_override("font_focus_color", aCoreVibeTheme.COLOR_NIGHT_NAVY)
+
 		_story_btn.add_theme_font_size_override("font_size", 14)
 		_story_btn.custom_minimum_size = Vector2(120, 40)
+
+		# Connect focus signals for pulsing animation
+		if not _story_btn.focus_entered.is_connected(_on_story_btn_focus_entered):
+			_story_btn.focus_entered.connect(_on_story_btn_focus_entered)
+		if not _story_btn.focus_exited.is_connected(_on_story_btn_focus_exited):
+			_story_btn.focus_exited.connect(_on_story_btn_focus_exited)
 
 	# Note: Unlock buttons styling is dynamic based on unlock status, handled in _update_detail()
 
@@ -1061,6 +1093,11 @@ func _update_detail(id: String) -> void:
 		aCoreVibeTheme.style_button(_unlock_acq, color, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
 		_unlock_acq.add_theme_stylebox_override("focus", StyleBoxEmpty.new())  # Remove grey focus box
 		_unlock_acq.custom_minimum_size = Vector2(180, 36)
+		# Connect focus signals for pulsing animation
+		if not _unlock_acq.focus_entered.is_connected(_on_unlock_btn_focus_entered):
+			_unlock_acq.focus_entered.connect(_on_unlock_btn_focus_entered.bind(_unlock_acq))
+		if not _unlock_acq.focus_exited.is_connected(_on_unlock_btn_focus_exited):
+			_unlock_acq.focus_exited.connect(_on_unlock_btn_focus_exited)
 
 	if _unlock_outer:
 		_unlock_outer.disabled = not middle_unlocked
@@ -1069,6 +1106,11 @@ func _update_detail(id: String) -> void:
 		aCoreVibeTheme.style_button(_unlock_outer, color, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
 		_unlock_outer.add_theme_stylebox_override("focus", StyleBoxEmpty.new())  # Remove grey focus box
 		_unlock_outer.custom_minimum_size = Vector2(180, 36)
+		# Connect focus signals for pulsing animation
+		if not _unlock_outer.focus_entered.is_connected(_on_unlock_btn_focus_entered):
+			_unlock_outer.focus_entered.connect(_on_unlock_btn_focus_entered.bind(_unlock_outer))
+		if not _unlock_outer.focus_exited.is_connected(_on_unlock_btn_focus_exited):
+			_unlock_outer.focus_exited.connect(_on_unlock_btn_focus_exited)
 
 	if _unlock_middle:
 		_unlock_middle.disabled = not inner_unlocked
@@ -1077,6 +1119,11 @@ func _update_detail(id: String) -> void:
 		aCoreVibeTheme.style_button(_unlock_middle, color, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
 		_unlock_middle.add_theme_stylebox_override("focus", StyleBoxEmpty.new())  # Remove grey focus box
 		_unlock_middle.custom_minimum_size = Vector2(180, 36)
+		# Connect focus signals for pulsing animation
+		if not _unlock_middle.focus_entered.is_connected(_on_unlock_btn_focus_entered):
+			_unlock_middle.focus_entered.connect(_on_unlock_btn_focus_entered.bind(_unlock_middle))
+		if not _unlock_middle.focus_exited.is_connected(_on_unlock_btn_focus_exited):
+			_unlock_middle.focus_exited.connect(_on_unlock_btn_focus_exited)
 
 	if _unlock_inner:
 		_unlock_inner.disabled = not core_unlocked
@@ -1085,6 +1132,11 @@ func _update_detail(id: String) -> void:
 		aCoreVibeTheme.style_button(_unlock_inner, color, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
 		_unlock_inner.add_theme_stylebox_override("focus", StyleBoxEmpty.new())  # Remove grey focus box
 		_unlock_inner.custom_minimum_size = Vector2(180, 36)
+		# Connect focus signals for pulsing animation
+		if not _unlock_inner.focus_entered.is_connected(_on_unlock_btn_focus_entered):
+			_unlock_inner.focus_entered.connect(_on_unlock_btn_focus_entered.bind(_unlock_inner))
+		if not _unlock_inner.focus_exited.is_connected(_on_unlock_btn_focus_exited):
+			_unlock_inner.focus_exited.connect(_on_unlock_btn_focus_exited)
 
 	# Story points
 	if _story_btn:
@@ -1567,3 +1619,55 @@ func _start_arrow_pulse() -> void:
 	var base_x = _selection_arrow.position.x
 	tween.tween_property(_selection_arrow, "position:x", base_x - 6, 0.6)
 	tween.tween_property(_selection_arrow, "position:x", base_x, 0.6)
+
+# ─────────────────────────────────────────────────────────────
+# Button Pulse Animation (for focused buttons)
+# ─────────────────────────────────────────────────────────────
+
+func _on_story_btn_focus_entered() -> void:
+	"""Start pulsing animation when Story Points button gains focus"""
+	_start_button_pulse(_story_btn)
+
+func _on_story_btn_focus_exited() -> void:
+	"""Stop pulsing animation when Story Points button loses focus"""
+	_stop_button_pulse()
+
+func _on_unlock_btn_focus_entered(button: Button) -> void:
+	"""Start pulsing animation when unlock button gains focus"""
+	_start_button_pulse(button)
+
+func _on_unlock_btn_focus_exited() -> void:
+	"""Stop pulsing animation when unlock button loses focus"""
+	_stop_button_pulse()
+
+func _start_button_pulse(button: Button) -> void:
+	"""Start pulsing animation for a button"""
+	if not button:
+		return
+
+	# Stop any existing pulse
+	_stop_button_pulse()
+
+	# Track the button being pulsed
+	_button_pulse_target = button
+
+	# Create pulsing scale animation
+	_button_pulse_tween = create_tween()
+	_button_pulse_tween.set_loops()
+	_button_pulse_tween.set_trans(Tween.TRANS_SINE)
+	_button_pulse_tween.set_ease(Tween.EASE_IN_OUT)
+
+	# Pulse scale slightly (1.0 -> 1.05 -> 1.0)
+	_button_pulse_tween.tween_property(button, "scale", Vector2(1.05, 1.05), 0.6)
+	_button_pulse_tween.tween_property(button, "scale", Vector2(1.0, 1.0), 0.6)
+
+func _stop_button_pulse() -> void:
+	"""Stop button pulsing animation"""
+	if _button_pulse_tween and is_instance_valid(_button_pulse_tween):
+		_button_pulse_tween.kill()
+		_button_pulse_tween = null
+
+	# Reset button scale
+	if _button_pulse_target and is_instance_valid(_button_pulse_target):
+		_button_pulse_target.scale = Vector2(1.0, 1.0)
+		_button_pulse_target = null
