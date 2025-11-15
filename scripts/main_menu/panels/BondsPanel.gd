@@ -125,6 +125,9 @@ var _story_overlay  : CanvasLayer    = null
 var _button_pulse_tween: Tween = null
 var _button_pulse_target: Button = null
 
+# Panel animation tracking
+var _panel_animating: bool = false
+
 # Data / state
 var _sys  : Node = null
 var _rows : Array[Dictionary] = []
@@ -132,6 +135,9 @@ var _selected : String = ""
 
 func _ready() -> void:
 	super()  # Call PanelBase._ready()
+
+	# Disable process by default (enabled during panel animations)
+	set_process(false)
 
 	_sys = get_node_or_null(SYS_PATH)
 
@@ -194,6 +200,56 @@ func _ready() -> void:
 		_unlock_inner.pressed.connect(_on_unlock_button_pressed.bind("inner_to_core"))
 
 	_rebuild()
+
+func _process(_delta: float) -> void:
+	"""Update arrow position during panel animations"""
+	if _panel_animating and _selection_arrow and _selection_arrow.visible:
+		# Update arrow position to follow the list during panel resize
+		# Use call_deferred to avoid layout issues
+		call_deferred("_update_arrow_position_immediate")
+
+func _update_arrow_position_immediate() -> void:
+	"""Immediate arrow position update without await (for use in _process)"""
+	if not _selection_arrow or not _list:
+		return
+
+	var selected = _list.get_selected_items()
+	if selected.size() == 0:
+		return
+
+	# Get the rect of the selected item in ItemList's local coordinates
+	var item_index = selected[0]
+	var item_rect = _list.get_item_rect(item_index)
+
+	# Convert to BondsPanel coordinates
+	var list_global_pos = _list.global_position
+	var panel_global_pos = global_position
+	var list_offset_in_panel = list_global_pos - panel_global_pos
+
+	# Get scroll offset
+	var scroll_offset = 0.0
+	if _list.get_v_scroll_bar():
+		var vscroll = _list.get_v_scroll_bar()
+		scroll_offset = vscroll.value
+
+	# Position arrow to the right of the bonds list
+	var arrow_x = list_offset_in_panel.x + _list.size.x - 8.0 - 80.0 + 40.0
+	var arrow_y = list_offset_in_panel.y + item_rect.position.y - scroll_offset + (item_rect.size.y / 2.0) - (_selection_arrow.size.y / 2.0)
+
+	_selection_arrow.position = Vector2(arrow_x, arrow_y)
+
+	# Position dark box to the left of arrow
+	if _dark_box:
+		var box_x = arrow_x - _dark_box.size.x - 4.0
+		var box_y = arrow_y + (_selection_arrow.size.y / 2.0) - (_dark_box.size.y / 2.0)
+		_dark_box.position = Vector2(box_x, box_y)
+
+func _on_panel_animation_finished() -> void:
+	"""Called when panel animation completes"""
+	_panel_animating = false
+	set_process(false)
+	# Do a final arrow position update
+	call_deferred("_update_arrow_position")
 
 func _apply_core_vibe_styling() -> void:
 	"""Apply Core Vibe neon-kawaii styling to BondsPanel elements"""
@@ -679,6 +735,10 @@ func _animate_panel_focus() -> void:
 
 	print("[BondsPanel] Animation ratios - left: %.2f, center: %.2f, right: %.2f" % [left_ratio, center_ratio, right_ratio])
 
+	# Set animation flag to enable continuous arrow position updates
+	_panel_animating = true
+	set_process(true)
+
 	# Create tweens for smooth animation
 	var tween := create_tween()
 	tween.set_parallel(true)
@@ -688,6 +748,9 @@ func _animate_panel_focus() -> void:
 	tween.tween_property(_left_panel, "size_flags_stretch_ratio", left_ratio, ANIM_DURATION)
 	tween.tween_property(_right_panel, "size_flags_stretch_ratio", center_ratio, ANIM_DURATION)
 	tween.tween_property(_profile_panel, "size_flags_stretch_ratio", right_ratio, ANIM_DURATION)
+
+	# Connect to finished signal to stop arrow updates
+	tween.finished.connect(_on_panel_animation_finished)
 
 	print("[BondsPanel] Tween created and started")
 
