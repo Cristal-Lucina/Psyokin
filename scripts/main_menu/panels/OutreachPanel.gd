@@ -58,6 +58,12 @@ const ANIM_DURATION := 0.2  # Animation duration in seconds
 @onready var _mission_list: ItemList = %MissionList
 @onready var _mission_label: Label = %MissionLabel
 
+# Selection arrows and dark boxes (one for each list)
+var _category_selection_arrow: Label = null
+var _category_dark_box: PanelContainer = null
+var _mission_selection_arrow: Label = null
+var _mission_dark_box: PanelContainer = null
+
 @onready var _title_container: Control = %TitleContainer
 @onready var _title_label: Label = %TitleLabel
 @onready var _desc_label: Label = %DescriptionLabel
@@ -92,12 +98,22 @@ const SCROLL_PAUSE := 1.5    # Seconds to pause before looping
 var _scroll_tween: Tween = null
 var _scroll_timer: Timer = null
 
+## Button pulse animation
+var _button_pulse_tween: Tween = null
+var _button_pulse_target: Button = null
+
+## Panel animation tracking
+var _panel_animating: bool = false
+
 ## ═══════════════════════════════════════════════════════════════════════════
 ## INITIALIZATION
 ## ═══════════════════════════════════════════════════════════════════════════
 
 func _ready() -> void:
 	super()  # Call PanelBase._ready()
+
+	# Disable process by default (enabled during panel animations)
+	set_process(false)
 
 	# Get system references
 	_main_event = get_node_or_null(MAIN_EVENT_PATH)
@@ -145,6 +161,9 @@ func _first_fill() -> void:
 	"""Initial data load"""
 	# Apply Core Vibe styling
 	_apply_core_vibe_styling()
+
+	# Create selection arrows and dark boxes for both lists
+	_create_selection_arrows()
 
 	if _category_list.get_item_count() > 0:
 		_category_list.select(0)
@@ -221,15 +240,132 @@ func _apply_core_vibe_styling() -> void:
 		aCoreVibeTheme.style_button(_back_btn, aCoreVibeTheme.COLOR_SKY_CYAN, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
 		_back_btn.custom_minimum_size = Vector2(120, 36)
 
-	# Style category list with Sky Cyan selection color
+	# Style category list like BondsPanel
 	if _category_list:
-		_category_list.add_theme_color_override("font_selected_color", aCoreVibeTheme.COLOR_SKY_CYAN)
 		_category_list.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE)
+		_category_list.add_theme_color_override("font_selected_color", aCoreVibeTheme.COLOR_SKY_CYAN)
+		_category_list.add_theme_color_override("font_hovered_color", aCoreVibeTheme.COLOR_SKY_CYAN)
+		_category_list.add_theme_font_size_override("font_size", 18)
+		_category_list.z_index = 200  # Above arrow and box
+		# Remove all borders and backgrounds
+		var empty_stylebox = StyleBoxEmpty.new()
+		_category_list.add_theme_stylebox_override("panel", empty_stylebox)
+		_category_list.add_theme_stylebox_override("focus", empty_stylebox)
+		_category_list.add_theme_stylebox_override("selected", empty_stylebox)
+		_category_list.add_theme_stylebox_override("selected_focus", empty_stylebox)
+		_category_list.add_theme_stylebox_override("cursor", empty_stylebox)
+		_category_list.add_theme_stylebox_override("cursor_unfocused", empty_stylebox)
 
-	# Style mission list with Electric Lime selection color
+	# Style mission list like BondsPanel
 	if _mission_list:
-		_mission_list.add_theme_color_override("font_selected_color", aCoreVibeTheme.COLOR_ELECTRIC_LIME)
 		_mission_list.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE)
+		_mission_list.add_theme_color_override("font_selected_color", aCoreVibeTheme.COLOR_SKY_CYAN)
+		_mission_list.add_theme_color_override("font_hovered_color", aCoreVibeTheme.COLOR_SKY_CYAN)
+		_mission_list.add_theme_font_size_override("font_size", 18)
+		_mission_list.z_index = 200  # Above arrow and box
+		# Remove all borders and backgrounds
+		var empty_stylebox2 = StyleBoxEmpty.new()
+		_mission_list.add_theme_stylebox_override("panel", empty_stylebox2)
+		_mission_list.add_theme_stylebox_override("focus", empty_stylebox2)
+		_mission_list.add_theme_stylebox_override("selected", empty_stylebox2)
+		_mission_list.add_theme_stylebox_override("selected_focus", empty_stylebox2)
+		_mission_list.add_theme_stylebox_override("cursor", empty_stylebox2)
+		_mission_list.add_theme_stylebox_override("cursor_unfocused", empty_stylebox2)
+
+	# Style action buttons with focus states and pulse
+	if _primary_btn:
+		# Normal state: Outlined Electric Lime with transparent background
+		var primary_style_normal = StyleBoxFlat.new()
+		primary_style_normal.bg_color = Color(0, 0, 0, 0)
+		primary_style_normal.border_color = aCoreVibeTheme.COLOR_ELECTRIC_LIME
+		primary_style_normal.border_width_left = 2
+		primary_style_normal.border_width_right = 2
+		primary_style_normal.border_width_top = 2
+		primary_style_normal.border_width_bottom = 2
+		primary_style_normal.corner_radius_top_left = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+		primary_style_normal.corner_radius_top_right = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+		primary_style_normal.corner_radius_bottom_left = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+		primary_style_normal.corner_radius_bottom_right = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+		primary_style_normal.content_margin_left = 12
+		primary_style_normal.content_margin_right = 12
+		primary_style_normal.content_margin_top = 8
+		primary_style_normal.content_margin_bottom = 8
+
+		# Focus state: Filled Electric Lime background
+		var primary_style_focus = StyleBoxFlat.new()
+		primary_style_focus.bg_color = aCoreVibeTheme.COLOR_ELECTRIC_LIME
+		primary_style_focus.corner_radius_top_left = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+		primary_style_focus.corner_radius_top_right = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+		primary_style_focus.corner_radius_bottom_left = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+		primary_style_focus.corner_radius_bottom_right = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+		primary_style_focus.content_margin_left = 12
+		primary_style_focus.content_margin_right = 12
+		primary_style_focus.content_margin_top = 8
+		primary_style_focus.content_margin_bottom = 8
+
+		_primary_btn.add_theme_stylebox_override("normal", primary_style_normal)
+		_primary_btn.add_theme_stylebox_override("hover", primary_style_normal.duplicate())
+		_primary_btn.add_theme_stylebox_override("pressed", primary_style_normal.duplicate())
+		_primary_btn.add_theme_stylebox_override("focus", primary_style_focus)
+
+		_primary_btn.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_ELECTRIC_LIME)
+		_primary_btn.add_theme_color_override("font_hover_color", aCoreVibeTheme.COLOR_ELECTRIC_LIME)
+		_primary_btn.add_theme_color_override("font_pressed_color", aCoreVibeTheme.COLOR_ELECTRIC_LIME)
+		_primary_btn.add_theme_color_override("font_focus_color", aCoreVibeTheme.COLOR_NIGHT_NAVY)
+		_primary_btn.custom_minimum_size = Vector2(120, 36)
+
+		# Connect focus signals for pulse
+		if not _primary_btn.focus_entered.is_connected(_on_button_focus_entered):
+			_primary_btn.focus_entered.connect(_on_button_focus_entered.bind(_primary_btn))
+		if not _primary_btn.focus_exited.is_connected(_on_button_focus_exited):
+			_primary_btn.focus_exited.connect(_on_button_focus_exited)
+
+	if _back_btn:
+		# Normal state: Outlined Sky Cyan with transparent background
+		var back_style_normal = StyleBoxFlat.new()
+		back_style_normal.bg_color = Color(0, 0, 0, 0)
+		back_style_normal.border_color = aCoreVibeTheme.COLOR_SKY_CYAN
+		back_style_normal.border_width_left = 2
+		back_style_normal.border_width_right = 2
+		back_style_normal.border_width_top = 2
+		back_style_normal.border_width_bottom = 2
+		back_style_normal.corner_radius_top_left = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+		back_style_normal.corner_radius_top_right = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+		back_style_normal.corner_radius_bottom_left = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+		back_style_normal.corner_radius_bottom_right = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+		back_style_normal.content_margin_left = 12
+		back_style_normal.content_margin_right = 12
+		back_style_normal.content_margin_top = 8
+		back_style_normal.content_margin_bottom = 8
+
+		# Focus state: Filled Sky Cyan background
+		var back_style_focus = StyleBoxFlat.new()
+		back_style_focus.bg_color = aCoreVibeTheme.COLOR_SKY_CYAN
+		back_style_focus.corner_radius_top_left = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+		back_style_focus.corner_radius_top_right = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+		back_style_focus.corner_radius_bottom_left = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+		back_style_focus.corner_radius_bottom_right = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+		back_style_focus.content_margin_left = 12
+		back_style_focus.content_margin_right = 12
+		back_style_focus.content_margin_top = 8
+		back_style_focus.content_margin_bottom = 8
+
+		_back_btn.add_theme_stylebox_override("normal", back_style_normal)
+		_back_btn.add_theme_stylebox_override("hover", back_style_normal.duplicate())
+		_back_btn.add_theme_stylebox_override("pressed", back_style_normal.duplicate())
+		_back_btn.add_theme_stylebox_override("focus", back_style_focus)
+
+		_back_btn.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_SKY_CYAN)
+		_back_btn.add_theme_color_override("font_hover_color", aCoreVibeTheme.COLOR_SKY_CYAN)
+		_back_btn.add_theme_color_override("font_pressed_color", aCoreVibeTheme.COLOR_SKY_CYAN)
+		_back_btn.add_theme_color_override("font_focus_color", aCoreVibeTheme.COLOR_NIGHT_NAVY)
+		_back_btn.custom_minimum_size = Vector2(120, 36)
+
+		# Connect focus signals for pulse
+		if not _back_btn.focus_entered.is_connected(_on_button_focus_entered):
+			_back_btn.focus_entered.connect(_on_button_focus_entered.bind(_back_btn))
+		if not _back_btn.focus_exited.is_connected(_on_button_focus_exited):
+			_back_btn.focus_exited.connect(_on_button_focus_exited)
 
 	_enter_category_select_state()
 
@@ -716,6 +852,283 @@ func _popup_close_and_return_to_list() -> void:
 	popup_to_close.queue_free()
 
 ## ═══════════════════════════════════════════════════════════════════════════
+## SELECTION ARROWS & DARK BOXES
+## ═══════════════════════════════════════════════════════════════════════════
+
+func _create_selection_arrows() -> void:
+	"""Create selection arrows and dark boxes for both lists (matching BondsPanel)"""
+	# Category list arrow and box
+	if _category_list:
+		_category_selection_arrow = Label.new()
+		_category_selection_arrow.text = "◄"
+		_category_selection_arrow.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_category_selection_arrow.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		_category_selection_arrow.add_theme_font_size_override("font_size", 43)
+		_category_selection_arrow.modulate = Color(1, 1, 1, 1)
+		_category_selection_arrow.custom_minimum_size = Vector2(54, 72)
+		_category_selection_arrow.size = Vector2(54, 72)
+		_category_selection_arrow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_category_selection_arrow.z_index = 100
+		add_child(_category_selection_arrow)
+		await get_tree().process_frame
+		_category_selection_arrow.size = Vector2(54, 72)
+
+		_category_dark_box = PanelContainer.new()
+		_category_dark_box.custom_minimum_size = Vector2(160, 20)
+		_category_dark_box.size = Vector2(160, 20)
+		_category_dark_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_category_dark_box.z_index = 99
+		var box_style = StyleBoxFlat.new()
+		box_style.bg_color = aCoreVibeTheme.COLOR_INK_CHARCOAL
+		box_style.corner_radius_top_left = 8
+		box_style.corner_radius_top_right = 8
+		box_style.corner_radius_bottom_left = 8
+		box_style.corner_radius_bottom_right = 8
+		_category_dark_box.add_theme_stylebox_override("panel", box_style)
+		add_child(_category_dark_box)
+		await get_tree().process_frame
+		_category_dark_box.size = Vector2(160, 20)
+
+		_start_arrow_pulse(_category_selection_arrow)
+
+	# Mission list arrow and box
+	if _mission_list:
+		_mission_selection_arrow = Label.new()
+		_mission_selection_arrow.text = "◄"
+		_mission_selection_arrow.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_mission_selection_arrow.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		_mission_selection_arrow.add_theme_font_size_override("font_size", 43)
+		_mission_selection_arrow.modulate = Color(1, 1, 1, 1)
+		_mission_selection_arrow.custom_minimum_size = Vector2(54, 72)
+		_mission_selection_arrow.size = Vector2(54, 72)
+		_mission_selection_arrow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_mission_selection_arrow.z_index = 100
+		add_child(_mission_selection_arrow)
+		await get_tree().process_frame
+		_mission_selection_arrow.size = Vector2(54, 72)
+
+		_mission_dark_box = PanelContainer.new()
+		_mission_dark_box.custom_minimum_size = Vector2(160, 20)
+		_mission_dark_box.size = Vector2(160, 20)
+		_mission_dark_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_mission_dark_box.z_index = 99
+		var box_style2 = StyleBoxFlat.new()
+		box_style2.bg_color = aCoreVibeTheme.COLOR_INK_CHARCOAL
+		box_style2.corner_radius_top_left = 8
+		box_style2.corner_radius_top_right = 8
+		box_style2.corner_radius_bottom_left = 8
+		box_style2.corner_radius_bottom_right = 8
+		_mission_dark_box.add_theme_stylebox_override("panel", box_style2)
+		add_child(_mission_dark_box)
+		await get_tree().process_frame
+		_mission_dark_box.size = Vector2(160, 20)
+
+		_start_arrow_pulse(_mission_selection_arrow)
+
+	# Initial arrow positions
+	call_deferred("_update_category_arrow_position")
+	call_deferred("_update_mission_arrow_position")
+
+func _update_category_arrow_position() -> void:
+	"""Update category arrow and dark box position"""
+	if not _category_selection_arrow or not _category_list:
+		return
+
+	var selected = _category_list.get_selected_items()
+	if selected.size() == 0:
+		_category_selection_arrow.visible = false
+		if _category_dark_box:
+			_category_dark_box.visible = false
+		return
+
+	_category_selection_arrow.visible = true
+	await get_tree().process_frame
+
+	var item_index = selected[0]
+	var item_rect = _category_list.get_item_rect(item_index)
+	var list_global_pos = _category_list.global_position
+	var panel_global_pos = global_position
+	var list_offset_in_panel = list_global_pos - panel_global_pos
+
+	var scroll_offset = 0.0
+	if _category_list.get_v_scroll_bar():
+		scroll_offset = _category_list.get_v_scroll_bar().value
+
+	var arrow_x = list_offset_in_panel.x + _category_list.size.x - 8.0 - 80.0 + 40.0
+	var arrow_y = list_offset_in_panel.y + item_rect.position.y - scroll_offset + (item_rect.size.y / 2.0) - (_category_selection_arrow.size.y / 2.0)
+
+	_category_selection_arrow.position = Vector2(arrow_x, arrow_y)
+
+	if _category_dark_box:
+		_category_dark_box.visible = true
+		var box_x = arrow_x - _category_dark_box.size.x - 4.0
+		var box_y = arrow_y + (_category_selection_arrow.size.y / 2.0) - (_category_dark_box.size.y / 2.0)
+		_category_dark_box.position = Vector2(box_x, box_y)
+
+func _update_mission_arrow_position() -> void:
+	"""Update mission arrow and dark box position"""
+	if not _mission_selection_arrow or not _mission_list:
+		return
+
+	var selected = _mission_list.get_selected_items()
+	if selected.size() == 0:
+		_mission_selection_arrow.visible = false
+		if _mission_dark_box:
+			_mission_dark_box.visible = false
+		return
+
+	_mission_selection_arrow.visible = true
+	await get_tree().process_frame
+
+	var item_index = selected[0]
+	var item_rect = _mission_list.get_item_rect(item_index)
+	var list_global_pos = _mission_list.global_position
+	var panel_global_pos = global_position
+	var list_offset_in_panel = list_global_pos - panel_global_pos
+
+	var scroll_offset = 0.0
+	if _mission_list.get_v_scroll_bar():
+		scroll_offset = _mission_list.get_v_scroll_bar().value
+
+	var arrow_x = list_offset_in_panel.x + _mission_list.size.x - 8.0 - 80.0 + 40.0
+	var arrow_y = list_offset_in_panel.y + item_rect.position.y - scroll_offset + (item_rect.size.y / 2.0) - (_mission_selection_arrow.size.y / 2.0)
+
+	_mission_selection_arrow.position = Vector2(arrow_x, arrow_y)
+
+	if _mission_dark_box:
+		_mission_dark_box.visible = true
+		var box_x = arrow_x - _mission_dark_box.size.x - 4.0
+		var box_y = arrow_y + (_mission_selection_arrow.size.y / 2.0) - (_mission_dark_box.size.y / 2.0)
+		_mission_dark_box.position = Vector2(box_x, box_y)
+
+func _start_arrow_pulse(arrow: Label) -> void:
+	"""Start pulsing animation for an arrow"""
+	if not arrow:
+		return
+
+	var tween = create_tween()
+	tween.set_loops()
+	tween.set_trans(Tween.TRANS_SINE)
+	tween.set_ease(Tween.EASE_IN_OUT)
+
+	var base_x = arrow.position.x
+	tween.tween_property(arrow, "position:x", base_x - 6, 0.6)
+	tween.tween_property(arrow, "position:x", base_x, 0.6)
+
+## ═══════════════════════════════════════════════════════════════════════════
+## BUTTON PULSE ANIMATION
+## ═══════════════════════════════════════════════════════════════════════════
+
+func _on_button_focus_entered(button: Button) -> void:
+	"""Start pulsing animation when button gains focus"""
+	_start_button_pulse(button)
+
+func _on_button_focus_exited() -> void:
+	"""Stop pulsing animation when button loses focus"""
+	_stop_button_pulse()
+
+func _start_button_pulse(button: Button) -> void:
+	"""Start pulsing animation for a button"""
+	if not button:
+		return
+
+	_stop_button_pulse()
+	_button_pulse_target = button
+
+	_button_pulse_tween = create_tween()
+	_button_pulse_tween.set_loops()
+	_button_pulse_tween.set_trans(Tween.TRANS_SINE)
+	_button_pulse_tween.set_ease(Tween.EASE_IN_OUT)
+
+	_button_pulse_tween.tween_property(button, "scale", Vector2(1.05, 1.05), 0.6)
+	_button_pulse_tween.tween_property(button, "scale", Vector2(1.0, 1.0), 0.6)
+
+func _stop_button_pulse() -> void:
+	"""Stop button pulsing animation"""
+	if _button_pulse_tween and is_instance_valid(_button_pulse_tween):
+		_button_pulse_tween.kill()
+		_button_pulse_tween = null
+
+	if _button_pulse_target and is_instance_valid(_button_pulse_target):
+		_button_pulse_target.scale = Vector2(1.0, 1.0)
+		_button_pulse_target = null
+
+## ═══════════════════════════════════════════════════════════════════════════
+## CONTINUOUS ARROW UPDATE DURING PANEL ANIMATION
+## ═══════════════════════════════════════════════════════════════════════════
+
+func _process(_delta: float) -> void:
+	"""Update arrow positions during panel animations"""
+	if _panel_animating:
+		call_deferred("_update_category_arrow_position_immediate")
+		call_deferred("_update_mission_arrow_position_immediate")
+
+func _update_category_arrow_position_immediate() -> void:
+	"""Immediate category arrow position update without await"""
+	if not _category_selection_arrow or not _category_list:
+		return
+
+	var selected = _category_list.get_selected_items()
+	if selected.size() == 0:
+		return
+
+	var item_index = selected[0]
+	var item_rect = _category_list.get_item_rect(item_index)
+	var list_global_pos = _category_list.global_position
+	var panel_global_pos = global_position
+	var list_offset_in_panel = list_global_pos - panel_global_pos
+
+	var scroll_offset = 0.0
+	if _category_list.get_v_scroll_bar():
+		scroll_offset = _category_list.get_v_scroll_bar().value
+
+	var arrow_x = list_offset_in_panel.x + _category_list.size.x - 8.0 - 80.0 + 40.0
+	var arrow_y = list_offset_in_panel.y + item_rect.position.y - scroll_offset + (item_rect.size.y / 2.0) - (_category_selection_arrow.size.y / 2.0)
+
+	_category_selection_arrow.position = Vector2(arrow_x, arrow_y)
+
+	if _category_dark_box:
+		var box_x = arrow_x - _category_dark_box.size.x - 4.0
+		var box_y = arrow_y + (_category_selection_arrow.size.y / 2.0) - (_category_dark_box.size.y / 2.0)
+		_category_dark_box.position = Vector2(box_x, box_y)
+
+func _update_mission_arrow_position_immediate() -> void:
+	"""Immediate mission arrow position update without await"""
+	if not _mission_selection_arrow or not _mission_list:
+		return
+
+	var selected = _mission_list.get_selected_items()
+	if selected.size() == 0:
+		return
+
+	var item_index = selected[0]
+	var item_rect = _mission_list.get_item_rect(item_index)
+	var list_global_pos = _mission_list.global_position
+	var panel_global_pos = global_position
+	var list_offset_in_panel = list_global_pos - panel_global_pos
+
+	var scroll_offset = 0.0
+	if _mission_list.get_v_scroll_bar():
+		scroll_offset = _mission_list.get_v_scroll_bar().value
+
+	var arrow_x = list_offset_in_panel.x + _mission_list.size.x - 8.0 - 80.0 + 40.0
+	var arrow_y = list_offset_in_panel.y + item_rect.position.y - scroll_offset + (item_rect.size.y / 2.0) - (_mission_selection_arrow.size.y / 2.0)
+
+	_mission_selection_arrow.position = Vector2(arrow_x, arrow_y)
+
+	if _mission_dark_box:
+		var box_x = arrow_x - _mission_dark_box.size.x - 4.0
+		var box_y = arrow_y + (_mission_selection_arrow.size.y / 2.0) - (_mission_dark_box.size.y / 2.0)
+		_mission_dark_box.position = Vector2(box_x, box_y)
+
+func _on_panel_animation_finished() -> void:
+	"""Called when panel animation completes"""
+	_panel_animating = false
+	set_process(false)
+	call_deferred("_update_category_arrow_position")
+	call_deferred("_update_mission_arrow_position")
+
+## ═══════════════════════════════════════════════════════════════════════════
 ## STATE TRANSITIONS
 ## ═══════════════════════════════════════════════════════════════════════════
 
@@ -743,6 +1156,10 @@ func _animate_panel_focus(active_state: NavState) -> void:
 	"""Animate panels to highlight which one is currently active"""
 	if not _left_panel or not _center_panel or not _right_panel:
 		return
+
+	# Set animation flag to enable continuous arrow position updates
+	_panel_animating = true
+	set_process(true)
 
 	var left_ratio := BASE_LEFT_RATIO
 	var center_ratio := BASE_CENTER_RATIO
@@ -773,6 +1190,9 @@ func _animate_panel_focus(active_state: NavState) -> void:
 	tween.tween_property(_left_panel, "size_flags_stretch_ratio", left_ratio, ANIM_DURATION)
 	tween.tween_property(_center_panel, "size_flags_stretch_ratio", center_ratio, ANIM_DURATION)
 	tween.tween_property(_right_panel, "size_flags_stretch_ratio", right_ratio, ANIM_DURATION)
+
+	# Connect to finished signal to stop arrow updates
+	tween.finished.connect(_on_panel_animation_finished)
 
 ## ═══════════════════════════════════════════════════════════════════════════
 ## INPUT HANDLING - STATE MACHINE
@@ -869,6 +1289,9 @@ func _navigate_category(delta: int) -> void:
 	_category_list.ensure_current_is_visible()
 	_on_category_selected(idx)
 
+	# Update arrow position after selection change
+	call_deferred("_update_category_arrow_position")
+
 func _navigate_mission(delta: int) -> void:
 	"""Navigate up/down in mission list"""
 	if not _mission_list or _mission_list.get_item_count() == 0:
@@ -881,6 +1304,9 @@ func _navigate_mission(delta: int) -> void:
 	_mission_list.select(idx)
 	_mission_list.ensure_current_is_visible()
 	_on_mission_selected(idx)
+
+	# Update arrow position after selection change
+	call_deferred("_update_mission_arrow_position")
 
 func _exit_outreach_panel() -> bool:
 	"""Exit OutreachPanel back to previous panel

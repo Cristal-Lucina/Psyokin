@@ -55,7 +55,7 @@ theme_override_constants/separation = 8
 
 [node name="CategoryLabel" type="Label" parent="Root/MainContent/LeftPanel/Margin/VBox"]
 layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
+theme_override_colors/font_color = Color(1, 0.290196, 0.850980, 1)
 theme_override_font_sizes/font_size = 16
 text = "OUTREACH"
 horizontal_alignment = 0
@@ -88,7 +88,7 @@ theme_override_constants/separation = 8
 [node name="MissionLabel" type="Label" parent="Root/MainContent/CenterPanel/Margin/VBox"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
+theme_override_colors/font_color = Color(1, 0.290196, 0.850980, 1)
 theme_override_font_sizes/font_size = 16
 text = "MISSIONS"
 horizontal_alignment = 0
@@ -120,7 +120,7 @@ theme_override_constants/separation = 8
 
 [node name="DetailLabel" type="Label" parent="Root/MainContent/RightPanel/Margin/VBox"]
 layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.7, 0.75, 1)
+theme_override_colors/font_color = Color(1, 0.290196, 0.850980, 1)
 theme_override_font_sizes/font_size = 16
 text = "DETAILS"
 horizontal_alignment = 0
