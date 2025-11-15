@@ -88,7 +88,6 @@ var _selection_arrow: Label = null
 var _dark_box: PanelContainer = null
 
 @onready var _name_tv   : Label          = %Name
-@onready var _desc      : RichTextLabel  = %Notes
 @onready var _profile_desc : RichTextLabel = %Description
 
 # Detail widgets (from TSCN)
@@ -303,13 +302,9 @@ func _apply_core_vibe_styling() -> void:
 
 	# Style unlock header
 	if _unlock_hdr:
-		aCoreVibeTheme.style_label(_unlock_hdr, aCoreVibeTheme.COLOR_SKY_CYAN, 16)
+		aCoreVibeTheme.style_label(_unlock_hdr, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA, 16)
 
-	# Style description
-	if _desc:
-		_desc.add_theme_color_override("default_color", aCoreVibeTheme.COLOR_MILK_WHITE)
-		_desc.add_theme_font_size_override("normal_font_size", 14)
-
+	# Style profile description
 	if _profile_desc:
 		_profile_desc.add_theme_color_override("default_color", aCoreVibeTheme.COLOR_MILK_WHITE)
 		_profile_desc.add_theme_font_size_override("normal_font_size", 14)
@@ -746,16 +741,16 @@ func _build_list() -> void:
 		_list.set_item_metadata(i, id)
 
 		if not known:
-			# Core Vibe: Dimmed Milk White for unknown bonds
-			_list.set_item_custom_fg_color(i, Color(aCoreVibeTheme.COLOR_MILK_WHITE.r, aCoreVibeTheme.COLOR_MILK_WHITE.g, aCoreVibeTheme.COLOR_MILK_WHITE.b, 0.4))
+			# Core Vibe: Dimmed grey for unknown bonds (stays grey when highlighted)
+			_list.set_item_custom_fg_color(i, Color(0.5, 0.5, 0.5, 0.6))
 			_list.set_item_tooltip(i, "Unknown")
 		elif maxed:
 			# Core Vibe: Electric Lime for maxed bonds
 			_list.set_item_custom_fg_color(i, aCoreVibeTheme.COLOR_ELECTRIC_LIME)
 			_list.set_item_tooltip(i, "Maxed")
 		else:
-			# Core Vibe: Sky Cyan for known, non-maxed bonds
-			_list.set_item_custom_fg_color(i, aCoreVibeTheme.COLOR_SKY_CYAN)
+			# Core Vibe: Milk White for known, non-maxed bonds
+			_list.set_item_custom_fg_color(i, aCoreVibeTheme.COLOR_MILK_WHITE)
 			_list.set_item_tooltip(i, disp_name)
 
 		# Track selected index
@@ -950,7 +945,6 @@ func _update_detail(id: String) -> void:
 		if _event_tv: _event_tv.text = "—"
 		if _layer_tv: _layer_tv.text = "—"
 		if _points_tv: _points_tv.text = "—"
-		if _desc: _desc.text = "[i]Select a bond to see details.[/i]"
 		if _profile_desc: _profile_desc.text = "[i]Have not met them.[/i]"
 		if _likes_tv: _likes_tv.text = "—"
 		if _dislikes_tv: _dislikes_tv.text = "—"
@@ -966,22 +960,10 @@ func _update_detail(id: String) -> void:
 	# Check if bond is known
 	var known: bool = _read_known(id)
 
-	# If unknown, hide all detail widgets and only show hint
+	# If unknown, hide all detail widgets
 	if not known:
 		# Hide all detail widgets
 		_hide_all_detail_widgets()
-
-		# Only show the description with hint
-		if _desc:
-			_desc.visible = true
-			var rec: Dictionary = _bond_def(id)
-			var hint: String = String(rec.get("bond_hint", "")).strip_edges()
-			print("[BondsPanel] Unknown bond '%s' - hint: '%s'" % [id, hint])
-			print("[BondsPanel] Bond def keys: ", rec.keys())
-			if hint != "":
-				_desc.text = hint
-			else:
-				_desc.text = "[i]This character has not been met yet.[/i]"
 
 		# Update profile description for unknown character
 		if _profile_desc:
@@ -1020,13 +1002,8 @@ func _update_detail(id: String) -> void:
 		else:
 			_points_tv.text = "%d (Max)" % points
 
-	# Description
-	var rec: Dictionary = _bond_def(id)
-	if _desc:
-		var desc: String = String(rec.get("bond_description", "")).strip_edges()
-		_desc.text = desc
-
 	# Profile description (same as bond description for known characters)
+	var rec: Dictionary = _bond_def(id)
 	if _profile_desc:
 		var profile_desc: String = String(rec.get("bond_description", "")).strip_edges()
 		if profile_desc != "":
@@ -1100,7 +1077,7 @@ func _hide_all_detail_widgets() -> void:
 	if _unlock_middle: _unlock_middle.visible = false
 	if _unlock_inner: _unlock_inner.visible = false
 	if _story_btn: _story_btn.visible = false
-	if _desc: _desc.visible = false
+	# Notes/description removed from Details panel
 
 func _show_all_detail_widgets() -> void:
 	if _name_tv: _name_tv.visible = true
@@ -1117,7 +1094,7 @@ func _show_all_detail_widgets() -> void:
 	if _unlock_middle: _unlock_middle.visible = true
 	if _unlock_inner: _unlock_inner.visible = true
 	if _story_btn: _story_btn.visible = true
-	if _desc: _desc.visible = true
+	# Notes/description removed from Details panel
 
 func _display_name(id: String) -> String:
 	if _sys and _sys.has_method("get_bond_name"):

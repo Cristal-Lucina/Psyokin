@@ -128,13 +128,6 @@ unique_name_in_owner = true
 layout_mode = 2
 text = "—"
 
-[node name="Notes" type="RichTextLabel" parent="Row/Right/Margin/VBox"]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_vertical = 3
-bbcode_enabled = true
-text = "[i]Select a bond to see details.[/i]"
-
 [node name="StoryBtn" type="Button" parent="Row/Right/Margin/VBox"]
 unique_name_in_owner = true
 layout_mode = 2
