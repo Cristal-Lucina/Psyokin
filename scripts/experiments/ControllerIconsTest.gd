@@ -1,7 +1,15 @@
 extends Control
 
 # Controller Icons Test Scene - Complete Collection
-# Showcases all 49 controller button icons organized by platform
+# Showcases all 51 controller button icons organized by platform
+
+# Theme management
+var current_theme = "Light"  # "Light" or "Dark"
+var light_bg_color = Color(0.15, 0.15, 0.2, 1)  # Dark background for light icons
+var dark_bg_color = Color(0.95, 0.95, 0.97, 1)  # Light background for dark icons
+var icon_base_path_light = "res://assets/graphics/icons/UI/PNG and PSD - Light/Controller/1x/"
+var icon_base_path_dark = "res://assets/graphics/icons/UI/PNG and PSD - Dark/Controller/1x/"
+var icon_base_path = icon_base_path_light
 
 # Icon definitions organized by controller type
 var controller_icons = {
@@ -24,10 +32,6 @@ var controller_icons = {
 			{"id": 14, "name": "Left", "asset": "Asset 68.png"},
 			{"id": 16, "name": "Right", "asset": "Asset 70.png"},
 		],
-		"Special": [
-			{"id": 8, "name": "Share", "asset": "Asset 77.png"},
-			{"id": 9, "name": "Options", "asset": "Asset 78.png"},
-		],
 	},
 	"PlayStation": {
 		"Face": [
@@ -48,13 +52,33 @@ var controller_icons = {
 			{"id": 26, "name": "Left", "asset": "Asset 72.png"},
 			{"id": 27, "name": "Right", "asset": "Asset 73.png"},
 		],
+		"Special": [
+			{"id": 2, "name": "Share", "asset": "Asset 50.png"},
+			{"id": 3, "name": "Options", "asset": "Asset 51.png"},
+		],
 	},
 	"Nintendo": {
+		"Face": [
+			{"id": 12, "name": "B", "asset": "Asset 81.png"},
+			{"id": 13, "name": "A", "asset": "Asset 82.png"},
+			{"id": 11, "name": "Y", "asset": "Asset 80.png"},
+			{"id": 10, "name": "X", "asset": "Asset 79.png"},
+		],
+		"Shoulders": [
+			{"id": 21, "name": "LB", "asset": "Asset 98.png"},
+			{"id": 20, "name": "RB", "asset": "Asset 97.png"},
+			{"id": 19, "name": "LT", "asset": "Asset 96.png"},
+			{"id": 18, "name": "RT", "asset": "Asset 95.png"},
+		],
 		"D-Pad": [
 			{"id": 37, "name": "Up", "asset": "Asset 67.png"},
 			{"id": 36, "name": "Down", "asset": "Asset 66.png"},
 			{"id": 34, "name": "Left", "asset": "Asset 64.png"},
 			{"id": 35, "name": "Right", "asset": "Asset 65.png"},
+		],
+		"Special": [
+			{"id": 99, "name": "+ Button", "asset": "Asset 99.svg"},
+			{"id": 100, "name": "- Button", "asset": "Asset 100.svg"},
 		],
 	},
 	"Universal": {
@@ -83,21 +107,56 @@ var controller_icons = {
 			{"id": 40, "name": "Right", "asset": "Asset 54.png"},
 			{"id": 42, "name": "D-Pad Any", "asset": "Asset 76.png"},
 		],
-		"Special": [
-			{"id": 2, "name": "Share", "asset": "Asset 50.png"},
-			{"id": 3, "name": "Options", "asset": "Asset 51.png"},
-		],
 	},
 }
 
-var icon_base_path = "res://assets/graphics/icons/UI/PNG and PSD - Light/Controller/1x/"
-
 func _ready():
 	print("=== Controller Icons Test - Complete Collection ===")
-	print("Loading 49 controller button icons...")
+	print("Loading 51 controller button icons...")
 
+	# Set initial theme (dark background for light icons)
+	_apply_theme()
 	_build_icon_display()
 	_print_icon_summary()
+
+func _on_theme_toggle():
+	"""Toggle between light and dark themes"""
+	if current_theme == "Light":
+		current_theme = "Dark"
+		icon_base_path = icon_base_path_dark
+		$"MarginContainer/MainVBox/Header/ThemeToggle".text = "Switch to Light Theme"
+	else:
+		current_theme = "Light"
+		icon_base_path = icon_base_path_light
+		$"MarginContainer/MainVBox/Header/ThemeToggle".text = "Switch to Dark Theme"
+
+	_apply_theme()
+	_rebuild_display()
+	print("Switched to %s theme" % current_theme)
+
+func _apply_theme():
+	"""Apply the current theme colors"""
+	var bg_panel = $BackgroundPanel
+	var title_label = $MarginContainer/MainVBox/Title
+	var footer_types = $"MarginContainer/MainVBox/Footer/ControllerTypes"
+	var footer_info = $"MarginContainer/MainVBox/Footer/Info"
+
+	if current_theme == "Light":
+		# Dark background for light icons
+		bg_panel.color = light_bg_color
+		title_label.add_theme_color_override("font_color", Color(0.9, 0.9, 0.95, 1))
+		footer_types.add_theme_color_override("font_color", Color(0.8, 0.8, 0.85, 1))
+		footer_info.add_theme_color_override("font_color", Color(0.6, 0.6, 0.65, 1))
+	else:
+		# Light background for dark icons
+		bg_panel.color = dark_bg_color
+		title_label.add_theme_color_override("font_color", Color(0.1, 0.1, 0.15, 1))
+		footer_types.add_theme_color_override("font_color", Color(0.2, 0.2, 0.25, 1))
+		footer_info.add_theme_color_override("font_color", Color(0.4, 0.4, 0.45, 1))
+
+func _rebuild_display():
+	"""Rebuild the icon display with new theme"""
+	_build_icon_display()
 
 func _build_icon_display():
 	"""Dynamically build the icon display grid"""
@@ -113,7 +172,13 @@ func _build_icon_display():
 		var type_label = Label.new()
 		type_label.text = controller_type
 		type_label.add_theme_font_size_override("font_size", 20)
-		type_label.add_theme_color_override("font_color", Color(0.1, 0.1, 0.15, 1))
+
+		# Apply theme-appropriate color
+		if current_theme == "Light":
+			type_label.add_theme_color_override("font_color", Color(0.9, 0.9, 0.95, 1))
+		else:
+			type_label.add_theme_color_override("font_color", Color(0.1, 0.1, 0.15, 1))
+
 		type_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		type_label.custom_minimum_size = Vector2(600, 40)
 		grid.add_child(type_label)
@@ -130,7 +195,13 @@ func _build_icon_display():
 			var cat_label = Label.new()
 			cat_label.text = category_name + ":"
 			cat_label.add_theme_font_size_override("font_size", 14)
-			cat_label.add_theme_color_override("font_color", Color(0.3, 0.3, 0.35, 1))
+
+			# Apply theme-appropriate color
+			if current_theme == "Light":
+				cat_label.add_theme_color_override("font_color", Color(0.7, 0.7, 0.75, 1))
+			else:
+				cat_label.add_theme_color_override("font_color", Color(0.3, 0.3, 0.35, 1))
+
 			cat_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 			cat_label.custom_minimum_size = Vector2(120, 80)
 			grid.add_child(cat_label)
@@ -172,7 +243,13 @@ func _create_icon_box(icon_data: Dictionary) -> VBoxContainer:
 	var label = Label.new()
 	label.text = icon_data["name"]
 	label.add_theme_font_size_override("font_size", 11)
-	label.add_theme_color_override("font_color", Color(0.2, 0.2, 0.25, 1))
+
+	# Apply theme-appropriate color
+	if current_theme == "Light":
+		label.add_theme_color_override("font_color", Color(0.8, 0.8, 0.85, 1))
+	else:
+		label.add_theme_color_override("font_color", Color(0.2, 0.2, 0.25, 1))
+
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vbox.add_child(label)
 

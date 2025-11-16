@@ -97,11 +97,19 @@ theme_override_constants/margin_bottom = 20
 layout_mode = 2
 theme_override_constants/separation = 10
 
+[node name="Header" type="HBoxContainer" parent="MarginContainer/MainVBox"]
+layout_mode = 2
+alignment = 1
+
+[node name="ThemeToggle" type="Button" parent="MarginContainer/MainVBox/Header"]
+layout_mode = 2
+text = "Switch to Dark Theme"
+
 [node name="Title" type="Label" parent="MarginContainer/MainVBox"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.1, 0.1, 0.15, 1)
 theme_override_font_sizes/font_size = 24
-text = "Controller Icons - Complete Collection (49 Icons)"
+text = "Controller Icons - Complete Collection (51 Icons)"
 horizontal_alignment = 1
 
 [node name="ScrollContainer" type="ScrollContainer" parent="MarginContainer/MainVBox"]
@@ -132,7 +140,7 @@ horizontal_alignment = 1
 [node name="Info" type="Label" parent="MarginContainer/MainVBox/Footer"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.4, 0.4, 0.45, 1)
-text = "Light theme PNG icons (1x scale)"
+text = "Theme-aware PNG icons (1x scale)"
 horizontal_alignment = 1
 
 [node name="BackButton" type="Button" parent="MarginContainer/MainVBox/Footer"]
@@ -140,4 +148,5 @@ layout_mode = 2
 size_flags_horizontal = 4
 text = "Back to Main Menu"
 
+[connection signal="pressed" from="MarginContainer/MainVBox/Header/ThemeToggle" to="." method="_on_theme_toggle"]
 [connection signal="pressed" from="MarginContainer/MainVBox/Footer/BackButton" to="." method="_on_back_pressed"]
