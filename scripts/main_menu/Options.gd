@@ -42,6 +42,12 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	set_process_input(true)
 
+	# Disable ControllerManager to prevent it from consuming controller inputs
+	if has_node("/root/aControllerManager"):
+		var controller_mgr = get_node("/root/aControllerManager")
+		controller_mgr.push_context(controller_mgr.InputContext.DISABLED)
+		print("[Options] ControllerManager disabled")
+
 	# Block all input from reaching the title screen behind this menu
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	if _background:
@@ -388,6 +394,13 @@ func _find_first_focusable(node: Node) -> Control:
 func _on_close_pressed() -> void:
 	print("[Options] Closing options menu")
 	_save_settings()
+
+	# Restore ControllerManager's previous context
+	if has_node("/root/aControllerManager"):
+		var controller_mgr = get_node("/root/aControllerManager")
+		controller_mgr.pop_context()
+		print("[Options] ControllerManager context restored")
+
 	queue_free()
 
 # ==============================================================================
