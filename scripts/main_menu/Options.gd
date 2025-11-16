@@ -6,6 +6,7 @@ extends Control
 @onready var _close_btn: Button = %CloseBtn
 @onready var _controls_panel: Control = %ControlsContent
 @onready var _background: ColorRect = $Background
+@onready var _panel: Panel = $CenterContainer/Panel
 
 # Remapping state
 var _action_data: Array[Dictionary] = []  # Array of {name: String, kb_button: Button, ctrl_button: Button}
@@ -31,8 +32,14 @@ func _ready() -> void:
 	if _background:
 		_background.mouse_filter = Control.MOUSE_FILTER_STOP
 
+	# Apply Core Vibe styling to panel
+	if _panel:
+		_style_panel(_panel)
+
+	# Style close button with focus invert
 	if _close_btn:
 		_close_btn.pressed.connect(_on_close_pressed)
+		aCoreVibeTheme.style_button_with_focus_invert(_close_btn, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
 		print("[Options] Close button connected")
 	else:
 		push_error("[Options] Close button not found!")
@@ -42,6 +49,18 @@ func _ready() -> void:
 		_build_controls_ui()
 	else:
 		push_error("[Options] Controls panel not found!")
+
+func _style_panel(panel: Panel) -> void:
+	"""Apply Core Vibe neon-kawaii styling to options panel"""
+	var style = aCoreVibeTheme.create_panel_style(
+		aCoreVibeTheme.COLOR_MILK_WHITE,          # White border
+		aCoreVibeTheme.COLOR_NIGHT_NAVY,          # Black background
+		1.0,                                       # Full opacity
+		aCoreVibeTheme.CORNER_RADIUS_MEDIUM,      # 16px rounded corners
+		aCoreVibeTheme.BORDER_WIDTH_THIN,         # 2px border
+		aCoreVibeTheme.SHADOW_SIZE_LARGE          # 12px glow
+	)
+	panel.add_theme_stylebox_override("panel", style)
 
 func _on_close_pressed() -> void:
 	print("[Options] Closing options menu")

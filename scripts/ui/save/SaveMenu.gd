@@ -54,10 +54,10 @@ func _find_node_any(paths: PackedStringArray) -> Node:
 func _style_panel(panel: Panel) -> void:
 	"""Apply Core Vibe neon-kawaii styling to a panel"""
 	var style = aCoreVibeTheme.create_panel_style(
-		aCoreVibeTheme.COLOR_PLASMA_TEAL,         # Plasma Teal border (save action)
-		aCoreVibeTheme.COLOR_INK_CHARCOAL,        # Ink charcoal background
-		aCoreVibeTheme.PANEL_OPACITY_FULL,        # Fully opaque
-		aCoreVibeTheme.CORNER_RADIUS_MEDIUM,      # 16px corners
+		aCoreVibeTheme.COLOR_MILK_WHITE,          # White border
+		aCoreVibeTheme.COLOR_NIGHT_NAVY,          # Black background
+		1.0,                                       # Full opacity
+		aCoreVibeTheme.CORNER_RADIUS_MEDIUM,      # 16px rounded corners
 		aCoreVibeTheme.BORDER_WIDTH_THIN,         # 2px border
 		aCoreVibeTheme.SHADOW_SIZE_LARGE          # 12px glow
 	)
@@ -105,8 +105,8 @@ func _ensure_fallback_layout() -> void:
 	title.name = "Title"
 	title.text = "Save Game"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	# Core Vibe: Plasma Teal title
-	aCoreVibeTheme.style_label(title, aCoreVibeTheme.COLOR_PLASMA_TEAL, 20)
+	# Core Vibe: White title to match border
+	aCoreVibeTheme.style_label(title, aCoreVibeTheme.COLOR_MILK_WHITE, 20)
 	root.add_child(title)
 
 	var scroll := ScrollContainer.new()
@@ -227,7 +227,7 @@ func _rebuild() -> void:
 		btn_save.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		btn_save.focus_mode = Control.FOCUS_ALL
 		btn_save.pressed.connect(func() -> void: _do_save(idx))
-		aCoreVibeTheme.style_button(btn_save, aCoreVibeTheme.COLOR_PLASMA_TEAL, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
+		aCoreVibeTheme.style_button_with_focus_invert(btn_save, aCoreVibeTheme.COLOR_PLASMA_TEAL, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
 		_slots_grid.add_child(btn_save)
 		_save_buttons.append(btn_save)
 
@@ -237,7 +237,7 @@ func _rebuild() -> void:
 		btn_del.custom_minimum_size = Vector2(100, 40)
 		btn_del.focus_mode = Control.FOCUS_ALL
 		btn_del.pressed.connect(func() -> void: _do_delete(idx))
-		aCoreVibeTheme.style_button(btn_del, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
+		aCoreVibeTheme.style_button_with_focus_invert(btn_del, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
 		_slots_grid.add_child(btn_del)
 		_delete_buttons.append(btn_del)
 
