@@ -214,24 +214,35 @@ func _cycle_current_option() -> void:
 		return
 
 	var opt_data = _option_containers[_current_option_index]
+	var container = opt_data["container"]
 	var opt_type = opt_data["type"]
 
 	if opt_type == "toggle":
-		# Cycle to next value
-		var toggle_data = opt_data["data"]
+		# Get the data dictionary from container metadata
+		var toggle_data = container.get_meta("option_data")
+		if not toggle_data:
+			print("[Options] Error: No option_data metadata found")
+			return
+
 		var current_value = toggle_data["current_value"]
 		var options = toggle_data["options"]
 		var callback = toggle_data["callback"]
 
-		# Cycle
+		# Cycle to next value
 		current_value += 1
 		if current_value >= options.size():
 			current_value = 0
 
+		# Update the dictionary
 		toggle_data["current_value"] = current_value
+
+		# Update the container's metadata to ensure persistence
+		container.set_meta("option_data", toggle_data)
+
+		# Call the callback to update the actual setting
 		callback.call(current_value)
 
-		# Update visual
+		# Update visual display
 		_update_option_visual(opt_data)
 
 	elif opt_type == "slider":
