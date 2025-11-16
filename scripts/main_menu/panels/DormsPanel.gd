@@ -189,6 +189,14 @@ func _ready() -> void:
 			ds.connect("plan_changed", Callable(self, "_on_dorms_changed"))
 			print("[DormsPanel._ready] Connected plan_changed signal")
 
+	# Connect resize signals to update arrow positions
+	if not resized.is_connected(_on_panel_resized):
+		resized.connect(_on_panel_resized)
+		print("[DormsPanel._ready] Connected panel resized signal")
+	if _roster_list and not _roster_list.resized.is_connected(_on_roster_list_resized):
+		_roster_list.resized.connect(_on_roster_list_resized)
+		print("[DormsPanel._ready] Connected roster list resized signal")
+
 	_apply_core_vibe_styling()
 	print("[DormsPanel._ready] Calling _rebuild()")
 	_rebuild()
@@ -993,15 +1001,15 @@ func _update_details_for_member(member_id: String) -> void:
 
 	# Name
 	var member_name: String = String(ds.call("display_name", member_id))
-	lines.append("[b]Name:[/b] %s" % member_name)
+	lines.append("[b]Name:[/b] [color=#4DE9FF]%s[/color]" % member_name)
 	lines.append("")
 
 	# Room
 	var room_id: String = _get_member_room(member_id)
 	if room_id != "":
-		lines.append("[b]Room:[/b] %s" % room_id)
+		lines.append("[b]Room:[/b] [color=#4DE9FF]%s[/color]" % room_id)
 	else:
-		lines.append("[b]Room:[/b] Common Room")
+		lines.append("[b]Room:[/b] [color=#4DE9FF]Common Room[/color]")
 	lines.append("")
 
 	# Neighbors (if in a room)
@@ -1013,11 +1021,12 @@ func _update_details_for_member(member_id: String) -> void:
 			var n_room: Dictionary = ds.call("get_room", n)
 			var n_occupant: String = String(n_room.get("occupant", ""))
 			if n_occupant == "":
-				lines.append("  • %s - Empty" % n)
+				lines.append("  • %s - [color=#808080]Empty[/color]" % n)
 			else:
 				var n_name: String = String(ds.call("display_name", n_occupant))
 				var status: String = _get_relationship_status(ds, member_id, n_occupant)
-				lines.append("  • %s - %s with %s" % [n, status, n_name])
+				var status_color: String = _get_relationship_color(status)
+				lines.append("  • %s - [color=%s]%s[/color] with %s" % [n, status_color, status, n_name])
 		lines.append("")
 
 	# Show pending reassignment in Reassignments view
@@ -1846,6 +1855,18 @@ func _get_relationship_status(ds: Node, aid1: String, aid2: String) -> String:
 		return String(ds.call("get_pair_status", aid1, aid2))
 	return "Neutral"
 
+func _get_relationship_color(status: String) -> String:
+	"""Return color code based on relationship status"""
+	match status:
+		"Rival":
+			return "#FF4AD9"  # Bubble Magenta
+		"Bestie":
+			return "#C8FF3D"  # Electric Lime
+		"Neutral":
+			return "#FFE84D"  # Citrus Yellow
+		_:
+			return "#FFE84D"  # Default to Citrus Yellow for unknown statuses
+
 func _get_member_status(aid: String) -> PackedStringArray:
 	var status := PackedStringArray()
 	var ds: Node = _ds()
@@ -1962,6 +1983,16 @@ func _can_accept_plan() -> bool:
 func _on_dorms_changed() -> void:
 	print("[DormsPanel._on_dorms_changed] DormSystem signal received, rebuilding...")
 	_rebuild()
+
+func _on_panel_resized() -> void:
+	"""Handle panel resize - update arrow positions"""
+	call_deferred("_update_roster_arrow_position")
+	call_deferred("_update_action_arrow_position")
+	call_deferred("_update_room_arrow_position")
+
+func _on_roster_list_resized() -> void:
+	"""Handle roster list resize - update arrow position"""
+	call_deferred("_update_roster_arrow_position")
 
 # ═══════════════════════════════════════════════════════════════════════════
 # POPUP HELPERS
