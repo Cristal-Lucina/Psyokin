@@ -944,4 +944,3 @@ func _apply_audio_settings() -> void:
 		AudioServer.set_bus_volume_db(ambient_idx, ambient_db)
 
 	print("[Options] Applied audio settings: Voice=%d%%, Music=%d%%, SFX=%d%%, Ambient=%d%%" % [_volume_voice, _volume_music, _volume_sfx, _volume_ambient])
-
