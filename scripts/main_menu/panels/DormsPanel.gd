@@ -189,6 +189,14 @@ func _ready() -> void:
 			ds.connect("plan_changed", Callable(self, "_on_dorms_changed"))
 			print("[DormsPanel._ready] Connected plan_changed signal")
 
+	# Connect resize signals to update arrow positions
+	if not resized.is_connected(_on_panel_resized):
+		resized.connect(_on_panel_resized)
+		print("[DormsPanel._ready] Connected panel resized signal")
+	if _roster_list and not _roster_list.resized.is_connected(_on_roster_list_resized):
+		_roster_list.resized.connect(_on_roster_list_resized)
+		print("[DormsPanel._ready] Connected roster list resized signal")
+
 	_apply_core_vibe_styling()
 	print("[DormsPanel._ready] Calling _rebuild()")
 	_rebuild()
@@ -559,6 +567,7 @@ func _navigate_up() -> void:
 		NavState.ROSTER_SELECT:
 			if _roster_list and _current_roster_index > 0:
 				_current_roster_index -= 1
+				print("[DEBUG Arrow] Navigate UP - roster index now: %d" % _current_roster_index)
 				_focus_current_roster()
 				# Update arrow position after selection change
 				call_deferred("_update_roster_arrow_position")
@@ -583,6 +592,7 @@ func _navigate_down() -> void:
 		NavState.ROSTER_SELECT:
 			if _roster_list and _current_roster_index < _roster_list.item_count - 1:
 				_current_roster_index += 1
+				print("[DEBUG Arrow] Navigate DOWN - roster index now: %d" % _current_roster_index)
 				_focus_current_roster()
 				# Update arrow position after selection change
 				call_deferred("_update_roster_arrow_position")
@@ -612,7 +622,7 @@ func _navigate_left() -> void:
 				# At leftmost edge of grid - navigate to Action Menu
 				_push_nav_state(NavState.ACTION_SELECT)
 				_current_action_index = 0
-				_focus_current_action()
+				_focus_current_action(true)  # Panel transition - wait for layout
 		NavState.ACTION_SELECT:
 			# Navigate to Roster
 			_push_nav_state(NavState.ROSTER_SELECT)
@@ -633,17 +643,17 @@ func _navigate_right() -> void:
 			# Navigate to Action Menu
 			_push_nav_state(NavState.ACTION_SELECT)
 			_current_action_index = 0
-			_focus_current_action()
+			_focus_current_action(true)  # Panel transition - wait for layout
 		NavState.COMMON_SELECT:
 			# Navigate to Action Menu
 			_push_nav_state(NavState.ACTION_SELECT)
 			_current_action_index = 0
-			_focus_current_action()
+			_focus_current_action(true)  # Panel transition - wait for layout
 		NavState.ACTION_SELECT:
 			# Navigate to Rooms
 			_push_nav_state(NavState.ROOM_SELECT)
 			_current_room_index = 0
-			_focus_current_room()
+			_focus_current_room(true)  # Panel transition - wait for animation
 		NavState.ROOM_SELECT:
 			# 2x4 grid: move right within grid
 			if _current_room_index % 4 < 3 and _current_room_index < _room_buttons.size() - 1:
@@ -693,9 +703,13 @@ func _on_back_input() -> void:
 
 	# Go back to previous navigation state
 	if _nav_state_history.size() > 0:
+		var current_state: NavState = _nav_state  # Save current state before popping
 		var prev_state: NavState = _nav_state_history.pop_back()
-		print("[DormsPanel._on_back_input] Going back from %s to %s" % [_get_nav_state_name(_nav_state), _get_nav_state_name(prev_state)])
+		print("[DormsPanel._on_back_input] Going back from %s to %s" % [_get_nav_state_name(current_state), _get_nav_state_name(prev_state)])
 		_nav_state = prev_state
+
+		# Check if this is a panel transition (different states)
+		var is_panel_transition = (current_state != prev_state)
 
 		# Clear selection when going back to roster
 		if _nav_state == NavState.ROSTER_SELECT:
@@ -711,9 +725,9 @@ func _on_back_input() -> void:
 			NavState.COMMON_SELECT:
 				_focus_current_common()
 			NavState.ROOM_SELECT:
-				_focus_current_room()
+				_focus_current_room(is_panel_transition)
 			NavState.ACTION_SELECT:
-				_focus_current_action()
+				_focus_current_action(is_panel_transition)
 		get_viewport().set_input_as_handled()
 	else:
 		# No history - check if panel can close
@@ -728,6 +742,8 @@ func _on_back_input() -> void:
 			# Do NOT call get_viewport().set_input_as_handled() - let event bubble up
 
 func _focus_current_roster() -> void:
+	print("[DEBUG Arrow] _focus_current_roster called - index: %d" % _current_roster_index)
+
 	if _roster_list and _current_roster_index >= 0 and _current_roster_index < _roster_list.item_count:
 		_roster_list.select(_current_roster_index)
 		_roster_list.ensure_current_is_visible()
@@ -738,32 +754,48 @@ func _focus_current_roster() -> void:
 			print("[DormsPanel._focus_current_roster] Focused member: ", focused_member)
 			_update_details_for_member(focused_member)
 
-	# Show roster arrow, hide action and room arrows
-	if _roster_selection_arrow:
-		_roster_selection_arrow.visible = true
-	if _roster_dark_box:
-		_roster_dark_box.visible = true
+	# Hide action and room arrows when focusing roster
 	if _action_selection_arrow:
 		_action_selection_arrow.visible = false
 	if _room_selection_arrow:
 		_room_selection_arrow.visible = false
 
+	# Update roster arrow position (will show it when position is calculated)
+	call_deferred("_update_roster_arrow_position")
+
 	_animate_panel_focus(NavState.ROSTER_SELECT)
 
-func _focus_current_room() -> void:
+func _focus_current_room(is_panel_transition: bool = false) -> void:
 	if _current_room_index >= 0 and _current_room_index < _room_buttons.size():
 		_room_buttons[_current_room_index].grab_focus()
 
-	# Hide roster and action arrows when focusing on rooms
+	# Hide roster and action arrows immediately when focusing on rooms
 	if _roster_selection_arrow:
 		_roster_selection_arrow.visible = false
+		print("[DEBUG Arrow] Roster arrow hidden when moving to rooms")
+	if _roster_dark_box:
+		_roster_dark_box.visible = false
+		print("[DEBUG Arrow] Roster dark box hidden when moving to rooms")
 	if _action_selection_arrow:
 		_action_selection_arrow.visible = false
+		print("[DEBUG Arrow] Action arrow hidden when moving to rooms")
 
-	# Update room arrow position
-	call_deferred("_update_room_arrow_position")
-
+	# Start panel animation
 	_animate_panel_focus(NavState.ROOM_SELECT)
+
+	if is_panel_transition:
+		# First time entering room panel - wait for animation to complete
+		print("[DEBUG Arrow] First room navigation - waiting for panel animation (%f seconds)" % ANIM_DURATION)
+		await get_tree().create_timer(ANIM_DURATION).timeout
+		print("[DEBUG Arrow] Panel animation complete, updating room arrow position")
+	else:
+		# Already in room panel, just moving between rooms - be fast
+		print("[DEBUG Arrow] Moving between rooms - waiting one frame")
+		await get_tree().process_frame
+		print("[DEBUG Arrow] Layout stabilized, updating room arrow position")
+
+	# Update room arrow position (will show it after position is calculated)
+	call_deferred("_update_room_arrow_position")
 
 func _focus_current_common() -> void:
 	if _current_common_index >= 0 and _current_common_index < _common_buttons.size():
@@ -786,20 +818,36 @@ func _focus_current_common() -> void:
 
 	_animate_panel_focus(NavState.COMMON_SELECT)
 
-func _focus_current_action() -> void:
+func _focus_current_action(is_panel_transition: bool = false) -> void:
 	if _current_action_index >= 0 and _current_action_index < _action_buttons.size():
 		_action_buttons[_current_action_index].grab_focus()
 
-	# Hide roster and room arrows but keep the box visible (no blinking)
-	if _roster_selection_arrow and _roster_selection_arrow.visible:
+	# Hide roster and room arrows when moving to action menu
+	if _roster_selection_arrow:
 		_roster_selection_arrow.visible = false
+		print("[DEBUG Arrow] Roster arrow hidden when moving to action menu")
+	if _roster_dark_box:
+		_roster_dark_box.visible = false
+		print("[DEBUG Arrow] Roster dark box hidden when moving to action menu")
 	if _room_selection_arrow:
 		_room_selection_arrow.visible = false
 
+	# Start panel animation
+	_animate_panel_focus(NavState.ACTION_SELECT)
+
+	if is_panel_transition:
+		# First time entering action menu - wait for animation to complete
+		print("[DEBUG Arrow] First action navigation - waiting for panel animation (%f seconds)" % ANIM_DURATION)
+		await get_tree().create_timer(ANIM_DURATION).timeout
+		print("[DEBUG Arrow] Panel animation complete, updating action arrow position")
+	else:
+		# Already in action menu, just moving between buttons - be fast
+		print("[DEBUG Arrow] Moving between action buttons - waiting one frame")
+		await get_tree().process_frame
+		print("[DEBUG Arrow] Layout stabilized, updating action arrow position")
+
 	# Update action arrow position
 	call_deferred("_update_action_arrow_position")
-
-	_animate_panel_focus(NavState.ACTION_SELECT)
 
 func _push_nav_state(new_state: NavState) -> void:
 	"""Push current state to history and switch to new state"""
@@ -993,15 +1041,15 @@ func _update_details_for_member(member_id: String) -> void:
 
 	# Name
 	var member_name: String = String(ds.call("display_name", member_id))
-	lines.append("[b]Name:[/b] %s" % member_name)
+	lines.append("[b]Name:[/b] [color=#4DE9FF]%s[/color]" % member_name)
 	lines.append("")
 
 	# Room
 	var room_id: String = _get_member_room(member_id)
 	if room_id != "":
-		lines.append("[b]Room:[/b] %s" % room_id)
+		lines.append("[b]Room:[/b] [color=#4DE9FF]%s[/color]" % room_id)
 	else:
-		lines.append("[b]Room:[/b] Common Room")
+		lines.append("[b]Room:[/b] [color=#4DE9FF]Common Room[/color]")
 	lines.append("")
 
 	# Neighbors (if in a room)
@@ -1013,11 +1061,12 @@ func _update_details_for_member(member_id: String) -> void:
 			var n_room: Dictionary = ds.call("get_room", n)
 			var n_occupant: String = String(n_room.get("occupant", ""))
 			if n_occupant == "":
-				lines.append("  • %s - Empty" % n)
+				lines.append("  • %s - [color=#808080]Empty[/color]" % n)
 			else:
 				var n_name: String = String(ds.call("display_name", n_occupant))
 				var status: String = _get_relationship_status(ds, member_id, n_occupant)
-				lines.append("  • %s - %s with %s" % [n, status, n_name])
+				var status_color: String = _get_relationship_color(status)
+				lines.append("  • %s - [color=%s]%s[/color] with %s" % [n, status_color, status, n_name])
 		lines.append("")
 
 	# Show pending reassignment in Reassignments view
@@ -1077,7 +1126,7 @@ func _on_roster_item_selected(index: int) -> void:
 	# Auto-navigate to Action Menu (locked navigation flow)
 	_push_nav_state(NavState.ACTION_SELECT)
 	_current_action_index = 0
-	_focus_current_action()
+	_focus_current_action(true)  # Panel transition - wait for layout
 	print("[DormsPanel._on_roster_item_selected] Auto-navigated to ACTION_SELECT")
 
 func _on_roster_member_selected(aid: String) -> void:
@@ -1090,7 +1139,7 @@ func _on_roster_member_selected(aid: String) -> void:
 	# Auto-navigate to Action Menu (locked navigation flow)
 	_push_nav_state(NavState.ACTION_SELECT)
 	_current_action_index = 0
-	_focus_current_action()
+	_focus_current_action(true)  # Panel transition - wait for layout
 	print("[DormsPanel._on_roster_member_selected] Auto-navigated to ACTION_SELECT")
 
 func _on_roster_member_hovered(aid: String) -> void:
@@ -1121,7 +1170,7 @@ func _on_common_member_selected(aid: String) -> void:
 	# Auto-navigate to Action Menu (locked navigation flow)
 	_push_nav_state(NavState.ACTION_SELECT)
 	_current_action_index = 0
-	_focus_current_action()
+	_focus_current_action(true)  # Panel transition - wait for layout
 	print("[DormsPanel._on_common_member_selected] Auto-navigated to ACTION_SELECT")
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -1140,7 +1189,7 @@ func _on_assign_room_pressed() -> void:
 	# Auto-navigate to room selection (locked navigation flow)
 	_push_nav_state(NavState.ROOM_SELECT)
 	_current_room_index = 0
-	_focus_current_room()
+	_focus_current_room(true)  # Panel transition - wait for animation
 
 func _on_move_out_pressed() -> void:
 	print("[DormsPanel._on_move_out_pressed] Move Out button pressed")
@@ -1436,12 +1485,18 @@ func _create_selection_arrows() -> void:
 
 func _update_roster_arrow_position() -> void:
 	"""Update roster arrow and dark box position"""
+	print("[DEBUG Arrow] _update_roster_arrow_position called")
+
 	if not _roster_selection_arrow or not _roster_list:
+		print("[DEBUG Arrow] Early return - arrow or list null: arrow=%s, list=%s" % [_roster_selection_arrow != null, _roster_list != null])
 		return
 
 	var selected = _roster_list.get_selected_items()
 	if selected.size() == 0:
+		print("[DEBUG Arrow] Early return - no items selected")
 		return
+
+	print("[DEBUG Arrow] Arrow currently visible: %s" % _roster_selection_arrow.visible)
 
 	await get_tree().process_frame
 
@@ -1451,20 +1506,41 @@ func _update_roster_arrow_position() -> void:
 	var panel_global_pos = global_position
 	var list_offset_in_panel = list_global_pos - panel_global_pos
 
+	print("[DEBUG Arrow] Item index: %d" % item_index)
+	print("[DEBUG Arrow] Item rect: pos=%s, size=%s" % [item_rect.position, item_rect.size])
+	print("[DEBUG Arrow] List global pos: %s" % list_global_pos)
+	print("[DEBUG Arrow] Panel global pos: %s" % panel_global_pos)
+	print("[DEBUG Arrow] List offset in panel: %s" % list_offset_in_panel)
+	print("[DEBUG Arrow] Roster list size: %s" % _roster_list.size)
+	print("[DEBUG Arrow] Arrow size: %s" % _roster_selection_arrow.size)
+
 	var scroll_offset = 0.0
 	if _roster_list.get_v_scroll_bar():
 		scroll_offset = _roster_list.get_v_scroll_bar().value
+		print("[DEBUG Arrow] Scroll offset: %f" % scroll_offset)
 
 	var arrow_x = list_offset_in_panel.x + _roster_list.size.x - 8.0 - 80.0 + 40.0
 	var arrow_y = list_offset_in_panel.y + item_rect.position.y - scroll_offset + (item_rect.size.y / 2.0) - (_roster_selection_arrow.size.y / 2.0)
 
+	print("[DEBUG Arrow] Calculated arrow position: x=%f, y=%f" % [arrow_x, arrow_y])
+	print("[DEBUG Arrow] Calculation breakdown:")
+	print("[DEBUG Arrow]   arrow_x = %f + %f - 8.0 - 80.0 + 40.0 = %f" % [list_offset_in_panel.x, _roster_list.size.x, arrow_x])
+	print("[DEBUG Arrow]   arrow_y = %f + %f - %f + %f - %f = %f" % [list_offset_in_panel.y, item_rect.position.y, scroll_offset, item_rect.size.y / 2.0, _roster_selection_arrow.size.y / 2.0, arrow_y])
+
 	_roster_selection_arrow.position = Vector2(arrow_x, arrow_y)
+	print("[DEBUG Arrow] Arrow position set to: %s" % _roster_selection_arrow.position)
+
+	# Only show arrow if we're in ROSTER_SELECT state
+	var should_be_visible = (_nav_state == NavState.ROSTER_SELECT)
+	_roster_selection_arrow.visible = should_be_visible
+	print("[DEBUG Arrow] Arrow visibility set to: %s (nav_state: %s)" % [should_be_visible, _get_nav_state_name(_nav_state)])
 
 	if _roster_dark_box:
-		_roster_dark_box.visible = true
 		var box_x = arrow_x - _roster_dark_box.size.x - 4.0
 		var box_y = arrow_y + (_roster_selection_arrow.size.y / 2.0) - (_roster_dark_box.size.y / 2.0)
 		_roster_dark_box.position = Vector2(box_x, box_y)
+		_roster_dark_box.visible = should_be_visible
+		print("[DEBUG Arrow] Dark box position set to: %s, visible: %s" % [_roster_dark_box.position, should_be_visible])
 
 func _update_action_arrow_position() -> void:
 	"""Update action menu arrow position - to the right of the center panel, facing left"""
@@ -1846,6 +1922,18 @@ func _get_relationship_status(ds: Node, aid1: String, aid2: String) -> String:
 		return String(ds.call("get_pair_status", aid1, aid2))
 	return "Neutral"
 
+func _get_relationship_color(status: String) -> String:
+	"""Return color code based on relationship status"""
+	match status:
+		"Rival":
+			return "#FF4AD9"  # Bubble Magenta
+		"Bestie":
+			return "#C8FF3D"  # Electric Lime
+		"Neutral":
+			return "#FFE84D"  # Citrus Yellow
+		_:
+			return "#FFE84D"  # Default to Citrus Yellow for unknown statuses
+
 func _get_member_status(aid: String) -> PackedStringArray:
 	var status := PackedStringArray()
 	var ds: Node = _ds()
@@ -1962,6 +2050,20 @@ func _can_accept_plan() -> bool:
 func _on_dorms_changed() -> void:
 	print("[DormsPanel._on_dorms_changed] DormSystem signal received, rebuilding...")
 	_rebuild()
+
+func _on_panel_resized() -> void:
+	"""Handle panel resize - update arrow positions"""
+	print("[DEBUG Arrow] Panel resized - updating all arrow positions")
+	print("[DEBUG Arrow] Panel size: %s" % size)
+	call_deferred("_update_roster_arrow_position")
+	call_deferred("_update_action_arrow_position")
+	call_deferred("_update_room_arrow_position")
+
+func _on_roster_list_resized() -> void:
+	"""Handle roster list resize - update arrow position"""
+	print("[DEBUG Arrow] Roster list resized - updating arrow position")
+	print("[DEBUG Arrow] Roster list size: %s" % _roster_list.size)
+	call_deferred("_update_roster_arrow_position")
 
 # ═══════════════════════════════════════════════════════════════════════════
 # POPUP HELPERS
