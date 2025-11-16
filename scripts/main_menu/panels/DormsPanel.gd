@@ -1406,9 +1406,9 @@ func _create_selection_arrows() -> void:
 	await get_tree().process_frame
 	_action_selection_arrow.size = Vector2(54, 40)
 
-	# Create room selection arrow (to the right of the selected room, facing right)
+	# Create room selection arrow (to the right of the selected room, facing left)
 	_room_selection_arrow = Label.new()
-	_room_selection_arrow.text = "►"
+	_room_selection_arrow.text = "◄"
 	_room_selection_arrow.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_room_selection_arrow.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_room_selection_arrow.add_theme_font_size_override("font_size", 43)
@@ -1583,8 +1583,8 @@ func _update_room_arrow_position() -> void:
 	_room_arrow_pulse_tween.set_trans(Tween.TRANS_SINE)
 	_room_arrow_pulse_tween.set_ease(Tween.EASE_IN_OUT)
 
-	# Pulse right (in the direction it's pointing)
-	_room_arrow_pulse_tween.tween_property(_room_selection_arrow, "position:x", arrow_x + 6, 0.6)
+	# Pulse left (in the direction it's pointing)
+	_room_arrow_pulse_tween.tween_property(_room_selection_arrow, "position:x", arrow_x - 6, 0.6)
 	_room_arrow_pulse_tween.tween_property(_room_selection_arrow, "position:x", arrow_x, 0.6)
 
 func _start_arrow_pulse(arrow: Label) -> void:
@@ -1738,11 +1738,11 @@ func _apply_room_visual(btn: Button, room_id: String) -> void:
 	# Core Vibe: Neon-kawaii room state colors
 	var col := aCoreVibeTheme.COLOR_INK_CHARCOAL  # default
 	if state == VIS_EMPTY:
-		col = Color(aCoreVibeTheme.COLOR_CITRUS_YELLOW.r, aCoreVibeTheme.COLOR_CITRUS_YELLOW.g, aCoreVibeTheme.COLOR_CITRUS_YELLOW.b, 0.3)  # Citrus Yellow (empty/available)
+		col = Color(aCoreVibeTheme.COLOR_SKY_CYAN.r, aCoreVibeTheme.COLOR_SKY_CYAN.g, aCoreVibeTheme.COLOR_SKY_CYAN.b, 0.3)  # Sky Cyan (empty/available)
 	elif state == VIS_OCCUPIED:
-		col = Color(aCoreVibeTheme.COLOR_SKY_CYAN.r, aCoreVibeTheme.COLOR_SKY_CYAN.g, aCoreVibeTheme.COLOR_SKY_CYAN.b, 0.3)  # Sky Cyan (occupied)
+		col = Color(aCoreVibeTheme.COLOR_GRAPE_VIOLET.r, aCoreVibeTheme.COLOR_GRAPE_VIOLET.g, aCoreVibeTheme.COLOR_GRAPE_VIOLET.b, 0.3)  # Grape Violet (occupied)
 	elif state == VIS_STAGED:
-		col = Color(aCoreVibeTheme.COLOR_CITRUS_YELLOW.r, aCoreVibeTheme.COLOR_CITRUS_YELLOW.g, aCoreVibeTheme.COLOR_CITRUS_YELLOW.b, 0.3)  # Citrus Yellow (staged/moving)
+		col = Color(aCoreVibeTheme.COLOR_BUBBLE_MAGENTA.r, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA.g, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA.b, 0.3)  # Bubble Magenta (staged/moving)
 	elif state == VIS_LOCKED:
 		col = Color(aCoreVibeTheme.COLOR_BUBBLE_MAGENTA.r, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA.g, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA.b, 0.3)  # Bubble Magenta (locked)
 
@@ -1770,6 +1770,7 @@ func _apply_room_visual(btn: Button, room_id: String) -> void:
 	btn.add_theme_stylebox_override("normal", sb)
 	btn.add_theme_stylebox_override("hover", sb)
 	btn.add_theme_stylebox_override("pressed", sb)
+	btn.add_theme_stylebox_override("focus", sb)
 
 func _update_room_colors() -> void:
 	var ds: Node = _ds()
