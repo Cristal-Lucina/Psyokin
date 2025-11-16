@@ -123,13 +123,14 @@ func _ensure_fallback_layout() -> void:
 
 	var scroll := ScrollContainer.new()
 	scroll.name = "Scroll"
-	scroll.size_flags_horizontal = Control.SIZE_SHRINK_CENTER  # Center content
+	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL  # Allow scroll to expand
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	root.add_child(scroll)
 
 	_slots_grid = GridContainer.new()
 	_slots_grid.name = "SlotsGrid"
 	_slots_grid.columns = 2
+	_slots_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL  # Allow grid to expand
 	_slots_grid.add_theme_constant_override("h_separation", 12)
 	_slots_grid.add_theme_constant_override("v_separation", 8)
 	scroll.add_child(_slots_grid)
