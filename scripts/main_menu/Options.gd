@@ -53,6 +53,9 @@ func _ready() -> void:
 	# Load settings from aSettings
 	_load_settings()
 
+	# Apply display settings to ensure they're in effect
+	_apply_display_settings()
+
 	# Build the tabbed interface
 	_build_tabbed_interface()
 
@@ -89,35 +92,34 @@ func _add_button_padding(button: Button) -> void:
 func _load_settings() -> void:
 	"""Load settings from aSettings autoload"""
 	if has_node("/root/aSettings"):
-		_control_type = aSettings.get_setting("control_type", "keyboard")
-		_language = aSettings.get_setting("language", "English")
-		_text_speed = aSettings.get_setting("text_speed", 1)
-		_vibration = aSettings.get_setting("vibration", true)
-		_difficulty = aSettings.get_setting("difficulty", 1)
-		_display_type = aSettings.get_setting("display_type", "stretch")
-		_resolution = aSettings.get_setting("resolution", "1080p")
-		_display_mode = aSettings.get_setting("display_mode", "fullscreen")
-		_volume_voice = aSettings.get_setting("volume_voice", 100.0)
-		_volume_music = aSettings.get_setting("volume_music", 100.0)
-		_volume_sfx = aSettings.get_setting("volume_sfx", 100.0)
-		_volume_ambient = aSettings.get_setting("volume_ambient", 100.0)
+		_control_type = aSettings.get_value("control_type", "keyboard")
+		_language = aSettings.get_value("language", "English")
+		_text_speed = aSettings.get_value("text_speed", 1)
+		_vibration = aSettings.get_value("vibration", true)
+		_difficulty = aSettings.get_value("difficulty", 1)
+		_display_type = aSettings.get_value("display_type", "stretch")
+		_resolution = aSettings.get_value("resolution", "1080p")
+		_display_mode = aSettings.get_value("display_mode", "fullscreen")
+		_volume_voice = aSettings.get_value("volume_voice", 100.0)
+		_volume_music = aSettings.get_value("volume_music", 100.0)
+		_volume_sfx = aSettings.get_value("volume_sfx", 100.0)
+		_volume_ambient = aSettings.get_value("volume_ambient", 100.0)
 
 func _save_settings() -> void:
 	"""Save settings to aSettings autoload"""
 	if has_node("/root/aSettings"):
-		aSettings.set_setting("control_type", _control_type)
-		aSettings.set_setting("language", _language)
-		aSettings.set_setting("text_speed", _text_speed)
-		aSettings.set_setting("vibration", _vibration)
-		aSettings.set_setting("difficulty", _difficulty)
-		aSettings.set_setting("display_type", _display_type)
-		aSettings.set_setting("resolution", _resolution)
-		aSettings.set_setting("display_mode", _display_mode)
-		aSettings.set_setting("volume_voice", _volume_voice)
-		aSettings.set_setting("volume_music", _volume_music)
-		aSettings.set_setting("volume_sfx", _volume_sfx)
-		aSettings.set_setting("volume_ambient", _volume_ambient)
-		aSettings.save_settings()
+		aSettings.set_value("control_type", _control_type)
+		aSettings.set_value("language", _language)
+		aSettings.set_value("text_speed", _text_speed)
+		aSettings.set_value("vibration", _vibration)
+		aSettings.set_value("difficulty", _difficulty)
+		aSettings.set_value("display_type", _display_type)
+		aSettings.set_value("resolution", _resolution)
+		aSettings.set_value("display_mode", _display_mode)
+		aSettings.set_value("volume_voice", _volume_voice)
+		aSettings.set_value("volume_music", _volume_music)
+		aSettings.set_value("volume_sfx", _volume_sfx)
+		aSettings.set_value("volume_ambient", _volume_ambient)
 
 # ==============================================================================
 # Tab Interface Builder
@@ -311,19 +313,88 @@ func _build_controls_tab() -> Control:
 
 func _build_display_tab() -> Control:
 	"""Build Display tab: Display Type, Resolution, Mode"""
+	var scroll = ScrollContainer.new()
+	scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
+	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+
 	var container = VBoxContainer.new()
-	container.set_anchors_preset(Control.PRESET_FULL_RECT)
 	container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	container.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	container.add_theme_constant_override("separation", 15)
+	container.add_theme_constant_override("separation", 20)
+	scroll.add_child(container)
 
-	# TODO: Build display content
-	var label = Label.new()
-	label.text = "DISPLAY (Coming Soon)"
-	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	container.add_child(label)
+	# Title
+	var title = Label.new()
+	title.text = "DISPLAY"
+	title.add_theme_font_size_override("font_size", 20)
+	title.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_CITRUS_YELLOW)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	container.add_child(title)
 
-	return container
+	_add_spacer(container, 10)
+
+	# Display Type
+	_add_option_label(container, "Display Type")
+	var type_idx = 0 if _display_type == "stretch" else 1
+	var type_hbox = _create_button_group(["Stretch", "Constant"], type_idx, func(idx):
+		_display_type = "stretch" if idx == 0 else "constant"
+		_apply_display_settings()
+		_save_settings()
+	)
+	container.add_child(type_hbox)
+
+	_add_spacer(container, 15)
+
+	# Resolution
+	_add_option_label(container, "Resolution")
+	var res_idx = 0 if _resolution == "720p" else 1
+	var res_hbox = _create_button_group(["720p", "1080p"], res_idx, func(idx):
+		_resolution = "720p" if idx == 0 else "1080p"
+		_apply_display_settings()
+		_save_settings()
+	)
+	container.add_child(res_hbox)
+
+	_add_spacer(container, 15)
+
+	# Display Mode
+	_add_option_label(container, "Display Mode")
+	var mode_idx = 0
+	if _display_mode == "fullscreen":
+		mode_idx = 0
+	elif _display_mode == "borderless":
+		mode_idx = 1
+	else:
+		mode_idx = 2
+	var mode_hbox = _create_button_group(["Fullscreen", "Borderless", "Windowed"], mode_idx, func(idx):
+		if idx == 0:
+			_display_mode = "fullscreen"
+		elif idx == 1:
+			_display_mode = "borderless"
+		else:
+			_display_mode = "windowed"
+		_apply_display_settings()
+		_save_settings()
+	)
+	container.add_child(mode_hbox)
+
+	# Spacer to push Restore Defaults to bottom
+	var spacer = Control.new()
+	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	container.add_child(spacer)
+
+	# Restore Defaults button
+	var restore_btn = Button.new()
+	restore_btn.text = "RESTORE DEFAULTS"
+	restore_btn.custom_minimum_size = Vector2(200, 45)
+	restore_btn.pressed.connect(_restore_display_defaults_and_rebuild)
+	aCoreVibeTheme.style_button_with_focus_invert(restore_btn, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
+	_add_button_padding(restore_btn)
+	var restore_center = CenterContainer.new()
+	restore_center.add_child(restore_btn)
+	container.add_child(restore_center)
+
+	return scroll
 
 func _build_sound_tab() -> Control:
 	"""Build Sound tab with volume sliders"""
@@ -422,7 +493,46 @@ func _restore_display_defaults() -> void:
 	_resolution = "1080p"
 	_display_mode = "fullscreen"
 	_save_settings()
+	_apply_display_settings()
 	print("[Options] Display settings restored to defaults")
+
+func _restore_display_defaults_and_rebuild() -> void:
+	"""Restore Display defaults and rebuild the tab"""
+	_restore_display_defaults()
+
+	# Rebuild the tab to show new values
+	if _tab_content.has(Tab.DISPLAY):
+		_tab_content[Tab.DISPLAY].queue_free()
+		_tab_content[Tab.DISPLAY] = _build_display_tab()
+		_content_container.add_child(_tab_content[Tab.DISPLAY])
+		_switch_tab(Tab.DISPLAY)
+
+func _apply_display_settings() -> void:
+	"""Apply display settings to the game window"""
+	var window = get_window()
+	if not window:
+		push_warning("[Options] Could not get window reference")
+		return
+
+	# Apply resolution
+	var target_size = Vector2i(1920, 1080) if _resolution == "1080p" else Vector2i(1280, 720)
+
+	# Apply display mode
+	if _display_mode == "fullscreen":
+		window.mode = Window.MODE_EXCLUSIVE_FULLSCREEN
+	elif _display_mode == "borderless":
+		window.mode = Window.MODE_FULLSCREEN
+	else:  # windowed
+		window.mode = Window.MODE_WINDOWED
+		window.size = target_size
+
+	# Apply display type (viewport stretch mode)
+	if _display_type == "stretch":
+		get_tree().root.content_scale_mode = Window.CONTENT_SCALE_MODE_VIEWPORT_STRETCH
+	else:  # constant
+		get_tree().root.content_scale_mode = Window.CONTENT_SCALE_MODE_VIEWPORT
+
+	print("[Options] Applied display settings: %s, %s, %s" % [_display_type, _resolution, _display_mode])
 
 func _restore_sound_defaults() -> void:
 	"""Restore Sound tab to defaults"""
