@@ -111,8 +111,10 @@ func _on_panel_gained_focus() -> void:
 	print("[CalendarPanel] Gained focus - refreshing calendar display")
 	# Refresh calendar when panel becomes active (in case date changed while away)
 	_rebuild()
-	# Start in calendar view
-	_focus_state = FocusState.CALENDAR
+	# Start with Today button focused
+	_focus_state = FocusState.BUTTONS
+	_button_index = 1  # Today button
+	call_deferred("_update_button_focus")
 
 func _apply_core_vibe_styling() -> void:
 	"""Apply Core Vibe neon-kawaii styling to calendar elements"""
@@ -120,48 +122,115 @@ func _apply_core_vibe_styling() -> void:
 	# Style the two main panel containers with rounded neon borders
 	if _left_panel:
 		var left_style = aCoreVibeTheme.create_panel_style(
-			aCoreVibeTheme.COLOR_SKY_CYAN,            # Sky Cyan border (calendar)
+			aCoreVibeTheme.COLOR_SKY_CYAN,            # Sky Cyan border (important dates)
 			aCoreVibeTheme.COLOR_INK_CHARCOAL,        # Ink charcoal background
 			aCoreVibeTheme.PANEL_OPACITY_SEMI,        # Semi-transparent
 			aCoreVibeTheme.CORNER_RADIUS_MEDIUM,      # 16px corners
-			aCoreVibeTheme.BORDER_WIDTH_THIN,         # 2px border
-			aCoreVibeTheme.SHADOW_SIZE_MEDIUM         # 6px glow
+			aCoreVibeTheme.BORDER_WIDTH_THICK,        # 3px border for more pop
+			aCoreVibeTheme.SHADOW_SIZE_LARGE          # 12px glow for neon effect
 		)
-		left_style.content_margin_left = 10
-		left_style.content_margin_top = 10
-		left_style.content_margin_right = 10
-		left_style.content_margin_bottom = 10
+		left_style.content_margin_left = 12
+		left_style.content_margin_top = 12
+		left_style.content_margin_right = 12
+		left_style.content_margin_bottom = 12
 		_left_panel.add_theme_stylebox_override("panel", left_style)
 
 	if _right_panel:
 		var right_style = aCoreVibeTheme.create_panel_style(
-			aCoreVibeTheme.COLOR_GRAPE_VIOLET,        # Grape Violet border (events)
+			aCoreVibeTheme.COLOR_GRAPE_VIOLET,        # Grape Violet border (calendar)
 			aCoreVibeTheme.COLOR_INK_CHARCOAL,        # Ink charcoal background
 			aCoreVibeTheme.PANEL_OPACITY_SEMI,        # Semi-transparent
 			aCoreVibeTheme.CORNER_RADIUS_MEDIUM,      # 16px corners
-			aCoreVibeTheme.BORDER_WIDTH_THIN,         # 2px border
-			aCoreVibeTheme.SHADOW_SIZE_MEDIUM         # 6px glow
+			aCoreVibeTheme.BORDER_WIDTH_THICK,        # 3px border for more pop
+			aCoreVibeTheme.SHADOW_SIZE_LARGE          # 12px glow for neon effect
 		)
-		right_style.content_margin_left = 10
-		right_style.content_margin_top = 10
-		right_style.content_margin_right = 10
-		right_style.content_margin_bottom = 10
+		right_style.content_margin_left = 12
+		right_style.content_margin_top = 12
+		right_style.content_margin_right = 12
+		right_style.content_margin_bottom = 12
 		_right_panel.add_theme_stylebox_override("panel", right_style)
 
-	# Style month label
+	# Style month label with Electric Lime
 	if _label_month:
-		aCoreVibeTheme.style_label(_label_month, aCoreVibeTheme.COLOR_ELECTRIC_LIME, 24)
+		_label_month.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_ELECTRIC_LIME)
+		_label_month.add_theme_font_size_override("font_size", 28)
 
-	# Style navigation buttons
+	# Style Important Dates header with Bubble Magenta
+	var important_dates_title = get_node_or_null("Root/LeftPanel/Margin/LeftContent/Title")
+	if important_dates_title:
+		important_dates_title.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_BUBBLE_MAGENTA)
+		important_dates_title.add_theme_font_size_override("font_size", 18)
+
+	# Style navigation buttons with enhanced Core Vibe styling
 	if _btn_prev:
-		aCoreVibeTheme.style_button(_btn_prev, aCoreVibeTheme.COLOR_SKY_CYAN, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
-		_btn_prev.custom_minimum_size = Vector2(100, 36)
+		_style_nav_button(_btn_prev, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA)
+		_btn_prev.custom_minimum_size = Vector2(100, 40)
 	if _btn_next:
-		aCoreVibeTheme.style_button(_btn_next, aCoreVibeTheme.COLOR_SKY_CYAN, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
-		_btn_next.custom_minimum_size = Vector2(100, 36)
+		_style_nav_button(_btn_next, aCoreVibeTheme.COLOR_SKY_CYAN)
+		_btn_next.custom_minimum_size = Vector2(100, 40)
 	if _btn_today:
-		aCoreVibeTheme.style_button(_btn_today, aCoreVibeTheme.COLOR_ELECTRIC_LIME, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
-		_btn_today.custom_minimum_size = Vector2(100, 36)
+		_style_nav_button(_btn_today, aCoreVibeTheme.COLOR_ELECTRIC_LIME)
+		_btn_today.custom_minimum_size = Vector2(100, 40)
+
+func _style_nav_button(btn: Button, color: Color) -> void:
+	"""Apply Core Vibe button styling with border and fill states"""
+	# Normal state: Transparent with colored border
+	var style_normal = StyleBoxFlat.new()
+	style_normal.bg_color = Color(0, 0, 0, 0)
+	style_normal.border_color = color
+	style_normal.border_width_left = 2
+	style_normal.border_width_right = 2
+	style_normal.border_width_top = 2
+	style_normal.border_width_bottom = 2
+	style_normal.corner_radius_top_left = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+	style_normal.corner_radius_top_right = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+	style_normal.corner_radius_bottom_left = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+	style_normal.corner_radius_bottom_right = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+
+	# Hover state: Slight glow
+	var style_hover = style_normal.duplicate()
+	style_hover.shadow_color = Color(color.r, color.g, color.b, 0.4)
+	style_hover.shadow_size = 4
+
+	# Pressed state: Darker fill
+	var style_pressed = style_normal.duplicate()
+	style_pressed.bg_color = Color(color.r, color.g, color.b, 0.3)
+
+	# Focus state: Filled with color
+	var style_focus = StyleBoxFlat.new()
+	style_focus.bg_color = color
+	style_focus.corner_radius_top_left = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+	style_focus.corner_radius_top_right = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+	style_focus.corner_radius_bottom_left = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+	style_focus.corner_radius_bottom_right = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+	style_focus.shadow_color = Color(color.r, color.g, color.b, 0.5)
+	style_focus.shadow_size = 6
+
+	# Disabled state: Grey
+	var style_disabled = StyleBoxFlat.new()
+	style_disabled.bg_color = aCoreVibeTheme.COLOR_INK_CHARCOAL
+	style_disabled.border_color = Color(0.5, 0.5, 0.5, 1.0)
+	style_disabled.border_width_left = 2
+	style_disabled.border_width_right = 2
+	style_disabled.border_width_top = 2
+	style_disabled.border_width_bottom = 2
+	style_disabled.corner_radius_top_left = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+	style_disabled.corner_radius_top_right = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+	style_disabled.corner_radius_bottom_left = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+	style_disabled.corner_radius_bottom_right = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+
+	btn.add_theme_stylebox_override("normal", style_normal)
+	btn.add_theme_stylebox_override("hover", style_hover)
+	btn.add_theme_stylebox_override("pressed", style_pressed)
+	btn.add_theme_stylebox_override("focus", style_focus)
+	btn.add_theme_stylebox_override("disabled", style_disabled)
+	btn.add_theme_stylebox_override("disabled_focused", style_disabled.duplicate())
+
+	btn.add_theme_color_override("font_color", color)
+	btn.add_theme_color_override("font_hover_color", color)
+	btn.add_theme_color_override("font_pressed_color", color)
+	btn.add_theme_color_override("font_focus_color", aCoreVibeTheme.COLOR_NIGHT_NAVY)
+	btn.add_theme_color_override("font_disabled_color", Color(0.5, 0.5, 0.5, 1.0))
 
 # --- node finders --------------------------------------------------------------
 
@@ -242,9 +311,9 @@ func _rebuild() -> void:
 		h.text = WEEKDAY_HEADERS[i]
 		h.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		h.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		# Core Vibe: Sky Cyan weekday headers
-		h.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_SKY_CYAN)
-		h.add_theme_font_size_override("font_size", 14)
+		# Core Vibe: Citrus Yellow weekday headers for pop
+		h.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_CITRUS_YELLOW)
+		h.add_theme_font_size_override("font_size", 16)
 		_grid.add_child(h)
 
 	# layout math
@@ -284,16 +353,16 @@ func _make_day_cell(num: int, is_today: bool) -> Control:
 	sb.corner_radius_bottom_right = aCoreVibeTheme.CORNER_RADIUS_SMALL
 
 	if is_today:
-		# Core Vibe: Electric Lime highlight for current day
-		sb.bg_color = Color(aCoreVibeTheme.COLOR_ELECTRIC_LIME.r, aCoreVibeTheme.COLOR_ELECTRIC_LIME.g, aCoreVibeTheme.COLOR_ELECTRIC_LIME.b, 0.2)
+		# Core Vibe: Electric Lime highlight for current day with enhanced glow
+		sb.bg_color = Color(aCoreVibeTheme.COLOR_ELECTRIC_LIME.r, aCoreVibeTheme.COLOR_ELECTRIC_LIME.g, aCoreVibeTheme.COLOR_ELECTRIC_LIME.b, 0.25)
 		sb.border_color = aCoreVibeTheme.COLOR_ELECTRIC_LIME
-		sb.border_width_left = 2
-		sb.border_width_top = 2
-		sb.border_width_right = 2
-		sb.border_width_bottom = 2
-		# Add neon glow
-		sb.shadow_color = Color(aCoreVibeTheme.COLOR_ELECTRIC_LIME.r, aCoreVibeTheme.COLOR_ELECTRIC_LIME.g, aCoreVibeTheme.COLOR_ELECTRIC_LIME.b, 0.4)
-		sb.shadow_size = 4
+		sb.border_width_left = 3
+		sb.border_width_top = 3
+		sb.border_width_right = 3
+		sb.border_width_bottom = 3
+		# Add stronger neon glow for current day
+		sb.shadow_color = Color(aCoreVibeTheme.COLOR_ELECTRIC_LIME.r, aCoreVibeTheme.COLOR_ELECTRIC_LIME.g, aCoreVibeTheme.COLOR_ELECTRIC_LIME.b, 0.6)
+		sb.shadow_size = 6
 
 	wrapper.add_theme_stylebox_override("panel", sb)
 
@@ -352,45 +421,21 @@ func _unhandled_input(event: InputEvent) -> void:
 	if not is_active():
 		return
 
-	match _focus_state:
-		FocusState.CALENDAR:
-			# In calendar view, press up to enter button navigation
-			if event.is_action_pressed("move_up") or event.is_action_pressed("ui_up"):
-				_focus_state = FocusState.BUTTONS
-				# Find first enabled button (prefer Today, then Prev, then Next)
-				_button_index = 1  # Start with "Today"
-				if not _is_button_enabled(_button_index):
-					# Try Prev
-					_button_index = 0
-					if not _is_button_enabled(_button_index):
-						# Try Next
-						_button_index = 2
-				_update_button_focus()
-				get_viewport().set_input_as_handled()
-			elif event.is_action_pressed("menu_back"):
-				# Back button exits the calendar panel
-				# Let PanelBase or GameMenu handle it (don't mark as handled)
-				pass
-
-		FocusState.BUTTONS:
-			# In button navigation mode
-			if event.is_action_pressed("move_down") or event.is_action_pressed("ui_down") or event.is_action_pressed("menu_back"):
-				# Go back to calendar view
-				_focus_state = FocusState.CALENDAR
-				_clear_button_focus()
-				get_viewport().set_input_as_handled()
-			elif event.is_action_pressed("move_left") or event.is_action_pressed("ui_left"):
-				# Move left through buttons, skipping disabled ones
-				_navigate_buttons_left()
-				get_viewport().set_input_as_handled()
-			elif event.is_action_pressed("move_right") or event.is_action_pressed("ui_right"):
-				# Move right through buttons, skipping disabled ones
-				_navigate_buttons_right()
-				get_viewport().set_input_as_handled()
-			elif event.is_action_pressed("menu_accept"):
-				# Press the currently focused button
-				_press_focused_button()
-				get_viewport().set_input_as_handled()
+	# Navigate left/right between buttons
+	if event.is_action_pressed("move_left") or event.is_action_pressed("ui_left"):
+		_navigate_buttons_left()
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("move_right") or event.is_action_pressed("ui_right"):
+		_navigate_buttons_right()
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("menu_accept"):
+		# Press the currently focused button
+		_press_focused_button()
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("menu_back"):
+		# Back button exits the calendar panel
+		# Let PanelBase or GameMenu handle it (don't mark as handled)
+		pass
 
 func _navigate_buttons_left() -> void:
 	"""Navigate left through buttons, skipping disabled ones"""
