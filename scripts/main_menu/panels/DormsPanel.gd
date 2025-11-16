@@ -622,7 +622,7 @@ func _navigate_left() -> void:
 				# At leftmost edge of grid - navigate to Action Menu
 				_push_nav_state(NavState.ACTION_SELECT)
 				_current_action_index = 0
-				_focus_current_action()
+				_focus_current_action(true)  # Panel transition - wait for layout
 		NavState.ACTION_SELECT:
 			# Navigate to Roster
 			_push_nav_state(NavState.ROSTER_SELECT)
@@ -643,12 +643,12 @@ func _navigate_right() -> void:
 			# Navigate to Action Menu
 			_push_nav_state(NavState.ACTION_SELECT)
 			_current_action_index = 0
-			_focus_current_action()
+			_focus_current_action(true)  # Panel transition - wait for layout
 		NavState.COMMON_SELECT:
 			# Navigate to Action Menu
 			_push_nav_state(NavState.ACTION_SELECT)
 			_current_action_index = 0
-			_focus_current_action()
+			_focus_current_action(true)  # Panel transition - wait for layout
 		NavState.ACTION_SELECT:
 			# Navigate to Rooms
 			_push_nav_state(NavState.ROOM_SELECT)
@@ -814,7 +814,7 @@ func _focus_current_common() -> void:
 
 	_animate_panel_focus(NavState.COMMON_SELECT)
 
-func _focus_current_action() -> void:
+func _focus_current_action(is_panel_transition: bool = false) -> void:
 	if _current_action_index >= 0 and _current_action_index < _action_buttons.size():
 		_action_buttons[_current_action_index].grab_focus()
 
@@ -828,10 +828,23 @@ func _focus_current_action() -> void:
 	if _room_selection_arrow:
 		_room_selection_arrow.visible = false
 
+	# Start panel animation
+	_animate_panel_focus(NavState.ACTION_SELECT)
+
+	if is_panel_transition:
+		# First time entering action menu - wait a bit for layout to settle
+		var delay = ANIM_DURATION * 0.5  # Half animation duration
+		print("[DEBUG Arrow] First action navigation - waiting for layout (%f seconds)" % delay)
+		await get_tree().create_timer(delay).timeout
+		print("[DEBUG Arrow] Layout settled, updating action arrow position")
+	else:
+		# Already in action menu, just moving between buttons - be fast
+		print("[DEBUG Arrow] Moving between action buttons - waiting one frame")
+		await get_tree().process_frame
+		print("[DEBUG Arrow] Layout stabilized, updating action arrow position")
+
 	# Update action arrow position
 	call_deferred("_update_action_arrow_position")
-
-	_animate_panel_focus(NavState.ACTION_SELECT)
 
 func _push_nav_state(new_state: NavState) -> void:
 	"""Push current state to history and switch to new state"""
@@ -1110,7 +1123,7 @@ func _on_roster_item_selected(index: int) -> void:
 	# Auto-navigate to Action Menu (locked navigation flow)
 	_push_nav_state(NavState.ACTION_SELECT)
 	_current_action_index = 0
-	_focus_current_action()
+	_focus_current_action(true)  # Panel transition - wait for layout
 	print("[DormsPanel._on_roster_item_selected] Auto-navigated to ACTION_SELECT")
 
 func _on_roster_member_selected(aid: String) -> void:
@@ -1123,7 +1136,7 @@ func _on_roster_member_selected(aid: String) -> void:
 	# Auto-navigate to Action Menu (locked navigation flow)
 	_push_nav_state(NavState.ACTION_SELECT)
 	_current_action_index = 0
-	_focus_current_action()
+	_focus_current_action(true)  # Panel transition - wait for layout
 	print("[DormsPanel._on_roster_member_selected] Auto-navigated to ACTION_SELECT")
 
 func _on_roster_member_hovered(aid: String) -> void:
@@ -1154,7 +1167,7 @@ func _on_common_member_selected(aid: String) -> void:
 	# Auto-navigate to Action Menu (locked navigation flow)
 	_push_nav_state(NavState.ACTION_SELECT)
 	_current_action_index = 0
-	_focus_current_action()
+	_focus_current_action(true)  # Panel transition - wait for layout
 	print("[DormsPanel._on_common_member_selected] Auto-navigated to ACTION_SELECT")
 
 # ═══════════════════════════════════════════════════════════════════════════
