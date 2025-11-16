@@ -60,8 +60,10 @@ func _ready() -> void:
 		controller_mgr.push_context(controller_mgr.InputContext.DISABLED)
 		print("[Options] ControllerManager disabled")
 
-	# Re-add joypad button 0 to ui_accept (InputManager removes it at startup)
-	# We need it for controller navigation in the Options menu
+	# Re-add joypad buttons to ui actions (InputManager removes them at startup)
+	# We need them for controller navigation in the Options menu
+
+	# Re-add button 0 to ui_accept
 	var has_button_0 = false
 	if InputMap.has_action("ui_accept"):
 		for event in InputMap.action_get_events("ui_accept"):
@@ -74,6 +76,20 @@ func _ready() -> void:
 		joy_accept.button_index = 0
 		InputMap.action_add_event("ui_accept", joy_accept)
 		print("[Options] Re-added button 0 to ui_accept for controller navigation")
+
+	# Re-add button 1 to ui_cancel
+	var has_button_1 = false
+	if InputMap.has_action("ui_cancel"):
+		for event in InputMap.action_get_events("ui_cancel"):
+			if event is InputEventJoypadButton and event.button_index == 1:
+				has_button_1 = true
+				break
+
+	if not has_button_1:
+		var joy_cancel = InputEventJoypadButton.new()
+		joy_cancel.button_index = 1
+		InputMap.action_add_event("ui_cancel", joy_cancel)
+		print("[Options] Re-added button 1 to ui_cancel for controller navigation")
 
 	# Block all input from reaching the title screen behind this menu
 	mouse_filter = Control.MOUSE_FILTER_STOP
@@ -456,7 +472,7 @@ func _on_close_pressed() -> void:
 	print("[Options] Closing options menu")
 	_save_settings()
 
-	# Remove button 0 from ui_accept (restore InputManager's original state)
+	# Remove joypad buttons from ui actions (restore InputManager's original state)
 	if InputMap.has_action("ui_accept"):
 		var events_to_remove = []
 		for event in InputMap.action_get_events("ui_accept"):
@@ -465,6 +481,15 @@ func _on_close_pressed() -> void:
 		for event in events_to_remove:
 			InputMap.action_erase_event("ui_accept", event)
 			print("[Options] Removed button 0 from ui_accept (restoring InputManager state)")
+
+	if InputMap.has_action("ui_cancel"):
+		var events_to_remove = []
+		for event in InputMap.action_get_events("ui_cancel"):
+			if event is InputEventJoypadButton and event.button_index == 1:
+				events_to_remove.append(event)
+		for event in events_to_remove:
+			InputMap.action_erase_event("ui_cancel", event)
+			print("[Options] Removed button 1 from ui_cancel (restoring InputManager state)")
 
 	# Restore ControllerManager's previous context
 	if has_node("/root/aControllerManager"):
