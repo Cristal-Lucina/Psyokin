@@ -124,8 +124,8 @@ func _apply_core_vibe_styling() -> void:
 			aCoreVibeTheme.COLOR_INK_CHARCOAL,        # Ink charcoal background
 			aCoreVibeTheme.PANEL_OPACITY_SEMI,        # Semi-transparent
 			aCoreVibeTheme.CORNER_RADIUS_MEDIUM,      # 16px corners
-			aCoreVibeTheme.BORDER_WIDTH_MEDIUM,       # 3px border for more pop
-			aCoreVibeTheme.SHADOW_SIZE_LARGE          # 8px glow for neon effect
+			aCoreVibeTheme.BORDER_WIDTH_THICK,        # 3px border for more pop
+			aCoreVibeTheme.SHADOW_SIZE_LARGE          # 12px glow for neon effect
 		)
 		left_style.content_margin_left = 12
 		left_style.content_margin_top = 12
@@ -139,8 +139,8 @@ func _apply_core_vibe_styling() -> void:
 			aCoreVibeTheme.COLOR_INK_CHARCOAL,        # Ink charcoal background
 			aCoreVibeTheme.PANEL_OPACITY_SEMI,        # Semi-transparent
 			aCoreVibeTheme.CORNER_RADIUS_MEDIUM,      # 16px corners
-			aCoreVibeTheme.BORDER_WIDTH_MEDIUM,       # 3px border for more pop
-			aCoreVibeTheme.SHADOW_SIZE_LARGE          # 8px glow for neon effect
+			aCoreVibeTheme.BORDER_WIDTH_THICK,        # 3px border for more pop
+			aCoreVibeTheme.SHADOW_SIZE_LARGE          # 12px glow for neon effect
 		)
 		right_style.content_margin_left = 12
 		right_style.content_margin_top = 12
