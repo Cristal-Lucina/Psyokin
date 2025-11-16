@@ -603,7 +603,7 @@ func _switch_tab(tab: Tab) -> void:
 
 func _collect_option_containers(node: Node, result: Array[Dictionary]) -> void:
 	"""Recursively collect option containers with metadata"""
-	if node.has_meta("option_data"):
+	if node.has_meta("is_option_container"):
 		# This is an option container with data
 		# Don't cache the data - it will be fetched fresh from metadata when needed
 		var opt_dict = {
@@ -972,8 +972,8 @@ func _create_option_container_with_radio(label_text: String, options: Array, sel
 	})
 	container.set_meta("radio_container", radio_group)
 
-	# Mark this container as having option data for collection
-	container.set_meta("option_data", true)
+	# Mark this container as an option container for collection
+	container.set_meta("is_option_container", true)
 
 	# Content margin
 	var margin = MarginContainer.new()
@@ -1031,8 +1031,8 @@ func _create_option_container_with_slider(label_text: String, slider_row: HBoxCo
 	container.set_meta("option_type", "slider")
 	container.set_meta("option_data", {})
 
-	# Mark this container as having option data for collection
-	container.set_meta("option_data", true)
+	# Mark this container as an option container for collection
+	container.set_meta("is_option_container", true)
 
 	# Content margin
 	var margin = MarginContainer.new()
