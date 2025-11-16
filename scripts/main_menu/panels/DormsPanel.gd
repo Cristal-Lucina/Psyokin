@@ -570,6 +570,7 @@ func _navigate_up() -> void:
 			if _roster_list and _current_roster_index > 0:
 				_current_roster_index -= 1
 				_roster_arrow_should_show = true  # Show arrow when navigating
+				print("[DEBUG Arrow] Navigate UP - roster index now: %d, arrow should show: true" % _current_roster_index)
 				_focus_current_roster()
 				# Update arrow position after selection change
 				call_deferred("_update_roster_arrow_position")
@@ -595,6 +596,7 @@ func _navigate_down() -> void:
 			if _roster_list and _current_roster_index < _roster_list.item_count - 1:
 				_current_roster_index += 1
 				_roster_arrow_should_show = true  # Show arrow when navigating
+				print("[DEBUG Arrow] Navigate DOWN - roster index now: %d, arrow should show: true" % _current_roster_index)
 				_focus_current_roster()
 				# Update arrow position after selection change
 				call_deferred("_update_roster_arrow_position")
@@ -742,6 +744,8 @@ func _on_back_input() -> void:
 			# Do NOT call get_viewport().set_input_as_handled() - let event bubble up
 
 func _focus_current_roster() -> void:
+	print("[DEBUG Arrow] _focus_current_roster called - index: %d, should show: %s" % [_current_roster_index, _roster_arrow_should_show])
+
 	if _roster_list and _current_roster_index >= 0 and _current_roster_index < _roster_list.item_count:
 		_roster_list.select(_current_roster_index)
 		_roster_list.ensure_current_is_visible()
@@ -755,8 +759,10 @@ func _focus_current_roster() -> void:
 	# Show roster arrow only if we've navigated (not on initial selection)
 	if _roster_selection_arrow:
 		_roster_selection_arrow.visible = _roster_arrow_should_show
+		print("[DEBUG Arrow] Set roster arrow visible to: %s" % _roster_arrow_should_show)
 	if _roster_dark_box:
 		_roster_dark_box.visible = _roster_arrow_should_show
+		print("[DEBUG Arrow] Set dark box visible to: %s" % _roster_arrow_should_show)
 	if _action_selection_arrow:
 		_action_selection_arrow.visible = false
 	if _room_selection_arrow:
@@ -1451,12 +1457,18 @@ func _create_selection_arrows() -> void:
 
 func _update_roster_arrow_position() -> void:
 	"""Update roster arrow and dark box position"""
+	print("[DEBUG Arrow] _update_roster_arrow_position called")
+
 	if not _roster_selection_arrow or not _roster_list:
+		print("[DEBUG Arrow] Early return - arrow or list null: arrow=%s, list=%s" % [_roster_selection_arrow != null, _roster_list != null])
 		return
 
 	var selected = _roster_list.get_selected_items()
 	if selected.size() == 0:
+		print("[DEBUG Arrow] Early return - no items selected")
 		return
+
+	print("[DEBUG Arrow] Arrow should show: %s, Arrow currently visible: %s" % [_roster_arrow_should_show, _roster_selection_arrow.visible])
 
 	await get_tree().process_frame
 
@@ -1466,20 +1478,36 @@ func _update_roster_arrow_position() -> void:
 	var panel_global_pos = global_position
 	var list_offset_in_panel = list_global_pos - panel_global_pos
 
+	print("[DEBUG Arrow] Item index: %d" % item_index)
+	print("[DEBUG Arrow] Item rect: pos=%s, size=%s" % [item_rect.position, item_rect.size])
+	print("[DEBUG Arrow] List global pos: %s" % list_global_pos)
+	print("[DEBUG Arrow] Panel global pos: %s" % panel_global_pos)
+	print("[DEBUG Arrow] List offset in panel: %s" % list_offset_in_panel)
+	print("[DEBUG Arrow] Roster list size: %s" % _roster_list.size)
+	print("[DEBUG Arrow] Arrow size: %s" % _roster_selection_arrow.size)
+
 	var scroll_offset = 0.0
 	if _roster_list.get_v_scroll_bar():
 		scroll_offset = _roster_list.get_v_scroll_bar().value
+		print("[DEBUG Arrow] Scroll offset: %f" % scroll_offset)
 
 	var arrow_x = list_offset_in_panel.x + _roster_list.size.x - 8.0 - 80.0 + 40.0
 	var arrow_y = list_offset_in_panel.y + item_rect.position.y - scroll_offset + (item_rect.size.y / 2.0) - (_roster_selection_arrow.size.y / 2.0)
 
+	print("[DEBUG Arrow] Calculated arrow position: x=%f, y=%f" % [arrow_x, arrow_y])
+	print("[DEBUG Arrow] Calculation breakdown:")
+	print("[DEBUG Arrow]   arrow_x = %f + %f - 8.0 - 80.0 + 40.0 = %f" % [list_offset_in_panel.x, _roster_list.size.x, arrow_x])
+	print("[DEBUG Arrow]   arrow_y = %f + %f - %f + %f - %f = %f" % [list_offset_in_panel.y, item_rect.position.y, scroll_offset, item_rect.size.y / 2.0, _roster_selection_arrow.size.y / 2.0, arrow_y])
+
 	_roster_selection_arrow.position = Vector2(arrow_x, arrow_y)
+	print("[DEBUG Arrow] Arrow position set to: %s" % _roster_selection_arrow.position)
 
 	if _roster_dark_box:
 		_roster_dark_box.visible = true
 		var box_x = arrow_x - _roster_dark_box.size.x - 4.0
 		var box_y = arrow_y + (_roster_selection_arrow.size.y / 2.0) - (_roster_dark_box.size.y / 2.0)
 		_roster_dark_box.position = Vector2(box_x, box_y)
+		print("[DEBUG Arrow] Dark box position set to: %s" % _roster_dark_box.position)
 
 func _update_action_arrow_position() -> void:
 	"""Update action menu arrow position - to the right of the center panel, facing left"""
@@ -1992,12 +2020,16 @@ func _on_dorms_changed() -> void:
 
 func _on_panel_resized() -> void:
 	"""Handle panel resize - update arrow positions"""
+	print("[DEBUG Arrow] Panel resized - updating all arrow positions")
+	print("[DEBUG Arrow] Panel size: %s" % size)
 	call_deferred("_update_roster_arrow_position")
 	call_deferred("_update_action_arrow_position")
 	call_deferred("_update_room_arrow_position")
 
 func _on_roster_list_resized() -> void:
 	"""Handle roster list resize - update arrow position"""
+	print("[DEBUG Arrow] Roster list resized - updating arrow position")
+	print("[DEBUG Arrow] Roster list size: %s" % _roster_list.size)
 	call_deferred("_update_roster_arrow_position")
 
 # ═══════════════════════════════════════════════════════════════════════════
