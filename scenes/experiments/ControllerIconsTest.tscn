@@ -1,0 +1,679 @@
+[gd_scene load_steps=32 format=3 uid="uid://controller_icons_test_01"]
+
+[ext_resource type="Script" path="res://scripts/experiments/ControllerIconsTest.gd" id="1_script"]
+
+; Shoulder Buttons
+[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/Controller_Icons/shoulder_buttons/LB.svg" id="2_lb"]
+[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/Controller_Icons/shoulder_buttons/RB.svg" id="3_rb"]
+[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/Controller_Icons/shoulder_buttons/LT.svg" id="4_lt"]
+[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/Controller_Icons/shoulder_buttons/RT.svg" id="5_rt"]
+[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/Controller_Icons/shoulder_buttons/L1.svg" id="6_l1"]
+[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/Controller_Icons/shoulder_buttons/R1.svg" id="7_r1"]
+[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/Controller_Icons/shoulder_buttons/L2.svg" id="8_l2"]
+[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/Controller_Icons/shoulder_buttons/R2.svg" id="9_r2"]
+
+; Face Buttons
+[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/Controller_Icons/face_buttons/X_Button.svg" id="10_x"]
+[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/Controller_Icons/face_buttons/Circle_Button.svg" id="11_circle"]
+[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/Controller_Icons/face_buttons/Square_Button.svg" id="12_square"]
+[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/Controller_Icons/face_buttons/Triangle_Button.svg" id="13_triangle"]
+
+; D-Pad
+[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/Controller_Icons/dpad/DPad_Up.svg" id="14_dpad_up"]
+[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/Controller_Icons/dpad/DPad_Down.svg" id="15_dpad_down"]
+[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/Controller_Icons/dpad/DPad_Left.svg" id="16_dpad_left"]
+[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/Controller_Icons/dpad/DPad_Right.svg" id="17_dpad_right"]
+
+; Analog Sticks
+[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/Controller_Icons/analog_sticks/L_Stick.svg" id="18_l_stick"]
+[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/Controller_Icons/analog_sticks/R_Stick.svg" id="19_r_stick"]
+[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/Controller_Icons/analog_sticks/L3.svg" id="20_l3"]
+[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/Controller_Icons/analog_sticks/R3.svg" id="21_r3"]
+
+; Special Buttons
+[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/Controller_Icons/special_buttons/Option.svg" id="22_option"]
+[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/Controller_Icons/special_buttons/Share.svg" id="23_share"]
+[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/Controller_Icons/special_buttons/Touchpad.svg" id="24_touchpad"]
+
+; Trigger Indicators
+[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/Controller_Icons/trigger_indicators/L_Trigger_Up.svg" id="25_l_trig_up"]
+[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/Controller_Icons/trigger_indicators/L_Trigger_Down.svg" id="26_l_trig_down"]
+[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/Controller_Icons/trigger_indicators/R_Trigger_Up.svg" id="27_r_trig_up"]
+[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/Controller_Icons/trigger_indicators/R_Trigger_Down.svg" id="28_r_trig_down"]
+
+[node name="ControllerIconsTest" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_script")
+
+[node name="BackgroundPanel" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.15, 0.15, 0.2, 1)
+
+[node name="MarginContainer" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 40
+theme_override_constants/margin_top = 40
+theme_override_constants/margin_right = 40
+theme_override_constants/margin_bottom = 40
+
+[node name="MainContainer" type="VBoxContainer" parent="MarginContainer"]
+layout_mode = 2
+theme_override_constants/separation = 20
+
+[node name="Header" type="VBoxContainer" parent="MarginContainer/MainContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Title" type="Label" parent="MarginContainer/MainContainer/Header"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 32
+text = "Controller Button Icons Test"
+horizontal_alignment = 1
+
+[node name="Subtitle" type="Label" parent="MarginContainer/MainContainer/Header"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+text = "27 Individual Controller Icons - All Categories"
+horizontal_alignment = 1
+
+[node name="HSeparator" type="HSeparator" parent="MarginContainer/MainContainer"]
+layout_mode = 2
+
+[node name="ScrollContainer" type="ScrollContainer" parent="MarginContainer/MainContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="ContentContainer" type="VBoxContainer" parent="MarginContainer/MainContainer/ScrollContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 30
+
+; === SHOULDER BUTTONS SECTION ===
+[node name="ShoulderButtons" type="VBoxContainer" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer"]
+layout_mode = 2
+theme_override_constants/separation = 15
+
+[node name="CategoryLabel" type="Label" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/ShoulderButtons"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+text = "Shoulder Buttons"
+
+[node name="XboxStyle" type="HBoxContainer" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/ShoulderButtons"]
+layout_mode = 2
+theme_override_constants/separation = 20
+alignment = 1
+
+[node name="LB" type="VBoxContainer" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/ShoulderButtons/XboxStyle"]
+custom_minimum_size = Vector2(100, 100)
+layout_mode = 2
+alignment = 1
+
+[node name="Icon" type="TextureRect" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/ShoulderButtons/XboxStyle/LB"]
+custom_minimum_size = Vector2(64, 64)
+layout_mode = 2
+texture = ExtResource("2_lb")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Label" type="Label" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/ShoulderButtons/XboxStyle/LB"]
+layout_mode = 2
+text = "LB"
+horizontal_alignment = 1
+
+[node name="RB" type="VBoxContainer" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/ShoulderButtons/XboxStyle"]
+custom_minimum_size = Vector2(100, 100)
+layout_mode = 2
+alignment = 1
+
+[node name="Icon" type="TextureRect" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/ShoulderButtons/XboxStyle/RB"]
+custom_minimum_size = Vector2(64, 64)
+layout_mode = 2
+texture = ExtResource("3_rb")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Label" type="Label" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/ShoulderButtons/XboxStyle/RB"]
+layout_mode = 2
+text = "RB"
+horizontal_alignment = 1
+
+[node name="LT" type="VBoxContainer" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/ShoulderButtons/XboxStyle"]
+custom_minimum_size = Vector2(100, 100)
+layout_mode = 2
+alignment = 1
+
+[node name="Icon" type="TextureRect" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/ShoulderButtons/XboxStyle/LT"]
+custom_minimum_size = Vector2(64, 64)
+layout_mode = 2
+texture = ExtResource("4_lt")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Label" type="Label" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/ShoulderButtons/XboxStyle/LT"]
+layout_mode = 2
+text = "LT"
+horizontal_alignment = 1
+
+[node name="RT" type="VBoxContainer" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/ShoulderButtons/XboxStyle"]
+custom_minimum_size = Vector2(100, 100)
+layout_mode = 2
+alignment = 1
+
+[node name="Icon" type="TextureRect" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/ShoulderButtons/XboxStyle/RT"]
+custom_minimum_size = Vector2(64, 64)
+layout_mode = 2
+texture = ExtResource("5_rt")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Label" type="Label" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/ShoulderButtons/XboxStyle/RT"]
+layout_mode = 2
+text = "RT"
+horizontal_alignment = 1
+
+[node name="PlayStationStyle" type="HBoxContainer" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/ShoulderButtons"]
+layout_mode = 2
+theme_override_constants/separation = 20
+alignment = 1
+
+[node name="L1" type="VBoxContainer" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/ShoulderButtons/PlayStationStyle"]
+custom_minimum_size = Vector2(100, 100)
+layout_mode = 2
+alignment = 1
+
+[node name="Icon" type="TextureRect" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/ShoulderButtons/PlayStationStyle/L1"]
+custom_minimum_size = Vector2(64, 64)
+layout_mode = 2
+texture = ExtResource("6_l1")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Label" type="Label" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/ShoulderButtons/PlayStationStyle/L1"]
+layout_mode = 2
+text = "L1"
+horizontal_alignment = 1
+
+[node name="R1" type="VBoxContainer" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/ShoulderButtons/PlayStationStyle"]
+custom_minimum_size = Vector2(100, 100)
+layout_mode = 2
+alignment = 1
+
+[node name="Icon" type="TextureRect" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/ShoulderButtons/PlayStationStyle/R1"]
+custom_minimum_size = Vector2(64, 64)
+layout_mode = 2
+texture = ExtResource("7_r1")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Label" type="Label" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/ShoulderButtons/PlayStationStyle/R1"]
+layout_mode = 2
+text = "R1"
+horizontal_alignment = 1
+
+[node name="L2" type="VBoxContainer" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/ShoulderButtons/PlayStationStyle"]
+custom_minimum_size = Vector2(100, 100)
+layout_mode = 2
+alignment = 1
+
+[node name="Icon" type="TextureRect" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/ShoulderButtons/PlayStationStyle/L2"]
+custom_minimum_size = Vector2(64, 64)
+layout_mode = 2
+texture = ExtResource("8_l2")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Label" type="Label" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/ShoulderButtons/PlayStationStyle/L2"]
+layout_mode = 2
+text = "L2"
+horizontal_alignment = 1
+
+[node name="R2" type="VBoxContainer" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/ShoulderButtons/PlayStationStyle"]
+custom_minimum_size = Vector2(100, 100)
+layout_mode = 2
+alignment = 1
+
+[node name="Icon" type="TextureRect" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/ShoulderButtons/PlayStationStyle/R2"]
+custom_minimum_size = Vector2(64, 64)
+layout_mode = 2
+texture = ExtResource("9_r2")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Label" type="Label" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/ShoulderButtons/PlayStationStyle/R2"]
+layout_mode = 2
+text = "R2"
+horizontal_alignment = 1
+
+; === FACE BUTTONS SECTION ===
+[node name="FaceButtons" type="VBoxContainer" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer"]
+layout_mode = 2
+theme_override_constants/separation = 15
+
+[node name="CategoryLabel" type="Label" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/FaceButtons"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+text = "Face Buttons"
+
+[node name="ButtonsRow" type="HBoxContainer" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/FaceButtons"]
+layout_mode = 2
+theme_override_constants/separation = 20
+alignment = 1
+
+[node name="X" type="VBoxContainer" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/FaceButtons/ButtonsRow"]
+custom_minimum_size = Vector2(100, 100)
+layout_mode = 2
+alignment = 1
+
+[node name="Icon" type="TextureRect" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/FaceButtons/ButtonsRow/X"]
+custom_minimum_size = Vector2(64, 64)
+layout_mode = 2
+texture = ExtResource("10_x")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Label" type="Label" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/FaceButtons/ButtonsRow/X"]
+layout_mode = 2
+text = "X Button"
+horizontal_alignment = 1
+
+[node name="Circle" type="VBoxContainer" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/FaceButtons/ButtonsRow"]
+custom_minimum_size = Vector2(100, 100)
+layout_mode = 2
+alignment = 1
+
+[node name="Icon" type="TextureRect" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/FaceButtons/ButtonsRow/Circle"]
+custom_minimum_size = Vector2(64, 64)
+layout_mode = 2
+texture = ExtResource("11_circle")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Label" type="Label" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/FaceButtons/ButtonsRow/Circle"]
+layout_mode = 2
+text = "Circle"
+horizontal_alignment = 1
+
+[node name="Square" type="VBoxContainer" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/FaceButtons/ButtonsRow"]
+custom_minimum_size = Vector2(100, 100)
+layout_mode = 2
+alignment = 1
+
+[node name="Icon" type="TextureRect" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/FaceButtons/ButtonsRow/Square"]
+custom_minimum_size = Vector2(64, 64)
+layout_mode = 2
+texture = ExtResource("12_square")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Label" type="Label" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/FaceButtons/ButtonsRow/Square"]
+layout_mode = 2
+text = "Square"
+horizontal_alignment = 1
+
+[node name="Triangle" type="VBoxContainer" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/FaceButtons/ButtonsRow"]
+custom_minimum_size = Vector2(100, 100)
+layout_mode = 2
+alignment = 1
+
+[node name="Icon" type="TextureRect" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/FaceButtons/ButtonsRow/Triangle"]
+custom_minimum_size = Vector2(64, 64)
+layout_mode = 2
+texture = ExtResource("13_triangle")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Label" type="Label" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/FaceButtons/ButtonsRow/Triangle"]
+layout_mode = 2
+text = "Triangle"
+horizontal_alignment = 1
+
+; === D-PAD SECTION ===
+[node name="DPad" type="VBoxContainer" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer"]
+layout_mode = 2
+theme_override_constants/separation = 15
+
+[node name="CategoryLabel" type="Label" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/DPad"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+text = "D-Pad"
+
+[node name="ButtonsRow" type="HBoxContainer" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/DPad"]
+layout_mode = 2
+theme_override_constants/separation = 20
+alignment = 1
+
+[node name="Up" type="VBoxContainer" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/DPad/ButtonsRow"]
+custom_minimum_size = Vector2(100, 100)
+layout_mode = 2
+alignment = 1
+
+[node name="Icon" type="TextureRect" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/DPad/ButtonsRow/Up"]
+custom_minimum_size = Vector2(64, 64)
+layout_mode = 2
+texture = ExtResource("14_dpad_up")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Label" type="Label" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/DPad/ButtonsRow/Up"]
+layout_mode = 2
+text = "D-Pad Up"
+horizontal_alignment = 1
+
+[node name="Down" type="VBoxContainer" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/DPad/ButtonsRow"]
+custom_minimum_size = Vector2(100, 100)
+layout_mode = 2
+alignment = 1
+
+[node name="Icon" type="TextureRect" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/DPad/ButtonsRow/Down"]
+custom_minimum_size = Vector2(64, 64)
+layout_mode = 2
+texture = ExtResource("15_dpad_down")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Label" type="Label" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/DPad/ButtonsRow/Down"]
+layout_mode = 2
+text = "D-Pad Down"
+horizontal_alignment = 1
+
+[node name="Left" type="VBoxContainer" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/DPad/ButtonsRow"]
+custom_minimum_size = Vector2(100, 100)
+layout_mode = 2
+alignment = 1
+
+[node name="Icon" type="TextureRect" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/DPad/ButtonsRow/Left"]
+custom_minimum_size = Vector2(64, 64)
+layout_mode = 2
+texture = ExtResource("16_dpad_left")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Label" type="Label" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/DPad/ButtonsRow/Left"]
+layout_mode = 2
+text = "D-Pad Left"
+horizontal_alignment = 1
+
+[node name="Right" type="VBoxContainer" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/DPad/ButtonsRow"]
+custom_minimum_size = Vector2(100, 100)
+layout_mode = 2
+alignment = 1
+
+[node name="Icon" type="TextureRect" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/DPad/ButtonsRow/Right"]
+custom_minimum_size = Vector2(64, 64)
+layout_mode = 2
+texture = ExtResource("17_dpad_right")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Label" type="Label" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/DPad/ButtonsRow/Right"]
+layout_mode = 2
+text = "D-Pad Right"
+horizontal_alignment = 1
+
+; === ANALOG STICKS SECTION ===
+[node name="AnalogSticks" type="VBoxContainer" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer"]
+layout_mode = 2
+theme_override_constants/separation = 15
+
+[node name="CategoryLabel" type="Label" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/AnalogSticks"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+text = "Analog Sticks"
+
+[node name="ButtonsRow" type="HBoxContainer" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/AnalogSticks"]
+layout_mode = 2
+theme_override_constants/separation = 20
+alignment = 1
+
+[node name="LStick" type="VBoxContainer" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/AnalogSticks/ButtonsRow"]
+custom_minimum_size = Vector2(100, 100)
+layout_mode = 2
+alignment = 1
+
+[node name="Icon" type="TextureRect" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/AnalogSticks/ButtonsRow/LStick"]
+custom_minimum_size = Vector2(64, 64)
+layout_mode = 2
+texture = ExtResource("18_l_stick")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Label" type="Label" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/AnalogSticks/ButtonsRow/LStick"]
+layout_mode = 2
+text = "L Stick"
+horizontal_alignment = 1
+
+[node name="RStick" type="VBoxContainer" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/AnalogSticks/ButtonsRow"]
+custom_minimum_size = Vector2(100, 100)
+layout_mode = 2
+alignment = 1
+
+[node name="Icon" type="TextureRect" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/AnalogSticks/ButtonsRow/RStick"]
+custom_minimum_size = Vector2(64, 64)
+layout_mode = 2
+texture = ExtResource("19_r_stick")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Label" type="Label" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/AnalogSticks/ButtonsRow/RStick"]
+layout_mode = 2
+text = "R Stick"
+horizontal_alignment = 1
+
+[node name="L3" type="VBoxContainer" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/AnalogSticks/ButtonsRow"]
+custom_minimum_size = Vector2(100, 100)
+layout_mode = 2
+alignment = 1
+
+[node name="Icon" type="TextureRect" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/AnalogSticks/ButtonsRow/L3"]
+custom_minimum_size = Vector2(64, 64)
+layout_mode = 2
+texture = ExtResource("20_l3")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Label" type="Label" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/AnalogSticks/ButtonsRow/L3"]
+layout_mode = 2
+text = "L3"
+horizontal_alignment = 1
+
+[node name="R3" type="VBoxContainer" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/AnalogSticks/ButtonsRow"]
+custom_minimum_size = Vector2(100, 100)
+layout_mode = 2
+alignment = 1
+
+[node name="Icon" type="TextureRect" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/AnalogSticks/ButtonsRow/R3"]
+custom_minimum_size = Vector2(64, 64)
+layout_mode = 2
+texture = ExtResource("21_r3")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Label" type="Label" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/AnalogSticks/ButtonsRow/R3"]
+layout_mode = 2
+text = "R3"
+horizontal_alignment = 1
+
+; === SPECIAL BUTTONS SECTION ===
+[node name="SpecialButtons" type="VBoxContainer" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer"]
+layout_mode = 2
+theme_override_constants/separation = 15
+
+[node name="CategoryLabel" type="Label" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/SpecialButtons"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+text = "Special Buttons"
+
+[node name="ButtonsRow" type="HBoxContainer" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/SpecialButtons"]
+layout_mode = 2
+theme_override_constants/separation = 20
+alignment = 1
+
+[node name="Option" type="VBoxContainer" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/SpecialButtons/ButtonsRow"]
+custom_minimum_size = Vector2(100, 100)
+layout_mode = 2
+alignment = 1
+
+[node name="Icon" type="TextureRect" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/SpecialButtons/ButtonsRow/Option"]
+custom_minimum_size = Vector2(64, 64)
+layout_mode = 2
+texture = ExtResource("22_option")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Label" type="Label" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/SpecialButtons/ButtonsRow/Option"]
+layout_mode = 2
+text = "Option"
+horizontal_alignment = 1
+
+[node name="Share" type="VBoxContainer" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/SpecialButtons/ButtonsRow"]
+custom_minimum_size = Vector2(100, 100)
+layout_mode = 2
+alignment = 1
+
+[node name="Icon" type="TextureRect" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/SpecialButtons/ButtonsRow/Share"]
+custom_minimum_size = Vector2(64, 64)
+layout_mode = 2
+texture = ExtResource("23_share")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Label" type="Label" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/SpecialButtons/ButtonsRow/Share"]
+layout_mode = 2
+text = "Share"
+horizontal_alignment = 1
+
+[node name="Touchpad" type="VBoxContainer" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/SpecialButtons/ButtonsRow"]
+custom_minimum_size = Vector2(100, 100)
+layout_mode = 2
+alignment = 1
+
+[node name="Icon" type="TextureRect" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/SpecialButtons/ButtonsRow/Touchpad"]
+custom_minimum_size = Vector2(64, 64)
+layout_mode = 2
+texture = ExtResource("24_touchpad")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Label" type="Label" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/SpecialButtons/ButtonsRow/Touchpad"]
+layout_mode = 2
+text = "Touchpad"
+horizontal_alignment = 1
+
+; === TRIGGER INDICATORS SECTION ===
+[node name="TriggerIndicators" type="VBoxContainer" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer"]
+layout_mode = 2
+theme_override_constants/separation = 15
+
+[node name="CategoryLabel" type="Label" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/TriggerIndicators"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+text = "Trigger Indicators"
+
+[node name="ButtonsRow" type="HBoxContainer" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/TriggerIndicators"]
+layout_mode = 2
+theme_override_constants/separation = 20
+alignment = 1
+
+[node name="LTriggerUp" type="VBoxContainer" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/TriggerIndicators/ButtonsRow"]
+custom_minimum_size = Vector2(100, 100)
+layout_mode = 2
+alignment = 1
+
+[node name="Icon" type="TextureRect" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/TriggerIndicators/ButtonsRow/LTriggerUp"]
+custom_minimum_size = Vector2(64, 64)
+layout_mode = 2
+texture = ExtResource("25_l_trig_up")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Label" type="Label" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/TriggerIndicators/ButtonsRow/LTriggerUp"]
+layout_mode = 2
+text = "L Trigger Up"
+horizontal_alignment = 1
+
+[node name="LTriggerDown" type="VBoxContainer" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/TriggerIndicators/ButtonsRow"]
+custom_minimum_size = Vector2(100, 100)
+layout_mode = 2
+alignment = 1
+
+[node name="Icon" type="TextureRect" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/TriggerIndicators/ButtonsRow/LTriggerDown"]
+custom_minimum_size = Vector2(64, 64)
+layout_mode = 2
+texture = ExtResource("26_l_trig_down")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Label" type="Label" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/TriggerIndicators/ButtonsRow/LTriggerDown"]
+layout_mode = 2
+text = "L Trigger Down"
+horizontal_alignment = 1
+
+[node name="RTriggerUp" type="VBoxContainer" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/TriggerIndicators/ButtonsRow"]
+custom_minimum_size = Vector2(100, 100)
+layout_mode = 2
+alignment = 1
+
+[node name="Icon" type="TextureRect" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/TriggerIndicators/ButtonsRow/RTriggerUp"]
+custom_minimum_size = Vector2(64, 64)
+layout_mode = 2
+texture = ExtResource("27_r_trig_up")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Label" type="Label" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/TriggerIndicators/ButtonsRow/RTriggerUp"]
+layout_mode = 2
+text = "R Trigger Up"
+horizontal_alignment = 1
+
+[node name="RTriggerDown" type="VBoxContainer" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/TriggerIndicators/ButtonsRow"]
+custom_minimum_size = Vector2(100, 100)
+layout_mode = 2
+alignment = 1
+
+[node name="Icon" type="TextureRect" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/TriggerIndicators/ButtonsRow/RTriggerDown"]
+custom_minimum_size = Vector2(64, 64)
+layout_mode = 2
+texture = ExtResource("28_r_trig_down")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Label" type="Label" parent="MarginContainer/MainContainer/ScrollContainer/ContentContainer/TriggerIndicators/ButtonsRow/RTriggerDown"]
+layout_mode = 2
+text = "R Trigger Down"
+horizontal_alignment = 1
+
+; === FOOTER ===
+[node name="Footer" type="VBoxContainer" parent="MarginContainer/MainContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="HSeparator" type="HSeparator" parent="MarginContainer/MainContainer/Footer"]
+layout_mode = 2
+
+[node name="Info" type="Label" parent="MarginContainer/MainContainer/Footer"]
+layout_mode = 2
+text = "All icons are scalable SVG format with transparent backgrounds"
+horizontal_alignment = 1
+
+[node name="BackButton" type="Button" parent="MarginContainer/MainContainer/Footer"]
+layout_mode = 2
+size_flags_horizontal = 4
+text = "Back to Main Menu"
+
+[connection signal="pressed" from="MarginContainer/MainContainer/Footer/BackButton" to="." method="_on_back_pressed"]
