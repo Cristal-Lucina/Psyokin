@@ -128,12 +128,12 @@ func _input(event: InputEvent) -> void:
 
 	# STATE 1: TAB_PANEL - Navigate between tabs on left
 	if _nav_state == NavState.TAB_PANEL:
-		if event.is_action_pressed("ui_accept") or event.is_action_pressed("menu_accept"):
+		if event.is_action_pressed("ui_accept"):
 			# Enter content panel
 			_enter_option_navigation()
 			get_viewport().set_input_as_handled()
 			return
-		elif event.is_action_pressed("menu_cancel") or event.is_action_pressed("ui_cancel"):
+		elif event.is_action_pressed("ui_cancel"):
 			# Close options menu
 			_on_close_pressed()
 			get_viewport().set_input_as_handled()
@@ -149,12 +149,12 @@ func _input(event: InputEvent) -> void:
 			_navigate_options(1)
 			get_viewport().set_input_as_handled()
 			return
-		elif event.is_action_pressed("ui_accept") or event.is_action_pressed("menu_accept"):
+		elif event.is_action_pressed("ui_accept"):
 			# Cycle current option value
 			_cycle_current_option()
 			get_viewport().set_input_as_handled()
 			return
-		elif event.is_action_pressed("menu_cancel") or event.is_action_pressed("ui_cancel"):
+		elif event.is_action_pressed("ui_cancel"):
 			# Return to tab panel
 			_exit_to_tab_panel()
 			get_viewport().set_input_as_handled()
@@ -532,6 +532,12 @@ func _build_tabbed_interface() -> void:
 	_content_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_content_container.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	content_margin.add_child(_content_container)
+
+	# Clear old tabs if they exist (force rebuild with correct metadata)
+	for tab in _tab_content.values():
+		if tab:
+			tab.queue_free()
+	_tab_content.clear()
 
 	# Build all tab content
 	_tab_content[Tab.GAME] = _build_game_options_tab()
