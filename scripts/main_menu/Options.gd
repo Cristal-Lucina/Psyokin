@@ -40,6 +40,7 @@ func _ready() -> void:
 	if _close_btn:
 		_close_btn.pressed.connect(_on_close_pressed)
 		aCoreVibeTheme.style_button_with_focus_invert(_close_btn, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
+		_add_button_padding(_close_btn)
 		print("[Options] Close button connected")
 	else:
 		push_error("[Options] Close button not found!")
@@ -61,6 +62,18 @@ func _style_panel(panel: Panel) -> void:
 		aCoreVibeTheme.SHADOW_SIZE_LARGE          # 12px glow
 	)
 	panel.add_theme_stylebox_override("panel", style)
+
+func _add_button_padding(button: Button) -> void:
+	"""Add padding to button text so it doesn't touch edges"""
+	# Get the current styleboxes and add content margins
+	for state in ["normal", "hover", "pressed", "focus"]:
+		var stylebox = button.get_theme_stylebox(state)
+		if stylebox and stylebox is StyleBoxFlat:
+			var style = stylebox as StyleBoxFlat
+			style.content_margin_left = 12
+			style.content_margin_right = 12
+			style.content_margin_top = 8
+			style.content_margin_bottom = 8
 
 func _on_close_pressed() -> void:
 	print("[Options] Closing options menu")

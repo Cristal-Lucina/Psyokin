@@ -63,6 +63,18 @@ func _style_panel(panel: Panel) -> void:
 	)
 	panel.add_theme_stylebox_override("panel", style)
 
+func _add_button_padding(button: Button) -> void:
+	"""Add padding to button text so it doesn't touch edges"""
+	# Get the current styleboxes and add content margins
+	for state in ["normal", "hover", "pressed", "focus"]:
+		var stylebox = button.get_theme_stylebox(state)
+		if stylebox and stylebox is StyleBoxFlat:
+			var style = stylebox as StyleBoxFlat
+			style.content_margin_left = 12
+			style.content_margin_right = 12
+			style.content_margin_top = 8
+			style.content_margin_bottom = 8
+
 func _ensure_fallback_layout() -> void:
 	# Build a compact center window if required
 	if _slots_grid != null:
@@ -223,21 +235,25 @@ func _rebuild() -> void:
 		# Save button with slot label (Core Vibe: Plasma Teal)
 		var btn_save: Button = Button.new()
 		btn_save.text = _label_for_slot(idx)
-		btn_save.custom_minimum_size = Vector2(350, 40)
+		btn_save.custom_minimum_size = Vector2(430, 40)  # Match LoadMenu width
 		btn_save.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		btn_save.focus_mode = Control.FOCUS_ALL
 		btn_save.pressed.connect(func() -> void: _do_save(idx))
 		aCoreVibeTheme.style_button_with_focus_invert(btn_save, aCoreVibeTheme.COLOR_PLASMA_TEAL, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
+		# Add text padding
+		_add_button_padding(btn_save)
 		_slots_grid.add_child(btn_save)
 		_save_buttons.append(btn_save)
 
 		# Delete button (Core Vibe: Bubble Magenta)
 		var btn_del: Button = Button.new()
 		btn_del.text = "Delete"
-		btn_del.custom_minimum_size = Vector2(100, 40)
+		btn_del.custom_minimum_size = Vector2(80, 40)  # Match LoadMenu width
 		btn_del.focus_mode = Control.FOCUS_ALL
 		btn_del.pressed.connect(func() -> void: _do_delete(idx))
 		aCoreVibeTheme.style_button_with_focus_invert(btn_del, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
+		# Add text padding
+		_add_button_padding(btn_del)
 		_slots_grid.add_child(btn_del)
 		_delete_buttons.append(btn_del)
 

@@ -48,6 +48,18 @@ func _ready() -> void:
 	# Apply Core Vibe styling
 	_apply_core_vibe_styling()
 
+func _add_button_padding(button: Button) -> void:
+	"""Add padding to button text so it doesn't touch edges"""
+	# Get the current styleboxes and add content margins
+	for state in ["normal", "hover", "pressed", "focus"]:
+		var stylebox = button.get_theme_stylebox(state)
+		if stylebox and stylebox is StyleBoxFlat:
+			var style = stylebox as StyleBoxFlat
+			style.content_margin_left = 12
+			style.content_margin_right = 12
+			style.content_margin_top = 8
+			style.content_margin_bottom = 8
+
 func _apply_core_vibe_styling() -> void:
 	"""Apply Core Vibe neon-kawaii styling to SystemPanel buttons and panel"""
 
@@ -78,18 +90,22 @@ func _apply_core_vibe_styling() -> void:
 	if _btn_load:
 		aCoreVibeTheme.style_button_with_focus_invert(_btn_load, aCoreVibeTheme.COLOR_SKY_CYAN, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
 		_btn_load.custom_minimum_size = Vector2(200, 50)
+		_add_button_padding(_btn_load)
 
 	if _btn_save:
 		aCoreVibeTheme.style_button_with_focus_invert(_btn_save, aCoreVibeTheme.COLOR_ELECTRIC_LIME, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
 		_btn_save.custom_minimum_size = Vector2(200, 50)
+		_add_button_padding(_btn_save)
 
 	if _btn_settings:
 		aCoreVibeTheme.style_button_with_focus_invert(_btn_settings, aCoreVibeTheme.COLOR_CITRUS_YELLOW, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
 		_btn_settings.custom_minimum_size = Vector2(200, 50)
+		_add_button_padding(_btn_settings)
 
 	if _btn_title:
 		aCoreVibeTheme.style_button_with_focus_invert(_btn_title, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
 		_btn_title.custom_minimum_size = Vector2(200, 50)
+		_add_button_padding(_btn_title)
 
 # --- Input Handling -----------------------------------------------------------
 
