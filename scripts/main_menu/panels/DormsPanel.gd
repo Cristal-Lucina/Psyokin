@@ -565,8 +565,12 @@ func _get_nav_state_name(state: NavState) -> String:
 func _navigate_up() -> void:
 	match _nav_state:
 		NavState.ROSTER_SELECT:
-			if _roster_list and _current_roster_index > 0:
-				_current_roster_index -= 1
+			if _roster_list and _roster_list.item_count > 0:
+				if _current_roster_index > 0:
+					_current_roster_index -= 1
+				else:
+					# Wrap around to bottom
+					_current_roster_index = _roster_list.item_count - 1
 				print("[DEBUG Arrow] Navigate UP - roster index now: %d" % _current_roster_index)
 				_focus_current_roster()
 				# Update arrow position after selection change
@@ -590,8 +594,12 @@ func _navigate_up() -> void:
 func _navigate_down() -> void:
 	match _nav_state:
 		NavState.ROSTER_SELECT:
-			if _roster_list and _current_roster_index < _roster_list.item_count - 1:
-				_current_roster_index += 1
+			if _roster_list and _roster_list.item_count > 0:
+				if _current_roster_index < _roster_list.item_count - 1:
+					_current_roster_index += 1
+				else:
+					# Wrap around to top
+					_current_roster_index = 0
 				print("[DEBUG Arrow] Navigate DOWN - roster index now: %d" % _current_roster_index)
 				_focus_current_roster()
 				# Update arrow position after selection change
@@ -1866,6 +1874,13 @@ func _update_room_colors() -> void:
 func _get_all_dorm_members(ds: Node) -> PackedStringArray:
 	var members := PackedStringArray()
 
+	# Get members from common room first (so they appear at top of list)
+	var common_v: Variant = ds.call("get_common")
+	var common: PackedStringArray = (common_v if typeof(common_v) == TYPE_PACKED_STRING_ARRAY else PackedStringArray())
+	for aid in common:
+		if not members.has(aid):
+			members.append(aid)
+
 	# Get members from rooms
 	var room_ids_v: Variant = ds.call("list_rooms")
 	var room_ids: PackedStringArray = (room_ids_v if typeof(room_ids_v) == TYPE_PACKED_STRING_ARRAY else PackedStringArray())
@@ -1874,13 +1889,6 @@ func _get_all_dorm_members(ds: Node) -> PackedStringArray:
 		var occupant: String = String(room_data.get("occupant", ""))
 		if occupant != "" and not members.has(occupant):
 			members.append(occupant)
-
-	# Get members from common room
-	var common_v: Variant = ds.call("get_common")
-	var common: PackedStringArray = (common_v if typeof(common_v) == TYPE_PACKED_STRING_ARRAY else PackedStringArray())
-	for aid in common:
-		if not members.has(aid):
-			members.append(aid)
 
 	return members
 
