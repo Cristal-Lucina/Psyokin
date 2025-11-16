@@ -42,6 +42,18 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	set_process_input(true)
 
+	# Debug: Check what's in ui_accept action
+	if InputMap.has_action("ui_accept"):
+		var events = InputMap.action_get_events("ui_accept")
+		print("[Options] ui_accept has %d events:" % events.size())
+		for e in events:
+			if e is InputEventJoypadButton:
+				print("  - JoypadButton %d" % e.button_index)
+			elif e is InputEventKey:
+				print("  - Key %d" % e.keycode)
+	else:
+		print("[Options] WARNING: ui_accept action does not exist!")
+
 	# Disable ControllerManager to prevent it from consuming controller inputs
 	if has_node("/root/aControllerManager"):
 		var controller_mgr = get_node("/root/aControllerManager")
@@ -79,6 +91,10 @@ func _input(event: InputEvent) -> void:
 	# Debug: Log all joypad button events
 	if event is InputEventJoypadButton:
 		print("[Options._input] Joypad button %d, pressed=%s" % [event.button_index, event.pressed])
+		# Check if this is recognized as ui_accept
+		var is_ui_accept = event.is_action("ui_accept")
+		var is_ui_accept_pressed = event.is_action_pressed("ui_accept")
+		print("[Options._input] is_action('ui_accept')=%s, is_action_pressed('ui_accept')=%s" % [is_ui_accept, is_ui_accept_pressed])
 
 	# If we're waiting for input to remap an action
 	if _waiting_for_input:
