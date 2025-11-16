@@ -129,6 +129,11 @@ func _input(event: InputEvent) -> void:
 	# STATE 1: TAB_PANEL - Navigate between tabs on left
 	if _nav_state == NavState.TAB_PANEL:
 		if event.is_action_pressed("ui_accept"):
+			# Find which tab button has focus and switch to it
+			for i in range(_tab_buttons.size()):
+				if _tab_buttons[i].has_focus():
+					_switch_tab(i as Tab)
+					break
 			# Enter content panel
 			_enter_option_navigation()
 			get_viewport().set_input_as_handled()
