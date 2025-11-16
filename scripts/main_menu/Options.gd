@@ -86,11 +86,19 @@ func _input(event: InputEvent) -> void:
 		elif event is InputEventJoypadMotion and abs(event.axis_value) > 0.5:
 			_remap_action(event)
 			get_viewport().set_input_as_handled()
-	else:
-		# Allow closing with menu_cancel or ui_cancel
-		if event.is_action_pressed("menu_cancel") or event.is_action_pressed("ui_cancel"):
-			_on_close_pressed()
-			get_viewport().set_input_as_handled()
+		return
+
+	# Handle menu closing
+	if event.is_action_pressed("menu_cancel") or event.is_action_pressed("ui_cancel"):
+		_on_close_pressed()
+		get_viewport().set_input_as_handled()
+		return
+
+func _unhandled_input(event: InputEvent) -> void:
+	"""Block any unhandled input from reaching the game behind this menu"""
+	# Consume all unhandled keyboard and controller inputs to prevent them from affecting the game
+	if event is InputEventKey or event is InputEventJoypadButton or event is InputEventJoypadMotion or event is InputEventMouseButton:
+		get_viewport().set_input_as_handled()
 
 func _remap_action(new_event: InputEvent) -> void:
 	"""Apply a new input event to the waiting action"""
