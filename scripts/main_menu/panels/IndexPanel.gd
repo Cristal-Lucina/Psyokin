@@ -513,18 +513,22 @@ func _update_category_arrow_position() -> void:
 	var panel_global_pos = global_position
 	var list_offset_in_panel = list_global_pos - panel_global_pos
 
-	# Position arrow to the right of the list (matching LoadoutPanel calculation)
-	var arrow_x = list_offset_in_panel.x + _category_list.size.x - 8.0 - 80.0 + 40.0
-	var arrow_y = list_offset_in_panel.y + item_rect.position.y + (item_rect.size.y / 2.0) - (_category_arrow.size.y / 2.0)
+	# Position box to the right of the list
+	var item_y_center = list_offset_in_panel.y + item_rect.position.y + (item_rect.size.y / 2.0)
 
-	_category_arrow.position = Vector2(arrow_x, arrow_y)
+	# Box starts just after the list edge
+	var box_x = list_offset_in_panel.x + _category_list.size.x + 8.0
+	var box_y = item_y_center - (_category_box.size.y / 2.0)
 
-	# Position dark box to the left of arrow
 	if _category_box:
 		_category_box.visible = true
-		var box_x = arrow_x - _category_box.size.x - 4.0  # 4px gap
-		var box_y = arrow_y + (_category_arrow.size.y / 2.0) - (_category_box.size.y / 2.0)
 		_category_box.position = Vector2(box_x, box_y)
+
+	# Arrow goes to the right of the box
+	var arrow_x = box_x + _category_box.size.x + 4.0  # 4px gap after box
+	var arrow_y = item_y_center - (_category_arrow.size.y / 2.0)
+
+	_category_arrow.position = Vector2(arrow_x, arrow_y)
 
 func _update_entry_arrow_position() -> void:
 	"""Update entry arrow and dark box position"""
@@ -553,18 +557,22 @@ func _update_entry_arrow_position() -> void:
 	var panel_global_pos = global_position
 	var list_offset_in_panel = list_global_pos - panel_global_pos
 
-	# Position arrow to the right of the list (matching LoadoutPanel calculation)
-	var arrow_x = list_offset_in_panel.x + _entry_list.size.x - 8.0 - 80.0 + 40.0
-	var arrow_y = list_offset_in_panel.y + item_rect.position.y + (item_rect.size.y / 2.0) - (_entry_arrow.size.y / 2.0)
+	# Position box to the right of the list
+	var item_y_center = list_offset_in_panel.y + item_rect.position.y + (item_rect.size.y / 2.0)
 
-	_entry_arrow.position = Vector2(arrow_x, arrow_y)
+	# Box starts just after the list edge
+	var box_x = list_offset_in_panel.x + _entry_list.size.x + 8.0
+	var box_y = item_y_center - (_entry_box.size.y / 2.0)
 
-	# Position dark box to the left of arrow
 	if _entry_box:
 		_entry_box.visible = true
-		var box_x = arrow_x - _entry_box.size.x - 4.0  # 4px gap
-		var box_y = arrow_y + (_entry_arrow.size.y / 2.0) - (_entry_box.size.y / 2.0)
 		_entry_box.position = Vector2(box_x, box_y)
+
+	# Arrow goes to the right of the box
+	var arrow_x = box_x + _entry_box.size.x + 4.0  # 4px gap after box
+	var arrow_y = item_y_center - (_entry_arrow.size.y / 2.0)
+
+	_entry_arrow.position = Vector2(arrow_x, arrow_y)
 
 func _start_arrow_pulse(arrow: Label) -> void:
 	"""Start pulsing animation for an arrow"""
