@@ -94,6 +94,18 @@ func _input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 		return
 
+	# Handle ui_accept on focused tab buttons
+	if event.is_action_pressed("ui_accept"):
+		var focused = get_viewport().gui_get_focus_owner()
+		if focused and focused in _tab_buttons:
+			var idx = _tab_buttons.find(focused)
+			if idx >= 0:
+				print("[Options] ui_accept on tab button %d" % idx)
+				_switch_tab(Tab.values()[idx])
+				_move_focus_to_content()
+				get_viewport().set_input_as_handled()
+				return
+
 	# Handle menu closing
 	if event.is_action_pressed("menu_cancel") or event.is_action_pressed("ui_cancel"):
 		_on_close_pressed()
@@ -344,10 +356,19 @@ func _create_tab_button(parent: Node, label: String, tab: Tab, color: Color) -> 
 	btn.text = label
 	btn.custom_minimum_size = Vector2(0, 50)
 	btn.focus_mode = Control.FOCUS_ALL
+
+	# Handle both pressed and gui_input for controller support
 	btn.pressed.connect(func():
+		print("[Options] Tab button '%s' pressed!" % label)
 		_switch_tab(tab)
 		_move_focus_to_content()
 	)
+
+	# Add focus tracking
+	btn.focus_entered.connect(func():
+		print("[Options] Tab button '%s' focused" % label)
+	)
+
 	aCoreVibeTheme.style_button_with_focus_invert(btn, color, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
 	_add_button_padding(btn)
 	parent.add_child(btn)
