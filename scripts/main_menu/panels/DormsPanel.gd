@@ -769,6 +769,9 @@ func _focus_current_room() -> void:
 	if _roster_selection_arrow:
 		_roster_selection_arrow.visible = false
 		print("[DEBUG Arrow] Roster arrow hidden when moving to rooms")
+	if _roster_dark_box:
+		_roster_dark_box.visible = false
+		print("[DEBUG Arrow] Roster dark box hidden when moving to rooms")
 	if _action_selection_arrow:
 		_action_selection_arrow.visible = false
 		print("[DEBUG Arrow] Action arrow hidden when moving to rooms")
@@ -776,10 +779,11 @@ func _focus_current_room() -> void:
 	# Start panel animation
 	_animate_panel_focus(NavState.ROOM_SELECT)
 
-	# Wait for expand animation to finish before showing room arrow
-	print("[DEBUG Arrow] Waiting for panel expand animation (%f seconds)" % ANIM_DURATION)
-	await get_tree().create_timer(ANIM_DURATION).timeout
-	print("[DEBUG Arrow] Panel animation complete, updating room arrow position")
+	# Wait for panel to start expanding before showing room arrow (faster than full animation)
+	var arrow_delay := ANIM_DURATION * 0.5  # Show arrow halfway through animation
+	print("[DEBUG Arrow] Waiting for panel expand animation (%f seconds)" % arrow_delay)
+	await get_tree().create_timer(arrow_delay).timeout
+	print("[DEBUG Arrow] Panel animation in progress, updating room arrow position")
 
 	# Update room arrow position (will show it after position is calculated)
 	call_deferred("_update_room_arrow_position")
@@ -809,9 +813,13 @@ func _focus_current_action() -> void:
 	if _current_action_index >= 0 and _current_action_index < _action_buttons.size():
 		_action_buttons[_current_action_index].grab_focus()
 
-	# Hide roster and room arrows but keep the box visible (no blinking)
-	if _roster_selection_arrow and _roster_selection_arrow.visible:
+	# Hide roster and room arrows when moving to action menu
+	if _roster_selection_arrow:
 		_roster_selection_arrow.visible = false
+		print("[DEBUG Arrow] Roster arrow hidden when moving to action menu")
+	if _roster_dark_box:
+		_roster_dark_box.visible = false
+		print("[DEBUG Arrow] Roster dark box hidden when moving to action menu")
 	if _room_selection_arrow:
 		_room_selection_arrow.visible = false
 
