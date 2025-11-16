@@ -34,8 +34,9 @@ const ANIM_DURATION := 0.2  # Animation duration in seconds
 @onready var _content_label: Label = $Root/ContentPanel/ContentColumn/ContentLabel
 @onready var _details_label: Label = $Root/DetailsPanel/DetailsColumn/DetailsLabel
 
-# Selection arrow for category list only
+# Selection arrow and box for category list only
 var _category_arrow: Label = null
+var _category_box: PanelContainer = null
 
 # Focus tracking
 var _focus_mode: String = "category"  # "category" or "entries"
@@ -413,7 +414,8 @@ func _placeholder_items(cat_id: int) -> Array[Dictionary]:
 # --- Selection Arrow for Category List ----------------------------------------
 
 func _create_category_arrow() -> void:
-	"""Create simple selection arrow for category list"""
+	"""Create selection arrow and dark box for category list"""
+	# Create arrow
 	_category_arrow = Label.new()
 	_category_arrow.text = "◄"
 	_category_arrow.add_theme_font_size_override("font_size", 40)
@@ -421,6 +423,24 @@ func _create_category_arrow() -> void:
 	_category_arrow.z_index = 1000
 	_category_arrow.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_category_arrow)
+
+	# Create dark box (100px wide, 20px height)
+	_category_box = PanelContainer.new()
+	_category_box.custom_minimum_size = Vector2(100, 20)
+	_category_box.size = Vector2(100, 20)
+	_category_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_category_box.z_index = 999
+
+	# Create Ink Charcoal rounded style
+	var box_style = StyleBoxFlat.new()
+	box_style.bg_color = aCoreVibeTheme.COLOR_INK_CHARCOAL
+	box_style.corner_radius_top_left = 8
+	box_style.corner_radius_top_right = 8
+	box_style.corner_radius_bottom_left = 8
+	box_style.corner_radius_bottom_right = 8
+	_category_box.add_theme_stylebox_override("panel", box_style)
+
+	add_child(_category_box)
 
 	# Start pulsing animation
 	_start_arrow_pulse()
@@ -433,9 +453,13 @@ func _update_category_arrow() -> void:
 	var selected = _category_list.get_selected_items()
 	if selected.size() == 0:
 		_category_arrow.visible = false
+		if _category_box:
+			_category_box.visible = false
 		return
 
 	_category_arrow.visible = true
+	if _category_box:
+		_category_box.visible = true
 
 	# Get selected item position
 	var item_index = selected[0]
@@ -446,11 +470,20 @@ func _update_category_arrow() -> void:
 	var panel_global = global_position
 	var list_offset = list_global - panel_global
 
+	# Calculate vertical center of the selected item
+	var item_y_center = list_offset.y + item_rect.position.y + (item_rect.size.y / 2.0)
+
 	# Position arrow to the right of the list, offset 40px to the left
 	var arrow_x = list_offset.x + _category_list.size.x + 10.0 - 40.0
-	var arrow_y = list_offset.y + item_rect.position.y + (item_rect.size.y / 2.0) - 20.0
+	var arrow_y = item_y_center - 20.0
 
 	_category_arrow.position = Vector2(arrow_x, arrow_y)
+
+	# Position box to the left of the arrow
+	if _category_box:
+		var box_x = arrow_x - _category_box.size.x - 4.0  # 4px gap to left of arrow
+		var box_y = item_y_center - (_category_box.size.y / 2.0)  # Center vertically
+		_category_box.position = Vector2(box_x, box_y)
 
 func _start_arrow_pulse() -> void:
 	"""Start pulsing animation for the category arrow"""
