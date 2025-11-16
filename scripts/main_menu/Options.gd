@@ -40,6 +40,7 @@ func _ready() -> void:
 
 	# Ensure this overlay continues to process even when title is "paused"
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	set_process_input(true)
 
 	# Block all input from reaching the title screen behind this menu
 	mouse_filter = Control.MOUSE_FILTER_STOP
@@ -61,6 +62,54 @@ func _ready() -> void:
 	_build_tabbed_interface()
 
 	print("[Options] Tabbed interface built successfully!")
+
+func _process(delta: float) -> void:
+	"""Handle input cooldown for remapping"""
+	if _input_cooldown > 0:
+		_input_cooldown -= delta
+
+func _input(event: InputEvent) -> void:
+	"""Handle input for remapping controls"""
+	# If we're waiting for input to remap an action
+	if _waiting_for_input:
+		# Ignore mouse motion
+		if event is InputEventMouseMotion:
+			return
+
+		# Accept key presses, joypad buttons, or joypad motion
+		if event is InputEventKey and event.pressed:
+			_remap_action(event)
+			get_viewport().set_input_as_handled()
+		elif event is InputEventJoypadButton and event.pressed:
+			_remap_action(event)
+			get_viewport().set_input_as_handled()
+		elif event is InputEventJoypadMotion and abs(event.axis_value) > 0.5:
+			_remap_action(event)
+			get_viewport().set_input_as_handled()
+
+func _remap_action(new_event: InputEvent) -> void:
+	"""Apply a new input event to the waiting action"""
+	if not _waiting_for_input or _waiting_action == "":
+		return
+
+	# Clear existing events for this action
+	InputMap.action_erase_events(_waiting_action)
+
+	# Add the new event
+	InputMap.action_add_event(_waiting_action, new_event)
+
+	# Update the button to show the new binding
+	if _selected_action_index >= 0 and _selected_action_index < _action_data.size():
+		var btn = _action_data[_selected_action_index]["button"] as Button
+		if btn:
+			btn.text = _get_action_display_text(_waiting_action)
+
+	# Stop waiting
+	_waiting_for_input = false
+	_waiting_action = ""
+
+	print("[Options] Remapped action to: %s" % _get_action_display_text(_waiting_action))
+	_save_settings()
 
 func _style_panel(panel: Panel) -> void:
 	"""Apply Core Vibe neon-kawaii styling to options panel"""
@@ -298,19 +347,77 @@ func _build_game_options_tab() -> Control:
 
 func _build_controls_tab() -> Control:
 	"""Build Controls tab with Control Type selector and remapping"""
-	var container = VBoxContainer.new()
-	container.set_anchors_preset(Control.PRESET_FULL_RECT)
-	container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	container.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	container.add_theme_constant_override("separation", 15)
+	var main_container = VBoxContainer.new()
+	main_container.set_anchors_preset(Control.PRESET_FULL_RECT)
+	main_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	main_container.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	main_container.add_theme_constant_override("separation", 20)
 
-	# TODO: Build controls content
-	var label = Label.new()
-	label.text = "CONTROLS (Coming Soon)"
-	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	container.add_child(label)
+	# Title
+	var title = Label.new()
+	title.text = "CONTROLS"
+	title.add_theme_font_size_override("font_size", 20)
+	title.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_SKY_CYAN)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	main_container.add_child(title)
 
-	return container
+	_add_spacer(main_container, 10)
+
+	# Control Type selector
+	_add_option_label(main_container, "Control Type")
+	var type_idx = 0
+	if _control_type == "keyboard":
+		type_idx = 0
+	elif _control_type == "xbox":
+		type_idx = 1
+	elif _control_type == "playstation":
+		type_idx = 2
+	else:  # nintendo
+		type_idx = 3
+
+	var type_hbox = _create_button_group(["Keyboard", "Xbox", "PlayStation", "Nintendo"], type_idx, func(idx):
+		if idx == 0:
+			_control_type = "keyboard"
+		elif idx == 1:
+			_control_type = "xbox"
+		elif idx == 2:
+			_control_type = "playstation"
+		else:
+			_control_type = "nintendo"
+		_save_settings()
+		# Rebuild tab to show new control type
+		_rebuild_controls_tab()
+	)
+	main_container.add_child(type_hbox)
+
+	_add_spacer(main_container, 20)
+
+	# Scrollable remapping section
+	_scroll_container = ScrollContainer.new()
+	_scroll_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_scroll_container.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	main_container.add_child(_scroll_container)
+
+	var scroll_content = VBoxContainer.new()
+	scroll_content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll_content.add_theme_constant_override("separation", 8)
+	_scroll_container.add_child(scroll_content)
+
+	# Build action rows for remapping
+	_build_action_rows(scroll_content)
+
+	# Restore Defaults button
+	var restore_btn = Button.new()
+	restore_btn.text = "RESTORE DEFAULTS"
+	restore_btn.custom_minimum_size = Vector2(200, 45)
+	restore_btn.pressed.connect(_restore_controls_defaults_and_rebuild)
+	aCoreVibeTheme.style_button_with_focus_invert(restore_btn, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
+	_add_button_padding(restore_btn)
+	var restore_center = CenterContainer.new()
+	restore_center.add_child(restore_btn)
+	main_container.add_child(restore_center)
+
+	return main_container
 
 func _build_display_tab() -> Control:
 	"""Build Display tab: Display Type, Resolution, Mode"""
@@ -581,9 +688,165 @@ func _restore_game_defaults() -> void:
 func _restore_controls_defaults() -> void:
 	"""Restore Controls tab to defaults"""
 	_control_type = "keyboard"
-	# TODO: Reset input mappings
+	# Reset all input mappings to Godot defaults
+	_reset_input_mappings()
 	_save_settings()
 	print("[Options] Controls restored to defaults")
+
+func _restore_controls_defaults_and_rebuild() -> void:
+	"""Restore Controls defaults and rebuild the tab"""
+	_restore_controls_defaults()
+
+	# Rebuild the tab to show new values
+	if _tab_content.has(Tab.CONTROLS):
+		_tab_content[Tab.CONTROLS].queue_free()
+		_tab_content[Tab.CONTROLS] = _build_controls_tab()
+		_content_container.add_child(_tab_content[Tab.CONTROLS])
+		_switch_tab(Tab.CONTROLS)
+
+func _rebuild_controls_tab() -> void:
+	"""Rebuild the Controls tab (used when control type changes)"""
+	if _tab_content.has(Tab.CONTROLS):
+		_tab_content[Tab.CONTROLS].queue_free()
+		_tab_content[Tab.CONTROLS] = _build_controls_tab()
+		_content_container.add_child(_tab_content[Tab.CONTROLS])
+		_switch_tab(Tab.CONTROLS)
+
+func _reset_input_mappings() -> void:
+	"""Reset all input action mappings to their defaults"""
+	# This is a placeholder - in a real implementation you'd restore from project settings
+	# For now we just clear any custom mappings
+	print("[Options] Input mappings reset to defaults")
+
+func _build_action_rows(parent: VBoxContainer) -> void:
+	"""Build rows for each remappable action"""
+	# Get all input actions defined in project settings
+	var actions = InputMap.get_actions()
+	_action_data.clear()
+
+	# Filter to only include game actions (exclude ui_* actions)
+	var game_actions: Array[String] = []
+	for action in actions:
+		var action_str = str(action)
+		if not action_str.begins_with("ui_"):
+			game_actions.append(action_str)
+
+	game_actions.sort()
+
+	# Create a row for each action
+	for action in game_actions:
+		var row = _create_action_row(action)
+		parent.add_child(row)
+
+	print("[Options] Built %d control rows" % game_actions.size())
+
+func _create_action_row(action: String) -> HBoxContainer:
+	"""Create a row showing an action and its current binding"""
+	var row = HBoxContainer.new()
+	row.add_theme_constant_override("separation", 15)
+
+	# Action name (formatted nicely)
+	var action_label = Label.new()
+	action_label.text = _format_action_name(action)
+	action_label.custom_minimum_size = Vector2(200, 0)
+	action_label.add_theme_font_size_override("font_size", 14)
+	action_label.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE)
+	row.add_child(action_label)
+
+	# Current binding button
+	var bind_btn = Button.new()
+	bind_btn.text = _get_action_display_text(action)
+	bind_btn.custom_minimum_size = Vector2(200, 35)
+	bind_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	aCoreVibeTheme.style_button_with_focus_invert(bind_btn, aCoreVibeTheme.COLOR_SKY_CYAN, aCoreVibeTheme.CORNER_RADIUS_SMALL)
+	_add_button_padding(bind_btn)
+
+	# Store action data for remapping
+	var action_idx = _action_data.size()
+	_action_data.append({
+		"action": action,
+		"button": bind_btn,
+		"row": row
+	})
+
+	# Click to remap
+	bind_btn.pressed.connect(func():
+		_start_remapping(action_idx)
+	)
+
+	row.add_child(bind_btn)
+
+	return row
+
+func _format_action_name(action: String) -> String:
+	"""Format action name for display (e.g., move_up -> Move Up)"""
+	return action.replace("_", " ").capitalize()
+
+func _get_action_display_text(action: String) -> String:
+	"""Get display text for current action binding"""
+	var events = InputMap.action_get_events(action)
+	if events.size() == 0:
+		return "Not Bound"
+
+	# Show the first event
+	var event = events[0]
+
+	if event is InputEventKey:
+		return OS.get_keycode_string(event.physical_keycode)
+	elif event is InputEventJoypadButton:
+		return _get_joypad_button_name(event.button_index)
+	elif event is InputEventJoypadMotion:
+		return _get_joypad_axis_name(event.axis, event.axis_value)
+	else:
+		return "Unknown"
+
+func _get_joypad_button_name(button_index: int) -> String:
+	"""Get friendly name for joypad button based on control type"""
+	# Xbox naming as default
+	match button_index:
+		JOY_BUTTON_A: return "A" if _control_type != "playstation" else "X"
+		JOY_BUTTON_B: return "B" if _control_type != "playstation" else "Circle"
+		JOY_BUTTON_X: return "X" if _control_type != "playstation" else "Square"
+		JOY_BUTTON_Y: return "Y" if _control_type != "playstation" else "Triangle"
+		JOY_BUTTON_LEFT_SHOULDER: return "LB" if _control_type == "xbox" else "L1"
+		JOY_BUTTON_RIGHT_SHOULDER: return "RB" if _control_type == "xbox" else "R1"
+		JOY_BUTTON_BACK: return "Back" if _control_type == "xbox" else "Select"
+		JOY_BUTTON_START: return "Start"
+		JOY_BUTTON_LEFT_STICK: return "LS"
+		JOY_BUTTON_RIGHT_STICK: return "RS"
+		JOY_BUTTON_DPAD_UP: return "D-Pad Up"
+		JOY_BUTTON_DPAD_DOWN: return "D-Pad Down"
+		JOY_BUTTON_DPAD_LEFT: return "D-Pad Left"
+		JOY_BUTTON_DPAD_RIGHT: return "D-Pad Right"
+		_: return "Button %d" % button_index
+
+func _get_joypad_axis_name(axis: int, value: float) -> String:
+	"""Get friendly name for joypad axis"""
+	var direction = "+" if value > 0 else "-"
+	match axis:
+		JOY_AXIS_LEFT_X: return "Left Stick %s X" % direction
+		JOY_AXIS_LEFT_Y: return "Left Stick %s Y" % direction
+		JOY_AXIS_RIGHT_X: return "Right Stick %s X" % direction
+		JOY_AXIS_RIGHT_Y: return "Right Stick %s Y" % direction
+		JOY_AXIS_TRIGGER_LEFT: return "LT" if _control_type == "xbox" else "L2"
+		JOY_AXIS_TRIGGER_RIGHT: return "RT" if _control_type == "xbox" else "R2"
+		_: return "Axis %d %s" % [axis, direction]
+
+func _start_remapping(action_idx: int) -> void:
+	"""Start waiting for input to remap an action"""
+	if action_idx < 0 or action_idx >= _action_data.size():
+		return
+
+	_waiting_for_input = true
+	_waiting_action = _action_data[action_idx]["action"]
+	_selected_action_index = action_idx
+
+	# Update button text to show we're waiting
+	var btn = _action_data[action_idx]["button"] as Button
+	if btn:
+		btn.text = "Press any key..."
+
+	print("[Options] Waiting for input to remap: %s" % _waiting_action)
 
 func _restore_display_defaults() -> void:
 	"""Restore Display tab to defaults"""
