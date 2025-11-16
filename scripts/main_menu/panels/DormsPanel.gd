@@ -1567,8 +1567,8 @@ func _update_room_arrow_position() -> void:
 	var panel_global_pos = global_position
 	var btn_offset_in_panel = btn_global_pos - panel_global_pos
 
-	# Position to the right of the selected room button
-	var arrow_x = btn_offset_in_panel.x + current_btn.size.x + 8.0
+	# Position to the right of the selected room button, offset 20px to the left
+	var arrow_x = btn_offset_in_panel.x + current_btn.size.x + 8.0 - 20.0
 	# Vertically align with the current button
 	var arrow_y = btn_offset_in_panel.y + (current_btn.size.y / 2.0) - (_room_selection_arrow.size.y / 2.0)
 
@@ -1742,7 +1742,7 @@ func _apply_room_visual(btn: Button, room_id: String) -> void:
 	elif state == VIS_OCCUPIED:
 		col = Color(aCoreVibeTheme.COLOR_GRAPE_VIOLET.r, aCoreVibeTheme.COLOR_GRAPE_VIOLET.g, aCoreVibeTheme.COLOR_GRAPE_VIOLET.b, 0.3)  # Grape Violet (occupied)
 	elif state == VIS_STAGED:
-		col = Color(aCoreVibeTheme.COLOR_BUBBLE_MAGENTA.r, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA.g, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA.b, 0.3)  # Bubble Magenta (staged/moving)
+		col = Color(aCoreVibeTheme.COLOR_CITRUS_YELLOW.r, aCoreVibeTheme.COLOR_CITRUS_YELLOW.g, aCoreVibeTheme.COLOR_CITRUS_YELLOW.b, 0.3)  # Citrus Yellow (moving out)
 	elif state == VIS_LOCKED:
 		col = Color(aCoreVibeTheme.COLOR_BUBBLE_MAGENTA.r, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA.g, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA.b, 0.3)  # Bubble Magenta (locked)
 
