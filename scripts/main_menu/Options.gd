@@ -889,9 +889,9 @@ func _apply_display_settings() -> void:
 
 	# Apply display type (viewport stretch mode)
 	if _display_type == "stretch":
-		get_tree().root.content_scale_mode = Window.CONTENT_SCALE_MODE_VIEWPORT_STRETCH
+		get_tree().root.content_scale_mode = Window.CONTENT_SCALE_MODE_CANVAS_ITEMS
 	else:  # constant
-		get_tree().root.content_scale_mode = Window.CONTENT_SCALE_MODE_VIEWPORT
+		get_tree().root.content_scale_mode = Window.CONTENT_SCALE_MODE_DISABLED
 
 	print("[Options] Applied display settings: %s, %s, %s" % [_display_type, _resolution, _display_mode])
 
