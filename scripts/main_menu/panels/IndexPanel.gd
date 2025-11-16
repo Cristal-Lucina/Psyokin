@@ -99,6 +99,7 @@ func _apply_core_vibe_styling() -> void:
 	"""Apply Core Vibe neon-kawaii styling to IndexPanel (matching LoadoutPanel)"""
 
 	# Style the three main panel containers with rounded neon borders
+	# Note: No content_margin here - scene already has VBoxContainers with separation
 	if _category_panel:
 		var cat_style = aCoreVibeTheme.create_panel_style(
 			aCoreVibeTheme.COLOR_SKY_CYAN,            # Sky Cyan border (categories)
@@ -108,6 +109,10 @@ func _apply_core_vibe_styling() -> void:
 			aCoreVibeTheme.BORDER_WIDTH_THIN,         # 2px border
 			aCoreVibeTheme.SHADOW_SIZE_MEDIUM         # 6px glow
 		)
+		cat_style.content_margin_left = 10
+		cat_style.content_margin_top = 10
+		cat_style.content_margin_right = 10
+		cat_style.content_margin_bottom = 10
 		_category_panel.add_theme_stylebox_override("panel", cat_style)
 
 	if _content_panel:
@@ -119,6 +124,10 @@ func _apply_core_vibe_styling() -> void:
 			aCoreVibeTheme.BORDER_WIDTH_THIN,         # 2px border
 			aCoreVibeTheme.SHADOW_SIZE_MEDIUM         # 6px glow
 		)
+		content_style.content_margin_left = 10
+		content_style.content_margin_top = 10
+		content_style.content_margin_right = 10
+		content_style.content_margin_bottom = 10
 		_content_panel.add_theme_stylebox_override("panel", content_style)
 
 	if _details_panel:
@@ -130,6 +139,10 @@ func _apply_core_vibe_styling() -> void:
 			aCoreVibeTheme.BORDER_WIDTH_THIN,         # 2px border
 			aCoreVibeTheme.SHADOW_SIZE_MEDIUM         # 6px glow
 		)
+		details_style.content_margin_left = 10
+		details_style.content_margin_top = 10
+		details_style.content_margin_right = 10
+		details_style.content_margin_bottom = 10
 		_details_panel.add_theme_stylebox_override("panel", details_style)
 
 	# Style header labels (Bubble Magenta, 16px - matching LoadoutPanel)
@@ -179,7 +192,7 @@ func _apply_core_vibe_styling() -> void:
 # --- PanelBase Lifecycle Overrides ---------------------------------------------
 
 func _input(event: InputEvent) -> void:
-	"""Handle input using menu_accept action like ItemsPanel"""
+	"""Handle input with wrap-around navigation"""
 	if not visible:
 		return
 
@@ -188,9 +201,17 @@ func _input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		return
 
-	# Handle focus switching between category and entries
+	# Handle wrap-around navigation for up/down
 	if _focus_mode == "category":
-		if event.is_action_pressed("menu_accept"):
+		if event.is_action_pressed("move_up") or event.is_action_pressed("ui_up"):
+			_navigate_category_up()
+			get_viewport().set_input_as_handled()
+			return
+		elif event.is_action_pressed("move_down") or event.is_action_pressed("ui_down"):
+			_navigate_category_down()
+			get_viewport().set_input_as_handled()
+			return
+		elif event.is_action_pressed("menu_accept"):
 			print("[IndexPanel] menu_accept pressed in category mode")
 			# Move to entry list if available
 			if _entry_list and _entry_list.item_count > 0:
@@ -204,7 +225,15 @@ func _input(event: InputEvent) -> void:
 				get_viewport().set_input_as_handled()
 				return
 	elif _focus_mode == "entries":
-		if event.is_action_pressed("menu_back"):
+		if event.is_action_pressed("move_up") or event.is_action_pressed("ui_up"):
+			_navigate_entry_up()
+			get_viewport().set_input_as_handled()
+			return
+		elif event.is_action_pressed("move_down") or event.is_action_pressed("ui_down"):
+			_navigate_entry_down()
+			get_viewport().set_input_as_handled()
+			return
+		elif event.is_action_pressed("menu_back"):
 			print("[IndexPanel] menu_back pressed in entries mode")
 			# Move back to category list
 			_focus_mode = "category"
@@ -477,8 +506,8 @@ func _update_category_arrow_position() -> void:
 	var panel_global_pos = global_position
 	var list_offset_in_panel = list_global_pos - panel_global_pos
 
-	# Position arrow to the right of the list
-	var arrow_x = list_offset_in_panel.x + _category_list.size.x - 8.0 - 80.0 + 40.0
+	# Position arrow to the right of the list (matching LoadoutPanel calculation)
+	var arrow_x = list_offset_in_panel.x + _category_list.size.x + 10.0  # 10px from right edge
 	var arrow_y = list_offset_in_panel.y + item_rect.position.y + (item_rect.size.y / 2.0) - (_category_arrow.size.y / 2.0)
 
 	_category_arrow.position = Vector2(arrow_x, arrow_y)
@@ -516,8 +545,8 @@ func _update_entry_arrow_position() -> void:
 	var panel_global_pos = global_position
 	var list_offset_in_panel = list_global_pos - panel_global_pos
 
-	# Position arrow to the right of the list
-	var arrow_x = list_offset_in_panel.x + _entry_list.size.x - 8.0 - 80.0 + 40.0
+	# Position arrow to the right of the list (matching LoadoutPanel calculation)
+	var arrow_x = list_offset_in_panel.x + _entry_list.size.x + 10.0  # 10px from right edge
 	var arrow_y = list_offset_in_panel.y + item_rect.position.y + (item_rect.size.y / 2.0) - (_entry_arrow.size.y / 2.0)
 
 	_entry_arrow.position = Vector2(arrow_x, arrow_y)
@@ -543,3 +572,69 @@ func _start_arrow_pulse(arrow: Label) -> void:
 	var base_x = arrow.position.x
 	tween.tween_property(arrow, "position:x", base_x - 6, 0.6)
 	tween.tween_property(arrow, "position:x", base_x, 0.6)
+
+# --- Wrap-around Navigation ----------------------------------------------------
+
+func _navigate_category_up() -> void:
+	"""Navigate up in category list with wrap-around"""
+	if not _category_list or _category_list.item_count == 0:
+		return
+
+	var selected = _category_list.get_selected_items()
+	var current_index = selected[0] if selected.size() > 0 else 0
+
+	if current_index > 0:
+		_category_list.select(current_index - 1)
+	else:
+		# Wrap to bottom
+		_category_list.select(_category_list.item_count - 1)
+
+	_on_category_selected(_category_list.get_selected_items()[0])
+
+func _navigate_category_down() -> void:
+	"""Navigate down in category list with wrap-around"""
+	if not _category_list or _category_list.item_count == 0:
+		return
+
+	var selected = _category_list.get_selected_items()
+	var current_index = selected[0] if selected.size() > 0 else 0
+
+	if current_index < _category_list.item_count - 1:
+		_category_list.select(current_index + 1)
+	else:
+		# Wrap to top
+		_category_list.select(0)
+
+	_on_category_selected(_category_list.get_selected_items()[0])
+
+func _navigate_entry_up() -> void:
+	"""Navigate up in entry list with wrap-around"""
+	if not _entry_list or _entry_list.item_count == 0:
+		return
+
+	var selected = _entry_list.get_selected_items()
+	var current_index = selected[0] if selected.size() > 0 else 0
+
+	if current_index > 0:
+		_entry_list.select(current_index - 1)
+	else:
+		# Wrap to bottom
+		_entry_list.select(_entry_list.item_count - 1)
+
+	_on_entry_selected(_entry_list.get_selected_items()[0])
+
+func _navigate_entry_down() -> void:
+	"""Navigate down in entry list with wrap-around"""
+	if not _entry_list or _entry_list.item_count == 0:
+		return
+
+	var selected = _entry_list.get_selected_items()
+	var current_index = selected[0] if selected.size() > 0 else 0
+
+	if current_index < _entry_list.item_count - 1:
+		_entry_list.select(current_index + 1)
+	else:
+		# Wrap to top
+		_entry_list.select(0)
+
+	_on_entry_selected(_entry_list.get_selected_items()[0])
