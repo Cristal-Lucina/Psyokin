@@ -60,6 +60,21 @@ func _ready() -> void:
 		controller_mgr.push_context(controller_mgr.InputContext.DISABLED)
 		print("[Options] ControllerManager disabled")
 
+	# Re-add joypad button 0 to ui_accept (InputManager removes it at startup)
+	# We need it for controller navigation in the Options menu
+	var has_button_0 = false
+	if InputMap.has_action("ui_accept"):
+		for event in InputMap.action_get_events("ui_accept"):
+			if event is InputEventJoypadButton and event.button_index == 0:
+				has_button_0 = true
+				break
+
+	if not has_button_0:
+		var joy_accept = InputEventJoypadButton.new()
+		joy_accept.button_index = 0
+		InputMap.action_add_event("ui_accept", joy_accept)
+		print("[Options] Re-added button 0 to ui_accept for controller navigation")
+
 	# Block all input from reaching the title screen behind this menu
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	if _background:
@@ -440,6 +455,16 @@ func _find_first_focusable(node: Node) -> Control:
 func _on_close_pressed() -> void:
 	print("[Options] Closing options menu")
 	_save_settings()
+
+	# Remove button 0 from ui_accept (restore InputManager's original state)
+	if InputMap.has_action("ui_accept"):
+		var events_to_remove = []
+		for event in InputMap.action_get_events("ui_accept"):
+			if event is InputEventJoypadButton and event.button_index == 0:
+				events_to_remove.append(event)
+		for event in events_to_remove:
+			InputMap.action_erase_event("ui_accept", event)
+			print("[Options] Removed button 0 from ui_accept (restoring InputManager state)")
 
 	# Restore ControllerManager's previous context
 	if has_node("/root/aControllerManager"):
