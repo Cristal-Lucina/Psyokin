@@ -64,7 +64,6 @@ var _background_panel: PanelContainer = null
 # Selection arrow and dark box for roster
 var _roster_selection_arrow: Label = null
 var _roster_dark_box: PanelContainer = null
-var _roster_arrow_should_show: bool = false  # Track if arrow should be visible (only after navigation)
 
 # Selection arrow for action menu
 var _action_selection_arrow: Label = null
@@ -497,7 +496,6 @@ func _on_panel_gained_focus() -> void:
 	_nav_state_history.clear()
 	print("[DormsPanel] Nav state set to ROSTER_SELECT, history cleared")
 	_current_roster_index = 0
-	_roster_arrow_should_show = false  # Hide arrow on initial focus
 	_focus_current_roster()
 
 func _can_panel_close() -> bool:
@@ -569,8 +567,7 @@ func _navigate_up() -> void:
 		NavState.ROSTER_SELECT:
 			if _roster_list and _current_roster_index > 0:
 				_current_roster_index -= 1
-				_roster_arrow_should_show = true  # Show arrow when navigating
-				print("[DEBUG Arrow] Navigate UP - roster index now: %d, arrow should show: true" % _current_roster_index)
+				print("[DEBUG Arrow] Navigate UP - roster index now: %d" % _current_roster_index)
 				_focus_current_roster()
 				# Update arrow position after selection change
 				call_deferred("_update_roster_arrow_position")
@@ -595,8 +592,7 @@ func _navigate_down() -> void:
 		NavState.ROSTER_SELECT:
 			if _roster_list and _current_roster_index < _roster_list.item_count - 1:
 				_current_roster_index += 1
-				_roster_arrow_should_show = true  # Show arrow when navigating
-				print("[DEBUG Arrow] Navigate DOWN - roster index now: %d, arrow should show: true" % _current_roster_index)
+				print("[DEBUG Arrow] Navigate DOWN - roster index now: %d" % _current_roster_index)
 				_focus_current_roster()
 				# Update arrow position after selection change
 				call_deferred("_update_roster_arrow_position")
@@ -631,13 +627,11 @@ func _navigate_left() -> void:
 			# Navigate to Roster
 			_push_nav_state(NavState.ROSTER_SELECT)
 			_current_roster_index = 0
-			_roster_arrow_should_show = false  # Hide arrow when navigating back to roster
 			_focus_current_roster()
 		NavState.COMMON_SELECT:
 			# Navigate to Roster
 			_push_nav_state(NavState.ROSTER_SELECT)
 			_current_roster_index = 0
-			_roster_arrow_should_show = false  # Hide arrow when navigating back to roster
 			_focus_current_roster()
 		_:
 			# ROSTER_SELECT at left edge - no further left navigation
@@ -744,7 +738,7 @@ func _on_back_input() -> void:
 			# Do NOT call get_viewport().set_input_as_handled() - let event bubble up
 
 func _focus_current_roster() -> void:
-	print("[DEBUG Arrow] _focus_current_roster called - index: %d, should show: %s" % [_current_roster_index, _roster_arrow_should_show])
+	print("[DEBUG Arrow] _focus_current_roster called - index: %d" % _current_roster_index)
 
 	if _roster_list and _current_roster_index >= 0 and _current_roster_index < _roster_list.item_count:
 		_roster_list.select(_current_roster_index)
@@ -756,11 +750,14 @@ func _focus_current_roster() -> void:
 			print("[DormsPanel._focus_current_roster] Focused member: ", focused_member)
 			_update_details_for_member(focused_member)
 
-	# Hide action and room arrows (roster arrow visibility is handled in _update_roster_arrow_position)
+	# Hide action and room arrows when focusing roster
 	if _action_selection_arrow:
 		_action_selection_arrow.visible = false
 	if _room_selection_arrow:
 		_room_selection_arrow.visible = false
+
+	# Update roster arrow position (will show it when position is calculated)
+	call_deferred("_update_roster_arrow_position")
 
 	_animate_panel_focus(NavState.ROSTER_SELECT)
 
@@ -768,16 +765,24 @@ func _focus_current_room() -> void:
 	if _current_room_index >= 0 and _current_room_index < _room_buttons.size():
 		_room_buttons[_current_room_index].grab_focus()
 
-	# Hide roster and action arrows when focusing on rooms
+	# Hide roster and action arrows immediately when focusing on rooms
 	if _roster_selection_arrow:
 		_roster_selection_arrow.visible = false
+		print("[DEBUG Arrow] Roster arrow hidden when moving to rooms")
 	if _action_selection_arrow:
 		_action_selection_arrow.visible = false
+		print("[DEBUG Arrow] Action arrow hidden when moving to rooms")
 
-	# Update room arrow position
-	call_deferred("_update_room_arrow_position")
-
+	# Start panel animation
 	_animate_panel_focus(NavState.ROOM_SELECT)
+
+	# Wait for expand animation to finish before showing room arrow
+	print("[DEBUG Arrow] Waiting for panel expand animation (%f seconds)" % ANIM_DURATION)
+	await get_tree().create_timer(ANIM_DURATION).timeout
+	print("[DEBUG Arrow] Panel animation complete, updating room arrow position")
+
+	# Update room arrow position (will show it after position is calculated)
+	call_deferred("_update_room_arrow_position")
 
 func _focus_current_common() -> void:
 	if _current_common_index >= 0 and _current_common_index < _common_buttons.size():
@@ -1462,7 +1467,7 @@ func _update_roster_arrow_position() -> void:
 		print("[DEBUG Arrow] Early return - no items selected")
 		return
 
-	print("[DEBUG Arrow] Arrow should show: %s, Arrow currently visible: %s" % [_roster_arrow_should_show, _roster_selection_arrow.visible])
+	print("[DEBUG Arrow] Arrow currently visible: %s" % _roster_selection_arrow.visible)
 
 	await get_tree().process_frame
 
@@ -1496,16 +1501,16 @@ func _update_roster_arrow_position() -> void:
 	_roster_selection_arrow.position = Vector2(arrow_x, arrow_y)
 	print("[DEBUG Arrow] Arrow position set to: %s" % _roster_selection_arrow.position)
 
-	# Set arrow visibility based on flag (do this AFTER position calculation)
-	_roster_selection_arrow.visible = _roster_arrow_should_show
-	print("[DEBUG Arrow] Arrow visibility set to: %s (based on _roster_arrow_should_show)" % _roster_arrow_should_show)
+	# Show arrow after position calculation (always visible when in roster)
+	_roster_selection_arrow.visible = true
+	print("[DEBUG Arrow] Arrow visibility set to: true")
 
 	if _roster_dark_box:
 		var box_x = arrow_x - _roster_dark_box.size.x - 4.0
 		var box_y = arrow_y + (_roster_selection_arrow.size.y / 2.0) - (_roster_dark_box.size.y / 2.0)
 		_roster_dark_box.position = Vector2(box_x, box_y)
-		_roster_dark_box.visible = _roster_arrow_should_show
-		print("[DEBUG Arrow] Dark box position set to: %s, visible: %s" % [_roster_dark_box.position, _roster_arrow_should_show])
+		_roster_dark_box.visible = true
+		print("[DEBUG Arrow] Dark box position set to: %s, visible: true" % _roster_dark_box.position)
 
 func _update_action_arrow_position() -> void:
 	"""Update action menu arrow position - to the right of the center panel, facing left"""
