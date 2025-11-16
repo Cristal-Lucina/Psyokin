@@ -40,11 +40,17 @@ var _category_box: PanelContainer = null
 var _entry_arrow: Label = null
 var _entry_box: PanelContainer = null
 
+# Panel animation tracking
+var _panel_animating: bool = false
+
 # Focus tracking
 var _focus_mode: String = "category"  # "category" or "entries"
 
 func _ready() -> void:
 	super()  # Call PanelBase._ready() for lifecycle management
+
+	# Disable process by default (enabled during panel animations)
+	set_process(false)
 
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -218,8 +224,18 @@ func _input(event: InputEvent) -> void:
 				if _entry_list.item_count > 0:
 					_entry_list.select(0)
 					_on_entry_selected(0)
+
+				# Hide category arrow, show entry arrow (matching OutreachPanel)
+				if _category_arrow:
+					_category_arrow.visible = false
+				# Category dark box always stays visible
+				if _entry_arrow:
+					_entry_arrow.visible = true
+				# Entry dark box always stays hidden
+
 				print("[IndexPanel] Calling _animate_panel_focus - mode: entries")
 				call_deferred("_animate_panel_focus")
+				call_deferred("_update_entry_arrow_position")
 				get_viewport().set_input_as_handled()
 				return
 	elif _focus_mode == "entries":
@@ -356,6 +372,10 @@ func _animate_panel_focus() -> void:
 		print("[IndexPanel] ERROR: Missing panel references!")
 		return
 
+	# Set animation flag to enable continuous arrow position updates
+	_panel_animating = true
+	set_process(true)
+
 	var left_ratio := BASE_LEFT_RATIO
 	var center_ratio := BASE_CENTER_RATIO
 	var right_ratio := BASE_RIGHT_RATIO  # Details panel always stays at base size
@@ -381,6 +401,9 @@ func _animate_panel_focus() -> void:
 	tween.tween_property(_category_panel, "size_flags_stretch_ratio", left_ratio, ANIM_DURATION)
 	tween.tween_property(_content_panel, "size_flags_stretch_ratio", center_ratio, ANIM_DURATION)
 	tween.tween_property(_details_panel, "size_flags_stretch_ratio", right_ratio, ANIM_DURATION)
+
+	# Connect to finished signal to stop arrow updates
+	tween.finished.connect(_on_panel_animation_finished)
 
 	print("[IndexPanel] Tween created and started")
 
@@ -595,6 +618,78 @@ func _start_arrow_pulse(arrow: Label) -> void:
 	var base_x = arrow.position.x
 	tween.tween_property(arrow, "position:x", base_x - 6, 0.6)
 	tween.tween_property(arrow, "position:x", base_x, 0.6)
+
+# --- Continuous Arrow Update During Panel Animation ---------------------------
+
+func _process(_delta: float) -> void:
+	"""Update arrow positions during panel animations"""
+	if _panel_animating:
+		call_deferred("_update_category_arrow_position_immediate")
+		call_deferred("_update_entry_arrow_position_immediate")
+
+func _update_category_arrow_position_immediate() -> void:
+	"""Immediate category arrow position update without await"""
+	if not _category_arrow or not _category_list:
+		return
+
+	var selected = _category_list.get_selected_items()
+	if selected.size() == 0:
+		return
+
+	var item_index = selected[0]
+	var item_rect = _category_list.get_item_rect(item_index)
+	var list_global_pos = _category_list.global_position
+	var panel_global_pos = global_position
+	var list_offset_in_panel = list_global_pos - panel_global_pos
+
+	var scroll_offset = 0.0
+	if _category_list.get_v_scroll_bar():
+		scroll_offset = _category_list.get_v_scroll_bar().value
+
+	var arrow_x = list_offset_in_panel.x + _category_list.size.x - 8.0 - 80.0 + 40.0
+	var arrow_y = list_offset_in_panel.y + item_rect.position.y - scroll_offset + (item_rect.size.y / 2.0) - (_category_arrow.size.y / 2.0)
+
+	_category_arrow.position = Vector2(arrow_x, arrow_y)
+
+	if _category_box:
+		var box_x = arrow_x - _category_box.size.x - 4.0
+		var box_y = arrow_y + (_category_arrow.size.y / 2.0) - (_category_box.size.y / 2.0)
+		_category_box.position = Vector2(box_x, box_y)
+
+func _update_entry_arrow_position_immediate() -> void:
+	"""Immediate entry arrow position update without await"""
+	if not _entry_arrow or not _entry_list:
+		return
+
+	var selected = _entry_list.get_selected_items()
+	if selected.size() == 0:
+		return
+
+	var item_index = selected[0]
+	var item_rect = _entry_list.get_item_rect(item_index)
+	var list_global_pos = _entry_list.global_position
+	var panel_global_pos = global_position
+	var list_offset_in_panel = list_global_pos - panel_global_pos
+
+	var scroll_offset = 0.0
+	if _entry_list.get_v_scroll_bar():
+		scroll_offset = _entry_list.get_v_scroll_bar().value
+
+	var arrow_x = list_offset_in_panel.x + _entry_list.size.x - 8.0 - 80.0 + 40.0
+	var arrow_y = list_offset_in_panel.y + item_rect.position.y - scroll_offset + (item_rect.size.y / 2.0) - (_entry_arrow.size.y / 2.0)
+
+	_entry_arrow.position = Vector2(arrow_x, arrow_y)
+
+	# Entry dark box is never shown
+	if _entry_box:
+		_entry_box.visible = false
+
+func _on_panel_animation_finished() -> void:
+	"""Called when panel animation completes"""
+	_panel_animating = false
+	set_process(false)
+	call_deferred("_update_category_arrow_position")
+	call_deferred("_update_entry_arrow_position")
 
 # --- Wrap-around Navigation ----------------------------------------------------
 
