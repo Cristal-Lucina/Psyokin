@@ -51,13 +51,13 @@ func _ready() -> void:
 func _apply_core_vibe_styling() -> void:
 	"""Apply Core Vibe neon-kawaii styling to SystemPanel buttons and panel"""
 
-	# Style the main frame panel with Sky Cyan border
+	# Style the main frame panel with WHITE border and BLACK background
 	if _frame_panel:
 		var panel_style = aCoreVibeTheme.create_panel_style(
-			aCoreVibeTheme.COLOR_SKY_CYAN,            # Sky Cyan border
-			aCoreVibeTheme.COLOR_INK_CHARCOAL,        # Ink charcoal background
-			aCoreVibeTheme.PANEL_OPACITY_SEMI,        # Semi-transparent
-			aCoreVibeTheme.CORNER_RADIUS_MEDIUM,      # 16px corners
+			aCoreVibeTheme.COLOR_MILK_WHITE,          # White border
+			aCoreVibeTheme.COLOR_NIGHT_NAVY,          # Black background
+			1.0,                                       # Full opacity
+			aCoreVibeTheme.CORNER_RADIUS_MEDIUM,      # 16px rounded corners
 			aCoreVibeTheme.BORDER_WIDTH_THIN,         # 2px border
 			aCoreVibeTheme.SHADOW_SIZE_MEDIUM         # 6px glow
 		)
@@ -72,23 +72,23 @@ func _apply_core_vibe_styling() -> void:
 		_title_label.text = "SYSTEM"
 		_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		_title_label.add_theme_font_size_override("font_size", 22)  # 16 + 6 = 22
-		_title_label.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_SKY_CYAN)
+		_title_label.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE)
 
-	# Style buttons with coordinated neon colors
+	# Style buttons with focus invert (white background + Night Navy text when selected)
 	if _btn_load:
-		aCoreVibeTheme.style_button(_btn_load, aCoreVibeTheme.COLOR_SKY_CYAN, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
+		aCoreVibeTheme.style_button_with_focus_invert(_btn_load, aCoreVibeTheme.COLOR_MILK_WHITE, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
 		_btn_load.custom_minimum_size = Vector2(200, 50)
 
 	if _btn_save:
-		aCoreVibeTheme.style_button(_btn_save, aCoreVibeTheme.COLOR_ELECTRIC_LIME, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
+		aCoreVibeTheme.style_button_with_focus_invert(_btn_save, aCoreVibeTheme.COLOR_MILK_WHITE, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
 		_btn_save.custom_minimum_size = Vector2(200, 50)
 
 	if _btn_settings:
-		aCoreVibeTheme.style_button(_btn_settings, aCoreVibeTheme.COLOR_CITRUS_YELLOW, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
+		aCoreVibeTheme.style_button_with_focus_invert(_btn_settings, aCoreVibeTheme.COLOR_MILK_WHITE, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
 		_btn_settings.custom_minimum_size = Vector2(200, 50)
 
 	if _btn_title:
-		aCoreVibeTheme.style_button(_btn_title, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
+		aCoreVibeTheme.style_button_with_focus_invert(_btn_title, aCoreVibeTheme.COLOR_MILK_WHITE, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
 		_btn_title.custom_minimum_size = Vector2(200, 50)
 
 # --- Input Handling -----------------------------------------------------------
