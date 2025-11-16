@@ -13,12 +13,12 @@ var _current_tab: Tab = Tab.GAME
 var _tab_buttons: Array[Button] = []
 var _tab_content: Dictionary = {}  # Tab -> Control node
 
-# Two-level navigation state
-enum NavLevel { OPTIONS, TOGGLES }  # Navigate option labels vs toggle buttons
-var _nav_level: NavLevel = NavLevel.OPTIONS
-var _option_containers: Array[Control] = []  # Focusable option containers
+# Navigation state - Three clear levels
+enum NavState { TAB_PANEL, OPTION_NAVIGATION, TOGGLE_SELECTION }
+var _nav_state: NavState = NavState.TAB_PANEL
+var _option_containers: Array[Control] = []  # All option containers in current tab
 var _current_option_index: int = 0
-var _current_toggle_group: HBoxContainer = null
+var _current_toggle_group: Control = null  # HBoxContainer with buttons or sliders
 
 # Settings
 var _control_type: String = "keyboard"  # keyboard, xbox, playstation, nintendo
@@ -125,177 +125,178 @@ func _process(delta: float) -> void:
 		_input_cooldown -= delta
 
 func _input(event: InputEvent) -> void:
-	"""Handle input for menu navigation"""
-	# Handle tab button acceptance
-	if event.is_action_pressed("ui_accept"):
-		var focused = get_viewport().gui_get_focus_owner()
-		if focused and focused in _tab_buttons:
-			var idx = _tab_buttons.find(focused)
-			if idx >= 0:
-				print("[Options] Switching to tab %d" % idx)
-				_switch_tab(Tab.values()[idx])
-				_move_focus_to_content()
-				get_viewport().set_input_as_handled()
-				return
+	"""Handle input for three-level navigation: tabs -> options -> toggles"""
 
-	# Handle two-level navigation in content
-	var focused = get_viewport().gui_get_focus_owner()
-	var is_in_content = _is_focused_in_content(focused)
-
-	if is_in_content:
-		# Handle navigation within content panel
-		if _nav_level == NavLevel.OPTIONS:
-			# Navigate option containers
-			if event.is_action_pressed("move_up"):
-				_navigate_options(-1)
-				get_viewport().set_input_as_handled()
-				return
-			elif event.is_action_pressed("move_down"):
-				_navigate_options(1)
-				get_viewport().set_input_as_handled()
-				return
-			elif event.is_action_pressed("ui_accept") or event.is_action_pressed("menu_accept"):
-				_enter_toggle_selection()
-				get_viewport().set_input_as_handled()
-				return
-			elif event.is_action_pressed("menu_cancel") or event.is_action_pressed("ui_cancel"):
-				# Back from options: return to tab buttons
-				_return_to_tabs()
-				get_viewport().set_input_as_handled()
-				return
-
-		elif _nav_level == NavLevel.TOGGLES:
-			# Navigate within toggle buttons
-			if event.is_action_pressed("move_left"):
-				_navigate_toggles(-1)
-				get_viewport().set_input_as_handled()
-				return
-			elif event.is_action_pressed("move_right"):
-				_navigate_toggles(1)
-				get_viewport().set_input_as_handled()
-				return
-			elif event.is_action_pressed("ui_accept") or event.is_action_pressed("menu_accept"):
-				_activate_current_toggle()
-				get_viewport().set_input_as_handled()
-				return
-			elif event.is_action_pressed("menu_cancel") or event.is_action_pressed("ui_cancel"):
-				# Back from toggles: return to option navigation
-				_exit_toggle_selection()
-				get_viewport().set_input_as_handled()
-				return
-	else:
-		# Handle back button in tab panel - close menu
-		if event.is_action_pressed("menu_cancel") or event.is_action_pressed("ui_cancel"):
+	# STATE 1: TAB_PANEL - Navigate between tabs on left
+	if _nav_state == NavState.TAB_PANEL:
+		if event.is_action_pressed("ui_accept") or event.is_action_pressed("menu_accept"):
+			# Enter content panel
+			_enter_option_navigation()
+			get_viewport().set_input_as_handled()
+			return
+		elif event.is_action_pressed("menu_cancel") or event.is_action_pressed("ui_cancel"):
+			# Close options menu
 			_on_close_pressed()
 			get_viewport().set_input_as_handled()
 			return
 
-func _is_focused_in_content(focused: Control) -> bool:
-	"""Check if focused control is within content container"""
-	if not focused:
-		return false
-	if focused in _tab_buttons:
-		return false
+	# STATE 2: OPTION_NAVIGATION - Navigate between option containers
+	elif _nav_state == NavState.OPTION_NAVIGATION:
+		if event.is_action_pressed("move_up"):
+			_navigate_options(-1)
+			get_viewport().set_input_as_handled()
+			return
+		elif event.is_action_pressed("move_down"):
+			_navigate_options(1)
+			get_viewport().set_input_as_handled()
+			return
+		elif event.is_action_pressed("ui_accept") or event.is_action_pressed("menu_accept"):
+			# Enter toggle selection
+			_enter_toggle_selection()
+			get_viewport().set_input_as_handled()
+			return
+		elif event.is_action_pressed("menu_cancel") or event.is_action_pressed("ui_cancel"):
+			# Return to tab panel
+			_exit_to_tab_panel()
+			get_viewport().set_input_as_handled()
+			return
 
-	var parent = focused
-	while parent != null:
-		if parent == _content_container:
-			return true
-		parent = parent.get_parent()
-	return false
+	# STATE 3: TOGGLE_SELECTION - Navigate within toggle buttons/sliders
+	elif _nav_state == NavState.TOGGLE_SELECTION:
+		if event.is_action_pressed("move_left"):
+			_navigate_toggles(-1)
+			get_viewport().set_input_as_handled()
+			return
+		elif event.is_action_pressed("move_right"):
+			_navigate_toggles(1)
+			get_viewport().set_input_as_handled()
+			return
+		elif event.is_action_pressed("ui_accept") or event.is_action_pressed("menu_accept"):
+			# Activate current toggle
+			_activate_current_toggle()
+			get_viewport().set_input_as_handled()
+			return
+		elif event.is_action_pressed("menu_cancel") or event.is_action_pressed("ui_cancel"):
+			# Return to option navigation
+			_exit_toggle_selection()
+			get_viewport().set_input_as_handled()
+			return
+
+# ==============================================================================
+# State Transition Functions
+# ==============================================================================
+
+func _enter_option_navigation() -> void:
+	"""STATE 1 -> 2: Enter content panel from tab panel"""
+	if _option_containers.is_empty():
+		print("[Options] No option containers in current tab")
+		return
+
+	_nav_state = NavState.OPTION_NAVIGATION
+	_current_option_index = 0
+	_highlight_option(0)
+	print("[Options] Entered option navigation mode")
+
+func _exit_to_tab_panel() -> void:
+	"""STATE 2 -> 1: Return to tab panel from option navigation"""
+	_nav_state = NavState.TAB_PANEL
+	_unhighlight_option(_current_option_index)
+	_current_option_index = 0
+
+	# Focus current tab button
+	if _current_tab >= 0 and _current_tab < _tab_buttons.size():
+		_tab_buttons[_current_tab].grab_focus()
+	print("[Options] Returned to tab panel")
+
+func _enter_toggle_selection() -> void:
+	"""STATE 2 -> 3: Enter toggle selection from option navigation"""
+	if _current_option_index < 0 or _current_option_index >= _option_containers.size():
+		return
+
+	var container = _option_containers[_current_option_index]
+	var toggle_group = _find_toggle_group(container)
+
+	if not toggle_group:
+		print("[Options] No toggle group found in option container")
+		return
+
+	_current_toggle_group = toggle_group
+	_nav_state = NavState.TOGGLE_SELECTION
+
+	# Focus first focusable element (Button or HSlider)
+	for child in toggle_group.get_children():
+		if (child is Button and child.focus_mode != Control.FOCUS_NONE) or child is HSlider:
+			child.grab_focus()
+			print("[Options] Entered toggle selection mode")
+			return
+
+func _exit_toggle_selection() -> void:
+	"""STATE 3 -> 2: Return to option navigation from toggle selection"""
+	_nav_state = NavState.OPTION_NAVIGATION
+	_current_toggle_group = null
+
+	# Restore highlight on current option
+	_highlight_option(_current_option_index)
+	print("[Options] Exited toggle selection mode")
+
+# ==============================================================================
+# Navigation Functions
+# ==============================================================================
 
 func _navigate_options(direction: int) -> void:
-	"""Navigate through option containers (Display Type, Resolution, etc.)"""
+	"""Navigate through option containers with up/down"""
 	if _option_containers.is_empty():
 		return
 
-	# Clear highlight from current option
-	if _current_option_index >= 0 and _current_option_index < _option_containers.size():
-		_unhighlight_option(_current_option_index)
+	# Unhighlight current
+	_unhighlight_option(_current_option_index)
 
-	# Move to next option
+	# Move
 	_current_option_index += direction
 	if _current_option_index < 0:
 		_current_option_index = _option_containers.size() - 1
 	elif _current_option_index >= _option_containers.size():
 		_current_option_index = 0
 
-	# Highlight new option
+	# Highlight new
 	_highlight_option(_current_option_index)
-	print("[Options] Navigated to option %d" % _current_option_index)
-
-func _enter_toggle_selection() -> void:
-	"""Enter toggle selection mode for current option"""
-	if _current_option_index < 0 or _current_option_index >= _option_containers.size():
-		return
-
-	var container = _option_containers[_current_option_index]
-	# Find the HBoxContainer with toggle buttons or sliders
-	var toggle_group = _find_toggle_group(container)
-	if toggle_group:
-		_current_toggle_group = toggle_group
-		_nav_level = NavLevel.TOGGLES
-
-		# Focus first button or slider in toggle group
-		if toggle_group.get_child_count() > 0:
-			var first_child = toggle_group.get_child(0)
-			if first_child is Button:
-				first_child.grab_focus()
-			elif first_child is HSlider:
-				first_child.grab_focus()
-			print("[Options] Entered toggle selection")
-
-func _exit_toggle_selection() -> void:
-	"""Exit toggle selection mode and return to option navigation"""
-	_nav_level = NavLevel.OPTIONS
-	_current_toggle_group = null
-
-	# Restore highlight on current option
-	if _current_option_index >= 0 and _current_option_index < _option_containers.size():
-		_highlight_option(_current_option_index)
-	print("[Options] Exited toggle selection")
 
 func _navigate_toggles(direction: int) -> void:
-	"""Navigate within toggle button group"""
+	"""Navigate within toggle group with left/right"""
 	if not _current_toggle_group:
 		return
 
 	var focused = get_viewport().gui_get_focus_owner()
-	if not focused or not focused is Button:
+	if not focused:
 		return
 
-	var buttons: Array[Button] = []
+	# Collect focusable elements (buttons and sliders)
+	var focusables: Array[Control] = []
 	for child in _current_toggle_group.get_children():
-		if child is Button:
-			buttons.append(child)
+		if (child is Button and child.focus_mode != Control.FOCUS_NONE) or child is HSlider:
+			focusables.append(child)
 
-	if buttons.is_empty():
+	if focusables.is_empty():
 		return
 
-	var current_idx = buttons.find(focused)
+	var current_idx = focusables.find(focused)
 	if current_idx < 0:
 		return
 
 	# Navigate
 	current_idx += direction
 	if current_idx < 0:
-		current_idx = buttons.size() - 1
-	elif current_idx >= buttons.size():
+		current_idx = focusables.size() - 1
+	elif current_idx >= focusables.size():
 		current_idx = 0
 
-	buttons[current_idx].grab_focus()
+	focusables[current_idx].grab_focus()
 
 func _activate_current_toggle() -> void:
-	"""Activate the currently focused toggle button"""
+	"""Activate the currently focused toggle button or slider"""
 	var focused = get_viewport().gui_get_focus_owner()
 	if focused and focused is Button:
 		focused.emit_signal("pressed")
-
-func _return_to_tabs() -> void:
-	"""Return focus to tab buttons"""
-	_nav_level = NavLevel.OPTIONS
-	if _current_tab >= 0 and _current_tab < _tab_buttons.size():
-		_tab_buttons[_current_tab].grab_focus()
 
 func _highlight_option(index: int) -> void:
 	"""Highlight an option container"""
@@ -617,8 +618,8 @@ func _switch_tab(tab: Tab) -> void:
 	if _tab_content.has(tab):
 		_tab_content[tab].visible = true
 
-	# Reset navigation state
-	_nav_level = NavLevel.OPTIONS
+	# Reset to tab panel state
+	_nav_state = NavState.TAB_PANEL
 	_current_option_index = 0
 	_current_toggle_group = null
 
@@ -628,18 +629,6 @@ func _switch_tab(tab: Tab) -> void:
 		_collect_option_containers(_tab_content[tab], _option_containers)
 
 	print("[Options] Switched to tab: %s with %d option containers" % [tab, _option_containers.size()])
-
-func _move_focus_to_content() -> void:
-	"""Move focus to the first option container in the current content"""
-	if _option_containers.is_empty():
-		return
-
-	# Reset to first option
-	_current_option_index = 0
-	_nav_level = NavLevel.OPTIONS
-
-	# Highlight first option
-	_highlight_option(0)
 
 func _collect_option_containers(node: Node, result: Array[Control]) -> void:
 	"""Recursively collect option containers"""
@@ -769,12 +758,16 @@ func _collect_focusable_controls(node: Node, result: Array[Control]) -> void:
 		_collect_focusable_controls(child, result)
 
 func _build_controls_tab() -> Control:
-	"""Build Controls tab with Control Type selector and remapping"""
-	var main_container = VBoxContainer.new()
-	main_container.set_anchors_preset(Control.PRESET_FULL_RECT)
-	main_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	main_container.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	main_container.add_theme_constant_override("separation", 20)
+	"""Build Controls tab with Control Style selector"""
+	var scroll = ScrollContainer.new()
+	scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
+	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+
+	var container = VBoxContainer.new()
+	container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	container.add_theme_constant_override("separation", 12)
+	scroll.add_child(container)
 
 	# Title
 	var title = Label.new()
@@ -782,12 +775,11 @@ func _build_controls_tab() -> Control:
 	title.add_theme_font_size_override("font_size", 20)
 	title.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_SKY_CYAN)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	main_container.add_child(title)
+	container.add_child(title)
 
-	_add_spacer(main_container, 10)
+	_add_spacer(container, 10)
 
-	# Control Style selector
-	_add_option_label(main_container, "Control Style")
+	# Control Style - option container with toggles
 	var type_idx = 0
 	if _control_type == "keyboard":
 		type_idx = 0
@@ -808,43 +800,28 @@ func _build_controls_tab() -> Control:
 		else:
 			_control_type = "nintendo"
 		_save_settings()
-		# Rebuild tab to show new control type
+		# Rebuild tab to update button configs display
 		_rebuild_controls_tab()
 	)
-	main_container.add_child(type_hbox)
+	var type_container = _create_option_container("Control Style", type_hbox)
+	container.add_child(type_container)
 
-	_add_spacer(main_container, 20)
+	_add_spacer(container, 20)
 
-	# Scrollable remapping section
-	_scroll_container = ScrollContainer.new()
-	_scroll_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_scroll_container.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	main_container.add_child(_scroll_container)
+	# Button configuration reference section
+	var config_label = Label.new()
+	config_label.text = "BUTTON CONFIGURATION (View Only)"
+	config_label.add_theme_font_size_override("font_size", 16)
+	config_label.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_SKY_CYAN)
+	config_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	container.add_child(config_label)
 
-	var scroll_content = VBoxContainer.new()
-	scroll_content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	scroll_content.add_theme_constant_override("separation", 8)
-	_scroll_container.add_child(scroll_content)
+	_add_spacer(container, 10)
 
-	# Build action rows for remapping
-	_build_action_rows(scroll_content)
+	# Build action rows (greyed out, view-only)
+	_build_action_rows(container)
 
-	# Restore Defaults button
-	var restore_btn = Button.new()
-	restore_btn.text = "RESTORE DEFAULTS"
-	restore_btn.custom_minimum_size = Vector2(200, 45)
-	restore_btn.focus_mode = Control.FOCUS_ALL
-	restore_btn.pressed.connect(_restore_controls_defaults_and_rebuild)
-	aCoreVibeTheme.style_button_with_focus_invert(restore_btn, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
-	_add_button_padding(restore_btn)
-	var restore_center = CenterContainer.new()
-	restore_center.add_child(restore_btn)
-	main_container.add_child(restore_center)
-
-	# Set up focus chain after UI is built
-	call_deferred("_setup_controls_focus_chain")
-
-	return main_container
+	return scroll
 
 func _build_display_tab() -> Control:
 	"""Build Display tab: Display Type, Resolution, Mode"""
@@ -1207,10 +1184,27 @@ func _restore_controls_defaults_and_rebuild() -> void:
 func _rebuild_controls_tab() -> void:
 	"""Rebuild the Controls tab (used when control type changes)"""
 	if _tab_content.has(Tab.CONTROLS):
+		# Store current state
+		var was_visible = _tab_content[Tab.CONTROLS].visible
+
+		# Remove old tab
 		_tab_content[Tab.CONTROLS].queue_free()
+
+		# Build new tab
 		_tab_content[Tab.CONTROLS] = _build_controls_tab()
 		_content_container.add_child(_tab_content[Tab.CONTROLS])
-		_switch_tab(Tab.CONTROLS)
+		_tab_content[Tab.CONTROLS].visible = was_visible
+
+		# Rebuild option containers
+		_option_containers.clear()
+		_collect_option_containers(_tab_content[Tab.CONTROLS], _option_containers)
+
+		# Reset to option navigation if we were in it
+		if _nav_state == NavState.OPTION_NAVIGATION or _nav_state == NavState.TOGGLE_SELECTION:
+			_nav_state = NavState.OPTION_NAVIGATION
+			_current_option_index = 0
+			_current_toggle_group = null
+			_highlight_option(0)
 
 func _reset_input_mappings() -> void:
 	"""Reset all input action mappings to their defaults"""
