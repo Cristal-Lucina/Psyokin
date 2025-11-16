@@ -431,7 +431,7 @@ func _create_selection_arrows() -> void:
 		_create_arrow_and_box(false)  # false = entry list
 
 func _create_arrow_and_box(is_category: bool) -> void:
-	"""Create arrow and dark box for a specific list"""
+	"""Create arrow and dark box for a specific list (matching LoadoutPanel)"""
 	# Create arrow label
 	var arrow = Label.new()
 	arrow.text = "◄"  # Left-pointing arrow
@@ -443,9 +443,14 @@ func _create_arrow_and_box(is_category: bool) -> void:
 	arrow.size = Vector2(54, 72)
 	arrow.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	arrow.z_index = 100  # Well above other elements
+	arrow.visible = false  # Start invisible, will be shown when positioned
 
 	# Add to main IndexPanel
 	add_child(arrow)
+
+	# Ensure size is locked after adding to tree
+	await get_tree().process_frame
+	arrow.size = Vector2(54, 72)
 
 	# Create dark box (160px wide, 20px height)
 	var box = PanelContainer.new()
@@ -453,6 +458,7 @@ func _create_arrow_and_box(is_category: bool) -> void:
 	box.size = Vector2(160, 20)
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.z_index = 100  # Same layer as arrow
+	box.visible = false  # Start invisible, will be shown when positioned
 
 	# Create Ink Charcoal rounded style
 	var box_style = StyleBoxFlat.new()
@@ -464,21 +470,19 @@ func _create_arrow_and_box(is_category: bool) -> void:
 	box.add_theme_stylebox_override("panel", box_style)
 
 	add_child(box)
+	await get_tree().process_frame
+	box.size = Vector2(160, 20)
 
-	# Store references
+	# Store references and start pulse animation
 	if is_category:
 		_category_arrow = arrow
 		_category_box = box
-		_start_arrow_pulse(arrow)
 	else:
 		_entry_arrow = arrow
 		_entry_box = box
-		_start_arrow_pulse(arrow)
 
-	# Wait for layout
-	await get_tree().process_frame
-	arrow.size = Vector2(54, 72)
-	box.size = Vector2(160, 20)
+	# Start pulsing animation after everything is set up
+	_start_arrow_pulse(arrow)
 
 func _update_category_arrow_position() -> void:
 	"""Update category arrow and dark box position"""
@@ -507,7 +511,7 @@ func _update_category_arrow_position() -> void:
 	var list_offset_in_panel = list_global_pos - panel_global_pos
 
 	# Position arrow to the right of the list (matching LoadoutPanel calculation)
-	var arrow_x = list_offset_in_panel.x + _category_list.size.x + 10.0  # 10px from right edge
+	var arrow_x = list_offset_in_panel.x + _category_list.size.x - 8.0 - 80.0 + 40.0
 	var arrow_y = list_offset_in_panel.y + item_rect.position.y + (item_rect.size.y / 2.0) - (_category_arrow.size.y / 2.0)
 
 	_category_arrow.position = Vector2(arrow_x, arrow_y)
@@ -546,7 +550,7 @@ func _update_entry_arrow_position() -> void:
 	var list_offset_in_panel = list_global_pos - panel_global_pos
 
 	# Position arrow to the right of the list (matching LoadoutPanel calculation)
-	var arrow_x = list_offset_in_panel.x + _entry_list.size.x + 10.0  # 10px from right edge
+	var arrow_x = list_offset_in_panel.x + _entry_list.size.x - 8.0 - 80.0 + 40.0
 	var arrow_y = list_offset_in_panel.y + item_rect.position.y + (item_rect.size.y / 2.0) - (_entry_arrow.size.y / 2.0)
 
 	_entry_arrow.position = Vector2(arrow_x, arrow_y)
