@@ -779,11 +779,10 @@ func _focus_current_room() -> void:
 	# Start panel animation
 	_animate_panel_focus(NavState.ROOM_SELECT)
 
-	# Wait for panel to start expanding before showing room arrow (faster than full animation)
-	var arrow_delay := ANIM_DURATION * 0.5  # Show arrow halfway through animation
-	print("[DEBUG Arrow] Waiting for panel expand animation (%f seconds)" % arrow_delay)
-	await get_tree().create_timer(arrow_delay).timeout
-	print("[DEBUG Arrow] Panel animation in progress, updating room arrow position")
+	# Wait just one frame for layout to stabilize before showing room arrow
+	print("[DEBUG Arrow] Waiting one frame for layout to stabilize")
+	await get_tree().process_frame
+	print("[DEBUG Arrow] Layout stabilized, updating room arrow position")
 
 	# Update room arrow position (will show it after position is calculated)
 	call_deferred("_update_room_arrow_position")
