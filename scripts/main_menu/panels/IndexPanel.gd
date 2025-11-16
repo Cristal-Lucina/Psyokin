@@ -444,8 +444,8 @@ func _create_arrow_and_box(is_category: bool) -> void:
 	arrow.custom_minimum_size = Vector2(54, 72)
 	arrow.size = Vector2(54, 72)
 	arrow.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	arrow.z_index = 100  # Well above other elements
-	arrow.visible = false  # Start invisible, will be shown when positioned
+	arrow.z_index = 1000  # Very high to ensure it's on top
+	arrow.visible = true  # Start visible for now
 
 	# Add to main IndexPanel
 	add_child(arrow)
@@ -459,8 +459,8 @@ func _create_arrow_and_box(is_category: bool) -> void:
 	box.custom_minimum_size = Vector2(160, 20)
 	box.size = Vector2(160, 20)
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	box.z_index = 100  # Same layer as arrow
-	box.visible = false  # Start invisible, will be shown when positioned
+	box.z_index = 999  # Just below arrow
+	box.visible = true  # Start visible for now
 
 	# Create Ink Charcoal rounded style
 	var box_style = StyleBoxFlat.new()
@@ -493,9 +493,10 @@ func _update_category_arrow_position() -> void:
 
 	var selected = _category_list.get_selected_items()
 	if selected.size() == 0:
-		_category_arrow.visible = false
-		if _category_box:
-			_category_box.visible = false
+		# Keep visible for debugging
+		# _category_arrow.visible = false
+		# if _category_box:
+		#	_category_box.visible = false
 		return
 
 	_category_arrow.visible = true
@@ -532,9 +533,10 @@ func _update_entry_arrow_position() -> void:
 
 	var selected = _entry_list.get_selected_items()
 	if selected.size() == 0:
-		_entry_arrow.visible = false
-		if _entry_box:
-			_entry_box.visible = false
+		# Keep visible for debugging
+		# _entry_arrow.visible = false
+		# if _entry_box:
+		#	_entry_box.visible = false
 		return
 
 	_entry_arrow.visible = true
