@@ -7,6 +7,10 @@ extends Control
 @onready var _panel: Panel = $CenterContainer/Panel
 @onready var _content_container: Control = null  # Will hold the tab content
 
+# Panel references for animation
+var _tab_panel: Panel = null
+var _content_panel: Panel = null
+
 # Tab management
 enum Tab { GAME, CONTROLS, DISPLAY, SOUND }
 var _current_tab: Tab = Tab.GAME
@@ -188,6 +192,10 @@ func _enter_option_navigation() -> void:
 	_nav_state = NavState.OPTION_NAVIGATION
 	_current_option_index = 0
 	_highlight_option(0)
+
+	# Animate panels - emphasize right panel
+	_animate_panel_focus(false)
+
 	print("[Options] Entered option navigation mode")
 
 func _exit_to_tab_panel() -> void:
@@ -199,7 +207,31 @@ func _exit_to_tab_panel() -> void:
 	# Focus current tab button
 	if _current_tab >= 0 and _current_tab < _tab_buttons.size():
 		_tab_buttons[_current_tab].grab_focus()
+
+	# Animate panels - emphasize left panel
+	_animate_panel_focus(true)
+
 	print("[Options] Returned to tab panel")
+
+func _animate_panel_focus(left_focused: bool) -> void:
+	"""Animate squash/stretch when switching panel focus"""
+	if not _tab_panel or not _content_panel:
+		return
+
+	# Create tweens for smooth animation
+	var tween = create_tween()
+	tween.set_parallel(true)
+	tween.set_trans(Tween.TRANS_CUBIC)
+	tween.set_ease(Tween.EASE_OUT)
+
+	if left_focused:
+		# Emphasize left panel (tab panel)
+		tween.tween_property(_tab_panel, "scale", Vector2(1.05, 1.05), 0.2)
+		tween.tween_property(_content_panel, "scale", Vector2(0.98, 0.98), 0.2)
+	else:
+		# Emphasize right panel (content panel)
+		tween.tween_property(_tab_panel, "scale", Vector2(0.98, 0.98), 0.2)
+		tween.tween_property(_content_panel, "scale", Vector2(1.02, 1.02), 0.2)
 
 # ==============================================================================
 # Navigation Functions
@@ -426,7 +458,7 @@ func _style_panel(panel: Panel) -> void:
 func _style_tab_panel(panel: Panel) -> void:
 	"""Apply Core Vibe styling to tab button panel"""
 	var style = aCoreVibeTheme.create_panel_style(
-		aCoreVibeTheme.COLOR_ELECTRIC_LIME,       # Electric Lime border
+		aCoreVibeTheme.COLOR_SKY_CYAN,              # Sky Cyan border
 		aCoreVibeTheme.COLOR_NIGHT_NAVY,          # Black background
 		0.8,                                       # 80% opacity
 		aCoreVibeTheme.CORNER_RADIUS_MEDIUM,      # 16px rounded corners
@@ -438,7 +470,7 @@ func _style_tab_panel(panel: Panel) -> void:
 func _style_content_panel(panel: Panel) -> void:
 	"""Apply Core Vibe styling to content panel"""
 	var style = aCoreVibeTheme.create_panel_style(
-		aCoreVibeTheme.COLOR_SKY_CYAN,            # Sky Cyan border
+		aCoreVibeTheme.COLOR_GRAPE_VIOLET,        # Grape Violet border
 		aCoreVibeTheme.COLOR_NIGHT_NAVY,          # Black background
 		0.8,                                       # 80% opacity
 		aCoreVibeTheme.CORNER_RADIUS_MEDIUM,      # 16px rounded corners
@@ -529,6 +561,9 @@ func _build_tabbed_interface() -> void:
 	_style_tab_panel(tab_panel)
 	main_hbox.add_child(tab_panel)
 
+	# Store reference for animation
+	_tab_panel = tab_panel
+
 	# Margin container inside tab panel
 	var tab_margin = MarginContainer.new()
 	tab_margin.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -571,6 +606,9 @@ func _build_tabbed_interface() -> void:
 	_style_content_panel(content_panel)
 	main_hbox.add_child(content_panel)
 
+	# Store reference for animation
+	_content_panel = content_panel
+
 	# Margin container inside content panel
 	var content_margin = MarginContainer.new()
 	content_margin.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -609,6 +647,9 @@ func _build_tabbed_interface() -> void:
 	# Set initial focus for controller navigation
 	if _tab_buttons.size() > 0:
 		_tab_buttons[0].grab_focus()
+
+	# Initialize panel scales (left panel emphasized initially)
+	_animate_panel_focus(true)
 
 	# Set up focus chain for tab buttons after UI is built
 	call_deferred("_setup_tab_focus_chain", close_btn)
