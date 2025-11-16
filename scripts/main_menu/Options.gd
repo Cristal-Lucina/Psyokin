@@ -1450,32 +1450,153 @@ func _create_action_row(action: String, display_name: String = "") -> HBoxContai
 	action_label.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE)
 	row.add_child(action_label)
 
-	# Current binding button (locked/view-only)
-	var bind_btn = Button.new()
-	bind_btn.text = _get_action_display_text(action)
-	bind_btn.custom_minimum_size = Vector2(200, 35)
-	bind_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	bind_btn.focus_mode = Control.FOCUS_NONE  # Disable focus
-	bind_btn.disabled = true  # Disable interaction
-	aCoreVibeTheme.style_button_with_focus_invert(bind_btn, aCoreVibeTheme.COLOR_SKY_CYAN, aCoreVibeTheme.CORNER_RADIUS_SMALL)
-	_add_button_padding(bind_btn)
+	# Current binding display (icon + text for controllers, text only for keyboard)
+	var bind_container = HBoxContainer.new()
+	bind_container.custom_minimum_size = Vector2(200, 35)
+	bind_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bind_container.add_theme_constant_override("separation", 8)
+	bind_container.alignment = BoxContainer.ALIGNMENT_CENTER
 
-	# Apply greyed-out styling
-	bind_btn.modulate = Color(0.6, 0.6, 0.6, 0.7)  # Grey out the button
+	# Get the input event for this action
+	var events = InputMap.action_get_events(action)
+	var target_event: InputEvent = null
+
+	if _control_type == "keyboard":
+		for event in events:
+			if event is InputEventKey:
+				target_event = event
+				break
+	else:
+		for event in events:
+			if event is InputEventJoypadButton or event is InputEventJoypadMotion:
+				target_event = event
+				break
+
+	# Add controller icon if not keyboard
+	if _control_type != "keyboard" and target_event:
+		var icon_texture: Texture2D = null
+
+		if target_event is InputEventJoypadButton:
+			icon_texture = _get_controller_button_icon(target_event.button_index)
+		elif target_event is InputEventJoypadMotion:
+			icon_texture = _get_controller_axis_icon(target_event.axis)
+
+		if icon_texture:
+			var icon_rect = TextureRect.new()
+			icon_rect.texture = icon_texture
+			icon_rect.custom_minimum_size = Vector2(24, 24)
+			icon_rect.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+			icon_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			bind_container.add_child(icon_rect)
+
+	# Add text label
+	var text_label = Label.new()
+	text_label.text = _get_action_display_text(action)
+	text_label.add_theme_font_size_override("font_size", 14)
+	text_label.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE)
+	text_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	bind_container.add_child(text_label)
 
 	# Store action data for reference (but no remapping)
 	var action_idx = _action_data.size()
 	_action_data.append({
 		"action": action,
-		"button": bind_btn,
+		"container": bind_container,
 		"row": row
 	})
 
-	# No click handler - buttons are locked
-
-	row.add_child(bind_btn)
+	row.add_child(bind_container)
 
 	return row
+
+func _get_controller_button_icon(button_index: int) -> Texture2D:
+	"""Get controller button icon texture based on control type"""
+	var icon_base_path = "res://assets/graphics/icons/UI/PNG and PSD - Light/Controller/1x/"
+	var asset_num = -1
+
+	# Map button index to asset number based on control type
+	if _control_type == "xbox":
+		match button_index:
+			JOY_BUTTON_A: asset_num = 82  # A
+			JOY_BUTTON_B: asset_num = 81  # B
+			JOY_BUTTON_X: asset_num = 79  # X
+			JOY_BUTTON_Y: asset_num = 80  # Y
+			JOY_BUTTON_LEFT_SHOULDER: asset_num = 98  # LB
+			JOY_BUTTON_RIGHT_SHOULDER: asset_num = 96  # RB
+			JOY_BUTTON_DPAD_UP: asset_num = 68  # Xbox D-Pad Up
+			JOY_BUTTON_DPAD_DOWN: asset_num = 69  # Xbox D-Pad Down
+			JOY_BUTTON_DPAD_LEFT: asset_num = 70  # Xbox D-Pad Left
+			JOY_BUTTON_DPAD_RIGHT: asset_num = 71  # Xbox D-Pad Right
+			JOY_BUTTON_LEFT_STICK: asset_num = 89  # Left Stick
+			JOY_BUTTON_RIGHT_STICK: asset_num = 87  # Right Stick
+	elif _control_type == "playstation":
+		match button_index:
+			JOY_BUTTON_A: asset_num = 86  # Cross
+			JOY_BUTTON_B: asset_num = 83  # Circle
+			JOY_BUTTON_X: asset_num = 85  # Square
+			JOY_BUTTON_Y: asset_num = 84  # Triangle
+			JOY_BUTTON_LEFT_SHOULDER: asset_num = 94  # L1
+			JOY_BUTTON_RIGHT_SHOULDER: asset_num = 92  # R1
+			JOY_BUTTON_DPAD_UP: asset_num = 72  # PS D-Pad Up
+			JOY_BUTTON_DPAD_DOWN: asset_num = 73  # PS D-Pad Down
+			JOY_BUTTON_DPAD_LEFT: asset_num = 74  # PS D-Pad Left
+			JOY_BUTTON_DPAD_RIGHT: asset_num = 75  # PS D-Pad Right
+			JOY_BUTTON_LEFT_STICK: asset_num = 89  # Left Stick
+			JOY_BUTTON_RIGHT_STICK: asset_num = 87  # Right Stick
+	elif _control_type == "nintendo":
+		match button_index:
+			JOY_BUTTON_A: asset_num = 77  # Nintendo B (bottom)
+			JOY_BUTTON_B: asset_num = 78  # Nintendo A (right)
+			JOY_BUTTON_X: asset_num = 79  # Nintendo Y (left)
+			JOY_BUTTON_Y: asset_num = 80  # Nintendo X (top)
+			JOY_BUTTON_LEFT_SHOULDER: asset_num = 98  # LB (Nintendo uses Xbox shoulders)
+			JOY_BUTTON_RIGHT_SHOULDER: asset_num = 96  # RB
+			JOY_BUTTON_DPAD_UP: asset_num = 64  # Nintendo D-Pad Up
+			JOY_BUTTON_DPAD_DOWN: asset_num = 65  # Nintendo D-Pad Down
+			JOY_BUTTON_DPAD_LEFT: asset_num = 66  # Nintendo D-Pad Left
+			JOY_BUTTON_DPAD_RIGHT: asset_num = 67  # Nintendo D-Pad Right
+			JOY_BUTTON_LEFT_STICK: asset_num = 89  # Left Stick
+			JOY_BUTTON_RIGHT_STICK: asset_num = 87  # Right Stick
+
+	# Load and return the texture
+	if asset_num > 0:
+		var texture_path = icon_base_path + "Asset " + str(asset_num) + ".png"
+		if ResourceLoader.exists(texture_path):
+			return load(texture_path) as Texture2D
+		else:
+			print("[Options] Warning: Icon not found at " + texture_path)
+
+	return null
+
+func _get_controller_axis_icon(axis: int) -> Texture2D:
+	"""Get controller axis icon texture (triggers) based on control type"""
+	var icon_base_path = "res://assets/graphics/icons/UI/PNG and PSD - Light/Controller/1x/"
+	var asset_num = -1
+
+	# Map axis to asset number based on control type
+	if _control_type == "xbox":
+		match axis:
+			JOY_AXIS_TRIGGER_LEFT: asset_num = 97  # LT
+			JOY_AXIS_TRIGGER_RIGHT: asset_num = 95  # RT
+	elif _control_type == "playstation":
+		match axis:
+			JOY_AXIS_TRIGGER_LEFT: asset_num = 93  # L2
+			JOY_AXIS_TRIGGER_RIGHT: asset_num = 91  # R2
+	elif _control_type == "nintendo":
+		# Nintendo uses Xbox shoulder buttons for triggers
+		match axis:
+			JOY_AXIS_TRIGGER_LEFT: asset_num = 97  # LT (using Xbox)
+			JOY_AXIS_TRIGGER_RIGHT: asset_num = 95  # RT (using Xbox)
+
+	# Load and return the texture
+	if asset_num > 0:
+		var texture_path = icon_base_path + "Asset " + str(asset_num) + ".png"
+		if ResourceLoader.exists(texture_path):
+			return load(texture_path) as Texture2D
+		else:
+			print("[Options] Warning: Icon not found at " + texture_path)
+
+	return null
 
 func _format_action_name(action: String) -> String:
 	"""Format action name for display (e.g., move_up -> Move Up)"""
