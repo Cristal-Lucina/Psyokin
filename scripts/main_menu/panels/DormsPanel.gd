@@ -779,10 +779,20 @@ func _focus_current_room() -> void:
 	# Start panel animation
 	_animate_panel_focus(NavState.ROOM_SELECT)
 
-	# Wait just one frame for layout to stabilize before showing room arrow
-	print("[DEBUG Arrow] Waiting one frame for layout to stabilize")
-	await get_tree().process_frame
-	print("[DEBUG Arrow] Layout stabilized, updating room arrow position")
+	# Check if we're coming from another panel or already in room panel
+	var previous_state = _nav_state_history[-1] if _nav_state_history.size() > 0 else NavState.ROSTER_SELECT
+	var is_first_room_navigation = (previous_state != NavState.ROOM_SELECT)
+
+	if is_first_room_navigation:
+		# First time entering room panel - wait for animation to complete
+		print("[DEBUG Arrow] First room navigation - waiting for panel animation (%f seconds)" % ANIM_DURATION)
+		await get_tree().create_timer(ANIM_DURATION).timeout
+		print("[DEBUG Arrow] Panel animation complete, updating room arrow position")
+	else:
+		# Already in room panel, just moving between rooms - be fast
+		print("[DEBUG Arrow] Moving between rooms - waiting one frame")
+		await get_tree().process_frame
+		print("[DEBUG Arrow] Layout stabilized, updating room arrow position")
 
 	# Update room arrow position (will show it after position is calculated)
 	call_deferred("_update_room_arrow_position")
