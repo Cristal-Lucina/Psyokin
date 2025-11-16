@@ -236,6 +236,7 @@ func _rebuild() -> void:
 		var btn_save: Button = Button.new()
 		btn_save.text = _label_for_slot(idx)
 		btn_save.custom_minimum_size = Vector2(430, 40)  # Match LoadMenu width
+		btn_save.size_flags_horizontal = Control.SIZE_EXPAND_FILL  # Allow button to expand
 		btn_save.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		btn_save.focus_mode = Control.FOCUS_ALL
 		btn_save.pressed.connect(func() -> void: _do_save(idx))
