@@ -69,7 +69,7 @@ func _process(delta: float) -> void:
 		_input_cooldown -= delta
 
 func _input(event: InputEvent) -> void:
-	"""Handle input for remapping controls"""
+	"""Handle input for remapping controls and menu navigation"""
 	# If we're waiting for input to remap an action
 	if _waiting_for_input:
 		# Ignore mouse motion
@@ -85,6 +85,11 @@ func _input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 		elif event is InputEventJoypadMotion and abs(event.axis_value) > 0.5:
 			_remap_action(event)
+			get_viewport().set_input_as_handled()
+	else:
+		# Allow closing with menu_cancel or ui_cancel
+		if event.is_action_pressed("menu_cancel") or event.is_action_pressed("ui_cancel"):
+			_on_close_pressed()
 			get_viewport().set_input_as_handled()
 
 func _remap_action(new_event: InputEvent) -> void:
@@ -220,6 +225,7 @@ func _build_tabbed_interface() -> void:
 	var close_btn = Button.new()
 	close_btn.text = "CLOSE"
 	close_btn.custom_minimum_size = Vector2(0, 50)
+	close_btn.focus_mode = Control.FOCUS_ALL
 	close_btn.pressed.connect(_on_close_pressed)
 	aCoreVibeTheme.style_button_with_focus_invert(close_btn, aCoreVibeTheme.COLOR_GRAPE_VIOLET, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
 	_add_button_padding(close_btn)
@@ -245,11 +251,16 @@ func _build_tabbed_interface() -> void:
 	# Show first tab
 	_switch_tab(Tab.GAME)
 
+	# Set initial focus for controller navigation
+	if _tab_buttons.size() > 0:
+		_tab_buttons[0].grab_focus()
+
 func _create_tab_button(parent: Node, label: String, tab: Tab, color: Color) -> void:
 	"""Create a tab button"""
 	var btn = Button.new()
 	btn.text = label
 	btn.custom_minimum_size = Vector2(0, 50)
+	btn.focus_mode = Control.FOCUS_ALL
 	btn.pressed.connect(func(): _switch_tab(tab))
 	aCoreVibeTheme.style_button_with_focus_invert(btn, color, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
 	_add_button_padding(btn)
@@ -336,6 +347,7 @@ func _build_game_options_tab() -> Control:
 	var restore_btn = Button.new()
 	restore_btn.text = "RESTORE DEFAULTS"
 	restore_btn.custom_minimum_size = Vector2(200, 45)
+	restore_btn.focus_mode = Control.FOCUS_ALL
 	restore_btn.pressed.connect(_restore_game_defaults)
 	aCoreVibeTheme.style_button_with_focus_invert(restore_btn, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
 	_add_button_padding(restore_btn)
@@ -410,6 +422,7 @@ func _build_controls_tab() -> Control:
 	var restore_btn = Button.new()
 	restore_btn.text = "RESTORE DEFAULTS"
 	restore_btn.custom_minimum_size = Vector2(200, 45)
+	restore_btn.focus_mode = Control.FOCUS_ALL
 	restore_btn.pressed.connect(_restore_controls_defaults_and_rebuild)
 	aCoreVibeTheme.style_button_with_focus_invert(restore_btn, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
 	_add_button_padding(restore_btn)
@@ -495,6 +508,7 @@ func _build_display_tab() -> Control:
 	var restore_btn = Button.new()
 	restore_btn.text = "RESTORE DEFAULTS"
 	restore_btn.custom_minimum_size = Vector2(200, 45)
+	restore_btn.focus_mode = Control.FOCUS_ALL
 	restore_btn.pressed.connect(_restore_display_defaults_and_rebuild)
 	aCoreVibeTheme.style_button_with_focus_invert(restore_btn, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
 	_add_button_padding(restore_btn)
@@ -569,6 +583,7 @@ func _build_sound_tab() -> Control:
 	var restore_btn = Button.new()
 	restore_btn.text = "RESTORE DEFAULTS"
 	restore_btn.custom_minimum_size = Vector2(200, 45)
+	restore_btn.focus_mode = Control.FOCUS_ALL
 	restore_btn.pressed.connect(_restore_sound_defaults_and_rebuild)
 	aCoreVibeTheme.style_button_with_focus_invert(restore_btn, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
 	_add_button_padding(restore_btn)
@@ -628,6 +643,7 @@ func _add_volume_slider(parent: Node, label_text: String, initial_value: float, 
 	slider.value = initial_value
 	slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	slider.custom_minimum_size = Vector2(300, 30)
+	slider.focus_mode = Control.FOCUS_ALL
 	row.add_child(slider)
 
 	# Percentage label
@@ -656,6 +672,7 @@ func _create_button_group(options: Array, selected_idx: int, on_select: Callable
 		btn.custom_minimum_size = Vector2(120, 40)
 		btn.toggle_mode = true
 		btn.button_pressed = (i == selected_idx)
+		btn.focus_mode = Control.FOCUS_ALL
 
 		# Style with Sky Cyan accent
 		aCoreVibeTheme.style_button_with_focus_invert(btn, aCoreVibeTheme.COLOR_SKY_CYAN, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
@@ -781,6 +798,7 @@ func _create_action_row(action: String) -> HBoxContainer:
 	bind_btn.text = _get_action_display_text(action)
 	bind_btn.custom_minimum_size = Vector2(200, 35)
 	bind_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bind_btn.focus_mode = Control.FOCUS_ALL
 	aCoreVibeTheme.style_button_with_focus_invert(bind_btn, aCoreVibeTheme.COLOR_SKY_CYAN, aCoreVibeTheme.CORNER_RADIUS_SMALL)
 	_add_button_padding(bind_btn)
 
