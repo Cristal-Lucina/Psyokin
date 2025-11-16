@@ -832,11 +832,10 @@ func _focus_current_action(is_panel_transition: bool = false) -> void:
 	_animate_panel_focus(NavState.ACTION_SELECT)
 
 	if is_panel_transition:
-		# First time entering action menu - wait a bit for layout to settle
-		var delay = ANIM_DURATION * 0.5  # Half animation duration
-		print("[DEBUG Arrow] First action navigation - waiting for layout (%f seconds)" % delay)
-		await get_tree().create_timer(delay).timeout
-		print("[DEBUG Arrow] Layout settled, updating action arrow position")
+		# First time entering action menu - wait for animation to complete
+		print("[DEBUG Arrow] First action navigation - waiting for panel animation (%f seconds)" % ANIM_DURATION)
+		await get_tree().create_timer(ANIM_DURATION).timeout
+		print("[DEBUG Arrow] Panel animation complete, updating action arrow position")
 	else:
 		# Already in action menu, just moving between buttons - be fast
 		print("[DEBUG Arrow] Moving between action buttons - waiting one frame")
