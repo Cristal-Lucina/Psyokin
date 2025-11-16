@@ -111,8 +111,10 @@ func _on_panel_gained_focus() -> void:
 	print("[CalendarPanel] Gained focus - refreshing calendar display")
 	# Refresh calendar when panel becomes active (in case date changed while away)
 	_rebuild()
-	# Start in calendar view
-	_focus_state = FocusState.CALENDAR
+	# Start with Today button focused
+	_focus_state = FocusState.BUTTONS
+	_button_index = 1  # Today button
+	call_deferred("_update_button_focus")
 
 func _apply_core_vibe_styling() -> void:
 	"""Apply Core Vibe neon-kawaii styling to calendar elements"""
@@ -419,45 +421,21 @@ func _unhandled_input(event: InputEvent) -> void:
 	if not is_active():
 		return
 
-	match _focus_state:
-		FocusState.CALENDAR:
-			# In calendar view, press up to enter button navigation
-			if event.is_action_pressed("move_up") or event.is_action_pressed("ui_up"):
-				_focus_state = FocusState.BUTTONS
-				# Find first enabled button (prefer Today, then Prev, then Next)
-				_button_index = 1  # Start with "Today"
-				if not _is_button_enabled(_button_index):
-					# Try Prev
-					_button_index = 0
-					if not _is_button_enabled(_button_index):
-						# Try Next
-						_button_index = 2
-				_update_button_focus()
-				get_viewport().set_input_as_handled()
-			elif event.is_action_pressed("menu_back"):
-				# Back button exits the calendar panel
-				# Let PanelBase or GameMenu handle it (don't mark as handled)
-				pass
-
-		FocusState.BUTTONS:
-			# In button navigation mode
-			if event.is_action_pressed("move_down") or event.is_action_pressed("ui_down") or event.is_action_pressed("menu_back"):
-				# Go back to calendar view
-				_focus_state = FocusState.CALENDAR
-				_clear_button_focus()
-				get_viewport().set_input_as_handled()
-			elif event.is_action_pressed("move_left") or event.is_action_pressed("ui_left"):
-				# Move left through buttons, skipping disabled ones
-				_navigate_buttons_left()
-				get_viewport().set_input_as_handled()
-			elif event.is_action_pressed("move_right") or event.is_action_pressed("ui_right"):
-				# Move right through buttons, skipping disabled ones
-				_navigate_buttons_right()
-				get_viewport().set_input_as_handled()
-			elif event.is_action_pressed("menu_accept"):
-				# Press the currently focused button
-				_press_focused_button()
-				get_viewport().set_input_as_handled()
+	# Navigate left/right between buttons
+	if event.is_action_pressed("move_left") or event.is_action_pressed("ui_left"):
+		_navigate_buttons_left()
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("move_right") or event.is_action_pressed("ui_right"):
+		_navigate_buttons_right()
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("menu_accept"):
+		# Press the currently focused button
+		_press_focused_button()
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("menu_back"):
+		# Back button exits the calendar panel
+		# Let PanelBase or GameMenu handle it (don't mark as handled)
+		pass
 
 func _navigate_buttons_left() -> void:
 	"""Navigate left through buttons, skipping disabled ones"""
