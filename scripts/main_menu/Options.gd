@@ -321,6 +321,9 @@ func _build_tabbed_interface() -> void:
 	if _tab_buttons.size() > 0:
 		_tab_buttons[0].grab_focus()
 
+	# Set up focus chain for tab buttons after UI is built
+	call_deferred("_setup_tab_focus_chain", close_btn)
+
 func _create_tab_button(parent: Node, label: String, tab: Tab, color: Color) -> void:
 	"""Create a tab button"""
 	var btn = Button.new()
@@ -1046,6 +1049,47 @@ func _start_remapping(action_idx: int) -> void:
 		btn.text = "Press any key..."
 
 	print("[Options] Waiting for input to remap: %s" % _waiting_action)
+
+func _setup_tab_focus_chain(close_btn: Button) -> void:
+	"""Set up vertical-only focus navigation for tab buttons"""
+	if _tab_buttons.size() == 0:
+		return
+
+	# Connect all tab buttons in a vertical chain
+	for i in range(_tab_buttons.size()):
+		var current_btn = _tab_buttons[i] as Button
+		if not current_btn:
+			continue
+
+		# Set up vertical navigation
+		if i > 0:
+			var prev_btn = _tab_buttons[i - 1] as Button
+			if prev_btn:
+				current_btn.focus_neighbor_top = current_btn.get_path_to(prev_btn)
+				prev_btn.focus_neighbor_bottom = prev_btn.get_path_to(current_btn)
+
+		# Disable horizontal navigation (stay in left panel)
+		current_btn.focus_neighbor_left = NodePath()
+		current_btn.focus_neighbor_right = NodePath()
+
+	# Connect last tab button to close button
+	if _tab_buttons.size() > 0 and close_btn:
+		var last_tab_btn = _tab_buttons[_tab_buttons.size() - 1] as Button
+		if last_tab_btn:
+			last_tab_btn.focus_neighbor_bottom = last_tab_btn.get_path_to(close_btn)
+			close_btn.focus_neighbor_top = close_btn.get_path_to(last_tab_btn)
+
+		# Connect close button back to first tab button
+		var first_tab_btn = _tab_buttons[0] as Button
+		if first_tab_btn:
+			close_btn.focus_neighbor_bottom = close_btn.get_path_to(first_tab_btn)
+			first_tab_btn.focus_neighbor_top = first_tab_btn.get_path_to(close_btn)
+
+		# Disable horizontal navigation for close button
+		close_btn.focus_neighbor_left = NodePath()
+		close_btn.focus_neighbor_right = NodePath()
+
+	print("[Options] Tab focus chain set up with %d buttons + close button" % _tab_buttons.size())
 
 func _setup_controls_focus_chain() -> void:
 	"""Set up focus navigation chain for control buttons"""
