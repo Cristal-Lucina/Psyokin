@@ -653,7 +653,7 @@ func _navigate_right() -> void:
 			# Navigate to Rooms
 			_push_nav_state(NavState.ROOM_SELECT)
 			_current_room_index = 0
-			_focus_current_room()
+			_focus_current_room(true)  # Panel transition - wait for animation
 		NavState.ROOM_SELECT:
 			# 2x4 grid: move right within grid
 			if _current_room_index % 4 < 3 and _current_room_index < _room_buttons.size() - 1:
@@ -761,7 +761,7 @@ func _focus_current_roster() -> void:
 
 	_animate_panel_focus(NavState.ROSTER_SELECT)
 
-func _focus_current_room() -> void:
+func _focus_current_room(is_panel_transition: bool = false) -> void:
 	if _current_room_index >= 0 and _current_room_index < _room_buttons.size():
 		_room_buttons[_current_room_index].grab_focus()
 
@@ -779,11 +779,7 @@ func _focus_current_room() -> void:
 	# Start panel animation
 	_animate_panel_focus(NavState.ROOM_SELECT)
 
-	# Check if we're coming from another panel or already in room panel
-	var previous_state = _nav_state_history[-1] if _nav_state_history.size() > 0 else NavState.ROSTER_SELECT
-	var is_first_room_navigation = (previous_state != NavState.ROOM_SELECT)
-
-	if is_first_room_navigation:
+	if is_panel_transition:
 		# First time entering room panel - wait for animation to complete
 		print("[DEBUG Arrow] First room navigation - waiting for panel animation (%f seconds)" % ANIM_DURATION)
 		await get_tree().create_timer(ANIM_DURATION).timeout
@@ -1177,7 +1173,7 @@ func _on_assign_room_pressed() -> void:
 	# Auto-navigate to room selection (locked navigation flow)
 	_push_nav_state(NavState.ROOM_SELECT)
 	_current_room_index = 0
-	_focus_current_room()
+	_focus_current_room(true)  # Panel transition - wait for animation
 
 func _on_move_out_pressed() -> void:
 	print("[DormsPanel._on_move_out_pressed] Move Out button pressed")
