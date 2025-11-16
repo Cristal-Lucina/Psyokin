@@ -154,6 +154,16 @@ func _input(event: InputEvent) -> void:
 			_navigate_options(1)
 			get_viewport().set_input_as_handled()
 			return
+		elif event.is_action_pressed("move_left"):
+			# For sliders, adjust value down
+			_adjust_current_slider(-5)
+			get_viewport().set_input_as_handled()
+			return
+		elif event.is_action_pressed("move_right"):
+			# For sliders, adjust value up
+			_adjust_current_slider(5)
+			get_viewport().set_input_as_handled()
+			return
 		elif event.is_action_pressed("ui_accept"):
 			# Cycle current option value
 			_cycle_current_option()
@@ -253,6 +263,32 @@ func _cycle_current_option() -> void:
 	elif opt_type == "slider":
 		# For sliders, we don't cycle - they use their own controls
 		pass
+
+func _adjust_current_slider(delta: float) -> void:
+	"""Adjust the current slider value by delta"""
+	if _current_option_index < 0 or _current_option_index >= _option_containers.size():
+		return
+
+	var opt_data = _option_containers[_current_option_index]
+	var opt_type = opt_data["type"]
+
+	if opt_type == "slider":
+		# Find the slider in the container
+		var slider = _find_slider_in_container(opt_data["container"])
+		if slider:
+			var new_value = clamp(slider.value + delta, slider.min_value, slider.max_value)
+			slider.value = new_value
+
+func _find_slider_in_container(container: Control) -> HSlider:
+	"""Recursively find a slider control in a container"""
+	for child in container.get_children():
+		if child is HSlider:
+			return child as HSlider
+		elif child is Control:
+			var slider = _find_slider_in_container(child as Control)
+			if slider:
+				return slider
+	return null
 
 func _highlight_option(index: int) -> void:
 	"""Highlight an option container"""
