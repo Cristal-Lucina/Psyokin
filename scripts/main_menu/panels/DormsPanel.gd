@@ -1509,16 +1509,17 @@ func _update_roster_arrow_position() -> void:
 	_roster_selection_arrow.position = Vector2(arrow_x, arrow_y)
 	print("[DEBUG Arrow] Arrow position set to: %s" % _roster_selection_arrow.position)
 
-	# Show arrow after position calculation (always visible when in roster)
-	_roster_selection_arrow.visible = true
-	print("[DEBUG Arrow] Arrow visibility set to: true")
+	# Only show arrow if we're in ROSTER_SELECT state
+	var should_be_visible = (_nav_state == NavState.ROSTER_SELECT)
+	_roster_selection_arrow.visible = should_be_visible
+	print("[DEBUG Arrow] Arrow visibility set to: %s (nav_state: %s)" % [should_be_visible, _get_nav_state_name(_nav_state)])
 
 	if _roster_dark_box:
 		var box_x = arrow_x - _roster_dark_box.size.x - 4.0
 		var box_y = arrow_y + (_roster_selection_arrow.size.y / 2.0) - (_roster_dark_box.size.y / 2.0)
 		_roster_dark_box.position = Vector2(box_x, box_y)
-		_roster_dark_box.visible = true
-		print("[DEBUG Arrow] Dark box position set to: %s, visible: true" % _roster_dark_box.position)
+		_roster_dark_box.visible = should_be_visible
+		print("[DEBUG Arrow] Dark box position set to: %s, visible: %s" % [_roster_dark_box.position, should_be_visible])
 
 func _update_action_arrow_position() -> void:
 	"""Update action menu arrow position - to the right of the center panel, facing left"""
