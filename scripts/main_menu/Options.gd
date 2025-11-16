@@ -76,6 +76,10 @@ func _process(delta: float) -> void:
 
 func _input(event: InputEvent) -> void:
 	"""Handle input for remapping controls and menu navigation"""
+	# Debug: Log all joypad button events
+	if event is InputEventJoypadButton:
+		print("[Options._input] Joypad button %d, pressed=%s" % [event.button_index, event.pressed])
+
 	# If we're waiting for input to remap an action
 	if _waiting_for_input:
 		# Ignore mouse motion
@@ -94,17 +98,22 @@ func _input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 		return
 
-	# Handle ui_accept on focused tab buttons
+	# Debug: Check if this is ui_accept
 	if event.is_action_pressed("ui_accept"):
+		print("[Options._input] ui_accept detected!")
 		var focused = get_viewport().gui_get_focus_owner()
+		print("[Options._input] Focused control: %s" % (focused.name if focused else "none"))
 		if focused and focused in _tab_buttons:
 			var idx = _tab_buttons.find(focused)
+			print("[Options._input] Tab button index: %d" % idx)
 			if idx >= 0:
 				print("[Options] ui_accept on tab button %d" % idx)
 				_switch_tab(Tab.values()[idx])
 				_move_focus_to_content()
 				get_viewport().set_input_as_handled()
 				return
+		else:
+			print("[Options._input] Focused control is NOT a tab button")
 
 	# Handle menu closing
 	if event.is_action_pressed("menu_cancel") or event.is_action_pressed("ui_cancel"):
