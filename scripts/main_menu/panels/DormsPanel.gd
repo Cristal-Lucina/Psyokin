@@ -703,9 +703,13 @@ func _on_back_input() -> void:
 
 	# Go back to previous navigation state
 	if _nav_state_history.size() > 0:
+		var current_state: NavState = _nav_state  # Save current state before popping
 		var prev_state: NavState = _nav_state_history.pop_back()
-		print("[DormsPanel._on_back_input] Going back from %s to %s" % [_get_nav_state_name(_nav_state), _get_nav_state_name(prev_state)])
+		print("[DormsPanel._on_back_input] Going back from %s to %s" % [_get_nav_state_name(current_state), _get_nav_state_name(prev_state)])
 		_nav_state = prev_state
+
+		# Check if this is a panel transition (different states)
+		var is_panel_transition = (current_state != prev_state)
 
 		# Clear selection when going back to roster
 		if _nav_state == NavState.ROSTER_SELECT:
@@ -721,9 +725,9 @@ func _on_back_input() -> void:
 			NavState.COMMON_SELECT:
 				_focus_current_common()
 			NavState.ROOM_SELECT:
-				_focus_current_room()
+				_focus_current_room(is_panel_transition)
 			NavState.ACTION_SELECT:
-				_focus_current_action()
+				_focus_current_action(is_panel_transition)
 		get_viewport().set_input_as_handled()
 	else:
 		# No history - check if panel can close
