@@ -27,7 +27,7 @@ const PATH_SLOTS  : PackedStringArray = [
 var _slots_grid : GridContainer
 var _backdrop   : ColorRect
 var _window     : Panel
-var _scroll     : ScrollContainer
+var _scroll     : ScrollContainer = null
 
 # Controller navigation - 2D grid (rows = slots, columns = save/delete)
 var _save_buttons: Array[Button] = []
@@ -121,11 +121,11 @@ func _ensure_fallback_layout() -> void:
 	aCoreVibeTheme.style_label(title, aCoreVibeTheme.COLOR_MILK_WHITE, 20)
 	root.add_child(title)
 
-	var scroll := ScrollContainer.new()
-	scroll.name = "Scroll"
-	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL  # Allow scroll to expand
-	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	root.add_child(scroll)
+	_scroll = ScrollContainer.new()
+	_scroll.name = "Scroll"
+	_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL  # Allow scroll to expand
+	_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	root.add_child(_scroll)
 
 	_slots_grid = GridContainer.new()
 	_slots_grid.name = "SlotsGrid"
@@ -133,7 +133,7 @@ func _ensure_fallback_layout() -> void:
 	_slots_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL  # Allow grid to expand
 	_slots_grid.add_theme_constant_override("h_separation", 12)
 	_slots_grid.add_theme_constant_override("v_separation", 8)
-	scroll.add_child(_slots_grid)
+	_scroll.add_child(_slots_grid)
 
 # --- lifecycle ----------------------------------------------------------------
 
@@ -154,8 +154,9 @@ func _ready() -> void:
 
 	# Resolve existing nodes first
 	_slots_grid = _find_node_any(PATH_SLOTS) as GridContainer
+	_scroll = get_node_or_null("Center/Window/Margin/Root/Scroll") as ScrollContainer
 
-	print("[SaveMenu] Found nodes - slots_grid: %s" % ["yes" if _slots_grid else "no"])
+	print("[SaveMenu] Found nodes - slots_grid: %s, scroll: %s" % ["yes" if _slots_grid else "no", "yes" if _scroll else "no"])
 
 	# If anything is missing, build a fallback (safe & centered)
 	_ensure_fallback_layout()
@@ -262,6 +263,20 @@ func _rebuild() -> void:
 	# Setup controller navigation after slots are created
 	await get_tree().process_frame
 	_setup_grid_navigation()
+
+	# DEBUG: Print sizes after layout
+	await get_tree().process_frame
+	print("[SaveMenu] === SIZE DEBUG ===")
+	print("[SaveMenu] GridContainer size: ", _slots_grid.size)
+	print("[SaveMenu] GridContainer size_flags_horizontal: ", _slots_grid.size_flags_horizontal)
+	if _scroll:
+		print("[SaveMenu] ScrollContainer size: ", _scroll.size)
+		print("[SaveMenu] ScrollContainer size_flags_horizontal: ", _scroll.size_flags_horizontal)
+	if _window:
+		print("[SaveMenu] Window size: ", _window.size)
+	for i in range(_save_buttons.size()):
+		print("[SaveMenu] Save button %d size: %s, size_flags: %d" % [i, _save_buttons[i].size, _save_buttons[i].size_flags_horizontal])
+		print("[SaveMenu] Delete button %d size: %s" % [i, _delete_buttons[i].size])
 
 # --- labels & actions ----------------------------------------------------------
 

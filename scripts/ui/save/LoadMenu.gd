@@ -155,6 +155,21 @@ func _rebuild() -> void:
 	# Setup controller navigation after slots are created
 	_setup_controller_navigation()
 
+	# DEBUG: Print sizes after layout
+	await get_tree().process_frame
+	print("[LoadMenu] === SIZE DEBUG ===")
+	print("[LoadMenu] Slots VBoxContainer size: ", _slots.size)
+	print("[LoadMenu] Slots size_flags_horizontal: ", _slots.size_flags_horizontal)
+	if _scroll:
+		print("[LoadMenu] ScrollContainer size: ", _scroll.size)
+		print("[LoadMenu] ScrollContainer size_flags_horizontal: ", _scroll.size_flags_horizontal)
+	if _window:
+		print("[LoadMenu] Window size: ", _window.size)
+	if _all_slots.size() > 0:
+		var first_slot = _all_slots[0]
+		print("[LoadMenu] First slot button size: %s, size_flags: %d" % [first_slot["slot_btn"].size, first_slot["slot_btn"].size_flags_horizontal])
+		print("[LoadMenu] First delete button size: %s" % [first_slot["delete_btn"].size])
+
 func _collect_slots() -> Array[int]:
 	var out: Array[int] = []
 	var sl: Node = get_node_or_null("/root/aSaveLoad")
