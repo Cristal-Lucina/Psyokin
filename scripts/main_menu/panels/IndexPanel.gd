@@ -422,6 +422,9 @@ func _create_category_arrow() -> void:
 	_category_arrow.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_category_arrow)
 
+	# Start pulsing animation
+	_start_arrow_pulse()
+
 func _update_category_arrow() -> void:
 	"""Update arrow position to align with selected category"""
 	if not _category_arrow or not _category_list:
@@ -443,11 +446,26 @@ func _update_category_arrow() -> void:
 	var panel_global = global_position
 	var list_offset = list_global - panel_global
 
-	# Position arrow to the right of the list
-	var arrow_x = list_offset.x + _category_list.size.x + 10.0
+	# Position arrow to the right of the list, offset 40px to the left
+	var arrow_x = list_offset.x + _category_list.size.x + 10.0 - 40.0
 	var arrow_y = list_offset.y + item_rect.position.y + (item_rect.size.y / 2.0) - 20.0
 
 	_category_arrow.position = Vector2(arrow_x, arrow_y)
+
+func _start_arrow_pulse() -> void:
+	"""Start pulsing animation for the category arrow"""
+	if not _category_arrow:
+		return
+
+	var tween = create_tween()
+	tween.set_loops()
+	tween.set_trans(Tween.TRANS_SINE)
+	tween.set_ease(Tween.EASE_IN_OUT)
+
+	# Pulse left 6 pixels then back
+	var base_pos = _category_arrow.position
+	tween.tween_property(_category_arrow, "position:x", base_pos.x - 6, 0.6)
+	tween.tween_property(_category_arrow, "position:x", base_pos.x, 0.6)
 
 # --- Wrap-around Navigation ----------------------------------------------------
 
