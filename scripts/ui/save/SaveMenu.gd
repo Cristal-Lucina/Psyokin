@@ -158,6 +158,13 @@ func _ready() -> void:
 
 	print("[SaveMenu] Found nodes - slots_grid: %s, scroll: %s" % ["yes" if _slots_grid else "no", "yes" if _scroll else "no"])
 
+	# Configure existing nodes if found
+	if _scroll:
+		_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	if _slots_grid:
+		_slots_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+
 	# If anything is missing, build a fallback (safe & centered)
 	_ensure_fallback_layout()
 
