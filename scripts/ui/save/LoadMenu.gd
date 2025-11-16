@@ -24,14 +24,26 @@ var _input_cooldown_duration: float = 0.2
 func _style_panel(panel: Panel) -> void:
 	"""Apply Core Vibe neon-kawaii styling to a panel"""
 	var style = aCoreVibeTheme.create_panel_style(
-		aCoreVibeTheme.COLOR_SKY_CYAN,            # Sky Cyan border (load action)
-		aCoreVibeTheme.COLOR_INK_CHARCOAL,        # Ink charcoal background
-		aCoreVibeTheme.PANEL_OPACITY_FULL,        # Fully opaque
-		aCoreVibeTheme.CORNER_RADIUS_MEDIUM,      # 16px corners
+		aCoreVibeTheme.COLOR_MILK_WHITE,          # White border
+		aCoreVibeTheme.COLOR_NIGHT_NAVY,          # Black background
+		1.0,                                       # Full opacity
+		aCoreVibeTheme.CORNER_RADIUS_MEDIUM,      # 16px rounded corners
 		aCoreVibeTheme.BORDER_WIDTH_THIN,         # 2px border
 		aCoreVibeTheme.SHADOW_SIZE_LARGE          # 12px glow
 	)
 	panel.add_theme_stylebox_override("panel", style)
+
+func _add_button_padding(button: Button) -> void:
+	"""Add padding to button text so it doesn't touch edges"""
+	# Get the current styleboxes and add content margins
+	for state in ["normal", "hover", "pressed", "focus"]:
+		var stylebox = button.get_theme_stylebox(state)
+		if stylebox and stylebox is StyleBoxFlat:
+			var style = stylebox as StyleBoxFlat
+			style.content_margin_left = 12
+			style.content_margin_right = 12
+			style.content_margin_top = 8
+			style.content_margin_bottom = 8
 
 func _ready() -> void:
 	# Ensure this overlay continues to process even when title is "paused"
@@ -143,6 +155,21 @@ func _rebuild() -> void:
 	# Setup controller navigation after slots are created
 	_setup_controller_navigation()
 
+	# DEBUG: Print sizes after layout
+	await get_tree().process_frame
+	print("[LoadMenu] === SIZE DEBUG ===")
+	print("[LoadMenu] Slots VBoxContainer size: ", _slots.size)
+	print("[LoadMenu] Slots size_flags_horizontal: ", _slots.size_flags_horizontal)
+	if _scroll:
+		print("[LoadMenu] ScrollContainer size: ", _scroll.size)
+		print("[LoadMenu] ScrollContainer size_flags_horizontal: ", _scroll.size_flags_horizontal)
+	if _window:
+		print("[LoadMenu] Window size: ", _window.size)
+	if _all_slots.size() > 0:
+		var first_slot = _all_slots[0]
+		print("[LoadMenu] First slot button size: %s, size_flags: %d" % [first_slot["slot_btn"].size, first_slot["slot_btn"].size_flags_horizontal])
+		print("[LoadMenu] First delete button size: %s" % [first_slot["delete_btn"].size])
+
 func _collect_slots() -> Array[int]:
 	var out: Array[int] = []
 	var sl: Node = get_node_or_null("/root/aSaveLoad")
@@ -200,7 +227,9 @@ func _make_row(slot: int) -> Dictionary:
 	row_btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	row_btn.custom_minimum_size = Vector2(430, 40)  # Wider since we removed Load button
 	row_btn.pressed.connect(_on_load_pressed.bind(slot))
-	aCoreVibeTheme.style_button(row_btn, aCoreVibeTheme.COLOR_SKY_CYAN, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
+	aCoreVibeTheme.style_button_with_focus_invert(row_btn, aCoreVibeTheme.COLOR_SKY_CYAN, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
+	# Add text padding
+	_add_button_padding(row_btn)
 	row.add_child(row_btn)
 
 	# Delete button (Core Vibe: Bubble Magenta)
@@ -208,7 +237,9 @@ func _make_row(slot: int) -> Dictionary:
 	del_b.text = "Delete"
 	del_b.custom_minimum_size = Vector2(80, 40)
 	del_b.pressed.connect(_on_delete_pressed.bind(slot))
-	aCoreVibeTheme.style_button(del_b, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
+	aCoreVibeTheme.style_button_with_focus_invert(del_b, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
+	# Add text padding
+	_add_button_padding(del_b)
 	row.add_child(del_b)
 
 	return {

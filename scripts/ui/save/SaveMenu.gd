@@ -27,7 +27,7 @@ const PATH_SLOTS  : PackedStringArray = [
 var _slots_grid : GridContainer
 var _backdrop   : ColorRect
 var _window     : Panel
-var _scroll     : ScrollContainer
+var _scroll     : ScrollContainer = null
 
 # Controller navigation - 2D grid (rows = slots, columns = save/delete)
 var _save_buttons: Array[Button] = []
@@ -54,14 +54,26 @@ func _find_node_any(paths: PackedStringArray) -> Node:
 func _style_panel(panel: Panel) -> void:
 	"""Apply Core Vibe neon-kawaii styling to a panel"""
 	var style = aCoreVibeTheme.create_panel_style(
-		aCoreVibeTheme.COLOR_PLASMA_TEAL,         # Plasma Teal border (save action)
-		aCoreVibeTheme.COLOR_INK_CHARCOAL,        # Ink charcoal background
-		aCoreVibeTheme.PANEL_OPACITY_FULL,        # Fully opaque
-		aCoreVibeTheme.CORNER_RADIUS_MEDIUM,      # 16px corners
+		aCoreVibeTheme.COLOR_MILK_WHITE,          # White border
+		aCoreVibeTheme.COLOR_NIGHT_NAVY,          # Black background
+		1.0,                                       # Full opacity
+		aCoreVibeTheme.CORNER_RADIUS_MEDIUM,      # 16px rounded corners
 		aCoreVibeTheme.BORDER_WIDTH_THIN,         # 2px border
 		aCoreVibeTheme.SHADOW_SIZE_LARGE          # 12px glow
 	)
 	panel.add_theme_stylebox_override("panel", style)
+
+func _add_button_padding(button: Button) -> void:
+	"""Add padding to button text so it doesn't touch edges"""
+	# Get the current styleboxes and add content margins
+	for state in ["normal", "hover", "pressed", "focus"]:
+		var stylebox = button.get_theme_stylebox(state)
+		if stylebox and stylebox is StyleBoxFlat:
+			var style = stylebox as StyleBoxFlat
+			style.content_margin_left = 12
+			style.content_margin_right = 12
+			style.content_margin_top = 8
+			style.content_margin_bottom = 8
 
 func _ensure_fallback_layout() -> void:
 	# Build a compact center window if required
@@ -105,22 +117,23 @@ func _ensure_fallback_layout() -> void:
 	title.name = "Title"
 	title.text = "Save Game"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	# Core Vibe: Plasma Teal title
-	aCoreVibeTheme.style_label(title, aCoreVibeTheme.COLOR_PLASMA_TEAL, 20)
+	# Core Vibe: White title to match border
+	aCoreVibeTheme.style_label(title, aCoreVibeTheme.COLOR_MILK_WHITE, 20)
 	root.add_child(title)
 
-	var scroll := ScrollContainer.new()
-	scroll.name = "Scroll"
-	scroll.size_flags_horizontal = Control.SIZE_SHRINK_CENTER  # Center content
-	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	root.add_child(scroll)
+	_scroll = ScrollContainer.new()
+	_scroll.name = "Scroll"
+	_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL  # Allow scroll to expand
+	_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	root.add_child(_scroll)
 
 	_slots_grid = GridContainer.new()
 	_slots_grid.name = "SlotsGrid"
 	_slots_grid.columns = 2
+	_slots_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL  # Allow grid to expand
 	_slots_grid.add_theme_constant_override("h_separation", 12)
 	_slots_grid.add_theme_constant_override("v_separation", 8)
-	scroll.add_child(_slots_grid)
+	_scroll.add_child(_slots_grid)
 
 # --- lifecycle ----------------------------------------------------------------
 
@@ -141,8 +154,16 @@ func _ready() -> void:
 
 	# Resolve existing nodes first
 	_slots_grid = _find_node_any(PATH_SLOTS) as GridContainer
+	_scroll = get_node_or_null("Center/Window/Margin/Root/Scroll") as ScrollContainer
 
-	print("[SaveMenu] Found nodes - slots_grid: %s" % ["yes" if _slots_grid else "no"])
+	print("[SaveMenu] Found nodes - slots_grid: %s, scroll: %s" % ["yes" if _slots_grid else "no", "yes" if _scroll else "no"])
+
+	# Configure existing nodes if found
+	if _scroll:
+		_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	if _slots_grid:
+		_slots_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
 	# If anything is missing, build a fallback (safe & centered)
 	_ensure_fallback_layout()
@@ -223,27 +244,46 @@ func _rebuild() -> void:
 		# Save button with slot label (Core Vibe: Plasma Teal)
 		var btn_save: Button = Button.new()
 		btn_save.text = _label_for_slot(idx)
-		btn_save.custom_minimum_size = Vector2(350, 40)
+		btn_save.custom_minimum_size = Vector2(430, 40)  # Match LoadMenu width
+		btn_save.size_flags_horizontal = Control.SIZE_EXPAND_FILL  # Allow button to expand
 		btn_save.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		btn_save.focus_mode = Control.FOCUS_ALL
 		btn_save.pressed.connect(func() -> void: _do_save(idx))
-		aCoreVibeTheme.style_button(btn_save, aCoreVibeTheme.COLOR_PLASMA_TEAL, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
+		aCoreVibeTheme.style_button_with_focus_invert(btn_save, aCoreVibeTheme.COLOR_PLASMA_TEAL, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
+		# Add text padding
+		_add_button_padding(btn_save)
 		_slots_grid.add_child(btn_save)
 		_save_buttons.append(btn_save)
 
 		# Delete button (Core Vibe: Bubble Magenta)
 		var btn_del: Button = Button.new()
 		btn_del.text = "Delete"
-		btn_del.custom_minimum_size = Vector2(100, 40)
+		btn_del.custom_minimum_size = Vector2(80, 40)  # Match LoadMenu width
 		btn_del.focus_mode = Control.FOCUS_ALL
 		btn_del.pressed.connect(func() -> void: _do_delete(idx))
-		aCoreVibeTheme.style_button(btn_del, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
+		aCoreVibeTheme.style_button_with_focus_invert(btn_del, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
+		# Add text padding
+		_add_button_padding(btn_del)
 		_slots_grid.add_child(btn_del)
 		_delete_buttons.append(btn_del)
 
 	# Setup controller navigation after slots are created
 	await get_tree().process_frame
 	_setup_grid_navigation()
+
+	# DEBUG: Print sizes after layout
+	await get_tree().process_frame
+	print("[SaveMenu] === SIZE DEBUG ===")
+	print("[SaveMenu] GridContainer size: ", _slots_grid.size)
+	print("[SaveMenu] GridContainer size_flags_horizontal: ", _slots_grid.size_flags_horizontal)
+	if _scroll:
+		print("[SaveMenu] ScrollContainer size: ", _scroll.size)
+		print("[SaveMenu] ScrollContainer size_flags_horizontal: ", _scroll.size_flags_horizontal)
+	if _window:
+		print("[SaveMenu] Window size: ", _window.size)
+	for i in range(_save_buttons.size()):
+		print("[SaveMenu] Save button %d size: %s, size_flags: %d" % [i, _save_buttons[i].size, _save_buttons[i].size_flags_horizontal])
+		print("[SaveMenu] Delete button %d size: %s" % [i, _delete_buttons[i].size])
 
 # --- labels & actions ----------------------------------------------------------
 
