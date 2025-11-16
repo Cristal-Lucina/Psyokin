@@ -751,8 +751,6 @@ func _focus_current_room() -> void:
 	# Hide both arrows when focusing on rooms
 	if _roster_selection_arrow:
 		_roster_selection_arrow.visible = false
-	if _roster_dark_box:
-		_roster_dark_box.visible = false
 	if _action_selection_arrow:
 		_action_selection_arrow.visible = false
 
