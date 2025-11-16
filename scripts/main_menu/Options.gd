@@ -97,8 +97,20 @@ func _remap_action(new_event: InputEvent) -> void:
 	if not _waiting_for_input or _waiting_action == "":
 		return
 
-	# Clear existing events for this action
-	InputMap.action_erase_events(_waiting_action)
+	# Get all current events
+	var current_events = InputMap.action_get_events(_waiting_action)
+
+	# Remove only events of the same type (keyboard or joypad)
+	var is_keyboard_remap = new_event is InputEventKey
+	for event in current_events:
+		if is_keyboard_remap:
+			# Removing keyboard event
+			if event is InputEventKey:
+				InputMap.action_erase_event(_waiting_action, event)
+		else:
+			# Removing joypad events
+			if event is InputEventJoypadButton or event is InputEventJoypadMotion:
+				InputMap.action_erase_event(_waiting_action, event)
 
 	# Add the new event
 	InputMap.action_add_event(_waiting_action, new_event)
@@ -510,6 +522,9 @@ func _build_controls_tab() -> Control:
 	var restore_center = CenterContainer.new()
 	restore_center.add_child(restore_btn)
 	main_container.add_child(restore_center)
+
+	# Set up focus chain after UI is built
+	call_deferred("_setup_controls_focus_chain")
 
 	return main_container
 
@@ -946,23 +961,41 @@ func _format_action_name(action: String) -> String:
 	return action.replace("_", " ").capitalize()
 
 func _get_action_display_text(action: String) -> String:
-	"""Get display text for current action binding"""
+	"""Get display text for current action binding based on control type"""
 	var events = InputMap.action_get_events(action)
 	if events.size() == 0:
 		return "Click to Bind"
 
-	# Show the first event
-	var event = events[0]
+	# Filter events based on control type
+	var target_event: InputEvent = null
 
-	if event is InputEventKey:
-		var keycode = event.physical_keycode if event.physical_keycode != 0 else event.keycode
+	if _control_type == "keyboard":
+		# Look for keyboard event
+		for event in events:
+			if event is InputEventKey:
+				target_event = event
+				break
+	else:
+		# Look for joypad event (any controller type)
+		for event in events:
+			if event is InputEventJoypadButton or event is InputEventJoypadMotion:
+				target_event = event
+				break
+
+	# If no event found for selected type, show "Click to Bind"
+	if not target_event:
+		return "Click to Bind"
+
+	# Display the event
+	if target_event is InputEventKey:
+		var keycode = target_event.physical_keycode if target_event.physical_keycode != 0 else target_event.keycode
 		if keycode == 0:
 			return "Click to Bind"
 		return OS.get_keycode_string(keycode)
-	elif event is InputEventJoypadButton:
-		return _get_joypad_button_name(event.button_index)
-	elif event is InputEventJoypadMotion:
-		return _get_joypad_axis_name(event.axis, event.axis_value)
+	elif target_event is InputEventJoypadButton:
+		return _get_joypad_button_name(target_event.button_index)
+	elif target_event is InputEventJoypadMotion:
+		return _get_joypad_axis_name(target_event.axis, target_event.axis_value)
 	else:
 		return "Unknown"
 
@@ -1013,6 +1046,34 @@ func _start_remapping(action_idx: int) -> void:
 		btn.text = "Press any key..."
 
 	print("[Options] Waiting for input to remap: %s" % _waiting_action)
+
+func _setup_controls_focus_chain() -> void:
+	"""Set up focus navigation chain for control buttons"""
+	if _action_data.size() == 0:
+		return
+
+	# Connect all buttons in a vertical chain
+	for i in range(_action_data.size()):
+		var current_btn = _action_data[i]["button"] as Button
+		if not current_btn:
+			continue
+
+		# Set up vertical navigation
+		if i > 0:
+			var prev_btn = _action_data[i - 1]["button"] as Button
+			if prev_btn:
+				current_btn.focus_neighbor_top = current_btn.get_path_to(prev_btn)
+				prev_btn.focus_neighbor_bottom = prev_btn.get_path_to(current_btn)
+
+		# Also set previous/next for left/right navigation
+		if i > 0:
+			var prev_btn = _action_data[i - 1]["button"] as Button
+			if prev_btn:
+				current_btn.focus_previous = current_btn.get_path_to(prev_btn)
+		if i < _action_data.size() - 1:
+			var next_btn = _action_data[i + 1]["button"] as Button
+			if next_btn:
+				current_btn.focus_next = current_btn.get_path_to(next_btn)
 
 func _restore_display_defaults() -> void:
 	"""Restore Display tab to defaults"""
