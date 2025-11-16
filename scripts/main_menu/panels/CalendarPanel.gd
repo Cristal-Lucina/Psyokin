@@ -120,7 +120,7 @@ func _apply_core_vibe_styling() -> void:
 	# Style the two main panel containers with rounded neon borders
 	if _left_panel:
 		var left_style = aCoreVibeTheme.create_panel_style(
-			aCoreVibeTheme.COLOR_ELECTRIC_LIME,       # Electric Lime border (calendar)
+			aCoreVibeTheme.COLOR_SKY_CYAN,            # Sky Cyan border (important dates)
 			aCoreVibeTheme.COLOR_INK_CHARCOAL,        # Ink charcoal background
 			aCoreVibeTheme.PANEL_OPACITY_SEMI,        # Semi-transparent
 			aCoreVibeTheme.CORNER_RADIUS_MEDIUM,      # 16px corners
@@ -135,7 +135,7 @@ func _apply_core_vibe_styling() -> void:
 
 	if _right_panel:
 		var right_style = aCoreVibeTheme.create_panel_style(
-			aCoreVibeTheme.COLOR_BUBBLE_MAGENTA,      # Bubble Magenta border (events)
+			aCoreVibeTheme.COLOR_GRAPE_VIOLET,        # Grape Violet border (calendar)
 			aCoreVibeTheme.COLOR_INK_CHARCOAL,        # Ink charcoal background
 			aCoreVibeTheme.PANEL_OPACITY_SEMI,        # Semi-transparent
 			aCoreVibeTheme.CORNER_RADIUS_MEDIUM,      # 16px corners
@@ -152,6 +152,12 @@ func _apply_core_vibe_styling() -> void:
 	if _label_month:
 		_label_month.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_ELECTRIC_LIME)
 		_label_month.add_theme_font_size_override("font_size", 28)
+
+	# Style Important Dates header with Bubble Magenta
+	var important_dates_title = get_node_or_null("Root/LeftPanel/Margin/LeftContent/Title")
+	if important_dates_title:
+		important_dates_title.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_BUBBLE_MAGENTA)
+		important_dates_title.add_theme_font_size_override("font_size", 18)
 
 	# Style navigation buttons with enhanced Core Vibe styling
 	if _btn_prev:
