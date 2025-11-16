@@ -34,9 +34,11 @@ const ANIM_DURATION := 0.2  # Animation duration in seconds
 @onready var _content_label: Label = $Root/ContentPanel/ContentColumn/ContentLabel
 @onready var _details_label: Label = $Root/DetailsPanel/DetailsColumn/DetailsLabel
 
-# Selection arrow and box for category list only
+# Selection arrows and dark boxes (matching OutreachPanel)
 var _category_arrow: Label = null
 var _category_box: PanelContainer = null
+var _entry_arrow: Label = null
+var _entry_box: PanelContainer = null
 
 # Focus tracking
 var _focus_mode: String = "category"  # "category" or "entries"
@@ -82,13 +84,14 @@ func _ready() -> void:
 		idx.connect("index_changed", Callable(self, "_on_index_changed"))
 
 	_apply_core_vibe_styling()
-	_create_category_arrow()
+
+	# Create selection arrows and dark boxes for both lists
+	_create_selection_arrows()
 
 	_rebuild()
 
-	# Position arrow after rebuild
-	await get_tree().process_frame
-	_update_category_arrow()
+	# Initial arrow positions
+	call_deferred("_update_category_arrow_position")
 
 func _apply_core_vibe_styling() -> void:
 	"""Apply Core Vibe neon-kawaii styling to IndexPanel (matching LoadoutPanel)"""
@@ -255,7 +258,7 @@ func _on_category_selected(_idx: int) -> void:
 	# Just rebuild entries, don't move focus
 	_rebuild()
 	# Update arrow position
-	call_deferred("_update_category_arrow")
+	call_deferred("_update_category_arrow_position")
 
 func _on_category_activated(_idx: int) -> void:
 	# This is called on double-click - move to entry list
@@ -411,83 +414,145 @@ func _placeholder_items(cat_id: int) -> Array[Dictionary]:
 		out.append({"title": t, "body": "[i]Placeholder entry.[/i] Replace via aIndexSystem."})
 	return out
 
-# --- Selection Arrow for Category List ----------------------------------------
+# --- Selection Arrows & Dark Boxes (matching OutreachPanel) ------------------
 
-func _create_category_arrow() -> void:
-	"""Create selection arrow and dark box for category list"""
-	# Create arrow
-	_category_arrow = Label.new()
-	_category_arrow.text = "◄"
-	_category_arrow.add_theme_font_size_override("font_size", 40)
-	_category_arrow.modulate = Color(1, 1, 1, 1)  # White
-	_category_arrow.z_index = 1000
-	_category_arrow.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(_category_arrow)
+func _create_selection_arrows() -> void:
+	"""Create selection arrows and dark boxes for both lists (matching OutreachPanel)"""
+	# Category list arrow and box
+	if _category_list:
+		_category_arrow = Label.new()
+		_category_arrow.text = "◄"
+		_category_arrow.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_category_arrow.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		_category_arrow.add_theme_font_size_override("font_size", 43)
+		_category_arrow.modulate = Color(1, 1, 1, 1)
+		_category_arrow.custom_minimum_size = Vector2(54, 72)
+		_category_arrow.size = Vector2(54, 72)
+		_category_arrow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_category_arrow.z_index = 100
+		add_child(_category_arrow)
+		await get_tree().process_frame
+		_category_arrow.size = Vector2(54, 72)
 
-	# Create dark box (100px wide, 20px height)
-	_category_box = PanelContainer.new()
-	_category_box.custom_minimum_size = Vector2(100, 20)
-	_category_box.size = Vector2(100, 20)
-	_category_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_category_box.z_index = 999
+		_category_box = PanelContainer.new()
+		_category_box.custom_minimum_size = Vector2(160, 20)
+		_category_box.size = Vector2(160, 20)
+		_category_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_category_box.z_index = 99
+		var box_style = StyleBoxFlat.new()
+		box_style.bg_color = aCoreVibeTheme.COLOR_INK_CHARCOAL
+		box_style.corner_radius_top_left = 8
+		box_style.corner_radius_top_right = 8
+		box_style.corner_radius_bottom_left = 8
+		box_style.corner_radius_bottom_right = 8
+		_category_box.add_theme_stylebox_override("panel", box_style)
+		add_child(_category_box)
+		await get_tree().process_frame
+		_category_box.size = Vector2(160, 20)
 
-	# Create Ink Charcoal rounded style
-	var box_style = StyleBoxFlat.new()
-	box_style.bg_color = aCoreVibeTheme.COLOR_INK_CHARCOAL
-	box_style.corner_radius_top_left = 8
-	box_style.corner_radius_top_right = 8
-	box_style.corner_radius_bottom_left = 8
-	box_style.corner_radius_bottom_right = 8
-	_category_box.add_theme_stylebox_override("panel", box_style)
+		_start_arrow_pulse(_category_arrow)
 
-	add_child(_category_box)
+	# Entry list arrow and box (no arrow initially, matching OutreachPanel's mission list behavior)
+	if _entry_list:
+		_entry_arrow = Label.new()
+		_entry_arrow.text = "◄"
+		_entry_arrow.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_entry_arrow.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		_entry_arrow.add_theme_font_size_override("font_size", 43)
+		_entry_arrow.modulate = Color(1, 1, 1, 1)
+		_entry_arrow.custom_minimum_size = Vector2(54, 72)
+		_entry_arrow.size = Vector2(54, 72)
+		_entry_arrow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_entry_arrow.z_index = 100
+		_entry_arrow.visible = false  # Start hidden
+		add_child(_entry_arrow)
+		await get_tree().process_frame
+		_entry_arrow.size = Vector2(54, 72)
 
-	# Start pulsing animation
-	_start_arrow_pulse()
+		_entry_box = PanelContainer.new()
+		_entry_box.custom_minimum_size = Vector2(160, 20)
+		_entry_box.size = Vector2(160, 20)
+		_entry_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_entry_box.z_index = 99
+		_entry_box.visible = false  # Start hidden
+		var box_style2 = StyleBoxFlat.new()
+		box_style2.bg_color = aCoreVibeTheme.COLOR_INK_CHARCOAL
+		box_style2.corner_radius_top_left = 8
+		box_style2.corner_radius_top_right = 8
+		box_style2.corner_radius_bottom_left = 8
+		box_style2.corner_radius_bottom_right = 8
+		_entry_box.add_theme_stylebox_override("panel", box_style2)
+		add_child(_entry_box)
+		await get_tree().process_frame
+		_entry_box.size = Vector2(160, 20)
 
-func _update_category_arrow() -> void:
-	"""Update arrow position to align with selected category"""
+		_start_arrow_pulse(_entry_arrow)
+
+func _update_category_arrow_position() -> void:
+	"""Update category arrow and dark box position"""
 	if not _category_arrow or not _category_list:
 		return
 
 	var selected = _category_list.get_selected_items()
 	if selected.size() == 0:
-		_category_arrow.visible = false
-		if _category_box:
-			_category_box.visible = false
 		return
 
-	_category_arrow.visible = true
-	if _category_box:
-		_category_box.visible = true
+	await get_tree().process_frame
 
-	# Get selected item position
 	var item_index = selected[0]
 	var item_rect = _category_list.get_item_rect(item_index)
+	var list_global_pos = _category_list.global_position
+	var panel_global_pos = global_position
+	var list_offset_in_panel = list_global_pos - panel_global_pos
 
-	# Convert to panel coordinates
-	var list_global = _category_list.global_position
-	var panel_global = global_position
-	var list_offset = list_global - panel_global
+	var scroll_offset = 0.0
+	if _category_list.get_v_scroll_bar():
+		scroll_offset = _category_list.get_v_scroll_bar().value
 
-	# Calculate vertical center of the selected item
-	var item_y_center = list_offset.y + item_rect.position.y + (item_rect.size.y / 2.0)
-
-	# Position arrow to the right of the list, offset 40px to the left
-	var arrow_x = list_offset.x + _category_list.size.x + 10.0 - 40.0
-	var arrow_y = item_y_center - 20.0
+	var arrow_x = list_offset_in_panel.x + _category_list.size.x - 8.0 - 80.0 + 40.0
+	var arrow_y = list_offset_in_panel.y + item_rect.position.y - scroll_offset + (item_rect.size.y / 2.0) - (_category_arrow.size.y / 2.0)
 
 	_category_arrow.position = Vector2(arrow_x, arrow_y)
 
-	# Position box to the left of the arrow
 	if _category_box:
-		var box_x = arrow_x - _category_box.size.x - 4.0  # 4px gap to left of arrow
-		var box_y = item_y_center - (_category_box.size.y / 2.0)  # Center vertically
+		_category_box.visible = true
+		var box_x = arrow_x - _category_box.size.x - 4.0
+		var box_y = arrow_y + (_category_arrow.size.y / 2.0) - (_category_box.size.y / 2.0)
 		_category_box.position = Vector2(box_x, box_y)
 
-func _start_arrow_pulse() -> void:
-	"""Start pulsing animation for the category arrow"""
-	if not _category_arrow:
+func _update_entry_arrow_position() -> void:
+	"""Update entry arrow and dark box position"""
+	if not _entry_arrow or not _entry_list:
+		return
+
+	var selected = _entry_list.get_selected_items()
+	if selected.size() == 0:
+		return
+
+	await get_tree().process_frame
+
+	var item_index = selected[0]
+	var item_rect = _entry_list.get_item_rect(item_index)
+	var list_global_pos = _entry_list.global_position
+	var panel_global_pos = global_position
+	var list_offset_in_panel = list_global_pos - panel_global_pos
+
+	var scroll_offset = 0.0
+	if _entry_list.get_v_scroll_bar():
+		scroll_offset = _entry_list.get_v_scroll_bar().value
+
+	var arrow_x = list_offset_in_panel.x + _entry_list.size.x - 8.0 - 80.0 + 40.0
+	var arrow_y = list_offset_in_panel.y + item_rect.position.y - scroll_offset + (item_rect.size.y / 2.0) - (_entry_arrow.size.y / 2.0)
+
+	_entry_arrow.position = Vector2(arrow_x, arrow_y)
+
+	# Entry dark box is never shown (matching OutreachPanel's mission box)
+	if _entry_box:
+		_entry_box.visible = false
+
+func _start_arrow_pulse(arrow: Label) -> void:
+	"""Start pulsing animation for an arrow"""
+	if not arrow:
 		return
 
 	var tween = create_tween()
@@ -495,10 +560,9 @@ func _start_arrow_pulse() -> void:
 	tween.set_trans(Tween.TRANS_SINE)
 	tween.set_ease(Tween.EASE_IN_OUT)
 
-	# Pulse left 6 pixels then back
-	var base_pos = _category_arrow.position
-	tween.tween_property(_category_arrow, "position:x", base_pos.x - 6, 0.6)
-	tween.tween_property(_category_arrow, "position:x", base_pos.x, 0.6)
+	var base_x = arrow.position.x
+	tween.tween_property(arrow, "position:x", base_x - 6, 0.6)
+	tween.tween_property(arrow, "position:x", base_x, 0.6)
 
 # --- Wrap-around Navigation ----------------------------------------------------
 
