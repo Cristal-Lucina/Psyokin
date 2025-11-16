@@ -596,6 +596,15 @@ func _add_option_label(parent: Node, text: String) -> void:
 	label.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE)
 	parent.add_child(label)
 
+func _add_section_header(parent: Node, text: String) -> void:
+	"""Add a styled section header for control categories"""
+	var label = Label.new()
+	label.text = text
+	label.add_theme_font_size_override("font_size", 18)
+	label.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_SKY_CYAN)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	parent.add_child(label)
+
 func _add_volume_slider(parent: Node, label_text: String, initial_value: float, on_change: Callable) -> void:
 	"""Add a volume slider with label and percentage display"""
 	# Container for slider row
@@ -719,26 +728,40 @@ func _reset_input_mappings() -> void:
 	print("[Options] Input mappings reset to defaults")
 
 func _build_action_rows(parent: VBoxContainer) -> void:
-	"""Build rows for each remappable action"""
-	# Get all input actions defined in project settings
-	var actions = InputMap.get_actions()
+	"""Build rows for each remappable action, organized by category"""
 	_action_data.clear()
 
-	# Filter to only include game actions (exclude ui_* actions)
-	var game_actions: Array[String] = []
-	for action in actions:
-		var action_str = str(action)
-		if not action_str.begins_with("ui_"):
-			game_actions.append(action_str)
+	# Define action categories
+	var menu_actions = ["menu_up", "menu_down", "menu_left", "menu_right", "menu_confirm", "menu_cancel", "menu_pause"]
+	var overworld_actions = ["move_up", "move_down", "move_left", "move_right", "interact", "run", "menu"]
+	var battle_actions = ["battle_attack", "battle_defend", "battle_skill", "battle_item", "battle_escape", "battle_target_next", "battle_target_prev"]
 
-	game_actions.sort()
+	# Menu Controls Section
+	_add_section_header(parent, "MENU CONTROLS")
+	for action in menu_actions:
+		if InputMap.has_action(action):
+			var row = _create_action_row(action)
+			parent.add_child(row)
 
-	# Create a row for each action
-	for action in game_actions:
-		var row = _create_action_row(action)
-		parent.add_child(row)
+	_add_spacer(parent, 20)
 
-	print("[Options] Built %d control rows" % game_actions.size())
+	# Overworld Controls Section
+	_add_section_header(parent, "OVERWORLD CONTROLS")
+	for action in overworld_actions:
+		if InputMap.has_action(action):
+			var row = _create_action_row(action)
+			parent.add_child(row)
+
+	_add_spacer(parent, 20)
+
+	# Battle Controls Section
+	_add_section_header(parent, "BATTLE CONTROLS")
+	for action in battle_actions:
+		if InputMap.has_action(action):
+			var row = _create_action_row(action)
+			parent.add_child(row)
+
+	print("[Options] Built %d control rows across 3 sections" % _action_data.size())
 
 func _create_action_row(action: String) -> HBoxContainer:
 	"""Create a row showing an action and its current binding"""
