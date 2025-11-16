@@ -65,6 +65,14 @@ var _background_panel: PanelContainer = null
 var _roster_selection_arrow: Label = null
 var _roster_dark_box: PanelContainer = null
 
+# Selection arrow for action menu
+var _action_selection_arrow: Label = null
+var _action_arrow_pulse_tween: Tween = null
+
+# Selection arrow for room grid
+var _room_selection_arrow: Label = null
+var _room_arrow_pulse_tween: Tween = null
+
 # Right Panel - Details (bottom section)
 @onready var _detail_content: RichTextLabel = %DetailContent
 
@@ -310,22 +318,36 @@ func _apply_core_vibe_styling() -> void:
 		assign_style_focus.content_margin_top = 8
 		assign_style_focus.content_margin_bottom = 8
 
+		# Disabled state: Grey with dark background (same for focused and unfocused)
+		var assign_style_disabled = StyleBoxFlat.new()
+		assign_style_disabled.bg_color = aCoreVibeTheme.COLOR_INK_CHARCOAL
+		assign_style_disabled.border_color = Color(0.5, 0.5, 0.5, 1.0)
+		assign_style_disabled.border_width_left = 2
+		assign_style_disabled.border_width_right = 2
+		assign_style_disabled.border_width_top = 2
+		assign_style_disabled.border_width_bottom = 2
+		assign_style_disabled.corner_radius_top_left = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+		assign_style_disabled.corner_radius_top_right = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+		assign_style_disabled.corner_radius_bottom_left = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+		assign_style_disabled.corner_radius_bottom_right = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+		assign_style_disabled.content_margin_left = 12
+		assign_style_disabled.content_margin_right = 12
+		assign_style_disabled.content_margin_top = 8
+		assign_style_disabled.content_margin_bottom = 8
+
 		_assign_room_btn.add_theme_stylebox_override("normal", assign_style_normal)
 		_assign_room_btn.add_theme_stylebox_override("hover", assign_style_normal.duplicate())
 		_assign_room_btn.add_theme_stylebox_override("pressed", assign_style_normal.duplicate())
 		_assign_room_btn.add_theme_stylebox_override("focus", assign_style_focus)
+		_assign_room_btn.add_theme_stylebox_override("disabled", assign_style_disabled)
+		_assign_room_btn.add_theme_stylebox_override("disabled_focused", assign_style_disabled.duplicate())
 
 		_assign_room_btn.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_ELECTRIC_LIME)
 		_assign_room_btn.add_theme_color_override("font_hover_color", aCoreVibeTheme.COLOR_ELECTRIC_LIME)
 		_assign_room_btn.add_theme_color_override("font_pressed_color", aCoreVibeTheme.COLOR_ELECTRIC_LIME)
 		_assign_room_btn.add_theme_color_override("font_focus_color", aCoreVibeTheme.COLOR_NIGHT_NAVY)
+		_assign_room_btn.add_theme_color_override("font_disabled_color", Color(0.5, 0.5, 0.5, 1.0))
 		_assign_room_btn.custom_minimum_size = Vector2(140, 40)
-
-		# Connect focus signals for pulse
-		if not _assign_room_btn.focus_entered.is_connected(_on_button_focus_entered):
-			_assign_room_btn.focus_entered.connect(_on_button_focus_entered.bind(_assign_room_btn))
-		if not _assign_room_btn.focus_exited.is_connected(_on_button_focus_exited):
-			_assign_room_btn.focus_exited.connect(_on_button_focus_exited)
 
 	if _move_out_btn:
 		# Normal state: Outlined Citrus Yellow
@@ -357,22 +379,36 @@ func _apply_core_vibe_styling() -> void:
 		move_style_focus.content_margin_top = 8
 		move_style_focus.content_margin_bottom = 8
 
+		# Disabled state: Grey with dark background (same for focused and unfocused)
+		var move_style_disabled = StyleBoxFlat.new()
+		move_style_disabled.bg_color = aCoreVibeTheme.COLOR_INK_CHARCOAL
+		move_style_disabled.border_color = Color(0.5, 0.5, 0.5, 1.0)
+		move_style_disabled.border_width_left = 2
+		move_style_disabled.border_width_right = 2
+		move_style_disabled.border_width_top = 2
+		move_style_disabled.border_width_bottom = 2
+		move_style_disabled.corner_radius_top_left = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+		move_style_disabled.corner_radius_top_right = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+		move_style_disabled.corner_radius_bottom_left = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+		move_style_disabled.corner_radius_bottom_right = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+		move_style_disabled.content_margin_left = 12
+		move_style_disabled.content_margin_right = 12
+		move_style_disabled.content_margin_top = 8
+		move_style_disabled.content_margin_bottom = 8
+
 		_move_out_btn.add_theme_stylebox_override("normal", move_style_normal)
 		_move_out_btn.add_theme_stylebox_override("hover", move_style_normal.duplicate())
 		_move_out_btn.add_theme_stylebox_override("pressed", move_style_normal.duplicate())
 		_move_out_btn.add_theme_stylebox_override("focus", move_style_focus)
+		_move_out_btn.add_theme_stylebox_override("disabled", move_style_disabled)
+		_move_out_btn.add_theme_stylebox_override("disabled_focused", move_style_disabled.duplicate())
 
 		_move_out_btn.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_CITRUS_YELLOW)
 		_move_out_btn.add_theme_color_override("font_hover_color", aCoreVibeTheme.COLOR_CITRUS_YELLOW)
 		_move_out_btn.add_theme_color_override("font_pressed_color", aCoreVibeTheme.COLOR_CITRUS_YELLOW)
 		_move_out_btn.add_theme_color_override("font_focus_color", aCoreVibeTheme.COLOR_NIGHT_NAVY)
+		_move_out_btn.add_theme_color_override("font_disabled_color", Color(0.5, 0.5, 0.5, 1.0))
 		_move_out_btn.custom_minimum_size = Vector2(140, 40)
-
-		# Connect focus signals for pulse
-		if not _move_out_btn.focus_entered.is_connected(_on_button_focus_entered):
-			_move_out_btn.focus_entered.connect(_on_button_focus_entered.bind(_move_out_btn))
-		if not _move_out_btn.focus_exited.is_connected(_on_button_focus_exited):
-			_move_out_btn.focus_exited.connect(_on_button_focus_exited)
 
 	if _cancel_move_btn:
 		# Normal state: Outlined Bubble Magenta
@@ -404,22 +440,36 @@ func _apply_core_vibe_styling() -> void:
 		cancel_style_focus.content_margin_top = 8
 		cancel_style_focus.content_margin_bottom = 8
 
+		# Disabled state: Grey with dark background (same for focused and unfocused)
+		var cancel_style_disabled = StyleBoxFlat.new()
+		cancel_style_disabled.bg_color = aCoreVibeTheme.COLOR_INK_CHARCOAL
+		cancel_style_disabled.border_color = Color(0.5, 0.5, 0.5, 1.0)
+		cancel_style_disabled.border_width_left = 2
+		cancel_style_disabled.border_width_right = 2
+		cancel_style_disabled.border_width_top = 2
+		cancel_style_disabled.border_width_bottom = 2
+		cancel_style_disabled.corner_radius_top_left = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+		cancel_style_disabled.corner_radius_top_right = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+		cancel_style_disabled.corner_radius_bottom_left = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+		cancel_style_disabled.corner_radius_bottom_right = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
+		cancel_style_disabled.content_margin_left = 12
+		cancel_style_disabled.content_margin_right = 12
+		cancel_style_disabled.content_margin_top = 8
+		cancel_style_disabled.content_margin_bottom = 8
+
 		_cancel_move_btn.add_theme_stylebox_override("normal", cancel_style_normal)
 		_cancel_move_btn.add_theme_stylebox_override("hover", cancel_style_normal.duplicate())
 		_cancel_move_btn.add_theme_stylebox_override("pressed", cancel_style_normal.duplicate())
 		_cancel_move_btn.add_theme_stylebox_override("focus", cancel_style_focus)
+		_cancel_move_btn.add_theme_stylebox_override("disabled", cancel_style_disabled)
+		_cancel_move_btn.add_theme_stylebox_override("disabled_focused", cancel_style_disabled.duplicate())
 
 		_cancel_move_btn.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_BUBBLE_MAGENTA)
 		_cancel_move_btn.add_theme_color_override("font_hover_color", aCoreVibeTheme.COLOR_BUBBLE_MAGENTA)
 		_cancel_move_btn.add_theme_color_override("font_pressed_color", aCoreVibeTheme.COLOR_BUBBLE_MAGENTA)
 		_cancel_move_btn.add_theme_color_override("font_focus_color", aCoreVibeTheme.COLOR_NIGHT_NAVY)
+		_cancel_move_btn.add_theme_color_override("font_disabled_color", Color(0.5, 0.5, 0.5, 1.0))
 		_cancel_move_btn.custom_minimum_size = Vector2(140, 40)
-
-		# Connect focus signals for pulse
-		if not _cancel_move_btn.focus_entered.is_connected(_on_button_focus_entered):
-			_cancel_move_btn.focus_entered.connect(_on_button_focus_entered.bind(_cancel_move_btn))
-		if not _cancel_move_btn.focus_exited.is_connected(_on_button_focus_exited):
-			_cancel_move_btn.focus_exited.connect(_on_button_focus_exited)
 
 	# Create selection arrows and dark box for roster
 	call_deferred("_create_selection_arrows")
@@ -687,11 +737,32 @@ func _focus_current_roster() -> void:
 			var focused_member: String = _all_members[_current_roster_index]
 			print("[DormsPanel._focus_current_roster] Focused member: ", focused_member)
 			_update_details_for_member(focused_member)
+
+	# Show roster arrow, hide action and room arrows
+	if _roster_selection_arrow:
+		_roster_selection_arrow.visible = true
+	if _roster_dark_box:
+		_roster_dark_box.visible = true
+	if _action_selection_arrow:
+		_action_selection_arrow.visible = false
+	if _room_selection_arrow:
+		_room_selection_arrow.visible = false
+
 	_animate_panel_focus(NavState.ROSTER_SELECT)
 
 func _focus_current_room() -> void:
 	if _current_room_index >= 0 and _current_room_index < _room_buttons.size():
 		_room_buttons[_current_room_index].grab_focus()
+
+	# Hide roster and action arrows when focusing on rooms
+	if _roster_selection_arrow:
+		_roster_selection_arrow.visible = false
+	if _action_selection_arrow:
+		_action_selection_arrow.visible = false
+
+	# Update room arrow position
+	call_deferred("_update_room_arrow_position")
+
 	_animate_panel_focus(NavState.ROOM_SELECT)
 
 func _focus_current_common() -> void:
@@ -702,11 +773,32 @@ func _focus_current_common() -> void:
 			var focused_member: String = _common_members[_current_common_index]
 			print("[DormsPanel._focus_current_common] Focused member: ", focused_member)
 			_update_details_for_member(focused_member)
+
+	# Hide all arrows when focusing on common room
+	if _roster_selection_arrow:
+		_roster_selection_arrow.visible = false
+	if _roster_dark_box:
+		_roster_dark_box.visible = false
+	if _action_selection_arrow:
+		_action_selection_arrow.visible = false
+	if _room_selection_arrow:
+		_room_selection_arrow.visible = false
+
 	_animate_panel_focus(NavState.COMMON_SELECT)
 
 func _focus_current_action() -> void:
 	if _current_action_index >= 0 and _current_action_index < _action_buttons.size():
 		_action_buttons[_current_action_index].grab_focus()
+
+	# Hide roster and room arrows but keep the box visible (no blinking)
+	if _roster_selection_arrow and _roster_selection_arrow.visible:
+		_roster_selection_arrow.visible = false
+	if _room_selection_arrow:
+		_room_selection_arrow.visible = false
+
+	# Update action arrow position
+	call_deferred("_update_action_arrow_position")
+
 	_animate_panel_focus(NavState.ACTION_SELECT)
 
 func _push_nav_state(new_state: NavState) -> void:
@@ -794,7 +886,7 @@ func _build_rooms_grid() -> void:
 	for i in range(room_ids.size()):
 		var rid: String = room_ids[i]
 		var btn := Button.new()
-		btn.custom_minimum_size = Vector2(108, 72)  # 10% smaller than 120x80
+		btn.custom_minimum_size = Vector2(92, 61)  # 15% smaller
 		btn.toggle_mode = false
 		btn.focus_mode = Control.FOCUS_ALL
 
@@ -853,6 +945,9 @@ func _build_common_list() -> void:
 	if _common_members.size() == 0:
 		var empty := Label.new()
 		empty.text = "— empty —"
+		# Make empty label grey (not clickable)
+		empty.add_theme_color_override("font_color", Color(0.5, 0.5, 0.5, 1.0))
+		empty.add_theme_font_size_override("font_size", 14)
 		_common_list.add_child(empty)
 		return
 
@@ -861,8 +956,8 @@ func _build_common_list() -> void:
 		var aid: String = _common_members[i]
 		var lbl := Label.new()
 		lbl.text = String(ds.call("display_name", aid))
-		# Core Vibe: Plasma Teal for common room members (awaiting assignment)
-		lbl.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_PLASMA_TEAL)
+		# Make common room members grey (not clickable in this list)
+		lbl.add_theme_color_override("font_color", Color(0.5, 0.5, 0.5, 1.0))
 		lbl.add_theme_font_size_override("font_size", 14)
 		_common_list.add_child(lbl)
 
@@ -1269,8 +1364,8 @@ func _create_selection_arrows() -> void:
 		_roster_selection_arrow.size = Vector2(54, 72)
 
 		_roster_dark_box = PanelContainer.new()
-		_roster_dark_box.custom_minimum_size = Vector2(160, 20)
-		_roster_dark_box.size = Vector2(160, 20)
+		_roster_dark_box.custom_minimum_size = Vector2(240, 20)
+		_roster_dark_box.size = Vector2(240, 20)
 		_roster_dark_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_roster_dark_box.z_index = 99
 		var box_style = StyleBoxFlat.new()
@@ -1282,9 +1377,59 @@ func _create_selection_arrows() -> void:
 		_roster_dark_box.add_theme_stylebox_override("panel", box_style)
 		add_child(_roster_dark_box)
 		await get_tree().process_frame
-		_roster_dark_box.size = Vector2(160, 20)
+		_roster_dark_box.size = Vector2(240, 20)
 
 		_start_arrow_pulse(_roster_selection_arrow)
+
+	# Create action menu arrow (to the right of the action panel, facing left)
+	_action_selection_arrow = Label.new()
+	_action_selection_arrow.text = "◄"
+	_action_selection_arrow.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_action_selection_arrow.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_action_selection_arrow.add_theme_font_size_override("font_size", 43)
+	_action_selection_arrow.modulate = Color(1, 1, 1, 1)
+
+	# Add shadow to the arrow
+	var arrow_label_settings = LabelSettings.new()
+	arrow_label_settings.font_size = 43
+	arrow_label_settings.shadow_color = Color(0, 0, 0, 0.8)
+	arrow_label_settings.shadow_size = 4
+	arrow_label_settings.shadow_offset = Vector2(2, 2)
+	_action_selection_arrow.label_settings = arrow_label_settings
+
+	_action_selection_arrow.custom_minimum_size = Vector2(54, 40)
+	_action_selection_arrow.size = Vector2(54, 40)
+	_action_selection_arrow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_action_selection_arrow.z_index = 100
+	_action_selection_arrow.visible = false  # Initially hidden
+	add_child(_action_selection_arrow)
+	await get_tree().process_frame
+	_action_selection_arrow.size = Vector2(54, 40)
+
+	# Create room selection arrow (to the right of the selected room, facing left)
+	_room_selection_arrow = Label.new()
+	_room_selection_arrow.text = "◄"
+	_room_selection_arrow.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_room_selection_arrow.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_room_selection_arrow.add_theme_font_size_override("font_size", 43)
+	_room_selection_arrow.modulate = Color(1, 1, 1, 1)
+
+	# Add shadow to the arrow
+	var room_arrow_label_settings = LabelSettings.new()
+	room_arrow_label_settings.font_size = 43
+	room_arrow_label_settings.shadow_color = Color(0, 0, 0, 0.8)
+	room_arrow_label_settings.shadow_size = 4
+	room_arrow_label_settings.shadow_offset = Vector2(2, 2)
+	_room_selection_arrow.label_settings = room_arrow_label_settings
+
+	_room_selection_arrow.custom_minimum_size = Vector2(54, 40)
+	_room_selection_arrow.size = Vector2(54, 40)
+	_room_selection_arrow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_room_selection_arrow.z_index = 100
+	_room_selection_arrow.visible = false  # Initially hidden
+	add_child(_room_selection_arrow)
+	await get_tree().process_frame
+	_room_selection_arrow.size = Vector2(54, 40)
 
 	# Initial arrow position
 	call_deferred("_update_roster_arrow_position")
@@ -1320,6 +1465,127 @@ func _update_roster_arrow_position() -> void:
 		var box_x = arrow_x - _roster_dark_box.size.x - 4.0
 		var box_y = arrow_y + (_roster_selection_arrow.size.y / 2.0) - (_roster_dark_box.size.y / 2.0)
 		_roster_dark_box.position = Vector2(box_x, box_y)
+
+func _update_action_arrow_position() -> void:
+	"""Update action menu arrow position - to the right of the center panel, facing left"""
+	if not _action_selection_arrow or not _center_panel:
+		return
+
+	# Only show arrow if we're in ACTION_SELECT state
+	if _nav_state != NavState.ACTION_SELECT:
+		_action_selection_arrow.visible = false
+		# Stop pulse animation when hiding arrow
+		if _action_arrow_pulse_tween and is_instance_valid(_action_arrow_pulse_tween):
+			_action_arrow_pulse_tween.kill()
+			_action_arrow_pulse_tween = null
+		return
+
+	# Only show if current button index is valid
+	if _current_action_index < 0 or _current_action_index >= _action_buttons.size():
+		_action_selection_arrow.visible = false
+		# Stop pulse animation when hiding arrow
+		if _action_arrow_pulse_tween and is_instance_valid(_action_arrow_pulse_tween):
+			_action_arrow_pulse_tween.kill()
+			_action_arrow_pulse_tween = null
+		return
+
+	var current_btn: Button = _action_buttons[_current_action_index]
+	if not current_btn:
+		_action_selection_arrow.visible = false
+		# Stop pulse animation when hiding arrow
+		if _action_arrow_pulse_tween and is_instance_valid(_action_arrow_pulse_tween):
+			_action_arrow_pulse_tween.kill()
+			_action_arrow_pulse_tween = null
+		return
+
+	# Show arrow regardless of whether button is enabled or disabled
+	_action_selection_arrow.visible = true
+
+	var center_panel_global_pos = _center_panel.global_position
+	var panel_global_pos = global_position
+	var center_panel_offset = center_panel_global_pos - panel_global_pos
+
+	var btn_global_pos = current_btn.global_position
+	var btn_offset_in_panel = btn_global_pos - panel_global_pos
+
+	# Position to the right of the center panel, offset 45px to the left
+	var arrow_x = center_panel_offset.x + _center_panel.size.x + 8.0 - 45.0
+	# Vertically align with the current button
+	var arrow_y = btn_offset_in_panel.y + (current_btn.size.y / 2.0) - (_action_selection_arrow.size.y / 2.0)
+
+	_action_selection_arrow.position = Vector2(arrow_x, arrow_y)
+
+	# Restart pulse animation with new base position
+	if _action_arrow_pulse_tween and is_instance_valid(_action_arrow_pulse_tween):
+		_action_arrow_pulse_tween.kill()
+
+	_action_arrow_pulse_tween = create_tween()
+	_action_arrow_pulse_tween.set_loops()
+	_action_arrow_pulse_tween.set_trans(Tween.TRANS_SINE)
+	_action_arrow_pulse_tween.set_ease(Tween.EASE_IN_OUT)
+
+	# Pulse left (toward the panel it's pointing at)
+	_action_arrow_pulse_tween.tween_property(_action_selection_arrow, "position:x", arrow_x - 6, 0.6)
+	_action_arrow_pulse_tween.tween_property(_action_selection_arrow, "position:x", arrow_x, 0.6)
+
+func _update_room_arrow_position() -> void:
+	"""Update room selection arrow position - to the right of the selected room"""
+	if not _room_selection_arrow or not _rooms_grid:
+		return
+
+	# Only show arrow if we're in ROOM_SELECT state
+	if _nav_state != NavState.ROOM_SELECT:
+		_room_selection_arrow.visible = false
+		# Stop pulse animation when hiding arrow
+		if _room_arrow_pulse_tween and is_instance_valid(_room_arrow_pulse_tween):
+			_room_arrow_pulse_tween.kill()
+			_room_arrow_pulse_tween = null
+		return
+
+	# Only show if current room index is valid
+	if _current_room_index < 0 or _current_room_index >= _room_buttons.size():
+		_room_selection_arrow.visible = false
+		# Stop pulse animation when hiding arrow
+		if _room_arrow_pulse_tween and is_instance_valid(_room_arrow_pulse_tween):
+			_room_arrow_pulse_tween.kill()
+			_room_arrow_pulse_tween = null
+		return
+
+	var current_btn: Button = _room_buttons[_current_room_index]
+	if not current_btn:
+		_room_selection_arrow.visible = false
+		# Stop pulse animation when hiding arrow
+		if _room_arrow_pulse_tween and is_instance_valid(_room_arrow_pulse_tween):
+			_room_arrow_pulse_tween.kill()
+			_room_arrow_pulse_tween = null
+		return
+
+	# Show arrow
+	_room_selection_arrow.visible = true
+
+	var btn_global_pos = current_btn.global_position
+	var panel_global_pos = global_position
+	var btn_offset_in_panel = btn_global_pos - panel_global_pos
+
+	# Position to the right of the selected room button, offset 20px to the left
+	var arrow_x = btn_offset_in_panel.x + current_btn.size.x + 8.0 - 20.0
+	# Vertically align with the current button
+	var arrow_y = btn_offset_in_panel.y + (current_btn.size.y / 2.0) - (_room_selection_arrow.size.y / 2.0)
+
+	_room_selection_arrow.position = Vector2(arrow_x, arrow_y)
+
+	# Restart pulse animation with new base position
+	if _room_arrow_pulse_tween and is_instance_valid(_room_arrow_pulse_tween):
+		_room_arrow_pulse_tween.kill()
+
+	_room_arrow_pulse_tween = create_tween()
+	_room_arrow_pulse_tween.set_loops()
+	_room_arrow_pulse_tween.set_trans(Tween.TRANS_SINE)
+	_room_arrow_pulse_tween.set_ease(Tween.EASE_IN_OUT)
+
+	# Pulse left (in the direction it's pointing)
+	_room_arrow_pulse_tween.tween_property(_room_selection_arrow, "position:x", arrow_x - 6, 0.6)
+	_room_arrow_pulse_tween.tween_property(_room_selection_arrow, "position:x", arrow_x, 0.6)
 
 func _start_arrow_pulse(arrow: Label) -> void:
 	"""Start pulsing animation for arrow"""
@@ -1472,11 +1738,11 @@ func _apply_room_visual(btn: Button, room_id: String) -> void:
 	# Core Vibe: Neon-kawaii room state colors
 	var col := aCoreVibeTheme.COLOR_INK_CHARCOAL  # default
 	if state == VIS_EMPTY:
-		col = Color(aCoreVibeTheme.COLOR_ELECTRIC_LIME.r, aCoreVibeTheme.COLOR_ELECTRIC_LIME.g, aCoreVibeTheme.COLOR_ELECTRIC_LIME.b, 0.3)  # Electric Lime (empty/available)
+		col = Color(aCoreVibeTheme.COLOR_SKY_CYAN.r, aCoreVibeTheme.COLOR_SKY_CYAN.g, aCoreVibeTheme.COLOR_SKY_CYAN.b, 0.3)  # Sky Cyan (empty/available)
 	elif state == VIS_OCCUPIED:
-		col = Color(aCoreVibeTheme.COLOR_SKY_CYAN.r, aCoreVibeTheme.COLOR_SKY_CYAN.g, aCoreVibeTheme.COLOR_SKY_CYAN.b, 0.3)  # Sky Cyan (occupied)
+		col = Color(aCoreVibeTheme.COLOR_GRAPE_VIOLET.r, aCoreVibeTheme.COLOR_GRAPE_VIOLET.g, aCoreVibeTheme.COLOR_GRAPE_VIOLET.b, 0.3)  # Grape Violet (occupied)
 	elif state == VIS_STAGED:
-		col = Color(aCoreVibeTheme.COLOR_CITRUS_YELLOW.r, aCoreVibeTheme.COLOR_CITRUS_YELLOW.g, aCoreVibeTheme.COLOR_CITRUS_YELLOW.b, 0.3)  # Citrus Yellow (staged/moving)
+		col = Color(aCoreVibeTheme.COLOR_CITRUS_YELLOW.r, aCoreVibeTheme.COLOR_CITRUS_YELLOW.g, aCoreVibeTheme.COLOR_CITRUS_YELLOW.b, 0.3)  # Citrus Yellow (moving out)
 	elif state == VIS_LOCKED:
 		col = Color(aCoreVibeTheme.COLOR_BUBBLE_MAGENTA.r, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA.g, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA.b, 0.3)  # Bubble Magenta (locked)
 
@@ -1504,6 +1770,7 @@ func _apply_room_visual(btn: Button, room_id: String) -> void:
 	btn.add_theme_stylebox_override("normal", sb)
 	btn.add_theme_stylebox_override("hover", sb)
 	btn.add_theme_stylebox_override("pressed", sb)
+	btn.add_theme_stylebox_override("focus", sb)
 
 func _update_room_colors() -> void:
 	var ds: Node = _ds()
