@@ -829,47 +829,88 @@ func _build_action_rows(parent: VBoxContainer) -> void:
 	"""Build rows for each remappable action, organized by category"""
 	_action_data.clear()
 
-	# Define action categories
-	var menu_actions = ["menu_up", "menu_down", "menu_left", "menu_right", "menu_confirm", "menu_cancel", "menu_pause"]
-	var overworld_actions = ["move_up", "move_down", "move_left", "move_right", "interact", "run", "menu"]
-	var battle_actions = ["battle_attack", "battle_defend", "battle_skill", "battle_item", "battle_escape", "battle_target_next", "battle_target_prev"]
+	# Define action categories matching original setup
+	var overworld_actions = [
+		{"name": "move_up", "display": "Move Up"},
+		{"name": "move_down", "display": "Move Down"},
+		{"name": "move_left", "display": "Move Left"},
+		{"name": "move_right", "display": "Move Right"},
+		{"name": "action", "display": "Action (A)"},
+		{"name": "jump", "display": "Jump (Y)"},
+		{"name": "run", "display": "Run (X)"},
+		{"name": "phone", "display": "Phone (B)"},
+		{"name": "menu", "display": "Menu (Start)"},
+		{"name": "save", "display": "Save (Select)"},
+	]
 
-	# Menu Controls Section
-	_add_section_header(parent, "MENU CONTROLS")
-	for action in menu_actions:
-		if InputMap.has_action(action):
-			var row = _create_action_row(action)
-			parent.add_child(row)
+	var battle_actions = [
+		{"name": "battle_attack", "display": "Attack (B)"},
+		{"name": "battle_skill", "display": "Skill (Y)"},
+		{"name": "battle_capture", "display": "Capture (A)"},
+		{"name": "battle_defend", "display": "Defend (X)"},
+		{"name": "battle_burst", "display": "Burst (L)"},
+		{"name": "battle_run", "display": "Run (R)"},
+		{"name": "battle_items", "display": "Items (Start)"},
+		{"name": "battle_status", "display": "Status (Select)"},
+	]
 
-	_add_spacer(parent, 20)
+	var menu_actions = [
+		{"name": "menu_accept", "display": "Accept (A)"},
+		{"name": "menu_back", "display": "Back (B)"},
+		{"name": "run", "display": "Inspect Item (X)"},
+		{"name": "jump", "display": "Discard Item (Y)"},
+	]
 
 	# Overworld Controls Section
-	_add_section_header(parent, "OVERWORLD CONTROLS")
-	for action in overworld_actions:
-		if InputMap.has_action(action):
-			var row = _create_action_row(action)
-			parent.add_child(row)
+	_add_section_header(parent, "OVERWORLD")
+	var overworld_count = 0
+	for action_def in overworld_actions:
+		# Create the action if it doesn't exist
+		if not InputMap.has_action(action_def["name"]):
+			InputMap.add_action(action_def["name"])
+		var row = _create_action_row(action_def["name"], action_def["display"])
+		parent.add_child(row)
+		overworld_count += 1
 
-	_add_spacer(parent, 20)
+	if overworld_count > 0:
+		_add_spacer(parent, 20)
 
 	# Battle Controls Section
-	_add_section_header(parent, "BATTLE CONTROLS")
-	for action in battle_actions:
-		if InputMap.has_action(action):
-			var row = _create_action_row(action)
-			parent.add_child(row)
+	_add_section_header(parent, "BATTLE")
+	var battle_count = 0
+	for action_def in battle_actions:
+		# Create the action if it doesn't exist
+		if not InputMap.has_action(action_def["name"]):
+			InputMap.add_action(action_def["name"])
+		var row = _create_action_row(action_def["name"], action_def["display"])
+		parent.add_child(row)
+		battle_count += 1
+
+	if battle_count > 0:
+		_add_spacer(parent, 20)
+
+	# Menu Controls Section
+	_add_section_header(parent, "MENU")
+	var menu_count = 0
+	for action_def in menu_actions:
+		# Create the action if it doesn't exist
+		if not InputMap.has_action(action_def["name"]):
+			InputMap.add_action(action_def["name"])
+		var row = _create_action_row(action_def["name"], action_def["display"])
+		parent.add_child(row)
+		menu_count += 1
 
 	print("[Options] Built %d control rows across 3 sections" % _action_data.size())
 
-func _create_action_row(action: String) -> HBoxContainer:
+func _create_action_row(action: String, display_name: String = "") -> HBoxContainer:
 	"""Create a row showing an action and its current binding"""
 	var row = HBoxContainer.new()
 	row.add_theme_constant_override("separation", 15)
 
-	# Action name (formatted nicely)
+	# Action name (use provided display name or format the action name)
 	var action_label = Label.new()
-	action_label.text = _format_action_name(action)
-	action_label.custom_minimum_size = Vector2(200, 0)
+	action_label.text = display_name if display_name != "" else _format_action_name(action)
+	action_label.custom_minimum_size = Vector2(250, 0)
 	action_label.add_theme_font_size_override("font_size", 14)
 	action_label.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE)
 	row.add_child(action_label)
@@ -908,13 +949,16 @@ func _get_action_display_text(action: String) -> String:
 	"""Get display text for current action binding"""
 	var events = InputMap.action_get_events(action)
 	if events.size() == 0:
-		return "Not Bound"
+		return "Click to Bind"
 
 	# Show the first event
 	var event = events[0]
 
 	if event is InputEventKey:
-		return OS.get_keycode_string(event.physical_keycode)
+		var keycode = event.physical_keycode if event.physical_keycode != 0 else event.keycode
+		if keycode == 0:
+			return "Click to Bind"
+		return OS.get_keycode_string(keycode)
 	elif event is InputEventJoypadButton:
 		return _get_joypad_button_name(event.button_index)
 	elif event is InputEventJoypadMotion:
