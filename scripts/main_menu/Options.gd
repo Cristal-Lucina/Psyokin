@@ -310,11 +310,23 @@ func _update_option_visual(opt_data: Dictionary) -> void:
 				var radio_item = radio_container.get_child(i)
 				if radio_item.has_meta("radio_indicator"):
 					var indicator = radio_item.get_meta("radio_indicator") as Panel
-					# Highlight selected option
+					# Create new style with bright green fill for selected option
+					var style = StyleBoxFlat.new()
 					if i == current_value:
-						indicator.modulate = aCoreVibeTheme.COLOR_ELECTRIC_LIME
+						style.bg_color = aCoreVibeTheme.COLOR_ELECTRIC_LIME
 					else:
-						indicator.modulate = Color(0.5, 0.5, 0.5, 0.5)
+						style.bg_color = Color(0.2, 0.2, 0.2, 1.0)
+
+					style.corner_radius_top_left = 8
+					style.corner_radius_top_right = 8
+					style.corner_radius_bottom_left = 8
+					style.corner_radius_bottom_right = 8
+					style.border_width_left = 2
+					style.border_width_right = 2
+					style.border_width_top = 2
+					style.border_width_bottom = 2
+					style.border_color = aCoreVibeTheme.COLOR_SKY_CYAN
+					indicator.add_theme_stylebox_override("panel", style)
 
 func _unhandled_input(event: InputEvent) -> void:
 	"""Block any unhandled input from reaching the game behind this menu"""
@@ -1163,9 +1175,13 @@ func _create_radio_group(options: Array, selected_idx: int) -> HBoxContainer:
 		var indicator = Panel.new()
 		indicator.custom_minimum_size = Vector2(16, 16)
 
-		# Style as a small circle
+		# Style as a small circle with bright green fill when selected
 		var style = StyleBoxFlat.new()
-		style.bg_color = Color(0.2, 0.2, 0.2, 1.0)
+		if i == selected_idx:
+			style.bg_color = aCoreVibeTheme.COLOR_ELECTRIC_LIME
+		else:
+			style.bg_color = Color(0.2, 0.2, 0.2, 1.0)
+
 		style.corner_radius_top_left = 8
 		style.corner_radius_top_right = 8
 		style.corner_radius_bottom_left = 8
@@ -1176,12 +1192,6 @@ func _create_radio_group(options: Array, selected_idx: int) -> HBoxContainer:
 		style.border_width_bottom = 2
 		style.border_color = aCoreVibeTheme.COLOR_SKY_CYAN
 		indicator.add_theme_stylebox_override("panel", style)
-
-		# Highlight selected option
-		if i == selected_idx:
-			indicator.modulate = aCoreVibeTheme.COLOR_ELECTRIC_LIME
-		else:
-			indicator.modulate = Color(0.5, 0.5, 0.5, 0.5)
 
 		radio_item.add_child(indicator)
 
