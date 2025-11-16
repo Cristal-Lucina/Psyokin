@@ -117,7 +117,7 @@ func _remap_action(new_event: InputEvent) -> void:
 	_save_settings()
 
 func _style_panel(panel: Panel) -> void:
-	"""Apply Core Vibe neon-kawaii styling to options panel"""
+	"""Apply Core Vibe neon-kawaii styling to main options panel"""
 	var style = aCoreVibeTheme.create_panel_style(
 		aCoreVibeTheme.COLOR_MILK_WHITE,          # White border
 		aCoreVibeTheme.COLOR_NIGHT_NAVY,          # Black background
@@ -125,6 +125,30 @@ func _style_panel(panel: Panel) -> void:
 		aCoreVibeTheme.CORNER_RADIUS_MEDIUM,      # 16px rounded corners
 		aCoreVibeTheme.BORDER_WIDTH_THIN,         # 2px border
 		aCoreVibeTheme.SHADOW_SIZE_LARGE          # 12px glow
+	)
+	panel.add_theme_stylebox_override("panel", style)
+
+func _style_tab_panel(panel: Panel) -> void:
+	"""Apply Core Vibe styling to tab button panel"""
+	var style = aCoreVibeTheme.create_panel_style(
+		aCoreVibeTheme.COLOR_ELECTRIC_LIME,       # Electric Lime border
+		aCoreVibeTheme.COLOR_NIGHT_NAVY,          # Black background
+		0.8,                                       # 80% opacity
+		aCoreVibeTheme.CORNER_RADIUS_MEDIUM,      # 16px rounded corners
+		aCoreVibeTheme.BORDER_WIDTH_THIN,         # 2px border
+		aCoreVibeTheme.SHADOW_SIZE_MEDIUM         # 8px glow
+	)
+	panel.add_theme_stylebox_override("panel", style)
+
+func _style_content_panel(panel: Panel) -> void:
+	"""Apply Core Vibe styling to content panel"""
+	var style = aCoreVibeTheme.create_panel_style(
+		aCoreVibeTheme.COLOR_SKY_CYAN,            # Sky Cyan border
+		aCoreVibeTheme.COLOR_NIGHT_NAVY,          # Black background
+		0.8,                                       # 80% opacity
+		aCoreVibeTheme.CORNER_RADIUS_MEDIUM,      # 16px rounded corners
+		aCoreVibeTheme.BORDER_WIDTH_THIN,         # 2px border
+		aCoreVibeTheme.SHADOW_SIZE_MEDIUM         # 8px glow
 	)
 	panel.add_theme_stylebox_override("panel", style)
 
@@ -204,11 +228,25 @@ func _build_tabbed_interface() -> void:
 	main_hbox.add_theme_constant_override("separation", 20)
 	margin.add_child(main_hbox)
 
-	# Left side: Vertical tab bar
+	# Left side: Panel containing tab buttons
+	var tab_panel = Panel.new()
+	tab_panel.custom_minimum_size = Vector2(200, 0)
+	_style_tab_panel(tab_panel)
+	main_hbox.add_child(tab_panel)
+
+	# Margin container inside tab panel
+	var tab_margin = MarginContainer.new()
+	tab_margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+	tab_margin.add_theme_constant_override("margin_left", 12)
+	tab_margin.add_theme_constant_override("margin_top", 12)
+	tab_margin.add_theme_constant_override("margin_right", 12)
+	tab_margin.add_theme_constant_override("margin_bottom", 12)
+	tab_panel.add_child(tab_margin)
+
+	# Vertical tab bar inside margin
 	var tab_vbox = VBoxContainer.new()
-	tab_vbox.custom_minimum_size = Vector2(180, 0)
 	tab_vbox.add_theme_constant_override("separation", 8)
-	main_hbox.add_child(tab_vbox)
+	tab_margin.add_child(tab_vbox)
 
 	# Tab buttons
 	_create_tab_button(tab_vbox, "GAME OPTIONS", Tab.GAME, aCoreVibeTheme.COLOR_ELECTRIC_LIME)
@@ -231,11 +269,27 @@ func _build_tabbed_interface() -> void:
 	_add_button_padding(close_btn)
 	tab_vbox.add_child(close_btn)
 
-	# Right side: Content container
+	# Right side: Panel containing content
+	var content_panel = Panel.new()
+	content_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	content_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_style_content_panel(content_panel)
+	main_hbox.add_child(content_panel)
+
+	# Margin container inside content panel
+	var content_margin = MarginContainer.new()
+	content_margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+	content_margin.add_theme_constant_override("margin_left", 12)
+	content_margin.add_theme_constant_override("margin_top", 12)
+	content_margin.add_theme_constant_override("margin_right", 12)
+	content_margin.add_theme_constant_override("margin_bottom", 12)
+	content_panel.add_child(content_margin)
+
+	# Content container inside margin
 	_content_container = Control.new()
 	_content_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_content_container.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	main_hbox.add_child(_content_container)
+	content_margin.add_child(_content_container)
 
 	# Build all tab content
 	_tab_content[Tab.GAME] = _build_game_options_tab()
@@ -261,7 +315,10 @@ func _create_tab_button(parent: Node, label: String, tab: Tab, color: Color) -> 
 	btn.text = label
 	btn.custom_minimum_size = Vector2(0, 50)
 	btn.focus_mode = Control.FOCUS_ALL
-	btn.pressed.connect(func(): _switch_tab(tab))
+	btn.pressed.connect(func():
+		_switch_tab(tab)
+		_move_focus_to_content()
+	)
 	aCoreVibeTheme.style_button_with_focus_invert(btn, color, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
 	_add_button_padding(btn)
 	parent.add_child(btn)
@@ -280,6 +337,30 @@ func _switch_tab(tab: Tab) -> void:
 		_tab_content[tab].visible = true
 
 	print("[Options] Switched to tab: ", tab)
+
+func _move_focus_to_content() -> void:
+	"""Move focus to the first focusable element in the current content"""
+	if not _tab_content.has(_current_tab):
+		return
+
+	var content = _tab_content[_current_tab]
+	var first_focusable = _find_first_focusable(content)
+	if first_focusable:
+		first_focusable.grab_focus()
+
+func _find_first_focusable(node: Node) -> Control:
+	"""Recursively find the first focusable control in a node tree"""
+	if node is Control:
+		var control = node as Control
+		if control.focus_mode != Control.FOCUS_NONE and control.visible:
+			return control
+
+	for child in node.get_children():
+		var result = _find_first_focusable(child)
+		if result:
+			return result
+
+	return null
 
 func _on_close_pressed() -> void:
 	print("[Options] Closing options menu")
