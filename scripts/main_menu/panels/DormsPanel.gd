@@ -314,7 +314,7 @@ func _apply_core_vibe_styling() -> void:
 		assign_style_focus.content_margin_top = 8
 		assign_style_focus.content_margin_bottom = 8
 
-		# Disabled state: Grey with dark background
+		# Disabled state: Grey with dark background (same for focused and unfocused)
 		var assign_style_disabled = StyleBoxFlat.new()
 		assign_style_disabled.bg_color = aCoreVibeTheme.COLOR_INK_CHARCOAL
 		assign_style_disabled.border_color = Color(0.5, 0.5, 0.5, 1.0)
@@ -331,29 +331,12 @@ func _apply_core_vibe_styling() -> void:
 		assign_style_disabled.content_margin_top = 8
 		assign_style_disabled.content_margin_bottom = 8
 
-		# Disabled+Focused state: Dark grey background to show selection
-		var assign_style_disabled_focused = StyleBoxFlat.new()
-		assign_style_disabled_focused.bg_color = Color(0.2, 0.2, 0.2, 1.0)  # Darker grey when selected
-		assign_style_disabled_focused.border_color = Color(0.5, 0.5, 0.5, 1.0)
-		assign_style_disabled_focused.border_width_left = 2
-		assign_style_disabled_focused.border_width_right = 2
-		assign_style_disabled_focused.border_width_top = 2
-		assign_style_disabled_focused.border_width_bottom = 2
-		assign_style_disabled_focused.corner_radius_top_left = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
-		assign_style_disabled_focused.corner_radius_top_right = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
-		assign_style_disabled_focused.corner_radius_bottom_left = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
-		assign_style_disabled_focused.corner_radius_bottom_right = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
-		assign_style_disabled_focused.content_margin_left = 12
-		assign_style_disabled_focused.content_margin_right = 12
-		assign_style_disabled_focused.content_margin_top = 8
-		assign_style_disabled_focused.content_margin_bottom = 8
-
 		_assign_room_btn.add_theme_stylebox_override("normal", assign_style_normal)
 		_assign_room_btn.add_theme_stylebox_override("hover", assign_style_normal.duplicate())
 		_assign_room_btn.add_theme_stylebox_override("pressed", assign_style_normal.duplicate())
 		_assign_room_btn.add_theme_stylebox_override("focus", assign_style_focus)
 		_assign_room_btn.add_theme_stylebox_override("disabled", assign_style_disabled)
-		_assign_room_btn.add_theme_stylebox_override("disabled_focused", assign_style_disabled_focused)
+		_assign_room_btn.add_theme_stylebox_override("disabled_focused", assign_style_disabled.duplicate())
 
 		_assign_room_btn.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_ELECTRIC_LIME)
 		_assign_room_btn.add_theme_color_override("font_hover_color", aCoreVibeTheme.COLOR_ELECTRIC_LIME)
@@ -392,7 +375,7 @@ func _apply_core_vibe_styling() -> void:
 		move_style_focus.content_margin_top = 8
 		move_style_focus.content_margin_bottom = 8
 
-		# Disabled state: Grey with dark background
+		# Disabled state: Grey with dark background (same for focused and unfocused)
 		var move_style_disabled = StyleBoxFlat.new()
 		move_style_disabled.bg_color = aCoreVibeTheme.COLOR_INK_CHARCOAL
 		move_style_disabled.border_color = Color(0.5, 0.5, 0.5, 1.0)
@@ -409,29 +392,12 @@ func _apply_core_vibe_styling() -> void:
 		move_style_disabled.content_margin_top = 8
 		move_style_disabled.content_margin_bottom = 8
 
-		# Disabled+Focused state: Dark grey background to show selection
-		var move_style_disabled_focused = StyleBoxFlat.new()
-		move_style_disabled_focused.bg_color = Color(0.2, 0.2, 0.2, 1.0)  # Darker grey when selected
-		move_style_disabled_focused.border_color = Color(0.5, 0.5, 0.5, 1.0)
-		move_style_disabled_focused.border_width_left = 2
-		move_style_disabled_focused.border_width_right = 2
-		move_style_disabled_focused.border_width_top = 2
-		move_style_disabled_focused.border_width_bottom = 2
-		move_style_disabled_focused.corner_radius_top_left = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
-		move_style_disabled_focused.corner_radius_top_right = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
-		move_style_disabled_focused.corner_radius_bottom_left = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
-		move_style_disabled_focused.corner_radius_bottom_right = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
-		move_style_disabled_focused.content_margin_left = 12
-		move_style_disabled_focused.content_margin_right = 12
-		move_style_disabled_focused.content_margin_top = 8
-		move_style_disabled_focused.content_margin_bottom = 8
-
 		_move_out_btn.add_theme_stylebox_override("normal", move_style_normal)
 		_move_out_btn.add_theme_stylebox_override("hover", move_style_normal.duplicate())
 		_move_out_btn.add_theme_stylebox_override("pressed", move_style_normal.duplicate())
 		_move_out_btn.add_theme_stylebox_override("focus", move_style_focus)
 		_move_out_btn.add_theme_stylebox_override("disabled", move_style_disabled)
-		_move_out_btn.add_theme_stylebox_override("disabled_focused", move_style_disabled_focused)
+		_move_out_btn.add_theme_stylebox_override("disabled_focused", move_style_disabled.duplicate())
 
 		_move_out_btn.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_CITRUS_YELLOW)
 		_move_out_btn.add_theme_color_override("font_hover_color", aCoreVibeTheme.COLOR_CITRUS_YELLOW)
@@ -470,7 +436,7 @@ func _apply_core_vibe_styling() -> void:
 		cancel_style_focus.content_margin_top = 8
 		cancel_style_focus.content_margin_bottom = 8
 
-		# Disabled state: Grey with dark background
+		# Disabled state: Grey with dark background (same for focused and unfocused)
 		var cancel_style_disabled = StyleBoxFlat.new()
 		cancel_style_disabled.bg_color = aCoreVibeTheme.COLOR_INK_CHARCOAL
 		cancel_style_disabled.border_color = Color(0.5, 0.5, 0.5, 1.0)
@@ -487,29 +453,12 @@ func _apply_core_vibe_styling() -> void:
 		cancel_style_disabled.content_margin_top = 8
 		cancel_style_disabled.content_margin_bottom = 8
 
-		# Disabled+Focused state: Dark grey background to show selection
-		var cancel_style_disabled_focused = StyleBoxFlat.new()
-		cancel_style_disabled_focused.bg_color = Color(0.2, 0.2, 0.2, 1.0)  # Darker grey when selected
-		cancel_style_disabled_focused.border_color = Color(0.5, 0.5, 0.5, 1.0)
-		cancel_style_disabled_focused.border_width_left = 2
-		cancel_style_disabled_focused.border_width_right = 2
-		cancel_style_disabled_focused.border_width_top = 2
-		cancel_style_disabled_focused.border_width_bottom = 2
-		cancel_style_disabled_focused.corner_radius_top_left = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
-		cancel_style_disabled_focused.corner_radius_top_right = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
-		cancel_style_disabled_focused.corner_radius_bottom_left = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
-		cancel_style_disabled_focused.corner_radius_bottom_right = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
-		cancel_style_disabled_focused.content_margin_left = 12
-		cancel_style_disabled_focused.content_margin_right = 12
-		cancel_style_disabled_focused.content_margin_top = 8
-		cancel_style_disabled_focused.content_margin_bottom = 8
-
 		_cancel_move_btn.add_theme_stylebox_override("normal", cancel_style_normal)
 		_cancel_move_btn.add_theme_stylebox_override("hover", cancel_style_normal.duplicate())
 		_cancel_move_btn.add_theme_stylebox_override("pressed", cancel_style_normal.duplicate())
 		_cancel_move_btn.add_theme_stylebox_override("focus", cancel_style_focus)
 		_cancel_move_btn.add_theme_stylebox_override("disabled", cancel_style_disabled)
-		_cancel_move_btn.add_theme_stylebox_override("disabled_focused", cancel_style_disabled_focused)
+		_cancel_move_btn.add_theme_stylebox_override("disabled_focused", cancel_style_disabled.duplicate())
 
 		_cancel_move_btn.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_BUBBLE_MAGENTA)
 		_cancel_move_btn.add_theme_color_override("font_hover_color", aCoreVibeTheme.COLOR_BUBBLE_MAGENTA)
@@ -1428,6 +1377,15 @@ func _create_selection_arrows() -> void:
 	_action_selection_arrow.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_action_selection_arrow.add_theme_font_size_override("font_size", 43)
 	_action_selection_arrow.modulate = Color(1, 1, 1, 1)
+
+	# Add shadow to the arrow
+	var arrow_label_settings = LabelSettings.new()
+	arrow_label_settings.font_size = 43
+	arrow_label_settings.shadow_color = Color(0, 0, 0, 0.8)
+	arrow_label_settings.shadow_size = 4
+	arrow_label_settings.shadow_offset = Vector2(2, 2)
+	_action_selection_arrow.label_settings = arrow_label_settings
+
 	_action_selection_arrow.custom_minimum_size = Vector2(54, 40)
 	_action_selection_arrow.size = Vector2(54, 40)
 	_action_selection_arrow.mouse_filter = Control.MOUSE_FILTER_IGNORE
