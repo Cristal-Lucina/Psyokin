@@ -118,7 +118,7 @@ func _process(delta: float) -> void:
 		_input_cooldown -= delta
 
 func _input(event: InputEvent) -> void:
-	"""Handle input for remapping controls and menu navigation"""
+	"""Handle input for menu navigation"""
 	# Debug: Log all joypad button events
 	if event is InputEventJoypadButton:
 		print("[Options._input] Joypad button %d, pressed=%s" % [event.button_index, event.pressed])
@@ -126,24 +126,6 @@ func _input(event: InputEvent) -> void:
 		var is_ui_accept = event.is_action("ui_accept")
 		var is_ui_accept_pressed = event.is_action_pressed("ui_accept")
 		print("[Options._input] is_action('ui_accept')=%s, is_action_pressed('ui_accept')=%s" % [is_ui_accept, is_ui_accept_pressed])
-
-	# If we're waiting for input to remap an action
-	if _waiting_for_input:
-		# Ignore mouse motion
-		if event is InputEventMouseMotion:
-			return
-
-		# Accept key presses, joypad buttons, or joypad motion
-		if event is InputEventKey and event.pressed:
-			_remap_action(event)
-			get_viewport().set_input_as_handled()
-		elif event is InputEventJoypadButton and event.pressed:
-			_remap_action(event)
-			get_viewport().set_input_as_handled()
-		elif event is InputEventJoypadMotion and abs(event.axis_value) > 0.5:
-			_remap_action(event)
-			get_viewport().set_input_as_handled()
-		return
 
 	# Debug: Check if this is ui_accept
 	if event.is_action_pressed("ui_accept"):
@@ -162,8 +144,28 @@ func _input(event: InputEvent) -> void:
 		else:
 			print("[Options._input] Focused control is NOT a tab button")
 
-	# Handle menu closing
+	# Handle back button - if in content panel, move focus to tab buttons
 	if event.is_action_pressed("menu_cancel") or event.is_action_pressed("ui_cancel"):
+		var focused = get_viewport().gui_get_focus_owner()
+		# Check if focused element is in the content area (not a tab button)
+		if focused and focused not in _tab_buttons:
+			# Check if the focused control is within the content container
+			var is_in_content = false
+			var parent = focused
+			while parent != null:
+				if parent == _content_container:
+					is_in_content = true
+					break
+				parent = parent.get_parent()
+
+			if is_in_content:
+				# Move focus back to the current tab button
+				if _current_tab >= 0 and _current_tab < _tab_buttons.size():
+					_tab_buttons[_current_tab].grab_focus()
+					get_viewport().set_input_as_handled()
+					return
+
+		# If in tab buttons area, close the menu
 		_on_close_pressed()
 		get_viewport().set_input_as_handled()
 		return
@@ -615,8 +617,8 @@ func _build_controls_tab() -> Control:
 
 	_add_spacer(main_container, 10)
 
-	# Control Type selector
-	_add_option_label(main_container, "Control Type")
+	# Control Style selector
+	_add_option_label(main_container, "Control Style")
 	var type_idx = 0
 	if _control_type == "keyboard":
 		type_idx = 0
@@ -932,15 +934,13 @@ func _create_button_group(options: Array, selected_idx: int, on_select: Callable
 		buttons.append(btn)
 		hbox.add_child(btn)
 
-	# Set up horizontal focus navigation within the group
+	# Set up button behavior (no horizontal navigation - disabled in content panel)
 	for i in range(buttons.size()):
 		var btn = buttons[i]
 
-		# Set left/right neighbors for horizontal navigation
-		if i > 0:
-			btn.focus_neighbor_left = btn.get_path_to(buttons[i - 1])
-		if i < buttons.size() - 1:
-			btn.focus_neighbor_right = btn.get_path_to(buttons[i + 1])
+		# Disable left/right neighbors - no horizontal navigation in content panel
+		btn.focus_neighbor_left = NodePath()
+		btn.focus_neighbor_right = NodePath()
 
 		# When pressed, update all buttons in group
 		btn.pressed.connect(func():
@@ -1096,16 +1096,20 @@ func _create_action_row(action: String, display_name: String = "") -> HBoxContai
 	action_label.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE)
 	row.add_child(action_label)
 
-	# Current binding button
+	# Current binding button (locked/view-only)
 	var bind_btn = Button.new()
 	bind_btn.text = _get_action_display_text(action)
 	bind_btn.custom_minimum_size = Vector2(200, 35)
 	bind_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	bind_btn.focus_mode = Control.FOCUS_ALL
+	bind_btn.focus_mode = Control.FOCUS_NONE  # Disable focus
+	bind_btn.disabled = true  # Disable interaction
 	aCoreVibeTheme.style_button_with_focus_invert(bind_btn, aCoreVibeTheme.COLOR_SKY_CYAN, aCoreVibeTheme.CORNER_RADIUS_SMALL)
 	_add_button_padding(bind_btn)
 
-	# Store action data for remapping
+	# Apply greyed-out styling
+	bind_btn.modulate = Color(0.6, 0.6, 0.6, 0.7)  # Grey out the button
+
+	# Store action data for reference (but no remapping)
 	var action_idx = _action_data.size()
 	_action_data.append({
 		"action": action,
@@ -1113,10 +1117,7 @@ func _create_action_row(action: String, display_name: String = "") -> HBoxContai
 		"row": row
 	})
 
-	# Click to remap
-	bind_btn.pressed.connect(func():
-		_start_remapping(action_idx)
-	)
+	# No click handler - buttons are locked
 
 	row.add_child(bind_btn)
 
@@ -1256,31 +1257,9 @@ func _setup_tab_focus_chain(close_btn: Button) -> void:
 
 func _setup_controls_focus_chain() -> void:
 	"""Set up focus navigation chain for control buttons"""
-	if _action_data.size() == 0:
-		return
-
-	# Connect all buttons in a vertical chain
-	for i in range(_action_data.size()):
-		var current_btn = _action_data[i]["button"] as Button
-		if not current_btn:
-			continue
-
-		# Set up vertical navigation
-		if i > 0:
-			var prev_btn = _action_data[i - 1]["button"] as Button
-			if prev_btn:
-				current_btn.focus_neighbor_top = current_btn.get_path_to(prev_btn)
-				prev_btn.focus_neighbor_bottom = prev_btn.get_path_to(current_btn)
-
-		# Also set previous/next for left/right navigation
-		if i > 0:
-			var prev_btn = _action_data[i - 1]["button"] as Button
-			if prev_btn:
-				current_btn.focus_previous = current_btn.get_path_to(prev_btn)
-		if i < _action_data.size() - 1:
-			var next_btn = _action_data[i + 1]["button"] as Button
-			if next_btn:
-				current_btn.focus_next = current_btn.get_path_to(next_btn)
+	# Button configs are now disabled/locked, so no focus chain needed
+	# Focus will go directly to the Control Style toggle buttons and Restore Defaults button
+	print("[Options] Skipping focus chain setup - button configs are disabled")
 
 func _restore_display_defaults() -> void:
 	"""Restore Display tab to defaults"""
