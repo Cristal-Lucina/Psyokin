@@ -799,11 +799,13 @@ func _focus_current_action() -> void:
 	if _current_action_index >= 0 and _current_action_index < _action_buttons.size():
 		_action_buttons[_current_action_index].grab_focus()
 
-	# Hide roster arrow, update action arrow (will show only if button is enabled)
-	if _roster_selection_arrow:
+	# Hide roster arrow and box (only set if not already hidden to prevent blinking)
+	if _roster_selection_arrow and _roster_selection_arrow.visible:
 		_roster_selection_arrow.visible = false
-	if _roster_dark_box:
+	if _roster_dark_box and _roster_dark_box.visible:
 		_roster_dark_box.visible = false
+
+	# Update action arrow position
 	call_deferred("_update_action_arrow_position")
 
 	_animate_panel_focus(NavState.ACTION_SELECT)
@@ -1453,7 +1455,7 @@ func _update_action_arrow_position() -> void:
 			_action_arrow_pulse_tween = null
 		return
 
-	# Only show if current button is enabled
+	# Only show if current button index is valid
 	if _current_action_index < 0 or _current_action_index >= _action_buttons.size():
 		_action_selection_arrow.visible = false
 		# Stop pulse animation when hiding arrow
@@ -1463,7 +1465,7 @@ func _update_action_arrow_position() -> void:
 		return
 
 	var current_btn: Button = _action_buttons[_current_action_index]
-	if not current_btn or current_btn.disabled:
+	if not current_btn:
 		_action_selection_arrow.visible = false
 		# Stop pulse animation when hiding arrow
 		if _action_arrow_pulse_tween and is_instance_valid(_action_arrow_pulse_tween):
@@ -1471,7 +1473,7 @@ func _update_action_arrow_position() -> void:
 			_action_arrow_pulse_tween = null
 		return
 
-	# Show arrow and position it to the right of the center panel, vertically aligned with button
+	# Show arrow regardless of whether button is enabled or disabled
 	_action_selection_arrow.visible = true
 
 	var center_panel_global_pos = _center_panel.global_position
@@ -1481,8 +1483,8 @@ func _update_action_arrow_position() -> void:
 	var btn_global_pos = current_btn.global_position
 	var btn_offset_in_panel = btn_global_pos - panel_global_pos
 
-	# Position to the right of the center panel
-	var arrow_x = center_panel_offset.x + _center_panel.size.x + 8.0
+	# Position to the right of the center panel, offset 25px to the left
+	var arrow_x = center_panel_offset.x + _center_panel.size.x + 8.0 - 25.0
 	# Vertically align with the current button
 	var arrow_y = btn_offset_in_panel.y + (current_btn.size.y / 2.0) - (_action_selection_arrow.size.y / 2.0)
 
