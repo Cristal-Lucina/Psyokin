@@ -236,8 +236,18 @@ func _input(event: InputEvent) -> void:
 			# Move back to category list
 			_focus_mode = "category"
 			_category_list.grab_focus()
+
+			# Show category arrow, hide entry arrow (matching OutreachPanel)
+			if _category_arrow:
+				_category_arrow.visible = true
+			# Category dark box always stays visible
+			if _entry_arrow:
+				_entry_arrow.visible = false
+			# Entry dark box always stays hidden
+
 			print("[IndexPanel] Calling _animate_panel_focus - mode: category")
 			call_deferred("_animate_panel_focus")
+			call_deferred("_update_category_arrow_position")
 			get_viewport().set_input_as_handled()
 			return
 
@@ -248,8 +258,18 @@ func _on_panel_gained_focus() -> void:
 	_focus_mode = "category"
 	if _category_list:
 		_category_list.grab_focus()
+
+	# Show category arrow, hide entry arrow (matching OutreachPanel)
+	if _category_arrow:
+		_category_arrow.visible = true
+	# Category dark box always stays visible
+	if _entry_arrow:
+		_entry_arrow.visible = false
+	# Entry dark box always stays hidden
+
 	print("[IndexPanel] About to call _animate_panel_focus from gained_focus")
 	call_deferred("_animate_panel_focus")
+	call_deferred("_update_category_arrow_position")
 
 func _on_index_changed(_cat: String) -> void:
 	_rebuild()
@@ -268,8 +288,18 @@ func _on_category_activated(_idx: int) -> void:
 		if _entry_list.item_count > 0:
 			_entry_list.select(0)
 			_on_entry_selected(0)
+
+		# Hide category arrow, show entry arrow (matching OutreachPanel)
+		if _category_arrow:
+			_category_arrow.visible = false
+		# Category dark box always stays visible
+		if _entry_arrow:
+			_entry_arrow.visible = true
+		# Entry dark box always stays hidden
+
 		print("[IndexPanel] Calling _animate_panel_focus from category_activated - mode: entries")
 		call_deferred("_animate_panel_focus")
+		call_deferred("_update_entry_arrow_position")
 
 func _on_entry_selected(_idx: int) -> void:
 	# Update details when entry is selected
@@ -277,6 +307,8 @@ func _on_entry_selected(_idx: int) -> void:
 		return
 	var entry_data: Dictionary = _entry_list.get_item_metadata(_idx)
 	_update_detail(entry_data)
+	# Update arrow position when selection changes
+	call_deferred("_update_entry_arrow_position")
 
 func _on_entry_list_gui_input(event: InputEvent) -> void:
 	# Update details on hover
