@@ -13,6 +13,13 @@ var _current_tab: Tab = Tab.GAME
 var _tab_buttons: Array[Button] = []
 var _tab_content: Dictionary = {}  # Tab -> Control node
 
+# Two-level navigation state
+enum NavLevel { OPTIONS, TOGGLES }  # Navigate option labels vs toggle buttons
+var _nav_level: NavLevel = NavLevel.OPTIONS
+var _option_containers: Array[Control] = []  # Focusable option containers
+var _current_option_index: int = 0
+var _current_toggle_group: HBoxContainer = null
+
 # Settings
 var _control_type: String = "keyboard"  # keyboard, xbox, playstation, nintendo
 var _language: String = "English"
@@ -119,56 +126,222 @@ func _process(delta: float) -> void:
 
 func _input(event: InputEvent) -> void:
 	"""Handle input for menu navigation"""
-	# Debug: Log all joypad button events
-	if event is InputEventJoypadButton:
-		print("[Options._input] Joypad button %d, pressed=%s" % [event.button_index, event.pressed])
-		# Check if this is recognized as ui_accept
-		var is_ui_accept = event.is_action("ui_accept")
-		var is_ui_accept_pressed = event.is_action_pressed("ui_accept")
-		print("[Options._input] is_action('ui_accept')=%s, is_action_pressed('ui_accept')=%s" % [is_ui_accept, is_ui_accept_pressed])
-
-	# Debug: Check if this is ui_accept
+	# Handle tab button acceptance
 	if event.is_action_pressed("ui_accept"):
-		print("[Options._input] ui_accept detected!")
 		var focused = get_viewport().gui_get_focus_owner()
-		print("[Options._input] Focused control: %s" % (focused.name if focused else "none"))
 		if focused and focused in _tab_buttons:
 			var idx = _tab_buttons.find(focused)
-			print("[Options._input] Tab button index: %d" % idx)
 			if idx >= 0:
-				print("[Options] ui_accept on tab button %d" % idx)
+				print("[Options] Switching to tab %d" % idx)
 				_switch_tab(Tab.values()[idx])
 				_move_focus_to_content()
 				get_viewport().set_input_as_handled()
 				return
-		else:
-			print("[Options._input] Focused control is NOT a tab button")
 
-	# Handle back button - if in content panel, move focus to tab buttons
-	if event.is_action_pressed("menu_cancel") or event.is_action_pressed("ui_cancel"):
-		var focused = get_viewport().gui_get_focus_owner()
-		# Check if focused element is in the content area (not a tab button)
-		if focused and focused not in _tab_buttons:
-			# Check if the focused control is within the content container
-			var is_in_content = false
-			var parent = focused
-			while parent != null:
-				if parent == _content_container:
-					is_in_content = true
-					break
-				parent = parent.get_parent()
+	# Handle two-level navigation in content
+	var focused = get_viewport().gui_get_focus_owner()
+	var is_in_content = _is_focused_in_content(focused)
 
-			if is_in_content:
-				# Move focus back to the current tab button
-				if _current_tab >= 0 and _current_tab < _tab_buttons.size():
-					_tab_buttons[_current_tab].grab_focus()
-					get_viewport().set_input_as_handled()
-					return
+	if is_in_content:
+		# Handle navigation within content panel
+		if _nav_level == NavLevel.OPTIONS:
+			# Navigate option containers
+			if event.is_action_pressed("move_up"):
+				_navigate_options(-1)
+				get_viewport().set_input_as_handled()
+				return
+			elif event.is_action_pressed("move_down"):
+				_navigate_options(1)
+				get_viewport().set_input_as_handled()
+				return
+			elif event.is_action_pressed("ui_accept") or event.is_action_pressed("menu_accept"):
+				_enter_toggle_selection()
+				get_viewport().set_input_as_handled()
+				return
+			elif event.is_action_pressed("menu_cancel") or event.is_action_pressed("ui_cancel"):
+				# Back from options: return to tab buttons
+				_return_to_tabs()
+				get_viewport().set_input_as_handled()
+				return
 
-		# If in tab buttons area, close the menu
-		_on_close_pressed()
-		get_viewport().set_input_as_handled()
+		elif _nav_level == NavLevel.TOGGLES:
+			# Navigate within toggle buttons
+			if event.is_action_pressed("move_left"):
+				_navigate_toggles(-1)
+				get_viewport().set_input_as_handled()
+				return
+			elif event.is_action_pressed("move_right"):
+				_navigate_toggles(1)
+				get_viewport().set_input_as_handled()
+				return
+			elif event.is_action_pressed("ui_accept") or event.is_action_pressed("menu_accept"):
+				_activate_current_toggle()
+				get_viewport().set_input_as_handled()
+				return
+			elif event.is_action_pressed("menu_cancel") or event.is_action_pressed("ui_cancel"):
+				# Back from toggles: return to option navigation
+				_exit_toggle_selection()
+				get_viewport().set_input_as_handled()
+				return
+	else:
+		# Handle back button in tab panel - close menu
+		if event.is_action_pressed("menu_cancel") or event.is_action_pressed("ui_cancel"):
+			_on_close_pressed()
+			get_viewport().set_input_as_handled()
+			return
+
+func _is_focused_in_content(focused: Control) -> bool:
+	"""Check if focused control is within content container"""
+	if not focused:
+		return false
+	if focused in _tab_buttons:
+		return false
+
+	var parent = focused
+	while parent != null:
+		if parent == _content_container:
+			return true
+		parent = parent.get_parent()
+	return false
+
+func _navigate_options(direction: int) -> void:
+	"""Navigate through option containers (Display Type, Resolution, etc.)"""
+	if _option_containers.is_empty():
 		return
+
+	# Clear highlight from current option
+	if _current_option_index >= 0 and _current_option_index < _option_containers.size():
+		_unhighlight_option(_current_option_index)
+
+	# Move to next option
+	_current_option_index += direction
+	if _current_option_index < 0:
+		_current_option_index = _option_containers.size() - 1
+	elif _current_option_index >= _option_containers.size():
+		_current_option_index = 0
+
+	# Highlight new option
+	_highlight_option(_current_option_index)
+	print("[Options] Navigated to option %d" % _current_option_index)
+
+func _enter_toggle_selection() -> void:
+	"""Enter toggle selection mode for current option"""
+	if _current_option_index < 0 or _current_option_index >= _option_containers.size():
+		return
+
+	var container = _option_containers[_current_option_index]
+	# Find the HBoxContainer with toggle buttons or sliders
+	var toggle_group = _find_toggle_group(container)
+	if toggle_group:
+		_current_toggle_group = toggle_group
+		_nav_level = NavLevel.TOGGLES
+
+		# Focus first button or slider in toggle group
+		if toggle_group.get_child_count() > 0:
+			var first_child = toggle_group.get_child(0)
+			if first_child is Button:
+				first_child.grab_focus()
+			elif first_child is HSlider:
+				first_child.grab_focus()
+			print("[Options] Entered toggle selection")
+
+func _exit_toggle_selection() -> void:
+	"""Exit toggle selection mode and return to option navigation"""
+	_nav_level = NavLevel.OPTIONS
+	_current_toggle_group = null
+
+	# Restore highlight on current option
+	if _current_option_index >= 0 and _current_option_index < _option_containers.size():
+		_highlight_option(_current_option_index)
+	print("[Options] Exited toggle selection")
+
+func _navigate_toggles(direction: int) -> void:
+	"""Navigate within toggle button group"""
+	if not _current_toggle_group:
+		return
+
+	var focused = get_viewport().gui_get_focus_owner()
+	if not focused or not focused is Button:
+		return
+
+	var buttons: Array[Button] = []
+	for child in _current_toggle_group.get_children():
+		if child is Button:
+			buttons.append(child)
+
+	if buttons.is_empty():
+		return
+
+	var current_idx = buttons.find(focused)
+	if current_idx < 0:
+		return
+
+	# Navigate
+	current_idx += direction
+	if current_idx < 0:
+		current_idx = buttons.size() - 1
+	elif current_idx >= buttons.size():
+		current_idx = 0
+
+	buttons[current_idx].grab_focus()
+
+func _activate_current_toggle() -> void:
+	"""Activate the currently focused toggle button"""
+	var focused = get_viewport().gui_get_focus_owner()
+	if focused and focused is Button:
+		focused.emit_signal("pressed")
+
+func _return_to_tabs() -> void:
+	"""Return focus to tab buttons"""
+	_nav_level = NavLevel.OPTIONS
+	if _current_tab >= 0 and _current_tab < _tab_buttons.size():
+		_tab_buttons[_current_tab].grab_focus()
+
+func _highlight_option(index: int) -> void:
+	"""Highlight an option container"""
+	if index < 0 or index >= _option_containers.size():
+		return
+
+	var container = _option_containers[index]
+	# Add visual feedback - bright border
+	if container.has_meta("panel"):
+		var panel = container.get_meta("panel") as Panel
+		if panel:
+			var style = panel.get_theme_stylebox("panel").duplicate() as StyleBoxFlat
+			style.border_color = aCoreVibeTheme.COLOR_ELECTRIC_LIME
+			style.border_width_left = 3
+			style.border_width_right = 3
+			style.border_width_top = 3
+			style.border_width_bottom = 3
+			panel.add_theme_stylebox_override("panel", style)
+
+func _unhighlight_option(index: int) -> void:
+	"""Remove highlight from an option container"""
+	if index < 0 or index >= _option_containers.size():
+		return
+
+	var container = _option_containers[index]
+	# Remove visual feedback - dim border
+	if container.has_meta("panel"):
+		var panel = container.get_meta("panel") as Panel
+		if panel:
+			var style = panel.get_theme_stylebox("panel").duplicate() as StyleBoxFlat
+			style.border_color = aCoreVibeTheme.COLOR_SKY_CYAN
+			style.border_width_left = 2
+			style.border_width_right = 2
+			style.border_width_top = 2
+			style.border_width_bottom = 2
+			panel.add_theme_stylebox_override("panel", style)
+
+func _find_toggle_group(container: Control) -> HBoxContainer:
+	"""Find the HBoxContainer with toggle buttons or sliders in an option container"""
+	for child in container.get_children():
+		if child is HBoxContainer:
+			# Check if it has Button or Slider children
+			for subchild in child.get_children():
+				if subchild is Button or subchild is HSlider:
+					return child as HBoxContainer
+	return null
 
 func _unhandled_input(event: InputEvent) -> void:
 	"""Block any unhandled input from reaching the game behind this menu"""
@@ -444,17 +617,39 @@ func _switch_tab(tab: Tab) -> void:
 	if _tab_content.has(tab):
 		_tab_content[tab].visible = true
 
-	print("[Options] Switched to tab: ", tab)
+	# Reset navigation state
+	_nav_level = NavLevel.OPTIONS
+	_current_option_index = 0
+	_current_toggle_group = null
+
+	# Rebuild option containers list for this tab
+	_option_containers.clear()
+	if _tab_content.has(tab):
+		_collect_option_containers(_tab_content[tab], _option_containers)
+
+	print("[Options] Switched to tab: %s with %d option containers" % [tab, _option_containers.size()])
 
 func _move_focus_to_content() -> void:
-	"""Move focus to the first focusable element in the current content"""
-	if not _tab_content.has(_current_tab):
+	"""Move focus to the first option container in the current content"""
+	if _option_containers.is_empty():
 		return
 
-	var content = _tab_content[_current_tab]
-	var first_focusable = _find_first_focusable(content)
-	if first_focusable:
-		first_focusable.grab_focus()
+	# Reset to first option
+	_current_option_index = 0
+	_nav_level = NavLevel.OPTIONS
+
+	# Highlight first option
+	_highlight_option(0)
+
+func _collect_option_containers(node: Node, result: Array[Control]) -> void:
+	"""Recursively collect option containers"""
+	if node.has_meta("panel"):
+		# This is an option container
+		result.append(node as Control)
+		return
+
+	for child in node.get_children():
+		_collect_option_containers(child, result)
 
 func _find_first_focusable(node: Node) -> Control:
 	"""Recursively find the first focusable control in a node tree"""
@@ -514,7 +709,7 @@ func _build_game_options_tab() -> Control:
 
 	var container = VBoxContainer.new()
 	container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	container.add_theme_constant_override("separation", 20)
+	container.add_theme_constant_override("separation", 12)
 	scroll.add_child(container)
 
 	# Title
@@ -527,51 +722,25 @@ func _build_game_options_tab() -> Control:
 
 	_add_spacer(container, 10)
 
-	# Language
-	_add_option_label(container, "Language")
+	# Language - option container with toggles
 	var lang_hbox = _create_button_group(["English"], 0, func(_idx): _language = "English"; _save_settings())
-	container.add_child(lang_hbox)
+	var lang_container = _create_option_container("Language", lang_hbox)
+	container.add_child(lang_container)
 
-	_add_spacer(container, 15)
-
-	# Text Speed
-	_add_option_label(container, "Text Speed")
+	# Text Speed - option container with toggles
 	var speed_hbox = _create_button_group(["Slow", "Normal", "Fast"], _text_speed, func(idx): _text_speed = idx; _save_settings())
-	container.add_child(speed_hbox)
+	var speed_container = _create_option_container("Text Speed", speed_hbox)
+	container.add_child(speed_container)
 
-	_add_spacer(container, 15)
-
-	# Vibration
-	_add_option_label(container, "Vibration")
+	# Vibration - option container with toggles
 	var vib_hbox = _create_button_group(["Off", "On"], 1 if _vibration else 0, func(idx): _vibration = (idx == 1); _save_settings())
-	container.add_child(vib_hbox)
+	var vib_container = _create_option_container("Vibration", vib_hbox)
+	container.add_child(vib_container)
 
-	_add_spacer(container, 15)
-
-	# Difficulty
-	_add_option_label(container, "Difficulty")
+	# Difficulty - option container with toggles
 	var diff_hbox = _create_button_group(["Easy", "Normal", "Hard"], _difficulty, func(idx): _difficulty = idx; _save_settings())
-	container.add_child(diff_hbox)
-
-	# Spacer to push Restore Defaults to bottom
-	var spacer = Control.new()
-	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	container.add_child(spacer)
-
-	# Restore Defaults button
-	var restore_btn = Button.new()
-	restore_btn.text = "RESTORE DEFAULTS"
-	restore_btn.custom_minimum_size = Vector2(200, 45)
-	restore_btn.focus_mode = Control.FOCUS_ALL
-	restore_btn.pressed.connect(_restore_game_defaults)
-	aCoreVibeTheme.style_button_with_focus_invert(restore_btn, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
-	_add_button_padding(restore_btn)
-	var restore_center = CenterContainer.new()
-	restore_center.add_child(restore_btn)
-	container.add_child(restore_center)
-
-	# Set up vertical focus navigation after UI is built
-	call_deferred("_setup_vertical_focus_for_tab", scroll)
+	var diff_container = _create_option_container("Difficulty", diff_hbox)
+	container.add_child(diff_container)
 
 	return scroll
 
@@ -686,7 +855,7 @@ func _build_display_tab() -> Control:
 
 	var container = VBoxContainer.new()
 	container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	container.add_theme_constant_override("separation", 20)
+	container.add_theme_constant_override("separation", 12)
 	scroll.add_child(container)
 
 	# Title
@@ -699,32 +868,27 @@ func _build_display_tab() -> Control:
 
 	_add_spacer(container, 10)
 
-	# Display Type
-	_add_option_label(container, "Display Type")
+	# Display Type - option container with toggles
 	var type_idx = 0 if _display_type == "stretch" else 1
 	var type_hbox = _create_button_group(["Stretch", "Constant"], type_idx, func(idx):
 		_display_type = "stretch" if idx == 0 else "constant"
 		_apply_display_settings()
 		_save_settings()
 	)
-	container.add_child(type_hbox)
+	var type_container = _create_option_container("Display Type", type_hbox)
+	container.add_child(type_container)
 
-	_add_spacer(container, 15)
-
-	# Resolution
-	_add_option_label(container, "Resolution")
+	# Resolution - option container with toggles
 	var res_idx = 0 if _resolution == "720p" else 1
 	var res_hbox = _create_button_group(["720p", "1080p"], res_idx, func(idx):
 		_resolution = "720p" if idx == 0 else "1080p"
 		_apply_display_settings()
 		_save_settings()
 	)
-	container.add_child(res_hbox)
+	var res_container = _create_option_container("Resolution", res_hbox)
+	container.add_child(res_container)
 
-	_add_spacer(container, 15)
-
-	# Display Mode
-	_add_option_label(container, "Display Mode")
+	# Display Mode - option container with toggles
 	var mode_idx = 0
 	if _display_mode == "fullscreen":
 		mode_idx = 0
@@ -742,27 +906,8 @@ func _build_display_tab() -> Control:
 		_apply_display_settings()
 		_save_settings()
 	)
-	container.add_child(mode_hbox)
-
-	# Spacer to push Restore Defaults to bottom
-	var spacer = Control.new()
-	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	container.add_child(spacer)
-
-	# Restore Defaults button
-	var restore_btn = Button.new()
-	restore_btn.text = "RESTORE DEFAULTS"
-	restore_btn.custom_minimum_size = Vector2(200, 45)
-	restore_btn.focus_mode = Control.FOCUS_ALL
-	restore_btn.pressed.connect(_restore_display_defaults_and_rebuild)
-	aCoreVibeTheme.style_button_with_focus_invert(restore_btn, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
-	_add_button_padding(restore_btn)
-	var restore_center = CenterContainer.new()
-	restore_center.add_child(restore_btn)
-	container.add_child(restore_center)
-
-	# Set up vertical focus navigation after UI is built
-	call_deferred("_setup_vertical_focus_for_tab", scroll)
+	var mode_container = _create_option_container("Display Mode", mode_hbox)
+	container.add_child(mode_container)
 
 	return scroll
 
@@ -775,7 +920,7 @@ func _build_sound_tab() -> Control:
 
 	var container = VBoxContainer.new()
 	container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	container.add_theme_constant_override("separation", 20)
+	container.add_theme_constant_override("separation", 12)
 	scroll.add_child(container)
 
 	# Title
@@ -788,59 +933,41 @@ func _build_sound_tab() -> Control:
 
 	_add_spacer(container, 10)
 
-	# Voice Volume
-	_add_volume_slider(container, "Voice", _volume_voice, func(value):
+	# Voice Volume - option container with slider
+	var voice_slider = _create_volume_slider_row(_volume_voice, func(value):
 		_volume_voice = value
 		_apply_audio_settings()
 		_save_settings()
 	)
+	var voice_container = _create_option_container("Voice Volume", voice_slider)
+	container.add_child(voice_container)
 
-	_add_spacer(container, 15)
-
-	# Music Volume
-	_add_volume_slider(container, "Music", _volume_music, func(value):
+	# Music Volume - option container with slider
+	var music_slider = _create_volume_slider_row(_volume_music, func(value):
 		_volume_music = value
 		_apply_audio_settings()
 		_save_settings()
 	)
+	var music_container = _create_option_container("Music Volume", music_slider)
+	container.add_child(music_container)
 
-	_add_spacer(container, 15)
-
-	# SFX Volume
-	_add_volume_slider(container, "SFX", _volume_sfx, func(value):
+	# SFX Volume - option container with slider
+	var sfx_slider = _create_volume_slider_row(_volume_sfx, func(value):
 		_volume_sfx = value
 		_apply_audio_settings()
 		_save_settings()
 	)
+	var sfx_container = _create_option_container("SFX Volume", sfx_slider)
+	container.add_child(sfx_container)
 
-	_add_spacer(container, 15)
-
-	# Ambient Volume
-	_add_volume_slider(container, "Ambient", _volume_ambient, func(value):
+	# Ambient Volume - option container with slider
+	var ambient_slider = _create_volume_slider_row(_volume_ambient, func(value):
 		_volume_ambient = value
 		_apply_audio_settings()
 		_save_settings()
 	)
-
-	# Spacer to push Restore Defaults to bottom
-	var spacer = Control.new()
-	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	container.add_child(spacer)
-
-	# Restore Defaults button
-	var restore_btn = Button.new()
-	restore_btn.text = "RESTORE DEFAULTS"
-	restore_btn.custom_minimum_size = Vector2(200, 45)
-	restore_btn.focus_mode = Control.FOCUS_ALL
-	restore_btn.pressed.connect(_restore_sound_defaults_and_rebuild)
-	aCoreVibeTheme.style_button_with_focus_invert(restore_btn, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
-	_add_button_padding(restore_btn)
-	var restore_center = CenterContainer.new()
-	restore_center.add_child(restore_btn)
-	container.add_child(restore_center)
-
-	# Set up vertical focus navigation after UI is built
-	call_deferred("_setup_vertical_focus_for_tab", scroll)
+	var ambient_container = _create_option_container("Ambient Volume", ambient_slider)
+	container.add_child(ambient_container)
 
 	return scroll
 
@@ -861,6 +988,58 @@ func _add_option_label(parent: Node, text: String) -> void:
 	label.add_theme_font_size_override("font_size", 16)
 	label.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE)
 	parent.add_child(label)
+
+func _create_option_container(label_text: String, toggle_group: HBoxContainer) -> Control:
+	"""Create a focusable container for an option with its label and toggles"""
+	# Main container
+	var container = Control.new()
+	container.custom_minimum_size = Vector2(0, 80)
+	container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+
+	# Panel for visual feedback
+	var panel = Panel.new()
+	panel.set_anchors_preset(Control.PRESET_FULL_RECT)
+
+	# Initial style - subtle border
+	var style = aCoreVibeTheme.create_panel_style(
+		aCoreVibeTheme.COLOR_SKY_CYAN,
+		Color(aCoreVibeTheme.COLOR_NIGHT_NAVY.r, aCoreVibeTheme.COLOR_NIGHT_NAVY.g, aCoreVibeTheme.COLOR_NIGHT_NAVY.b, 0.5),
+		0.5,
+		aCoreVibeTheme.CORNER_RADIUS_SMALL,
+		2,
+		aCoreVibeTheme.SHADOW_SIZE_SMALL
+	)
+	panel.add_theme_stylebox_override("panel", style)
+	container.add_child(panel)
+
+	# Store panel reference for highlighting
+	container.set_meta("panel", panel)
+
+	# Content margin
+	var margin = MarginContainer.new()
+	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+	margin.add_theme_constant_override("margin_left", 12)
+	margin.add_theme_constant_override("margin_top", 12)
+	margin.add_theme_constant_override("margin_right", 12)
+	margin.add_theme_constant_override("margin_bottom", 12)
+	container.add_child(margin)
+
+	# VBox for label and toggles
+	var vbox = VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 8)
+	margin.add_child(vbox)
+
+	# Label
+	var label = Label.new()
+	label.text = label_text
+	label.add_theme_font_size_override("font_size", 16)
+	label.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE)
+	vbox.add_child(label)
+
+	# Toggle group
+	vbox.add_child(toggle_group)
+
+	return container
 
 func _add_section_header(parent: Node, text: String) -> void:
 	"""Add a styled section header for control categories"""
@@ -910,6 +1089,39 @@ func _add_volume_slider(parent: Node, label_text: String, initial_value: float, 
 		percent_label.text = "%d%%" % int(value)
 		on_change.call(value)
 	)
+
+func _create_volume_slider_row(initial_value: float, on_change: Callable) -> HBoxContainer:
+	"""Create a volume slider row (without label) for use in option containers"""
+	var row = HBoxContainer.new()
+	row.add_theme_constant_override("separation", 15)
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+
+	# Slider
+	var slider = HSlider.new()
+	slider.min_value = 0.0
+	slider.max_value = 100.0
+	slider.step = 1.0
+	slider.value = initial_value
+	slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	slider.custom_minimum_size = Vector2(300, 30)
+	slider.focus_mode = Control.FOCUS_ALL
+	row.add_child(slider)
+
+	# Percentage label
+	var percent_label = Label.new()
+	percent_label.text = "%d%%" % int(initial_value)
+	percent_label.custom_minimum_size = Vector2(60, 0)
+	percent_label.add_theme_font_size_override("font_size", 16)
+	percent_label.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE)
+	row.add_child(percent_label)
+
+	# Update percentage label and call callback when slider changes
+	slider.value_changed.connect(func(value):
+		percent_label.text = "%d%%" % int(value)
+		on_change.call(value)
+	)
+
+	return row
 
 func _create_button_group(options: Array, selected_idx: int, on_select: Callable) -> HBoxContainer:
 	"""Create a horizontal group of toggle buttons with focus navigation"""
