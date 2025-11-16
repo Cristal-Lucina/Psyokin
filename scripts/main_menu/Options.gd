@@ -472,7 +472,34 @@ func _build_game_options_tab() -> Control:
 	restore_center.add_child(restore_btn)
 	container.add_child(restore_center)
 
+	# Set up vertical focus navigation after UI is built
+	call_deferred("_setup_vertical_focus_for_tab", scroll)
+
 	return scroll
+
+func _setup_vertical_focus_for_tab(container: Control) -> void:
+	"""Set up vertical focus navigation for all focusable controls in a tab"""
+	var focusable_controls: Array[Control] = []
+	_collect_focusable_controls(container, focusable_controls)
+
+	# Connect them vertically
+	for i in range(focusable_controls.size()):
+		if i > 0:
+			focusable_controls[i].focus_neighbor_top = focusable_controls[i].get_path_to(focusable_controls[i - 1])
+		if i < focusable_controls.size() - 1:
+			focusable_controls[i].focus_neighbor_bottom = focusable_controls[i].get_path_to(focusable_controls[i + 1])
+
+	print("[Options] Set up vertical focus chain with %d controls" % focusable_controls.size())
+
+func _collect_focusable_controls(node: Node, result: Array[Control]) -> void:
+	"""Recursively collect all focusable controls"""
+	if node is Control:
+		var ctrl = node as Control
+		if ctrl.focus_mode != Control.FOCUS_NONE and ctrl.visible:
+			result.append(ctrl)
+
+	for child in node.get_children():
+		_collect_focusable_controls(child, result)
 
 func _build_controls_tab() -> Control:
 	"""Build Controls tab with Control Type selector and remapping"""
@@ -636,6 +663,9 @@ func _build_display_tab() -> Control:
 	restore_center.add_child(restore_btn)
 	container.add_child(restore_center)
 
+	# Set up vertical focus navigation after UI is built
+	call_deferred("_setup_vertical_focus_for_tab", scroll)
+
 	return scroll
 
 func _build_sound_tab() -> Control:
@@ -711,6 +741,9 @@ func _build_sound_tab() -> Control:
 	restore_center.add_child(restore_btn)
 	container.add_child(restore_center)
 
+	# Set up vertical focus navigation after UI is built
+	call_deferred("_setup_vertical_focus_for_tab", scroll)
+
 	return scroll
 
 # ==============================================================================
@@ -781,10 +814,12 @@ func _add_volume_slider(parent: Node, label_text: String, initial_value: float, 
 	)
 
 func _create_button_group(options: Array, selected_idx: int, on_select: Callable) -> HBoxContainer:
-	"""Create a horizontal group of toggle buttons"""
+	"""Create a horizontal group of toggle buttons with focus navigation"""
 	var hbox = HBoxContainer.new()
 	hbox.alignment = BoxContainer.ALIGNMENT_CENTER
 	hbox.add_theme_constant_override("separation", 8)
+
+	var buttons: Array[Button] = []
 
 	for i in range(options.size()):
 		var btn = Button.new()
@@ -798,6 +833,19 @@ func _create_button_group(options: Array, selected_idx: int, on_select: Callable
 		aCoreVibeTheme.style_button_with_focus_invert(btn, aCoreVibeTheme.COLOR_SKY_CYAN, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
 		_add_button_padding(btn)
 
+		buttons.append(btn)
+		hbox.add_child(btn)
+
+	# Set up horizontal focus navigation within the group
+	for i in range(buttons.size()):
+		var btn = buttons[i]
+
+		# Set left/right neighbors for horizontal navigation
+		if i > 0:
+			btn.focus_neighbor_left = btn.get_path_to(buttons[i - 1])
+		if i < buttons.size() - 1:
+			btn.focus_neighbor_right = btn.get_path_to(buttons[i + 1])
+
 		# When pressed, update all buttons in group
 		btn.pressed.connect(func():
 			for j in range(hbox.get_child_count()):
@@ -805,8 +853,6 @@ func _create_button_group(options: Array, selected_idx: int, on_select: Callable
 				other_btn.button_pressed = (j == i)
 			on_select.call(i)
 		)
-
-		hbox.add_child(btn)
 
 	return hbox
 
