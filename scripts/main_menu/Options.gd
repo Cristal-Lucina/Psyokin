@@ -13,12 +13,11 @@ var _current_tab: Tab = Tab.GAME
 var _tab_buttons: Array[Button] = []
 var _tab_content: Dictionary = {}  # Tab -> Control node
 
-# Navigation state - Three clear levels
-enum NavState { TAB_PANEL, OPTION_NAVIGATION, TOGGLE_SELECTION }
+# Navigation state - Two levels only
+enum NavState { TAB_PANEL, OPTION_NAVIGATION }
 var _nav_state: NavState = NavState.TAB_PANEL
-var _option_containers: Array[Control] = []  # All option containers in current tab
+var _option_containers: Array[Dictionary] = []  # {container: Control, type: String, data: Variant}
 var _current_option_index: int = 0
-var _current_toggle_group: Control = null  # HBoxContainer with buttons or sliders
 
 # Settings
 var _control_type: String = "keyboard"  # keyboard, xbox, playstation, nintendo
@@ -125,7 +124,7 @@ func _process(delta: float) -> void:
 		_input_cooldown -= delta
 
 func _input(event: InputEvent) -> void:
-	"""Handle input for three-level navigation: tabs -> options -> toggles"""
+	"""Handle input for two-level navigation: tabs -> options"""
 
 	# STATE 1: TAB_PANEL - Navigate between tabs on left
 	if _nav_state == NavState.TAB_PANEL:
@@ -140,7 +139,7 @@ func _input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 			return
 
-	# STATE 2: OPTION_NAVIGATION - Navigate between option containers
+	# STATE 2: OPTION_NAVIGATION - Navigate and cycle options
 	elif _nav_state == NavState.OPTION_NAVIGATION:
 		if event.is_action_pressed("move_up"):
 			_navigate_options(-1)
@@ -151,34 +150,13 @@ func _input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 			return
 		elif event.is_action_pressed("ui_accept") or event.is_action_pressed("menu_accept"):
-			# Enter toggle selection
-			_enter_toggle_selection()
+			# Cycle current option value
+			_cycle_current_option()
 			get_viewport().set_input_as_handled()
 			return
 		elif event.is_action_pressed("menu_cancel") or event.is_action_pressed("ui_cancel"):
 			# Return to tab panel
 			_exit_to_tab_panel()
-			get_viewport().set_input_as_handled()
-			return
-
-	# STATE 3: TOGGLE_SELECTION - Navigate within toggle buttons/sliders
-	elif _nav_state == NavState.TOGGLE_SELECTION:
-		if event.is_action_pressed("move_left"):
-			_navigate_toggles(-1)
-			get_viewport().set_input_as_handled()
-			return
-		elif event.is_action_pressed("move_right"):
-			_navigate_toggles(1)
-			get_viewport().set_input_as_handled()
-			return
-		elif event.is_action_pressed("ui_accept") or event.is_action_pressed("menu_accept"):
-			# Activate current toggle
-			_activate_current_toggle()
-			get_viewport().set_input_as_handled()
-			return
-		elif event.is_action_pressed("menu_cancel") or event.is_action_pressed("ui_cancel"):
-			# Return to option navigation
-			_exit_toggle_selection()
 			get_viewport().set_input_as_handled()
 			return
 
@@ -208,37 +186,6 @@ func _exit_to_tab_panel() -> void:
 		_tab_buttons[_current_tab].grab_focus()
 	print("[Options] Returned to tab panel")
 
-func _enter_toggle_selection() -> void:
-	"""STATE 2 -> 3: Enter toggle selection from option navigation"""
-	if _current_option_index < 0 or _current_option_index >= _option_containers.size():
-		return
-
-	var container = _option_containers[_current_option_index]
-	var toggle_group = _find_toggle_group(container)
-
-	if not toggle_group:
-		print("[Options] No toggle group found in option container")
-		return
-
-	_current_toggle_group = toggle_group
-	_nav_state = NavState.TOGGLE_SELECTION
-
-	# Focus first focusable element (Button or HSlider)
-	for child in toggle_group.get_children():
-		if (child is Button and child.focus_mode != Control.FOCUS_NONE) or child is HSlider:
-			child.grab_focus()
-			print("[Options] Entered toggle selection mode")
-			return
-
-func _exit_toggle_selection() -> void:
-	"""STATE 3 -> 2: Return to option navigation from toggle selection"""
-	_nav_state = NavState.OPTION_NAVIGATION
-	_current_toggle_group = null
-
-	# Restore highlight on current option
-	_highlight_option(_current_option_index)
-	print("[Options] Exited toggle selection mode")
-
 # ==============================================================================
 # Navigation Functions
 # ==============================================================================
@@ -261,49 +208,43 @@ func _navigate_options(direction: int) -> void:
 	# Highlight new
 	_highlight_option(_current_option_index)
 
-func _navigate_toggles(direction: int) -> void:
-	"""Navigate within toggle group with left/right"""
-	if not _current_toggle_group:
+func _cycle_current_option() -> void:
+	"""Cycle the value of the current option"""
+	if _current_option_index < 0 or _current_option_index >= _option_containers.size():
 		return
 
-	var focused = get_viewport().gui_get_focus_owner()
-	if not focused:
-		return
+	var opt_data = _option_containers[_current_option_index]
+	var opt_type = opt_data["type"]
 
-	# Collect focusable elements (buttons and sliders)
-	var focusables: Array[Control] = []
-	for child in _current_toggle_group.get_children():
-		if (child is Button and child.focus_mode != Control.FOCUS_NONE) or child is HSlider:
-			focusables.append(child)
+	if opt_type == "toggle":
+		# Cycle to next value
+		var toggle_data = opt_data["data"]
+		var current_value = toggle_data["current_value"]
+		var options = toggle_data["options"]
+		var callback = toggle_data["callback"]
 
-	if focusables.is_empty():
-		return
+		# Cycle
+		current_value += 1
+		if current_value >= options.size():
+			current_value = 0
 
-	var current_idx = focusables.find(focused)
-	if current_idx < 0:
-		return
+		toggle_data["current_value"] = current_value
+		callback.call(current_value)
 
-	# Navigate
-	current_idx += direction
-	if current_idx < 0:
-		current_idx = focusables.size() - 1
-	elif current_idx >= focusables.size():
-		current_idx = 0
+		# Update visual
+		_update_option_visual(opt_data)
 
-	focusables[current_idx].grab_focus()
-
-func _activate_current_toggle() -> void:
-	"""Activate the currently focused toggle button or slider"""
-	var focused = get_viewport().gui_get_focus_owner()
-	if focused and focused is Button:
-		focused.emit_signal("pressed")
+	elif opt_type == "slider":
+		# For sliders, we don't cycle - they use their own controls
+		pass
 
 func _highlight_option(index: int) -> void:
 	"""Highlight an option container"""
 	if index < 0 or index >= _option_containers.size():
 		return
 
-	var container = _option_containers[index]
+	var opt_data = _option_containers[index]
+	var container = opt_data["container"]
 	# Add visual feedback - bright border
 	if container.has_meta("panel"):
 		var panel = container.get_meta("panel") as Panel
@@ -321,7 +262,8 @@ func _unhighlight_option(index: int) -> void:
 	if index < 0 or index >= _option_containers.size():
 		return
 
-	var container = _option_containers[index]
+	var opt_data = _option_containers[index]
+	var container = opt_data["container"]
 	# Remove visual feedback - dim border
 	if container.has_meta("panel"):
 		var panel = container.get_meta("panel") as Panel
@@ -334,15 +276,30 @@ func _unhighlight_option(index: int) -> void:
 			style.border_width_bottom = 2
 			panel.add_theme_stylebox_override("panel", style)
 
-func _find_toggle_group(container: Control) -> HBoxContainer:
-	"""Find the HBoxContainer with toggle buttons or sliders in an option container"""
-	for child in container.get_children():
-		if child is HBoxContainer:
-			# Check if it has Button or Slider children
-			for subchild in child.get_children():
-				if subchild is Button or subchild is HSlider:
-					return child as HBoxContainer
-	return null
+func _update_option_visual(opt_data: Dictionary) -> void:
+	"""Update the visual display of an option after cycling its value"""
+	var container = opt_data["container"]
+	var opt_type = opt_data["type"]
+
+	if opt_type == "toggle":
+		# Find the radio buttons container and update display
+		var toggle_data = opt_data["data"]
+		var current_value = toggle_data["current_value"]
+		var options = toggle_data["options"]
+
+		# Find the HBoxContainer with radio buttons
+		var radio_container = container.get_meta("radio_container") if container.has_meta("radio_container") else null
+		if radio_container:
+			# Update which button shows as selected
+			for i in range(radio_container.get_child_count()):
+				var radio_item = radio_container.get_child(i)
+				if radio_item.has_meta("radio_indicator"):
+					var indicator = radio_item.get_meta("radio_indicator") as Panel
+					# Highlight selected option
+					if i == current_value:
+						indicator.modulate = aCoreVibeTheme.COLOR_ELECTRIC_LIME
+					else:
+						indicator.modulate = Color(0.5, 0.5, 0.5, 0.5)
 
 func _unhandled_input(event: InputEvent) -> void:
 	"""Block any unhandled input from reaching the game behind this menu"""
@@ -621,7 +578,6 @@ func _switch_tab(tab: Tab) -> void:
 	# Reset to tab panel state
 	_nav_state = NavState.TAB_PANEL
 	_current_option_index = 0
-	_current_toggle_group = null
 
 	# Rebuild option containers list for this tab
 	_option_containers.clear()
@@ -630,11 +586,16 @@ func _switch_tab(tab: Tab) -> void:
 
 	print("[Options] Switched to tab: %s with %d option containers" % [tab, _option_containers.size()])
 
-func _collect_option_containers(node: Node, result: Array[Control]) -> void:
-	"""Recursively collect option containers"""
-	if node.has_meta("panel"):
-		# This is an option container
-		result.append(node as Control)
+func _collect_option_containers(node: Node, result: Array[Dictionary]) -> void:
+	"""Recursively collect option containers with metadata"""
+	if node.has_meta("option_data"):
+		# This is an option container with data
+		var opt_dict = {
+			"container": node as Control,
+			"type": node.get_meta("option_type"),
+			"data": node.get_meta("option_data")
+		}
+		result.append(opt_dict)
 		return
 
 	for child in node.get_children():
@@ -711,24 +672,20 @@ func _build_game_options_tab() -> Control:
 
 	_add_spacer(container, 10)
 
-	# Language - option container with toggles
-	var lang_hbox = _create_button_group(["English"], 0, func(_idx): _language = "English"; _save_settings())
-	var lang_container = _create_option_container("Language", lang_hbox)
+	# Language - option container with radio buttons
+	var lang_container = _create_option_container_with_radio("Language", ["English"], 0, func(_idx): _language = "English"; _save_settings())
 	container.add_child(lang_container)
 
-	# Text Speed - option container with toggles
-	var speed_hbox = _create_button_group(["Slow", "Normal", "Fast"], _text_speed, func(idx): _text_speed = idx; _save_settings())
-	var speed_container = _create_option_container("Text Speed", speed_hbox)
+	# Text Speed - option container with radio buttons
+	var speed_container = _create_option_container_with_radio("Text Speed", ["Slow", "Normal", "Fast"], _text_speed, func(idx): _text_speed = idx; _save_settings())
 	container.add_child(speed_container)
 
-	# Vibration - option container with toggles
-	var vib_hbox = _create_button_group(["Off", "On"], 1 if _vibration else 0, func(idx): _vibration = (idx == 1); _save_settings())
-	var vib_container = _create_option_container("Vibration", vib_hbox)
+	# Vibration - option container with radio buttons
+	var vib_container = _create_option_container_with_radio("Vibration", ["Off", "On"], 1 if _vibration else 0, func(idx): _vibration = (idx == 1); _save_settings())
 	container.add_child(vib_container)
 
-	# Difficulty - option container with toggles
-	var diff_hbox = _create_button_group(["Easy", "Normal", "Hard"], _difficulty, func(idx): _difficulty = idx; _save_settings())
-	var diff_container = _create_option_container("Difficulty", diff_hbox)
+	# Difficulty - option container with radio buttons
+	var diff_container = _create_option_container_with_radio("Difficulty", ["Easy", "Normal", "Hard"], _difficulty, func(idx): _difficulty = idx; _save_settings())
 	container.add_child(diff_container)
 
 	return scroll
@@ -779,7 +736,7 @@ func _build_controls_tab() -> Control:
 
 	_add_spacer(container, 10)
 
-	# Control Style - option container with toggles
+	# Control Style - option container with radio buttons
 	var type_idx = 0
 	if _control_type == "keyboard":
 		type_idx = 0
@@ -790,7 +747,7 @@ func _build_controls_tab() -> Control:
 	else:  # nintendo
 		type_idx = 3
 
-	var type_hbox = _create_button_group(["Keyboard", "Xbox", "PlayStation", "Nintendo"], type_idx, func(idx):
+	var type_container = _create_option_container_with_radio("Control Style", ["Keyboard", "Xbox", "PlayStation", "Nintendo"], type_idx, func(idx):
 		if idx == 0:
 			_control_type = "keyboard"
 		elif idx == 1:
@@ -803,7 +760,6 @@ func _build_controls_tab() -> Control:
 		# Rebuild tab to update button configs display
 		_rebuild_controls_tab()
 	)
-	var type_container = _create_option_container("Control Style", type_hbox)
 	container.add_child(type_container)
 
 	_add_spacer(container, 20)
@@ -845,27 +801,25 @@ func _build_display_tab() -> Control:
 
 	_add_spacer(container, 10)
 
-	# Display Type - option container with toggles
+	# Display Type - option container with radio buttons
 	var type_idx = 0 if _display_type == "stretch" else 1
-	var type_hbox = _create_button_group(["Stretch", "Constant"], type_idx, func(idx):
+	var type_container = _create_option_container_with_radio("Display Type", ["Stretch", "Constant"], type_idx, func(idx):
 		_display_type = "stretch" if idx == 0 else "constant"
 		_apply_display_settings()
 		_save_settings()
 	)
-	var type_container = _create_option_container("Display Type", type_hbox)
 	container.add_child(type_container)
 
-	# Resolution - option container with toggles
+	# Resolution - option container with radio buttons
 	var res_idx = 0 if _resolution == "720p" else 1
-	var res_hbox = _create_button_group(["720p", "1080p"], res_idx, func(idx):
+	var res_container = _create_option_container_with_radio("Resolution", ["720p", "1080p"], res_idx, func(idx):
 		_resolution = "720p" if idx == 0 else "1080p"
 		_apply_display_settings()
 		_save_settings()
 	)
-	var res_container = _create_option_container("Resolution", res_hbox)
 	container.add_child(res_container)
 
-	# Display Mode - option container with toggles
+	# Display Mode - option container with radio buttons
 	var mode_idx = 0
 	if _display_mode == "fullscreen":
 		mode_idx = 0
@@ -873,7 +827,7 @@ func _build_display_tab() -> Control:
 		mode_idx = 1
 	else:
 		mode_idx = 2
-	var mode_hbox = _create_button_group(["Fullscreen", "Borderless", "Windowed"], mode_idx, func(idx):
+	var mode_container = _create_option_container_with_radio("Display Mode", ["Fullscreen", "Borderless", "Windowed"], mode_idx, func(idx):
 		if idx == 0:
 			_display_mode = "fullscreen"
 		elif idx == 1:
@@ -883,7 +837,6 @@ func _build_display_tab() -> Control:
 		_apply_display_settings()
 		_save_settings()
 	)
-	var mode_container = _create_option_container("Display Mode", mode_hbox)
 	container.add_child(mode_container)
 
 	return scroll
@@ -916,7 +869,7 @@ func _build_sound_tab() -> Control:
 		_apply_audio_settings()
 		_save_settings()
 	)
-	var voice_container = _create_option_container("Voice Volume", voice_slider)
+	var voice_container = _create_option_container_with_slider("Voice Volume", voice_slider)
 	container.add_child(voice_container)
 
 	# Music Volume - option container with slider
@@ -925,7 +878,7 @@ func _build_sound_tab() -> Control:
 		_apply_audio_settings()
 		_save_settings()
 	)
-	var music_container = _create_option_container("Music Volume", music_slider)
+	var music_container = _create_option_container_with_slider("Music Volume", music_slider)
 	container.add_child(music_container)
 
 	# SFX Volume - option container with slider
@@ -934,7 +887,7 @@ func _build_sound_tab() -> Control:
 		_apply_audio_settings()
 		_save_settings()
 	)
-	var sfx_container = _create_option_container("SFX Volume", sfx_slider)
+	var sfx_container = _create_option_container_with_slider("SFX Volume", sfx_slider)
 	container.add_child(sfx_container)
 
 	# Ambient Volume - option container with slider
@@ -943,7 +896,7 @@ func _build_sound_tab() -> Control:
 		_apply_audio_settings()
 		_save_settings()
 	)
-	var ambient_container = _create_option_container("Ambient Volume", ambient_slider)
+	var ambient_container = _create_option_container_with_slider("Ambient Volume", ambient_slider)
 	container.add_child(ambient_container)
 
 	return scroll
@@ -966,8 +919,8 @@ func _add_option_label(parent: Node, text: String) -> void:
 	label.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE)
 	parent.add_child(label)
 
-func _create_option_container(label_text: String, toggle_group: HBoxContainer) -> Control:
-	"""Create a focusable container for an option with its label and toggles"""
+func _create_option_container_with_radio(label_text: String, options: Array, selected_idx: int, on_change: Callable) -> Control:
+	"""Create a container for an option with radio buttons"""
 	# Main container
 	var container = Control.new()
 	container.custom_minimum_size = Vector2(0, 80)
@@ -992,6 +945,21 @@ func _create_option_container(label_text: String, toggle_group: HBoxContainer) -
 	# Store panel reference for highlighting
 	container.set_meta("panel", panel)
 
+	# Create radio button group
+	var radio_group = _create_radio_group(options, selected_idx)
+
+	# Store option metadata
+	container.set_meta("option_type", "toggle")
+	container.set_meta("option_data", {
+		"options": options,
+		"current_value": selected_idx,
+		"callback": on_change
+	})
+	container.set_meta("radio_container", radio_group)
+
+	# Mark this container as having option data for collection
+	container.set_meta("option_data", true)
+
 	# Content margin
 	var margin = MarginContainer.new()
 	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -1001,7 +969,7 @@ func _create_option_container(label_text: String, toggle_group: HBoxContainer) -
 	margin.add_theme_constant_override("margin_bottom", 12)
 	container.add_child(margin)
 
-	# VBox for label and toggles
+	# VBox for label and radio buttons
 	var vbox = VBoxContainer.new()
 	vbox.add_theme_constant_override("separation", 8)
 	margin.add_child(vbox)
@@ -1013,8 +981,67 @@ func _create_option_container(label_text: String, toggle_group: HBoxContainer) -
 	label.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE)
 	vbox.add_child(label)
 
-	# Toggle group
-	vbox.add_child(toggle_group)
+	# Radio button group
+	vbox.add_child(radio_group)
+
+	return container
+
+func _create_option_container_with_slider(label_text: String, slider_row: HBoxContainer) -> Control:
+	"""Create a container for an option with a slider"""
+	# Main container
+	var container = Control.new()
+	container.custom_minimum_size = Vector2(0, 80)
+	container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+
+	# Panel for visual feedback
+	var panel = Panel.new()
+	panel.set_anchors_preset(Control.PRESET_FULL_RECT)
+
+	# Initial style - subtle border
+	var style = aCoreVibeTheme.create_panel_style(
+		aCoreVibeTheme.COLOR_SKY_CYAN,
+		Color(aCoreVibeTheme.COLOR_NIGHT_NAVY.r, aCoreVibeTheme.COLOR_NIGHT_NAVY.g, aCoreVibeTheme.COLOR_NIGHT_NAVY.b, 0.5),
+		0.5,
+		aCoreVibeTheme.CORNER_RADIUS_SMALL,
+		2,
+		aCoreVibeTheme.SHADOW_SIZE_SMALL
+	)
+	panel.add_theme_stylebox_override("panel", style)
+	container.add_child(panel)
+
+	# Store panel reference for highlighting
+	container.set_meta("panel", panel)
+
+	# Store option metadata
+	container.set_meta("option_type", "slider")
+	container.set_meta("option_data", {})
+
+	# Mark this container as having option data for collection
+	container.set_meta("option_data", true)
+
+	# Content margin
+	var margin = MarginContainer.new()
+	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+	margin.add_theme_constant_override("margin_left", 12)
+	margin.add_theme_constant_override("margin_top", 12)
+	margin.add_theme_constant_override("margin_right", 12)
+	margin.add_theme_constant_override("margin_bottom", 12)
+	container.add_child(margin)
+
+	# VBox for label and slider
+	var vbox = VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 8)
+	margin.add_child(vbox)
+
+	# Label
+	var label = Label.new()
+	label.text = label_text
+	label.add_theme_font_size_override("font_size", 16)
+	label.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE)
+	vbox.add_child(label)
+
+	# Slider row
+	vbox.add_child(slider_row)
 
 	return container
 
@@ -1100,44 +1127,54 @@ func _create_volume_slider_row(initial_value: float, on_change: Callable) -> HBo
 
 	return row
 
-func _create_button_group(options: Array, selected_idx: int, on_select: Callable) -> HBoxContainer:
-	"""Create a horizontal group of toggle buttons with focus navigation"""
+func _create_radio_group(options: Array, selected_idx: int) -> HBoxContainer:
+	"""Create a horizontal group of small radio buttons (non-interactive display)"""
 	var hbox = HBoxContainer.new()
 	hbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	hbox.add_theme_constant_override("separation", 8)
-
-	var buttons: Array[Button] = []
+	hbox.add_theme_constant_override("separation", 12)
 
 	for i in range(options.size()):
-		var btn = Button.new()
-		btn.text = str(options[i])
-		btn.custom_minimum_size = Vector2(120, 40)
-		btn.toggle_mode = true
-		btn.button_pressed = (i == selected_idx)
-		btn.focus_mode = Control.FOCUS_ALL
+		# Container for radio button and label
+		var radio_item = HBoxContainer.new()
+		radio_item.add_theme_constant_override("separation", 6)
 
-		# Style with Sky Cyan accent
-		aCoreVibeTheme.style_button_with_focus_invert(btn, aCoreVibeTheme.COLOR_SKY_CYAN, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
-		_add_button_padding(btn)
+		# Small circular radio indicator
+		var indicator = Panel.new()
+		indicator.custom_minimum_size = Vector2(16, 16)
 
-		buttons.append(btn)
-		hbox.add_child(btn)
+		# Style as a small circle
+		var style = StyleBoxFlat.new()
+		style.bg_color = Color(0.2, 0.2, 0.2, 1.0)
+		style.corner_radius_top_left = 8
+		style.corner_radius_top_right = 8
+		style.corner_radius_bottom_left = 8
+		style.corner_radius_bottom_right = 8
+		style.border_width_left = 2
+		style.border_width_right = 2
+		style.border_width_top = 2
+		style.border_width_bottom = 2
+		style.border_color = aCoreVibeTheme.COLOR_SKY_CYAN
+		indicator.add_theme_stylebox_override("panel", style)
 
-	# Set up button behavior (no horizontal navigation - disabled in content panel)
-	for i in range(buttons.size()):
-		var btn = buttons[i]
+		# Highlight selected option
+		if i == selected_idx:
+			indicator.modulate = aCoreVibeTheme.COLOR_ELECTRIC_LIME
+		else:
+			indicator.modulate = Color(0.5, 0.5, 0.5, 0.5)
 
-		# Disable left/right neighbors - no horizontal navigation in content panel
-		btn.focus_neighbor_left = NodePath()
-		btn.focus_neighbor_right = NodePath()
+		radio_item.add_child(indicator)
 
-		# When pressed, update all buttons in group
-		btn.pressed.connect(func():
-			for j in range(hbox.get_child_count()):
-				var other_btn = hbox.get_child(j) as Button
-				other_btn.button_pressed = (j == i)
-			on_select.call(i)
-		)
+		# Label for option
+		var label = Label.new()
+		label.text = str(options[i])
+		label.add_theme_font_size_override("font_size", 14)
+		label.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE)
+		radio_item.add_child(label)
+
+		# Store indicator reference for later updates
+		radio_item.set_meta("radio_indicator", indicator)
+
+		hbox.add_child(radio_item)
 
 	return hbox
 
@@ -1200,10 +1237,8 @@ func _rebuild_controls_tab() -> void:
 		_collect_option_containers(_tab_content[Tab.CONTROLS], _option_containers)
 
 		# Reset to option navigation if we were in it
-		if _nav_state == NavState.OPTION_NAVIGATION or _nav_state == NavState.TOGGLE_SELECTION:
-			_nav_state = NavState.OPTION_NAVIGATION
+		if _nav_state == NavState.OPTION_NAVIGATION:
 			_current_option_index = 0
-			_current_toggle_group = null
 			_highlight_option(0)
 
 func _reset_input_mappings() -> void:
