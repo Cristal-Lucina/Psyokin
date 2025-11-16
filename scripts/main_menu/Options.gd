@@ -1,28 +1,44 @@
 extends Control
 
 ## Options menu - accessible from Title screen and System panel
-## Displays game settings including controls configuration with remapping
+## Tabbed interface with Game Options, Controls, Display, and Sound
 
 @onready var _close_btn: Button = %CloseBtn
-@onready var _controls_panel: Control = %ControlsContent
 @onready var _background: ColorRect = $Background
 @onready var _panel: Panel = $CenterContainer/Panel
+@onready var _content_container: Control = null  # Will hold the tab content
 
-# Remapping state
-var _action_data: Array[Dictionary] = []  # Array of {name: String, kb_button: Button, ctrl_button: Button}
+# Tab management
+enum Tab { GAME, CONTROLS, DISPLAY, SOUND }
+var _current_tab: Tab = Tab.GAME
+var _tab_buttons: Array[Button] = []
+var _tab_content: Dictionary = {}  # Tab -> Control node
+
+# Settings
+var _control_type: String = "keyboard"  # keyboard, xbox, playstation, nintendo
+var _language: String = "English"
+var _text_speed: int = 1  # 0=Slow, 1=Normal, 2=Fast
+var _vibration: bool = true
+var _difficulty: int = 1  # 0=Easy, 1=Normal, 2=Hard
+var _display_type: String = "stretch"  # stretch, constant
+var _resolution: String = "1080p"  # 720p, 1080p
+var _display_mode: String = "fullscreen"  # fullscreen, borderless, windowed
+var _volume_voice: float = 100.0
+var _volume_music: float = 100.0
+var _volume_sfx: float = 100.0
+var _volume_ambient: float = 100.0
+
+# Remapping state (for Controls tab)
+var _action_data: Array[Dictionary] = []
 var _waiting_for_input: bool = false
 var _waiting_action: String = ""
-
-# Controller navigation - action-based
 var _selected_action_index: int = 0
 var _input_cooldown: float = 0.0
 var _input_cooldown_duration: float = 0.2
-var _scroll_container: ScrollContainer = null  # Reference for auto-scrolling
+var _scroll_container: ScrollContainer = null
 
 func _ready() -> void:
-	print("[Options] _ready() called")
-	print("[Options] Close button: ", _close_btn)
-	print("[Options] Controls panel: ", _controls_panel)
+	print("[Options] _ready() called - building tabbed interface")
 
 	# Ensure this overlay continues to process even when title is "paused"
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -36,20 +52,13 @@ func _ready() -> void:
 	if _panel:
 		_style_panel(_panel)
 
-	# Style close button with focus invert
-	if _close_btn:
-		_close_btn.pressed.connect(_on_close_pressed)
-		aCoreVibeTheme.style_button_with_focus_invert(_close_btn, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
-		_add_button_padding(_close_btn)
-		print("[Options] Close button connected")
-	else:
-		push_error("[Options] Close button not found!")
+	# Load settings from aSettings
+	_load_settings()
 
-	if _controls_panel:
-		# Create the controls UI
-		_build_controls_ui()
-	else:
-		push_error("[Options] Controls panel not found!")
+	# Build the tabbed interface
+	_build_tabbed_interface()
+
+	print("[Options] Tabbed interface built successfully!")
 
 func _style_panel(panel: Panel) -> void:
 	"""Apply Core Vibe neon-kawaii styling to options panel"""
@@ -75,10 +84,216 @@ func _add_button_padding(button: Button) -> void:
 			style.content_margin_top = 8
 			style.content_margin_bottom = 8
 
+# ==============================================================================
+# Settings Load/Save
+# ==============================================================================
+
+func _load_settings() -> void:
+	"""Load settings from aSettings autoload"""
+	if has_node("/root/aSettings"):
+		_control_type = aSettings.get_setting("control_type", "keyboard")
+		_language = aSettings.get_setting("language", "English")
+		_text_speed = aSettings.get_setting("text_speed", 1)
+		_vibration = aSettings.get_setting("vibration", true)
+		_difficulty = aSettings.get_setting("difficulty", 1)
+		_display_type = aSettings.get_setting("display_type", "stretch")
+		_resolution = aSettings.get_setting("resolution", "1080p")
+		_display_mode = aSettings.get_setting("display_mode", "fullscreen")
+		_volume_voice = aSettings.get_setting("volume_voice", 100.0)
+		_volume_music = aSettings.get_setting("volume_music", 100.0)
+		_volume_sfx = aSettings.get_setting("volume_sfx", 100.0)
+		_volume_ambient = aSettings.get_setting("volume_ambient", 100.0)
+
+func _save_settings() -> void:
+	"""Save settings to aSettings autoload"""
+	if has_node("/root/aSettings"):
+		aSettings.set_setting("control_type", _control_type)
+		aSettings.set_setting("language", _language)
+		aSettings.set_setting("text_speed", _text_speed)
+		aSettings.set_setting("vibration", _vibration)
+		aSettings.set_setting("difficulty", _difficulty)
+		aSettings.set_setting("display_type", _display_type)
+		aSettings.set_setting("resolution", _resolution)
+		aSettings.set_setting("display_mode", _display_mode)
+		aSettings.set_setting("volume_voice", _volume_voice)
+		aSettings.set_setting("volume_music", _volume_music)
+		aSettings.set_setting("volume_sfx", _volume_sfx)
+		aSettings.set_setting("volume_ambient", _volume_ambient)
+		aSettings.save_settings()
+
+# ==============================================================================
+# Tab Interface Builder
+# ==============================================================================
+
+func _build_tabbed_interface() -> void:
+	"""Build vertical tabs on left, content on right"""
+	# Clear existing content
+	var margin = _panel.get_node_or_null("MarginContainer")
+	if margin:
+		for child in margin.get_children():
+			child.queue_free()
+	else:
+		margin = MarginContainer.new()
+		margin.name = "MarginContainer"
+		margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+		margin.add_theme_constant_override("margin_left", 20)
+		margin.add_theme_constant_override("margin_top", 20)
+		margin.add_theme_constant_override("margin_right", 20)
+		margin.add_theme_constant_override("margin_bottom", 20)
+		_panel.add_child(margin)
+
+	# Main HBox: tabs on left, content on right
+	var main_hbox = HBoxContainer.new()
+	main_hbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	main_hbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	main_hbox.add_theme_constant_override("separation", 20)
+	margin.add_child(main_hbox)
+
+	# Left side: Vertical tab bar
+	var tab_vbox = VBoxContainer.new()
+	tab_vbox.custom_minimum_size = Vector2(180, 0)
+	tab_vbox.add_theme_constant_override("separation", 8)
+	main_hbox.add_child(tab_vbox)
+
+	# Tab buttons
+	_create_tab_button(tab_vbox, "GAME OPTIONS", Tab.GAME, aCoreVibeTheme.COLOR_ELECTRIC_LIME)
+	_create_tab_button(tab_vbox, "CONTROLS", Tab.CONTROLS, aCoreVibeTheme.COLOR_SKY_CYAN)
+	_create_tab_button(tab_vbox, "DISPLAY", Tab.DISPLAY, aCoreVibeTheme.COLOR_CITRUS_YELLOW)
+	_create_tab_button(tab_vbox, "SOUND", Tab.SOUND, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA)
+
+	# Spacer to push Close button to bottom
+	var spacer = Control.new()
+	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	tab_vbox.add_child(spacer)
+
+	# Close button at bottom of tab bar
+	var close_btn = Button.new()
+	close_btn.text = "CLOSE"
+	close_btn.custom_minimum_size = Vector2(0, 50)
+	close_btn.pressed.connect(_on_close_pressed)
+	aCoreVibeTheme.style_button_with_focus_invert(close_btn, aCoreVibeTheme.COLOR_GRAPE_VIOLET, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
+	_add_button_padding(close_btn)
+	tab_vbox.add_child(close_btn)
+
+	# Right side: Content container
+	_content_container = Control.new()
+	_content_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_content_container.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	main_hbox.add_child(_content_container)
+
+	# Build all tab content
+	_tab_content[Tab.GAME] = _build_game_options_tab()
+	_tab_content[Tab.CONTROLS] = _build_controls_tab()
+	_tab_content[Tab.DISPLAY] = _build_display_tab()
+	_tab_content[Tab.SOUND] = _build_sound_tab()
+
+	# Add all tabs to container (initially hidden)
+	for tab in _tab_content.values():
+		_content_container.add_child(tab)
+		tab.visible = false
+
+	# Show first tab
+	_switch_tab(Tab.GAME)
+
+func _create_tab_button(parent: Node, label: String, tab: Tab, color: Color) -> void:
+	"""Create a tab button"""
+	var btn = Button.new()
+	btn.text = label
+	btn.custom_minimum_size = Vector2(0, 50)
+	btn.pressed.connect(func(): _switch_tab(tab))
+	aCoreVibeTheme.style_button_with_focus_invert(btn, color, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
+	_add_button_padding(btn)
+	parent.add_child(btn)
+	_tab_buttons.append(btn)
+
+func _switch_tab(tab: Tab) -> void:
+	"""Switch to a different tab"""
+	_current_tab = tab
+
+	# Hide all tabs
+	for t in _tab_content.values():
+		t.visible = false
+
+	# Show selected tab
+	if _tab_content.has(tab):
+		_tab_content[tab].visible = true
+
+	print("[Options] Switched to tab: ", tab)
+
 func _on_close_pressed() -> void:
 	print("[Options] Closing options menu")
+	_save_settings()
 	queue_free()
 
+# ==============================================================================
+# Tab Content Builders
+# ==============================================================================
+
+func _build_game_options_tab() -> Control:
+	"""Build Game Options tab: Language, Text Speed, Vibration, Difficulty"""
+	var container = VBoxContainer.new()
+	container.set_anchors_preset(Control.PRESET_FULL_RECT)
+	container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	container.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	container.add_theme_constant_override("separation", 15)
+
+	# TODO: Build game options content
+	var label = Label.new()
+	label.text = "GAME OPTIONS (Coming Soon)"
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	container.add_child(label)
+
+	return container
+
+func _build_controls_tab() -> Control:
+	"""Build Controls tab with Control Type selector and remapping"""
+	var container = VBoxContainer.new()
+	container.set_anchors_preset(Control.PRESET_FULL_RECT)
+	container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	container.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	container.add_theme_constant_override("separation", 15)
+
+	# TODO: Build controls content
+	var label = Label.new()
+	label.text = "CONTROLS (Coming Soon)"
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	container.add_child(label)
+
+	return container
+
+func _build_display_tab() -> Control:
+	"""Build Display tab: Display Type, Resolution, Mode"""
+	var container = VBoxContainer.new()
+	container.set_anchors_preset(Control.PRESET_FULL_RECT)
+	container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	container.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	container.add_theme_constant_override("separation", 15)
+
+	# TODO: Build display content
+	var label = Label.new()
+	label.text = "DISPLAY (Coming Soon)"
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	container.add_child(label)
+
+	return container
+
+func _build_sound_tab() -> Control:
+	"""Build Sound tab with volume sliders"""
+	var container = VBoxContainer.new()
+	container.set_anchors_preset(Control.PRESET_FULL_RECT)
+	container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	container.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	container.add_theme_constant_override("separation", 15)
+
+	# TODO: Build sound content
+	var label = Label.new()
+	label.text = "SOUND (Coming Soon)"
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	container.add_child(label)
+
+	return container
+
+# OLD CODE TO BE REMOVED BELOW
 func _build_controls_ui() -> void:
 	"""Build the controls configuration UI"""
 	print("[Options] Building controls UI...")
@@ -440,72 +655,17 @@ func _setup_controller_navigation() -> void:
 	print("[Options] Navigation setup complete. ", _action_data.size(), " actions")
 
 func _process(delta: float) -> void:
-	"""Handle input cooldown and right stick scrolling"""
+	"""Handle input cooldown"""
 	if _input_cooldown > 0:
 		_input_cooldown -= delta
 
-	# Right stick controls scroll wheel
-	if _scroll_container:
-		var right_stick_y = Input.get_joy_axis(0, JOY_AXIS_RIGHT_Y)
-		if abs(right_stick_y) > 0.2:  # Deadzone
-			var scroll_speed = 500.0  # Pixels per second
-			_scroll_container.scroll_vertical += int(right_stick_y * scroll_speed * delta)
-
 func _input(event: InputEvent) -> void:
-	# Handle controller navigation and actions when not remapping
-	if not _waiting_for_input:
-		# Back button closes menu
-		if event.is_action_pressed("menu_back") or (event is InputEventKey and event.keycode == KEY_ESCAPE and event.pressed):
-			_on_close_pressed()
-			get_viewport().set_input_as_handled()
-			return
-
-		# Controller navigation through ACTIONS (not individual buttons)
-		if _input_cooldown <= 0 and _action_data.size() > 0:
-			if event.is_action_pressed("move_up"):
-				_navigate_actions(-1)
-				_input_cooldown = _input_cooldown_duration
-				get_viewport().set_input_as_handled()
-				return
-			elif event.is_action_pressed("move_down"):
-				_navigate_actions(1)
-				_input_cooldown = _input_cooldown_duration
-				get_viewport().set_input_as_handled()
-				return
-			elif event.is_action_pressed("menu_accept"):
-				# Start remapping for selected action
-				_start_remapping()
-				get_viewport().set_input_as_handled()
-				return
-		return
-
-	# In remapping mode - auto-detect keyboard vs controller
-	# Allow ESC to cancel remapping
-	if event is InputEventKey and event.keycode == KEY_ESCAPE and event.pressed:
-		_cancel_remapping()
+	"""Simple input handling - just close on back button for now"""
+	# Back button closes menu
+	if event.is_action_pressed("menu_back") or (event is InputEventKey and event.keycode == KEY_ESCAPE and event.pressed):
+		_on_close_pressed()
 		get_viewport().set_input_as_handled()
 		return
-
-	var is_controller = false
-	var new_event: InputEvent = null
-
-	# Auto-detect: controller input
-	if event is InputEventJoypadButton and event.pressed:
-		new_event = event
-		is_controller = true
-	elif event is InputEventJoypadMotion and abs(event.axis_value) > 0.5:
-		new_event = event
-		is_controller = true
-	# Auto-detect: keyboard input (but not ESC since we handle that above)
-	elif event is InputEventKey and event.pressed and event.keycode != KEY_ESCAPE:
-		new_event = event
-		is_controller = false
-
-	# Remap if we got valid input
-	if new_event != null:
-		_remap_action(_waiting_action, new_event, is_controller)
-		_complete_remapping(is_controller)
-		get_viewport().set_input_as_handled()
 
 func _remap_action(action_name: String, new_event: InputEvent, is_controller: bool) -> void:
 	"""Remap an action to a new input event"""
