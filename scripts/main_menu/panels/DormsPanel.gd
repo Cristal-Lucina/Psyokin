@@ -756,13 +756,7 @@ func _focus_current_roster() -> void:
 			print("[DormsPanel._focus_current_roster] Focused member: ", focused_member)
 			_update_details_for_member(focused_member)
 
-	# Show roster arrow only if we've navigated (not on initial selection)
-	if _roster_selection_arrow:
-		_roster_selection_arrow.visible = _roster_arrow_should_show
-		print("[DEBUG Arrow] Set roster arrow visible to: %s" % _roster_arrow_should_show)
-	if _roster_dark_box:
-		_roster_dark_box.visible = _roster_arrow_should_show
-		print("[DEBUG Arrow] Set dark box visible to: %s" % _roster_arrow_should_show)
+	# Hide action and room arrows (roster arrow visibility is handled in _update_roster_arrow_position)
 	if _action_selection_arrow:
 		_action_selection_arrow.visible = false
 	if _room_selection_arrow:
@@ -1502,12 +1496,16 @@ func _update_roster_arrow_position() -> void:
 	_roster_selection_arrow.position = Vector2(arrow_x, arrow_y)
 	print("[DEBUG Arrow] Arrow position set to: %s" % _roster_selection_arrow.position)
 
+	# Set arrow visibility based on flag (do this AFTER position calculation)
+	_roster_selection_arrow.visible = _roster_arrow_should_show
+	print("[DEBUG Arrow] Arrow visibility set to: %s (based on _roster_arrow_should_show)" % _roster_arrow_should_show)
+
 	if _roster_dark_box:
-		_roster_dark_box.visible = true
 		var box_x = arrow_x - _roster_dark_box.size.x - 4.0
 		var box_y = arrow_y + (_roster_selection_arrow.size.y / 2.0) - (_roster_dark_box.size.y / 2.0)
 		_roster_dark_box.position = Vector2(box_x, box_y)
-		print("[DEBUG Arrow] Dark box position set to: %s" % _roster_dark_box.position)
+		_roster_dark_box.visible = _roster_arrow_should_show
+		print("[DEBUG Arrow] Dark box position set to: %s, visible: %s" % [_roster_dark_box.position, _roster_arrow_should_show])
 
 func _update_action_arrow_position() -> void:
 	"""Update action menu arrow position - to the right of the center panel, facing left"""
