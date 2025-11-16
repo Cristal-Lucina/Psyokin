@@ -86,14 +86,16 @@ func _ready() -> void:
 	_apply_core_vibe_styling()
 
 	# Create selection arrows and dark boxes (matching LoadoutPanel)
-	_create_selection_arrows()
+	await _create_selection_arrows()
 
 	_rebuild()
 
-	# Update arrow positions after initial rebuild
-	if _category_list and _entry_list:
-		call_deferred("_update_category_arrow_position")
-		call_deferred("_update_entry_arrow_position")
+	# Update arrow positions after initial rebuild (synchronously like LoadoutPanel)
+	await get_tree().process_frame  # Wait for layout
+	if _category_list and _category_list.item_count > 0:
+		await _update_category_arrow_position()
+	if _entry_list and _entry_list.item_count > 0:
+		await _update_entry_arrow_position()
 
 func _apply_core_vibe_styling() -> void:
 	"""Apply Core Vibe neon-kawaii styling to IndexPanel (matching LoadoutPanel)"""
@@ -426,9 +428,9 @@ func _placeholder_items(cat_id: int) -> Array[Dictionary]:
 func _create_selection_arrows() -> void:
 	"""Create selection arrows and dark boxes for both lists (matching LoadoutPanel)"""
 	if _category_list:
-		_create_arrow_and_box(true)  # true = category list
+		await _create_arrow_and_box(true)  # true = category list
 	if _entry_list:
-		_create_arrow_and_box(false)  # false = entry list
+		await _create_arrow_and_box(false)  # false = entry list
 
 func _create_arrow_and_box(is_category: bool) -> void:
 	"""Create arrow and dark box for a specific list (matching LoadoutPanel)"""
