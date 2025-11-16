@@ -293,8 +293,12 @@ func _update_option_visual(opt_data: Dictionary) -> void:
 	var opt_type = opt_data["type"]
 
 	if opt_type == "toggle":
-		# Find the radio buttons container and update display
-		var toggle_data = opt_data["data"]
+		# Get fresh data from container metadata (not stale data from opt_data)
+		var toggle_data = container.get_meta("option_data")
+		if not toggle_data:
+			print("[Options] Error: No option_data metadata found in _update_option_visual")
+			return
+
 		var current_value = toggle_data["current_value"]
 		var options = toggle_data["options"]
 
@@ -601,10 +605,10 @@ func _collect_option_containers(node: Node, result: Array[Dictionary]) -> void:
 	"""Recursively collect option containers with metadata"""
 	if node.has_meta("option_data"):
 		# This is an option container with data
+		# Don't cache the data - it will be fetched fresh from metadata when needed
 		var opt_dict = {
 			"container": node as Control,
-			"type": node.get_meta("option_type"),
-			"data": node.get_meta("option_data")
+			"type": node.get_meta("option_type")
 		}
 		result.append(opt_dict)
 		return
