@@ -231,19 +231,69 @@ func _on_close_pressed() -> void:
 
 func _build_game_options_tab() -> Control:
 	"""Build Game Options tab: Language, Text Speed, Vibration, Difficulty"""
+	var scroll = ScrollContainer.new()
+	scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
+	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+
 	var container = VBoxContainer.new()
-	container.set_anchors_preset(Control.PRESET_FULL_RECT)
 	container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	container.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	container.add_theme_constant_override("separation", 15)
+	container.add_theme_constant_override("separation", 20)
+	scroll.add_child(container)
 
-	# TODO: Build game options content
-	var label = Label.new()
-	label.text = "GAME OPTIONS (Coming Soon)"
-	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	container.add_child(label)
+	# Title
+	var title = Label.new()
+	title.text = "GAME OPTIONS"
+	title.add_theme_font_size_override("font_size", 20)
+	title.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_ELECTRIC_LIME)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	container.add_child(title)
 
-	return container
+	_add_spacer(container, 10)
+
+	# Language
+	_add_option_label(container, "Language")
+	var lang_hbox = _create_button_group(["English"], 0, func(idx): _language = "English"; _save_settings())
+	container.add_child(lang_hbox)
+
+	_add_spacer(container, 15)
+
+	# Text Speed
+	_add_option_label(container, "Text Speed")
+	var speed_hbox = _create_button_group(["Slow", "Normal", "Fast"], _text_speed, func(idx): _text_speed = idx; _save_settings())
+	container.add_child(speed_hbox)
+
+	_add_spacer(container, 15)
+
+	# Vibration
+	_add_option_label(container, "Vibration")
+	var vib_hbox = _create_button_group(["Off", "On"], 1 if _vibration else 0, func(idx): _vibration = (idx == 1); _save_settings())
+	container.add_child(vib_hbox)
+
+	_add_spacer(container, 15)
+
+	# Difficulty
+	_add_option_label(container, "Difficulty")
+	var diff_hbox = _create_button_group(["Easy", "Normal", "Hard"], _difficulty, func(idx): _difficulty = idx; _save_settings())
+	container.add_child(diff_hbox)
+
+	# Spacer to push Restore Defaults to bottom
+	var spacer = Control.new()
+	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	container.add_child(spacer)
+
+	# Restore Defaults button
+	var restore_btn = Button.new()
+	restore_btn.text = "RESTORE DEFAULTS"
+	restore_btn.custom_minimum_size = Vector2(200, 45)
+	restore_btn.pressed.connect(_restore_game_defaults)
+	aCoreVibeTheme.style_button_with_focus_invert(restore_btn, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
+	_add_button_padding(restore_btn)
+	var restore_center = CenterContainer.new()
+	restore_center.add_child(restore_btn)
+	container.add_child(restore_center)
+
+	return scroll
 
 func _build_controls_tab() -> Control:
 	"""Build Controls tab with Control Type selector and remapping"""
@@ -292,6 +342,99 @@ func _build_sound_tab() -> Control:
 	container.add_child(label)
 
 	return container
+
+# ==============================================================================
+# UI Helper Functions
+# ==============================================================================
+
+func _add_spacer(parent: Node, height: float) -> void:
+	"""Add a vertical spacer"""
+	var spacer = Control.new()
+	spacer.custom_minimum_size = Vector2(0, height)
+	parent.add_child(spacer)
+
+func _add_option_label(parent: Node, text: String) -> void:
+	"""Add a section label"""
+	var label = Label.new()
+	label.text = text
+	label.add_theme_font_size_override("font_size", 16)
+	label.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE)
+	parent.add_child(label)
+
+func _create_button_group(options: Array, selected_idx: int, on_select: Callable) -> HBoxContainer:
+	"""Create a horizontal group of toggle buttons"""
+	var hbox = HBoxContainer.new()
+	hbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	hbox.add_theme_constant_override("separation", 8)
+
+	for i in range(options.size()):
+		var btn = Button.new()
+		btn.text = str(options[i])
+		btn.custom_minimum_size = Vector2(120, 40)
+		btn.toggle_mode = true
+		btn.button_pressed = (i == selected_idx)
+
+		# Color based on state
+		var color = aCoreVibeTheme.COLOR_SKY_CYAN if i == selected_idx else aCoreVibeTheme.COLOR_INK_CHARCOAL
+		aCoreVibeTheme.style_button_with_focus_invert(btn, aCoreVibeTheme.COLOR_SKY_CYAN, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
+		_add_button_padding(btn)
+
+		# When pressed, update all buttons in group
+		btn.pressed.connect(func():
+			for j in range(hbox.get_child_count()):
+				var other_btn = hbox.get_child(j) as Button
+				other_btn.button_pressed = (j == i)
+			on_select.call(i)
+		)
+
+		hbox.add_child(btn)
+
+	return hbox
+
+# ==============================================================================
+# Restore Defaults Functions
+# ==============================================================================
+
+func _restore_game_defaults() -> void:
+	"""Restore Game Options tab to defaults"""
+	_language = "English"
+	_text_speed = 1
+	_vibration = true
+	_difficulty = 1
+	_save_settings()
+
+	# Rebuild the tab to show new values
+	if _tab_content.has(Tab.GAME):
+		_tab_content[Tab.GAME].queue_free()
+		_tab_content[Tab.GAME] = _build_game_options_tab()
+		_content_container.add_child(_tab_content[Tab.GAME])
+		_switch_tab(Tab.GAME)
+
+	print("[Options] Game options restored to defaults")
+
+func _restore_controls_defaults() -> void:
+	"""Restore Controls tab to defaults"""
+	_control_type = "keyboard"
+	# TODO: Reset input mappings
+	_save_settings()
+	print("[Options] Controls restored to defaults")
+
+func _restore_display_defaults() -> void:
+	"""Restore Display tab to defaults"""
+	_display_type = "stretch"
+	_resolution = "1080p"
+	_display_mode = "fullscreen"
+	_save_settings()
+	print("[Options] Display settings restored to defaults")
+
+func _restore_sound_defaults() -> void:
+	"""Restore Sound tab to defaults"""
+	_volume_voice = 100.0
+	_volume_music = 100.0
+	_volume_sfx = 100.0
+	_volume_ambient = 100.0
+	_save_settings()
+	print("[Options] Sound settings restored to defaults")
 
 # OLD CODE TO BE REMOVED BELOW
 func _build_controls_ui() -> void:
