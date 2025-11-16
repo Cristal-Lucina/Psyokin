@@ -230,8 +230,18 @@ func _create_icon_box(icon_data: Dictionary) -> VBoxContainer:
 	tex_rect.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
 	tex_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 
-	# Load the texture
-	var texture_path = icon_base_path + icon_data["asset"]
+	# Load the texture - remap asset numbers for dark theme
+	var asset_name = icon_data["asset"]
+
+	# Dark theme: Assets 1-49 = Light theme Assets 50-98
+	# Special handling: Assets 99-100 (Nintendo +/-) exist in both themes
+	if current_theme == "Dark" and not asset_name.begins_with("Asset 99") and not asset_name.begins_with("Asset 100"):
+		# Extract the asset number and subtract 49
+		var asset_num = int(asset_name.replace("Asset ", "").replace(".png", ""))
+		if asset_num >= 50 and asset_num <= 98:
+			asset_name = "Asset " + str(asset_num - 49) + ".png"
+
+	var texture_path = icon_base_path + asset_name
 	if ResourceLoader.exists(texture_path):
 		tex_rect.texture = load(texture_path)
 	else:
