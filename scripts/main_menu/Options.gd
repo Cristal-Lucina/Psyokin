@@ -593,7 +593,7 @@ func _create_tab_button(parent: Node, label: String, tab: Tab, color: Color) -> 
 	btn.pressed.connect(func():
 		print("[Options] Tab button '%s' pressed!" % label)
 		_switch_tab(tab)
-		_move_focus_to_content()
+		_enter_option_navigation()
 	)
 
 	# Add focus tracking
