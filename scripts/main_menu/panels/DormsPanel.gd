@@ -64,6 +64,7 @@ var _background_panel: PanelContainer = null
 # Selection arrow and dark box for roster
 var _roster_selection_arrow: Label = null
 var _roster_dark_box: PanelContainer = null
+var _roster_arrow_should_show: bool = false  # Track if arrow should be visible (only after navigation)
 
 # Selection arrow for action menu
 var _action_selection_arrow: Label = null
@@ -496,6 +497,7 @@ func _on_panel_gained_focus() -> void:
 	_nav_state_history.clear()
 	print("[DormsPanel] Nav state set to ROSTER_SELECT, history cleared")
 	_current_roster_index = 0
+	_roster_arrow_should_show = false  # Hide arrow on initial focus
 	_focus_current_roster()
 
 func _can_panel_close() -> bool:
@@ -567,6 +569,7 @@ func _navigate_up() -> void:
 		NavState.ROSTER_SELECT:
 			if _roster_list and _current_roster_index > 0:
 				_current_roster_index -= 1
+				_roster_arrow_should_show = true  # Show arrow when navigating
 				_focus_current_roster()
 				# Update arrow position after selection change
 				call_deferred("_update_roster_arrow_position")
@@ -591,6 +594,7 @@ func _navigate_down() -> void:
 		NavState.ROSTER_SELECT:
 			if _roster_list and _current_roster_index < _roster_list.item_count - 1:
 				_current_roster_index += 1
+				_roster_arrow_should_show = true  # Show arrow when navigating
 				_focus_current_roster()
 				# Update arrow position after selection change
 				call_deferred("_update_roster_arrow_position")
@@ -625,11 +629,13 @@ func _navigate_left() -> void:
 			# Navigate to Roster
 			_push_nav_state(NavState.ROSTER_SELECT)
 			_current_roster_index = 0
+			_roster_arrow_should_show = false  # Hide arrow when navigating back to roster
 			_focus_current_roster()
 		NavState.COMMON_SELECT:
 			# Navigate to Roster
 			_push_nav_state(NavState.ROSTER_SELECT)
 			_current_roster_index = 0
+			_roster_arrow_should_show = false  # Hide arrow when navigating back to roster
 			_focus_current_roster()
 		_:
 			# ROSTER_SELECT at left edge - no further left navigation
@@ -746,11 +752,11 @@ func _focus_current_roster() -> void:
 			print("[DormsPanel._focus_current_roster] Focused member: ", focused_member)
 			_update_details_for_member(focused_member)
 
-	# Show roster arrow, hide action and room arrows
+	# Show roster arrow only if we've navigated (not on initial selection)
 	if _roster_selection_arrow:
-		_roster_selection_arrow.visible = true
+		_roster_selection_arrow.visible = _roster_arrow_should_show
 	if _roster_dark_box:
-		_roster_dark_box.visible = true
+		_roster_dark_box.visible = _roster_arrow_should_show
 	if _action_selection_arrow:
 		_action_selection_arrow.visible = false
 	if _room_selection_arrow:
