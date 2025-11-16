@@ -53,8 +53,9 @@ func _ready() -> void:
 	# Load settings from aSettings
 	_load_settings()
 
-	# Apply display settings to ensure they're in effect
+	# Apply display and audio settings to ensure they're in effect
 	_apply_display_settings()
+	_apply_audio_settings()
 
 	# Build the tabbed interface
 	_build_tabbed_interface()
@@ -398,19 +399,77 @@ func _build_display_tab() -> Control:
 
 func _build_sound_tab() -> Control:
 	"""Build Sound tab with volume sliders"""
+	var scroll = ScrollContainer.new()
+	scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
+	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+
 	var container = VBoxContainer.new()
-	container.set_anchors_preset(Control.PRESET_FULL_RECT)
 	container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	container.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	container.add_theme_constant_override("separation", 15)
+	container.add_theme_constant_override("separation", 20)
+	scroll.add_child(container)
 
-	# TODO: Build sound content
-	var label = Label.new()
-	label.text = "SOUND (Coming Soon)"
-	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	container.add_child(label)
+	# Title
+	var title = Label.new()
+	title.text = "SOUND"
+	title.add_theme_font_size_override("font_size", 20)
+	title.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_BUBBLE_MAGENTA)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	container.add_child(title)
 
-	return container
+	_add_spacer(container, 10)
+
+	# Voice Volume
+	_add_volume_slider(container, "Voice", _volume_voice, func(value):
+		_volume_voice = value
+		_apply_audio_settings()
+		_save_settings()
+	)
+
+	_add_spacer(container, 15)
+
+	# Music Volume
+	_add_volume_slider(container, "Music", _volume_music, func(value):
+		_volume_music = value
+		_apply_audio_settings()
+		_save_settings()
+	)
+
+	_add_spacer(container, 15)
+
+	# SFX Volume
+	_add_volume_slider(container, "SFX", _volume_sfx, func(value):
+		_volume_sfx = value
+		_apply_audio_settings()
+		_save_settings()
+	)
+
+	_add_spacer(container, 15)
+
+	# Ambient Volume
+	_add_volume_slider(container, "Ambient", _volume_ambient, func(value):
+		_volume_ambient = value
+		_apply_audio_settings()
+		_save_settings()
+	)
+
+	# Spacer to push Restore Defaults to bottom
+	var spacer = Control.new()
+	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	container.add_child(spacer)
+
+	# Restore Defaults button
+	var restore_btn = Button.new()
+	restore_btn.text = "RESTORE DEFAULTS"
+	restore_btn.custom_minimum_size = Vector2(200, 45)
+	restore_btn.pressed.connect(_restore_sound_defaults_and_rebuild)
+	aCoreVibeTheme.style_button_with_focus_invert(restore_btn, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
+	_add_button_padding(restore_btn)
+	var restore_center = CenterContainer.new()
+	restore_center.add_child(restore_btn)
+	container.add_child(restore_center)
+
+	return scroll
 
 # ==============================================================================
 # UI Helper Functions
@@ -429,6 +488,45 @@ func _add_option_label(parent: Node, text: String) -> void:
 	label.add_theme_font_size_override("font_size", 16)
 	label.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE)
 	parent.add_child(label)
+
+func _add_volume_slider(parent: Node, label_text: String, initial_value: float, on_change: Callable) -> void:
+	"""Add a volume slider with label and percentage display"""
+	# Container for slider row
+	var row = HBoxContainer.new()
+	row.add_theme_constant_override("separation", 15)
+	parent.add_child(row)
+
+	# Label (e.g., "Voice")
+	var label = Label.new()
+	label.text = label_text
+	label.custom_minimum_size = Vector2(100, 0)
+	label.add_theme_font_size_override("font_size", 16)
+	label.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE)
+	row.add_child(label)
+
+	# Slider
+	var slider = HSlider.new()
+	slider.min_value = 0.0
+	slider.max_value = 100.0
+	slider.step = 1.0
+	slider.value = initial_value
+	slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	slider.custom_minimum_size = Vector2(300, 30)
+	row.add_child(slider)
+
+	# Percentage label
+	var percent_label = Label.new()
+	percent_label.text = "%d%%" % int(initial_value)
+	percent_label.custom_minimum_size = Vector2(50, 0)
+	percent_label.add_theme_font_size_override("font_size", 16)
+	percent_label.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE)
+	row.add_child(percent_label)
+
+	# Update percentage label and call callback when slider changes
+	slider.value_changed.connect(func(value):
+		percent_label.text = "%d%%" % int(value)
+		on_change.call(value)
+	)
 
 func _create_button_group(options: Array, selected_idx: int, on_select: Callable) -> HBoxContainer:
 	"""Create a horizontal group of toggle buttons"""
@@ -541,5 +639,46 @@ func _restore_sound_defaults() -> void:
 	_volume_sfx = 100.0
 	_volume_ambient = 100.0
 	_save_settings()
+	_apply_audio_settings()
 	print("[Options] Sound settings restored to defaults")
+
+func _restore_sound_defaults_and_rebuild() -> void:
+	"""Restore Sound defaults and rebuild the tab"""
+	_restore_sound_defaults()
+
+	# Rebuild the tab to show new values
+	if _tab_content.has(Tab.SOUND):
+		_tab_content[Tab.SOUND].queue_free()
+		_tab_content[Tab.SOUND] = _build_sound_tab()
+		_content_container.add_child(_tab_content[Tab.SOUND])
+		_switch_tab(Tab.SOUND)
+
+func _apply_audio_settings() -> void:
+	"""Apply audio volume settings to audio buses"""
+	# Convert 0-100 percentage to decibel scale
+	# 100% = 0 dB (max volume)
+	# 0% = -80 dB (effectively silent)
+	var voice_db = linear_to_db(_volume_voice / 100.0) if _volume_voice > 0 else -80.0
+	var music_db = linear_to_db(_volume_music / 100.0) if _volume_music > 0 else -80.0
+	var sfx_db = linear_to_db(_volume_sfx / 100.0) if _volume_sfx > 0 else -80.0
+	var ambient_db = linear_to_db(_volume_ambient / 100.0) if _volume_ambient > 0 else -80.0
+
+	# Apply to audio buses if they exist
+	var voice_idx = AudioServer.get_bus_index("Voice")
+	if voice_idx >= 0:
+		AudioServer.set_bus_volume_db(voice_idx, voice_db)
+
+	var music_idx = AudioServer.get_bus_index("Music")
+	if music_idx >= 0:
+		AudioServer.set_bus_volume_db(music_idx, music_db)
+
+	var sfx_idx = AudioServer.get_bus_index("SFX")
+	if sfx_idx >= 0:
+		AudioServer.set_bus_volume_db(sfx_idx, sfx_db)
+
+	var ambient_idx = AudioServer.get_bus_index("Ambient")
+	if ambient_idx >= 0:
+		AudioServer.set_bus_volume_db(ambient_idx, ambient_db)
+
+	print("[Options] Applied audio settings: Voice=%d%%, Music=%d%%, SFX=%d%%, Ambient=%d%%" % [_volume_voice, _volume_music, _volume_sfx, _volume_ambient])
 
