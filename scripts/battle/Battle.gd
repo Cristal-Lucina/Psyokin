@@ -1338,11 +1338,11 @@ func _show_victory_screen() -> void:
 	style.shadow_color = Color(COLOR_SKY_CYAN.r, COLOR_SKY_CYAN.g, COLOR_SKY_CYAN.b, 0.4)  # Cyan glow
 	victory_panel.add_theme_stylebox_override("panel", style)
 
-	# Position it in center of screen (200px wider)
+	# Position it in center of screen (1000x650px)
 	victory_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER, Control.PRESET_MODE_MINSIZE)
-	victory_panel.custom_minimum_size = Vector2(700, 450)  # Increased width by 200px
-	victory_panel.size = Vector2(700, 450)
-	victory_panel.position = Vector2(-350, -225)  # Center the 700x450 panel
+	victory_panel.custom_minimum_size = Vector2(1000, 650)
+	victory_panel.size = Vector2(1000, 650)
+	victory_panel.position = Vector2(-500, -325)  # Center the 1000x650 panel
 	victory_panel.modulate.a = 0.0  # Start transparent for fade-in
 
 	# Create vertical box for content
@@ -3559,7 +3559,7 @@ func _show_status_character_picker() -> void:
 	status_picker_panel.add_theme_stylebox_override("panel", panel_style)
 
 	status_picker_panel.position = get_viewport_rect().size / 2 - status_picker_panel.custom_minimum_size / 2
-	status_picker_panel.position.y -= 60  # Move up 60px
+	status_picker_panel.position.y -= 100  # Move up 100px (60 + 40)
 	status_picker_panel.z_index = 100
 	status_picker_panel.mouse_filter = Control.MOUSE_FILTER_STOP
 
@@ -4287,9 +4287,9 @@ func _create_continue_indicator() -> void:
 	continue_indicator.add_theme_color_override("font_color", COLOR_ELECTRIC_LIME)
 	continue_indicator.add_theme_font_size_override("font_size", 20)
 
-	# Position in bottom-right corner of battle log panel
+	# Position in bottom-right corner of battle log panel (moved up 10px and left 10px)
 	# BattleLogPanel: offset_left=360, offset_top=-200, offset_right=920, offset_bottom=-50
-	continue_indicator.position = Vector2(880, get_viewport().get_visible_rect().size.y - 70)
+	continue_indicator.position = Vector2(870, get_viewport().get_visible_rect().size.y - 80)
 	continue_indicator.size = Vector2(30, 20)
 	continue_indicator.modulate.a = 0.0  # Start invisible
 
@@ -4624,10 +4624,10 @@ func _show_skill_menu(skill_menu: Array) -> void:
 	# Add to scene
 	add_child(skill_menu_panel)
 
-	# Center it
+	# Center it (moved left 30px)
 	skill_menu_panel.position = Vector2(
 		(get_viewport_rect().size.x - skill_menu_panel.custom_minimum_size.x) / 2,
-		100
+		200  # Moved down 100px
 	)
 
 	# Highlight first button if available (Change Mind Type will be first if it exists)
@@ -5058,7 +5058,7 @@ func _show_item_menu(items: Array) -> void:
 	# Add to scene and center (moved up 130px total)
 	add_child(item_menu_panel)
 	item_menu_panel.position = Vector2(
-		(get_viewport_rect().size.x - 440) / 2,  # Adjusted for new width (440px)
+		(get_viewport_rect().size.x - 440) / 2 - 30,  # Moved left 30px
 		(get_viewport_rect().size.y - 400) / 2 - 130  # Moved up 130px total (30px more)
 	)
 
@@ -5509,7 +5509,7 @@ func _show_capture_menu(bind_items: Array) -> void:
 	add_child(capture_menu_panel)
 	capture_menu_panel.position = Vector2(
 		(get_viewport_rect().size.x - 500) / 2,
-		(get_viewport_rect().size.y - 400) / 2 - 150
+		(get_viewport_rect().size.y - 400) / 2 - 165  # Moved down 15px (was -150)
 	)
 
 	# Highlight first item if available
@@ -5751,7 +5751,7 @@ func _show_burst_menu(burst_abilities: Array) -> void:
 	add_child(burst_menu_panel)
 	burst_menu_panel.position = Vector2(
 		(get_viewport_rect().size.x - 450) / 2,
-		100
+		130  # Moved down 30px
 	)
 
 	# Highlight first burst if available

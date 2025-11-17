@@ -35,6 +35,12 @@ var speed_modifier: float = 1.0  # Speed modifier (affected by status effects)
 var arena: Control  # Custom control for drawing circles
 var instruction_label: Label
 
+func _ready() -> void:
+	super._ready()
+	# Move the minigame left by 10px
+	if overlay_panel:
+		overlay_panel.position.x -= 10
+
 func _setup_minigame() -> void:
 	base_duration = 8.0
 	current_duration = base_duration
