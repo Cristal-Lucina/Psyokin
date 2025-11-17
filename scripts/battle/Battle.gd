@@ -119,6 +119,13 @@ func _ready() -> void:
 
 	# Apply neon-kawaii style to action buttons
 	_style_action_buttons()
+	_update_button_icons()
+
+	# Connect to controller type changed signal to update icons dynamically
+	if has_node("/root/aControllerIconLayout"):
+		var icon_layout = get_node("/root/aControllerIconLayout")
+		if not icon_layout.controller_type_changed.is_connected(_on_controller_type_changed):
+			icon_layout.controller_type_changed.connect(_on_controller_type_changed)
 
 	# Apply neon-kawaii style to panels
 	_style_panels()
@@ -286,6 +293,44 @@ func _style_action_buttons() -> void:
 
 			# Apply diagonal tilt (10-18 degrees) using rotation
 			btn.rotation_degrees = randf_range(-3, 3)  # Subtle variation per button
+
+func _update_button_icons() -> void:
+	"""Add controller button icons to the left of each battle action button"""
+	var icon_layout = get_node_or_null("/root/aControllerIconLayout")
+	if not icon_layout:
+		print("[Battle] aControllerIconLayout not found, skipping button icons")
+		return
+
+	# Map each battle button to its controller button action
+	var button_icon_mappings = [
+		{"button": "AttackButton", "icon_action": "accept"},        # A / Cross
+		{"button": "SkillButton", "icon_action": "special_1"},      # X / Square
+		{"button": "CaptureButton", "icon_action": "special_2"},    # Y / Triangle
+		{"button": "DefendButton", "icon_action": "back"},          # B / Circle
+		{"button": "BurstButton", "icon_action": "l_bumper"},       # LB / L1
+		{"button": "RunButton", "icon_action": "r_bumper"},         # RB / R1
+		{"button": "ItemButton", "icon_action": "l_trigger"},       # LT / L2
+		{"button": "StatusButton", "icon_action": "r_trigger"},     # RT / R2
+	]
+
+	for mapping in button_icon_mappings:
+		var btn = action_menu.get_node_or_null(mapping["button"])
+		if btn and btn is Button:
+			var icon_texture = icon_layout.get_button_icon(mapping["icon_action"])
+			if icon_texture:
+				btn.icon = icon_texture
+				btn.icon_alignment = HORIZONTAL_ALIGNMENT_LEFT
+				btn.expand_icon = false
+				# Add some spacing between icon and text
+				if btn.has_theme_constant_override("h_separation"):
+					btn.add_theme_constant_override("h_separation", 8)
+				else:
+					btn.add_theme_constant_override("h_separation", 8)
+
+func _on_controller_type_changed(new_type: String) -> void:
+	"""Update button icons when controller type changes"""
+	print("[Battle] Controller type changed to: %s, updating button icons..." % new_type)
+	_update_button_icons()
 
 func _create_diagonal_background() -> void:
 	"""Create neon-kawaii diagonal band background with grid overlay"""

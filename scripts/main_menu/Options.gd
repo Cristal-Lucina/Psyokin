@@ -940,6 +940,11 @@ func _build_controls_tab() -> Control:
 		else:
 			_control_type = "nintendo"
 		_save_settings()
+		# Update ControllerIconLayout with new controller type
+		if has_node("/root/aControllerIconLayout"):
+			var icon_layout = get_node("/root/aControllerIconLayout")
+			if _control_type in ["xbox", "playstation", "nintendo"]:
+				icon_layout.set_controller_type(_control_type)
 		# Rebuild tab to update button configs display
 		_rebuild_controls_tab()
 	)
