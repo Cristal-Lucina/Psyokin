@@ -1217,9 +1217,6 @@ func _on_turn_started(combatant_id: String) -> void:
 	# Reset action cooldown at start of turn
 	action_cooldown = 0.0
 
-	# Animate turn indicator (slide combatant panel)
-	_animate_turn_indicator(combatant_id)
-
 	# Queue turn announcement message (include round number on first turn)
 	if battle_mgr.current_turn_index == 0:
 		log_message("Round %d - %s's turn!" % [battle_mgr.current_round, current_combatant.display_name])
@@ -1228,6 +1225,9 @@ func _on_turn_started(combatant_id: String) -> void:
 
 	# Wait for player to press continue before proceeding
 	await _wait_for_message_queue()
+
+	# Animate turn indicator AFTER message is displayed
+	_animate_turn_indicator(combatant_id)
 
 	# Check if combatant is asleep - skip turn entirely
 	var ailment = str(current_combatant.get("ailment", ""))
