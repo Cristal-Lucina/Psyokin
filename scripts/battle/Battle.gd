@@ -93,6 +93,12 @@ var combatant_panels: Dictionary = {}  # combatant_id -> PanelContainer for shak
 var instruction_popup: PanelContainer = null  # Instruction message popup
 var instruction_label: Label = null  # Label inside instruction popup
 
+# Active action button visual feedback
+var active_action_button: Button = null  # Currently active action button
+var active_button_tween: Tween = null  # Tween for pulsing animation
+var active_button_original_size: Vector2 = Vector2.ZERO  # Original size to restore
+var active_button_original_rotation: float = 0.0  # Original rotation to restore
+
 # Input debouncing for joystick sensitivity
 var input_cooldown: float = 0.0  # Current cooldown timer
 var input_cooldown_duration: float = 0.15  # 150ms between inputs
@@ -390,6 +396,99 @@ func _on_controller_type_changed(new_type: String) -> void:
 	"""Update button icons when controller type changes"""
 	print("[Battle] Controller type changed to: %s, updating button icons..." % new_type)
 	_update_button_icons()
+
+func _activate_action_button(button_name: String, neon_color: Color) -> void:
+	"""
+	Activate an action button with visual feedback (bigger, pulsing, colored background, black text).
+	The button remains in this state until the turn ends.
+
+	Args:
+		button_name: Name of the button node (e.g., "AttackButton", "SkillButton")
+		neon_color: The neon color for the background (same as the border color)
+	"""
+	# Clear any previously active button
+	_clear_active_action_button()
+
+	# Get the button
+	var btn = action_menu.get_node_or_null(button_name)
+	if not btn or not (btn is Button):
+		return
+
+	active_action_button = btn
+
+	# Store original properties
+	active_button_original_size = btn.custom_minimum_size
+	active_button_original_rotation = btn.rotation_degrees
+
+	# Create active style: neon background with black text
+	var style_active = StyleBoxFlat.new()
+	style_active.bg_color = neon_color  # Fill with the neon color
+	style_active.border_width_left = 3
+	style_active.border_width_right = 3
+	style_active.border_width_top = 3
+	style_active.border_width_bottom = 3
+	style_active.border_color = neon_color.lightened(0.3)  # Brighter border
+	style_active.corner_radius_top_left = 20
+	style_active.corner_radius_top_right = 20
+	style_active.corner_radius_bottom_left = 20
+	style_active.corner_radius_bottom_right = 20
+	style_active.shadow_size = 12  # Strong glow
+	style_active.shadow_color = Color(neon_color.r, neon_color.g, neon_color.b, 0.8)
+
+	# Apply active style to all button states so it stays active
+	btn.add_theme_stylebox_override("normal", style_active)
+	btn.add_theme_stylebox_override("hover", style_active)
+	btn.add_theme_stylebox_override("pressed", style_active)
+	btn.add_theme_stylebox_override("focus", style_active)
+
+	# Change text color to black
+	btn.add_theme_color_override("font_color", Color.BLACK)
+	btn.add_theme_color_override("font_hover_color", Color.BLACK)
+	btn.add_theme_color_override("font_pressed_color", Color.BLACK)
+	btn.add_theme_color_override("font_focus_color", Color.BLACK)
+
+	# Make button bigger (scale up by 20%)
+	var new_size = active_button_original_size * 1.2
+	btn.custom_minimum_size = new_size
+
+	# Reset rotation to 0 for active button (no tilt)
+	btn.rotation_degrees = 0.0
+
+	# Create pulsing animation
+	if active_button_tween:
+		active_button_tween.kill()
+
+	active_button_tween = create_tween()
+	active_button_tween.set_loops()  # Loop indefinitely
+	# Pulse scale between 1.2x and 1.3x (subtle pulse on top of the bigger size)
+	active_button_tween.tween_property(btn, "scale", Vector2(1.05, 1.05), 0.6).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	active_button_tween.tween_property(btn, "scale", Vector2(1.0, 1.0), 0.6).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+
+func _clear_active_action_button() -> void:
+	"""Clear the active action button visual feedback and restore original styling"""
+	if not active_action_button or not is_instance_valid(active_action_button):
+		active_action_button = null
+		return
+
+	# Kill the pulsing animation
+	if active_button_tween:
+		active_button_tween.kill()
+		active_button_tween = null
+
+	# Restore scale
+	active_action_button.scale = Vector2(1.0, 1.0)
+
+	# Restore original size
+	active_action_button.custom_minimum_size = active_button_original_size
+
+	# Restore original rotation
+	active_action_button.rotation_degrees = active_button_original_rotation
+
+	# Re-apply original button styling by calling _style_action_buttons
+	# This will restore all the original styles
+	_style_action_buttons()
+
+	active_action_button = null
 
 func _create_diagonal_background() -> void:
 	"""Create neon-kawaii diagonal band background with grid overlay"""
@@ -1161,6 +1260,9 @@ func _on_turn_started(combatant_id: String) -> void:
 
 func _on_turn_ended(_combatant_id: String) -> void:
 	"""Called when a combatant's turn ends"""
+	# Clear active button visual feedback
+	_clear_active_action_button()
+
 	# Disable and dim action menu
 	_disable_action_menu()
 
@@ -2098,6 +2200,9 @@ func _on_attack_pressed() -> void:
 	if is_in_round_transition:
 		return
 
+	# Activate the Fight button with visual feedback
+	_activate_action_button("AttackButton", COLOR_BUBBLE_MAGENTA)
+
 	_show_instruction("Select an enemy.")
 
 	# Get alive enemies
@@ -2307,6 +2412,9 @@ func _on_skill_pressed() -> void:
 	if is_in_round_transition:
 		return
 
+	# Activate the Skill button with visual feedback
+	_activate_action_button("SkillButton", COLOR_SKY_CYAN)
+
 	var sigils = current_combatant.get("sigils", [])
 	var skills = current_combatant.get("skills", [])
 
@@ -2384,6 +2492,9 @@ func _on_item_pressed() -> void:
 	# Block input during round transitions
 	if is_in_round_transition:
 		return
+
+	# Activate the Items button with visual feedback
+	_activate_action_button("ItemButton", COLOR_ELECTRIC_LIME)
 
 	var inventory = get_node_or_null("/root/aInventorySystem")
 	if not inventory:
@@ -2477,6 +2588,9 @@ func _on_capture_pressed() -> void:
 	# Block input during round transitions
 	if is_in_round_transition:
 		return
+
+	# Activate the Capture button with visual feedback
+	_activate_action_button("CaptureButton", COLOR_GRAPE_VIOLET)
 
 	var inventory = get_node_or_null("/root/aInventorySystem")
 	if not inventory:
@@ -3112,6 +3226,9 @@ func _on_defend_pressed() -> void:
 	if is_in_round_transition:
 		return
 
+	# Activate the Guard button with visual feedback
+	_activate_action_button("DefendButton", COLOR_PLASMA_TEAL)
+
 	# Check if frozen combatant can act
 	if not _check_freeze_action_allowed():
 		return
@@ -3134,6 +3251,9 @@ func _on_burst_pressed() -> void:
 	# Block input during round transitions
 	if is_in_round_transition:
 		return
+
+	# Activate the Burst button with visual feedback
+	_activate_action_button("BurstButton", COLOR_CITRUS_YELLOW)
 
 	# Check if frozen combatant can act
 	if not _check_freeze_action_allowed():
@@ -3183,6 +3303,9 @@ func _on_run_pressed() -> void:
 	# Block input during round transitions
 	if is_in_round_transition:
 		return
+
+	# Activate the Run button with visual feedback
+	_activate_action_button("RunButton", COLOR_INK_CHARCOAL)
 
 	# Check if frozen combatant can act
 	if not _check_freeze_action_allowed():
@@ -3258,6 +3381,9 @@ func _on_status_pressed() -> void:
 	# Block input during round transitions
 	if is_in_round_transition:
 		return
+
+	# Activate the Status button with visual feedback
+	_activate_action_button("StatusButton", COLOR_MILK_WHITE)
 
 	_show_instruction("Choose a character.")
 
