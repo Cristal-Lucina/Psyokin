@@ -571,10 +571,18 @@ func _highlight_button(index: int) -> void:
 	style_highlight.corner_radius_bottom_right = 20
 	style_highlight.shadow_color = Color(color.r, color.g, color.b, 0.8)
 	style_highlight.shadow_size = 12
-	button.add_theme_stylebox_override("normal", style_highlight)
 
-	# Change font color to Night Navy
+	# Override ALL button states to prevent glitching back to old styles
+	button.add_theme_stylebox_override("normal", style_highlight)
+	button.add_theme_stylebox_override("hover", style_highlight)
+	button.add_theme_stylebox_override("pressed", style_highlight)
+	button.add_theme_stylebox_override("focus", style_highlight)
+
+	# Change font color to Night Navy for ALL states
 	button.add_theme_color_override("font_color", COLOR_NIGHT_NAVY)
+	button.add_theme_color_override("font_hover_color", COLOR_NIGHT_NAVY)
+	button.add_theme_color_override("font_pressed_color", COLOR_NIGHT_NAVY)
+	button.add_theme_color_override("font_focus_color", COLOR_NIGHT_NAVY)
 
 	# Set pivot offset to center for centered pulsing
 	button.pivot_offset = button.size / 2
@@ -659,10 +667,18 @@ func _unhighlight_button(index: int) -> void:
 	style_normal.corner_radius_bottom_right = 20
 	style_normal.shadow_color = Color(color.r, color.g, color.b, 0.4)
 	style_normal.shadow_size = 4
-	button.add_theme_stylebox_override("normal", style_normal)
 
-	# Restore font color to white
+	# Override ALL button states to prevent glitching
+	button.add_theme_stylebox_override("normal", style_normal)
+	button.add_theme_stylebox_override("hover", style_normal)
+	button.add_theme_stylebox_override("pressed", style_normal)
+	button.add_theme_stylebox_override("focus", style_normal)
+
+	# Restore font color to white for ALL states
 	button.add_theme_color_override("font_color", COLOR_MILK_WHITE)
+	button.add_theme_color_override("font_hover_color", COLOR_MILK_WHITE)
+	button.add_theme_color_override("font_pressed_color", COLOR_MILK_WHITE)
+	button.add_theme_color_override("font_focus_color", COLOR_MILK_WHITE)
 
 # ------------------------------------------------------------------------------
 # Core Vibe Styling
