@@ -1010,9 +1010,11 @@ func _navigate_targets(direction: int) -> void:
 	# Update visual highlights
 	_highlight_target_candidates()
 
-	# Log current target
+	# Update battle log to show current target (without queuing message)
 	var target = target_candidates[selected_target_index]
-	log_message("→ %s" % target.display_name)
+	if battle_log:
+		battle_log.clear()
+		battle_log.append_text("→ %s" % target.display_name)
 
 func _confirm_target_selection() -> void:
 	"""Confirm the currently selected target"""
@@ -1093,8 +1095,7 @@ func _on_battle_started() -> void:
 
 func _on_round_started(round_number: int) -> void:
 	"""Called at start of each round"""
-	log_message("=== Round %d ===" % round_number)
-
+	# Round announcement will be combined with first turn message
 	# Disable all input during round transition
 	_disable_all_input()
 
@@ -1108,8 +1109,11 @@ func _on_turn_started(combatant_id: String) -> void:
 	# Reset action cooldown at start of turn
 	action_cooldown = 0.0
 
-	# Queue turn announcement message
-	log_message("%s's turn!" % current_combatant.display_name)
+	# Queue turn announcement message (include round number on first turn)
+	if battle_mgr.current_turn_index == 0:
+		log_message("Round %d - %s's turn!" % [battle_mgr.current_round, current_combatant.display_name])
+	else:
+		log_message("%s's turn!" % current_combatant.display_name)
 
 	# Wait for player to press continue before proceeding
 	await _wait_for_message_queue()
@@ -2112,9 +2116,10 @@ func _on_attack_pressed() -> void:
 	selected_target_index = 0  # Start with first target
 	_highlight_target_candidates()
 
-	# Show currently selected target
-	if not target_candidates.is_empty():
-		log_message("→ %s" % target_candidates[0].display_name)
+	# Show currently selected target (without queuing message)
+	if not target_candidates.is_empty() and battle_log:
+		battle_log.clear()
+		battle_log.append_text("→ %s" % target_candidates[0].display_name)
 
 func _execute_attack(target: Dictionary) -> void:
 	"""Execute attack on selected target"""
@@ -2549,12 +2554,11 @@ func _execute_capture(target: Dictionary) -> void:
 	var capture_chance: float = capture_result.chance
 	print("[Battle] Capture calculation result: %s" % capture_result)
 
-	log_message("%s uses %s on %s!" % [current_combatant.display_name, bind_name, target.display_name])
-	log_message("  Capture chance: %.1f%%" % capture_chance)
-
 	# ═══════ CAPTURE MINIGAME ═══════
 	# Initialize or get persistent break rating
+	var is_first_attempt = false
 	if not target.has("break_rating"):
+		is_first_attempt = true
 		# First capture attempt - calculate initial break rating
 		var base_rating = target.get("level", 1)
 		var enemy_hp = target.hp
@@ -2569,24 +2573,17 @@ func _execute_capture(target: Dictionary) -> void:
 		if enemy_hp_percent >= 1.0:
 			# Enemy at 100% HP: +50%
 			calculated_rating *= 1.5
-			log_message("  → Enemy at full health! (+50% break rating)")
 		elif enemy_hp > party_hp:
 			# Enemy has more HP than party member: +25%
 			calculated_rating *= 1.25
-			log_message("  → Enemy stronger than you! (+25% break rating)")
 		elif enemy_hp_percent <= 0.1:
 			# Enemy below 10% HP: -50%
 			calculated_rating *= 0.5
-			log_message("  → Enemy critically weak! (-50% break rating)")
 		elif enemy_hp < party_hp:
 			# Enemy has less HP than party member: -25%
 			calculated_rating *= 0.75
-			log_message("  → Enemy weaker than you! (-25% break rating)")
 
 		target.break_rating = max(1, int(calculated_rating))
-		log_message("  → First capture attempt! Break rating: %d" % target.break_rating)
-	else:
-		log_message("  → Continued capture! Break rating: %d" % target.break_rating)
 
 	# Map bind item to bind type
 	var bind_type = "basic"
@@ -2619,19 +2616,17 @@ func _execute_capture(target: Dictionary) -> void:
 	if ailment != "":
 		status_effects.append(ailment)
 
-	# Launch capture minigame
-	log_message("  → Starting capture minigame...")
+	# Launch capture minigame (auto-starts, no message)
 	var minigame_result = await minigame_mgr.launch_capture_minigame([bind_type], enemy_data, party_member_data, status_effects)
 
 	# Update break rating based on minigame result
 	var break_rating_reduced = minigame_result.get("break_rating_reduced", 0)
 	var wraps_completed = minigame_result.get("wraps_completed", 0)
+	var old_break_rating = target.break_rating
 
 	target.break_rating -= break_rating_reduced
 	if target.break_rating < 0:
 		target.break_rating = 0
-
-	log_message("  → Completed %d wraps! Break rating: %d → %d" % [wraps_completed, target.break_rating + break_rating_reduced, target.break_rating])
 
 	# Consume the bind item
 	var inventory = get_node("/root/aInventorySystem")
@@ -2640,10 +2635,22 @@ func _execute_capture(target: Dictionary) -> void:
 	# Check if break rating hit 0 (capture success)
 	var success = target.break_rating <= 0
 
+	# Build capture result message
+	start_turn_message()
+	add_turn_line("%s used %s on %s!" % [current_combatant.display_name, bind_name, target.display_name])
+	add_turn_line("Capture chance: %.1f%%" % capture_chance)
+
+	if is_first_attempt:
+		add_turn_line("First capture attempt! Breaking rating: %d" % old_break_rating)
+	else:
+		add_turn_line("Continued capture! Breaking rating: %d" % old_break_rating)
+
 	if success:
+		add_turn_line("SUCCESS! %s was captured!" % target.display_name)
+		queue_turn_message()
+
 		# Capture successful!
 		_set_captured(target)  # Remove from battle and mark as captured
-		log_message("  → SUCCESS! %s was captured!" % target.display_name)
 
 		# Record capture for morality system
 		battle_mgr.record_enemy_defeat(target, true)  # true = capture
@@ -2658,6 +2665,9 @@ func _execute_capture(target: Dictionary) -> void:
 		# Update display
 		_update_combatant_displays()
 
+		# Wait for message to be acknowledged before checking battle end
+		await _wait_for_message_queue()
+
 		# Check if battle is over (after capture)
 		print("[Battle] Checking if battle ended after capture...")
 		var battle_ended = await battle_mgr._check_battle_end()
@@ -2666,11 +2676,15 @@ func _execute_capture(target: Dictionary) -> void:
 			print("[Battle] Battle ended - skipping end turn")
 			return  # Battle ended
 	else:
-		# Capture failed but progress made
+		# Capture failed
 		if break_rating_reduced > 0:
-			log_message("  → Progress made! %s resists but is weakening..." % target.display_name)
+			add_turn_line("Failed! %s broke free but is weakening... (Break rating: %d)" % [target.display_name, target.break_rating])
 		else:
-			log_message("  → FAILED! %s broke free with no progress!" % target.display_name)
+			add_turn_line("Failed! %s broke free with no progress!" % target.display_name)
+		queue_turn_message()
+
+	# Wait for message acknowledgment before ending turn
+	await _wait_for_message_queue()
 
 	# End turn
 	battle_mgr.end_turn()
@@ -3172,8 +3186,6 @@ func _execute_run() -> void:
 	# Calculate run chance based on enemy HP and level difference
 	var run_chance = _calculate_run_chance()
 
-	log_message("%s attempts to escape... (%d%% base chance)" % [current_combatant.display_name, int(run_chance)])
-
 	# ═══════ RUN MINIGAME ═══════
 	# Calculate tempo difference (party TPO - enemy TPO)
 	var party_tpo = current_combatant.stats.get("TPO", 1)
@@ -3194,20 +3206,33 @@ func _execute_run() -> void:
 	if ailment != "":
 		status_effects.append(ailment)
 
-	# Launch run minigame
-	log_message("  → Navigate through the gaps to escape!")
+	# Launch run minigame (auto-starts, no message)
 	var minigame_result = await minigame_mgr.launch_run_minigame(run_chance, tempo_diff, focus_stat, status_effects)
 
 	# Get success from minigame
 	var success = minigame_result.get("success", false)
 
+	# Build run result message
+	start_turn_message()
+	add_turn_line("%s attempts to escape..." % current_combatant.display_name)
+	add_turn_line("Navigate through the gaps to escape!")
+
 	if success:
-		log_message("Escaped successfully!")
-		await get_tree().create_timer(1.0).timeout
+		add_turn_line("Escaped successfully!")
+		queue_turn_message()
+
+		# Wait for message acknowledgment
+		await _wait_for_message_queue()
+
 		battle_mgr.current_state = battle_mgr.BattleState.ESCAPED
 		battle_mgr.return_to_overworld()
 	else:
-		log_message("Couldn't escape!")
+		add_turn_line("Couldn't escape!")
+		queue_turn_message()
+
+		# Wait for message acknowledgment before ending turn
+		await _wait_for_message_queue()
+
 		battle_mgr.end_turn()
 
 func _on_status_pressed() -> void:
