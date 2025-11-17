@@ -1273,7 +1273,7 @@ func _on_turn_started(combatant_id: String) -> void:
 		await _execute_enemy_ai()
 
 func _animate_turn_indicator(combatant_id: String) -> void:
-	"""Animate the active combatant's panel sliding to indicate their turn"""
+	"""Animate the active combatant's panel to indicate their turn"""
 	# Reset previous animation if any
 	_reset_turn_indicator()
 
@@ -1282,32 +1282,25 @@ func _animate_turn_indicator(combatant_id: String) -> void:
 		return
 
 	active_turn_panel = combatant_panels[combatant_id]
-	active_turn_original_pos = active_turn_panel.position
+	active_turn_original_pos = active_turn_panel.scale  # Store original scale instead
 
-	# Determine slide direction based on whether ally or enemy
-	var is_ally = active_turn_panel.get_meta("is_ally", false)
-	var slide_offset = 15.0  # Slide distance
-	var target_pos = active_turn_original_pos
+	# Determine visual emphasis based on whether ally or enemy
+	var target_scale = Vector2(1.15, 1.15)  # Scale up by 15% for visual emphasis
 
-	if is_ally:
-		target_pos.x += slide_offset  # Slide right for allies
-	else:
-		target_pos.x -= slide_offset  # Slide left for enemies
-
-	# Animate slide
+	# Animate scale (this won't conflict with layout containers)
 	var tween = create_tween()
 	tween.set_trans(Tween.TRANS_CUBIC)
 	tween.set_ease(Tween.EASE_OUT)
-	tween.tween_property(active_turn_panel, "position", target_pos, 0.3)
+	tween.tween_property(active_turn_panel, "scale", target_scale, 0.3)
 
 func _reset_turn_indicator() -> void:
 	"""Reset the turn indicator animation"""
 	if active_turn_panel:
-		# Animate back to original position
+		# Animate back to original scale
 		var tween = create_tween()
 		tween.set_trans(Tween.TRANS_CUBIC)
 		tween.set_ease(Tween.EASE_IN)
-		tween.tween_property(active_turn_panel, "position", active_turn_original_pos, 0.2)
+		tween.tween_property(active_turn_panel, "scale", Vector2(1.0, 1.0), 0.2)
 		active_turn_panel = null
 
 func _on_turn_ended(_combatant_id: String) -> void:
