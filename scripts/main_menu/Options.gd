@@ -1418,6 +1418,7 @@ func _build_action_rows(parent: VBoxContainer) -> void:
 		{"name": "menu_back", "display": "Back (B)"},
 		{"name": "run", "display": "Inspect Item (X)"},
 		{"name": "jump", "display": "Discard Item (Y)"},
+		{"name": "menu_scroll", "display": "Scroll"},
 	]
 
 	# Overworld Controls Section
@@ -1463,6 +1464,14 @@ func _build_action_rows(parent: VBoxContainer) -> void:
 		# Create the action if it doesn't exist
 		if not InputMap.has_action(action_def["name"]):
 			InputMap.add_action(action_def["name"])
+
+			# Add default bindings for new actions
+			if action_def["name"] == "menu_scroll":
+				# Scroll uses Right Stick (we'll use the stick press as a placeholder)
+				var joy_event = InputEventJoypadButton.new()
+				joy_event.button_index = JOY_BUTTON_RIGHT_STICK
+				InputMap.action_add_event(action_def["name"], joy_event)
+
 		var row = _create_action_row(action_def["name"], action_def["display"])
 		parent.add_child(row)
 		menu_count += 1
@@ -1614,8 +1623,8 @@ func _get_controller_button_icon(button_index: int) -> Texture2D:
 			JOY_BUTTON_DPAD_DOWN: asset_num = 69  # Xbox D-Pad Down
 			JOY_BUTTON_DPAD_LEFT: asset_num = 70  # Xbox D-Pad Left
 			JOY_BUTTON_DPAD_RIGHT: asset_num = 71  # Xbox D-Pad Right
-			JOY_BUTTON_LEFT_STICK: asset_num = 89  # Left Stick
-			JOY_BUTTON_RIGHT_STICK: asset_num = 87  # Right Stick
+			JOY_BUTTON_LEFT_STICK: asset_num = 90  # Left Stick
+			JOY_BUTTON_RIGHT_STICK: asset_num = 89  # Right Stick
 	elif _control_type == "playstation":
 		match button_index:
 			JOY_BUTTON_A: asset_num = 86  # Cross
@@ -1630,8 +1639,8 @@ func _get_controller_button_icon(button_index: int) -> Texture2D:
 			JOY_BUTTON_DPAD_DOWN: asset_num = 73  # PS D-Pad Down
 			JOY_BUTTON_DPAD_LEFT: asset_num = 74  # PS D-Pad Left
 			JOY_BUTTON_DPAD_RIGHT: asset_num = 75  # PS D-Pad Right
-			JOY_BUTTON_LEFT_STICK: asset_num = 89  # Left Stick
-			JOY_BUTTON_RIGHT_STICK: asset_num = 87  # Right Stick
+			JOY_BUTTON_LEFT_STICK: asset_num = 90  # Left Stick
+			JOY_BUTTON_RIGHT_STICK: asset_num = 89  # Right Stick
 	elif _control_type == "nintendo":
 		match button_index:
 			JOY_BUTTON_A: asset_num = 82  # Nintendo shows Xbox A icon
@@ -1646,8 +1655,8 @@ func _get_controller_button_icon(button_index: int) -> Texture2D:
 			JOY_BUTTON_DPAD_DOWN: asset_num = 69  # Use Xbox D-Pad Down
 			JOY_BUTTON_DPAD_LEFT: asset_num = 68  # Use Xbox D-Pad Up
 			JOY_BUTTON_DPAD_RIGHT: asset_num = 70  # Use Xbox D-Pad Left
-			JOY_BUTTON_LEFT_STICK: asset_num = 89  # Left Stick
-			JOY_BUTTON_RIGHT_STICK: asset_num = 87  # Right Stick
+			JOY_BUTTON_LEFT_STICK: asset_num = 90  # Left Stick
+			JOY_BUTTON_RIGHT_STICK: asset_num = 89  # Right Stick
 
 	# Load and return the texture
 	if asset_num > 0:
