@@ -735,7 +735,7 @@ func _input(event: InputEvent) -> void:
 	# CRITICAL: Handle message queue continuation FIRST (Pokemon-style)
 	# This blocks all other input while messages are displaying
 	if is_displaying_message:
-		if event.is_action_pressed(aInputManager.ACTION_ACCEPT) or event.is_action_pressed(aInputManager.ACTION_CANCEL):
+		if event.is_action_pressed(aInputManager.ACTION_ACCEPT) or event.is_action_pressed(aInputManager.ACTION_BACK):
 			_continue_to_next_message()
 			get_viewport().set_input_as_handled()
 		return
