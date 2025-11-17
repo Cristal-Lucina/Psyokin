@@ -68,36 +68,8 @@ func _ready() -> void:
 	_create_diagonal_background()
 	_spawn_ambient_particles()
 
-	# Create black overlay for fade in
-	var black_overlay = ColorRect.new()
-	black_overlay.color = Color(0.0, 0.0, 0.0, 1.0)
-	black_overlay.z_index = 1000
-	add_child(black_overlay)
-	black_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
-
-	# Fade in the title screen from black over 0.5 seconds
-	var fade_tween = create_tween()
-	fade_tween.set_ease(Tween.EASE_OUT)
-	fade_tween.set_trans(Tween.TRANS_CUBIC)
-	fade_tween.tween_property(black_overlay, "color", Color(0.0, 0.0, 0.0, 0.0), 0.5)
-	await fade_tween.finished
-	black_overlay.queue_free()  # Remove overlay when done
+	# Set fade in as complete immediately (no fade effect)
 	fade_in_complete = true
-
-	# Create black square at top Z layer that fades out over 3 seconds
-	var black_square = ColorRect.new()
-	black_square.color = Color(0.0, 0.0, 0.0, 1.0)
-	black_square.z_index = 2000
-	add_child(black_square)
-	black_square.set_anchors_preset(Control.PRESET_FULL_RECT)
-
-	# Fade out the black square over 3 seconds
-	var square_tween = create_tween()
-	square_tween.set_ease(Tween.EASE_OUT)
-	square_tween.set_trans(Tween.TRANS_CUBIC)
-	square_tween.tween_property(black_square, "color", Color(0.0, 0.0, 0.0, 0.0), 3.0)
-	await square_tween.finished
-	black_square.visible = false  # Make invisible after fade
 
 	# Check if we're auto-loading from in-game (two-step loading process)
 	if has_node("/root/aGameState"):
