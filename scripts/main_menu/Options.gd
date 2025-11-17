@@ -1477,7 +1477,11 @@ func _create_action_row(action: String, display_name: String = "") -> HBoxContai
 		var icon_texture: Texture2D = null
 
 		if target_event is InputEventJoypadButton:
-			icon_texture = _get_controller_button_icon(target_event.button_index)
+			# Special handling for Nintendo battle actions (different button positions)
+			if _control_type == "nintendo":
+				icon_texture = _get_nintendo_action_icon(action, target_event.button_index)
+			else:
+				icon_texture = _get_controller_button_icon(target_event.button_index)
 		elif target_event is InputEventJoypadMotion:
 			icon_texture = _get_controller_axis_icon(target_event.axis)
 
@@ -1508,6 +1512,50 @@ func _create_action_row(action: String, display_name: String = "") -> HBoxContai
 	row.add_child(bind_container)
 
 	return row
+
+func _get_nintendo_action_icon(action: String, button_index: int) -> Texture2D:
+	"""Get Nintendo controller icon with special handling for battle actions"""
+	var icon_base_path = "res://assets/graphics/icons/UI/PNG and PSD - Light/Controller/1x/"
+	var asset_num = -1
+
+	# Special mappings for Nintendo actions (different button positions)
+	match action:
+		# Overworld actions
+		"action":  # Action uses A button (right position) = Asset 82
+			asset_num = 82
+		"jump":  # Jump uses Y button = Asset 79 (X icon)
+			asset_num = 79
+		"run":  # Run uses X button = Asset 80 (Y icon)
+			asset_num = 80
+		"phone":  # Phone uses B button (bottom position) = Asset 81
+			asset_num = 81
+		# Battle actions
+		"battle_attack":  # Attack uses A button (right position) = Asset 82
+			asset_num = 82
+		"battle_capture":  # Capture uses B button (bottom position) = Asset 81
+			asset_num = 81
+		"battle_skill":  # Skill uses X button (top position) = Asset 79
+			asset_num = 79
+		"battle_defend":  # Defend uses Y button (left position) = Asset 80
+			asset_num = 80
+		# Menu actions
+		"menu_accept":  # Accept uses A button (right position) = Asset 82
+			asset_num = 82
+		"menu_back":  # Back uses B button (bottom position) = Asset 81
+			asset_num = 81
+		_:
+			# For all other actions, use standard Nintendo mappings
+			return _get_controller_button_icon(button_index)
+
+	# Load and return the texture
+	if asset_num > 0:
+		var texture_path = icon_base_path + "Asset " + str(asset_num) + ".png"
+		if ResourceLoader.exists(texture_path):
+			return load(texture_path) as Texture2D
+		else:
+			print("[Options] Warning: Icon not found at " + texture_path)
+
+	return null
 
 func _get_controller_button_icon(button_index: int) -> Texture2D:
 	"""Get controller button icon texture based on control type"""
