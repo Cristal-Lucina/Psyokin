@@ -1108,14 +1108,18 @@ func _on_turn_started(combatant_id: String) -> void:
 	# Reset action cooldown at start of turn
 	action_cooldown = 0.0
 
+	# Queue turn announcement message
 	log_message("%s's turn!" % current_combatant.display_name)
+
+	# Wait for player to press continue before proceeding
+	await _wait_for_message_queue()
 
 	# Check if combatant is asleep - skip turn entirely
 	var ailment = str(current_combatant.get("ailment", ""))
 	if ailment == "sleep":
-		log_message("  → %s is fast asleep... (turn skipped)" % current_combatant.display_name)
+		log_message("%s is fast asleep..." % current_combatant.display_name)
 		# Wait a moment for readability
-		await get_tree().create_timer(1.0).timeout
+		await _wait_for_message_queue()
 		# End turn immediately
 		battle_mgr.end_turn()
 		return
@@ -1123,24 +1127,26 @@ func _on_turn_started(combatant_id: String) -> void:
 	# Check for Berserk - attack random target (including allies)
 	if ailment == "berserk":
 		if current_combatant.is_ally:
-			log_message("  → %s is berserk and attacks wildly!" % current_combatant.display_name)
+			log_message("%s is berserk and attacks wildly!" % current_combatant.display_name)
+			await _wait_for_message_queue()
 			await _execute_berserk_action()
 			return
 		else:
 			# Enemies with berserk just attack normally (already random)
-			_execute_enemy_ai()
+			await _execute_enemy_ai()
 			return
 
 	# Check for Charm - use heal/buff items on enemy
 	if ailment == "charm":
 		if current_combatant.is_ally:
-			log_message("  → %s is charmed and aids the enemy!" % current_combatant.display_name)
+			log_message("%s is charmed and aids the enemy!" % current_combatant.display_name)
+			await _wait_for_message_queue()
 			await _execute_charm_action()
 			return
 		else:
 			# Enemies with charm do nothing (have no heal items to use on player)
-			log_message("  → %s is charmed but has no way to help!" % current_combatant.display_name)
-			await get_tree().create_timer(1.0).timeout
+			log_message("%s is charmed but has no way to help!" % current_combatant.display_name)
+			await _wait_for_message_queue()
 			battle_mgr.end_turn()
 			return
 
@@ -1148,8 +1154,8 @@ func _on_turn_started(combatant_id: String) -> void:
 		# Player's turn - show action menu
 		_show_action_menu()
 	else:
-		# Enemy turn - execute AI
-		_execute_enemy_ai()
+		# Enemy turn - execute AI (after player continues)
+		await _execute_enemy_ai()
 
 func _on_turn_ended(_combatant_id: String) -> void:
 	"""Called when a combatant's turn ends"""
@@ -2192,13 +2198,28 @@ func _execute_attack(target: Dictionary) -> void:
 				if not target.get("is_ally", false):
 					battle_mgr.record_enemy_defeat(target, false)  # false = kill
 
+			# Record weakness hits AFTER damage (only if target still alive)
+			var weakness_line = ""
+			if not target.is_ko and (weapon_weakness_hit or crit_weakness_hit):
+				var became_fallen = await battle_mgr.record_weapon_weakness_hit(target)
+				if weapon_weakness_hit:
+					weakness_line = "%s receives a WEAPON WEAKNESS!" % target.display_name
+				elif crit_weakness_hit:
+					weakness_line = "%s receives a CRITICAL STUMBLE!" % target.display_name
+				if became_fallen:
+					weakness_line += " %s fell!" % target.display_name
+
+			# Add weakness line if present
+			if weakness_line != "":
+				add_turn_line(weakness_line)
+
 			# Build hit message line
-			var hit_msg = "It dealt %d damage!" % damage
+			var hit_msg = "%s is hit for %d damage!" % [target.display_name, damage]
 
 			# Add special effects to message
 			var effect_parts = []
 			if is_crit:
-				effect_parts.append("CRITICAL HIT")
+				effect_parts.append("CRITICAL")
 			if type_bonus > 0.0:
 				effect_parts.append("Super Effective")
 			elif type_bonus < 0.0:
@@ -2211,23 +2232,10 @@ func _execute_attack(target: Dictionary) -> void:
 
 			add_turn_line(hit_msg)
 
-			# Record weakness hits AFTER damage (only if target still alive)
-			var weakness_line = ""
-			if not target.is_ko and (weapon_weakness_hit or crit_weakness_hit):
-				var became_fallen = await battle_mgr.record_weapon_weakness_hit(target)
-				if weapon_weakness_hit:
-					weakness_line = "Weapon weakness hit!"
-				elif crit_weakness_hit:
-					weakness_line = "Critical stumble!"
-				if became_fallen:
-					weakness_line += " %s fell!" % target.display_name
-
-			# Add KO or weakness line
+			# Add KO or status line
 			if target.is_ko:
 				add_turn_line("%s fainted!" % target.display_name)
-			elif weakness_line != "":
-				add_turn_line(weakness_line)
-			else:
+			elif weakness_line == "":  # Only show HP if no weakness
 				add_turn_line("%s has %d HP left." % [target.display_name, target.hp])
 
 			# Queue the full turn message
@@ -3624,8 +3632,6 @@ func _execute_enemy_ai() -> void:
 	# Clear defending status when attacking
 	current_combatant.is_defending = false
 
-	log_message("%s attacks!" % current_combatant.display_name)
-
 	# Simple AI: attack random ally
 	var allies = battle_mgr.get_ally_combatants()
 	var alive_allies = allies.filter(func(a): return not a.is_ko)
@@ -3633,13 +3639,19 @@ func _execute_enemy_ai() -> void:
 	if alive_allies.size() > 0:
 		var target = alive_allies[randi() % alive_allies.size()]
 
+		# Start building turn message
+		start_turn_message()
+		add_turn_line("%s attacked %s!" % [current_combatant.display_name, target.display_name])
+
 		# First, check if the attack hits
 		var hit_check = combat_resolver.check_physical_hit(current_combatant, target)
 
 		if not hit_check.hit:
 			# Miss!
 			_show_miss_feedback()  # Show big MISS text
-			log_message("  → Missed! (%d%% chance, rolled %d)" % [int(hit_check.hit_chance), hit_check.roll])
+			add_turn_line("But it missed!")
+			add_turn_line("(Hit chance: %d%%, rolled %d)" % [int(hit_check.hit_chance), hit_check.roll])
+			queue_turn_message()  # Queue the full turn message
 			print("[Battle] Enemy Miss! Hit chance: %.1f%%, Roll: %d" % [hit_check.hit_chance, hit_check.roll])
 		else:
 			# Hit! Now roll for critical
@@ -3684,30 +3696,47 @@ func _execute_enemy_ai() -> void:
 					battle_mgr.record_enemy_defeat(target, false)  # false = kill
 
 			# Record weakness hits AFTER damage (only if target still alive)
+			var weakness_line = ""
 			if not target.is_ko and (weapon_weakness_hit or crit_weakness_hit):
 				var became_fallen = await battle_mgr.record_weapon_weakness_hit(target)
 				if weapon_weakness_hit:
-					var weapon_desc = combat_resolver.get_weapon_type_description(current_combatant, target)
-					log_message("  → WEAPON WEAKNESS! %s" % weapon_desc)
+					weakness_line = "%s receives a WEAPON WEAKNESS!" % target.display_name
 				elif crit_weakness_hit:
-					log_message("  → CRITICAL STUMBLE!")
+					weakness_line = "%s receives a CRITICAL STUMBLE!" % target.display_name
 				if became_fallen:
-					log_message("  → %s is FALLEN! (will skip next turn)" % target.display_name)
+					weakness_line += " %s fell!" % target.display_name
 
-			# Log the hit with details
-			var hit_msg = "  → Hit %s for %d damage! (%d%% chance)" % [target.display_name, damage, int(hit_check.hit_chance)]
+			# Add weakness line if present
+			if weakness_line != "":
+				add_turn_line(weakness_line)
+
+			# Build hit message line
+			var hit_msg = "%s is hit for %d damage!" % [target.display_name, damage]
+
+			# Add special effects to message
+			var effect_parts = []
 			if is_crit:
-				hit_msg += " (CRITICAL! %d%% chance)" % int(crit_check.crit_chance)
+				effect_parts.append("CRITICAL")
 			if type_bonus > 0.0:
-				hit_msg += " (Super Effective!)"
+				effect_parts.append("Super Effective")
 			elif type_bonus < 0.0:
-				hit_msg += " (Not Very Effective...)"
+				effect_parts.append("Not Very Effective")
 			if target.get("is_defending", false):
-				# Calculate damage reduction from defensive stance (0.7 multiplier = 30% reduction)
-				var damage_without_defense = int(round(damage / 0.7))
-				var damage_reduced = damage_without_defense - damage
-				hit_msg += " (Defensive: -%d)" % damage_reduced
-			log_message(hit_msg)
+				effect_parts.append("Guarded")
+
+			if not effect_parts.is_empty():
+				hit_msg = "%s (%s)" % [hit_msg, ", ".join(effect_parts)]
+
+			add_turn_line(hit_msg)
+
+			# Add KO or status line
+			if target.is_ko:
+				add_turn_line("%s fainted!" % target.display_name)
+			elif weakness_line == "":  # Only show HP if no weakness
+				add_turn_line("%s has %d HP left." % [target.display_name, target.hp])
+
+			# Queue the full turn message
+			queue_turn_message()
 
 			# Debug: show hit, crit, and damage breakdown
 			var hit_breakdown = hit_check.breakdown
@@ -3950,6 +3979,15 @@ func _skip_typewriter_effect() -> void:
 
 	# Show continue indicator
 	_show_continue_indicator()
+
+func _wait_for_message_queue() -> void:
+	"""Wait until all messages in queue have been displayed and player has continued"""
+	# Wait until message queue is empty and no message is displaying
+	while not message_queue.is_empty() or is_displaying_message:
+		await get_tree().process_frame
+
+	# Brief pause after messages clear for smooth flow
+	await get_tree().create_timer(0.1).timeout
 
 func _create_instruction_popup() -> void:
 	"""Create the instruction message popup that appears above battle log"""
