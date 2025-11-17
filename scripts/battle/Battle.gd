@@ -2427,13 +2427,21 @@ func _on_skill_pressed() -> void:
 	var skills = current_combatant.get("skills", [])
 
 	if skills.is_empty():
-		log_message("No skills available!")
+		_clear_active_action_button()
+		if battle_log:
+			battle_log.clear()
+			battle_log.append_text("No skills available!")
+			battle_log.append_text("\nTarget selection cancelled.")
 		return
 
 	# Get SigilSystem for display names
 	var sigil_sys = get_node_or_null("/root/aSigilSystem")
 	if not sigil_sys:
-		log_message("Sigil system not available!")
+		_clear_active_action_button()
+		if battle_log:
+			battle_log.clear()
+			battle_log.append_text("Sigil system not available!")
+			battle_log.append_text("\nTarget selection cancelled.")
 		return
 
 	# Build skill menu with sigil info
@@ -3269,15 +3277,27 @@ func _on_burst_pressed() -> void:
 
 	# Only hero can use burst abilities
 	if current_combatant.get("id", "") != "hero":
-		log_message("Only %s can use Burst abilities!" % _get_hero_display_name())
+		_clear_active_action_button()
+		if battle_log:
+			battle_log.clear()
+			battle_log.append_text("Only %s can use Burst abilities!" % _get_hero_display_name())
+			battle_log.append_text("\nTarget selection cancelled.")
 		return
 
 	if not burst_system:
-		log_message("Burst system not available!")
+		_clear_active_action_button()
+		if battle_log:
+			battle_log.clear()
+			battle_log.append_text("Burst system not available!")
+			battle_log.append_text("\nTarget selection cancelled.")
 		return
 
 	if not battle_mgr:
-		log_message("Battle manager not available!")
+		_clear_active_action_button()
+		if battle_log:
+			battle_log.clear()
+			battle_log.append_text("Battle manager not available!")
+			battle_log.append_text("\nTarget selection cancelled.")
 		return
 
 	# Get current party IDs (all allies in battle)
@@ -3291,14 +3311,22 @@ func _on_burst_pressed() -> void:
 					party_ids.append(id)
 
 	if party_ids.is_empty():
-		log_message("No active party members!")
+		_clear_active_action_button()
+		if battle_log:
+			battle_log.clear()
+			battle_log.append_text("No active party members!")
+			battle_log.append_text("\nTarget selection cancelled.")
 		return
 
 	# Get available burst abilities
 	var available_bursts = burst_system.get_available_bursts(party_ids)
 
 	if available_bursts.is_empty():
-		_show_instruction("No Bursts available.")
+		_clear_active_action_button()
+		if battle_log:
+			battle_log.clear()
+			battle_log.append_text("No Bursts available.")
+			battle_log.append_text("\nTarget selection cancelled.")
 		return
 
 	_show_instruction("Choose Burst Ability")
@@ -4425,6 +4453,9 @@ func _on_confirmation_no() -> void:
 	_close_confirmation_dialog()
 	_hide_instruction()
 
+	# Clear active button visual feedback
+	_clear_active_action_button()
+
 	# Re-enable action menu
 	_enable_action_menu()
 
@@ -4886,6 +4917,9 @@ func _close_status_picker() -> void:
 	status_picker_buttons = []
 	status_picker_data = []
 	selected_status_index = 0
+
+	# Clear active button visual feedback
+	_clear_active_action_button()
 
 func _highlight_status_button(index: int) -> void:
 	"""Highlight a status picker button"""
@@ -5471,11 +5505,11 @@ func _show_capture_menu(bind_items: Array) -> void:
 	cancel_btn.pressed.connect(_close_capture_menu)
 	vbox.add_child(cancel_btn)
 
-	# Add to scene and center
+	# Add to scene and center (moved up 150px)
 	add_child(capture_menu_panel)
 	capture_menu_panel.position = Vector2(
 		(get_viewport_rect().size.x - 500) / 2,
-		(get_viewport_rect().size.y - 400) / 2
+		(get_viewport_rect().size.y - 400) / 2 - 150
 	)
 
 	# Highlight first item if available
