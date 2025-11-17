@@ -1282,9 +1282,18 @@ func _animate_turn_indicator(combatant_id: String) -> void:
 		return
 
 	active_turn_panel = combatant_panels[combatant_id]
-	active_turn_original_pos = active_turn_panel.scale  # Store original scale instead
 
-	# Determine visual emphasis based on whether ally or enemy
+	# Determine direction based on whether ally or enemy
+	var is_ally = active_turn_panel.get_meta("is_ally", false)
+
+	# Set pivot offset to create directional scale effect
+	# Allies scale from left (appears to move right)
+	# Enemies scale from right (appears to move left)
+	if is_ally:
+		active_turn_panel.pivot_offset = Vector2(0, active_turn_panel.size.y / 2)
+	else:
+		active_turn_panel.pivot_offset = Vector2(active_turn_panel.size.x, active_turn_panel.size.y / 2)
+
 	var target_scale = Vector2(1.15, 1.15)  # Scale up by 15% for visual emphasis
 
 	# Animate scale (this won't conflict with layout containers)
@@ -1301,6 +1310,10 @@ func _reset_turn_indicator() -> void:
 		tween.set_trans(Tween.TRANS_CUBIC)
 		tween.set_ease(Tween.EASE_IN)
 		tween.tween_property(active_turn_panel, "scale", Vector2(1.0, 1.0), 0.2)
+		await tween.finished
+
+		# Reset pivot offset
+		active_turn_panel.pivot_offset = Vector2.ZERO
 		active_turn_panel = null
 
 func _on_turn_ended(_combatant_id: String) -> void:
