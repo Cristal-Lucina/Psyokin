@@ -104,6 +104,12 @@ var message_queue: Array[String] = []  # Queue of messages to display
 var is_displaying_message: bool = false  # True when waiting for player to continue
 var continue_indicator: Label = null  # Visual indicator for "Press A to continue"
 var continue_indicator_tween: Tween = null  # Tween for blinking animation
+var typewriter_tween: Tween = null  # Tween for character-by-character reveal
+var current_message_full: String = ""  # Full message being displayed
+var is_typewriter_active: bool = false  # True while text is being revealed
+
+# Turn message builder (accumulate lines for full turn display)
+var turn_message_lines: Array[String] = []  # Lines of current turn message
 
 func _ready() -> void:
 	print("[Battle] Battle scene loaded")
@@ -2109,7 +2115,9 @@ func _execute_attack(target: Dictionary) -> void:
 	# Clear defending status when attacking
 	current_combatant.is_defending = false
 
-	log_message("%s attacks %s!" % [current_combatant.display_name, target.display_name])
+	# Start building turn message
+	start_turn_message()
+	add_turn_line("%s attacked %s!" % [current_combatant.display_name, target.display_name])
 
 	if target:
 		# First, check if the attack hits
@@ -2118,7 +2126,9 @@ func _execute_attack(target: Dictionary) -> void:
 		if not hit_check.hit:
 			# Miss!
 			_show_miss_feedback()  # Show big MISS text
-			log_message("  → Missed! (%d%% chance, rolled %d)" % [int(hit_check.hit_chance), hit_check.roll])
+			add_turn_line("But it missed!")
+			add_turn_line("(Hit chance: %d%%, rolled %d)" % [int(hit_check.hit_chance), hit_check.roll])
+			queue_turn_message()  # Queue the full turn message
 			print("[Battle] Miss! Hit chance: %.1f%%, Roll: %d" % [hit_check.hit_chance, hit_check.roll])
 		else:
 			# Hit! Launch attack minigame
@@ -2129,7 +2139,6 @@ func _execute_attack(target: Dictionary) -> void:
 			if ailment != "":
 				status_effects.append(ailment)
 
-			log_message("  → Hit! Starting attack minigame...")
 			_show_instruction("FIGHT!")
 			var minigame_result = await minigame_mgr.launch_attack_minigame(tpo, brw, status_effects)
 			_hide_instruction()
@@ -2183,31 +2192,46 @@ func _execute_attack(target: Dictionary) -> void:
 				if not target.get("is_ally", false):
 					battle_mgr.record_enemy_defeat(target, false)  # false = kill
 
+			# Build hit message line
+			var hit_msg = "It dealt %d damage!" % damage
+
+			# Add special effects to message
+			var effect_parts = []
+			if is_crit:
+				effect_parts.append("CRITICAL HIT")
+			if type_bonus > 0.0:
+				effect_parts.append("Super Effective")
+			elif type_bonus < 0.0:
+				effect_parts.append("Not Very Effective")
+			if target.get("is_defending", false):
+				effect_parts.append("Guarded")
+
+			if not effect_parts.is_empty():
+				hit_msg = "%s (%s)" % [hit_msg, ", ".join(effect_parts)]
+
+			add_turn_line(hit_msg)
+
 			# Record weakness hits AFTER damage (only if target still alive)
+			var weakness_line = ""
 			if not target.is_ko and (weapon_weakness_hit or crit_weakness_hit):
 				var became_fallen = await battle_mgr.record_weapon_weakness_hit(target)
 				if weapon_weakness_hit:
-					var weapon_desc = combat_resolver.get_weapon_type_description(current_combatant, target)
-					log_message("  → WEAPON WEAKNESS! %s" % weapon_desc)
+					weakness_line = "Weapon weakness hit!"
 				elif crit_weakness_hit:
-					log_message("  → CRITICAL STUMBLE!")
+					weakness_line = "Critical stumble!"
 				if became_fallen:
-					log_message("  → %s is FALLEN! (will skip next turn)" % target.display_name)
+					weakness_line += " %s fell!" % target.display_name
 
-			# Log the hit with details
-			var hit_msg = "  → Hit %s for %d damage! (%d%% chance)" % [target.display_name, damage, int(hit_check.hit_chance)]
-			if is_crit:
-				hit_msg += " (CRITICAL! %d%% chance)" % int(crit_check.crit_chance)
-			if type_bonus > 0.0:
-				hit_msg += " (Super Effective!)"
-			elif type_bonus < 0.0:
-				hit_msg += " (Not Very Effective...)"
-			if target.get("is_defending", false):
-				# Calculate damage reduction from defensive stance (0.7 multiplier = 30% reduction)
-				var damage_without_defense = int(round(damage / 0.7))
-				var damage_reduced = damage_without_defense - damage
-				hit_msg += " (Defensive: -%d)" % damage_reduced
-			log_message(hit_msg)
+			# Add KO or weakness line
+			if target.is_ko:
+				add_turn_line("%s fainted!" % target.display_name)
+			elif weakness_line != "":
+				add_turn_line(weakness_line)
+			else:
+				add_turn_line("%s has %d HP left." % [target.display_name, target.hp])
+
+			# Queue the full turn message
+			queue_turn_message()
 
 			# Debug: show hit, crit, and damage breakdown
 			var hit_breakdown = hit_check.breakdown
@@ -3811,6 +3835,24 @@ func _update_burst_gauge() -> void:
 		tween.set_trans(Tween.TRANS_CUBIC)
 		tween.tween_property(burst_gauge_bar, "value", battle_mgr.burst_gauge, 0.8)
 
+func start_turn_message() -> void:
+	"""Start building a new turn message"""
+	turn_message_lines.clear()
+
+func add_turn_line(line: String) -> void:
+	"""Add a line to the current turn message"""
+	turn_message_lines.append(line)
+
+func queue_turn_message() -> void:
+	"""Queue the accumulated turn message as a single message"""
+	if turn_message_lines.is_empty():
+		return
+
+	# Join all lines with newlines
+	var full_message = "\n".join(turn_message_lines)
+	log_message(full_message)
+	turn_message_lines.clear()
+
 func log_message(message: String) -> void:
 	"""Add a message to the message queue for Pokemon-style display"""
 	message_queue.append(message)
@@ -3821,32 +3863,93 @@ func log_message(message: String) -> void:
 		_display_next_message()
 
 func _display_next_message() -> void:
-	"""Display the next message in the queue"""
+	"""Display the next message in the queue with typewriter effect"""
 	if message_queue.is_empty():
 		is_displaying_message = false
 		_hide_continue_indicator()
 		return
 
 	is_displaying_message = true
+	is_typewriter_active = true
 
 	# Get next message
 	var message = message_queue.pop_front()
+	current_message_full = message
 
-	# Clear battle log and display new message
+	# Clear battle log
 	if battle_log:
 		battle_log.clear()
-		battle_log.append_text(message)
 
-	# Show continue indicator
-	_show_continue_indicator()
+	# Start typewriter effect
+	_start_typewriter_effect(message)
 
 func _continue_to_next_message() -> void:
 	"""Continue to next message when player presses accept"""
 	if not is_displaying_message:
 		return
 
+	# If typewriter is still active, skip to full message
+	if is_typewriter_active:
+		_skip_typewriter_effect()
+		return
+
 	# Display next message
 	_display_next_message()
+
+func _start_typewriter_effect(message: String) -> void:
+	"""Start character-by-character reveal of message"""
+	if not battle_log:
+		return
+
+	# Kill any existing typewriter tween
+	if typewriter_tween:
+		typewriter_tween.kill()
+		typewriter_tween = null
+
+	# Calculate duration based on message length (faster than typical for battle pacing)
+	var chars_per_second = 60.0  # 60 characters per second
+	var duration = float(message.length()) / chars_per_second
+
+	# Use a custom method to reveal text character by character
+	var char_index = 0
+	var reveal_interval = 1.0 / chars_per_second
+
+	# Create a timer-based typewriter effect
+	_typewriter_reveal_next_char(message, 0, reveal_interval)
+
+func _typewriter_reveal_next_char(message: String, char_index: int, interval: float) -> void:
+	"""Reveal one character at a time"""
+	if not battle_log or not is_typewriter_active:
+		return
+
+	if char_index >= message.length():
+		# Finished revealing all characters
+		is_typewriter_active = false
+		_show_continue_indicator()
+		return
+
+	# Append next character
+	battle_log.clear()
+	battle_log.append_text(message.substr(0, char_index + 1))
+
+	# Schedule next character
+	await get_tree().create_timer(interval).timeout
+	_typewriter_reveal_next_char(message, char_index + 1, interval)
+
+func _skip_typewriter_effect() -> void:
+	"""Skip to showing the full message immediately"""
+	if not battle_log:
+		return
+
+	# Stop typewriter
+	is_typewriter_active = false
+
+	# Show full message
+	battle_log.clear()
+	battle_log.append_text(current_message_full)
+
+	# Show continue indicator
+	_show_continue_indicator()
 
 func _create_instruction_popup() -> void:
 	"""Create the instruction message popup that appears above battle log"""
