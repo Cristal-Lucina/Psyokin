@@ -1282,39 +1282,45 @@ func _animate_turn_indicator(combatant_id: String) -> void:
 		return
 
 	active_turn_panel = combatant_panels[combatant_id]
+	active_turn_original_pos = Vector2(active_turn_panel.offset_left, active_turn_panel.offset_right)
 
 	# Determine direction based on whether ally or enemy
 	var is_ally = active_turn_panel.get_meta("is_ally", false)
+	var slide_distance = 15.0
 
-	# Set pivot offset to create directional scale effect
-	# Allies scale from left (appears to move right)
-	# Enemies scale from right (appears to move left)
+	# Calculate target offsets for slide
+	var target_offset_left = active_turn_panel.offset_left
+	var target_offset_right = active_turn_panel.offset_right
+
 	if is_ally:
-		active_turn_panel.pivot_offset = Vector2(0, active_turn_panel.size.y / 2)
+		# Slide right
+		target_offset_left += slide_distance
+		target_offset_right += slide_distance
 	else:
-		active_turn_panel.pivot_offset = Vector2(active_turn_panel.size.x, active_turn_panel.size.y / 2)
+		# Slide left
+		target_offset_left -= slide_distance
+		target_offset_right -= slide_distance
 
-	var target_scale = Vector2(1.15, 1.15)  # Scale up by 15% for visual emphasis
-
-	# Animate scale (this won't conflict with layout containers)
+	# Animate slide using offsets (won't conflict with layout containers)
 	var tween = create_tween()
 	tween.set_trans(Tween.TRANS_CUBIC)
 	tween.set_ease(Tween.EASE_OUT)
-	tween.tween_property(active_turn_panel, "scale", target_scale, 0.3)
+	tween.set_parallel(true)
+	tween.tween_property(active_turn_panel, "offset_left", target_offset_left, 0.3)
+	tween.tween_property(active_turn_panel, "offset_right", target_offset_right, 0.3)
 
 func _reset_turn_indicator() -> void:
 	"""Reset the turn indicator animation"""
-	if active_turn_panel:
-		# Animate back to original scale
+	if active_turn_panel and is_instance_valid(active_turn_panel):
+		# Animate back to original position
 		var tween = create_tween()
 		tween.set_trans(Tween.TRANS_CUBIC)
 		tween.set_ease(Tween.EASE_IN)
-		tween.tween_property(active_turn_panel, "scale", Vector2(1.0, 1.0), 0.2)
+		tween.set_parallel(true)
+		tween.tween_property(active_turn_panel, "offset_left", active_turn_original_pos.x, 0.2)
+		tween.tween_property(active_turn_panel, "offset_right", active_turn_original_pos.y, 0.2)
 		await tween.finished
 
-		# Reset pivot offset (check if still valid after await)
-		if active_turn_panel and is_instance_valid(active_turn_panel):
-			active_turn_panel.pivot_offset = Vector2.ZERO
 		active_turn_panel = null
 
 func _on_turn_ended(_combatant_id: String) -> void:
