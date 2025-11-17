@@ -578,12 +578,13 @@ func _highlight_button(index: int) -> void:
 		selection_arrow.add_theme_font_size_override("font_size", 32)
 		selection_arrow.add_theme_color_override("font_color", color)
 		selection_arrow.z_index = 100
+		selection_arrow.visible = false  # Start invisible to avoid flicker
 		add_child(selection_arrow)
 
-	# Update arrow color and position
+	# Update arrow color and position BEFORE making visible
 	selection_arrow.add_theme_color_override("font_color", color)
-	selection_arrow.visible = true
 	selection_arrow.global_position = button.global_position + Vector2(button.size.x + 20, button.size.y / 2 - 21)
+	selection_arrow.visible = true  # Make visible after positioning
 
 	# Kill any existing pulse animation
 	if active_pulse_tween:
