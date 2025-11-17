@@ -5441,8 +5441,6 @@ func _on_bind_selected(bind_data: Dictionary) -> void:
 	"""Handle bind item selection from capture menu"""
 	_close_capture_menu()
 
-	log_message("Using %s (x%d) - select target..." % [bind_data.name, bind_data.count])
-
 	# Get alive enemies
 	var enemies = battle_mgr.get_enemy_combatants()
 	target_candidates = enemies.filter(func(e): return not e.is_ko and not e.get("is_captured", false))
@@ -5457,16 +5455,20 @@ func _on_bind_selected(bind_data: Dictionary) -> void:
 	# Show instruction to select enemy
 	_show_instruction("Select an enemy.")
 
+	# Update battle log directly (without queuing message to avoid continue prompt)
+	if battle_log:
+		battle_log.clear()
+		battle_log.append_text("Using %s (x%d) - select target..." % [bind_data.name, bind_data.count])
+
 	# Enable capture target selection mode
 	awaiting_target_selection = true
 	awaiting_capture_target = true
 	selected_target_index = 0  # Start with first target
 	_highlight_target_candidates()
 
-	# Show currently selected target (without queuing message)
+	# Show currently selected target on next line (without queuing message)
 	if not target_candidates.is_empty() and battle_log:
-		battle_log.clear()
-		battle_log.append_text("→ %s" % target_candidates[0].display_name)
+		battle_log.append_text("\n→ %s" % target_candidates[0].display_name)
 
 ## ═══════════════════════════════════════════════════════════════
 ## BURST MENU & EXECUTION
