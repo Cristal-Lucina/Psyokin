@@ -53,6 +53,7 @@ var button_colors: Dictionary = {}  # Maps Button -> Color for highlight
 var active_pulse_tween: Tween = null  # Track the pulsing animation
 var selection_arrow: Label = null  # Arrow indicator for selected button
 var fade_in_complete: bool = false  # Track if initial fade in is done
+var navigation_started: bool = false  # Track if user has started navigating
 
 # Dynamic background elements
 var diagonal_bands: ColorRect = null
@@ -532,6 +533,9 @@ func _navigate_menu(direction: int) -> void:
 	if navigable_buttons.is_empty():
 		return
 
+	# Mark that navigation has started (for arrow display)
+	navigation_started = true
+
 	_unhighlight_button(selected_button_index)
 
 	selected_button_index += direction
@@ -575,27 +579,28 @@ func _highlight_button(index: int) -> void:
 	# Set pivot offset to center for centered pulsing
 	button.pivot_offset = button.size / 2
 
-	# Create or show selection arrow
-	if not selection_arrow:
-		selection_arrow = Label.new()
-		selection_arrow.text = "◀"
-		selection_arrow.add_theme_font_size_override("font_size", 32)
+	# Create or show selection arrow only if navigation has started
+	if navigation_started:
+		if not selection_arrow:
+			selection_arrow = Label.new()
+			selection_arrow.text = "◀"
+			selection_arrow.add_theme_font_size_override("font_size", 32)
+			selection_arrow.add_theme_color_override("font_color", color)
+			selection_arrow.z_index = 100
+			selection_arrow.modulate = Color(1.0, 1.0, 1.0, 0.0)  # Start transparent
+			selection_arrow.visible = true  # Visible but transparent
+			add_child(selection_arrow)
+
+		# Update arrow color and position
 		selection_arrow.add_theme_color_override("font_color", color)
-		selection_arrow.z_index = 100
-		selection_arrow.modulate = Color(1.0, 1.0, 1.0, 0.0)  # Start transparent
-		selection_arrow.visible = true  # Visible but transparent
-		add_child(selection_arrow)
+		selection_arrow.global_position = button.global_position + Vector2(button.size.x + 20, button.size.y / 2 - 21)
 
-	# Update arrow color and position
-	selection_arrow.add_theme_color_override("font_color", color)
-	selection_arrow.global_position = button.global_position + Vector2(button.size.x + 20, button.size.y / 2 - 21)
-
-	# Fade in arrow slowly
-	if fade_in_complete:
-		var arrow_tween = create_tween()
-		arrow_tween.set_ease(Tween.EASE_OUT)
-		arrow_tween.set_trans(Tween.TRANS_CUBIC)
-		arrow_tween.tween_property(selection_arrow, "modulate", Color(1.0, 1.0, 1.0, 1.0), 0.3)
+		# Fade in arrow slowly
+		if fade_in_complete:
+			var arrow_tween = create_tween()
+			arrow_tween.set_ease(Tween.EASE_OUT)
+			arrow_tween.set_trans(Tween.TRANS_CUBIC)
+			arrow_tween.tween_property(selection_arrow, "modulate", Color(1.0, 1.0, 1.0, 1.0), 0.3)
 
 	# Kill any existing pulse animation
 	if active_pulse_tween:
