@@ -16,10 +16,10 @@ layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = -1.0
-offset_top = -2.0
-offset_right = -1.0
-offset_bottom = -2.0
+offset_left = 1.0
+offset_top = 1.0
+offset_right = 1.0
+offset_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
@@ -30,10 +30,10 @@ layout_mode = 2
 [node name="TitleLabel" type="Label" parent="Center/Frame"]
 unique_name_in_owner = true
 layout_mode = 0
-offset_left = 3.0
-offset_top = 2.0
+offset_left = -3.0
+offset_top = -18.0
 offset_right = 497.0
-offset_bottom = 99.0
+offset_bottom = 89.0
 size_flags_vertical = 1
 text = "PSYOKIN"
 horizontal_alignment = 1
@@ -78,3 +78,12 @@ unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
 text = "Options"
+
+[node name="ColorRect" type="ColorRect" parent="."]
+z_index = -1000
+layout_mode = 0
+offset_left = -3.0
+offset_top = -1.0
+offset_right = 1286.0
+offset_bottom = 734.0
+color = Color(0.039215688, 0.05882353, 0.101960786, 1)
