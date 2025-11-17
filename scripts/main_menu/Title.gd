@@ -51,6 +51,7 @@ var input_cooldown: float = 0.0
 var input_cooldown_duration: float = 0.15  # 150ms between inputs
 var button_colors: Dictionary = {}  # Maps Button -> Color for highlight
 var active_pulse_tween: Tween = null  # Track the pulsing animation
+var selection_arrow: Label = null  # Arrow indicator for selected button
 
 # Dynamic background elements
 var diagonal_bands: ColorRect = null
@@ -567,6 +568,23 @@ func _highlight_button(index: int) -> void:
 	# Change font color to Night Navy
 	button.add_theme_color_override("font_color", COLOR_NIGHT_NAVY)
 
+	# Set pivot offset to center for centered pulsing
+	button.pivot_offset = button.size / 2
+
+	# Create or show selection arrow
+	if not selection_arrow:
+		selection_arrow = Label.new()
+		selection_arrow.text = "▶"
+		selection_arrow.add_theme_font_size_override("font_size", 32)
+		selection_arrow.add_theme_color_override("font_color", color)
+		selection_arrow.z_index = 100
+		add_child(selection_arrow)
+
+	# Update arrow color and position
+	selection_arrow.add_theme_color_override("font_color", color)
+	selection_arrow.visible = true
+	selection_arrow.global_position = button.global_position + Vector2(button.size.x + 20, button.size.y / 2 - 16)
+
 	# Kill any existing pulse animation
 	if active_pulse_tween:
 		active_pulse_tween.kill()
@@ -595,6 +613,13 @@ func _unhighlight_button(index: int) -> void:
 
 	# Restore original scale immediately
 	button.scale = Vector2.ONE
+
+	# Set pivot offset to center (keep centered for consistency)
+	button.pivot_offset = button.size / 2
+
+	# Hide selection arrow
+	if selection_arrow:
+		selection_arrow.visible = false
 
 	# Get button's original border color
 	var color = button_colors.get(button, COLOR_ELECTRIC_LIME)
