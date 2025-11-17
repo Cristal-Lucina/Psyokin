@@ -82,6 +82,8 @@ text = "Options"
 [node name="ColorRect" type="ColorRect" parent="."]
 z_index = -1000
 layout_mode = 0
-offset_right = 1289.0
-offset_bottom = 735.0
+offset_left = -3.0
+offset_top = -1.0
+offset_right = 1286.0
+offset_bottom = 734.0
 color = Color(0.039215688, 0.05882353, 0.101960786, 1)
