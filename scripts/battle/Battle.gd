@@ -1312,8 +1312,9 @@ func _reset_turn_indicator() -> void:
 		tween.tween_property(active_turn_panel, "scale", Vector2(1.0, 1.0), 0.2)
 		await tween.finished
 
-		# Reset pivot offset
-		active_turn_panel.pivot_offset = Vector2.ZERO
+		# Reset pivot offset (check if still valid after await)
+		if active_turn_panel and is_instance_valid(active_turn_panel):
+			active_turn_panel.pivot_offset = Vector2.ZERO
 		active_turn_panel = null
 
 func _on_turn_ended(_combatant_id: String) -> void:
