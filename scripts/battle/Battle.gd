@@ -86,10 +86,13 @@ var status_details_modal: ColorRect = null  # Status details modal background
 var current_skill_menu: Array = []  # Current skills in menu
 var selected_item: Dictionary = {}  # Selected item data
 var selected_burst: Dictionary = {}  # Selected burst ability data
+var selection_indicator: Control = null  # Floating selection indicator above targets
 var victory_panel: PanelContainer = null  # Victory screen panel
 var victory_scroll: ScrollContainer = null  # Victory screen scroll container for controller scrolling
 var is_in_round_transition: bool = false  # True during round transition animations
 var combatant_panels: Dictionary = {}  # combatant_id -> PanelContainer for shake animations
+var active_turn_panel: Control = null  # Currently active combatant's panel (for turn animation)
+var active_turn_original_pos: Vector2 = Vector2.ZERO  # Original position before turn animation
 var instruction_popup: PanelContainer = null  # Instruction message popup
 var instruction_label: Label = null  # Label inside instruction popup
 
@@ -1214,6 +1217,9 @@ func _on_turn_started(combatant_id: String) -> void:
 	# Reset action cooldown at start of turn
 	action_cooldown = 0.0
 
+	# Animate turn indicator (slide combatant panel)
+	_animate_turn_indicator(combatant_id)
+
 	# Queue turn announcement message (include round number on first turn)
 	if battle_mgr.current_turn_index == 0:
 		log_message("Round %d - %s's turn!" % [battle_mgr.current_round, current_combatant.display_name])
@@ -1266,8 +1272,49 @@ func _on_turn_started(combatant_id: String) -> void:
 		# Enemy turn - execute AI (after player continues)
 		await _execute_enemy_ai()
 
+func _animate_turn_indicator(combatant_id: String) -> void:
+	"""Animate the active combatant's panel sliding to indicate their turn"""
+	# Reset previous animation if any
+	_reset_turn_indicator()
+
+	# Find the panel for this combatant
+	if not combatant_panels.has(combatant_id):
+		return
+
+	active_turn_panel = combatant_panels[combatant_id]
+	active_turn_original_pos = active_turn_panel.position
+
+	# Determine slide direction based on whether ally or enemy
+	var is_ally = active_turn_panel.get_meta("is_ally", false)
+	var slide_offset = 15.0  # Slide distance
+	var target_pos = active_turn_original_pos
+
+	if is_ally:
+		target_pos.x += slide_offset  # Slide right for allies
+	else:
+		target_pos.x -= slide_offset  # Slide left for enemies
+
+	# Animate slide
+	var tween = create_tween()
+	tween.set_trans(Tween.TRANS_CUBIC)
+	tween.set_ease(Tween.EASE_OUT)
+	tween.tween_property(active_turn_panel, "position", target_pos, 0.3)
+
+func _reset_turn_indicator() -> void:
+	"""Reset the turn indicator animation"""
+	if active_turn_panel:
+		# Animate back to original position
+		var tween = create_tween()
+		tween.set_trans(Tween.TRANS_CUBIC)
+		tween.set_ease(Tween.EASE_IN)
+		tween.tween_property(active_turn_panel, "position", active_turn_original_pos, 0.2)
+		active_turn_panel = null
+
 func _on_turn_ended(_combatant_id: String) -> void:
 	"""Called when a combatant's turn ends"""
+	# Reset turn indicator animation
+	_reset_turn_indicator()
+
 	# Clear active button visual feedback
 	_clear_active_action_button()
 
@@ -1747,7 +1794,7 @@ func _create_combatant_slot(combatant: Dictionary, is_ally: bool) -> PanelContai
 
 	# Apply neon-kawaii sticker style for allies
 	if is_ally:
-		panel.custom_minimum_size = Vector2(220, 110)
+		panel.custom_minimum_size = Vector2(80, 80)
 
 		# Sticker style: Dark fill with thick white keyline (2px per design spec)
 		var style = StyleBoxFlat.new()
@@ -1768,12 +1815,11 @@ func _create_combatant_slot(combatant: Dictionary, is_ally: bool) -> PanelContai
 		# Apply subtle diagonal tilt
 		panel.rotation_degrees = randf_range(-2, 2)
 
-		# Horizontal layout for icon + info
-		var hbox = HBoxContainer.new()
-		hbox.add_theme_constant_override("separation", 10)
-		panel.add_child(hbox)
+		var vbox = VBoxContainer.new()
+		vbox.add_theme_constant_override("separation", 6)
+		panel.add_child(vbox)
 
-		# Character capsule icon with thick white keyline
+		# Character capsule icon (centered)
 		var icon_container = PanelContainer.new()
 		icon_container.custom_minimum_size = Vector2(40, 40)
 
@@ -1794,92 +1840,19 @@ func _create_combatant_slot(combatant: Dictionary, is_ally: bool) -> PanelContai
 		icon_style.corner_radius_bottom_right = 20
 		icon_container.add_theme_stylebox_override("panel", icon_style)
 
-		hbox.add_child(icon_container)
+		var icon_center = CenterContainer.new()
+		icon_center.add_child(icon_container)
+		vbox.add_child(icon_center)
 
-		# Info column (name + HP bar)
-		var vbox = VBoxContainer.new()
-		vbox.add_theme_constant_override("separation", 4)
-		vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		hbox.add_child(vbox)
-
-		# Name label (Milk White, all caps)
+		# Name label
 		var name_label = Label.new()
 		name_label.text = combatant.display_name.to_upper()
+		name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		name_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
-		name_label.add_theme_font_size_override("font_size", 11)
+		name_label.add_theme_font_size_override("font_size", 9)
 		vbox.add_child(name_label)
 
-		# HP bar as pill shape with gradient fill
-		var hp_bar = ProgressBar.new()
-		hp_bar.max_value = combatant.hp_max
-		hp_bar.value = combatant.hp
-		hp_bar.show_percentage = false
-		hp_bar.custom_minimum_size = Vector2(0, 10)
-
-		# Pill background
-		var hp_bar_bg = StyleBoxFlat.new()
-		hp_bar_bg.bg_color = COLOR_NIGHT_NAVY
-		hp_bar_bg.corner_radius_top_left = 8
-		hp_bar_bg.corner_radius_top_right = 8
-		hp_bar_bg.corner_radius_bottom_left = 8
-		hp_bar_bg.corner_radius_bottom_right = 8
-		hp_bar.add_theme_stylebox_override("background", hp_bar_bg)
-
-		# Pill fill with gradient (Cyan to Milk White gradient)
-		var hp_bar_fill = StyleBoxFlat.new()
-		# Create two-tone effect: use cyan for >25%, transition to magenta for low HP
-		var hp_percent = float(combatant.hp) / float(combatant.hp_max) if combatant.hp_max > 0 else 1.0
-		var fill_color = COLOR_SKY_CYAN if hp_percent > 0.25 else COLOR_BUBBLE_MAGENTA
-		hp_bar_fill.bg_color = fill_color
-		hp_bar_fill.corner_radius_top_left = 8
-		hp_bar_fill.corner_radius_top_right = 8
-		hp_bar_fill.corner_radius_bottom_left = 8
-		hp_bar_fill.corner_radius_bottom_right = 8
-		hp_bar.add_theme_stylebox_override("fill", hp_bar_fill)
-
-		vbox.add_child(hp_bar)
-
-		# HP text (current/max in small monospace)
-		var hp_label = Label.new()
-		hp_label.text = "%d/%d HP" % [combatant.hp, combatant.hp_max]
-		hp_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
-		hp_label.add_theme_font_size_override("font_size", 8)
-		vbox.add_child(hp_label)
-
-		# MP bar (if character has MP)
-		if combatant.mp_max > 0:
-			var mp_bar = ProgressBar.new()
-			mp_bar.max_value = combatant.mp_max
-			mp_bar.value = combatant.mp
-			mp_bar.show_percentage = false
-			mp_bar.custom_minimum_size = Vector2(0, 8)
-
-			# Pill background
-			var mp_bar_bg = StyleBoxFlat.new()
-			mp_bar_bg.bg_color = COLOR_NIGHT_NAVY
-			mp_bar_bg.corner_radius_top_left = 8
-			mp_bar_bg.corner_radius_top_right = 8
-			mp_bar_bg.corner_radius_bottom_left = 8
-			mp_bar_bg.corner_radius_bottom_right = 8
-			mp_bar.add_theme_stylebox_override("background", mp_bar_bg)
-
-			# Pill fill - use Grape Violet for MP
-			var mp_bar_fill = StyleBoxFlat.new()
-			mp_bar_fill.bg_color = COLOR_GRAPE_VIOLET
-			mp_bar_fill.corner_radius_top_left = 8
-			mp_bar_fill.corner_radius_top_right = 8
-			mp_bar_fill.corner_radius_bottom_left = 8
-			mp_bar_fill.corner_radius_bottom_right = 8
-			mp_bar.add_theme_stylebox_override("fill", mp_bar_fill)
-
-			vbox.add_child(mp_bar)
-
-			# MP text
-			var mp_label = Label.new()
-			mp_label.text = "%d/%d MP" % [combatant.mp, combatant.mp_max]
-			mp_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
-			mp_label.add_theme_font_size_override("font_size", 8)
-			vbox.add_child(mp_label)
+		# Don't show HP/MP bars for allies (clean capsule style)
 
 	else:
 		# Enemies: Capsule icon style (no HP/MP shown unless scan perk unlocked)
@@ -3830,62 +3803,81 @@ func _on_ally_panel_input(event: InputEvent, target: Dictionary) -> void:
 					_execute_item_usage(target)
 
 func _highlight_target_candidates() -> void:
-	"""Highlight valid targets with a visual indicator"""
-	# Get currently selected target ID
-	var selected_target_id = ""
-	if selected_target_index >= 0 and selected_target_index < target_candidates.size():
-		selected_target_id = target_candidates[selected_target_index].id
+	"""Show selection indicator above currently selected target"""
+	# Clear existing indicator
+	_clear_target_highlights()
 
-	# Highlight enemies
+	# Get currently selected target
+	if selected_target_index < 0 or selected_target_index >= target_candidates.size():
+		return
+
+	var selected_target = target_candidates[selected_target_index]
+	var selected_target_id = selected_target.id
+
+	# Find the panel for this target
+	var target_panel: Control = null
 	for child in enemy_slots.get_children():
-		var combatant_id = child.get_meta("combatant_id", "")
-		var is_candidate = target_candidates.any(func(c): return c.id == combatant_id)
+		if child.get_meta("combatant_id", "") == selected_target_id:
+			target_panel = child
+			break
 
-		if is_candidate:
-			var style = StyleBoxFlat.new()
-			style.bg_color = Color(0.3, 0.2, 0.2, 0.9)
-			style.border_width_left = 4
-			style.border_width_right = 4
-			style.border_width_top = 4
-			style.border_width_bottom = 4
+	if target_panel == null:
+		for child in ally_slots.get_children():
+			if child.get_meta("combatant_id", "") == selected_target_id:
+				target_panel = child
+				break
 
-			# Red border for currently selected, yellow for others
-			if combatant_id == selected_target_id:
-				style.border_color = Color(1.0, 0.2, 0.2, 1.0)  # Red - currently selected
-			else:
-				style.border_color = Color(1.0, 1.0, 0.0, 1.0)  # Yellow - targetable
+	if target_panel == null:
+		return
 
-			child.add_theme_stylebox_override("panel", style)
+	# Create selection indicator (animated arrow/marker above target)
+	selection_indicator = Control.new()
+	selection_indicator.custom_minimum_size = Vector2(60, 30)
+	selection_indicator.z_index = 50
+	add_child(selection_indicator)
 
-	# Highlight allies (for items)
-	for child in ally_slots.get_children():
-		var combatant_id = child.get_meta("combatant_id", "")
-		var is_candidate = target_candidates.any(func(c): return c.id == combatant_id)
+	# Position above the target panel
+	var indicator_pos = target_panel.global_position
+	indicator_pos.y -= 35  # Hover above
+	indicator_pos.x += (target_panel.size.x / 2) - 30  # Center horizontally
+	selection_indicator.global_position = indicator_pos
 
-		if is_candidate:
-			var style = StyleBoxFlat.new()
-			style.bg_color = Color(0.2, 0.3, 0.2, 0.9)
-			style.border_width_left = 4
-			style.border_width_right = 4
-			style.border_width_top = 4
-			style.border_width_bottom = 4
+	# Draw the indicator
+	selection_indicator.draw.connect(_draw_selection_indicator)
+	selection_indicator.queue_redraw()
 
-			# Red border for currently selected, green for others
-			if combatant_id == selected_target_id:
-				style.border_color = Color(1.0, 0.2, 0.2, 1.0)  # Red - currently selected
-			else:
-				style.border_color = Color(0.0, 1.0, 0.0, 1.0)  # Green - targetable
+	# Animate bouncing
+	var tween = create_tween()
+	tween.set_loops()
+	tween.tween_property(selection_indicator, "position:y", selection_indicator.position.y - 5, 0.5)
+	tween.tween_property(selection_indicator, "position:y", selection_indicator.position.y, 0.5)
 
-			child.add_theme_stylebox_override("panel", style)
+func _draw_selection_indicator() -> void:
+	"""Draw an arrow/indicator pointing down at the target"""
+	if not selection_indicator:
+		return
+
+	# Draw a downward-pointing arrow
+	var points = PackedVector2Array([
+		Vector2(30, 0),   # Top center
+		Vector2(15, 15),  # Bottom left
+		Vector2(30, 12),  # Bottom center
+		Vector2(45, 15),  # Bottom right
+	])
+
+	# Draw filled arrow with glow
+	selection_indicator.draw_colored_polygon(points, COLOR_CITRUS_YELLOW)
+	# Draw outline
+	for i in range(points.size()):
+		var p1 = points[i]
+		var p2 = points[(i + 1) % points.size()]
+		selection_indicator.draw_line(p1, p2, COLOR_MILK_WHITE, 2.0)
 
 func _clear_target_highlights() -> void:
-	"""Remove targeting highlights from all panels"""
-	for child in enemy_slots.get_children():
-		# Reset to default panel style
-		child.remove_theme_stylebox_override("panel")
-	for child in ally_slots.get_children():
-		# Reset to default panel style
-		child.remove_theme_stylebox_override("panel")
+	"""Remove selection indicator"""
+	if selection_indicator:
+		selection_indicator.queue_free()
+		selection_indicator = null
 
 ## ═══════════════════════════════════════════════════════════════
 ## ENEMY AI
