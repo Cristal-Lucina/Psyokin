@@ -1572,7 +1572,7 @@ func _get_controller_button_icon(button_index: int) -> Texture2D:
 			JOY_BUTTON_X: asset_num = 79  # X
 			JOY_BUTTON_Y: asset_num = 80  # Y
 			JOY_BUTTON_LEFT_SHOULDER: asset_num = 98  # LB
-			JOY_BUTTON_RIGHT_SHOULDER: asset_num = 96  # RB
+			JOY_BUTTON_RIGHT_SHOULDER: asset_num = 97  # RB
 			JOY_BUTTON_START: asset_num = 78  # Start
 			JOY_BUTTON_BACK: asset_num = 77  # Select
 			JOY_BUTTON_DPAD_UP: asset_num = 68  # Xbox D-Pad Up
@@ -1588,7 +1588,7 @@ func _get_controller_button_icon(button_index: int) -> Texture2D:
 			JOY_BUTTON_X: asset_num = 85  # Square
 			JOY_BUTTON_Y: asset_num = 84  # Triangle
 			JOY_BUTTON_LEFT_SHOULDER: asset_num = 94  # L1
-			JOY_BUTTON_RIGHT_SHOULDER: asset_num = 92  # R1
+			JOY_BUTTON_RIGHT_SHOULDER: asset_num = 93  # R1
 			JOY_BUTTON_START: asset_num = 51  # Options
 			JOY_BUTTON_BACK: asset_num = 50  # Share
 			JOY_BUTTON_DPAD_UP: asset_num = 72  # PS D-Pad Up
@@ -1604,7 +1604,7 @@ func _get_controller_button_icon(button_index: int) -> Texture2D:
 			JOY_BUTTON_X: asset_num = 80  # Nintendo shows Xbox Y icon
 			JOY_BUTTON_Y: asset_num = 79  # Nintendo shows Xbox X icon
 			JOY_BUTTON_LEFT_SHOULDER: asset_num = 98  # LB (Nintendo uses Xbox shoulders)
-			JOY_BUTTON_RIGHT_SHOULDER: asset_num = 96  # RB
+			JOY_BUTTON_RIGHT_SHOULDER: asset_num = 97  # RB
 			JOY_BUTTON_START: asset_num = 99  # + button
 			JOY_BUTTON_BACK: asset_num = 100  # - button
 			JOY_BUTTON_DPAD_UP: asset_num = 71  # Use Xbox D-Pad Right
@@ -1637,16 +1637,16 @@ func _get_controller_axis_icon(axis: int) -> Texture2D:
 	# Map axis to asset number based on control type
 	if _control_type == "xbox":
 		match axis:
-			JOY_AXIS_TRIGGER_LEFT: asset_num = 97  # LT
+			JOY_AXIS_TRIGGER_LEFT: asset_num = 96  # LT
 			JOY_AXIS_TRIGGER_RIGHT: asset_num = 95  # RT
 	elif _control_type == "playstation":
 		match axis:
-			JOY_AXIS_TRIGGER_LEFT: asset_num = 93  # L2
+			JOY_AXIS_TRIGGER_LEFT: asset_num = 92  # L2
 			JOY_AXIS_TRIGGER_RIGHT: asset_num = 91  # R2
 	elif _control_type == "nintendo":
-		# Nintendo uses Xbox shoulder buttons for triggers
+		# Nintendo uses Xbox trigger icons
 		match axis:
-			JOY_AXIS_TRIGGER_LEFT: asset_num = 97  # LT (using Xbox)
+			JOY_AXIS_TRIGGER_LEFT: asset_num = 96  # LT (using Xbox)
 			JOY_AXIS_TRIGGER_RIGHT: asset_num = 95  # RT (using Xbox)
 
 	# Load and return the texture
