@@ -305,17 +305,33 @@ func _update_button_icons() -> void:
 	print("[Battle] Updating button icons for controller type: %s" % controller_type)
 
 	# Map each battle button to its controller button action
-	# Xbox layout: Fight/Status=(B), Capture/Item=(A), Guard/Run=(X), Skill/Burst=(Y)
-	var button_icon_mappings = [
-		{"button": "AttackButton", "icon_action": "back"},          # B / Circle - Fight
-		{"button": "StatusButton", "icon_action": "back"},          # B / Circle - Status
-		{"button": "CaptureButton", "icon_action": "accept"},       # A / Cross - Capture
-		{"button": "ItemButton", "icon_action": "accept"},          # A / Cross - Item
-		{"button": "DefendButton", "icon_action": "special_1"},     # X / Square - Guard
-		{"button": "RunButton", "icon_action": "special_1"},        # X / Square - Run
-		{"button": "SkillButton", "icon_action": "special_2"},      # Y / Triangle - Skill
-		{"button": "BurstButton", "icon_action": "special_2"},      # Y / Triangle - Burst
-	]
+	# Different layouts for different controllers due to button position differences
+	var button_icon_mappings = []
+
+	if controller_type == "nintendo":
+		# Nintendo layout: Fight/Status=(A), Capture/Item=(B), Guard/Run=(Y), Skill/Burst=(X)
+		button_icon_mappings = [
+			{"button": "AttackButton", "icon_action": "accept"},        # A (right) - Fight
+			{"button": "StatusButton", "icon_action": "accept"},        # A (right) - Status
+			{"button": "CaptureButton", "icon_action": "back"},         # B (bottom) - Capture
+			{"button": "ItemButton", "icon_action": "back"},            # B (bottom) - Item
+			{"button": "DefendButton", "icon_action": "special_1"},     # Y (left) - Guard
+			{"button": "RunButton", "icon_action": "special_1"},        # Y (left) - Run
+			{"button": "SkillButton", "icon_action": "special_2"},      # X (top) - Skill
+			{"button": "BurstButton", "icon_action": "special_2"},      # X (top) - Burst
+		]
+	else:
+		# Xbox/PlayStation layout: Fight/Status=(B), Capture/Item=(A), Guard/Run=(X), Skill/Burst=(Y)
+		button_icon_mappings = [
+			{"button": "AttackButton", "icon_action": "back"},          # B / Circle - Fight
+			{"button": "StatusButton", "icon_action": "back"},          # B / Circle - Status
+			{"button": "CaptureButton", "icon_action": "accept"},       # A / Cross - Capture
+			{"button": "ItemButton", "icon_action": "accept"},          # A / Cross - Item
+			{"button": "DefendButton", "icon_action": "special_1"},     # X / Square - Guard
+			{"button": "RunButton", "icon_action": "special_1"},        # X / Square - Run
+			{"button": "SkillButton", "icon_action": "special_2"},      # Y / Triangle - Skill
+			{"button": "BurstButton", "icon_action": "special_2"},      # Y / Triangle - Burst
+		]
 
 	for mapping in button_icon_mappings:
 		var btn = action_menu.get_node_or_null(mapping["button"])
