@@ -1593,6 +1593,13 @@ func _on_victory_accept_pressed() -> void:
 	"""Handle Accept button press on victory screen"""
 	print("[Battle] Victory accepted - returning to overworld")
 	if victory_panel:
+		# Fade out victory panel before removing
+		var fade_tween = create_tween()
+		fade_tween.set_ease(Tween.EASE_IN)
+		fade_tween.set_trans(Tween.TRANS_CUBIC)
+		fade_tween.tween_property(victory_panel, "modulate:a", 0.0, 0.4)
+		await fade_tween.finished
+
 		victory_panel.queue_free()
 		victory_panel = null
 	victory_scroll = null
