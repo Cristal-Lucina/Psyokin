@@ -52,6 +52,7 @@ var input_cooldown_duration: float = 0.15  # 150ms between inputs
 var button_colors: Dictionary = {}  # Maps Button -> Color for highlight
 var active_pulse_tween: Tween = null  # Track the pulsing animation
 var selection_arrow: Label = null  # Arrow indicator for selected button
+var fade_in_complete: bool = false  # Track if initial fade in is done
 
 # Dynamic background elements
 var diagonal_bands: ColorRect = null
@@ -63,9 +64,20 @@ var particle_layer: Node2D = null
 func _ready() -> void:
 	"""Wire buttons defensively and decorate Continue."""
 
+	# Start with scene invisible for fade in
+	modulate = Color(1.0, 1.0, 1.0, 0.0)
+
 	# Create neon-kawaii background
 	_create_diagonal_background()
 	_spawn_ambient_particles()
+
+	# Fade in the title screen over 1 second
+	var fade_tween = create_tween()
+	fade_tween.set_ease(Tween.EASE_OUT)
+	fade_tween.set_trans(Tween.TRANS_CUBIC)
+	fade_tween.tween_property(self, "modulate", Color(1.0, 1.0, 1.0, 1.0), 1.0)
+	await fade_tween.finished
+	fade_in_complete = true
 
 	# Check if we're auto-loading from in-game (two-step loading process)
 	if has_node("/root/aGameState"):
@@ -584,7 +596,9 @@ func _highlight_button(index: int) -> void:
 	# Update arrow color and position BEFORE making visible
 	selection_arrow.add_theme_color_override("font_color", color)
 	selection_arrow.global_position = button.global_position + Vector2(button.size.x + 20, button.size.y / 2 - 21)
-	selection_arrow.visible = true  # Make visible after positioning
+	# Only show arrow after fade in is complete
+	if fade_in_complete:
+		selection_arrow.visible = true
 
 	# Kill any existing pulse animation
 	if active_pulse_tween:
