@@ -645,17 +645,6 @@ func _unhighlight_button(index: int) -> void:
 	# Set pivot offset to center (keep centered for consistency)
 	button.pivot_offset = button.size / 2
 
-	# Fade out selection arrow
-	if selection_arrow:
-		# Kill any existing arrow fade animation
-		if active_arrow_tween:
-			active_arrow_tween.kill()
-
-		active_arrow_tween = create_tween()
-		active_arrow_tween.set_ease(Tween.EASE_OUT)
-		active_arrow_tween.set_trans(Tween.TRANS_CUBIC)
-		active_arrow_tween.tween_property(selection_arrow, "modulate", Color(1.0, 1.0, 1.0, 0.0), 0.2)
-
 	# Get button's original border color
 	var color = button_colors.get(button, COLOR_ELECTRIC_LIME)
 
