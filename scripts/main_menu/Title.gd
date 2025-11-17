@@ -781,18 +781,13 @@ func _spawn_meteors() -> void:
 	_spawn_single_meteor()
 
 func _spawn_single_meteor() -> void:
-	"""Spawn a single meteor and schedule the next one"""
+	"""Spawn a single meteor with glow and trail effects"""
 	if not meteor_layer:
 		return
 
-	var meteor = ColorRect.new()
-	var size = randi_range(3, 8)
-	meteor.custom_minimum_size = Vector2(size * 3, size)  # Elongated for trail effect
-	meteor.size = Vector2(size * 3, size)
-
-	# Grey/white colors for rocky meteors
-	var grey_value = randf_range(0.6, 0.9)
-	meteor.color = Color(grey_value, grey_value, grey_value, 0.8)
+	# Create container for meteor and its trail
+	var meteor_container = Node2D.new()
+	meteor_layer.add_child(meteor_container)
 
 	# Start from random position on the right or top edge
 	var viewport_size = get_viewport_rect().size
@@ -800,24 +795,58 @@ func _spawn_single_meteor() -> void:
 
 	if start_from_top:
 		# Coming from top-right diagonal
-		meteor.position = Vector2(randf_range(viewport_size.x * 0.5, viewport_size.x), -20)
+		meteor_container.position = Vector2(randf_range(viewport_size.x * 0.5, viewport_size.x), -50)
 	else:
 		# Coming from right side
-		meteor.position = Vector2(viewport_size.x + 20, randf_range(0, viewport_size.y * 0.5))
+		meteor_container.position = Vector2(viewport_size.x + 50, randf_range(0, viewport_size.y * 0.5))
 
-	meteor_layer.add_child(meteor)
+	# Main meteor head - much bigger and glowing
+	var meteor = ColorRect.new()
+	var size = randi_range(15, 35)  # Much bigger!
+	meteor.custom_minimum_size = Vector2(size, size)
+	meteor.size = Vector2(size, size)
+
+	# Bright glowing colors - oranges, yellows, whites
+	var colors = [
+		Color(1.0, 0.8, 0.3, 1.0),  # Bright orange-yellow
+		Color(1.0, 0.6, 0.2, 1.0),  # Orange
+		Color(1.0, 0.9, 0.7, 1.0),  # Pale yellow
+		Color(0.9, 0.9, 0.9, 1.0)   # Bright white
+	]
+	meteor.color = colors[randi() % colors.size()]
+	meteor_container.add_child(meteor)
+
+	# Create glowing trail particles
+	var trail_count = randi_range(8, 15)
+	for i in range(trail_count):
+		var trail = ColorRect.new()
+		var trail_size = size * randf_range(0.4, 0.8) * (1.0 - float(i) / trail_count)
+		trail.custom_minimum_size = Vector2(trail_size, trail_size)
+		trail.size = Vector2(trail_size, trail_size)
+
+		# Trail gets dimmer and more transparent further back
+		var alpha = 0.8 * (1.0 - float(i) / trail_count)
+		trail.color = Color(meteor.color.r, meteor.color.g, meteor.color.b, alpha)
+
+		# Position trail particles behind the meteor head
+		trail.position = Vector2(i * size * 0.3, i * size * 0.15)
+		meteor_container.add_child(trail)
 
 	# Animate meteor flying diagonally across screen
 	var tween = create_tween()
-	var end_x = meteor.position.x - randf_range(800, 1200)
-	var end_y = meteor.position.y + randf_range(400, 800)
-	var duration = randf_range(1.5, 3.0)
+	var end_x = meteor_container.position.x - randf_range(1200, 1800)
+	var end_y = meteor_container.position.y + randf_range(600, 1000)
+	var duration = randf_range(2.0, 4.0)
 
-	tween.tween_property(meteor, "position", Vector2(end_x, end_y), duration).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_QUAD)
-	tween.tween_callback(meteor.queue_free)
+	tween.tween_property(meteor_container, "position", Vector2(end_x, end_y), duration).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_QUAD)
+
+	# Add rotation for more dynamic movement
+	tween.parallel().tween_property(meteor_container, "rotation", randf_range(-0.5, 0.5), duration)
+
+	tween.tween_callback(meteor_container.queue_free)
 
 	# Schedule next meteor
-	await get_tree().create_timer(randf_range(2.0, 5.0)).timeout
+	await get_tree().create_timer(randf_range(3.0, 7.0)).timeout
 	_spawn_single_meteor()
 
 func _style_panel() -> void:
