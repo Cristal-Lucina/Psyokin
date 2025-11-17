@@ -1360,6 +1360,7 @@ func _show_victory_screen() -> void:
 
 	var content_vbox = VBoxContainer.new()
 	content_vbox.add_theme_constant_override("separation", 15)
+	content_vbox.custom_minimum_size = Vector2(0, 550)  # Minimum height of 550px
 	margin.add_child(content_vbox)
 
 	# Title label
@@ -3559,7 +3560,7 @@ func _show_status_character_picker() -> void:
 	status_picker_panel.add_theme_stylebox_override("panel", panel_style)
 
 	status_picker_panel.position = get_viewport_rect().size / 2 - status_picker_panel.custom_minimum_size / 2
-	status_picker_panel.position.y -= 100  # Move up 100px (60 + 40)
+	status_picker_panel.position.y -= 110  # Move up 110px (60 + 40 + 10)
 	status_picker_panel.z_index = 100
 	status_picker_panel.mouse_filter = Control.MOUSE_FILTER_STOP
 
@@ -5509,7 +5510,7 @@ func _show_capture_menu(bind_items: Array) -> void:
 	add_child(capture_menu_panel)
 	capture_menu_panel.position = Vector2(
 		(get_viewport_rect().size.x - 500) / 2,
-		(get_viewport_rect().size.y - 400) / 2 - 165  # Moved down 15px (was -150)
+		(get_viewport_rect().size.y - 400) / 2 - 145  # Moved down 35px total (was -150, then -165)
 	)
 
 	# Highlight first item if available
