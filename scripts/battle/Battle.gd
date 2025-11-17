@@ -2278,7 +2278,7 @@ func _execute_attack(target: Dictionary) -> void:
 	_clear_target_highlights()
 
 	# Check if frozen combatant can act
-	if not _check_freeze_action_allowed():
+	if not await _check_freeze_action_allowed():
 		return
 
 	# Clear defending status when attacking
@@ -2878,7 +2878,7 @@ func _execute_item_usage(target: Dictionary) -> void:
 	_clear_target_highlights()
 
 	# Check if frozen combatant can act
-	if not _check_freeze_action_allowed():
+	if not await _check_freeze_action_allowed():
 		return
 
 	# Get the item that was selected
@@ -3324,7 +3324,7 @@ func _on_defend_pressed() -> void:
 	_activate_action_button("DefendButton", COLOR_PLASMA_TEAL)
 
 	# Check if frozen combatant can act
-	if not _check_freeze_action_allowed():
+	if not await _check_freeze_action_allowed():
 		return
 
 	# Show confirmation dialog
@@ -3353,7 +3353,7 @@ func _on_burst_pressed() -> void:
 	_activate_action_button("BurstButton", COLOR_CITRUS_YELLOW)
 
 	# Check if frozen combatant can act
-	if not _check_freeze_action_allowed():
+	if not await _check_freeze_action_allowed():
 		return
 
 	# Only hero can use burst abilities
@@ -3425,7 +3425,7 @@ func _on_run_pressed() -> void:
 	_activate_action_button("RunButton", COLOR_INK_CHARCOAL)
 
 	# Check if frozen combatant can act
-	if not _check_freeze_action_allowed():
+	if not await _check_freeze_action_allowed():
 		return
 
 	# Check if run was already attempted this round
@@ -6175,7 +6175,7 @@ func _on_skill_selected(skill_entry: Dictionary) -> void:
 func _execute_skill_single(target: Dictionary) -> void:
 	"""Execute a single-target skill"""
 	# Check if frozen combatant can act
-	if not _check_freeze_action_allowed():
+	if not await _check_freeze_action_allowed():
 		return
 
 	# Get skill info
@@ -6503,7 +6503,7 @@ func _execute_skill_single(target: Dictionary) -> void:
 func _execute_skill_aoe() -> void:
 	"""Execute an AoE skill on all valid targets"""
 	# Check if frozen combatant can act
-	if not _check_freeze_action_allowed():
+	if not await _check_freeze_action_allowed():
 		return
 
 	var skill_name = String(skill_to_use.get("name", "Unknown"))
