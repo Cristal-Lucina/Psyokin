@@ -1792,24 +1792,17 @@ func _create_combatant_slot(combatant: Dictionary, is_ally: bool) -> PanelContai
 		panel.visible = false
 		panel.position = Vector2(-1000, -1000)  # Move off screen
 
-	# Apply neon-kawaii sticker style for allies
+	# Allies: Transparent background, only capsule and name visible
 	if is_ally:
 		panel.custom_minimum_size = Vector2(80, 80)
 
-		# Sticker style: Dark fill with thick white keyline (2px per design spec)
+		# Make panel background completely transparent
 		var style = StyleBoxFlat.new()
-		style.bg_color = COLOR_INK_CHARCOAL  # Dark glass fill
-		style.border_width_left = 2
-		style.border_width_right = 2
-		style.border_width_top = 2
-		style.border_width_bottom = 2
-		style.border_color = COLOR_MILK_WHITE  # Thick white keyline
-		style.corner_radius_top_left = 12  # Soft rectangle
-		style.corner_radius_top_right = 12
-		style.corner_radius_bottom_left = 12
-		style.corner_radius_bottom_right = 12
-		style.shadow_size = 4
-		style.shadow_color = Color(COLOR_SKY_CYAN.r, COLOR_SKY_CYAN.g, COLOR_SKY_CYAN.b, 0.3)  # Subtle cyan glow
+		style.bg_color = Color(0, 0, 0, 0)  # Fully transparent
+		style.border_width_left = 0
+		style.border_width_right = 0
+		style.border_width_top = 0
+		style.border_width_bottom = 0
 		panel.add_theme_stylebox_override("panel", style)
 
 		# Apply subtle diagonal tilt
@@ -1855,22 +1848,16 @@ func _create_combatant_slot(combatant: Dictionary, is_ally: bool) -> PanelContai
 		# Don't show HP/MP bars for allies (clean capsule style)
 
 	else:
-		# Enemies: Capsule icon style (no HP/MP shown unless scan perk unlocked)
+		# Enemies: Transparent background, only capsule and name visible
 		panel.custom_minimum_size = Vector2(80, 80)
 
+		# Make panel background completely transparent
 		var style = StyleBoxFlat.new()
-		style.bg_color = COLOR_NIGHT_NAVY
-		style.border_width_left = 2
-		style.border_width_right = 2
-		style.border_width_top = 2
-		style.border_width_bottom = 2
-		style.border_color = COLOR_BUBBLE_MAGENTA  # Magenta for enemies
-		style.corner_radius_top_left = 12
-		style.corner_radius_top_right = 12
-		style.corner_radius_bottom_left = 12
-		style.corner_radius_bottom_right = 12
-		style.shadow_size = 4
-		style.shadow_color = Color(COLOR_BUBBLE_MAGENTA.r, COLOR_BUBBLE_MAGENTA.g, COLOR_BUBBLE_MAGENTA.b, 0.3)
+		style.bg_color = Color(0, 0, 0, 0)  # Fully transparent
+		style.border_width_left = 0
+		style.border_width_right = 0
+		style.border_width_top = 0
+		style.border_width_bottom = 0
 		panel.add_theme_stylebox_override("panel", style)
 
 		var vbox = VBoxContainer.new()
