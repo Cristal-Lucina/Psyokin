@@ -1455,7 +1455,7 @@ func _create_action_row(action: String, display_name: String = "") -> HBoxContai
 	bind_container.custom_minimum_size = Vector2(200, 35)
 	bind_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	bind_container.add_theme_constant_override("separation", 8)
-	bind_container.alignment = BoxContainer.ALIGNMENT_CENTER
+	bind_container.alignment = BoxContainer.ALIGNMENT_BEGIN  # Left justify
 
 	# Get the input event for this action
 	var events = InputMap.action_get_events(action)
@@ -1523,6 +1523,8 @@ func _get_controller_button_icon(button_index: int) -> Texture2D:
 			JOY_BUTTON_Y: asset_num = 80  # Y
 			JOY_BUTTON_LEFT_SHOULDER: asset_num = 98  # LB
 			JOY_BUTTON_RIGHT_SHOULDER: asset_num = 96  # RB
+			JOY_BUTTON_START: asset_num = 78  # Start
+			JOY_BUTTON_BACK: asset_num = 77  # Select
 			JOY_BUTTON_DPAD_UP: asset_num = 68  # Xbox D-Pad Up
 			JOY_BUTTON_DPAD_DOWN: asset_num = 69  # Xbox D-Pad Down
 			JOY_BUTTON_DPAD_LEFT: asset_num = 70  # Xbox D-Pad Left
@@ -1537,6 +1539,8 @@ func _get_controller_button_icon(button_index: int) -> Texture2D:
 			JOY_BUTTON_Y: asset_num = 84  # Triangle
 			JOY_BUTTON_LEFT_SHOULDER: asset_num = 94  # L1
 			JOY_BUTTON_RIGHT_SHOULDER: asset_num = 92  # R1
+			JOY_BUTTON_START: asset_num = 51  # Options
+			JOY_BUTTON_BACK: asset_num = 50  # Share
 			JOY_BUTTON_DPAD_UP: asset_num = 72  # PS D-Pad Up
 			JOY_BUTTON_DPAD_DOWN: asset_num = 73  # PS D-Pad Down
 			JOY_BUTTON_DPAD_LEFT: asset_num = 74  # PS D-Pad Left
@@ -1545,16 +1549,18 @@ func _get_controller_button_icon(button_index: int) -> Texture2D:
 			JOY_BUTTON_RIGHT_STICK: asset_num = 87  # Right Stick
 	elif _control_type == "nintendo":
 		match button_index:
-			JOY_BUTTON_A: asset_num = 77  # Nintendo B (bottom)
-			JOY_BUTTON_B: asset_num = 78  # Nintendo A (right)
-			JOY_BUTTON_X: asset_num = 79  # Nintendo Y (left)
-			JOY_BUTTON_Y: asset_num = 80  # Nintendo X (top)
+			JOY_BUTTON_A: asset_num = 82  # Nintendo shows Xbox A icon
+			JOY_BUTTON_B: asset_num = 81  # Nintendo shows Xbox B icon
+			JOY_BUTTON_X: asset_num = 80  # Nintendo shows Xbox Y icon
+			JOY_BUTTON_Y: asset_num = 79  # Nintendo shows Xbox X icon
 			JOY_BUTTON_LEFT_SHOULDER: asset_num = 98  # LB (Nintendo uses Xbox shoulders)
 			JOY_BUTTON_RIGHT_SHOULDER: asset_num = 96  # RB
-			JOY_BUTTON_DPAD_UP: asset_num = 64  # Nintendo D-Pad Up
-			JOY_BUTTON_DPAD_DOWN: asset_num = 65  # Nintendo D-Pad Down
-			JOY_BUTTON_DPAD_LEFT: asset_num = 66  # Nintendo D-Pad Left
-			JOY_BUTTON_DPAD_RIGHT: asset_num = 67  # Nintendo D-Pad Right
+			JOY_BUTTON_START: asset_num = 99  # + button
+			JOY_BUTTON_BACK: asset_num = 100  # - button
+			JOY_BUTTON_DPAD_UP: asset_num = 71  # Use Xbox D-Pad Right
+			JOY_BUTTON_DPAD_DOWN: asset_num = 69  # Use Xbox D-Pad Down
+			JOY_BUTTON_DPAD_LEFT: asset_num = 68  # Use Xbox D-Pad Up
+			JOY_BUTTON_DPAD_RIGHT: asset_num = 70  # Use Xbox D-Pad Left
 			JOY_BUTTON_LEFT_STICK: asset_num = 89  # Left Stick
 			JOY_BUTTON_RIGHT_STICK: asset_num = 87  # Right Stick
 
