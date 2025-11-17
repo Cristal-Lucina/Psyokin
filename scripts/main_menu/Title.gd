@@ -49,6 +49,8 @@ var navigable_buttons: Array[Button] = []
 var selected_button_index: int = 0
 var input_cooldown: float = 0.0
 var input_cooldown_duration: float = 0.15  # 150ms between inputs
+var button_colors: Dictionary = {}  # Maps Button -> Color for highlight
+var active_pulse_tween: Tween = null  # Track the pulsing animation
 
 # Dynamic background elements
 var diagonal_bands: ColorRect = null
@@ -453,19 +455,25 @@ func _collect_buttons(n: Node, out: Array) -> void:
 func _setup_controller_navigation(new_btn: Button, continue_btn: Button, load_btn: Button, options_btn: Button, quit_btn: Button, has_save: bool) -> void:
 	"""Setup controller navigation for menu buttons"""
 	navigable_buttons.clear()
+	button_colors.clear()
 
-	# Add buttons in VISUAL order (top to bottom)
+	# Add buttons in VISUAL order (top to bottom) and map their highlight colors
 	# Continue should be first if it exists
 	if continue_btn and has_save:
 		navigable_buttons.append(continue_btn)
+		button_colors[continue_btn] = COLOR_SKY_CYAN
 	if new_btn:
 		navigable_buttons.append(new_btn)
+		button_colors[new_btn] = COLOR_BUBBLE_MAGENTA
 	if load_btn and has_save:
 		navigable_buttons.append(load_btn)
+		button_colors[load_btn] = COLOR_ELECTRIC_LIME
 	if options_btn:
 		navigable_buttons.append(options_btn)
+		button_colors[options_btn] = COLOR_CITRUS_YELLOW
 	if quit_btn:
 		navigable_buttons.append(quit_btn)
+		button_colors[quit_btn] = COLOR_GRAPE_VIOLET
 
 	# Start at Continue if save exists, else New Game
 	if navigable_buttons.size() > 0:
@@ -530,86 +538,85 @@ func _navigate_menu(direction: int) -> void:
 	_highlight_button(selected_button_index)
 
 func _highlight_button(index: int) -> void:
-	"""Highlight a button with Core Vibe animation - resets all buttons first"""
-	# First, unhighlight ALL buttons to ensure only one is highlighted
-	for i in range(navigable_buttons.size()):
-		var btn = navigable_buttons[i]
-		btn.modulate = Color(1.0, 1.0, 1.0, 1.0)
-		btn.scale = Vector2.ONE
+	"""Highlight a button with color change and pulsing animation"""
+	if index < 0 or index >= navigable_buttons.size():
+		return
 
-		# Reset to normal styling
-		var btn_index = i
-		var colors = [COLOR_BUBBLE_MAGENTA, COLOR_SKY_CYAN, COLOR_ELECTRIC_LIME, COLOR_CITRUS_YELLOW, COLOR_INK_CHARCOAL]
-		var color = colors[btn_index % colors.size()]
+	var button = navigable_buttons[index]
+	button.grab_focus()
 
-		var style_normal = StyleBoxFlat.new()
-		style_normal.bg_color = COLOR_NIGHT_NAVY
-		style_normal.border_color = color
-		style_normal.border_width_left = 2
-		style_normal.border_width_right = 2
-		style_normal.border_width_top = 2
-		style_normal.border_width_bottom = 2
-		style_normal.corner_radius_top_left = 20
-		style_normal.corner_radius_top_right = 20
-		style_normal.corner_radius_bottom_left = 20
-		style_normal.corner_radius_bottom_right = 20
-		style_normal.shadow_color = Color(color.r, color.g, color.b, 0.4)
-		style_normal.shadow_size = 4
-		btn.add_theme_stylebox_override("normal", style_normal)
+	# Get button's highlight color
+	var color = button_colors.get(button, COLOR_ELECTRIC_LIME)
 
-		# Reset font color to white
-		btn.add_theme_color_override("font_color", COLOR_MILK_WHITE)
+	# Create highlighted style - background becomes the assigned color, font becomes dark
+	var style_highlight = StyleBoxFlat.new()
+	style_highlight.bg_color = color  # Background is the highlight color
+	style_highlight.border_color = color
+	style_highlight.border_width_left = 3
+	style_highlight.border_width_right = 3
+	style_highlight.border_width_top = 3
+	style_highlight.border_width_bottom = 3
+	style_highlight.corner_radius_top_left = 20
+	style_highlight.corner_radius_top_right = 20
+	style_highlight.corner_radius_bottom_left = 20
+	style_highlight.corner_radius_bottom_right = 20
+	style_highlight.shadow_color = Color(color.r, color.g, color.b, 0.8)
+	style_highlight.shadow_size = 12
+	button.add_theme_stylebox_override("normal", style_highlight)
 
-	# Now highlight the selected button
-	if index >= 0 and index < navigable_buttons.size():
-		var button = navigable_buttons[index]
-		button.grab_focus()
+	# Change font color to Night Navy
+	button.add_theme_color_override("font_color", COLOR_NIGHT_NAVY)
 
-		# Get button's border color
-		var colors = [COLOR_BUBBLE_MAGENTA, COLOR_SKY_CYAN, COLOR_ELECTRIC_LIME, COLOR_CITRUS_YELLOW, COLOR_INK_CHARCOAL]
-		var color = colors[index % colors.size()]
+	# Kill any existing pulse animation
+	if active_pulse_tween:
+		active_pulse_tween.kill()
 
-		# Create highlighted style - background becomes border color, font becomes dark
-		var style_highlight = StyleBoxFlat.new()
-		style_highlight.bg_color = color  # Background is now the border color
-		style_highlight.border_color = color
-		style_highlight.border_width_left = 3
-		style_highlight.border_width_right = 3
-		style_highlight.border_width_top = 3
-		style_highlight.border_width_bottom = 3
-		style_highlight.corner_radius_top_left = 20
-		style_highlight.corner_radius_top_right = 20
-		style_highlight.corner_radius_bottom_left = 20
-		style_highlight.corner_radius_bottom_right = 20
-		style_highlight.shadow_color = Color(color.r, color.g, color.b, 0.8)
-		style_highlight.shadow_size = 12
-		button.add_theme_stylebox_override("normal", style_highlight)
+	# Animate with pulsing effect (only for selected button)
+	active_pulse_tween = create_tween()
+	active_pulse_tween.set_loops()
+	active_pulse_tween.set_parallel(false)
 
-		# Change font color to Night Navy
-		button.add_theme_color_override("font_color", COLOR_NIGHT_NAVY)
-
-		# Animate with pulsing effect
-		var tween = create_tween()
-		tween.set_loops()
-		tween.set_parallel(false)
-
-		# Pulse scale up
-		tween.tween_property(button, "scale", Vector2(1.05, 1.05), 0.6).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
-		# Pulse scale down
-		tween.tween_property(button, "scale", Vector2(1.0, 1.0), 0.6).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
+	# Pulse scale up
+	active_pulse_tween.tween_property(button, "scale", Vector2(1.05, 1.05), 0.6).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
+	# Pulse scale down
+	active_pulse_tween.tween_property(button, "scale", Vector2(1.0, 1.0), 0.6).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
 
 func _unhighlight_button(index: int) -> void:
-	"""Remove highlight from a button with smooth animation"""
-	if index >= 0 and index < navigable_buttons.size():
-		var button = navigable_buttons[index]
+	"""Remove highlight from a button - restore to original styled state"""
+	if index < 0 or index >= navigable_buttons.size():
+		return
 
-		var tween = create_tween()
-		tween.set_parallel(true)
-		tween.set_ease(Tween.EASE_OUT)
-		tween.set_trans(Tween.TRANS_CUBIC)
+	var button = navigable_buttons[index]
 
-		tween.tween_property(button, "scale", Vector2.ONE, 0.2)
-		tween.tween_property(button, "modulate", Color(1.0, 1.0, 1.0, 1.0), 0.2)
+	# Kill any active pulse animation
+	if active_pulse_tween:
+		active_pulse_tween.kill()
+		active_pulse_tween = null
+
+	# Restore original scale immediately
+	button.scale = Vector2.ONE
+
+	# Get button's original border color
+	var color = button_colors.get(button, COLOR_ELECTRIC_LIME)
+
+	# Restore normal styling (dark background, colored border)
+	var style_normal = StyleBoxFlat.new()
+	style_normal.bg_color = COLOR_NIGHT_NAVY
+	style_normal.border_color = color
+	style_normal.border_width_left = 2
+	style_normal.border_width_right = 2
+	style_normal.border_width_top = 2
+	style_normal.border_width_bottom = 2
+	style_normal.corner_radius_top_left = 20
+	style_normal.corner_radius_top_right = 20
+	style_normal.corner_radius_bottom_left = 20
+	style_normal.corner_radius_bottom_right = 20
+	style_normal.shadow_color = Color(color.r, color.g, color.b, 0.4)
+	style_normal.shadow_size = 4
+	button.add_theme_stylebox_override("normal", style_normal)
+
+	# Restore font color to white
+	button.add_theme_color_override("font_color", COLOR_MILK_WHITE)
 
 # ------------------------------------------------------------------------------
 # Core Vibe Styling
