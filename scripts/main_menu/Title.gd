@@ -574,7 +574,7 @@ func _highlight_button(index: int) -> void:
 	# Create or show selection arrow
 	if not selection_arrow:
 		selection_arrow = Label.new()
-		selection_arrow.text = "▶"
+		selection_arrow.text = "◀"
 		selection_arrow.add_theme_font_size_override("font_size", 32)
 		selection_arrow.add_theme_color_override("font_color", color)
 		selection_arrow.z_index = 100
@@ -583,7 +583,7 @@ func _highlight_button(index: int) -> void:
 	# Update arrow color and position
 	selection_arrow.add_theme_color_override("font_color", color)
 	selection_arrow.visible = true
-	selection_arrow.global_position = button.global_position + Vector2(button.size.x + 20, button.size.y / 2 - 16)
+	selection_arrow.global_position = button.global_position + Vector2(button.size.x + 20, button.size.y / 2 - 21)
 
 	# Kill any existing pulse animation
 	if active_pulse_tween:
