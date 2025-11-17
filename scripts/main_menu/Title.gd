@@ -844,9 +844,9 @@ func _spawn_single_meteor() -> void:
 		wiggle_tween.tween_property(trail, "position", base_pos + Vector2(0, wiggle_amount), wiggle_speed).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
 		wiggle_tween.tween_property(trail, "position", base_pos + Vector2(0, -wiggle_amount), wiggle_speed).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
 
-		# Add fade out animation - trail particles fade faster the further back they are
+		# Add fade out animation - slow 5 second fade
 		var fade_delay = float(i) * 0.05  # Stagger the fade
-		var fade_duration = randf_range(0.4, 0.8)
+		var fade_duration = randf_range(4.5, 5.5)  # 5 seconds with slight variation
 		var fade_tween = create_tween()
 		fade_tween.tween_interval(fade_delay)
 		fade_tween.tween_property(trail, "modulate:a", 0.0, fade_duration).set_ease(Tween.EASE_OUT)
