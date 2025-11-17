@@ -1146,6 +1146,7 @@ func _confirm_target_selection() -> void:
 		# Check if battle is over
 		var battle_ended = await battle_mgr._check_battle_end()
 		if not battle_ended:
+			_reset_turn_indicator()  # Slide back before ending turn
 			battle_mgr.end_turn()
 	elif not selected_burst.is_empty():
 		# Using a burst ability (single target)
@@ -1156,6 +1157,7 @@ func _confirm_target_selection() -> void:
 		# Check if battle is over
 		var battle_ended = await battle_mgr._check_battle_end()
 		if not battle_ended:
+			_reset_turn_indicator()  # Slide back before ending turn
 			battle_mgr.end_turn()
 	else:
 		# Regular attack
@@ -1235,6 +1237,8 @@ func _on_turn_started(combatant_id: String) -> void:
 		log_message("%s is fast asleep..." % current_combatant.display_name)
 		# Wait a moment for readability
 		await _wait_for_message_queue()
+		# Slide back before ending turn
+		_reset_turn_indicator()
 		# End turn immediately
 		battle_mgr.end_turn()
 		return
@@ -1688,6 +1692,8 @@ func _check_freeze_action_allowed() -> bool:
 		log_message("  → %s is unable to act due to %s! (%d%% chance, rolled %d)" % [
 			current_combatant.display_name, ailment_name, success_chance, roll
 		])
+		# Slide back before ending turn
+		_reset_turn_indicator()
 		# End turn without acting
 		battle_mgr.end_turn()
 		return false
@@ -2445,6 +2451,9 @@ func _execute_attack(target: Dictionary) -> void:
 	if battle_ended:
 		print("[Battle] Battle ended after attack - skipping end turn")
 		return  # Battle ended
+
+	# Slide back before ending turn
+	_reset_turn_indicator()
 
 	# End turn
 	battle_mgr.end_turn()
@@ -3268,6 +3277,9 @@ func _execute_item_usage(target: Dictionary) -> void:
 	var inventory = get_node("/root/aInventorySystem")
 	inventory.remove_item(item_id, 1)
 
+	# Slide back before ending turn
+	_reset_turn_indicator()
+
 	# End turn
 	battle_mgr.end_turn()
 
@@ -3292,6 +3304,9 @@ func _execute_defend() -> void:
 	print("[Battle] _execute_defend called!")
 	log_message("%s moved into a defensive stance." % current_combatant.display_name)
 	current_combatant.is_defending = true
+
+	# Slide back before ending turn
+	_reset_turn_indicator()
 
 	# End turn
 	print("[Battle] Calling battle_mgr.end_turn()")
@@ -3444,6 +3459,9 @@ func _execute_run() -> void:
 
 		# Wait for message acknowledgment before ending turn
 		await _wait_for_message_queue()
+
+		# Slide back before ending turn
+		_reset_turn_indicator()
 
 		battle_mgr.end_turn()
 
