@@ -836,17 +836,17 @@ func _spawn_single_meteor() -> void:
 		trail.position = base_pos
 		meteor_container.add_child(trail)
 
-		# Add wiggle animation to trail particles
+		# Add wiggle animation to trail particles - faster wiggle
 		var wiggle_tween = create_tween()
 		wiggle_tween.set_loops()
 		var wiggle_amount = randf_range(3, 8)
-		var wiggle_speed = randf_range(0.3, 0.6)
+		var wiggle_speed = randf_range(0.15, 0.3)  # Faster (was 0.3-0.6)
 		wiggle_tween.tween_property(trail, "position", base_pos + Vector2(0, wiggle_amount), wiggle_speed).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
 		wiggle_tween.tween_property(trail, "position", base_pos + Vector2(0, -wiggle_amount), wiggle_speed).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
 
-		# Add fade out animation - slow 5 second fade
+		# Add fade out animation - 3 second fade
 		var fade_delay = float(i) * 0.05  # Stagger the fade
-		var fade_duration = randf_range(4.5, 5.5)  # 5 seconds with slight variation
+		var fade_duration = randf_range(2.8, 3.2)  # 3 seconds with slight variation
 		var fade_tween = create_tween()
 		fade_tween.tween_interval(fade_delay)
 		fade_tween.tween_property(trail, "modulate:a", 0.0, fade_duration).set_ease(Tween.EASE_OUT)
