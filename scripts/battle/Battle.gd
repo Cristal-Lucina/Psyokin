@@ -1342,7 +1342,7 @@ func _show_victory_screen() -> void:
 	victory_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER, Control.PRESET_MODE_MINSIZE)
 	victory_panel.custom_minimum_size = Vector2(1000, 650)
 	victory_panel.size = Vector2(1000, 650)
-	victory_panel.position = Vector2(-500, -325)  # Center the 1000x650 panel
+	victory_panel.position = Vector2(-500, -341)  # Center the 1000x650 panel, moved up 16px
 	victory_panel.modulate.a = 0.0  # Start transparent for fade-in
 
 	# Create vertical box for content
@@ -1682,6 +1682,60 @@ func _display_combatants() -> void:
 		enemy_slots.add_child(slot)
 		combatant_panels[enemy.id] = slot
 
+func _get_character_capsule_color(name: String, is_ally: bool) -> Color:
+	"""Get capsule color for a character or enemy based on name/type"""
+	if is_ally:
+		# Party member colors (placeholder capsule colors)
+		var name_lower = name.to_lower()
+		if "player" in name_lower:
+			return Color(1.0, 0.75, 0.85)  # Pink
+		elif "risa" in name_lower:
+			return Color(0.9, 0.2, 0.2)  # Red
+		elif "skye" in name_lower:
+			return Color(0.6, 0.85, 1.0)  # Light blue
+		elif "tessa" in name_lower:
+			return Color(1.0, 0.95, 0.4)  # Yellow
+		elif "kai" in name_lower:
+			return Color(0.7, 0.5, 0.9)  # Purple
+		elif "douglas" in name_lower:
+			return Color(0.3, 0.5, 0.9)  # Blue
+		elif "sev" in name_lower:
+			return Color(1.0, 0.6, 0.3)  # Orange
+		elif "matcha" in name_lower:
+			return Color(0.7, 0.95, 0.6)  # Light green
+		else:
+			return COLOR_BUBBLE_MAGENTA  # Default pink
+	else:
+		# Enemy colors based on type
+		var name_lower = name.to_lower()
+		if "slime" in name_lower:
+			return Color(0.2, 0.3, 0.6)  # Dark blue
+		elif "goblin" in name_lower:
+			return Color(0.2, 0.5, 0.3)  # Dark green
+		else:
+			return Color(0.4, 0.3, 0.5)  # Default dark purple
+
+func _has_enemy_scan_perk() -> bool:
+	"""Check if player has unlocked the perk to see enemy HP/MP"""
+	# For now, always return false - will implement perk system later
+	return false
+
+func _get_enemy_health_hint(enemy: Dictionary) -> String:
+	"""Get a text hint about enemy's health status"""
+	if enemy.hp_max <= 0:
+		return ""
+
+	var hp_percent = (float(enemy.hp) / float(enemy.hp_max)) * 100.0
+
+	if hp_percent <= 0:
+		return "%s has been defeated" % enemy.display_name
+	elif hp_percent < 30:
+		return "%s is in critical shape" % enemy.display_name
+	elif hp_percent < 60:
+		return "%s is not looking great" % enemy.display_name
+	else:
+		return "%s is holding strong" % enemy.display_name
+
 func _create_combatant_slot(combatant: Dictionary, is_ally: bool) -> PanelContainer:
 	"""Create a UI slot for a combatant with neon-kawaii sticker aesthetic"""
 	var panel = PanelContainer.new()
@@ -1719,15 +1773,13 @@ func _create_combatant_slot(combatant: Dictionary, is_ally: bool) -> PanelContai
 		hbox.add_theme_constant_override("separation", 10)
 		panel.add_child(hbox)
 
-		# Character icon with thick white keyline (sticker edges)
+		# Character capsule icon with thick white keyline
 		var icon_container = PanelContainer.new()
 		icon_container.custom_minimum_size = Vector2(40, 40)
 
 		var icon_style = StyleBoxFlat.new()
-		# Assign a neon color based on character index for variety
-		var icon_colors = [COLOR_BUBBLE_MAGENTA, COLOR_SKY_CYAN, COLOR_ELECTRIC_LIME, COLOR_CITRUS_YELLOW]
-		var hash_val = combatant.display_name.hash()
-		var icon_color = icon_colors[abs(hash_val) % icon_colors.size()]
+		# Get character-specific capsule color
+		var icon_color = _get_character_capsule_color(combatant.display_name, true)
 
 		icon_style.bg_color = icon_color
 		icon_style.border_width_left = 2
@@ -1735,10 +1787,11 @@ func _create_combatant_slot(combatant: Dictionary, is_ally: bool) -> PanelContai
 		icon_style.border_width_top = 2
 		icon_style.border_width_bottom = 2
 		icon_style.border_color = COLOR_MILK_WHITE  # White keyline around icon
-		icon_style.corner_radius_top_left = 8
-		icon_style.corner_radius_top_right = 8
-		icon_style.corner_radius_bottom_left = 8
-		icon_style.corner_radius_bottom_right = 8
+		# Make it circular (capsule) with full corner radius
+		icon_style.corner_radius_top_left = 20
+		icon_style.corner_radius_top_right = 20
+		icon_style.corner_radius_bottom_left = 20
+		icon_style.corner_radius_bottom_right = 20
 		icon_container.add_theme_stylebox_override("panel", icon_style)
 
 		hbox.add_child(icon_container)
@@ -1829,8 +1882,8 @@ func _create_combatant_slot(combatant: Dictionary, is_ally: bool) -> PanelContai
 			vbox.add_child(mp_label)
 
 	else:
-		# Enemies: Simpler sticker style
-		panel.custom_minimum_size = Vector2(140, 90)
+		# Enemies: Capsule icon style (no HP/MP shown unless scan perk unlocked)
+		panel.custom_minimum_size = Vector2(80, 80)
 
 		var style = StyleBoxFlat.new()
 		style.bg_color = COLOR_NIGHT_NAVY
@@ -1848,49 +1901,42 @@ func _create_combatant_slot(combatant: Dictionary, is_ally: bool) -> PanelContai
 		panel.add_theme_stylebox_override("panel", style)
 
 		var vbox = VBoxContainer.new()
-		vbox.add_theme_constant_override("separation", 4)
+		vbox.add_theme_constant_override("separation", 6)
 		panel.add_child(vbox)
+
+		# Enemy capsule icon (centered)
+		var icon_container = PanelContainer.new()
+		icon_container.custom_minimum_size = Vector2(40, 40)
+
+		var icon_style = StyleBoxFlat.new()
+		var icon_color = _get_character_capsule_color(combatant.display_name, false)
+
+		icon_style.bg_color = icon_color
+		icon_style.border_width_left = 2
+		icon_style.border_width_right = 2
+		icon_style.border_width_top = 2
+		icon_style.border_width_bottom = 2
+		icon_style.border_color = COLOR_MILK_WHITE  # White keyline around icon
+		# Make it circular (capsule)
+		icon_style.corner_radius_top_left = 20
+		icon_style.corner_radius_top_right = 20
+		icon_style.corner_radius_bottom_left = 20
+		icon_style.corner_radius_bottom_right = 20
+		icon_container.add_theme_stylebox_override("panel", icon_style)
+
+		var icon_center = CenterContainer.new()
+		icon_center.add_child(icon_container)
+		vbox.add_child(icon_center)
 
 		# Name label
 		var name_label = Label.new()
 		name_label.text = combatant.display_name.to_upper()
 		name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		name_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
-		name_label.add_theme_font_size_override("font_size", 11)
+		name_label.add_theme_font_size_override("font_size", 9)
 		vbox.add_child(name_label)
 
-		# HP bar
-		var hp_bar = ProgressBar.new()
-		hp_bar.max_value = combatant.hp_max
-		hp_bar.value = combatant.hp
-		hp_bar.show_percentage = false
-		hp_bar.custom_minimum_size = Vector2(0, 10)
-
-		var hp_bar_bg = StyleBoxFlat.new()
-		hp_bar_bg.bg_color = COLOR_NIGHT_NAVY.darkened(0.2)
-		hp_bar_bg.corner_radius_top_left = 8
-		hp_bar_bg.corner_radius_top_right = 8
-		hp_bar_bg.corner_radius_bottom_left = 8
-		hp_bar_bg.corner_radius_bottom_right = 8
-		hp_bar.add_theme_stylebox_override("background", hp_bar_bg)
-
-		var hp_bar_fill = StyleBoxFlat.new()
-		hp_bar_fill.bg_color = COLOR_BUBBLE_MAGENTA
-		hp_bar_fill.corner_radius_top_left = 8
-		hp_bar_fill.corner_radius_top_right = 8
-		hp_bar_fill.corner_radius_bottom_left = 8
-		hp_bar_fill.corner_radius_bottom_right = 8
-		hp_bar.add_theme_stylebox_override("fill", hp_bar_fill)
-
-		vbox.add_child(hp_bar)
-
-		# HP label
-		var hp_label = Label.new()
-		hp_label.text = "%d/%d" % [combatant.hp, combatant.hp_max]
-		hp_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		hp_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
-		hp_label.add_theme_font_size_override("font_size", 8)
-		vbox.add_child(hp_label)
+		# Don't show HP/MP bars for enemies (hidden until scan perk unlocked)
 
 	# Store combatant ID in metadata
 	panel.set_meta("combatant_id", combatant.id)
@@ -2360,8 +2406,13 @@ func _execute_attack(target: Dictionary) -> void:
 			# Add KO or status line
 			if target.is_ko:
 				add_turn_line("%s fainted!" % target.display_name)
-			elif weakness_line == "":  # Only show HP if no weakness
-				add_turn_line("%s has %d HP left." % [target.display_name, target.hp])
+			elif weakness_line == "":  # Only show status hint if no weakness
+				# For enemies, show health hint instead of exact HP
+				var is_enemy = target in battle_mgr.get_enemy_combatants()
+				if is_enemy:
+					add_turn_line(_get_enemy_health_hint(target))
+				else:
+					add_turn_line("%s has %d HP left." % [target.display_name, target.hp])
 
 			# Queue the full turn message
 			queue_turn_message()
@@ -3628,7 +3679,8 @@ func _show_status_character_picker() -> void:
 
 		for enemy in enemies:
 			var btn = Button.new()
-			var hp_text = "%d/%d HP" % [enemy.hp, enemy.hp_max]
+			# Show "??" for enemy HP unless scan perk unlocked
+			var hp_text = "??/?? HP" if not _has_enemy_scan_perk() else "%d/%d HP" % [enemy.hp, enemy.hp_max]
 			var status_text = ""
 			if enemy.is_ko:
 				status_text = " [KO]"
@@ -3946,8 +3998,13 @@ func _execute_enemy_ai() -> void:
 			# Add KO or status line
 			if target.is_ko:
 				add_turn_line("%s fainted!" % target.display_name)
-			elif weakness_line == "":  # Only show HP if no weakness
-				add_turn_line("%s has %d HP left." % [target.display_name, target.hp])
+			elif weakness_line == "":  # Only show status hint if no weakness
+				# For enemies, show health hint instead of exact HP
+				var is_enemy = target in battle_mgr.get_enemy_combatants()
+				if is_enemy:
+					add_turn_line(_get_enemy_health_hint(target))
+				else:
+					add_turn_line("%s has %d HP left." % [target.display_name, target.hp])
 
 			# Queue the full turn message
 			queue_turn_message()
@@ -6358,7 +6415,12 @@ func _execute_skill_single(target: Dictionary) -> void:
 	if target.is_ko:
 		add_turn_line("%s fainted!" % target.display_name)
 	else:
-		add_turn_line("%s has %d HP left." % [target.display_name, target.hp])
+		# For enemies, show health hint instead of exact HP
+		var is_enemy = target in battle_mgr.get_enemy_combatants()
+		if is_enemy:
+			add_turn_line(_get_enemy_health_hint(target))
+		else:
+			add_turn_line("%s has %d HP left." % [target.display_name, target.hp])
 
 	# Queue the full turn message
 	queue_turn_message()
