@@ -99,6 +99,12 @@ var input_cooldown_duration: float = 0.15  # 150ms between inputs
 var action_cooldown: float = 0.0  # Cooldown for action button presses (FIGHT/SKILL/etc)
 var action_cooldown_duration: float = 1.0  # 1 second between action button presses
 
+# Message queue system (Pokemon-style message display)
+var message_queue: Array[String] = []  # Queue of messages to display
+var is_displaying_message: bool = false  # True when waiting for player to continue
+var continue_indicator: Label = null  # Visual indicator for "Press A to continue"
+var continue_indicator_tween: Tween = null  # Tween for blinking animation
+
 func _ready() -> void:
 	print("[Battle] Battle scene loaded")
 
@@ -132,6 +138,9 @@ func _ready() -> void:
 
 	# Create instruction popup
 	_create_instruction_popup()
+
+	# Create continue indicator for message queue
+	_create_continue_indicator()
 
 	# Load skill definitions
 	_load_skills()
@@ -617,6 +626,14 @@ func _input(event: InputEvent) -> void:
 	"""Handle keyboard/controller input for battle actions and target selection"""
 	# Note: Input processing is disabled until battle is fully initialized
 	# This function only runs after set_process_input(true) is called in _ready()
+
+	# CRITICAL: Handle message queue continuation FIRST (Pokemon-style)
+	# This blocks all other input while messages are displaying
+	if is_displaying_message:
+		if event.is_action_pressed(aInputManager.ACTION_ACCEPT):
+			_continue_to_next_message()
+			get_viewport().set_input_as_handled()
+		return
 
 	# If victory screen is showing, handle scrolling and accept
 	if victory_panel != null:
@@ -3795,12 +3812,41 @@ func _update_burst_gauge() -> void:
 		tween.tween_property(burst_gauge_bar, "value", battle_mgr.burst_gauge, 0.8)
 
 func log_message(message: String) -> void:
-	"""Add a message to the battle log"""
+	"""Add a message to the message queue for Pokemon-style display"""
+	message_queue.append(message)
+	print("[Battle] Queued: " + message)
+
+	# Start processing queue if not already displaying
+	if not is_displaying_message:
+		_display_next_message()
+
+func _display_next_message() -> void:
+	"""Display the next message in the queue"""
+	if message_queue.is_empty():
+		is_displaying_message = false
+		_hide_continue_indicator()
+		return
+
+	is_displaying_message = true
+
+	# Get next message
+	var message = message_queue.pop_front()
+
+	# Clear battle log and display new message
 	if battle_log:
-		battle_log.append_text(message + "\n")
-		# Auto-scroll to bottom
-		battle_log.scroll_to_line(battle_log.get_line_count() - 1)
-	print("[Battle] " + message)
+		battle_log.clear()
+		battle_log.append_text(message)
+
+	# Show continue indicator
+	_show_continue_indicator()
+
+func _continue_to_next_message() -> void:
+	"""Continue to next message when player presses accept"""
+	if not is_displaying_message:
+		return
+
+	# Display next message
+	_display_next_message()
 
 func _create_instruction_popup() -> void:
 	"""Create the instruction message popup that appears above battle log"""
@@ -3877,6 +3923,50 @@ func _hide_instruction() -> void:
 	tween.set_trans(Tween.TRANS_BACK)
 	tween.tween_property(instruction_popup, "position:y", get_viewport().get_visible_rect().size.y - 200, 0.2)
 	tween.tween_property(instruction_popup, "modulate:a", 0.0, 0.15)
+
+func _create_continue_indicator() -> void:
+	"""Create the 'Press A to continue' indicator"""
+	continue_indicator = Label.new()
+	continue_indicator.text = "▼"  # Down arrow
+	continue_indicator.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	continue_indicator.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
+	continue_indicator.add_theme_color_override("font_color", COLOR_ELECTRIC_LIME)
+	continue_indicator.add_theme_font_size_override("font_size", 20)
+
+	# Position in bottom-right corner of battle log panel
+	# BattleLogPanel: offset_left=360, offset_top=-200, offset_right=920, offset_bottom=-50
+	continue_indicator.position = Vector2(880, get_viewport().get_visible_rect().size.y - 70)
+	continue_indicator.size = Vector2(30, 20)
+	continue_indicator.modulate.a = 0.0  # Start invisible
+
+	add_child(continue_indicator)
+
+func _show_continue_indicator() -> void:
+	"""Show the continue indicator with blinking animation"""
+	if not continue_indicator:
+		return
+
+	# Kill any existing tween
+	if continue_indicator_tween:
+		continue_indicator_tween.kill()
+
+	# Create blinking animation
+	continue_indicator_tween = create_tween()
+	continue_indicator_tween.set_loops()
+	continue_indicator_tween.tween_property(continue_indicator, "modulate:a", 1.0, 0.5).set_ease(Tween.EASE_IN_OUT)
+	continue_indicator_tween.tween_property(continue_indicator, "modulate:a", 0.3, 0.5).set_ease(Tween.EASE_IN_OUT)
+
+func _hide_continue_indicator() -> void:
+	"""Hide the continue indicator"""
+	if not continue_indicator:
+		return
+
+	# Kill any existing tween
+	if continue_indicator_tween:
+		continue_indicator_tween.kill()
+		continue_indicator_tween = null
+
+	continue_indicator.modulate.a = 0.0
 
 func _show_miss_feedback() -> void:
 	"""Show big MISS text in center of screen that fades away in 0.5 seconds"""
