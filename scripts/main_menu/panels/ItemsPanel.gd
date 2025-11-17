@@ -80,8 +80,6 @@ const CATEGORIES : Array[Dictionary] = [
 @onready var _items_scroll: ScrollContainer = %ItemsScroll
 @onready var _item_name: Label = %ItemName
 @onready var _details_text: RichTextLabel = %DetailsText
-@onready var _use_button: Button = %UseButton
-@onready var _inspect_button: Button = %InspectButton
 
 # System references
 var _inv: Node = null
@@ -127,11 +125,6 @@ func _ready() -> void:
 	_gs = get_node_or_null(GS_PATH)
 	_sig = get_node_or_null(SIGIL_PATH)
 	_cps = get_node_or_null(CPS_PATH)
-
-	if _use_button:
-		_use_button.pressed.connect(_on_use_button_pressed)
-	if _inspect_button:
-		_inspect_button.pressed.connect(_on_inspect_button_pressed)
 
 	if _inv and _inv.has_signal("inventory_changed"):
 		if not _inv.is_connected("inventory_changed", Callable(self, "_rebuild")):
@@ -489,11 +482,6 @@ func _apply_styling() -> void:
 		r1_style.content_margin_top = 4
 		r1_style.content_margin_bottom = 4
 		_r1_label.add_theme_stylebox_override("normal", r1_style)
-
-	if _use_button:
-		aCoreVibeTheme.style_button(_use_button, aCoreVibeTheme.COLOR_ELECTRIC_LIME, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
-	if _inspect_button:
-		aCoreVibeTheme.style_button(_inspect_button, aCoreVibeTheme.COLOR_SKY_CYAN, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
 
 func _rebuild() -> void:
 	"""Rebuild all data from systems"""
@@ -929,21 +917,11 @@ func _update_details() -> void:
 	if _details_text:
 		_details_text.text = details
 
-	var category: String = CATEGORIES[_current_category_index]["id"]
-	if _use_button:
-		_use_button.visible = (category == "Recovery")
-	if _inspect_button:
-		_inspect_button.visible = true
-
 func _clear_details() -> void:
 	if _item_name:
 		_item_name.text = "(Select an item)"
 	if _details_text:
 		_details_text.text = ""
-	if _use_button:
-		_use_button.visible = false
-	if _inspect_button:
-		_inspect_button.visible = false
 
 func _category_of(def: Dictionary) -> String:
 	"""Get category of an item - checks multiple fields with priority"""
@@ -1280,18 +1258,15 @@ func _update_selection_highlight() -> void:
 		button.add_theme_stylebox_override("pressed", style)
 
 func _on_accept_pressed() -> void:
-	"""Handle Accept button press"""
+	"""Handle Accept button press - use recovery items directly"""
 	if _selected_item_id == "" or not _defs.has(_selected_item_id):
 		return
 
 	var def: Dictionary = _defs[_selected_item_id]
 
-	# If it's a recovery item, trigger use button
-	if _is_recovery_item(def) and _use_button and _use_button.visible:
-		_on_use_button_pressed()
-	# For other items, trigger inspect
-	elif _inspect_button and _inspect_button.visible:
-		_on_inspect_button_pressed()
+	# If it's a recovery item, show member selection popup
+	if _is_recovery_item(def):
+		_show_member_selection_popup()
 
 func _on_visibility_changed() -> void:
 	if visible:
@@ -1300,17 +1275,43 @@ func _on_visibility_changed() -> void:
 func _on_equipment_changed(_member: String) -> void:
 	_rebuild()
 
-func _on_use_button_pressed() -> void:
-	"""Use recovery item - show party picker popup"""
-	print("[ItemsPanel] Use button pressed for: %s" % _selected_item_id)
-	_show_member_selection_popup()
-
-func _on_inspect_button_pressed() -> void:
-	print("[ItemsPanel] Inspect button pressed for: %s" % _selected_item_id)
-
 # ==============================================================================
 # Party Picker Popup Functions
 # ==============================================================================
+
+func _can_anyone_benefit_from_recovery(item_def: Dictionary) -> bool:
+	"""Check if any party member can benefit from this recovery item"""
+	var effect: String = String(item_def.get("field_status_effect", ""))
+	if effect == "":
+		effect = String(item_def.get("battle_status_effect", ""))
+
+	var effect_lower: String = effect.to_lower()
+	var heals_hp: bool = effect_lower.contains("heal") and effect_lower.contains("hp")
+	var heals_mp: bool = effect_lower.contains("heal") and effect_lower.contains("mp")
+
+	# If item doesn't heal HP or MP, allow use
+	if not heals_hp and not heals_mp:
+		return true
+
+	# Check if anyone needs healing
+	var members: Array[String] = _gather_members()
+	for member_token in members:
+		var stats: Dictionary = _get_member_hp_mp(member_token)
+		var hp: int = stats["hp"]
+		var hp_max: int = stats["hp_max"]
+		var mp: int = stats["mp"]
+		var mp_max: int = stats["mp_max"]
+
+		# If item heals HP and member is not at full HP, they can benefit
+		if heals_hp and hp < hp_max:
+			return true
+
+		# If item heals MP and member is not at full MP, they can benefit
+		if heals_mp and mp < mp_max:
+			return true
+
+	# No one can benefit
+	return false
 
 func _show_member_selection_popup() -> void:
 	"""Show popup to select which party member to use item on - matches StatusPanel pattern"""
@@ -1319,6 +1320,11 @@ func _show_member_selection_popup() -> void:
 
 	var def: Dictionary = _defs.get(_selected_item_id, {})
 	var item_name: String = _display_name(_selected_item_id, def)
+
+	# Check if anyone can benefit from this recovery item
+	if not _can_anyone_benefit_from_recovery(def):
+		print("[ItemsPanel] No one can benefit from %s" % item_name)
+		return  # Don't show the popup
 
 	print("[ItemsPanel] Showing member selection popup for: %s" % item_name)
 
@@ -1371,19 +1377,37 @@ func _show_member_selection_popup() -> void:
 	_party_picker_list.focus_mode = Control.FOCUS_ALL
 	vbox.add_child(_party_picker_list)
 
-	# Populate members
+	# Populate members - only show those who can benefit from this recovery item
 	var members: Array[String] = _gather_members()
 	_party_member_tokens.clear()
+
+	# Determine what the item heals
+	var effect: String = String(def.get("field_status_effect", ""))
+	if effect == "":
+		effect = String(def.get("battle_status_effect", ""))
+	var effect_lower: String = effect.to_lower()
+	var heals_hp: bool = effect_lower.contains("heal") and effect_lower.contains("hp")
+	var heals_mp: bool = effect_lower.contains("heal") and effect_lower.contains("mp")
 
 	for member_token in members:
 		var member_name: String = _member_display_name(member_token)
 		var stats: Dictionary = _get_member_hp_mp(member_token)
-		_party_picker_list.add_item("%s  HP:%d/%d  MP:%d/%d" % [
-			member_name,
-			stats["hp"], stats["hp_max"],
-			stats["mp"], stats["mp_max"]
-		])
-		_party_member_tokens.append(member_token)
+
+		# Check if this member can benefit from the item
+		var can_benefit: bool = false
+		if heals_hp and stats["hp"] < stats["hp_max"]:
+			can_benefit = true
+		if heals_mp and stats["mp"] < stats["mp_max"]:
+			can_benefit = true
+
+		# Only add members who can benefit
+		if can_benefit:
+			_party_picker_list.add_item("%s  HP:%d/%d  MP:%d/%d" % [
+				member_name,
+				stats["hp"], stats["hp_max"],
+				stats["mp"], stats["mp_max"]
+			])
+			_party_member_tokens.append(member_token)
 
 	# Add Cancel button
 	var cancel_btn := Button.new()
