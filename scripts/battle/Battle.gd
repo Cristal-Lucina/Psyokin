@@ -104,6 +104,12 @@ var message_queue: Array[String] = []  # Queue of messages to display
 var is_displaying_message: bool = false  # True when waiting for player to continue
 var continue_indicator: Label = null  # Visual indicator for "Press A to continue"
 var continue_indicator_tween: Tween = null  # Tween for blinking animation
+var typewriter_tween: Tween = null  # Tween for character-by-character reveal
+var current_message_full: String = ""  # Full message being displayed
+var is_typewriter_active: bool = false  # True while text is being revealed
+
+# Turn message builder (accumulate lines for full turn display)
+var turn_message_lines: Array[String] = []  # Lines of current turn message
 
 func _ready() -> void:
 	print("[Battle] Battle scene loaded")
@@ -1004,9 +1010,11 @@ func _navigate_targets(direction: int) -> void:
 	# Update visual highlights
 	_highlight_target_candidates()
 
-	# Log current target
+	# Update battle log to show current target (without queuing message)
 	var target = target_candidates[selected_target_index]
-	log_message("→ %s" % target.display_name)
+	if battle_log:
+		battle_log.clear()
+		battle_log.append_text("→ %s" % target.display_name)
 
 func _confirm_target_selection() -> void:
 	"""Confirm the currently selected target"""
@@ -1017,9 +1025,7 @@ func _confirm_target_selection() -> void:
 
 	# Determine what action to execute based on state
 	if awaiting_capture_target:
-		# Show CAPTURE! instruction
-		_show_instruction("CAPTURE!")
-		# Attempting capture
+		# Attempting capture (minigame starts immediately)
 		await _execute_capture(target)
 	elif awaiting_item_target:
 		# Using an item
@@ -1087,8 +1093,7 @@ func _on_battle_started() -> void:
 
 func _on_round_started(round_number: int) -> void:
 	"""Called at start of each round"""
-	log_message("=== Round %d ===" % round_number)
-
+	# Round announcement will be combined with first turn message
 	# Disable all input during round transition
 	_disable_all_input()
 
@@ -1102,14 +1107,21 @@ func _on_turn_started(combatant_id: String) -> void:
 	# Reset action cooldown at start of turn
 	action_cooldown = 0.0
 
-	log_message("%s's turn!" % current_combatant.display_name)
+	# Queue turn announcement message (include round number on first turn)
+	if battle_mgr.current_turn_index == 0:
+		log_message("Round %d - %s's turn!" % [battle_mgr.current_round, current_combatant.display_name])
+	else:
+		log_message("%s's turn!" % current_combatant.display_name)
+
+	# Wait for player to press continue before proceeding
+	await _wait_for_message_queue()
 
 	# Check if combatant is asleep - skip turn entirely
 	var ailment = str(current_combatant.get("ailment", ""))
 	if ailment == "sleep":
-		log_message("  → %s is fast asleep... (turn skipped)" % current_combatant.display_name)
+		log_message("%s is fast asleep..." % current_combatant.display_name)
 		# Wait a moment for readability
-		await get_tree().create_timer(1.0).timeout
+		await _wait_for_message_queue()
 		# End turn immediately
 		battle_mgr.end_turn()
 		return
@@ -1117,24 +1129,26 @@ func _on_turn_started(combatant_id: String) -> void:
 	# Check for Berserk - attack random target (including allies)
 	if ailment == "berserk":
 		if current_combatant.is_ally:
-			log_message("  → %s is berserk and attacks wildly!" % current_combatant.display_name)
+			log_message("%s is berserk and attacks wildly!" % current_combatant.display_name)
+			await _wait_for_message_queue()
 			await _execute_berserk_action()
 			return
 		else:
 			# Enemies with berserk just attack normally (already random)
-			_execute_enemy_ai()
+			await _execute_enemy_ai()
 			return
 
 	# Check for Charm - use heal/buff items on enemy
 	if ailment == "charm":
 		if current_combatant.is_ally:
-			log_message("  → %s is charmed and aids the enemy!" % current_combatant.display_name)
+			log_message("%s is charmed and aids the enemy!" % current_combatant.display_name)
+			await _wait_for_message_queue()
 			await _execute_charm_action()
 			return
 		else:
 			# Enemies with charm do nothing (have no heal items to use on player)
-			log_message("  → %s is charmed but has no way to help!" % current_combatant.display_name)
-			await get_tree().create_timer(1.0).timeout
+			log_message("%s is charmed but has no way to help!" % current_combatant.display_name)
+			await _wait_for_message_queue()
 			battle_mgr.end_turn()
 			return
 
@@ -1142,8 +1156,8 @@ func _on_turn_started(combatant_id: String) -> void:
 		# Player's turn - show action menu
 		_show_action_menu()
 	else:
-		# Enemy turn - execute AI
-		_execute_enemy_ai()
+		# Enemy turn - execute AI (after player continues)
+		await _execute_enemy_ai()
 
 func _on_turn_ended(_combatant_id: String) -> void:
 	"""Called when a combatant's turn ends"""
@@ -1161,11 +1175,19 @@ func _on_battle_ended(victory: bool) -> void:
 	if victory:
 		log_message("*** VICTORY ***")
 		log_message("All enemies have been defeated!")
+
+		# Wait for all messages to be displayed and acknowledged before showing victory screen
+		await _wait_for_message_queue()
+
 		_show_victory_screen()
 	else:
 		log_message("*** DEFEAT ***")
 		log_message("Your party has been wiped out!")
 		log_message("GAME OVER")
+
+		# Wait for all messages to be displayed and acknowledged before game over
+		await _wait_for_message_queue()
+
 		# TODO: Show game over screen with retry/load options
 		await get_tree().create_timer(3.0).timeout
 		# For now, return to main menu or reload
@@ -2092,9 +2114,10 @@ func _on_attack_pressed() -> void:
 	selected_target_index = 0  # Start with first target
 	_highlight_target_candidates()
 
-	# Show currently selected target
-	if not target_candidates.is_empty():
-		log_message("→ %s" % target_candidates[0].display_name)
+	# Show currently selected target (without queuing message)
+	if not target_candidates.is_empty() and battle_log:
+		battle_log.clear()
+		battle_log.append_text("→ %s" % target_candidates[0].display_name)
 
 func _execute_attack(target: Dictionary) -> void:
 	"""Execute attack on selected target"""
@@ -2109,7 +2132,9 @@ func _execute_attack(target: Dictionary) -> void:
 	# Clear defending status when attacking
 	current_combatant.is_defending = false
 
-	log_message("%s attacks %s!" % [current_combatant.display_name, target.display_name])
+	# Start building turn message
+	start_turn_message()
+	add_turn_line("%s attacked %s!" % [current_combatant.display_name, target.display_name])
 
 	if target:
 		# First, check if the attack hits
@@ -2118,7 +2143,9 @@ func _execute_attack(target: Dictionary) -> void:
 		if not hit_check.hit:
 			# Miss!
 			_show_miss_feedback()  # Show big MISS text
-			log_message("  → Missed! (%d%% chance, rolled %d)" % [int(hit_check.hit_chance), hit_check.roll])
+			add_turn_line("But it missed!")
+			add_turn_line("(Hit chance: %d%%, rolled %d)" % [int(hit_check.hit_chance), hit_check.roll])
+			queue_turn_message()  # Queue the full turn message
 			print("[Battle] Miss! Hit chance: %.1f%%, Roll: %d" % [hit_check.hit_chance, hit_check.roll])
 		else:
 			# Hit! Launch attack minigame
@@ -2129,7 +2156,6 @@ func _execute_attack(target: Dictionary) -> void:
 			if ailment != "":
 				status_effects.append(ailment)
 
-			log_message("  → Hit! Starting attack minigame...")
 			_show_instruction("FIGHT!")
 			var minigame_result = await minigame_mgr.launch_attack_minigame(tpo, brw, status_effects)
 			_hide_instruction()
@@ -2184,30 +2210,47 @@ func _execute_attack(target: Dictionary) -> void:
 					battle_mgr.record_enemy_defeat(target, false)  # false = kill
 
 			# Record weakness hits AFTER damage (only if target still alive)
+			var weakness_line = ""
 			if not target.is_ko and (weapon_weakness_hit or crit_weakness_hit):
 				var became_fallen = await battle_mgr.record_weapon_weakness_hit(target)
 				if weapon_weakness_hit:
-					var weapon_desc = combat_resolver.get_weapon_type_description(current_combatant, target)
-					log_message("  → WEAPON WEAKNESS! %s" % weapon_desc)
+					weakness_line = "%s receives a WEAPON WEAKNESS!" % target.display_name
 				elif crit_weakness_hit:
-					log_message("  → CRITICAL STUMBLE!")
+					weakness_line = "%s receives a CRITICAL STUMBLE!" % target.display_name
 				if became_fallen:
-					log_message("  → %s is FALLEN! (will skip next turn)" % target.display_name)
+					weakness_line += " %s fell!" % target.display_name
 
-			# Log the hit with details
-			var hit_msg = "  → Hit %s for %d damage! (%d%% chance)" % [target.display_name, damage, int(hit_check.hit_chance)]
+			# Add weakness line if present
+			if weakness_line != "":
+				add_turn_line(weakness_line)
+
+			# Build hit message line
+			var hit_msg = "%s is hit for %d damage!" % [target.display_name, damage]
+
+			# Add special effects to message
+			var effect_parts = []
 			if is_crit:
-				hit_msg += " (CRITICAL! %d%% chance)" % int(crit_check.crit_chance)
+				effect_parts.append("CRITICAL")
 			if type_bonus > 0.0:
-				hit_msg += " (Super Effective!)"
+				effect_parts.append("Super Effective")
 			elif type_bonus < 0.0:
-				hit_msg += " (Not Very Effective...)"
+				effect_parts.append("Not Very Effective")
 			if target.get("is_defending", false):
-				# Calculate damage reduction from defensive stance (0.7 multiplier = 30% reduction)
-				var damage_without_defense = int(round(damage / 0.7))
-				var damage_reduced = damage_without_defense - damage
-				hit_msg += " (Defensive: -%d)" % damage_reduced
-			log_message(hit_msg)
+				effect_parts.append("Guarded")
+
+			if not effect_parts.is_empty():
+				hit_msg = "%s (%s)" % [hit_msg, ", ".join(effect_parts)]
+
+			add_turn_line(hit_msg)
+
+			# Add KO or status line
+			if target.is_ko:
+				add_turn_line("%s fainted!" % target.display_name)
+			elif weakness_line == "":  # Only show HP if no weakness
+				add_turn_line("%s has %d HP left." % [target.display_name, target.hp])
+
+			# Queue the full turn message
+			queue_turn_message()
 
 			# Debug: show hit, crit, and damage breakdown
 			var hit_breakdown = hit_check.breakdown
@@ -2509,12 +2552,11 @@ func _execute_capture(target: Dictionary) -> void:
 	var capture_chance: float = capture_result.chance
 	print("[Battle] Capture calculation result: %s" % capture_result)
 
-	log_message("%s uses %s on %s!" % [current_combatant.display_name, bind_name, target.display_name])
-	log_message("  Capture chance: %.1f%%" % capture_chance)
-
 	# ═══════ CAPTURE MINIGAME ═══════
 	# Initialize or get persistent break rating
+	var is_first_attempt = false
 	if not target.has("break_rating"):
+		is_first_attempt = true
 		# First capture attempt - calculate initial break rating
 		var base_rating = target.get("level", 1)
 		var enemy_hp = target.hp
@@ -2529,24 +2571,17 @@ func _execute_capture(target: Dictionary) -> void:
 		if enemy_hp_percent >= 1.0:
 			# Enemy at 100% HP: +50%
 			calculated_rating *= 1.5
-			log_message("  → Enemy at full health! (+50% break rating)")
 		elif enemy_hp > party_hp:
 			# Enemy has more HP than party member: +25%
 			calculated_rating *= 1.25
-			log_message("  → Enemy stronger than you! (+25% break rating)")
 		elif enemy_hp_percent <= 0.1:
 			# Enemy below 10% HP: -50%
 			calculated_rating *= 0.5
-			log_message("  → Enemy critically weak! (-50% break rating)")
 		elif enemy_hp < party_hp:
 			# Enemy has less HP than party member: -25%
 			calculated_rating *= 0.75
-			log_message("  → Enemy weaker than you! (-25% break rating)")
 
 		target.break_rating = max(1, int(calculated_rating))
-		log_message("  → First capture attempt! Break rating: %d" % target.break_rating)
-	else:
-		log_message("  → Continued capture! Break rating: %d" % target.break_rating)
 
 	# Map bind item to bind type
 	var bind_type = "basic"
@@ -2579,19 +2614,17 @@ func _execute_capture(target: Dictionary) -> void:
 	if ailment != "":
 		status_effects.append(ailment)
 
-	# Launch capture minigame
-	log_message("  → Starting capture minigame...")
+	# Launch capture minigame (auto-starts, no message)
 	var minigame_result = await minigame_mgr.launch_capture_minigame([bind_type], enemy_data, party_member_data, status_effects)
 
 	# Update break rating based on minigame result
 	var break_rating_reduced = minigame_result.get("break_rating_reduced", 0)
 	var wraps_completed = minigame_result.get("wraps_completed", 0)
+	var old_break_rating = target.break_rating
 
 	target.break_rating -= break_rating_reduced
 	if target.break_rating < 0:
 		target.break_rating = 0
-
-	log_message("  → Completed %d wraps! Break rating: %d → %d" % [wraps_completed, target.break_rating + break_rating_reduced, target.break_rating])
 
 	# Consume the bind item
 	var inventory = get_node("/root/aInventorySystem")
@@ -2600,10 +2633,22 @@ func _execute_capture(target: Dictionary) -> void:
 	# Check if break rating hit 0 (capture success)
 	var success = target.break_rating <= 0
 
+	# Build capture result message
+	start_turn_message()
+	add_turn_line("%s used %s on %s!" % [current_combatant.display_name, bind_name, target.display_name])
+	add_turn_line("Capture chance: %.1f%%" % capture_chance)
+
+	if is_first_attempt:
+		add_turn_line("First capture attempt! Breaking rating: %d" % old_break_rating)
+	else:
+		add_turn_line("Continued capture! Breaking rating: %d" % old_break_rating)
+
 	if success:
+		add_turn_line("SUCCESS! %s was captured!" % target.display_name)
+		queue_turn_message()
+
 		# Capture successful!
 		_set_captured(target)  # Remove from battle and mark as captured
-		log_message("  → SUCCESS! %s was captured!" % target.display_name)
 
 		# Record capture for morality system
 		battle_mgr.record_enemy_defeat(target, true)  # true = capture
@@ -2618,6 +2663,9 @@ func _execute_capture(target: Dictionary) -> void:
 		# Update display
 		_update_combatant_displays()
 
+		# Wait for message to be acknowledged before checking battle end
+		await _wait_for_message_queue()
+
 		# Check if battle is over (after capture)
 		print("[Battle] Checking if battle ended after capture...")
 		var battle_ended = await battle_mgr._check_battle_end()
@@ -2626,11 +2674,15 @@ func _execute_capture(target: Dictionary) -> void:
 			print("[Battle] Battle ended - skipping end turn")
 			return  # Battle ended
 	else:
-		# Capture failed but progress made
+		# Capture failed
 		if break_rating_reduced > 0:
-			log_message("  → Progress made! %s resists but is weakening..." % target.display_name)
+			add_turn_line("Failed! %s broke free but is weakening... (Break rating: %d)" % [target.display_name, target.break_rating])
 		else:
-			log_message("  → FAILED! %s broke free with no progress!" % target.display_name)
+			add_turn_line("Failed! %s broke free with no progress!" % target.display_name)
+		queue_turn_message()
+
+	# Wait for message acknowledgment before ending turn
+	await _wait_for_message_queue()
 
 	# End turn
 	battle_mgr.end_turn()
@@ -2662,9 +2714,6 @@ func _execute_item_usage(target: Dictionary) -> void:
 
 	# ═══════ MIRROR ITEMS (Reflect) ═══════
 	if "Reflect" in effect:
-		# Log item usage with target
-		log_message("%s uses %s on %s!" % [current_combatant.display_name, item_name, target.display_name])
-
 		# Extract element type from effect (e.g., "Reflect: Fire (1 hit)")
 		var reflect_type = mind_type_tag  # Use mind_type_tag from item
 		if reflect_type == "none" or reflect_type == "":
@@ -2696,7 +2745,11 @@ func _execute_item_usage(target: Dictionary) -> void:
 			"source": item_name
 		})
 
-		log_message("  → %s is protected by a %s Mirror! (Duration: %d rounds)" % [target.display_name, reflect_type.capitalize(), duration])
+		# Build message
+		start_turn_message()
+		add_turn_line("%s used %s on %s!" % [current_combatant.display_name, item_name, target.display_name])
+		add_turn_line("%s is protected by a %s Mirror! (Duration: %d rounds)" % [target.display_name, reflect_type.capitalize(), duration])
+		queue_turn_message()
 
 	# ═══════ BOMB ITEMS (AOE Damage) ═══════
 	elif "AOE" in effect or "Bomb" in item_name:
@@ -2707,9 +2760,8 @@ func _execute_item_usage(target: Dictionary) -> void:
 		var base_damage = 50  # Base bomb damage (50 direct AOE damage)
 		var bomb_targets = battle_mgr.get_enemy_combatants()
 
-		log_message("  → %s explodes, hitting all enemies!" % item_name)
-
 		var ko_list = []  # Track defeated enemies for animation
+		var damage_lines = []  # Collect damage lines
 
 		for enemy in bomb_targets:
 			if enemy.is_ko:
@@ -2731,14 +2783,22 @@ func _execute_item_usage(target: Dictionary) -> void:
 			elif type_bonus < 0:
 				type_msg = " (Resisted)"
 
-			log_message("    %s takes %d damage%s!" % [enemy.display_name, damage, type_msg])
+			damage_lines.append("%s takes %d damage%s!" % [enemy.display_name, damage, type_msg])
 
 			# Check for KO
 			if enemy.hp <= 0:
 				_set_fainted(enemy)
-				log_message("    %s was defeated!" % enemy.display_name)
+				damage_lines.append("%s was defeated!" % enemy.display_name)
 				battle_mgr.record_enemy_defeat(enemy, false)
 				ko_list.append(enemy)
+
+		# Build message
+		start_turn_message()
+		add_turn_line("%s used %s!" % [current_combatant.display_name, item_name])
+		add_turn_line("%s explodes, hitting all enemies!" % item_name)
+		for line in damage_lines:
+			add_turn_line(line)
+		queue_turn_message()
 
 		_update_combatant_displays()
 
@@ -2751,9 +2811,6 @@ func _execute_item_usage(target: Dictionary) -> void:
 
 	# ═══════ FLASH POP (Evasion + Run Boost) ═══════
 	elif "Run%" in effect:
-		# Log item usage with target
-		log_message("%s uses %s on %s!" % [current_combatant.display_name, item_name, target.display_name])
-
 		if not target.has("buffs"):
 			target.buffs = []
 
@@ -2773,7 +2830,10 @@ func _execute_item_usage(target: Dictionary) -> void:
 			"source": item_name
 		})
 
-		log_message("  → %s's escape chance increased by %d%%!" % [target.display_name, int(run_bonus)])
+		# Build message
+		start_turn_message()
+		add_turn_line("%s used %s on %s!" % [current_combatant.display_name, item_name, target.display_name])
+		add_turn_line("%s's escape chance increased by %d%%!" % [target.display_name, int(run_bonus)])
 
 		# Also apply evasion buff if present
 		if "Evasion Up" in effect:
@@ -2790,13 +2850,12 @@ func _execute_item_usage(target: Dictionary) -> void:
 				"duration": duration,
 				"source": item_name
 			})
-			log_message("  → %s's evasion increased by %d%% for %d round(s)!" % [target.display_name, evasion_value, duration])
+			add_turn_line("%s's evasion increased by %d%% for %d round(s)!" % [target.display_name, evasion_value, duration])
+
+		queue_turn_message()
 
 	# ═══════ BUFF ITEMS (ATK Up, MND Up, Shield, etc.) ═══════
 	elif "Up" in effect or "Shield" in effect or "Regen" in effect or "Speed" in effect or "Hit%" in effect or "Evasion%" in effect or "SkillHit%" in effect:
-		# Log item usage with target
-		log_message("%s uses %s on %s!" % [current_combatant.display_name, item_name, target.display_name])
-
 		# Determine buff type and magnitude
 		var buff_type = ""
 		var buff_value = 0.0
@@ -2828,16 +2887,20 @@ func _execute_item_usage(target: Dictionary) -> void:
 
 		if buff_type != "":
 			battle_mgr.apply_buff(target, buff_type, buff_value, duration)
-			log_message("  → %s gained %s for %d turns!" % [target.display_name, buff_type.replace("_", " ").capitalize(), duration])
+
+			# Build message
+			start_turn_message()
+			add_turn_line("%s used %s on %s!" % [current_combatant.display_name, item_name, target.display_name])
+			add_turn_line("%s gained %s for %d turns!" % [target.display_name, buff_type.replace("_", " ").capitalize(), duration])
+			queue_turn_message()
+
 			# Refresh turn order to show buff immediately
 			if battle_mgr:
 				battle_mgr.refresh_turn_order()
 
 	# ═══════ CURE ITEMS (Remove ailments) ═══════
 	elif "Cure" in effect:
-		# Log item usage with target
-		log_message("%s uses %s on %s!" % [current_combatant.display_name, item_name, target.display_name])
-
+		var cure_message = ""
 		var cured_ailment = ""
 		if "Poison" in effect:
 			cured_ailment = "poison"
@@ -2859,33 +2922,37 @@ func _execute_item_usage(target: Dictionary) -> void:
 			# Remove attack down debuff
 			if target.has("debuffs"):
 				target.debuffs = target.debuffs.filter(func(d): return d.get("type", "") != "attack_down")
-			log_message("  → Cured Attack Down!")
+			cure_message = "Cured Attack Down!"
 		elif "Defense Down" in effect:
 			if target.has("debuffs"):
 				target.debuffs = target.debuffs.filter(func(d): return d.get("type", "") != "defense_down")
-			log_message("  → Cured Defense Down!")
+			cure_message = "Cured Defense Down!"
 		elif "Mind Down" in effect:
 			if target.has("debuffs"):
 				target.debuffs = target.debuffs.filter(func(d): return d.get("type", "") != "mind_down")
-			log_message("  → Cured Mind Down!")
+			cure_message = "Cured Mind Down!"
 
 		if cured_ailment != "":
 			var current_ailment = str(target.get("ailment", ""))
 			if current_ailment == cured_ailment:
 				target.ailment = ""
 				target.ailment_turn_count = 0
-				log_message("  → Cured %s!" % cured_ailment.capitalize())
+				cure_message = "Cured %s!" % cured_ailment.capitalize()
 				# Refresh turn order to remove status indicator
 				if battle_mgr:
 					battle_mgr.refresh_turn_order()
 			else:
-				log_message("  → %s doesn't have %s!" % [target.display_name, cured_ailment.capitalize()])
+				cure_message = "%s doesn't have %s!" % [target.display_name, cured_ailment.capitalize()]
+
+		# Build message
+		start_turn_message()
+		add_turn_line("%s used %s on %s!" % [current_combatant.display_name, item_name, target.display_name])
+		if cure_message != "":
+			add_turn_line(cure_message)
+		queue_turn_message()
 
 	# ═══════ HEAL ITEMS ═══════
 	elif "Heal" in effect:
-		# Log item usage with target
-		log_message("%s uses %s on %s!" % [current_combatant.display_name, item_name, target.display_name])
-
 		# Parse heal amount from effect string (e.g., "Heal 50 HP")
 		var hp_heal = 0
 		var mp_heal = 0
@@ -2920,18 +2987,23 @@ func _execute_item_usage(target: Dictionary) -> void:
 				else:
 					mp_heal = heal_value
 
-		# Apply healing
+		# Apply healing and build message
+		start_turn_message()
+		add_turn_line("%s used %s on %s!" % [current_combatant.display_name, item_name, target.display_name])
+
 		if hp_heal > 0:
 			var old_hp = target.hp
 			target.hp = min(target.hp + hp_heal, target.hp_max)
 			var actual_heal = target.hp - old_hp
-			log_message("  → Restored %d HP!" % actual_heal)
+			add_turn_line("Restored %d HP!" % actual_heal)
 
 		if mp_heal > 0:
 			var old_mp = target.mp
 			target.mp = min(target.mp + mp_heal, target.mp_max)
 			var actual_heal = target.mp - old_mp
-			log_message("  → Restored %d MP!" % actual_heal)
+			add_turn_line("Restored %d MP!" % actual_heal)
+
+		queue_turn_message()
 
 		# Update displays
 		_update_combatant_displays()
@@ -3132,8 +3204,6 @@ func _execute_run() -> void:
 	# Calculate run chance based on enemy HP and level difference
 	var run_chance = _calculate_run_chance()
 
-	log_message("%s attempts to escape... (%d%% base chance)" % [current_combatant.display_name, int(run_chance)])
-
 	# ═══════ RUN MINIGAME ═══════
 	# Calculate tempo difference (party TPO - enemy TPO)
 	var party_tpo = current_combatant.stats.get("TPO", 1)
@@ -3154,20 +3224,33 @@ func _execute_run() -> void:
 	if ailment != "":
 		status_effects.append(ailment)
 
-	# Launch run minigame
-	log_message("  → Navigate through the gaps to escape!")
+	# Launch run minigame (auto-starts, no message)
 	var minigame_result = await minigame_mgr.launch_run_minigame(run_chance, tempo_diff, focus_stat, status_effects)
 
 	# Get success from minigame
 	var success = minigame_result.get("success", false)
 
+	# Build run result message
+	start_turn_message()
+	add_turn_line("%s attempts to escape..." % current_combatant.display_name)
+	add_turn_line("Navigate through the gaps to escape!")
+
 	if success:
-		log_message("Escaped successfully!")
-		await get_tree().create_timer(1.0).timeout
+		add_turn_line("Escaped successfully!")
+		queue_turn_message()
+
+		# Wait for message acknowledgment
+		await _wait_for_message_queue()
+
 		battle_mgr.current_state = battle_mgr.BattleState.ESCAPED
 		battle_mgr.return_to_overworld()
 	else:
-		log_message("Couldn't escape!")
+		add_turn_line("Couldn't escape!")
+		queue_turn_message()
+
+		# Wait for message acknowledgment before ending turn
+		await _wait_for_message_queue()
+
 		battle_mgr.end_turn()
 
 func _on_status_pressed() -> void:
@@ -3600,8 +3683,6 @@ func _execute_enemy_ai() -> void:
 	# Clear defending status when attacking
 	current_combatant.is_defending = false
 
-	log_message("%s attacks!" % current_combatant.display_name)
-
 	# Simple AI: attack random ally
 	var allies = battle_mgr.get_ally_combatants()
 	var alive_allies = allies.filter(func(a): return not a.is_ko)
@@ -3609,13 +3690,19 @@ func _execute_enemy_ai() -> void:
 	if alive_allies.size() > 0:
 		var target = alive_allies[randi() % alive_allies.size()]
 
+		# Start building turn message
+		start_turn_message()
+		add_turn_line("%s attacked %s!" % [current_combatant.display_name, target.display_name])
+
 		# First, check if the attack hits
 		var hit_check = combat_resolver.check_physical_hit(current_combatant, target)
 
 		if not hit_check.hit:
 			# Miss!
 			_show_miss_feedback()  # Show big MISS text
-			log_message("  → Missed! (%d%% chance, rolled %d)" % [int(hit_check.hit_chance), hit_check.roll])
+			add_turn_line("But it missed!")
+			add_turn_line("(Hit chance: %d%%, rolled %d)" % [int(hit_check.hit_chance), hit_check.roll])
+			queue_turn_message()  # Queue the full turn message
 			print("[Battle] Enemy Miss! Hit chance: %.1f%%, Roll: %d" % [hit_check.hit_chance, hit_check.roll])
 		else:
 			# Hit! Now roll for critical
@@ -3660,30 +3747,47 @@ func _execute_enemy_ai() -> void:
 					battle_mgr.record_enemy_defeat(target, false)  # false = kill
 
 			# Record weakness hits AFTER damage (only if target still alive)
+			var weakness_line = ""
 			if not target.is_ko and (weapon_weakness_hit or crit_weakness_hit):
 				var became_fallen = await battle_mgr.record_weapon_weakness_hit(target)
 				if weapon_weakness_hit:
-					var weapon_desc = combat_resolver.get_weapon_type_description(current_combatant, target)
-					log_message("  → WEAPON WEAKNESS! %s" % weapon_desc)
+					weakness_line = "%s receives a WEAPON WEAKNESS!" % target.display_name
 				elif crit_weakness_hit:
-					log_message("  → CRITICAL STUMBLE!")
+					weakness_line = "%s receives a CRITICAL STUMBLE!" % target.display_name
 				if became_fallen:
-					log_message("  → %s is FALLEN! (will skip next turn)" % target.display_name)
+					weakness_line += " %s fell!" % target.display_name
 
-			# Log the hit with details
-			var hit_msg = "  → Hit %s for %d damage! (%d%% chance)" % [target.display_name, damage, int(hit_check.hit_chance)]
+			# Add weakness line if present
+			if weakness_line != "":
+				add_turn_line(weakness_line)
+
+			# Build hit message line
+			var hit_msg = "%s is hit for %d damage!" % [target.display_name, damage]
+
+			# Add special effects to message
+			var effect_parts = []
 			if is_crit:
-				hit_msg += " (CRITICAL! %d%% chance)" % int(crit_check.crit_chance)
+				effect_parts.append("CRITICAL")
 			if type_bonus > 0.0:
-				hit_msg += " (Super Effective!)"
+				effect_parts.append("Super Effective")
 			elif type_bonus < 0.0:
-				hit_msg += " (Not Very Effective...)"
+				effect_parts.append("Not Very Effective")
 			if target.get("is_defending", false):
-				# Calculate damage reduction from defensive stance (0.7 multiplier = 30% reduction)
-				var damage_without_defense = int(round(damage / 0.7))
-				var damage_reduced = damage_without_defense - damage
-				hit_msg += " (Defensive: -%d)" % damage_reduced
-			log_message(hit_msg)
+				effect_parts.append("Guarded")
+
+			if not effect_parts.is_empty():
+				hit_msg = "%s (%s)" % [hit_msg, ", ".join(effect_parts)]
+
+			add_turn_line(hit_msg)
+
+			# Add KO or status line
+			if target.is_ko:
+				add_turn_line("%s fainted!" % target.display_name)
+			elif weakness_line == "":  # Only show HP if no weakness
+				add_turn_line("%s has %d HP left." % [target.display_name, target.hp])
+
+			# Queue the full turn message
+			queue_turn_message()
 
 			# Debug: show hit, crit, and damage breakdown
 			var hit_breakdown = hit_check.breakdown
@@ -3811,6 +3915,24 @@ func _update_burst_gauge() -> void:
 		tween.set_trans(Tween.TRANS_CUBIC)
 		tween.tween_property(burst_gauge_bar, "value", battle_mgr.burst_gauge, 0.8)
 
+func start_turn_message() -> void:
+	"""Start building a new turn message"""
+	turn_message_lines.clear()
+
+func add_turn_line(line: String) -> void:
+	"""Add a line to the current turn message"""
+	turn_message_lines.append(line)
+
+func queue_turn_message() -> void:
+	"""Queue the accumulated turn message as a single message"""
+	if turn_message_lines.is_empty():
+		return
+
+	# Join all lines with newlines
+	var full_message = "\n".join(turn_message_lines)
+	log_message(full_message)
+	turn_message_lines.clear()
+
 func log_message(message: String) -> void:
 	"""Add a message to the message queue for Pokemon-style display"""
 	message_queue.append(message)
@@ -3821,32 +3943,102 @@ func log_message(message: String) -> void:
 		_display_next_message()
 
 func _display_next_message() -> void:
-	"""Display the next message in the queue"""
+	"""Display the next message in the queue with typewriter effect"""
 	if message_queue.is_empty():
 		is_displaying_message = false
 		_hide_continue_indicator()
 		return
 
 	is_displaying_message = true
+	is_typewriter_active = true
 
 	# Get next message
 	var message = message_queue.pop_front()
+	current_message_full = message
 
-	# Clear battle log and display new message
+	# Clear battle log
 	if battle_log:
 		battle_log.clear()
-		battle_log.append_text(message)
 
-	# Show continue indicator
-	_show_continue_indicator()
+	# Start typewriter effect
+	_start_typewriter_effect(message)
 
 func _continue_to_next_message() -> void:
 	"""Continue to next message when player presses accept"""
 	if not is_displaying_message:
 		return
 
+	# If typewriter is still active, skip to full message
+	if is_typewriter_active:
+		_skip_typewriter_effect()
+		return
+
 	# Display next message
 	_display_next_message()
+
+func _start_typewriter_effect(message: String) -> void:
+	"""Start character-by-character reveal of message"""
+	if not battle_log:
+		return
+
+	# Kill any existing typewriter tween
+	if typewriter_tween:
+		typewriter_tween.kill()
+		typewriter_tween = null
+
+	# Calculate duration based on message length (faster than typical for battle pacing)
+	var chars_per_second = 60.0  # 60 characters per second
+	var duration = float(message.length()) / chars_per_second
+
+	# Use a custom method to reveal text character by character
+	var char_index = 0
+	var reveal_interval = 1.0 / chars_per_second
+
+	# Create a timer-based typewriter effect
+	_typewriter_reveal_next_char(message, 0, reveal_interval)
+
+func _typewriter_reveal_next_char(message: String, char_index: int, interval: float) -> void:
+	"""Reveal one character at a time"""
+	if not battle_log or not is_typewriter_active:
+		return
+
+	if char_index >= message.length():
+		# Finished revealing all characters
+		is_typewriter_active = false
+		_show_continue_indicator()
+		return
+
+	# Append next character
+	battle_log.clear()
+	battle_log.append_text(message.substr(0, char_index + 1))
+
+	# Schedule next character
+	await get_tree().create_timer(interval).timeout
+	_typewriter_reveal_next_char(message, char_index + 1, interval)
+
+func _skip_typewriter_effect() -> void:
+	"""Skip to showing the full message immediately"""
+	if not battle_log:
+		return
+
+	# Stop typewriter
+	is_typewriter_active = false
+
+	# Show full message
+	battle_log.clear()
+	battle_log.append_text(current_message_full)
+
+	# Show continue indicator
+	_show_continue_indicator()
+
+func _wait_for_message_queue() -> void:
+	"""Wait until all messages in queue have been displayed and player has continued"""
+	# Wait until message queue is empty and no message is displaying
+	while not message_queue.is_empty() or is_displaying_message:
+		await get_tree().process_frame
+
+	# Brief pause after messages clear for smooth flow
+	await get_tree().create_timer(0.1).timeout
 
 func _create_instruction_popup() -> void:
 	"""Create the instruction message popup that appears above battle log"""
@@ -5007,12 +5199,14 @@ func _on_item_selected(item_data: Dictionary) -> void:
 
 	# Special handling for AllEnemies targeting (Bombs)
 	if targeting == "AllEnemies":
-		# Bombs hit all enemies, no target selection needed
-		log_message("%s uses %s!" % [current_combatant.display_name, str(item_data.get("name", "item"))])
+		# Bombs hit all enemies, no target selection needed (message will be shown after)
 		_execute_item_usage({})  # Pass empty dict since bombs hit all enemies
 		return
 
-	log_message("Using %s - select target..." % str(item_data.get("name", "item")))
+	# Update battle log to show item usage prompt (without queuing message)
+	if battle_log:
+		battle_log.clear()
+		battle_log.append_text("Using %s - select target..." % str(item_data.get("name", "item")))
 
 	# Determine target candidates
 	if targeting == "Ally":
@@ -5048,9 +5242,10 @@ func _on_item_selected(item_data: Dictionary) -> void:
 	selected_target_index = 0  # Start with first target
 	_highlight_target_candidates()
 
-	# Show currently selected target
-	if not target_candidates.is_empty():
-		log_message("→ %s" % target_candidates[0].display_name)
+	# Show currently selected target (without queuing message)
+	if not target_candidates.is_empty() and battle_log:
+		battle_log.clear()
+		battle_log.append_text("→ %s" % target_candidates[0].display_name)
 
 ## ═══════════════════════════════════════════════════════════════
 ## CAPTURE/BIND MENU
@@ -5268,9 +5463,10 @@ func _on_bind_selected(bind_data: Dictionary) -> void:
 	selected_target_index = 0  # Start with first target
 	_highlight_target_candidates()
 
-	# Show currently selected target
-	if not target_candidates.is_empty():
-		log_message("→ %s" % target_candidates[0].display_name)
+	# Show currently selected target (without queuing message)
+	if not target_candidates.is_empty() and battle_log:
+		battle_log.clear()
+		battle_log.append_text("→ %s" % target_candidates[0].display_name)
 
 ## ═══════════════════════════════════════════════════════════════
 ## BURST MENU & EXECUTION
@@ -5559,7 +5755,11 @@ func _execute_burst_on_target(target: Dictionary) -> void:
 
 	if not hit_check.hit:
 		_show_miss_feedback()  # Show big MISS text
-		log_message("  → Missed %s! (%d%% chance)" % [target.display_name, int(hit_check.hit_chance)])
+		# Build miss message
+		start_turn_message()
+		add_turn_line("Burst attack!")
+		add_turn_line("But it missed!")
+		queue_turn_message()
 		return
 
 	# ═══════ BURST MINIGAME ═══════
@@ -5569,7 +5769,7 @@ func _execute_burst_on_target(target: Dictionary) -> void:
 	if ailment != "":
 		status_effects.append(ailment)
 
-	log_message("  → Syncing burst energy...")
+	# Launch burst minigame (auto-starts, no message)
 	var minigame_result = await minigame_mgr.launch_burst_minigame(affinity, status_effects)
 
 	var damage_modifier = minigame_result.get("damage_modifier", 1.0)
@@ -5625,15 +5825,31 @@ func _execute_burst_on_target(target: Dictionary) -> void:
 		if not target.get("is_ally", false):
 			battle_mgr.record_enemy_defeat(target, false)
 
-	# Log the hit
-	var hit_msg = "  → BURST HIT %s for %d damage!" % [target.display_name, damage]
+	# Build burst message
+	start_turn_message()
+	add_turn_line("Burst attack!")
+
+	var hit_msg = "Burst hit %s for %d damage!" % [target.display_name, damage]
+	var effect_parts = []
 	if is_crit:
-		hit_msg += " (CRITICAL!)"
+		effect_parts.append("CRITICAL")
 	if type_bonus > 0.0:
-		hit_msg += " (Super Effective!)"
+		effect_parts.append("Super Effective")
 	elif type_bonus < 0.0:
-		hit_msg += " (Not Very Effective...)"
-	log_message(hit_msg)
+		effect_parts.append("Not Very Effective")
+
+	if not effect_parts.is_empty():
+		hit_msg = "%s (%s)" % [hit_msg, ", ".join(effect_parts)]
+
+	add_turn_line(hit_msg)
+
+	# Add KO or HP remaining
+	if target.is_ko:
+		add_turn_line("%s fainted!" % target.display_name)
+	else:
+		add_turn_line("%s has %d HP left." % [target.display_name, target.hp])
+
+	queue_turn_message()
 
 	# Update displays
 	_update_combatant_displays()
@@ -5651,9 +5867,7 @@ func _on_skill_selected(skill_entry: Dictionary) -> void:
 	var skill_name = String(skill_to_use.get("name", "Unknown"))
 	var target_type = String(skill_to_use.get("target", "Enemy")).to_lower()
 
-	log_message("Selected: %s" % skill_name)
-
-	# Determine targeting
+	# Determine targeting (removed "Selected: X" message for cleaner flow)
 	if target_type == "enemy" or target_type == "enemies":
 		# Get alive enemies
 		var enemies = battle_mgr.get_enemy_combatants()
@@ -5672,16 +5886,16 @@ func _on_skill_selected(skill_entry: Dictionary) -> void:
 			_execute_skill_aoe()
 		else:
 			# Single target - need to select
-			log_message("Select a target...")
 			_show_instruction("Select an enemy.")
 			awaiting_target_selection = true
 			awaiting_skill_selection = true
 			selected_target_index = 0  # Start with first target
 			_highlight_target_candidates()
 
-			# Show currently selected target
-			if not target_candidates.is_empty():
-				log_message("→ %s" % target_candidates[0].display_name)
+			# Show currently selected target (without queuing message)
+			if not target_candidates.is_empty() and battle_log:
+				battle_log.clear()
+				battle_log.append_text("Select a target\n→ %s" % target_candidates[0].display_name)
 	elif target_type == "ally" or target_type == "allies":
 		# TODO: Implement ally targeting
 		log_message("Ally targeting not yet implemented")
@@ -5708,16 +5922,20 @@ func _execute_skill_single(target: Dictionary) -> void:
 	var mnd_scaling = int(skill_to_use.get("scaling_mnd", 1))
 
 	# ═══════ HIT CHECK FIRST ═══════
-	log_message("%s uses %s!" % [current_combatant.display_name, skill_name])
 	var hit_check = combat_resolver.check_sigil_hit(current_combatant, target, {"skill_acc": acc})
 
 	if not hit_check.hit:
 		_show_miss_feedback()  # Show big MISS text
-		log_message("  → Missed! (%d%% chance, rolled %d)" % [int(hit_check.hit_chance), hit_check.roll])
 		# Still deduct MP even on miss
 		current_combatant.mp -= mp_cost
 		if current_combatant.mp < 0:
 			current_combatant.mp = 0
+
+		# Build miss message
+		start_turn_message()
+		add_turn_line("%s used %s!" % [current_combatant.display_name, skill_name])
+		add_turn_line("But it missed!")
+		queue_turn_message()
 		return
 
 	# ═══════ SKILL MINIGAME ═══════
@@ -5727,7 +5945,7 @@ func _execute_skill_single(target: Dictionary) -> void:
 		var parts = skill_id.split("_L")
 		skill_tier = int(parts[1]) if parts.size() > 1 else 1
 
-	# Launch skill minigame
+	# Launch skill minigame (auto-starts, no message)
 	var focus_stat = current_combatant.stats.get("FCS", 1)
 	var skill_sequence = _get_skill_button_sequence(skill_id)
 	var mind_type = element  # Use the element as the mind type
@@ -5736,7 +5954,6 @@ func _execute_skill_single(target: Dictionary) -> void:
 	if ailment != "":
 		status_effects.append(ailment)
 
-	log_message("  → %s prepares the skill..." % [current_combatant.display_name])
 	_show_instruction("SKILL!")
 	var minigame_result = await minigame_mgr.launch_skill_minigame(focus_stat, skill_sequence, skill_tier, mind_type, status_effects)
 	_hide_instruction()
@@ -5757,10 +5974,10 @@ func _execute_skill_single(target: Dictionary) -> void:
 	if current_combatant.mp < 0:
 		current_combatant.mp = 0
 
-	# Log MP savings if applicable
+	# Store MP savings for message (if applicable)
+	var mp_saved = 0
 	if mp_modifier < 1.0:
-		var saved_mp = mp_cost - final_mp_cost
-		log_message("  → High Focus! Saved %d MP (%d → %d)" % [saved_mp, mp_cost, final_mp_cost])
+		mp_saved = mp_cost - final_mp_cost
 
 	# Track sigil usage for bonus GXP
 	var sigil_inst_id = skill_to_use.get("_sigil_inst_id", "")
@@ -5783,7 +6000,6 @@ func _execute_skill_single(target: Dictionary) -> void:
 
 				if should_reflect:
 					# REFLECT! The skill bounces back to the attacker
-					log_message("  → %s's Mirror reflects the attack!" % target.display_name)
 
 					# Remove the reflect buff (it's consumed)
 					target.buffs.remove_at(i)
@@ -5821,9 +6037,16 @@ func _execute_skill_single(target: Dictionary) -> void:
 					if new_target.hp <= 0:
 						new_target.hp = 0
 						_set_fainted(new_target)
-						log_message("  → %s was defeated by the reflection!" % new_target.display_name)
+
+					# Build reflect message
+					start_turn_message()
+					add_turn_line("%s used %s!" % [current_combatant.display_name, skill_name])
+					add_turn_line("%s's Mirror reflects the attack!" % target.display_name)
+					if new_target.is_ko:
+						add_turn_line("%s was defeated by the reflection!" % new_target.display_name)
 					else:
-						log_message("  → %s takes %d reflected damage!" % [new_target.display_name, reflect_damage])
+						add_turn_line("%s takes %d reflected damage!" % [new_target.display_name, reflect_damage])
+					queue_turn_message()
 
 					# Update displays and end skill
 					_update_combatant_displays()
@@ -5843,11 +6066,7 @@ func _execute_skill_single(target: Dictionary) -> void:
 			element
 		)
 
-		# Show type matchup explanation
-		if type_bonus > 0.0:
-			log_message("  → TYPE ADVANTAGE! %s vs %s" % [element.capitalize(), target.mind_type.capitalize()])
-		elif type_bonus < 0.0:
-			log_message("  → TYPE DISADVANTAGE! %s vs %s" % [element.capitalize(), target.mind_type.capitalize()])
+		# Type matchup will be shown in final message
 
 	# Both crits and type advantages count as stumbles for skills
 	var crit_weakness_hit = is_crit
@@ -5873,13 +6092,6 @@ func _execute_skill_single(target: Dictionary) -> void:
 	var base_damage = damage
 	damage = int(damage * damage_modifier)
 
-	# Log damage modification if applicable
-	if damage_modifier != 1.0:
-		if damage_modifier > 1.0:
-			log_message("  → Button sequence bonus! Damage: %d → %d (%.0f%%)" % [base_damage, damage, damage_modifier * 100])
-		else:
-			log_message("  → Missed buttons! Damage: %d → %d (%.0f%%)" % [base_damage, damage, damage_modifier * 100])
-
 	# Apply damage
 	target.hp -= damage
 
@@ -5899,16 +6111,19 @@ func _execute_skill_single(target: Dictionary) -> void:
 
 	# Record weakness hits AFTER damage (only if target still alive)
 	# Skills count crits and type advantages as weakness hits
+	var stumble_line = ""
+	var became_fallen = false
 	if not target.is_ko and (crit_weakness_hit or type_advantage_hit):
-		var became_fallen = await battle_mgr.record_weapon_weakness_hit(target)
+		became_fallen = await battle_mgr.record_weapon_weakness_hit(target)
 		if crit_weakness_hit:
-			log_message("  → CRITICAL STUMBLE!")
+			stumble_line = "CRITICAL STUMBLE!"
 		elif type_advantage_hit:
-			log_message("  → ELEMENTAL STUMBLE!")
+			stumble_line = "ELEMENTAL STUMBLE!"
 		if became_fallen:
-			log_message("  → %s is FALLEN! (will skip next turn)" % target.display_name)
+			stumble_line += " %s fell!" % target.display_name
 
 	# Apply status effect if skill has one (only if target still alive)
+	var status_applied_line = ""
 	if not target.is_ko:
 		var status_to_apply = str(skill_to_use.get("status_apply", "")).to_lower()
 		var status_chance_pct = int(skill_to_use.get("status_chance", 0))
@@ -5923,12 +6138,12 @@ func _execute_skill_single(target: Dictionary) -> void:
 					# Check if target already has an ailment
 					var current_ailment = str(target.get("ailment", ""))
 					if current_ailment != "" and current_ailment != "null":
-						log_message("  → Failed to inflict %s! (%s already has %s)" % [status_to_apply.capitalize(), target.display_name, current_ailment.capitalize()])
+						status_applied_line = "Failed to inflict %s! (Already has %s)" % [status_to_apply.capitalize(), current_ailment.capitalize()]
 					else:
 						# Apply the ailment
 						target.ailment = status_to_apply
 						target.ailment_turn_count = 0
-						log_message("  → %s is now %s! (%d%% chance, rolled %d)" % [target.display_name, status_to_apply.capitalize(), status_chance_pct, roll])
+						status_applied_line = "%s is now %s!" % [target.display_name, status_to_apply.capitalize()]
 						battle_mgr.refresh_turn_order()
 				else:
 					# It's a debuff (not an independent ailment)
@@ -5946,22 +6161,59 @@ func _execute_skill_single(target: Dictionary) -> void:
 
 					if debuff_type != "":
 						battle_mgr.apply_buff(target, debuff_type, -0.15, duration)
-						log_message("  → %s's %s reduced! (%d%% chance, rolled %d)" % [target.display_name, status_to_apply.replace("_", " ").capitalize(), status_chance_pct, roll])
+						status_applied_line = "%s's %s reduced!" % [target.display_name, status_to_apply.replace("_", " ").capitalize()]
 						battle_mgr.refresh_turn_order()
 
-	# Log the hit
-	var hit_msg = "  → Hit %s for %d damage! (%d%% chance)" % [target.display_name, damage, int(hit_check.hit_chance)]
-	if is_crit:
-		hit_msg += " (CRITICAL! %d%% chance)" % int(crit_check.crit_chance)
+	# Build complete turn message
+	start_turn_message()
+	add_turn_line("%s used %s!" % [current_combatant.display_name, skill_name])
+
+	# Line 2: Type advantage (if applicable)
 	if type_bonus > 0.0:
-		hit_msg += " (Super Effective!)"
+		add_turn_line("TYPE ADVANTAGE! %s vs %s" % [element.capitalize(), target.mind_type.capitalize()])
 	elif type_bonus < 0.0:
-		hit_msg += " (Not Very Effective...)"
+		add_turn_line("TYPE DISADVANTAGE! %s vs %s" % [element.capitalize(), target.mind_type.capitalize()])
+
+	# Line 3: Minigame result
+	if damage_modifier != 1.0:
+		if damage_modifier > 1.0:
+			add_turn_line("Button sequence bonus! Damage: %d → %d (%.0f%%)" % [base_damage, damage, damage_modifier * 100])
+		else:
+			add_turn_line("Missed buttons! Damage: %d → %d (%.0f%%)" % [base_damage, damage, damage_modifier * 100])
+
+	# Line 4: Stumble (if applicable)
+	if stumble_line != "":
+		add_turn_line(stumble_line)
+
+	# Line 5: Main damage line
+	var hit_msg = "Hit %s for %d damage!" % [target.display_name, damage]
+	var effect_parts = []
+	if is_crit:
+		effect_parts.append("CRITICAL")
+	if type_bonus > 0.0:
+		effect_parts.append("Super Effective")
+	elif type_bonus < 0.0:
+		effect_parts.append("Not Very Effective")
 	if target.get("is_defending", false):
-		var damage_without_defense = int(round(damage / 0.7))
-		var damage_reduced = damage_without_defense - damage
-		hit_msg += " (Defensive: -%d)" % damage_reduced
-	log_message(hit_msg)
+		effect_parts.append("Guarded")
+
+	if not effect_parts.is_empty():
+		hit_msg = "%s (%s)" % [hit_msg, ", ".join(effect_parts)]
+
+	add_turn_line(hit_msg)
+
+	# Line 6: Status applied (if any)
+	if status_applied_line != "":
+		add_turn_line(status_applied_line)
+
+	# Line 7: KO or HP remaining
+	if target.is_ko:
+		add_turn_line("%s fainted!" % target.display_name)
+	else:
+		add_turn_line("%s has %d HP left." % [target.display_name, target.hp])
+
+	# Queue the full turn message
+	queue_turn_message()
 
 	# Update displays
 	_update_combatant_displays()
