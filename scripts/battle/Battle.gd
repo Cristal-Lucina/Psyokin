@@ -735,7 +735,7 @@ func _input(event: InputEvent) -> void:
 	# CRITICAL: Handle message queue continuation FIRST (Pokemon-style)
 	# This blocks all other input while messages are displaying
 	if is_displaying_message:
-		if event.is_action_pressed(aInputManager.ACTION_ACCEPT):
+		if event.is_action_pressed(aInputManager.ACTION_ACCEPT) or event.is_action_pressed(aInputManager.ACTION_CANCEL):
 			_continue_to_next_message()
 			get_viewport().set_input_as_handled()
 		return
@@ -891,22 +891,12 @@ func _input(event: InputEvent) -> void:
 			return
 
 		if event.is_action_pressed(aInputManager.ACTION_MOVE_UP):
-			_navigate_capture_menu_vertical(-2)  # Move up one row (2 columns)
+			_navigate_capture_menu_vertical(-1)  # Move up one item
 			input_cooldown = input_cooldown_duration
 			get_viewport().set_input_as_handled()
 			return
 		elif event.is_action_pressed(aInputManager.ACTION_MOVE_DOWN):
-			_navigate_capture_menu_vertical(2)  # Move down one row (2 columns)
-			input_cooldown = input_cooldown_duration
-			get_viewport().set_input_as_handled()
-			return
-		elif event.is_action_pressed(aInputManager.ACTION_MOVE_LEFT):
-			_navigate_capture_menu_horizontal(-1)  # Move left one column
-			input_cooldown = input_cooldown_duration
-			get_viewport().set_input_as_handled()
-			return
-		elif event.is_action_pressed(aInputManager.ACTION_MOVE_RIGHT):
-			_navigate_capture_menu_horizontal(1)  # Move right one column
+			_navigate_capture_menu_vertical(1)  # Move down one item
 			input_cooldown = input_cooldown_duration
 			get_viewport().set_input_as_handled()
 			return
@@ -1051,6 +1041,10 @@ func _input(event: InputEvent) -> void:
 		# Panel 2: RUN/BURST/ITEMS/STATUS
 		# Button mapping: Y=SKILL, X=DEFEND, B=ATTACK, A=CAPTURE
 
+		# Block action button presses when menus are open
+		if _is_any_menu_open():
+			return
+
 		# Check action cooldown to prevent button spam
 		if action_cooldown > 0:
 			return
@@ -1091,6 +1085,15 @@ func _input(event: InputEvent) -> void:
 				_on_item_pressed()
 				action_cooldown = action_cooldown_duration  # Set cooldown
 				get_viewport().set_input_as_handled()
+
+func _is_any_menu_open() -> bool:
+	"""Check if any menu is currently open"""
+	return (skill_menu_panel != null or
+			item_menu_panel != null or
+			capture_menu_panel != null or
+			burst_menu_panel != null or
+			confirmation_panel != null or
+			status_picker_panel != null)
 
 func _navigate_targets(direction: int) -> void:
 	"""Navigate through target candidates"""
@@ -1162,7 +1165,12 @@ func _cancel_target_selection() -> void:
 	awaiting_item_target = false
 	selected_target_index = 0
 	_clear_target_highlights()
-	log_message("Target selection cancelled.")
+	_clear_active_action_button()  # Clear active button visual feedback
+
+	# Update battle log directly (without queuing message to avoid continue prompt)
+	if battle_log:
+		battle_log.clear()
+		battle_log.append_text("Target selection cancelled.")
 
 func _initialize_battle() -> void:
 	"""Initialize the battle from encounter data"""
@@ -4328,8 +4336,7 @@ func _show_confirmation_dialog(message: String, on_confirm: Callable) -> void:
 	awaiting_confirmation = true
 	confirmation_callback = on_confirm
 
-	# Disable action menu while showing confirmation
-	_disable_action_menu()
+	# Don't disable action menu - keep it visible during confirmation
 
 	# Create confirmation panel
 	confirmation_panel = PanelContainer.new()
@@ -4439,8 +4446,7 @@ func _close_confirmation_dialog() -> void:
 
 func _show_skill_menu(skill_menu: Array) -> void:
 	"""Show skill selection menu with sigils"""
-	# Disable and dim action menu
-	_disable_action_menu()
+	# Don't disable action menu - keep it visible
 
 	# Store current menu
 	current_skill_menu = skill_menu
@@ -4734,6 +4740,9 @@ func _close_skill_menu() -> void:
 	skill_menu_buttons = []
 	selected_skill_index = 0
 
+	# Clear active button visual feedback
+	_clear_active_action_button()
+
 	# Enable action menu again
 	_enable_action_menu()
 
@@ -4914,8 +4923,7 @@ func _close_status_details() -> void:
 
 func _show_item_menu(items: Array) -> void:
 	"""Show item selection menu with categorized tabs"""
-	# Disable and dim action menu
-	_disable_action_menu()
+	# Don't disable action menu - keep it visible
 
 	# Reset navigation
 	item_menu_buttons = []
@@ -5090,6 +5098,9 @@ func _close_item_menu() -> void:
 	item_scroll_container = null
 	item_menu_buttons = []
 	selected_item_index = 0
+
+	# Clear active button visual feedback
+	_clear_active_action_button()
 
 	# Enable action menu again
 	_enable_action_menu()
@@ -5379,16 +5390,15 @@ func _on_item_selected(item_data: Dictionary) -> void:
 
 func _show_capture_menu(bind_items: Array) -> void:
 	"""Show bind item selection menu for capture"""
-	# Disable and dim action menu
-	_disable_action_menu()
+	# Don't disable action menu - keep it visible until minigame starts
 
 	# Reset navigation
 	capture_menu_buttons = []
 	selected_capture_index = 0
 
-	# Create capture menu panel (wider for 2 columns)
+	# Create capture menu panel (1 column, 500x400px)
 	capture_menu_panel = PanelContainer.new()
-	capture_menu_panel.custom_minimum_size = Vector2(800, 0)
+	capture_menu_panel.custom_minimum_size = Vector2(500, 400)
 
 	# Style the panel with Core vibe
 	var style = StyleBoxFlat.new()
@@ -5422,22 +5432,19 @@ func _show_capture_menu(bind_items: Array) -> void:
 	var sep1 = HSeparator.new()
 	vbox.add_child(sep1)
 
-	# Create scroll container for bind items (2 columns, show max 3 rows at a time)
+	# Create scroll container for bind items (1 column)
 	var scroll = ScrollContainer.new()
-	var rows_to_show = min(ceili(bind_items.size() / 2.0), 3)  # Show up to 3 rows (6 items)
-	scroll.custom_minimum_size = Vector2(780, rows_to_show * 55)  # 55px per row (50px button + 5px spacing)
+	scroll.custom_minimum_size = Vector2(480, 280)  # Fixed height for consistency
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 	vbox.add_child(scroll)
 
-	# Create GridContainer for scrollable bind item buttons (2 columns)
-	var items_grid = GridContainer.new()
-	items_grid.columns = 2
-	items_grid.add_theme_constant_override("h_separation", 10)
-	items_grid.add_theme_constant_override("v_separation", 5)
-	scroll.add_child(items_grid)
+	# Create VBox for scrollable bind item buttons (1 column)
+	var items_vbox = VBoxContainer.new()
+	items_vbox.add_theme_constant_override("separation", 5)
+	scroll.add_child(items_vbox)
 
-	# Add bind item buttons (2 columns)
+	# Add bind item buttons (1 column)
 	for i in range(bind_items.size()):
 		var bind_data = bind_items[i]
 		var bind_name = str(bind_data.get("name", "Unknown"))
@@ -5447,9 +5454,9 @@ func _show_capture_menu(bind_items: Array) -> void:
 
 		var button = Button.new()
 		button.text = "%s (x%d) [+%d%%]\n%s" % [bind_name, bind_count, capture_mod, bind_desc]
-		button.custom_minimum_size = Vector2(375, 50)  # Width for 2 columns (780 - 10 spacing) / 2
+		button.custom_minimum_size = Vector2(460, 60)  # Full width, taller for readability
 		button.pressed.connect(_on_bind_selected.bind(bind_data))
-		items_grid.add_child(button)
+		items_vbox.add_child(button)
 
 		# Add to navigation list
 		capture_menu_buttons.append(button)
@@ -5460,15 +5467,15 @@ func _show_capture_menu(bind_items: Array) -> void:
 
 	var cancel_btn = Button.new()
 	cancel_btn.text = "Cancel"
-	cancel_btn.custom_minimum_size = Vector2(780, 40)
+	cancel_btn.custom_minimum_size = Vector2(480, 40)
 	cancel_btn.pressed.connect(_close_capture_menu)
 	vbox.add_child(cancel_btn)
 
 	# Add to scene and center
 	add_child(capture_menu_panel)
 	capture_menu_panel.position = Vector2(
-		(get_viewport_rect().size.x - 800) / 2,
-		(get_viewport_rect().size.y - vbox.size.y) / 2
+		(get_viewport_rect().size.x - 500) / 2,
+		(get_viewport_rect().size.y - 400) / 2
 	)
 
 	# Highlight first item if available
@@ -5488,61 +5495,36 @@ func _close_capture_menu() -> void:
 	capture_menu_buttons = []
 	selected_capture_index = 0
 
+	# Clear active button visual feedback
+	_clear_active_action_button()
+
 	# Enable action menu again
 	_enable_action_menu()
 
 func _navigate_capture_menu_vertical(direction: int) -> void:
-	"""Navigate capture menu vertically (direction: -2 for up, 2 for down in 2-column grid)"""
+	"""Navigate capture menu vertically (direction: -1 for up, 1 for down in single column)"""
 	if capture_menu_buttons.is_empty():
 		return
 
 	# Remove highlight from current button
 	_unhighlight_capture_button(selected_capture_index)
 
-	# Move selection vertically
-	var new_index = selected_capture_index + direction
+	# Move selection up or down
+	selected_capture_index += direction
 
-	# Wrap around vertically
-	if new_index < 0:
-		# If going up from top row, wrap to bottom
-		# Find last item in same column
-		var column = selected_capture_index % 2
-		var last_row = (capture_menu_buttons.size() - 1) / 2
-		new_index = last_row * 2 + column
-		# Make sure it doesn't exceed array size
-		if new_index >= capture_menu_buttons.size():
-			new_index = capture_menu_buttons.size() - 1
-	elif new_index >= capture_menu_buttons.size():
-		# If going down from bottom row, wrap to top
-		var column = selected_capture_index % 2
-		new_index = column
-
-	selected_capture_index = new_index
+	# Wrap around
+	if selected_capture_index < 0:
+		selected_capture_index = capture_menu_buttons.size() - 1
+	elif selected_capture_index >= capture_menu_buttons.size():
+		selected_capture_index = 0
 
 	# Highlight new button
 	_highlight_capture_button(selected_capture_index)
 
-func _navigate_capture_menu_horizontal(direction: int) -> void:
-	"""Navigate capture menu horizontally (direction: -1 for left, 1 for right in 2-column grid)"""
-	if capture_menu_buttons.is_empty():
-		return
-
-	# Remove highlight from current button
-	_unhighlight_capture_button(selected_capture_index)
-
-	# Move selection horizontally
-	var new_index = selected_capture_index + direction
-
-	# Wrap around horizontally
-	if new_index < 0:
-		new_index = capture_menu_buttons.size() - 1
-	elif new_index >= capture_menu_buttons.size():
-		new_index = 0
-
-	selected_capture_index = new_index
-
-	# Highlight new button
-	_highlight_capture_button(selected_capture_index)
+func _navigate_capture_menu_horizontal(_direction: int) -> void:
+	"""Navigate capture menu horizontally - not used for single column layout"""
+	# Single column layout doesn't need horizontal navigation
+	pass
 
 func _confirm_capture_selection() -> void:
 	"""Confirm capture item selection with A button"""
@@ -5754,6 +5736,9 @@ func _close_burst_menu() -> void:
 		burst_menu_panel = null
 	burst_menu_buttons = []
 	selected_burst_index = 0
+
+	# Clear active button visual feedback
+	_clear_active_action_button()
 
 	# Enable action menu again
 	_enable_action_menu()
