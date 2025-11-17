@@ -1173,11 +1173,19 @@ func _on_battle_ended(victory: bool) -> void:
 	if victory:
 		log_message("*** VICTORY ***")
 		log_message("All enemies have been defeated!")
+
+		# Wait for all messages to be displayed and acknowledged before showing victory screen
+		await _wait_for_message_queue()
+
 		_show_victory_screen()
 	else:
 		log_message("*** DEFEAT ***")
 		log_message("Your party has been wiped out!")
 		log_message("GAME OVER")
+
+		# Wait for all messages to be displayed and acknowledged before game over
+		await _wait_for_message_queue()
+
 		# TODO: Show game over screen with retry/load options
 		await get_tree().create_timer(3.0).timeout
 		# For now, return to main menu or reload
