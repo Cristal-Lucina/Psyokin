@@ -5825,9 +5825,7 @@ func _on_skill_selected(skill_entry: Dictionary) -> void:
 	var skill_name = String(skill_to_use.get("name", "Unknown"))
 	var target_type = String(skill_to_use.get("target", "Enemy")).to_lower()
 
-	log_message("Selected: %s" % skill_name)
-
-	# Determine targeting
+	# Determine targeting (removed "Selected: X" message for cleaner flow)
 	if target_type == "enemy" or target_type == "enemies":
 		# Get alive enemies
 		var enemies = battle_mgr.get_enemy_combatants()
@@ -5846,16 +5844,16 @@ func _on_skill_selected(skill_entry: Dictionary) -> void:
 			_execute_skill_aoe()
 		else:
 			# Single target - need to select
-			log_message("Select a target...")
 			_show_instruction("Select an enemy.")
 			awaiting_target_selection = true
 			awaiting_skill_selection = true
 			selected_target_index = 0  # Start with first target
 			_highlight_target_candidates()
 
-			# Show currently selected target
-			if not target_candidates.is_empty():
-				log_message("→ %s" % target_candidates[0].display_name)
+			# Show currently selected target (without queuing message)
+			if not target_candidates.is_empty() and battle_log:
+				battle_log.clear()
+				battle_log.append_text("Select a target\n→ %s" % target_candidates[0].display_name)
 	elif target_type == "ally" or target_type == "allies":
 		# TODO: Implement ally targeting
 		log_message("Ally targeting not yet implemented")
@@ -5882,16 +5880,20 @@ func _execute_skill_single(target: Dictionary) -> void:
 	var mnd_scaling = int(skill_to_use.get("scaling_mnd", 1))
 
 	# ═══════ HIT CHECK FIRST ═══════
-	log_message("%s uses %s!" % [current_combatant.display_name, skill_name])
 	var hit_check = combat_resolver.check_sigil_hit(current_combatant, target, {"skill_acc": acc})
 
 	if not hit_check.hit:
 		_show_miss_feedback()  # Show big MISS text
-		log_message("  → Missed! (%d%% chance, rolled %d)" % [int(hit_check.hit_chance), hit_check.roll])
 		# Still deduct MP even on miss
 		current_combatant.mp -= mp_cost
 		if current_combatant.mp < 0:
 			current_combatant.mp = 0
+
+		# Build miss message
+		start_turn_message()
+		add_turn_line("%s used %s!" % [current_combatant.display_name, skill_name])
+		add_turn_line("But it missed!")
+		queue_turn_message()
 		return
 
 	# ═══════ SKILL MINIGAME ═══════
@@ -5901,7 +5903,7 @@ func _execute_skill_single(target: Dictionary) -> void:
 		var parts = skill_id.split("_L")
 		skill_tier = int(parts[1]) if parts.size() > 1 else 1
 
-	# Launch skill minigame
+	# Launch skill minigame (auto-starts, no message)
 	var focus_stat = current_combatant.stats.get("FCS", 1)
 	var skill_sequence = _get_skill_button_sequence(skill_id)
 	var mind_type = element  # Use the element as the mind type
@@ -5910,7 +5912,6 @@ func _execute_skill_single(target: Dictionary) -> void:
 	if ailment != "":
 		status_effects.append(ailment)
 
-	log_message("  → %s prepares the skill..." % [current_combatant.display_name])
 	_show_instruction("SKILL!")
 	var minigame_result = await minigame_mgr.launch_skill_minigame(focus_stat, skill_sequence, skill_tier, mind_type, status_effects)
 	_hide_instruction()
@@ -5931,10 +5932,10 @@ func _execute_skill_single(target: Dictionary) -> void:
 	if current_combatant.mp < 0:
 		current_combatant.mp = 0
 
-	# Log MP savings if applicable
+	# Store MP savings for message (if applicable)
+	var mp_saved = 0
 	if mp_modifier < 1.0:
-		var saved_mp = mp_cost - final_mp_cost
-		log_message("  → High Focus! Saved %d MP (%d → %d)" % [saved_mp, mp_cost, final_mp_cost])
+		mp_saved = mp_cost - final_mp_cost
 
 	# Track sigil usage for bonus GXP
 	var sigil_inst_id = skill_to_use.get("_sigil_inst_id", "")
@@ -5957,7 +5958,6 @@ func _execute_skill_single(target: Dictionary) -> void:
 
 				if should_reflect:
 					# REFLECT! The skill bounces back to the attacker
-					log_message("  → %s's Mirror reflects the attack!" % target.display_name)
 
 					# Remove the reflect buff (it's consumed)
 					target.buffs.remove_at(i)
@@ -5995,9 +5995,16 @@ func _execute_skill_single(target: Dictionary) -> void:
 					if new_target.hp <= 0:
 						new_target.hp = 0
 						_set_fainted(new_target)
-						log_message("  → %s was defeated by the reflection!" % new_target.display_name)
+
+					# Build reflect message
+					start_turn_message()
+					add_turn_line("%s used %s!" % [current_combatant.display_name, skill_name])
+					add_turn_line("%s's Mirror reflects the attack!" % target.display_name)
+					if new_target.is_ko:
+						add_turn_line("%s was defeated by the reflection!" % new_target.display_name)
 					else:
-						log_message("  → %s takes %d reflected damage!" % [new_target.display_name, reflect_damage])
+						add_turn_line("%s takes %d reflected damage!" % [new_target.display_name, reflect_damage])
+					queue_turn_message()
 
 					# Update displays and end skill
 					_update_combatant_displays()
@@ -6017,11 +6024,7 @@ func _execute_skill_single(target: Dictionary) -> void:
 			element
 		)
 
-		# Show type matchup explanation
-		if type_bonus > 0.0:
-			log_message("  → TYPE ADVANTAGE! %s vs %s" % [element.capitalize(), target.mind_type.capitalize()])
-		elif type_bonus < 0.0:
-			log_message("  → TYPE DISADVANTAGE! %s vs %s" % [element.capitalize(), target.mind_type.capitalize()])
+		# Type matchup will be shown in final message
 
 	# Both crits and type advantages count as stumbles for skills
 	var crit_weakness_hit = is_crit
@@ -6047,13 +6050,6 @@ func _execute_skill_single(target: Dictionary) -> void:
 	var base_damage = damage
 	damage = int(damage * damage_modifier)
 
-	# Log damage modification if applicable
-	if damage_modifier != 1.0:
-		if damage_modifier > 1.0:
-			log_message("  → Button sequence bonus! Damage: %d → %d (%.0f%%)" % [base_damage, damage, damage_modifier * 100])
-		else:
-			log_message("  → Missed buttons! Damage: %d → %d (%.0f%%)" % [base_damage, damage, damage_modifier * 100])
-
 	# Apply damage
 	target.hp -= damage
 
@@ -6073,16 +6069,19 @@ func _execute_skill_single(target: Dictionary) -> void:
 
 	# Record weakness hits AFTER damage (only if target still alive)
 	# Skills count crits and type advantages as weakness hits
+	var stumble_line = ""
+	var became_fallen = false
 	if not target.is_ko and (crit_weakness_hit or type_advantage_hit):
-		var became_fallen = await battle_mgr.record_weapon_weakness_hit(target)
+		became_fallen = await battle_mgr.record_weapon_weakness_hit(target)
 		if crit_weakness_hit:
-			log_message("  → CRITICAL STUMBLE!")
+			stumble_line = "CRITICAL STUMBLE!"
 		elif type_advantage_hit:
-			log_message("  → ELEMENTAL STUMBLE!")
+			stumble_line = "ELEMENTAL STUMBLE!"
 		if became_fallen:
-			log_message("  → %s is FALLEN! (will skip next turn)" % target.display_name)
+			stumble_line += " %s fell!" % target.display_name
 
 	# Apply status effect if skill has one (only if target still alive)
+	var status_applied_line = ""
 	if not target.is_ko:
 		var status_to_apply = str(skill_to_use.get("status_apply", "")).to_lower()
 		var status_chance_pct = int(skill_to_use.get("status_chance", 0))
@@ -6097,12 +6096,12 @@ func _execute_skill_single(target: Dictionary) -> void:
 					# Check if target already has an ailment
 					var current_ailment = str(target.get("ailment", ""))
 					if current_ailment != "" and current_ailment != "null":
-						log_message("  → Failed to inflict %s! (%s already has %s)" % [status_to_apply.capitalize(), target.display_name, current_ailment.capitalize()])
+						status_applied_line = "Failed to inflict %s! (Already has %s)" % [status_to_apply.capitalize(), current_ailment.capitalize()]
 					else:
 						# Apply the ailment
 						target.ailment = status_to_apply
 						target.ailment_turn_count = 0
-						log_message("  → %s is now %s! (%d%% chance, rolled %d)" % [target.display_name, status_to_apply.capitalize(), status_chance_pct, roll])
+						status_applied_line = "%s is now %s!" % [target.display_name, status_to_apply.capitalize()]
 						battle_mgr.refresh_turn_order()
 				else:
 					# It's a debuff (not an independent ailment)
@@ -6120,22 +6119,59 @@ func _execute_skill_single(target: Dictionary) -> void:
 
 					if debuff_type != "":
 						battle_mgr.apply_buff(target, debuff_type, -0.15, duration)
-						log_message("  → %s's %s reduced! (%d%% chance, rolled %d)" % [target.display_name, status_to_apply.replace("_", " ").capitalize(), status_chance_pct, roll])
+						status_applied_line = "%s's %s reduced!" % [target.display_name, status_to_apply.replace("_", " ").capitalize()]
 						battle_mgr.refresh_turn_order()
 
-	# Log the hit
-	var hit_msg = "  → Hit %s for %d damage! (%d%% chance)" % [target.display_name, damage, int(hit_check.hit_chance)]
-	if is_crit:
-		hit_msg += " (CRITICAL! %d%% chance)" % int(crit_check.crit_chance)
+	# Build complete turn message
+	start_turn_message()
+	add_turn_line("%s used %s!" % [current_combatant.display_name, skill_name])
+
+	# Line 2: Type advantage (if applicable)
 	if type_bonus > 0.0:
-		hit_msg += " (Super Effective!)"
+		add_turn_line("TYPE ADVANTAGE! %s vs %s" % [element.capitalize(), target.mind_type.capitalize()])
 	elif type_bonus < 0.0:
-		hit_msg += " (Not Very Effective...)"
+		add_turn_line("TYPE DISADVANTAGE! %s vs %s" % [element.capitalize(), target.mind_type.capitalize()])
+
+	# Line 3: Minigame result
+	if damage_modifier != 1.0:
+		if damage_modifier > 1.0:
+			add_turn_line("Button sequence bonus! Damage: %d → %d (%.0f%%)" % [base_damage, damage, damage_modifier * 100])
+		else:
+			add_turn_line("Missed buttons! Damage: %d → %d (%.0f%%)" % [base_damage, damage, damage_modifier * 100])
+
+	# Line 4: Stumble (if applicable)
+	if stumble_line != "":
+		add_turn_line(stumble_line)
+
+	# Line 5: Main damage line
+	var hit_msg = "Hit %s for %d damage!" % [target.display_name, damage]
+	var effect_parts = []
+	if is_crit:
+		effect_parts.append("CRITICAL")
+	if type_bonus > 0.0:
+		effect_parts.append("Super Effective")
+	elif type_bonus < 0.0:
+		effect_parts.append("Not Very Effective")
 	if target.get("is_defending", false):
-		var damage_without_defense = int(round(damage / 0.7))
-		var damage_reduced = damage_without_defense - damage
-		hit_msg += " (Defensive: -%d)" % damage_reduced
-	log_message(hit_msg)
+		effect_parts.append("Guarded")
+
+	if not effect_parts.is_empty():
+		hit_msg = "%s (%s)" % [hit_msg, ", ".join(effect_parts)]
+
+	add_turn_line(hit_msg)
+
+	# Line 6: Status applied (if any)
+	if status_applied_line != "":
+		add_turn_line(status_applied_line)
+
+	# Line 7: KO or HP remaining
+	if target.is_ko:
+		add_turn_line("%s fainted!" % target.display_name)
+	else:
+		add_turn_line("%s has %d HP left." % [target.display_name, target.hp])
+
+	# Queue the full turn message
+	queue_turn_message()
 
 	# Update displays
 	_update_combatant_displays()
