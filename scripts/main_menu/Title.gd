@@ -585,14 +585,18 @@ func _highlight_button(index: int) -> void:
 			selection_arrow = Label.new()
 			selection_arrow.text = "◀"
 			selection_arrow.add_theme_font_size_override("font_size", 32)
-			selection_arrow.add_theme_color_override("font_color", color)
+			selection_arrow.add_theme_color_override("font_color", COLOR_MILK_WHITE)
+			# Add shadow to arrow
+			selection_arrow.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.8))
+			selection_arrow.add_theme_constant_override("shadow_offset_x", 2)
+			selection_arrow.add_theme_constant_override("shadow_offset_y", 2)
+			selection_arrow.add_theme_constant_override("shadow_outline_size", 4)
 			selection_arrow.z_index = 100
 			selection_arrow.modulate = Color(1.0, 1.0, 1.0, 0.0)  # Start transparent
 			selection_arrow.visible = true  # Visible but transparent
 			add_child(selection_arrow)
 
-		# Update arrow color and position
-		selection_arrow.add_theme_color_override("font_color", color)
+		# Keep arrow white (don't change color based on button)
 		selection_arrow.global_position = button.global_position + Vector2(button.size.x + 20, button.size.y / 2 - 21)
 
 		# Fade in arrow slowly
@@ -692,8 +696,8 @@ func _spawn_ambient_particles() -> void:
 	particle_layer.z_index = -1
 	add_child(particle_layer)
 
-	# Create 30 ambient particles
-	for i in range(30):
+	# Create 60 background ambient particles (increased from 30)
+	for i in range(60):
 		var particle = ColorRect.new()
 		var size = randi_range(2, 6)
 		particle.custom_minimum_size = Vector2(size, size)
@@ -719,6 +723,41 @@ func _spawn_ambient_particles() -> void:
 		var duration = randf_range(8, 15)
 		tween.tween_property(particle, "position", particle.position + Vector2(drift_x, drift_y), duration)
 		tween.tween_property(particle, "position", particle.position, duration)
+
+	# Create foreground layer for bigger particles
+	var foreground_layer = Node2D.new()
+	foreground_layer.name = "ForegroundParticles"
+	foreground_layer.z_index = 50  # In front of menu but behind popups
+	add_child(foreground_layer)
+
+	# Create 15 larger, semi-transparent foreground squares
+	for i in range(15):
+		var square = ColorRect.new()
+		var size = randi_range(20, 50)  # Much bigger
+		square.custom_minimum_size = Vector2(size, size)
+		square.size = Vector2(size, size)
+
+		# Random neon color with transparency
+		var colors = [COLOR_SKY_CYAN, COLOR_BUBBLE_MAGENTA, COLOR_ELECTRIC_LIME, COLOR_CITRUS_YELLOW]
+		var base_color = colors[randi() % colors.size()]
+		square.color = Color(base_color.r, base_color.g, base_color.b, 0.15)  # 15% opacity
+
+		# Random position
+		square.position = Vector2(
+			randf_range(0, get_viewport_rect().size.x),
+			randf_range(0, get_viewport_rect().size.y)
+		)
+
+		foreground_layer.add_child(square)
+
+		# Animate slower drift for foreground
+		var tween = create_tween()
+		tween.set_loops()
+		var drift_x = randf_range(-80, 80)
+		var drift_y = randf_range(-50, 50)
+		var duration = randf_range(12, 20)  # Slower movement
+		tween.tween_property(square, "position", square.position + Vector2(drift_x, drift_y), duration)
+		tween.tween_property(square, "position", square.position, duration)
 
 func _style_panel() -> void:
 	"""Apply Core Vibe styling to main menu panel"""
@@ -751,11 +790,17 @@ func _style_title() -> void:
 
 	var label = title as Label
 	label.add_theme_color_override("font_color", COLOR_BUBBLE_MAGENTA)
-	label.add_theme_font_size_override("font_size", 48)
+	label.add_theme_font_size_override("font_size", 72)  # Increased from 48
 
-	# Add white outline glow
+	# Add white outline glow (thicker and more prominent)
 	label.add_theme_color_override("font_outline_color", COLOR_MILK_WHITE)
-	label.add_theme_constant_override("outline_size", 4)
+	label.add_theme_constant_override("outline_size", 8)  # Increased from 4
+
+	# Add shadow for depth
+	label.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.6))
+	label.add_theme_constant_override("shadow_offset_x", 4)
+	label.add_theme_constant_override("shadow_offset_y", 4)
+	label.add_theme_constant_override("shadow_outline_size", 6)
 
 func _style_buttons(new_btn: Button, continue_btn: Button, load_btn: Button, options_btn: Button, quit_btn: Button) -> void:
 	"""Apply pill capsule styling to all buttons"""
