@@ -832,8 +832,24 @@ func _spawn_single_meteor() -> void:
 		trail.color = Color(meteor.color.r, meteor.color.g, meteor.color.b, alpha)
 
 		# Position trail particles behind the meteor head - doubled spacing for longer trail
-		trail.position = Vector2(i * size * 0.6, i * size * 0.3)
+		var base_pos = Vector2(i * size * 0.6, i * size * 0.3)
+		trail.position = base_pos
 		meteor_container.add_child(trail)
+
+		# Add wiggle animation to trail particles
+		var wiggle_tween = create_tween()
+		wiggle_tween.set_loops()
+		var wiggle_amount = randf_range(3, 8)
+		var wiggle_speed = randf_range(0.3, 0.6)
+		wiggle_tween.tween_property(trail, "position", base_pos + Vector2(0, wiggle_amount), wiggle_speed).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
+		wiggle_tween.tween_property(trail, "position", base_pos + Vector2(0, -wiggle_amount), wiggle_speed).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
+
+		# Add fade out animation - trail particles fade faster the further back they are
+		var fade_delay = float(i) * 0.05  # Stagger the fade
+		var fade_duration = randf_range(0.4, 0.8)
+		var fade_tween = create_tween()
+		fade_tween.tween_interval(fade_delay)
+		fade_tween.tween_property(trail, "modulate:a", 0.0, fade_duration).set_ease(Tween.EASE_OUT)
 
 	# Animate meteor flying diagonally across screen
 	var tween = create_tween()
