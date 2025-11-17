@@ -226,33 +226,46 @@ func _remap_buttons_for_controller_type(controller_type: String) -> void:
 	Nintendo controllers have A and B swapped compared to Xbox:
 	- Nintendo: B (button 1) = accept, A (button 0) = back
 	- Xbox/PlayStation: A (button 0) = accept, B (button 1) = back
+
+	However, battle actions use the same physical buttons across all controllers:
+	- Fight/Status always use the button on the right (B for all)
+	- Capture/Item always use the button on the bottom (A for all)
 	"""
 	# Define button mappings based on controller type
 	var accept_button: int
 	var back_button: int
+	var fight_button: int
+	var capture_button: int
 
 	if controller_type == "nintendo":
-		# Nintendo swaps A and B
+		# Nintendo swaps A and B for menu navigation
 		accept_button = JOY_BUTTON_B  # Button 1
 		back_button = JOY_BUTTON_A    # Button 0
+		# But battle uses same physical buttons as Xbox
+		fight_button = JOY_BUTTON_B   # Button 1 (right button)
+		capture_button = JOY_BUTTON_A # Button 0 (bottom button)
 	else:
-		# Xbox and PlayStation use standard layout
+		# Xbox and PlayStation use standard layout for everything
 		accept_button = JOY_BUTTON_A  # Button 0
 		back_button = JOY_BUTTON_B    # Button 1
+		fight_button = JOY_BUTTON_B   # Button 1
+		capture_button = JOY_BUTTON_A # Button 0
 
-	# Actions that need remapping for accept/back buttons
+	# Actions that need remapping
 	var actions_to_remap = {
 		# Overworld
-		ACTION_ACTION: accept_button,   # A/B button - accept/interact
-		ACTION_PHONE: back_button,      # B/A button - back/phone
+		ACTION_ACTION: accept_button,     # A/B button - accept/interact
+		ACTION_PHONE: back_button,        # B/A button - back/phone
 
-		# Battle
-		ACTION_ATTACK: back_button,     # B/A button - fight
-		ACTION_CAPTURE: accept_button,  # A/B button - capture
+		# Battle - uses same physical buttons across all controllers
+		ACTION_ATTACK: fight_button,      # Button 1 for all - fight
+		ACTION_CAPTURE: capture_button,   # Button 0 for all - capture
+		ACTION_ITEMS: capture_button,     # Button 0 for all - items
+		ACTION_STATUS: fight_button,      # Button 1 for all - status
 
 		# Menus
-		ACTION_ACCEPT: accept_button,   # A/B button - menu accept
-		ACTION_BACK: back_button,       # B/A button - menu back
+		ACTION_ACCEPT: accept_button,     # A/B button - menu accept
+		ACTION_BACK: back_button,         # B/A button - menu back
 	}
 
 	# Remap each action
