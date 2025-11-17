@@ -789,6 +789,9 @@ func _spawn_single_meteor() -> void:
 	var meteor_container = Node2D.new()
 	meteor_layer.add_child(meteor_container)
 
+	# Rotate meteor about -30 degrees for diagonal orientation
+	meteor_container.rotation = deg_to_rad(-30)
+
 	# Start from random position on the right or top edge
 	var viewport_size = get_viewport_rect().size
 	var start_from_top = randf() > 0.5
@@ -800,9 +803,9 @@ func _spawn_single_meteor() -> void:
 		# Coming from right side
 		meteor_container.position = Vector2(viewport_size.x + 50, randf_range(0, viewport_size.y * 0.5))
 
-	# Main meteor head - much bigger and glowing
+	# Main meteor head - 100% bigger (doubled!)
 	var meteor = ColorRect.new()
-	var size = randi_range(15, 35)  # Much bigger!
+	var size = randi_range(30, 70)  # 100% bigger than before (was 15-35)
 	meteor.custom_minimum_size = Vector2(size, size)
 	meteor.size = Vector2(size, size)
 
@@ -839,10 +842,6 @@ func _spawn_single_meteor() -> void:
 	var duration = randf_range(2.0, 4.0)
 
 	tween.tween_property(meteor_container, "position", Vector2(end_x, end_y), duration).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_QUAD)
-
-	# Add rotation for more dynamic movement
-	tween.parallel().tween_property(meteor_container, "rotation", randf_range(-0.5, 0.5), duration)
-
 	tween.tween_callback(meteor_container.queue_free)
 
 	# Schedule next meteor
