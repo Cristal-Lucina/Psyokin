@@ -310,11 +310,12 @@ func _update_button_icons() -> void:
 
 	if controller_type == "nintendo":
 		# Nintendo layout: Fight/Status=(A), Capture/Item=(B), Guard/Run=(Y), Skill/Burst=(X)
+		# Note: Nintendo swaps A/B compared to Xbox, so "back" gives A and "accept" gives B
 		button_icon_mappings = [
-			{"button": "AttackButton", "icon_action": "accept"},        # A (right) - Fight
-			{"button": "StatusButton", "icon_action": "accept"},        # A (right) - Status
-			{"button": "CaptureButton", "icon_action": "back"},         # B (bottom) - Capture
-			{"button": "ItemButton", "icon_action": "back"},            # B (bottom) - Item
+			{"button": "AttackButton", "icon_action": "back"},          # A (right) - Fight
+			{"button": "StatusButton", "icon_action": "back"},          # A (right) - Status
+			{"button": "CaptureButton", "icon_action": "accept"},       # B (bottom) - Capture
+			{"button": "ItemButton", "icon_action": "accept"},          # B (bottom) - Item
 			{"button": "DefendButton", "icon_action": "special_1"},     # Y (left) - Guard
 			{"button": "RunButton", "icon_action": "special_1"},        # Y (left) - Run
 			{"button": "SkillButton", "icon_action": "special_2"},      # X (top) - Skill

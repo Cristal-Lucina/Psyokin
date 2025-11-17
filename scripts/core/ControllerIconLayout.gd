@@ -47,8 +47,8 @@ const BUTTON_ICONS = {
 		"dpad_right": "Asset 73.png",
 	},
 	"nintendo": {
-		"accept": "Asset 82.png",        # A button (right)
-		"back": "Asset 81.png",          # B button (bottom)
+		"accept": "Asset 81.png",        # B button (bottom) - Nintendo accept
+		"back": "Asset 82.png",          # A button (right) - Nintendo cancel
 		"special_1": "Asset 80.png",     # Y button (left)
 		"special_2": "Asset 79.png",     # X button (top)
 		"l_bumper": "Asset 98.png",      # LB
