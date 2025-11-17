@@ -302,15 +302,16 @@ func _update_button_icons() -> void:
 		return
 
 	# Map each battle button to its controller button action
+	# Xbox layout: Fight/Status=(B), Capture/Item=(A), Guard/Run=(X), Skill/Burst=(Y)
 	var button_icon_mappings = [
-		{"button": "AttackButton", "icon_action": "accept"},        # A / Cross
-		{"button": "SkillButton", "icon_action": "special_1"},      # X / Square
-		{"button": "CaptureButton", "icon_action": "special_2"},    # Y / Triangle
-		{"button": "DefendButton", "icon_action": "back"},          # B / Circle
-		{"button": "BurstButton", "icon_action": "l_bumper"},       # LB / L1
-		{"button": "RunButton", "icon_action": "r_bumper"},         # RB / R1
-		{"button": "ItemButton", "icon_action": "l_trigger"},       # LT / L2
-		{"button": "StatusButton", "icon_action": "r_trigger"},     # RT / R2
+		{"button": "AttackButton", "icon_action": "back"},          # B / Circle - Fight
+		{"button": "StatusButton", "icon_action": "back"},          # B / Circle - Status
+		{"button": "CaptureButton", "icon_action": "accept"},       # A / Cross - Capture
+		{"button": "ItemButton", "icon_action": "accept"},          # A / Cross - Item
+		{"button": "DefendButton", "icon_action": "special_1"},     # X / Square - Guard
+		{"button": "RunButton", "icon_action": "special_1"},        # X / Square - Run
+		{"button": "SkillButton", "icon_action": "special_2"},      # Y / Triangle - Skill
+		{"button": "BurstButton", "icon_action": "special_2"},      # Y / Triangle - Burst
 	]
 
 	for mapping in button_icon_mappings:
@@ -318,9 +319,9 @@ func _update_button_icons() -> void:
 		if btn and btn is Button:
 			var icon_texture = icon_layout.get_button_icon(mapping["icon_action"])
 			if icon_texture:
-				# Resize icon to 15x15 pixels
+				# Resize icon to 25x25 pixels
 				var image = icon_texture.get_image()
-				image.resize(15, 15, Image.INTERPOLATE_LANCZOS)
+				image.resize(25, 25, Image.INTERPOLATE_LANCZOS)
 				var scaled_texture = ImageTexture.create_from_image(image)
 
 				btn.icon = scaled_texture
