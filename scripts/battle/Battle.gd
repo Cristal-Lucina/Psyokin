@@ -1143,6 +1143,9 @@ func _confirm_target_selection() -> void:
 		awaiting_skill_selection = false
 		await _execute_skill_single(target)
 
+		# Wait for skill messages to be displayed
+		await _wait_for_message_queue()
+
 		# Check if battle is over
 		var battle_ended = await battle_mgr._check_battle_end()
 		if not battle_ended:
@@ -1153,6 +1156,9 @@ func _confirm_target_selection() -> void:
 		_clear_target_highlights()
 		awaiting_target_selection = false
 		await _execute_burst_on_target(target)
+
+		# Wait for burst messages to be displayed
+		await _wait_for_message_queue()
 
 		# Check if battle is over
 		var battle_ended = await battle_mgr._check_battle_end()
@@ -2446,6 +2452,9 @@ func _execute_attack(target: Dictionary) -> void:
 			elif turn_order_display:
 				turn_order_display.update_combatant_hp(target.id)
 
+	# Wait for attack messages to be displayed
+	await _wait_for_message_queue()
+
 	# Check if battle is over (all enemies defeated/captured)
 	var battle_ended = await battle_mgr._check_battle_end()
 	if battle_ended:
@@ -3272,6 +3281,9 @@ func _execute_item_usage(target: Dictionary) -> void:
 		# Refresh turn order to show debuff
 		if battle_mgr:
 			battle_mgr.refresh_turn_order()
+
+	# Wait for item usage messages to be displayed
+	await _wait_for_message_queue()
 
 	# Consume the item
 	var inventory = get_node("/root/aInventorySystem")
