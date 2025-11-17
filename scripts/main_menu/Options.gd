@@ -139,7 +139,17 @@ func _input(event: InputEvent) -> void:
 
 	# STATE 1: TAB_PANEL - Navigate between tabs on left
 	if _nav_state == NavState.TAB_PANEL:
-		if event.is_action_pressed("ui_accept"):
+		if event.is_action_pressed("move_up"):
+			# Navigate up through tab buttons
+			_navigate_tab_buttons(-1)
+			get_viewport().set_input_as_handled()
+			return
+		elif event.is_action_pressed("move_down"):
+			# Navigate down through tab buttons
+			_navigate_tab_buttons(1)
+			get_viewport().set_input_as_handled()
+			return
+		elif event.is_action_pressed("ui_accept"):
 			# Find which tab button has focus and switch to it
 			for i in range(_tab_buttons.size()):
 				if _tab_buttons[i].has_focus():
@@ -263,6 +273,37 @@ func _animate_panel_focus(left_focused: bool) -> void:
 # ==============================================================================
 # Navigation Functions
 # ==============================================================================
+
+func _navigate_tab_buttons(direction: int) -> void:
+	"""Navigate through tab buttons with up/down"""
+	if _tab_buttons.is_empty():
+		return
+
+	# Find currently focused tab button
+	var current_index = -1
+	for i in range(_tab_buttons.size()):
+		if _tab_buttons[i].has_focus():
+			current_index = i
+			break
+
+	# If nothing focused, start at first button
+	if current_index == -1:
+		_tab_buttons[0].grab_focus()
+		return
+
+	# Move to next button
+	current_index += direction
+
+	# Wrap around (including close button which is at the end)
+	# For now, just wrap within tab buttons
+	if current_index < 0:
+		current_index = _tab_buttons.size() - 1
+	elif current_index >= _tab_buttons.size():
+		current_index = 0
+
+	# Focus the new button
+	_tab_buttons[current_index].grab_focus()
+	print("[Options] Tab button navigation: focused button %d" % current_index)
 
 func _navigate_options(direction: int) -> void:
 	"""Navigate through option containers with up/down"""
