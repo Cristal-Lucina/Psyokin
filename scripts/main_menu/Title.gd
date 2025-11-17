@@ -676,7 +676,7 @@ func _create_diagonal_background() -> void:
 	# Create diagonal bands
 	diagonal_bands = ColorRect.new()
 	diagonal_bands.name = "DiagonalBands"
-	diagonal_bands.color = COLOR_NIGHT_NAVY
+	diagonal_bands.color = COLOR_INK_CHARCOAL
 	diagonal_bands.z_index = -2
 	add_child(diagonal_bands)
 	diagonal_bands.set_anchors_preset(Control.PRESET_FULL_RECT)
