@@ -49,11 +49,18 @@ var navigable_buttons: Array[Button] = []
 var selected_button_index: int = 0
 var input_cooldown: float = 0.0
 var input_cooldown_duration: float = 0.15  # 150ms between inputs
+var button_colors: Dictionary = {}  # Maps Button -> Color for highlight
+var active_pulse_tween: Tween = null  # Track the pulsing animation
+var active_arrow_tween: Tween = null  # Track the arrow fade animation
+var selection_arrow: Label = null  # Arrow indicator for selected button
+var fade_in_complete: bool = false  # Track if initial fade in is done
+var navigation_started: bool = false  # Track if user has started navigating
 
 # Dynamic background elements
 var diagonal_bands: ColorRect = null
 var grid_overlay: ColorRect = null
 var particle_layer: Node2D = null
+var meteor_layer: Node2D = null
 
 # ------------------------------------------------------------------------------
 
@@ -63,6 +70,10 @@ func _ready() -> void:
 	# Create neon-kawaii background
 	_create_diagonal_background()
 	_spawn_ambient_particles()
+	_spawn_meteors()
+
+	# Set fade in as complete immediately (no fade effect)
+	fade_in_complete = true
 
 	# Check if we're auto-loading from in-game (two-step loading process)
 	if has_node("/root/aGameState"):
@@ -88,25 +99,25 @@ func _ready() -> void:
 	var options_btn : Button = _find_button(OPTIONS_PATHS, ["OptionsButton", "Options"])
 	var quit_btn    : Button = _find_button(QUIT_PATHS, ["QuitButton", "Quit"])
 
-	# Connect once
-	if new_btn and not new_btn.pressed.is_connected(_on_new_game_pressed):
-		new_btn.pressed.connect(_on_new_game_pressed)
+	# Connect once with fade out wrappers
+	if new_btn and not new_btn.pressed.is_connected(_on_new_game_button_pressed):
+		new_btn.pressed.connect(_on_new_game_button_pressed)
 
 	if continue_btn:
 		continue_btn.visible = has_save
-		if not continue_btn.pressed.is_connected(_on_continue_pressed):
-			continue_btn.pressed.connect(_on_continue_pressed)
+		if not continue_btn.pressed.is_connected(_on_continue_button_pressed):
+			continue_btn.pressed.connect(_on_continue_button_pressed)
 
 	if load_btn:
 		load_btn.visible = has_save
-		if not load_btn.pressed.is_connected(_on_load_pressed):
-			load_btn.pressed.connect(_on_load_pressed)
+		if not load_btn.pressed.is_connected(_on_load_button_pressed):
+			load_btn.pressed.connect(_on_load_button_pressed)
 
-	if options_btn and not options_btn.pressed.is_connected(_on_options_pressed):
-		options_btn.pressed.connect(_on_options_pressed)
+	if options_btn and not options_btn.pressed.is_connected(_on_options_button_pressed):
+		options_btn.pressed.connect(_on_options_button_pressed)
 
-	if quit_btn and not quit_btn.pressed.is_connected(_on_quit_pressed):
-		quit_btn.pressed.connect(_on_quit_pressed)
+	if quit_btn and not quit_btn.pressed.is_connected(_on_quit_button_pressed):
+		quit_btn.pressed.connect(_on_quit_button_pressed)
 
 	# Decorate Continue with latest save summary (nice UX)
 	if continue_btn and has_save:
@@ -125,6 +136,40 @@ func _ready() -> void:
 	_style_panel()
 	_style_title()
 	_style_buttons(new_btn, continue_btn, load_btn, options_btn, quit_btn)
+
+# ------------------------------------------------------------------------------
+# Button wrapper handlers (with fade out)
+# ------------------------------------------------------------------------------
+
+func _on_new_game_button_pressed() -> void:
+	"""Wrapper for New Game button - fades out then activates"""
+	await _fade_out_scene()
+	_on_new_game_pressed()
+
+func _on_continue_button_pressed() -> void:
+	"""Wrapper for Continue button - fades out then activates"""
+	await _fade_out_scene()
+	_on_continue_pressed()
+
+func _on_load_button_pressed() -> void:
+	"""Wrapper for Load button - fades out then activates"""
+	await _fade_out_scene()
+	_on_load_pressed()
+
+func _on_options_button_pressed() -> void:
+	"""Wrapper for Options button - fades out then activates"""
+	await _fade_out_scene()
+	_on_options_pressed()
+
+func _on_quit_button_pressed() -> void:
+	"""Wrapper for Quit button - fades out then activates"""
+	await _fade_out_scene()
+	_on_quit_pressed()
+
+func _fade_out_scene() -> void:
+	"""Fade out the entire scene - disabled for instant transitions"""
+	# No fade effect - transition immediately
+	await get_tree().process_frame
 
 # ------------------------------------------------------------------------------
 # Button handlers
@@ -416,19 +461,25 @@ func _collect_buttons(n: Node, out: Array) -> void:
 func _setup_controller_navigation(new_btn: Button, continue_btn: Button, load_btn: Button, options_btn: Button, quit_btn: Button, has_save: bool) -> void:
 	"""Setup controller navigation for menu buttons"""
 	navigable_buttons.clear()
+	button_colors.clear()
 
-	# Add buttons in VISUAL order (top to bottom)
+	# Add buttons in VISUAL order (top to bottom) and map their highlight colors
 	# Continue should be first if it exists
 	if continue_btn and has_save:
 		navigable_buttons.append(continue_btn)
+		button_colors[continue_btn] = COLOR_SKY_CYAN
 	if new_btn:
 		navigable_buttons.append(new_btn)
+		button_colors[new_btn] = COLOR_BUBBLE_MAGENTA
 	if load_btn and has_save:
 		navigable_buttons.append(load_btn)
+		button_colors[load_btn] = COLOR_ELECTRIC_LIME
 	if options_btn:
 		navigable_buttons.append(options_btn)
+		button_colors[options_btn] = COLOR_CITRUS_YELLOW
 	if quit_btn:
 		navigable_buttons.append(quit_btn)
+		button_colors[quit_btn] = COLOR_GRAPE_VIOLET
 
 	# Start at Continue if save exists, else New Game
 	if navigable_buttons.size() > 0:
@@ -468,14 +519,22 @@ func _input(event: InputEvent) -> void:
 			var button = navigable_buttons[selected_button_index]
 			# Mark input as handled BEFORE triggering button (scene may change)
 			get_viewport().set_input_as_handled()
-			# Trigger the button's pressed signal by emitting it
-			# Note: This may destroy this node if it changes scenes, so nothing after this line will execute
-			button.emit_signal("pressed")
+			# Fade out the scene before transitioning
+			_fade_out_and_activate(button)
+
+func _fade_out_and_activate(button: Button) -> void:
+	"""Fade out the entire scene before activating button"""
+	await _fade_out_scene()
+	# Trigger the button's pressed signal
+	button.emit_signal("pressed")
 
 func _navigate_menu(direction: int) -> void:
 	"""Navigate menu with controller"""
 	if navigable_buttons.is_empty():
 		return
+
+	# Mark that navigation has started (for arrow display)
+	navigation_started = true
 
 	_unhighlight_button(selected_button_index)
 
@@ -488,53 +547,133 @@ func _navigate_menu(direction: int) -> void:
 	_highlight_button(selected_button_index)
 
 func _highlight_button(index: int) -> void:
-	"""Highlight a button with Core Vibe animation - resets all buttons first"""
-	# First, unhighlight ALL buttons to ensure only one is highlighted
-	for i in range(navigable_buttons.size()):
-		var btn = navigable_buttons[i]
-		btn.modulate = Color(1.0, 1.0, 1.0, 1.0)
-		btn.scale = Vector2.ONE
+	"""Highlight a button with color change and pulsing animation"""
+	if index < 0 or index >= navigable_buttons.size():
+		return
 
-	# Now highlight the selected button
-	if index >= 0 and index < navigable_buttons.size():
-		var button = navigable_buttons[index]
-		button.grab_focus()
+	var button = navigable_buttons[index]
+	button.grab_focus()
 
-		# Animate with elastic bounce
-		var tween = create_tween()
-		tween.set_parallel(true)
-		tween.set_ease(Tween.EASE_OUT)
-		tween.set_trans(Tween.TRANS_BACK)
+	# Get button's highlight color
+	var color = button_colors.get(button, COLOR_ELECTRIC_LIME)
 
-		# Scale up slightly with overshoot
-		tween.tween_property(button, "scale", Vector2(1.08, 1.08), 0.3)
+	# Create highlighted style - background becomes the assigned color, font becomes dark
+	var style_highlight = StyleBoxFlat.new()
+	style_highlight.bg_color = color  # Background is the highlight color
+	style_highlight.border_color = color
+	style_highlight.border_width_left = 3
+	style_highlight.border_width_right = 3
+	style_highlight.border_width_top = 3
+	style_highlight.border_width_bottom = 3
+	style_highlight.corner_radius_top_left = 20
+	style_highlight.corner_radius_top_right = 20
+	style_highlight.corner_radius_bottom_left = 20
+	style_highlight.corner_radius_bottom_right = 20
+	style_highlight.shadow_color = Color(color.r, color.g, color.b, 0.8)
+	style_highlight.shadow_size = 12
+	button.add_theme_stylebox_override("normal", style_highlight)
 
-		# Brighten slightly
-		tween.tween_property(button, "modulate", Color(1.1, 1.1, 1.1, 1.0), 0.3)
+	# Change font color to Night Navy
+	button.add_theme_color_override("font_color", COLOR_NIGHT_NAVY)
+
+	# Set pivot offset to center for centered pulsing
+	button.pivot_offset = button.size / 2
+
+	# Create or show selection arrow only if navigation has started
+	if navigation_started:
+		if not selection_arrow:
+			selection_arrow = Label.new()
+			selection_arrow.text = "◀"
+			selection_arrow.add_theme_font_size_override("font_size", 32)
+			selection_arrow.add_theme_color_override("font_color", COLOR_MILK_WHITE)
+			# Add shadow to arrow
+			selection_arrow.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.8))
+			selection_arrow.add_theme_constant_override("shadow_offset_x", 2)
+			selection_arrow.add_theme_constant_override("shadow_offset_y", 2)
+			selection_arrow.add_theme_constant_override("shadow_outline_size", 4)
+			selection_arrow.z_index = 100
+			selection_arrow.modulate = Color(1.0, 1.0, 1.0, 0.0)  # Start transparent
+			selection_arrow.visible = true  # Visible but transparent
+			add_child(selection_arrow)
+
+		# Keep arrow white (don't change color based on button)
+		selection_arrow.global_position = button.global_position + Vector2(button.size.x + 20, button.size.y / 2 - 21)
+
+		# Kill any existing arrow fade animation
+		if active_arrow_tween:
+			active_arrow_tween.kill()
+
+		# Fade in arrow slowly
+		if fade_in_complete:
+			active_arrow_tween = create_tween()
+			active_arrow_tween.set_ease(Tween.EASE_OUT)
+			active_arrow_tween.set_trans(Tween.TRANS_CUBIC)
+			active_arrow_tween.tween_property(selection_arrow, "modulate", Color(1.0, 1.0, 1.0, 1.0), 0.3)
+
+	# Kill any existing pulse animation
+	if active_pulse_tween:
+		active_pulse_tween.kill()
+
+	# Animate with pulsing effect (only for selected button)
+	active_pulse_tween = create_tween()
+	active_pulse_tween.set_loops()
+	active_pulse_tween.set_parallel(false)
+
+	# Pulse scale up
+	active_pulse_tween.tween_property(button, "scale", Vector2(1.05, 1.05), 0.6).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
+	# Pulse scale down
+	active_pulse_tween.tween_property(button, "scale", Vector2(1.0, 1.0), 0.6).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
 
 func _unhighlight_button(index: int) -> void:
-	"""Remove highlight from a button with smooth animation"""
-	if index >= 0 and index < navigable_buttons.size():
-		var button = navigable_buttons[index]
+	"""Remove highlight from a button - restore to original styled state"""
+	if index < 0 or index >= navigable_buttons.size():
+		return
 
-		var tween = create_tween()
-		tween.set_parallel(true)
-		tween.set_ease(Tween.EASE_OUT)
-		tween.set_trans(Tween.TRANS_CUBIC)
+	var button = navigable_buttons[index]
 
-		tween.tween_property(button, "scale", Vector2.ONE, 0.2)
-		tween.tween_property(button, "modulate", Color(1.0, 1.0, 1.0, 1.0), 0.2)
+	# Kill any active pulse animation
+	if active_pulse_tween:
+		active_pulse_tween.kill()
+		active_pulse_tween = null
+
+	# Restore original scale immediately
+	button.scale = Vector2.ONE
+
+	# Set pivot offset to center (keep centered for consistency)
+	button.pivot_offset = button.size / 2
+
+	# Get button's original border color
+	var color = button_colors.get(button, COLOR_ELECTRIC_LIME)
+
+	# Restore normal styling (dark background, colored border)
+	var style_normal = StyleBoxFlat.new()
+	style_normal.bg_color = COLOR_NIGHT_NAVY
+	style_normal.border_color = color
+	style_normal.border_width_left = 2
+	style_normal.border_width_right = 2
+	style_normal.border_width_top = 2
+	style_normal.border_width_bottom = 2
+	style_normal.corner_radius_top_left = 20
+	style_normal.corner_radius_top_right = 20
+	style_normal.corner_radius_bottom_left = 20
+	style_normal.corner_radius_bottom_right = 20
+	style_normal.shadow_color = Color(color.r, color.g, color.b, 0.4)
+	style_normal.shadow_size = 4
+	button.add_theme_stylebox_override("normal", style_normal)
+
+	# Restore font color to white
+	button.add_theme_color_override("font_color", COLOR_MILK_WHITE)
 
 # ------------------------------------------------------------------------------
 # Core Vibe Styling
 # ------------------------------------------------------------------------------
 
 func _create_diagonal_background() -> void:
-	"""Create diagonal striped background with grid overlay"""
-	# Create diagonal bands
+	"""Create space black background with grid overlay"""
+	# Create space black background
 	diagonal_bands = ColorRect.new()
-	diagonal_bands.name = "DiagonalBands"
-	diagonal_bands.color = COLOR_NIGHT_NAVY
+	diagonal_bands.name = "SpaceBackground"
+	diagonal_bands.color = Color(0.0, 0.0, 0.0, 1.0)  # Pure black for space
 	diagonal_bands.z_index = -2
 	add_child(diagonal_bands)
 	diagonal_bands.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -554,8 +693,8 @@ func _spawn_ambient_particles() -> void:
 	particle_layer.z_index = -1
 	add_child(particle_layer)
 
-	# Create 30 ambient particles
-	for i in range(30):
+	# Create 60 background ambient particles (increased from 30)
+	for i in range(60):
 		var particle = ColorRect.new()
 		var size = randi_range(2, 6)
 		particle.custom_minimum_size = Vector2(size, size)
@@ -582,6 +721,135 @@ func _spawn_ambient_particles() -> void:
 		tween.tween_property(particle, "position", particle.position + Vector2(drift_x, drift_y), duration)
 		tween.tween_property(particle, "position", particle.position, duration)
 
+	# Create foreground layer for bigger particles
+	var foreground_layer = Node2D.new()
+	foreground_layer.name = "ForegroundParticles"
+	foreground_layer.z_index = 50  # In front of menu but behind popups
+	add_child(foreground_layer)
+
+	# Create 15 larger, semi-transparent foreground squares
+	for i in range(15):
+		var square = ColorRect.new()
+		var size = randi_range(20, 50)  # Much bigger
+		square.custom_minimum_size = Vector2(size, size)
+		square.size = Vector2(size, size)
+
+		# Random neon color with transparency
+		var colors = [COLOR_SKY_CYAN, COLOR_BUBBLE_MAGENTA, COLOR_ELECTRIC_LIME, COLOR_CITRUS_YELLOW]
+		var base_color = colors[randi() % colors.size()]
+		square.color = Color(base_color.r, base_color.g, base_color.b, 0.15)  # 15% opacity
+
+		# Random position
+		square.position = Vector2(
+			randf_range(0, get_viewport_rect().size.x),
+			randf_range(0, get_viewport_rect().size.y)
+		)
+
+		foreground_layer.add_child(square)
+
+		# Animate slower drift for foreground
+		var tween = create_tween()
+		tween.set_loops()
+		var drift_x = randf_range(-80, 80)
+		var drift_y = randf_range(-50, 50)
+		var duration = randf_range(12, 20)  # Slower movement
+		tween.tween_property(square, "position", square.position + Vector2(drift_x, drift_y), duration)
+		tween.tween_property(square, "position", square.position, duration)
+
+func _spawn_meteors() -> void:
+	"""Spawn meteors flying across the background"""
+	meteor_layer = Node2D.new()
+	meteor_layer.name = "MeteorLayer"
+	meteor_layer.z_index = -1
+	add_child(meteor_layer)
+
+	# Continuously spawn meteors
+	_spawn_single_meteor()
+
+func _spawn_single_meteor() -> void:
+	"""Spawn a single meteor with glow and trail effects"""
+	if not meteor_layer:
+		return
+
+	# Create container for meteor and its trail
+	var meteor_container = Node2D.new()
+	meteor_layer.add_child(meteor_container)
+
+	# Rotate meteor about -50 degrees for steeper diagonal orientation
+	meteor_container.rotation = deg_to_rad(-50)
+
+	# Start from random position on the right or top edge
+	var viewport_size = get_viewport_rect().size
+	var start_from_top = randf() > 0.5
+
+	if start_from_top:
+		# Coming from top-right diagonal
+		meteor_container.position = Vector2(randf_range(viewport_size.x * 0.5, viewport_size.x), -50)
+	else:
+		# Coming from right side
+		meteor_container.position = Vector2(viewport_size.x + 50, randf_range(0, viewport_size.y * 0.5))
+
+	# Main meteor head - 100% bigger (doubled!)
+	var meteor = ColorRect.new()
+	var size = randi_range(30, 70)  # 100% bigger than before (was 15-35)
+	meteor.custom_minimum_size = Vector2(size, size)
+	meteor.size = Vector2(size, size)
+
+	# Bright glowing colors - oranges, yellows, whites
+	var colors = [
+		Color(1.0, 0.8, 0.3, 1.0),  # Bright orange-yellow
+		Color(1.0, 0.6, 0.2, 1.0),  # Orange
+		Color(1.0, 0.9, 0.7, 1.0),  # Pale yellow
+		Color(0.9, 0.9, 0.9, 1.0)   # Bright white
+	]
+	meteor.color = colors[randi() % colors.size()]
+	meteor_container.add_child(meteor)
+
+	# Create glowing trail particles - longer trail
+	var trail_count = randi_range(12, 20)  # More particles for longer trail
+	for i in range(trail_count):
+		var trail = ColorRect.new()
+		var trail_size = size * randf_range(0.4, 0.8) * (1.0 - float(i) / trail_count)
+		trail.custom_minimum_size = Vector2(trail_size, trail_size)
+		trail.size = Vector2(trail_size, trail_size)
+
+		# Trail gets dimmer and more transparent further back
+		var alpha = 0.8 * (1.0 - float(i) / trail_count)
+		trail.color = Color(meteor.color.r, meteor.color.g, meteor.color.b, alpha)
+
+		# Position trail particles behind the meteor head - doubled spacing for longer trail
+		var base_pos = Vector2(i * size * 0.6, i * size * 0.3)
+		trail.position = base_pos
+		meteor_container.add_child(trail)
+
+		# Add wiggle animation to trail particles - faster wiggle
+		var wiggle_tween = create_tween()
+		wiggle_tween.set_loops()
+		var wiggle_amount = randf_range(3, 8)
+		var wiggle_speed = randf_range(0.15, 0.3)  # Faster (was 0.3-0.6)
+		wiggle_tween.tween_property(trail, "position", base_pos + Vector2(0, wiggle_amount), wiggle_speed).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
+		wiggle_tween.tween_property(trail, "position", base_pos + Vector2(0, -wiggle_amount), wiggle_speed).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
+
+		# Add fade out animation - 3 second fade
+		var fade_delay = float(i) * 0.05  # Stagger the fade
+		var fade_duration = randf_range(2.8, 3.2)  # 3 seconds with slight variation
+		var fade_tween = create_tween()
+		fade_tween.tween_interval(fade_delay)
+		fade_tween.tween_property(trail, "modulate:a", 0.0, fade_duration).set_ease(Tween.EASE_OUT)
+
+	# Animate meteor flying diagonally across screen
+	var tween = create_tween()
+	var end_x = meteor_container.position.x - randf_range(1200, 1800)
+	var end_y = meteor_container.position.y + randf_range(600, 1000)
+	var duration = randf_range(2.0, 4.0)
+
+	tween.tween_property(meteor_container, "position", Vector2(end_x, end_y), duration).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_QUAD)
+	tween.tween_callback(meteor_container.queue_free)
+
+	# Schedule next meteor
+	await get_tree().create_timer(randf_range(3.0, 7.0)).timeout
+	_spawn_single_meteor()
+
 func _style_panel() -> void:
 	"""Apply Core Vibe styling to main menu panel"""
 	var frame = get_node_or_null("Center/Frame")
@@ -607,17 +875,40 @@ func _style_panel() -> void:
 
 func _style_title() -> void:
 	"""Apply Core Vibe styling to PSYOKIN title"""
-	var title = get_node_or_null("Center/Frame/Root/TitleLabel")
+	# Try unique name first, then path
+	var title = get_node_or_null("%TitleLabel")
+	if not title:
+		title = get_node_or_null("Center/Frame/Root/TitleLabel")
 	if not title or not title is Label:
 		return
 
 	var label = title as Label
-	label.add_theme_color_override("font_color", COLOR_BUBBLE_MAGENTA)
-	label.add_theme_font_size_override("font_size", 48)
 
-	# Add white outline glow
+	# Make the title MASSIVE and fancy
+	label.add_theme_font_size_override("font_size", 96)  # Even bigger!
+
+	# Gradient-like effect using bubble magenta with bright glow
+	label.add_theme_color_override("font_color", COLOR_BUBBLE_MAGENTA)
+
+	# Thick white outline for contrast
 	label.add_theme_color_override("font_outline_color", COLOR_MILK_WHITE)
-	label.add_theme_constant_override("outline_size", 4)
+	label.add_theme_constant_override("outline_size", 12)  # Very thick outline
+
+	# Deep shadow for 3D depth effect
+	label.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.8))
+	label.add_theme_constant_override("shadow_offset_x", 6)
+	label.add_theme_constant_override("shadow_offset_y", 6)
+	label.add_theme_constant_override("shadow_outline_size", 8)
+
+	# Set pivot offset to center for centered pulsing
+	label.pivot_offset = label.size / 2
+
+	# Add a subtle pulsing glow animation
+	var pulse_tween = create_tween()
+	pulse_tween.set_loops()
+	pulse_tween.set_parallel(false)
+	pulse_tween.tween_property(label, "scale", Vector2(1.05, 1.05), 2.0).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
+	pulse_tween.tween_property(label, "scale", Vector2(1.0, 1.0), 2.0).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
 
 func _style_buttons(new_btn: Button, continue_btn: Button, load_btn: Button, options_btn: Button, quit_btn: Button) -> void:
 	"""Apply pill capsule styling to all buttons"""

@@ -1,0 +1,91 @@
+[gd_scene load_steps=2 format=3 uid="uid://6pr0w84h2job"]
+
+[ext_resource type="Script" uid="uid://dknqudwpch1a4" path="res://scripts/experiments/ControllerIconsTest.gd" id="1_script"]
+
+[node name="ControllerIconsTest" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_script")
+
+[node name="BackgroundPanel" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.95, 0.95, 0.97, 1)
+
+[node name="MarginContainer" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 20
+theme_override_constants/margin_top = 20
+theme_override_constants/margin_right = 20
+theme_override_constants/margin_bottom = 20
+
+[node name="MainVBox" type="VBoxContainer" parent="MarginContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Header" type="HBoxContainer" parent="MarginContainer/MainVBox"]
+layout_mode = 2
+alignment = 1
+
+[node name="ThemeToggle" type="Button" parent="MarginContainer/MainVBox/Header"]
+layout_mode = 2
+text = "Switch to Dark Theme"
+
+[node name="Title" type="Label" parent="MarginContainer/MainVBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.1, 0.1, 0.15, 1)
+theme_override_font_sizes/font_size = 24
+text = "Controller Icons - Complete Collection (51 Icons)"
+horizontal_alignment = 1
+
+[node name="ScrollContainer" type="ScrollContainer" parent="MarginContainer/MainVBox"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="ContentGrid" type="GridContainer" parent="MarginContainer/MainVBox/ScrollContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/h_separation = 40
+theme_override_constants/v_separation = 30
+columns = 8
+
+[node name="Footer" type="VBoxContainer" parent="MarginContainer/MainVBox"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="HSeparator" type="HSeparator" parent="MarginContainer/MainVBox/Footer"]
+layout_mode = 2
+
+[node name="ControllerTypes" type="Label" parent="MarginContainer/MainVBox/Footer"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.2, 0.2, 0.25, 1)
+theme_override_font_sizes/font_size = 14
+text = "Xbox | PlayStation | Nintendo | Universal"
+horizontal_alignment = 1
+
+[node name="Info" type="Label" parent="MarginContainer/MainVBox/Footer"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.4, 0.4, 0.45, 1)
+text = "Theme-aware PNG icons (1x scale)"
+horizontal_alignment = 1
+
+[node name="BackButton" type="Button" parent="MarginContainer/MainVBox/Footer"]
+layout_mode = 2
+size_flags_horizontal = 4
+text = "Back to Main Menu"
+
+[connection signal="pressed" from="MarginContainer/MainVBox/Header/ThemeToggle" to="." method="_on_theme_toggle"]
+[connection signal="pressed" from="MarginContainer/MainVBox/Footer/BackButton" to="." method="_on_back_pressed"]
