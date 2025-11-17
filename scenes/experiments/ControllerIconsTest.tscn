@@ -1,67 +1,6 @@
-[gd_scene load_steps=50 format=3 uid="uid://controller_icons_test_complete"]
+[gd_scene load_steps=2 format=3 uid="uid://6pr0w84h2job"]
 
-[ext_resource type="Script" path="res://scripts/experiments/ControllerIconsTest.gd" id="1_script"]
-
-; Universal Controls
-[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/PNG and PSD - Light/Controller/1x/Asset 50.png" id="2_share"]
-[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/PNG and PSD - Light/Controller/1x/Asset 51.png" id="3_options"]
-[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/PNG and PSD - Light/Controller/1x/Asset 87.png" id="4_r3"]
-[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/PNG and PSD - Light/Controller/1x/Asset 88.png" id="5_l3"]
-[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/PNG and PSD - Light/Controller/1x/Asset 89.png" id="6_right_stick"]
-[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/PNG and PSD - Light/Controller/1x/Asset 90.png" id="7_left_stick"]
-
-; Xbox Controller
-[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/PNG and PSD - Light/Controller/1x/Asset 77.png" id="8_xbox_share"]
-[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/PNG and PSD - Light/Controller/1x/Asset 78.png" id="9_xbox_options"]
-[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/PNG and PSD - Light/Controller/1x/Asset 79.png" id="10_xbox_x"]
-[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/PNG and PSD - Light/Controller/1x/Asset 80.png" id="11_xbox_y"]
-[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/PNG and PSD - Light/Controller/1x/Asset 81.png" id="12_xbox_b"]
-[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/PNG and PSD - Light/Controller/1x/Asset 82.png" id="13_xbox_a"]
-[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/PNG and PSD - Light/Controller/1x/Asset 68.png" id="14_xbox_dpad_l"]
-[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/PNG and PSD - Light/Controller/1x/Asset 69.png" id="15_xbox_dpad_d"]
-[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/PNG and PSD - Light/Controller/1x/Asset 70.png" id="16_xbox_dpad_r"]
-[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/PNG and PSD - Light/Controller/1x/Asset 71.png" id="17_xbox_dpad_u"]
-[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/PNG and PSD - Light/Controller/1x/Asset 95.png" id="18_xbox_rt"]
-[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/PNG and PSD - Light/Controller/1x/Asset 96.png" id="19_xbox_lt"]
-[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/PNG and PSD - Light/Controller/1x/Asset 97.png" id="20_xbox_rb"]
-[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/PNG and PSD - Light/Controller/1x/Asset 98.png" id="21_xbox_lb"]
-
-; PlayStation Controller
-[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/PNG and PSD - Light/Controller/1x/Asset 83.png" id="22_ps_circle"]
-[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/PNG and PSD - Light/Controller/1x/Asset 84.png" id="23_ps_triangle"]
-[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/PNG and PSD - Light/Controller/1x/Asset 85.png" id="24_ps_square"]
-[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/PNG and PSD - Light/Controller/1x/Asset 86.png" id="25_ps_x"]
-[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/PNG and PSD - Light/Controller/1x/Asset 72.png" id="26_ps_dpad_l"]
-[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/PNG and PSD - Light/Controller/1x/Asset 73.png" id="27_ps_dpad_r"]
-[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/PNG and PSD - Light/Controller/1x/Asset 74.png" id="28_ps_dpad_d"]
-[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/PNG and PSD - Light/Controller/1x/Asset 75.png" id="29_ps_dpad_u"]
-[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/PNG and PSD - Light/Controller/1x/Asset 91.png" id="30_ps_r2"]
-[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/PNG and PSD - Light/Controller/1x/Asset 92.png" id="31_ps_l2"]
-[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/PNG and PSD - Light/Controller/1x/Asset 93.png" id="32_ps_r1"]
-[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/PNG and PSD - Light/Controller/1x/Asset 94.png" id="33_ps_l1"]
-
-; Nintendo Controller
-[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/PNG and PSD - Light/Controller/1x/Asset 64.png" id="34_nintendo_dpad_l"]
-[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/PNG and PSD - Light/Controller/1x/Asset 65.png" id="35_nintendo_dpad_r"]
-[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/PNG and PSD - Light/Controller/1x/Asset 66.png" id="36_nintendo_dpad_d"]
-[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/PNG and PSD - Light/Controller/1x/Asset 67.png" id="37_nintendo_dpad_u"]
-
-; Generic Directional
-[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/PNG and PSD - Light/Controller/1x/Asset 52.png" id="38_dir_u"]
-[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/PNG and PSD - Light/Controller/1x/Asset 53.png" id="39_dir_l"]
-[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/PNG and PSD - Light/Controller/1x/Asset 54.png" id="40_dir_r"]
-[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/PNG and PSD - Light/Controller/1x/Asset 55.png" id="41_dir_d"]
-[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/PNG and PSD - Light/Controller/1x/Asset 76.png" id="42_dpad_any"]
-
-; Analog Stick Directions
-[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/PNG and PSD - Light/Controller/1x/Asset 56.png" id="43_rs_l"]
-[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/PNG and PSD - Light/Controller/1x/Asset 57.png" id="44_rs_r"]
-[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/PNG and PSD - Light/Controller/1x/Asset 58.png" id="45_rs_u"]
-[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/PNG and PSD - Light/Controller/1x/Asset 59.png" id="46_rs_d"]
-[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/PNG and PSD - Light/Controller/1x/Asset 60.png" id="47_ls_l"]
-[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/PNG and PSD - Light/Controller/1x/Asset 61.png" id="48_ls_r"]
-[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/PNG and PSD - Light/Controller/1x/Asset 62.png" id="49_ls_u"]
-[ext_resource type="Texture2D" path="res://assets/graphics/icons/UI/PNG and PSD - Light/Controller/1x/Asset 63.png" id="50_ls_d"]
+[ext_resource type="Script" uid="uid://dknqudwpch1a4" path="res://scripts/experiments/ControllerIconsTest.gd" id="1_script"]
 
 [node name="ControllerIconsTest" type="Control"]
 layout_mode = 3
