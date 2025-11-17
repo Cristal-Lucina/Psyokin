@@ -88,25 +88,25 @@ func _ready() -> void:
 	var options_btn : Button = _find_button(OPTIONS_PATHS, ["OptionsButton", "Options"])
 	var quit_btn    : Button = _find_button(QUIT_PATHS, ["QuitButton", "Quit"])
 
-	# Connect once
-	if new_btn and not new_btn.pressed.is_connected(_on_new_game_pressed):
-		new_btn.pressed.connect(_on_new_game_pressed)
+	# Connect once with fade out wrappers
+	if new_btn and not new_btn.pressed.is_connected(_on_new_game_button_pressed):
+		new_btn.pressed.connect(_on_new_game_button_pressed)
 
 	if continue_btn:
 		continue_btn.visible = has_save
-		if not continue_btn.pressed.is_connected(_on_continue_pressed):
-			continue_btn.pressed.connect(_on_continue_pressed)
+		if not continue_btn.pressed.is_connected(_on_continue_button_pressed):
+			continue_btn.pressed.connect(_on_continue_button_pressed)
 
 	if load_btn:
 		load_btn.visible = has_save
-		if not load_btn.pressed.is_connected(_on_load_pressed):
-			load_btn.pressed.connect(_on_load_pressed)
+		if not load_btn.pressed.is_connected(_on_load_button_pressed):
+			load_btn.pressed.connect(_on_load_button_pressed)
 
-	if options_btn and not options_btn.pressed.is_connected(_on_options_pressed):
-		options_btn.pressed.connect(_on_options_pressed)
+	if options_btn and not options_btn.pressed.is_connected(_on_options_button_pressed):
+		options_btn.pressed.connect(_on_options_button_pressed)
 
-	if quit_btn and not quit_btn.pressed.is_connected(_on_quit_pressed):
-		quit_btn.pressed.connect(_on_quit_pressed)
+	if quit_btn and not quit_btn.pressed.is_connected(_on_quit_button_pressed):
+		quit_btn.pressed.connect(_on_quit_button_pressed)
 
 	# Decorate Continue with latest save summary (nice UX)
 	if continue_btn and has_save:
@@ -125,6 +125,43 @@ func _ready() -> void:
 	_style_panel()
 	_style_title()
 	_style_buttons(new_btn, continue_btn, load_btn, options_btn, quit_btn)
+
+# ------------------------------------------------------------------------------
+# Button wrapper handlers (with fade out)
+# ------------------------------------------------------------------------------
+
+func _on_new_game_button_pressed() -> void:
+	"""Wrapper for New Game button - fades out then activates"""
+	await _fade_out_scene()
+	_on_new_game_pressed()
+
+func _on_continue_button_pressed() -> void:
+	"""Wrapper for Continue button - fades out then activates"""
+	await _fade_out_scene()
+	_on_continue_pressed()
+
+func _on_load_button_pressed() -> void:
+	"""Wrapper for Load button - fades out then activates"""
+	await _fade_out_scene()
+	_on_load_pressed()
+
+func _on_options_button_pressed() -> void:
+	"""Wrapper for Options button - fades out then activates"""
+	await _fade_out_scene()
+	_on_options_pressed()
+
+func _on_quit_button_pressed() -> void:
+	"""Wrapper for Quit button - fades out then activates"""
+	await _fade_out_scene()
+	_on_quit_pressed()
+
+func _fade_out_scene() -> void:
+	"""Fade out the entire scene"""
+	var tween = create_tween()
+	tween.set_ease(Tween.EASE_IN)
+	tween.set_trans(Tween.TRANS_CUBIC)
+	tween.tween_property(self, "modulate", Color(1.0, 1.0, 1.0, 0.0), 0.3)
+	await tween.finished
 
 # ------------------------------------------------------------------------------
 # Button handlers
@@ -468,9 +505,14 @@ func _input(event: InputEvent) -> void:
 			var button = navigable_buttons[selected_button_index]
 			# Mark input as handled BEFORE triggering button (scene may change)
 			get_viewport().set_input_as_handled()
-			# Trigger the button's pressed signal by emitting it
-			# Note: This may destroy this node if it changes scenes, so nothing after this line will execute
-			button.emit_signal("pressed")
+			# Fade out the scene before transitioning
+			_fade_out_and_activate(button)
+
+func _fade_out_and_activate(button: Button) -> void:
+	"""Fade out the entire scene before activating button"""
+	await _fade_out_scene()
+	# Trigger the button's pressed signal
+	button.emit_signal("pressed")
 
 func _navigate_menu(direction: int) -> void:
 	"""Navigate menu with controller"""
@@ -495,22 +537,66 @@ func _highlight_button(index: int) -> void:
 		btn.modulate = Color(1.0, 1.0, 1.0, 1.0)
 		btn.scale = Vector2.ONE
 
+		# Reset to normal styling
+		var btn_index = i
+		var colors = [COLOR_BUBBLE_MAGENTA, COLOR_SKY_CYAN, COLOR_ELECTRIC_LIME, COLOR_CITRUS_YELLOW, COLOR_INK_CHARCOAL]
+		var color = colors[btn_index % colors.size()]
+
+		var style_normal = StyleBoxFlat.new()
+		style_normal.bg_color = COLOR_NIGHT_NAVY
+		style_normal.border_color = color
+		style_normal.border_width_left = 2
+		style_normal.border_width_right = 2
+		style_normal.border_width_top = 2
+		style_normal.border_width_bottom = 2
+		style_normal.corner_radius_top_left = 20
+		style_normal.corner_radius_top_right = 20
+		style_normal.corner_radius_bottom_left = 20
+		style_normal.corner_radius_bottom_right = 20
+		style_normal.shadow_color = Color(color.r, color.g, color.b, 0.4)
+		style_normal.shadow_size = 4
+		btn.add_theme_stylebox_override("normal", style_normal)
+
+		# Reset font color to white
+		btn.add_theme_color_override("font_color", COLOR_MILK_WHITE)
+
 	# Now highlight the selected button
 	if index >= 0 and index < navigable_buttons.size():
 		var button = navigable_buttons[index]
 		button.grab_focus()
 
-		# Animate with elastic bounce
+		# Get button's border color
+		var colors = [COLOR_BUBBLE_MAGENTA, COLOR_SKY_CYAN, COLOR_ELECTRIC_LIME, COLOR_CITRUS_YELLOW, COLOR_INK_CHARCOAL]
+		var color = colors[index % colors.size()]
+
+		# Create highlighted style - background becomes border color, font becomes dark
+		var style_highlight = StyleBoxFlat.new()
+		style_highlight.bg_color = color  # Background is now the border color
+		style_highlight.border_color = color
+		style_highlight.border_width_left = 3
+		style_highlight.border_width_right = 3
+		style_highlight.border_width_top = 3
+		style_highlight.border_width_bottom = 3
+		style_highlight.corner_radius_top_left = 20
+		style_highlight.corner_radius_top_right = 20
+		style_highlight.corner_radius_bottom_left = 20
+		style_highlight.corner_radius_bottom_right = 20
+		style_highlight.shadow_color = Color(color.r, color.g, color.b, 0.8)
+		style_highlight.shadow_size = 12
+		button.add_theme_stylebox_override("normal", style_highlight)
+
+		# Change font color to Night Navy
+		button.add_theme_color_override("font_color", COLOR_NIGHT_NAVY)
+
+		# Animate with pulsing effect
 		var tween = create_tween()
-		tween.set_parallel(true)
-		tween.set_ease(Tween.EASE_OUT)
-		tween.set_trans(Tween.TRANS_BACK)
+		tween.set_loops()
+		tween.set_parallel(false)
 
-		# Scale up slightly with overshoot
-		tween.tween_property(button, "scale", Vector2(1.08, 1.08), 0.3)
-
-		# Brighten slightly
-		tween.tween_property(button, "modulate", Color(1.1, 1.1, 1.1, 1.0), 0.3)
+		# Pulse scale up
+		tween.tween_property(button, "scale", Vector2(1.05, 1.05), 0.6).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
+		# Pulse scale down
+		tween.tween_property(button, "scale", Vector2(1.0, 1.0), 0.6).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
 
 func _unhighlight_button(index: int) -> void:
 	"""Remove highlight from a button with smooth animation"""
