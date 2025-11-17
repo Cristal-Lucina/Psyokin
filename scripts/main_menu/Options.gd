@@ -130,6 +130,13 @@ func _process(delta: float) -> void:
 func _input(event: InputEvent) -> void:
 	"""Handle input for two-level navigation: tabs -> options"""
 
+	# Handle right joystick scrolling for scroll containers
+	if event is InputEventJoypadMotion:
+		if event.axis == JOY_AXIS_RIGHT_Y:
+			_handle_scroll_input(event.axis_value)
+			get_viewport().set_input_as_handled()
+			return
+
 	# STATE 1: TAB_PANEL - Navigate between tabs on left
 	if _nav_state == NavState.TAB_PANEL:
 		if event.is_action_pressed("ui_accept"):
@@ -182,6 +189,26 @@ func _input(event: InputEvent) -> void:
 # ==============================================================================
 # State Transition Functions
 # ==============================================================================
+
+func _handle_scroll_input(axis_value: float) -> void:
+	"""Handle right joystick scrolling for the active tab's scroll container"""
+	# Only scroll if we're in a tab with content
+	if not _tab_content.has(_current_tab):
+		return
+
+	var current_tab_node = _tab_content[_current_tab]
+	if not current_tab_node:
+		return
+
+	# Find the ScrollContainer (it's the root of each tab)
+	if current_tab_node is ScrollContainer:
+		var scroll_container = current_tab_node as ScrollContainer
+		var scroll_speed = 20.0  # Adjust this value to control scroll speed
+
+		# Apply deadzone to prevent drift
+		if abs(axis_value) > 0.2:
+			var scroll_amount = axis_value * scroll_speed
+			scroll_container.scroll_vertical += int(scroll_amount)
 
 func _enter_option_navigation() -> void:
 	"""STATE 1 -> 2: Enter content panel from tab panel"""
