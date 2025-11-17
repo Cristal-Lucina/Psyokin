@@ -1143,9 +1143,6 @@ func _confirm_target_selection() -> void:
 		awaiting_skill_selection = false
 		await _execute_skill_single(target)
 
-		# Wait for skill messages to be displayed
-		await _wait_for_message_queue()
-
 		# Check if battle is over
 		var battle_ended = await battle_mgr._check_battle_end()
 		if not battle_ended:
@@ -1156,9 +1153,6 @@ func _confirm_target_selection() -> void:
 		_clear_target_highlights()
 		awaiting_target_selection = false
 		await _execute_burst_on_target(target)
-
-		# Wait for burst messages to be displayed
-		await _wait_for_message_queue()
 
 		# Check if battle is over
 		var battle_ended = await battle_mgr._check_battle_end()
@@ -2301,6 +2295,10 @@ func _execute_attack(target: Dictionary) -> void:
 			add_turn_line("But it missed!")
 			add_turn_line("(Hit chance: %d%%, rolled %d)" % [int(hit_check.hit_chance), hit_check.roll])
 			queue_turn_message()  # Queue the full turn message
+
+			# Wait for messages to be displayed to player
+			await _wait_for_message_queue()
+
 			print("[Battle] Miss! Hit chance: %.1f%%, Roll: %d" % [hit_check.hit_chance, hit_check.roll])
 		else:
 			# Hit! Launch attack minigame
@@ -2412,6 +2410,9 @@ func _execute_attack(target: Dictionary) -> void:
 			# Queue the full turn message
 			queue_turn_message()
 
+			# Wait for messages to be displayed to player
+			await _wait_for_message_queue()
+
 			# Debug: show hit, crit, and damage breakdown
 			var hit_breakdown = hit_check.breakdown
 			var crit_breakdown = crit_check.breakdown
@@ -2451,9 +2452,6 @@ func _execute_attack(target: Dictionary) -> void:
 				await battle_mgr.refresh_turn_order()
 			elif turn_order_display:
 				turn_order_display.update_combatant_hp(target.id)
-
-	# Wait for attack messages to be displayed
-	await _wait_for_message_queue()
 
 	# Check if battle is over (all enemies defeated/captured)
 	var battle_ended = await battle_mgr._check_battle_end()
@@ -2934,6 +2932,9 @@ func _execute_item_usage(target: Dictionary) -> void:
 		add_turn_line("%s is protected by a %s Mirror! (Duration: %d rounds)" % [target.display_name, reflect_type.capitalize(), duration])
 		queue_turn_message()
 
+		# Wait for messages to be displayed to player
+		await _wait_for_message_queue()
+
 	# ═══════ BOMB ITEMS (AOE Damage) ═══════
 	elif "AOE" in effect or "Bomb" in item_name:
 		# Get bomb element from mind_type_tag
@@ -2982,6 +2983,9 @@ func _execute_item_usage(target: Dictionary) -> void:
 		for line in damage_lines:
 			add_turn_line(line)
 		queue_turn_message()
+
+		# Wait for messages to be displayed to player
+		await _wait_for_message_queue()
 
 		_update_combatant_displays()
 
@@ -3037,6 +3041,9 @@ func _execute_item_usage(target: Dictionary) -> void:
 
 		queue_turn_message()
 
+		# Wait for messages to be displayed to player
+		await _wait_for_message_queue()
+
 	# ═══════ BUFF ITEMS (ATK Up, MND Up, Shield, etc.) ═══════
 	elif "Up" in effect or "Shield" in effect or "Regen" in effect or "Speed" in effect or "Hit%" in effect or "Evasion%" in effect or "SkillHit%" in effect:
 		# Determine buff type and magnitude
@@ -3076,6 +3083,9 @@ func _execute_item_usage(target: Dictionary) -> void:
 			add_turn_line("%s used %s on %s!" % [current_combatant.display_name, item_name, target.display_name])
 			add_turn_line("%s gained %s for %d turns!" % [target.display_name, buff_type.replace("_", " ").capitalize(), duration])
 			queue_turn_message()
+
+			# Wait for messages to be displayed to player
+			await _wait_for_message_queue()
 
 			# Refresh turn order to show buff immediately
 			if battle_mgr:
@@ -3134,6 +3144,9 @@ func _execute_item_usage(target: Dictionary) -> void:
 			add_turn_line(cure_message)
 		queue_turn_message()
 
+		# Wait for messages to be displayed to player
+		await _wait_for_message_queue()
+
 	# ═══════ HEAL ITEMS ═══════
 	elif "Heal" in effect:
 		# Parse heal amount from effect string (e.g., "Heal 50 HP")
@@ -3187,6 +3200,9 @@ func _execute_item_usage(target: Dictionary) -> void:
 			add_turn_line("Restored %d MP!" % actual_heal)
 
 		queue_turn_message()
+
+		# Wait for messages to be displayed to player
+		await _wait_for_message_queue()
 
 		# Update displays
 		_update_combatant_displays()
@@ -3282,7 +3298,7 @@ func _execute_item_usage(target: Dictionary) -> void:
 		if battle_mgr:
 			battle_mgr.refresh_turn_order()
 
-	# Wait for item usage messages to be displayed
+	# Wait for ailment/debuff messages to be displayed (if any)
 	await _wait_for_message_queue()
 
 	# Consume the item
@@ -4045,6 +4061,9 @@ func _execute_enemy_ai() -> void:
 
 			# Queue the full turn message
 			queue_turn_message()
+
+			# Wait for messages to be displayed to player
+			await _wait_for_message_queue()
 
 			# Debug: show hit, crit, and damage breakdown
 			var hit_breakdown = hit_check.breakdown
@@ -6093,6 +6112,9 @@ func _execute_burst_on_target(target: Dictionary) -> void:
 
 	queue_turn_message()
 
+	# Wait for messages to be displayed to player
+	await _wait_for_message_queue()
+
 	# Update displays
 	_update_combatant_displays()
 	if target.is_ko:
@@ -6461,6 +6483,9 @@ func _execute_skill_single(target: Dictionary) -> void:
 
 	# Queue the full turn message
 	queue_turn_message()
+
+	# Wait for messages to be displayed to player
+	await _wait_for_message_queue()
 
 	# Update displays
 	_update_combatant_displays()
