@@ -1313,6 +1313,49 @@ func _can_anyone_benefit_from_recovery(item_def: Dictionary) -> bool:
 	# No one can benefit
 	return false
 
+func _show_full_health_message(item_def: Dictionary) -> void:
+	"""Show a message indicating everyone is already at full HP/MP"""
+	# Determine what the item heals
+	var effect: String = String(item_def.get("field_status_effect", ""))
+	if effect == "":
+		effect = String(item_def.get("battle_status_effect", ""))
+
+	var effect_lower: String = effect.to_lower()
+	var heals_hp: bool = effect_lower.contains("heal") and effect_lower.contains("hp")
+	var heals_mp: bool = effect_lower.contains("heal") and effect_lower.contains("mp")
+
+	# Build appropriate message
+	var message: String = ""
+	if heals_hp and heals_mp:
+		message = "Everyone is at full HP and MP!"
+	elif heals_hp:
+		message = "Everyone is at full HP!"
+	elif heals_mp:
+		message = "Everyone is at full MP!"
+	else:
+		message = "Everyone is already at full health!"
+
+	# Create CanvasLayer overlay for popup
+	var overlay := CanvasLayer.new()
+	overlay.layer = 100
+	overlay.process_mode = Node.PROCESS_MODE_ALWAYS
+	overlay.process_priority = -1000
+	get_tree().root.add_child(overlay)
+
+	# Create and show popup
+	var popup := ToastPopup.create(message, "")
+	popup.process_mode = Node.PROCESS_MODE_ALWAYS
+	overlay.add_child(popup)
+
+	# Wait for user response
+	await popup.confirmed
+
+	# Clean up
+	if is_instance_valid(popup):
+		popup.queue_free()
+	if is_instance_valid(overlay):
+		overlay.queue_free()
+
 func _show_member_selection_popup() -> void:
 	"""Show popup to select which party member to use item on - matches StatusPanel pattern"""
 	if _selected_item_id == "":
@@ -1324,6 +1367,8 @@ func _show_member_selection_popup() -> void:
 	# Check if anyone can benefit from this recovery item
 	if not _can_anyone_benefit_from_recovery(def):
 		print("[ItemsPanel] No one can benefit from %s" % item_name)
+		# Show message about why item can't be used
+		await _show_full_health_message(def)
 		return  # Don't show the popup
 
 	print("[ItemsPanel] Showing member selection popup for: %s" % item_name)
