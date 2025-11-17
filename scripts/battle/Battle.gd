@@ -1324,7 +1324,6 @@ func _on_battle_ended(victory: bool) -> void:
 	"""Called when battle ends"""
 	if victory:
 		log_message("*** VICTORY ***")
-		log_message("All enemies have been defeated!")
 
 		# Wait for all messages to be displayed and acknowledged before showing victory screen
 		await _wait_for_message_queue()
