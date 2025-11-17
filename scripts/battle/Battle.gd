@@ -330,6 +330,21 @@ func _update_button_icons() -> void:
 				# Add some spacing between icon and text
 				btn.add_theme_constant_override("h_separation", 8)
 
+	# Add RB icon to switch button
+	if switch_button and switch_button is Button:
+		var icon_texture = icon_layout.get_button_icon("r_bumper")  # RB / R1
+		if icon_texture:
+			# Resize icon to 25x25 pixels
+			var image = icon_texture.get_image()
+			image.resize(25, 25, Image.INTERPOLATE_LANCZOS)
+			var scaled_texture = ImageTexture.create_from_image(image)
+
+			switch_button.icon = scaled_texture
+			switch_button.icon_alignment = HORIZONTAL_ALIGNMENT_LEFT
+			switch_button.expand_icon = false
+			# Add some spacing between icon and text
+			switch_button.add_theme_constant_override("h_separation", 8)
+
 func _on_controller_type_changed(new_type: String) -> void:
 	"""Update button icons when controller type changes"""
 	print("[Battle] Controller type changed to: %s, updating button icons..." % new_type)
