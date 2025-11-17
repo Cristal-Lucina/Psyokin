@@ -70,10 +70,6 @@ var _mission_dark_box: PanelContainer = null
 @onready var _reward_label: Label = %RewardLabel
 @onready var _status_label: Label = %StatusLabel
 
-@onready var _primary_btn: Button = %PrimaryBtn
-@onready var _back_btn: Button = %BackBtn
-# @onready var _advance_btn: Button = %AdvanceBtn  # Removed from scene
-
 ## ═══════════════════════════════════════════════════════════════════════════
 ## STATE MACHINE
 ## ═══════════════════════════════════════════════════════════════════════════
@@ -138,11 +134,6 @@ func _wire_signals() -> void:
 		_mission_list.item_selected.connect(_on_mission_selected)
 
 	# Action buttons
-	if _primary_btn and not _primary_btn.pressed.is_connected(_on_primary_action):
-		_primary_btn.pressed.connect(_on_primary_action)
-
-	if _back_btn and not _back_btn.pressed.is_connected(_on_back_from_details):
-		_back_btn.pressed.connect(_on_back_from_details)
 
 	# if _advance_btn and not _advance_btn.pressed.is_connected(_on_advance_event):
 	# 	_advance_btn.pressed.connect(_on_advance_event)  # Button removed from scene
@@ -231,15 +222,6 @@ func _apply_core_vibe_styling() -> void:
 	if _status_label:
 		aCoreVibeTheme.style_label(_status_label, aCoreVibeTheme.COLOR_CITRUS_YELLOW, 14)
 
-	# Style action buttons
-	if _primary_btn:
-		aCoreVibeTheme.style_button(_primary_btn, aCoreVibeTheme.COLOR_ELECTRIC_LIME, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
-		_primary_btn.custom_minimum_size = Vector2(120, 36)
-
-	if _back_btn:
-		aCoreVibeTheme.style_button(_back_btn, aCoreVibeTheme.COLOR_SKY_CYAN, aCoreVibeTheme.CORNER_RADIUS_MEDIUM)
-		_back_btn.custom_minimum_size = Vector2(120, 36)
-
 	# Style category list like BondsPanel
 	if _category_list:
 		_category_list.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_MILK_WHITE)
@@ -271,101 +253,6 @@ func _apply_core_vibe_styling() -> void:
 		_mission_list.add_theme_stylebox_override("selected_focus", empty_stylebox2)
 		_mission_list.add_theme_stylebox_override("cursor", empty_stylebox2)
 		_mission_list.add_theme_stylebox_override("cursor_unfocused", empty_stylebox2)
-
-	# Style action buttons with focus states and pulse
-	if _primary_btn:
-		# Normal state: Outlined Electric Lime with transparent background
-		var primary_style_normal = StyleBoxFlat.new()
-		primary_style_normal.bg_color = Color(0, 0, 0, 0)
-		primary_style_normal.border_color = aCoreVibeTheme.COLOR_ELECTRIC_LIME
-		primary_style_normal.border_width_left = 2
-		primary_style_normal.border_width_right = 2
-		primary_style_normal.border_width_top = 2
-		primary_style_normal.border_width_bottom = 2
-		primary_style_normal.corner_radius_top_left = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
-		primary_style_normal.corner_radius_top_right = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
-		primary_style_normal.corner_radius_bottom_left = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
-		primary_style_normal.corner_radius_bottom_right = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
-		primary_style_normal.content_margin_left = 12
-		primary_style_normal.content_margin_right = 12
-		primary_style_normal.content_margin_top = 8
-		primary_style_normal.content_margin_bottom = 8
-
-		# Focus state: Filled Electric Lime background
-		var primary_style_focus = StyleBoxFlat.new()
-		primary_style_focus.bg_color = aCoreVibeTheme.COLOR_ELECTRIC_LIME
-		primary_style_focus.corner_radius_top_left = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
-		primary_style_focus.corner_radius_top_right = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
-		primary_style_focus.corner_radius_bottom_left = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
-		primary_style_focus.corner_radius_bottom_right = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
-		primary_style_focus.content_margin_left = 12
-		primary_style_focus.content_margin_right = 12
-		primary_style_focus.content_margin_top = 8
-		primary_style_focus.content_margin_bottom = 8
-
-		_primary_btn.add_theme_stylebox_override("normal", primary_style_normal)
-		_primary_btn.add_theme_stylebox_override("hover", primary_style_normal.duplicate())
-		_primary_btn.add_theme_stylebox_override("pressed", primary_style_normal.duplicate())
-		_primary_btn.add_theme_stylebox_override("focus", primary_style_focus)
-
-		_primary_btn.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_ELECTRIC_LIME)
-		_primary_btn.add_theme_color_override("font_hover_color", aCoreVibeTheme.COLOR_ELECTRIC_LIME)
-		_primary_btn.add_theme_color_override("font_pressed_color", aCoreVibeTheme.COLOR_ELECTRIC_LIME)
-		_primary_btn.add_theme_color_override("font_focus_color", aCoreVibeTheme.COLOR_NIGHT_NAVY)
-		_primary_btn.custom_minimum_size = Vector2(120, 36)
-
-		# Connect focus signals for pulse
-		if not _primary_btn.focus_entered.is_connected(_on_button_focus_entered):
-			_primary_btn.focus_entered.connect(_on_button_focus_entered.bind(_primary_btn))
-		if not _primary_btn.focus_exited.is_connected(_on_button_focus_exited):
-			_primary_btn.focus_exited.connect(_on_button_focus_exited)
-
-	if _back_btn:
-		# Normal state: Outlined Sky Cyan with transparent background
-		var back_style_normal = StyleBoxFlat.new()
-		back_style_normal.bg_color = Color(0, 0, 0, 0)
-		back_style_normal.border_color = aCoreVibeTheme.COLOR_SKY_CYAN
-		back_style_normal.border_width_left = 2
-		back_style_normal.border_width_right = 2
-		back_style_normal.border_width_top = 2
-		back_style_normal.border_width_bottom = 2
-		back_style_normal.corner_radius_top_left = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
-		back_style_normal.corner_radius_top_right = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
-		back_style_normal.corner_radius_bottom_left = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
-		back_style_normal.corner_radius_bottom_right = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
-		back_style_normal.content_margin_left = 12
-		back_style_normal.content_margin_right = 12
-		back_style_normal.content_margin_top = 8
-		back_style_normal.content_margin_bottom = 8
-
-		# Focus state: Filled Sky Cyan background
-		var back_style_focus = StyleBoxFlat.new()
-		back_style_focus.bg_color = aCoreVibeTheme.COLOR_SKY_CYAN
-		back_style_focus.corner_radius_top_left = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
-		back_style_focus.corner_radius_top_right = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
-		back_style_focus.corner_radius_bottom_left = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
-		back_style_focus.corner_radius_bottom_right = aCoreVibeTheme.CORNER_RADIUS_MEDIUM
-		back_style_focus.content_margin_left = 12
-		back_style_focus.content_margin_right = 12
-		back_style_focus.content_margin_top = 8
-		back_style_focus.content_margin_bottom = 8
-
-		_back_btn.add_theme_stylebox_override("normal", back_style_normal)
-		_back_btn.add_theme_stylebox_override("hover", back_style_normal.duplicate())
-		_back_btn.add_theme_stylebox_override("pressed", back_style_normal.duplicate())
-		_back_btn.add_theme_stylebox_override("focus", back_style_focus)
-
-		_back_btn.add_theme_color_override("font_color", aCoreVibeTheme.COLOR_SKY_CYAN)
-		_back_btn.add_theme_color_override("font_hover_color", aCoreVibeTheme.COLOR_SKY_CYAN)
-		_back_btn.add_theme_color_override("font_pressed_color", aCoreVibeTheme.COLOR_SKY_CYAN)
-		_back_btn.add_theme_color_override("font_focus_color", aCoreVibeTheme.COLOR_NIGHT_NAVY)
-		_back_btn.custom_minimum_size = Vector2(120, 36)
-
-		# Connect focus signals for pulse
-		if not _back_btn.focus_entered.is_connected(_on_button_focus_entered):
-			_back_btn.focus_entered.connect(_on_button_focus_entered.bind(_back_btn))
-		if not _back_btn.focus_exited.is_connected(_on_button_focus_exited):
-			_back_btn.focus_exited.connect(_on_button_focus_exited)
 
 	_enter_category_select_state()
 
@@ -471,6 +358,8 @@ func _refresh_mission_list(category: String) -> void:
 	if _mission_data.size() > 0:
 		_mission_list.select(0)
 		_on_mission_selected(0)
+		# Update arrow position to follow the selection
+		call_deferred("_update_mission_arrow_position")
 	else:
 		_show_empty_details()
 
@@ -590,9 +479,6 @@ func _show_mission_details(mission: Dictionary) -> void:
 	# Status
 	_status_label.text = "Status: " + status
 
-	# Update action buttons
-	_update_action_buttons(mission)
-
 func _show_empty_details() -> void:
 	"""Show empty state in detail panel"""
 	_title_label.text = "No missions available"
@@ -601,25 +487,7 @@ func _show_empty_details() -> void:
 	_desc_label.visible = false
 	_reward_label.visible = false
 	_status_label.text = ""
-	_primary_btn.visible = false
-	_back_btn.visible = true
 	_selected_mission = {}
-
-func _update_action_buttons(mission: Dictionary) -> void:
-	"""Update action button labels and visibility"""
-	var is_current = mission.get("current", false)
-
-	if is_current:
-		# Current mission - show Advance button
-		_primary_btn.text = "Advance"
-		_primary_btn.tooltip_text = "Advance this mission"
-	else:
-		# Available mission - show Set Current button
-		_primary_btn.text = "Set Current"
-		_primary_btn.tooltip_text = "Set as current mission"
-
-	_primary_btn.visible = true
-	_back_btn.visible = true
 
 ## ═══════════════════════════════════════════════════════════════════════════
 ## TEXT SCROLLING ANIMATION
@@ -802,10 +670,6 @@ func _advance_current_mission() -> void:
 func _on_advance_event() -> void:
 	"""Debug button - advance current mission"""
 	_advance_current_mission()
-
-func _on_back_from_details() -> void:
-	"""Back button in details - return focus to mission list"""
-	_enter_mission_list_state()
 
 ## ═══════════════════════════════════════════════════════════════════════════
 ## SIGNAL HANDLERS
