@@ -1312,16 +1312,20 @@ func _animate_turn_indicator(combatant_id: String) -> void:
 func _reset_turn_indicator() -> void:
 	"""Reset the turn indicator animation"""
 	if active_turn_panel and is_instance_valid(active_turn_panel):
+		# Store panel reference locally before clearing
+		var panel_to_reset = active_turn_panel
+		var original_pos = active_turn_original_pos
+
+		# Clear the active reference immediately
+		active_turn_panel = null
+
 		# Animate back to original position
 		var tween = create_tween()
 		tween.set_trans(Tween.TRANS_CUBIC)
 		tween.set_ease(Tween.EASE_IN)
 		tween.set_parallel(true)
-		tween.tween_property(active_turn_panel, "offset_left", active_turn_original_pos.x, 0.2)
-		tween.tween_property(active_turn_panel, "offset_right", active_turn_original_pos.y, 0.2)
-		await tween.finished
-
-		active_turn_panel = null
+		tween.tween_property(panel_to_reset, "offset_left", original_pos.x, 0.2)
+		tween.tween_property(panel_to_reset, "offset_right", original_pos.y, 0.2)
 
 func _on_turn_ended(_combatant_id: String) -> void:
 	"""Called when a combatant's turn ends"""
