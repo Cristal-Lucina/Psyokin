@@ -1013,10 +1013,10 @@ func _input(event: InputEvent) -> void:
 
 	# If awaiting target selection, handle navigation
 	if awaiting_target_selection and not target_candidates.is_empty():
-		if event.is_action_pressed(aInputManager.ACTION_MOVE_LEFT):
+		if event.is_action_pressed(aInputManager.ACTION_MOVE_UP):
 			_navigate_targets(-1)
 			get_viewport().set_input_as_handled()
-		elif event.is_action_pressed(aInputManager.ACTION_MOVE_RIGHT):
+		elif event.is_action_pressed(aInputManager.ACTION_MOVE_DOWN):
 			_navigate_targets(1)
 			get_viewport().set_input_as_handled()
 		elif event.is_action_pressed(aInputManager.ACTION_ACCEPT):
@@ -1374,11 +1374,11 @@ func _show_victory_screen() -> void:
 	# Get rewards data from battle manager
 	var rewards = battle_mgr.battle_rewards
 
-	# Rewards display (scrollable) - increased width for 2 columns
+	# Rewards display (no scrolling) - increased width for 2 columns
 	var rewards_scroll = ScrollContainer.new()
-	rewards_scroll.custom_minimum_size = Vector2(660, 200)  # Wider for 2 columns
+	rewards_scroll.custom_minimum_size = Vector2(660, 450)  # Taller to fit all content without scrolling
 	rewards_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	rewards_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	rewards_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED  # No vertical scrolling
 	content_vbox.add_child(rewards_scroll)
 
 	# Store reference for controller scrolling
@@ -5510,7 +5510,7 @@ func _show_capture_menu(bind_items: Array) -> void:
 	add_child(capture_menu_panel)
 	capture_menu_panel.position = Vector2(
 		(get_viewport_rect().size.x - 500) / 2,
-		(get_viewport_rect().size.y - 400) / 2 - 145  # Moved down 35px total (was -150, then -165)
+		(get_viewport_rect().size.y - 400) / 2 - 137  # Moved down 43px total (was -150, then -165, now -137)
 	)
 
 	# Highlight first item if available
