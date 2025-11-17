@@ -784,23 +784,37 @@ func _style_panel() -> void:
 
 func _style_title() -> void:
 	"""Apply Core Vibe styling to PSYOKIN title"""
-	var title = get_node_or_null("Center/Frame/Root/TitleLabel")
+	# Try unique name first, then path
+	var title = get_node_or_null("%TitleLabel")
+	if not title:
+		title = get_node_or_null("Center/Frame/Root/TitleLabel")
 	if not title or not title is Label:
 		return
 
 	var label = title as Label
+
+	# Make the title MASSIVE and fancy
+	label.add_theme_font_size_override("font_size", 96)  # Even bigger!
+
+	# Gradient-like effect using bubble magenta with bright glow
 	label.add_theme_color_override("font_color", COLOR_BUBBLE_MAGENTA)
-	label.add_theme_font_size_override("font_size", 72)  # Increased from 48
 
-	# Add white outline glow (thicker and more prominent)
+	# Thick white outline for contrast
 	label.add_theme_color_override("font_outline_color", COLOR_MILK_WHITE)
-	label.add_theme_constant_override("outline_size", 8)  # Increased from 4
+	label.add_theme_constant_override("outline_size", 12)  # Very thick outline
 
-	# Add shadow for depth
-	label.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.6))
-	label.add_theme_constant_override("shadow_offset_x", 4)
-	label.add_theme_constant_override("shadow_offset_y", 4)
-	label.add_theme_constant_override("shadow_outline_size", 6)
+	# Deep shadow for 3D depth effect
+	label.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.8))
+	label.add_theme_constant_override("shadow_offset_x", 6)
+	label.add_theme_constant_override("shadow_offset_y", 6)
+	label.add_theme_constant_override("shadow_outline_size", 8)
+
+	# Add a subtle pulsing glow animation
+	var pulse_tween = create_tween()
+	pulse_tween.set_loops()
+	pulse_tween.set_parallel(false)
+	pulse_tween.tween_property(label, "scale", Vector2(1.05, 1.05), 2.0).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
+	pulse_tween.tween_property(label, "scale", Vector2(1.0, 1.0), 2.0).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
 
 func _style_buttons(new_btn: Button, continue_btn: Button, load_btn: Button, options_btn: Button, quit_btn: Button) -> void:
 	"""Apply pill capsule styling to all buttons"""
