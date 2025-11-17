@@ -1414,6 +1414,14 @@ func _build_action_rows(parent: VBoxContainer) -> void:
 		# Create the action if it doesn't exist
 		if not InputMap.has_action(action_def["name"]):
 			InputMap.add_action(action_def["name"])
+
+			# Add default bindings for new actions
+			if action_def["name"] == "battle_switch":
+				# Switch Menu uses R shoulder button
+				var joy_event = InputEventJoypadButton.new()
+				joy_event.button_index = JOY_BUTTON_RIGHT_SHOULDER
+				InputMap.action_add_event(action_def["name"], joy_event)
+
 		var row = _create_action_row(action_def["name"], action_def["display"])
 		parent.add_child(row)
 		battle_count += 1
