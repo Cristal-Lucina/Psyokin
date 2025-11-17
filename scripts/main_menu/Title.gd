@@ -789,8 +789,8 @@ func _spawn_single_meteor() -> void:
 	var meteor_container = Node2D.new()
 	meteor_layer.add_child(meteor_container)
 
-	# Rotate meteor about -30 degrees for diagonal orientation
-	meteor_container.rotation = deg_to_rad(-30)
+	# Rotate meteor about -50 degrees for steeper diagonal orientation
+	meteor_container.rotation = deg_to_rad(-50)
 
 	# Start from random position on the right or top edge
 	var viewport_size = get_viewport_rect().size
@@ -819,8 +819,8 @@ func _spawn_single_meteor() -> void:
 	meteor.color = colors[randi() % colors.size()]
 	meteor_container.add_child(meteor)
 
-	# Create glowing trail particles
-	var trail_count = randi_range(8, 15)
+	# Create glowing trail particles - longer trail
+	var trail_count = randi_range(12, 20)  # More particles for longer trail
 	for i in range(trail_count):
 		var trail = ColorRect.new()
 		var trail_size = size * randf_range(0.4, 0.8) * (1.0 - float(i) / trail_count)
@@ -831,8 +831,8 @@ func _spawn_single_meteor() -> void:
 		var alpha = 0.8 * (1.0 - float(i) / trail_count)
 		trail.color = Color(meteor.color.r, meteor.color.g, meteor.color.b, alpha)
 
-		# Position trail particles behind the meteor head
-		trail.position = Vector2(i * size * 0.3, i * size * 0.15)
+		# Position trail particles behind the meteor head - doubled spacing for longer trail
+		trail.position = Vector2(i * size * 0.6, i * size * 0.3)
 		meteor_container.add_child(trail)
 
 	# Animate meteor flying diagonally across screen
