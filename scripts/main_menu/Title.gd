@@ -167,12 +167,9 @@ func _on_quit_button_pressed() -> void:
 	_on_quit_pressed()
 
 func _fade_out_scene() -> void:
-	"""Fade out the entire scene"""
-	var tween = create_tween()
-	tween.set_ease(Tween.EASE_IN)
-	tween.set_trans(Tween.TRANS_CUBIC)
-	tween.tween_property(self, "modulate", Color(1.0, 1.0, 1.0, 0.0), 0.3)
-	await tween.finished
+	"""Fade out the entire scene - disabled for instant transitions"""
+	# No fade effect - transition immediately
+	await get_tree().process_frame
 
 # ------------------------------------------------------------------------------
 # Button handlers
