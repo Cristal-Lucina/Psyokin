@@ -1146,7 +1146,7 @@ func _confirm_target_selection() -> void:
 		# Check if battle is over
 		var battle_ended = await battle_mgr._check_battle_end()
 		if not battle_ended:
-			_reset_turn_indicator()  # Slide back before ending turn
+			await _reset_turn_indicator()  # Slide back before ending turn
 			battle_mgr.end_turn()
 	elif not selected_burst.is_empty():
 		# Using a burst ability (single target)
@@ -1157,7 +1157,7 @@ func _confirm_target_selection() -> void:
 		# Check if battle is over
 		var battle_ended = await battle_mgr._check_battle_end()
 		if not battle_ended:
-			_reset_turn_indicator()  # Slide back before ending turn
+			await _reset_turn_indicator()  # Slide back before ending turn
 			battle_mgr.end_turn()
 	else:
 		# Regular attack
@@ -1238,7 +1238,7 @@ func _on_turn_started(combatant_id: String) -> void:
 		# Wait a moment for readability
 		await _wait_for_message_queue()
 		# Slide back before ending turn
-		_reset_turn_indicator()
+		await _reset_turn_indicator()
 		# End turn immediately
 		battle_mgr.end_turn()
 		return
@@ -1279,7 +1279,7 @@ func _on_turn_started(combatant_id: String) -> void:
 func _animate_turn_indicator(combatant_id: String) -> void:
 	"""Animate the active combatant's panel to indicate their turn"""
 	# Reset previous animation if any
-	_reset_turn_indicator()
+	await _reset_turn_indicator()
 
 	# Find the panel for this combatant
 	if not combatant_panels.has(combatant_id):
@@ -1314,7 +1314,7 @@ func _animate_turn_indicator(combatant_id: String) -> void:
 	tween.tween_property(active_turn_panel, "offset_right", target_offset_right, 0.3)
 
 func _reset_turn_indicator() -> void:
-	"""Reset the turn indicator animation"""
+	"""Reset the turn indicator animation (awaitable to wait for completion)"""
 	if active_turn_panel and is_instance_valid(active_turn_panel):
 		# Store panel reference locally before clearing
 		var panel_to_reset = active_turn_panel
@@ -1331,10 +1331,13 @@ func _reset_turn_indicator() -> void:
 		tween.tween_property(panel_to_reset, "offset_left", original_pos.x, 0.2)
 		tween.tween_property(panel_to_reset, "offset_right", original_pos.y, 0.2)
 
+		# Wait for animation to complete
+		await tween.finished
+
 func _on_turn_ended(_combatant_id: String) -> void:
 	"""Called when a combatant's turn ends"""
 	# Reset turn indicator animation
-	_reset_turn_indicator()
+	await _reset_turn_indicator()
 
 	# Clear active button visual feedback
 	_clear_active_action_button()
@@ -1693,7 +1696,7 @@ func _check_freeze_action_allowed() -> bool:
 			current_combatant.display_name, ailment_name, success_chance, roll
 		])
 		# Slide back before ending turn
-		_reset_turn_indicator()
+		await _reset_turn_indicator()
 		# End turn without acting
 		battle_mgr.end_turn()
 		return false
@@ -2460,7 +2463,7 @@ func _execute_attack(target: Dictionary) -> void:
 		return  # Battle ended
 
 	# Slide back before ending turn
-	_reset_turn_indicator()
+	await _reset_turn_indicator()
 
 	# End turn
 	battle_mgr.end_turn()
@@ -3306,7 +3309,7 @@ func _execute_item_usage(target: Dictionary) -> void:
 	inventory.remove_item(item_id, 1)
 
 	# Slide back before ending turn
-	_reset_turn_indicator()
+	await _reset_turn_indicator()
 
 	# End turn
 	battle_mgr.end_turn()
@@ -3489,7 +3492,7 @@ func _execute_run() -> void:
 		await _wait_for_message_queue()
 
 		# Slide back before ending turn
-		_reset_turn_indicator()
+		await _reset_turn_indicator()
 
 		battle_mgr.end_turn()
 
