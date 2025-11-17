@@ -99,6 +99,12 @@ var input_cooldown_duration: float = 0.15  # 150ms between inputs
 var action_cooldown: float = 0.0  # Cooldown for action button presses (FIGHT/SKILL/etc)
 var action_cooldown_duration: float = 1.0  # 1 second between action button presses
 
+# Message queue system (Pokemon-style message display)
+var message_queue: Array[String] = []  # Queue of messages to display
+var is_displaying_message: bool = false  # True when waiting for player to continue
+var continue_indicator: Label = null  # Visual indicator for "Press A to continue"
+var continue_indicator_tween: Tween = null  # Tween for blinking animation
+
 func _ready() -> void:
 	print("[Battle] Battle scene loaded")
 
@@ -119,12 +125,22 @@ func _ready() -> void:
 
 	# Apply neon-kawaii style to action buttons
 	_style_action_buttons()
+	_update_button_icons()
+
+	# Connect to controller type changed signal to update icons dynamically
+	if has_node("/root/aControllerIconLayout"):
+		var icon_layout = get_node("/root/aControllerIconLayout")
+		if not icon_layout.controller_type_changed.is_connected(_on_controller_type_changed):
+			icon_layout.controller_type_changed.connect(_on_controller_type_changed)
 
 	# Apply neon-kawaii style to panels
 	_style_panels()
 
 	# Create instruction popup
 	_create_instruction_popup()
+
+	# Create continue indicator for message queue
+	_create_continue_indicator()
 
 	# Load skill definitions
 	_load_skills()
@@ -286,6 +302,88 @@ func _style_action_buttons() -> void:
 
 			# Apply diagonal tilt (10-18 degrees) using rotation
 			btn.rotation_degrees = randf_range(-3, 3)  # Subtle variation per button
+
+func _update_button_icons() -> void:
+	"""Add controller button icons to the left of each battle action button"""
+	var icon_layout = get_node_or_null("/root/aControllerIconLayout")
+	if not icon_layout:
+		print("[Battle] aControllerIconLayout not found, skipping button icons")
+		return
+
+	var controller_type = icon_layout.get_controller_type()
+	print("[Battle] Updating button icons for controller type: %s" % controller_type)
+
+	# Map each battle button to its controller button action
+	# Different layouts for different controllers due to button position differences
+	var button_icon_mappings = []
+
+	if controller_type == "nintendo":
+		# Nintendo layout: Fight/Status=(A), Capture/Item=(B), Guard/Run=(Y), Skill/Burst=(X)
+		# Note: Nintendo swaps A/B compared to Xbox, so "back" gives A and "accept" gives B
+		button_icon_mappings = [
+			{"button": "AttackButton", "icon_action": "back"},          # A (right) - Fight
+			{"button": "StatusButton", "icon_action": "back"},          # A (right) - Status
+			{"button": "CaptureButton", "icon_action": "accept"},       # B (bottom) - Capture
+			{"button": "ItemButton", "icon_action": "accept"},          # B (bottom) - Item
+			{"button": "DefendButton", "icon_action": "special_1"},     # Y (left) - Guard
+			{"button": "RunButton", "icon_action": "special_1"},        # Y (left) - Run
+			{"button": "SkillButton", "icon_action": "special_2"},      # X (top) - Skill
+			{"button": "BurstButton", "icon_action": "special_2"},      # X (top) - Burst
+		]
+	else:
+		# Xbox/PlayStation layout: Fight/Status=(B), Capture/Item=(A), Guard/Run=(X), Skill/Burst=(Y)
+		button_icon_mappings = [
+			{"button": "AttackButton", "icon_action": "back"},          # B / Circle - Fight
+			{"button": "StatusButton", "icon_action": "back"},          # B / Circle - Status
+			{"button": "CaptureButton", "icon_action": "accept"},       # A / Cross - Capture
+			{"button": "ItemButton", "icon_action": "accept"},          # A / Cross - Item
+			{"button": "DefendButton", "icon_action": "special_1"},     # X / Square - Guard
+			{"button": "RunButton", "icon_action": "special_1"},        # X / Square - Run
+			{"button": "SkillButton", "icon_action": "special_2"},      # Y / Triangle - Skill
+			{"button": "BurstButton", "icon_action": "special_2"},      # Y / Triangle - Burst
+		]
+
+	for mapping in button_icon_mappings:
+		var btn = action_menu.get_node_or_null(mapping["button"])
+		if btn and btn is Button:
+			# Clear existing icon to force refresh
+			btn.icon = null
+
+			var icon_texture = icon_layout.get_button_icon(mapping["icon_action"])
+			if icon_texture:
+				# Resize icon to 25x25 pixels
+				var image = icon_texture.get_image()
+				image.resize(25, 25, Image.INTERPOLATE_LANCZOS)
+				var scaled_texture = ImageTexture.create_from_image(image)
+
+				btn.icon = scaled_texture
+				btn.icon_alignment = HORIZONTAL_ALIGNMENT_LEFT
+				btn.expand_icon = false
+				# Add some spacing between icon and text
+				btn.add_theme_constant_override("h_separation", 8)
+
+	# Add RB icon to switch button
+	if switch_button and switch_button is Button:
+		# Clear existing icon to force refresh
+		switch_button.icon = null
+
+		var icon_texture = icon_layout.get_button_icon("r_bumper")  # RB / R1
+		if icon_texture:
+			# Resize icon to 25x25 pixels
+			var image = icon_texture.get_image()
+			image.resize(25, 25, Image.INTERPOLATE_LANCZOS)
+			var scaled_texture = ImageTexture.create_from_image(image)
+
+			switch_button.icon = scaled_texture
+			switch_button.icon_alignment = HORIZONTAL_ALIGNMENT_LEFT
+			switch_button.expand_icon = false
+			# Add some spacing between icon and text
+			switch_button.add_theme_constant_override("h_separation", 8)
+
+func _on_controller_type_changed(new_type: String) -> void:
+	"""Update button icons when controller type changes"""
+	print("[Battle] Controller type changed to: %s, updating button icons..." % new_type)
+	_update_button_icons()
 
 func _create_diagonal_background() -> void:
 	"""Create neon-kawaii diagonal band background with grid overlay"""
@@ -528,6 +626,14 @@ func _input(event: InputEvent) -> void:
 	"""Handle keyboard/controller input for battle actions and target selection"""
 	# Note: Input processing is disabled until battle is fully initialized
 	# This function only runs after set_process_input(true) is called in _ready()
+
+	# CRITICAL: Handle message queue continuation FIRST (Pokemon-style)
+	# This blocks all other input while messages are displaying
+	if is_displaying_message:
+		if event.is_action_pressed(aInputManager.ACTION_ACCEPT):
+			_continue_to_next_message()
+			get_viewport().set_input_as_handled()
+		return
 
 	# If victory screen is showing, handle scrolling and accept
 	if victory_panel != null:
@@ -3706,12 +3812,41 @@ func _update_burst_gauge() -> void:
 		tween.tween_property(burst_gauge_bar, "value", battle_mgr.burst_gauge, 0.8)
 
 func log_message(message: String) -> void:
-	"""Add a message to the battle log"""
+	"""Add a message to the message queue for Pokemon-style display"""
+	message_queue.append(message)
+	print("[Battle] Queued: " + message)
+
+	# Start processing queue if not already displaying
+	if not is_displaying_message:
+		_display_next_message()
+
+func _display_next_message() -> void:
+	"""Display the next message in the queue"""
+	if message_queue.is_empty():
+		is_displaying_message = false
+		_hide_continue_indicator()
+		return
+
+	is_displaying_message = true
+
+	# Get next message
+	var message = message_queue.pop_front()
+
+	# Clear battle log and display new message
 	if battle_log:
-		battle_log.append_text(message + "\n")
-		# Auto-scroll to bottom
-		battle_log.scroll_to_line(battle_log.get_line_count() - 1)
-	print("[Battle] " + message)
+		battle_log.clear()
+		battle_log.append_text(message)
+
+	# Show continue indicator
+	_show_continue_indicator()
+
+func _continue_to_next_message() -> void:
+	"""Continue to next message when player presses accept"""
+	if not is_displaying_message:
+		return
+
+	# Display next message
+	_display_next_message()
 
 func _create_instruction_popup() -> void:
 	"""Create the instruction message popup that appears above battle log"""
@@ -3788,6 +3923,50 @@ func _hide_instruction() -> void:
 	tween.set_trans(Tween.TRANS_BACK)
 	tween.tween_property(instruction_popup, "position:y", get_viewport().get_visible_rect().size.y - 200, 0.2)
 	tween.tween_property(instruction_popup, "modulate:a", 0.0, 0.15)
+
+func _create_continue_indicator() -> void:
+	"""Create the 'Press A to continue' indicator"""
+	continue_indicator = Label.new()
+	continue_indicator.text = "▼"  # Down arrow
+	continue_indicator.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	continue_indicator.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
+	continue_indicator.add_theme_color_override("font_color", COLOR_ELECTRIC_LIME)
+	continue_indicator.add_theme_font_size_override("font_size", 20)
+
+	# Position in bottom-right corner of battle log panel
+	# BattleLogPanel: offset_left=360, offset_top=-200, offset_right=920, offset_bottom=-50
+	continue_indicator.position = Vector2(880, get_viewport().get_visible_rect().size.y - 70)
+	continue_indicator.size = Vector2(30, 20)
+	continue_indicator.modulate.a = 0.0  # Start invisible
+
+	add_child(continue_indicator)
+
+func _show_continue_indicator() -> void:
+	"""Show the continue indicator with blinking animation"""
+	if not continue_indicator:
+		return
+
+	# Kill any existing tween
+	if continue_indicator_tween:
+		continue_indicator_tween.kill()
+
+	# Create blinking animation
+	continue_indicator_tween = create_tween()
+	continue_indicator_tween.set_loops()
+	continue_indicator_tween.tween_property(continue_indicator, "modulate:a", 1.0, 0.5).set_ease(Tween.EASE_IN_OUT)
+	continue_indicator_tween.tween_property(continue_indicator, "modulate:a", 0.3, 0.5).set_ease(Tween.EASE_IN_OUT)
+
+func _hide_continue_indicator() -> void:
+	"""Hide the continue indicator"""
+	if not continue_indicator:
+		return
+
+	# Kill any existing tween
+	if continue_indicator_tween:
+		continue_indicator_tween.kill()
+		continue_indicator_tween = null
+
+	continue_indicator.modulate.a = 0.0
 
 func _show_miss_feedback() -> void:
 	"""Show big MISS text in center of screen that fades away in 0.5 seconds"""

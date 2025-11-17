@@ -60,6 +60,13 @@ func _ready() -> void:
 	# Connect to input device changes
 	Input.joy_connection_changed.connect(_on_joy_connection_changed)
 
+	# Connect to controller type changes from ControllerIconLayout
+	if has_node("/root/aControllerIconLayout"):
+		var icon_layout = get_node("/root/aControllerIconLayout")
+		icon_layout.controller_type_changed.connect(_on_controller_type_changed)
+		# Apply initial controller type mapping
+		_remap_buttons_for_controller_type(icon_layout.get_controller_type())
+
 func _clear_ui_action_joypad_bindings() -> void:
 	"""Remove joypad button bindings from Godot's default ui_* actions
 
@@ -207,6 +214,78 @@ func _on_joy_connection_changed(device_id: int, connected: bool) -> void:
 				controller_connected_flag = false
 		controller_disconnected.emit(device_id)
 		print("Controller disconnected")
+
+func _on_controller_type_changed(new_type: String) -> void:
+	"""Handle controller type changes - remap buttons for Nintendo"""
+	print("[InputManager] Controller type changed to: %s, remapping buttons..." % new_type)
+	_remap_buttons_for_controller_type(new_type)
+
+func _remap_buttons_for_controller_type(controller_type: String) -> void:
+	"""Remap controller buttons based on controller type
+
+	Nintendo controllers have A and B swapped compared to Xbox:
+	- Nintendo: B (button 1) = accept, A (button 0) = back
+	- Xbox/PlayStation: A (button 0) = accept, B (button 1) = back
+
+	However, battle actions use the same physical buttons across all controllers:
+	- Fight/Status always use the button on the right (B for all)
+	- Capture/Item always use the button on the bottom (A for all)
+	"""
+	# Define button mappings based on controller type
+	var accept_button: int
+	var back_button: int
+	var fight_button: int
+	var capture_button: int
+
+	if controller_type == "nintendo":
+		# Nintendo swaps A and B for menu navigation
+		accept_button = JOY_BUTTON_B  # Button 1
+		back_button = JOY_BUTTON_A    # Button 0
+		# But battle uses same physical buttons as Xbox
+		fight_button = JOY_BUTTON_B   # Button 1 (right button)
+		capture_button = JOY_BUTTON_A # Button 0 (bottom button)
+	else:
+		# Xbox and PlayStation use standard layout for everything
+		accept_button = JOY_BUTTON_A  # Button 0
+		back_button = JOY_BUTTON_B    # Button 1
+		fight_button = JOY_BUTTON_B   # Button 1
+		capture_button = JOY_BUTTON_A # Button 0
+
+	# Actions that need remapping
+	var actions_to_remap = {
+		# Overworld
+		ACTION_ACTION: accept_button,     # A/B button - accept/interact
+		ACTION_PHONE: back_button,        # B/A button - back/phone
+
+		# Battle - uses same physical buttons across all controllers
+		ACTION_ATTACK: fight_button,      # Button 1 for all - fight
+		ACTION_CAPTURE: capture_button,   # Button 0 for all - capture
+		ACTION_ITEMS: capture_button,     # Button 0 for all - items
+		ACTION_STATUS: fight_button,      # Button 1 for all - status
+
+		# Menus
+		ACTION_ACCEPT: accept_button,     # A/B button - menu accept
+		ACTION_BACK: back_button,         # B/A button - menu back
+	}
+
+	# Remap each action
+	for action in actions_to_remap:
+		if InputMap.has_action(action):
+			# Remove old joypad button events
+			var events_to_remove = []
+			for event in InputMap.action_get_events(action):
+				if event is InputEventJoypadButton:
+					events_to_remove.append(event)
+
+			for event in events_to_remove:
+				InputMap.action_erase_event(action, event)
+
+			# Add new joypad button event
+			var new_event = InputEventJoypadButton.new()
+			new_event.button_index = actions_to_remap[action]
+			InputMap.action_add_event(action, new_event)
+
+			print("[InputManager] Remapped %s to button %d" % [action, actions_to_remap[action]])
 
 # Input checking methods
 func is_action_pressed(action: String) -> bool:

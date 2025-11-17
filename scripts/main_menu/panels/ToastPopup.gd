@@ -132,8 +132,8 @@ func _build_ui() -> void:
 	_accept_btn.focus_mode = Control.FOCUS_ALL
 	_accept_btn.custom_minimum_size = Vector2(120, 44)
 	_accept_btn.process_mode = Node.PROCESS_MODE_ALWAYS  # Process even when paused
-	# Core Vibe: Electric Lime button (success/confirm)
-	aCoreVibeTheme.style_button(_accept_btn, aCoreVibeTheme.COLOR_ELECTRIC_LIME, aCoreVibeTheme.CORNER_RADIUS_LARGE)
+	# Accept/Cancel selection style: Electric Lime background when focused, black text
+	aCoreVibeTheme.style_button_with_focus_invert(_accept_btn, aCoreVibeTheme.COLOR_ELECTRIC_LIME, aCoreVibeTheme.CORNER_RADIUS_LARGE)
 	hbox.add_child(_accept_btn)
 
 	_cancel_btn = Button.new()
@@ -141,8 +141,8 @@ func _build_ui() -> void:
 	_cancel_btn.focus_mode = Control.FOCUS_ALL
 	_cancel_btn.custom_minimum_size = Vector2(120, 44)
 	_cancel_btn.process_mode = Node.PROCESS_MODE_ALWAYS  # Process even when paused
-	# Core Vibe: Bubble Magenta button (warning/cancel)
-	aCoreVibeTheme.style_button(_cancel_btn, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA, aCoreVibeTheme.CORNER_RADIUS_LARGE)
+	# Accept/Cancel selection style: Bubble Magenta background when focused, black text
+	aCoreVibeTheme.style_button_with_focus_invert(_cancel_btn, aCoreVibeTheme.COLOR_BUBBLE_MAGENTA, aCoreVibeTheme.CORNER_RADIUS_LARGE)
 	hbox.add_child(_cancel_btn)
 
 	# Connect buttons
