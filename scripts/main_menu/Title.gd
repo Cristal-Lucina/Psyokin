@@ -582,15 +582,20 @@ func _highlight_button(index: int) -> void:
 		selection_arrow.add_theme_font_size_override("font_size", 32)
 		selection_arrow.add_theme_color_override("font_color", color)
 		selection_arrow.z_index = 100
-		selection_arrow.visible = false  # Start invisible to avoid flicker
+		selection_arrow.modulate = Color(1.0, 1.0, 1.0, 0.0)  # Start transparent
+		selection_arrow.visible = true  # Visible but transparent
 		add_child(selection_arrow)
 
-	# Update arrow color and position BEFORE making visible
+	# Update arrow color and position
 	selection_arrow.add_theme_color_override("font_color", color)
 	selection_arrow.global_position = button.global_position + Vector2(button.size.x + 20, button.size.y / 2 - 21)
-	# Only show arrow after fade in is complete
+
+	# Fade in arrow slowly
 	if fade_in_complete:
-		selection_arrow.visible = true
+		var arrow_tween = create_tween()
+		arrow_tween.set_ease(Tween.EASE_OUT)
+		arrow_tween.set_trans(Tween.TRANS_CUBIC)
+		arrow_tween.tween_property(selection_arrow, "modulate", Color(1.0, 1.0, 1.0, 1.0), 0.3)
 
 	# Kill any existing pulse animation
 	if active_pulse_tween:
@@ -624,9 +629,12 @@ func _unhighlight_button(index: int) -> void:
 	# Set pivot offset to center (keep centered for consistency)
 	button.pivot_offset = button.size / 2
 
-	# Hide selection arrow
+	# Fade out selection arrow
 	if selection_arrow:
-		selection_arrow.visible = false
+		var arrow_tween = create_tween()
+		arrow_tween.set_ease(Tween.EASE_OUT)
+		arrow_tween.set_trans(Tween.TRANS_CUBIC)
+		arrow_tween.tween_property(selection_arrow, "modulate", Color(1.0, 1.0, 1.0, 0.0), 0.2)
 
 	# Get button's original border color
 	var color = button_colors.get(button, COLOR_ELECTRIC_LIME)
