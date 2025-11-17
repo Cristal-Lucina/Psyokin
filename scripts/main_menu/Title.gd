@@ -64,19 +64,24 @@ var particle_layer: Node2D = null
 func _ready() -> void:
 	"""Wire buttons defensively and decorate Continue."""
 
-	# Start with scene invisible for fade in
-	modulate = Color(1.0, 1.0, 1.0, 0.0)
-
 	# Create neon-kawaii background
 	_create_diagonal_background()
 	_spawn_ambient_particles()
 
-	# Fade in the title screen over 1 second
+	# Create black overlay for fade in
+	var black_overlay = ColorRect.new()
+	black_overlay.color = Color(0.0, 0.0, 0.0, 1.0)
+	black_overlay.z_index = 1000
+	add_child(black_overlay)
+	black_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+
+	# Fade in the title screen from black over 1 second
 	var fade_tween = create_tween()
 	fade_tween.set_ease(Tween.EASE_OUT)
 	fade_tween.set_trans(Tween.TRANS_CUBIC)
-	fade_tween.tween_property(self, "modulate", Color(1.0, 1.0, 1.0, 1.0), 1.0)
+	fade_tween.tween_property(black_overlay, "color", Color(0.0, 0.0, 0.0, 0.0), 1.0)
 	await fade_tween.finished
+	black_overlay.queue_free()  # Remove overlay when done
 	fade_in_complete = true
 
 	# Check if we're auto-loading from in-game (two-step loading process)
