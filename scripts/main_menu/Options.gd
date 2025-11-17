@@ -1379,14 +1379,11 @@ func _build_action_rows(parent: VBoxContainer) -> void:
 	]
 
 	var battle_actions = [
-		{"name": "battle_attack", "display": "Attack (B)"},
-		{"name": "battle_skill", "display": "Skill (Y)"},
-		{"name": "battle_capture", "display": "Capture (A)"},
-		{"name": "battle_defend", "display": "Defend (X)"},
-		{"name": "battle_burst", "display": "Burst (L)"},
-		{"name": "battle_run", "display": "Run (R)"},
-		{"name": "battle_items", "display": "Items (Start)"},
-		{"name": "battle_status", "display": "Status (Select)"},
+		{"name": "battle_attack", "display": "Attack / Status"},
+		{"name": "battle_skill", "display": "Skill / Burst"},
+		{"name": "battle_capture", "display": "Capture / Items"},
+		{"name": "battle_defend", "display": "Guard / Run"},
+		{"name": "battle_switch", "display": "Switch Menu (R)"},
 	]
 
 	var menu_actions = [
@@ -1529,14 +1526,14 @@ func _get_nintendo_action_icon(action: String, button_index: int) -> Texture2D:
 			asset_num = 80
 		"phone":  # Phone uses B button (bottom position) = Asset 81
 			asset_num = 81
-		# Battle actions
-		"battle_attack":  # Attack uses A button (right position) = Asset 82
+		# Battle actions (dual-function buttons)
+		"battle_attack":  # Attack/Status uses A button (right position) = Asset 82
 			asset_num = 82
-		"battle_capture":  # Capture uses B button (bottom position) = Asset 81
+		"battle_capture":  # Capture/Items uses B button (bottom position) = Asset 81
 			asset_num = 81
-		"battle_skill":  # Skill uses X button (top position) = Asset 79
+		"battle_skill":  # Skill/Burst uses X button (top position) = Asset 79
 			asset_num = 79
-		"battle_defend":  # Defend uses Y button (left position) = Asset 80
+		"battle_defend":  # Guard/Run uses Y button (left position) = Asset 80
 			asset_num = 80
 		# Menu actions
 		"menu_accept":  # Accept uses A button (right position) = Asset 82
@@ -1549,7 +1546,12 @@ func _get_nintendo_action_icon(action: String, button_index: int) -> Texture2D:
 
 	# Load and return the texture
 	if asset_num > 0:
-		var texture_path = icon_base_path + "Asset " + str(asset_num) + ".png"
+		# Special handling for Assets 99 and 100 (SVG files)
+		var file_extension = ".png"
+		if asset_num == 99 or asset_num == 100:
+			file_extension = ".svg"
+
+		var texture_path = icon_base_path + "Asset " + str(asset_num) + file_extension
 		if ResourceLoader.exists(texture_path):
 			return load(texture_path) as Texture2D
 		else:
@@ -1614,7 +1616,12 @@ func _get_controller_button_icon(button_index: int) -> Texture2D:
 
 	# Load and return the texture
 	if asset_num > 0:
-		var texture_path = icon_base_path + "Asset " + str(asset_num) + ".png"
+		# Special handling for Assets 99 and 100 (SVG files)
+		var file_extension = ".png"
+		if asset_num == 99 or asset_num == 100:
+			file_extension = ".svg"
+
+		var texture_path = icon_base_path + "Asset " + str(asset_num) + file_extension
 		if ResourceLoader.exists(texture_path):
 			return load(texture_path) as Texture2D
 		else:
@@ -1644,7 +1651,12 @@ func _get_controller_axis_icon(axis: int) -> Texture2D:
 
 	# Load and return the texture
 	if asset_num > 0:
-		var texture_path = icon_base_path + "Asset " + str(asset_num) + ".png"
+		# Special handling for Assets 99 and 100 (SVG files)
+		var file_extension = ".png"
+		if asset_num == 99 or asset_num == 100:
+			file_extension = ".svg"
+
+		var texture_path = icon_base_path + "Asset " + str(asset_num) + file_extension
 		if ResourceLoader.exists(texture_path):
 			return load(texture_path) as Texture2D
 		else:
