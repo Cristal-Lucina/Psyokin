@@ -28,6 +28,7 @@ const COLOR_MILK_WHITE = Color(0.96, 0.97, 0.98)        # #F4F7FB
 @onready var burst_gauge_bar: ProgressBar = %BurstGauge
 @onready var turn_order_display: VBoxContainer = %TurnOrderDisplay
 @onready var switch_button: Button = %SwitchButton
+@onready var party_status_container: VBoxContainer = %PartyStatusContainer
 
 ## Combatant display containers
 @onready var ally_slots: VBoxContainer = %AllySlots
@@ -98,6 +99,9 @@ var instruction_label: Label = null  # Label inside instruction popup
 
 # Active action button visual feedback
 var active_action_button: Button = null  # Currently active action button
+
+# Party status panels for left-side display
+var party_status_panels: Array = []  # Array of 3 panels for player + 2 active party members
 var active_button_tween: Tween = null  # Tween for pulsing animation
 var active_button_original_size: Vector2 = Vector2.ZERO  # Original size to restore
 var active_button_original_rotation: float = 0.0  # Original rotation to restore
@@ -1761,6 +1765,191 @@ func _display_combatants() -> void:
 		enemy_slots.add_child(slot)
 		combatant_panels[enemy.id] = slot
 
+	# Create party status panels
+	_create_party_status_panels()
+
+func _create_party_status_panels() -> void:
+	"""Create the 3 party status panels on the left side of the screen"""
+	# Clear existing panels
+	for child in party_status_container.get_children():
+		child.queue_free()
+	party_status_panels.clear()
+
+	# Get ally combatants (player + active party members)
+	var allies = battle_mgr.get_ally_combatants()
+
+	# Create up to 3 panels (player + 2 active party members)
+	var panel_count = min(3, allies.size())
+	for i in range(panel_count):
+		var ally = allies[i]
+		var panel = _create_single_party_status_panel(ally)
+		party_status_container.add_child(panel)
+		party_status_panels.append(panel)
+
+func _create_single_party_status_panel(combatant: Dictionary) -> PanelContainer:
+	"""Create a single party status panel (80x30px) with portrait and HP/MP bars"""
+	var panel = PanelContainer.new()
+	panel.custom_minimum_size = Vector2(80, 30)
+	panel.set_meta("combatant_id", combatant.id)
+
+	# Style the panel with a subtle background
+	var style = StyleBoxFlat.new()
+	style.bg_color = Color(0.1, 0.1, 0.15, 0.8)  # Semi-transparent dark background
+	style.border_width_left = 1
+	style.border_width_right = 1
+	style.border_width_top = 1
+	style.border_width_bottom = 1
+	style.border_color = COLOR_MILK_WHITE.darkened(0.5)
+	style.corner_radius_top_left = 3
+	style.corner_radius_top_right = 3
+	style.corner_radius_bottom_left = 3
+	style.corner_radius_bottom_right = 3
+	panel.add_theme_stylebox_override("panel", style)
+
+	# Main horizontal container
+	var hbox = HBoxContainer.new()
+	hbox.add_theme_constant_override("separation", 2)
+	panel.add_child(hbox)
+
+	# Left side: Portrait (30x30px square)
+	var portrait_container = PanelContainer.new()
+	portrait_container.custom_minimum_size = Vector2(30, 30)
+
+	var portrait_style = StyleBoxFlat.new()
+	var portrait_color = _get_character_capsule_color(combatant.display_name, true)
+	portrait_style.bg_color = portrait_color
+	portrait_style.border_width_left = 2
+	portrait_style.border_width_right = 2
+	portrait_style.border_width_top = 2
+	portrait_style.border_width_bottom = 2
+	portrait_style.border_color = COLOR_MILK_WHITE
+	portrait_style.corner_radius_top_left = 15
+	portrait_style.corner_radius_top_right = 15
+	portrait_style.corner_radius_bottom_left = 15
+	portrait_style.corner_radius_bottom_right = 15
+	portrait_container.add_theme_stylebox_override("panel", portrait_style)
+	hbox.add_child(portrait_container)
+
+	# Right side: HP/MP bars (48px width)
+	var stats_vbox = VBoxContainer.new()
+	stats_vbox.add_theme_constant_override("separation", 2)
+	stats_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hbox.add_child(stats_vbox)
+
+	# HP bar container
+	var hp_hbox = HBoxContainer.new()
+	hp_hbox.add_theme_constant_override("separation", 2)
+	stats_vbox.add_child(hp_hbox)
+
+	# HP label
+	var hp_label = Label.new()
+	hp_label.text = "HP"
+	hp_label.add_theme_font_size_override("font_size", 6)
+	hp_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
+	hp_label.custom_minimum_size = Vector2(10, 0)
+	hp_hbox.add_child(hp_label)
+
+	# HP bar
+	var hp_bar = ProgressBar.new()
+	hp_bar.name = "HPBar"
+	hp_bar.custom_minimum_size = Vector2(25, 8)
+	hp_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hp_bar.show_percentage = false
+	hp_bar.max_value = combatant.get("hp_max", 100)
+	hp_bar.value = combatant.get("hp", 100)
+
+	# Style HP bar
+	var hp_bg = StyleBoxFlat.new()
+	hp_bg.bg_color = Color(0.2, 0.2, 0.2, 1.0)
+	hp_bar.add_theme_stylebox_override("background", hp_bg)
+
+	var hp_fill = StyleBoxFlat.new()
+	hp_fill.bg_color = Color(0.2, 0.8, 0.2, 1.0)  # Green
+	hp_bar.add_theme_stylebox_override("fill", hp_fill)
+	hp_hbox.add_child(hp_bar)
+
+	# HP value label
+	var hp_value = Label.new()
+	hp_value.name = "HPValue"
+	hp_value.text = str(combatant.get("hp", 100))
+	hp_value.add_theme_font_size_override("font_size", 6)
+	hp_value.add_theme_color_override("font_color", COLOR_MILK_WHITE)
+	hp_value.custom_minimum_size = Vector2(12, 0)
+	hp_hbox.add_child(hp_value)
+
+	# MP bar container
+	var mp_hbox = HBoxContainer.new()
+	mp_hbox.add_theme_constant_override("separation", 2)
+	stats_vbox.add_child(mp_hbox)
+
+	# MP label
+	var mp_label = Label.new()
+	mp_label.text = "MP"
+	mp_label.add_theme_font_size_override("font_size", 6)
+	mp_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
+	mp_label.custom_minimum_size = Vector2(10, 0)
+	mp_hbox.add_child(mp_label)
+
+	# MP bar
+	var mp_bar = ProgressBar.new()
+	mp_bar.name = "MPBar"
+	mp_bar.custom_minimum_size = Vector2(25, 8)
+	mp_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	mp_bar.show_percentage = false
+	mp_bar.max_value = combatant.get("mp_max", 50)
+	mp_bar.value = combatant.get("mp", 50)
+
+	# Style MP bar
+	var mp_bg = StyleBoxFlat.new()
+	mp_bg.bg_color = Color(0.2, 0.2, 0.2, 1.0)
+	mp_bar.add_theme_stylebox_override("background", mp_bg)
+
+	var mp_fill = StyleBoxFlat.new()
+	mp_fill.bg_color = Color(0.3, 0.5, 1.0, 1.0)  # Blue
+	mp_bar.add_theme_stylebox_override("fill", mp_fill)
+	mp_hbox.add_child(mp_bar)
+
+	# MP value label
+	var mp_value = Label.new()
+	mp_value.name = "MPValue"
+	mp_value.text = str(combatant.get("mp", 50))
+	mp_value.add_theme_font_size_override("font_size", 6)
+	mp_value.add_theme_color_override("font_color", COLOR_MILK_WHITE)
+	mp_value.custom_minimum_size = Vector2(12, 0)
+	mp_hbox.add_child(mp_value)
+
+	return panel
+
+func _update_party_status_panels() -> void:
+	"""Update HP/MP values in the party status panels"""
+	var allies = battle_mgr.get_ally_combatants()
+
+	for i in range(min(party_status_panels.size(), allies.size())):
+		var panel = party_status_panels[i]
+		var ally = allies[i]
+
+		# Find HP bar and value
+		var hp_bar = panel.find_child("HPBar", true, false)
+		var hp_value = panel.find_child("HPValue", true, false)
+
+		if hp_bar:
+			hp_bar.max_value = ally.get("hp_max", 100)
+			hp_bar.value = ally.get("hp", 100)
+
+		if hp_value:
+			hp_value.text = str(ally.get("hp", 100))
+
+		# Find MP bar and value
+		var mp_bar = panel.find_child("MPBar", true, false)
+		var mp_value = panel.find_child("MPValue", true, false)
+
+		if mp_bar:
+			mp_bar.max_value = ally.get("mp_max", 50)
+			mp_bar.value = ally.get("mp", 50)
+
+		if mp_value:
+			mp_value.text = str(ally.get("mp", 50))
+
 func _get_character_capsule_color(name: String, is_ally: bool) -> Color:
 	"""Get capsule color for a character or enemy based on name/type"""
 	if is_ally:
@@ -1947,6 +2136,7 @@ func _update_combatant_displays() -> void:
 	"""Update all combatant HP/MP displays"""
 	# TODO: Update HP/MP bars without recreating everything
 	_display_combatants()
+	_update_party_status_panels()
 
 func _shake_combatant_panel(combatant_id: String) -> void:
 	"""Shake a combatant's panel when they take damage"""
