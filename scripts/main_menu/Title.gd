@@ -51,6 +51,7 @@ var input_cooldown: float = 0.0
 var input_cooldown_duration: float = 0.15  # 150ms between inputs
 var button_colors: Dictionary = {}  # Maps Button -> Color for highlight
 var active_pulse_tween: Tween = null  # Track the pulsing animation
+var active_arrow_tween: Tween = null  # Track the arrow fade animation
 var selection_arrow: Label = null  # Arrow indicator for selected button
 var fade_in_complete: bool = false  # Track if initial fade in is done
 var navigation_started: bool = false  # Track if user has started navigating
@@ -59,6 +60,7 @@ var navigation_started: bool = false  # Track if user has started navigating
 var diagonal_bands: ColorRect = null
 var grid_overlay: ColorRect = null
 var particle_layer: Node2D = null
+var meteor_layer: Node2D = null
 
 # ------------------------------------------------------------------------------
 
@@ -68,6 +70,7 @@ func _ready() -> void:
 	# Create neon-kawaii background
 	_create_diagonal_background()
 	_spawn_ambient_particles()
+	_spawn_meteors()
 
 	# Set fade in as complete immediately (no fade effect)
 	fade_in_complete = true
@@ -599,12 +602,16 @@ func _highlight_button(index: int) -> void:
 		# Keep arrow white (don't change color based on button)
 		selection_arrow.global_position = button.global_position + Vector2(button.size.x + 20, button.size.y / 2 - 21)
 
+		# Kill any existing arrow fade animation
+		if active_arrow_tween:
+			active_arrow_tween.kill()
+
 		# Fade in arrow slowly
 		if fade_in_complete:
-			var arrow_tween = create_tween()
-			arrow_tween.set_ease(Tween.EASE_OUT)
-			arrow_tween.set_trans(Tween.TRANS_CUBIC)
-			arrow_tween.tween_property(selection_arrow, "modulate", Color(1.0, 1.0, 1.0, 1.0), 0.3)
+			active_arrow_tween = create_tween()
+			active_arrow_tween.set_ease(Tween.EASE_OUT)
+			active_arrow_tween.set_trans(Tween.TRANS_CUBIC)
+			active_arrow_tween.tween_property(selection_arrow, "modulate", Color(1.0, 1.0, 1.0, 1.0), 0.3)
 
 	# Kill any existing pulse animation
 	if active_pulse_tween:
@@ -640,10 +647,14 @@ func _unhighlight_button(index: int) -> void:
 
 	# Fade out selection arrow
 	if selection_arrow:
-		var arrow_tween = create_tween()
-		arrow_tween.set_ease(Tween.EASE_OUT)
-		arrow_tween.set_trans(Tween.TRANS_CUBIC)
-		arrow_tween.tween_property(selection_arrow, "modulate", Color(1.0, 1.0, 1.0, 0.0), 0.2)
+		# Kill any existing arrow fade animation
+		if active_arrow_tween:
+			active_arrow_tween.kill()
+
+		active_arrow_tween = create_tween()
+		active_arrow_tween.set_ease(Tween.EASE_OUT)
+		active_arrow_tween.set_trans(Tween.TRANS_CUBIC)
+		active_arrow_tween.tween_property(selection_arrow, "modulate", Color(1.0, 1.0, 1.0, 0.0), 0.2)
 
 	# Get button's original border color
 	var color = button_colors.get(button, COLOR_ELECTRIC_LIME)
@@ -672,11 +683,11 @@ func _unhighlight_button(index: int) -> void:
 # ------------------------------------------------------------------------------
 
 func _create_diagonal_background() -> void:
-	"""Create diagonal striped background with grid overlay"""
-	# Create diagonal bands
+	"""Create space black background with grid overlay"""
+	# Create space black background
 	diagonal_bands = ColorRect.new()
-	diagonal_bands.name = "DiagonalBands"
-	diagonal_bands.color = COLOR_INK_CHARCOAL
+	diagonal_bands.name = "SpaceBackground"
+	diagonal_bands.color = Color(0.0, 0.0, 0.0, 1.0)  # Pure black for space
 	diagonal_bands.z_index = -2
 	add_child(diagonal_bands)
 	diagonal_bands.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -758,6 +769,56 @@ func _spawn_ambient_particles() -> void:
 		var duration = randf_range(12, 20)  # Slower movement
 		tween.tween_property(square, "position", square.position + Vector2(drift_x, drift_y), duration)
 		tween.tween_property(square, "position", square.position, duration)
+
+func _spawn_meteors() -> void:
+	"""Spawn meteors flying across the background"""
+	meteor_layer = Node2D.new()
+	meteor_layer.name = "MeteorLayer"
+	meteor_layer.z_index = -1
+	add_child(meteor_layer)
+
+	# Continuously spawn meteors
+	_spawn_single_meteor()
+
+func _spawn_single_meteor() -> void:
+	"""Spawn a single meteor and schedule the next one"""
+	if not meteor_layer:
+		return
+
+	var meteor = ColorRect.new()
+	var size = randi_range(3, 8)
+	meteor.custom_minimum_size = Vector2(size * 3, size)  # Elongated for trail effect
+	meteor.size = Vector2(size * 3, size)
+
+	# Grey/white colors for rocky meteors
+	var grey_value = randf_range(0.6, 0.9)
+	meteor.color = Color(grey_value, grey_value, grey_value, 0.8)
+
+	# Start from random position on the right or top edge
+	var viewport_size = get_viewport_rect().size
+	var start_from_top = randf() > 0.5
+
+	if start_from_top:
+		# Coming from top-right diagonal
+		meteor.position = Vector2(randf_range(viewport_size.x * 0.5, viewport_size.x), -20)
+	else:
+		# Coming from right side
+		meteor.position = Vector2(viewport_size.x + 20, randf_range(0, viewport_size.y * 0.5))
+
+	meteor_layer.add_child(meteor)
+
+	# Animate meteor flying diagonally across screen
+	var tween = create_tween()
+	var end_x = meteor.position.x - randf_range(800, 1200)
+	var end_y = meteor.position.y + randf_range(400, 800)
+	var duration = randf_range(1.5, 3.0)
+
+	tween.tween_property(meteor, "position", Vector2(end_x, end_y), duration).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_QUAD)
+	tween.tween_callback(meteor.queue_free)
+
+	# Schedule next meteor
+	await get_tree().create_timer(randf_range(2.0, 5.0)).timeout
+	_spawn_single_meteor()
 
 func _style_panel() -> void:
 	"""Apply Core Vibe styling to main menu panel"""
