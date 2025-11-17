@@ -301,6 +301,9 @@ func _update_button_icons() -> void:
 		print("[Battle] aControllerIconLayout not found, skipping button icons")
 		return
 
+	var controller_type = icon_layout.get_controller_type()
+	print("[Battle] Updating button icons for controller type: %s" % controller_type)
+
 	# Map each battle button to its controller button action
 	# Xbox layout: Fight/Status=(B), Capture/Item=(A), Guard/Run=(X), Skill/Burst=(Y)
 	var button_icon_mappings = [
@@ -317,6 +320,9 @@ func _update_button_icons() -> void:
 	for mapping in button_icon_mappings:
 		var btn = action_menu.get_node_or_null(mapping["button"])
 		if btn and btn is Button:
+			# Clear existing icon to force refresh
+			btn.icon = null
+
 			var icon_texture = icon_layout.get_button_icon(mapping["icon_action"])
 			if icon_texture:
 				# Resize icon to 25x25 pixels
@@ -332,6 +338,9 @@ func _update_button_icons() -> void:
 
 	# Add RB icon to switch button
 	if switch_button and switch_button is Button:
+		# Clear existing icon to force refresh
+		switch_button.icon = null
+
 		var icon_texture = icon_layout.get_button_icon("r_bumper")  # RB / R1
 		if icon_texture:
 			# Resize icon to 25x25 pixels
