@@ -3853,25 +3853,30 @@ func _highlight_target_candidates() -> void:
 	tween.tween_property(selection_indicator, "position:y", selection_indicator.position.y, 0.5)
 
 func _draw_selection_indicator() -> void:
-	"""Draw an arrow/indicator pointing down at the target"""
+	"""Draw a white arrow with shadow pointing down at the target"""
 	if not selection_indicator:
 		return
 
-	# Draw a downward-pointing arrow
+	# Create a clear downward-pointing arrow shape
 	var points = PackedVector2Array([
-		Vector2(30, 0),   # Top center
-		Vector2(15, 15),  # Bottom left
-		Vector2(30, 12),  # Bottom center
-		Vector2(45, 15),  # Bottom right
+		Vector2(15, 0),   # Top left
+		Vector2(45, 0),   # Top right
+		Vector2(45, 10),  # Right side top
+		Vector2(35, 10),  # Right side inner
+		Vector2(30, 20),  # Bottom point (tip)
+		Vector2(25, 10),  # Left side inner
+		Vector2(15, 10),  # Left side top
 	])
 
-	# Draw filled arrow with glow
-	selection_indicator.draw_colored_polygon(points, COLOR_CITRUS_YELLOW)
-	# Draw outline
-	for i in range(points.size()):
-		var p1 = points[i]
-		var p2 = points[(i + 1) % points.size()]
-		selection_indicator.draw_line(p1, p2, COLOR_MILK_WHITE, 2.0)
+	# Draw shadow first (offset and darkened)
+	var shadow_offset = Vector2(2, 2)
+	var shadow_points = PackedVector2Array()
+	for point in points:
+		shadow_points.append(point + shadow_offset)
+	selection_indicator.draw_colored_polygon(shadow_points, Color(0.0, 0.0, 0.0, 0.5))
+
+	# Draw white arrow on top
+	selection_indicator.draw_colored_polygon(points, COLOR_MILK_WHITE)
 
 func _clear_target_highlights() -> void:
 	"""Remove selection indicator"""
