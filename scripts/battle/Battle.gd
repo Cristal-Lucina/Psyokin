@@ -318,14 +318,16 @@ func _update_button_icons() -> void:
 		if btn and btn is Button:
 			var icon_texture = icon_layout.get_button_icon(mapping["icon_action"])
 			if icon_texture:
-				btn.icon = icon_texture
+				# Resize icon to 15x15 pixels
+				var image = icon_texture.get_image()
+				image.resize(15, 15, Image.INTERPOLATE_LANCZOS)
+				var scaled_texture = ImageTexture.create_from_image(image)
+
+				btn.icon = scaled_texture
 				btn.icon_alignment = HORIZONTAL_ALIGNMENT_LEFT
 				btn.expand_icon = false
 				# Add some spacing between icon and text
-				if btn.has_theme_constant_override("h_separation"):
-					btn.add_theme_constant_override("h_separation", 8)
-				else:
-					btn.add_theme_constant_override("h_separation", 8)
+				btn.add_theme_constant_override("h_separation", 8)
 
 func _on_controller_type_changed(new_type: String) -> void:
 	"""Update button icons when controller type changes"""
