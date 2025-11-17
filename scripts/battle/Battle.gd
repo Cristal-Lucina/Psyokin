@@ -1025,9 +1025,7 @@ func _confirm_target_selection() -> void:
 
 	# Determine what action to execute based on state
 	if awaiting_capture_target:
-		# Show CAPTURE! instruction
-		_show_instruction("CAPTURE!")
-		# Attempting capture
+		# Attempting capture (minigame starts immediately)
 		await _execute_capture(target)
 	elif awaiting_item_target:
 		# Using an item
@@ -5201,12 +5199,14 @@ func _on_item_selected(item_data: Dictionary) -> void:
 
 	# Special handling for AllEnemies targeting (Bombs)
 	if targeting == "AllEnemies":
-		# Bombs hit all enemies, no target selection needed
-		log_message("%s uses %s!" % [current_combatant.display_name, str(item_data.get("name", "item"))])
+		# Bombs hit all enemies, no target selection needed (message will be shown after)
 		_execute_item_usage({})  # Pass empty dict since bombs hit all enemies
 		return
 
-	log_message("Using %s - select target..." % str(item_data.get("name", "item")))
+	# Update battle log to show item usage prompt (without queuing message)
+	if battle_log:
+		battle_log.clear()
+		battle_log.append_text("Using %s - select target..." % str(item_data.get("name", "item")))
 
 	# Determine target candidates
 	if targeting == "Ally":
@@ -5242,9 +5242,10 @@ func _on_item_selected(item_data: Dictionary) -> void:
 	selected_target_index = 0  # Start with first target
 	_highlight_target_candidates()
 
-	# Show currently selected target
-	if not target_candidates.is_empty():
-		log_message("→ %s" % target_candidates[0].display_name)
+	# Show currently selected target (without queuing message)
+	if not target_candidates.is_empty() and battle_log:
+		battle_log.clear()
+		battle_log.append_text("→ %s" % target_candidates[0].display_name)
 
 ## ═══════════════════════════════════════════════════════════════
 ## CAPTURE/BIND MENU
@@ -5462,9 +5463,10 @@ func _on_bind_selected(bind_data: Dictionary) -> void:
 	selected_target_index = 0  # Start with first target
 	_highlight_target_candidates()
 
-	# Show currently selected target
-	if not target_candidates.is_empty():
-		log_message("→ %s" % target_candidates[0].display_name)
+	# Show currently selected target (without queuing message)
+	if not target_candidates.is_empty() and battle_log:
+		battle_log.clear()
+		battle_log.append_text("→ %s" % target_candidates[0].display_name)
 
 ## ═══════════════════════════════════════════════════════════════
 ## BURST MENU & EXECUTION
