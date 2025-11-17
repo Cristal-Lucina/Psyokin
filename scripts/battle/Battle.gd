@@ -86,12 +86,21 @@ var status_details_modal: ColorRect = null  # Status details modal background
 var current_skill_menu: Array = []  # Current skills in menu
 var selected_item: Dictionary = {}  # Selected item data
 var selected_burst: Dictionary = {}  # Selected burst ability data
+var selection_indicator: Control = null  # Floating selection indicator above targets
 var victory_panel: PanelContainer = null  # Victory screen panel
 var victory_scroll: ScrollContainer = null  # Victory screen scroll container for controller scrolling
 var is_in_round_transition: bool = false  # True during round transition animations
 var combatant_panels: Dictionary = {}  # combatant_id -> PanelContainer for shake animations
+var active_turn_panel: Control = null  # Currently active combatant's panel (for turn animation)
+var active_turn_original_pos: Vector2 = Vector2.ZERO  # Original position before turn animation
 var instruction_popup: PanelContainer = null  # Instruction message popup
 var instruction_label: Label = null  # Label inside instruction popup
+
+# Active action button visual feedback
+var active_action_button: Button = null  # Currently active action button
+var active_button_tween: Tween = null  # Tween for pulsing animation
+var active_button_original_size: Vector2 = Vector2.ZERO  # Original size to restore
+var active_button_original_rotation: float = 0.0  # Original rotation to restore
 
 # Input debouncing for joystick sensitivity
 var input_cooldown: float = 0.0  # Current cooldown timer
@@ -391,6 +400,99 @@ func _on_controller_type_changed(new_type: String) -> void:
 	print("[Battle] Controller type changed to: %s, updating button icons..." % new_type)
 	_update_button_icons()
 
+func _activate_action_button(button_name: String, neon_color: Color) -> void:
+	"""
+	Activate an action button with visual feedback (bigger, pulsing, colored background, black text).
+	The button remains in this state until the turn ends.
+
+	Args:
+		button_name: Name of the button node (e.g., "AttackButton", "SkillButton")
+		neon_color: The neon color for the background (same as the border color)
+	"""
+	# Clear any previously active button
+	_clear_active_action_button()
+
+	# Get the button
+	var btn = action_menu.get_node_or_null(button_name)
+	if not btn or not (btn is Button):
+		return
+
+	active_action_button = btn
+
+	# Store original properties
+	active_button_original_size = btn.custom_minimum_size
+	active_button_original_rotation = btn.rotation_degrees
+
+	# Create active style: neon background with black text
+	var style_active = StyleBoxFlat.new()
+	style_active.bg_color = neon_color  # Fill with the neon color
+	style_active.border_width_left = 3
+	style_active.border_width_right = 3
+	style_active.border_width_top = 3
+	style_active.border_width_bottom = 3
+	style_active.border_color = neon_color.lightened(0.3)  # Brighter border
+	style_active.corner_radius_top_left = 20
+	style_active.corner_radius_top_right = 20
+	style_active.corner_radius_bottom_left = 20
+	style_active.corner_radius_bottom_right = 20
+	style_active.shadow_size = 12  # Strong glow
+	style_active.shadow_color = Color(neon_color.r, neon_color.g, neon_color.b, 0.8)
+
+	# Apply active style to all button states so it stays active
+	btn.add_theme_stylebox_override("normal", style_active)
+	btn.add_theme_stylebox_override("hover", style_active)
+	btn.add_theme_stylebox_override("pressed", style_active)
+	btn.add_theme_stylebox_override("focus", style_active)
+
+	# Change text color to black
+	btn.add_theme_color_override("font_color", Color.BLACK)
+	btn.add_theme_color_override("font_hover_color", Color.BLACK)
+	btn.add_theme_color_override("font_pressed_color", Color.BLACK)
+	btn.add_theme_color_override("font_focus_color", Color.BLACK)
+
+	# Make button bigger (scale up by 20%)
+	var new_size = active_button_original_size * 1.2
+	btn.custom_minimum_size = new_size
+
+	# Reset rotation to 0 for active button (no tilt)
+	btn.rotation_degrees = 0.0
+
+	# Create pulsing animation
+	if active_button_tween:
+		active_button_tween.kill()
+
+	active_button_tween = create_tween()
+	active_button_tween.set_loops()  # Loop indefinitely
+	# Pulse scale between 1.2x and 1.3x (subtle pulse on top of the bigger size)
+	active_button_tween.tween_property(btn, "scale", Vector2(1.05, 1.05), 0.6).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	active_button_tween.tween_property(btn, "scale", Vector2(1.0, 1.0), 0.6).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+
+func _clear_active_action_button() -> void:
+	"""Clear the active action button visual feedback and restore original styling"""
+	if not active_action_button or not is_instance_valid(active_action_button):
+		active_action_button = null
+		return
+
+	# Kill the pulsing animation
+	if active_button_tween:
+		active_button_tween.kill()
+		active_button_tween = null
+
+	# Restore scale
+	active_action_button.scale = Vector2(1.0, 1.0)
+
+	# Restore original size
+	active_action_button.custom_minimum_size = active_button_original_size
+
+	# Restore original rotation
+	active_action_button.rotation_degrees = active_button_original_rotation
+
+	# Re-apply original button styling by calling _style_action_buttons
+	# This will restore all the original styles
+	_style_action_buttons()
+
+	active_action_button = null
+
 func _create_diagonal_background() -> void:
 	"""Create neon-kawaii diagonal band background with grid overlay"""
 	var background = get_node_or_null("Background")
@@ -636,7 +738,7 @@ func _input(event: InputEvent) -> void:
 	# CRITICAL: Handle message queue continuation FIRST (Pokemon-style)
 	# This blocks all other input while messages are displaying
 	if is_displaying_message:
-		if event.is_action_pressed(aInputManager.ACTION_ACCEPT):
+		if event.is_action_pressed(aInputManager.ACTION_ACCEPT) or event.is_action_pressed(aInputManager.ACTION_BACK):
 			_continue_to_next_message()
 			get_viewport().set_input_as_handled()
 		return
@@ -792,22 +894,12 @@ func _input(event: InputEvent) -> void:
 			return
 
 		if event.is_action_pressed(aInputManager.ACTION_MOVE_UP):
-			_navigate_capture_menu_vertical(-2)  # Move up one row (2 columns)
+			_navigate_capture_menu_vertical(-1)  # Move up one item
 			input_cooldown = input_cooldown_duration
 			get_viewport().set_input_as_handled()
 			return
 		elif event.is_action_pressed(aInputManager.ACTION_MOVE_DOWN):
-			_navigate_capture_menu_vertical(2)  # Move down one row (2 columns)
-			input_cooldown = input_cooldown_duration
-			get_viewport().set_input_as_handled()
-			return
-		elif event.is_action_pressed(aInputManager.ACTION_MOVE_LEFT):
-			_navigate_capture_menu_horizontal(-1)  # Move left one column
-			input_cooldown = input_cooldown_duration
-			get_viewport().set_input_as_handled()
-			return
-		elif event.is_action_pressed(aInputManager.ACTION_MOVE_RIGHT):
-			_navigate_capture_menu_horizontal(1)  # Move right one column
+			_navigate_capture_menu_vertical(1)  # Move down one item
 			input_cooldown = input_cooldown_duration
 			get_viewport().set_input_as_handled()
 			return
@@ -924,10 +1016,10 @@ func _input(event: InputEvent) -> void:
 
 	# If awaiting target selection, handle navigation
 	if awaiting_target_selection and not target_candidates.is_empty():
-		if event.is_action_pressed(aInputManager.ACTION_MOVE_LEFT):
+		if event.is_action_pressed(aInputManager.ACTION_MOVE_UP):
 			_navigate_targets(-1)
 			get_viewport().set_input_as_handled()
-		elif event.is_action_pressed(aInputManager.ACTION_MOVE_RIGHT):
+		elif event.is_action_pressed(aInputManager.ACTION_MOVE_DOWN):
 			_navigate_targets(1)
 			get_viewport().set_input_as_handled()
 		elif event.is_action_pressed(aInputManager.ACTION_ACCEPT):
@@ -951,6 +1043,10 @@ func _input(event: InputEvent) -> void:
 		# Panel 1: GUARD/SKILL/CAPTURE/FIGHT
 		# Panel 2: RUN/BURST/ITEMS/STATUS
 		# Button mapping: Y=SKILL, X=DEFEND, B=ATTACK, A=CAPTURE
+
+		# Block action button presses when menus are open
+		if _is_any_menu_open():
+			return
 
 		# Check action cooldown to prevent button spam
 		if action_cooldown > 0:
@@ -992,6 +1088,15 @@ func _input(event: InputEvent) -> void:
 				_on_item_pressed()
 				action_cooldown = action_cooldown_duration  # Set cooldown
 				get_viewport().set_input_as_handled()
+
+func _is_any_menu_open() -> bool:
+	"""Check if any menu is currently open"""
+	return (skill_menu_panel != null or
+			item_menu_panel != null or
+			capture_menu_panel != null or
+			burst_menu_panel != null or
+			confirmation_panel != null or
+			status_picker_panel != null)
 
 func _navigate_targets(direction: int) -> void:
 	"""Navigate through target candidates"""
@@ -1041,6 +1146,7 @@ func _confirm_target_selection() -> void:
 		# Check if battle is over
 		var battle_ended = await battle_mgr._check_battle_end()
 		if not battle_ended:
+			await _reset_turn_indicator()  # Slide back before ending turn
 			battle_mgr.end_turn()
 	elif not selected_burst.is_empty():
 		# Using a burst ability (single target)
@@ -1051,6 +1157,7 @@ func _confirm_target_selection() -> void:
 		# Check if battle is over
 		var battle_ended = await battle_mgr._check_battle_end()
 		if not battle_ended:
+			await _reset_turn_indicator()  # Slide back before ending turn
 			battle_mgr.end_turn()
 	else:
 		# Regular attack
@@ -1063,7 +1170,12 @@ func _cancel_target_selection() -> void:
 	awaiting_item_target = false
 	selected_target_index = 0
 	_clear_target_highlights()
-	log_message("Target selection cancelled.")
+	_clear_active_action_button()  # Clear active button visual feedback
+
+	# Update battle log directly (without queuing message to avoid continue prompt)
+	if battle_log:
+		battle_log.clear()
+		battle_log.append_text("Target selection cancelled.")
 
 func _initialize_battle() -> void:
 	"""Initialize the battle from encounter data"""
@@ -1116,12 +1228,17 @@ func _on_turn_started(combatant_id: String) -> void:
 	# Wait for player to press continue before proceeding
 	await _wait_for_message_queue()
 
+	# Animate turn indicator AFTER message is displayed
+	_animate_turn_indicator(combatant_id)
+
 	# Check if combatant is asleep - skip turn entirely
 	var ailment = str(current_combatant.get("ailment", ""))
 	if ailment == "sleep":
 		log_message("%s is fast asleep..." % current_combatant.display_name)
 		# Wait a moment for readability
 		await _wait_for_message_queue()
+		# Slide back before ending turn
+		await _reset_turn_indicator()
 		# End turn immediately
 		battle_mgr.end_turn()
 		return
@@ -1159,8 +1276,72 @@ func _on_turn_started(combatant_id: String) -> void:
 		# Enemy turn - execute AI (after player continues)
 		await _execute_enemy_ai()
 
+func _animate_turn_indicator(combatant_id: String) -> void:
+	"""Animate the active combatant's panel to indicate their turn"""
+	# Reset previous animation if any
+	await _reset_turn_indicator()
+
+	# Find the panel for this combatant
+	if not combatant_panels.has(combatant_id):
+		return
+
+	active_turn_panel = combatant_panels[combatant_id]
+	active_turn_original_pos = Vector2(active_turn_panel.offset_left, active_turn_panel.offset_right)
+
+	# Determine direction based on whether ally or enemy
+	var is_ally = active_turn_panel.get_meta("is_ally", false)
+	var slide_distance = 15.0
+
+	# Calculate target offsets for slide
+	var target_offset_left = active_turn_panel.offset_left
+	var target_offset_right = active_turn_panel.offset_right
+
+	if is_ally:
+		# Slide right
+		target_offset_left += slide_distance
+		target_offset_right += slide_distance
+	else:
+		# Slide left
+		target_offset_left -= slide_distance
+		target_offset_right -= slide_distance
+
+	# Animate slide using offsets (won't conflict with layout containers)
+	var tween = create_tween()
+	tween.set_trans(Tween.TRANS_CUBIC)
+	tween.set_ease(Tween.EASE_OUT)
+	tween.set_parallel(true)
+	tween.tween_property(active_turn_panel, "offset_left", target_offset_left, 0.3)
+	tween.tween_property(active_turn_panel, "offset_right", target_offset_right, 0.3)
+
+func _reset_turn_indicator() -> void:
+	"""Reset the turn indicator animation (awaitable to wait for completion)"""
+	if active_turn_panel and is_instance_valid(active_turn_panel):
+		# Store panel reference locally before clearing
+		var panel_to_reset = active_turn_panel
+		var original_pos = active_turn_original_pos
+
+		# Clear the active reference immediately
+		active_turn_panel = null
+
+		# Animate back to original position
+		var tween = create_tween()
+		tween.set_trans(Tween.TRANS_CUBIC)
+		tween.set_ease(Tween.EASE_IN)
+		tween.set_parallel(true)
+		tween.tween_property(panel_to_reset, "offset_left", original_pos.x, 0.2)
+		tween.tween_property(panel_to_reset, "offset_right", original_pos.y, 0.2)
+
+		# Wait for animation to complete
+		await tween.finished
+
 func _on_turn_ended(_combatant_id: String) -> void:
 	"""Called when a combatant's turn ends"""
+	# Reset turn indicator animation
+	await _reset_turn_indicator()
+
+	# Clear active button visual feedback
+	_clear_active_action_button()
+
 	# Disable and dim action menu
 	_disable_action_menu()
 
@@ -1174,7 +1355,6 @@ func _on_battle_ended(victory: bool) -> void:
 	"""Called when battle ends"""
 	if victory:
 		log_message("*** VICTORY ***")
-		log_message("All enemies have been defeated!")
 
 		# Wait for all messages to be displayed and acknowledged before showing victory screen
 		await _wait_for_message_queue()
@@ -1228,11 +1408,11 @@ func _show_victory_screen() -> void:
 	style.shadow_color = Color(COLOR_SKY_CYAN.r, COLOR_SKY_CYAN.g, COLOR_SKY_CYAN.b, 0.4)  # Cyan glow
 	victory_panel.add_theme_stylebox_override("panel", style)
 
-	# Position it in center of screen (200px wider)
+	# Position it in center of screen (1000x650px)
 	victory_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER, Control.PRESET_MODE_MINSIZE)
-	victory_panel.custom_minimum_size = Vector2(700, 450)  # Increased width by 200px
-	victory_panel.size = Vector2(700, 450)
-	victory_panel.position = Vector2(-350, -225)  # Center the 700x450 panel
+	victory_panel.custom_minimum_size = Vector2(1000, 650)
+	victory_panel.size = Vector2(1000, 650)
+	victory_panel.position = Vector2(-500, -341)  # Center the 1000x650 panel, moved up 16px
 	victory_panel.modulate.a = 0.0  # Start transparent for fade-in
 
 	# Create vertical box for content
@@ -1250,6 +1430,7 @@ func _show_victory_screen() -> void:
 
 	var content_vbox = VBoxContainer.new()
 	content_vbox.add_theme_constant_override("separation", 15)
+	content_vbox.custom_minimum_size = Vector2(0, 550)  # Minimum height of 550px
 	margin.add_child(content_vbox)
 
 	# Title label
@@ -1263,11 +1444,11 @@ func _show_victory_screen() -> void:
 	# Get rewards data from battle manager
 	var rewards = battle_mgr.battle_rewards
 
-	# Rewards display (scrollable) - increased width for 2 columns
+	# Rewards display (no scrolling) - increased width for 2 columns
 	var rewards_scroll = ScrollContainer.new()
-	rewards_scroll.custom_minimum_size = Vector2(660, 200)  # Wider for 2 columns
+	rewards_scroll.custom_minimum_size = Vector2(660, 450)  # Taller to fit all content without scrolling
 	rewards_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	rewards_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	rewards_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED  # No vertical scrolling
 	content_vbox.add_child(rewards_scroll)
 
 	# Store reference for controller scrolling
@@ -1443,6 +1624,13 @@ func _on_victory_accept_pressed() -> void:
 	"""Handle Accept button press on victory screen"""
 	print("[Battle] Victory accepted - returning to overworld")
 	if victory_panel:
+		# Fade out victory panel before removing
+		var fade_tween = create_tween()
+		fade_tween.set_ease(Tween.EASE_IN)
+		fade_tween.set_trans(Tween.TRANS_CUBIC)
+		fade_tween.tween_property(victory_panel, "modulate:a", 0.0, 0.4)
+		await fade_tween.finished
+
 		victory_panel.queue_free()
 		victory_panel = null
 	victory_scroll = null
@@ -1507,6 +1695,8 @@ func _check_freeze_action_allowed() -> bool:
 		log_message("  → %s is unable to act due to %s! (%d%% chance, rolled %d)" % [
 			current_combatant.display_name, ailment_name, success_chance, roll
 		])
+		# Slide back before ending turn
+		await _reset_turn_indicator()
 		# End turn without acting
 		battle_mgr.end_turn()
 		return false
@@ -1571,6 +1761,60 @@ func _display_combatants() -> void:
 		enemy_slots.add_child(slot)
 		combatant_panels[enemy.id] = slot
 
+func _get_character_capsule_color(name: String, is_ally: bool) -> Color:
+	"""Get capsule color for a character or enemy based on name/type"""
+	if is_ally:
+		# Party member colors (placeholder capsule colors)
+		var name_lower = name.to_lower()
+		if "player" in name_lower:
+			return Color(1.0, 0.75, 0.85)  # Pink
+		elif "risa" in name_lower:
+			return Color(0.9, 0.2, 0.2)  # Red
+		elif "skye" in name_lower:
+			return Color(0.6, 0.85, 1.0)  # Light blue
+		elif "tessa" in name_lower:
+			return Color(1.0, 0.95, 0.4)  # Yellow
+		elif "kai" in name_lower:
+			return Color(0.7, 0.5, 0.9)  # Purple
+		elif "douglas" in name_lower:
+			return Color(0.3, 0.5, 0.9)  # Blue
+		elif "sev" in name_lower:
+			return Color(1.0, 0.6, 0.3)  # Orange
+		elif "matcha" in name_lower:
+			return Color(0.7, 0.95, 0.6)  # Light green
+		else:
+			return COLOR_BUBBLE_MAGENTA  # Default pink
+	else:
+		# Enemy colors based on type
+		var name_lower = name.to_lower()
+		if "slime" in name_lower:
+			return Color(0.2, 0.3, 0.6)  # Dark blue
+		elif "goblin" in name_lower:
+			return Color(0.2, 0.5, 0.3)  # Dark green
+		else:
+			return Color(0.4, 0.3, 0.5)  # Default dark purple
+
+func _has_enemy_scan_perk() -> bool:
+	"""Check if player has unlocked the perk to see enemy HP/MP"""
+	# For now, always return false - will implement perk system later
+	return false
+
+func _get_enemy_health_hint(enemy: Dictionary) -> String:
+	"""Get a text hint about enemy's health status"""
+	if enemy.hp_max <= 0:
+		return ""
+
+	var hp_percent = (float(enemy.hp) / float(enemy.hp_max)) * 100.0
+
+	if hp_percent <= 0:
+		return "%s has been defeated" % enemy.display_name
+	elif hp_percent < 30:
+		return "%s is in critical shape" % enemy.display_name
+	elif hp_percent < 60:
+		return "%s is not looking great" % enemy.display_name
+	else:
+		return "%s is holding strong" % enemy.display_name
+
 func _create_combatant_slot(combatant: Dictionary, is_ally: bool) -> PanelContainer:
 	"""Create a UI slot for a combatant with neon-kawaii sticker aesthetic"""
 	var panel = PanelContainer.new()
@@ -1580,43 +1824,33 @@ func _create_combatant_slot(combatant: Dictionary, is_ally: bool) -> PanelContai
 		panel.visible = false
 		panel.position = Vector2(-1000, -1000)  # Move off screen
 
-	# Apply neon-kawaii sticker style for allies
+	# Allies: Transparent background, only capsule and name visible
 	if is_ally:
-		panel.custom_minimum_size = Vector2(220, 110)
+		panel.custom_minimum_size = Vector2(80, 80)
 
-		# Sticker style: Dark fill with thick white keyline (2px per design spec)
+		# Make panel background completely transparent
 		var style = StyleBoxFlat.new()
-		style.bg_color = COLOR_INK_CHARCOAL  # Dark glass fill
-		style.border_width_left = 2
-		style.border_width_right = 2
-		style.border_width_top = 2
-		style.border_width_bottom = 2
-		style.border_color = COLOR_MILK_WHITE  # Thick white keyline
-		style.corner_radius_top_left = 12  # Soft rectangle
-		style.corner_radius_top_right = 12
-		style.corner_radius_bottom_left = 12
-		style.corner_radius_bottom_right = 12
-		style.shadow_size = 4
-		style.shadow_color = Color(COLOR_SKY_CYAN.r, COLOR_SKY_CYAN.g, COLOR_SKY_CYAN.b, 0.3)  # Subtle cyan glow
+		style.bg_color = Color(0, 0, 0, 0)  # Fully transparent
+		style.border_width_left = 0
+		style.border_width_right = 0
+		style.border_width_top = 0
+		style.border_width_bottom = 0
 		panel.add_theme_stylebox_override("panel", style)
 
 		# Apply subtle diagonal tilt
 		panel.rotation_degrees = randf_range(-2, 2)
 
-		# Horizontal layout for icon + info
-		var hbox = HBoxContainer.new()
-		hbox.add_theme_constant_override("separation", 10)
-		panel.add_child(hbox)
+		var vbox = VBoxContainer.new()
+		vbox.add_theme_constant_override("separation", 6)
+		panel.add_child(vbox)
 
-		# Character icon with thick white keyline (sticker edges)
+		# Character capsule icon (centered)
 		var icon_container = PanelContainer.new()
 		icon_container.custom_minimum_size = Vector2(40, 40)
 
 		var icon_style = StyleBoxFlat.new()
-		# Assign a neon color based on character index for variety
-		var icon_colors = [COLOR_BUBBLE_MAGENTA, COLOR_SKY_CYAN, COLOR_ELECTRIC_LIME, COLOR_CITRUS_YELLOW]
-		var hash_val = combatant.display_name.hash()
-		var icon_color = icon_colors[abs(hash_val) % icon_colors.size()]
+		# Get character-specific capsule color
+		var icon_color = _get_character_capsule_color(combatant.display_name, true)
 
 		icon_style.bg_color = icon_color
 		icon_style.border_width_left = 2
@@ -1624,162 +1858,77 @@ func _create_combatant_slot(combatant: Dictionary, is_ally: bool) -> PanelContai
 		icon_style.border_width_top = 2
 		icon_style.border_width_bottom = 2
 		icon_style.border_color = COLOR_MILK_WHITE  # White keyline around icon
-		icon_style.corner_radius_top_left = 8
-		icon_style.corner_radius_top_right = 8
-		icon_style.corner_radius_bottom_left = 8
-		icon_style.corner_radius_bottom_right = 8
+		# Make it circular (capsule) with full corner radius
+		icon_style.corner_radius_top_left = 20
+		icon_style.corner_radius_top_right = 20
+		icon_style.corner_radius_bottom_left = 20
+		icon_style.corner_radius_bottom_right = 20
 		icon_container.add_theme_stylebox_override("panel", icon_style)
 
-		hbox.add_child(icon_container)
-
-		# Info column (name + HP bar)
-		var vbox = VBoxContainer.new()
-		vbox.add_theme_constant_override("separation", 4)
-		vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		hbox.add_child(vbox)
-
-		# Name label (Milk White, all caps)
-		var name_label = Label.new()
-		name_label.text = combatant.display_name.to_upper()
-		name_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
-		name_label.add_theme_font_size_override("font_size", 11)
-		vbox.add_child(name_label)
-
-		# HP bar as pill shape with gradient fill
-		var hp_bar = ProgressBar.new()
-		hp_bar.max_value = combatant.hp_max
-		hp_bar.value = combatant.hp
-		hp_bar.show_percentage = false
-		hp_bar.custom_minimum_size = Vector2(0, 10)
-
-		# Pill background
-		var hp_bar_bg = StyleBoxFlat.new()
-		hp_bar_bg.bg_color = COLOR_NIGHT_NAVY
-		hp_bar_bg.corner_radius_top_left = 8
-		hp_bar_bg.corner_radius_top_right = 8
-		hp_bar_bg.corner_radius_bottom_left = 8
-		hp_bar_bg.corner_radius_bottom_right = 8
-		hp_bar.add_theme_stylebox_override("background", hp_bar_bg)
-
-		# Pill fill with gradient (Cyan to Milk White gradient)
-		var hp_bar_fill = StyleBoxFlat.new()
-		# Create two-tone effect: use cyan for >25%, transition to magenta for low HP
-		var hp_percent = float(combatant.hp) / float(combatant.hp_max) if combatant.hp_max > 0 else 1.0
-		var fill_color = COLOR_SKY_CYAN if hp_percent > 0.25 else COLOR_BUBBLE_MAGENTA
-		hp_bar_fill.bg_color = fill_color
-		hp_bar_fill.corner_radius_top_left = 8
-		hp_bar_fill.corner_radius_top_right = 8
-		hp_bar_fill.corner_radius_bottom_left = 8
-		hp_bar_fill.corner_radius_bottom_right = 8
-		hp_bar.add_theme_stylebox_override("fill", hp_bar_fill)
-
-		vbox.add_child(hp_bar)
-
-		# HP text (current/max in small monospace)
-		var hp_label = Label.new()
-		hp_label.text = "%d/%d HP" % [combatant.hp, combatant.hp_max]
-		hp_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
-		hp_label.add_theme_font_size_override("font_size", 8)
-		vbox.add_child(hp_label)
-
-		# MP bar (if character has MP)
-		if combatant.mp_max > 0:
-			var mp_bar = ProgressBar.new()
-			mp_bar.max_value = combatant.mp_max
-			mp_bar.value = combatant.mp
-			mp_bar.show_percentage = false
-			mp_bar.custom_minimum_size = Vector2(0, 8)
-
-			# Pill background
-			var mp_bar_bg = StyleBoxFlat.new()
-			mp_bar_bg.bg_color = COLOR_NIGHT_NAVY
-			mp_bar_bg.corner_radius_top_left = 8
-			mp_bar_bg.corner_radius_top_right = 8
-			mp_bar_bg.corner_radius_bottom_left = 8
-			mp_bar_bg.corner_radius_bottom_right = 8
-			mp_bar.add_theme_stylebox_override("background", mp_bar_bg)
-
-			# Pill fill - use Grape Violet for MP
-			var mp_bar_fill = StyleBoxFlat.new()
-			mp_bar_fill.bg_color = COLOR_GRAPE_VIOLET
-			mp_bar_fill.corner_radius_top_left = 8
-			mp_bar_fill.corner_radius_top_right = 8
-			mp_bar_fill.corner_radius_bottom_left = 8
-			mp_bar_fill.corner_radius_bottom_right = 8
-			mp_bar.add_theme_stylebox_override("fill", mp_bar_fill)
-
-			vbox.add_child(mp_bar)
-
-			# MP text
-			var mp_label = Label.new()
-			mp_label.text = "%d/%d MP" % [combatant.mp, combatant.mp_max]
-			mp_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
-			mp_label.add_theme_font_size_override("font_size", 8)
-			vbox.add_child(mp_label)
-
-	else:
-		# Enemies: Simpler sticker style
-		panel.custom_minimum_size = Vector2(140, 90)
-
-		var style = StyleBoxFlat.new()
-		style.bg_color = COLOR_NIGHT_NAVY
-		style.border_width_left = 2
-		style.border_width_right = 2
-		style.border_width_top = 2
-		style.border_width_bottom = 2
-		style.border_color = COLOR_BUBBLE_MAGENTA  # Magenta for enemies
-		style.corner_radius_top_left = 12
-		style.corner_radius_top_right = 12
-		style.corner_radius_bottom_left = 12
-		style.corner_radius_bottom_right = 12
-		style.shadow_size = 4
-		style.shadow_color = Color(COLOR_BUBBLE_MAGENTA.r, COLOR_BUBBLE_MAGENTA.g, COLOR_BUBBLE_MAGENTA.b, 0.3)
-		panel.add_theme_stylebox_override("panel", style)
-
-		var vbox = VBoxContainer.new()
-		vbox.add_theme_constant_override("separation", 4)
-		panel.add_child(vbox)
+		var icon_center = CenterContainer.new()
+		icon_center.add_child(icon_container)
+		vbox.add_child(icon_center)
 
 		# Name label
 		var name_label = Label.new()
 		name_label.text = combatant.display_name.to_upper()
 		name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		name_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
-		name_label.add_theme_font_size_override("font_size", 11)
+		name_label.add_theme_font_size_override("font_size", 9)
 		vbox.add_child(name_label)
 
-		# HP bar
-		var hp_bar = ProgressBar.new()
-		hp_bar.max_value = combatant.hp_max
-		hp_bar.value = combatant.hp
-		hp_bar.show_percentage = false
-		hp_bar.custom_minimum_size = Vector2(0, 10)
+		# Don't show HP/MP bars for allies (clean capsule style)
 
-		var hp_bar_bg = StyleBoxFlat.new()
-		hp_bar_bg.bg_color = COLOR_NIGHT_NAVY.darkened(0.2)
-		hp_bar_bg.corner_radius_top_left = 8
-		hp_bar_bg.corner_radius_top_right = 8
-		hp_bar_bg.corner_radius_bottom_left = 8
-		hp_bar_bg.corner_radius_bottom_right = 8
-		hp_bar.add_theme_stylebox_override("background", hp_bar_bg)
+	else:
+		# Enemies: Transparent background, only capsule and name visible
+		panel.custom_minimum_size = Vector2(80, 80)
 
-		var hp_bar_fill = StyleBoxFlat.new()
-		hp_bar_fill.bg_color = COLOR_BUBBLE_MAGENTA
-		hp_bar_fill.corner_radius_top_left = 8
-		hp_bar_fill.corner_radius_top_right = 8
-		hp_bar_fill.corner_radius_bottom_left = 8
-		hp_bar_fill.corner_radius_bottom_right = 8
-		hp_bar.add_theme_stylebox_override("fill", hp_bar_fill)
+		# Make panel background completely transparent
+		var style = StyleBoxFlat.new()
+		style.bg_color = Color(0, 0, 0, 0)  # Fully transparent
+		style.border_width_left = 0
+		style.border_width_right = 0
+		style.border_width_top = 0
+		style.border_width_bottom = 0
+		panel.add_theme_stylebox_override("panel", style)
 
-		vbox.add_child(hp_bar)
+		var vbox = VBoxContainer.new()
+		vbox.add_theme_constant_override("separation", 6)
+		panel.add_child(vbox)
 
-		# HP label
-		var hp_label = Label.new()
-		hp_label.text = "%d/%d" % [combatant.hp, combatant.hp_max]
-		hp_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		hp_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
-		hp_label.add_theme_font_size_override("font_size", 8)
-		vbox.add_child(hp_label)
+		# Enemy capsule icon (centered)
+		var icon_container = PanelContainer.new()
+		icon_container.custom_minimum_size = Vector2(40, 40)
+
+		var icon_style = StyleBoxFlat.new()
+		var icon_color = _get_character_capsule_color(combatant.display_name, false)
+
+		icon_style.bg_color = icon_color
+		icon_style.border_width_left = 2
+		icon_style.border_width_right = 2
+		icon_style.border_width_top = 2
+		icon_style.border_width_bottom = 2
+		icon_style.border_color = COLOR_MILK_WHITE  # White keyline around icon
+		# Make it circular (capsule)
+		icon_style.corner_radius_top_left = 20
+		icon_style.corner_radius_top_right = 20
+		icon_style.corner_radius_bottom_left = 20
+		icon_style.corner_radius_bottom_right = 20
+		icon_container.add_theme_stylebox_override("panel", icon_style)
+
+		var icon_center = CenterContainer.new()
+		icon_center.add_child(icon_container)
+		vbox.add_child(icon_center)
+
+		# Name label
+		var name_label = Label.new()
+		name_label.text = combatant.display_name.to_upper()
+		name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		name_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
+		name_label.add_theme_font_size_override("font_size", 9)
+		vbox.add_child(name_label)
+
+		# Don't show HP/MP bars for enemies (hidden until scan perk unlocked)
 
 	# Store combatant ID in metadata
 	panel.set_meta("combatant_id", combatant.id)
@@ -2098,6 +2247,9 @@ func _on_attack_pressed() -> void:
 	if is_in_round_transition:
 		return
 
+	# Activate the Fight button with visual feedback
+	_activate_action_button("AttackButton", COLOR_BUBBLE_MAGENTA)
+
 	_show_instruction("Select an enemy.")
 
 	# Get alive enemies
@@ -2126,7 +2278,7 @@ func _execute_attack(target: Dictionary) -> void:
 	_clear_target_highlights()
 
 	# Check if frozen combatant can act
-	if not _check_freeze_action_allowed():
+	if not await _check_freeze_action_allowed():
 		return
 
 	# Clear defending status when attacking
@@ -2146,6 +2298,10 @@ func _execute_attack(target: Dictionary) -> void:
 			add_turn_line("But it missed!")
 			add_turn_line("(Hit chance: %d%%, rolled %d)" % [int(hit_check.hit_chance), hit_check.roll])
 			queue_turn_message()  # Queue the full turn message
+
+			# Wait for messages to be displayed to player
+			await _wait_for_message_queue()
+
 			print("[Battle] Miss! Hit chance: %.1f%%, Roll: %d" % [hit_check.hit_chance, hit_check.roll])
 		else:
 			# Hit! Launch attack minigame
@@ -2246,11 +2402,19 @@ func _execute_attack(target: Dictionary) -> void:
 			# Add KO or status line
 			if target.is_ko:
 				add_turn_line("%s fainted!" % target.display_name)
-			elif weakness_line == "":  # Only show HP if no weakness
-				add_turn_line("%s has %d HP left." % [target.display_name, target.hp])
+			elif weakness_line == "":  # Only show status hint if no weakness
+				# For enemies, show health hint instead of exact HP
+				var is_enemy = target in battle_mgr.get_enemy_combatants()
+				if is_enemy:
+					add_turn_line(_get_enemy_health_hint(target))
+				else:
+					add_turn_line("%s has %d HP left." % [target.display_name, target.hp])
 
 			# Queue the full turn message
 			queue_turn_message()
+
+			# Wait for messages to be displayed to player
+			await _wait_for_message_queue()
 
 			# Debug: show hit, crit, and damage breakdown
 			var hit_breakdown = hit_check.breakdown
@@ -2298,6 +2462,9 @@ func _execute_attack(target: Dictionary) -> void:
 		print("[Battle] Battle ended after attack - skipping end turn")
 		return  # Battle ended
 
+	# Slide back before ending turn
+	await _reset_turn_indicator()
+
 	# End turn
 	battle_mgr.end_turn()
 
@@ -2307,17 +2474,28 @@ func _on_skill_pressed() -> void:
 	if is_in_round_transition:
 		return
 
+	# Activate the Skill button with visual feedback
+	_activate_action_button("SkillButton", COLOR_SKY_CYAN)
+
 	var sigils = current_combatant.get("sigils", [])
 	var skills = current_combatant.get("skills", [])
 
 	if skills.is_empty():
-		log_message("No skills available!")
+		_clear_active_action_button()
+		if battle_log:
+			battle_log.clear()
+			battle_log.append_text("No skills available!")
+			battle_log.append_text("\nTarget selection cancelled.")
 		return
 
 	# Get SigilSystem for display names
 	var sigil_sys = get_node_or_null("/root/aSigilSystem")
 	if not sigil_sys:
-		log_message("Sigil system not available!")
+		_clear_active_action_button()
+		if battle_log:
+			battle_log.clear()
+			battle_log.append_text("Sigil system not available!")
+			battle_log.append_text("\nTarget selection cancelled.")
 		return
 
 	# Build skill menu with sigil info
@@ -2384,6 +2562,9 @@ func _on_item_pressed() -> void:
 	# Block input during round transitions
 	if is_in_round_transition:
 		return
+
+	# Activate the Items button with visual feedback
+	_activate_action_button("ItemButton", COLOR_ELECTRIC_LIME)
 
 	var inventory = get_node_or_null("/root/aInventorySystem")
 	if not inventory:
@@ -2477,6 +2658,9 @@ func _on_capture_pressed() -> void:
 	# Block input during round transitions
 	if is_in_round_transition:
 		return
+
+	# Activate the Capture button with visual feedback
+	_activate_action_button("CaptureButton", COLOR_GRAPE_VIOLET)
 
 	var inventory = get_node_or_null("/root/aInventorySystem")
 	if not inventory:
@@ -2694,7 +2878,7 @@ func _execute_item_usage(target: Dictionary) -> void:
 	_clear_target_highlights()
 
 	# Check if frozen combatant can act
-	if not _check_freeze_action_allowed():
+	if not await _check_freeze_action_allowed():
 		return
 
 	# Get the item that was selected
@@ -2751,6 +2935,9 @@ func _execute_item_usage(target: Dictionary) -> void:
 		add_turn_line("%s is protected by a %s Mirror! (Duration: %d rounds)" % [target.display_name, reflect_type.capitalize(), duration])
 		queue_turn_message()
 
+		# Wait for messages to be displayed to player
+		await _wait_for_message_queue()
+
 	# ═══════ BOMB ITEMS (AOE Damage) ═══════
 	elif "AOE" in effect or "Bomb" in item_name:
 		# Get bomb element from mind_type_tag
@@ -2799,6 +2986,9 @@ func _execute_item_usage(target: Dictionary) -> void:
 		for line in damage_lines:
 			add_turn_line(line)
 		queue_turn_message()
+
+		# Wait for messages to be displayed to player
+		await _wait_for_message_queue()
 
 		_update_combatant_displays()
 
@@ -2854,6 +3044,9 @@ func _execute_item_usage(target: Dictionary) -> void:
 
 		queue_turn_message()
 
+		# Wait for messages to be displayed to player
+		await _wait_for_message_queue()
+
 	# ═══════ BUFF ITEMS (ATK Up, MND Up, Shield, etc.) ═══════
 	elif "Up" in effect or "Shield" in effect or "Regen" in effect or "Speed" in effect or "Hit%" in effect or "Evasion%" in effect or "SkillHit%" in effect:
 		# Determine buff type and magnitude
@@ -2893,6 +3086,9 @@ func _execute_item_usage(target: Dictionary) -> void:
 			add_turn_line("%s used %s on %s!" % [current_combatant.display_name, item_name, target.display_name])
 			add_turn_line("%s gained %s for %d turns!" % [target.display_name, buff_type.replace("_", " ").capitalize(), duration])
 			queue_turn_message()
+
+			# Wait for messages to be displayed to player
+			await _wait_for_message_queue()
 
 			# Refresh turn order to show buff immediately
 			if battle_mgr:
@@ -2951,6 +3147,9 @@ func _execute_item_usage(target: Dictionary) -> void:
 			add_turn_line(cure_message)
 		queue_turn_message()
 
+		# Wait for messages to be displayed to player
+		await _wait_for_message_queue()
+
 	# ═══════ HEAL ITEMS ═══════
 	elif "Heal" in effect:
 		# Parse heal amount from effect string (e.g., "Heal 50 HP")
@@ -3004,6 +3203,9 @@ func _execute_item_usage(target: Dictionary) -> void:
 			add_turn_line("Restored %d MP!" % actual_heal)
 
 		queue_turn_message()
+
+		# Wait for messages to be displayed to player
+		await _wait_for_message_queue()
 
 		# Update displays
 		_update_combatant_displays()
@@ -3099,9 +3301,15 @@ func _execute_item_usage(target: Dictionary) -> void:
 		if battle_mgr:
 			battle_mgr.refresh_turn_order()
 
+	# Wait for ailment/debuff messages to be displayed (if any)
+	await _wait_for_message_queue()
+
 	# Consume the item
 	var inventory = get_node("/root/aInventorySystem")
 	inventory.remove_item(item_id, 1)
+
+	# Slide back before ending turn
+	await _reset_turn_indicator()
 
 	# End turn
 	battle_mgr.end_turn()
@@ -3112,8 +3320,11 @@ func _on_defend_pressed() -> void:
 	if is_in_round_transition:
 		return
 
+	# Activate the Guard button with visual feedback
+	_activate_action_button("DefendButton", COLOR_PLASMA_TEAL)
+
 	# Check if frozen combatant can act
-	if not _check_freeze_action_allowed():
+	if not await _check_freeze_action_allowed():
 		return
 
 	# Show confirmation dialog
@@ -3125,6 +3336,9 @@ func _execute_defend() -> void:
 	log_message("%s moved into a defensive stance." % current_combatant.display_name)
 	current_combatant.is_defending = true
 
+	# Slide back before ending turn
+	_reset_turn_indicator()
+
 	# End turn
 	print("[Battle] Calling battle_mgr.end_turn()")
 	battle_mgr.end_turn()
@@ -3135,21 +3349,36 @@ func _on_burst_pressed() -> void:
 	if is_in_round_transition:
 		return
 
+	# Activate the Burst button with visual feedback
+	_activate_action_button("BurstButton", COLOR_CITRUS_YELLOW)
+
 	# Check if frozen combatant can act
-	if not _check_freeze_action_allowed():
+	if not await _check_freeze_action_allowed():
 		return
 
 	# Only hero can use burst abilities
 	if current_combatant.get("id", "") != "hero":
-		log_message("Only %s can use Burst abilities!" % _get_hero_display_name())
+		_clear_active_action_button()
+		if battle_log:
+			battle_log.clear()
+			battle_log.append_text("Only %s can use Burst abilities!" % _get_hero_display_name())
+			battle_log.append_text("\nTarget selection cancelled.")
 		return
 
 	if not burst_system:
-		log_message("Burst system not available!")
+		_clear_active_action_button()
+		if battle_log:
+			battle_log.clear()
+			battle_log.append_text("Burst system not available!")
+			battle_log.append_text("\nTarget selection cancelled.")
 		return
 
 	if not battle_mgr:
-		log_message("Battle manager not available!")
+		_clear_active_action_button()
+		if battle_log:
+			battle_log.clear()
+			battle_log.append_text("Battle manager not available!")
+			battle_log.append_text("\nTarget selection cancelled.")
 		return
 
 	# Get current party IDs (all allies in battle)
@@ -3163,14 +3392,22 @@ func _on_burst_pressed() -> void:
 					party_ids.append(id)
 
 	if party_ids.is_empty():
-		log_message("No active party members!")
+		_clear_active_action_button()
+		if battle_log:
+			battle_log.clear()
+			battle_log.append_text("No active party members!")
+			battle_log.append_text("\nTarget selection cancelled.")
 		return
 
 	# Get available burst abilities
 	var available_bursts = burst_system.get_available_bursts(party_ids)
 
 	if available_bursts.is_empty():
-		_show_instruction("No Bursts available.")
+		_clear_active_action_button()
+		if battle_log:
+			battle_log.clear()
+			battle_log.append_text("No Bursts available.")
+			battle_log.append_text("\nTarget selection cancelled.")
 		return
 
 	_show_instruction("Choose Burst Ability")
@@ -3184,8 +3421,11 @@ func _on_run_pressed() -> void:
 	if is_in_round_transition:
 		return
 
+	# Activate the Run button with visual feedback
+	_activate_action_button("RunButton", COLOR_INK_CHARCOAL)
+
 	# Check if frozen combatant can act
-	if not _check_freeze_action_allowed():
+	if not await _check_freeze_action_allowed():
 		return
 
 	# Check if run was already attempted this round
@@ -3251,6 +3491,9 @@ func _execute_run() -> void:
 		# Wait for message acknowledgment before ending turn
 		await _wait_for_message_queue()
 
+		# Slide back before ending turn
+		await _reset_turn_indicator()
+
 		battle_mgr.end_turn()
 
 func _on_status_pressed() -> void:
@@ -3258,6 +3501,9 @@ func _on_status_pressed() -> void:
 	# Block input during round transitions
 	if is_in_round_transition:
 		return
+
+	# Activate the Status button with visual feedback
+	_activate_action_button("StatusButton", COLOR_MILK_WHITE)
 
 	_show_instruction("Choose a character.")
 
@@ -3397,7 +3643,7 @@ func _show_status_character_picker() -> void:
 	status_picker_panel.add_theme_stylebox_override("panel", panel_style)
 
 	status_picker_panel.position = get_viewport_rect().size / 2 - status_picker_panel.custom_minimum_size / 2
-	status_picker_panel.position.y -= 60  # Move up 60px
+	status_picker_panel.position.y -= 110  # Move up 110px (60 + 40 + 10)
 	status_picker_panel.z_index = 100
 	status_picker_panel.mouse_filter = Control.MOUSE_FILTER_STOP
 
@@ -3465,7 +3711,8 @@ func _show_status_character_picker() -> void:
 
 		for enemy in enemies:
 			var btn = Button.new()
-			var hp_text = "%d/%d HP" % [enemy.hp, enemy.hp_max]
+			# Show "??" for enemy HP unless scan perk unlocked
+			var hp_text = "??/?? HP" if not _has_enemy_scan_perk() else "%d/%d HP" % [enemy.hp, enemy.hp_max]
 			var status_text = ""
 			if enemy.is_ko:
 				status_text = " [KO]"
@@ -3615,62 +3862,86 @@ func _on_ally_panel_input(event: InputEvent, target: Dictionary) -> void:
 					_execute_item_usage(target)
 
 func _highlight_target_candidates() -> void:
-	"""Highlight valid targets with a visual indicator"""
-	# Get currently selected target ID
-	var selected_target_id = ""
-	if selected_target_index >= 0 and selected_target_index < target_candidates.size():
-		selected_target_id = target_candidates[selected_target_index].id
+	"""Show selection indicator above currently selected target"""
+	# Clear existing indicator
+	_clear_target_highlights()
 
-	# Highlight enemies
+	# Get currently selected target
+	if selected_target_index < 0 or selected_target_index >= target_candidates.size():
+		return
+
+	var selected_target = target_candidates[selected_target_index]
+	var selected_target_id = selected_target.id
+
+	# Find the panel for this target
+	var target_panel: Control = null
 	for child in enemy_slots.get_children():
-		var combatant_id = child.get_meta("combatant_id", "")
-		var is_candidate = target_candidates.any(func(c): return c.id == combatant_id)
+		if child.get_meta("combatant_id", "") == selected_target_id:
+			target_panel = child
+			break
 
-		if is_candidate:
-			var style = StyleBoxFlat.new()
-			style.bg_color = Color(0.3, 0.2, 0.2, 0.9)
-			style.border_width_left = 4
-			style.border_width_right = 4
-			style.border_width_top = 4
-			style.border_width_bottom = 4
+	if target_panel == null:
+		for child in ally_slots.get_children():
+			if child.get_meta("combatant_id", "") == selected_target_id:
+				target_panel = child
+				break
 
-			# Red border for currently selected, yellow for others
-			if combatant_id == selected_target_id:
-				style.border_color = Color(1.0, 0.2, 0.2, 1.0)  # Red - currently selected
-			else:
-				style.border_color = Color(1.0, 1.0, 0.0, 1.0)  # Yellow - targetable
+	if target_panel == null:
+		return
 
-			child.add_theme_stylebox_override("panel", style)
+	# Create selection indicator (animated arrow/marker above target)
+	selection_indicator = Control.new()
+	selection_indicator.custom_minimum_size = Vector2(60, 30)
+	selection_indicator.z_index = 50
+	add_child(selection_indicator)
 
-	# Highlight allies (for items)
-	for child in ally_slots.get_children():
-		var combatant_id = child.get_meta("combatant_id", "")
-		var is_candidate = target_candidates.any(func(c): return c.id == combatant_id)
+	# Position above the target panel
+	var indicator_pos = target_panel.global_position
+	indicator_pos.y -= 35  # Hover above
+	indicator_pos.x += (target_panel.size.x / 2) - 30  # Center horizontally
+	selection_indicator.global_position = indicator_pos
 
-		if is_candidate:
-			var style = StyleBoxFlat.new()
-			style.bg_color = Color(0.2, 0.3, 0.2, 0.9)
-			style.border_width_left = 4
-			style.border_width_right = 4
-			style.border_width_top = 4
-			style.border_width_bottom = 4
+	# Draw the indicator
+	selection_indicator.draw.connect(_draw_selection_indicator)
+	selection_indicator.queue_redraw()
 
-			# Red border for currently selected, green for others
-			if combatant_id == selected_target_id:
-				style.border_color = Color(1.0, 0.2, 0.2, 1.0)  # Red - currently selected
-			else:
-				style.border_color = Color(0.0, 1.0, 0.0, 1.0)  # Green - targetable
+	# Animate bouncing
+	var tween = create_tween()
+	tween.set_loops()
+	tween.tween_property(selection_indicator, "position:y", selection_indicator.position.y - 5, 0.5)
+	tween.tween_property(selection_indicator, "position:y", selection_indicator.position.y, 0.5)
 
-			child.add_theme_stylebox_override("panel", style)
+func _draw_selection_indicator() -> void:
+	"""Draw a white arrow with shadow pointing down at the target"""
+	if not selection_indicator:
+		return
+
+	# Create a clear downward-pointing arrow shape
+	var points = PackedVector2Array([
+		Vector2(15, 0),   # Top left
+		Vector2(45, 0),   # Top right
+		Vector2(45, 10),  # Right side top
+		Vector2(35, 10),  # Right side inner
+		Vector2(30, 20),  # Bottom point (tip)
+		Vector2(25, 10),  # Left side inner
+		Vector2(15, 10),  # Left side top
+	])
+
+	# Draw shadow first (offset and darkened)
+	var shadow_offset = Vector2(2, 2)
+	var shadow_points = PackedVector2Array()
+	for point in points:
+		shadow_points.append(point + shadow_offset)
+	selection_indicator.draw_colored_polygon(shadow_points, Color(0.0, 0.0, 0.0, 0.5))
+
+	# Draw white arrow on top
+	selection_indicator.draw_colored_polygon(points, COLOR_MILK_WHITE)
 
 func _clear_target_highlights() -> void:
-	"""Remove targeting highlights from all panels"""
-	for child in enemy_slots.get_children():
-		# Reset to default panel style
-		child.remove_theme_stylebox_override("panel")
-	for child in ally_slots.get_children():
-		# Reset to default panel style
-		child.remove_theme_stylebox_override("panel")
+	"""Remove selection indicator"""
+	if selection_indicator:
+		selection_indicator.queue_free()
+		selection_indicator = null
 
 ## ═══════════════════════════════════════════════════════════════
 ## ENEMY AI
@@ -3783,11 +4054,19 @@ func _execute_enemy_ai() -> void:
 			# Add KO or status line
 			if target.is_ko:
 				add_turn_line("%s fainted!" % target.display_name)
-			elif weakness_line == "":  # Only show HP if no weakness
-				add_turn_line("%s has %d HP left." % [target.display_name, target.hp])
+			elif weakness_line == "":  # Only show status hint if no weakness
+				# For enemies, show health hint instead of exact HP
+				var is_enemy = target in battle_mgr.get_enemy_combatants()
+				if is_enemy:
+					add_turn_line(_get_enemy_health_hint(target))
+				else:
+					add_turn_line("%s has %d HP left." % [target.display_name, target.hp])
 
 			# Queue the full turn message
 			queue_turn_message()
+
+			# Wait for messages to be displayed to player
+			await _wait_for_message_queue()
 
 			# Debug: show hit, crit, and damage breakdown
 			var hit_breakdown = hit_check.breakdown
@@ -4125,9 +4404,9 @@ func _create_continue_indicator() -> void:
 	continue_indicator.add_theme_color_override("font_color", COLOR_ELECTRIC_LIME)
 	continue_indicator.add_theme_font_size_override("font_size", 20)
 
-	# Position in bottom-right corner of battle log panel
+	# Position in bottom-right corner of battle log panel (moved up 10px and left 10px)
 	# BattleLogPanel: offset_left=360, offset_top=-200, offset_right=920, offset_bottom=-50
-	continue_indicator.position = Vector2(880, get_viewport().get_visible_rect().size.y - 70)
+	continue_indicator.position = Vector2(870, get_viewport().get_visible_rect().size.y - 80)
 	continue_indicator.size = Vector2(30, 20)
 	continue_indicator.modulate.a = 0.0  # Start invisible
 
@@ -4202,8 +4481,7 @@ func _show_confirmation_dialog(message: String, on_confirm: Callable) -> void:
 	awaiting_confirmation = true
 	confirmation_callback = on_confirm
 
-	# Disable action menu while showing confirmation
-	_disable_action_menu()
+	# Don't disable action menu - keep it visible during confirmation
 
 	# Create confirmation panel
 	confirmation_panel = PanelContainer.new()
@@ -4292,6 +4570,9 @@ func _on_confirmation_no() -> void:
 	_close_confirmation_dialog()
 	_hide_instruction()
 
+	# Clear active button visual feedback
+	_clear_active_action_button()
+
 	# Re-enable action menu
 	_enable_action_menu()
 
@@ -4313,8 +4594,7 @@ func _close_confirmation_dialog() -> void:
 
 func _show_skill_menu(skill_menu: Array) -> void:
 	"""Show skill selection menu with sigils"""
-	# Disable and dim action menu
-	_disable_action_menu()
+	# Don't disable action menu - keep it visible
 
 	# Store current menu
 	current_skill_menu = skill_menu
@@ -4461,10 +4741,10 @@ func _show_skill_menu(skill_menu: Array) -> void:
 	# Add to scene
 	add_child(skill_menu_panel)
 
-	# Center it
+	# Center it (moved left 30px)
 	skill_menu_panel.position = Vector2(
 		(get_viewport_rect().size.x - skill_menu_panel.custom_minimum_size.x) / 2,
-		100
+		200  # Moved down 100px
 	)
 
 	# Highlight first button if available (Change Mind Type will be first if it exists)
@@ -4607,6 +4887,9 @@ func _close_skill_menu() -> void:
 	current_skill_menu = []
 	skill_menu_buttons = []
 	selected_skill_index = 0
+
+	# Clear active button visual feedback
+	_clear_active_action_button()
 
 	# Enable action menu again
 	_enable_action_menu()
@@ -4752,6 +5035,9 @@ func _close_status_picker() -> void:
 	status_picker_data = []
 	selected_status_index = 0
 
+	# Clear active button visual feedback
+	_clear_active_action_button()
+
 func _highlight_status_button(index: int) -> void:
 	"""Highlight a status picker button"""
 	if index >= 0 and index < status_picker_buttons.size():
@@ -4788,8 +5074,7 @@ func _close_status_details() -> void:
 
 func _show_item_menu(items: Array) -> void:
 	"""Show item selection menu with categorized tabs"""
-	# Disable and dim action menu
-	_disable_action_menu()
+	# Don't disable action menu - keep it visible
 
 	# Reset navigation
 	item_menu_buttons = []
@@ -4890,7 +5175,7 @@ func _show_item_menu(items: Array) -> void:
 	# Add to scene and center (moved up 130px total)
 	add_child(item_menu_panel)
 	item_menu_panel.position = Vector2(
-		(get_viewport_rect().size.x - 440) / 2,  # Adjusted for new width (440px)
+		(get_viewport_rect().size.x - 440) / 2 - 30,  # Moved left 30px
 		(get_viewport_rect().size.y - 400) / 2 - 130  # Moved up 130px total (30px more)
 	)
 
@@ -4964,6 +5249,9 @@ func _close_item_menu() -> void:
 	item_scroll_container = null
 	item_menu_buttons = []
 	selected_item_index = 0
+
+	# Clear active button visual feedback
+	_clear_active_action_button()
 
 	# Enable action menu again
 	_enable_action_menu()
@@ -5253,16 +5541,15 @@ func _on_item_selected(item_data: Dictionary) -> void:
 
 func _show_capture_menu(bind_items: Array) -> void:
 	"""Show bind item selection menu for capture"""
-	# Disable and dim action menu
-	_disable_action_menu()
+	# Don't disable action menu - keep it visible until minigame starts
 
 	# Reset navigation
 	capture_menu_buttons = []
 	selected_capture_index = 0
 
-	# Create capture menu panel (wider for 2 columns)
+	# Create capture menu panel (1 column, 500x400px)
 	capture_menu_panel = PanelContainer.new()
-	capture_menu_panel.custom_minimum_size = Vector2(800, 0)
+	capture_menu_panel.custom_minimum_size = Vector2(500, 400)
 
 	# Style the panel with Core vibe
 	var style = StyleBoxFlat.new()
@@ -5296,22 +5583,19 @@ func _show_capture_menu(bind_items: Array) -> void:
 	var sep1 = HSeparator.new()
 	vbox.add_child(sep1)
 
-	# Create scroll container for bind items (2 columns, show max 3 rows at a time)
+	# Create scroll container for bind items (1 column)
 	var scroll = ScrollContainer.new()
-	var rows_to_show = min(ceili(bind_items.size() / 2.0), 3)  # Show up to 3 rows (6 items)
-	scroll.custom_minimum_size = Vector2(780, rows_to_show * 55)  # 55px per row (50px button + 5px spacing)
+	scroll.custom_minimum_size = Vector2(480, 280)  # Fixed height for consistency
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 	vbox.add_child(scroll)
 
-	# Create GridContainer for scrollable bind item buttons (2 columns)
-	var items_grid = GridContainer.new()
-	items_grid.columns = 2
-	items_grid.add_theme_constant_override("h_separation", 10)
-	items_grid.add_theme_constant_override("v_separation", 5)
-	scroll.add_child(items_grid)
+	# Create VBox for scrollable bind item buttons (1 column)
+	var items_vbox = VBoxContainer.new()
+	items_vbox.add_theme_constant_override("separation", 5)
+	scroll.add_child(items_vbox)
 
-	# Add bind item buttons (2 columns)
+	# Add bind item buttons (1 column)
 	for i in range(bind_items.size()):
 		var bind_data = bind_items[i]
 		var bind_name = str(bind_data.get("name", "Unknown"))
@@ -5321,9 +5605,9 @@ func _show_capture_menu(bind_items: Array) -> void:
 
 		var button = Button.new()
 		button.text = "%s (x%d) [+%d%%]\n%s" % [bind_name, bind_count, capture_mod, bind_desc]
-		button.custom_minimum_size = Vector2(375, 50)  # Width for 2 columns (780 - 10 spacing) / 2
+		button.custom_minimum_size = Vector2(460, 60)  # Full width, taller for readability
 		button.pressed.connect(_on_bind_selected.bind(bind_data))
-		items_grid.add_child(button)
+		items_vbox.add_child(button)
 
 		# Add to navigation list
 		capture_menu_buttons.append(button)
@@ -5334,15 +5618,15 @@ func _show_capture_menu(bind_items: Array) -> void:
 
 	var cancel_btn = Button.new()
 	cancel_btn.text = "Cancel"
-	cancel_btn.custom_minimum_size = Vector2(780, 40)
+	cancel_btn.custom_minimum_size = Vector2(480, 40)
 	cancel_btn.pressed.connect(_close_capture_menu)
 	vbox.add_child(cancel_btn)
 
-	# Add to scene and center
+	# Add to scene and center (moved up 150px)
 	add_child(capture_menu_panel)
 	capture_menu_panel.position = Vector2(
-		(get_viewport_rect().size.x - 800) / 2,
-		(get_viewport_rect().size.y - vbox.size.y) / 2
+		(get_viewport_rect().size.x - 500) / 2,
+		(get_viewport_rect().size.y - 400) / 2 - 137  # Moved down 43px total (was -150, then -165, now -137)
 	)
 
 	# Highlight first item if available
@@ -5362,61 +5646,36 @@ func _close_capture_menu() -> void:
 	capture_menu_buttons = []
 	selected_capture_index = 0
 
+	# Clear active button visual feedback
+	_clear_active_action_button()
+
 	# Enable action menu again
 	_enable_action_menu()
 
 func _navigate_capture_menu_vertical(direction: int) -> void:
-	"""Navigate capture menu vertically (direction: -2 for up, 2 for down in 2-column grid)"""
+	"""Navigate capture menu vertically (direction: -1 for up, 1 for down in single column)"""
 	if capture_menu_buttons.is_empty():
 		return
 
 	# Remove highlight from current button
 	_unhighlight_capture_button(selected_capture_index)
 
-	# Move selection vertically
-	var new_index = selected_capture_index + direction
+	# Move selection up or down
+	selected_capture_index += direction
 
-	# Wrap around vertically
-	if new_index < 0:
-		# If going up from top row, wrap to bottom
-		# Find last item in same column
-		var column = selected_capture_index % 2
-		var last_row = (capture_menu_buttons.size() - 1) / 2
-		new_index = last_row * 2 + column
-		# Make sure it doesn't exceed array size
-		if new_index >= capture_menu_buttons.size():
-			new_index = capture_menu_buttons.size() - 1
-	elif new_index >= capture_menu_buttons.size():
-		# If going down from bottom row, wrap to top
-		var column = selected_capture_index % 2
-		new_index = column
-
-	selected_capture_index = new_index
+	# Wrap around
+	if selected_capture_index < 0:
+		selected_capture_index = capture_menu_buttons.size() - 1
+	elif selected_capture_index >= capture_menu_buttons.size():
+		selected_capture_index = 0
 
 	# Highlight new button
 	_highlight_capture_button(selected_capture_index)
 
-func _navigate_capture_menu_horizontal(direction: int) -> void:
-	"""Navigate capture menu horizontally (direction: -1 for left, 1 for right in 2-column grid)"""
-	if capture_menu_buttons.is_empty():
-		return
-
-	# Remove highlight from current button
-	_unhighlight_capture_button(selected_capture_index)
-
-	# Move selection horizontally
-	var new_index = selected_capture_index + direction
-
-	# Wrap around horizontally
-	if new_index < 0:
-		new_index = capture_menu_buttons.size() - 1
-	elif new_index >= capture_menu_buttons.size():
-		new_index = 0
-
-	selected_capture_index = new_index
-
-	# Highlight new button
-	_highlight_capture_button(selected_capture_index)
+func _navigate_capture_menu_horizontal(_direction: int) -> void:
+	"""Navigate capture menu horizontally - not used for single column layout"""
+	# Single column layout doesn't need horizontal navigation
+	pass
 
 func _confirm_capture_selection() -> void:
 	"""Confirm capture item selection with A button"""
@@ -5441,8 +5700,6 @@ func _on_bind_selected(bind_data: Dictionary) -> void:
 	"""Handle bind item selection from capture menu"""
 	_close_capture_menu()
 
-	log_message("Using %s (x%d) - select target..." % [bind_data.name, bind_data.count])
-
 	# Get alive enemies
 	var enemies = battle_mgr.get_enemy_combatants()
 	target_candidates = enemies.filter(func(e): return not e.is_ko and not e.get("is_captured", false))
@@ -5457,16 +5714,20 @@ func _on_bind_selected(bind_data: Dictionary) -> void:
 	# Show instruction to select enemy
 	_show_instruction("Select an enemy.")
 
+	# Update battle log directly (without queuing message to avoid continue prompt)
+	if battle_log:
+		battle_log.clear()
+		battle_log.append_text("Using %s (x%d) - select target..." % [bind_data.name, bind_data.count])
+
 	# Enable capture target selection mode
 	awaiting_target_selection = true
 	awaiting_capture_target = true
 	selected_target_index = 0  # Start with first target
 	_highlight_target_candidates()
 
-	# Show currently selected target (without queuing message)
+	# Show currently selected target on next line (without queuing message)
 	if not target_candidates.is_empty() and battle_log:
-		battle_log.clear()
-		battle_log.append_text("→ %s" % target_candidates[0].display_name)
+		battle_log.append_text("\n→ %s" % target_candidates[0].display_name)
 
 ## ═══════════════════════════════════════════════════════════════
 ## BURST MENU & EXECUTION
@@ -5607,7 +5868,7 @@ func _show_burst_menu(burst_abilities: Array) -> void:
 	add_child(burst_menu_panel)
 	burst_menu_panel.position = Vector2(
 		(get_viewport_rect().size.x - 450) / 2,
-		100
+		130  # Moved down 30px
 	)
 
 	# Highlight first burst if available
@@ -5626,6 +5887,9 @@ func _close_burst_menu() -> void:
 		burst_menu_panel = null
 	burst_menu_buttons = []
 	selected_burst_index = 0
+
+	# Clear active button visual feedback
+	_clear_active_action_button()
 
 	# Enable action menu again
 	_enable_action_menu()
@@ -5851,6 +6115,9 @@ func _execute_burst_on_target(target: Dictionary) -> void:
 
 	queue_turn_message()
 
+	# Wait for messages to be displayed to player
+	await _wait_for_message_queue()
+
 	# Update displays
 	_update_combatant_displays()
 	if target.is_ko:
@@ -5908,7 +6175,7 @@ func _on_skill_selected(skill_entry: Dictionary) -> void:
 func _execute_skill_single(target: Dictionary) -> void:
 	"""Execute a single-target skill"""
 	# Check if frozen combatant can act
-	if not _check_freeze_action_allowed():
+	if not await _check_freeze_action_allowed():
 		return
 
 	# Get skill info
@@ -6210,10 +6477,18 @@ func _execute_skill_single(target: Dictionary) -> void:
 	if target.is_ko:
 		add_turn_line("%s fainted!" % target.display_name)
 	else:
-		add_turn_line("%s has %d HP left." % [target.display_name, target.hp])
+		# For enemies, show health hint instead of exact HP
+		var is_enemy = target in battle_mgr.get_enemy_combatants()
+		if is_enemy:
+			add_turn_line(_get_enemy_health_hint(target))
+		else:
+			add_turn_line("%s has %d HP left." % [target.display_name, target.hp])
 
 	# Queue the full turn message
 	queue_turn_message()
+
+	# Wait for messages to be displayed to player
+	await _wait_for_message_queue()
 
 	# Update displays
 	_update_combatant_displays()
@@ -6228,7 +6503,7 @@ func _execute_skill_single(target: Dictionary) -> void:
 func _execute_skill_aoe() -> void:
 	"""Execute an AoE skill on all valid targets"""
 	# Check if frozen combatant can act
-	if not _check_freeze_action_allowed():
+	if not await _check_freeze_action_allowed():
 		return
 
 	var skill_name = String(skill_to_use.get("name", "Unknown"))

@@ -63,6 +63,11 @@ var prompt_label: Label  # Shows "PRESS A!" during button prompts
 const COLOR_MILK_WHITE = Color(0.96, 0.97, 0.98)
 const COLOR_BUBBLE_MAGENTA = Color(1.0, 0.29, 0.85)
 
+func _ready() -> void:
+	super._ready()
+	if overlay_panel:
+		overlay_panel.position.y -= 20
+
 func _setup_minigame() -> void:
 	base_duration = 10.0
 	current_duration = base_duration

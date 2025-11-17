@@ -59,6 +59,12 @@ var charge_label: Label
 var instruction_label: Label
 var timer_label: Label
 
+func _ready() -> void:
+	super._ready()
+	# Move the minigame up by 10px
+	if overlay_panel:
+		overlay_panel.position.y -= 10
+
 func _setup_minigame() -> void:
 	base_duration = time_limit + 3.0  # Shorter overall duration
 	current_duration = base_duration
