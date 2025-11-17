@@ -809,6 +809,9 @@ func _style_title() -> void:
 	label.add_theme_constant_override("shadow_offset_y", 6)
 	label.add_theme_constant_override("shadow_outline_size", 8)
 
+	# Set pivot offset to center for centered pulsing
+	label.pivot_offset = label.size / 2
+
 	# Add a subtle pulsing glow animation
 	var pulse_tween = create_tween()
 	pulse_tween.set_loops()
