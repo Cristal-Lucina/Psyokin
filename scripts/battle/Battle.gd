@@ -1177,6 +1177,8 @@ func _confirm_target_selection() -> void:
 		await _execute_capture(target)
 	elif awaiting_item_target:
 		# Using an item
+		# Slide character back after selecting item target
+		await _reset_turn_indicator()
 		await _execute_item_usage(target)
 	elif awaiting_skill_selection:
 		# Using a skill
@@ -4125,6 +4127,8 @@ func _on_enemy_panel_input(event: InputEvent, target: Dictionary) -> void:
 						await _execute_capture(target)
 					elif awaiting_item_target:
 						# Using an item
+						# Slide character back after selecting item target
+						await _reset_turn_indicator()
 						await _execute_item_usage(target)
 					elif awaiting_skill_selection:
 						# Using a skill
@@ -4159,6 +4163,8 @@ func _on_ally_panel_input(event: InputEvent, target: Dictionary) -> void:
 			if awaiting_target_selection and awaiting_item_target:
 				# Check if this target is valid
 				if target in target_candidates:
+					# Slide character back after selecting item target
+					await _reset_turn_indicator()
 					await _execute_item_usage(target)
 
 func _highlight_target_candidates() -> void:
@@ -5789,8 +5795,6 @@ func _on_item_selected(item_data: Dictionary) -> void:
 	"""Handle item selection from menu"""
 	_close_item_menu()
 
-	# Slide character back immediately after item menu closes
-	await _reset_turn_indicator()
 
 	# Store selected item
 	selected_item = item_data
@@ -5802,12 +5806,16 @@ func _on_item_selected(item_data: Dictionary) -> void:
 	# Special handling for auto-escape items (Smoke Grenade only)
 	if "Auto-escape" in effect:
 		# Execute auto-escape immediately without target selection
+		# Slide character back after selecting auto-escape item (no target selection needed)
+		await _reset_turn_indicator()
 		_execute_auto_escape_item(item_data)
 		return
 
 	# Special handling for AllEnemies targeting (Bombs)
 	if targeting == "AllEnemies":
 		# Bombs hit all enemies, no target selection needed (message will be shown after)
+		# Slide character back after selecting bomb item (no target selection needed)
+		await _reset_turn_indicator()
 		await _execute_item_usage({})  # Pass empty dict since bombs hit all enemies
 		return
 
