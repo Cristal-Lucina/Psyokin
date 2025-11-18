@@ -6425,7 +6425,7 @@ func _execute_skill_single(target: Dictionary) -> void:
 	var hit_check = combat_resolver.check_sigil_hit(current_combatant, target, {"skill_acc": acc})
 
 	if not hit_check.hit:
-		_show_miss_feedback()  # Show big MISS text
+		_show_miss_feedback(target)  # Show big MISS text above target
 		# Still deduct MP even on miss
 		current_combatant.mp -= mp_cost
 		if current_combatant.mp < 0:
