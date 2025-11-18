@@ -1753,15 +1753,17 @@ func _display_combatants() -> void:
 
 	# Display allies
 	var allies = battle_mgr.get_ally_combatants()
-	for ally in allies:
-		var slot = _create_combatant_slot(ally, true)
+	for i in range(allies.size()):
+		var ally = allies[i]
+		var slot = _create_combatant_slot(ally, true, i)
 		ally_slots.add_child(slot)
 		combatant_panels[ally.id] = slot
 
 	# Display enemies
 	var enemies = battle_mgr.get_enemy_combatants()
-	for enemy in enemies:
-		var slot = _create_combatant_slot(enemy, false)
+	for i in range(enemies.size()):
+		var enemy = enemies[i]
+		var slot = _create_combatant_slot(enemy, false, i)
 		enemy_slots.add_child(slot)
 		combatant_panels[enemy.id] = slot
 
@@ -2022,7 +2024,7 @@ func _get_enemy_health_hint(enemy: Dictionary) -> String:
 	else:
 		return "%s is holding strong" % enemy.display_name
 
-func _create_combatant_slot(combatant: Dictionary, is_ally: bool) -> PanelContainer:
+func _create_combatant_slot(combatant: Dictionary, is_ally: bool, slot_index: int = 0) -> PanelContainer:
 	"""Create a UI slot for a combatant with neon-kawaii sticker aesthetic"""
 	var panel = PanelContainer.new()
 
@@ -2030,6 +2032,16 @@ func _create_combatant_slot(combatant: Dictionary, is_ally: bool) -> PanelContai
 	if not is_ally and combatant.get("is_ko", false):
 		panel.visible = false
 		panel.position = Vector2(-1000, -1000)  # Move off screen
+
+	# Calculate position offset for fighting stance
+	var x_offset = 0.0
+	if slot_index == 0:
+		# Top slot: allies move right, enemies move left
+		x_offset = 20.0 if is_ally else -20.0
+	elif slot_index == 2:
+		# Bottom slot: allies move left, enemies move right
+		x_offset = -20.0 if is_ally else 20.0
+	# Middle slot (slot_index == 1) has no offset
 
 	# Allies: Transparent background, only capsule and name visible
 	if is_ally:
@@ -2070,6 +2082,10 @@ func _create_combatant_slot(combatant: Dictionary, is_ally: bool) -> PanelContai
 		icon_style.corner_radius_top_right = 20
 		icon_style.corner_radius_bottom_left = 20
 		icon_style.corner_radius_bottom_right = 20
+		# Add shadow underneath character
+		icon_style.shadow_color = Color(0, 0, 0, 0.5)  # Black shadow with transparency
+		icon_style.shadow_size = 4
+		icon_style.shadow_offset = Vector2(0, 8)  # Shadow below the character
 		icon_container.add_theme_stylebox_override("panel", icon_style)
 
 		var icon_center = CenterContainer.new()
@@ -2085,6 +2101,9 @@ func _create_combatant_slot(combatant: Dictionary, is_ally: bool) -> PanelContai
 		vbox.add_child(name_label)
 
 		# Don't show HP/MP bars for allies (clean capsule style)
+
+		# Apply position offset for fighting stance
+		panel.position.x += x_offset
 
 	else:
 		# Enemies: Transparent background, only capsule and name visible
@@ -2121,6 +2140,10 @@ func _create_combatant_slot(combatant: Dictionary, is_ally: bool) -> PanelContai
 		icon_style.corner_radius_top_right = 20
 		icon_style.corner_radius_bottom_left = 20
 		icon_style.corner_radius_bottom_right = 20
+		# Add shadow underneath character
+		icon_style.shadow_color = Color(0, 0, 0, 0.5)
+		icon_style.shadow_size = 4
+		icon_style.shadow_offset = Vector2(0, 8)
 		icon_container.add_theme_stylebox_override("panel", icon_style)
 
 		var icon_center = CenterContainer.new()
@@ -2136,6 +2159,9 @@ func _create_combatant_slot(combatant: Dictionary, is_ally: bool) -> PanelContai
 		vbox.add_child(name_label)
 
 		# Don't show HP/MP bars for enemies (hidden until scan perk unlocked)
+
+		# Apply position offset for fighting stance
+		panel.position.x += x_offset
 
 	# Store combatant ID in metadata
 	panel.set_meta("combatant_id", combatant.id)
