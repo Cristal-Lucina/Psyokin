@@ -2615,6 +2615,9 @@ func _execute_attack(target: Dictionary) -> void:
 			var minigame_result = await minigame_mgr.launch_attack_minigame(tpo, brw, status_effects)
 			_hide_instruction()
 
+
+			# Slide character back immediately after minigame closes
+			await _reset_turn_indicator()
 			# Apply minigame result modifiers
 			var damage_modifier = minigame_result.get("damage_modifier", 1.0)
 			var minigame_crit = minigame_result.get("is_crit", false)
@@ -6540,6 +6543,9 @@ func _execute_skill_single(target: Dictionary) -> void:
 	_show_instruction("SKILL!")
 	var minigame_result = await minigame_mgr.launch_skill_minigame(focus_stat, skill_sequence, skill_tier, mind_type, status_effects)
 	_hide_instruction()
+
+	# Slide character back immediately after minigame closes
+	await _reset_turn_indicator()
 
 	# Apply minigame modifiers
 	var damage_modifier = minigame_result.get("damage_modifier", 1.0)
