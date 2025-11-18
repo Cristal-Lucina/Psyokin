@@ -1903,7 +1903,7 @@ func _create_single_party_status_panel(combatant: Dictionary) -> PanelContainer:
 	hp_bar.add_theme_stylebox_override("background", hp_bg)
 
 	var hp_fill = StyleBoxFlat.new()
-	hp_fill.bg_color = Color(0.2, 0.8, 0.2, 0.8)  # Green with transparency
+	hp_fill.bg_color = COLOR_SKY_CYAN  # Sky Cyan #4DE9FF
 	hp_fill.corner_radius_top_left = 6
 	hp_fill.corner_radius_top_right = 6
 	hp_fill.corner_radius_bottom_left = 6
@@ -1952,7 +1952,7 @@ func _create_single_party_status_panel(combatant: Dictionary) -> PanelContainer:
 	mp_bar.add_theme_stylebox_override("background", mp_bg)
 
 	var mp_fill = StyleBoxFlat.new()
-	mp_fill.bg_color = Color(0.3, 0.5, 1.0, 0.8)  # Blue with transparency
+	mp_fill.bg_color = COLOR_BUBBLE_MAGENTA  # Bubble Magenta #FF4AD9
 	mp_fill.corner_radius_top_left = 6
 	mp_fill.corner_radius_top_right = 6
 	mp_fill.corner_radius_bottom_left = 6
