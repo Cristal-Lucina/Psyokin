@@ -1333,7 +1333,7 @@ func _animate_turn_indicator(combatant_id: String) -> void:
 
 	# Determine direction based on whether ally or enemy
 	var is_ally = active_turn_panel.get_meta("is_ally", false)
-	var slide_distance = 40.0  # Slide forward when it's their turn
+	var slide_distance = 140.0  # Slide forward when it's their turn (40 + 100 additional)
 
 	# Calculate target offsets for slide
 	var target_offset_left = active_turn_panel.offset_left
