@@ -2502,7 +2502,7 @@ func _execute_attack(target: Dictionary) -> void:
 
 		if not hit_check.hit:
 			# Miss!
-			_show_miss_feedback()  # Show big MISS text
+			_show_miss_feedback(target)  # Show big MISS text above target
 			add_turn_line("But it missed!")
 			add_turn_line("(Hit chance: %d%%, rolled %d)" % [int(hit_check.hit_chance), hit_check.roll])
 			queue_turn_message()  # Queue the full turn message
@@ -4178,7 +4178,7 @@ func _execute_enemy_ai() -> void:
 
 		if not hit_check.hit:
 			# Miss!
-			_show_miss_feedback()  # Show big MISS text
+			_show_miss_feedback(target)  # Show big MISS text above target
 			add_turn_line("But it missed!")
 			add_turn_line("(Hit chance: %d%%, rolled %d)" % [int(hit_check.hit_chance), hit_check.roll])
 			queue_turn_message()  # Queue the full turn message
@@ -4647,8 +4647,15 @@ func _hide_continue_indicator() -> void:
 
 	continue_indicator.modulate.a = 0.0
 
-func _show_miss_feedback() -> void:
-	"""Show big MISS text in center of screen that fades away in 0.5 seconds"""
+func _show_miss_feedback(target: Dictionary) -> void:
+	"""Show big MISS text above target character that fades away over 3 seconds"""
+	# Find the target's panel
+	var target_panel = combatant_panels.get(target.id)
+	if not target_panel or not is_instance_valid(target_panel):
+		print("[Battle] Warning: Could not find panel for target %s, showing MISS in center" % target.display_name)
+		# Fallback to center if panel not found
+		target_panel = null
+
 	# Create miss label
 	var miss_label = Label.new()
 	miss_label.text = "MISS!"
@@ -4658,27 +4665,39 @@ func _show_miss_feedback() -> void:
 	miss_label.add_theme_constant_override("outline_size", 8)  # Bold outline
 	miss_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	miss_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-
-	# Center it on screen using anchors
-	miss_label.anchor_left = 0.5
-	miss_label.anchor_top = 0.5
-	miss_label.anchor_right = 0.5
-	miss_label.anchor_bottom = 0.5
-	miss_label.offset_left = -300  # Half of width
-	miss_label.offset_top = -100  # Half of height
-	miss_label.offset_right = 300
-	miss_label.offset_bottom = 100
-	miss_label.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	miss_label.grow_vertical = Control.GROW_DIRECTION_BOTH
 	miss_label.z_index = 200  # High z-index to appear above everything
+
+	if target_panel:
+		# Position above the target's panel
+		var panel_global_pos = target_panel.global_position
+		var panel_size = target_panel.size
+
+		# Position MISS text above the panel (centered horizontally, above vertically)
+		miss_label.position = Vector2(
+			panel_global_pos.x + panel_size.x / 2 - 150,  # Center horizontally (300px width / 2)
+			panel_global_pos.y - 120  # Position above the panel
+		)
+		miss_label.custom_minimum_size = Vector2(300, 120)
+	else:
+		# Fallback to center of screen
+		miss_label.anchor_left = 0.5
+		miss_label.anchor_top = 0.5
+		miss_label.anchor_right = 0.5
+		miss_label.anchor_bottom = 0.5
+		miss_label.offset_left = -300
+		miss_label.offset_top = -100
+		miss_label.offset_right = 300
+		miss_label.offset_bottom = 100
+		miss_label.grow_horizontal = Control.GROW_DIRECTION_BOTH
+		miss_label.grow_vertical = Control.GROW_DIRECTION_BOTH
 
 	add_child(miss_label)
 
-	# Fade out and remove after 0.5 seconds
+	# Fade out and remove after 3 seconds
 	var tween = create_tween()
 	tween.set_ease(Tween.EASE_OUT)
 	tween.set_trans(Tween.TRANS_CUBIC)
-	tween.tween_property(miss_label, "modulate:a", 0.0, 0.5)
+	tween.tween_property(miss_label, "modulate:a", 0.0, 3.0)
 
 	# Remove label after fade completes
 	await tween.finished
