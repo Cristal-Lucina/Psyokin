@@ -3610,8 +3610,6 @@ func _execute_item_usage(target: Dictionary) -> void:
 	var inventory = get_node("/root/aInventorySystem")
 	inventory.remove_item(item_id, 1)
 
-	# Slide back before ending turn
-	await _reset_turn_indicator()
 
 	# End turn
 	battle_mgr.end_turn()
@@ -5790,6 +5788,9 @@ func _execute_auto_escape_item(item_data: Dictionary) -> void:
 func _on_item_selected(item_data: Dictionary) -> void:
 	"""Handle item selection from menu"""
 	_close_item_menu()
+
+	# Slide character back immediately after item menu closes
+	await _reset_turn_indicator()
 
 	# Store selected item
 	selected_item = item_data
