@@ -6251,7 +6251,7 @@ func _execute_burst_on_target(target: Dictionary) -> void:
 	var hit_check = combat_resolver.check_sigil_hit(current_combatant, target, {"skill_acc": acc})
 
 	if not hit_check.hit:
-		_show_miss_feedback()  # Show big MISS text
+		_show_miss_feedback(target)  # Show big MISS text above target
 		# Build miss message
 		start_turn_message()
 		add_turn_line("Burst attack!")
