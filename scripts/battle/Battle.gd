@@ -725,22 +725,30 @@ func _style_panels() -> void:
 	# Add shadow to Action Menu by creating a shadow panel behind it
 	var action_menu = get_node_or_null("ActionMenu")
 	if action_menu:
+		# Ensure action menu is above the shadow
+		action_menu.z_index = 2
+
 		# Create a shadow panel container to place behind the action menu
 		var shadow_panel = PanelContainer.new()
 		shadow_panel.name = "ActionMenuShadow"
-		shadow_panel.z_index = 1  # Above background but behind action menu (via child order)
+		shadow_panel.z_index = 1  # Above background but behind action menu
 
 		# Match the action menu's position and size
 		shadow_panel.position = action_menu.position
 		shadow_panel.size = action_menu.size
 		shadow_panel.set_anchors_preset(Control.PRESET_TOP_LEFT)
 
-		# Create shadow style
+		# Create circular shadow style
 		var shadow_style = StyleBoxFlat.new()
 		shadow_style.bg_color = Color(0, 0, 0, 0)  # Transparent background
 		shadow_style.shadow_size = 16  # Larger shadow for the action menu
 		shadow_style.shadow_color = Color(0, 0, 0, 0.8)  # Dark prominent shadow
 		shadow_style.shadow_offset = Vector2(6, 6)  # Offset for depth
+		# Make it circular with high corner radius
+		shadow_style.corner_radius_top_left = 200
+		shadow_style.corner_radius_top_right = 200
+		shadow_style.corner_radius_bottom_left = 200
+		shadow_style.corner_radius_bottom_right = 200
 		shadow_panel.add_theme_stylebox_override("panel", shadow_style)
 
 		# Add shadow panel to the same parent as action menu
@@ -1792,9 +1800,9 @@ func _display_combatants() -> void:
 		var margin_container = MarginContainer.new()
 		var x_offset = 0
 		if i == 0:  # Top slot - lean right toward center
-			x_offset = 20
+			x_offset = 80
 		elif i == 2:  # Bottom slot - lean left toward center
-			x_offset = -20
+			x_offset = -80
 
 		if x_offset > 0:
 			margin_container.add_theme_constant_override("margin_left", x_offset)
@@ -1815,9 +1823,9 @@ func _display_combatants() -> void:
 		var margin_container = MarginContainer.new()
 		var x_offset = 0
 		if i == 0:  # Top slot - lean left toward center
-			x_offset = -20
+			x_offset = -80
 		elif i == 2:  # Bottom slot - lean right toward center
-			x_offset = 20
+			x_offset = 80
 
 		if x_offset > 0:
 			margin_container.add_theme_constant_override("margin_left", x_offset)
