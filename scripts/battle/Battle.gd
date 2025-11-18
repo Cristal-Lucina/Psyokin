@@ -629,8 +629,10 @@ func _style_panels() -> void:
 		style.corner_radius_top_right = 12
 		style.corner_radius_bottom_left = 12
 		style.corner_radius_bottom_right = 12
-		style.shadow_size = 4
-		style.shadow_color = Color(COLOR_SKY_CYAN.r, COLOR_SKY_CYAN.g, COLOR_SKY_CYAN.b, 0.3)
+		# Enhanced shadow for depth
+		style.shadow_size = 12
+		style.shadow_color = Color(0, 0, 0, 0.7)  # Darker, more prominent shadow
+		style.shadow_offset = Vector2(4, 4)  # Offset shadow for depth effect
 		turn_order_panel.add_theme_stylebox_override("panel", style)
 
 		# Style title label in Milk White all caps
@@ -654,8 +656,10 @@ func _style_panels() -> void:
 		style.corner_radius_top_right = 12
 		style.corner_radius_bottom_left = 12
 		style.corner_radius_bottom_right = 12
-		style.shadow_size = 4
-		style.shadow_color = Color(COLOR_ELECTRIC_LIME.r, COLOR_ELECTRIC_LIME.g, COLOR_ELECTRIC_LIME.b, 0.3)
+		# Enhanced shadow for depth
+		style.shadow_size = 12
+		style.shadow_color = Color(0, 0, 0, 0.7)  # Darker, more prominent shadow
+		style.shadow_offset = Vector2(4, 4)  # Offset shadow for depth effect
 		# Add 10px internal padding
 		style.content_margin_left = 10
 		style.content_margin_right = 10
@@ -682,8 +686,10 @@ func _style_panels() -> void:
 		style.corner_radius_top_right = 12
 		style.corner_radius_bottom_left = 12
 		style.corner_radius_bottom_right = 12
-		style.shadow_size = 4
-		style.shadow_color = Color(COLOR_CITRUS_YELLOW.r, COLOR_CITRUS_YELLOW.g, COLOR_CITRUS_YELLOW.b, 0.3)
+		# Enhanced shadow for depth
+		style.shadow_size = 12
+		style.shadow_color = Color(0, 0, 0, 0.7)  # Darker, more prominent shadow
+		style.shadow_offset = Vector2(4, 4)  # Offset shadow for depth effect
 		burst_panel.add_theme_stylebox_override("panel", style)
 
 		# Style burst label in Milk White all caps
@@ -715,6 +721,31 @@ func _style_panels() -> void:
 			gauge_fill.corner_radius_bottom_left = 8
 			gauge_fill.corner_radius_bottom_right = 8
 			burst_gauge.add_theme_stylebox_override("fill", gauge_fill)
+
+	# Add shadow to Action Menu by creating a shadow panel behind it
+	var action_menu = get_node_or_null("ActionMenu")
+	if action_menu:
+		# Create a shadow panel container to place behind the action menu
+		var shadow_panel = PanelContainer.new()
+		shadow_panel.name = "ActionMenuShadow"
+		shadow_panel.z_index = -1  # Place behind the action menu
+
+		# Match the action menu's position and size
+		shadow_panel.position = action_menu.position
+		shadow_panel.size = action_menu.size
+		shadow_panel.set_anchors_preset(Control.PRESET_TOP_LEFT)
+
+		# Create shadow style
+		var shadow_style = StyleBoxFlat.new()
+		shadow_style.bg_color = Color(0, 0, 0, 0)  # Transparent background
+		shadow_style.shadow_size = 16  # Larger shadow for the action menu
+		shadow_style.shadow_color = Color(0, 0, 0, 0.8)  # Dark prominent shadow
+		shadow_style.shadow_offset = Vector2(6, 6)  # Offset for depth
+		shadow_panel.add_theme_stylebox_override("panel", shadow_style)
+
+		# Add shadow panel to the same parent as action menu
+		action_menu.get_parent().add_child(shadow_panel)
+		action_menu.get_parent().move_child(shadow_panel, action_menu.get_index())
 
 func _load_skills() -> void:
 	"""Load skill definitions from skills.csv"""
@@ -2083,9 +2114,9 @@ func _create_combatant_slot(combatant: Dictionary, is_ally: bool, slot_index: in
 		icon_style.corner_radius_bottom_left = 20
 		icon_style.corner_radius_bottom_right = 20
 		# Add shadow underneath character
-		icon_style.shadow_color = Color(0, 0, 0, 0.5)  # Black shadow with transparency
-		icon_style.shadow_size = 4
-		icon_style.shadow_offset = Vector2(0, 8)  # Shadow below the character
+		icon_style.shadow_color = Color(0, 0, 0, 0.8)  # Darker shadow
+		icon_style.shadow_size = 6
+		icon_style.shadow_offset = Vector2(0, 10)  # Shadow below the character
 		icon_container.add_theme_stylebox_override("panel", icon_style)
 
 		var icon_center = CenterContainer.new()
@@ -2102,8 +2133,9 @@ func _create_combatant_slot(combatant: Dictionary, is_ally: bool, slot_index: in
 
 		# Don't show HP/MP bars for allies (clean capsule style)
 
-		# Apply position offset for fighting stance
-		panel.position.x += x_offset
+		# Apply position offset for fighting stance using offset_left
+		panel.offset_left = x_offset
+		panel.offset_right = x_offset
 
 	else:
 		# Enemies: Transparent background, only capsule and name visible
@@ -2141,9 +2173,9 @@ func _create_combatant_slot(combatant: Dictionary, is_ally: bool, slot_index: in
 		icon_style.corner_radius_bottom_left = 20
 		icon_style.corner_radius_bottom_right = 20
 		# Add shadow underneath character
-		icon_style.shadow_color = Color(0, 0, 0, 0.5)
-		icon_style.shadow_size = 4
-		icon_style.shadow_offset = Vector2(0, 8)
+		icon_style.shadow_color = Color(0, 0, 0, 0.8)  # Darker shadow
+		icon_style.shadow_size = 6
+		icon_style.shadow_offset = Vector2(0, 10)
 		icon_container.add_theme_stylebox_override("panel", icon_style)
 
 		var icon_center = CenterContainer.new()
@@ -2160,8 +2192,9 @@ func _create_combatant_slot(combatant: Dictionary, is_ally: bool, slot_index: in
 
 		# Don't show HP/MP bars for enemies (hidden until scan perk unlocked)
 
-		# Apply position offset for fighting stance
-		panel.position.x += x_offset
+		# Apply position offset for fighting stance using offset_left
+		panel.offset_left = x_offset
+		panel.offset_right = x_offset
 
 	# Store combatant ID in metadata
 	panel.set_meta("combatant_id", combatant.id)
