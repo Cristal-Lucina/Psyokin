@@ -28,6 +28,7 @@ const COLOR_MILK_WHITE = Color(0.96, 0.97, 0.98)        # #F4F7FB
 @onready var burst_gauge_bar: ProgressBar = %BurstGauge
 @onready var turn_order_display: VBoxContainer = %TurnOrderDisplay
 @onready var switch_button: Button = %SwitchButton
+@onready var party_status_container: VBoxContainer = %PartyStatusContainer
 
 ## Combatant display containers
 @onready var ally_slots: VBoxContainer = %AllySlots
@@ -98,6 +99,9 @@ var instruction_label: Label = null  # Label inside instruction popup
 
 # Active action button visual feedback
 var active_action_button: Button = null  # Currently active action button
+
+# Party status panels for left-side display
+var party_status_panels: Array = []  # Array of 3 panels for player + 2 active party members
 var active_button_tween: Tween = null  # Tween for pulsing animation
 var active_button_original_size: Vector2 = Vector2.ZERO  # Original size to restore
 var active_button_original_rotation: float = 0.0  # Original rotation to restore
@@ -625,8 +629,10 @@ func _style_panels() -> void:
 		style.corner_radius_top_right = 12
 		style.corner_radius_bottom_left = 12
 		style.corner_radius_bottom_right = 12
-		style.shadow_size = 4
-		style.shadow_color = Color(COLOR_SKY_CYAN.r, COLOR_SKY_CYAN.g, COLOR_SKY_CYAN.b, 0.3)
+		# Enhanced shadow for depth
+		style.shadow_size = 12
+		style.shadow_color = Color(0, 0, 0, 0.7)  # Darker, more prominent shadow
+		style.shadow_offset = Vector2(4, 4)  # Offset shadow for depth effect
 		turn_order_panel.add_theme_stylebox_override("panel", style)
 
 		# Style title label in Milk White all caps
@@ -650,8 +656,10 @@ func _style_panels() -> void:
 		style.corner_radius_top_right = 12
 		style.corner_radius_bottom_left = 12
 		style.corner_radius_bottom_right = 12
-		style.shadow_size = 4
-		style.shadow_color = Color(COLOR_ELECTRIC_LIME.r, COLOR_ELECTRIC_LIME.g, COLOR_ELECTRIC_LIME.b, 0.3)
+		# Enhanced shadow for depth
+		style.shadow_size = 12
+		style.shadow_color = Color(0, 0, 0, 0.7)  # Darker, more prominent shadow
+		style.shadow_offset = Vector2(4, 4)  # Offset shadow for depth effect
 		# Add 10px internal padding
 		style.content_margin_left = 10
 		style.content_margin_right = 10
@@ -678,8 +686,10 @@ func _style_panels() -> void:
 		style.corner_radius_top_right = 12
 		style.corner_radius_bottom_left = 12
 		style.corner_radius_bottom_right = 12
-		style.shadow_size = 4
-		style.shadow_color = Color(COLOR_CITRUS_YELLOW.r, COLOR_CITRUS_YELLOW.g, COLOR_CITRUS_YELLOW.b, 0.3)
+		# Enhanced shadow for depth
+		style.shadow_size = 12
+		style.shadow_color = Color(0, 0, 0, 0.7)  # Darker, more prominent shadow
+		style.shadow_offset = Vector2(4, 4)  # Offset shadow for depth effect
 		burst_panel.add_theme_stylebox_override("panel", style)
 
 		# Style burst label in Milk White all caps
@@ -711,6 +721,39 @@ func _style_panels() -> void:
 			gauge_fill.corner_radius_bottom_left = 8
 			gauge_fill.corner_radius_bottom_right = 8
 			burst_gauge.add_theme_stylebox_override("fill", gauge_fill)
+
+	# Add shadow to Action Menu by creating a shadow panel behind it
+	var action_menu = get_node_or_null("ActionMenu")
+	if action_menu:
+		# Create a shadow panel container to place behind the action menu
+		var shadow_panel = PanelContainer.new()
+		shadow_panel.name = "ActionMenuShadow"
+		shadow_panel.z_index = -1  # Below default elements but above background
+
+		# Scale down the shadow panel to 60% size (40% reduction)
+		shadow_panel.scale = Vector2(0.6, 0.6)
+
+		# Match the action menu's position and size
+		shadow_panel.position = action_menu.position
+		shadow_panel.size = action_menu.size
+		shadow_panel.set_anchors_preset(Control.PRESET_TOP_LEFT)
+
+		# Create circular shadow style
+		var shadow_style = StyleBoxFlat.new()
+		shadow_style.bg_color = Color(0, 0, 0, 0)  # Transparent background
+		shadow_style.shadow_size = 8  # Shadow blur size
+		shadow_style.shadow_color = Color(0, 0, 0, 0.4)  # More transparent shadow
+		shadow_style.shadow_offset = Vector2(26, 6)  # Shifted left 20px from 46
+		# Make it circular with high corner radius
+		shadow_style.corner_radius_top_left = 200
+		shadow_style.corner_radius_top_right = 200
+		shadow_style.corner_radius_bottom_left = 200
+		shadow_style.corner_radius_bottom_right = 200
+		shadow_panel.add_theme_stylebox_override("panel", shadow_style)
+
+		# Add shadow panel to the same parent as action menu
+		action_menu.get_parent().add_child(shadow_panel)
+		action_menu.get_parent().move_child(shadow_panel, action_menu.get_index())
 
 func _load_skills() -> void:
 	"""Load skill definitions from skills.csv"""
@@ -1134,7 +1177,9 @@ func _confirm_target_selection() -> void:
 		await _execute_capture(target)
 	elif awaiting_item_target:
 		# Using an item
-		_execute_item_usage(target)
+		# Slide character back after selecting item target
+		await _reset_turn_indicator()
+		await _execute_item_usage(target)
 	elif awaiting_skill_selection:
 		# Using a skill
 		_hide_instruction()
@@ -1290,7 +1335,7 @@ func _animate_turn_indicator(combatant_id: String) -> void:
 
 	# Determine direction based on whether ally or enemy
 	var is_ally = active_turn_panel.get_meta("is_ally", false)
-	var slide_distance = 15.0
+	var slide_distance = 140.0  # Slide forward when it's their turn (40 + 100 additional)
 
 	# Calculate target offsets for slide
 	var target_offset_left = active_turn_panel.offset_left
@@ -1749,17 +1794,264 @@ func _display_combatants() -> void:
 
 	# Display allies
 	var allies = battle_mgr.get_ally_combatants()
-	for ally in allies:
-		var slot = _create_combatant_slot(ally, true)
-		ally_slots.add_child(slot)
+	for i in range(allies.size()):
+		var ally = allies[i]
+		var slot = _create_combatant_slot(ally, true, i)
+
+		# Wrap in MarginContainer to apply horizontal offset for fighting stance
+		var margin_container = MarginContainer.new()
+		var x_offset = 0
+		if i == 0:  # Top slot - lean right toward center
+			x_offset = 80
+		elif i == 2:  # Bottom slot - lean left toward center
+			x_offset = -80
+
+		if x_offset > 0:
+			margin_container.add_theme_constant_override("margin_left", x_offset)
+		elif x_offset < 0:
+			margin_container.add_theme_constant_override("margin_right", abs(x_offset))
+
+		margin_container.add_child(slot)
+		ally_slots.add_child(margin_container)
 		combatant_panels[ally.id] = slot
 
 	# Display enemies
 	var enemies = battle_mgr.get_enemy_combatants()
-	for enemy in enemies:
-		var slot = _create_combatant_slot(enemy, false)
-		enemy_slots.add_child(slot)
+	for i in range(enemies.size()):
+		var enemy = enemies[i]
+		var slot = _create_combatant_slot(enemy, false, i)
+
+		# Wrap in MarginContainer to apply horizontal offset for fighting stance
+		var margin_container = MarginContainer.new()
+		var x_offset = 0
+		if i == 0:  # Top slot - lean left toward center
+			x_offset = -80
+		elif i == 2:  # Bottom slot - lean right toward center
+			x_offset = 80
+
+		if x_offset > 0:
+			margin_container.add_theme_constant_override("margin_left", x_offset)
+		elif x_offset < 0:
+			margin_container.add_theme_constant_override("margin_right", abs(x_offset))
+
+		margin_container.add_child(slot)
+		enemy_slots.add_child(margin_container)
 		combatant_panels[enemy.id] = slot
+
+	# Create party status panels
+	_create_party_status_panels()
+
+func _create_party_status_panels() -> void:
+	"""Create the 3 party status panels on the left side of the screen"""
+	# Clear existing panels
+	for child in party_status_container.get_children():
+		child.queue_free()
+	party_status_panels.clear()
+
+	# Get ally combatants (player + active party members)
+	var allies = battle_mgr.get_ally_combatants()
+
+	# Create up to 3 panels (player + 2 active party members)
+	var panel_count = min(3, allies.size())
+	for i in range(panel_count):
+		var ally = allies[i]
+		var panel = _create_single_party_status_panel(ally)
+		party_status_container.add_child(panel)
+		party_status_panels.append(panel)
+
+func _create_single_party_status_panel(combatant: Dictionary) -> PanelContainer:
+	"""Create a single party status panel (160x60px) with portrait and HP/MP bars"""
+	var panel = PanelContainer.new()
+	panel.custom_minimum_size = Vector2(160, 60)
+	panel.set_meta("combatant_id", combatant.id)
+
+	# Style the panel with transparent background and no border
+	var style = StyleBoxFlat.new()
+	style.bg_color = Color(0, 0, 0, 0)  # Fully transparent
+	style.border_width_left = 0
+	style.border_width_right = 0
+	style.border_width_top = 0
+	style.border_width_bottom = 0
+	panel.add_theme_stylebox_override("panel", style)
+
+	# Main vertical container to center content horizontally
+	var main_vbox = VBoxContainer.new()
+	main_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	panel.add_child(main_vbox)
+
+	# Centered horizontal container for portrait and stats
+	var hbox = HBoxContainer.new()
+	hbox.add_theme_constant_override("separation", 4)
+	hbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	main_vbox.add_child(hbox)
+
+	# Left side: Portrait (60x60px square)
+	var portrait_container = PanelContainer.new()
+	portrait_container.custom_minimum_size = Vector2(60, 60)
+
+	var portrait_style = StyleBoxFlat.new()
+	var portrait_color = _get_character_capsule_color(combatant.display_name, true)
+	portrait_style.bg_color = portrait_color
+	portrait_style.bg_color.a = 0.8  # Slight transparency
+	portrait_style.border_width_left = 2
+	portrait_style.border_width_right = 2
+	portrait_style.border_width_top = 2
+	portrait_style.border_width_bottom = 2
+	portrait_style.border_color = COLOR_MILK_WHITE
+	portrait_style.corner_radius_top_left = 30
+	portrait_style.corner_radius_top_right = 30
+	portrait_style.corner_radius_bottom_left = 30
+	portrait_style.corner_radius_bottom_right = 30
+	# Add shadow behind portrait
+	portrait_style.shadow_size = 8
+	portrait_style.shadow_color = Color(0, 0, 0, 0.6)
+	portrait_style.shadow_offset = Vector2(3, 3)
+	portrait_container.add_theme_stylebox_override("panel", portrait_style)
+	hbox.add_child(portrait_container)
+
+	# Right side: HP/MP bars
+	var stats_vbox = VBoxContainer.new()
+	stats_vbox.add_theme_constant_override("separation", 4)
+	stats_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hbox.add_child(stats_vbox)
+
+	# HP bar container
+	var hp_hbox = HBoxContainer.new()
+	hp_hbox.add_theme_constant_override("separation", 2)
+	stats_vbox.add_child(hp_hbox)
+
+	# HP label
+	var hp_label = Label.new()
+	hp_label.text = "HP"
+	hp_label.add_theme_font_size_override("font_size", 8)
+	hp_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
+	hp_label.custom_minimum_size = Vector2(10, 0)
+	hp_hbox.add_child(hp_label)
+
+	# HP bar
+	var hp_bar = ProgressBar.new()
+	hp_bar.name = "HPBar"
+	hp_bar.custom_minimum_size = Vector2(25, 12)
+	hp_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hp_bar.show_percentage = false
+	hp_bar.max_value = combatant.get("hp_max", 100)
+	hp_bar.value = combatant.get("hp", 100)
+
+	# Style HP bar with rounded corners and transparency
+	var hp_bg = StyleBoxFlat.new()
+	hp_bg.bg_color = Color(0.2, 0.2, 0.2, 0.6)  # Transparent background
+	hp_bg.corner_radius_top_left = 6
+	hp_bg.corner_radius_top_right = 6
+	hp_bg.corner_radius_bottom_left = 6
+	hp_bg.corner_radius_bottom_right = 6
+	# Add shadow behind HP bar
+	hp_bg.shadow_size = 6
+	hp_bg.shadow_color = Color(0, 0, 0, 0.5)
+	hp_bg.shadow_offset = Vector2(2, 2)
+	hp_bar.add_theme_stylebox_override("background", hp_bg)
+
+	var hp_fill = StyleBoxFlat.new()
+	hp_fill.bg_color = COLOR_SKY_CYAN  # Sky Cyan #4DE9FF
+	hp_fill.corner_radius_top_left = 6
+	hp_fill.corner_radius_top_right = 6
+	hp_fill.corner_radius_bottom_left = 6
+	hp_fill.corner_radius_bottom_right = 6
+	hp_bar.add_theme_stylebox_override("fill", hp_fill)
+	hp_hbox.add_child(hp_bar)
+
+	# HP value label
+	var hp_value = Label.new()
+	hp_value.name = "HPValue"
+	hp_value.text = str(combatant.get("hp", 100))
+	hp_value.add_theme_font_size_override("font_size", 8)
+	hp_value.add_theme_color_override("font_color", COLOR_MILK_WHITE)
+	hp_value.custom_minimum_size = Vector2(12, 0)
+	hp_hbox.add_child(hp_value)
+
+	# MP bar container
+	var mp_hbox = HBoxContainer.new()
+	mp_hbox.add_theme_constant_override("separation", 2)
+	stats_vbox.add_child(mp_hbox)
+
+	# MP label
+	var mp_label = Label.new()
+	mp_label.text = "MP"
+	mp_label.add_theme_font_size_override("font_size", 8)
+	mp_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
+	mp_label.custom_minimum_size = Vector2(10, 0)
+	mp_hbox.add_child(mp_label)
+
+	# MP bar
+	var mp_bar = ProgressBar.new()
+	mp_bar.name = "MPBar"
+	mp_bar.custom_minimum_size = Vector2(25, 12)
+	mp_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	mp_bar.show_percentage = false
+	mp_bar.max_value = combatant.get("mp_max", 50)
+	mp_bar.value = combatant.get("mp", 50)
+
+	# Style MP bar with rounded corners and transparency
+	var mp_bg = StyleBoxFlat.new()
+	mp_bg.bg_color = Color(0.2, 0.2, 0.2, 0.6)  # Transparent background
+	mp_bg.corner_radius_top_left = 6
+	mp_bg.corner_radius_top_right = 6
+	mp_bg.corner_radius_bottom_left = 6
+	mp_bg.corner_radius_bottom_right = 6
+	# Add shadow behind MP bar
+	mp_bg.shadow_size = 6
+	mp_bg.shadow_color = Color(0, 0, 0, 0.5)
+	mp_bg.shadow_offset = Vector2(2, 2)
+	mp_bar.add_theme_stylebox_override("background", mp_bg)
+
+	var mp_fill = StyleBoxFlat.new()
+	mp_fill.bg_color = COLOR_BUBBLE_MAGENTA  # Bubble Magenta #FF4AD9
+	mp_fill.corner_radius_top_left = 6
+	mp_fill.corner_radius_top_right = 6
+	mp_fill.corner_radius_bottom_left = 6
+	mp_fill.corner_radius_bottom_right = 6
+	mp_bar.add_theme_stylebox_override("fill", mp_fill)
+	mp_hbox.add_child(mp_bar)
+
+	# MP value label
+	var mp_value = Label.new()
+	mp_value.name = "MPValue"
+	mp_value.text = str(combatant.get("mp", 50))
+	mp_value.add_theme_font_size_override("font_size", 8)
+	mp_value.add_theme_color_override("font_color", COLOR_MILK_WHITE)
+	mp_value.custom_minimum_size = Vector2(12, 0)
+	mp_hbox.add_child(mp_value)
+
+	return panel
+
+func _update_party_status_panels() -> void:
+	"""Update HP/MP values in the party status panels"""
+	var allies = battle_mgr.get_ally_combatants()
+
+	for i in range(min(party_status_panels.size(), allies.size())):
+		var panel = party_status_panels[i]
+		var ally = allies[i]
+
+		# Find HP bar and value
+		var hp_bar = panel.find_child("HPBar", true, false)
+		var hp_value = panel.find_child("HPValue", true, false)
+
+		if hp_bar:
+			hp_bar.max_value = ally.get("hp_max", 100)
+			hp_bar.value = ally.get("hp", 100)
+
+		if hp_value:
+			hp_value.text = str(ally.get("hp", 100))
+
+		# Find MP bar and value
+		var mp_bar = panel.find_child("MPBar", true, false)
+		var mp_value = panel.find_child("MPValue", true, false)
+
+		if mp_bar:
+			mp_bar.max_value = ally.get("mp_max", 50)
+			mp_bar.value = ally.get("mp", 50)
+
+		if mp_value:
+			mp_value.text = str(ally.get("mp", 50))
 
 func _get_character_capsule_color(name: String, is_ally: bool) -> Color:
 	"""Get capsule color for a character or enemy based on name/type"""
@@ -1815,7 +2107,7 @@ func _get_enemy_health_hint(enemy: Dictionary) -> String:
 	else:
 		return "%s is holding strong" % enemy.display_name
 
-func _create_combatant_slot(combatant: Dictionary, is_ally: bool) -> PanelContainer:
+func _create_combatant_slot(combatant: Dictionary, is_ally: bool, slot_index: int = 0) -> PanelContainer:
 	"""Create a UI slot for a combatant with neon-kawaii sticker aesthetic"""
 	var panel = PanelContainer.new()
 
@@ -1863,6 +2155,10 @@ func _create_combatant_slot(combatant: Dictionary, is_ally: bool) -> PanelContai
 		icon_style.corner_radius_top_right = 20
 		icon_style.corner_radius_bottom_left = 20
 		icon_style.corner_radius_bottom_right = 20
+		# Add shadow underneath character
+		icon_style.shadow_color = Color(0, 0, 0, 0.8)  # Darker shadow
+		icon_style.shadow_size = 6
+		icon_style.shadow_offset = Vector2(0, 10)  # Shadow below the character
 		icon_container.add_theme_stylebox_override("panel", icon_style)
 
 		var icon_center = CenterContainer.new()
@@ -1914,6 +2210,10 @@ func _create_combatant_slot(combatant: Dictionary, is_ally: bool) -> PanelContai
 		icon_style.corner_radius_top_right = 20
 		icon_style.corner_radius_bottom_left = 20
 		icon_style.corner_radius_bottom_right = 20
+		# Add shadow underneath character
+		icon_style.shadow_color = Color(0, 0, 0, 0.8)  # Darker shadow
+		icon_style.shadow_size = 6
+		icon_style.shadow_offset = Vector2(0, 10)
 		icon_container.add_theme_stylebox_override("panel", icon_style)
 
 		var icon_center = CenterContainer.new()
@@ -1947,6 +2247,7 @@ func _update_combatant_displays() -> void:
 	"""Update all combatant HP/MP displays"""
 	# TODO: Update HP/MP bars without recreating everything
 	_display_combatants()
+	_update_party_status_panels()
 
 func _shake_combatant_panel(combatant_id: String) -> void:
 	"""Shake a combatant's panel when they take damage"""
@@ -2294,7 +2595,7 @@ func _execute_attack(target: Dictionary) -> void:
 
 		if not hit_check.hit:
 			# Miss!
-			_show_miss_feedback()  # Show big MISS text
+			_show_miss_feedback(target)  # Show big MISS text above target
 			add_turn_line("But it missed!")
 			add_turn_line("(Hit chance: %d%%, rolled %d)" % [int(hit_check.hit_chance), hit_check.roll])
 			queue_turn_message()  # Queue the full turn message
@@ -2316,6 +2617,9 @@ func _execute_attack(target: Dictionary) -> void:
 			var minigame_result = await minigame_mgr.launch_attack_minigame(tpo, brw, status_effects)
 			_hide_instruction()
 
+
+			# Slide character back immediately after minigame closes
+			await _reset_turn_indicator()
 			# Apply minigame result modifiers
 			var damage_modifier = minigame_result.get("damage_modifier", 1.0)
 			var minigame_crit = minigame_result.get("is_crit", false)
@@ -3308,8 +3612,6 @@ func _execute_item_usage(target: Dictionary) -> void:
 	var inventory = get_node("/root/aInventorySystem")
 	inventory.remove_item(item_id, 1)
 
-	# Slide back before ending turn
-	await _reset_turn_indicator()
 
 	# End turn
 	battle_mgr.end_turn()
@@ -3825,7 +4127,9 @@ func _on_enemy_panel_input(event: InputEvent, target: Dictionary) -> void:
 						await _execute_capture(target)
 					elif awaiting_item_target:
 						# Using an item
-						_execute_item_usage(target)
+						# Slide character back after selecting item target
+						await _reset_turn_indicator()
+						await _execute_item_usage(target)
 					elif awaiting_skill_selection:
 						# Using a skill
 						_clear_target_highlights()
@@ -3859,7 +4163,9 @@ func _on_ally_panel_input(event: InputEvent, target: Dictionary) -> void:
 			if awaiting_target_selection and awaiting_item_target:
 				# Check if this target is valid
 				if target in target_candidates:
-					_execute_item_usage(target)
+					# Slide character back after selecting item target
+					await _reset_turn_indicator()
+					await _execute_item_usage(target)
 
 func _highlight_target_candidates() -> void:
 	"""Show selection indicator above currently selected target"""
@@ -3873,18 +4179,10 @@ func _highlight_target_candidates() -> void:
 	var selected_target = target_candidates[selected_target_index]
 	var selected_target_id = selected_target.id
 
-	# Find the panel for this target
+	# Find the panel for this target using the combatant_panels dictionary
 	var target_panel: Control = null
-	for child in enemy_slots.get_children():
-		if child.get_meta("combatant_id", "") == selected_target_id:
-			target_panel = child
-			break
-
-	if target_panel == null:
-		for child in ally_slots.get_children():
-			if child.get_meta("combatant_id", "") == selected_target_id:
-				target_panel = child
-				break
+	if combatant_panels.has(selected_target_id):
+		target_panel = combatant_panels[selected_target_id]
 
 	if target_panel == null:
 		return
@@ -3892,7 +4190,7 @@ func _highlight_target_candidates() -> void:
 	# Create selection indicator (animated arrow/marker above target)
 	selection_indicator = Control.new()
 	selection_indicator.custom_minimum_size = Vector2(60, 30)
-	selection_indicator.z_index = 50
+	selection_indicator.z_index = 100  # Very high to ensure visibility above all elements
 	add_child(selection_indicator)
 
 	# Position above the target panel
@@ -3927,12 +4225,12 @@ func _draw_selection_indicator() -> void:
 		Vector2(15, 10),  # Left side top
 	])
 
-	# Draw shadow first (offset and darkened)
-	var shadow_offset = Vector2(2, 2)
+	# Draw shadow first (offset and darkened) - larger and darker for better visibility
+	var shadow_offset = Vector2(3, 3)
 	var shadow_points = PackedVector2Array()
 	for point in points:
 		shadow_points.append(point + shadow_offset)
-	selection_indicator.draw_colored_polygon(shadow_points, Color(0.0, 0.0, 0.0, 0.5))
+	selection_indicator.draw_colored_polygon(shadow_points, Color(0.0, 0.0, 0.0, 0.9))
 
 	# Draw white arrow on top
 	selection_indicator.draw_colored_polygon(points, COLOR_MILK_WHITE)
@@ -3970,7 +4268,7 @@ func _execute_enemy_ai() -> void:
 
 		if not hit_check.hit:
 			# Miss!
-			_show_miss_feedback()  # Show big MISS text
+			_show_miss_feedback(target)  # Show big MISS text above target
 			add_turn_line("But it missed!")
 			add_turn_line("(Hit chance: %d%%, rolled %d)" % [int(hit_check.hit_chance), hit_check.roll])
 			queue_turn_message()  # Queue the full turn message
@@ -4439,32 +4737,57 @@ func _hide_continue_indicator() -> void:
 
 	continue_indicator.modulate.a = 0.0
 
-func _show_miss_feedback() -> void:
-	"""Show big MISS text in center of screen that fades away in 0.5 seconds"""
+func _show_miss_feedback(target: Dictionary) -> void:
+	"""Show big MISS text above target character that fades away over 3 seconds"""
+	# Find the target's panel
+	var target_panel = combatant_panels.get(target.id)
+	if not target_panel or not is_instance_valid(target_panel):
+		print("[Battle] Warning: Could not find panel for target %s, showing MISS in center" % target.display_name)
+		# Fallback to center if panel not found
+		target_panel = null
+
 	# Create miss label
 	var miss_label = Label.new()
 	miss_label.text = "MISS!"
-	miss_label.add_theme_font_size_override("font_size", 80)  # Big font
+	miss_label.add_theme_font_size_override("font_size", 120)  # Very big font
 	miss_label.add_theme_color_override("font_color", COLOR_CITRUS_YELLOW)  # Yellow color
+	miss_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 1.0))  # Black outline for visibility
+	miss_label.add_theme_constant_override("outline_size", 8)  # Bold outline
 	miss_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	miss_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-
-	# Center it on screen
-	miss_label.set_anchors_preset(Control.PRESET_CENTER)
-	miss_label.custom_minimum_size = Vector2(400, 100)
-	miss_label.position = Vector2(
-		get_viewport_rect().size.x / 2 - 200,
-		get_viewport_rect().size.y / 2 - 50
-	)
 	miss_label.z_index = 200  # High z-index to appear above everything
+
+	if target_panel:
+		# Position above the target's panel
+		var panel_global_pos = target_panel.global_position
+		var panel_size = target_panel.size
+
+		# Position MISS text above the panel (centered horizontally, above vertically)
+		miss_label.position = Vector2(
+			panel_global_pos.x + panel_size.x / 2 - 150,  # Center horizontally (300px width / 2)
+			panel_global_pos.y - 120  # Position above the panel
+		)
+		miss_label.custom_minimum_size = Vector2(300, 120)
+	else:
+		# Fallback to center of screen
+		miss_label.anchor_left = 0.5
+		miss_label.anchor_top = 0.5
+		miss_label.anchor_right = 0.5
+		miss_label.anchor_bottom = 0.5
+		miss_label.offset_left = -300
+		miss_label.offset_top = -100
+		miss_label.offset_right = 300
+		miss_label.offset_bottom = 100
+		miss_label.grow_horizontal = Control.GROW_DIRECTION_BOTH
+		miss_label.grow_vertical = Control.GROW_DIRECTION_BOTH
 
 	add_child(miss_label)
 
-	# Fade out and remove after 0.5 seconds
+	# Fade out and remove after 3 seconds
 	var tween = create_tween()
 	tween.set_ease(Tween.EASE_OUT)
 	tween.set_trans(Tween.TRANS_CUBIC)
-	tween.tween_property(miss_label, "modulate:a", 0.0, 0.5)
+	tween.tween_property(miss_label, "modulate:a", 0.0, 3.0)
 
 	# Remove label after fade completes
 	await tween.finished
@@ -5472,6 +5795,7 @@ func _on_item_selected(item_data: Dictionary) -> void:
 	"""Handle item selection from menu"""
 	_close_item_menu()
 
+
 	# Store selected item
 	selected_item = item_data
 
@@ -5482,13 +5806,17 @@ func _on_item_selected(item_data: Dictionary) -> void:
 	# Special handling for auto-escape items (Smoke Grenade only)
 	if "Auto-escape" in effect:
 		# Execute auto-escape immediately without target selection
+		# Slide character back after selecting auto-escape item (no target selection needed)
+		await _reset_turn_indicator()
 		_execute_auto_escape_item(item_data)
 		return
 
 	# Special handling for AllEnemies targeting (Bombs)
 	if targeting == "AllEnemies":
 		# Bombs hit all enemies, no target selection needed (message will be shown after)
-		_execute_item_usage({})  # Pass empty dict since bombs hit all enemies
+		# Slide character back after selecting bomb item (no target selection needed)
+		await _reset_turn_indicator()
+		await _execute_item_usage({})  # Pass empty dict since bombs hit all enemies
 		return
 
 	# Update battle log to show item usage prompt (without queuing message)
@@ -6018,7 +6346,7 @@ func _execute_burst_on_target(target: Dictionary) -> void:
 	var hit_check = combat_resolver.check_sigil_hit(current_combatant, target, {"skill_acc": acc})
 
 	if not hit_check.hit:
-		_show_miss_feedback()  # Show big MISS text
+		_show_miss_feedback(target)  # Show big MISS text above target
 		# Build miss message
 		start_turn_message()
 		add_turn_line("Burst attack!")
@@ -6150,7 +6478,7 @@ func _on_skill_selected(skill_entry: Dictionary) -> void:
 
 		if is_aoe:
 			# AoE skill - hit all enemies
-			_execute_skill_aoe()
+			await _execute_skill_aoe()
 		else:
 			# Single target - need to select
 			_show_instruction("Select an enemy.")
@@ -6192,7 +6520,7 @@ func _execute_skill_single(target: Dictionary) -> void:
 	var hit_check = combat_resolver.check_sigil_hit(current_combatant, target, {"skill_acc": acc})
 
 	if not hit_check.hit:
-		_show_miss_feedback()  # Show big MISS text
+		_show_miss_feedback(target)  # Show big MISS text above target
 		# Still deduct MP even on miss
 		current_combatant.mp -= mp_cost
 		if current_combatant.mp < 0:
@@ -6224,6 +6552,9 @@ func _execute_skill_single(target: Dictionary) -> void:
 	_show_instruction("SKILL!")
 	var minigame_result = await minigame_mgr.launch_skill_minigame(focus_stat, skill_sequence, skill_tier, mind_type, status_effects)
 	_hide_instruction()
+
+	# Slide character back immediately after minigame closes
+	await _reset_turn_indicator()
 
 	# Apply minigame modifiers
 	var damage_modifier = minigame_result.get("damage_modifier", 1.0)
@@ -6529,6 +6860,7 @@ func _execute_skill_aoe() -> void:
 	var battle_ended = await battle_mgr._check_battle_end()
 	if not battle_ended:
 		# End turn after AoE
+		await _reset_turn_indicator()  # Slide back before ending turn
 		battle_mgr.end_turn()
 
 ## ═══════════════════════════════════════════════════════════════

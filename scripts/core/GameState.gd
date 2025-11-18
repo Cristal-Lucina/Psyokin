@@ -85,6 +85,7 @@ var perk_points: int = 0
 var pacifist_score: int = 0
 var bloodlust_score: int = 0
 var time_played: float = 0.0  # Total playtime in seconds
+var burst_gauge: int = 0  # Burst gauge persists between battles
 
 # Player world position and facing direction
 var player_position: Vector2 = Vector2(287, 250)  # Default spawn position
@@ -660,6 +661,7 @@ func save() -> Dictionary:
 	payload["pacifist_score"]  = pacifist_score
 	payload["bloodlust_score"] = bloodlust_score
 	payload["time_played"]     = int(time_played)  # Save as integer seconds
+	payload["burst_gauge"]     = burst_gauge  # Burst gauge persists between battles
 
 	# Player position and facing direction
 	payload["player_position"] = {"x": player_position.x, "y": player_position.y}
@@ -783,6 +785,7 @@ func load(data: Dictionary) -> void:
 	pacifist_score  = int(data.get("pacifist_score", pacifist_score))
 	bloodlust_score = int(data.get("bloodlust_score", bloodlust_score))
 	time_played     = float(data.get("time_played", time_played))
+	burst_gauge     = int(data.get("burst_gauge", burst_gauge))
 
 	# Player position and facing direction
 	var pos_v: Variant = data.get("player_position", null)

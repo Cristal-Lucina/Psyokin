@@ -119,12 +119,12 @@ func initialize_battle(ally_party: Array, enemy_list: Array) -> void:
 	current_round = 0
 
 	# Load burst gauge from GameState (persists between battles)
-	if gs and "burst_gauge" in gs:
-		burst_gauge = int(gs.get("burst_gauge"))
+	if gs:
+		burst_gauge = gs.burst_gauge
 		print("[BattleManager] Loaded burst gauge from GameState: %d" % burst_gauge)
 	else:
 		burst_gauge = 0
-		print("[BattleManager] No saved burst gauge, starting at 0")
+		print("[BattleManager] No GameState available, starting at 0")
 
 	combatants.clear()
 	turn_order.clear()
@@ -1218,7 +1218,7 @@ func _end_battle(victory: bool) -> void:
 
 	# Save burst gauge to GameState (persists between battles)
 	if gs:
-		gs.set("burst_gauge", burst_gauge)
+		gs.burst_gauge = burst_gauge
 		print("[BattleManager] Saved burst gauge to GameState: %d" % burst_gauge)
 
 	print("[BattleManager] Emitting battle_ended signal...")

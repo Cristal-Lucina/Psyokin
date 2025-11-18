@@ -1,7 +1,8 @@
-[gd_scene load_steps=3 format=3 uid="uid://c6kdayltgkpfp"]
+[gd_scene load_steps=4 format=3 uid="uid://c6kdayltgkpfp"]
 
 [ext_resource type="Script" uid="uid://bh4st7f0x1862" path="res://scripts/battle/Battle.gd" id="1_battle"]
 [ext_resource type="Script" uid="uid://d4fuvn7bww4k1" path="res://scripts/battle/TurnOrderDisplay.gd" id="2_turn_order"]
+[ext_resource type="Texture2D" uid="uid://uvia2k0c3eiy" path="res://assets/graphics/envirnments/Backgrounds/087.png" id="3_background"]
 
 [node name="Battle" type="Control"]
 layout_mode = 3
@@ -12,24 +13,30 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_battle")
 
-[node name="Background" type="ColorRect" parent="."]
+[node name="Background" type="TextureRect" parent="."]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
+offset_left = -253.0
+offset_top = -164.0
+offset_right = 160.0
+offset_bottom = 38.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0, 0, 0, 1)
+texture = ExtResource("3_background")
+expand_mode = 1
+stretch_mode = 5
 
 [node name="MainLayout" type="HBoxContainer" parent="."]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = 70.0
-offset_top = 20.0
-offset_right = -70.0
-offset_bottom = -220.0
+offset_left = 270.0
+offset_top = 89.0
+offset_right = -271.0
+offset_bottom = -118.0
 grow_horizontal = 2
 grow_vertical = 2
 theme_override_constants/separation = 15
@@ -71,17 +78,18 @@ alignment = 1
 
 [node name="TurnOrderPanel" type="PanelContainer" parent="."]
 layout_mode = 1
-anchors_preset = 3
-anchor_left = 1.0
+anchors_preset = -1
+anchor_left = 1.0109375
 anchor_top = 1.0
-anchor_right = 1.0
+anchor_right = 1.0890625
 anchor_bottom = 1.0
-offset_left = -200.0
-offset_top = -280.0
-offset_right = -20.0
-offset_bottom = -20.0
+offset_left = -316.0
+offset_top = -272.0
+offset_right = -179.0
+offset_bottom = -32.0
 grow_horizontal = 0
 grow_vertical = 0
+metadata/_edit_use_anchors_ = true
 
 [node name="VBox" type="VBoxContainer" parent="TurnOrderPanel"]
 layout_mode = 2
@@ -96,7 +104,7 @@ vertical_alignment = 1
 layout_mode = 2
 
 [node name="ScrollContainer" type="ScrollContainer" parent="TurnOrderPanel/VBox"]
-custom_minimum_size = Vector2(0, 260)
+custom_minimum_size = Vector2(0, 200)
 layout_mode = 2
 size_flags_vertical = 3
 
@@ -121,77 +129,77 @@ grow_vertical = 0
 
 [node name="DiamondBackground" type="ColorRect" parent="ActionMenu"]
 layout_mode = 0
-offset_left = 52.0
-offset_top = 12.0
-offset_right = 198.0
-offset_bottom = 158.0
+offset_left = 79.99997
+offset_top = -5.9999743
+offset_right = 341.44595
+offset_bottom = 262.6613
 rotation = 0.785398
+scale = Vector2(0.49, 0.49)
 pivot_offset = Vector2(73, 73)
 color = Color(0.96, 0.97, 0.98, 0.15)
-scale = Vector2(0.49, 0.49)
 
 [node name="DiamondBorder" type="ColorRect" parent="ActionMenu/DiamondBackground"]
 show_behind_parent = true
 layout_mode = 0
-offset_left = 3.0
-offset_top = 3.0
-offset_right = 207.0
-offset_bottom = 207.0
+offset_left = -10.6983795
+offset_top = 0.8461914
+offset_right = 266.8985
+offset_bottom = 266.8985
 color = Color(0.96, 0.97, 0.98, 0.8)
 
 [node name="SkillButton" type="Button" parent="ActionMenu"]
 custom_minimum_size = Vector2(120, 45)
 layout_mode = 0
-offset_left = 65.0
-offset_top = 5.0
-offset_right = 185.0
-offset_bottom = 50.0
+offset_left = 90.0
+offset_top = -2.0
+offset_right = 210.0
+offset_bottom = 43.0
 text = "(Y) SKILL"
 
 [node name="DefendButton" type="Button" parent="ActionMenu"]
 custom_minimum_size = Vector2(120, 45)
 layout_mode = 0
-offset_left = 0.0
-offset_top = 82.0
-offset_right = 120.0
-offset_bottom = 127.0
+offset_left = 6.0
+offset_top = 81.0
+offset_right = 126.0
+offset_bottom = 126.0
 text = "(X) GUARD"
 
 [node name="AttackButton" type="Button" parent="ActionMenu"]
 custom_minimum_size = Vector2(120, 45)
 layout_mode = 0
-offset_left = 130.0
+offset_left = 174.0
 offset_top = 82.0
-offset_right = 250.0
+offset_right = 294.0
 offset_bottom = 127.0
 text = "(B) FIGHT"
 
 [node name="CaptureButton" type="Button" parent="ActionMenu"]
 custom_minimum_size = Vector2(120, 45)
 layout_mode = 0
-offset_left = 65.0
-offset_top = 160.0
-offset_right = 185.0
-offset_bottom = 205.0
+offset_left = 93.0
+offset_top = 168.0
+offset_right = 213.0
+offset_bottom = 213.0
 text = "(A) CAPTURE"
 
 [node name="BurstButton" type="Button" parent="ActionMenu"]
 visible = false
 custom_minimum_size = Vector2(120, 45)
 layout_mode = 0
-offset_left = 65.0
-offset_top = 5.0
-offset_right = 185.0
-offset_bottom = 50.0
+offset_left = 90.0
+offset_top = 8.0
+offset_right = 210.0
+offset_bottom = 53.0
 text = "(Y) BURST"
 
 [node name="RunButton" type="Button" parent="ActionMenu"]
 visible = false
 custom_minimum_size = Vector2(120, 45)
 layout_mode = 0
-offset_left = 0.0
+offset_left = 7.0
 offset_top = 82.0
-offset_right = 120.0
+offset_right = 127.0
 offset_bottom = 127.0
 text = "(X) RUN"
 
@@ -199,30 +207,30 @@ text = "(X) RUN"
 visible = false
 custom_minimum_size = Vector2(120, 45)
 layout_mode = 0
-offset_left = 130.0
-offset_top = 82.0
-offset_right = 250.0
-offset_bottom = 127.0
+offset_left = 176.0
+offset_top = 84.0
+offset_right = 296.0
+offset_bottom = 129.0
 text = "(B) STATUS"
 
 [node name="ItemButton" type="Button" parent="ActionMenu"]
 visible = false
 custom_minimum_size = Vector2(120, 45)
 layout_mode = 0
-offset_left = 65.0
-offset_top = 160.0
-offset_right = 185.0
-offset_bottom = 205.0
+offset_left = 96.0
+offset_top = 168.0
+offset_right = 216.0
+offset_bottom = 213.0
 text = "(A) ITEMS"
 
 [node name="SwitchButton" type="Button" parent="ActionMenu"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(40, 40)
 layout_mode = 0
-offset_left = 210.0
-offset_top = 170.0
-offset_right = 250.0
-offset_bottom = 210.0
+offset_left = 12.0
+offset_top = 13.0
+offset_right = 57.0
+offset_bottom = 53.0
 text = "⇄"
 
 [node name="BattleLogPanel" type="PanelContainer" parent="."]
@@ -231,9 +239,9 @@ anchors_preset = 2
 anchor_top = 1.0
 anchor_bottom = 1.0
 offset_left = 360.0
-offset_top = -200.0
+offset_top = -207.0
 offset_right = 920.0
-offset_bottom = -50.0
+offset_bottom = -56.0
 grow_vertical = 0
 
 [node name="ScrollContainer" type="ScrollContainer" parent="BattleLogPanel"]
@@ -248,6 +256,15 @@ size_flags_vertical = 3
 bbcode_enabled = true
 fit_content = true
 scroll_following = true
+
+[node name="PartyStatusContainer" type="VBoxContainer" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+offset_left = 39.0
+offset_top = 37.0
+offset_right = 249.0
+offset_bottom = 274.0
+theme_override_constants/separation = 8
 
 [node name="BurstGaugePanel" type="PanelContainer" parent="."]
 layout_mode = 1

@@ -17,7 +17,7 @@ const REVEAL_DELAY: float = 0.15  # Delay between each combatant reveal
 const KO_FALL_DURATION: float = 0.5  # Duration of KO falling animation
 
 ## Container for turn slots
-var turn_slots: Array[PanelContainer] = []
+var turn_slots: Array[MarginContainer] = []
 var previous_order: Dictionary = {}  # combatant_id -> previous_index
 var round_label: Label = null
 var round_announcement: Label = null  # Current round announcement label (protected from cleanup)
@@ -449,12 +449,12 @@ func _animate_position_changes(animations: Array[Dictionary]) -> void:
 	var tweens: Array = []
 
 	for anim_data in animations:
-		var slot: PanelContainer = anim_data.slot
+		var slot: MarginContainer = anim_data.slot
 		var old_index: int = anim_data.old_index
 		var new_index: int = anim_data.new_index
 
-		# Calculate vertical offset (each slot is ~40px + spacing)
-		var slot_height = 45.0  # Approximate height including spacing
+		# Calculate vertical offset (each slot is ~24px + spacing)
+		var slot_height = 32.0  # Approximate height including spacing (24px + 8px separator)
 		var offset = (new_index - old_index) * slot_height
 
 		# Create tween for this slot
@@ -478,12 +478,21 @@ func _animate_position_changes(animations: Array[Dictionary]) -> void:
 	if not tweens.is_empty():
 		await tweens[0].finished
 
-func _create_turn_slot(combatant: Dictionary, index: int) -> PanelContainer:
+func _create_turn_slot(combatant: Dictionary, index: int) -> MarginContainer:
 	"""Create a UI slot for a combatant in the turn order"""
+	# Create margin container to add horizontal spacing
+	var margin_container = MarginContainer.new()
+	margin_container.add_theme_constant_override("margin_left", 10)
+	margin_container.add_theme_constant_override("margin_right", 10)
+	# Store metadata on margin container for easy access
+	margin_container.set_meta("combatant_id", combatant.id)
+	margin_container.set_meta("turn_index", index)
+
 	var panel = PanelContainer.new()
-	panel.custom_minimum_size = Vector2(170, 32)  # Expanded to 170px width
-	panel.set_meta("combatant_id", combatant.id)
-	panel.set_meta("turn_index", index)
+	panel.custom_minimum_size = Vector2(170, 24)  # Skinnier height for compact display
+
+	# Add panel to margin container
+	margin_container.add_child(panel)
 
 	# Neon Orchard Color Palette
 	const COLOR_SKY_CYAN = Color(0.30, 0.91, 1.0, 0.8)           # #4DE9FF with transparency
@@ -506,24 +515,24 @@ func _create_turn_slot(combatant: Dictionary, index: int) -> PanelContainer:
 		style.bg_color = COLOR_BUBBLE_MAGENTA  # Magenta for enemies
 		style.border_color = COLOR_MILK_WHITE  # White keyline
 
-	style.border_width_left = 2
-	style.border_width_right = 2
-	style.border_width_top = 2
-	style.border_width_bottom = 2
+	style.border_width_left = 0
+	style.border_width_right = 0
+	style.border_width_top = 0
+	style.border_width_bottom = 0
 	style.corner_radius_top_left = 8
 	style.corner_radius_top_right = 8
 	style.corner_radius_bottom_left = 8
 	style.corner_radius_bottom_right = 8
-	# Reduce padding inside panel for tighter layout
-	style.content_margin_left = 4
-	style.content_margin_right = 4
-	style.content_margin_top = 2
-	style.content_margin_bottom = 2
+	# Remove padding inside panel for sleek layout
+	style.content_margin_left = 0
+	style.content_margin_right = 0
+	style.content_margin_top = 0
+	style.content_margin_bottom = 0
 	panel.add_theme_stylebox_override("panel", style)
 
-	# HBox for layout with reduced spacing
+	# HBox for layout with no spacing
 	var hbox = HBoxContainer.new()
-	hbox.add_theme_constant_override("separation", 2)  # Reduce spacing between elements
+	hbox.add_theme_constant_override("separation", 0)  # No spacing between elements
 	panel.add_child(hbox)
 
 	# Turn number indicator (narrower)
@@ -532,7 +541,7 @@ func _create_turn_slot(combatant: Dictionary, index: int) -> PanelContainer:
 	turn_label.custom_minimum_size = Vector2(20, 0)  # Reduced from 24px
 	turn_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	turn_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	turn_label.add_theme_font_size_override("font_size", 16)  # Keep font size
+	turn_label.add_theme_font_size_override("font_size", 14)  # Reduced for skinnier panel
 
 	# Check if combatant has "Revived" ailment
 	var ailment_check = str(combatant.get("ailment", ""))
@@ -574,7 +583,7 @@ func _create_turn_slot(combatant: Dictionary, index: int) -> PanelContainer:
 
 	name_label.text = display_text
 
-	name_label.add_theme_font_size_override("font_size", 12)  # Scaled for 150px width
+	name_label.add_theme_font_size_override("font_size", 10)  # Reduced for skinnier panel
 	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	name_label.clip_text = true  # Clip text if too long
@@ -643,7 +652,7 @@ func _create_turn_slot(combatant: Dictionary, index: int) -> PanelContainer:
 				if count > 2:
 					buff_label.text += "+"  # Add + if more than 2 stacks
 
-				buff_label.add_theme_font_size_override("font_size", 10)  # Scaled for 150px width
+				buff_label.add_theme_font_size_override("font_size", 9)  # Reduced for skinnier panel
 				buff_label.add_theme_color_override("font_color", display_info.color)
 				buff_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 				buff_container.add_child(buff_label)
@@ -664,13 +673,13 @@ func _create_turn_slot(combatant: Dictionary, index: int) -> PanelContainer:
 		init_label.add_theme_constant_override("shadow_offset_x", 0)
 		init_label.add_theme_constant_override("shadow_offset_y", 0)
 		init_label.add_theme_constant_override("shadow_outline_size", 4)
-	init_label.add_theme_font_size_override("font_size", 10)  # Scaled for 170px width
+	init_label.add_theme_font_size_override("font_size", 9)  # Reduced for skinnier panel
 	init_label.custom_minimum_size = Vector2(20, 0)  # Reduced from 24px
 	init_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	init_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	hbox.add_child(init_label)
 
-	return panel
+	return margin_container
 
 func _update_highlight() -> void:
 	"""Update highlighting to show current turn"""
@@ -678,28 +687,38 @@ func _update_highlight() -> void:
 		return
 
 	var current_turn_index = battle_mgr.current_turn_index
-	const COLOR_CITRUS_YELLOW = Color(1.0, 0.91, 0.30, 1.0)  # #FFE84D - highlight color
-	const COLOR_MILK_WHITE = Color(0.96, 0.97, 0.98, 1.0)    # #F4F7FB - default border
 
 	# Update all slots
 	for i in range(turn_slots.size()):
 		var slot = turn_slots[i]
-		var style = slot.get_theme_stylebox("panel") as StyleBoxFlat
+		# Get the panel from inside the margin container
+		var panel = slot.get_child(0) as PanelContainer
+		if not panel:
+			continue
+
+		var style = panel.get_theme_stylebox("panel") as StyleBoxFlat
 
 		if style:
-			# Highlight the current turn
 			if i == current_turn_index:
-				style.border_width_left = 4
-				style.border_width_right = 4
-				style.border_width_top = 4
-				style.border_width_bottom = 4
-				style.border_color = COLOR_CITRUS_YELLOW  # Citrus Yellow highlight
+				# Add white glow shadow behind active character
+				style.shadow_color = Color(1.0, 1.0, 1.0, 0.8)  # White with transparency
+				style.shadow_size = 8
+				style.shadow_offset = Vector2(0, 0)
+				slot.modulate = Color(1.1, 1.1, 1.1, 1.0)  # Slightly brighter
+
+				# Add pulsing animation to active turn marker
+				var tween = create_tween()
+				tween.set_loops()  # Loop infinitely
+				tween.set_ease(Tween.EASE_IN_OUT)
+				tween.set_trans(Tween.TRANS_SINE)
+				# Pulse between 1.1 and 1.2 brightness
+				tween.tween_property(slot, "modulate", Color(1.2, 1.2, 1.2, 1.0), 0.6)
+				tween.tween_property(slot, "modulate", Color(1.1, 1.1, 1.1, 1.0), 0.6)
 			else:
-				style.border_width_left = 2
-				style.border_width_right = 2
-				style.border_width_top = 2
-				style.border_width_bottom = 2
-				style.border_color = COLOR_MILK_WHITE  # Milk White default
+				# Remove shadow from inactive slots
+				style.shadow_color = Color(0, 0, 0, 0)  # Transparent
+				style.shadow_size = 0
+				slot.modulate = Color(1.0, 1.0, 1.0, 1.0)  # Normal
 
 func update_combatant_hp(_combatant_id: String) -> void:
 	"""Update HP display for a specific combatant (simplified - no HP bars in turn order)"""
@@ -709,7 +728,7 @@ func update_combatant_hp(_combatant_id: String) -> void:
 func animate_ko_fall(combatant_id: String) -> void:
 	"""Animate a combatant falling when KO'd - drops to bottom of screen"""
 	# Find the slot for this combatant
-	var target_slot: PanelContainer = null
+	var target_slot: MarginContainer = null
 	for slot in turn_slots:
 		if slot.get_meta("combatant_id", "") == combatant_id:
 			target_slot = slot
@@ -753,7 +772,7 @@ func animate_ko_fall(combatant_id: String) -> void:
 func animate_capture(combatant_id: String) -> void:
 	"""Animate a combatant being captured - turns cell green"""
 	# Find the slot for this combatant
-	var target_slot: PanelContainer = null
+	var target_slot: MarginContainer = null
 	for slot in turn_slots:
 		if slot.get_meta("combatant_id", "") == combatant_id:
 			target_slot = slot
@@ -782,8 +801,13 @@ func animate_capture(combatant_id: String) -> void:
 	tween.tween_property(target_slot, "scale", Vector2(1.15, 1.15), 0.2)
 	tween.tween_property(target_slot, "scale", Vector2(1.0, 1.0), 0.2)
 
+	# Get the panel from the margin container
+	var panel = target_slot.get_child(0) as PanelContainer
+	if not panel:
+		return
+
 	# Apply green style
-	target_slot.add_theme_stylebox_override("panel", captured_style)
+	panel.add_theme_stylebox_override("panel", captured_style)
 
 	# Add "CAPTURED" label
 	var captured_label = Label.new()
@@ -792,10 +816,10 @@ func animate_capture(combatant_id: String) -> void:
 	captured_label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 1.0))
 	captured_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
-	# Find the VBox inside the slot and add label
-	var vbox = target_slot.get_child(0) as VBoxContainer
-	if vbox:
-		vbox.add_child(captured_label)
+	# Find the HBox inside the panel and add label
+	var hbox = panel.get_child(0) as HBoxContainer
+	if hbox:
+		hbox.add_child(captured_label)
 
 	await tween.finished
 
