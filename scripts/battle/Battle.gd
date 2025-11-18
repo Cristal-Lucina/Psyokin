@@ -1787,9 +1787,9 @@ func _create_party_status_panels() -> void:
 		party_status_panels.append(panel)
 
 func _create_single_party_status_panel(combatant: Dictionary) -> PanelContainer:
-	"""Create a single party status panel (160x30px) with portrait and HP/MP bars"""
+	"""Create a single party status panel (160x60px) with portrait and HP/MP bars"""
 	var panel = PanelContainer.new()
-	panel.custom_minimum_size = Vector2(160, 30)
+	panel.custom_minimum_size = Vector2(160, 60)
 	panel.set_meta("combatant_id", combatant.id)
 
 	# Style the panel with a subtle background
@@ -1811,9 +1811,9 @@ func _create_single_party_status_panel(combatant: Dictionary) -> PanelContainer:
 	hbox.add_theme_constant_override("separation", 2)
 	panel.add_child(hbox)
 
-	# Left side: Portrait (30x30px square)
+	# Left side: Portrait (60x60px square)
 	var portrait_container = PanelContainer.new()
-	portrait_container.custom_minimum_size = Vector2(30, 30)
+	portrait_container.custom_minimum_size = Vector2(60, 60)
 
 	var portrait_style = StyleBoxFlat.new()
 	var portrait_color = _get_character_capsule_color(combatant.display_name, true)
@@ -1823,14 +1823,14 @@ func _create_single_party_status_panel(combatant: Dictionary) -> PanelContainer:
 	portrait_style.border_width_top = 2
 	portrait_style.border_width_bottom = 2
 	portrait_style.border_color = COLOR_MILK_WHITE
-	portrait_style.corner_radius_top_left = 15
-	portrait_style.corner_radius_top_right = 15
-	portrait_style.corner_radius_bottom_left = 15
-	portrait_style.corner_radius_bottom_right = 15
+	portrait_style.corner_radius_top_left = 30
+	portrait_style.corner_radius_top_right = 30
+	portrait_style.corner_radius_bottom_left = 30
+	portrait_style.corner_radius_bottom_right = 30
 	portrait_container.add_theme_stylebox_override("panel", portrait_style)
 	hbox.add_child(portrait_container)
 
-	# Right side: HP/MP bars (48px width)
+	# Right side: HP/MP bars
 	var stats_vbox = VBoxContainer.new()
 	stats_vbox.add_theme_constant_override("separation", 2)
 	stats_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -1844,7 +1844,7 @@ func _create_single_party_status_panel(combatant: Dictionary) -> PanelContainer:
 	# HP label
 	var hp_label = Label.new()
 	hp_label.text = "HP"
-	hp_label.add_theme_font_size_override("font_size", 6)
+	hp_label.add_theme_font_size_override("font_size", 8)
 	hp_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
 	hp_label.custom_minimum_size = Vector2(10, 0)
 	hp_hbox.add_child(hp_label)
@@ -1852,7 +1852,7 @@ func _create_single_party_status_panel(combatant: Dictionary) -> PanelContainer:
 	# HP bar
 	var hp_bar = ProgressBar.new()
 	hp_bar.name = "HPBar"
-	hp_bar.custom_minimum_size = Vector2(25, 8)
+	hp_bar.custom_minimum_size = Vector2(25, 12)
 	hp_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	hp_bar.show_percentage = false
 	hp_bar.max_value = combatant.get("hp_max", 100)
@@ -1872,7 +1872,7 @@ func _create_single_party_status_panel(combatant: Dictionary) -> PanelContainer:
 	var hp_value = Label.new()
 	hp_value.name = "HPValue"
 	hp_value.text = str(combatant.get("hp", 100))
-	hp_value.add_theme_font_size_override("font_size", 6)
+	hp_value.add_theme_font_size_override("font_size", 8)
 	hp_value.add_theme_color_override("font_color", COLOR_MILK_WHITE)
 	hp_value.custom_minimum_size = Vector2(12, 0)
 	hp_hbox.add_child(hp_value)
@@ -1885,7 +1885,7 @@ func _create_single_party_status_panel(combatant: Dictionary) -> PanelContainer:
 	# MP label
 	var mp_label = Label.new()
 	mp_label.text = "MP"
-	mp_label.add_theme_font_size_override("font_size", 6)
+	mp_label.add_theme_font_size_override("font_size", 8)
 	mp_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
 	mp_label.custom_minimum_size = Vector2(10, 0)
 	mp_hbox.add_child(mp_label)
@@ -1893,7 +1893,7 @@ func _create_single_party_status_panel(combatant: Dictionary) -> PanelContainer:
 	# MP bar
 	var mp_bar = ProgressBar.new()
 	mp_bar.name = "MPBar"
-	mp_bar.custom_minimum_size = Vector2(25, 8)
+	mp_bar.custom_minimum_size = Vector2(25, 12)
 	mp_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	mp_bar.show_percentage = false
 	mp_bar.max_value = combatant.get("mp_max", 50)
@@ -1913,7 +1913,7 @@ func _create_single_party_status_panel(combatant: Dictionary) -> PanelContainer:
 	var mp_value = Label.new()
 	mp_value.name = "MPValue"
 	mp_value.text = str(combatant.get("mp", 50))
-	mp_value.add_theme_font_size_override("font_size", 6)
+	mp_value.add_theme_font_size_override("font_size", 8)
 	mp_value.add_theme_color_override("font_color", COLOR_MILK_WHITE)
 	mp_value.custom_minimum_size = Vector2(12, 0)
 	mp_hbox.add_child(mp_value)
