@@ -1177,7 +1177,7 @@ func _confirm_target_selection() -> void:
 		await _execute_capture(target)
 	elif awaiting_item_target:
 		# Using an item
-		_execute_item_usage(target)
+		await _execute_item_usage(target)
 	elif awaiting_skill_selection:
 		# Using a skill
 		_hide_instruction()
@@ -4124,7 +4124,7 @@ func _on_enemy_panel_input(event: InputEvent, target: Dictionary) -> void:
 						await _execute_capture(target)
 					elif awaiting_item_target:
 						# Using an item
-						_execute_item_usage(target)
+						await _execute_item_usage(target)
 					elif awaiting_skill_selection:
 						# Using a skill
 						_clear_target_highlights()
@@ -4158,7 +4158,7 @@ func _on_ally_panel_input(event: InputEvent, target: Dictionary) -> void:
 			if awaiting_target_selection and awaiting_item_target:
 				# Check if this target is valid
 				if target in target_candidates:
-					_execute_item_usage(target)
+					await _execute_item_usage(target)
 
 func _highlight_target_candidates() -> void:
 	"""Show selection indicator above currently selected target"""
@@ -5804,7 +5804,7 @@ func _on_item_selected(item_data: Dictionary) -> void:
 	# Special handling for AllEnemies targeting (Bombs)
 	if targeting == "AllEnemies":
 		# Bombs hit all enemies, no target selection needed (message will be shown after)
-		_execute_item_usage({})  # Pass empty dict since bombs hit all enemies
+		await _execute_item_usage({})  # Pass empty dict since bombs hit all enemies
 		return
 
 	# Update battle log to show item usage prompt (without queuing message)
@@ -6466,7 +6466,7 @@ func _on_skill_selected(skill_entry: Dictionary) -> void:
 
 		if is_aoe:
 			# AoE skill - hit all enemies
-			_execute_skill_aoe()
+			await _execute_skill_aoe()
 		else:
 			# Single target - need to select
 			_show_instruction("Select an enemy.")
@@ -6845,6 +6845,7 @@ func _execute_skill_aoe() -> void:
 	var battle_ended = await battle_mgr._check_battle_end()
 	if not battle_ended:
 		# End turn after AoE
+		await _reset_turn_indicator()  # Slide back before ending turn
 		battle_mgr.end_turn()
 
 ## ═══════════════════════════════════════════════════════════════
