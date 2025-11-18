@@ -4652,18 +4652,24 @@ func _show_miss_feedback() -> void:
 	# Create miss label
 	var miss_label = Label.new()
 	miss_label.text = "MISS!"
-	miss_label.add_theme_font_size_override("font_size", 80)  # Big font
+	miss_label.add_theme_font_size_override("font_size", 120)  # Very big font
 	miss_label.add_theme_color_override("font_color", COLOR_CITRUS_YELLOW)  # Yellow color
+	miss_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 1.0))  # Black outline for visibility
+	miss_label.add_theme_constant_override("outline_size", 8)  # Bold outline
 	miss_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	miss_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 
-	# Center it on screen
-	miss_label.set_anchors_preset(Control.PRESET_CENTER)
-	miss_label.custom_minimum_size = Vector2(400, 100)
-	miss_label.position = Vector2(
-		get_viewport_rect().size.x / 2 - 200,
-		get_viewport_rect().size.y / 2 - 50
-	)
+	# Center it on screen using anchors
+	miss_label.anchor_left = 0.5
+	miss_label.anchor_top = 0.5
+	miss_label.anchor_right = 0.5
+	miss_label.anchor_bottom = 0.5
+	miss_label.offset_left = -300  # Half of width
+	miss_label.offset_top = -100  # Half of height
+	miss_label.offset_right = 300
+	miss_label.offset_bottom = 100
+	miss_label.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	miss_label.grow_vertical = Control.GROW_DIRECTION_BOTH
 	miss_label.z_index = 200  # High z-index to appear above everything
 
 	add_child(miss_label)
