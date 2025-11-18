@@ -17,7 +17,7 @@ const REVEAL_DELAY: float = 0.15  # Delay between each combatant reveal
 const KO_FALL_DURATION: float = 0.5  # Duration of KO falling animation
 
 ## Container for turn slots
-var turn_slots: Array[PanelContainer] = []
+var turn_slots: Array[MarginContainer] = []
 var previous_order: Dictionary = {}  # combatant_id -> previous_index
 var round_label: Label = null
 var round_announcement: Label = null  # Current round announcement label (protected from cleanup)
@@ -478,12 +478,21 @@ func _animate_position_changes(animations: Array[Dictionary]) -> void:
 	if not tweens.is_empty():
 		await tweens[0].finished
 
-func _create_turn_slot(combatant: Dictionary, index: int) -> PanelContainer:
+func _create_turn_slot(combatant: Dictionary, index: int) -> MarginContainer:
 	"""Create a UI slot for a combatant in the turn order"""
+	# Create margin container to add horizontal spacing
+	var margin_container = MarginContainer.new()
+	margin_container.add_theme_constant_override("margin_left", 10)
+	margin_container.add_theme_constant_override("margin_right", 10)
+	# Store metadata on margin container for easy access
+	margin_container.set_meta("combatant_id", combatant.id)
+	margin_container.set_meta("turn_index", index)
+
 	var panel = PanelContainer.new()
 	panel.custom_minimum_size = Vector2(170, 24)  # Skinnier height for compact display
-	panel.set_meta("combatant_id", combatant.id)
-	panel.set_meta("turn_index", index)
+
+	# Add panel to margin container
+	margin_container.add_child(panel)
 
 	# Neon Orchard Color Palette
 	const COLOR_SKY_CYAN = Color(0.30, 0.91, 1.0, 0.8)           # #4DE9FF with transparency
@@ -670,7 +679,7 @@ func _create_turn_slot(combatant: Dictionary, index: int) -> PanelContainer:
 	init_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	hbox.add_child(init_label)
 
-	return panel
+	return margin_container
 
 func _update_highlight() -> void:
 	"""Update highlighting to show current turn"""
@@ -682,7 +691,12 @@ func _update_highlight() -> void:
 	# Update all slots
 	for i in range(turn_slots.size()):
 		var slot = turn_slots[i]
-		var style = slot.get_theme_stylebox("panel") as StyleBoxFlat
+		# Get the panel from inside the margin container
+		var panel = slot.get_child(0) as PanelContainer
+		if not panel:
+			continue
+
+		var style = panel.get_theme_stylebox("panel") as StyleBoxFlat
 
 		if style:
 			if i == current_turn_index:
@@ -691,6 +705,15 @@ func _update_highlight() -> void:
 				style.shadow_size = 8
 				style.shadow_offset = Vector2(0, 0)
 				slot.modulate = Color(1.1, 1.1, 1.1, 1.0)  # Slightly brighter
+
+				# Add pulsing animation to active turn marker
+				var tween = create_tween()
+				tween.set_loops()  # Loop infinitely
+				tween.set_ease(Tween.EASE_IN_OUT)
+				tween.set_trans(Tween.TRANS_SINE)
+				# Pulse between 1.1 and 1.2 brightness
+				tween.tween_property(slot, "modulate", Color(1.2, 1.2, 1.2, 1.0), 0.6)
+				tween.tween_property(slot, "modulate", Color(1.1, 1.1, 1.1, 1.0), 0.6)
 			else:
 				# Remove shadow from inactive slots
 				style.shadow_color = Color(0, 0, 0, 0)  # Transparent
@@ -705,7 +728,7 @@ func update_combatant_hp(_combatant_id: String) -> void:
 func animate_ko_fall(combatant_id: String) -> void:
 	"""Animate a combatant falling when KO'd - drops to bottom of screen"""
 	# Find the slot for this combatant
-	var target_slot: PanelContainer = null
+	var target_slot: MarginContainer = null
 	for slot in turn_slots:
 		if slot.get_meta("combatant_id", "") == combatant_id:
 			target_slot = slot
@@ -749,7 +772,7 @@ func animate_ko_fall(combatant_id: String) -> void:
 func animate_capture(combatant_id: String) -> void:
 	"""Animate a combatant being captured - turns cell green"""
 	# Find the slot for this combatant
-	var target_slot: PanelContainer = null
+	var target_slot: MarginContainer = null
 	for slot in turn_slots:
 		if slot.get_meta("combatant_id", "") == combatant_id:
 			target_slot = slot
@@ -778,8 +801,13 @@ func animate_capture(combatant_id: String) -> void:
 	tween.tween_property(target_slot, "scale", Vector2(1.15, 1.15), 0.2)
 	tween.tween_property(target_slot, "scale", Vector2(1.0, 1.0), 0.2)
 
+	# Get the panel from the margin container
+	var panel = target_slot.get_child(0) as PanelContainer
+	if not panel:
+		return
+
 	# Apply green style
-	target_slot.add_theme_stylebox_override("panel", captured_style)
+	panel.add_theme_stylebox_override("panel", captured_style)
 
 	# Add "CAPTURED" label
 	var captured_label = Label.new()
@@ -788,10 +816,10 @@ func animate_capture(combatant_id: String) -> void:
 	captured_label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 1.0))
 	captured_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
-	# Find the VBox inside the slot and add label
-	var vbox = target_slot.get_child(0) as VBoxContainer
-	if vbox:
-		vbox.add_child(captured_label)
+	# Find the HBox inside the panel and add label
+	var hbox = panel.get_child(0) as HBoxContainer
+	if hbox:
+		hbox.add_child(captured_label)
 
 	await tween.finished
 
