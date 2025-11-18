@@ -741,9 +741,9 @@ func _style_panels() -> void:
 		# Create circular shadow style
 		var shadow_style = StyleBoxFlat.new()
 		shadow_style.bg_color = Color(0, 0, 0, 0)  # Transparent background
-		shadow_style.shadow_size = 8  # Reduced by 50% from 16
+		shadow_style.shadow_size = 4.8  # Scaled down by 40% from 8
 		shadow_style.shadow_color = Color(0, 0, 0, 0.8)  # Dark prominent shadow
-		shadow_style.shadow_offset = Vector2(46, 6)  # Shifted right 40px more
+		shadow_style.shadow_offset = Vector2(26, 6)  # Shifted left 20px from 46
 		# Make it circular with high corner radius
 		shadow_style.corner_radius_top_left = 200
 		shadow_style.corner_radius_top_right = 200
