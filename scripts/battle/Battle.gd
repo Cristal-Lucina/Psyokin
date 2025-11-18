@@ -1792,24 +1792,25 @@ func _create_single_party_status_panel(combatant: Dictionary) -> PanelContainer:
 	panel.custom_minimum_size = Vector2(160, 60)
 	panel.set_meta("combatant_id", combatant.id)
 
-	# Style the panel with a subtle background
+	# Style the panel with transparent background and no border
 	var style = StyleBoxFlat.new()
-	style.bg_color = Color(0.1, 0.1, 0.15, 0.8)  # Semi-transparent dark background
-	style.border_width_left = 1
-	style.border_width_right = 1
-	style.border_width_top = 1
-	style.border_width_bottom = 1
-	style.border_color = COLOR_MILK_WHITE.darkened(0.5)
-	style.corner_radius_top_left = 3
-	style.corner_radius_top_right = 3
-	style.corner_radius_bottom_left = 3
-	style.corner_radius_bottom_right = 3
+	style.bg_color = Color(0, 0, 0, 0)  # Fully transparent
+	style.border_width_left = 0
+	style.border_width_right = 0
+	style.border_width_top = 0
+	style.border_width_bottom = 0
 	panel.add_theme_stylebox_override("panel", style)
 
-	# Main horizontal container
+	# Main vertical container to center content horizontally
+	var main_vbox = VBoxContainer.new()
+	main_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	panel.add_child(main_vbox)
+
+	# Centered horizontal container for portrait and stats
 	var hbox = HBoxContainer.new()
-	hbox.add_theme_constant_override("separation", 2)
-	panel.add_child(hbox)
+	hbox.add_theme_constant_override("separation", 4)
+	hbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	main_vbox.add_child(hbox)
 
 	# Left side: Portrait (60x60px square)
 	var portrait_container = PanelContainer.new()
@@ -1818,6 +1819,7 @@ func _create_single_party_status_panel(combatant: Dictionary) -> PanelContainer:
 	var portrait_style = StyleBoxFlat.new()
 	var portrait_color = _get_character_capsule_color(combatant.display_name, true)
 	portrait_style.bg_color = portrait_color
+	portrait_style.bg_color.a = 0.8  # Slight transparency
 	portrait_style.border_width_left = 2
 	portrait_style.border_width_right = 2
 	portrait_style.border_width_top = 2
@@ -1832,7 +1834,7 @@ func _create_single_party_status_panel(combatant: Dictionary) -> PanelContainer:
 
 	# Right side: HP/MP bars
 	var stats_vbox = VBoxContainer.new()
-	stats_vbox.add_theme_constant_override("separation", 2)
+	stats_vbox.add_theme_constant_override("separation", 4)
 	stats_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	hbox.add_child(stats_vbox)
 
@@ -1858,13 +1860,21 @@ func _create_single_party_status_panel(combatant: Dictionary) -> PanelContainer:
 	hp_bar.max_value = combatant.get("hp_max", 100)
 	hp_bar.value = combatant.get("hp", 100)
 
-	# Style HP bar
+	# Style HP bar with rounded corners and transparency
 	var hp_bg = StyleBoxFlat.new()
-	hp_bg.bg_color = Color(0.2, 0.2, 0.2, 1.0)
+	hp_bg.bg_color = Color(0.2, 0.2, 0.2, 0.6)  # Transparent background
+	hp_bg.corner_radius_top_left = 6
+	hp_bg.corner_radius_top_right = 6
+	hp_bg.corner_radius_bottom_left = 6
+	hp_bg.corner_radius_bottom_right = 6
 	hp_bar.add_theme_stylebox_override("background", hp_bg)
 
 	var hp_fill = StyleBoxFlat.new()
-	hp_fill.bg_color = Color(0.2, 0.8, 0.2, 1.0)  # Green
+	hp_fill.bg_color = Color(0.2, 0.8, 0.2, 0.8)  # Green with transparency
+	hp_fill.corner_radius_top_left = 6
+	hp_fill.corner_radius_top_right = 6
+	hp_fill.corner_radius_bottom_left = 6
+	hp_fill.corner_radius_bottom_right = 6
 	hp_bar.add_theme_stylebox_override("fill", hp_fill)
 	hp_hbox.add_child(hp_bar)
 
@@ -1899,13 +1909,21 @@ func _create_single_party_status_panel(combatant: Dictionary) -> PanelContainer:
 	mp_bar.max_value = combatant.get("mp_max", 50)
 	mp_bar.value = combatant.get("mp", 50)
 
-	# Style MP bar
+	# Style MP bar with rounded corners and transparency
 	var mp_bg = StyleBoxFlat.new()
-	mp_bg.bg_color = Color(0.2, 0.2, 0.2, 1.0)
+	mp_bg.bg_color = Color(0.2, 0.2, 0.2, 0.6)  # Transparent background
+	mp_bg.corner_radius_top_left = 6
+	mp_bg.corner_radius_top_right = 6
+	mp_bg.corner_radius_bottom_left = 6
+	mp_bg.corner_radius_bottom_right = 6
 	mp_bar.add_theme_stylebox_override("background", mp_bg)
 
 	var mp_fill = StyleBoxFlat.new()
-	mp_fill.bg_color = Color(0.3, 0.5, 1.0, 1.0)  # Blue
+	mp_fill.bg_color = Color(0.3, 0.5, 1.0, 0.8)  # Blue with transparency
+	mp_fill.corner_radius_top_left = 6
+	mp_fill.corner_radius_top_right = 6
+	mp_fill.corner_radius_bottom_left = 6
+	mp_fill.corner_radius_bottom_right = 6
 	mp_bar.add_theme_stylebox_override("fill", mp_fill)
 	mp_hbox.add_child(mp_bar)
 

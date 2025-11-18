@@ -682,12 +682,20 @@ func _update_highlight() -> void:
 	# Update all slots
 	for i in range(turn_slots.size()):
 		var slot = turn_slots[i]
+		var style = slot.get_theme_stylebox("panel") as StyleBoxFlat
 
-		# Highlight the current turn with increased opacity/brightness
-		if i == current_turn_index:
-			slot.modulate = Color(1.2, 1.2, 1.2, 1.0)  # Brighter
-		else:
-			slot.modulate = Color(1.0, 1.0, 1.0, 1.0)  # Normal
+		if style:
+			if i == current_turn_index:
+				# Add white glow shadow behind active character
+				style.shadow_color = Color(1.0, 1.0, 1.0, 0.8)  # White with transparency
+				style.shadow_size = 8
+				style.shadow_offset = Vector2(0, 0)
+				slot.modulate = Color(1.1, 1.1, 1.1, 1.0)  # Slightly brighter
+			else:
+				# Remove shadow from inactive slots
+				style.shadow_color = Color(0, 0, 0, 0)  # Transparent
+				style.shadow_size = 0
+				slot.modulate = Color(1.0, 1.0, 1.0, 1.0)  # Normal
 
 func update_combatant_hp(_combatant_id: String) -> void:
 	"""Update HP display for a specific combatant (simplified - no HP bars in turn order)"""
