@@ -449,7 +449,7 @@ func _animate_position_changes(animations: Array[Dictionary]) -> void:
 	var tweens: Array = []
 
 	for anim_data in animations:
-		var slot: PanelContainer = anim_data.slot
+		var slot: MarginContainer = anim_data.slot
 		var old_index: int = anim_data.old_index
 		var new_index: int = anim_data.new_index
 
