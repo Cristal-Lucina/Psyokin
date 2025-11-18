@@ -1900,6 +1900,10 @@ func _create_single_party_status_panel(combatant: Dictionary) -> PanelContainer:
 	portrait_style.corner_radius_top_right = 30
 	portrait_style.corner_radius_bottom_left = 30
 	portrait_style.corner_radius_bottom_right = 30
+	# Add shadow behind portrait
+	portrait_style.shadow_size = 8
+	portrait_style.shadow_color = Color(0, 0, 0, 0.6)
+	portrait_style.shadow_offset = Vector2(3, 3)
 	portrait_container.add_theme_stylebox_override("panel", portrait_style)
 	hbox.add_child(portrait_container)
 
@@ -1938,6 +1942,10 @@ func _create_single_party_status_panel(combatant: Dictionary) -> PanelContainer:
 	hp_bg.corner_radius_top_right = 6
 	hp_bg.corner_radius_bottom_left = 6
 	hp_bg.corner_radius_bottom_right = 6
+	# Add shadow behind HP bar
+	hp_bg.shadow_size = 6
+	hp_bg.shadow_color = Color(0, 0, 0, 0.5)
+	hp_bg.shadow_offset = Vector2(2, 2)
 	hp_bar.add_theme_stylebox_override("background", hp_bg)
 
 	var hp_fill = StyleBoxFlat.new()
@@ -1987,6 +1995,10 @@ func _create_single_party_status_panel(combatant: Dictionary) -> PanelContainer:
 	mp_bg.corner_radius_top_right = 6
 	mp_bg.corner_radius_bottom_left = 6
 	mp_bg.corner_radius_bottom_right = 6
+	# Add shadow behind MP bar
+	mp_bg.shadow_size = 6
+	mp_bg.shadow_color = Color(0, 0, 0, 0.5)
+	mp_bg.shadow_offset = Vector2(2, 2)
 	mp_bar.add_theme_stylebox_override("background", mp_bg)
 
 	var mp_fill = StyleBoxFlat.new()
