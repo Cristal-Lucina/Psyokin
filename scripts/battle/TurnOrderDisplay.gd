@@ -453,8 +453,8 @@ func _animate_position_changes(animations: Array[Dictionary]) -> void:
 		var old_index: int = anim_data.old_index
 		var new_index: int = anim_data.new_index
 
-		# Calculate vertical offset (each slot is ~40px + spacing)
-		var slot_height = 45.0  # Approximate height including spacing
+		# Calculate vertical offset (each slot is ~24px + spacing)
+		var slot_height = 32.0  # Approximate height including spacing (24px + 8px separator)
 		var offset = (new_index - old_index) * slot_height
 
 		# Create tween for this slot
@@ -481,7 +481,7 @@ func _animate_position_changes(animations: Array[Dictionary]) -> void:
 func _create_turn_slot(combatant: Dictionary, index: int) -> PanelContainer:
 	"""Create a UI slot for a combatant in the turn order"""
 	var panel = PanelContainer.new()
-	panel.custom_minimum_size = Vector2(170, 32)  # Expanded to 170px width
+	panel.custom_minimum_size = Vector2(170, 24)  # Skinnier height for compact display
 	panel.set_meta("combatant_id", combatant.id)
 	panel.set_meta("turn_index", index)
 
@@ -532,7 +532,7 @@ func _create_turn_slot(combatant: Dictionary, index: int) -> PanelContainer:
 	turn_label.custom_minimum_size = Vector2(20, 0)  # Reduced from 24px
 	turn_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	turn_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	turn_label.add_theme_font_size_override("font_size", 16)  # Keep font size
+	turn_label.add_theme_font_size_override("font_size", 14)  # Reduced for skinnier panel
 
 	# Check if combatant has "Revived" ailment
 	var ailment_check = str(combatant.get("ailment", ""))
@@ -574,7 +574,7 @@ func _create_turn_slot(combatant: Dictionary, index: int) -> PanelContainer:
 
 	name_label.text = display_text
 
-	name_label.add_theme_font_size_override("font_size", 12)  # Scaled for 150px width
+	name_label.add_theme_font_size_override("font_size", 10)  # Reduced for skinnier panel
 	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	name_label.clip_text = true  # Clip text if too long
@@ -643,7 +643,7 @@ func _create_turn_slot(combatant: Dictionary, index: int) -> PanelContainer:
 				if count > 2:
 					buff_label.text += "+"  # Add + if more than 2 stacks
 
-				buff_label.add_theme_font_size_override("font_size", 10)  # Scaled for 150px width
+				buff_label.add_theme_font_size_override("font_size", 9)  # Reduced for skinnier panel
 				buff_label.add_theme_color_override("font_color", display_info.color)
 				buff_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 				buff_container.add_child(buff_label)
@@ -664,7 +664,7 @@ func _create_turn_slot(combatant: Dictionary, index: int) -> PanelContainer:
 		init_label.add_theme_constant_override("shadow_offset_x", 0)
 		init_label.add_theme_constant_override("shadow_offset_y", 0)
 		init_label.add_theme_constant_override("shadow_outline_size", 4)
-	init_label.add_theme_font_size_override("font_size", 10)  # Scaled for 170px width
+	init_label.add_theme_font_size_override("font_size", 9)  # Reduced for skinnier panel
 	init_label.custom_minimum_size = Vector2(20, 0)  # Reduced from 24px
 	init_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	init_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
