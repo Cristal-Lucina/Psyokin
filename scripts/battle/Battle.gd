@@ -728,7 +728,7 @@ func _style_panels() -> void:
 		# Create a shadow panel container to place behind the action menu
 		var shadow_panel = PanelContainer.new()
 		shadow_panel.name = "ActionMenuShadow"
-		shadow_panel.z_index = -1  # Place behind the action menu
+		shadow_panel.z_index = 1  # Above background but behind action menu (via child order)
 
 		# Match the action menu's position and size
 		shadow_panel.position = action_menu.position
@@ -1787,7 +1787,22 @@ func _display_combatants() -> void:
 	for i in range(allies.size()):
 		var ally = allies[i]
 		var slot = _create_combatant_slot(ally, true, i)
-		ally_slots.add_child(slot)
+
+		# Wrap in MarginContainer to apply horizontal offset for fighting stance
+		var margin_container = MarginContainer.new()
+		var x_offset = 0
+		if i == 0:  # Top slot - lean right toward center
+			x_offset = 20
+		elif i == 2:  # Bottom slot - lean left toward center
+			x_offset = -20
+
+		if x_offset > 0:
+			margin_container.add_theme_constant_override("margin_left", x_offset)
+		elif x_offset < 0:
+			margin_container.add_theme_constant_override("margin_right", abs(x_offset))
+
+		margin_container.add_child(slot)
+		ally_slots.add_child(margin_container)
 		combatant_panels[ally.id] = slot
 
 	# Display enemies
@@ -1795,7 +1810,22 @@ func _display_combatants() -> void:
 	for i in range(enemies.size()):
 		var enemy = enemies[i]
 		var slot = _create_combatant_slot(enemy, false, i)
-		enemy_slots.add_child(slot)
+
+		# Wrap in MarginContainer to apply horizontal offset for fighting stance
+		var margin_container = MarginContainer.new()
+		var x_offset = 0
+		if i == 0:  # Top slot - lean left toward center
+			x_offset = -20
+		elif i == 2:  # Bottom slot - lean right toward center
+			x_offset = 20
+
+		if x_offset > 0:
+			margin_container.add_theme_constant_override("margin_left", x_offset)
+		elif x_offset < 0:
+			margin_container.add_theme_constant_override("margin_right", abs(x_offset))
+
+		margin_container.add_child(slot)
+		enemy_slots.add_child(margin_container)
 		combatant_panels[enemy.id] = slot
 
 	# Create party status panels
@@ -2064,16 +2094,6 @@ func _create_combatant_slot(combatant: Dictionary, is_ally: bool, slot_index: in
 		panel.visible = false
 		panel.position = Vector2(-1000, -1000)  # Move off screen
 
-	# Calculate position offset for fighting stance
-	var x_offset = 0.0
-	if slot_index == 0:
-		# Top slot: allies move right, enemies move left
-		x_offset = 20.0 if is_ally else -20.0
-	elif slot_index == 2:
-		# Bottom slot: allies move left, enemies move right
-		x_offset = -20.0 if is_ally else 20.0
-	# Middle slot (slot_index == 1) has no offset
-
 	# Allies: Transparent background, only capsule and name visible
 	if is_ally:
 		panel.custom_minimum_size = Vector2(80, 80)
@@ -2133,10 +2153,6 @@ func _create_combatant_slot(combatant: Dictionary, is_ally: bool, slot_index: in
 
 		# Don't show HP/MP bars for allies (clean capsule style)
 
-		# Apply position offset for fighting stance using offset_left
-		panel.offset_left = x_offset
-		panel.offset_right = x_offset
-
 	else:
 		# Enemies: Transparent background, only capsule and name visible
 		panel.custom_minimum_size = Vector2(80, 80)
@@ -2191,10 +2207,6 @@ func _create_combatant_slot(combatant: Dictionary, is_ally: bool, slot_index: in
 		vbox.add_child(name_label)
 
 		# Don't show HP/MP bars for enemies (hidden until scan perk unlocked)
-
-		# Apply position offset for fighting stance using offset_left
-		panel.offset_left = x_offset
-		panel.offset_right = x_offset
 
 	# Store combatant ID in metadata
 	panel.set_meta("combatant_id", combatant.id)
