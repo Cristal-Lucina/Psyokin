@@ -725,13 +725,13 @@ func _style_panels() -> void:
 	# Add shadow to Action Menu by creating a shadow panel behind it
 	var action_menu = get_node_or_null("ActionMenu")
 	if action_menu:
-		# Ensure action menu is above the shadow
-		action_menu.z_index = 2
-
 		# Create a shadow panel container to place behind the action menu
 		var shadow_panel = PanelContainer.new()
 		shadow_panel.name = "ActionMenuShadow"
-		shadow_panel.z_index = 1  # Above background but behind action menu
+		shadow_panel.z_index = -1  # Below default elements but above background
+
+		# Scale down the shadow panel to 60% size (40% reduction)
+		shadow_panel.scale = Vector2(0.6, 0.6)
 
 		# Match the action menu's position and size
 		shadow_panel.position = action_menu.position
@@ -741,8 +741,8 @@ func _style_panels() -> void:
 		# Create circular shadow style
 		var shadow_style = StyleBoxFlat.new()
 		shadow_style.bg_color = Color(0, 0, 0, 0)  # Transparent background
-		shadow_style.shadow_size = 4.8  # Scaled down by 40% from 8
-		shadow_style.shadow_color = Color(0, 0, 0, 0.8)  # Dark prominent shadow
+		shadow_style.shadow_size = 8  # Shadow blur size
+		shadow_style.shadow_color = Color(0, 0, 0, 0.4)  # More transparent shadow
 		shadow_style.shadow_offset = Vector2(26, 6)  # Shifted left 20px from 46
 		# Make it circular with high corner radius
 		shadow_style.corner_radius_top_left = 200
@@ -4160,18 +4160,10 @@ func _highlight_target_candidates() -> void:
 	var selected_target = target_candidates[selected_target_index]
 	var selected_target_id = selected_target.id
 
-	# Find the panel for this target
+	# Find the panel for this target using the combatant_panels dictionary
 	var target_panel: Control = null
-	for child in enemy_slots.get_children():
-		if child.get_meta("combatant_id", "") == selected_target_id:
-			target_panel = child
-			break
-
-	if target_panel == null:
-		for child in ally_slots.get_children():
-			if child.get_meta("combatant_id", "") == selected_target_id:
-				target_panel = child
-				break
+	if combatant_panels.has(selected_target_id):
+		target_panel = combatant_panels[selected_target_id]
 
 	if target_panel == null:
 		return
