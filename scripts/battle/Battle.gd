@@ -1787,9 +1787,9 @@ func _create_party_status_panels() -> void:
 		party_status_panels.append(panel)
 
 func _create_single_party_status_panel(combatant: Dictionary) -> PanelContainer:
-	"""Create a single party status panel (80x30px) with portrait and HP/MP bars"""
+	"""Create a single party status panel (160x30px) with portrait and HP/MP bars"""
 	var panel = PanelContainer.new()
-	panel.custom_minimum_size = Vector2(80, 30)
+	panel.custom_minimum_size = Vector2(160, 30)
 	panel.set_meta("combatant_id", combatant.id)
 
 	# Style the panel with a subtle background
