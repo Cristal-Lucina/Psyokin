@@ -741,9 +741,9 @@ func _style_panels() -> void:
 		# Create circular shadow style
 		var shadow_style = StyleBoxFlat.new()
 		shadow_style.bg_color = Color(0, 0, 0, 0)  # Transparent background
-		shadow_style.shadow_size = 16  # Larger shadow for the action menu
+		shadow_style.shadow_size = 8  # Reduced by 50% from 16
 		shadow_style.shadow_color = Color(0, 0, 0, 0.8)  # Dark prominent shadow
-		shadow_style.shadow_offset = Vector2(6, 6)  # Offset for depth
+		shadow_style.shadow_offset = Vector2(46, 6)  # Shifted right 40px more
 		# Make it circular with high corner radius
 		shadow_style.corner_radius_top_left = 200
 		shadow_style.corner_radius_top_right = 200
@@ -4179,7 +4179,7 @@ func _highlight_target_candidates() -> void:
 	# Create selection indicator (animated arrow/marker above target)
 	selection_indicator = Control.new()
 	selection_indicator.custom_minimum_size = Vector2(60, 30)
-	selection_indicator.z_index = 50
+	selection_indicator.z_index = 100  # Very high to ensure visibility above all elements
 	add_child(selection_indicator)
 
 	# Position above the target panel
@@ -4214,12 +4214,12 @@ func _draw_selection_indicator() -> void:
 		Vector2(15, 10),  # Left side top
 	])
 
-	# Draw shadow first (offset and darkened)
-	var shadow_offset = Vector2(2, 2)
+	# Draw shadow first (offset and darkened) - larger and darker for better visibility
+	var shadow_offset = Vector2(3, 3)
 	var shadow_points = PackedVector2Array()
 	for point in points:
 		shadow_points.append(point + shadow_offset)
-	selection_indicator.draw_colored_polygon(shadow_points, Color(0.0, 0.0, 0.0, 0.5))
+	selection_indicator.draw_colored_polygon(shadow_points, Color(0.0, 0.0, 0.0, 0.9))
 
 	# Draw white arrow on top
 	selection_indicator.draw_colored_polygon(points, COLOR_MILK_WHITE)
