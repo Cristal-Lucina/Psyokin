@@ -506,24 +506,24 @@ func _create_turn_slot(combatant: Dictionary, index: int) -> PanelContainer:
 		style.bg_color = COLOR_BUBBLE_MAGENTA  # Magenta for enemies
 		style.border_color = COLOR_MILK_WHITE  # White keyline
 
-	style.border_width_left = 2
-	style.border_width_right = 2
-	style.border_width_top = 2
-	style.border_width_bottom = 2
+	style.border_width_left = 0
+	style.border_width_right = 0
+	style.border_width_top = 0
+	style.border_width_bottom = 0
 	style.corner_radius_top_left = 8
 	style.corner_radius_top_right = 8
 	style.corner_radius_bottom_left = 8
 	style.corner_radius_bottom_right = 8
-	# Reduce padding inside panel for tighter layout
-	style.content_margin_left = 4
-	style.content_margin_right = 4
-	style.content_margin_top = 2
-	style.content_margin_bottom = 2
+	# Remove padding inside panel for sleek layout
+	style.content_margin_left = 0
+	style.content_margin_right = 0
+	style.content_margin_top = 0
+	style.content_margin_bottom = 0
 	panel.add_theme_stylebox_override("panel", style)
 
-	# HBox for layout with reduced spacing
+	# HBox for layout with no spacing
 	var hbox = HBoxContainer.new()
-	hbox.add_theme_constant_override("separation", 2)  # Reduce spacing between elements
+	hbox.add_theme_constant_override("separation", 0)  # No spacing between elements
 	panel.add_child(hbox)
 
 	# Turn number indicator (narrower)
@@ -678,28 +678,16 @@ func _update_highlight() -> void:
 		return
 
 	var current_turn_index = battle_mgr.current_turn_index
-	const COLOR_CITRUS_YELLOW = Color(1.0, 0.91, 0.30, 1.0)  # #FFE84D - highlight color
-	const COLOR_MILK_WHITE = Color(0.96, 0.97, 0.98, 1.0)    # #F4F7FB - default border
 
 	# Update all slots
 	for i in range(turn_slots.size()):
 		var slot = turn_slots[i]
-		var style = slot.get_theme_stylebox("panel") as StyleBoxFlat
 
-		if style:
-			# Highlight the current turn
-			if i == current_turn_index:
-				style.border_width_left = 4
-				style.border_width_right = 4
-				style.border_width_top = 4
-				style.border_width_bottom = 4
-				style.border_color = COLOR_CITRUS_YELLOW  # Citrus Yellow highlight
-			else:
-				style.border_width_left = 2
-				style.border_width_right = 2
-				style.border_width_top = 2
-				style.border_width_bottom = 2
-				style.border_color = COLOR_MILK_WHITE  # Milk White default
+		# Highlight the current turn with increased opacity/brightness
+		if i == current_turn_index:
+			slot.modulate = Color(1.2, 1.2, 1.2, 1.0)  # Brighter
+		else:
+			slot.modulate = Color(1.0, 1.0, 1.0, 1.0)  # Normal
 
 func update_combatant_hp(_combatant_id: String) -> void:
 	"""Update HP display for a specific combatant (simplified - no HP bars in turn order)"""
