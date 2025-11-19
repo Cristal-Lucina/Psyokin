@@ -51,8 +51,12 @@ var available_parts = {}
 var current_selections = {}
 var current_color_ramps = {}
 
+# Cached palette images
+var palette_images = {}
+
 func _ready():
 	print("=== PSYOKIN TEST CHARACTER CREATOR ===")
+	load_palette_images()
 	load_animation_data()
 	scan_character_assets()
 	populate_animation_list()
@@ -85,6 +89,82 @@ func _process(delta):
 		animation_timer = 0.0
 		current_frame_index = (current_frame_index + 1) % anim_data.total_frames
 		update_frame_display()
+
+func load_palette_images():
+	"""Load and cache palette images for color extraction"""
+	print("Loading palette images...")
+
+	var palette_paths = {
+		"3color": PALETTE_PATH + "mana seed 3-color ramps.png",
+		"4color": PALETTE_PATH + "mana seed 4-color ramps.png",
+		"hair": PALETTE_PATH + "mana seed hair ramps.png",
+		"skin": PALETTE_PATH + "mana seed skin ramps.png"
+	}
+
+	for ramp_type in palette_paths:
+		var path = palette_paths[ramp_type]
+		if FileAccess.file_exists(path):
+			var texture = load(path)
+			if texture:
+				# Get the image data from the texture
+				var image = texture.get_image()
+				palette_images[ramp_type] = image
+				print("  Loaded ", ramp_type, " palette: ", image.get_width(), "x", image.get_height())
+			else:
+				print("  ERROR: Failed to load texture: ", path)
+		else:
+			print("  WARNING: Palette not found: ", path)
+
+	# Also load base ramps (these are the colors in the sprite that will be replaced)
+	var base_ramp_paths = {
+		"3color": PALETTE_PATH + "base ramps/3-color base ramp (00a).png",
+		"4color": PALETTE_PATH + "base ramps/4-color base ramp (00b).png",
+		"hair": PALETTE_PATH + "base ramps/hair color base ramp.png",
+		"skin": PALETTE_PATH + "base ramps/skin color base ramp.png"
+	}
+
+	for ramp_type in base_ramp_paths:
+		var path = base_ramp_paths[ramp_type]
+		if FileAccess.file_exists(path):
+			var texture = load(path)
+			if texture:
+				var image = texture.get_image()
+				palette_images[ramp_type + "_base"] = image
+				print("  Loaded ", ramp_type, " base ramp: ", image.get_width(), "x", image.get_height())
+			else:
+				print("  ERROR: Failed to load base ramp texture: ", path)
+		else:
+			print("  WARNING: Base ramp not found: ", path)
+
+func extract_colors_from_palette(ramp_type: String, row_index: int) -> Array:
+	"""Extract colors from a specific row of a palette image
+	Returns array of Color objects"""
+	if ramp_type not in palette_images:
+		print("ERROR: Palette type not loaded: ", ramp_type)
+		return []
+
+	var image = palette_images[ramp_type]
+	var colors = []
+
+	# Determine how many colors per row based on ramp type
+	var colors_per_row = 3
+	match ramp_type:
+		"3color":
+			colors_per_row = 3
+		"4color":
+			colors_per_row = 4
+		"hair":
+			colors_per_row = 5
+		"skin":
+			colors_per_row = 4
+
+	# Read pixels from the specified row
+	# Each row in the palette image represents one color scheme
+	for i in range(colors_per_row):
+		var pixel_color = image.get_pixel(i, row_index)
+		colors.append(pixel_color)
+
+	return colors
 
 func load_animation_data():
 	"""Parse the CSV file to load animation data"""
@@ -433,7 +513,7 @@ func update_preview():
 	update_frame_display()
 
 func apply_color_ramp(layer_code: String):
-	"""Apply color ramp shader"""
+	"""Apply color ramp shader with actual palette colors"""
 	if layer_code not in current_selections or current_selections[layer_code] == null:
 		return
 
@@ -463,6 +543,76 @@ func apply_color_ramp(layer_code: String):
 		ramp_type_int = 3
 
 	mat.set_shader_parameter("ramp_type", ramp_type_int)
+
+	# Load and set base colors (the colors in the sprite to be replaced)
+	# These are always from row 0 of the base ramp image
+	var base_colors = extract_colors_from_palette(ramp_type + "_base", 0)
+	if base_colors.size() > 0:
+		match ramp_type:
+			"3color":
+				if base_colors.size() >= 3:
+					mat.set_shader_parameter("base_3color_1", base_colors[0])
+					mat.set_shader_parameter("base_3color_2", base_colors[1])
+					mat.set_shader_parameter("base_3color_3", base_colors[2])
+			"4color":
+				if base_colors.size() >= 4:
+					mat.set_shader_parameter("base_4color_1", base_colors[0])
+					mat.set_shader_parameter("base_4color_2", base_colors[1])
+					mat.set_shader_parameter("base_4color_3", base_colors[2])
+					mat.set_shader_parameter("base_4color_4", base_colors[3])
+			"hair":
+				if base_colors.size() >= 5:
+					mat.set_shader_parameter("base_hair_1", base_colors[0])
+					mat.set_shader_parameter("base_hair_2", base_colors[1])
+					mat.set_shader_parameter("base_hair_3", base_colors[2])
+					mat.set_shader_parameter("base_hair_4", base_colors[3])
+					mat.set_shader_parameter("base_hair_5", base_colors[4])
+			"skin":
+				if base_colors.size() >= 4:
+					mat.set_shader_parameter("base_skin_1", base_colors[0])
+					mat.set_shader_parameter("base_skin_2", base_colors[1])
+					mat.set_shader_parameter("base_skin_3", base_colors[2])
+					mat.set_shader_parameter("base_skin_4", base_colors[3])
+
+	# If a color ramp has been selected, apply target colors
+	if layer_code in current_color_ramps:
+		var ramp_info = current_color_ramps[layer_code]
+		var row_index = ramp_info.index
+
+		# Extract colors from the palette
+		var colors = extract_colors_from_palette(ramp_type, row_index)
+
+		if colors.size() > 0:
+			# Apply colors to shader based on ramp type
+			match ramp_type:
+				"3color":
+					if colors.size() >= 3:
+						mat.set_shader_parameter("target_3color_1", colors[0])
+						mat.set_shader_parameter("target_3color_2", colors[1])
+						mat.set_shader_parameter("target_3color_3", colors[2])
+						print("Applied 3-color ramp ", row_index, " to ", layer_code)
+				"4color":
+					if colors.size() >= 4:
+						mat.set_shader_parameter("target_4color_1", colors[0])
+						mat.set_shader_parameter("target_4color_2", colors[1])
+						mat.set_shader_parameter("target_4color_3", colors[2])
+						mat.set_shader_parameter("target_4color_4", colors[3])
+						print("Applied 4-color ramp ", row_index, " to ", layer_code)
+				"hair":
+					if colors.size() >= 5:
+						mat.set_shader_parameter("target_hair_1", colors[0])
+						mat.set_shader_parameter("target_hair_2", colors[1])
+						mat.set_shader_parameter("target_hair_3", colors[2])
+						mat.set_shader_parameter("target_hair_4", colors[3])
+						mat.set_shader_parameter("target_hair_5", colors[4])
+						print("Applied hair ramp ", row_index, " to ", layer_code)
+				"skin":
+					if colors.size() >= 4:
+						mat.set_shader_parameter("target_skin_1", colors[0])
+						mat.set_shader_parameter("target_skin_2", colors[1])
+						mat.set_shader_parameter("target_skin_3", colors[2])
+						mat.set_shader_parameter("target_skin_4", colors[3])
+						print("Applied skin ramp ", row_index, " to ", layer_code)
 
 func update_frame_display():
 	"""Update the character sprite frames"""
