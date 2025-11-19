@@ -2106,9 +2106,8 @@ func _create_single_party_status_panel(combatant: Dictionary) -> PanelContainer:
 	# HP bar
 	var hp_bar = ProgressBar.new()
 	hp_bar.name = "HPBar"
-	hp_bar.custom_minimum_size = Vector2(25, 0)
+	hp_bar.custom_minimum_size = Vector2(25, 12)
 	hp_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	hp_bar.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	hp_bar.show_percentage = false
 	hp_bar.max_value = combatant.get("hp_max", 100)
 	hp_bar.value = combatant.get("hp", 100)
@@ -2165,9 +2164,8 @@ func _create_single_party_status_panel(combatant: Dictionary) -> PanelContainer:
 	# MP bar
 	var mp_bar = ProgressBar.new()
 	mp_bar.name = "MPBar"
-	mp_bar.custom_minimum_size = Vector2(25, 0)
+	mp_bar.custom_minimum_size = Vector2(25, 12)
 	mp_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	mp_bar.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	mp_bar.show_percentage = false
 	mp_bar.max_value = combatant.get("mp_max", 50)
 	mp_bar.value = combatant.get("mp", 50)
