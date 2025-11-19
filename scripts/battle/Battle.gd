@@ -1901,24 +1901,11 @@ func _display_combatants() -> void:
 		enemy_slots.add_child(slot)
 		combatant_panels[enemy.id] = slot
 
-		# Apply horizontal offset for fighting stance AFTER adding to scene
-		await get_tree().process_frame
-
-		var x_offset = 0
-		if i == 0:  # Top enemy - neutral (no offset)
-			x_offset = 0
-		elif i == 1:  # Middle enemy - shift right 60px (if present)
-			x_offset = 60
-		elif i == 2:  # Bottom enemy - shift right 120px (if present)
-			x_offset = 120
-
-		if x_offset != 0:
-			slot.position.x += x_offset
-			print("[Battle] Applied x_offset %d to enemy %d (%s)" % [x_offset, i, enemy.display_name])
-
-		# Create sprite for this enemy (if available)
-		# Note: Enemies currently use capsule icons, but this allows for enemy sprites in the future
-		# For now, this section is prepared but won't create sprites unless enemy sprite sheets exist
+		# Note: Enemy sprites not yet implemented, they use capsule icons for now
+		# When enemy sprites are added, apply x_offset to sprite.position like allies:
+		# - Enemy 0: 0px offset
+		# - Enemy 1: +60px offset
+		# - Enemy 2: +120px offset
 
 	# Create party status panels
 	_create_party_status_panels()
@@ -2224,6 +2211,7 @@ func _create_combatant_slot(combatant: Dictionary, is_ally: bool, slot_index: in
 	# Allies: Transparent background, only capsule and name visible
 	if is_ally:
 		panel.custom_minimum_size = Vector2(80, 80)
+		panel.clip_contents = false  # Allow sprites/shadows to render outside slot bounds
 
 		# Make panel background completely transparent
 		var style = StyleBoxFlat.new()
