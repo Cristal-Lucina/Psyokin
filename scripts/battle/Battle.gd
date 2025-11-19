@@ -1230,9 +1230,19 @@ func _initialize_battle() -> void:
 
 	# Get party from GameState
 	var party = gs.party.duplicate()
+
+	print("[Battle] GameState party before check: %s" % str(party))
+
+	# If party is empty or only has hero, add Kai and Matcha for testing
 	if party.is_empty():
-		# Fallback: use hero
-		party = ["hero"]
+		# Fallback: use hero + kai + matcha for now
+		party = ["hero", "kai", "matcha"]
+		print("[Battle] Party was empty, using default: %s" % str(party))
+	elif party.size() == 1 and party[0] == "hero":
+		# Add Kai and Matcha as default party members
+		party.append("kai")
+		party.append("matcha")
+		print("[Battle] Added kai and matcha to party: %s" % str(party))
 
 	# Get enemies from encounter data
 	var enemies = battle_mgr.encounter_data.get("enemy_ids", ["slime"])
@@ -1409,6 +1419,14 @@ func _on_battle_ended(victory: bool) -> void:
 
 		# Wait for all messages to be displayed and acknowledged before showing victory screen
 		await _wait_for_message_queue()
+
+		# Play Thumbs Up animation for all party members
+		if sprite_animator:
+			sprite_animator.play_animation_for_all("Thumbs Up", "RIGHT", true)  # Hold the pose
+			print("[Battle] Playing victory animation: Thumbs Up (hold)")
+
+		# Wait a moment for the animation to display
+		await get_tree().create_timer(0.5).timeout
 
 		_show_victory_screen()
 	else:
@@ -3876,6 +3894,11 @@ func _execute_run() -> void:
 	else:
 		add_turn_line("Couldn't escape!")
 		queue_turn_message()
+
+		# Return all party members to idle pose after failed escape
+		if sprite_animator:
+			sprite_animator.play_animation_for_all("Idle", "RIGHT")
+			print("[Battle] Failed escape - returning party to idle pose")
 
 		# Wait for message acknowledgment before ending turn
 		await _wait_for_message_queue()
