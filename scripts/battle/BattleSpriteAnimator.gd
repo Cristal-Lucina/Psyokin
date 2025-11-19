@@ -141,6 +141,11 @@ func create_sprite_for_combatant(combatant_id: String, parent: Node, display_nam
 	if "_" in lookup_name and lookup_name.split("_")[-1].is_valid_int():
 		lookup_name = "_".join(lookup_name.split("_").slice(0, -1))
 
+	# Remove letter suffix from duplicate enemy names (e.g., "goblin a" -> "goblin", "slime b" -> "slime")
+	var suffix_pattern = RegEx.new()
+	suffix_pattern.compile("\\s+[a-h]$")  # Match space + single letter A-H at end
+	lookup_name = suffix_pattern.sub(lookup_name, "", true)
+
 	print("[BattleSpriteAnimator] Creating sprite for combatant ID: %s, Display Name: %s, Lookup: %s, is_ally: %s" % [combatant_id, display_name, lookup_name, is_ally])
 	print("[BattleSpriteAnimator] Available character sprites: %s" % str(character_sprites.keys()))
 	print("[BattleSpriteAnimator] Parent node: %s" % str(parent))

@@ -1867,15 +1867,17 @@ func _display_combatants() -> void:
 				shadow.name = "Shadow"
 				var shadow_texture = _create_shadow_circle_texture()
 				shadow.texture = shadow_texture
-				shadow.modulate = Color(0, 0, 0, 0.5)  # Semi-transparent black
-				shadow.position = Vector2(40 + x_offset, 60)  # Below sprite, with same offset
-				shadow.scale = Vector2(2, 1)  # Ellipse shape for perspective
-				shadow.z_index = 105 + i  # Shadows at 105-107, below sprites at 108-110
+				shadow.modulate = Color(0, 0, 0, 0.7)  # Darker, more visible shadow
+				shadow.position = Vector2(40 + x_offset, 55)  # Closer to sprite base
+				shadow.scale = Vector2(3, 1.5)  # Larger ellipse shape for better visibility
+				shadow.z_index = -10  # Below sprite (negative to ensure it's behind)
 				slot.add_child(shadow)
 
 				# Depth-based z-layering: bottom allies have higher z (appear in front)
 				# Ally 0 (top) = 108, Ally 1 (middle) = 109, Ally 2 (bottom) = 110
 				sprite.z_index = 108 + i
+
+				print("[Battle] Created shadow for ally: %s at position (%f, %f) with z-index %d" % [ally.id, shadow.position.x, shadow.position.y, shadow.z_index])
 
 				print("[Battle] Created sprite for ally: %s at position %s with z-index %d" % [ally.id, sprite.position, sprite.z_index])
 
@@ -1928,17 +1930,31 @@ func _display_combatants() -> void:
 				shadow.name = "Shadow"
 				var shadow_texture = _create_shadow_circle_texture()
 				shadow.texture = shadow_texture
-				shadow.modulate = Color(0, 0, 0, 0.5)  # Semi-transparent black
-				shadow.position = Vector2(40 + x_offset, 60)  # Below sprite, with same offset
-				shadow.scale = Vector2(2, 1)  # Ellipse shape for perspective
-				shadow.z_index = 105 + i  # Shadows at 105-107, below sprites at 108-110
+				shadow.modulate = Color(0, 0, 0, 0.7)  # Darker, more visible shadow
+				shadow.position = Vector2(40 + x_offset, 55)  # Closer to sprite base
+				shadow.scale = Vector2(3, 1.5)  # Larger ellipse shape for better visibility
+				shadow.z_index = -10  # Below sprite (negative to ensure it's behind)
 				slot.add_child(shadow)
 
 				# Depth-based z-layering: bottom enemies have higher z (appear in front)
 				# Enemy 0 (top) = 108, Enemy 1 (middle) = 109, Enemy 2 (bottom) = 110
 				sprite.z_index = 108 + i
 
+				print("[Battle] Created shadow for enemy: %s at position (%f, %f) with z-index %d" % [enemy.id, shadow.position.x, shadow.position.y, shadow.z_index])
 				print("[Battle] Created sprite for enemy: %s at position %s with z-index %d" % [enemy.id, sprite.position, sprite.z_index])
+
+				# Add name label above sprite
+				var name_label = Label.new()
+				name_label.name = "EnemyNameLabel"
+				name_label.text = enemy.display_name.to_upper()
+				name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+				name_label.add_theme_color_override("font_color", Color(1, 1, 1, 1))  # White
+				name_label.add_theme_font_size_override("font_size", 10)
+				name_label.position = Vector2(40 + x_offset - 30, 5)  # Above sprite, centered
+				name_label.custom_minimum_size = Vector2(60, 0)  # Wide enough for name
+				name_label.z_index = 150  # Above everything
+				slot.add_child(name_label)
+				print("[Battle] Added name label '%s' for enemy at position (%f, %f)" % [enemy.display_name, name_label.position.x, name_label.position.y])
 
 				# Hide the capsule icon since we have a sprite
 				var vbox = slot.get_child(0) if slot.get_child_count() > 0 else null
@@ -1947,6 +1963,11 @@ func _display_combatants() -> void:
 					if icon_center:
 						icon_center.visible = false
 						print("[Battle] Hid capsule icon for %s (sprite is showing)" % enemy.id)
+					# Also hide the name label in the vbox since we have one above sprite
+					for child in vbox.get_children():
+						if child is Label:
+							child.visible = false
+							print("[Battle] Hid vbox name label for %s" % enemy.id)
 			else:
 				print("[Battle] No sprite available for enemy: %s (will use capsule icon)" % enemy.id)
 		else:
