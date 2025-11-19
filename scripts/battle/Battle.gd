@@ -2101,6 +2101,7 @@ func _create_single_party_status_panel(combatant: Dictionary) -> PanelContainer:
 	hp_label.add_theme_constant_override("outline_size", 10)
 	hp_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 1))
 	hp_label.custom_minimum_size = Vector2(10, 0)
+	hp_label.position.y = -4  # Shift up 4px
 	hp_hbox.add_child(hp_label)
 
 	# HP bar
@@ -2144,6 +2145,7 @@ func _create_single_party_status_panel(combatant: Dictionary) -> PanelContainer:
 	hp_value.add_theme_constant_override("outline_size", 10)
 	hp_value.add_theme_color_override("font_outline_color", Color(0, 0, 0, 1))
 	hp_value.custom_minimum_size = Vector2(12, 0)
+	hp_value.position.y = -4  # Shift up 4px
 	hp_hbox.add_child(hp_value)
 
 	# MP bar container
@@ -2160,6 +2162,7 @@ func _create_single_party_status_panel(combatant: Dictionary) -> PanelContainer:
 	mp_label.add_theme_constant_override("outline_size", 10)
 	mp_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 1))
 	mp_label.custom_minimum_size = Vector2(10, 0)
+	mp_label.position.y = -4  # Shift up 4px
 	mp_hbox.add_child(mp_label)
 
 	# MP bar
@@ -2203,6 +2206,7 @@ func _create_single_party_status_panel(combatant: Dictionary) -> PanelContainer:
 	mp_value.add_theme_constant_override("outline_size", 10)
 	mp_value.add_theme_color_override("font_outline_color", Color(0, 0, 0, 1))
 	mp_value.custom_minimum_size = Vector2(12, 0)
+	mp_value.position.y = -4  # Shift up 4px
 	mp_hbox.add_child(mp_value)
 
 	return panel
