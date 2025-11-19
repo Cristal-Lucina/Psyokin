@@ -1,8 +1,9 @@
-[gd_scene load_steps=4 format=3 uid="uid://c6kdayltgkpfp"]
+[gd_scene load_steps=5 format=3 uid="uid://c6kdayltgkpfp"]
 
 [ext_resource type="Script" uid="uid://bh4st7f0x1862" path="res://scripts/battle/Battle.gd" id="1_battle"]
 [ext_resource type="Script" uid="uid://d4fuvn7bww4k1" path="res://scripts/battle/TurnOrderDisplay.gd" id="2_turn_order"]
 [ext_resource type="Texture2D" uid="uid://uvia2k0c3eiy" path="res://assets/graphics/envirnments/Backgrounds/087.png" id="3_background"]
+[ext_resource type="Script" path="res://scripts/battle/BattleSpriteAnimator.gd" id="4_sprite_animator"]
 
 [node name="Battle" type="Control"]
 layout_mode = 3
@@ -291,6 +292,10 @@ horizontal_alignment = 1
 unique_name_in_owner = true
 layout_mode = 2
 show_percentage = false
+
+[node name="SpriteAnimator" type="Node" parent="."]
+unique_name_in_owner = true
+script = ExtResource("4_sprite_animator")
 
 [connection signal="pressed" from="ActionMenu/SkillButton" to="." method="_on_skill_pressed"]
 [connection signal="pressed" from="ActionMenu/DefendButton" to="." method="_on_defend_pressed"]

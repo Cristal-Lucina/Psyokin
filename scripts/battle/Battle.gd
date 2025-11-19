@@ -10,6 +10,7 @@ class_name Battle
 @onready var csv_loader = get_node("/root/aCSVLoader")
 @onready var burst_system = get_node("/root/aBurstSystem")
 @onready var minigame_mgr = get_node("/root/aMinigameManager")
+@onready var combat_profiles = get_node("/root/aCombatProfileSystem")
 
 ## Neon Orchard Color Palette
 const COLOR_ELECTRIC_LIME = Color(0.78, 1.0, 0.24)      # #C8FF3D
@@ -33,6 +34,7 @@ const COLOR_MILK_WHITE = Color(0.96, 0.97, 0.98)        # #F4F7FB
 ## Combatant display containers
 @onready var ally_slots: VBoxContainer = %AllySlots
 @onready var enemy_slots: VBoxContainer = %EnemySlots
+@onready var sprite_animator: BattleSpriteAnimator = %SpriteAnimator
 
 ## Dynamic background elements
 var diagonal_bands: ColorRect = null
@@ -1261,6 +1263,10 @@ func _on_turn_started(combatant_id: String) -> void:
 	if current_combatant.is_empty():
 		return
 
+	# Clear any held animations (like Guard) when turn starts
+	if sprite_animator and current_combatant.is_ally:
+		sprite_animator.clear_hold(current_combatant.id)
+
 	# Reset action cooldown at start of turn
 	action_cooldown = 0.0
 
@@ -1763,6 +1769,12 @@ func _set_fainted(target: Dictionary) -> void:
 	target.is_ko = true
 	target.ailment = "fainted"
 	target.ailment_turn_count = 0
+
+	# Play faint animation (Hurt) and hold it
+	if sprite_animator and target.get("is_ally", false):
+		sprite_animator.play_animation(target.id, "Hurt", "DOWN", true)  # true = hold
+		print("[Battle] Playing faint animation (hold): Hurt for %s" % target.id)
+
 	# Refresh turn order to show fainted status
 	if battle_mgr:
 		battle_mgr.refresh_turn_order()
@@ -1814,6 +1826,16 @@ func _display_combatants() -> void:
 		margin_container.add_child(slot)
 		ally_slots.add_child(margin_container)
 		combatant_panels[ally.id] = slot
+
+		# Create sprite for this party member
+		if sprite_animator:
+			var sprite = sprite_animator.create_sprite_for_combatant(ally.id, slot)
+			if sprite:
+				# Position sprite in front of/replacing the capsule
+				# The sprite should be centered in the slot
+				sprite.position = Vector2(40, 40)  # Center of the 80x80 slot
+				sprite.scale = Vector2(1.5, 1.5)  # Scale up for visibility
+				print("[Battle] Created sprite for ally: %s" % ally.id)
 
 	# Display enemies
 	var enemies = battle_mgr.get_enemy_combatants()
@@ -2617,6 +2639,34 @@ func _execute_attack(target: Dictionary) -> void:
 			var minigame_result = await minigame_mgr.launch_attack_minigame(tpo, brw, status_effects)
 			_hide_instruction()
 
+			# Play attack animation based on weapon type
+			if sprite_animator and current_combatant.is_ally:
+				var weapon_type = "Neutral"
+				if current_combatant.has("equipment") and current_combatant.equipment.has("weapon"):
+					var weapon_id = current_combatant.equipment.weapon
+					# Get weapon type from combat profile
+					var profile = combat_profiles.get_profile(current_combatant.id) if combat_profiles else {}
+					weapon_type = profile.get("weapon", {}).get("type", "Neutral")
+
+				# Map weapon type to animation name
+				var anim_name = "Idle"
+				match weapon_type.to_lower():
+					"wand":
+						anim_name = "Wand Strike"
+					"sword":
+						anim_name = "Sword Strike"
+					"hammer":
+						anim_name = "Hammer Strike"
+					"spear":
+						anim_name = "Spear Strike"
+					_:
+						anim_name = "Sword Strike"  # Default attack animation
+
+				sprite_animator.play_animation(current_combatant.id, anim_name, "RIGHT")
+				print("[Battle] Playing attack animation: %s for %s (weapon: %s)" % [anim_name, current_combatant.id, weapon_type])
+
+				# Wait for animation to play (about 0.5 seconds)
+				await get_tree().create_timer(0.6).timeout
 
 			# Slide character back immediately after minigame closes
 			await _reset_turn_indicator()
@@ -3105,6 +3155,14 @@ func _execute_capture(target: Dictionary) -> void:
 	# Launch capture minigame (auto-starts, no message)
 	var minigame_result = await minigame_mgr.launch_capture_minigame([bind_type], enemy_data, party_member_data, status_effects)
 
+	# Play capture animation (Throw Carried)
+	if sprite_animator and current_combatant.is_ally:
+		sprite_animator.play_animation(current_combatant.id, "Throw Carried", "RIGHT")
+		print("[Battle] Playing capture animation: Throw Carried for %s" % current_combatant.id)
+
+		# Wait for animation to play (about 0.5 seconds)
+		await get_tree().create_timer(0.5).timeout
+
 	# Update break rating based on minigame result
 	var break_rating_reduced = minigame_result.get("break_rating_reduced", 0)
 	var wraps_completed = minigame_result.get("wraps_completed", 0)
@@ -3184,6 +3242,16 @@ func _execute_item_usage(target: Dictionary) -> void:
 	# Check if frozen combatant can act
 	if not await _check_freeze_action_allowed():
 		return
+
+	# Play item animation (Throw Carried)
+	# Direction: LEFT for party/allies, RIGHT for enemies
+	if sprite_animator and current_combatant.is_ally:
+		var direction = "LEFT" if target.is_ally else "RIGHT"
+		sprite_animator.play_animation(current_combatant.id, "Throw Carried", direction)
+		print("[Battle] Playing item animation: Throw Carried %s for %s" % [direction, current_combatant.id])
+
+		# Wait for animation to play (about 0.5 seconds)
+		await get_tree().create_timer(0.5).timeout
 
 	# Get the item that was selected
 	if selected_item.is_empty():
@@ -3532,6 +3600,12 @@ func _execute_item_usage(target: Dictionary) -> void:
 			target.ailment = "Revived"  # Set Revived status (prevents action this turn)
 			target.ailment_turn_count = 1  # Lasts 1 turn
 			target.hp = max(1, int(target.hp_max * revive_percent / 100.0))
+
+			# Clear the Hurt hold animation when revived
+			if sprite_animator and target.get("is_ally", false):
+				sprite_animator.clear_hold(target.id)
+				print("[Battle] Cleared faint animation for revived: %s" % target.id)
+
 			log_message("  → %s was revived with %d HP! (Can't act this turn)" % [target.display_name, target.hp])
 			# Refresh turn order to show revive
 			if battle_mgr:
@@ -3637,6 +3711,11 @@ func _execute_defend() -> void:
 	print("[Battle] _execute_defend called!")
 	log_message("%s moved into a defensive stance." % current_combatant.display_name)
 	current_combatant.is_defending = true
+
+	# Play guard animation and hold it
+	if sprite_animator and current_combatant.is_ally:
+		sprite_animator.play_animation(current_combatant.id, "Guard", "RIGHT", true)  # true = hold
+		print("[Battle] Playing guard animation (hold): Guard for %s" % current_combatant.id)
 
 	# Slide back before ending turn
 	_reset_turn_indicator()
@@ -3768,6 +3847,14 @@ func _execute_run() -> void:
 
 	# Launch run minigame (auto-starts, no message)
 	var minigame_result = await minigame_mgr.launch_run_minigame(run_chance, tempo_diff, focus_stat, status_effects)
+
+	# Play run animation to the left
+	if sprite_animator and current_combatant.is_ally:
+		sprite_animator.play_animation(current_combatant.id, "Run", "LEFT")
+		print("[Battle] Playing run animation: Run LEFT for %s" % current_combatant.id)
+
+		# Wait for animation to play (about 0.8 seconds)
+		await get_tree().create_timer(0.8).timeout
 
 	# Get success from minigame
 	var success = minigame_result.get("success", false)
@@ -6552,6 +6639,14 @@ func _execute_skill_single(target: Dictionary) -> void:
 	_show_instruction("SKILL!")
 	var minigame_result = await minigame_mgr.launch_skill_minigame(focus_stat, skill_sequence, skill_tier, mind_type, status_effects)
 	_hide_instruction()
+
+	# Play skill animation (Bow Shot)
+	if sprite_animator and current_combatant.is_ally:
+		sprite_animator.play_animation(current_combatant.id, "Bow Shot", "RIGHT")
+		print("[Battle] Playing skill animation: Bow Shot for %s" % current_combatant.id)
+
+		# Wait for animation to play (about 1 second for Bow Shot)
+		await get_tree().create_timer(1.2).timeout
 
 	# Slide character back immediately after minigame closes
 	await _reset_turn_indicator()
