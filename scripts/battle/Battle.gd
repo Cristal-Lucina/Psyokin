@@ -1844,6 +1844,10 @@ func _display_combatants() -> void:
 		# Wait one frame to let layout system position the slot
 		await get_tree().process_frame
 
+		# DEBUG: Show base position
+		var base_pos_x = slot.position.x
+		print("[Battle] Ally %d (%s) BASE position.x = %.2f" % [i, ally.display_name, base_pos_x])
+
 		var x_offset = 0
 		if i == 0:  # Top ally (hero) - no offset
 			x_offset = 0
@@ -1852,9 +1856,13 @@ func _display_combatants() -> void:
 		elif i == 2:  # Bottom ally - shift left 120px
 			x_offset = -120
 
+		print("[Battle] Ally %d (%s) x_offset = %d" % [i, ally.display_name, x_offset])
+
 		if x_offset != 0:
 			slot.position.x += x_offset
-			print("[Battle] Applied x_offset %d to ally %d (%s)" % [x_offset, i, ally.display_name])
+
+		# DEBUG: Show final position
+		print("[Battle] Ally %d (%s) FINAL position.x = %.2f (offset: %d)" % [i, ally.display_name, slot.position.x, x_offset])
 
 		# Create sprite for this party member
 		print("[Battle] Attempting to create sprite for ally ID: %s, Name: %s, sprite_animator null: %s" % [ally.id, ally.get("display_name", ""), sprite_animator == null])
