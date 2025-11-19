@@ -1432,7 +1432,8 @@ func _on_battle_ended(victory: bool) -> void:
 			print("[Battle] Playing victory animation: Thumbs Up (hold)")
 
 			# Move portrait sprites up 16px for thumbs up pose
-			for ally in battle_mgr.allies:
+			var allies = battle_mgr.get_ally_combatants()
+			for ally in allies:
 				var portrait_id = ally.id + "_portrait"
 				if sprite_animator.sprite_instances.has(portrait_id):
 					var portrait_sprite = sprite_animator.sprite_instances[portrait_id]
