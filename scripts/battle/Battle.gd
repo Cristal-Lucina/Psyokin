@@ -1859,31 +1859,21 @@ func _display_combatants() -> void:
 			if sprite:
 				# Position and scale sprite for 70px height
 				# 16px base frame * 4.375 = 70px
-				# Base position is center of 80x80 slot
-				var base_x = 40
+				# Position centered in 80x80 slot
+				# Note: MarginContainer already handles fighting stance offset
+				sprite.position = Vector2(40, 40)
+				sprite.scale = Vector2(4.375, 4.375)  # 70px height
 
-				# Apply horizontal offset based on ally position for fighting stance
-				# This ensures sprite follows the same spacing as the name label
-				var sprite_x_offset = 0
-				if i == 0:  # Top ally - lean right
-					sprite_x_offset = 80
-				elif i == 2:  # Bottom ally - lean left
-					sprite_x_offset = -80
-				# i == 1 (middle) stays centered with no offset
-
-				# Create shadow circle at base of sprite (positioned to match sprite offset)
+				# Create shadow circle at base of sprite
 				var shadow = Sprite2D.new()
 				shadow.name = "Shadow"
 				var shadow_texture = _create_shadow_circle_texture()
 				shadow.texture = shadow_texture
 				shadow.modulate = Color(0, 0, 0, 0.5)  # Semi-transparent black
-				shadow.position = Vector2(base_x + sprite_x_offset, 60)  # Below sprite, same x-offset
+				shadow.position = Vector2(40, 60)  # Below sprite, centered
 				shadow.scale = Vector2(2, 1)  # Ellipse shape for perspective
 				shadow.z_index = 105 + i  # Shadows at 105-107, below sprites at 108-110
 				slot.add_child(shadow)
-
-				sprite.position = Vector2(base_x + sprite_x_offset, 40)
-				sprite.scale = Vector2(4.375, 4.375)  # 70px height
 
 				# Depth-based z-layering: bottom allies have higher z (appear in front)
 				# Ally 0 (top) = 108, Ally 1 (middle) = 109, Ally 2 (bottom) = 110
@@ -2281,13 +2271,14 @@ func _create_combatant_slot(combatant: Dictionary, is_ally: bool, slot_index: in
 		icon_center.add_child(icon_container)
 		vbox.add_child(icon_center)
 
-		# Name label
-		var name_label = Label.new()
-		name_label.text = combatant.display_name.to_upper()
-		name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		name_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
-		name_label.add_theme_font_size_override("font_size", 9)
-		vbox.add_child(name_label)
+		# Name label - hidden since we show sprites instead
+		# (Name is shown in party status panels on the left side instead)
+		# var name_label = Label.new()
+		# name_label.text = combatant.display_name.to_upper()
+		# name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		# name_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
+		# name_label.add_theme_font_size_override("font_size", 9)
+		# vbox.add_child(name_label)
 
 		# Don't show HP/MP bars for allies (clean capsule style)
 
