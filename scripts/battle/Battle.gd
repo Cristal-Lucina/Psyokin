@@ -1845,12 +1845,12 @@ func _display_combatants() -> void:
 		await get_tree().process_frame
 
 		var x_offset = 0
-		if i == 0:  # Top ally (hero) - shift further right for proper stance
-			x_offset = 100
-		elif i == 1:  # Middle ally - slight right lean
-			x_offset = 20
-		elif i == 2:  # Bottom ally - centered
+		if i == 0:  # Top ally (hero) - shift right
+			x_offset = 60
+		elif i == 1:  # Middle ally - centered
 			x_offset = 0
+		elif i == 2:  # Bottom ally - shift left
+			x_offset = -60
 
 		if x_offset != 0:
 			slot.position.x += x_offset
@@ -1911,12 +1911,12 @@ func _display_combatants() -> void:
 		await get_tree().process_frame
 
 		var x_offset = 0
-		if i == 0:  # Top enemy - lean left toward center (mirrors hero)
-			x_offset = -100
-		elif i == 1:  # Middle enemy - slight left lean
-			x_offset = -20
-		elif i == 2:  # Bottom enemy - centered
+		if i == 0:  # Top enemy - shift left
+			x_offset = -60
+		elif i == 1:  # Middle enemy - centered
 			x_offset = 0
+		elif i == 2:  # Bottom enemy - shift right
+			x_offset = 60
 
 		if x_offset != 0:
 			slot.position.x += x_offset
