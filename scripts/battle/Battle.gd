@@ -4462,6 +4462,10 @@ func _highlight_target_candidates() -> void:
 	selection_name_label.add_theme_color_override("font_color", Color(1, 1, 1, 1))  # White
 	selection_name_label.add_theme_font_size_override("font_size", 20)  # 20pt font (14 + 6)
 
+	# Add thick black outline/stroke
+	selection_name_label.add_theme_constant_override("outline_size", 8)  # Thick outline
+	selection_name_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 1))  # Black stroke
+
 	# Add drop shadow effect (expanded and diffuse)
 	selection_name_label.add_theme_constant_override("shadow_offset_x", 6)
 	selection_name_label.add_theme_constant_override("shadow_offset_y", 6)
