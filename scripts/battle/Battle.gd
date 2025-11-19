@@ -2069,10 +2069,23 @@ func _create_single_party_status_panel(combatant: Dictionary) -> PanelContainer:
 			print("[Battle] Created portrait sprite for %s facing LEFT" % combatant.display_name)
 
 	# Right side: HP/MP bars
+	var stats_panel = PanelContainer.new()
+	stats_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+
+	var stats_style = StyleBoxFlat.new()
+	stats_style.bg_color = Color(0, 0, 0, 0)  # Transparent background
+	# Add soft shadow behind stats section
+	stats_style.shadow_size = 8
+	stats_style.shadow_color = Color(0, 0, 0, 0.4)
+	stats_style.shadow_offset = Vector2(2, 2)
+	stats_panel.add_theme_stylebox_override("panel", stats_style)
+
+	hbox.add_child(stats_panel)
+
 	var stats_vbox = VBoxContainer.new()
 	stats_vbox.add_theme_constant_override("separation", 4)
 	stats_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	hbox.add_child(stats_vbox)
+	stats_panel.add_child(stats_vbox)
 
 	# HP bar container
 	var hp_hbox = HBoxContainer.new()
