@@ -1430,6 +1430,14 @@ func _on_battle_ended(victory: bool) -> void:
 		if sprite_animator:
 			sprite_animator.play_animation_for_all("Thumbs Up", "DOWN", true)  # Hold the pose
 			print("[Battle] Playing victory animation: Thumbs Up (hold)")
+
+			# Move portrait sprites up 16px for thumbs up pose
+			for ally in battle_mgr.allies:
+				var portrait_id = ally.id + "_portrait"
+				if sprite_animator.sprite_instances.has(portrait_id):
+					var portrait_sprite = sprite_animator.sprite_instances[portrait_id]
+					portrait_sprite.position.y -= 16  # Move up 16px
+					print("[Battle] Moved portrait sprite for %s up 16px (y: %d -> %d)" % [ally.display_name, portrait_sprite.position.y + 16, portrait_sprite.position.y])
 		else:
 			print("[Battle] ERROR: sprite_animator is null, cannot play victory animation!")
 
