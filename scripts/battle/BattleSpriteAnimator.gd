@@ -34,7 +34,10 @@ var character_sprites = {
 	"sev": "res://assets/graphics/characters/New Character System/PartySpriteSheets/Sev.png",
 	"skye": "res://assets/graphics/characters/New Character System/PartySpriteSheets/Skye.png",
 	"tessa": "res://assets/graphics/characters/New Character System/PartySpriteSheets/Tessa.png",
-	"hero": "res://assets/graphics/characters/New Character System/PartySpriteSheets/Douglas.png"  # Default for hero
+	"hero": "res://assets/graphics/characters/New Character System/PartySpriteSheets/Douglas.png",  # Default for hero
+	# Enemy sprites
+	"slime": "res://assets/graphics/characters/New Character System/EnemySpriteSheets/Slime.png",
+	"goblin": "res://assets/graphics/characters/New Character System/EnemySpriteSheets/Goblin.png"
 }
 
 func _ready():
@@ -122,24 +125,29 @@ func load_animations_from_csv():
 	file.close()
 	print("[BattleSpriteAnimator] Loaded animation keys: %d" % animations.size())
 
-func create_sprite_for_combatant(combatant_id: String, parent: Node, display_name: String = "") -> Node:
-	"""Create a sprite node for a party member
+func create_sprite_for_combatant(combatant_id: String, parent: Node, display_name: String = "", is_ally: bool = true) -> Node:
+	"""Create a sprite node for a combatant (ally or enemy)
 
 	Args:
-		combatant_id: The unique ID of the combatant (e.g., "best_friend", "green_friend")
+		combatant_id: The unique ID of the combatant (e.g., "best_friend", "green_friend", "slime_0")
 		parent: The node to add the sprite to
-		display_name: The display name of the character (e.g., "Kai", "Matcha")
+		display_name: The display name of the character (e.g., "Kai", "Matcha", "Slime")
+		is_ally: True for allies (face RIGHT), False for enemies (face LEFT)
 	"""
 	# Use display_name for sprite lookup if provided, otherwise fall back to ID
 	var lookup_name = display_name.to_lower() if not display_name.is_empty() else combatant_id.to_lower()
 
-	print("[BattleSpriteAnimator] Creating sprite for combatant ID: %s, Display Name: %s, Lookup: %s" % [combatant_id, display_name, lookup_name])
+	# Remove number suffix from enemy IDs (e.g., "slime_0" -> "slime")
+	if "_" in lookup_name and lookup_name.split("_")[-1].is_valid_int():
+		lookup_name = "_".join(lookup_name.split("_").slice(0, -1))
+
+	print("[BattleSpriteAnimator] Creating sprite for combatant ID: %s, Display Name: %s, Lookup: %s, is_ally: %s" % [combatant_id, display_name, lookup_name, is_ally])
 	print("[BattleSpriteAnimator] Available character sprites: %s" % str(character_sprites.keys()))
 	print("[BattleSpriteAnimator] Parent node: %s" % str(parent))
 
 	# For hero, use layered system (body + hair)
 	if combatant_id.to_lower() == "hero":
-		return _create_layered_sprite_for_hero(combatant_id, parent)
+		return _create_layered_sprite_for_hero(combatant_id, parent, is_ally)
 
 	if not character_sprites.has(lookup_name):
 		push_error("[BattleSpriteAnimator] No sprite sheet found for: %s (display_name: %s, id: %s)" % [lookup_name, display_name, combatant_id])
@@ -169,24 +177,27 @@ func create_sprite_for_combatant(combatant_id: String, parent: Node, display_nam
 	else:
 		print("[BattleSpriteAnimator] ERROR: No parent provided!")
 
+	# Determine default direction based on ally/enemy
+	var default_direction = "RIGHT" if is_ally else "LEFT"
+
 	# Track sprite instance
 	sprite_instances[combatant_id] = {
 		"sprite": sprite,
-		"current_anim": "Idle_RIGHT",
+		"current_anim": "Idle_" + default_direction,
 		"frame_index": 0,
 		"timer": 0.0,
 		"is_playing": false,
 		"hold_until_clear": false,  # For animations that hold until manually cleared
 		"play_once": false,  # For animations that play once then return to idle
-		"default_direction": "RIGHT"  # Default facing direction for idle
+		"default_direction": default_direction  # Default facing direction for idle
 	}
 
 	# Play idle animation by default
-	play_animation(combatant_id, "Idle", "RIGHT")
+	play_animation(combatant_id, "Idle", default_direction)
 
 	return sprite
 
-func _create_layered_sprite_for_hero(combatant_id: String, parent: Node) -> Node2D:
+func _create_layered_sprite_for_hero(combatant_id: String, parent: Node, is_ally: bool = true) -> Node2D:
 	"""Create a layered sprite system for the hero (body + hair)"""
 	# Create a container for layers
 	var container = Node2D.new()
@@ -264,23 +275,26 @@ func _create_layered_sprite_for_hero(combatant_id: String, parent: Node) -> Node
 	if parent:
 		parent.add_child(container)
 
+	# Determine default direction based on ally/enemy
+	var default_direction = "RIGHT" if is_ally else "LEFT"
+
 	# Track both layers for animation updates
 	sprite_instances[combatant_id] = {
 		"sprite": container,  # Use container as the main sprite reference
 		"body_layer": body_sprite,
 		"hair_layer": hair_sprite,
-		"current_anim": "Idle_RIGHT",
+		"current_anim": "Idle_" + default_direction,
 		"frame_index": 0,
 		"timer": 0.0,
 		"is_playing": false,
 		"hold_until_clear": false,
 		"play_once": false,
-		"default_direction": "RIGHT",
+		"default_direction": default_direction,
 		"is_layered": true  # Flag to indicate this is a layered sprite
 	}
 
 	# Play idle animation by default
-	play_animation(combatant_id, "Idle", "RIGHT")
+	play_animation(combatant_id, "Idle", default_direction)
 
 	print("[BattleSpriteAnimator] Created layered sprite for hero")
 	return container

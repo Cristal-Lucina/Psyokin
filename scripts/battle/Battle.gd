@@ -1854,7 +1854,7 @@ func _display_combatants() -> void:
 		# Create sprite for this party member
 		print("[Battle] Attempting to create sprite for ally ID: %s, Name: %s, sprite_animator null: %s" % [ally.id, ally.get("display_name", ""), sprite_animator == null])
 		if sprite_animator:
-			var sprite = sprite_animator.create_sprite_for_combatant(ally.id, slot, ally.get("display_name", ""))
+			var sprite = sprite_animator.create_sprite_for_combatant(ally.id, slot, ally.get("display_name", ""), true)
 			if sprite:
 				# Position and scale sprite for 70px height
 				# Apply x_offset to sprite position (not slot position, since VBoxContainer controls that)
@@ -1901,11 +1901,56 @@ func _display_combatants() -> void:
 		enemy_slots.add_child(slot)
 		combatant_panels[enemy.id] = slot
 
-		# Note: Enemy sprites not yet implemented, they use capsule icons for now
-		# When enemy sprites are added, apply x_offset to sprite.position like allies:
-		# - Enemy 0: 0px offset
-		# - Enemy 1: +60px offset
-		# - Enemy 2: +120px offset
+		# Calculate horizontal offset for fighting stance (mirrored from allies)
+		var x_offset = 0
+		if i == 0:  # Top enemy - no offset
+			x_offset = 0
+		elif i == 1:  # Middle enemy - shift right 60px
+			x_offset = 60
+		elif i == 2:  # Bottom enemy - shift right 120px
+			x_offset = 120
+
+		print("[Battle] Enemy %d (%s) will apply x_offset = %d to sprite" % [i, enemy.display_name, x_offset])
+
+		# Create sprite for this enemy
+		print("[Battle] Attempting to create sprite for enemy ID: %s, Name: %s, sprite_animator null: %s" % [enemy.id, enemy.get("display_name", ""), sprite_animator == null])
+		if sprite_animator:
+			var sprite = sprite_animator.create_sprite_for_combatant(enemy.id, slot, enemy.get("display_name", ""), false)
+			if sprite:
+				# Position and scale sprite for 70px height
+				# Apply x_offset to sprite position (not slot position, since VBoxContainer controls that)
+				sprite.position = Vector2(40 + x_offset, 40)
+				sprite.scale = Vector2(4.375, 4.375)  # 70px height
+				print("[Battle] Enemy %d (%s) sprite positioned at (%.2f, %.2f)" % [i, enemy.display_name, sprite.position.x, sprite.position.y])
+
+				# Create shadow circle at base of sprite (also offset)
+				var shadow = Sprite2D.new()
+				shadow.name = "Shadow"
+				var shadow_texture = _create_shadow_circle_texture()
+				shadow.texture = shadow_texture
+				shadow.modulate = Color(0, 0, 0, 0.5)  # Semi-transparent black
+				shadow.position = Vector2(40 + x_offset, 60)  # Below sprite, with same offset
+				shadow.scale = Vector2(2, 1)  # Ellipse shape for perspective
+				shadow.z_index = 105 + i  # Shadows at 105-107, below sprites at 108-110
+				slot.add_child(shadow)
+
+				# Depth-based z-layering: bottom enemies have higher z (appear in front)
+				# Enemy 0 (top) = 108, Enemy 1 (middle) = 109, Enemy 2 (bottom) = 110
+				sprite.z_index = 108 + i
+
+				print("[Battle] Created sprite for enemy: %s at position %s with z-index %d" % [enemy.id, sprite.position, sprite.z_index])
+
+				# Hide the capsule icon since we have a sprite
+				var vbox = slot.get_child(0) if slot.get_child_count() > 0 else null
+				if vbox:
+					var icon_center = vbox.get_node_or_null("IconCenter")
+					if icon_center:
+						icon_center.visible = false
+						print("[Battle] Hid capsule icon for %s (sprite is showing)" % enemy.id)
+			else:
+				print("[Battle] No sprite available for enemy: %s (will use capsule icon)" % enemy.id)
+		else:
+			print("[Battle] ERROR: sprite_animator is null!")
 
 	# Create party status panels
 	_create_party_status_panels()
@@ -2273,6 +2318,7 @@ func _create_combatant_slot(combatant: Dictionary, is_ally: bool, slot_index: in
 	else:
 		# Enemies: Transparent background, only capsule and name visible
 		panel.custom_minimum_size = Vector2(80, 80)
+		panel.clip_contents = false  # Allow sprites/shadows to render outside slot bounds
 
 		# Make panel background completely transparent
 		var style = StyleBoxFlat.new()
