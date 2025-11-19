@@ -6464,6 +6464,14 @@ func _execute_burst_on_target(target: Dictionary) -> void:
 	var scaling_mnd = float(selected_burst.get("scaling_mnd", 1.0))
 	var scaling_fcs = float(selected_burst.get("scaling_fcs", 0.5))
 
+	# Play Jump animation once for burst ability
+	if sprite_animator and current_combatant.is_ally:
+		sprite_animator.play_animation(current_combatant.id, "Jump", "RIGHT", false, true)  # play_once=true
+		print("[Battle] Playing burst animation: Jump (play once) for %s" % current_combatant.id)
+
+		# Wait for animation to complete
+		await get_tree().create_timer(0.6).timeout
+
 	# Check if hit (bursts have high accuracy)
 	var hit_check = combat_resolver.check_sigil_hit(current_combatant, target, {"skill_acc": acc})
 
