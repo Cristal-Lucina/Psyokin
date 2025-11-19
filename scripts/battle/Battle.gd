@@ -10,6 +10,7 @@ class_name Battle
 @onready var csv_loader = get_node("/root/aCSVLoader")
 @onready var burst_system = get_node("/root/aBurstSystem")
 @onready var minigame_mgr = get_node("/root/aMinigameManager")
+@onready var combat_profiles = get_node("/root/aCombatProfileSystem")
 
 ## Neon Orchard Color Palette
 const COLOR_ELECTRIC_LIME = Color(0.78, 1.0, 0.24)      # #C8FF3D
@@ -33,6 +34,7 @@ const COLOR_MILK_WHITE = Color(0.96, 0.97, 0.98)        # #F4F7FB
 ## Combatant display containers
 @onready var ally_slots: VBoxContainer = %AllySlots
 @onready var enemy_slots: VBoxContainer = %EnemySlots
+@onready var sprite_animator: BattleSpriteAnimator = %SpriteAnimator
 
 ## Dynamic background elements
 var diagonal_bands: ColorRect = null
@@ -1228,9 +1230,19 @@ func _initialize_battle() -> void:
 
 	# Get party from GameState
 	var party = gs.party.duplicate()
+
+	print("[Battle] GameState party before check: %s" % str(party))
+
+	# If party is empty or only has hero, add Kai and Matcha for testing
 	if party.is_empty():
-		# Fallback: use hero
-		party = ["hero"]
+		# Fallback: use hero + kai + matcha for now
+		party = ["hero", "kai", "matcha"]
+		print("[Battle] Party was empty, using default: %s" % str(party))
+	elif party.size() == 1 and party[0] == "hero":
+		# Add Kai and Matcha as default party members
+		party.append("kai")
+		party.append("matcha")
+		print("[Battle] Added kai and matcha to party: %s" % str(party))
 
 	# Get enemies from encounter data
 	var enemies = battle_mgr.encounter_data.get("enemy_ids", ["slime"])
@@ -1260,6 +1272,14 @@ func _on_turn_started(combatant_id: String) -> void:
 
 	if current_combatant.is_empty():
 		return
+
+	# Clear held animations ONLY if not defending
+	# Guard pose should persist while is_defending is true
+	if sprite_animator and current_combatant.is_ally:
+		if not current_combatant.get("is_defending", false):
+			sprite_animator.clear_hold(current_combatant.id)
+		else:
+			print("[Battle] %s is defending - maintaining guard pose" % current_combatant.id)
 
 	# Reset action cooldown at start of turn
 	action_cooldown = 0.0
@@ -1404,6 +1424,16 @@ func _on_battle_ended(victory: bool) -> void:
 		# Wait for all messages to be displayed and acknowledged before showing victory screen
 		await _wait_for_message_queue()
 
+		# Play Thumbs Up animation for all party members
+		if sprite_animator:
+			sprite_animator.play_animation_for_all("Thumbs Up", "DOWN", true)  # Hold the pose
+			print("[Battle] Playing victory animation: Thumbs Up (hold)")
+		else:
+			print("[Battle] ERROR: sprite_animator is null, cannot play victory animation!")
+
+		# Wait a moment for the animation to display
+		await get_tree().create_timer(0.5).timeout
+
 		_show_victory_screen()
 	else:
 		log_message("*** DEFEAT ***")
@@ -1436,6 +1466,7 @@ func _show_victory_screen() -> void:
 	# Create victory panel
 	victory_panel = PanelContainer.new()
 	victory_panel.name = "VictoryPanel"
+	victory_panel.z_index = 2000  # Above all UI elements
 
 	# Set up styling with Core vibe
 	var style = StyleBoxFlat.new()
@@ -1763,6 +1794,12 @@ func _set_fainted(target: Dictionary) -> void:
 	target.is_ko = true
 	target.ailment = "fainted"
 	target.ailment_turn_count = 0
+
+	# Play faint animation (Hurt) and hold it
+	if sprite_animator and target.get("is_ally", false):
+		sprite_animator.play_animation(target.id, "Hurt", "DOWN", true)  # true = hold
+		print("[Battle] Playing faint animation (hold): Hurt for %s" % target.id)
+
 	# Refresh turn order to show fainted status
 	if battle_mgr:
 		battle_mgr.refresh_turn_order()
@@ -1798,22 +1835,66 @@ func _display_combatants() -> void:
 		var ally = allies[i]
 		var slot = _create_combatant_slot(ally, true, i)
 
-		# Wrap in MarginContainer to apply horizontal offset for fighting stance
-		var margin_container = MarginContainer.new()
-		var x_offset = 0
-		if i == 0:  # Top slot - lean right toward center
-			x_offset = 80
-		elif i == 2:  # Bottom slot - lean left toward center
-			x_offset = -80
-
-		if x_offset > 0:
-			margin_container.add_theme_constant_override("margin_left", x_offset)
-		elif x_offset < 0:
-			margin_container.add_theme_constant_override("margin_right", abs(x_offset))
-
-		margin_container.add_child(slot)
-		ally_slots.add_child(margin_container)
+		# Add slot directly to ally_slots (no wrapper)
+		ally_slots.add_child(slot)
 		combatant_panels[ally.id] = slot
+
+		# Apply horizontal offset for fighting stance AFTER adding to scene
+		# This ensures we can see the base position first, then apply offset
+		# Wait one frame to let layout system position the slot
+		await get_tree().process_frame
+
+		var x_offset = 0
+		if i == 0:  # Top ally - lean right toward center
+			x_offset = 60
+		elif i == 2:  # Bottom ally - lean left toward center
+			x_offset = -60
+		# i == 1 (middle) stays centered with no offset
+
+		if x_offset != 0:
+			slot.position.x += x_offset
+			print("[Battle] Applied x_offset %d to ally %d (%s)" % [x_offset, i, ally.display_name])
+
+		# Create sprite for this party member
+		print("[Battle] Attempting to create sprite for ally ID: %s, Name: %s, sprite_animator null: %s" % [ally.id, ally.get("display_name", ""), sprite_animator == null])
+		if sprite_animator:
+			var sprite = sprite_animator.create_sprite_for_combatant(ally.id, slot, ally.get("display_name", ""))
+			if sprite:
+				# Position and scale sprite for 70px height
+				# 16px base frame * 4.375 = 70px
+				# Position centered in 80x80 slot
+				# Note: MarginContainer already handles fighting stance offset
+				sprite.position = Vector2(40, 40)
+				sprite.scale = Vector2(4.375, 4.375)  # 70px height
+
+				# Create shadow circle at base of sprite
+				var shadow = Sprite2D.new()
+				shadow.name = "Shadow"
+				var shadow_texture = _create_shadow_circle_texture()
+				shadow.texture = shadow_texture
+				shadow.modulate = Color(0, 0, 0, 0.5)  # Semi-transparent black
+				shadow.position = Vector2(40, 60)  # Below sprite, centered
+				shadow.scale = Vector2(2, 1)  # Ellipse shape for perspective
+				shadow.z_index = 105 + i  # Shadows at 105-107, below sprites at 108-110
+				slot.add_child(shadow)
+
+				# Depth-based z-layering: bottom allies have higher z (appear in front)
+				# Ally 0 (top) = 108, Ally 1 (middle) = 109, Ally 2 (bottom) = 110
+				sprite.z_index = 108 + i
+
+				print("[Battle] Created sprite for ally: %s at position %s with z-index %d" % [ally.id, sprite.position, sprite.z_index])
+
+				# Hide the capsule icon since we have a sprite
+				var vbox = slot.get_child(0) if slot.get_child_count() > 0 else null
+				if vbox:
+					var icon_center = vbox.get_node_or_null("IconCenter")
+					if icon_center:
+						icon_center.visible = false
+						print("[Battle] Hid capsule icon for %s (sprite is showing)" % ally.id)
+			else:
+				print("[Battle] ERROR: create_sprite_for_combatant returned null for %s" % ally.id)
+		else:
+			print("[Battle] ERROR: sprite_animator is null!")
 
 	# Display enemies
 	var enemies = battle_mgr.get_enemy_combatants()
@@ -1821,22 +1902,27 @@ func _display_combatants() -> void:
 		var enemy = enemies[i]
 		var slot = _create_combatant_slot(enemy, false, i)
 
-		# Wrap in MarginContainer to apply horizontal offset for fighting stance
-		var margin_container = MarginContainer.new()
-		var x_offset = 0
-		if i == 0:  # Top slot - lean left toward center
-			x_offset = -80
-		elif i == 2:  # Bottom slot - lean right toward center
-			x_offset = 80
-
-		if x_offset > 0:
-			margin_container.add_theme_constant_override("margin_left", x_offset)
-		elif x_offset < 0:
-			margin_container.add_theme_constant_override("margin_right", abs(x_offset))
-
-		margin_container.add_child(slot)
-		enemy_slots.add_child(margin_container)
+		# Add slot directly to enemy_slots (no wrapper)
+		enemy_slots.add_child(slot)
 		combatant_panels[enemy.id] = slot
+
+		# Apply horizontal offset for fighting stance AFTER adding to scene
+		await get_tree().process_frame
+
+		var x_offset = 0
+		if i == 0:  # Top enemy - lean left toward center
+			x_offset = -60
+		elif i == 2:  # Bottom enemy - lean right toward center
+			x_offset = 60
+		# i == 1 (middle) stays centered with no offset
+
+		if x_offset != 0:
+			slot.position.x += x_offset
+			print("[Battle] Applied x_offset %d to enemy %d (%s)" % [x_offset, i, enemy.display_name])
+
+		# Create sprite for this enemy (if available)
+		# Note: Enemies currently use capsule icons, but this allows for enemy sprites in the future
+		# For now, this section is prepared but won't create sprites unless enemy sprite sheets exist
 
 	# Create party status panels
 	_create_party_status_panels()
@@ -2053,6 +2139,29 @@ func _update_party_status_panels() -> void:
 		if mp_value:
 			mp_value.text = str(ally.get("mp", 50))
 
+func _create_shadow_circle_texture() -> ImageTexture:
+	"""Create a circular shadow texture for sprite shadows"""
+	var size = 32
+	var image = Image.create(size, size, false, Image.FORMAT_RGBA8)
+
+	# Draw a radial gradient circle
+	for x in range(size):
+		for y in range(size):
+			var dx = x - size / 2.0
+			var dy = y - size / 2.0
+			var distance = sqrt(dx * dx + dy * dy)
+			var radius = size / 2.0
+
+			if distance < radius:
+				# Smooth gradient from center (opaque) to edge (transparent)
+				var alpha = 1.0 - (distance / radius)
+				alpha = alpha * alpha  # Quadratic falloff for softer shadow
+				image.set_pixel(x, y, Color(0, 0, 0, alpha))
+			else:
+				image.set_pixel(x, y, Color(0, 0, 0, 0))
+
+	return ImageTexture.create_from_image(image)
+
 func _get_character_capsule_color(name: String, is_ally: bool) -> Color:
 	"""Get capsule color for a character or enemy based on name/type"""
 	if is_ally:
@@ -2162,16 +2271,18 @@ func _create_combatant_slot(combatant: Dictionary, is_ally: bool, slot_index: in
 		icon_container.add_theme_stylebox_override("panel", icon_style)
 
 		var icon_center = CenterContainer.new()
+		icon_center.name = "IconCenter"  # Name it so we can hide it later if sprite exists
 		icon_center.add_child(icon_container)
 		vbox.add_child(icon_center)
 
-		# Name label
-		var name_label = Label.new()
-		name_label.text = combatant.display_name.to_upper()
-		name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		name_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
-		name_label.add_theme_font_size_override("font_size", 9)
-		vbox.add_child(name_label)
+		# Name label - hidden since we show sprites instead
+		# (Name is shown in party status panels on the left side instead)
+		# var name_label = Label.new()
+		# name_label.text = combatant.display_name.to_upper()
+		# name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		# name_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
+		# name_label.add_theme_font_size_override("font_size", 9)
+		# vbox.add_child(name_label)
 
 		# Don't show HP/MP bars for allies (clean capsule style)
 
@@ -2217,6 +2328,7 @@ func _create_combatant_slot(combatant: Dictionary, is_ally: bool, slot_index: in
 		icon_container.add_theme_stylebox_override("panel", icon_style)
 
 		var icon_center = CenterContainer.new()
+		icon_center.name = "IconCenter"  # Name it so we can hide it later if sprite exists
 		icon_center.add_child(icon_container)
 		vbox.add_child(icon_center)
 
@@ -2585,6 +2697,10 @@ func _execute_attack(target: Dictionary) -> void:
 	# Clear defending status when attacking
 	current_combatant.is_defending = false
 
+	# Clear guard animation when no longer defending
+	if sprite_animator and current_combatant.is_ally:
+		sprite_animator.clear_hold(current_combatant.id)
+
 	# Start building turn message
 	start_turn_message()
 	add_turn_line("%s attacked %s!" % [current_combatant.display_name, target.display_name])
@@ -2617,6 +2733,34 @@ func _execute_attack(target: Dictionary) -> void:
 			var minigame_result = await minigame_mgr.launch_attack_minigame(tpo, brw, status_effects)
 			_hide_instruction()
 
+			# Play attack animation based on weapon type
+			if sprite_animator and current_combatant.is_ally:
+				var weapon_type = "Neutral"
+				if current_combatant.has("equipment") and current_combatant.equipment.has("weapon"):
+					var weapon_id = current_combatant.equipment.weapon
+					# Get weapon type from combat profile
+					var profile = combat_profiles.get_profile(current_combatant.id) if combat_profiles else {}
+					weapon_type = profile.get("weapon", {}).get("type", "Neutral")
+
+				# Map weapon type to animation name
+				var anim_name = "Idle"
+				match weapon_type.to_lower():
+					"wand":
+						anim_name = "Wand Strike"
+					"sword":
+						anim_name = "Sword Strike"
+					"hammer":
+						anim_name = "Hammer Strike"
+					"spear":
+						anim_name = "Spear Strike"
+					_:
+						anim_name = "Sword Strike"  # Default attack animation
+
+				sprite_animator.play_animation(current_combatant.id, anim_name, "RIGHT", false, true)
+				print("[Battle] Playing attack animation: %s for %s (weapon: %s)" % [anim_name, current_combatant.id, weapon_type])
+
+				# Wait for animation to play (about 0.5 seconds)
+				await get_tree().create_timer(0.6).timeout
 
 			# Slide character back immediately after minigame closes
 			await _reset_turn_indicator()
@@ -3105,6 +3249,14 @@ func _execute_capture(target: Dictionary) -> void:
 	# Launch capture minigame (auto-starts, no message)
 	var minigame_result = await minigame_mgr.launch_capture_minigame([bind_type], enemy_data, party_member_data, status_effects)
 
+	# Play capture animation (Throw Carried)
+	if sprite_animator and current_combatant.is_ally:
+		sprite_animator.play_animation(current_combatant.id, "Throw Carried", "RIGHT", false, true)
+		print("[Battle] Playing capture animation: Throw Carried for %s" % current_combatant.id)
+
+		# Wait for animation to play (about 0.5 seconds)
+		await get_tree().create_timer(0.5).timeout
+
 	# Update break rating based on minigame result
 	var break_rating_reduced = minigame_result.get("break_rating_reduced", 0)
 	var wraps_completed = minigame_result.get("wraps_completed", 0)
@@ -3184,6 +3336,17 @@ func _execute_item_usage(target: Dictionary) -> void:
 	# Check if frozen combatant can act
 	if not await _check_freeze_action_allowed():
 		return
+
+	# Play item animation (Throw Carried)
+	# Direction: LEFT for party/allies, RIGHT for enemies
+	if sprite_animator and current_combatant.is_ally:
+		# For AOE items (bombs), target might be empty dict, default to RIGHT (toward enemies)
+		var direction = "LEFT" if target.get("is_ally", false) else "RIGHT"
+		sprite_animator.play_animation(current_combatant.id, "Throw Carried", direction, false, true)
+		print("[Battle] Playing item animation: Throw Carried %s for %s" % [direction, current_combatant.id])
+
+		# Wait for animation to play (about 0.5 seconds)
+		await get_tree().create_timer(0.5).timeout
 
 	# Get the item that was selected
 	if selected_item.is_empty():
@@ -3532,6 +3695,12 @@ func _execute_item_usage(target: Dictionary) -> void:
 			target.ailment = "Revived"  # Set Revived status (prevents action this turn)
 			target.ailment_turn_count = 1  # Lasts 1 turn
 			target.hp = max(1, int(target.hp_max * revive_percent / 100.0))
+
+			# Clear the Hurt hold animation when revived
+			if sprite_animator and target.get("is_ally", false):
+				sprite_animator.clear_hold(target.id)
+				print("[Battle] Cleared faint animation for revived: %s" % target.id)
+
 			log_message("  → %s was revived with %d HP! (Can't act this turn)" % [target.display_name, target.hp])
 			# Refresh turn order to show revive
 			if battle_mgr:
@@ -3637,6 +3806,11 @@ func _execute_defend() -> void:
 	print("[Battle] _execute_defend called!")
 	log_message("%s moved into a defensive stance." % current_combatant.display_name)
 	current_combatant.is_defending = true
+
+	# Play guard animation and hold it
+	if sprite_animator and current_combatant.is_ally:
+		sprite_animator.play_animation(current_combatant.id, "Guard", "RIGHT", true)  # true = hold
+		print("[Battle] Playing guard animation (hold): Guard for %s" % current_combatant.id)
 
 	# Slide back before ending turn
 	_reset_turn_indicator()
@@ -3769,6 +3943,14 @@ func _execute_run() -> void:
 	# Launch run minigame (auto-starts, no message)
 	var minigame_result = await minigame_mgr.launch_run_minigame(run_chance, tempo_diff, focus_stat, status_effects)
 
+	# Play run animation to the left for ALL party members
+	if sprite_animator:
+		sprite_animator.play_animation_for_all("Run", "LEFT")
+		print("[Battle] Playing run animation: Run LEFT for entire party")
+
+		# Wait for animation to play (about 0.8 seconds)
+		await get_tree().create_timer(0.8).timeout
+
 	# Get success from minigame
 	var success = minigame_result.get("success", false)
 
@@ -3789,6 +3971,11 @@ func _execute_run() -> void:
 	else:
 		add_turn_line("Couldn't escape!")
 		queue_turn_message()
+
+		# Return all party members to idle pose after failed escape
+		if sprite_animator:
+			sprite_animator.play_animation_for_all("Idle", "RIGHT")
+			print("[Battle] Failed escape - returning party to idle pose")
 
 		# Wait for message acknowledgment before ending turn
 		await _wait_for_message_queue()
@@ -3928,6 +4115,7 @@ func _show_status_character_picker() -> void:
 	# Create picker panel
 	status_picker_panel = PanelContainer.new()
 	status_picker_panel.custom_minimum_size = Vector2(500, 400)
+	status_picker_panel.z_index = 1000  # Above all sprites
 
 	var panel_style = StyleBoxFlat.new()
 	panel_style.bg_color = COLOR_INK_CHARCOAL  # Dark background
@@ -4412,6 +4600,10 @@ func _execute_berserk_action() -> void:
 	# Clear defending status
 	current_combatant.is_defending = false
 
+	# Clear guard animation when no longer defending
+	if sprite_animator and current_combatant.is_ally:
+		sprite_animator.clear_hold(current_combatant.id)
+
 	# Get all alive combatants (allies and enemies)
 	var all_targets = []
 	for c in battle_mgr.combatants:
@@ -4621,6 +4813,7 @@ func _create_instruction_popup() -> void:
 	"""Create the instruction message popup that appears above battle log"""
 	instruction_popup = PanelContainer.new()
 	instruction_popup.custom_minimum_size = Vector2(560, 50)  # Same width as BattleLogPanel
+	instruction_popup.z_index = 200  # Same layer as other battle UI
 
 	# Style with cyan neon border to match Core vibe
 	var style = StyleBoxFlat.new()
@@ -4809,6 +5002,7 @@ func _show_confirmation_dialog(message: String, on_confirm: Callable) -> void:
 	# Create confirmation panel
 	confirmation_panel = PanelContainer.new()
 	confirmation_panel.custom_minimum_size = Vector2(300, 120)
+	confirmation_panel.z_index = 1000  # Above all sprites
 
 	# Style the panel with cyan neon border
 	var style = StyleBoxFlat.new()
@@ -4927,6 +5121,7 @@ func _show_skill_menu(skill_menu: Array) -> void:
 	# Create skill menu panel
 	skill_menu_panel = PanelContainer.new()
 	skill_menu_panel.custom_minimum_size = Vector2(400, 0)
+	skill_menu_panel.z_index = 1000  # Above all sprites
 
 	# Style the panel with cyan neon Core vibe
 	var style = StyleBoxFlat.new()
@@ -5423,6 +5618,7 @@ func _show_item_menu(items: Array) -> void:
 	# Create item menu panel
 	item_menu_panel = PanelContainer.new()
 	item_menu_panel.custom_minimum_size = Vector2(440, 0)  # Reduced width by 110px total
+	item_menu_panel.z_index = 1000  # Above all sprites
 
 	# Style the panel with Core vibe
 	var style = StyleBoxFlat.new()
@@ -5878,6 +6074,7 @@ func _show_capture_menu(bind_items: Array) -> void:
 	# Create capture menu panel (1 column, 500x400px)
 	capture_menu_panel = PanelContainer.new()
 	capture_menu_panel.custom_minimum_size = Vector2(500, 400)
+	capture_menu_panel.z_index = 1000  # Above all sprites
 
 	# Style the panel with Core vibe
 	var style = StyleBoxFlat.new()
@@ -6078,6 +6275,7 @@ func _show_burst_menu(burst_abilities: Array) -> void:
 	# Create burst menu panel
 	burst_menu_panel = PanelContainer.new()
 	burst_menu_panel.custom_minimum_size = Vector2(450, 0)
+	burst_menu_panel.z_index = 1000  # Above all sprites
 
 	# Style the panel with Core vibe
 	var style = StyleBoxFlat.new()
@@ -6342,6 +6540,14 @@ func _execute_burst_on_target(target: Dictionary) -> void:
 	var scaling_mnd = float(selected_burst.get("scaling_mnd", 1.0))
 	var scaling_fcs = float(selected_burst.get("scaling_fcs", 0.5))
 
+	# Play Jump animation once for burst ability
+	if sprite_animator and current_combatant.is_ally:
+		sprite_animator.play_animation(current_combatant.id, "Jump", "RIGHT", false, true)  # play_once=true
+		print("[Battle] Playing burst animation: Jump (play once) for %s" % current_combatant.id)
+
+		# Wait for animation to complete
+		await get_tree().create_timer(0.6).timeout
+
 	# Check if hit (bursts have high accuracy)
 	var hit_check = combat_resolver.check_sigil_hit(current_combatant, target, {"skill_acc": acc})
 
@@ -6553,6 +6759,14 @@ func _execute_skill_single(target: Dictionary) -> void:
 	var minigame_result = await minigame_mgr.launch_skill_minigame(focus_stat, skill_sequence, skill_tier, mind_type, status_effects)
 	_hide_instruction()
 
+	# Play skill animation (Bow Shot)
+	if sprite_animator and current_combatant.is_ally:
+		sprite_animator.play_animation(current_combatant.id, "Bow Shot", "RIGHT", false, true)
+		print("[Battle] Playing skill animation: Bow Shot for %s" % current_combatant.id)
+
+		# Wait for animation to play (about 1 second for Bow Shot)
+		await get_tree().create_timer(1.2).timeout
+
 	# Slide character back immediately after minigame closes
 	await _reset_turn_indicator()
 
@@ -6565,6 +6779,10 @@ func _execute_skill_single(target: Dictionary) -> void:
 
 	# Clear defending status when using skill
 	current_combatant.is_defending = false
+
+	# Clear guard animation when no longer defending
+	if sprite_animator and current_combatant.is_ally:
+		sprite_animator.clear_hold(current_combatant.id)
 
 	# Deduct MP (with minigame modifier)
 	var final_mp_cost = int(mp_cost * mp_modifier)
@@ -6842,6 +7060,10 @@ func _execute_skill_aoe() -> void:
 
 	# Clear defending status
 	current_combatant.is_defending = false
+
+	# Clear guard animation when no longer defending
+	if sprite_animator and current_combatant.is_ally:
+		sprite_animator.clear_hold(current_combatant.id)
 
 	# Deduct MP
 	current_combatant.mp -= mp_cost

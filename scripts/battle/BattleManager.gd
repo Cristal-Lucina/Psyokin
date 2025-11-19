@@ -144,6 +144,9 @@ func initialize_battle(ally_party: Array, enemy_list: Array) -> void:
 		combatants.append(enemy_data)
 		print("[BattleManager] Added enemy: %s [ID: %s]" % [enemy_data.display_name, enemy_data.id])
 
+	# Add A/B/C suffixes to duplicate enemy names
+	_add_enemy_name_suffixes()
+
 	# ULTRA FIX: Validate immediately after adding all combatants
 	_validate_and_fix_combatants()
 
@@ -311,6 +314,33 @@ func _sort_by_initiative(a: Dictionary, b: Dictionary) -> bool:
 
 	# Final tiebreaker: coinflip
 	return randf() > 0.5
+
+func _add_enemy_name_suffixes() -> void:
+	"""Add A/B/C suffixes to duplicate enemy names (e.g., Goblin A, Goblin B)"""
+	# Count enemies by base name (excluding allies)
+	var enemy_name_counts: Dictionary = {}  # base_name -> count
+	var enemies_by_name: Dictionary = {}  # base_name -> [combatant references]
+
+	# First pass: count enemies with same display_name
+	for combatant in combatants:
+		if not combatant.get("is_ally", false):  # Only process enemies
+			var name = combatant.get("display_name", "")
+			if not enemy_name_counts.has(name):
+				enemy_name_counts[name] = 0
+				enemies_by_name[name] = []
+			enemy_name_counts[name] += 1
+			enemies_by_name[name].append(combatant)
+
+	# Second pass: add suffixes to duplicates
+	var suffixes = ["A", "B", "C", "D", "E", "F", "G", "H"]
+	for base_name in enemy_name_counts:
+		var count = enemy_name_counts[base_name]
+		if count > 1:  # Only add suffixes if there are duplicates
+			var enemy_group = enemies_by_name[base_name]
+			for i in range(enemy_group.size()):
+				var suffix = suffixes[i] if i < suffixes.size() else str(i + 1)
+				enemy_group[i]["display_name"] = "%s %s" % [base_name, suffix]
+				print("[BattleManager] Renamed duplicate enemy: %s -> %s" % [base_name, enemy_group[i]["display_name"]])
 
 func _validate_and_fix_combatants() -> void:
 	"""ULTRA FIX: Validate combatants array has no duplicates and fix if found"""
