@@ -127,6 +127,8 @@ func create_sprite_for_combatant(combatant_id: String, parent: Node) -> Node:
 	var member_id = combatant_id.to_lower()
 
 	print("[BattleSpriteAnimator] Creating sprite for combatant: %s (lowercase: %s)" % [combatant_id, member_id])
+	print("[BattleSpriteAnimator] Available character sprites: %s" % str(character_sprites.keys()))
+	print("[BattleSpriteAnimator] Parent node: %s" % str(parent))
 
 	# For hero, use layered system (body + hair)
 	if member_id == "hero":
@@ -156,6 +158,9 @@ func create_sprite_for_combatant(combatant_id: String, parent: Node) -> Node:
 	# Add to parent
 	if parent:
 		parent.add_child(sprite)
+		print("[BattleSpriteAnimator] Sprite added to parent successfully")
+	else:
+		print("[BattleSpriteAnimator] ERROR: No parent provided!")
 
 	# Track sprite instance
 	sprite_instances[combatant_id] = {

@@ -1426,8 +1426,10 @@ func _on_battle_ended(victory: bool) -> void:
 
 		# Play Thumbs Up animation for all party members
 		if sprite_animator:
-			sprite_animator.play_animation_for_all("Thumbs Up", "RIGHT", true)  # Hold the pose
+			sprite_animator.play_animation_for_all("Thumbs Up", "DOWN", true)  # Hold the pose
 			print("[Battle] Playing victory animation: Thumbs Up (hold)")
+		else:
+			print("[Battle] ERROR: sprite_animator is null, cannot play victory animation!")
 
 		# Wait a moment for the animation to display
 		await get_tree().create_timer(0.5).timeout
@@ -1850,6 +1852,7 @@ func _display_combatants() -> void:
 		combatant_panels[ally.id] = slot
 
 		# Create sprite for this party member
+		print("[Battle] Attempting to create sprite for ally: %s, sprite_animator null: %s" % [ally.id, sprite_animator == null])
 		if sprite_animator:
 			var sprite = sprite_animator.create_sprite_for_combatant(ally.id, slot)
 			if sprite:
@@ -1857,7 +1860,20 @@ func _display_combatants() -> void:
 				# The sprite should be centered in the slot
 				sprite.position = Vector2(40, 40)  # Center of the 80x80 slot
 				sprite.scale = Vector2(1.5, 1.5)  # Scale up for visibility
-				print("[Battle] Created sprite for ally: %s" % ally.id)
+				sprite.z_index = 10  # Ensure sprite is above capsule
+				print("[Battle] Created sprite for ally: %s at position %s" % [ally.id, sprite.position])
+
+				# Hide the capsule icon since we have a sprite
+				var vbox = slot.get_child(0) if slot.get_child_count() > 0 else null
+				if vbox:
+					var icon_center = vbox.get_node_or_null("IconCenter")
+					if icon_center:
+						icon_center.visible = false
+						print("[Battle] Hid capsule icon for %s (sprite is showing)" % ally.id)
+			else:
+				print("[Battle] ERROR: create_sprite_for_combatant returned null for %s" % ally.id)
+		else:
+			print("[Battle] ERROR: sprite_animator is null!")
 
 	# Display enemies
 	var enemies = battle_mgr.get_enemy_combatants()
@@ -2206,6 +2222,7 @@ func _create_combatant_slot(combatant: Dictionary, is_ally: bool, slot_index: in
 		icon_container.add_theme_stylebox_override("panel", icon_style)
 
 		var icon_center = CenterContainer.new()
+		icon_center.name = "IconCenter"  # Name it so we can hide it later if sprite exists
 		icon_center.add_child(icon_container)
 		vbox.add_child(icon_center)
 
@@ -2261,6 +2278,7 @@ func _create_combatant_slot(combatant: Dictionary, is_ally: bool, slot_index: in
 		icon_container.add_theme_stylebox_override("panel", icon_style)
 
 		var icon_center = CenterContainer.new()
+		icon_center.name = "IconCenter"  # Name it so we can hide it later if sprite exists
 		icon_center.add_child(icon_container)
 		vbox.add_child(icon_center)
 
