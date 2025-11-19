@@ -19,6 +19,21 @@ This is a **test scene** for the new Mana Seed Character System with shader-base
 
 ## Features
 
+### Animation Selector (Left Panel)
+
+The left panel displays **30+ animations** organized into categories:
+
+- **Basic Movement**: Walk, Run, Jump, Push, Pull
+- **Farming**: Plant Seeds, Water, Carry, Tools, Throw
+- **Fishing**: Cast Fishing Line, Got A Bite, Got It
+- **Combat/Tools**: Overhead Strike, Forging Strike, Backhand Strike
+- **Expressions**: Wave, Hug, Flute/Horn/Lute
+- **Utility**: Sit Throne, Sit Chair, Meditate, Sleep, Climb
+- **Death/Hit**: Hurt, KIA Shot
+- **Misc**: Pet Dog/Cat, Look Around
+
+Click any animation to preview it with your customized character!
+
 ### 11 Customization Categories
 
 Based on the Mana Seed system documentation:
@@ -47,6 +62,14 @@ The system uses a custom shader (`palette_swap.gdshader`) that supports:
 - **4-color ramps** - Headwear and neckwear
 - **5-color hair ramps** - Hair colors
 - **Skin ramps** - Body skin tones
+
+### Visual Color Ramp Selector
+
+When customizing character parts, you can see the actual color ramp palettes:
+- **Visual Preview**: Displays the full palette image (200px height)
+- **Quick Selection**: Grid of numbered buttons (1-20) for each color ramp
+- **Real Palette Images**: Loads actual PNG files from the Mana Seed palette folder
+- **Easy to Use**: Click a number button to apply that color ramp to the selected part
 
 ### Layer System
 
@@ -180,12 +203,19 @@ See `Sprite System readme.txt` for full documentation and usage guidelines.
 
 - [ ] Scene loads without errors
 - [ ] All 11+ customization categories appear in UI
+- [ ] **Animation panel appears on left with 30+ animations**
+- [ ] **Animations organized into 8 categories**
+- [ ] **Can click animations to switch between them**
 - [ ] Body sprite displays by default
 - [ ] Can select different parts for each layer
 - [ ] Can select "None" to hide layers
 - [ ] Bottomwear options are mutually exclusive
 - [ ] Direction buttons work (South/North/East/West)
-- [ ] Animation cycles through frames automatically
-- [ ] Color ramp selectors appear for appropriate layers
+- [ ] **Animation cycles through frames based on selected animation**
+- [ ] **Frame counter updates correctly (e.g., "Frame: 3/8" for walk)**
+- [ ] **Visual color ramp palettes display for each layer type**
+- [ ] **Color ramp images load correctly (3-color, 4-color, hair, skin)**
+- [ ] **Can click numbered buttons to select color ramps**
 - [ ] Sprites layer in correct order
 - [ ] No z-fighting or rendering issues
+- [ ] **Different animations have correct frame counts and speeds**
