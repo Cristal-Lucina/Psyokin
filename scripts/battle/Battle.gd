@@ -2853,9 +2853,9 @@ func _execute_attack(target: Dictionary) -> void:
 						anim_name = "Wand Strike"
 					"sword":
 						anim_name = "Sword Strike"
-					"hammer":
+					"hammer", "impact":
 						anim_name = "Hammer Strike"
-					"spear":
+					"spear", "pierce":
 						anim_name = "Spear Strike"
 					_:
 						anim_name = "Sword Strike"  # Default attack animation
@@ -6924,7 +6924,7 @@ func _execute_skill_single(target: Dictionary) -> void:
 			"slash":
 				anim_name = "Sword Strike"
 				anim_duration = 0.6
-			"blunt":
+			"blunt", "impact":
 				anim_name = "Hammer Strike"
 				anim_duration = 0.6
 			_:
