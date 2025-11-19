@@ -2056,8 +2056,8 @@ func _create_single_party_status_panel(combatant: Dictionary) -> PanelContainer:
 		if portrait_sprite:
 			# Position sprite to show top half only (head/shoulders)
 			# Sprite is 16px base * 4.375 scale = 70px tall
-			# Shifted down 40px to better align head/face in portrait circle
-			portrait_sprite.position = Vector2(30, 85)  # Centered horizontally, shifted down 40px
+			# Fine-tuned positioning to align head/face in portrait circle
+			portrait_sprite.position = Vector2(30, 81)  # Centered horizontally, adjusted for optimal framing
 			portrait_sprite.scale = Vector2(4.375, 4.375)  # Same scale as battle sprites
 			portrait_sprite.z_index = 10  # Above background
 
