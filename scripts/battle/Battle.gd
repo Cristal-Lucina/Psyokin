@@ -90,10 +90,12 @@ var current_skill_menu: Array = []  # Current skills in menu
 var selected_item: Dictionary = {}  # Selected item data
 var selected_burst: Dictionary = {}  # Selected burst ability data
 var selection_indicator: Control = null  # Floating selection indicator above targets
+var selection_name_label: Label = null  # Name label above selection indicator
 var victory_panel: PanelContainer = null  # Victory screen panel
 var victory_scroll: ScrollContainer = null  # Victory screen scroll container for controller scrolling
 var is_in_round_transition: bool = false  # True during round transition animations
 var combatant_panels: Dictionary = {}  # combatant_id -> PanelContainer for shake animations
+var combatant_sprite_offsets: Dictionary = {}  # combatant_id -> x_offset for sprite positioning
 var active_turn_panel: Control = null  # Currently active combatant's panel (for turn animation)
 var active_turn_original_pos: Vector2 = Vector2.ZERO  # Original position before turn animation
 var instruction_popup: PanelContainer = null  # Instruction message popup
@@ -1428,6 +1430,15 @@ func _on_battle_ended(victory: bool) -> void:
 		if sprite_animator:
 			sprite_animator.play_animation_for_all("Thumbs Up", "DOWN", true)  # Hold the pose
 			print("[Battle] Playing victory animation: Thumbs Up (hold)")
+
+			# Move portrait sprites up 16px for thumbs up pose
+			var allies = battle_mgr.get_ally_combatants()
+			for ally in allies:
+				var portrait_id = ally.id + "_portrait"
+				if sprite_animator.sprite_instances.has(portrait_id):
+					var portrait_sprite = sprite_animator.sprite_instances[portrait_id]
+					portrait_sprite.position.y -= 16  # Move up 16px
+					print("[Battle] Moved portrait sprite for %s up 16px (y: %d -> %d)" % [ally.display_name, portrait_sprite.position.y + 16, portrait_sprite.position.y])
 		else:
 			print("[Battle] ERROR: sprite_animator is null, cannot play victory animation!")
 
@@ -1454,6 +1465,7 @@ func _show_victory_screen() -> void:
 	var black_bg = ColorRect.new()
 	black_bg.color = Color(0, 0, 0, 0)  # Start transparent
 	black_bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	black_bg.z_index = 102  # Above background, below sprites
 	black_bg.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(black_bg)
 
@@ -1839,48 +1851,48 @@ func _display_combatants() -> void:
 		ally_slots.add_child(slot)
 		combatant_panels[ally.id] = slot
 
-		# Apply horizontal offset for fighting stance AFTER adding to scene
-		# This ensures we can see the base position first, then apply offset
-		# Wait one frame to let layout system position the slot
-		await get_tree().process_frame
-
+		# Calculate horizontal offset for fighting stance
+		# VBoxContainer controls slot position, so we offset the sprite instead
 		var x_offset = 0
-		if i == 0:  # Top ally - lean right toward center
-			x_offset = 60
-		elif i == 2:  # Bottom ally - lean left toward center
+		if i == 0:  # Top ally (hero) - no offset
+			x_offset = 0
+		elif i == 1:  # Middle ally - shift left 60px
 			x_offset = -60
-		# i == 1 (middle) stays centered with no offset
+		elif i == 2:  # Bottom ally - shift left 120px
+			x_offset = -120
 
-		if x_offset != 0:
-			slot.position.x += x_offset
-			print("[Battle] Applied x_offset %d to ally %d (%s)" % [x_offset, i, ally.display_name])
+		print("[Battle] Ally %d (%s) will apply x_offset = %d to sprite" % [i, ally.display_name, x_offset])
+
+		# Store sprite offset for selection indicator positioning
+		combatant_sprite_offsets[ally.id] = x_offset
 
 		# Create sprite for this party member
 		print("[Battle] Attempting to create sprite for ally ID: %s, Name: %s, sprite_animator null: %s" % [ally.id, ally.get("display_name", ""), sprite_animator == null])
 		if sprite_animator:
-			var sprite = sprite_animator.create_sprite_for_combatant(ally.id, slot, ally.get("display_name", ""))
+			var sprite = sprite_animator.create_sprite_for_combatant(ally.id, slot, ally.get("display_name", ""), true)
 			if sprite:
 				# Position and scale sprite for 70px height
-				# 16px base frame * 4.375 = 70px
-				# Position centered in 80x80 slot
-				# Note: MarginContainer already handles fighting stance offset
-				sprite.position = Vector2(40, 40)
+				# Apply x_offset to sprite position (not slot position, since VBoxContainer controls that)
+				sprite.position = Vector2(40 + x_offset, 40)
 				sprite.scale = Vector2(4.375, 4.375)  # 70px height
+				print("[Battle] Ally %d (%s) sprite positioned at (%.2f, %.2f)" % [i, ally.display_name, sprite.position.x, sprite.position.y])
 
-				# Create shadow circle at base of sprite
+				# Create shadow circle at base of sprite (also offset)
 				var shadow = Sprite2D.new()
 				shadow.name = "Shadow"
 				var shadow_texture = _create_shadow_circle_texture()
 				shadow.texture = shadow_texture
-				shadow.modulate = Color(0, 0, 0, 0.5)  # Semi-transparent black
-				shadow.position = Vector2(40, 60)  # Below sprite, centered
-				shadow.scale = Vector2(2, 1)  # Ellipse shape for perspective
-				shadow.z_index = 105 + i  # Shadows at 105-107, below sprites at 108-110
+				shadow.modulate = Color(0, 0, 0, 0.7)  # Darker, more visible shadow
+				shadow.position = Vector2(40 + x_offset, 55)  # Closer to sprite base
+				shadow.scale = Vector2(3, 1.5)  # Larger ellipse shape for better visibility
+				shadow.z_index = 104  # Below sprite (sprites at 108-110)
 				slot.add_child(shadow)
 
 				# Depth-based z-layering: bottom allies have higher z (appear in front)
 				# Ally 0 (top) = 108, Ally 1 (middle) = 109, Ally 2 (bottom) = 110
 				sprite.z_index = 108 + i
+
+				print("[Battle] Created shadow for ally: %s at position (%f, %f) with z-index %d" % [ally.id, shadow.position.x, shadow.position.y, shadow.z_index])
 
 				print("[Battle] Created sprite for ally: %s at position %s with z-index %d" % [ally.id, sprite.position, sprite.z_index])
 
@@ -1906,23 +1918,65 @@ func _display_combatants() -> void:
 		enemy_slots.add_child(slot)
 		combatant_panels[enemy.id] = slot
 
-		# Apply horizontal offset for fighting stance AFTER adding to scene
-		await get_tree().process_frame
-
+		# Calculate horizontal offset for fighting stance (mirrored from allies)
 		var x_offset = 0
-		if i == 0:  # Top enemy - lean left toward center
-			x_offset = -60
-		elif i == 2:  # Bottom enemy - lean right toward center
+		if i == 0:  # Top enemy - no offset
+			x_offset = 0
+		elif i == 1:  # Middle enemy - shift right 60px
 			x_offset = 60
-		# i == 1 (middle) stays centered with no offset
+		elif i == 2:  # Bottom enemy - shift right 120px
+			x_offset = 120
 
-		if x_offset != 0:
-			slot.position.x += x_offset
-			print("[Battle] Applied x_offset %d to enemy %d (%s)" % [x_offset, i, enemy.display_name])
+		print("[Battle] Enemy %d (%s) will apply x_offset = %d to sprite" % [i, enemy.display_name, x_offset])
 
-		# Create sprite for this enemy (if available)
-		# Note: Enemies currently use capsule icons, but this allows for enemy sprites in the future
-		# For now, this section is prepared but won't create sprites unless enemy sprite sheets exist
+		# Store sprite offset for selection indicator positioning
+		combatant_sprite_offsets[enemy.id] = x_offset
+
+		# Create sprite for this enemy
+		print("[Battle] Attempting to create sprite for enemy ID: %s, Name: %s, sprite_animator null: %s" % [enemy.id, enemy.get("display_name", ""), sprite_animator == null])
+		if sprite_animator:
+			var sprite = sprite_animator.create_sprite_for_combatant(enemy.id, slot, enemy.get("display_name", ""), false)
+			if sprite:
+				# Position and scale sprite for 70px height
+				# Apply x_offset to sprite position (not slot position, since VBoxContainer controls that)
+				sprite.position = Vector2(40 + x_offset, 40)
+				sprite.scale = Vector2(4.375, 4.375)  # 70px height
+				print("[Battle] Enemy %d (%s) sprite positioned at (%.2f, %.2f)" % [i, enemy.display_name, sprite.position.x, sprite.position.y])
+
+				# Create shadow circle at base of sprite (also offset)
+				var shadow = Sprite2D.new()
+				shadow.name = "Shadow"
+				var shadow_texture = _create_shadow_circle_texture()
+				shadow.texture = shadow_texture
+				shadow.modulate = Color(0, 0, 0, 0.7)  # Darker, more visible shadow
+				shadow.position = Vector2(40 + x_offset, 55)  # Closer to sprite base
+				shadow.scale = Vector2(3, 1.5)  # Larger ellipse shape for better visibility
+				shadow.z_index = 104  # Below sprite (sprites at 108-110)
+				slot.add_child(shadow)
+
+				# Depth-based z-layering: bottom enemies have higher z (appear in front)
+				# Enemy 0 (top) = 108, Enemy 1 (middle) = 109, Enemy 2 (bottom) = 110
+				sprite.z_index = 108 + i
+
+				print("[Battle] Created shadow for enemy: %s at position (%f, %f) with z-index %d" % [enemy.id, shadow.position.x, shadow.position.y, shadow.z_index])
+				print("[Battle] Created sprite for enemy: %s at position %s with z-index %d" % [enemy.id, sprite.position, sprite.z_index])
+
+				# Hide the capsule icon since we have a sprite
+				var vbox = slot.get_child(0) if slot.get_child_count() > 0 else null
+				if vbox:
+					var icon_center = vbox.get_node_or_null("IconCenter")
+					if icon_center:
+						icon_center.visible = false
+						print("[Battle] Hid capsule icon for %s (sprite is showing)" % enemy.id)
+					# Also hide the name label in the vbox since we have one above sprite
+					for child in vbox.get_children():
+						if child is Label:
+							child.visible = false
+							print("[Battle] Hid vbox name label for %s" % enemy.id)
+			else:
+				print("[Battle] No sprite available for enemy: %s (will use capsule icon)" % enemy.id)
+		else:
+			print("[Battle] ERROR: sprite_animator is null!")
 
 	# Create party status panels
 	_create_party_status_panels()
@@ -1993,25 +2047,70 @@ func _create_single_party_status_panel(combatant: Dictionary) -> PanelContainer:
 	portrait_style.shadow_color = Color(0, 0, 0, 0.6)
 	portrait_style.shadow_offset = Vector2(3, 3)
 	portrait_container.add_theme_stylebox_override("panel", portrait_style)
+
+	# Enable clipping to keep sprite within circular bounds
+	portrait_container.clip_contents = true
+
 	hbox.add_child(portrait_container)
 
+	# Add character sprite to portrait (idle pose, facing left, top half only)
+	if sprite_animator:
+		var portrait_sprite = sprite_animator.create_sprite_for_combatant(
+			combatant.id + "_portrait",  # Unique ID for portrait sprite
+			portrait_container,
+			combatant.get("display_name", ""),
+			true  # is_ally
+		)
+
+		if portrait_sprite:
+			# Position sprite to show top half only (head/shoulders)
+			# Sprite is 16px base * 4.375 scale = 70px tall
+			# Fine-tuned positioning to align head/face in portrait circle
+			portrait_sprite.position = Vector2(30, 81)  # Centered horizontally, adjusted for optimal framing
+			portrait_sprite.scale = Vector2(4.375, 4.375)  # Same scale as battle sprites
+			portrait_sprite.z_index = 10  # Above background
+
+			# Make sprite face LEFT instead of RIGHT
+			# Play Idle_LEFT animation
+			if sprite_animator.sprite_instances.has(combatant.id + "_portrait"):
+				sprite_animator.play_animation(combatant.id + "_portrait", "Idle", "LEFT")
+
+			print("[Battle] Created portrait sprite for %s facing LEFT" % combatant.display_name)
+
 	# Right side: HP/MP bars
+	var stats_panel = PanelContainer.new()
+	stats_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+
+	var stats_style = StyleBoxFlat.new()
+	stats_style.bg_color = Color(0, 0, 0, 0)  # Transparent background
+	# Add soft shadow behind stats section
+	stats_style.shadow_size = 8
+	stats_style.shadow_color = Color(0, 0, 0, 0.4)
+	stats_style.shadow_offset = Vector2(2, 2)
+	stats_panel.add_theme_stylebox_override("panel", stats_style)
+
+	hbox.add_child(stats_panel)
+
 	var stats_vbox = VBoxContainer.new()
 	stats_vbox.add_theme_constant_override("separation", 4)
 	stats_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	hbox.add_child(stats_vbox)
+	stats_panel.add_child(stats_vbox)
 
 	# HP bar container
 	var hp_hbox = HBoxContainer.new()
 	hp_hbox.add_theme_constant_override("separation", 2)
+	hp_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
 	stats_vbox.add_child(hp_hbox)
 
 	# HP label
 	var hp_label = Label.new()
 	hp_label.text = "HP"
-	hp_label.add_theme_font_size_override("font_size", 8)
+	hp_label.add_theme_font_size_override("font_size", 15)
 	hp_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
+	hp_label.add_theme_constant_override("outline_size", 10)
+	hp_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 1))
 	hp_label.custom_minimum_size = Vector2(10, 0)
+	hp_label.position.y = -4  # Shift up 4px
 	hp_hbox.add_child(hp_label)
 
 	# HP bar
@@ -2043,28 +2142,36 @@ func _create_single_party_status_panel(combatant: Dictionary) -> PanelContainer:
 	hp_fill.corner_radius_bottom_left = 6
 	hp_fill.corner_radius_bottom_right = 6
 	hp_bar.add_theme_stylebox_override("fill", hp_fill)
+	hp_bar.position.y = 6  # Shift down to align with labels
 	hp_hbox.add_child(hp_bar)
 
 	# HP value label
 	var hp_value = Label.new()
 	hp_value.name = "HPValue"
 	hp_value.text = str(combatant.get("hp", 100))
-	hp_value.add_theme_font_size_override("font_size", 8)
+	hp_value.add_theme_font_size_override("font_size", 15)
 	hp_value.add_theme_color_override("font_color", COLOR_MILK_WHITE)
+	hp_value.add_theme_constant_override("outline_size", 10)
+	hp_value.add_theme_color_override("font_outline_color", Color(0, 0, 0, 1))
 	hp_value.custom_minimum_size = Vector2(12, 0)
+	hp_value.position.y = -4  # Shift up 4px
 	hp_hbox.add_child(hp_value)
 
 	# MP bar container
 	var mp_hbox = HBoxContainer.new()
 	mp_hbox.add_theme_constant_override("separation", 2)
+	mp_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
 	stats_vbox.add_child(mp_hbox)
 
 	# MP label
 	var mp_label = Label.new()
 	mp_label.text = "MP"
-	mp_label.add_theme_font_size_override("font_size", 8)
+	mp_label.add_theme_font_size_override("font_size", 15)
 	mp_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
+	mp_label.add_theme_constant_override("outline_size", 10)
+	mp_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 1))
 	mp_label.custom_minimum_size = Vector2(10, 0)
+	mp_label.position.y = -4  # Shift up 4px
 	mp_hbox.add_child(mp_label)
 
 	# MP bar
@@ -2096,15 +2203,19 @@ func _create_single_party_status_panel(combatant: Dictionary) -> PanelContainer:
 	mp_fill.corner_radius_bottom_left = 6
 	mp_fill.corner_radius_bottom_right = 6
 	mp_bar.add_theme_stylebox_override("fill", mp_fill)
+	mp_bar.position.y = 6  # Shift down to align with labels
 	mp_hbox.add_child(mp_bar)
 
 	# MP value label
 	var mp_value = Label.new()
 	mp_value.name = "MPValue"
 	mp_value.text = str(combatant.get("mp", 50))
-	mp_value.add_theme_font_size_override("font_size", 8)
+	mp_value.add_theme_font_size_override("font_size", 15)
 	mp_value.add_theme_color_override("font_color", COLOR_MILK_WHITE)
+	mp_value.add_theme_constant_override("outline_size", 10)
+	mp_value.add_theme_color_override("font_outline_color", Color(0, 0, 0, 1))
 	mp_value.custom_minimum_size = Vector2(12, 0)
+	mp_value.position.y = -4  # Shift up 4px
 	mp_hbox.add_child(mp_value)
 
 	return panel
@@ -2228,6 +2339,7 @@ func _create_combatant_slot(combatant: Dictionary, is_ally: bool, slot_index: in
 	# Allies: Transparent background, only capsule and name visible
 	if is_ally:
 		panel.custom_minimum_size = Vector2(80, 80)
+		panel.clip_contents = false  # Allow sprites/shadows to render outside slot bounds
 
 		# Make panel background completely transparent
 		var style = StyleBoxFlat.new()
@@ -2289,6 +2401,7 @@ func _create_combatant_slot(combatant: Dictionary, is_ally: bool, slot_index: in
 	else:
 		# Enemies: Transparent background, only capsule and name visible
 		panel.custom_minimum_size = Vector2(80, 80)
+		panel.clip_contents = false  # Allow sprites/shadows to render outside slot bounds
 
 		# Make panel background completely transparent
 		var style = StyleBoxFlat.new()
@@ -2749,9 +2862,9 @@ func _execute_attack(target: Dictionary) -> void:
 						anim_name = "Wand Strike"
 					"sword":
 						anim_name = "Sword Strike"
-					"hammer":
+					"hammer", "impact":
 						anim_name = "Hammer Strike"
-					"spear":
+					"spear", "pierce":
 						anim_name = "Spear Strike"
 					_:
 						anim_name = "Sword Strike"  # Default attack animation
@@ -4115,7 +4228,6 @@ func _show_status_character_picker() -> void:
 	# Create picker panel
 	status_picker_panel = PanelContainer.new()
 	status_picker_panel.custom_minimum_size = Vector2(500, 400)
-	status_picker_panel.z_index = 1000  # Above all sprites
 
 	var panel_style = StyleBoxFlat.new()
 	panel_style.bg_color = COLOR_INK_CHARCOAL  # Dark background
@@ -4134,7 +4246,7 @@ func _show_status_character_picker() -> void:
 
 	status_picker_panel.position = get_viewport_rect().size / 2 - status_picker_panel.custom_minimum_size / 2
 	status_picker_panel.position.y -= 110  # Move up 110px (60 + 40 + 10)
-	status_picker_panel.z_index = 100
+	status_picker_panel.z_index = 900  # Above most UI but below modals
 	status_picker_panel.mouse_filter = Control.MOUSE_FILTER_STOP
 
 	var vbox = VBoxContainer.new()
@@ -4378,18 +4490,63 @@ func _highlight_target_candidates() -> void:
 	# Create selection indicator (animated arrow/marker above target)
 	selection_indicator = Control.new()
 	selection_indicator.custom_minimum_size = Vector2(60, 30)
-	selection_indicator.z_index = 100  # Very high to ensure visibility above all elements
+	selection_indicator.z_index = 500  # Above sprites and shadows but below modals
 	add_child(selection_indicator)
 
-	# Position above the target panel
+	# Position at the very top center of the sprite
+	# Get sprite offset for this combatant
+	var sprite_offset = combatant_sprite_offsets.get(selected_target_id, 0)
+
+	# Base position from panel
 	var indicator_pos = target_panel.global_position
-	indicator_pos.y -= 35  # Hover above
-	indicator_pos.x += (target_panel.size.x / 2) - 30  # Center horizontally
+
+	# Sprite is at position (40 + sprite_offset, 40) within the 80x80 slot
+	# Sprite height is 70px (4.375 scale * 16px base)
+	# Top of sprite is at y = 40 - 35 = 5 (sprite center is 40, half height is 35)
+	# Center of sprite horizontally is at x = 40 + sprite_offset
+
+	indicator_pos.x += (40 + sprite_offset) - 30  # Center arrow on sprite (arrow is 60px wide, so -30 to center it)
+	indicator_pos.y += 5 - 55  # Position above top of sprite (5 is top of sprite, -55 for arrow height + spacing + 20px offset up)
+
 	selection_indicator.global_position = indicator_pos
+
+	print("[Battle] Selection arrow CREATED for %s: sprite_offset=%d, panel_pos=(%f, %f), final_pos=(%f, %f), z_index=%d, visible=%s" % [
+		selected_target_id, sprite_offset,
+		target_panel.global_position.x, target_panel.global_position.y,
+		indicator_pos.x, indicator_pos.y,
+		selection_indicator.z_index, selection_indicator.visible
+	])
 
 	# Draw the indicator
 	selection_indicator.draw.connect(_draw_selection_indicator)
 	selection_indicator.queue_redraw()
+
+	# Create name label above the arrow
+	selection_name_label = Label.new()
+	selection_name_label.text = selected_target.display_name.to_upper()
+	selection_name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	selection_name_label.add_theme_color_override("font_color", Color(1, 1, 1, 1))  # White
+	selection_name_label.add_theme_font_size_override("font_size", 20)  # 20pt font (14 + 6)
+
+	# Add thick black outline/stroke
+	selection_name_label.add_theme_constant_override("outline_size", 8)  # Thick outline
+	selection_name_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 1))  # Black stroke
+
+	# Add drop shadow effect (tighter shadow)
+	selection_name_label.add_theme_constant_override("shadow_offset_x", 3)
+	selection_name_label.add_theme_constant_override("shadow_offset_y", 3)
+	selection_name_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.5))  # Softer, more diffuse shadow
+
+	# Position above the arrow
+	var name_pos = indicator_pos
+	name_pos.y -= 30  # Position 30px above the arrow (increased for larger font)
+	name_pos.x -= 30  # Center the label (adjust based on text width)
+	selection_name_label.position = name_pos
+	selection_name_label.custom_minimum_size = Vector2(120, 25)  # Taller for larger font
+	selection_name_label.z_index = 500  # Same as arrow
+	add_child(selection_name_label)
+
+	print("[Battle] Name label created: '%s' at position (%f, %f)" % [selected_target.display_name, name_pos.x, name_pos.y])
 
 	# Animate bouncing
 	var tween = create_tween()
@@ -4424,10 +4581,13 @@ func _draw_selection_indicator() -> void:
 	selection_indicator.draw_colored_polygon(points, COLOR_MILK_WHITE)
 
 func _clear_target_highlights() -> void:
-	"""Remove selection indicator"""
+	"""Remove selection indicator and name label"""
 	if selection_indicator:
 		selection_indicator.queue_free()
 		selection_indicator = null
+	if selection_name_label:
+		selection_name_label.queue_free()
+		selection_name_label = null
 
 ## ═══════════════════════════════════════════════════════════════
 ## ENEMY AI
@@ -6715,6 +6875,7 @@ func _execute_skill_single(target: Dictionary) -> void:
 	# Get skill info
 	var skill_id = String(skill_to_use.get("skill_id", ""))
 	var skill_name = String(skill_to_use.get("name", "Unknown"))
+	var skill_type = String(skill_to_use.get("type", "Attack")).to_lower()
 	var mp_cost = int(skill_to_use.get("cost_mp", 0))
 	var element = String(skill_to_use.get("element", "none")).to_lower()
 	var power = int(skill_to_use.get("power", 30))
@@ -6759,13 +6920,31 @@ func _execute_skill_single(target: Dictionary) -> void:
 	var minigame_result = await minigame_mgr.launch_skill_minigame(focus_stat, skill_sequence, skill_tier, mind_type, status_effects)
 	_hide_instruction()
 
-	# Play skill animation (Bow Shot)
+	# Play skill animation based on skill type
 	if sprite_animator and current_combatant.is_ally:
-		sprite_animator.play_animation(current_combatant.id, "Bow Shot", "RIGHT", false, true)
-		print("[Battle] Playing skill animation: Bow Shot for %s" % current_combatant.id)
+		var anim_name = "Bow Shot"  # Default
+		var anim_duration = 1.2
 
-		# Wait for animation to play (about 1 second for Bow Shot)
-		await get_tree().create_timer(1.2).timeout
+		# Map skill type to animation
+		match skill_type:
+			"pierce":
+				anim_name = "Spear Strike"
+				anim_duration = 0.6
+			"slash":
+				anim_name = "Sword Strike"
+				anim_duration = 0.6
+			"blunt", "impact":
+				anim_name = "Hammer Strike"
+				anim_duration = 0.6
+			_:
+				anim_name = "Bow Shot"  # Default for magic/ranged
+				anim_duration = 1.2
+
+		sprite_animator.play_animation(current_combatant.id, anim_name, "RIGHT", false, true)
+		print("[Battle] Playing skill animation: %s for %s (type: %s)" % [anim_name, current_combatant.id, skill_type])
+
+		# Wait for animation to play
+		await get_tree().create_timer(anim_duration).timeout
 
 	# Slide character back immediately after minigame closes
 	await _reset_turn_indicator()
