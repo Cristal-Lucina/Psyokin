@@ -1456,6 +1456,7 @@ func _show_victory_screen() -> void:
 	var black_bg = ColorRect.new()
 	black_bg.color = Color(0, 0, 0, 0)  # Start transparent
 	black_bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	black_bg.z_index = 102  # Above background, below sprites
 	black_bg.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(black_bg)
 
