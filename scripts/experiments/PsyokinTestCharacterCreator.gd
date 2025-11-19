@@ -1,0 +1,516 @@
+extends Control
+
+## Psyokin Test Character Creator
+## Uses sprite_animations_data.csv for accurate animation data
+## Sprites numbered 0-255 in 16x16 grid (left to right, top to bottom)
+
+# Paths
+const SPRITE_PATH = "res://assets/graphics/characters/New Character System/SpriteSystem/base_sheets/"
+const PALETTE_PATH = "res://assets/graphics/characters/New Character System/SpriteSystem/_supporting files/palettes/"
+const ANIM_DATA_PATH = "res://scenes/test/sprite_animations_data.csv"
+
+# Shader for palette swapping
+var palette_shader = preload("res://assets/shaders/palette_swap.gdshader")
+
+# Layer configuration (Mana Seed system)
+const LAYERS = [
+	{"code": "00undr", "label": "Under Layer", "ramp_type": null},
+	{"code": "01body", "label": "Body", "ramp_type": "skin"},
+	{"code": "02sock", "label": "Legwear", "ramp_type": "3color"},
+	{"code": "03fot1", "label": "Footwear (Small)", "ramp_type": "3color"},
+	{"code": "04lwr1", "label": "Bottomwear", "ramp_type": "3color"},
+	{"code": "05shrt", "label": "Topwear", "ramp_type": "3color"},
+	{"code": "06lwr2", "label": "Bottomwear (Overalls)", "ramp_type": "3color"},
+	{"code": "07fot2", "label": "Footwear (Large)", "ramp_type": "3color"},
+	{"code": "08lwr3", "label": "Bottomwear (Dress/Skirt)", "ramp_type": "3color"},
+	{"code": "09hand", "label": "Handwear", "ramp_type": "3color"},
+	{"code": "10outr", "label": "Overwear", "ramp_type": "3color"},
+	{"code": "11neck", "label": "Neckwear", "ramp_type": "4color"},
+	{"code": "12face", "label": "Eyewear", "ramp_type": "3color"},
+	{"code": "13hair", "label": "Hairstyle", "ramp_type": "hair"},
+	{"code": "14head", "label": "Headwear", "ramp_type": "4color"}
+]
+
+# Animation data parsed from CSV
+var animations = {}  # {anim_name: {direction: {frames:[], times:[], total_frames:int}}}
+
+# References
+@onready var character_layers = $MainContainer/PreviewPanel/PreviewContainer/CenterContainer/CharacterLayers
+@onready var parts_container = $MainContainer/ControlsPanel/ControlsContainer/ScrollContainer/PartsContainer
+@onready var animation_list = $MainContainer/AnimationPanel/AnimationContainer/ScrollContainer/AnimationList
+@onready var anim_label = $MainContainer/PreviewPanel/PreviewContainer/AnimationInfo/AnimLabel
+@onready var direction_label = $MainContainer/PreviewPanel/PreviewContainer/AnimationInfo/DirectionLabel
+@onready var frame_label = $MainContainer/PreviewPanel/PreviewContainer/AnimationInfo/FrameLabel
+
+# State
+var current_animation = "Idle"
+var current_direction = "DOWN"
+var current_frame_index = 0
+var animation_timer = 0.0
+var available_parts = {}
+var current_selections = {}
+var current_color_ramps = {}
+
+func _ready():
+	print("=== PSYOKIN TEST CHARACTER CREATOR ===")
+	load_animation_data()
+	scan_character_assets()
+	populate_animation_list()
+	populate_ui()
+	set_default_character()
+	update_preview()
+
+func _process(delta):
+	# Animate based on current animation
+	if current_animation not in animations:
+		return
+	if current_direction not in animations[current_animation]:
+		return
+
+	var anim_data = animations[current_animation][current_direction]
+	var times = anim_data.times
+
+	if current_frame_index >= times.size():
+		return
+
+	var current_time = times[current_frame_index]
+
+	# Check if this is a "hold" frame (don't advance)
+	if current_time < 0:  # We'll use negative for hold
+		return
+
+	animation_timer += delta * 1000.0  # Convert to milliseconds
+
+	if animation_timer >= current_time:
+		animation_timer = 0.0
+		current_frame_index = (current_frame_index + 1) % anim_data.total_frames
+		update_frame_display()
+
+func load_animation_data():
+	"""Parse the CSV file to load animation data"""
+	print("Loading animation data from CSV...")
+
+	var file = FileAccess.open(ANIM_DATA_PATH, FileAccess.READ)
+	if file == null:
+		print("ERROR: Could not open animation data file!")
+		return
+
+	# Skip header line
+	file.get_csv_line()
+
+	while not file.eof_reached():
+		var line = file.get_csv_line()
+		if line.size() < 4:
+			continue
+
+		var anim_name = line[0].strip_edges()
+		var direction = line[1].strip_edges()
+		var frame_count = int(line[2])
+
+		if anim_name == "":
+			continue
+
+		# Parse frames and times
+		var frames = []
+		var times = []
+
+		for i in range(frame_count):
+			var cell_idx = 3 + (i * 2)
+			var time_idx = 4 + (i * 2)
+
+			if cell_idx >= line.size() or time_idx >= line.size():
+				break
+
+			var cell_str = line[cell_idx].strip_edges()
+			var time_str = line[time_idx].strip_edges()
+
+			if cell_str == "":
+				break
+
+			# Parse cell (handle flip flag and convert to frame number)
+			var frame_data = parse_cell(cell_str)
+			frames.append(frame_data)
+
+			# Parse time (handle "hold")
+			var time_ms = 0
+			if time_str.to_lower() == "hold":
+				time_ms = -1  # Negative means hold forever
+			else:
+				time_ms = int(time_str)
+			times.append(time_ms)
+
+		# Store animation data
+		if anim_name not in animations:
+			animations[anim_name] = {}
+
+		animations[anim_name][direction] = {
+			"frames": frames,
+			"times": times,
+			"total_frames": frames.size()
+		}
+
+	file.close()
+	print("Loaded ", animations.size(), " animations")
+
+func parse_cell(cell_str: String) -> Dictionary:
+	"""Parse cell string like '48f' or '064F' into {cell: int, flip: bool}"""
+	var flip = false
+	var cell_num = 0
+
+	# Check for flip flag
+	if cell_str.to_lower().ends_with("f"):
+		flip = true
+		cell_str = cell_str.substr(0, cell_str.length() - 1)
+
+	# Parse cell number
+	cell_num = int(cell_str)
+
+	return {"cell": cell_num, "flip": flip}
+
+func scan_character_assets():
+	"""Scan the sprite system folders"""
+	print("Scanning character assets...")
+
+	for layer in LAYERS:
+		var layer_code = layer.code
+		var layer_path = SPRITE_PATH + layer_code + "/"
+		var dir = DirAccess.open(layer_path)
+
+		if dir == null:
+			print("  Layer ", layer_code, ": not found")
+			continue
+
+		if layer_code not in available_parts:
+			available_parts[layer_code] = []
+
+		dir.list_dir_begin()
+		var file_name = dir.get_next()
+		while file_name != "":
+			if file_name.ends_with(".png") and file_name.begins_with("fbas_"):
+				var full_path = layer_path + file_name
+				var part_info = parse_filename(file_name, layer_code)
+				part_info["path"] = full_path
+				available_parts[layer_code].append(part_info)
+			file_name = dir.get_next()
+		dir.list_dir_end()
+
+	print("Asset scan complete")
+
+func parse_filename(filename: String, layer_code: String) -> Dictionary:
+	"""Parse Mana Seed filename format"""
+	var parts = filename.get_basename().split("_")
+	var result = {
+		"name": filename.get_basename(),
+		"base_name": "",
+		"palette_code": "",
+		"has_e_flag": false,
+		"display_name": filename.get_basename()
+	}
+
+	if parts.size() >= 4:
+		result["base_name"] = parts[2]
+		result["palette_code"] = parts[3]
+		if parts.size() >= 5 and parts[4] == "e":
+			result["has_e_flag"] = true
+
+		result["display_name"] = parts[2].capitalize() + " (" + parts[3] + ")"
+		if result["has_e_flag"]:
+			result["display_name"] += " [E]"
+
+	return result
+
+func populate_animation_list():
+	"""Populate the animation selector"""
+	print("Populating animation list...")
+
+	# Get unique animation names and sort them
+	var anim_names = animations.keys()
+	anim_names.sort()
+
+	# Group by category (simplified - you can enhance this)
+	var categories = {
+		"Idle & Movement": ["Idle", "Walk", "Walk While Carrying", "Run", "Run While Carrying", "Jump", "Jump While Carrying"],
+		"Actions": ["Push", "Pull", "Pick up, Carry", "Throw Carried", "Work at Desk", "Work at Station"],
+		"Social": ["Wave", "Hugs", "Sing", "Guitar", "Drums", "Flute"],
+		"Combat": ["Hammer Strike", "Spear Strike", "Sword Strike", "Wand Strike", "Bow Shot", "Guard", "Fight Pose", "Evade", "Hurt", "Take Damage"],
+		"Farming": ["Water Plants", "Climb", "Smith", "Pet Small", "Pet Large", "Milk"],
+		"Fishing": ["Fishing Cast", "Fishing BITE", "Fishing GOT IT"],
+		"Sitting": ["Throne Sit", "Sit on Ledge", "Sit on Chair", "Sit on Floor", "Sit on Floor Cute", "Sleep in Chair"],
+		"Resting": ["Meditate", "Sleep"],
+		"Emotions": ["Look Around (Left then Right)", "Sad", "Thumbs Up", "Shocked", "Mad Stomp", "Laugh"],
+		"Drinking": ["Drink Standing", "Drink Sitting"],
+		"Riding": ["Mount Up", "Ride Mount", "Soothe Mount"],
+		"Misc": ["Top of Climb", "Impatient"]
+	}
+
+	var added_anims = {}
+
+	for category in categories:
+		var category_label = Label.new()
+		category_label.text = "─── " + category + " ───"
+		category_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		category_label.add_theme_font_size_override("font_size", 12)
+		animation_list.add_child(category_label)
+
+		for anim_name in categories[category]:
+			if anim_name in animations:
+				var btn = Button.new()
+				btn.text = anim_name
+				btn.pressed.connect(_on_animation_selected.bind(anim_name))
+				animation_list.add_child(btn)
+				added_anims[anim_name] = true
+
+		var separator = HSeparator.new()
+		animation_list.add_child(separator)
+
+	# Add any remaining uncategorized animations
+	var uncategorized = []
+	for anim_name in anim_names:
+		if anim_name not in added_anims:
+			uncategorized.append(anim_name)
+
+	if uncategorized.size() > 0:
+		var category_label = Label.new()
+		category_label.text = "─── Other ───"
+		category_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		animation_list.add_child(category_label)
+
+		for anim_name in uncategorized:
+			var btn = Button.new()
+			btn.text = anim_name
+			btn.pressed.connect(_on_animation_selected.bind(anim_name))
+			animation_list.add_child(btn)
+
+func populate_ui():
+	"""Create UI controls for each layer"""
+	print("Populating UI...")
+
+	# Group bottomwear layers
+	var bottomwear_parts = []
+	for layer in LAYERS:
+		if layer.code in ["04lwr1", "06lwr2", "08lwr3"]:
+			if layer.code in available_parts:
+				bottomwear_parts.append_array(available_parts[layer.code])
+
+	for layer in LAYERS:
+		var layer_code = layer.code
+
+		# Skip bottomwear sub-layers (handled as group)
+		if layer_code in ["06lwr2", "08lwr3"]:
+			continue
+
+		var section = create_layer_section(layer_code, layer.label)
+		parts_container.add_child(section)
+
+		# Special handling for bottomwear group
+		if layer_code == "04lwr1":
+			populate_layer_options(section, layer_code, bottomwear_parts, layer.ramp_type)
+		else:
+			var parts = available_parts.get(layer_code, [])
+			populate_layer_options(section, layer_code, parts, layer.ramp_type)
+
+		var separator = HSeparator.new()
+		parts_container.add_child(separator)
+
+func create_layer_section(layer_code: String, label: String) -> VBoxContainer:
+	"""Create a section container for a layer"""
+	var section = VBoxContainer.new()
+	section.name = layer_code + "_Section"
+
+	var section_label = Label.new()
+	section_label.text = label + " (" + layer_code + ")"
+	section_label.add_theme_font_size_override("font_size", 16)
+	section.add_child(section_label)
+
+	var options_container = VBoxContainer.new()
+	options_container.name = "Options"
+	section.add_child(options_container)
+
+	return section
+
+func populate_layer_options(section: Node, layer_code: String, parts: Array, ramp_type):
+	"""Populate a section with part and color options"""
+	var options_container = section.get_node("Options")
+
+	# Add "None" option
+	var none_btn = Button.new()
+	none_btn.text = "None"
+	none_btn.pressed.connect(_on_part_selected.bind(layer_code, null))
+	options_container.add_child(none_btn)
+
+	# Add button for each part
+	for part in parts:
+		var btn = Button.new()
+		btn.text = part.display_name
+		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		btn.pressed.connect(_on_part_selected.bind(layer_code, part))
+		options_container.add_child(btn)
+
+	# Add color ramp selector if supported
+	if ramp_type != null:
+		var color_section = VBoxContainer.new()
+		var color_label = Label.new()
+		color_label.text = "  Color Ramp:"
+		color_section.add_child(color_label)
+
+		# Load and display palette image
+		var palette_image_path = get_palette_image_path(ramp_type)
+		if FileAccess.file_exists(palette_image_path):
+			var palette_texture = load(palette_image_path)
+			if palette_texture:
+				var palette_display = TextureRect.new()
+				palette_display.texture = palette_texture
+				palette_display.expand_mode = TextureRect.EXPAND_FIT_WIDTH
+				palette_display.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT
+				palette_display.custom_minimum_size = Vector2(0, 150)
+				color_section.add_child(palette_display)
+
+		# Add color ramp buttons
+		var ramp_grid = GridContainer.new()
+		ramp_grid.columns = 5
+		for i in range(20):
+			var btn = Button.new()
+			btn.text = str(i + 1)
+			btn.custom_minimum_size = Vector2(40, 30)
+			btn.pressed.connect(_on_color_ramp_selected.bind(i, layer_code, ramp_type))
+			ramp_grid.add_child(btn)
+
+		color_section.add_child(ramp_grid)
+		options_container.add_child(color_section)
+
+func get_palette_image_path(ramp_type: String) -> String:
+	"""Get the path to the palette image"""
+	match ramp_type:
+		"3color":
+			return PALETTE_PATH + "mana seed 3-color ramps.png"
+		"4color":
+			return PALETTE_PATH + "mana seed 4-color ramps.png"
+		"hair":
+			return PALETTE_PATH + "mana seed hair ramps.png"
+		"skin":
+			return PALETTE_PATH + "mana seed skin ramps.png"
+		_:
+			return ""
+
+func set_default_character():
+	"""Set up a default character"""
+	if "01body" in available_parts and available_parts["01body"].size() > 0:
+		_on_part_selected("01body", available_parts["01body"][0])
+
+func _on_part_selected(layer_code: String, part):
+	"""Handle part selection"""
+	current_selections[layer_code] = part
+	update_preview()
+
+func _on_color_ramp_selected(index: int, layer_code: String, ramp_type: String):
+	"""Handle color ramp selection"""
+	current_color_ramps[layer_code] = {"type": ramp_type, "index": index}
+	apply_color_ramp(layer_code)
+
+func update_preview():
+	"""Update the character preview"""
+	for layer in LAYERS:
+		var layer_code = layer.code
+		var sprite = character_layers.get_node(layer_code)
+
+		if layer_code in current_selections and current_selections[layer_code] != null:
+			var part = current_selections[layer_code]
+			var texture = load(part.path)
+			sprite.texture = texture
+			sprite.visible = true
+
+			# Apply shader if supported
+			if layer.ramp_type != null:
+				var shader_material = ShaderMaterial.new()
+				shader_material.shader = palette_shader
+				sprite.material = shader_material
+				apply_color_ramp(layer_code)
+		else:
+			sprite.texture = null
+			sprite.visible = false
+			sprite.material = null
+
+	update_frame_display()
+
+func apply_color_ramp(layer_code: String):
+	"""Apply color ramp shader"""
+	if layer_code not in current_selections or current_selections[layer_code] == null:
+		return
+
+	var sprite = character_layers.get_node(layer_code)
+	if sprite.material == null or not sprite.material is ShaderMaterial:
+		return
+
+	var mat = sprite.material as ShaderMaterial
+
+	# Find layer config
+	var ramp_type = null
+	for layer in LAYERS:
+		if layer.code == layer_code:
+			ramp_type = layer.ramp_type
+			break
+
+	if ramp_type == null:
+		return
+
+	# Set ramp type in shader
+	var ramp_type_int = 0
+	if ramp_type == "4color":
+		ramp_type_int = 1
+	elif ramp_type == "hair":
+		ramp_type_int = 2
+	elif ramp_type == "skin":
+		ramp_type_int = 3
+
+	mat.set_shader_parameter("ramp_type", ramp_type_int)
+
+func update_frame_display():
+	"""Update the character sprite frames"""
+	if current_animation not in animations:
+		return
+	if current_direction not in animations[current_animation]:
+		return
+
+	var anim_data = animations[current_animation][current_direction]
+	if current_frame_index >= anim_data.frames.size():
+		current_frame_index = 0
+		return
+
+	var frame_data = anim_data.frames[current_frame_index]
+	var cell = frame_data.cell
+	var flip = frame_data.flip
+
+	# Update all visible sprites
+	for layer in LAYERS:
+		var layer_code = layer.code
+		var sprite = character_layers.get_node(layer_code)
+		if sprite.visible and sprite.texture:
+			sprite.frame = cell
+			sprite.flip_h = flip
+
+	# Update labels
+	anim_label.text = "Animation: " + current_animation
+	direction_label.text = "Direction: " + current_direction
+	frame_label.text = "Frame: " + str(current_frame_index + 1) + "/" + str(anim_data.total_frames)
+
+func _on_direction_changed(direction: String):
+	"""Handle direction change"""
+	current_direction = direction
+	current_frame_index = 0
+	animation_timer = 0.0
+	update_frame_display()
+
+func _on_animation_selected(anim_name: String):
+	"""Handle animation selection"""
+	print("Selected animation: ", anim_name)
+	current_animation = anim_name
+	current_frame_index = 0
+	animation_timer = 0.0
+
+	# If current direction doesn't exist for this animation, pick first available
+	if current_direction not in animations[anim_name]:
+		var available_dirs = animations[anim_name].keys()
+		if available_dirs.size() > 0:
+			current_direction = available_dirs[0]
+
+	update_frame_display()
