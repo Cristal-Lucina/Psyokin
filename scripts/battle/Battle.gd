@@ -2082,8 +2082,10 @@ func _create_single_party_status_panel(combatant: Dictionary) -> PanelContainer:
 	# HP label
 	var hp_label = Label.new()
 	hp_label.text = "HP"
-	hp_label.add_theme_font_size_override("font_size", 8)
+	hp_label.add_theme_font_size_override("font_size", 11)
 	hp_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
+	hp_label.add_theme_constant_override("outline_size", 2)
+	hp_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 1))
 	hp_label.custom_minimum_size = Vector2(10, 0)
 	hp_hbox.add_child(hp_label)
 
@@ -2122,8 +2124,10 @@ func _create_single_party_status_panel(combatant: Dictionary) -> PanelContainer:
 	var hp_value = Label.new()
 	hp_value.name = "HPValue"
 	hp_value.text = str(combatant.get("hp", 100))
-	hp_value.add_theme_font_size_override("font_size", 8)
+	hp_value.add_theme_font_size_override("font_size", 11)
 	hp_value.add_theme_color_override("font_color", COLOR_MILK_WHITE)
+	hp_value.add_theme_constant_override("outline_size", 2)
+	hp_value.add_theme_color_override("font_outline_color", Color(0, 0, 0, 1))
 	hp_value.custom_minimum_size = Vector2(12, 0)
 	hp_hbox.add_child(hp_value)
 
@@ -2135,8 +2139,10 @@ func _create_single_party_status_panel(combatant: Dictionary) -> PanelContainer:
 	# MP label
 	var mp_label = Label.new()
 	mp_label.text = "MP"
-	mp_label.add_theme_font_size_override("font_size", 8)
+	mp_label.add_theme_font_size_override("font_size", 11)
 	mp_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
+	mp_label.add_theme_constant_override("outline_size", 2)
+	mp_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 1))
 	mp_label.custom_minimum_size = Vector2(10, 0)
 	mp_hbox.add_child(mp_label)
 
@@ -2175,8 +2181,10 @@ func _create_single_party_status_panel(combatant: Dictionary) -> PanelContainer:
 	var mp_value = Label.new()
 	mp_value.name = "MPValue"
 	mp_value.text = str(combatant.get("mp", 50))
-	mp_value.add_theme_font_size_override("font_size", 8)
+	mp_value.add_theme_font_size_override("font_size", 11)
 	mp_value.add_theme_color_override("font_color", COLOR_MILK_WHITE)
+	mp_value.add_theme_constant_override("outline_size", 2)
+	mp_value.add_theme_color_override("font_outline_color", Color(0, 0, 0, 1))
 	mp_value.custom_minimum_size = Vector2(12, 0)
 	mp_hbox.add_child(mp_value)
 
