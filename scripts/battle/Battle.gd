@@ -4440,7 +4440,7 @@ func _highlight_target_candidates() -> void:
 	# Center of sprite horizontally is at x = 40 + sprite_offset
 
 	indicator_pos.x += (40 + sprite_offset) - 30  # Center arrow on sprite (arrow is 60px wide, so -30 to center it)
-	indicator_pos.y += 5 - 35  # Position above top of sprite (5 is top of sprite, -35 for arrow height + spacing)
+	indicator_pos.y += 5 - 55  # Position above top of sprite (5 is top of sprite, -55 for arrow height + spacing + 20px offset up)
 
 	selection_indicator.global_position = indicator_pos
 
@@ -4466,9 +4466,9 @@ func _highlight_target_candidates() -> void:
 	selection_name_label.add_theme_constant_override("outline_size", 8)  # Thick outline
 	selection_name_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 1))  # Black stroke
 
-	# Add drop shadow effect (expanded and diffuse)
-	selection_name_label.add_theme_constant_override("shadow_offset_x", 6)
-	selection_name_label.add_theme_constant_override("shadow_offset_y", 6)
+	# Add drop shadow effect (tighter shadow)
+	selection_name_label.add_theme_constant_override("shadow_offset_x", 3)
+	selection_name_label.add_theme_constant_override("shadow_offset_y", 3)
 	selection_name_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.5))  # Softer, more diffuse shadow
 
 	# Position above the arrow
