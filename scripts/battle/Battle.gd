@@ -4160,7 +4160,6 @@ func _show_status_character_picker() -> void:
 	# Create picker panel
 	status_picker_panel = PanelContainer.new()
 	status_picker_panel.custom_minimum_size = Vector2(500, 400)
-	status_picker_panel.z_index = 1000  # Above all sprites
 
 	var panel_style = StyleBoxFlat.new()
 	panel_style.bg_color = COLOR_INK_CHARCOAL  # Dark background
@@ -4179,7 +4178,7 @@ func _show_status_character_picker() -> void:
 
 	status_picker_panel.position = get_viewport_rect().size / 2 - status_picker_panel.custom_minimum_size / 2
 	status_picker_panel.position.y -= 110  # Move up 110px (60 + 40 + 10)
-	status_picker_panel.z_index = 100
+	status_picker_panel.z_index = 900  # Above most UI but below modals
 	status_picker_panel.mouse_filter = Control.MOUSE_FILTER_STOP
 
 	var vbox = VBoxContainer.new()
@@ -4423,7 +4422,7 @@ func _highlight_target_candidates() -> void:
 	# Create selection indicator (animated arrow/marker above target)
 	selection_indicator = Control.new()
 	selection_indicator.custom_minimum_size = Vector2(60, 30)
-	selection_indicator.z_index = 100  # Very high to ensure visibility above all elements
+	selection_indicator.z_index = 500  # Above sprites and shadows but below modals
 	add_child(selection_indicator)
 
 	# Position at the very top center of the sprite
@@ -4439,11 +4438,16 @@ func _highlight_target_candidates() -> void:
 	# Center of sprite horizontally is at x = 40 + sprite_offset
 
 	indicator_pos.x += (40 + sprite_offset) - 30  # Center arrow on sprite (arrow is 60px wide, so -30 to center it)
-	indicator_pos.y += 5 - 30  # Position above top of sprite (5 is top of sprite, -30 for arrow height)
+	indicator_pos.y += 5 - 35  # Position above top of sprite (5 is top of sprite, -35 for arrow height + spacing)
 
 	selection_indicator.global_position = indicator_pos
 
-	print("[Battle] Selection arrow for %s: sprite_offset=%d, position=(%f, %f)" % [selected_target_id, sprite_offset, indicator_pos.x, indicator_pos.y])
+	print("[Battle] Selection arrow CREATED for %s: sprite_offset=%d, panel_pos=(%f, %f), final_pos=(%f, %f), z_index=%d, visible=%s" % [
+		selected_target_id, sprite_offset,
+		target_panel.global_position.x, target_panel.global_position.y,
+		indicator_pos.x, indicator_pos.y,
+		selection_indicator.z_index, selection_indicator.visible
+	])
 
 	# Draw the indicator
 	selection_indicator.draw.connect(_draw_selection_indicator)
