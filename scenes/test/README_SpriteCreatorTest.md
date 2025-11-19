@@ -51,9 +51,9 @@ To add more animations from the guide:
 3. Add to the `animations` dictionary in `FarmerSpriteAnimator.gd`:
    ```gdscript
    "animation_name": [
-       AnimationFrame.new(cell_number, timing_in_seconds, flip_horizontal),
-       AnimationFrame.new(48, 0.138),  // Example
-       AnimationFrame.new(49, 0.138, true),  // Flipped
+	   AnimationFrame.new(cell_number, timing_in_seconds, flip_horizontal),
+	   AnimationFrame.new(48, 0.138),  // Example
+	   AnimationFrame.new(49, 0.138, true),  // Flipped
    ]
    ```
 
