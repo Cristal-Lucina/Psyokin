@@ -205,8 +205,8 @@ func setup_ui():
 		character_list.clear()
 		var char_names = characters.keys()
 		char_names.sort()
-		for i in range(char_names.size()):
-			character_list.add_item(char_names[i], i)
+		for char_name in char_names:
+			character_list.add_item(char_name)
 
 		# Connect character selection
 		character_list.item_selected.connect(_on_character_selected)
