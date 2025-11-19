@@ -114,3 +114,23 @@ UI MODE (Space to toggle):
 KEYBOARD MODE (Space to toggle):
 • Arrow Keys: Walk animation
 • Hold Shift + Arrows: Run animation"
+
+[node name="CharacterPanel" type="Panel" parent="UI"]
+offset_left = 1050.0
+offset_top = 10.0
+offset_right = 1270.0
+offset_bottom = 710.0
+
+[node name="CharacterLabel" type="Label" parent="UI/CharacterPanel"]
+offset_left = 10.0
+offset_top = 10.0
+offset_right = 210.0
+offset_bottom = 35.0
+text = "👤 Select Character:"
+horizontal_alignment = 1
+
+[node name="CharacterList" type="ItemList" parent="UI/CharacterPanel"]
+offset_left = 10.0
+offset_top = 40.0
+offset_right = 210.0
+offset_bottom = 690.0

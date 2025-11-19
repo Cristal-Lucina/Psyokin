@@ -24,6 +24,45 @@ var frame_timer: float = 0.0
 var is_playing: bool = true
 var manual_mode: bool = false  # Set to true when using UI controls
 
+# Character sprite definitions
+var characters = {
+	"Layered (Body+Hair)": {
+		"body": "res://assets/graphics/characters/New Character System/SpriteSystem/farmer_base_sheets/01body/fbas_01body_human_00.png",
+		"hair": "res://assets/graphics/characters/New Character System/SpriteSystem/farmer_base_sheets/13hair/fbas_13hair_twintail_00.png",
+		"layered": true
+	},
+	"Douglas": {
+		"sprite": "res://assets/graphics/characters/New Character System/PartySpriteSheets/Douglas.png",
+		"layered": false
+	},
+	"Kai": {
+		"sprite": "res://assets/graphics/characters/New Character System/PartySpriteSheets/Kai.png",
+		"layered": false
+	},
+	"Matcha": {
+		"sprite": "res://assets/graphics/characters/New Character System/PartySpriteSheets/Matcha.png",
+		"layered": false
+	},
+	"Risa": {
+		"sprite": "res://assets/graphics/characters/New Character System/PartySpriteSheets/Risa.png",
+		"layered": false
+	},
+	"Sev": {
+		"sprite": "res://assets/graphics/characters/New Character System/PartySpriteSheets/Sev.png",
+		"layered": false
+	},
+	"Skye": {
+		"sprite": "res://assets/graphics/characters/New Character System/PartySpriteSheets/Skye.png",
+		"layered": false
+	},
+	"Tessa": {
+		"sprite": "res://assets/graphics/characters/New Character System/PartySpriteSheets/Tessa.png",
+		"layered": false
+	}
+}
+
+var current_character: String = "Layered (Body+Hair)"
+
 # References to sprite layers
 @onready var body_layer = $FarmerSprite/BodyLayer
 @onready var hair_layer = $FarmerSprite/HairLayer
@@ -35,6 +74,7 @@ var manual_mode: bool = false  # Set to true when using UI controls
 @onready var btn_left = $UI/DirectionButtons/BtnLeft
 @onready var btn_right = $UI/DirectionButtons/BtnRight
 @onready var status_label = $UI/StatusLabel
+@onready var character_list = $UI/CharacterPanel/CharacterList
 
 func _ready():
 	load_animations_from_csv()
@@ -146,6 +186,21 @@ func setup_ui():
 	var idle_idx = animation_list.find("Idle")
 	if idle_idx >= 0:
 		animation_dropdown.select(idle_idx)
+
+	# Populate character list
+	character_list.clear()
+	var char_names = characters.keys()
+	char_names.sort()
+	for i in range(char_names.size()):
+		character_list.add_item(char_names[i], i)
+
+	# Connect character selection
+	character_list.item_selected.connect(_on_character_selected)
+
+	# Set initial character selection
+	var layered_idx = char_names.find("Layered (Body+Hair)")
+	if layered_idx >= 0:
+		character_list.select(layered_idx)
 
 func _on_animation_selected(index: int):
 	manual_mode = true
@@ -294,6 +349,53 @@ func apply_to_layer(layer: Sprite2D, frame_data: AnimationFrame):
 
 	layer.frame = frame_data.cell
 	layer.flip_h = frame_data.flip_h
+
+func _on_character_selected(index: int):
+	var char_names = characters.keys()
+	char_names.sort()
+
+	if index >= 0 and index < char_names.size():
+		var char_name = char_names[index]
+		load_character(char_name)
+
+func load_character(char_name: String):
+	if not characters.has(char_name):
+		print("Character not found: " + char_name)
+		return
+
+	current_character = char_name
+	var char_data = characters[char_name]
+
+	if char_data.layered:
+		# Layered mode: separate body and hair
+		hair_layer.visible = true
+
+		# Load body texture
+		var body_texture = load(char_data.body)
+		if body_texture:
+			body_layer.texture = body_texture
+			print("Loaded body: " + char_data.body)
+
+		# Load hair texture
+		var hair_texture = load(char_data.hair)
+		if hair_texture:
+			hair_layer.texture = hair_texture
+			print("Loaded hair: " + char_data.hair)
+	else:
+		# Single sprite mode: use body layer, hide hair layer
+		hair_layer.visible = false
+
+		# Load character sprite
+		var char_texture = load(char_data.sprite)
+		if char_texture:
+			body_layer.texture = char_texture
+			print("Loaded character: " + char_data.sprite)
+
+	# Refresh current animation frame
+	if animations.has(current_animation):
+		apply_frame(current_frame_index)
+
+	print("Switched to character: " + char_name)
 
 func _input(event):
 	# Toggle between manual and keyboard mode with Space
