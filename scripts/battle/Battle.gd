@@ -1466,7 +1466,7 @@ func _show_victory_screen() -> void:
 	# Create victory panel
 	victory_panel = PanelContainer.new()
 	victory_panel.name = "VictoryPanel"
-	victory_panel.z_index = 1000  # Above all sprites
+	victory_panel.z_index = 2000  # Above all UI elements
 
 	# Set up styling with Core vibe
 	var style = StyleBoxFlat.new()
@@ -1863,15 +1863,15 @@ func _display_combatants() -> void:
 				var shadow_texture = _create_shadow_circle_texture()
 				shadow.texture = shadow_texture
 				shadow.modulate = Color(0, 0, 0, 0.5)  # Semi-transparent black
-				shadow.position = Vector2(40, 75)  # Below the sprite
-				shadow.scale = Vector2(3, 1.5)  # Ellipse shape for perspective
+				shadow.position = Vector2(40, 60)  # Below the sprite
+				shadow.scale = Vector2(2, 1)  # Ellipse shape for perspective
 				shadow.z_index = i + 100  # Shadows just below sprites
 				slot.add_child(shadow)
 
-				# Position and scale sprite for 150px height
-				# 16px base frame * 9.375 = 150px
+				# Position and scale sprite for 70px height
+				# 16px base frame * 4.375 = 70px
 				sprite.position = Vector2(40, 40)  # Center of the 80x80 slot
-				sprite.scale = Vector2(9.375, 9.375)  # 150px height
+				sprite.scale = Vector2(4.375, 4.375)  # 70px height
 
 				# Depth-based z-layering: bottom allies have higher z (appear in front)
 				# Ally 0 (top) = 108, Ally 1 (middle) = 109, Ally 2 (bottom) = 110
