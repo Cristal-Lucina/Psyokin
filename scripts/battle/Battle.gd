@@ -94,6 +94,7 @@ var victory_panel: PanelContainer = null  # Victory screen panel
 var victory_scroll: ScrollContainer = null  # Victory screen scroll container for controller scrolling
 var is_in_round_transition: bool = false  # True during round transition animations
 var combatant_panels: Dictionary = {}  # combatant_id -> PanelContainer for shake animations
+var combatant_sprite_offsets: Dictionary = {}  # combatant_id -> x_offset for sprite positioning
 var active_turn_panel: Control = null  # Currently active combatant's panel (for turn animation)
 var active_turn_original_pos: Vector2 = Vector2.ZERO  # Original position before turn animation
 var instruction_popup: PanelContainer = null  # Instruction message popup
@@ -1851,6 +1852,9 @@ func _display_combatants() -> void:
 
 		print("[Battle] Ally %d (%s) will apply x_offset = %d to sprite" % [i, ally.display_name, x_offset])
 
+		# Store sprite offset for selection indicator positioning
+		combatant_sprite_offsets[ally.id] = x_offset
+
 		# Create sprite for this party member
 		print("[Battle] Attempting to create sprite for ally ID: %s, Name: %s, sprite_animator null: %s" % [ally.id, ally.get("display_name", ""), sprite_animator == null])
 		if sprite_animator:
@@ -1914,6 +1918,9 @@ func _display_combatants() -> void:
 
 		print("[Battle] Enemy %d (%s) will apply x_offset = %d to sprite" % [i, enemy.display_name, x_offset])
 
+		# Store sprite offset for selection indicator positioning
+		combatant_sprite_offsets[enemy.id] = x_offset
+
 		# Create sprite for this enemy
 		print("[Battle] Attempting to create sprite for enemy ID: %s, Name: %s, sprite_animator null: %s" % [enemy.id, enemy.get("display_name", ""), sprite_animator == null])
 		if sprite_animator:
@@ -1942,19 +1949,6 @@ func _display_combatants() -> void:
 
 				print("[Battle] Created shadow for enemy: %s at position (%f, %f) with z-index %d" % [enemy.id, shadow.position.x, shadow.position.y, shadow.z_index])
 				print("[Battle] Created sprite for enemy: %s at position %s with z-index %d" % [enemy.id, sprite.position, sprite.z_index])
-
-				# Add name label above sprite
-				var name_label = Label.new()
-				name_label.name = "EnemyNameLabel"
-				name_label.text = enemy.display_name.to_upper()
-				name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-				name_label.add_theme_color_override("font_color", Color(1, 1, 1, 1))  # White
-				name_label.add_theme_font_size_override("font_size", 10)
-				name_label.position = Vector2(40 + x_offset - 30, 5)  # Above sprite, centered
-				name_label.custom_minimum_size = Vector2(60, 0)  # Wide enough for name
-				name_label.z_index = 150  # Above everything
-				slot.add_child(name_label)
-				print("[Battle] Added name label '%s' for enemy at position (%f, %f)" % [enemy.display_name, name_label.position.x, name_label.position.y])
 
 				# Hide the capsule icon since we have a sprite
 				var vbox = slot.get_child(0) if slot.get_child_count() > 0 else null
@@ -4432,11 +4426,24 @@ func _highlight_target_candidates() -> void:
 	selection_indicator.z_index = 100  # Very high to ensure visibility above all elements
 	add_child(selection_indicator)
 
-	# Position above the target panel
+	# Position at the very top center of the sprite
+	# Get sprite offset for this combatant
+	var sprite_offset = combatant_sprite_offsets.get(selected_target_id, 0)
+
+	# Base position from panel
 	var indicator_pos = target_panel.global_position
-	indicator_pos.y -= 35  # Hover above
-	indicator_pos.x += (target_panel.size.x / 2) - 30  # Center horizontally
+
+	# Sprite is at position (40 + sprite_offset, 40) within the 80x80 slot
+	# Sprite height is 70px (4.375 scale * 16px base)
+	# Top of sprite is at y = 40 - 35 = 5 (sprite center is 40, half height is 35)
+	# Center of sprite horizontally is at x = 40 + sprite_offset
+
+	indicator_pos.x += (40 + sprite_offset) - 30  # Center arrow on sprite (arrow is 60px wide, so -30 to center it)
+	indicator_pos.y += 5 - 30  # Position above top of sprite (5 is top of sprite, -30 for arrow height)
+
 	selection_indicator.global_position = indicator_pos
+
+	print("[Battle] Selection arrow for %s: sprite_offset=%d, position=(%f, %f)" % [selected_target_id, sprite_offset, indicator_pos.x, indicator_pos.y])
 
 	# Draw the indicator
 	selection_indicator.draw.connect(_draw_selection_indicator)
