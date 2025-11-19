@@ -3,7 +3,7 @@
 [ext_resource type="Script" uid="uid://bh4st7f0x1862" path="res://scripts/battle/Battle.gd" id="1_battle"]
 [ext_resource type="Script" uid="uid://d4fuvn7bww4k1" path="res://scripts/battle/TurnOrderDisplay.gd" id="2_turn_order"]
 [ext_resource type="Texture2D" uid="uid://uvia2k0c3eiy" path="res://assets/graphics/envirnments/Backgrounds/087.png" id="3_background"]
-[ext_resource type="Script" path="res://scripts/battle/BattleSpriteAnimator.gd" id="4_sprite_animator"]
+[ext_resource type="Script" uid="uid://bh31v1b6hap1c" path="res://scripts/battle/BattleSpriteAnimator.gd" id="4_sprite_animator"]
 
 [node name="Battle" type="Control"]
 layout_mode = 3
@@ -33,10 +33,10 @@ layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = 270.0
-offset_top = 89.0
-offset_right = -271.0
-offset_bottom = -118.0
+offset_left = 328.0
+offset_top = 45.0
+offset_right = -140.0
+offset_bottom = -206.0
 grow_horizontal = 2
 grow_vertical = 2
 theme_override_constants/separation = 15
