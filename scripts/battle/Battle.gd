@@ -1839,15 +1839,8 @@ func _display_combatants() -> void:
 		ally_slots.add_child(slot)
 		combatant_panels[ally.id] = slot
 
-		# Apply horizontal offset for fighting stance AFTER adding to scene
-		# This ensures we can see the base position first, then apply offset
-		# Wait one frame to let layout system position the slot
-		await get_tree().process_frame
-
-		# DEBUG: Show base position
-		var base_pos_x = slot.position.x
-		print("[Battle] Ally %d (%s) BASE position.x = %.2f" % [i, ally.display_name, base_pos_x])
-
+		# Calculate horizontal offset for fighting stance
+		# VBoxContainer controls slot position, so we offset the sprite instead
 		var x_offset = 0
 		if i == 0:  # Top ally (hero) - no offset
 			x_offset = 0
@@ -1856,13 +1849,7 @@ func _display_combatants() -> void:
 		elif i == 2:  # Bottom ally - shift left 120px
 			x_offset = -120
 
-		print("[Battle] Ally %d (%s) x_offset = %d" % [i, ally.display_name, x_offset])
-
-		if x_offset != 0:
-			slot.position.x += x_offset
-
-		# DEBUG: Show final position
-		print("[Battle] Ally %d (%s) FINAL position.x = %.2f (offset: %d)" % [i, ally.display_name, slot.position.x, x_offset])
+		print("[Battle] Ally %d (%s) will apply x_offset = %d to sprite" % [i, ally.display_name, x_offset])
 
 		# Create sprite for this party member
 		print("[Battle] Attempting to create sprite for ally ID: %s, Name: %s, sprite_animator null: %s" % [ally.id, ally.get("display_name", ""), sprite_animator == null])
@@ -1870,19 +1857,18 @@ func _display_combatants() -> void:
 			var sprite = sprite_animator.create_sprite_for_combatant(ally.id, slot, ally.get("display_name", ""))
 			if sprite:
 				# Position and scale sprite for 70px height
-				# 16px base frame * 4.375 = 70px
-				# Position centered in 80x80 slot
-				# Note: MarginContainer already handles fighting stance offset
-				sprite.position = Vector2(40, 40)
+				# Apply x_offset to sprite position (not slot position, since VBoxContainer controls that)
+				sprite.position = Vector2(40 + x_offset, 40)
 				sprite.scale = Vector2(4.375, 4.375)  # 70px height
+				print("[Battle] Ally %d (%s) sprite positioned at (%.2f, %.2f)" % [i, ally.display_name, sprite.position.x, sprite.position.y])
 
-				# Create shadow circle at base of sprite
+				# Create shadow circle at base of sprite (also offset)
 				var shadow = Sprite2D.new()
 				shadow.name = "Shadow"
 				var shadow_texture = _create_shadow_circle_texture()
 				shadow.texture = shadow_texture
 				shadow.modulate = Color(0, 0, 0, 0.5)  # Semi-transparent black
-				shadow.position = Vector2(40, 60)  # Below sprite, centered
+				shadow.position = Vector2(40 + x_offset, 60)  # Below sprite, with same offset
 				shadow.scale = Vector2(2, 1)  # Ellipse shape for perspective
 				shadow.z_index = 105 + i  # Shadows at 105-107, below sprites at 108-110
 				slot.add_child(shadow)
