@@ -4462,10 +4462,10 @@ func _highlight_target_candidates() -> void:
 	selection_name_label.add_theme_color_override("font_color", Color(1, 1, 1, 1))  # White
 	selection_name_label.add_theme_font_size_override("font_size", 20)  # 20pt font (14 + 6)
 
-	# Add drop shadow effect (bigger shadow)
-	selection_name_label.add_theme_constant_override("shadow_offset_x", 4)
-	selection_name_label.add_theme_constant_override("shadow_offset_y", 4)
-	selection_name_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.9))  # Darker black shadow
+	# Add drop shadow effect (expanded and diffuse)
+	selection_name_label.add_theme_constant_override("shadow_offset_x", 6)
+	selection_name_label.add_theme_constant_override("shadow_offset_y", 6)
+	selection_name_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.5))  # Softer, more diffuse shadow
 
 	# Position above the arrow
 	var name_pos = indicator_pos
