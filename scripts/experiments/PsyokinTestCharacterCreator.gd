@@ -495,16 +495,20 @@ func update_preview():
 
 		if layer_code in current_selections and current_selections[layer_code] != null:
 			var part = current_selections[layer_code]
-			var texture = load(part.path)
-			sprite.texture = texture
-			sprite.visible = true
 
-			# Apply shader if supported
-			if layer.ramp_type != null:
-				var shader_material = ShaderMaterial.new()
-				shader_material.shader = palette_shader
-				sprite.material = shader_material
-				apply_color_ramp(layer_code)
+			# Load original texture
+			var original_texture = load(part.path)
+
+			# Check if we need to apply color ramp
+			if layer.ramp_type != null and layer_code in current_color_ramps:
+				# Apply color mapping and create new texture
+				var recolored_texture = apply_color_mapping(original_texture, part, layer.ramp_type, layer_code)
+				sprite.texture = recolored_texture
+			else:
+				sprite.texture = original_texture
+
+			sprite.visible = true
+			sprite.material = null  # No shader needed
 		else:
 			sprite.texture = null
 			sprite.visible = false
@@ -513,106 +517,82 @@ func update_preview():
 	update_frame_display()
 
 func apply_color_ramp(layer_code: String):
-	"""Apply color ramp shader with actual palette colors"""
-	if layer_code not in current_selections or current_selections[layer_code] == null:
-		return
+	"""Trigger update_preview to recolor the sprite"""
+	update_preview()
 
-	var sprite = character_layers.get_node(layer_code)
-	if sprite.material == null or not sprite.material is ShaderMaterial:
-		return
+func apply_color_mapping(original_texture: Texture2D, part: Dictionary, ramp_type: String, layer_code: String) -> ImageTexture:
+	"""Apply color palette mapping by replacing pixels in the image
+	Returns a new ImageTexture with swapped colors"""
 
-	var mat = sprite.material as ShaderMaterial
+	# Get the image from the texture
+	var original_image = original_texture.get_image()
+	if original_image == null:
+		print("ERROR: Could not get image from texture for ", layer_code)
+		return ImageTexture.create_from_image(original_image)
 
-	# Find layer config
-	var ramp_type = null
-	for layer in LAYERS:
-		if layer.code == layer_code:
-			ramp_type = layer.ramp_type
-			break
+	# Create a copy to modify
+	var recolored_image = Image.create(original_image.get_width(), original_image.get_height(), false, original_image.get_format())
+	recolored_image.copy_from(original_image)
 
-	if ramp_type == null:
-		return
+	# Get the base colors (what's in the sprite) based on the palette code
+	var palette_code = part.palette_code  # e.g., "00a", "00b", etc.
+	var base_colors = get_base_colors_for_palette_code(palette_code, ramp_type)
 
-	# Set ramp type in shader
-	var ramp_type_int = 0
-	if ramp_type == "4color":
-		ramp_type_int = 1
-	elif ramp_type == "hair":
-		ramp_type_int = 2
-	elif ramp_type == "skin":
-		ramp_type_int = 3
+	# Get the target colors (what we want to replace with)
+	var ramp_info = current_color_ramps[layer_code]
+	var row_index = ramp_info.index
+	var target_colors = extract_colors_from_palette(ramp_type, row_index)
 
-	mat.set_shader_parameter("ramp_type", ramp_type_int)
+	if base_colors.size() == 0 or target_colors.size() == 0:
+		print("ERROR: No colors loaded for ", layer_code)
+		return ImageTexture.create_from_image(recolored_image)
 
-	# Load and set base colors (the colors in the sprite to be replaced)
-	# These are always from row 0 of the base ramp image
-	var base_colors = extract_colors_from_palette(ramp_type + "_base", 0)
-	if base_colors.size() > 0:
-		match ramp_type:
-			"3color":
-				if base_colors.size() >= 3:
-					mat.set_shader_parameter("base_3color_1", base_colors[0])
-					mat.set_shader_parameter("base_3color_2", base_colors[1])
-					mat.set_shader_parameter("base_3color_3", base_colors[2])
-			"4color":
-				if base_colors.size() >= 4:
-					mat.set_shader_parameter("base_4color_1", base_colors[0])
-					mat.set_shader_parameter("base_4color_2", base_colors[1])
-					mat.set_shader_parameter("base_4color_3", base_colors[2])
-					mat.set_shader_parameter("base_4color_4", base_colors[3])
-			"hair":
-				if base_colors.size() >= 5:
-					mat.set_shader_parameter("base_hair_1", base_colors[0])
-					mat.set_shader_parameter("base_hair_2", base_colors[1])
-					mat.set_shader_parameter("base_hair_3", base_colors[2])
-					mat.set_shader_parameter("base_hair_4", base_colors[3])
-					mat.set_shader_parameter("base_hair_5", base_colors[4])
-			"skin":
-				if base_colors.size() >= 4:
-					mat.set_shader_parameter("base_skin_1", base_colors[0])
-					mat.set_shader_parameter("base_skin_2", base_colors[1])
-					mat.set_shader_parameter("base_skin_3", base_colors[2])
-					mat.set_shader_parameter("base_skin_4", base_colors[3])
+	print("Applying color map to ", layer_code, ": ", base_colors.size(), " colors")
 
-	# If a color ramp has been selected, apply target colors
-	if layer_code in current_color_ramps:
-		var ramp_info = current_color_ramps[layer_code]
-		var row_index = ramp_info.index
+	# Replace colors pixel by pixel
+	for y in range(recolored_image.get_height()):
+		for x in range(recolored_image.get_width()):
+			var pixel = recolored_image.get_pixel(x, y)
 
-		# Extract colors from the palette
-		var colors = extract_colors_from_palette(ramp_type, row_index)
+			# Skip transparent pixels
+			if pixel.a < 0.01:
+				continue
 
-		if colors.size() > 0:
-			# Apply colors to shader based on ramp type
-			match ramp_type:
-				"3color":
-					if colors.size() >= 3:
-						mat.set_shader_parameter("target_3color_1", colors[0])
-						mat.set_shader_parameter("target_3color_2", colors[1])
-						mat.set_shader_parameter("target_3color_3", colors[2])
-						print("Applied 3-color ramp ", row_index, " to ", layer_code)
-				"4color":
-					if colors.size() >= 4:
-						mat.set_shader_parameter("target_4color_1", colors[0])
-						mat.set_shader_parameter("target_4color_2", colors[1])
-						mat.set_shader_parameter("target_4color_3", colors[2])
-						mat.set_shader_parameter("target_4color_4", colors[3])
-						print("Applied 4-color ramp ", row_index, " to ", layer_code)
-				"hair":
-					if colors.size() >= 5:
-						mat.set_shader_parameter("target_hair_1", colors[0])
-						mat.set_shader_parameter("target_hair_2", colors[1])
-						mat.set_shader_parameter("target_hair_3", colors[2])
-						mat.set_shader_parameter("target_hair_4", colors[3])
-						mat.set_shader_parameter("target_hair_5", colors[4])
-						print("Applied hair ramp ", row_index, " to ", layer_code)
-				"skin":
-					if colors.size() >= 4:
-						mat.set_shader_parameter("target_skin_1", colors[0])
-						mat.set_shader_parameter("target_skin_2", colors[1])
-						mat.set_shader_parameter("target_skin_3", colors[2])
-						mat.set_shader_parameter("target_skin_4", colors[3])
-						print("Applied skin ramp ", row_index, " to ", layer_code)
+			# Check if this pixel matches any base color
+			for i in range(min(base_colors.size(), target_colors.size())):
+				if colors_match(pixel, base_colors[i]):
+					recolored_image.set_pixel(x, y, Color(target_colors[i].r, target_colors[i].g, target_colors[i].b, pixel.a))
+					break
+
+	# Create and return new texture
+	return ImageTexture.create_from_image(recolored_image)
+
+func get_base_colors_for_palette_code(palette_code: String, ramp_type: String) -> Array:
+	"""Get base colors based on the palette code (00a, 00b, etc.)"""
+
+	# Determine which base ramp to use based on palette code
+	var base_ramp_key = ""
+	if palette_code.ends_with("a"):
+		base_ramp_key = "3color_base"
+	elif palette_code.ends_with("b"):
+		base_ramp_key = "4color_base"
+	elif palette_code == "00":  # Plain 00 is usually skin or hair
+		if ramp_type == "skin":
+			base_ramp_key = "skin_base"
+		elif ramp_type == "hair":
+			base_ramp_key = "hair_base"
+	else:
+		# Default fallback
+		base_ramp_key = ramp_type + "_base"
+
+	# Extract colors from row 0 of the base ramp
+	return extract_colors_from_palette(base_ramp_key, 0)
+
+func colors_match(color1: Color, color2: Color, tolerance: float = 0.02) -> bool:
+	"""Check if two colors match within a tolerance"""
+	return abs(color1.r - color2.r) < tolerance and \
+	       abs(color1.g - color2.g) < tolerance and \
+	       abs(color1.b - color2.b) < tolerance
 
 func update_frame_display():
 	"""Update the character sprite frames"""
