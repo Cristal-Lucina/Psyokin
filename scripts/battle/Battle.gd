@@ -1273,9 +1273,13 @@ func _on_turn_started(combatant_id: String) -> void:
 	if current_combatant.is_empty():
 		return
 
-	# Clear any held animations (like Guard) when turn starts
+	# Clear held animations ONLY if not defending
+	# Guard pose should persist while is_defending is true
 	if sprite_animator and current_combatant.is_ally:
-		sprite_animator.clear_hold(current_combatant.id)
+		if not current_combatant.get("is_defending", false):
+			sprite_animator.clear_hold(current_combatant.id)
+		else:
+			print("[Battle] %s is defending - maintaining guard pose" % current_combatant.id)
 
 	# Reset action cooldown at start of turn
 	action_cooldown = 0.0
@@ -2624,6 +2628,10 @@ func _execute_attack(target: Dictionary) -> void:
 
 	# Clear defending status when attacking
 	current_combatant.is_defending = false
+
+	# Clear guard animation when no longer defending
+	if sprite_animator and current_combatant.is_ally:
+		sprite_animator.clear_hold(current_combatant.id)
 
 	# Start building turn message
 	start_turn_message()
@@ -4521,6 +4529,10 @@ func _execute_berserk_action() -> void:
 
 	# Clear defending status
 	current_combatant.is_defending = false
+
+	# Clear guard animation when no longer defending
+	if sprite_animator and current_combatant.is_ally:
+		sprite_animator.clear_hold(current_combatant.id)
 
 	# Get all alive combatants (allies and enemies)
 	var all_targets = []
@@ -6684,6 +6696,10 @@ func _execute_skill_single(target: Dictionary) -> void:
 	# Clear defending status when using skill
 	current_combatant.is_defending = false
 
+	# Clear guard animation when no longer defending
+	if sprite_animator and current_combatant.is_ally:
+		sprite_animator.clear_hold(current_combatant.id)
+
 	# Deduct MP (with minigame modifier)
 	var final_mp_cost = int(mp_cost * mp_modifier)
 	current_combatant.mp -= final_mp_cost
@@ -6960,6 +6976,10 @@ func _execute_skill_aoe() -> void:
 
 	# Clear defending status
 	current_combatant.is_defending = false
+
+	# Clear guard animation when no longer defending
+	if sprite_animator and current_combatant.is_ally:
+		sprite_animator.clear_hold(current_combatant.id)
 
 	# Deduct MP
 	current_combatant.mp -= mp_cost
