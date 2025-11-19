@@ -126,6 +126,12 @@ func create_sprite_for_combatant(combatant_id: String, parent: Node) -> Sprite2D
 	"""Create a sprite node for a party member"""
 	var member_id = combatant_id.to_lower()
 
+	print("[BattleSpriteAnimator] Creating sprite for combatant: %s (lowercase: %s)" % [combatant_id, member_id])
+
+	# For hero, use layered system (body + hair)
+	if member_id == "hero":
+		return _create_layered_sprite_for_hero(combatant_id, parent)
+
 	if not character_sprites.has(member_id):
 		push_error("[BattleSpriteAnimator] No sprite sheet found for: " + member_id)
 		return null
@@ -158,7 +164,9 @@ func create_sprite_for_combatant(combatant_id: String, parent: Node) -> Sprite2D
 		"frame_index": 0,
 		"timer": 0.0,
 		"is_playing": false,
-		"hold_until_clear": false  # For animations that hold until manually cleared
+		"hold_until_clear": false,  # For animations that hold until manually cleared
+		"play_once": false,  # For animations that play once then return to idle
+		"default_direction": "RIGHT"  # Default facing direction for idle
 	}
 
 	# Play idle animation by default
@@ -166,7 +174,90 @@ func create_sprite_for_combatant(combatant_id: String, parent: Node) -> Sprite2D
 
 	return sprite
 
-func play_animation(combatant_id: String, anim_name: String, direction: String = "RIGHT", hold: bool = false):
+func _create_layered_sprite_for_hero(combatant_id: String, parent: Node) -> Sprite2D:
+	"""Create a layered sprite system for the hero (body + hair)"""
+	# Create a container for layers
+	var container = Node2D.new()
+	container.name = "HeroSpriteContainer_" + combatant_id
+
+	# Create body layer
+	var body_sprite = Sprite2D.new()
+	body_sprite.name = "BodyLayer"
+	body_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	body_sprite.hframes = 16
+	body_sprite.vframes = 16
+	body_sprite.frame = 0
+
+	# Create hair layer
+	var hair_sprite = Sprite2D.new()
+	hair_sprite.name = "HairLayer"
+	hair_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	hair_sprite.hframes = 16
+	hair_sprite.vframes = 16
+	hair_sprite.frame = 0
+
+	# Get hero appearance from GameState
+	var gs = get_node_or_null("/root/aGameState")
+	var body_variant = "human_00"  # Default
+	var hair_variant = "twintail_00"  # Default
+
+	if gs and gs.has_meta("hero_identity"):
+		var hero_identity = gs.get_meta("hero_identity")
+		if typeof(hero_identity) == TYPE_DICTIONARY and hero_identity.has("character_variants"):
+			var variants = hero_identity["character_variants"]
+			if variants.has("body"):
+				body_variant = variants["body"]
+			if variants.has("hair"):
+				hair_variant = variants["hair"]
+
+	# Load body texture
+	var body_path = "res://assets/graphics/characters/New Character System/SpriteSystem/farmer_base_sheets/01body/fbas_01body_" + body_variant + ".png"
+	var body_texture = load(body_path)
+	if body_texture:
+		body_sprite.texture = body_texture
+		print("[BattleSpriteAnimator] Loaded hero body: %s" % body_path)
+	else:
+		print("[BattleSpriteAnimator] Failed to load hero body: %s" % body_path)
+
+	# Load hair texture
+	var hair_path = "res://assets/graphics/characters/New Character System/SpriteSystem/farmer_base_sheets/13hair/fbas_13hair_" + hair_variant + ".png"
+	var hair_texture = load(hair_path)
+	if hair_texture:
+		hair_sprite.texture = hair_texture
+		print("[BattleSpriteAnimator] Loaded hero hair: %s" % hair_path)
+	else:
+		print("[BattleSpriteAnimator] Failed to load hero hair: %s" % hair_path)
+
+	# Add layers to container
+	container.add_child(body_sprite)
+	container.add_child(hair_sprite)
+
+	# Add container to parent
+	if parent:
+		parent.add_child(container)
+
+	# Track both layers for animation updates
+	sprite_instances[combatant_id] = {
+		"sprite": container,  # Use container as the main sprite reference
+		"body_layer": body_sprite,
+		"hair_layer": hair_sprite,
+		"current_anim": "Idle_RIGHT",
+		"frame_index": 0,
+		"timer": 0.0,
+		"is_playing": false,
+		"hold_until_clear": false,
+		"play_once": false,
+		"default_direction": "RIGHT",
+		"is_layered": true  # Flag to indicate this is a layered sprite
+	}
+
+	# Play idle animation by default
+	play_animation(combatant_id, "Idle", "RIGHT")
+
+	print("[BattleSpriteAnimator] Created layered sprite for hero")
+	return container
+
+func play_animation(combatant_id: String, anim_name: String, direction: String = "RIGHT", hold: bool = false, play_once: bool = false):
 	"""Play an animation for a specific combatant
 
 	Args:
@@ -174,6 +265,7 @@ func play_animation(combatant_id: String, anim_name: String, direction: String =
 		anim_name: Animation name (e.g., "Walk", "Sword Strike")
 		direction: Direction to face (UP, DOWN, LEFT, RIGHT)
 		hold: If true, animation will hold on last frame until cleared
+		play_once: If true, animation plays once then returns to idle
 	"""
 	if not sprite_instances.has(combatant_id):
 		print("[BattleSpriteAnimator] No sprite instance for: " + combatant_id)
@@ -191,11 +283,13 @@ func play_animation(combatant_id: String, anim_name: String, direction: String =
 	instance["timer"] = 0.0
 	instance["is_playing"] = true
 	instance["hold_until_clear"] = hold
+	instance["play_once"] = play_once
+	instance["default_direction"] = direction  # Remember direction for returning to idle
 
 	# Apply first frame immediately
 	_apply_frame(combatant_id, 0)
 
-	print("[BattleSpriteAnimator] Playing %s for %s (hold: %s)" % [anim_key, combatant_id, hold])
+	print("[BattleSpriteAnimator] Playing %s for %s (hold: %s, play_once: %s)" % [anim_key, combatant_id, hold, play_once])
 
 func clear_hold(combatant_id: String):
 	"""Clear a held animation and return to idle"""
@@ -242,7 +336,22 @@ func _update_sprite_animation(combatant_id: String, delta: float):
 	# Check if we need to advance to next frame
 	if instance["timer"] >= frame_data.timing:
 		instance["timer"] = 0.0
-		instance["frame_index"] = (frame_index + 1) % anim_data.size()
+		var next_frame = frame_index + 1
+
+		# Check if animation completed
+		if next_frame >= anim_data.size():
+			# Animation completed one loop
+			if instance["play_once"]:
+				# Return to idle animation
+				var default_dir = instance.get("default_direction", "RIGHT")
+				play_animation(combatant_id, "Idle", default_dir)
+				print("[BattleSpriteAnimator] Play-once animation complete for %s, returning to idle" % combatant_id)
+				return
+			else:
+				# Loop animation
+				next_frame = 0
+
+		instance["frame_index"] = next_frame
 		_apply_frame(combatant_id, instance["frame_index"])
 
 func _apply_frame(combatant_id: String, frame_index: int):
@@ -251,7 +360,6 @@ func _apply_frame(combatant_id: String, frame_index: int):
 		return
 
 	var instance = sprite_instances[combatant_id]
-	var sprite = instance["sprite"]
 	var anim_key = instance["current_anim"]
 
 	if not animations.has(anim_key):
@@ -262,14 +370,33 @@ func _apply_frame(combatant_id: String, frame_index: int):
 		return
 
 	var frame_data = anim_data[frame_index]
-	sprite.frame = frame_data.cell
-	sprite.flip_h = frame_data.flip_h
+
+	# Handle layered sprites (hero)
+	if instance.get("is_layered", false):
+		var body_layer = instance.get("body_layer")
+		var hair_layer = instance.get("hair_layer")
+		if body_layer:
+			body_layer.frame = frame_data.cell
+			body_layer.flip_h = frame_data.flip_h
+		if hair_layer:
+			hair_layer.frame = frame_data.cell
+			hair_layer.flip_h = frame_data.flip_h
+	else:
+		# Handle regular single sprite
+		var sprite = instance["sprite"]
+		sprite.frame = frame_data.cell
+		sprite.flip_h = frame_data.flip_h
 
 func get_sprite(combatant_id: String) -> Sprite2D:
 	"""Get the sprite node for a combatant"""
 	if not sprite_instances.has(combatant_id):
 		return null
 	return sprite_instances[combatant_id]["sprite"]
+
+func play_animation_for_all(anim_name: String, direction: String = "RIGHT", hold: bool = false, play_once: bool = false):
+	"""Play an animation for all active party members"""
+	for combatant_id in sprite_instances.keys():
+		play_animation(combatant_id, anim_name, direction, hold, play_once)
 
 func remove_sprite(combatant_id: String):
 	"""Remove a sprite instance"""

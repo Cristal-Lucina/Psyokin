@@ -2662,7 +2662,7 @@ func _execute_attack(target: Dictionary) -> void:
 					_:
 						anim_name = "Sword Strike"  # Default attack animation
 
-				sprite_animator.play_animation(current_combatant.id, anim_name, "RIGHT")
+				sprite_animator.play_animation(current_combatant.id, anim_name, "RIGHT", false, true)
 				print("[Battle] Playing attack animation: %s for %s (weapon: %s)" % [anim_name, current_combatant.id, weapon_type])
 
 				# Wait for animation to play (about 0.5 seconds)
@@ -3157,7 +3157,7 @@ func _execute_capture(target: Dictionary) -> void:
 
 	# Play capture animation (Throw Carried)
 	if sprite_animator and current_combatant.is_ally:
-		sprite_animator.play_animation(current_combatant.id, "Throw Carried", "RIGHT")
+		sprite_animator.play_animation(current_combatant.id, "Throw Carried", "RIGHT", false, true)
 		print("[Battle] Playing capture animation: Throw Carried for %s" % current_combatant.id)
 
 		# Wait for animation to play (about 0.5 seconds)
@@ -3247,7 +3247,7 @@ func _execute_item_usage(target: Dictionary) -> void:
 	# Direction: LEFT for party/allies, RIGHT for enemies
 	if sprite_animator and current_combatant.is_ally:
 		var direction = "LEFT" if target.is_ally else "RIGHT"
-		sprite_animator.play_animation(current_combatant.id, "Throw Carried", direction)
+		sprite_animator.play_animation(current_combatant.id, "Throw Carried", direction, false, true)
 		print("[Battle] Playing item animation: Throw Carried %s for %s" % [direction, current_combatant.id])
 
 		# Wait for animation to play (about 0.5 seconds)
@@ -3848,10 +3848,10 @@ func _execute_run() -> void:
 	# Launch run minigame (auto-starts, no message)
 	var minigame_result = await minigame_mgr.launch_run_minigame(run_chance, tempo_diff, focus_stat, status_effects)
 
-	# Play run animation to the left
-	if sprite_animator and current_combatant.is_ally:
-		sprite_animator.play_animation(current_combatant.id, "Run", "LEFT")
-		print("[Battle] Playing run animation: Run LEFT for %s" % current_combatant.id)
+	# Play run animation to the left for ALL party members
+	if sprite_animator:
+		sprite_animator.play_animation_for_all("Run", "LEFT")
+		print("[Battle] Playing run animation: Run LEFT for entire party")
 
 		# Wait for animation to play (about 0.8 seconds)
 		await get_tree().create_timer(0.8).timeout
@@ -6642,7 +6642,7 @@ func _execute_skill_single(target: Dictionary) -> void:
 
 	# Play skill animation (Bow Shot)
 	if sprite_animator and current_combatant.is_ally:
-		sprite_animator.play_animation(current_combatant.id, "Bow Shot", "RIGHT")
+		sprite_animator.play_animation(current_combatant.id, "Bow Shot", "RIGHT", false, true)
 		print("[Battle] Playing skill animation: Bow Shot for %s" % current_combatant.id)
 
 		# Wait for animation to play (about 1 second for Bow Shot)
