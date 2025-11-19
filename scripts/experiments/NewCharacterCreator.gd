@@ -54,6 +54,64 @@ const DIRECTIONS = {
 	3: "West"
 }
 
+# Animation configurations based on Mana Seed animation guide
+# Format: {start_cell, frame_count, speed, direction_order}
+const ANIMATIONS = {
+	# Basic Movement
+	"walk": {"cells": [0, 16, 32, 48], "frames": 8, "speed": 0.135, "label": "Walk"},
+	"run": {"cells": [8, 24, 40, 56], "frames": 8, "speed": 0.080, "label": "Run"},
+	"jump": {"cells": [64, 80, 96, 112], "frames": 4, "speed": 0.150, "label": "Jump"},
+	"push": {"cells": [68, 84, 100, 116], "frames": 2, "speed": 0.200, "label": "Push"},
+	"pull": {"cells": [70, 86, 102, 118], "frames": 2, "speed": 0.200, "label": "Pull"},
+
+	# Farming - Planting
+	"plant_seeds": {"cells": [72, 88, 104, 120], "frames": 4, "speed": 0.150, "label": "Plant Seeds"},
+
+	# Farming - Watering
+	"water_long": {"cells": [128, 144, 160, 176], "frames": 8, "speed": 0.150, "label": "Water (Long 2-4)"},
+
+	# Farming - Carrying
+	"walk_carry": {"cells": [0, 16, 32, 48], "frames": 8, "speed": 0.135, "label": "Walk While Carrying"},
+	"run_carry": {"cells": [8, 24, 40, 56], "frames": 8, "speed": 0.080, "label": "Run While Carrying"},
+	"jump_carry": {"cells": [64, 80, 96, 112], "frames": 4, "speed": 0.150, "label": "Jump While Carrying"},
+
+	# Farming - Tools
+	"pickaxe": {"cells": [192, 193, 194, 195], "frames": 1, "speed": 0.200, "label": "Pick Up/Carry"},
+	"throw": {"cells": [196, 197, 198, 199], "frames": 1, "speed": 0.200, "label": "Throw Cropped"},
+
+	# Fishing
+	"cast_fishing": {"cells": [128, 144, 160, 176], "frames": 4, "speed": 0.200, "label": "Cast Fishing Line"},
+	"got_bite": {"cells": [132, 148, 164, 180], "frames": 1, "speed": 0.100, "label": "Got A Bite!"},
+	"got_it": {"cells": [133, 149, 165, 181], "frames": 1, "speed": 0.100, "label": "Got It!"},
+
+	# Combat/Tools
+	"overhead_strike": {"cells": [144, 145, 146, 147], "frames": 4, "speed": 0.100, "label": "Overhead Strike (1h/2h)"},
+	"forging_strike": {"cells": [148, 149, 150, 151], "frames": 4, "speed": 0.120, "label": "Forging Strike"},
+	"backhand_strike": {"cells": [152, 153, 154, 155], "frames": 1, "speed": 0.100, "label": "Backhand Strike"},
+
+	# Expressions/Actions
+	"wave": {"cells": [72, 89, 106, 123], "frames": 1, "speed": 0.200, "label": "Wave"},
+	"hug": {"cells": [104, 105], "frames": 2, "speed": 0.300, "label": "Hug (south, scramble)"},
+	"flute": {"cells": [76, 92, 108, 124], "frames": 1, "speed": 0.200, "label": "Flute/Horn/Lute"},
+
+	# Utility
+	"sit_throne": {"cells": [116], "frames": 1, "speed": 0.100, "label": "Sit Throne"},
+	"sit_chair": {"cells": [117], "frames": 1, "speed": 0.100, "label": "Sit, Chair"},
+	"meditate": {"cells": [118], "frames": 1, "speed": 0.100, "label": "Meditate"},
+	"sleep": {"cells": [119], "frames": 1, "speed": 0.100, "label": "Sleep"},
+
+	# Death/Hit
+	"hurt": {"cells": [177, 178, 179, 180], "frames": 1, "speed": 0.150, "label": "Hurt (down/right/left)"},
+	"kia_shot": {"cells": [120, 136, 152, 168], "frames": 4, "speed": 0.120, "label": "KIA Shot"},
+
+	# Climbing
+	"climb": {"cells": [4, 5, 6, 7], "frames": 4, "speed": 0.150, "label": "Climb (going up)"},
+
+	# Misc
+	"pet_dog": {"cells": [76, 77], "frames": 2, "speed": 0.200, "label": "Pet Dog/Cat"},
+	"look_around": {"cells": [240, 241, 242], "frames": 3, "speed": 0.300, "label": "Look Around"}
+}
+
 # Color ramp data (will be loaded from palette images)
 var color_ramps = {
 	"3color": [],
@@ -65,12 +123,14 @@ var color_ramps = {
 # References
 @onready var character_layers = $MainContainer/PreviewPanel/PreviewContainer/CenterContainer/CharacterLayers
 @onready var parts_container = $MainContainer/ControlsPanel/ControlsContainer/ScrollContainer/PartsContainer
+@onready var animation_list = $MainContainer/AnimationPanel/AnimationContainer/ScrollContainer/AnimationList
 @onready var frame_label = $MainContainer/PreviewPanel/PreviewContainer/AnimationControls/FrameLabel
 @onready var direction_label = $MainContainer/PreviewPanel/PreviewContainer/AnimationControls/DirectionLabel
 
 # State
 var current_direction = 0  # South
 var current_frame = 0
+var current_animation = "walk"  # Default animation
 var available_parts = {}
 var current_selections = {}
 var current_color_ramps = {}  # Track selected color ramps per layer
@@ -81,16 +141,18 @@ func _ready():
 	print("=== NEW CHARACTER CREATOR STARTING ===")
 	load_color_ramps()
 	scan_character_assets()
+	populate_animation_list()
 	populate_ui()
 	set_default_character()
 	update_preview()
 
 func _process(delta):
-	# Walk animation cycling (6 frames)
+	# Animate based on current animation
+	var anim_config = ANIMATIONS[current_animation]
 	animation_timer += delta
-	if animation_timer >= animation_speed:
+	if animation_timer >= anim_config.speed:
 		animation_timer = 0.0
-		current_frame = (current_frame + 1) % 6
+		current_frame = (current_frame + 1) % anim_config.frames
 		update_frame_display()
 
 func load_color_ramps():
@@ -125,6 +187,43 @@ func load_color_ramps():
 			"name": "Skin Tone %d" % (i + 1),
 			"index": i
 		})
+
+func populate_animation_list():
+	"""Populate the animation selector with all available animations"""
+	print("Populating animation list...")
+
+	# Group animations by category
+	var categories = {
+		"Basic Movement": ["walk", "run", "jump", "push", "pull"],
+		"Farming": ["plant_seeds", "water_long", "walk_carry", "run_carry", "jump_carry", "pickaxe", "throw"],
+		"Fishing": ["cast_fishing", "got_bite", "got_it"],
+		"Combat/Tools": ["overhead_strike", "forging_strike", "backhand_strike"],
+		"Expressions": ["wave", "hug", "flute"],
+		"Utility": ["sit_throne", "sit_chair", "meditate", "sleep", "climb"],
+		"Death/Hit": ["hurt", "kia_shot"],
+		"Misc": ["pet_dog", "look_around"]
+	}
+
+	for category in categories:
+		# Add category label
+		var category_label = Label.new()
+		category_label.text = "─── " + category + " ───"
+		category_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		category_label.add_theme_font_size_override("font_size", 12)
+		animation_list.add_child(category_label)
+
+		# Add animation buttons
+		for anim_key in categories[category]:
+			if anim_key in ANIMATIONS:
+				var anim = ANIMATIONS[anim_key]
+				var btn = Button.new()
+				btn.text = anim.label
+				btn.pressed.connect(_on_animation_selected.bind(anim_key))
+				animation_list.add_child(btn)
+
+		# Add separator
+		var separator = HSeparator.new()
+		animation_list.add_child(separator)
 
 func scan_character_assets():
 	"""Scan the new character system folders"""
@@ -271,18 +370,52 @@ func populate_layer_options(section: Node, layer_code: String, parts: Array, ram
 		color_label.text = "  Color Ramp:"
 		color_section.add_child(color_label)
 
-		var color_dropdown = OptionButton.new()
-		color_dropdown.name = "ColorRampSelector"
+		# Load and display the palette image
+		var palette_image_path = get_palette_image_path(ramp_type)
+		if FileAccess.file_exists(palette_image_path):
+			var palette_texture = load(palette_image_path)
+			if palette_texture:
+				# Create a texture rect to show the palette
+				var palette_display = TextureRect.new()
+				palette_display.texture = palette_texture
+				palette_display.expand_mode = TextureRect.EXPAND_FIT_WIDTH
+				palette_display.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT
+				palette_display.custom_minimum_size = Vector2(0, 200)
+				color_section.add_child(palette_display)
 
-		# Populate with appropriate color ramps
+				# Add info label
+				var info_label = Label.new()
+				info_label.text = "  Click row to select color ramp"
+				info_label.add_theme_font_size_override("font_size", 10)
+				color_section.add_child(info_label)
+
+		# Add a grid of color ramp buttons (first 10 rows)
+		var ramp_grid = GridContainer.new()
+		ramp_grid.columns = 5
 		var ramps = color_ramps.get(ramp_type, [])
-		for i in range(min(ramps.size(), 10)):  # Limit to first 10 for UI manageability
-			var ramp = ramps[i]
-			color_dropdown.add_item(ramp.name, i)
+		for i in range(min(ramps.size(), 20)):  # Show first 20 ramps
+			var btn = Button.new()
+			btn.text = str(i + 1)
+			btn.custom_minimum_size = Vector2(40, 30)
+			btn.pressed.connect(_on_color_ramp_selected.bind(i, layer_code, ramp_type))
+			ramp_grid.add_child(btn)
 
-		color_dropdown.item_selected.connect(_on_color_ramp_selected.bind(layer_code, ramp_type))
-		color_section.add_child(color_dropdown)
+		color_section.add_child(ramp_grid)
 		options_container.add_child(color_section)
+
+func get_palette_image_path(ramp_type: String) -> String:
+	"""Get the path to the palette image for a given ramp type"""
+	match ramp_type:
+		"3color":
+			return PALETTE_PATH + "mana seed 3-color ramps.png"
+		"4color":
+			return PALETTE_PATH + "mana seed 4-color ramps.png"
+		"hair":
+			return PALETTE_PATH + "mana seed hair ramps.png"
+		"skin":
+			return PALETTE_PATH + "mana seed skin ramps.png"
+		_:
+			return ""
 
 func set_default_character():
 	"""Set up a default character with base body"""
@@ -376,19 +509,33 @@ func apply_color_ramp(layer_code: String):
 
 func update_frame_display():
 	"""Update the frame and direction display"""
+	var anim_config = ANIMATIONS[current_animation]
+
+	# Get the starting cell for the current direction
+	var direction_cells = anim_config.cells
+	var start_cell = direction_cells[current_direction]
+
+	# Calculate the current frame cell
+	var frame_cell = start_cell + current_frame
+
 	for layer_code in LAYERS.keys():
 		var layer = LAYERS[layer_code]
 		var sprite = character_layers.get_node(layer.node_name)
 		if sprite.visible and sprite.texture:
-			# Assuming similar layout to old system
-			# Will need to verify actual frame layout
-			var row = current_direction
-			sprite.frame = row * 16 + current_frame
+			sprite.frame = frame_cell
 
-	frame_label.text = "Frame: " + str(current_frame + 1) + "/6"
+	frame_label.text = "Frame: " + str(current_frame + 1) + "/" + str(anim_config.frames)
 	direction_label.text = "Direction: " + DIRECTIONS[current_direction]
 
 func _on_direction_changed(direction: int):
 	"""Handle direction button press"""
 	current_direction = direction
+	update_frame_display()
+
+func _on_animation_selected(anim_key: String):
+	"""Handle animation selection"""
+	print("Selected animation: ", anim_key)
+	current_animation = anim_key
+	current_frame = 0
+	animation_timer = 0.0
 	update_frame_display()

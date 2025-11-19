@@ -28,6 +28,28 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
+[node name="AnimationPanel" type="PanelContainer" parent="MainContainer"]
+custom_minimum_size = Vector2(250, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="AnimationContainer" type="VBoxContainer" parent="MainContainer/AnimationPanel"]
+layout_mode = 2
+
+[node name="Title" type="Label" parent="MainContainer/AnimationPanel/AnimationContainer"]
+layout_mode = 2
+text = "Animations"
+horizontal_alignment = 1
+
+[node name="ScrollContainer" type="ScrollContainer" parent="MainContainer/AnimationPanel/AnimationContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="AnimationList" type="VBoxContainer" parent="MainContainer/AnimationPanel/AnimationContainer/ScrollContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
 [node name="PreviewPanel" type="PanelContainer" parent="MainContainer"]
 custom_minimum_size = Vector2(600, 0)
 layout_mode = 2
