@@ -3336,7 +3336,8 @@ func _execute_item_usage(target: Dictionary) -> void:
 	# Play item animation (Throw Carried)
 	# Direction: LEFT for party/allies, RIGHT for enemies
 	if sprite_animator and current_combatant.is_ally:
-		var direction = "LEFT" if target.is_ally else "RIGHT"
+		# For AOE items (bombs), target might be empty dict, default to RIGHT (toward enemies)
+		var direction = "LEFT" if target.get("is_ally", false) else "RIGHT"
 		sprite_animator.play_animation(current_combatant.id, "Throw Carried", direction, false, true)
 		print("[Battle] Playing item animation: Throw Carried %s for %s" % [direction, current_combatant.id])
 
