@@ -2038,7 +2038,36 @@ func _create_single_party_status_panel(combatant: Dictionary) -> PanelContainer:
 	portrait_style.shadow_color = Color(0, 0, 0, 0.6)
 	portrait_style.shadow_offset = Vector2(3, 3)
 	portrait_container.add_theme_stylebox_override("panel", portrait_style)
+
+	# Enable clipping to keep sprite within circular bounds
+	portrait_container.clip_contents = true
+
 	hbox.add_child(portrait_container)
+
+	# Add character sprite to portrait (idle pose, facing left, top half only)
+	if sprite_animator:
+		var portrait_sprite = sprite_animator.create_sprite_for_combatant(
+			combatant.id + "_portrait",  # Unique ID for portrait sprite
+			portrait_container,
+			combatant.get("display_name", ""),
+			true  # is_ally
+		)
+
+		if portrait_sprite:
+			# Position sprite to show top half only (head/shoulders)
+			# Sprite is 16px base * 4.375 scale = 70px tall
+			# We want the top 30px (head/shoulders) centered in 60px circle
+			# Sprite center should be at y=45 (30 below top edge) to show top portion
+			portrait_sprite.position = Vector2(30, 45)  # Centered horizontally, positioned to show top
+			portrait_sprite.scale = Vector2(4.375, 4.375)  # Same scale as battle sprites
+			portrait_sprite.z_index = 10  # Above background
+
+			# Make sprite face LEFT instead of RIGHT
+			# Play Idle_LEFT animation
+			if sprite_animator.sprite_instances.has(combatant.id + "_portrait"):
+				sprite_animator.play_animation(combatant.id + "_portrait", "Idle", "LEFT")
+
+			print("[Battle] Created portrait sprite for %s facing LEFT" % combatant.display_name)
 
 	# Right side: HP/MP bars
 	var stats_vbox = VBoxContainer.new()
