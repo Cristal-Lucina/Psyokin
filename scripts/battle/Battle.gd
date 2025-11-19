@@ -2132,6 +2132,7 @@ func _create_single_party_status_panel(combatant: Dictionary) -> PanelContainer:
 	hp_fill.corner_radius_bottom_left = 6
 	hp_fill.corner_radius_bottom_right = 6
 	hp_bar.add_theme_stylebox_override("fill", hp_fill)
+	hp_bar.position.y = 6  # Shift down to align with labels
 	hp_hbox.add_child(hp_bar)
 
 	# HP value label
@@ -2190,6 +2191,7 @@ func _create_single_party_status_panel(combatant: Dictionary) -> PanelContainer:
 	mp_fill.corner_radius_bottom_left = 6
 	mp_fill.corner_radius_bottom_right = 6
 	mp_bar.add_theme_stylebox_override("fill", mp_fill)
+	mp_bar.position.y = 6  # Shift down to align with labels
 	mp_hbox.add_child(mp_bar)
 
 	# MP value label
