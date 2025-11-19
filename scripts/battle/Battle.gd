@@ -1857,20 +1857,32 @@ func _display_combatants() -> void:
 		if sprite_animator:
 			var sprite = sprite_animator.create_sprite_for_combatant(ally.id, slot, ally.get("display_name", ""))
 			if sprite:
-				# Create shadow circle at base of sprite
+				# Position and scale sprite for 70px height
+				# 16px base frame * 4.375 = 70px
+				# Base position is center of 80x80 slot
+				var base_x = 40
+
+				# Apply horizontal offset based on ally position for fighting stance
+				# This ensures sprite follows the same spacing as the name label
+				var sprite_x_offset = 0
+				if i == 0:  # Top ally - lean right
+					sprite_x_offset = 80
+				elif i == 2:  # Bottom ally - lean left
+					sprite_x_offset = -80
+				# i == 1 (middle) stays centered with no offset
+
+				# Create shadow circle at base of sprite (positioned to match sprite offset)
 				var shadow = Sprite2D.new()
 				shadow.name = "Shadow"
 				var shadow_texture = _create_shadow_circle_texture()
 				shadow.texture = shadow_texture
 				shadow.modulate = Color(0, 0, 0, 0.5)  # Semi-transparent black
-				shadow.position = Vector2(40, 60)  # Below the sprite
+				shadow.position = Vector2(base_x + sprite_x_offset, 60)  # Below sprite, same x-offset
 				shadow.scale = Vector2(2, 1)  # Ellipse shape for perspective
-				shadow.z_index = i + 100  # Shadows just below sprites
+				shadow.z_index = 105 + i  # Shadows at 105-107, below sprites at 108-110
 				slot.add_child(shadow)
 
-				# Position and scale sprite for 70px height
-				# 16px base frame * 4.375 = 70px
-				sprite.position = Vector2(40, 40)  # Center of the 80x80 slot
+				sprite.position = Vector2(base_x + sprite_x_offset, 40)
 				sprite.scale = Vector2(4.375, 4.375)  # 70px height
 
 				# Depth-based z-layering: bottom allies have higher z (appear in front)
@@ -4805,6 +4817,7 @@ func _create_instruction_popup() -> void:
 	"""Create the instruction message popup that appears above battle log"""
 	instruction_popup = PanelContainer.new()
 	instruction_popup.custom_minimum_size = Vector2(560, 50)  # Same width as BattleLogPanel
+	instruction_popup.z_index = 200  # Same layer as other battle UI
 
 	# Style with cyan neon border to match Core vibe
 	var style = StyleBoxFlat.new()
