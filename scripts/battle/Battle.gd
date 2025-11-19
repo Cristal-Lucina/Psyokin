@@ -90,6 +90,7 @@ var current_skill_menu: Array = []  # Current skills in menu
 var selected_item: Dictionary = {}  # Selected item data
 var selected_burst: Dictionary = {}  # Selected burst ability data
 var selection_indicator: Control = null  # Floating selection indicator above targets
+var selection_name_label: Label = null  # Name label above selection indicator
 var victory_panel: PanelContainer = null  # Victory screen panel
 var victory_scroll: ScrollContainer = null  # Victory screen scroll container for controller scrolling
 var is_in_round_transition: bool = false  # True during round transition animations
@@ -1874,7 +1875,7 @@ func _display_combatants() -> void:
 				shadow.modulate = Color(0, 0, 0, 0.7)  # Darker, more visible shadow
 				shadow.position = Vector2(40 + x_offset, 55)  # Closer to sprite base
 				shadow.scale = Vector2(3, 1.5)  # Larger ellipse shape for better visibility
-				shadow.z_index = -10  # Below sprite (negative to ensure it's behind)
+				shadow.z_index = 104  # Below sprite (sprites at 108-110)
 				slot.add_child(shadow)
 
 				# Depth-based z-layering: bottom allies have higher z (appear in front)
@@ -1940,7 +1941,7 @@ func _display_combatants() -> void:
 				shadow.modulate = Color(0, 0, 0, 0.7)  # Darker, more visible shadow
 				shadow.position = Vector2(40 + x_offset, 55)  # Closer to sprite base
 				shadow.scale = Vector2(3, 1.5)  # Larger ellipse shape for better visibility
-				shadow.z_index = -10  # Below sprite (negative to ensure it's behind)
+				shadow.z_index = 104  # Below sprite (sprites at 108-110)
 				slot.add_child(shadow)
 
 				# Depth-based z-layering: bottom enemies have higher z (appear in front)
@@ -4453,6 +4454,29 @@ func _highlight_target_candidates() -> void:
 	selection_indicator.draw.connect(_draw_selection_indicator)
 	selection_indicator.queue_redraw()
 
+	# Create name label above the arrow
+	selection_name_label = Label.new()
+	selection_name_label.text = selected_target.display_name.to_upper()
+	selection_name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	selection_name_label.add_theme_color_override("font_color", Color(1, 1, 1, 1))  # White
+	selection_name_label.add_theme_font_size_override("font_size", 14)
+
+	# Add drop shadow effect
+	selection_name_label.add_theme_constant_override("shadow_offset_x", 2)
+	selection_name_label.add_theme_constant_override("shadow_offset_y", 2)
+	selection_name_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))  # Dark black shadow
+
+	# Position above the arrow
+	var name_pos = indicator_pos
+	name_pos.y -= 25  # Position 25px above the arrow
+	name_pos.x -= 30  # Center the label (adjust based on text width)
+	selection_name_label.position = name_pos
+	selection_name_label.custom_minimum_size = Vector2(120, 20)  # Wide enough for most names
+	selection_name_label.z_index = 500  # Same as arrow
+	add_child(selection_name_label)
+
+	print("[Battle] Name label created: '%s' at position (%f, %f)" % [selected_target.display_name, name_pos.x, name_pos.y])
+
 	# Animate bouncing
 	var tween = create_tween()
 	tween.set_loops()
@@ -4486,10 +4510,13 @@ func _draw_selection_indicator() -> void:
 	selection_indicator.draw_colored_polygon(points, COLOR_MILK_WHITE)
 
 func _clear_target_highlights() -> void:
-	"""Remove selection indicator"""
+	"""Remove selection indicator and name label"""
 	if selection_indicator:
 		selection_indicator.queue_free()
 		selection_indicator = null
+	if selection_name_label:
+		selection_name_label.queue_free()
+		selection_name_label = null
 
 ## ═══════════════════════════════════════════════════════════════
 ## ENEMY AI
