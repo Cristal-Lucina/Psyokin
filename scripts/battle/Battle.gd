@@ -1466,6 +1466,7 @@ func _show_victory_screen() -> void:
 	# Create victory panel
 	victory_panel = PanelContainer.new()
 	victory_panel.name = "VictoryPanel"
+	victory_panel.z_index = 1000  # Above all sprites
 
 	# Set up styling with Core vibe
 	var style = StyleBoxFlat.new()
@@ -1856,12 +1857,27 @@ func _display_combatants() -> void:
 		if sprite_animator:
 			var sprite = sprite_animator.create_sprite_for_combatant(ally.id, slot, ally.get("display_name", ""))
 			if sprite:
-				# Position sprite in front of/replacing the capsule
-				# The sprite should be centered in the slot
+				# Create shadow circle at base of sprite
+				var shadow = Sprite2D.new()
+				shadow.name = "Shadow"
+				var shadow_texture = _create_shadow_circle_texture()
+				shadow.texture = shadow_texture
+				shadow.modulate = Color(0, 0, 0, 0.5)  # Semi-transparent black
+				shadow.position = Vector2(40, 75)  # Below the sprite
+				shadow.scale = Vector2(3, 1.5)  # Ellipse shape for perspective
+				shadow.z_index = i + 100  # Shadows just below sprites
+				slot.add_child(shadow)
+
+				# Position and scale sprite for 150px height
+				# 16px base frame * 9.375 = 150px
 				sprite.position = Vector2(40, 40)  # Center of the 80x80 slot
-				sprite.scale = Vector2(1.5, 1.5)  # Scale up for visibility
-				sprite.z_index = 10  # Ensure sprite is above capsule
-				print("[Battle] Created sprite for ally: %s at position %s" % [ally.id, sprite.position])
+				sprite.scale = Vector2(9.375, 9.375)  # 150px height
+
+				# Depth-based z-layering: bottom allies have higher z (appear in front)
+				# Ally 0 (top) = 108, Ally 1 (middle) = 109, Ally 2 (bottom) = 110
+				sprite.z_index = 108 + i
+
+				print("[Battle] Created sprite for ally: %s at position %s with z-index %d" % [ally.id, sprite.position, sprite.z_index])
 
 				# Hide the capsule icon since we have a sprite
 				var vbox = slot.get_child(0) if slot.get_child_count() > 0 else null
@@ -1897,6 +1913,10 @@ func _display_combatants() -> void:
 		margin_container.add_child(slot)
 		enemy_slots.add_child(margin_container)
 		combatant_panels[enemy.id] = slot
+
+		# Create sprite for this enemy (if available)
+		# Note: Enemies currently use capsule icons, but this allows for enemy sprites in the future
+		# For now, this section is prepared but won't create sprites unless enemy sprite sheets exist
 
 	# Create party status panels
 	_create_party_status_panels()
@@ -2112,6 +2132,29 @@ func _update_party_status_panels() -> void:
 
 		if mp_value:
 			mp_value.text = str(ally.get("mp", 50))
+
+func _create_shadow_circle_texture() -> ImageTexture:
+	"""Create a circular shadow texture for sprite shadows"""
+	var size = 32
+	var image = Image.create(size, size, false, Image.FORMAT_RGBA8)
+
+	# Draw a radial gradient circle
+	for x in range(size):
+		for y in range(size):
+			var dx = x - size / 2.0
+			var dy = y - size / 2.0
+			var distance = sqrt(dx * dx + dy * dy)
+			var radius = size / 2.0
+
+			if distance < radius:
+				# Smooth gradient from center (opaque) to edge (transparent)
+				var alpha = 1.0 - (distance / radius)
+				alpha = alpha * alpha  # Quadratic falloff for softer shadow
+				image.set_pixel(x, y, Color(0, 0, 0, alpha))
+			else:
+				image.set_pixel(x, y, Color(0, 0, 0, 0))
+
+	return ImageTexture.create_from_image(image)
 
 func _get_character_capsule_color(name: String, is_ally: bool) -> Color:
 	"""Get capsule color for a character or enemy based on name/type"""
@@ -4064,6 +4107,7 @@ func _show_status_character_picker() -> void:
 	# Create picker panel
 	status_picker_panel = PanelContainer.new()
 	status_picker_panel.custom_minimum_size = Vector2(500, 400)
+	status_picker_panel.z_index = 1000  # Above all sprites
 
 	var panel_style = StyleBoxFlat.new()
 	panel_style.bg_color = COLOR_INK_CHARCOAL  # Dark background
@@ -4949,6 +4993,7 @@ func _show_confirmation_dialog(message: String, on_confirm: Callable) -> void:
 	# Create confirmation panel
 	confirmation_panel = PanelContainer.new()
 	confirmation_panel.custom_minimum_size = Vector2(300, 120)
+	confirmation_panel.z_index = 1000  # Above all sprites
 
 	# Style the panel with cyan neon border
 	var style = StyleBoxFlat.new()
@@ -5067,6 +5112,7 @@ func _show_skill_menu(skill_menu: Array) -> void:
 	# Create skill menu panel
 	skill_menu_panel = PanelContainer.new()
 	skill_menu_panel.custom_minimum_size = Vector2(400, 0)
+	skill_menu_panel.z_index = 1000  # Above all sprites
 
 	# Style the panel with cyan neon Core vibe
 	var style = StyleBoxFlat.new()
@@ -5563,6 +5609,7 @@ func _show_item_menu(items: Array) -> void:
 	# Create item menu panel
 	item_menu_panel = PanelContainer.new()
 	item_menu_panel.custom_minimum_size = Vector2(440, 0)  # Reduced width by 110px total
+	item_menu_panel.z_index = 1000  # Above all sprites
 
 	# Style the panel with Core vibe
 	var style = StyleBoxFlat.new()
@@ -6018,6 +6065,7 @@ func _show_capture_menu(bind_items: Array) -> void:
 	# Create capture menu panel (1 column, 500x400px)
 	capture_menu_panel = PanelContainer.new()
 	capture_menu_panel.custom_minimum_size = Vector2(500, 400)
+	capture_menu_panel.z_index = 1000  # Above all sprites
 
 	# Style the panel with Core vibe
 	var style = StyleBoxFlat.new()
@@ -6218,6 +6266,7 @@ func _show_burst_menu(burst_abilities: Array) -> void:
 	# Create burst menu panel
 	burst_menu_panel = PanelContainer.new()
 	burst_menu_panel.custom_minimum_size = Vector2(450, 0)
+	burst_menu_panel.z_index = 1000  # Above all sprites
 
 	# Style the panel with Core vibe
 	var style = StyleBoxFlat.new()
