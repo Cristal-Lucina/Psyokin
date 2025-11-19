@@ -4459,19 +4459,19 @@ func _highlight_target_candidates() -> void:
 	selection_name_label.text = selected_target.display_name.to_upper()
 	selection_name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	selection_name_label.add_theme_color_override("font_color", Color(1, 1, 1, 1))  # White
-	selection_name_label.add_theme_font_size_override("font_size", 14)
+	selection_name_label.add_theme_font_size_override("font_size", 20)  # 20pt font (14 + 6)
 
-	# Add drop shadow effect
-	selection_name_label.add_theme_constant_override("shadow_offset_x", 2)
-	selection_name_label.add_theme_constant_override("shadow_offset_y", 2)
-	selection_name_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))  # Dark black shadow
+	# Add drop shadow effect (bigger shadow)
+	selection_name_label.add_theme_constant_override("shadow_offset_x", 4)
+	selection_name_label.add_theme_constant_override("shadow_offset_y", 4)
+	selection_name_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.9))  # Darker black shadow
 
 	# Position above the arrow
 	var name_pos = indicator_pos
-	name_pos.y -= 25  # Position 25px above the arrow
+	name_pos.y -= 30  # Position 30px above the arrow (increased for larger font)
 	name_pos.x -= 30  # Center the label (adjust based on text width)
 	selection_name_label.position = name_pos
-	selection_name_label.custom_minimum_size = Vector2(120, 20)  # Wide enough for most names
+	selection_name_label.custom_minimum_size = Vector2(120, 25)  # Taller for larger font
 	selection_name_label.z_index = 500  # Same as arrow
 	add_child(selection_name_label)
 
