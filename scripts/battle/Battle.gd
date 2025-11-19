@@ -1852,9 +1852,9 @@ func _display_combatants() -> void:
 		combatant_panels[ally.id] = slot
 
 		# Create sprite for this party member
-		print("[Battle] Attempting to create sprite for ally: %s, sprite_animator null: %s" % [ally.id, sprite_animator == null])
+		print("[Battle] Attempting to create sprite for ally ID: %s, Name: %s, sprite_animator null: %s" % [ally.id, ally.get("display_name", ""), sprite_animator == null])
 		if sprite_animator:
-			var sprite = sprite_animator.create_sprite_for_combatant(ally.id, slot)
+			var sprite = sprite_animator.create_sprite_for_combatant(ally.id, slot, ally.get("display_name", ""))
 			if sprite:
 				# Position sprite in front of/replacing the capsule
 				# The sprite should be centered in the slot

@@ -122,28 +122,35 @@ func load_animations_from_csv():
 	file.close()
 	print("[BattleSpriteAnimator] Loaded animation keys: %d" % animations.size())
 
-func create_sprite_for_combatant(combatant_id: String, parent: Node) -> Node:
-	"""Create a sprite node for a party member"""
-	var member_id = combatant_id.to_lower()
+func create_sprite_for_combatant(combatant_id: String, parent: Node, display_name: String = "") -> Node:
+	"""Create a sprite node for a party member
 
-	print("[BattleSpriteAnimator] Creating sprite for combatant: %s (lowercase: %s)" % [combatant_id, member_id])
+	Args:
+		combatant_id: The unique ID of the combatant (e.g., "best_friend", "green_friend")
+		parent: The node to add the sprite to
+		display_name: The display name of the character (e.g., "Kai", "Matcha")
+	"""
+	# Use display_name for sprite lookup if provided, otherwise fall back to ID
+	var lookup_name = display_name.to_lower() if not display_name.is_empty() else combatant_id.to_lower()
+
+	print("[BattleSpriteAnimator] Creating sprite for combatant ID: %s, Display Name: %s, Lookup: %s" % [combatant_id, display_name, lookup_name])
 	print("[BattleSpriteAnimator] Available character sprites: %s" % str(character_sprites.keys()))
 	print("[BattleSpriteAnimator] Parent node: %s" % str(parent))
 
 	# For hero, use layered system (body + hair)
-	if member_id == "hero":
+	if combatant_id.to_lower() == "hero":
 		return _create_layered_sprite_for_hero(combatant_id, parent)
 
-	if not character_sprites.has(member_id):
-		push_error("[BattleSpriteAnimator] No sprite sheet found for: " + member_id)
+	if not character_sprites.has(lookup_name):
+		push_error("[BattleSpriteAnimator] No sprite sheet found for: %s (display_name: %s, id: %s)" % [lookup_name, display_name, combatant_id])
 		return null
 
 	var sprite = Sprite2D.new()
 	sprite.name = "BattleSprite_" + combatant_id
 	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST  # Pixel-perfect rendering
 
-	# Load texture
-	var texture_path = character_sprites[member_id]
+	# Load texture using the lookup name
+	var texture_path = character_sprites[lookup_name]
 	var texture = load(texture_path)
 	if texture:
 		sprite.texture = texture
