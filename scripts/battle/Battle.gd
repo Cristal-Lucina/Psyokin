@@ -6866,6 +6866,7 @@ func _execute_skill_single(target: Dictionary) -> void:
 	# Get skill info
 	var skill_id = String(skill_to_use.get("skill_id", ""))
 	var skill_name = String(skill_to_use.get("name", "Unknown"))
+	var skill_type = String(skill_to_use.get("type", "Attack")).to_lower()
 	var mp_cost = int(skill_to_use.get("cost_mp", 0))
 	var element = String(skill_to_use.get("element", "none")).to_lower()
 	var power = int(skill_to_use.get("power", 30))
@@ -6910,13 +6911,31 @@ func _execute_skill_single(target: Dictionary) -> void:
 	var minigame_result = await minigame_mgr.launch_skill_minigame(focus_stat, skill_sequence, skill_tier, mind_type, status_effects)
 	_hide_instruction()
 
-	# Play skill animation (Bow Shot)
+	# Play skill animation based on skill type
 	if sprite_animator and current_combatant.is_ally:
-		sprite_animator.play_animation(current_combatant.id, "Bow Shot", "RIGHT", false, true)
-		print("[Battle] Playing skill animation: Bow Shot for %s" % current_combatant.id)
+		var anim_name = "Bow Shot"  # Default
+		var anim_duration = 1.2
 
-		# Wait for animation to play (about 1 second for Bow Shot)
-		await get_tree().create_timer(1.2).timeout
+		# Map skill type to animation
+		match skill_type:
+			"pierce":
+				anim_name = "Spear Strike"
+				anim_duration = 0.6
+			"slash":
+				anim_name = "Sword Strike"
+				anim_duration = 0.6
+			"blunt":
+				anim_name = "Hammer Strike"
+				anim_duration = 0.6
+			_:
+				anim_name = "Bow Shot"  # Default for magic/ranged
+				anim_duration = 1.2
+
+		sprite_animator.play_animation(current_combatant.id, anim_name, "RIGHT", false, true)
+		print("[Battle] Playing skill animation: %s for %s (type: %s)" % [anim_name, current_combatant.id, skill_type])
+
+		# Wait for animation to play
+		await get_tree().create_timer(anim_duration).timeout
 
 	# Slide character back immediately after minigame closes
 	await _reset_turn_indicator()
