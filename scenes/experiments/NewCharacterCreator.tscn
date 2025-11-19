@@ -1,0 +1,184 @@
+[gd_scene load_steps=3 format=3 uid="uid://b3v8fbalm54ny"]
+
+[ext_resource type="Script" path="res://scripts/experiments/NewCharacterCreator.gd" id="1_script"]
+[ext_resource type="Shader" path="res://assets/shaders/palette_swap.gdshader" id="2_shader"]
+
+[node name="NewCharacterCreatorExperiment" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_script")
+
+[node name="BackgroundPanel" type="Panel" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="MainContainer" type="HBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="PreviewPanel" type="PanelContainer" parent="MainContainer"]
+custom_minimum_size = Vector2(600, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 2.0
+
+[node name="PreviewContainer" type="VBoxContainer" parent="MainContainer/PreviewPanel"]
+layout_mode = 2
+
+[node name="Title" type="Label" parent="MainContainer/PreviewPanel/PreviewContainer"]
+layout_mode = 2
+text = "New Character System Preview"
+horizontal_alignment = 1
+
+[node name="CenterContainer" type="CenterContainer" parent="MainContainer/PreviewPanel/PreviewContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="CharacterLayers" type="Node2D" parent="MainContainer/PreviewPanel/PreviewContainer/CenterContainer"]
+position = Vector2(300, 300)
+scale = Vector2(3, 3)
+
+[node name="UnderSprite" type="Sprite2D" parent="MainContainer/PreviewPanel/PreviewContainer/CenterContainer/CharacterLayers"]
+texture_filter = 1
+hframes = 16
+vframes = 16
+
+[node name="BodySprite" type="Sprite2D" parent="MainContainer/PreviewPanel/PreviewContainer/CenterContainer/CharacterLayers"]
+texture_filter = 1
+hframes = 16
+vframes = 16
+
+[node name="LegwearSprite" type="Sprite2D" parent="MainContainer/PreviewPanel/PreviewContainer/CenterContainer/CharacterLayers"]
+texture_filter = 1
+hframes = 16
+vframes = 16
+
+[node name="Footwear1Sprite" type="Sprite2D" parent="MainContainer/PreviewPanel/PreviewContainer/CenterContainer/CharacterLayers"]
+texture_filter = 1
+hframes = 16
+vframes = 16
+
+[node name="BottomwearSprite" type="Sprite2D" parent="MainContainer/PreviewPanel/PreviewContainer/CenterContainer/CharacterLayers"]
+texture_filter = 1
+hframes = 16
+vframes = 16
+
+[node name="TopwearSprite" type="Sprite2D" parent="MainContainer/PreviewPanel/PreviewContainer/CenterContainer/CharacterLayers"]
+texture_filter = 1
+hframes = 16
+vframes = 16
+
+[node name="Footwear2Sprite" type="Sprite2D" parent="MainContainer/PreviewPanel/PreviewContainer/CenterContainer/CharacterLayers"]
+texture_filter = 1
+hframes = 16
+vframes = 16
+
+[node name="HandwearSprite" type="Sprite2D" parent="MainContainer/PreviewPanel/PreviewContainer/CenterContainer/CharacterLayers"]
+texture_filter = 1
+hframes = 16
+vframes = 16
+
+[node name="OverwearSprite" type="Sprite2D" parent="MainContainer/PreviewPanel/PreviewContainer/CenterContainer/CharacterLayers"]
+texture_filter = 1
+hframes = 16
+vframes = 16
+
+[node name="NeckwearSprite" type="Sprite2D" parent="MainContainer/PreviewPanel/PreviewContainer/CenterContainer/CharacterLayers"]
+texture_filter = 1
+hframes = 16
+vframes = 16
+
+[node name="EyewearSprite" type="Sprite2D" parent="MainContainer/PreviewPanel/PreviewContainer/CenterContainer/CharacterLayers"]
+texture_filter = 1
+hframes = 16
+vframes = 16
+
+[node name="HairSprite" type="Sprite2D" parent="MainContainer/PreviewPanel/PreviewContainer/CenterContainer/CharacterLayers"]
+texture_filter = 1
+hframes = 16
+vframes = 16
+
+[node name="HeadwearSprite" type="Sprite2D" parent="MainContainer/PreviewPanel/PreviewContainer/CenterContainer/CharacterLayers"]
+texture_filter = 1
+hframes = 16
+vframes = 16
+
+[node name="AnimationControls" type="HBoxContainer" parent="MainContainer/PreviewPanel/PreviewContainer"]
+layout_mode = 2
+
+[node name="FrameLabel" type="Label" parent="MainContainer/PreviewPanel/PreviewContainer/AnimationControls"]
+layout_mode = 2
+text = "Frame: 0"
+
+[node name="DirectionLabel" type="Label" parent="MainContainer/PreviewPanel/PreviewContainer/AnimationControls"]
+layout_mode = 2
+text = "Direction: South"
+
+[node name="ControlsPanel" type="PanelContainer" parent="MainContainer"]
+custom_minimum_size = Vector2(500, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="ControlsContainer" type="VBoxContainer" parent="MainContainer/ControlsPanel"]
+layout_mode = 2
+
+[node name="Title" type="Label" parent="MainContainer/ControlsPanel/ControlsContainer"]
+layout_mode = 2
+text = "New Character System Customization"
+horizontal_alignment = 1
+
+[node name="ScrollContainer" type="ScrollContainer" parent="MainContainer/ControlsPanel/ControlsContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="PartsContainer" type="VBoxContainer" parent="MainContainer/ControlsPanel/ControlsContainer/ScrollContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="DirectionControls" type="VBoxContainer" parent="MainContainer/ControlsPanel/ControlsContainer"]
+layout_mode = 2
+
+[node name="DirectionLabel" type="Label" parent="MainContainer/ControlsPanel/ControlsContainer/DirectionControls"]
+layout_mode = 2
+text = "Direction"
+
+[node name="DirectionButtons" type="HBoxContainer" parent="MainContainer/ControlsPanel/ControlsContainer/DirectionControls"]
+layout_mode = 2
+
+[node name="SouthBtn" type="Button" parent="MainContainer/ControlsPanel/ControlsContainer/DirectionControls/DirectionButtons"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "South"
+
+[node name="WestBtn" type="Button" parent="MainContainer/ControlsPanel/ControlsContainer/DirectionControls/DirectionButtons"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "West"
+
+[node name="EastBtn" type="Button" parent="MainContainer/ControlsPanel/ControlsContainer/DirectionControls/DirectionButtons"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "East"
+
+[node name="NorthBtn" type="Button" parent="MainContainer/ControlsPanel/ControlsContainer/DirectionControls/DirectionButtons"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "North"
+
+[connection signal="pressed" from="MainContainer/ControlsPanel/ControlsContainer/DirectionControls/DirectionButtons/SouthBtn" to="." method="_on_direction_changed" binds= [0]]
+[connection signal="pressed" from="MainContainer/ControlsPanel/ControlsContainer/DirectionControls/DirectionButtons/WestBtn" to="." method="_on_direction_changed" binds= [3]]
+[connection signal="pressed" from="MainContainer/ControlsPanel/ControlsContainer/DirectionControls/DirectionButtons/EastBtn" to="." method="_on_direction_changed" binds= [2]]
+[connection signal="pressed" from="MainContainer/ControlsPanel/ControlsContainer/DirectionControls/DirectionButtons/NorthBtn" to="." method="_on_direction_changed" binds= [1]]
