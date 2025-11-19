@@ -265,9 +265,9 @@ scroll_following = true
 unique_name_in_owner = true
 z_index = 103
 layout_mode = 1
-offset_left = 39.0
+offset_left = 6.0
 offset_top = 37.0
-offset_right = 249.0
+offset_right = 218.0
 offset_bottom = 274.0
 theme_override_constants/separation = 8
 
