@@ -122,7 +122,7 @@ func load_animations_from_csv():
 	file.close()
 	print("[BattleSpriteAnimator] Loaded animation keys: %d" % animations.size())
 
-func create_sprite_for_combatant(combatant_id: String, parent: Node) -> Sprite2D:
+func create_sprite_for_combatant(combatant_id: String, parent: Node) -> Node:
 	"""Create a sprite node for a party member"""
 	var member_id = combatant_id.to_lower()
 
@@ -174,7 +174,7 @@ func create_sprite_for_combatant(combatant_id: String, parent: Node) -> Sprite2D
 
 	return sprite
 
-func _create_layered_sprite_for_hero(combatant_id: String, parent: Node) -> Sprite2D:
+func _create_layered_sprite_for_hero(combatant_id: String, parent: Node) -> Node2D:
 	"""Create a layered sprite system for the hero (body + hair)"""
 	# Create a container for layers
 	var container = Node2D.new()
@@ -210,23 +210,39 @@ func _create_layered_sprite_for_hero(combatant_id: String, parent: Node) -> Spri
 			if variants.has("hair"):
 				hair_variant = variants["hair"]
 
-	# Load body texture
+	# Load body texture with fallback
 	var body_path = "res://assets/graphics/characters/New Character System/SpriteSystem/farmer_base_sheets/01body/fbas_01body_" + body_variant + ".png"
-	var body_texture = load(body_path)
+	var body_texture = null
+	if FileAccess.file_exists(body_path):
+		body_texture = load(body_path)
+
 	if body_texture:
 		body_sprite.texture = body_texture
 		print("[BattleSpriteAnimator] Loaded hero body: %s" % body_path)
 	else:
-		print("[BattleSpriteAnimator] Failed to load hero body: %s" % body_path)
+		print("[BattleSpriteAnimator] Failed to load hero body: %s, using default" % body_path)
+		# Fallback to default
+		var default_body_path = "res://assets/graphics/characters/New Character System/SpriteSystem/farmer_base_sheets/01body/fbas_01body_human_00.png"
+		body_texture = load(default_body_path)
+		if body_texture:
+			body_sprite.texture = body_texture
 
-	# Load hair texture
+	# Load hair texture with fallback
 	var hair_path = "res://assets/graphics/characters/New Character System/SpriteSystem/farmer_base_sheets/13hair/fbas_13hair_" + hair_variant + ".png"
-	var hair_texture = load(hair_path)
+	var hair_texture = null
+	if FileAccess.file_exists(hair_path):
+		hair_texture = load(hair_path)
+
 	if hair_texture:
 		hair_sprite.texture = hair_texture
 		print("[BattleSpriteAnimator] Loaded hero hair: %s" % hair_path)
 	else:
-		print("[BattleSpriteAnimator] Failed to load hero hair: %s" % hair_path)
+		print("[BattleSpriteAnimator] Failed to load hero hair: %s, using default" % hair_path)
+		# Fallback to default
+		var default_hair_path = "res://assets/graphics/characters/New Character System/SpriteSystem/farmer_base_sheets/13hair/fbas_13hair_twintail_00.png"
+		hair_texture = load(default_hair_path)
+		if hair_texture:
+			hair_sprite.texture = hair_texture
 
 	# Add layers to container
 	container.add_child(body_sprite)
