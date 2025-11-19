@@ -263,6 +263,7 @@ scroll_following = true
 
 [node name="PartyStatusContainer" type="VBoxContainer" parent="."]
 unique_name_in_owner = true
+z_index = 103
 layout_mode = 1
 offset_left = 39.0
 offset_top = 37.0
