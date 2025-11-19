@@ -79,7 +79,11 @@ var current_character: String = "Layered (Body+Hair)"
 func _ready():
 	load_animations_from_csv()
 	setup_ui()
-	play_animation("Idle_DOWN")
+
+	# Only play animation if it was loaded successfully
+	if animations.has("Idle_DOWN"):
+		play_animation("Idle_DOWN")
+
 	print("FarmerSpriteAnimator ready!")
 	print("Loaded " + str(animations.size()) + " animations from CSV")
 
@@ -171,36 +175,48 @@ func load_animations_from_csv():
 
 func setup_ui():
 	# Populate dropdown
-	animation_dropdown.clear()
-	for i in range(animation_list.size()):
-		animation_dropdown.add_item(animation_list[i], i)
+	if animation_dropdown:
+		animation_dropdown.clear()
+		for i in range(animation_list.size()):
+			animation_dropdown.add_item(animation_list[i], i)
 
-	# Connect signals
-	animation_dropdown.item_selected.connect(_on_animation_selected)
-	btn_up.pressed.connect(_on_direction_pressed.bind("UP"))
-	btn_down.pressed.connect(_on_direction_pressed.bind("DOWN"))
-	btn_left.pressed.connect(_on_direction_pressed.bind("LEFT"))
-	btn_right.pressed.connect(_on_direction_pressed.bind("RIGHT"))
+		# Connect signals
+		animation_dropdown.item_selected.connect(_on_animation_selected)
 
-	# Set initial selection
-	var idle_idx = animation_list.find("Idle")
-	if idle_idx >= 0:
-		animation_dropdown.select(idle_idx)
+		# Set initial selection
+		var idle_idx = animation_list.find("Idle")
+		if idle_idx >= 0:
+			animation_dropdown.select(idle_idx)
+	else:
+		print("WARNING: AnimationDropdown UI element not found!")
+
+	# Connect direction buttons
+	if btn_up:
+		btn_up.pressed.connect(_on_direction_pressed.bind("UP"))
+	if btn_down:
+		btn_down.pressed.connect(_on_direction_pressed.bind("DOWN"))
+	if btn_left:
+		btn_left.pressed.connect(_on_direction_pressed.bind("LEFT"))
+	if btn_right:
+		btn_right.pressed.connect(_on_direction_pressed.bind("RIGHT"))
 
 	# Populate character list
-	character_list.clear()
-	var char_names = characters.keys()
-	char_names.sort()
-	for i in range(char_names.size()):
-		character_list.add_item(char_names[i], i)
+	if character_list:
+		character_list.clear()
+		var char_names = characters.keys()
+		char_names.sort()
+		for i in range(char_names.size()):
+			character_list.add_item(char_names[i], i)
 
-	# Connect character selection
-	character_list.item_selected.connect(_on_character_selected)
+		# Connect character selection
+		character_list.item_selected.connect(_on_character_selected)
 
-	# Set initial character selection
-	var layered_idx = char_names.find("Layered (Body+Hair)")
-	if layered_idx >= 0:
-		character_list.select(layered_idx)
+		# Set initial character selection
+		var layered_idx = char_names.find("Layered (Body+Hair)")
+		if layered_idx >= 0:
+			character_list.select(layered_idx)
+	else:
+		print("WARNING: CharacterList UI element not found!")
 
 func _on_animation_selected(index: int):
 	manual_mode = true
@@ -219,6 +235,10 @@ func _on_animation_selected(index: int):
 
 func _on_direction_pressed(direction: String):
 	manual_mode = true
+
+	if not animation_dropdown:
+		return
+
 	var selected_idx = animation_dropdown.get_selected_id()
 	if selected_idx < 0:
 		return
@@ -231,7 +251,8 @@ func _on_direction_pressed(direction: String):
 		update_status_label()
 	else:
 		print("Animation not found: " + anim_key)
-		status_label.text = "⚠ No " + direction + " animation for " + anim_name
+		if status_label:
+			status_label.text = "⚠ No " + direction + " animation for " + anim_name
 
 func update_status_label():
 	if status_label:
@@ -404,4 +425,5 @@ func _input(event):
 			manual_mode = !manual_mode
 			var mode_text = "UI Mode" if manual_mode else "Keyboard Mode"
 			print("Switched to: " + mode_text)
-			status_label.text = "Mode: " + mode_text
+			if status_label:
+				status_label.text = "Mode: " + mode_text
