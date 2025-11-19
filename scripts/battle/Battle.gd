@@ -1835,22 +1835,25 @@ func _display_combatants() -> void:
 		var ally = allies[i]
 		var slot = _create_combatant_slot(ally, true, i)
 
-		# Wrap in MarginContainer to apply horizontal offset for fighting stance
-		var margin_container = MarginContainer.new()
-		var x_offset = 0
-		if i == 0:  # Top slot - lean right toward center
-			x_offset = 80
-		elif i == 2:  # Bottom slot - lean left toward center
-			x_offset = -80
-
-		if x_offset > 0:
-			margin_container.add_theme_constant_override("margin_left", x_offset)
-		elif x_offset < 0:
-			margin_container.add_theme_constant_override("margin_right", abs(x_offset))
-
-		margin_container.add_child(slot)
-		ally_slots.add_child(margin_container)
+		# Add slot directly to ally_slots (no wrapper)
+		ally_slots.add_child(slot)
 		combatant_panels[ally.id] = slot
+
+		# Apply horizontal offset for fighting stance AFTER adding to scene
+		# This ensures we can see the base position first, then apply offset
+		# Wait one frame to let layout system position the slot
+		await get_tree().process_frame
+
+		var x_offset = 0
+		if i == 0:  # Top ally - lean right toward center
+			x_offset = 60
+		elif i == 2:  # Bottom ally - lean left toward center
+			x_offset = -60
+		# i == 1 (middle) stays centered with no offset
+
+		if x_offset != 0:
+			slot.position.x += x_offset
+			print("[Battle] Applied x_offset %d to ally %d (%s)" % [x_offset, i, ally.display_name])
 
 		# Create sprite for this party member
 		print("[Battle] Attempting to create sprite for ally ID: %s, Name: %s, sprite_animator null: %s" % [ally.id, ally.get("display_name", ""), sprite_animator == null])
@@ -1899,22 +1902,23 @@ func _display_combatants() -> void:
 		var enemy = enemies[i]
 		var slot = _create_combatant_slot(enemy, false, i)
 
-		# Wrap in MarginContainer to apply horizontal offset for fighting stance
-		var margin_container = MarginContainer.new()
-		var x_offset = 0
-		if i == 0:  # Top slot - lean left toward center
-			x_offset = -80
-		elif i == 2:  # Bottom slot - lean right toward center
-			x_offset = 80
-
-		if x_offset > 0:
-			margin_container.add_theme_constant_override("margin_left", x_offset)
-		elif x_offset < 0:
-			margin_container.add_theme_constant_override("margin_right", abs(x_offset))
-
-		margin_container.add_child(slot)
-		enemy_slots.add_child(margin_container)
+		# Add slot directly to enemy_slots (no wrapper)
+		enemy_slots.add_child(slot)
 		combatant_panels[enemy.id] = slot
+
+		# Apply horizontal offset for fighting stance AFTER adding to scene
+		await get_tree().process_frame
+
+		var x_offset = 0
+		if i == 0:  # Top enemy - lean left toward center
+			x_offset = -60
+		elif i == 2:  # Bottom enemy - lean right toward center
+			x_offset = 60
+		# i == 1 (middle) stays centered with no offset
+
+		if x_offset != 0:
+			slot.position.x += x_offset
+			print("[Battle] Applied x_offset %d to enemy %d (%s)" % [x_offset, i, enemy.display_name])
 
 		# Create sprite for this enemy (if available)
 		# Note: Enemies currently use capsule icons, but this allows for enemy sprites in the future
