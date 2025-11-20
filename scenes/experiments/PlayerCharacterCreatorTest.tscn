@@ -11,125 +11,141 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1")
 
-[node name="MainContainer" type="HBoxContainer" parent="."]
+[node name="MarginContainer" type="MarginContainer" parent="."]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+theme_override_constants/margin_left = 50
+theme_override_constants/margin_top = 50
+theme_override_constants/margin_right = 50
+theme_override_constants/margin_bottom = 50
 
-[node name="LeftPanel" type="PanelContainer" parent="MainContainer"]
+[node name="MainContainer" type="HBoxContainer" parent="MarginContainer"]
+layout_mode = 2
+theme_override_constants/separation = 50
+
+[node name="LeftPanel" type="PanelContainer" parent="MarginContainer/MainContainer"]
 layout_mode = 2
 size_flags_horizontal = 3
 
-[node name="ScrollContainer" type="ScrollContainer" parent="MainContainer/LeftPanel"]
+[node name="PaddingContainer" type="MarginContainer" parent="MarginContainer/MainContainer/LeftPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 50
+theme_override_constants/margin_top = 50
+theme_override_constants/margin_right = 50
+theme_override_constants/margin_bottom = 50
+
+[node name="ScrollContainer" type="ScrollContainer" parent="MarginContainer/MainContainer/LeftPanel/PaddingContainer"]
 layout_mode = 2
 
-[node name="CustomizationList" type="VBoxContainer" parent="MainContainer/LeftPanel/ScrollContainer"]
+[node name="CustomizationList" type="VBoxContainer" parent="MarginContainer/MainContainer/LeftPanel/PaddingContainer/ScrollContainer"]
 layout_mode = 2
 size_flags_horizontal = 3
 
-[node name="RightPanel" type="VBoxContainer" parent="MainContainer"]
+[node name="RightPanel" type="VBoxContainer" parent="MarginContainer/MainContainer"]
 layout_mode = 2
 size_flags_horizontal = 3
 
-[node name="PreviewContainer" type="CenterContainer" parent="MainContainer/RightPanel"]
+[node name="PreviewContainer" type="CenterContainer" parent="MarginContainer/MainContainer/RightPanel"]
 layout_mode = 2
 size_flags_vertical = 3
 
-[node name="CharacterLayers" type="Node2D" parent="MainContainer/RightPanel/PreviewContainer"]
+[node name="CharacterLayers" type="Node2D" parent="MarginContainer/MainContainer/RightPanel/PreviewContainer"]
+position = Vector2(128, 128)
 scale = Vector2(4, 4)
 
-[node name="00undr" type="Sprite2D" parent="MainContainer/RightPanel/PreviewContainer/CharacterLayers"]
+[node name="00undr" type="Sprite2D" parent="MarginContainer/MainContainer/RightPanel/PreviewContainer/CharacterLayers"]
 texture_filter = 1
 hframes = 16
 vframes = 16
 
-[node name="01body" type="Sprite2D" parent="MainContainer/RightPanel/PreviewContainer/CharacterLayers"]
+[node name="01body" type="Sprite2D" parent="MarginContainer/MainContainer/RightPanel/PreviewContainer/CharacterLayers"]
 texture_filter = 1
 hframes = 16
 vframes = 16
 
-[node name="02sock" type="Sprite2D" parent="MainContainer/RightPanel/PreviewContainer/CharacterLayers"]
+[node name="02sock" type="Sprite2D" parent="MarginContainer/MainContainer/RightPanel/PreviewContainer/CharacterLayers"]
 texture_filter = 1
 hframes = 16
 vframes = 16
 
-[node name="03fot1" type="Sprite2D" parent="MainContainer/RightPanel/PreviewContainer/CharacterLayers"]
+[node name="03fot1" type="Sprite2D" parent="MarginContainer/MainContainer/RightPanel/PreviewContainer/CharacterLayers"]
 texture_filter = 1
 hframes = 16
 vframes = 16
 
-[node name="04lwr1" type="Sprite2D" parent="MainContainer/RightPanel/PreviewContainer/CharacterLayers"]
+[node name="04lwr1" type="Sprite2D" parent="MarginContainer/MainContainer/RightPanel/PreviewContainer/CharacterLayers"]
 texture_filter = 1
 hframes = 16
 vframes = 16
 
-[node name="05shrt" type="Sprite2D" parent="MainContainer/RightPanel/PreviewContainer/CharacterLayers"]
+[node name="05shrt" type="Sprite2D" parent="MarginContainer/MainContainer/RightPanel/PreviewContainer/CharacterLayers"]
 texture_filter = 1
 hframes = 16
 vframes = 16
 
-[node name="06lwr2" type="Sprite2D" parent="MainContainer/RightPanel/PreviewContainer/CharacterLayers"]
+[node name="06lwr2" type="Sprite2D" parent="MarginContainer/MainContainer/RightPanel/PreviewContainer/CharacterLayers"]
 texture_filter = 1
 hframes = 16
 vframes = 16
 
-[node name="07fot2" type="Sprite2D" parent="MainContainer/RightPanel/PreviewContainer/CharacterLayers"]
+[node name="07fot2" type="Sprite2D" parent="MarginContainer/MainContainer/RightPanel/PreviewContainer/CharacterLayers"]
 texture_filter = 1
 hframes = 16
 vframes = 16
 
-[node name="08lwr3" type="Sprite2D" parent="MainContainer/RightPanel/PreviewContainer/CharacterLayers"]
+[node name="08lwr3" type="Sprite2D" parent="MarginContainer/MainContainer/RightPanel/PreviewContainer/CharacterLayers"]
 texture_filter = 1
 hframes = 16
 vframes = 16
 
-[node name="09hand" type="Sprite2D" parent="MainContainer/RightPanel/PreviewContainer/CharacterLayers"]
+[node name="09hand" type="Sprite2D" parent="MarginContainer/MainContainer/RightPanel/PreviewContainer/CharacterLayers"]
 texture_filter = 1
 hframes = 16
 vframes = 16
 
-[node name="10outr" type="Sprite2D" parent="MainContainer/RightPanel/PreviewContainer/CharacterLayers"]
+[node name="10outr" type="Sprite2D" parent="MarginContainer/MainContainer/RightPanel/PreviewContainer/CharacterLayers"]
 texture_filter = 1
 hframes = 16
 vframes = 16
 
-[node name="11neck" type="Sprite2D" parent="MainContainer/RightPanel/PreviewContainer/CharacterLayers"]
+[node name="11neck" type="Sprite2D" parent="MarginContainer/MainContainer/RightPanel/PreviewContainer/CharacterLayers"]
 texture_filter = 1
 hframes = 16
 vframes = 16
 
-[node name="12face" type="Sprite2D" parent="MainContainer/RightPanel/PreviewContainer/CharacterLayers"]
+[node name="12face" type="Sprite2D" parent="MarginContainer/MainContainer/RightPanel/PreviewContainer/CharacterLayers"]
 texture_filter = 1
 hframes = 16
 vframes = 16
 
-[node name="13hair" type="Sprite2D" parent="MainContainer/RightPanel/PreviewContainer/CharacterLayers"]
+[node name="13hair" type="Sprite2D" parent="MarginContainer/MainContainer/RightPanel/PreviewContainer/CharacterLayers"]
 texture_filter = 1
 hframes = 16
 vframes = 16
 
-[node name="14head" type="Sprite2D" parent="MainContainer/RightPanel/PreviewContainer/CharacterLayers"]
+[node name="14head" type="Sprite2D" parent="MarginContainer/MainContainer/RightPanel/PreviewContainer/CharacterLayers"]
 texture_filter = 1
 hframes = 16
 vframes = 16
 
-[node name="AnimationLabel" type="Label" parent="MainContainer/RightPanel"]
+[node name="AnimationLabel" type="Label" parent="MarginContainer/MainContainer/RightPanel"]
 layout_mode = 2
 text = "Animation"
 horizontal_alignment = 1
 
-[node name="AnimationButtons" type="HBoxContainer" parent="MainContainer/RightPanel"]
+[node name="AnimationButtons" type="HBoxContainer" parent="MarginContainer/MainContainer/RightPanel"]
 layout_mode = 2
 alignment = 1
 
-[node name="DirectionLabel" type="Label" parent="MainContainer/RightPanel"]
+[node name="DirectionLabel" type="Label" parent="MarginContainer/MainContainer/RightPanel"]
 layout_mode = 2
 text = "Direction"
 horizontal_alignment = 1
 
-[node name="DirectionButtons" type="HBoxContainer" parent="MainContainer/RightPanel"]
+[node name="DirectionButtons" type="HBoxContainer" parent="MarginContainer/MainContainer/RightPanel"]
 layout_mode = 2
 alignment = 1

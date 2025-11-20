@@ -28,10 +28,11 @@ const ANIMATIONS = ["Idle", "Walk", "Run", "Jump"]
 const DIRECTIONS = ["DOWN", "UP", "LEFT", "RIGHT"]
 
 # UI References
-@onready var character_preview = $MainContainer/RightPanel/PreviewContainer/CharacterLayers
-@onready var animation_buttons_container = $MainContainer/RightPanel/AnimationButtons
-@onready var direction_buttons_container = $MainContainer/RightPanel/DirectionButtons
-@onready var customization_container = $MainContainer/LeftPanel/ScrollContainer/CustomizationList
+@onready var character_preview = $MarginContainer/MainContainer/RightPanel/PreviewContainer/CharacterLayers
+@onready var animation_buttons_container = $MarginContainer/MainContainer/RightPanel/AnimationButtons
+@onready var direction_buttons_container = $MarginContainer/MainContainer/RightPanel/DirectionButtons
+@onready var customization_container = $MarginContainer/MainContainer/LeftPanel/PaddingContainer/ScrollContainer/CustomizationList
+@onready var scroll_container = $MarginContainer/MainContainer/LeftPanel/PaddingContainer/ScrollContainer
 
 # State
 var animations = {}  # Loaded from CSV
@@ -292,10 +293,17 @@ func create_layer_section(layer: Dictionary, layer_index: int) -> VBoxContainer:
 
 		section.add_child(dropdown_container)
 
-		# Dropdown menu (hidden by default)
+		# Dropdown popup panel (floating, doesn't push content)
+		var dropdown_popup = PopupPanel.new()
+		dropdown_popup.name = "DropdownPopup"
+		dropdown_popup.size = Vector2(400, 300)
+
+		var dropdown_scroll = ScrollContainer.new()
+		dropdown_popup.add_child(dropdown_scroll)
+
 		var dropdown_menu = VBoxContainer.new()
 		dropdown_menu.name = "DropdownMenu"
-		dropdown_menu.visible = false
+		dropdown_scroll.add_child(dropdown_menu)
 
 		# Populate dropdown with available parts
 		if layer.code in available_parts:
@@ -315,7 +323,7 @@ func create_layer_section(layer: Dictionary, layer_index: int) -> VBoxContainer:
 				part_button.pressed.connect(_on_part_selected.bind(layer_index, part))
 				dropdown_menu.add_child(part_button)
 
-		section.add_child(dropdown_menu)
+		section.add_child(dropdown_popup)
 
 	# Color grid label
 	var color_label = Label.new()
@@ -419,17 +427,25 @@ func _on_part_selected(layer_index: int, part):
 func toggle_dropdown(layer_index: int):
 	"""Toggle dropdown menu visibility"""
 	var section = customization_container.get_child(layer_index)
-	var dropdown_menu = section.get_node_or_null("DropdownMenu")
+	var dropdown_popup = section.get_node_or_null("DropdownPopup")
 
-	if dropdown_menu:
-		dropdown_menu.visible = not dropdown_menu.visible
-		dropdown_open = dropdown_menu.visible
+	if dropdown_popup:
+		if dropdown_popup.visible:
+			dropdown_popup.hide()
+			dropdown_open = false
+			navigation_mode = "color_grid"
+		else:
+			# Position popup below the dropdown button
+			var dropdown_container = section.get_node_or_null("DropdownContainer")
+			if dropdown_container:
+				var button_pos = dropdown_container.global_position
+				var button_size = dropdown_container.size
+				dropdown_popup.position = Vector2(button_pos.x, button_pos.y + button_size.y)
 
-		if dropdown_open:
+			dropdown_popup.popup()
+			dropdown_open = true
 			navigation_mode = "dropdown_menu"
 			dropdown_selection_index = 0
-		else:
-			navigation_mode = "color_grid"
 
 func _on_color_selected(layer_index: int, color_index: int):
 	"""Handle color selection"""
@@ -621,10 +637,12 @@ func handle_accept():
 	elif navigation_mode == "dropdown_menu":
 		# Select current dropdown item
 		var section = customization_container.get_child(current_layer_index)
-		var dropdown_menu = section.get_node_or_null("DropdownMenu")
-		if dropdown_menu and dropdown_selection_index < dropdown_menu.get_child_count():
-			var selected_button = dropdown_menu.get_child(dropdown_selection_index)
-			selected_button.emit_signal("pressed")
+		var dropdown_popup = section.get_node_or_null("DropdownPopup")
+		if dropdown_popup:
+			var dropdown_menu = dropdown_popup.get_node("ScrollContainer/DropdownMenu")
+			if dropdown_menu and dropdown_selection_index < dropdown_menu.get_child_count():
+				var selected_button = dropdown_menu.get_child(dropdown_selection_index)
+				selected_button.emit_signal("pressed")
 	elif navigation_mode == "color_grid":
 		# Select current color
 		_on_color_selected(current_layer_index, color_grid_index)
@@ -642,11 +660,13 @@ func handle_up():
 		# Navigate dropdown menu
 		dropdown_selection_index -= 1
 		var section = customization_container.get_child(current_layer_index)
-		var dropdown_menu = section.get_node_or_null("DropdownMenu")
-		if dropdown_menu:
-			# Wrap to bottom
-			if dropdown_selection_index < 0:
-				dropdown_selection_index = dropdown_menu.get_child_count() - 1
+		var dropdown_popup = section.get_node_or_null("DropdownPopup")
+		if dropdown_popup:
+			var dropdown_menu = dropdown_popup.get_node("ScrollContainer/DropdownMenu")
+			if dropdown_menu:
+				# Wrap to bottom
+				if dropdown_selection_index < 0:
+					dropdown_selection_index = dropdown_menu.get_child_count() - 1
 	elif navigation_mode == "color_grid":
 		# Navigate up in color grid (10 per row)
 		var layer = LAYERS[current_layer_index]
@@ -662,6 +682,7 @@ func handle_up():
 			color_grid_index = new_layer.max_colors - 1
 
 	update_focus_visual()
+	ensure_section_visible()
 
 func handle_down():
 	"""Handle down navigation"""
@@ -669,11 +690,13 @@ func handle_down():
 		# Navigate dropdown menu
 		dropdown_selection_index += 1
 		var section = customization_container.get_child(current_layer_index)
-		var dropdown_menu = section.get_node_or_null("DropdownMenu")
-		if dropdown_menu:
-			# Wrap to top
-			if dropdown_selection_index >= dropdown_menu.get_child_count():
-				dropdown_selection_index = 0
+		var dropdown_popup = section.get_node_or_null("DropdownPopup")
+		if dropdown_popup:
+			var dropdown_menu = dropdown_popup.get_node("ScrollContainer/DropdownMenu")
+			if dropdown_menu:
+				# Wrap to top
+				if dropdown_selection_index >= dropdown_menu.get_child_count():
+					dropdown_selection_index = 0
 	elif navigation_mode == "color_grid":
 		# Navigate down in color grid
 		var layer = LAYERS[current_layer_index]
@@ -688,6 +711,7 @@ func handle_down():
 			color_grid_index = 0
 
 	update_focus_visual()
+	ensure_section_visible()
 
 func handle_left():
 	"""Handle left navigation"""
@@ -722,28 +746,52 @@ func update_focus_visual():
 					# Remove focus outline
 					btn.modulate = Color.WHITE
 
-		var dropdown_menu = section.get_node_or_null("DropdownMenu")
-		if dropdown_menu:
-			for btn_idx in range(dropdown_menu.get_child_count()):
-				var btn = dropdown_menu.get_child(btn_idx)
-				if btn is Button:
-					btn.modulate = Color.WHITE
+		var dropdown_popup = section.get_node_or_null("DropdownPopup")
+		if dropdown_popup:
+			var dropdown_menu = dropdown_popup.get_node_or_null("ScrollContainer/DropdownMenu")
+			if dropdown_menu:
+				for btn_idx in range(dropdown_menu.get_child_count()):
+					var btn = dropdown_menu.get_child(btn_idx)
+					if btn is Button:
+						btn.modulate = Color.WHITE
 
 	# Add focus indicator to current element
 	var current_section = customization_container.get_child(current_layer_index)
 
 	if navigation_mode == "dropdown_menu":
-		var dropdown_menu = current_section.get_node_or_null("DropdownMenu")
-		if dropdown_menu and dropdown_selection_index < dropdown_menu.get_child_count():
-			var focused_btn = dropdown_menu.get_child(dropdown_selection_index)
-			if focused_btn is Button:
-				focused_btn.modulate = Color(1.5, 1.5, 0.5)  # Yellow highlight
+		var dropdown_popup = current_section.get_node_or_null("DropdownPopup")
+		if dropdown_popup:
+			var dropdown_menu = dropdown_popup.get_node_or_null("ScrollContainer/DropdownMenu")
+			if dropdown_menu and dropdown_selection_index < dropdown_menu.get_child_count():
+				var focused_btn = dropdown_menu.get_child(dropdown_selection_index)
+				if focused_btn is Button:
+					focused_btn.modulate = Color(1.5, 1.5, 0.5)  # Yellow highlight
 	elif navigation_mode == "color_grid":
 		var color_grid = current_section.get_node_or_null("ColorGrid")
 		if color_grid and color_grid_index < color_grid.get_child_count():
 			var focused_btn = color_grid.get_child(color_grid_index)
 			if focused_btn is Button:
 				focused_btn.modulate = Color(1.5, 1.5, 0.5)  # Yellow highlight
+
+func ensure_section_visible():
+	"""Scroll to keep the current section visible"""
+	if current_layer_index < 0 or current_layer_index >= customization_container.get_child_count():
+		return
+
+	var current_section = customization_container.get_child(current_layer_index)
+	var section_pos = current_section.position.y
+	var section_height = current_section.size.y
+
+	var scroll_pos = scroll_container.scroll_vertical
+	var viewport_height = scroll_container.size.y
+
+	# Scroll down if section is below viewport
+	if section_pos + section_height > scroll_pos + viewport_height:
+		scroll_container.scroll_vertical = section_pos + section_height - viewport_height
+
+	# Scroll up if section is above viewport
+	elif section_pos < scroll_pos:
+		scroll_container.scroll_vertical = section_pos
 
 # ========== END CONTROLLER NAVIGATION ==========
 
