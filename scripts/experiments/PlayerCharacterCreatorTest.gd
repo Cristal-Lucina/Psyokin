@@ -45,9 +45,11 @@ var current_frame_index = 0
 var animation_timer = 0.0
 
 # Navigation state
-var current_focus_path = []  # [layer_index, "dropdown" or "color_grid", grid_index]
+var current_layer_index = 0  # Which layer section is focused
+var focus_mode = "color_grid"  # "dropdown_button", "dropdown_menu", or "color_grid"
+var dropdown_selection_index = 0  # Current selection in dropdown menu
+var color_grid_index = 0  # Current selection in color grid
 var dropdown_open = false
-var dropdown_scroll_position = 0
 
 func _ready():
 	print("=== PLAYER CHARACTER CREATOR TEST ===")
@@ -57,6 +59,39 @@ func _ready():
 	build_ui()
 	set_default_character()
 	update_preview()
+	update_focus_visual()
+
+func _unhandled_input(event):
+	"""Handle controller/keyboard input"""
+	# Accept/Confirm button (A button, Enter, Space)
+	if event.is_action_pressed("ui_accept"):
+		handle_accept()
+		get_viewport().set_input_as_handled()
+
+	# Back/Cancel button (B button, Escape, Backspace)
+	elif event.is_action_pressed("ui_cancel"):
+		handle_back()
+		get_viewport().set_input_as_handled()
+
+	# Navigate up
+	elif event.is_action_pressed("ui_up"):
+		handle_up()
+		get_viewport().set_input_as_handled()
+
+	# Navigate down
+	elif event.is_action_pressed("ui_down"):
+		handle_down()
+		get_viewport().set_input_as_handled()
+
+	# Navigate left
+	elif event.is_action_pressed("ui_left"):
+		handle_left()
+		get_viewport().set_input_as_handled()
+
+	# Navigate right
+	elif event.is_action_pressed("ui_right"):
+		handle_right()
+		get_viewport().set_input_as_handled()
 
 func load_palette_images():
 	"""Load all palette images for color swapping"""
@@ -261,6 +296,25 @@ func create_layer_section(layer: Dictionary, layer_index: int) -> VBoxContainer:
 		var dropdown_menu = VBoxContainer.new()
 		dropdown_menu.name = "DropdownMenu"
 		dropdown_menu.visible = false
+
+		# Populate dropdown with available parts
+		if layer.code in available_parts:
+			# Add "None" option
+			var none_option = Button.new()
+			none_option.text = "None"
+			none_option.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			none_option.pressed.connect(_on_part_selected.bind(layer_index, null))
+			dropdown_menu.add_child(none_option)
+
+			# Add all available parts
+			for part_index in range(available_parts[layer.code].size()):
+				var part = available_parts[layer.code][part_index]
+				var part_button = Button.new()
+				part_button.text = part.display_name
+				part_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+				part_button.pressed.connect(_on_part_selected.bind(layer_index, part))
+				dropdown_menu.add_child(part_button)
+
 		section.add_child(dropdown_menu)
 
 	# Color grid label
@@ -337,8 +391,45 @@ func _on_direction_selected(direction: String):
 
 func _on_dropdown_opened(layer_index: int):
 	"""Handle dropdown button pressed"""
-	# TODO: Implement dropdown menu
-	print("Dropdown opened for layer ", layer_index)
+	toggle_dropdown(layer_index)
+
+func _on_part_selected(layer_index: int, part):
+	"""Handle part selection from dropdown"""
+	var layer = LAYERS[layer_index]
+
+	# Update selection
+	if part == null:
+		current_selections.erase(layer.code)
+	else:
+		current_selections[layer.code] = part
+
+	# Update dropdown button text
+	var section = customization_container.get_child(layer_index)
+	var dropdown_container = section.get_node_or_null("DropdownContainer")
+	if dropdown_container:
+		var dropdown_button = dropdown_container.get_node("DropdownButton")
+		dropdown_button.text = part.display_name if part != null else "None"
+
+	# Close dropdown
+	toggle_dropdown(layer_index)
+
+	# Update preview
+	update_preview()
+
+func toggle_dropdown(layer_index: int):
+	"""Toggle dropdown menu visibility"""
+	var section = customization_container.get_child(layer_index)
+	var dropdown_menu = section.get_node_or_null("DropdownMenu")
+
+	if dropdown_menu:
+		dropdown_menu.visible = not dropdown_menu.visible
+		dropdown_open = dropdown_menu.visible
+
+		if dropdown_open:
+			focus_mode = "dropdown_menu"
+			dropdown_selection_index = 0
+		else:
+			focus_mode = "color_grid"
 
 func _on_color_selected(layer_index: int, color_index: int):
 	"""Handle color selection"""
@@ -517,6 +608,144 @@ func extract_colors_from_palette(ramp_type: String, row_index: int) -> Array:
 func colors_match(c1: Color, c2: Color, tolerance: float = 0.01) -> bool:
 	"""Check if two colors match within tolerance"""
 	return abs(c1.r - c2.r) < tolerance and abs(c1.g - c2.g) < tolerance and abs(c1.b - c2.b) < tolerance
+
+# ========== CONTROLLER NAVIGATION ==========
+
+func handle_accept():
+	"""Handle accept/confirm button"""
+	var layer = LAYERS[current_layer_index]
+
+	if focus_mode == "dropdown_button":
+		# Open dropdown
+		toggle_dropdown(current_layer_index)
+	elif focus_mode == "dropdown_menu":
+		# Select current dropdown item
+		var section = customization_container.get_child(current_layer_index)
+		var dropdown_menu = section.get_node_or_null("DropdownMenu")
+		if dropdown_menu and dropdown_selection_index < dropdown_menu.get_child_count():
+			var selected_button = dropdown_menu.get_child(dropdown_selection_index)
+			selected_button.emit_signal("pressed")
+	elif focus_mode == "color_grid":
+		# Select current color
+		_on_color_selected(current_layer_index, color_grid_index)
+
+func handle_back():
+	"""Handle back/cancel button"""
+	if dropdown_open:
+		# Close dropdown
+		toggle_dropdown(current_layer_index)
+	# Otherwise do nothing (could navigate to main menu)
+
+func handle_up():
+	"""Handle up navigation"""
+	if focus_mode == "dropdown_menu":
+		# Navigate dropdown menu
+		dropdown_selection_index -= 1
+		var section = customization_container.get_child(current_layer_index)
+		var dropdown_menu = section.get_node_or_null("DropdownMenu")
+		if dropdown_menu:
+			# Wrap to bottom
+			if dropdown_selection_index < 0:
+				dropdown_selection_index = dropdown_menu.get_child_count() - 1
+	elif focus_mode == "color_grid":
+		# Navigate up in color grid (10 per row)
+		var layer = LAYERS[current_layer_index]
+		color_grid_index -= 10
+		if color_grid_index < 0:
+			# Move to previous layer
+			current_layer_index -= 1
+			if current_layer_index < 0:
+				current_layer_index = LAYERS.size() - 1  # Wrap to last layer
+
+			# Set to last color of new layer
+			var new_layer = LAYERS[current_layer_index]
+			color_grid_index = new_layer.max_colors - 1
+
+	update_focus_visual()
+
+func handle_down():
+	"""Handle down navigation"""
+	if focus_mode == "dropdown_menu":
+		# Navigate dropdown menu
+		dropdown_selection_index += 1
+		var section = customization_container.get_child(current_layer_index)
+		var dropdown_menu = section.get_node_or_null("DropdownMenu")
+		if dropdown_menu:
+			# Wrap to top
+			if dropdown_selection_index >= dropdown_menu.get_child_count():
+				dropdown_selection_index = 0
+	elif focus_mode == "color_grid":
+		# Navigate down in color grid
+		var layer = LAYERS[current_layer_index]
+		color_grid_index += 10
+		if color_grid_index >= layer.max_colors:
+			# Move to next layer
+			current_layer_index += 1
+			if current_layer_index >= LAYERS.size():
+				current_layer_index = 0  # Wrap to first layer
+
+			# Set to first color of new layer
+			color_grid_index = 0
+
+	update_focus_visual()
+
+func handle_left():
+	"""Handle left navigation"""
+	if focus_mode == "color_grid":
+		color_grid_index -= 1
+		var layer = LAYERS[current_layer_index]
+		if color_grid_index < 0:
+			color_grid_index = layer.max_colors - 1  # Wrap to last color
+
+	update_focus_visual()
+
+func handle_right():
+	"""Handle right navigation"""
+	if focus_mode == "color_grid":
+		color_grid_index += 1
+		var layer = LAYERS[current_layer_index]
+		if color_grid_index >= layer.max_colors:
+			color_grid_index = 0  # Wrap to first color
+
+	update_focus_visual()
+
+func update_focus_visual():
+	"""Update visual indicators for current focus"""
+	# Clear all focus indicators first
+	for i in range(LAYERS.size()):
+		var section = customization_container.get_child(i)
+		var color_grid = section.get_node_or_null("ColorGrid")
+		if color_grid:
+			for btn_idx in range(color_grid.get_child_count()):
+				var btn = color_grid.get_child(btn_idx)
+				if btn is Button:
+					# Remove focus outline
+					btn.modulate = Color.WHITE
+
+		var dropdown_menu = section.get_node_or_null("DropdownMenu")
+		if dropdown_menu:
+			for btn_idx in range(dropdown_menu.get_child_count()):
+				var btn = dropdown_menu.get_child(btn_idx)
+				if btn is Button:
+					btn.modulate = Color.WHITE
+
+	# Add focus indicator to current element
+	var current_section = customization_container.get_child(current_layer_index)
+
+	if focus_mode == "dropdown_menu":
+		var dropdown_menu = current_section.get_node_or_null("DropdownMenu")
+		if dropdown_menu and dropdown_selection_index < dropdown_menu.get_child_count():
+			var focused_btn = dropdown_menu.get_child(dropdown_selection_index)
+			if focused_btn is Button:
+				focused_btn.modulate = Color(1.5, 1.5, 0.5)  # Yellow highlight
+	elif focus_mode == "color_grid":
+		var color_grid = current_section.get_node_or_null("ColorGrid")
+		if color_grid and color_grid_index < color_grid.get_child_count():
+			var focused_btn = color_grid.get_child(color_grid_index)
+			if focused_btn is Button:
+				focused_btn.modulate = Color(1.5, 1.5, 0.5)  # Yellow highlight
+
+# ========== END CONTROLLER NAVIGATION ==========
 
 func _process(delta):
 	"""Handle animation playback"""
