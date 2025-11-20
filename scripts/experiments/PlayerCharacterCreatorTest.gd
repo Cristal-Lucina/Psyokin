@@ -290,6 +290,14 @@ func create_layer_section(layer: Dictionary, layer_index: int) -> VBoxContainer:
 		change_btn.focus_mode = Control.FOCUS_ALL
 		part_container.add_child(change_btn)
 
+		# Left arrow
+		var left_arrow = Button.new()
+		left_arrow.name = "LeftArrow"
+		left_arrow.text = "◀"
+		left_arrow.custom_minimum_size = Vector2(40, 40)
+		left_arrow.pressed.connect(_on_part_previous.bind(layer_index))
+		part_container.add_child(left_arrow)
+
 		# Current selection label
 		var selection_label = Label.new()
 		selection_label.name = "PartLabel"
@@ -298,6 +306,14 @@ func create_layer_section(layer: Dictionary, layer_index: int) -> VBoxContainer:
 		selection_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		selection_label.add_theme_font_size_override("font_size", 16)
 		part_container.add_child(selection_label)
+
+		# Right arrow
+		var right_arrow = Button.new()
+		right_arrow.name = "RightArrow"
+		right_arrow.text = "▶"
+		right_arrow.custom_minimum_size = Vector2(40, 40)
+		right_arrow.pressed.connect(_on_part_next.bind(layer_index))
+		part_container.add_child(right_arrow)
 
 		section.add_child(part_container)
 
@@ -361,6 +377,7 @@ func create_layer_section(layer: Dictionary, layer_index: int) -> VBoxContainer:
 	left_arrow.name = "LeftArrow"
 	left_arrow.text = "◀"
 	left_arrow.custom_minimum_size = Vector2(40, 40)
+	left_arrow.pressed.connect(_on_color_previous.bind(layer_index))
 	color_strip_row.add_child(left_arrow)
 
 	# Color strip (fixed 300px width)
@@ -383,11 +400,7 @@ func create_layer_section(layer: Dictionary, layer_index: int) -> VBoxContainer:
 			var preview_color = palette_image.get_pixel(4, i * 2)  # 3rd color
 			var style = StyleBoxFlat.new()
 			style.bg_color = preview_color
-			style.border_color = Color.BLACK
-			style.border_width_left = 1
-			style.border_width_right = 1
-			style.border_width_top = 1
-			style.border_width_bottom = 1
+			# No borders so colors touch each other
 			color_block.add_theme_stylebox_override("panel", style)
 
 		color_strip.add_child(color_block)
@@ -399,6 +412,7 @@ func create_layer_section(layer: Dictionary, layer_index: int) -> VBoxContainer:
 	right_arrow.name = "RightArrow"
 	right_arrow.text = "▶"
 	right_arrow.custom_minimum_size = Vector2(40, 40)
+	right_arrow.pressed.connect(_on_color_next.bind(layer_index))
 	color_strip_row.add_child(right_arrow)
 
 	color_bar_container.add_child(color_strip_row)
@@ -518,6 +532,28 @@ func update_part_label(layer_index: int):
 			part_label.text = parts[current_index].display_name
 		else:
 			part_label.text = "None"
+
+func _on_color_previous(layer_index: int):
+	"""Cycle to previous color"""
+	var layer = LAYERS[layer_index]
+	var color_index = current_colors.get(layer.code, 0)
+	color_index -= 1
+	if color_index < 0:
+		color_index = layer.max_colors - 1
+	current_colors[layer.code] = color_index
+	update_preview()
+	update_focus_visual()
+
+func _on_color_next(layer_index: int):
+	"""Cycle to next color"""
+	var layer = LAYERS[layer_index]
+	var color_index = current_colors.get(layer.code, 0)
+	color_index += 1
+	if color_index >= layer.max_colors:
+		color_index = 0
+	current_colors[layer.code] = color_index
+	update_preview()
+	update_focus_visual()
 
 
 func update_preview():
