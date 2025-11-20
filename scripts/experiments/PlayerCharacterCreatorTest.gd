@@ -1108,14 +1108,18 @@ func update_focus_visual():
 			var color_bar_container = color_container.get_node("ColorBarContainer")
 			var indicator_row = color_bar_container.get_node("IndicatorRow")
 			var indicator_position_spacer = indicator_row.get_node("IndicatorPositionSpacer")
+			var indicator_label = indicator_row.get_node("IndicatorLabel")
 
 			# Calculate indicator position based on current color
 			var color_index = current_colors.get(layer_data.code, 0)
 			var num_colors = layer_data.max_colors
 			var block_width = 300.0 / num_colors if num_colors > 0 else 20.0
-			var indicator_x = (color_index * block_width) + (block_width / 2.0) - 8  # Center on block
 
-			# Update spacer width to position the arrow
+			# Set indicator label width to match block width (no max width constraint)
+			indicator_label.custom_minimum_size = Vector2(block_width, 20)
+
+			# Position the spacer to place indicator at the correct block
+			var indicator_x = color_index * block_width
 			indicator_position_spacer.custom_minimum_size = Vector2(indicator_x, 20)
 
 func ensure_section_visible():
