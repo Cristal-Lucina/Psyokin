@@ -439,6 +439,8 @@ func populate_layer_options(section: Node, layer_code: String, parts: Array, ram
 
 		# Load and display palette image
 		var palette_image_path = get_palette_image_path(ramp_type)
+		var num_color_schemes = 20  # Default fallback
+
 		if FileAccess.file_exists(palette_image_path):
 			var palette_texture = load(palette_image_path)
 			if palette_texture:
@@ -449,10 +451,16 @@ func populate_layer_options(section: Node, layer_code: String, parts: Array, ram
 				palette_display.custom_minimum_size = Vector2(0, 150)
 				color_section.add_child(palette_display)
 
-		# Add color ramp buttons
+				# Calculate number of color schemes from image height
+				# Each color scheme is 2 pixels tall (2x2 blocks per color)
+				var palette_image = palette_texture.get_image()
+				num_color_schemes = palette_image.get_height() / 2
+				print("  Found ", num_color_schemes, " color schemes for ", ramp_type)
+
+		# Add color ramp buttons (all available schemes)
 		var ramp_grid = GridContainer.new()
 		ramp_grid.columns = 5
-		for i in range(20):
+		for i in range(num_color_schemes):
 			var btn = Button.new()
 			btn.text = str(i + 1)
 			btn.custom_minimum_size = Vector2(40, 30)
