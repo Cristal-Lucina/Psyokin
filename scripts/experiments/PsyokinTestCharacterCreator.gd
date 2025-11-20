@@ -416,7 +416,7 @@ func create_layer_section(layer_code: String, label: String) -> VBoxContainer:
 	section.name = layer_code + "_Section"
 
 	var section_label = Label.new()
-	section_label.text = label + " (" + layer_code + ")"
+	section_label.text = label
 	section_label.add_theme_font_size_override("font_size", 16)
 	section.add_child(section_label)
 
