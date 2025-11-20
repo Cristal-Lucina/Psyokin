@@ -463,6 +463,7 @@ func populate_layer_options(section: Node, layer_code: String, parts: Array, lay
 		# Load and display palette image
 		var palette_image_path = get_palette_image_path(ramp_type)
 		var num_color_schemes = 20  # Default fallback
+		var palette_image = null
 
 		if FileAccess.file_exists(palette_image_path):
 			var palette_texture = load(palette_image_path)
@@ -476,7 +477,7 @@ func populate_layer_options(section: Node, layer_code: String, parts: Array, lay
 
 				# Calculate number of color schemes from image height
 				# Each color scheme is 2 pixels tall (2x2 blocks per color)
-				var palette_image = palette_texture.get_image()
+				palette_image = palette_texture.get_image()
 				num_color_schemes = palette_image.get_height() / 2
 				print("  Found ", num_color_schemes, " color schemes for ", ramp_type)
 
@@ -491,6 +492,27 @@ func populate_layer_options(section: Node, layer_code: String, parts: Array, lay
 			btn.text = str(i + 1)
 			btn.custom_minimum_size = Vector2(40, 30)
 			btn.pressed.connect(_on_color_ramp_selected.bind(i, layer_code, ramp_type))
+
+			# Add color preview from 3rd color in the palette row
+			if palette_image != null:
+				# Get the 3rd color (index 2) from this row
+				# Each color is a 2x2 block, so 3rd color is at x = 2 * 2 = 4
+				var preview_color = palette_image.get_pixel(4, i * 2)
+
+				# Create a StyleBoxFlat for the button background
+				var style = StyleBoxFlat.new()
+				style.bg_color = preview_color
+				style.border_color = Color.BLACK
+				style.border_width_left = 1
+				style.border_width_right = 1
+				style.border_width_top = 1
+				style.border_width_bottom = 1
+				btn.add_theme_stylebox_override("normal", style)
+
+				# Make text more visible with a contrasting color
+				var text_color = Color.WHITE if preview_color.get_luminance() < 0.5 else Color.BLACK
+				btn.add_theme_color_override("font_color", text_color)
+
 			ramp_grid.add_child(btn)
 
 		color_section.add_child(ramp_grid)
