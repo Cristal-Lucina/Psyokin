@@ -1211,10 +1211,26 @@ func _process(delta):
 			current_frame_index = 0  # Loop back to start
 			var frame_data = anim_data.frames[current_frame_index]
 			for layer in LAYERS:
-				var sprite = character_preview.get_node_or_null(layer.code)
-				if sprite:
-					sprite.frame = frame_data.cell
-					sprite.flip_h = frame_data.flip
+				# Get actual sprite codes (handle sprite_layers for combined layers)
+				var sprite_codes = []
+				if "sprite_layers" in layer:
+					sprite_codes = layer.sprite_layers
+				else:
+					sprite_codes = [layer.code]
+
+				# Update all sprite nodes for this layer
+				for sprite_code in sprite_codes:
+					var sprite = character_preview.get_node_or_null(sprite_code)
+					if sprite:
+						sprite.frame = frame_data.cell
+						sprite.flip_h = frame_data.flip
+
+				# Also update auto-match layer if it exists (like 00undr for neckwear)
+				if "auto_match_layer" in layer:
+					var auto_sprite = character_preview.get_node_or_null(layer.auto_match_layer)
+					if auto_sprite:
+						auto_sprite.frame = frame_data.cell
+						auto_sprite.flip_h = frame_data.flip
 		return
 
 	animation_timer += delta * 1000.0  # Convert to milliseconds
@@ -1230,7 +1246,23 @@ func _process(delta):
 		# Update sprite frames
 		var frame_data = anim_data.frames[current_frame_index]
 		for layer in LAYERS:
-			var sprite = character_preview.get_node_or_null(layer.code)
-			if sprite:
-				sprite.frame = frame_data.cell
-				sprite.flip_h = frame_data.flip
+			# Get actual sprite codes (handle sprite_layers for combined layers)
+			var sprite_codes = []
+			if "sprite_layers" in layer:
+				sprite_codes = layer.sprite_layers
+			else:
+				sprite_codes = [layer.code]
+
+			# Update all sprite nodes for this layer
+			for sprite_code in sprite_codes:
+				var sprite = character_preview.get_node_or_null(sprite_code)
+				if sprite:
+					sprite.frame = frame_data.cell
+					sprite.flip_h = frame_data.flip
+
+			# Also update auto-match layer if it exists (like 00undr for neckwear)
+			if "auto_match_layer" in layer:
+				var auto_sprite = character_preview.get_node_or_null(layer.auto_match_layer)
+				if auto_sprite:
+					auto_sprite.frame = frame_data.cell
+					auto_sprite.flip_h = frame_data.flip
