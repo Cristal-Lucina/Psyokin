@@ -48,9 +48,8 @@ var current_frame_index = 0
 var animation_timer = 0.0
 
 # Navigation state
-var current_layer_index = 0  # Which layer section is focused
-var navigation_mode = "normal"  # "normal", "part_selection", "color_selection"
-var focused_element = "part"  # "part" or "color" - which Change button is focused
+var active_toggle_layer = -1  # Which layer's toggle is active (-1 = none)
+var active_toggle_type = ""  # "part" or "color" - which toggle is active
 
 func _ready():
 	print("=== PLAYER CHARACTER CREATOR TEST ===")
@@ -288,6 +287,7 @@ func create_layer_section(layer: Dictionary, layer_index: int) -> VBoxContainer:
 		change_btn.text = "Change"
 		change_btn.custom_minimum_size = Vector2(80, 40)
 		change_btn.focus_mode = Control.FOCUS_ALL
+		change_btn.pressed.connect(_on_toggle_activated.bind(layer_index, "part"))
 		part_container.add_child(change_btn)
 
 		# Left arrow
@@ -330,6 +330,7 @@ func create_layer_section(layer: Dictionary, layer_index: int) -> VBoxContainer:
 	color_change_btn.text = "Change"
 	color_change_btn.custom_minimum_size = Vector2(80, 40)
 	color_change_btn.focus_mode = Control.FOCUS_ALL
+	color_change_btn.pressed.connect(_on_toggle_activated.bind(layer_index, "color"))
 	color_change_row.add_child(color_change_btn)
 
 	var color_label = Label.new()
@@ -439,9 +440,9 @@ func set_default_character():
 		if layer.has_parts:
 			current_part_indices[layer.code] = -1
 
-	# Initialize focused element based on first layer
-	var first_layer = LAYERS[0]
-	focused_element = "part" if first_layer.has_parts else "color"
+	# No toggle active by default
+	active_toggle_layer = -1
+	active_toggle_type = ""
 
 func _on_animation_selected(anim_name: String):
 	"""Handle animation selection"""
@@ -553,6 +554,19 @@ func _on_color_next(layer_index: int):
 		color_index = 0
 	current_colors[layer.code] = color_index
 	update_preview()
+	update_focus_visual()
+
+func _on_toggle_activated(layer_index: int, toggle_type: String):
+	"""Handle Change button toggle - only one can be active at a time"""
+	# If clicking the same toggle, deactivate it
+	if active_toggle_layer == layer_index and active_toggle_type == toggle_type:
+		active_toggle_layer = -1
+		active_toggle_type = ""
+	else:
+		# Activate this toggle, deactivate all others
+		active_toggle_layer = layer_index
+		active_toggle_type = toggle_type
+
 	update_focus_visual()
 
 
@@ -744,109 +758,96 @@ func colors_match(c1: Color, c2: Color, tolerance: float = 0.01) -> bool:
 # ========== CONTROLLER NAVIGATION ==========
 
 func handle_accept():
-	"""Handle accept/confirm button"""
-	var layer = LAYERS[current_layer_index]
-
-	if navigation_mode == "normal":
-		# Entering selection mode based on focused element
-		if focused_element == "part" and layer.has_parts:
-			navigation_mode = "part_selection"
-			print("Entered part selection mode")
-		elif focused_element == "color":
-			navigation_mode = "color_selection"
-			print("Entered color selection mode")
-	elif navigation_mode == "part_selection":
-		# Exit part selection mode
-		navigation_mode = "normal"
-		print("Exited part selection mode")
-	elif navigation_mode == "color_selection":
-		# Exit color selection mode and apply selection
-		navigation_mode = "normal"
-		print("Exited color selection mode")
-
-	update_focus_visual()
+	"""Handle accept/confirm button - not used in toggle system"""
+	pass
 
 func handle_back():
-	"""Handle back/cancel button"""
-	if navigation_mode == "part_selection" or navigation_mode == "color_selection":
-		# Exit selection mode without applying
-		navigation_mode = "normal"
-		print("Cancelled selection mode")
+	"""Handle back/cancel button - deactivate current toggle"""
+	if active_toggle_layer != -1:
+		active_toggle_layer = -1
+		active_toggle_type = ""
 		update_focus_visual()
 
 func handle_up():
-	"""Handle up navigation"""
-	if navigation_mode == "normal":
-		# Move to previous layer
-		current_layer_index -= 1
-		if current_layer_index < 0:
-			current_layer_index = LAYERS.size() - 1  # Wrap to last layer
+	"""Handle up navigation - activate previous toggle"""
+	# Find previous toggle (wraps around)
+	var found_current = false
+	var prev_layer = -1
+	var prev_type = ""
 
-		# Default to part button if available, otherwise color button
-		var layer = LAYERS[current_layer_index]
-		focused_element = "part" if layer.has_parts else "color"
+	# Build list of all toggles in order
+	var toggles = []
+	for i in range(LAYERS.size()):
+		var layer = LAYERS[i]
+		if layer.has_parts:
+			toggles.append({"layer": i, "type": "part"})
+		toggles.append({"layer": i, "type": "color"})
 
-		update_focus_visual()
-		ensure_section_visible()
+	# Find current toggle index
+	var current_idx = -1
+	for i in range(toggles.size()):
+		if toggles[i].layer == active_toggle_layer and toggles[i].type == active_toggle_type:
+			current_idx = i
+			break
+
+	# Move to previous (wrap around)
+	var new_idx = current_idx - 1
+	if new_idx < 0:
+		new_idx = toggles.size() - 1
+
+	active_toggle_layer = toggles[new_idx].layer
+	active_toggle_type = toggles[new_idx].type
+
+	update_focus_visual()
+	ensure_section_visible()
 
 func handle_down():
-	"""Handle down navigation"""
-	if navigation_mode == "normal":
-		# Move to next layer
-		current_layer_index += 1
-		if current_layer_index >= LAYERS.size():
-			current_layer_index = 0  # Wrap to first layer
+	"""Handle down navigation - activate next toggle"""
+	# Build list of all toggles in order
+	var toggles = []
+	for i in range(LAYERS.size()):
+		var layer = LAYERS[i]
+		if layer.has_parts:
+			toggles.append({"layer": i, "type": "part"})
+		toggles.append({"layer": i, "type": "color"})
 
-		# Default to part button if available, otherwise color button
-		var layer = LAYERS[current_layer_index]
-		focused_element = "part" if layer.has_parts else "color"
+	# Find current toggle index
+	var current_idx = -1
+	for i in range(toggles.size()):
+		if toggles[i].layer == active_toggle_layer and toggles[i].type == active_toggle_type:
+			current_idx = i
+			break
 
-		update_focus_visual()
-		ensure_section_visible()
+	# Move to next (wrap around)
+	var new_idx = current_idx + 1
+	if new_idx >= toggles.size():
+		new_idx = 0
+
+	active_toggle_layer = toggles[new_idx].layer
+	active_toggle_type = toggles[new_idx].type
+
+	update_focus_visual()
+	ensure_section_visible()
 
 func handle_left():
-	"""Handle left navigation"""
-	var layer = LAYERS[current_layer_index]
+	"""Handle left navigation - control active toggle's selection"""
+	if active_toggle_layer == -1:
+		return
 
-	if navigation_mode == "normal":
-		# Toggle between part and color Change buttons
-		if focused_element == "color" and layer.has_parts:
-			focused_element = "part"
-			update_focus_visual()
-	elif navigation_mode == "part_selection":
-		# Cycle to previous part
-		_on_part_previous(current_layer_index)
-	elif navigation_mode == "color_selection":
-		# Slide to previous color
-		var color_index = current_colors.get(layer.code, 0)
-		color_index -= 1
-		if color_index < 0:
-			color_index = layer.max_colors - 1
-		current_colors[layer.code] = color_index
-		update_preview()
-		update_focus_visual()
+	if active_toggle_type == "part":
+		_on_part_previous(active_toggle_layer)
+	elif active_toggle_type == "color":
+		_on_color_previous(active_toggle_layer)
 
 func handle_right():
-	"""Handle right navigation"""
-	var layer = LAYERS[current_layer_index]
+	"""Handle right navigation - control active toggle's selection"""
+	if active_toggle_layer == -1:
+		return
 
-	if navigation_mode == "normal":
-		# Toggle between part and color Change buttons
-		if focused_element == "part":
-			focused_element = "color"
-			update_focus_visual()
-	elif navigation_mode == "part_selection":
-		# Cycle to next part
-		_on_part_next(current_layer_index)
-	elif navigation_mode == "color_selection":
-		# Slide to next color
-		var color_index = current_colors.get(layer.code, 0)
-		color_index += 1
-		if color_index >= layer.max_colors:
-			color_index = 0
-		current_colors[layer.code] = color_index
-		update_preview()
-		update_focus_visual()
+	if active_toggle_type == "part":
+		_on_part_next(active_toggle_layer)
+	elif active_toggle_type == "color":
+		_on_color_next(active_toggle_layer)
 
 func update_focus_visual():
 	"""Update visual indicators for current focus"""
@@ -875,45 +876,32 @@ func update_focus_visual():
 				var block = color_strip.get_child(j)
 				block.scale = Vector2(1, 1)
 
-	# Highlight current focus
-	var current_section = customization_container.get_child(current_layer_index)
-	var layer = LAYERS[current_layer_index]
+	# Highlight active toggle if one is active
+	if active_toggle_layer != -1:
+		var active_section = customization_container.get_child(active_toggle_layer)
 
-	if navigation_mode == "normal":
-		# Highlight the focused Change button
-		if focused_element == "part" and layer.has_parts:
-			var part_container = current_section.get_node("PartContainer")
+		if active_toggle_type == "part":
+			var part_container = active_section.get_node("PartContainer")
 			var part_btn = part_container.get_node("PartChangeButton")
-			part_btn.modulate = Color(1.5, 1.5, 0.5)  # Yellow highlight
-		elif focused_element == "color":
-			var color_container = current_section.get_node("ColorContainer")
+			part_btn.modulate = Color(0.5, 1.5, 0.5)  # Green highlight (active)
+
+		elif active_toggle_type == "color":
+			var color_container = active_section.get_node("ColorContainer")
 			var color_change_row = color_container.get_node("ColorChangeRow")
 			var color_btn = color_change_row.get_node("ColorChangeButton")
-			color_btn.modulate = Color(1.5, 1.5, 0.5)  # Yellow highlight
+			color_btn.modulate = Color(0.5, 1.5, 0.5)  # Green highlight (active)
 
-	elif navigation_mode == "part_selection":
-		# Highlight the part Change button (active selection mode)
-		var part_container = current_section.get_node("PartContainer")
-		var part_btn = part_container.get_node("PartChangeButton")
-		part_btn.modulate = Color(0.5, 1.5, 0.5)  # Green highlight (active mode)
+			# Highlight current color in strip
+			var color_bar_container = color_container.get_node("ColorBarContainer")
+			var color_strip_row = color_bar_container.get_node("ColorStripRow")
+			var color_strip = color_strip_row.get_node("ColorStrip")
+			var layer = LAYERS[active_toggle_layer]
+			var color_index = current_colors.get(layer.code, 0)
+			if color_index < color_strip.get_child_count():
+				var current_block = color_strip.get_child(color_index)
+				current_block.scale = Vector2(1.0, 1.2)  # Scale up current color vertically
 
-	elif navigation_mode == "color_selection":
-		# Highlight the color Change button and current color in strip
-		var color_container = current_section.get_node("ColorContainer")
-		var color_change_row = color_container.get_node("ColorChangeRow")
-		var color_btn = color_change_row.get_node("ColorChangeButton")
-		color_btn.modulate = Color(0.5, 1.5, 0.5)  # Green highlight (active mode)
-
-		# Highlight current color in strip
-		var color_bar_container = color_container.get_node("ColorBarContainer")
-		var color_strip_row = color_bar_container.get_node("ColorStripRow")
-		var color_strip = color_strip_row.get_node("ColorStrip")
-		var color_index = current_colors.get(layer.code, 0)
-		if color_index < color_strip.get_child_count():
-			var current_block = color_strip.get_child(color_index)
-			current_block.scale = Vector2(1.0, 1.2)  # Scale up current color vertically
-
-	# Update indicator arrow position for all layers (not just current)
+	# Update indicator arrow position for all layers
 	for i in range(LAYERS.size()):
 		var section = customization_container.get_child(i)
 		var layer_data = LAYERS[i]
@@ -933,13 +921,13 @@ func update_focus_visual():
 			indicator_position_spacer.custom_minimum_size = Vector2(indicator_x, 20)
 
 func ensure_section_visible():
-	"""Scroll to keep the current section visible"""
-	if current_layer_index < 0 or current_layer_index >= customization_container.get_child_count():
+	"""Scroll to keep the active section visible"""
+	if active_toggle_layer < 0 or active_toggle_layer >= customization_container.get_child_count():
 		return
 
-	var current_section = customization_container.get_child(current_layer_index)
-	var section_pos = current_section.position.y
-	var section_height = current_section.size.y
+	var active_section = customization_container.get_child(active_toggle_layer)
+	var section_pos = active_section.position.y
+	var section_height = active_section.size.y
 
 	var scroll_pos = scroll_container.scroll_vertical
 	var viewport_height = scroll_container.size.y
