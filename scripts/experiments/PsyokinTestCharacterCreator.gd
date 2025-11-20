@@ -15,20 +15,20 @@ var palette_shader = preload("res://assets/shaders/palette_swap.gdshader")
 # Layer configuration (Mana Seed system)
 const LAYERS = [
 	{"code": "00undr", "label": "Under Layer", "ramp_type": null, "hidden": true, "allow_none": true, "max_color_schemes": 0},
-	{"code": "01body", "label": "BODY", "ramp_type": "skin", "hidden": false, "allow_none": false, "max_color_schemes": 20},
-	{"code": "02sock", "label": "Legwear", "ramp_type": "3color", "hidden": false, "allow_none": true, "max_color_schemes": 50},
-	{"code": "03fot1", "label": "Footwear", "ramp_type": "3color", "hidden": false, "allow_none": true, "max_color_schemes": 50, "combine_with": "07fot2"},
-	{"code": "04lwr1", "label": "Bottomwear", "ramp_type": "3color", "hidden": false, "allow_none": true, "max_color_schemes": 50},
-	{"code": "05shrt", "label": "Topwear", "ramp_type": "3color", "hidden": false, "allow_none": true, "max_color_schemes": 50},
-	{"code": "06lwr2", "label": "Bottomwear", "ramp_type": "3color", "hidden": false, "allow_none": true, "max_color_schemes": 50},
-	{"code": "07fot2", "label": "Footwear", "ramp_type": "3color", "hidden": true, "allow_none": true, "max_color_schemes": 50},  # Combined into 03fot1
-	{"code": "08lwr3", "label": "Bottomwear", "ramp_type": "3color", "hidden": false, "allow_none": true, "max_color_schemes": 50},
-	{"code": "09hand", "label": "Handwear", "ramp_type": "3color", "hidden": false, "allow_none": true, "max_color_schemes": 50},
-	{"code": "10outr", "label": "Overwear", "ramp_type": "3color", "hidden": false, "allow_none": true, "max_color_schemes": 50},
-	{"code": "11neck", "label": "Neckwear", "ramp_type": "4color", "hidden": false, "allow_none": true, "max_color_schemes": 50},
-	{"code": "12face", "label": "Eyewear", "ramp_type": "3color", "hidden": false, "allow_none": true, "max_color_schemes": 50},
+	{"code": "01body", "label": "BODY", "ramp_type": "skin", "hidden": false, "allow_none": false, "max_color_schemes": 18},
+	{"code": "02sock", "label": "Legwear", "ramp_type": "3color", "hidden": false, "allow_none": true, "max_color_schemes": 48},
+	{"code": "03fot1", "label": "Footwear", "ramp_type": "3color", "hidden": false, "allow_none": true, "max_color_schemes": 48, "combine_with": "07fot2"},
+	{"code": "04lwr1", "label": "Bottomwear", "ramp_type": "3color", "hidden": false, "allow_none": true, "max_color_schemes": 48},
+	{"code": "05shrt", "label": "Topwear", "ramp_type": "3color", "hidden": false, "allow_none": true, "max_color_schemes": 48},
+	{"code": "06lwr2", "label": "Bottomwear", "ramp_type": "3color", "hidden": false, "allow_none": true, "max_color_schemes": 48},
+	{"code": "07fot2", "label": "Footwear", "ramp_type": "3color", "hidden": true, "allow_none": true, "max_color_schemes": 48},  # Combined into 03fot1
+	{"code": "08lwr3", "label": "Bottomwear", "ramp_type": "3color", "hidden": false, "allow_none": true, "max_color_schemes": 48},
+	{"code": "09hand", "label": "Handwear", "ramp_type": "3color", "hidden": false, "allow_none": true, "max_color_schemes": 48},
+	{"code": "10outr", "label": "Overwear", "ramp_type": "3color", "hidden": false, "allow_none": true, "max_color_schemes": 48},
+	{"code": "11neck", "label": "Neckwear", "ramp_type": "4color", "hidden": false, "allow_none": true, "max_color_schemes": 60},
+	{"code": "12face", "label": "Eyewear", "ramp_type": "3color", "hidden": false, "allow_none": true, "max_color_schemes": 48},
 	{"code": "13hair", "label": "Hairstyle", "ramp_type": "hair", "hidden": false, "allow_none": true, "max_color_schemes": 58},
-	{"code": "14head", "label": "Headwear", "ramp_type": "4color", "hidden": false, "allow_none": true, "max_color_schemes": 50}
+	{"code": "14head", "label": "Headwear", "ramp_type": "4color", "hidden": false, "allow_none": true, "max_color_schemes": 60}
 ]
 
 # Animation data parsed from CSV
