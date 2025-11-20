@@ -49,8 +49,8 @@ var animation_timer = 0.0
 
 # Navigation state
 var current_layer_index = 0  # Which layer section is focused
-var navigation_mode = "color_grid"  # "color_grid" only now
-var color_grid_index = 0  # Current selection in color grid
+var navigation_mode = "normal"  # "normal", "part_selection", "color_selection"
+var focused_element = "part"  # "part" or "color" - which Change button is focused
 
 func _ready():
 	print("=== PLAYER CHARACTER CREATOR TEST ===")
@@ -271,63 +271,71 @@ func create_layer_section(layer: Dictionary, layer_index: int) -> VBoxContainer:
 	var section = VBoxContainer.new()
 	section.name = layer.code + "_Section"
 
-	# Label
+	# Layer label
 	var label = Label.new()
 	label.text = layer.label
 	label.add_theme_font_size_override("font_size", 18)
 	section.add_child(label)
 
-	# Part selector with arrows (if layer has parts)
+	# Part selector with Change button (if layer has parts)
 	if layer.has_parts:
-		var selector_container = HBoxContainer.new()
-		selector_container.name = "SelectorContainer"
+		var part_container = HBoxContainer.new()
+		part_container.name = "PartContainer"
 
-		# Left arrow
-		var left_arrow = Button.new()
-		left_arrow.name = "LeftArrow"
-		left_arrow.text = "◀"
-		left_arrow.custom_minimum_size = Vector2(40, 40)
-		left_arrow.focus_mode = Control.FOCUS_ALL  # Make controller-selectable
-		left_arrow.pressed.connect(_on_part_previous.bind(layer_index))
-		selector_container.add_child(left_arrow)
+		# Change button
+		var change_btn = Button.new()
+		change_btn.name = "PartChangeButton"
+		change_btn.text = "Change"
+		change_btn.custom_minimum_size = Vector2(80, 40)
+		change_btn.focus_mode = Control.FOCUS_ALL
+		part_container.add_child(change_btn)
 
 		# Current selection label
 		var selection_label = Label.new()
-		selection_label.name = "SelectionLabel"
+		selection_label.name = "PartLabel"
 		selection_label.text = "None"
-		selection_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		selection_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		selection_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		selector_container.add_child(selection_label)
+		selection_label.add_theme_font_size_override("font_size", 16)
+		part_container.add_child(selection_label)
 
-		# Right arrow
-		var right_arrow = Button.new()
-		right_arrow.name = "RightArrow"
-		right_arrow.text = "▶"
-		right_arrow.custom_minimum_size = Vector2(40, 40)
-		right_arrow.focus_mode = Control.FOCUS_ALL  # Make controller-selectable
-		right_arrow.pressed.connect(_on_part_next.bind(layer_index))
-		selector_container.add_child(right_arrow)
+		section.add_child(part_container)
 
-		section.add_child(selector_container)
+	# Color selector with Change button and slider
+	var color_container = VBoxContainer.new()
+	color_container.name = "ColorContainer"
 
-	# Color grid label
+	# Change button row
+	var color_change_row = HBoxContainer.new()
+	color_change_row.name = "ColorChangeRow"
+
+	var color_change_btn = Button.new()
+	color_change_btn.name = "ColorChangeButton"
+	color_change_btn.text = "Change"
+	color_change_btn.custom_minimum_size = Vector2(80, 40)
+	color_change_btn.focus_mode = Control.FOCUS_ALL
+	color_change_row.add_child(color_change_btn)
+
 	var color_label = Label.new()
+	color_label.name = "ColorLabel"
 	color_label.text = layer.label + " Color"
-	section.add_child(color_label)
+	color_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	color_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	color_change_row.add_child(color_label)
 
-	# Color grid (10 per row)
-	var color_grid = GridContainer.new()
-	color_grid.name = "ColorGrid"
-	color_grid.columns = 10
+	color_container.add_child(color_change_row)
+
+	# Color strip/slider
+	var color_strip = HBoxContainer.new()
+	color_strip.name = "ColorStrip"
 
 	var palette_image = get_palette_image(layer.ramp_type)
 	var num_colors = min(layer.max_colors, palette_image.get_height() / 2 if palette_image else 0)
 
 	for i in range(num_colors):
-		var btn = Button.new()
-		btn.text = str(i + 1)
-		btn.custom_minimum_size = Vector2(40, 40)
-		btn.focus_mode = Control.FOCUS_ALL  # Make controller-selectable
+		var color_block = Panel.new()
+		color_block.name = "ColorBlock_" + str(i)
+		color_block.custom_minimum_size = Vector2(20, 30)
 
 		# Add color preview
 		if palette_image:
@@ -339,15 +347,12 @@ func create_layer_section(layer: Dictionary, layer_index: int) -> VBoxContainer:
 			style.border_width_right = 1
 			style.border_width_top = 1
 			style.border_width_bottom = 1
-			btn.add_theme_stylebox_override("normal", style)
+			color_block.add_theme_stylebox_override("panel", style)
 
-			var text_color = Color.WHITE if preview_color.get_luminance() < 0.5 else Color.BLACK
-			btn.add_theme_color_override("font_color", text_color)
+		color_strip.add_child(color_block)
 
-		btn.pressed.connect(_on_color_selected.bind(layer_index, i))
-		color_grid.add_child(btn)
-
-	section.add_child(color_grid)
+	color_container.add_child(color_strip)
+	section.add_child(color_container)
 
 	# Separator
 	var separator = HSeparator.new()
@@ -368,6 +373,10 @@ func set_default_character():
 	for layer in LAYERS:
 		if layer.has_parts:
 			current_part_indices[layer.code] = -1
+
+	# Initialize focused element based on first layer
+	var first_layer = LAYERS[0]
+	focused_element = "part" if first_layer.has_parts else "color"
 
 func _on_animation_selected(anim_name: String):
 	"""Handle animation selection"""
@@ -407,7 +416,7 @@ func _on_part_previous(layer_index: int):
 		current_selections[layer.code] = parts[current_index]
 
 	# Update label
-	update_selection_label(layer_index)
+	update_part_label(layer_index)
 	update_preview()
 
 func _on_part_next(layer_index: int):
@@ -436,34 +445,29 @@ func _on_part_next(layer_index: int):
 		current_selections[layer.code] = parts[current_index]
 
 	# Update label
-	update_selection_label(layer_index)
+	update_part_label(layer_index)
 	update_preview()
 
-func update_selection_label(layer_index: int):
-	"""Update the selection label text"""
+func update_part_label(layer_index: int):
+	"""Update the part selection label text"""
 	var layer = LAYERS[layer_index]
 	var section = customization_container.get_child(layer_index)
-	var selector_container = section.get_node_or_null("SelectorContainer")
-	if not selector_container:
+	var part_container = section.get_node_or_null("PartContainer")
+	if not part_container:
 		return
 
-	var selection_label = selector_container.get_node("SelectionLabel")
+	var part_label = part_container.get_node("PartLabel")
 	var current_index = current_part_indices.get(layer.code, -1)
 
 	if current_index == -1:
-		selection_label.text = "None"
+		part_label.text = "None"
 	else:
 		var parts = available_parts[layer.code]
 		if current_index < parts.size():
-			selection_label.text = parts[current_index].display_name
+			part_label.text = parts[current_index].display_name
 		else:
-			selection_label.text = "None"
+			part_label.text = "None"
 
-func _on_color_selected(layer_index: int, color_index: int):
-	"""Handle color selection"""
-	var layer = LAYERS[layer_index]
-	current_colors[layer.code] = color_index
-	update_preview()
 
 func update_preview():
 	"""Update character preview"""
@@ -654,97 +658,169 @@ func colors_match(c1: Color, c2: Color, tolerance: float = 0.01) -> bool:
 
 func handle_accept():
 	"""Handle accept/confirm button"""
-	# Select current color
-	_on_color_selected(current_layer_index, color_grid_index)
+	var layer = LAYERS[current_layer_index]
+
+	if navigation_mode == "normal":
+		# Entering selection mode based on focused element
+		if focused_element == "part" and layer.has_parts:
+			navigation_mode = "part_selection"
+			print("Entered part selection mode")
+		elif focused_element == "color":
+			navigation_mode = "color_selection"
+			print("Entered color selection mode")
+	elif navigation_mode == "part_selection":
+		# Exit part selection mode
+		navigation_mode = "normal"
+		print("Exited part selection mode")
+	elif navigation_mode == "color_selection":
+		# Exit color selection mode and apply selection
+		navigation_mode = "normal"
+		print("Exited color selection mode")
+
+	update_focus_visual()
 
 func handle_back():
 	"""Handle back/cancel button"""
-	# Could navigate to main menu or previous screen
-	pass
+	if navigation_mode == "part_selection" or navigation_mode == "color_selection":
+		# Exit selection mode without applying
+		navigation_mode = "normal"
+		print("Cancelled selection mode")
+		update_focus_visual()
 
 func handle_up():
 	"""Handle up navigation"""
-	# Navigate up in color grid (10 per row)
-	var layer = LAYERS[current_layer_index]
-	color_grid_index -= 10
-	if color_grid_index < 0:
+	if navigation_mode == "normal":
 		# Move to previous layer
 		current_layer_index -= 1
 		if current_layer_index < 0:
 			current_layer_index = LAYERS.size() - 1  # Wrap to last layer
 
-		# Set to last color of new layer
-		var new_layer = LAYERS[current_layer_index]
-		color_grid_index = new_layer.max_colors - 1
+		# Default to part button if available, otherwise color button
+		var layer = LAYERS[current_layer_index]
+		focused_element = "part" if layer.has_parts else "color"
 
-	update_focus_visual()
-	ensure_section_visible()
+		update_focus_visual()
+		ensure_section_visible()
 
 func handle_down():
 	"""Handle down navigation"""
-	# Navigate down in color grid
-	var layer = LAYERS[current_layer_index]
-	color_grid_index += 10
-	if color_grid_index >= layer.max_colors:
+	if navigation_mode == "normal":
 		# Move to next layer
 		current_layer_index += 1
 		if current_layer_index >= LAYERS.size():
 			current_layer_index = 0  # Wrap to first layer
 
-		# Set to first color of new layer
-		color_grid_index = 0
+		# Default to part button if available, otherwise color button
+		var layer = LAYERS[current_layer_index]
+		focused_element = "part" if layer.has_parts else "color"
 
-	update_focus_visual()
-	ensure_section_visible()
+		update_focus_visual()
+		ensure_section_visible()
 
 func handle_left():
 	"""Handle left navigation"""
-	# Try to use left arrow for part selection
 	var layer = LAYERS[current_layer_index]
-	if layer.has_parts:
-		_on_part_previous(current_layer_index)
-	else:
-		# Otherwise navigate color grid
-		color_grid_index -= 1
-		if color_grid_index < 0:
-			color_grid_index = layer.max_colors - 1  # Wrap to last color
 
-	update_focus_visual()
+	if navigation_mode == "normal":
+		# Toggle between part and color Change buttons
+		if focused_element == "color" and layer.has_parts:
+			focused_element = "part"
+			update_focus_visual()
+	elif navigation_mode == "part_selection":
+		# Cycle to previous part
+		_on_part_previous(current_layer_index)
+	elif navigation_mode == "color_selection":
+		# Slide to previous color
+		var color_index = current_colors.get(layer.code, 0)
+		color_index -= 1
+		if color_index < 0:
+			color_index = layer.max_colors - 1
+		current_colors[layer.code] = color_index
+		update_preview()
+		update_focus_visual()
 
 func handle_right():
 	"""Handle right navigation"""
-	# Try to use right arrow for part selection
 	var layer = LAYERS[current_layer_index]
-	if layer.has_parts:
-		_on_part_next(current_layer_index)
-	else:
-		# Otherwise navigate color grid
-		color_grid_index += 1
-		if color_grid_index >= layer.max_colors:
-			color_grid_index = 0  # Wrap to first color
 
-	update_focus_visual()
+	if navigation_mode == "normal":
+		# Toggle between part and color Change buttons
+		if focused_element == "part":
+			focused_element = "color"
+			update_focus_visual()
+	elif navigation_mode == "part_selection":
+		# Cycle to next part
+		_on_part_next(current_layer_index)
+	elif navigation_mode == "color_selection":
+		# Slide to next color
+		var color_index = current_colors.get(layer.code, 0)
+		color_index += 1
+		if color_index >= layer.max_colors:
+			color_index = 0
+		current_colors[layer.code] = color_index
+		update_preview()
+		update_focus_visual()
 
 func update_focus_visual():
 	"""Update visual indicators for current focus"""
 	# Clear all focus indicators first
 	for i in range(LAYERS.size()):
 		var section = customization_container.get_child(i)
-		var color_grid = section.get_node_or_null("ColorGrid")
-		if color_grid:
-			for btn_idx in range(color_grid.get_child_count()):
-				var btn = color_grid.get_child(btn_idx)
-				if btn is Button:
-					# Remove focus outline
-					btn.modulate = Color.WHITE
 
-	# Add focus indicator to current element
+		# Clear part button
+		var part_container = section.get_node_or_null("PartContainer")
+		if part_container:
+			var part_btn = part_container.get_node("PartChangeButton")
+			part_btn.modulate = Color.WHITE
+
+		# Clear color button and strip
+		var color_container = section.get_node_or_null("ColorContainer")
+		if color_container:
+			var color_change_row = color_container.get_node("ColorChangeRow")
+			var color_btn = color_change_row.get_node("ColorChangeButton")
+			color_btn.modulate = Color.WHITE
+
+			# Clear color strip highlights
+			var color_strip = color_container.get_node("ColorStrip")
+			for j in range(color_strip.get_child_count()):
+				var block = color_strip.get_child(j)
+				block.scale = Vector2(1, 1)
+
+	# Highlight current focus
 	var current_section = customization_container.get_child(current_layer_index)
-	var color_grid = current_section.get_node_or_null("ColorGrid")
-	if color_grid and color_grid_index < color_grid.get_child_count():
-		var focused_btn = color_grid.get_child(color_grid_index)
-		if focused_btn is Button:
-			focused_btn.modulate = Color(1.5, 1.5, 0.5)  # Yellow highlight
+	var layer = LAYERS[current_layer_index]
+
+	if navigation_mode == "normal":
+		# Highlight the focused Change button
+		if focused_element == "part" and layer.has_parts:
+			var part_container = current_section.get_node("PartContainer")
+			var part_btn = part_container.get_node("PartChangeButton")
+			part_btn.modulate = Color(1.5, 1.5, 0.5)  # Yellow highlight
+		elif focused_element == "color":
+			var color_container = current_section.get_node("ColorContainer")
+			var color_change_row = color_container.get_node("ColorChangeRow")
+			var color_btn = color_change_row.get_node("ColorChangeButton")
+			color_btn.modulate = Color(1.5, 1.5, 0.5)  # Yellow highlight
+
+	elif navigation_mode == "part_selection":
+		# Highlight the part Change button (active selection mode)
+		var part_container = current_section.get_node("PartContainer")
+		var part_btn = part_container.get_node("PartChangeButton")
+		part_btn.modulate = Color(0.5, 1.5, 0.5)  # Green highlight (active mode)
+
+	elif navigation_mode == "color_selection":
+		# Highlight the color Change button and current color in strip
+		var color_container = current_section.get_node("ColorContainer")
+		var color_change_row = color_container.get_node("ColorChangeRow")
+		var color_btn = color_change_row.get_node("ColorChangeButton")
+		color_btn.modulate = Color(0.5, 1.5, 0.5)  # Green highlight (active mode)
+
+		# Highlight current color in strip
+		var color_strip = color_container.get_node("ColorStrip")
+		var color_index = current_colors.get(layer.code, 0)
+		if color_index < color_strip.get_child_count():
+			var current_block = color_strip.get_child(color_index)
+			current_block.scale = Vector2(1.2, 1.2)  # Scale up current color
 
 func ensure_section_visible():
 	"""Scroll to keep the current section visible"""
