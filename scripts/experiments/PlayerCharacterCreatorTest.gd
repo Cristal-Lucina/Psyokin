@@ -303,7 +303,9 @@ func create_layer_section(layer: Dictionary, layer_index: int) -> VBoxContainer:
 		selection_label.name = "PartLabel"
 		selection_label.text = "None"
 		selection_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		selection_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		selection_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		selection_label.custom_minimum_size = Vector2(200, 0)
 		selection_label.add_theme_font_size_override("font_size", 16)
 		part_container.add_child(selection_label)
 
@@ -317,30 +319,18 @@ func create_layer_section(layer: Dictionary, layer_index: int) -> VBoxContainer:
 
 		section.add_child(part_container)
 
-	# Color selector with Change button and slider
-	var color_container = VBoxContainer.new()
+	# Color selector with Change button to the left
+	var color_container = HBoxContainer.new()
 	color_container.name = "ColorContainer"
 
-	# Change button row
-	var color_change_row = HBoxContainer.new()
-	color_change_row.name = "ColorChangeRow"
-
+	# Change button
 	var color_change_btn = Button.new()
 	color_change_btn.name = "ColorChangeButton"
 	color_change_btn.text = "Change"
 	color_change_btn.custom_minimum_size = Vector2(80, 40)
 	color_change_btn.focus_mode = Control.FOCUS_ALL
 	color_change_btn.pressed.connect(_on_toggle_activated.bind(layer_index, "color"))
-	color_change_row.add_child(color_change_btn)
-
-	var color_label = Label.new()
-	color_label.name = "ColorLabel"
-	color_label.text = layer.label + " Color"
-	color_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	color_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	color_change_row.add_child(color_label)
-
-	color_container.add_child(color_change_row)
+	color_container.add_child(color_change_btn)
 
 	# Color bar container with arrows
 	var color_bar_container = VBoxContainer.new()
@@ -864,8 +854,7 @@ func update_focus_visual():
 		# Clear color button and strip
 		var color_container = section.get_node_or_null("ColorContainer")
 		if color_container:
-			var color_change_row = color_container.get_node("ColorChangeRow")
-			var color_btn = color_change_row.get_node("ColorChangeButton")
+			var color_btn = color_container.get_node("ColorChangeButton")
 			color_btn.modulate = Color.WHITE
 
 			# Clear color strip highlights
@@ -887,8 +876,7 @@ func update_focus_visual():
 
 		elif active_toggle_type == "color":
 			var color_container = active_section.get_node("ColorContainer")
-			var color_change_row = color_container.get_node("ColorChangeRow")
-			var color_btn = color_change_row.get_node("ColorChangeButton")
+			var color_btn = color_container.get_node("ColorChangeButton")
 			color_btn.modulate = Color(0.5, 1.5, 0.5)  # Green highlight (active)
 
 			# Highlight current color in strip
