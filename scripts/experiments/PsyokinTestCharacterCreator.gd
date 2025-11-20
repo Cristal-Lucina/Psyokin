@@ -159,9 +159,13 @@ func extract_colors_from_palette(ramp_type: String, row_index: int) -> Array:
 			colors_per_row = 4
 
 	# Read pixels from the specified row
+	# Each color is a 2x2 pixel block in the palette image
 	# Each row in the palette image represents one color scheme
 	for i in range(colors_per_row):
-		var pixel_color = image.get_pixel(i, row_index)
+		# Calculate position in 2x2 blocks
+		var x = i * 2  # Each color block is 2 pixels wide
+		var y = row_index * 2  # Each row of colors is 2 pixels tall
+		var pixel_color = image.get_pixel(x, y)
 		colors.append(pixel_color)
 
 	return colors
@@ -662,9 +666,11 @@ func get_base_colors_for_palette_code(palette_code: String, ramp_type: String) -
 
 	# Read all colors from the base ramp (row 0, all columns)
 	# The number of colors varies by palette code
-	var num_colors = image.get_width()
+	# Each color is a 2x2 pixel block
+	var num_colors = image.get_width() / 2  # Divide by 2 since each color is 2 pixels wide
 	for i in range(num_colors):
-		var pixel_color = image.get_pixel(i, 0)
+		var x = i * 2  # Each color block is 2 pixels wide
+		var pixel_color = image.get_pixel(x, 0)
 		colors.append(pixel_color)
 
 	print("Loaded ", colors.size(), " base colors from ", base_ramp_filename)
