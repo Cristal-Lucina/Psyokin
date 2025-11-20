@@ -12,7 +12,7 @@ const ANIM_DATA_PATH = "res://scenes/test/sprite_animations_data.csv"
 const LAYERS = [
 	{"code": "01body", "label": "Skin Tone", "ramp_type": "skin", "max_colors": 18, "has_parts": false},
 	{"code": "02sock", "label": "Legwear", "ramp_type": "3color", "max_colors": 48, "has_parts": true},
-	{"code": "03fot1", "label": "Footwear", "ramp_type": "3color", "max_colors": 48, "has_parts": true},
+	{"code": "footwear", "label": "Footwear", "ramp_type": "3color", "max_colors": 48, "has_parts": true, "sprite_layers": ["03fot1", "07fot2"]},
 	{"code": "04lwr1", "label": "Bottomwear", "ramp_type": "3color", "max_colors": 48, "has_parts": true},
 	{"code": "05shrt", "label": "Topwear", "ramp_type": "3color", "max_colors": 48, "has_parts": true},
 	{"code": "09hand", "label": "Handwear", "ramp_type": "3color", "max_colors": 48, "has_parts": true},
@@ -216,26 +216,37 @@ func scan_character_assets():
 
 	for layer in LAYERS:
 		var layer_code = layer.code
-		var layer_path = SPRITE_PATH + layer_code + "/"
-		var dir = DirAccess.open(layer_path)
 
-		if dir == null:
-			print("  Layer ", layer_code, ": not found")
-			continue
+		# Check if this layer uses multiple sprite layers (like footwear)
+		var sprite_codes = []
+		if "sprite_layers" in layer:
+			sprite_codes = layer.sprite_layers
+		else:
+			sprite_codes = [layer_code]
 
 		if layer_code not in available_parts:
 			available_parts[layer_code] = []
 
-		dir.list_dir_begin()
-		var file_name = dir.get_next()
-		while file_name != "":
-			if file_name.ends_with(".png") and file_name.begins_with("fbas_"):
-				var full_path = layer_path + file_name
-				var part_info = parse_filename(file_name, layer_code)
-				part_info["path"] = full_path
-				available_parts[layer_code].append(part_info)
-			file_name = dir.get_next()
-		dir.list_dir_end()
+		# Scan all sprite layer directories
+		for sprite_code in sprite_codes:
+			var layer_path = SPRITE_PATH + sprite_code + "/"
+			var dir = DirAccess.open(layer_path)
+
+			if dir == null:
+				print("  Sprite layer ", sprite_code, ": not found")
+				continue
+
+			dir.list_dir_begin()
+			var file_name = dir.get_next()
+			while file_name != "":
+				if file_name.ends_with(".png") and file_name.begins_with("fbas_"):
+					var full_path = layer_path + file_name
+					var part_info = parse_filename(file_name, sprite_code)
+					part_info["path"] = full_path
+					part_info["sprite_code"] = sprite_code  # Track which sprite layer this belongs to
+					available_parts[layer_code].append(part_info)
+				file_name = dir.get_next()
+			dir.list_dir_end()
 
 		print("  Layer ", layer_code, ": found ", available_parts[layer_code].size(), " parts")
 
@@ -750,9 +761,13 @@ func update_preview():
 	"""Update character preview"""
 	for layer in LAYERS:
 		var layer_code = layer.code
-		var sprite = character_preview.get_node_or_null(layer_code)
-		if not sprite:
-			continue
+
+		# Get sprite codes (single or multiple for combined layers)
+		var sprite_codes = []
+		if "sprite_layers" in layer:
+			sprite_codes = layer.sprite_layers
+		else:
+			sprite_codes = [layer_code]
 
 		# Get selected part (or body for body layer)
 		var part = null
@@ -765,20 +780,33 @@ func update_preview():
 				if body_parts.size() > 0:
 					part = body_parts[0]
 
-		if part == null:
-			sprite.texture = null
-			continue
+		# Apply to all sprite nodes for this layer
+		for sprite_code in sprite_codes:
+			var sprite = character_preview.get_node_or_null(sprite_code)
+			if not sprite:
+				continue
 
-		# Load texture
-		var original_texture = load(part.path)
+			# If no part selected, clear the sprite
+			if part == null:
+				sprite.texture = null
+				continue
 
-		# Apply color mapping if color is selected
-		if layer_code in current_colors:
-			var color_index = current_colors[layer_code]
-			var recolored_texture = apply_color_mapping(original_texture, part, layer.ramp_type, color_index)
-			sprite.texture = recolored_texture
-		else:
-			sprite.texture = original_texture
+			# For combined layers (like footwear), only apply if the part belongs to this sprite layer
+			if "sprite_layers" in layer:
+				if part.sprite_code != sprite_code:
+					sprite.texture = null
+					continue
+
+			# Load texture
+			var original_texture = load(part.path)
+
+			# Apply color mapping if color is selected
+			if layer_code in current_colors:
+				var color_index = current_colors[layer_code]
+				var recolored_texture = apply_color_mapping(original_texture, part, layer.ramp_type, color_index)
+				sprite.texture = recolored_texture
+			else:
+				sprite.texture = original_texture
 
 func apply_color_mapping(original_texture: Texture2D, part: Dictionary, ramp_type: String, color_index: int) -> ImageTexture:
 	"""Apply color mapping to a texture (with caching for performance)"""
