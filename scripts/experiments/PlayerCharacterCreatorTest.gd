@@ -46,7 +46,7 @@ var animation_timer = 0.0
 
 # Navigation state
 var current_layer_index = 0  # Which layer section is focused
-var focus_mode = "color_grid"  # "dropdown_button", "dropdown_menu", or "color_grid"
+var navigation_mode = "color_grid"  # "dropdown_button", "dropdown_menu", or "color_grid"
 var dropdown_selection_index = 0  # Current selection in dropdown menu
 var color_grid_index = 0  # Current selection in color grid
 var dropdown_open = false
@@ -426,10 +426,10 @@ func toggle_dropdown(layer_index: int):
 		dropdown_open = dropdown_menu.visible
 
 		if dropdown_open:
-			focus_mode = "dropdown_menu"
+			navigation_mode = "dropdown_menu"
 			dropdown_selection_index = 0
 		else:
-			focus_mode = "color_grid"
+			navigation_mode = "color_grid"
 
 func _on_color_selected(layer_index: int, color_index: int):
 	"""Handle color selection"""
@@ -615,17 +615,17 @@ func handle_accept():
 	"""Handle accept/confirm button"""
 	var layer = LAYERS[current_layer_index]
 
-	if focus_mode == "dropdown_button":
+	if navigation_mode == "dropdown_button":
 		# Open dropdown
 		toggle_dropdown(current_layer_index)
-	elif focus_mode == "dropdown_menu":
+	elif navigation_mode == "dropdown_menu":
 		# Select current dropdown item
 		var section = customization_container.get_child(current_layer_index)
 		var dropdown_menu = section.get_node_or_null("DropdownMenu")
 		if dropdown_menu and dropdown_selection_index < dropdown_menu.get_child_count():
 			var selected_button = dropdown_menu.get_child(dropdown_selection_index)
 			selected_button.emit_signal("pressed")
-	elif focus_mode == "color_grid":
+	elif navigation_mode == "color_grid":
 		# Select current color
 		_on_color_selected(current_layer_index, color_grid_index)
 
@@ -638,7 +638,7 @@ func handle_back():
 
 func handle_up():
 	"""Handle up navigation"""
-	if focus_mode == "dropdown_menu":
+	if navigation_mode == "dropdown_menu":
 		# Navigate dropdown menu
 		dropdown_selection_index -= 1
 		var section = customization_container.get_child(current_layer_index)
@@ -647,7 +647,7 @@ func handle_up():
 			# Wrap to bottom
 			if dropdown_selection_index < 0:
 				dropdown_selection_index = dropdown_menu.get_child_count() - 1
-	elif focus_mode == "color_grid":
+	elif navigation_mode == "color_grid":
 		# Navigate up in color grid (10 per row)
 		var layer = LAYERS[current_layer_index]
 		color_grid_index -= 10
@@ -665,7 +665,7 @@ func handle_up():
 
 func handle_down():
 	"""Handle down navigation"""
-	if focus_mode == "dropdown_menu":
+	if navigation_mode == "dropdown_menu":
 		# Navigate dropdown menu
 		dropdown_selection_index += 1
 		var section = customization_container.get_child(current_layer_index)
@@ -674,7 +674,7 @@ func handle_down():
 			# Wrap to top
 			if dropdown_selection_index >= dropdown_menu.get_child_count():
 				dropdown_selection_index = 0
-	elif focus_mode == "color_grid":
+	elif navigation_mode == "color_grid":
 		# Navigate down in color grid
 		var layer = LAYERS[current_layer_index]
 		color_grid_index += 10
@@ -691,7 +691,7 @@ func handle_down():
 
 func handle_left():
 	"""Handle left navigation"""
-	if focus_mode == "color_grid":
+	if navigation_mode == "color_grid":
 		color_grid_index -= 1
 		var layer = LAYERS[current_layer_index]
 		if color_grid_index < 0:
@@ -701,7 +701,7 @@ func handle_left():
 
 func handle_right():
 	"""Handle right navigation"""
-	if focus_mode == "color_grid":
+	if navigation_mode == "color_grid":
 		color_grid_index += 1
 		var layer = LAYERS[current_layer_index]
 		if color_grid_index >= layer.max_colors:
@@ -732,13 +732,13 @@ func update_focus_visual():
 	# Add focus indicator to current element
 	var current_section = customization_container.get_child(current_layer_index)
 
-	if focus_mode == "dropdown_menu":
+	if navigation_mode == "dropdown_menu":
 		var dropdown_menu = current_section.get_node_or_null("DropdownMenu")
 		if dropdown_menu and dropdown_selection_index < dropdown_menu.get_child_count():
 			var focused_btn = dropdown_menu.get_child(dropdown_selection_index)
 			if focused_btn is Button:
 				focused_btn.modulate = Color(1.5, 1.5, 0.5)  # Yellow highlight
-	elif focus_mode == "color_grid":
+	elif navigation_mode == "color_grid":
 		var color_grid = current_section.get_node_or_null("ColorGrid")
 		if color_grid and color_grid_index < color_grid.get_child_count():
 			var focused_btn = color_grid.get_child(color_grid_index)
