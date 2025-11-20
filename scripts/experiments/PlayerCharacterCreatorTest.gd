@@ -261,7 +261,7 @@ func build_animation_controls():
 	l1_btn.name = "L1Button"
 	l1_btn.text = "L1"
 	l1_btn.custom_minimum_size = Vector2(60, 40)
-	l1_btn.focus_mode = Control.FOCUS_ALL
+	l1_btn.focus_mode = Control.FOCUS_NONE  # Not controller-selectable, only for display
 	l1_btn.pressed.connect(_on_animation_previous)
 	anim_label_container.add_child(l1_btn)
 
@@ -276,7 +276,7 @@ func build_animation_controls():
 	r1_btn.name = "R1Button"
 	r1_btn.text = "R1"
 	r1_btn.custom_minimum_size = Vector2(60, 40)
-	r1_btn.focus_mode = Control.FOCUS_ALL
+	r1_btn.focus_mode = Control.FOCUS_NONE  # Not controller-selectable, only for display
 	r1_btn.pressed.connect(_on_animation_next)
 	anim_label_container.add_child(r1_btn)
 
@@ -299,7 +299,7 @@ func build_animation_controls():
 	l2_btn.name = "L2Button"
 	l2_btn.text = "L2"
 	l2_btn.custom_minimum_size = Vector2(60, 40)
-	l2_btn.focus_mode = Control.FOCUS_ALL
+	l2_btn.focus_mode = Control.FOCUS_NONE  # Not controller-selectable, only for display
 	l2_btn.pressed.connect(_on_direction_previous)
 	dir_label_container.add_child(l2_btn)
 
@@ -314,7 +314,7 @@ func build_animation_controls():
 	r2_btn.name = "R2Button"
 	r2_btn.text = "R2"
 	r2_btn.custom_minimum_size = Vector2(60, 40)
-	r2_btn.focus_mode = Control.FOCUS_ALL
+	r2_btn.focus_mode = Control.FOCUS_NONE  # Not controller-selectable, only for display
 	r2_btn.pressed.connect(_on_direction_next)
 	dir_label_container.add_child(r2_btn)
 
@@ -505,9 +505,9 @@ func set_default_character():
 		if layer.has_parts:
 			current_part_indices[layer.code] = -1
 
-	# No toggle active by default
-	active_toggle_layer = -1
-	active_toggle_type = ""
+	# Activate the first toggle (Skin Tone color) by default so left/right works immediately
+	active_toggle_layer = 0  # First layer (Skin Tone)
+	active_toggle_type = "color"  # Color toggle
 
 func _on_animation_selected(anim_name: String):
 	"""Handle animation selection"""
