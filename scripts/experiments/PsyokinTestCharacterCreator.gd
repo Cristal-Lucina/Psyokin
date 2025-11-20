@@ -25,10 +25,10 @@ const LAYERS = [
 	{"code": "08lwr3", "label": "Bottomwear", "ramp_type": "3color", "hidden": false, "allow_none": true, "max_color_schemes": 48},
 	{"code": "09hand", "label": "Handwear", "ramp_type": "3color", "hidden": false, "allow_none": true, "max_color_schemes": 48},
 	{"code": "10outr", "label": "Overwear", "ramp_type": "3color", "hidden": false, "allow_none": true, "max_color_schemes": 48},
-	{"code": "11neck", "label": "Neckwear", "ramp_type": "4color", "hidden": false, "allow_none": true, "max_color_schemes": 60},
+	{"code": "11neck", "label": "Neckwear", "ramp_type": "4color", "hidden": false, "allow_none": true, "max_color_schemes": 59},
 	{"code": "12face", "label": "Eyewear", "ramp_type": "3color", "hidden": false, "allow_none": true, "max_color_schemes": 48},
 	{"code": "13hair", "label": "Hairstyle", "ramp_type": "hair", "hidden": false, "allow_none": true, "max_color_schemes": 58},
-	{"code": "14head", "label": "Headwear", "ramp_type": "4color", "hidden": false, "allow_none": true, "max_color_schemes": 60}
+	{"code": "14head", "label": "Headwear", "ramp_type": "4color", "hidden": false, "allow_none": true, "max_color_schemes": 59}
 ]
 
 # Animation data parsed from CSV
