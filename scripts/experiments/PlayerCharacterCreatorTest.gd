@@ -31,7 +31,7 @@ const DIRECTIONS = ["DOWN", "UP", "LEFT", "RIGHT"]
 @onready var character_preview = $MarginContainer/MainContainer/RightPanel/PreviewContainer/CharacterLayers
 @onready var animation_buttons_container = $MarginContainer/MainContainer/RightPanel/AnimationButtons
 @onready var direction_buttons_container = $MarginContainer/MainContainer/RightPanel/DirectionButtons
-@onready var customization_container = $MarginContainer/MainContainer/LeftPanel/PaddingContainer/ScrollContainer/CustomizationList
+@onready var customization_container = $MarginContainer/MainContainer/LeftPanel/PaddingContainer/ScrollContainer/ScrollPadding/CustomizationList
 @onready var scroll_container = $MarginContainer/MainContainer/LeftPanel/PaddingContainer/ScrollContainer
 
 # State

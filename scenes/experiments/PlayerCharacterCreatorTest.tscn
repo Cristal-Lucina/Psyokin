@@ -42,7 +42,11 @@ theme_override_constants/margin_bottom = 50
 [node name="ScrollContainer" type="ScrollContainer" parent="MarginContainer/MainContainer/LeftPanel/PaddingContainer"]
 layout_mode = 2
 
-[node name="CustomizationList" type="VBoxContainer" parent="MarginContainer/MainContainer/LeftPanel/PaddingContainer/ScrollContainer"]
+[node name="ScrollPadding" type="MarginContainer" parent="MarginContainer/MainContainer/LeftPanel/PaddingContainer/ScrollContainer"]
+layout_mode = 2
+theme_override_constants/margin_right = 15
+
+[node name="CustomizationList" type="VBoxContainer" parent="MarginContainer/MainContainer/LeftPanel/PaddingContainer/ScrollContainer/ScrollPadding"]
 layout_mode = 2
 size_flags_horizontal = 3
 
