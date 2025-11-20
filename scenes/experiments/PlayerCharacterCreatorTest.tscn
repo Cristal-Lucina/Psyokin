@@ -54,7 +54,7 @@ layout_mode = 2
 size_flags_vertical = 3
 
 [node name="CharacterLayers" type="Node2D" parent="MarginContainer/MainContainer/RightPanel/PreviewContainer"]
-position = Vector2(128, 128)
+position = Vector2(228, 328)
 scale = Vector2(4, 4)
 
 [node name="00undr" type="Sprite2D" parent="MarginContainer/MainContainer/RightPanel/PreviewContainer/CharacterLayers"]

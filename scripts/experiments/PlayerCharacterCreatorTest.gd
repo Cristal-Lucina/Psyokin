@@ -38,6 +38,7 @@ const DIRECTIONS = ["DOWN", "UP", "LEFT", "RIGHT"]
 var animations = {}  # Loaded from CSV
 var available_parts = {}  # Scanned sprite parts
 var palette_images = {}  # Cached palette images
+var texture_cache = {}  # Cached recolored textures for performance
 var current_selections = {}  # Current part selections {layer_code: part}
 var current_part_indices = {}  # Current part index for each layer {layer_code: index}
 var current_colors = {}  # Current color selections
@@ -242,6 +243,7 @@ func build_animation_controls():
 	for anim in ANIMATIONS:
 		var btn = Button.new()
 		btn.text = anim
+		btn.focus_mode = Control.FOCUS_ALL  # Make controller-selectable
 		btn.pressed.connect(_on_animation_selected.bind(anim))
 		animation_buttons_container.add_child(btn)
 
@@ -253,6 +255,7 @@ func build_animation_controls():
 			"DOWN": btn.text = "↓"
 			"LEFT": btn.text = "←"
 			"RIGHT": btn.text = "→"
+		btn.focus_mode = Control.FOCUS_ALL  # Make controller-selectable
 		btn.pressed.connect(_on_direction_selected.bind(dir))
 		direction_buttons_container.add_child(btn)
 
@@ -284,6 +287,7 @@ func create_layer_section(layer: Dictionary, layer_index: int) -> VBoxContainer:
 		left_arrow.name = "LeftArrow"
 		left_arrow.text = "◀"
 		left_arrow.custom_minimum_size = Vector2(40, 40)
+		left_arrow.focus_mode = Control.FOCUS_ALL  # Make controller-selectable
 		left_arrow.pressed.connect(_on_part_previous.bind(layer_index))
 		selector_container.add_child(left_arrow)
 
@@ -300,6 +304,7 @@ func create_layer_section(layer: Dictionary, layer_index: int) -> VBoxContainer:
 		right_arrow.name = "RightArrow"
 		right_arrow.text = "▶"
 		right_arrow.custom_minimum_size = Vector2(40, 40)
+		right_arrow.focus_mode = Control.FOCUS_ALL  # Make controller-selectable
 		right_arrow.pressed.connect(_on_part_next.bind(layer_index))
 		selector_container.add_child(right_arrow)
 
@@ -322,6 +327,7 @@ func create_layer_section(layer: Dictionary, layer_index: int) -> VBoxContainer:
 		var btn = Button.new()
 		btn.text = str(i + 1)
 		btn.custom_minimum_size = Vector2(40, 40)
+		btn.focus_mode = Control.FOCUS_ALL  # Make controller-selectable
 
 		# Add color preview
 		if palette_image:
@@ -354,16 +360,14 @@ func get_palette_image(ramp_type: String) -> Image:
 	return palette_images.get(ramp_type, null)
 
 func set_default_character():
-	"""Set up default character"""
-	# Set default body
+	"""Set up default character - naked with just body"""
+	# Set default body color
 	current_colors["01body"] = 0
 
-	# Default to first available part for each layer
+	# Initialize all part indices to -1 (None) so character starts naked
 	for layer in LAYERS:
-		if layer.has_parts and layer.code in available_parts:
-			if available_parts[layer.code].size() > 0:
-				current_selections[layer.code] = available_parts[layer.code][0]
-				current_colors[layer.code] = 0
+		if layer.has_parts:
+			current_part_indices[layer.code] = -1
 
 func _on_animation_selected(anim_name: String):
 	"""Handle animation selection"""
@@ -496,7 +500,15 @@ func update_preview():
 			sprite.texture = original_texture
 
 func apply_color_mapping(original_texture: Texture2D, part: Dictionary, ramp_type: String, color_index: int) -> ImageTexture:
-	"""Apply color mapping to a texture"""
+	"""Apply color mapping to a texture (with caching for performance)"""
+	# Create cache key from part path and color index
+	var cache_key = part.path + ":" + str(color_index)
+
+	# Check if already cached
+	if cache_key in texture_cache:
+		return texture_cache[cache_key]
+
+	# Not cached - create the recolored texture
 	var original_image = original_texture.get_image()
 	var recolored_image = Image.create(original_image.get_width(), original_image.get_height(), false, original_image.get_format())
 	recolored_image.copy_from(original_image)
@@ -506,9 +518,11 @@ func apply_color_mapping(original_texture: Texture2D, part: Dictionary, ramp_typ
 	var target_colors = get_target_colors_for_palette_code(palette_code, ramp_type, color_index)
 
 	if base_colors.size() == 0 or target_colors.size() == 0:
-		return ImageTexture.create_from_image(recolored_image)
+		var result = ImageTexture.create_from_image(recolored_image)
+		texture_cache[cache_key] = result
+		return result
 
-	# Pixel-by-pixel color replacement
+	# Pixel-by-pixel color replacement (CPU-based)
 	for y in range(recolored_image.get_height()):
 		for x in range(recolored_image.get_width()):
 			var pixel = recolored_image.get_pixel(x, y)
@@ -521,7 +535,10 @@ func apply_color_mapping(original_texture: Texture2D, part: Dictionary, ramp_typ
 					recolored_image.set_pixel(x, y, Color(target_colors[i].r, target_colors[i].g, target_colors[i].b, pixel.a))
 					break
 
-	return ImageTexture.create_from_image(recolored_image)
+	# Cache the result before returning
+	var result = ImageTexture.create_from_image(recolored_image)
+	texture_cache[cache_key] = result
+	return result
 
 func get_base_colors_for_palette_code(palette_code: String, ramp_type: String) -> Array:
 	"""Get base colors based on palette code"""
