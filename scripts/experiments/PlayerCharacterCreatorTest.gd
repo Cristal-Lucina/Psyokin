@@ -28,10 +28,10 @@ const ANIMATIONS = ["Idle", "Walk", "Run", "Jump"]
 const DIRECTIONS = ["DOWN", "UP", "LEFT", "RIGHT"]
 
 # UI References
-@onready var character_preview = $RightPanel/PreviewContainer/CharacterLayers
-@onready var animation_buttons_container = $RightPanel/AnimationButtons
-@onready var direction_buttons_container = $RightPanel/DirectionButtons
-@onready var customization_container = $LeftPanel/ScrollContainer/CustomizationList
+@onready var character_preview = $MainContainer/RightPanel/PreviewContainer/CharacterLayers
+@onready var animation_buttons_container = $MainContainer/RightPanel/AnimationButtons
+@onready var direction_buttons_container = $MainContainer/RightPanel/DirectionButtons
+@onready var customization_container = $MainContainer/LeftPanel/ScrollContainer/CustomizationList
 
 # State
 var animations = {}  # Loaded from CSV
