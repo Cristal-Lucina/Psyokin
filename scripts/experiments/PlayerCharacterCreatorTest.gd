@@ -316,7 +316,7 @@ func build_animation_controls():
 	for anim in ANIMATIONS:
 		var btn = Button.new()
 		btn.text = anim
-		btn.focus_mode = Control.FOCUS_ALL  # Make controller-selectable
+		btn.focus_mode = Control.FOCUS_NONE  # Not controller-selectable
 		btn.pressed.connect(_on_animation_selected.bind(anim))
 		animation_buttons_container.add_child(btn)
 
@@ -358,7 +358,7 @@ func build_animation_controls():
 			"DOWN": btn.text = "↓"
 			"LEFT": btn.text = "←"
 			"RIGHT": btn.text = "→"
-		btn.focus_mode = Control.FOCUS_ALL  # Make controller-selectable
+		btn.focus_mode = Control.FOCUS_NONE  # Not controller-selectable
 		btn.pressed.connect(_on_direction_selected.bind(dir))
 		direction_buttons_container.add_child(btn)
 
