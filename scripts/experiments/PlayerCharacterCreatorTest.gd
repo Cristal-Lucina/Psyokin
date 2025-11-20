@@ -51,6 +51,10 @@ var animation_timer = 0.0
 var active_toggle_layer = -1  # Which layer's toggle is active (-1 = none)
 var active_toggle_type = ""  # "part" or "color" - which toggle is active
 
+# Trigger debouncing
+var l2_was_pressed = false
+var r2_was_pressed = false
+
 func _ready():
 	print("=== PLAYER CHARACTER CREATOR TEST ===")
 	load_palette_images()
@@ -92,6 +96,34 @@ func _unhandled_input(event):
 	elif event.is_action_pressed("ui_right"):
 		handle_right()
 		get_viewport().set_input_as_handled()
+
+	# L1 button (Joybutton 9) - Previous animation
+	elif event is InputEventJoypadButton and event.button_index == 9 and event.pressed:
+		_on_animation_previous()
+		get_viewport().set_input_as_handled()
+
+	# R1 button (Joybutton 10) - Next animation
+	elif event is InputEventJoypadButton and event.button_index == 10 and event.pressed:
+		_on_animation_next()
+		get_viewport().set_input_as_handled()
+
+	# L2 trigger (Joypad Axis 4+) - Previous direction
+	elif event is InputEventJoypadMotion and event.axis == 4:
+		if event.axis_value > 0.5 and not l2_was_pressed:
+			_on_direction_previous()
+			l2_was_pressed = true
+			get_viewport().set_input_as_handled()
+		elif event.axis_value < 0.3:
+			l2_was_pressed = false
+
+	# R2 trigger (Joypad Axis 5+) - Next direction
+	elif event is InputEventJoypadMotion and event.axis == 5:
+		if event.axis_value > 0.5 and not r2_was_pressed:
+			_on_direction_next()
+			r2_was_pressed = true
+			get_viewport().set_input_as_handled()
+		elif event.axis_value < 0.3:
+			r2_was_pressed = false
 
 func load_palette_images():
 	"""Load all palette images for color swapping"""
