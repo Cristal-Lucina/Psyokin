@@ -10,6 +10,7 @@ const ANIM_DATA_PATH = "res://scenes/test/sprite_animations_data.csv"
 
 # Layer configuration
 const LAYERS = [
+	{"code": "00undr", "label": "Underwear", "ramp_type": "3color", "max_colors": 48, "has_parts": true},
 	{"code": "01body", "label": "Skin Tone", "ramp_type": "skin", "max_colors": 18, "has_parts": false},
 	{"code": "02sock", "label": "Legwear", "ramp_type": "3color", "max_colors": 48, "has_parts": true},
 	{"code": "footwear", "label": "Footwear", "ramp_type": "3color", "max_colors": 48, "has_parts": true, "sprite_layers": ["03fot1", "07fot2"]},
