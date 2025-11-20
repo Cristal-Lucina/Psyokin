@@ -535,19 +535,21 @@ func apply_color_mapping(original_texture: Texture2D, part: Dictionary, ramp_typ
 	recolored_image.copy_from(original_image)
 
 	# Get the base colors (what's in the sprite) based on the palette code
-	var palette_code = part.palette_code  # e.g., "00a", "00b", etc.
+	var palette_code = part.palette_code  # e.g., "00a", "00b", "00c", "00d", "00f"
 	var base_colors = get_base_colors_for_palette_code(palette_code, ramp_type)
 
-	# Get the target colors (what we want to replace with)
-	var ramp_info = current_color_ramps[layer_code]
-	var row_index = ramp_info.index
-	var target_colors = extract_colors_from_palette(ramp_type, row_index)
-
-	if base_colors.size() == 0 or target_colors.size() == 0:
-		print("ERROR: No colors loaded for ", layer_code)
+	if base_colors.size() == 0:
+		print("ERROR: No base colors loaded for ", layer_code)
 		return ImageTexture.create_from_image(recolored_image)
 
-	print("Applying color map to ", layer_code, ": ", base_colors.size(), " colors")
+	# Get the target colors based on palette code
+	var target_colors = get_target_colors_for_palette_code(palette_code, ramp_type, layer_code)
+
+	if target_colors.size() == 0:
+		print("ERROR: No target colors loaded for ", layer_code)
+		return ImageTexture.create_from_image(recolored_image)
+
+	print("Applying color map to ", layer_code, ": ", base_colors.size(), " base → ", target_colors.size(), " target colors")
 
 	# Replace colors pixel by pixel
 	for y in range(recolored_image.get_height()):
@@ -567,26 +569,106 @@ func apply_color_mapping(original_texture: Texture2D, part: Dictionary, ramp_typ
 	# Create and return new texture
 	return ImageTexture.create_from_image(recolored_image)
 
+func get_target_colors_for_palette_code(palette_code: String, ramp_type: String, layer_code: String) -> Array:
+	"""Get target colors based on palette code
+	For multi-ramp codes, builds the appropriate color array"""
+
+	var ramp_info = current_color_ramps[layer_code]
+	var row_index = ramp_info.index
+
+	match palette_code:
+		"00a":  # Single 3-color ramp
+			return extract_colors_from_palette(ramp_type, row_index)
+		"00b":  # Single 4-color ramp
+			return extract_colors_from_palette(ramp_type, row_index)
+		"00c":  # Two 3-color ramps (6 colors)
+			# For now, use the same 3-color ramp twice
+			var colors_3 = extract_colors_from_palette("3color", row_index)
+			if colors_3.size() >= 3:
+				return colors_3 + colors_3  # Repeat the 3 colors
+			return []
+		"00d":  # One 4-color + one 3-color (7 colors)
+			# Use 4-color ramp + 3-color ramp
+			var colors_4 = extract_colors_from_palette("4color", row_index)
+			var colors_3 = extract_colors_from_palette("3color", row_index)
+			if colors_4.size() >= 4 and colors_3.size() >= 3:
+				return colors_4 + colors_3
+			return []
+		"00f":  # One 4-color + one 5-color hair (9 colors)
+			# Use 4-color ramp + hair ramp
+			var colors_4 = extract_colors_from_palette("4color", row_index)
+			var colors_hair = extract_colors_from_palette("hair", row_index)
+			if colors_4.size() >= 4 and colors_hair.size() >= 5:
+				return colors_4 + colors_hair
+			return []
+		"00":  # Plain 00 - skin or hair
+			return extract_colors_from_palette(ramp_type, row_index)
+		_:
+			# Fallback
+			return extract_colors_from_palette(ramp_type, row_index)
+
 func get_base_colors_for_palette_code(palette_code: String, ramp_type: String) -> Array:
-	"""Get base colors based on the palette code (00a, 00b, etc.)"""
+	"""Get base colors based on the palette code (00a, 00b, 00c, 00d, 00f)"""
 
-	# Determine which base ramp to use based on palette code
+	# Determine which base ramp file to use based on exact palette code
 	var base_ramp_key = ""
-	if palette_code.ends_with("a"):
-		base_ramp_key = "3color_base"
-	elif palette_code.ends_with("b"):
-		base_ramp_key = "4color_base"
-	elif palette_code == "00":  # Plain 00 is usually skin or hair
-		if ramp_type == "skin":
-			base_ramp_key = "skin_base"
-		elif ramp_type == "hair":
-			base_ramp_key = "hair_base"
-	else:
-		# Default fallback
-		base_ramp_key = ramp_type + "_base"
+	var base_ramp_filename = ""
 
-	# Extract colors from row 0 of the base ramp
-	return extract_colors_from_palette(base_ramp_key, 0)
+	match palette_code:
+		"00a":  # Single 3-color ramp
+			base_ramp_filename = "3-color base ramp (00a).png"
+		"00b":  # Single 4-color ramp
+			base_ramp_filename = "4-color base ramp (00b).png"
+		"00c":  # Two 3-color ramps (6 colors total)
+			base_ramp_filename = "2x 3-color base ramps (00c).png"
+		"00d":  # One 4-color + one 3-color ramp (7 colors total)
+			base_ramp_filename = "4-color + 3-color base ramps (00d).png"
+		"00f":  # One 4-color + one 5-color hair ramp (9 colors total)
+			# This case is complex - need special handling
+			base_ramp_filename = "4-color base ramp (00b).png"  # Fallback for now
+		"00":  # Plain 00 - use ramp_type to determine
+			if ramp_type == "skin":
+				base_ramp_filename = "skin color base ramp.png"
+			elif ramp_type == "hair":
+				base_ramp_filename = "hair color base ramp.png"
+		_:
+			# Fallback - try to guess based on ramp_type
+			if ramp_type == "skin":
+				base_ramp_filename = "skin color base ramp.png"
+			elif ramp_type == "hair":
+				base_ramp_filename = "hair color base ramp.png"
+			elif ramp_type == "3color":
+				base_ramp_filename = "3-color base ramp (00a).png"
+			elif ramp_type == "4color":
+				base_ramp_filename = "4-color base ramp (00b).png"
+
+	if base_ramp_filename == "":
+		print("ERROR: Could not determine base ramp file for palette code: ", palette_code)
+		return []
+
+	# Load the base ramp image
+	var base_ramp_path = PALETTE_PATH + "base ramps/" + base_ramp_filename
+	if not FileAccess.file_exists(base_ramp_path):
+		print("ERROR: Base ramp file not found: ", base_ramp_path)
+		return []
+
+	var texture = load(base_ramp_path)
+	if texture == null:
+		print("ERROR: Could not load base ramp texture: ", base_ramp_path)
+		return []
+
+	var image = texture.get_image()
+	var colors = []
+
+	# Read all colors from the base ramp (row 0, all columns)
+	# The number of colors varies by palette code
+	var num_colors = image.get_width()
+	for i in range(num_colors):
+		var pixel_color = image.get_pixel(i, 0)
+		colors.append(pixel_color)
+
+	print("Loaded ", colors.size(), " base colors from ", base_ramp_filename)
+	return colors
 
 func colors_match(color1: Color, color2: Color, tolerance: float = 0.02) -> bool:
 	"""Check if two colors match within a tolerance"""
