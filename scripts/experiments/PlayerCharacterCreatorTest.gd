@@ -325,17 +325,58 @@ func create_layer_section(layer: Dictionary, layer_index: int) -> VBoxContainer:
 
 	color_container.add_child(color_change_row)
 
-	# Color strip/slider
+	# Color bar container with arrows
+	var color_bar_container = VBoxContainer.new()
+	color_bar_container.name = "ColorBarContainer"
+
+	# Position indicator (small arrow pointing down)
+	var indicator_row = HBoxContainer.new()
+	indicator_row.name = "IndicatorRow"
+	indicator_row.custom_minimum_size = Vector2(0, 20)
+
+	var indicator_left_spacer = Control.new()
+	indicator_left_spacer.name = "IndicatorLeftSpacer"
+	indicator_left_spacer.custom_minimum_size = Vector2(40, 20)  # Match left arrow width
+	indicator_row.add_child(indicator_left_spacer)
+
+	var indicator_position_spacer = Control.new()
+	indicator_position_spacer.name = "IndicatorPositionSpacer"
+	indicator_position_spacer.custom_minimum_size = Vector2(0, 20)
+	indicator_row.add_child(indicator_position_spacer)
+
+	var indicator_label = Label.new()
+	indicator_label.name = "IndicatorLabel"
+	indicator_label.text = "▼"
+	indicator_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	indicator_row.add_child(indicator_label)
+
+	color_bar_container.add_child(indicator_row)
+
+	# Color strip with left/right arrows
+	var color_strip_row = HBoxContainer.new()
+	color_strip_row.name = "ColorStripRow"
+
+	# Left arrow
+	var left_arrow = Button.new()
+	left_arrow.name = "LeftArrow"
+	left_arrow.text = "◀"
+	left_arrow.custom_minimum_size = Vector2(40, 40)
+	color_strip_row.add_child(left_arrow)
+
+	# Color strip (fixed 300px width)
 	var color_strip = HBoxContainer.new()
 	color_strip.name = "ColorStrip"
+	color_strip.custom_minimum_size = Vector2(300, 40)
 
 	var palette_image = get_palette_image(layer.ramp_type)
 	var num_colors = min(layer.max_colors, palette_image.get_height() / 2 if palette_image else 0)
+	var block_width = 300.0 / num_colors if num_colors > 0 else 20.0
 
 	for i in range(num_colors):
 		var color_block = Panel.new()
 		color_block.name = "ColorBlock_" + str(i)
-		color_block.custom_minimum_size = Vector2(20, 30)
+		color_block.custom_minimum_size = Vector2(block_width, 40)
+		color_block.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
 		# Add color preview
 		if palette_image:
@@ -351,7 +392,17 @@ func create_layer_section(layer: Dictionary, layer_index: int) -> VBoxContainer:
 
 		color_strip.add_child(color_block)
 
-	color_container.add_child(color_strip)
+	color_strip_row.add_child(color_strip)
+
+	# Right arrow
+	var right_arrow = Button.new()
+	right_arrow.name = "RightArrow"
+	right_arrow.text = "▶"
+	right_arrow.custom_minimum_size = Vector2(40, 40)
+	color_strip_row.add_child(right_arrow)
+
+	color_bar_container.add_child(color_strip_row)
+	color_container.add_child(color_bar_container)
 	section.add_child(color_container)
 
 	# Separator
@@ -781,7 +832,9 @@ func update_focus_visual():
 			color_btn.modulate = Color.WHITE
 
 			# Clear color strip highlights
-			var color_strip = color_container.get_node("ColorStrip")
+			var color_bar_container = color_container.get_node("ColorBarContainer")
+			var color_strip_row = color_bar_container.get_node("ColorStripRow")
+			var color_strip = color_strip_row.get_node("ColorStrip")
 			for j in range(color_strip.get_child_count()):
 				var block = color_strip.get_child(j)
 				block.scale = Vector2(1, 1)
@@ -816,11 +869,32 @@ func update_focus_visual():
 		color_btn.modulate = Color(0.5, 1.5, 0.5)  # Green highlight (active mode)
 
 		# Highlight current color in strip
-		var color_strip = color_container.get_node("ColorStrip")
+		var color_bar_container = color_container.get_node("ColorBarContainer")
+		var color_strip_row = color_bar_container.get_node("ColorStripRow")
+		var color_strip = color_strip_row.get_node("ColorStrip")
 		var color_index = current_colors.get(layer.code, 0)
 		if color_index < color_strip.get_child_count():
 			var current_block = color_strip.get_child(color_index)
-			current_block.scale = Vector2(1.2, 1.2)  # Scale up current color
+			current_block.scale = Vector2(1.0, 1.2)  # Scale up current color vertically
+
+	# Update indicator arrow position for all layers (not just current)
+	for i in range(LAYERS.size()):
+		var section = customization_container.get_child(i)
+		var layer_data = LAYERS[i]
+		var color_container = section.get_node_or_null("ColorContainer")
+		if color_container:
+			var color_bar_container = color_container.get_node("ColorBarContainer")
+			var indicator_row = color_bar_container.get_node("IndicatorRow")
+			var indicator_position_spacer = indicator_row.get_node("IndicatorPositionSpacer")
+
+			# Calculate indicator position based on current color
+			var color_index = current_colors.get(layer_data.code, 0)
+			var num_colors = layer_data.max_colors
+			var block_width = 300.0 / num_colors if num_colors > 0 else 20.0
+			var indicator_x = (color_index * block_width) + (block_width / 2.0) - 8  # Center on block
+
+			# Update spacer width to position the arrow
+			indicator_position_spacer.custom_minimum_size = Vector2(indicator_x, 20)
 
 func ensure_section_visible():
 	"""Scroll to keep the current section visible"""
