@@ -10,7 +10,6 @@ const ANIM_DATA_PATH = "res://scenes/test/sprite_animations_data.csv"
 
 # Layer configuration
 const LAYERS = [
-	{"code": "00undr", "label": "Underwear", "ramp_type": "3color", "max_colors": 48, "has_parts": true},
 	{"code": "01body", "label": "Skin Tone", "ramp_type": "skin", "max_colors": 18, "has_parts": false},
 	{"code": "02sock", "label": "Legwear", "ramp_type": "3color", "max_colors": 48, "has_parts": true},
 	{"code": "footwear", "label": "Footwear", "ramp_type": "3color", "max_colors": 48, "has_parts": true, "sprite_layers": ["03fot1", "07fot2"]},
@@ -18,7 +17,7 @@ const LAYERS = [
 	{"code": "05shrt", "label": "Topwear", "ramp_type": "3color", "max_colors": 48, "has_parts": true},
 	{"code": "09hand", "label": "Handwear", "ramp_type": "3color", "max_colors": 48, "has_parts": true},
 	{"code": "10outr", "label": "Overwear", "ramp_type": "3color", "max_colors": 48, "has_parts": true},
-	{"code": "11neck", "label": "Neckwear", "ramp_type": "4color", "max_colors": 59, "has_parts": true},
+	{"code": "11neck", "label": "Neckwear", "ramp_type": "4color", "max_colors": 59, "has_parts": true, "auto_match_layer": "00undr"},
 	{"code": "12face", "label": "Eyewear", "ramp_type": "3color", "max_colors": 48, "has_parts": true},
 	{"code": "13hair", "label": "Hairstyle", "ramp_type": "hair", "max_colors": 58, "has_parts": true},
 	{"code": "14head", "label": "Headwear", "ramp_type": "4color", "max_colors": 59, "has_parts": true}
@@ -248,6 +247,29 @@ func scan_character_assets():
 					available_parts[layer_code].append(part_info)
 				file_name = dir.get_next()
 			dir.list_dir_end()
+
+		# Also scan auto-match layer if defined (like 00undr for neckwear)
+		if "auto_match_layer" in layer:
+			var auto_layer_code = layer.auto_match_layer
+			var auto_layer_path = SPRITE_PATH + auto_layer_code + "/"
+			var auto_dir = DirAccess.open(auto_layer_path)
+
+			if auto_layer_code not in available_parts:
+				available_parts[auto_layer_code] = []
+
+			if auto_dir != null:
+				auto_dir.list_dir_begin()
+				var file_name = auto_dir.get_next()
+				while file_name != "":
+					if file_name.ends_with(".png") and file_name.begins_with("fbas_"):
+						var full_path = auto_layer_path + file_name
+						var part_info = parse_filename(file_name, auto_layer_code)
+						part_info["path"] = full_path
+						part_info["sprite_code"] = auto_layer_code
+						available_parts[auto_layer_code].append(part_info)
+					file_name = auto_dir.get_next()
+				auto_dir.list_dir_end()
+				print("  Auto-match layer ", auto_layer_code, ": found ", available_parts[auto_layer_code].size(), " parts")
 
 		print("  Layer ", layer_code, ": found ", available_parts[layer_code].size(), " parts")
 
@@ -808,6 +830,39 @@ func update_preview():
 				sprite.texture = recolored_texture
 			else:
 				sprite.texture = original_texture
+
+		# Auto-match layer (e.g., apply matching underwear for neckwear)
+		if "auto_match_layer" in layer and part != null:
+			var auto_layer_code = layer.auto_match_layer
+			var auto_sprite = character_preview.get_node_or_null(auto_layer_code)
+
+			if auto_sprite:
+				# Find matching part by base_name in the auto-match layer
+				var matching_part = null
+				if auto_layer_code in available_parts:
+					for auto_part in available_parts[auto_layer_code]:
+						if auto_part.base_name == part.base_name:
+							matching_part = auto_part
+							break
+
+				if matching_part != null:
+					# Load and apply matching texture with same color
+					var auto_texture = load(matching_part.path)
+					if layer_code in current_colors:
+						var color_index = current_colors[layer_code]
+						var recolored_texture = apply_color_mapping(auto_texture, matching_part, layer.ramp_type, color_index)
+						auto_sprite.texture = recolored_texture
+					else:
+						auto_sprite.texture = auto_texture
+				else:
+					# No matching part, clear the auto-match sprite
+					auto_sprite.texture = null
+		# Clear auto-match layer if main layer has no selection
+		elif "auto_match_layer" in layer and part == null:
+			var auto_layer_code = layer.auto_match_layer
+			var auto_sprite = character_preview.get_node_or_null(auto_layer_code)
+			if auto_sprite:
+				auto_sprite.texture = null
 
 func apply_color_mapping(original_texture: Texture2D, part: Dictionary, ramp_type: String, color_index: int) -> ImageTexture:
 	"""Apply color mapping to a texture (with caching for performance)"""
