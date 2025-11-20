@@ -14,21 +14,21 @@ var palette_shader = preload("res://assets/shaders/palette_swap.gdshader")
 
 # Layer configuration (Mana Seed system)
 const LAYERS = [
-	{"code": "00undr", "label": "Under Layer", "ramp_type": null},
-	{"code": "01body", "label": "Body", "ramp_type": "skin"},
-	{"code": "02sock", "label": "Legwear", "ramp_type": "3color"},
-	{"code": "03fot1", "label": "Footwear (Small)", "ramp_type": "3color"},
-	{"code": "04lwr1", "label": "Bottomwear", "ramp_type": "3color"},
-	{"code": "05shrt", "label": "Topwear", "ramp_type": "3color"},
-	{"code": "06lwr2", "label": "Bottomwear (Overalls)", "ramp_type": "3color"},
-	{"code": "07fot2", "label": "Footwear (Large)", "ramp_type": "3color"},
-	{"code": "08lwr3", "label": "Bottomwear (Dress/Skirt)", "ramp_type": "3color"},
-	{"code": "09hand", "label": "Handwear", "ramp_type": "3color"},
-	{"code": "10outr", "label": "Overwear", "ramp_type": "3color"},
-	{"code": "11neck", "label": "Neckwear", "ramp_type": "4color"},
-	{"code": "12face", "label": "Eyewear", "ramp_type": "3color"},
-	{"code": "13hair", "label": "Hairstyle", "ramp_type": "hair"},
-	{"code": "14head", "label": "Headwear", "ramp_type": "4color"}
+	{"code": "00undr", "label": "Under Layer", "ramp_type": null, "hidden": true, "allow_none": true, "max_color_schemes": 0},
+	{"code": "01body", "label": "BODY", "ramp_type": "skin", "hidden": false, "allow_none": false, "max_color_schemes": 20},
+	{"code": "02sock", "label": "Legwear", "ramp_type": "3color", "hidden": false, "allow_none": true, "max_color_schemes": 50},
+	{"code": "03fot1", "label": "Footwear", "ramp_type": "3color", "hidden": false, "allow_none": true, "max_color_schemes": 50, "combine_with": "07fot2"},
+	{"code": "04lwr1", "label": "Bottomwear", "ramp_type": "3color", "hidden": false, "allow_none": true, "max_color_schemes": 50},
+	{"code": "05shrt", "label": "Topwear", "ramp_type": "3color", "hidden": false, "allow_none": true, "max_color_schemes": 50},
+	{"code": "06lwr2", "label": "Bottomwear", "ramp_type": "3color", "hidden": false, "allow_none": true, "max_color_schemes": 50},
+	{"code": "07fot2", "label": "Footwear", "ramp_type": "3color", "hidden": true, "allow_none": true, "max_color_schemes": 50},  # Combined into 03fot1
+	{"code": "08lwr3", "label": "Bottomwear", "ramp_type": "3color", "hidden": false, "allow_none": true, "max_color_schemes": 50},
+	{"code": "09hand", "label": "Handwear", "ramp_type": "3color", "hidden": false, "allow_none": true, "max_color_schemes": 50},
+	{"code": "10outr", "label": "Overwear", "ramp_type": "3color", "hidden": false, "allow_none": true, "max_color_schemes": 50},
+	{"code": "11neck", "label": "Neckwear", "ramp_type": "4color", "hidden": false, "allow_none": true, "max_color_schemes": 50},
+	{"code": "12face", "label": "Eyewear", "ramp_type": "3color", "hidden": false, "allow_none": true, "max_color_schemes": 50},
+	{"code": "13hair", "label": "Hairstyle", "ramp_type": "hair", "hidden": false, "allow_none": true, "max_color_schemes": 58},
+	{"code": "14head", "label": "Headwear", "ramp_type": "4color", "hidden": false, "allow_none": true, "max_color_schemes": 50}
 ]
 
 # Animation data parsed from CSV
@@ -376,8 +376,19 @@ func populate_ui():
 			if layer.code in available_parts:
 				bottomwear_parts.append_array(available_parts[layer.code])
 
+	# Group footwear layers (Small + Large)
+	var footwear_parts = []
+	for layer in LAYERS:
+		if layer.code in ["03fot1", "07fot2"]:
+			if layer.code in available_parts:
+				footwear_parts.append_array(available_parts[layer.code])
+
 	for layer in LAYERS:
 		var layer_code = layer.code
+
+		# Skip hidden layers
+		if layer.get("hidden", false):
+			continue
 
 		# Skip bottomwear sub-layers (handled as group)
 		if layer_code in ["06lwr2", "08lwr3"]:
@@ -388,10 +399,13 @@ func populate_ui():
 
 		# Special handling for bottomwear group
 		if layer_code == "04lwr1":
-			populate_layer_options(section, layer_code, bottomwear_parts, layer.ramp_type)
+			populate_layer_options(section, layer_code, bottomwear_parts, layer)
+		# Special handling for footwear group (combine 03fot1 and 07fot2)
+		elif layer_code == "03fot1":
+			populate_layer_options(section, layer_code, footwear_parts, layer)
 		else:
 			var parts = available_parts.get(layer_code, [])
-			populate_layer_options(section, layer_code, parts, layer.ramp_type)
+			populate_layer_options(section, layer_code, parts, layer)
 
 		var separator = HSeparator.new()
 		parts_container.add_child(separator)
@@ -412,20 +426,29 @@ func create_layer_section(layer_code: String, label: String) -> VBoxContainer:
 
 	return section
 
-func populate_layer_options(section: Node, layer_code: String, parts: Array, ramp_type):
+func populate_layer_options(section: Node, layer_code: String, parts: Array, layer):
 	"""Populate a section with part and color options"""
 	var options_container = section.get_node("Options")
+	var ramp_type = layer.get("ramp_type", null)
+	var allow_none = layer.get("allow_none", true)
+	var max_color_schemes = layer.get("max_color_schemes", 999)
 
-	# Add "None" option
-	var none_btn = Button.new()
-	none_btn.text = "None"
-	none_btn.pressed.connect(_on_part_selected.bind(layer_code, null))
-	options_container.add_child(none_btn)
+	# Add "None" option (only if allowed)
+	if allow_none:
+		var none_btn = Button.new()
+		none_btn.text = "None"
+		none_btn.pressed.connect(_on_part_selected.bind(layer_code, null))
+		options_container.add_child(none_btn)
 
 	# Add button for each part
 	for part in parts:
 		var btn = Button.new()
-		btn.text = part.display_name
+		# Clean up display name - remove parentheses content
+		var display_name = part.display_name
+		var paren_pos = display_name.find("(")
+		if paren_pos > 0:
+			display_name = display_name.substr(0, paren_pos).strip_edges()
+		btn.text = display_name
 		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		btn.pressed.connect(_on_part_selected.bind(layer_code, part))
 		options_container.add_child(btn)
@@ -457,7 +480,10 @@ func populate_layer_options(section: Node, layer_code: String, parts: Array, ram
 				num_color_schemes = palette_image.get_height() / 2
 				print("  Found ", num_color_schemes, " color schemes for ", ramp_type)
 
-		# Add color ramp buttons (all available schemes)
+		# Limit to max_color_schemes specified in layer config
+		num_color_schemes = min(num_color_schemes, max_color_schemes)
+
+		# Add color ramp buttons (limited to max_color_schemes)
 		var ramp_grid = GridContainer.new()
 		ramp_grid.columns = 5
 		for i in range(num_color_schemes):
@@ -492,6 +518,23 @@ func set_default_character():
 func _on_part_selected(layer_code: String, part):
 	"""Handle part selection"""
 	current_selections[layer_code] = part
+
+	# Auto-toggle Under Layer when cloak items are selected/deselected in Neckwear
+	if layer_code == "11neck":
+		if part != null and ("cloak" in part.base_name.to_lower()):
+			# Auto-select matching under layer for cloak items
+			# Look for matching under layer part
+			if "00undr" in available_parts:
+				for under_part in available_parts["00undr"]:
+					# Match the cloak base name to under layer
+					if under_part.base_name.to_lower().contains("cloak"):
+						current_selections["00undr"] = under_part
+						print("Auto-selected under layer: ", under_part.display_name)
+						break
+		else:
+			# Deselect under layer when no cloak or None selected
+			current_selections["00undr"] = null
+
 	update_preview()
 
 func _on_color_ramp_selected(index: int, layer_code: String, ramp_type: String):
