@@ -442,30 +442,6 @@ func create_layer_section(layer: Dictionary, layer_index: int) -> VBoxContainer:
 	var color_bar_container = VBoxContainer.new()
 	color_bar_container.name = "ColorBarContainer"
 
-	# Position indicator (small arrow pointing down)
-	var indicator_row = HBoxContainer.new()
-	indicator_row.name = "IndicatorRow"
-	indicator_row.custom_minimum_size = Vector2(0, 20)
-
-	var indicator_left_spacer = Control.new()
-	indicator_left_spacer.name = "IndicatorLeftSpacer"
-	indicator_left_spacer.custom_minimum_size = Vector2(40, 20)  # Match left arrow width
-	indicator_row.add_child(indicator_left_spacer)
-
-	var indicator_position_spacer = Control.new()
-	indicator_position_spacer.name = "IndicatorPositionSpacer"
-	indicator_position_spacer.custom_minimum_size = Vector2(0, 20)
-	indicator_row.add_child(indicator_position_spacer)
-
-	var indicator_label = Label.new()
-	indicator_label.name = "IndicatorLabel"
-	indicator_label.text = "▼"
-	indicator_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	indicator_label.add_theme_color_override("font_color", Color("#4DE9FF"))  # Sky Cyan
-	indicator_row.add_child(indicator_label)
-
-	color_bar_container.add_child(indicator_row)
-
 	# Color strip with left/right arrows
 	var color_strip_row = HBoxContainer.new()
 	color_strip_row.name = "ColorStripRow"
@@ -1061,19 +1037,11 @@ func update_focus_visual():
 			var part_btn = part_container.get_node("PartChangeButton")
 			part_btn.modulate = Color.WHITE
 
-		# Clear color button and strip
+		# Clear color button
 		var color_container = section.get_node_or_null("ColorContainer")
 		if color_container:
 			var color_btn = color_container.get_node("ColorChangeButton")
 			color_btn.modulate = Color.WHITE
-
-			# Clear color strip highlights
-			var color_bar_container = color_container.get_node("ColorBarContainer")
-			var color_strip_row = color_bar_container.get_node("ColorStripRow")
-			var color_strip = color_strip_row.get_node("ColorStrip")
-			for j in range(color_strip.get_child_count()):
-				var block = color_strip.get_child(j)
-				block.scale = Vector2(1, 1)
 
 	# Highlight active toggle if one is active
 	if active_toggle_layer != -1:
@@ -1089,38 +1057,30 @@ func update_focus_visual():
 			var color_btn = color_container.get_node("ColorChangeButton")
 			color_btn.modulate = Color(0.5, 1.5, 0.5)  # Green highlight (active)
 
-			# Highlight current color in strip
-			var color_bar_container = color_container.get_node("ColorBarContainer")
-			var color_strip_row = color_bar_container.get_node("ColorStripRow")
-			var color_strip = color_strip_row.get_node("ColorStrip")
-			var layer = LAYERS[active_toggle_layer]
-			var color_index = current_colors.get(layer.code, 0)
-			if color_index < color_strip.get_child_count():
-				var current_block = color_strip.get_child(color_index)
-				current_block.scale = Vector2(1.0, 1.2)  # Scale up current color vertically
-
-	# Update indicator arrow position for all layers
+	# Update glow effect on selected color blocks for all layers
 	for i in range(LAYERS.size()):
 		var section = customization_container.get_child(i)
 		var layer_data = LAYERS[i]
 		var color_container = section.get_node_or_null("ColorContainer")
 		if color_container:
 			var color_bar_container = color_container.get_node("ColorBarContainer")
-			var indicator_row = color_bar_container.get_node("IndicatorRow")
-			var indicator_position_spacer = indicator_row.get_node("IndicatorPositionSpacer")
-			var indicator_label = indicator_row.get_node("IndicatorLabel")
+			var color_strip_row = color_bar_container.get_node("ColorStripRow")
+			var color_strip = color_strip_row.get_node("ColorStrip")
 
-			# Calculate indicator position based on current color
+			# Get current color index
 			var color_index = current_colors.get(layer_data.code, 0)
-			var num_colors = layer_data.max_colors
-			var block_width = 300.0 / num_colors if num_colors > 0 else 20.0
 
-			# Set indicator label width to match block width (no max width constraint)
-			indicator_label.custom_minimum_size = Vector2(block_width, 20)
-
-			# Position the spacer to place indicator at the correct block
-			var indicator_x = color_index * block_width
-			indicator_position_spacer.custom_minimum_size = Vector2(indicator_x, 20)
+			# Update all color blocks in this layer
+			for j in range(color_strip.get_child_count()):
+				var block = color_strip.get_child(j)
+				if j == color_index:
+					# Selected block - add glow effect
+					block.modulate = Color(1.5, 1.5, 1.5)  # Brighten
+					block.scale = Vector2(1.0, 1.2)  # Scale up slightly
+				else:
+					# Non-selected blocks - reset
+					block.modulate = Color(1.0, 1.0, 1.0)
+					block.scale = Vector2(1.0, 1.0)
 
 func ensure_section_visible():
 	"""Scroll to keep the active section visible"""
@@ -1159,8 +1119,18 @@ func _process(delta):
 
 	var current_time = times[current_frame_index]
 
-	# Handle "hold" frames
+	# Handle "hold" frames - treat as 500ms hold then loop
 	if current_time < 0:
+		animation_timer += delta * 1000.0
+		if animation_timer >= 500.0:  # Hold for 500ms then loop
+			animation_timer = 0.0
+			current_frame_index = 0  # Loop back to start
+			var frame_data = anim_data.frames[current_frame_index]
+			for layer in LAYERS:
+				var sprite = character_preview.get_node_or_null(layer.code)
+				if sprite:
+					sprite.frame = frame_data.cell
+					sprite.flip_h = frame_data.flip
 		return
 
 	animation_timer += delta * 1000.0  # Convert to milliseconds
