@@ -25,7 +25,7 @@ const LAYERS = [
 
 # Animation options
 const ANIMATIONS = ["Idle", "Walk", "Run", "Jump"]
-const DIRECTIONS = ["DOWN", "UP", "LEFT", "RIGHT"]
+const DIRECTIONS = ["DOWN", "LEFT", "RIGHT", "UP"]
 
 # UI References
 @onready var character_preview = $MarginContainer/MainContainer/RightPanel/PreviewContainer/CharacterLayers
