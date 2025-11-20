@@ -238,6 +238,48 @@ func build_ui():
 
 func build_animation_controls():
 	"""Build animation selection buttons"""
+	# Get the parent containers
+	var anim_label_parent = $MarginContainer/MainContainer/RightPanel/AnimationLabel.get_parent()
+	var dir_label_parent = $MarginContainer/MainContainer/RightPanel/DirectionLabel.get_parent()
+
+	# Remove the default labels
+	var anim_label = $MarginContainer/MainContainer/RightPanel/AnimationLabel
+	var dir_label = $MarginContainer/MainContainer/RightPanel/DirectionLabel
+	var anim_label_idx = anim_label.get_index()
+	var dir_label_idx = dir_label.get_index()
+	anim_label.queue_free()
+	dir_label.queue_free()
+
+	# Create Animation label with L1/R1 buttons
+	var anim_label_container = HBoxContainer.new()
+	anim_label_container.name = "AnimationLabelContainer"
+	anim_label_container.alignment = BoxContainer.ALIGNMENT_CENTER
+	anim_label_parent.add_child(anim_label_container)
+	anim_label_parent.move_child(anim_label_container, anim_label_idx)
+
+	var l1_btn = Button.new()
+	l1_btn.name = "L1Button"
+	l1_btn.text = "L1"
+	l1_btn.custom_minimum_size = Vector2(60, 40)
+	l1_btn.focus_mode = Control.FOCUS_ALL
+	l1_btn.pressed.connect(_on_animation_previous)
+	anim_label_container.add_child(l1_btn)
+
+	var anim_label_new = Label.new()
+	anim_label_new.name = "AnimationLabel"
+	anim_label_new.text = "Animation: " + current_animation
+	anim_label_new.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	anim_label_new.custom_minimum_size = Vector2(200, 0)
+	anim_label_container.add_child(anim_label_new)
+
+	var r1_btn = Button.new()
+	r1_btn.name = "R1Button"
+	r1_btn.text = "R1"
+	r1_btn.custom_minimum_size = Vector2(60, 40)
+	r1_btn.focus_mode = Control.FOCUS_ALL
+	r1_btn.pressed.connect(_on_animation_next)
+	anim_label_container.add_child(r1_btn)
+
 	# Animation buttons (Walk/Run/Jump)
 	for anim in ANIMATIONS:
 		var btn = Button.new()
@@ -245,6 +287,36 @@ func build_animation_controls():
 		btn.focus_mode = Control.FOCUS_ALL  # Make controller-selectable
 		btn.pressed.connect(_on_animation_selected.bind(anim))
 		animation_buttons_container.add_child(btn)
+
+	# Create Direction label with L2/R2 buttons
+	var dir_label_container = HBoxContainer.new()
+	dir_label_container.name = "DirectionLabelContainer"
+	dir_label_container.alignment = BoxContainer.ALIGNMENT_CENTER
+	dir_label_parent.add_child(dir_label_container)
+	dir_label_parent.move_child(dir_label_container, dir_label_idx)
+
+	var l2_btn = Button.new()
+	l2_btn.name = "L2Button"
+	l2_btn.text = "L2"
+	l2_btn.custom_minimum_size = Vector2(60, 40)
+	l2_btn.focus_mode = Control.FOCUS_ALL
+	l2_btn.pressed.connect(_on_direction_previous)
+	dir_label_container.add_child(l2_btn)
+
+	var dir_label_new = Label.new()
+	dir_label_new.name = "DirectionLabel"
+	dir_label_new.text = "Direction: " + current_direction
+	dir_label_new.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	dir_label_new.custom_minimum_size = Vector2(200, 0)
+	dir_label_container.add_child(dir_label_new)
+
+	var r2_btn = Button.new()
+	r2_btn.name = "R2Button"
+	r2_btn.text = "R2"
+	r2_btn.custom_minimum_size = Vector2(60, 40)
+	r2_btn.focus_mode = Control.FOCUS_ALL
+	r2_btn.pressed.connect(_on_direction_next)
+	dir_label_container.add_child(r2_btn)
 
 	# Direction arrows
 	for dir in DIRECTIONS:
@@ -274,6 +346,7 @@ func create_layer_section(layer: Dictionary, layer_index: int) -> VBoxContainer:
 	var label = Label.new()
 	label.text = layer.label
 	label.add_theme_font_size_override("font_size", 18)
+	label.add_theme_color_override("font_color", Color("#8A3FFC"))  # Grape Violet
 	section.add_child(label)
 
 	# Part selector with Change button (if layer has parts)
@@ -307,6 +380,7 @@ func create_layer_section(layer: Dictionary, layer_index: int) -> VBoxContainer:
 		selection_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		selection_label.custom_minimum_size = Vector2(200, 0)
 		selection_label.add_theme_font_size_override("font_size", 16)
+		selection_label.add_theme_color_override("font_color", Color("#4DE9FF"))  # Sky Cyan
 		part_container.add_child(selection_label)
 
 		# Right arrow
@@ -354,7 +428,8 @@ func create_layer_section(layer: Dictionary, layer_index: int) -> VBoxContainer:
 	var indicator_label = Label.new()
 	indicator_label.name = "IndicatorLabel"
 	indicator_label.text = "▼"
-	indicator_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	indicator_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	indicator_label.add_theme_color_override("font_color", Color("#4DE9FF"))  # Sky Cyan
 	indicator_row.add_child(indicator_label)
 
 	color_bar_container.add_child(indicator_row)
@@ -439,12 +514,115 @@ func _on_animation_selected(anim_name: String):
 	current_animation = anim_name
 	current_frame_index = 0
 	animation_timer = 0.0
+	update_animation_label()
 
 func _on_direction_selected(direction: String):
 	"""Handle direction selection"""
 	current_direction = direction
 	current_frame_index = 0
 	animation_timer = 0.0
+	update_direction_label()
+
+func _on_animation_previous():
+	"""Cycle to previous animation"""
+	var current_idx = ANIMATIONS.find(current_animation)
+	if current_idx == -1:
+		current_idx = 0
+	else:
+		current_idx -= 1
+		if current_idx < 0:
+			current_idx = ANIMATIONS.size() - 1
+
+	current_animation = ANIMATIONS[current_idx]
+	current_frame_index = 0
+	animation_timer = 0.0
+	update_animation_label()
+	flash_button("L1")
+
+func _on_animation_next():
+	"""Cycle to next animation"""
+	var current_idx = ANIMATIONS.find(current_animation)
+	if current_idx == -1:
+		current_idx = 0
+	else:
+		current_idx += 1
+		if current_idx >= ANIMATIONS.size():
+			current_idx = 0
+
+	current_animation = ANIMATIONS[current_idx]
+	current_frame_index = 0
+	animation_timer = 0.0
+	update_animation_label()
+	flash_button("R1")
+
+func _on_direction_previous():
+	"""Cycle to previous direction"""
+	var current_idx = DIRECTIONS.find(current_direction)
+	if current_idx == -1:
+		current_idx = 0
+	else:
+		current_idx -= 1
+		if current_idx < 0:
+			current_idx = DIRECTIONS.size() - 1
+
+	current_direction = DIRECTIONS[current_idx]
+	current_frame_index = 0
+	animation_timer = 0.0
+	update_direction_label()
+	flash_button("L2")
+
+func _on_direction_next():
+	"""Cycle to next direction"""
+	var current_idx = DIRECTIONS.find(current_direction)
+	if current_idx == -1:
+		current_idx = 0
+	else:
+		current_idx += 1
+		if current_idx >= DIRECTIONS.size():
+			current_idx = 0
+
+	current_direction = DIRECTIONS[current_idx]
+	current_frame_index = 0
+	animation_timer = 0.0
+	update_direction_label()
+	flash_button("R2")
+
+func update_animation_label():
+	"""Update the animation label text"""
+	var label_container = $MarginContainer/MainContainer/RightPanel.get_node_or_null("AnimationLabelContainer")
+	if label_container:
+		var label = label_container.get_node_or_null("AnimationLabel")
+		if label:
+			label.text = "Animation: " + current_animation
+
+func update_direction_label():
+	"""Update the direction label text"""
+	var label_container = $MarginContainer/MainContainer/RightPanel.get_node_or_null("DirectionLabelContainer")
+	if label_container:
+		var label = label_container.get_node_or_null("DirectionLabel")
+		if label:
+			label.text = "Direction: " + current_direction
+
+func flash_button(button_name: String):
+	"""Flash a button with Bubble Magenta highlight"""
+	var button = null
+
+	match button_name:
+		"L1":
+			button = $MarginContainer/MainContainer/RightPanel/AnimationLabelContainer/L1Button
+		"R1":
+			button = $MarginContainer/MainContainer/RightPanel/AnimationLabelContainer/R1Button
+		"L2":
+			button = $MarginContainer/MainContainer/RightPanel/DirectionLabelContainer/L2Button
+		"R2":
+			button = $MarginContainer/MainContainer/RightPanel/DirectionLabelContainer/R2Button
+
+	if button:
+		# Flash with Bubble Magenta
+		button.modulate = Color("#FF4AD9")  # Bubble Magenta
+		# Create a tween to fade back to white
+		var tween = create_tween()
+		tween.tween_property(button, "modulate", Color.WHITE, 0.3)
 
 func _on_part_previous(layer_index: int):
 	"""Cycle to previous part"""

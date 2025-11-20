@@ -28,7 +28,7 @@ layout_mode = 2
 theme_override_constants/separation = 50
 
 [node name="LeftPanel" type="PanelContainer" parent="MarginContainer/MainContainer"]
-custom_minimum_size = Vector2(800, 0)
+custom_minimum_size = Vector2(830, 0)
 layout_mode = 2
 size_flags_horizontal = 3
 
@@ -59,8 +59,8 @@ layout_mode = 2
 size_flags_vertical = 3
 
 [node name="CharacterLayers" type="Node2D" parent="MarginContainer/MainContainer/RightPanel/PreviewContainer"]
-position = Vector2(228, 328)
-scale = Vector2(4, 4)
+position = Vector2(188, 528)
+scale = Vector2(8, 8)
 
 [node name="00undr" type="Sprite2D" parent="MarginContainer/MainContainer/RightPanel/PreviewContainer/CharacterLayers"]
 texture_filter = 1
