@@ -657,7 +657,7 @@ func _on_accept_pressed():
 		existing_identity["character_indices"] = current_part_indices.duplicate()  # Part indices
 		existing_identity["character_colors"] = current_colors.duplicate()  # Color indices
 		existing_identity["character_animation"] = current_animation  # Current animation
-		existing_identity["character_direction"] = current_anim_direction  # Current direction
+		existing_identity["character_direction"] = current_direction  # Current direction
 		existing_identity["customization_completed"] = true  # Flag for CharacterCreation
 
 		gs.set_meta("hero_identity", existing_identity)
