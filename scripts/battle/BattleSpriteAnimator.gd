@@ -4,6 +4,28 @@ class_name BattleSpriteAnimator
 ## BattleSpriteAnimator - Manages sprite animations for party members in battle
 ## Loads animation data from CSV and provides methods to play animations
 
+# Mana Seed sprite system paths
+const SPRITE_PATH = "res://assets/graphics/characters/New Character System/SpriteSystem/base_sheets/"
+const PALETTE_PATH = "res://assets/graphics/characters/New Character System/SpriteSystem/_supporting files/palettes/"
+
+# Mana Seed layer configuration (matching Player.gd)
+const LAYERS = [
+	{"code": "01body", "label": "Skin Tone", "ramp_type": "skin", "max_colors": 18, "has_parts": false},
+	{"code": "02sock", "label": "Legwear", "ramp_type": "3color", "max_colors": 48, "has_parts": true},
+	{"code": "footwear", "label": "Footwear", "ramp_type": "3color", "max_colors": 48, "has_parts": true, "sprite_layers": ["03fot1", "07fot2"]},
+	{"code": "bottomwear", "label": "Bottomwear", "ramp_type": "3color", "max_colors": 48, "has_parts": true, "sprite_layers": ["04lwr1", "06lwr2", "08lwr3"]},
+	{"code": "05shrt", "label": "Topwear", "ramp_type": "3color", "max_colors": 48, "has_parts": true},
+	{"code": "09hand", "label": "Handwear", "ramp_type": "3color", "max_colors": 48, "has_parts": true},
+	{"code": "10outr", "label": "Overwear", "ramp_type": "3color", "max_colors": 48, "has_parts": true},
+	{"code": "11neck", "label": "Neckwear", "ramp_type": "4color", "max_colors": 59, "has_parts": true, "auto_match_layer": "00undr"},
+	{"code": "12face", "label": "Eyewear", "ramp_type": "3color", "max_colors": 48, "has_parts": true},
+	{"code": "13hair", "label": "Hairstyle", "ramp_type": "hair", "max_colors": 58, "has_parts": true},
+	{"code": "14head", "label": "Headwear", "ramp_type": "4color", "max_colors": 59, "has_parts": true}
+]
+
+# Palette images for color mapping (loaded at runtime)
+var palette_images = {}
+
 # Animation frame data structure
 class AnimationFrame:
 	var cell: int
@@ -41,8 +63,65 @@ var character_sprites = {
 }
 
 func _ready():
+	_load_palettes()
 	load_animations_from_csv()
 	print("[BattleSpriteAnimator] Loaded %d animations from CSV" % animations.size())
+
+func _load_palettes() -> void:
+	"""Load palette images for color mapping"""
+	print("[BattleSpriteAnimator] Loading palette images...")
+	palette_images["3color"] = load(PALETTE_PATH + "mana seed 3-color ramps.png").get_image()
+	palette_images["4color"] = load(PALETTE_PATH + "mana seed 4-color ramps.png").get_image()
+	palette_images["hair"] = load(PALETTE_PATH + "mana seed hair ramps.png").get_image()
+	palette_images["skin"] = load(PALETTE_PATH + "mana seed skin ramps.png").get_image()
+	print("[BattleSpriteAnimator] Palette images loaded")
+
+func _apply_color_mapping(original_texture: Texture2D, part: Dictionary, ramp_type: String, color_index: int) -> ImageTexture:
+	"""Apply color mapping to a texture using palette ramps (matching Player.gd)"""
+	var original_image = original_texture.get_image()
+	var result_image = Image.create(original_image.get_width(), original_image.get_height(), false, Image.FORMAT_RGBA8)
+
+	var palette_image = palette_images.get(ramp_type)
+	if not palette_image:
+		print("[BattleSpriteAnimator] ERROR: No palette for ramp_type: ", ramp_type)
+		return ImageTexture.create_from_image(original_image)
+
+	var palette_code = part.get("palette_code", "00")
+	var source_row = int(palette_code)
+	var target_row = color_index
+
+	if source_row < 0 or source_row >= palette_image.get_height():
+		print("[BattleSpriteAnimator] ERROR: Invalid source row: ", source_row)
+		return ImageTexture.create_from_image(original_image)
+
+	if target_row < 0 or target_row >= palette_image.get_height():
+		print("[BattleSpriteAnimator] ERROR: Invalid target row: ", target_row)
+		return ImageTexture.create_from_image(original_image)
+
+	# Build color mapping dictionary
+	var color_map = {}
+	var palette_width = palette_image.get_width()
+
+	for x in range(palette_width):
+		var source_color = palette_image.get_pixel(x, source_row)
+		var target_color = palette_image.get_pixel(x, target_row)
+		if source_color.a > 0.1:
+			color_map[source_color.to_html(false)] = target_color
+
+	# Apply color mapping
+	for y in range(original_image.get_height()):
+		for x in range(original_image.get_width()):
+			var pixel = original_image.get_pixel(x, y)
+			if pixel.a > 0.1:
+				var pixel_key = pixel.to_html(false)
+				if color_map.has(pixel_key):
+					result_image.set_pixel(x, y, color_map[pixel_key])
+				else:
+					result_image.set_pixel(x, y, pixel)
+			else:
+				result_image.set_pixel(x, y, pixel)
+
+	return ImageTexture.create_from_image(result_image)
 
 func _process(delta):
 	# Update all active sprite animations
@@ -203,78 +282,176 @@ func create_sprite_for_combatant(combatant_id: String, parent: Node, display_nam
 	return sprite
 
 func _create_layered_sprite_for_hero(combatant_id: String, parent: Node, is_ally: bool = true) -> Node2D:
-	"""Create a layered sprite system for the hero (body + hair)"""
+	"""Create a full Mana Seed layered sprite system for the hero"""
+	print("[BattleSpriteAnimator] Creating Mana Seed layered sprite for hero...")
+
 	# Create a container for layers
 	var container = Node2D.new()
 	container.name = "HeroSpriteContainer_" + combatant_id
 
-	# Create body layer
-	var body_sprite = Sprite2D.new()
-	body_sprite.name = "BodyLayer"
-	body_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	body_sprite.hframes = 16
-	body_sprite.vframes = 16
-	body_sprite.frame = 0
+	# Create all sprite layer nodes
+	var layer_sprites = {}
+	for layer in LAYERS:
+		var sprite_codes = []
+		if "sprite_layers" in layer:
+			sprite_codes = layer.sprite_layers
+		else:
+			sprite_codes = [layer.code]
 
-	# Create hair layer
-	var hair_sprite = Sprite2D.new()
-	hair_sprite.name = "HairLayer"
-	hair_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	hair_sprite.hframes = 16
-	hair_sprite.vframes = 16
-	hair_sprite.frame = 0
+		for sprite_code in sprite_codes:
+			var sprite = Sprite2D.new()
+			sprite.name = sprite_code
+			sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+			sprite.hframes = 16
+			sprite.vframes = 16
+			sprite.frame = 0
+			sprite.visible = true
+			container.add_child(sprite)
+			layer_sprites[sprite_code] = sprite
+
+	# Add underwear layer (00undr) for auto-matching
+	var undr_sprite = Sprite2D.new()
+	undr_sprite.name = "00undr"
+	undr_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	undr_sprite.hframes = 16
+	undr_sprite.vframes = 16
+	undr_sprite.frame = 0
+	undr_sprite.visible = true
+	container.add_child_at_index(undr_sprite, 0)  # Add at beginning
+	layer_sprites["00undr"] = undr_sprite
 
 	# Get hero appearance from GameState
 	var gs = get_node_or_null("/root/aGameState")
-	var body_variant = "human_00"  # Default
-	var hair_variant = "twintail_00"  # Default
+	var character_selections: Dictionary = {}
+	var character_colors: Dictionary = {}
 
 	if gs and gs.has_meta("hero_identity"):
-		var hero_identity = gs.get_meta("hero_identity")
-		if typeof(hero_identity) == TYPE_DICTIONARY and hero_identity.has("character_variants"):
-			var variants = hero_identity["character_variants"]
-			if variants.has("body"):
-				body_variant = variants["body"]
-			if variants.has("hair"):
-				hair_variant = variants["hair"]
-
-	# Load body texture with fallback
-	var body_path = "res://assets/graphics/characters/New Character System/SpriteSystem/farmer_base_sheets/01body/fbas_01body_" + body_variant + ".png"
-	var body_texture = null
-	if FileAccess.file_exists(body_path):
-		body_texture = load(body_path)
-
-	if body_texture:
-		body_sprite.texture = body_texture
-		print("[BattleSpriteAnimator] Loaded hero body: %s" % body_path)
+		var hero_id = gs.get_meta("hero_identity")
+		if typeof(hero_id) == TYPE_DICTIONARY:
+			print("[BattleSpriteAnimator] hero_identity found: ", hero_id.keys())
+			if hero_id.has("character_selections"):
+				character_selections = hero_id.get("character_selections", {})
+			if hero_id.has("character_colors"):
+				character_colors = hero_id.get("character_colors", {})
+			print("[BattleSpriteAnimator] Loaded ", character_selections.size(), " parts and ", character_colors.size(), " colors")
 	else:
-		print("[BattleSpriteAnimator] Failed to load hero body: %s, using default" % body_path)
-		# Fallback to default
-		var default_body_path = "res://assets/graphics/characters/New Character System/SpriteSystem/farmer_base_sheets/01body/fbas_01body_human_00.png"
-		body_texture = load(default_body_path)
-		if body_texture:
-			body_sprite.texture = body_texture
+		print("[BattleSpriteAnimator] WARNING: No hero_identity meta found in GameState!")
+		# Create default naked character with just body
+		character_colors["01body"] = 0
 
-	# Load hair texture with fallback
-	var hair_path = "res://assets/graphics/characters/New Character System/SpriteSystem/farmer_base_sheets/13hair/fbas_13hair_" + hair_variant + ".png"
-	var hair_texture = null
-	if FileAccess.file_exists(hair_path):
-		hair_texture = load(hair_path)
+	# Load sprites for each layer (matching Player.gd logic)
+	for layer in LAYERS:
+		var layer_code = layer.code
+		var sprite_codes = []
+		if "sprite_layers" in layer:
+			sprite_codes = layer.sprite_layers
+		else:
+			sprite_codes = [layer_code]
 
-	if hair_texture:
-		hair_sprite.texture = hair_texture
-		print("[BattleSpriteAnimator] Loaded hero hair: %s" % hair_path)
-	else:
-		print("[BattleSpriteAnimator] Failed to load hero hair: %s, using default" % hair_path)
-		# Fallback to default
-		var default_hair_path = "res://assets/graphics/characters/New Character System/SpriteSystem/farmer_base_sheets/13hair/fbas_13hair_twintail_00.png"
-		hair_texture = load(default_hair_path)
-		if hair_texture:
-			hair_sprite.texture = hair_texture
+		# Get selected part
+		var part = null
+		if layer.has_parts:
+			part = character_selections.get(layer_code, null)
+		else:
+			# Body layer - load default body sprite
+			if layer_code == "01body":
+				var body_dir = SPRITE_PATH + "01body/"
+				var dir = DirAccess.open(body_dir)
+				if dir:
+					dir.list_dir_begin()
+					var file_name = dir.get_next()
+					while file_name != "":
+						if file_name.ends_with(".png") and file_name.begins_with("fbas_"):
+							part = {
+								"name": file_name.get_basename(),
+								"path": body_dir + file_name,
+								"base_name": "",
+								"palette_code": "00",
+								"display_name": "Body"
+							}
+							var parts_arr = file_name.get_basename().split("_")
+							if parts_arr.size() >= 4:
+								part["palette_code"] = parts_arr[3]
+							break
+						file_name = dir.get_next()
+					dir.list_dir_end()
 
-	# Add layers to container
-	container.add_child(body_sprite)
-	container.add_child(hair_sprite)
+		# Apply to all sprite nodes for this layer
+		for sprite_code in sprite_codes:
+			var sprite = layer_sprites.get(sprite_code)
+			if not sprite:
+				continue
+
+			if part == null:
+				sprite.texture = null
+				continue
+
+			# For combined layers, only apply if the part belongs to this sprite layer
+			if "sprite_layers" in layer:
+				if part.get("sprite_code", "") != sprite_code:
+					sprite.texture = null
+					continue
+
+			# Load texture
+			var texture_path = part.get("path", "")
+			if texture_path == "" or not FileAccess.file_exists(texture_path):
+				print("[BattleSpriteAnimator] ERROR: Texture not found: ", texture_path)
+				sprite.texture = null
+				continue
+
+			var original_texture = load(texture_path)
+
+			# Apply color mapping if color is selected
+			if layer_code in character_colors:
+				var color_index = character_colors[layer_code]
+				var recolored_texture = _apply_color_mapping(original_texture, part, layer.ramp_type, color_index)
+				sprite.texture = recolored_texture
+			else:
+				sprite.texture = original_texture
+
+		# Auto-match layer (e.g., underwear for neckwear)
+		if "auto_match_layer" in layer and part != null:
+			var auto_layer_code = layer.auto_match_layer
+			var auto_sprite = layer_sprites.get(auto_layer_code)
+
+			if auto_sprite:
+				var matching_part = null
+				var auto_dir_path = SPRITE_PATH + auto_layer_code + "/"
+				var auto_dir = DirAccess.open(auto_dir_path)
+
+				if auto_dir:
+					auto_dir.list_dir_begin()
+					var file_name = auto_dir.get_next()
+					while file_name != "":
+						if file_name.ends_with(".png") and file_name.begins_with("fbas_"):
+							var file_parts = file_name.get_basename().split("_")
+							if file_parts.size() >= 4 and file_parts[2] == part.get("base_name", ""):
+								matching_part = {
+									"name": file_name.get_basename(),
+									"path": auto_dir_path + file_name,
+									"base_name": file_parts[2],
+									"palette_code": file_parts[3],
+									"display_name": file_parts[2].capitalize()
+								}
+								break
+						file_name = auto_dir.get_next()
+					auto_dir.list_dir_end()
+
+				if matching_part != null:
+					var auto_texture = load(matching_part.path)
+					if layer_code in character_colors:
+						var color_index = character_colors[layer_code]
+						var recolored_texture = _apply_color_mapping(auto_texture, matching_part, layer.ramp_type, color_index)
+						auto_sprite.texture = recolored_texture
+					else:
+						auto_sprite.texture = auto_texture
+				else:
+					auto_sprite.texture = null
+		elif "auto_match_layer" in layer and part == null:
+			var auto_layer_code = layer.auto_match_layer
+			var auto_sprite = layer_sprites.get(auto_layer_code)
+			if auto_sprite:
+				auto_sprite.texture = null
 
 	# Add container to parent
 	if parent:
@@ -283,11 +460,10 @@ func _create_layered_sprite_for_hero(combatant_id: String, parent: Node, is_ally
 	# Determine default direction based on ally/enemy
 	var default_direction = "RIGHT" if is_ally else "LEFT"
 
-	# Track both layers for animation updates
+	# Track all layers for animation updates
 	sprite_instances[combatant_id] = {
-		"sprite": container,  # Use container as the main sprite reference
-		"body_layer": body_sprite,
-		"hair_layer": hair_sprite,
+		"sprite": container,
+		"layer_sprites": layer_sprites,  # All layer sprites
 		"current_anim": "Idle_" + default_direction,
 		"frame_index": 0,
 		"timer": 0.0,
@@ -295,13 +471,13 @@ func _create_layered_sprite_for_hero(combatant_id: String, parent: Node, is_ally
 		"hold_until_clear": false,
 		"play_once": false,
 		"default_direction": default_direction,
-		"is_layered": true  # Flag to indicate this is a layered sprite
+		"is_layered": true
 	}
 
 	# Play idle animation by default
 	play_animation(combatant_id, "Idle", default_direction)
 
-	print("[BattleSpriteAnimator] Created layered sprite for hero")
+	print("[BattleSpriteAnimator] Created Mana Seed layered sprite for hero with %d layers" % layer_sprites.size())
 	return container
 
 func play_animation(combatant_id: String, anim_name: String, direction: String = "RIGHT", hold: bool = false, play_once: bool = false):
@@ -418,16 +594,15 @@ func _apply_frame(combatant_id: String, frame_index: int):
 
 	var frame_data = anim_data[frame_index]
 
-	# Handle layered sprites (hero)
+	# Handle layered sprites (hero with Mana Seed system)
 	if instance.get("is_layered", false):
-		var body_layer = instance.get("body_layer")
-		var hair_layer = instance.get("hair_layer")
-		if body_layer:
-			body_layer.frame = frame_data.cell
-			body_layer.flip_h = frame_data.flip_h
-		if hair_layer:
-			hair_layer.frame = frame_data.cell
-			hair_layer.flip_h = frame_data.flip_h
+		var layer_sprites = instance.get("layer_sprites", {})
+		# Update all visible layers
+		for sprite_code in layer_sprites:
+			var sprite = layer_sprites[sprite_code]
+			if sprite and sprite.visible and sprite.texture:
+				sprite.frame = frame_data.cell
+				sprite.flip_h = frame_data.flip_h
 	else:
 		# Handle regular single sprite
 		var sprite = instance["sprite"]
