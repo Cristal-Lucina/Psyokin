@@ -493,7 +493,7 @@ func create_layer_section(layer: Dictionary, layer_index: int) -> VBoxContainer:
 	# Color strip (fixed 300px width)
 	var color_strip = HBoxContainer.new()
 	color_strip.name = "ColorStrip"
-	color_strip.custom_minimum_size = Vector2(300, 30)  # Reduced height from 40 to 30
+	color_strip.custom_minimum_size = Vector2(300, 20)  # Squeezed more compact
 
 	var palette_image = get_palette_image(layer.ramp_type)
 	var num_colors = min(layer.max_colors, palette_image.get_height() / 2 if palette_image else 0)
@@ -502,7 +502,7 @@ func create_layer_section(layer: Dictionary, layer_index: int) -> VBoxContainer:
 	for i in range(num_colors):
 		var color_block = Panel.new()
 		color_block.name = "ColorBlock_" + str(i)
-		color_block.custom_minimum_size = Vector2(block_width, 30)  # Reduced from 40 to 30
+		color_block.custom_minimum_size = Vector2(block_width, 20)  # Squeezed more compact
 		color_block.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
 		# Add color preview
