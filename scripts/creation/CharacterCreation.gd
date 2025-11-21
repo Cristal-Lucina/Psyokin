@@ -255,13 +255,16 @@ func _ready() -> void:
 	_update_confirm_enabled()
 
 	# Initialize cinematic opening
-	_setup_cinematic()
-	_hide_form()  # Hide the form initially - only shows if player says "No" at end
-
-	# If returning from customization, skip to confirmation
 	if returning_from_customization:
-		current_stage = CinematicStage.FINAL_CONFIRMATION
-		_build_confirmation_ui()
+		# Set up cinematic layer without starting dialogue
+		_setup_cinematic_layer_only()
+		_hide_form()
+		# Go directly to confirmation
+		_enter_stage(CinematicStage.FINAL_CONFIRMATION)
+	else:
+		# Normal flow: set up and start from beginning
+		_setup_cinematic()
+		_hide_form()
 
 func _style_panels() -> void:
 	"""Apply LoadoutPanel styling (dark gray background with pink border) to all panels"""
@@ -1070,6 +1073,73 @@ func _opt_text(ob: OptionButton) -> String:
 # ══════════════════════════════════════════════════════════════════════════════
 
 # ── Cinematic Setup ──────────────────────────────────────────────────────────
+func _setup_cinematic_layer_only() -> void:
+	"""Initialize the cinematic layer without starting dialogue (for returning from customization)"""
+	# Set ControllerManager context to CHARACTER_CREATION
+	var controller_manager = get_node_or_null("/root/aControllerManager")
+	if controller_manager:
+		controller_manager.set_context(controller_manager.InputContext.CHARACTER_CREATION)
+		print("[CharacterCreation] Set ControllerManager context to CHARACTER_CREATION")
+
+	# Create cinematic overlay
+	cinematic_layer = CanvasLayer.new()
+	cinematic_layer.layer = 100  # Render above everything
+	add_child(cinematic_layer)
+
+	# Create black background
+	var bg = ColorRect.new()
+	bg.color = Color.BLACK
+	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	cinematic_layer.add_child(bg)
+
+	# Create container for dialogue and arrow
+	var dialogue_container = VBoxContainer.new()
+	dialogue_container.set_anchors_preset(Control.PRESET_CENTER)
+	dialogue_container.anchor_left = 0.5
+	dialogue_container.anchor_top = 0.5
+	dialogue_container.anchor_right = 0.5
+	dialogue_container.anchor_bottom = 0.5
+	dialogue_container.offset_left = -400
+	dialogue_container.offset_right = 400
+	dialogue_container.offset_top = -30
+	dialogue_container.offset_bottom = 70
+	dialogue_container.add_theme_constant_override("separation", 10)
+	cinematic_layer.add_child(dialogue_container)
+
+	# Create dialogue label (for typing text)
+	dialogue_label = Label.new()
+	dialogue_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	dialogue_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	dialogue_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	dialogue_label.add_theme_font_size_override("font_size", 18)
+	dialogue_label.add_theme_color_override("font_color", Color.WHITE)
+	dialogue_label.text = ""
+	dialogue_container.add_child(dialogue_label)
+
+	# Create up arrow label (below the dialogue)
+	arrow_label = Label.new()
+	arrow_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	arrow_label.add_theme_font_size_override("font_size", 24)
+	arrow_label.add_theme_color_override("font_color", Color(1.0, 0.7, 0.75, 1.0))
+	arrow_label.text = "↑"
+	arrow_label.visible = false
+	dialogue_container.add_child(arrow_label)
+
+	# Create continue prompt
+	continue_prompt = Label.new()
+	continue_prompt.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	continue_prompt.anchor_top = 1.0
+	continue_prompt.anchor_bottom = 1.0
+	continue_prompt.offset_top = -50
+	continue_prompt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	continue_prompt.add_theme_font_size_override("font_size", 12)
+	continue_prompt.add_theme_color_override("font_color", Color(0.8, 0.8, 0.8, 1.0))
+	continue_prompt.text = "Press Accept or Enter to continue..."
+	continue_prompt.visible = false
+	cinematic_layer.add_child(continue_prompt)
+
+	# Don't start any stage - let caller decide
+
 func _setup_cinematic() -> void:
 	"""Initialize the cinematic layer and start the opening sequence"""
 	# Set ControllerManager context to CHARACTER_CREATION
