@@ -434,7 +434,7 @@ func create_layer_section(layer: Dictionary, layer_index: int) -> VBoxContainer:
 		var left_arrow = Button.new()
 		left_arrow.name = "LeftArrow"
 		left_arrow.text = "◀"
-		left_arrow.custom_minimum_size = Vector2(30, 0)  # Smaller and no vertical padding
+		left_arrow.custom_minimum_size = Vector2(20, 0)  # Even smaller
 		left_arrow.pressed.connect(_on_part_previous.bind(layer_index))
 		part_container.add_child(left_arrow)
 
@@ -454,7 +454,7 @@ func create_layer_section(layer: Dictionary, layer_index: int) -> VBoxContainer:
 		var right_arrow = Button.new()
 		right_arrow.name = "RightArrow"
 		right_arrow.text = "▶"
-		right_arrow.custom_minimum_size = Vector2(30, 0)  # Smaller and no vertical padding
+		right_arrow.custom_minimum_size = Vector2(20, 0)  # Even smaller
 		right_arrow.pressed.connect(_on_part_next.bind(layer_index))
 		part_container.add_child(right_arrow)
 
@@ -486,7 +486,7 @@ func create_layer_section(layer: Dictionary, layer_index: int) -> VBoxContainer:
 	var left_arrow = Button.new()
 	left_arrow.name = "LeftArrow"
 	left_arrow.text = "◀"
-	left_arrow.custom_minimum_size = Vector2(30, 0)  # Smaller and no vertical padding
+	left_arrow.custom_minimum_size = Vector2(20, 0)  # Even smaller
 	left_arrow.pressed.connect(_on_color_previous.bind(layer_index))
 	color_strip_row.add_child(left_arrow)
 
@@ -521,7 +521,7 @@ func create_layer_section(layer: Dictionary, layer_index: int) -> VBoxContainer:
 	var right_arrow = Button.new()
 	right_arrow.name = "RightArrow"
 	right_arrow.text = "▶"
-	right_arrow.custom_minimum_size = Vector2(30, 0)  # Smaller and no vertical padding
+	right_arrow.custom_minimum_size = Vector2(20, 0)  # Even smaller
 	right_arrow.pressed.connect(_on_color_next.bind(layer_index))
 	color_strip_row.add_child(right_arrow)
 
