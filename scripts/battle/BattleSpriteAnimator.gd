@@ -229,8 +229,8 @@ func create_sprite_for_combatant(combatant_id: String, parent: Node, display_nam
 	print("[BattleSpriteAnimator] Available character sprites: %s" % str(character_sprites.keys()))
 	print("[BattleSpriteAnimator] Parent node: %s" % str(parent))
 
-	# For hero, use layered system (body + hair)
-	if combatant_id.to_lower() == "hero":
+	# For hero (including hero_portrait), use layered Mana Seed system
+	if combatant_id.to_lower().begins_with("hero"):
 		return _create_layered_sprite_for_hero(combatant_id, parent, is_ally)
 
 	if not character_sprites.has(lookup_name):
