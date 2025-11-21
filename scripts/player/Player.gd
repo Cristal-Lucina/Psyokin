@@ -539,11 +539,19 @@ func _update_animation(delta: float) -> void:
 			frame = _current_direction * 8 + 3 + _anim_frame_index
 
 	# Update all visible sprites
-	for layer_key in LAYERS:
-		var layer = LAYERS[layer_key]
-		var sprite: Sprite2D = character_layers.get_node(layer.node_name)
-		if sprite and sprite.visible and sprite.texture:
-			sprite.frame = frame
+	for layer in LAYERS:
+		# Get sprite codes (single or multiple for combined layers)
+		var sprite_codes = []
+		if "sprite_layers" in layer:
+			sprite_codes = layer.sprite_layers
+		else:
+			sprite_codes = [layer.code]
+
+		# Update each sprite node for this layer
+		for sprite_code in sprite_codes:
+			var sprite: Sprite2D = character_layers.get_node_or_null(sprite_code)
+			if sprite and sprite.visible and sprite.texture:
+				sprite.frame = frame
 
 ## ═══════════════════════════════════════════════════════════════
 ## RANDOM ENCOUNTERS
