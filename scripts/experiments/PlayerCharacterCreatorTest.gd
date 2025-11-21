@@ -417,6 +417,9 @@ func build_customization_options():
 		# Track section by index for navigation
 		sections.append(section)
 
+	# Add Accept button at the end of right column
+	add_accept_button()
+
 func create_layer_section(layer: Dictionary, layer_index: int) -> VBoxContainer:
 	"""Create a customization section for a layer"""
 	var section = VBoxContainer.new()
@@ -573,6 +576,41 @@ func create_layer_section(layer: Dictionary, layer_index: int) -> VBoxContainer:
 	section.add_child(separator)
 
 	return section
+
+func add_accept_button():
+	"""Add the Accept button at the end of the right column"""
+	# Create a centered container for the button
+	var button_container = CenterContainer.new()
+	button_container.name = "AcceptButtonContainer"
+
+	# Create the Accept button
+	var accept_btn = Button.new()
+	accept_btn.name = "AcceptButton"
+	accept_btn.text = "Accept"
+	accept_btn.custom_minimum_size = Vector2(150, 40)
+	accept_btn.focus_mode = Control.FOCUS_ALL
+	accept_btn.pressed.connect(_on_accept_pressed)
+
+	# Create rounded style with Electric Lime border
+	var style = StyleBoxFlat.new()
+	style.bg_color = Color(0.1, 0.1, 0.1, 0.8)  # Dark semi-transparent background
+	style.border_color = Color("#C8FF3D")  # Electric Lime
+	style.set_border_width_all(3)
+	style.set_corner_radius_all(10)  # Rounded corners
+
+	accept_btn.add_theme_stylebox_override("normal", style)
+	accept_btn.add_theme_stylebox_override("hover", style)
+	accept_btn.add_theme_stylebox_override("pressed", style)
+	accept_btn.add_theme_color_override("font_color", Color("#C8FF3D"))  # Electric Lime text
+	accept_btn.add_theme_font_size_override("font_size", 16)
+
+	button_container.add_child(accept_btn)
+	right_column.add_child(button_container)
+
+func _on_accept_pressed():
+	"""Handle Accept button press"""
+	print("Character accepted!")
+	# TODO: Save character data or transition to next scene
 
 func get_palette_image(ramp_type: String) -> Image:
 	"""Get the palette image for a ramp type"""

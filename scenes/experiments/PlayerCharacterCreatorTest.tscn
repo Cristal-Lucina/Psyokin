@@ -1,6 +1,7 @@
-[gd_scene load_steps=2 format=3 uid="uid://c8yv7j8xqm2pk"]
+[gd_scene load_steps=3 format=3 uid="uid://c8yv7j8xqm2pk"]
 
 [ext_resource type="Script" path="res://scripts/experiments/PlayerCharacterCreatorTest.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/graphics/items/MirrorSprite.png" id="2_mirror"]
 
 [node name="PlayerCharacterCreatorTest" type="Control"]
 layout_mode = 3
@@ -67,6 +68,12 @@ size_flags_horizontal = 3
 [node name="PreviewContainer" type="CenterContainer" parent="MarginContainer/MainContainer/RightPanel"]
 layout_mode = 2
 size_flags_vertical = 3
+
+[node name="MirrorSprite" type="Sprite2D" parent="MarginContainer/MainContainer/RightPanel/PreviewContainer"]
+position = Vector2(178, 278)
+scale = Vector2(8, 8)
+texture = ExtResource("2_mirror")
+z_index = -1
 
 [node name="CharacterLayers" type="Node2D" parent="MarginContainer/MainContainer/RightPanel/PreviewContainer"]
 position = Vector2(178, 278)
