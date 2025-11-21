@@ -71,7 +71,7 @@ size_flags_vertical = 3
 
 [node name="MirrorSprite" type="Sprite2D" parent="MarginContainer/MainContainer/RightPanel/PreviewContainer"]
 position = Vector2(178, 278)
-scale = Vector2(8, 8)
+scale = Vector2(4, 4)
 texture = ExtResource("2_mirror")
 z_index = -1
 
