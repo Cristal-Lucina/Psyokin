@@ -35,19 +35,26 @@ class_name Player
 
 # Constants
 const GS_PATH = "/root/aGameState"
-const CHAR_BASE_PATH = "res://assets/graphics/characters/"
-const CHAR_VARIANTS = ["char_a_p1"]
+const SPRITE_PATH = "res://assets/graphics/characters/New Character System/SpriteSystem/base_sheets/"
+const PALETTE_PATH = "res://assets/graphics/characters/New Character System/SpriteSystem/_supporting files/palettes/"
 
-const LAYERS = {
-	"base": {"code": "0bas", "node_name": "BaseSprite", "path": ""},
-	"outfit": {"code": "1out", "node_name": "OutfitSprite", "path": "1out"},
-	"cloak": {"code": "2clo", "node_name": "CloakSprite", "path": "2clo"},
-	"face": {"code": "3fac", "node_name": "FaceSprite", "path": "3fac"},
-	"hair": {"code": "4har", "node_name": "HairSprite", "path": "4har"},
-	"hat": {"code": "5hat", "node_name": "HatSprite", "path": "5hat"},
-	"tool_a": {"code": "6tla", "node_name": "ToolASprite", "path": "6tla"},
-	"tool_b": {"code": "7tlb", "node_name": "ToolBSprite", "path": "7tlb"}
-}
+# Mana Seed layer configuration (matching character creator)
+const LAYERS = [
+	{"code": "01body", "label": "Skin Tone", "ramp_type": "skin", "max_colors": 18, "has_parts": false},
+	{"code": "02sock", "label": "Legwear", "ramp_type": "3color", "max_colors": 48, "has_parts": true},
+	{"code": "footwear", "label": "Footwear", "ramp_type": "3color", "max_colors": 48, "has_parts": true, "sprite_layers": ["03fot1", "07fot2"]},
+	{"code": "bottomwear", "label": "Bottomwear", "ramp_type": "3color", "max_colors": 48, "has_parts": true, "sprite_layers": ["04lwr1", "06lwr2", "08lwr3"]},
+	{"code": "05shrt", "label": "Topwear", "ramp_type": "3color", "max_colors": 48, "has_parts": true},
+	{"code": "09hand", "label": "Handwear", "ramp_type": "3color", "max_colors": 48, "has_parts": true},
+	{"code": "10outr", "label": "Overwear", "ramp_type": "3color", "max_colors": 48, "has_parts": true},
+	{"code": "11neck", "label": "Neckwear", "ramp_type": "4color", "max_colors": 59, "has_parts": true, "auto_match_layer": "00undr"},
+	{"code": "12face", "label": "Eyewear", "ramp_type": "3color", "max_colors": 48, "has_parts": true},
+	{"code": "13hair", "label": "Hairstyle", "ramp_type": "hair", "max_colors": 58, "has_parts": true},
+	{"code": "14head", "label": "Headwear", "ramp_type": "4color", "max_colors": 59, "has_parts": true}
+]
+
+# Palette images for color mapping (loaded at runtime)
+var palette_images = {}
 
 # Movement settings
 @export var move_speed: float = 120.0
@@ -132,105 +139,167 @@ func _ready() -> void:
 	print("[Player] Initializing player character...")
 	add_to_group("player")  # Add to group for easy finding
 	_gs = get_node_or_null(GS_PATH)
+	_load_palettes()
 	_load_character_appearance()
 
+func _load_palettes() -> void:
+	"""Load palette images for color mapping"""
+	print("[Player] Loading palette images...")
+	palette_images["3color"] = load(PALETTE_PATH + "mana seed 3-color ramps.png").get_image()
+	palette_images["4color"] = load(PALETTE_PATH + "mana seed 4-color ramps.png").get_image()
+	palette_images["hair"] = load(PALETTE_PATH + "mana seed hair ramps.png").get_image()
+	palette_images["skin"] = load(PALETTE_PATH + "mana seed skin ramps.png").get_image()
+	print("[Player] Palette images loaded")
+
 func _load_character_appearance() -> void:
-	"""Load character appearance from GameState"""
-	print("[Player] Loading character appearance...")
+	"""Load character appearance from GameState using Mana Seed system"""
+	print("[Player] Loading Mana Seed character appearance...")
 
 	if not character_layers:
 		print("[Player] ERROR: character_layers is null!")
 		return
 
-	# Get character variants from GameState
-	var variants: Dictionary = {}
+	# Get character data from GameState hero_identity meta
+	var character_selections: Dictionary = {}
+	var character_colors: Dictionary = {}
+
 	if _gs and _gs.has_meta("hero_identity"):
-		var id_v: Variant = _gs.get_meta("hero_identity")
-		if typeof(id_v) == TYPE_DICTIONARY:
-			var id: Dictionary = id_v
-			print("[Player] hero_identity found: ", id.keys())
-			if id.has("character_variants"):
-				var cv: Variant = id.get("character_variants")
-				if typeof(cv) == TYPE_DICTIONARY:
-					variants = cv
-					print("[Player] Loaded variants from GameState: ", variants)
-			else:
-				print("[Player] No character_variants in hero_identity")
-		else:
-			print("[Player] hero_identity is not a dictionary")
+		var hero_id = _gs.get_meta("hero_identity")
+		if typeof(hero_id) == TYPE_DICTIONARY:
+			print("[Player] hero_identity found: ", hero_id.keys())
+			if hero_id.has("character_selections"):
+				character_selections = hero_id.get("character_selections", {})
+			if hero_id.has("character_colors"):
+				character_colors = hero_id.get("character_colors", {})
+			print("[Player] Loaded ", character_selections.size(), " parts and ", character_colors.size(), " colors")
 	else:
-		print("[Player] No hero_identity meta found in GameState")
+		print("[Player] WARNING: No hero_identity meta found in GameState!")
+		# Create default naked character with just body
+		character_colors["01body"] = 0
 
-	# If no variants saved, try to load from CharacterData autoload
-	if variants.is_empty():
-		print("[Player] Trying CharacterData autoload...")
-		var char_data = get_node_or_null("/root/aCharacterData")
-		if char_data:
-			print("[Player] CharacterData found")
-			if char_data.has_method("get"):
-				var sv: Variant = char_data.get("selected_variants")
-				print("[Player] selected_variants type: ", typeof(sv))
-				if typeof(sv) == TYPE_DICTIONARY:
-					variants = sv
-					print("[Player] Loaded variants from CharacterData: ", variants)
-			elif char_data.get("selected_variants"):
-				var sv2 = char_data.get("selected_variants")
-				if typeof(sv2) == TYPE_DICTIONARY:
-					variants = sv2
-					print("[Player] Loaded variants from CharacterData (property): ", variants)
+	# Load sprites for each layer
+	for layer in LAYERS:
+		var layer_code = layer.code
+
+		# Get sprite codes (single or multiple for combined layers)
+		var sprite_codes = []
+		if "sprite_layers" in layer:
+			sprite_codes = layer.sprite_layers
 		else:
-			print("[Player] CharacterData autoload not found")
+			sprite_codes = [layer_code]
 
-	if variants.is_empty():
-		print("[Player] WARNING: No character variants found!")
-		return
+		# Get selected part (or body for body layer)
+		var part = null
+		if layer.has_parts:
+			part = character_selections.get(layer_code, null)
+		else:
+			# Body layer - load default body sprite
+			if layer_code == "01body":
+				# Find first body sprite
+				var body_dir = SPRITE_PATH + "01body/"
+				var dir = DirAccess.open(body_dir)
+				if dir:
+					dir.list_dir_begin()
+					var file_name = dir.get_next()
+					while file_name != "":
+						if file_name.ends_with(".png") and file_name.begins_with("fbas_"):
+							part = {
+								"name": file_name.get_basename(),
+								"path": body_dir + file_name,
+								"base_name": "",
+								"palette_code": "00",
+								"display_name": "Body"
+							}
+							# Parse palette code from filename
+							var parts_arr = file_name.get_basename().split("_")
+							if parts_arr.size() >= 4:
+								part["palette_code"] = parts_arr[3]
+							break
+						file_name = dir.get_next()
+					dir.list_dir_end()
 
-	# Update each layer sprite
-	for layer_key in LAYERS:
-		var layer = LAYERS[layer_key]
-		var sprite = character_layers.get_node(layer.node_name)
+		# Apply to all sprite nodes for this layer
+		for sprite_code in sprite_codes:
+			var sprite = character_layers.get_node_or_null(sprite_code)
+			if not sprite:
+				continue
 
-		if layer_key in variants and variants[layer_key] != "":
-			var variant_code = variants[layer_key]
-			print("[Player] Loading ", layer_key, " with variant: ", variant_code)
-			var texture_path = _find_character_file(layer_key, variant_code)
-			print("[Player]   -> Path: ", texture_path)
-			if texture_path != "" and FileAccess.file_exists(texture_path):
-				var texture = load(texture_path)
-				sprite.texture = texture
-				sprite.visible = true
-				# Set to idle pose: rows 0-3, column 0
-				# Frame = direction * 8 (South=0, North=8, East=16, West=24)
-				sprite.frame = _current_direction * 8
-				print("[Player]   -> Loaded successfully, frame set to ", sprite.frame)
-			else:
-				print("[Player]   -> ERROR: File not found!")
+			# If no part selected, clear the sprite
+			if part == null:
 				sprite.texture = null
-				sprite.visible = false
-		else:
-			sprite.texture = null
-			sprite.visible = false
+				continue
 
-func _find_character_file(layer_key: String, variant_code: String) -> String:
-	"""Find the character file for a given layer and variant code"""
-	if not LAYERS.has(layer_key):
-		print("[Player]     Layer key not found: ", layer_key)
-		return ""
+			# For combined layers (like footwear), only apply if the part belongs to this sprite layer
+			if "sprite_layers" in layer:
+				if part.get("sprite_code", "") != sprite_code:
+					sprite.texture = null
+					continue
 
-	var layer = LAYERS[layer_key]
-	for variant in CHAR_VARIANTS:
-		var base_path = CHAR_BASE_PATH + variant + "/"
-		var layer_path = base_path + (layer.path + "/" if layer.path != "" else "")
-		var filename = "%s_%s_%s.png" % [variant, layer.code, variant_code]
-		var full_path = layer_path + filename
+			# Load texture
+			var texture_path = part.get("path", "")
+			if texture_path == "" or not FileAccess.file_exists(texture_path):
+				print("[Player] ERROR: Texture not found: ", texture_path)
+				sprite.texture = null
+				continue
 
-		print("[Player]     Trying: ", full_path)
-		if FileAccess.file_exists(full_path):
-			print("[Player]     FOUND!")
-			return full_path
+			var original_texture = load(texture_path)
 
-	print("[Player]     Not found in any variant")
-	return ""
+			# Apply color mapping if color is selected
+			if layer_code in character_colors:
+				var color_index = character_colors[layer_code]
+				var recolored_texture = _apply_color_mapping(original_texture, part, layer.ramp_type, color_index)
+				sprite.texture = recolored_texture
+			else:
+				sprite.texture = original_texture
+
+		# Auto-match layer (e.g., apply matching underwear for neckwear)
+		if "auto_match_layer" in layer and part != null:
+			var auto_layer_code = layer.auto_match_layer
+			var auto_sprite = character_layers.get_node_or_null(auto_layer_code)
+
+			if auto_sprite:
+				# Find matching part by base_name in the auto-match layer
+				var matching_part = null
+				var auto_dir_path = SPRITE_PATH + auto_layer_code + "/"
+				var auto_dir = DirAccess.open(auto_dir_path)
+
+				if auto_dir:
+					auto_dir.list_dir_begin()
+					var file_name = auto_dir.get_next()
+					while file_name != "":
+						if file_name.ends_with(".png") and file_name.begins_with("fbas_"):
+							var file_parts = file_name.get_basename().split("_")
+							if file_parts.size() >= 4 and file_parts[2] == part.get("base_name", ""):
+								matching_part = {
+									"name": file_name.get_basename(),
+									"path": auto_dir_path + file_name,
+									"base_name": file_parts[2],
+									"palette_code": file_parts[3],
+									"display_name": file_parts[2].capitalize()
+								}
+								break
+						file_name = auto_dir.get_next()
+					auto_dir.list_dir_end()
+
+				if matching_part != null:
+					# Load and apply matching texture with same color
+					var auto_texture = load(matching_part.path)
+					if layer_code in character_colors:
+						var color_index = character_colors[layer_code]
+						var recolored_texture = _apply_color_mapping(auto_texture, matching_part, layer.ramp_type, color_index)
+						auto_sprite.texture = recolored_texture
+					else:
+						auto_sprite.texture = auto_texture
+				else:
+					auto_sprite.texture = null
+		# Clear auto-match layer if main layer has no selection
+		elif "auto_match_layer" in layer and part == null:
+			var auto_layer_code = layer.auto_match_layer
+			var auto_sprite = character_layers.get_node_or_null(auto_layer_code)
+			if auto_sprite:
+				auto_sprite.texture = null
+
+	print("[Player] Character appearance loaded")
 
 func _physics_process(delta: float) -> void:
 	_handle_jump(delta)
@@ -573,10 +642,162 @@ func restore_position() -> void:
 
 		# Update sprite frames to idle frame for the restored direction
 		var idle_frame = _current_direction * 8
-		for layer_key in LAYERS:
-			var layer = LAYERS[layer_key]
-			var sprite: Sprite2D = character_layers.get_node(layer.node_name)
-			if sprite and sprite.visible and sprite.texture:
-				sprite.frame = idle_frame
+		for layer in LAYERS:
+			var sprite_codes = []
+			if "sprite_layers" in layer:
+				sprite_codes = layer.sprite_layers
+			else:
+				sprite_codes = [layer.code]
+
+			for sprite_code in sprite_codes:
+				var sprite: Sprite2D = character_layers.get_node_or_null(sprite_code)
+				if sprite and sprite.visible and sprite.texture:
+					sprite.frame = idle_frame
+
+			# Also update auto-match layer if it exists
+			if "auto_match_layer" in layer:
+				var auto_sprite = character_layers.get_node_or_null(layer.auto_match_layer)
+				if auto_sprite and auto_sprite.visible and auto_sprite.texture:
+					auto_sprite.frame = idle_frame
 
 		print("[Player] Restored position: %s, direction: %d" % [position, _current_direction])
+
+# ========== COLOR MAPPING FUNCTIONS ==========
+
+func _apply_color_mapping(original_texture: Texture2D, part: Dictionary, ramp_type: String, color_index: int) -> ImageTexture:
+	"""Apply color mapping to a texture"""
+	var original_image = original_texture.get_image()
+	var recolored_image = Image.create(original_image.get_width(), original_image.get_height(), false, original_image.get_format())
+	recolored_image.copy_from(original_image)
+
+	var palette_code = part.get("palette_code", "00")
+	var base_colors = _get_base_colors_for_palette_code(palette_code, ramp_type)
+	var target_colors = _get_target_colors_for_palette_code(palette_code, ramp_type, color_index)
+
+	if base_colors.size() == 0 or target_colors.size() == 0:
+		return ImageTexture.create_from_image(recolored_image)
+
+	# Pixel-by-pixel color replacement
+	for y in range(recolored_image.get_height()):
+		for x in range(recolored_image.get_width()):
+			var pixel = recolored_image.get_pixel(x, y)
+			if pixel.a < 0.01:
+				continue
+
+			# Check against each base color
+			for i in range(min(base_colors.size(), target_colors.size())):
+				if _colors_match(pixel, base_colors[i]):
+					recolored_image.set_pixel(x, y, Color(target_colors[i].r, target_colors[i].g, target_colors[i].b, pixel.a))
+					break
+
+	return ImageTexture.create_from_image(recolored_image)
+
+func _get_base_colors_for_palette_code(palette_code: String, ramp_type: String) -> Array:
+	"""Get base colors based on palette code"""
+	var base_ramp_filename = ""
+
+	match palette_code:
+		"00a":
+			base_ramp_filename = "3-color base ramp (00a).png"
+		"00b":
+			base_ramp_filename = "4-color base ramp (00b).png"
+		"00c":
+			base_ramp_filename = "2x 3-color base ramps (00c).png"
+		"00d":
+			base_ramp_filename = "4-color + 3-color base ramps (00d).png"
+		"00f":
+			base_ramp_filename = "4-color base ramp (00b).png"
+		"00":
+			if ramp_type == "skin":
+				base_ramp_filename = "skin color base ramp.png"
+			elif ramp_type == "hair":
+				base_ramp_filename = "hair color base ramp.png"
+		_:
+			if ramp_type == "skin":
+				base_ramp_filename = "skin color base ramp.png"
+			elif ramp_type == "hair":
+				base_ramp_filename = "hair color base ramp.png"
+			elif ramp_type == "3color":
+				base_ramp_filename = "3-color base ramp (00a).png"
+			elif ramp_type == "4color":
+				base_ramp_filename = "4-color base ramp (00b).png"
+
+	if base_ramp_filename == "":
+		return []
+
+	var base_ramp_path = PALETTE_PATH + "base ramps/" + base_ramp_filename
+	if not FileAccess.file_exists(base_ramp_path):
+		return []
+
+	var texture = load(base_ramp_path)
+	if texture == null:
+		return []
+
+	var image = texture.get_image()
+	var colors = []
+
+	# Read colors from 2x2 blocks
+	var num_colors = image.get_width() / 2
+	for i in range(num_colors):
+		var x = i * 2
+		var pixel_color = image.get_pixel(x, 0)
+		colors.append(pixel_color)
+
+	return colors
+
+func _get_target_colors_for_palette_code(palette_code: String, ramp_type: String, row_index: int) -> Array:
+	"""Get target colors for a specific palette row"""
+	match palette_code:
+		"00a":
+			return _extract_colors_from_palette("3color", row_index)
+		"00b":
+			return _extract_colors_from_palette("4color", row_index)
+		"00c":
+			var colors_3 = _extract_colors_from_palette("3color", row_index)
+			if colors_3.size() >= 3:
+				return colors_3 + colors_3
+			return colors_3
+		"00d":
+			var colors_4 = _extract_colors_from_palette("4color", row_index)
+			var colors_3 = _extract_colors_from_palette("3color", row_index)
+			return colors_4 + colors_3
+		"00f":
+			var colors_4 = _extract_colors_from_palette("4color", row_index)
+			var colors_hair = _extract_colors_from_palette("hair", row_index)
+			return colors_4 + colors_hair
+		"00":
+			return _extract_colors_from_palette(ramp_type, row_index)
+		_:
+			return _extract_colors_from_palette(ramp_type, row_index)
+
+func _extract_colors_from_palette(ramp_type: String, row_index: int) -> Array:
+	"""Extract colors from a specific row of a palette image"""
+	if ramp_type not in palette_images:
+		return []
+
+	var image = palette_images[ramp_type]
+	var colors = []
+
+	var colors_per_row = 3
+	match ramp_type:
+		"3color":
+			colors_per_row = 3
+		"4color":
+			colors_per_row = 4
+		"hair":
+			colors_per_row = 5
+		"skin":
+			colors_per_row = 4
+
+	# Read colors from 2x2 blocks
+	for i in range(colors_per_row):
+		var x = i * 2
+		var y = row_index * 2
+		var pixel_color = image.get_pixel(x, y)
+		colors.append(pixel_color)
+
+	return colors
+
+func _colors_match(c1: Color, c2: Color, tolerance: float = 0.01) -> bool:
+	"""Check if two colors match within tolerance"""
+	return abs(c1.r - c2.r) < tolerance and abs(c1.g - c2.g) < tolerance and abs(c1.b - c2.b) < tolerance

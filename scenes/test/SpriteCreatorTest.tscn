@@ -1,8 +1,8 @@
-[gd_scene load_steps=4 format=3 uid="uid://ctest123farmer"]
+[gd_scene load_steps=4 format=3 uid="uid://cdto2tuuucdpx"]
 
-[ext_resource type="Script" path="res://scripts/test/FarmerSpriteAnimator.gd" id="1"]
-[ext_resource type="Texture2D" path="res://assets/graphics/characters/New Character System/SpriteSystem/farmer_base_sheets/01body/fbas_01body_human_00.png" id="2"]
-[ext_resource type="Texture2D" path="res://assets/graphics/characters/New Character System/SpriteSystem/farmer_base_sheets/13hair/fbas_13hair_twintail_00.png" id="3"]
+[ext_resource type="Script" uid="uid://sf1110ttvale" path="res://scripts/test/FarmerSpriteAnimator.gd" id="1"]
+[ext_resource type="Texture2D" uid="uid://rvjiid20remh" path="res://assets/graphics/characters/New Character System/SpriteSystem/base_sheets/fbas_XXfldr_blank_sheet.png" id="2"]
+[ext_resource type="Texture2D" uid="uid://rvjiid20remh" path="res://assets/graphics/characters/New Character System/SpriteSystem/base_sheets/fbas_XXfldr_blank_sheet.png" id="3"]
 
 [node name="SpriteCreatorTest" type="Node2D"]
 script = ExtResource("1")

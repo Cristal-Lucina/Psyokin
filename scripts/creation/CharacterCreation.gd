@@ -9,6 +9,7 @@ enum CinematicStage {
 	OPENING_DIALOGUE_2,    # "Is the patient aware?"
 	OPENING_DIALOGUE_3,    # "Hey, do you remember your name?"
 	NAME_INPUT,            # Name input with validation
+	PRONOUN_SELECTION,     # Choose pronouns: He/She/They
 	DIALOGUE_RESPONSE_1,   # "We got a response!"
 	DIALOGUE_RESPONSE_2,   # "Wonderful, how are the vitals?"
 	STAT_SELECTION,        # Choose 3 stats
@@ -42,21 +43,38 @@ const PERK_PATH    := "/root/aPerkSystem"
 const CPS_PATH     := "/root/aCombatProfileSystem"
 const ROUTER_PATH  := "/root/aSceneRouter"
 
-# Character directories
+# Mana Seed character system paths
+const SPRITE_PATH = "res://assets/graphics/characters/New Character System/SpriteSystem/base_sheets/"
+const PALETTE_PATH = "res://assets/graphics/characters/New Character System/SpriteSystem/_supporting files/palettes/"
+const ANIM_DATA_PATH = "res://scenes/test/sprite_animations_data.csv"
+
+# Old system compatibility paths (for legacy code)
 const CHAR_BASE_PATH = "res://assets/graphics/characters/"
 const CHAR_VARIANTS = ["char_a_p1"]
 
-# Layer configuration
-const LAYERS = {
-	"base": {"code": "0bas", "node_name": "BaseSprite", "path": ""},
-	"outfit": {"code": "1out", "node_name": "OutfitSprite", "path": "1out"},
-	"cloak": {"code": "2clo", "node_name": "CloakSprite", "path": "2clo"},
-	"face": {"code": "3fac", "node_name": "FaceSprite", "path": "3fac"},
-	"hair": {"code": "4har", "node_name": "HairSprite", "path": "4har"},
-	"hat": {"code": "5hat", "node_name": "HatSprite", "path": "5hat"},
-	"tool_a": {"code": "6tla", "node_name": "ToolASprite", "path": "6tla"},
-	"tool_b": {"code": "7tlb", "node_name": "ToolBSprite", "path": "7tlb"}
-}
+# Mana Seed layer configuration (matching PlayerCharacterCreatorTest)
+const LAYERS = [
+	{"code": "01body", "label": "Skin Tone", "ramp_type": "skin", "max_colors": 18, "has_parts": false},
+	{"code": "02sock", "label": "Legwear", "ramp_type": "3color", "max_colors": 48, "has_parts": true},
+	{"code": "footwear", "label": "Footwear", "ramp_type": "3color", "max_colors": 48, "has_parts": true, "sprite_layers": ["03fot1", "07fot2"]},
+	{"code": "bottomwear", "label": "Bottomwear", "ramp_type": "3color", "max_colors": 48, "has_parts": true, "sprite_layers": ["04lwr1", "06lwr2", "08lwr3"]},
+	{"code": "05shrt", "label": "Topwear", "ramp_type": "3color", "max_colors": 48, "has_parts": true},
+	{"code": "09hand", "label": "Handwear", "ramp_type": "3color", "max_colors": 48, "has_parts": true},
+	{"code": "10outr", "label": "Overwear", "ramp_type": "3color", "max_colors": 48, "has_parts": true},
+	{"code": "11neck", "label": "Neckwear", "ramp_type": "4color", "max_colors": 59, "has_parts": true, "auto_match_layer": "00undr"},
+	{"code": "12face", "label": "Eyewear", "ramp_type": "3color", "max_colors": 48, "has_parts": true},
+	{"code": "13hair", "label": "Hairstyle", "ramp_type": "hair", "max_colors": 58, "has_parts": true},
+	{"code": "14head", "label": "Headwear", "ramp_type": "4color", "max_colors": 59, "has_parts": true}
+]
+
+# Animation options (Mana Seed system)
+const ANIMATIONS = ["Idle", "Walk", "Run", "Jump"]
+const ANIM_DIRECTIONS = ["DOWN", "RIGHT", "UP", "LEFT"]
+
+# Palette images for color mapping (loaded at runtime)
+var palette_images = {}
+var animations = {}  # Loaded from CSV
+var texture_cache = {}  # Cache for recolored textures
 
 # Direction mapping
 const DIRECTIONS = {
@@ -99,18 +117,25 @@ var _perk_id_by_idx : Dictionary = {}          # index -> perk_id
 var _perk_stat_by_idx : Dictionary = {}        # index -> stat_id (help text)
 var _perk_name_by_idx : Dictionary = {}        # index -> perk_name
 
-# Character state
-var current_direction = 0  # South
+# Character state (Mana Seed system)
+var current_direction = 0  # South (corresponds to "DOWN" in ANIM_DIRECTIONS)
 var current_frame = 0
-var available_parts = {}
-var current_selections = {}
-var selected_variants = {}  # Track variant codes for connecting animations
-var selected_outfit_type = ""  # "fstr" or "pfpn"
-var selected_hair_type = ""  # "bob1" or "dap1"
+var available_parts = {}  # Scanned sprite parts
+var current_selections = {}  # Current part selections {layer_code: part}
+var current_part_indices = {}  # Current part index for each layer {layer_code: index}
+var current_colors = {}  # Current color selections {layer_code: color_index}
+var current_animation = "Idle"  # Current animation
+var current_anim_direction = "DOWN"  # Current animation direction
 
-# Walk animation
+# Animation state (Mana Seed system)
 var animation_timer = 0.0
-var animation_speed = 0.135  # 135ms per frame for walk
+var current_frame_index = 0
+
+# Old system compatibility variables (for legacy code paths)
+var selected_variants = {}  # Old variant tracking
+var selected_outfit_type = ""  # Old outfit type
+var selected_hair_type = ""  # Old hair type
+var animation_speed = 0.135  # Old animation speed
 
 # Cinematic state
 var current_stage: CinematicStage = CinematicStage.OPENING_DIALOGUE_1
@@ -124,6 +149,7 @@ var stage_timer: float = 0.0
 var nurse_response_index: int = 0
 var cinematic_name: String = ""
 var cinematic_surname: String = ""
+var cinematic_pronoun: String = "they/them"  # Default pronoun
 var waiting_for_input: bool = false
 var last_input_time: float = 0.0  # Track last input time for cooldown
 
@@ -157,6 +183,7 @@ const CURSOR_BLINK_SPEED := 0.5  # Blink every 0.5 seconds
 var cinematic_layer: CanvasLayer = null
 var dialogue_label: Label = null
 var name_input_container: Control = null
+var pronoun_selection_container: Control = null
 var stat_selection_container: Control = null
 var perk_selection_container: Control = null
 var customization_container: Control = null
@@ -167,9 +194,24 @@ var continue_prompt: Label = null
 func _ready() -> void:
 	print("Character Creation starting with cinematic opening...")
 
+	# Check if returning from character customization
+	var gs = get_node_or_null(GS_PATH)
+	var returning_from_customization = false
+	if gs and gs.has_meta("hero_identity"):
+		var hero_id = gs.get_meta("hero_identity")
+		if hero_id.has("customization_completed") and hero_id.customization_completed:
+			print("[CharacterCreation] Returning from customization, skipping to confirmation")
+			returning_from_customization = true
+			# Clear the flag
+			hero_id.customization_completed = false
+			gs.set_meta("hero_identity", hero_id)
+
 	# Apply LoadoutPanel styling to all panels
 	_style_panels()
 
+	# Load Mana Seed system assets
+	load_palette_images()
+	load_animation_data()
 	scan_character_assets()
 	_fill_basics()
 	_wire_stat_toggles()
@@ -216,8 +258,18 @@ func _ready() -> void:
 	_update_confirm_enabled()
 
 	# Initialize cinematic opening
-	_setup_cinematic()
-	_hide_form()  # Hide the form initially - only shows if player says "No" at end
+	if returning_from_customization:
+		# Load saved cinematic data
+		_load_cinematic_data_from_gamestate()
+		# Set up cinematic layer without starting dialogue
+		_setup_cinematic_layer_only()
+		_hide_form()
+		# Go directly to confirmation
+		_enter_stage(CinematicStage.FINAL_CONFIRMATION)
+	else:
+		# Normal flow: set up and start from beginning
+		_setup_cinematic()
+		_hide_form()
 
 func _style_panels() -> void:
 	"""Apply LoadoutPanel styling (dark gray background with pink border) to all panels"""
@@ -301,92 +353,189 @@ func _process(delta):
 	if cinematic_active:
 		_process_cinematic(delta)
 
-# ── Character Asset Scanning ─────────────────────────────────────────────────
-func scan_character_assets():
-	"""Scan the character assets folder to find all available parts"""
-	print("Scanning character assets...")
+# ── Mana Seed System Functions ──────────────────────────────────────────────
+func load_palette_images():
+	"""Load all palette images for color swapping"""
+	print("[CharacterCreation] Loading palette images...")
+	palette_images["3color"] = load(PALETTE_PATH + "mana seed 3-color ramps.png").get_image()
+	palette_images["4color"] = load(PALETTE_PATH + "mana seed 4-color ramps.png").get_image()
+	palette_images["hair"] = load(PALETTE_PATH + "mana seed hair ramps.png").get_image()
+	palette_images["skin"] = load(PALETTE_PATH + "mana seed skin ramps.png").get_image()
+	print("[CharacterCreation] Palette images loaded")
 
-	for variant in CHAR_VARIANTS:
-		var variant_path = CHAR_BASE_PATH + variant + "/"
-		var dir = DirAccess.open(variant_path)
+func load_animation_data():
+	"""Parse the CSV file to load animation data"""
+	print("[CharacterCreation] Loading animation data from CSV...")
+	var file = FileAccess.open(ANIM_DATA_PATH, FileAccess.READ)
+	if file == null:
+		print("[CharacterCreation] ERROR: Could not open animation CSV file")
+		return
 
-		if dir == null:
-			print("Could not open directory: ", variant_path)
+	# Skip header
+	file.get_csv_line()
+
+	while not file.eof_reached():
+		var line = file.get_csv_line()
+		if line.size() < 3:
 			continue
 
-		# Scan each layer
-		for layer_key in LAYERS:
-			var layer = LAYERS[layer_key]
-			var layer_path = variant_path + layer.path
+		var anim_name = line[0].strip_edges()
+		var direction = line[1].strip_edges().to_upper()
+		var frame_count = int(line[2].strip_edges())
 
-			if layer_key not in available_parts:
-				available_parts[layer_key] = []
+		if anim_name == "" or direction == "":
+			continue
 
-			# For base layer, files are directly in variant folder
-			if layer.path == "":
-				dir.list_dir_begin()
-				var file_name = dir.get_next()
-				while file_name != "":
-					if file_name.ends_with(".png") and layer.code in file_name:
-						var full_path = variant_path + file_name
-						var variant_code = extract_variant_code(file_name.get_basename())
-						available_parts[layer_key].append({
-							"name": file_name.get_basename(),
-							"path": full_path,
-							"variant": variant_code
-						})
-					file_name = dir.get_next()
-				dir.list_dir_end()
+		# Parse frames and times
+		var frames = []
+		var times = []
+
+		for i in range(frame_count):
+			var cell_idx = 3 + (i * 2)
+			var time_idx = 4 + (i * 2)
+
+			if cell_idx >= line.size() or time_idx >= line.size():
+				break
+
+			var cell_str = line[cell_idx].strip_edges()
+			var time_str = line[time_idx].strip_edges()
+
+			if cell_str == "":
+				break
+
+			# Parse cell
+			var frame_data = parse_cell(cell_str)
+			frames.append(frame_data)
+
+			# Parse time
+			var time_ms = 0
+			if time_str.to_lower() == "hold":
+				time_ms = -1
 			else:
-				# For other layers, check subdirectory
-				var subdir = DirAccess.open(layer_path)
-				if subdir:
-					subdir.list_dir_begin()
-					var file_name = subdir.get_next()
-					while file_name != "":
-						if file_name.ends_with(".png"):
-							var full_path = layer_path + "/" + file_name
-							var variant_code = extract_variant_code(file_name.get_basename())
-							available_parts[layer_key].append({
-								"name": file_name.get_basename(),
-								"path": full_path,
-								"variant": variant_code
-							})
-						file_name = subdir.get_next()
-					subdir.list_dir_end()
+				time_ms = int(time_str)
+			times.append(time_ms)
 
-	print("Asset scan complete. Found:")
-	for layer_key in available_parts:
-		print("  ", layer_key, ": ", available_parts[layer_key].size(), " items")
+		# Store animation data
+		if anim_name not in animations:
+			animations[anim_name] = {}
 
-func extract_variant_code(filename: String) -> String:
-	"""Extract the variant code from filename
-	Example: 'char_a_p1_0bas_humn_v06' -> 'humn_v06'
-	Example: 'char_a_p1_4har_bob1_v05' -> 'bob1_v05'
-	"""
-	# Split by underscores
-	var parts = filename.split("_")
+		animations[anim_name][direction] = {
+			"frames": frames,
+			"times": times,
+			"total_frames": frames.size()
+		}
 
-	# Find the part that contains the item code and variant
-	# Format is usually: char_a_p1_LAYER_ITEM_VARIANT
-	# We want the last two parts (ITEM_VARIANT)
-	if parts.size() >= 2:
-		var item_code = parts[parts.size() - 2]
-		var variant_code = parts[parts.size() - 1]
-		return item_code + "_" + variant_code
+	file.close()
+	print("[CharacterCreation] Loaded ", animations.size(), " animations")
 
-	return ""
+func parse_cell(cell_str: String) -> Dictionary:
+	"""Parse cell string like '48f' into {cell: int, flip: bool}"""
+	var flip = false
+	var cell_num = 0
+
+	if cell_str.to_lower().ends_with("f"):
+		flip = true
+		cell_str = cell_str.substr(0, cell_str.length() - 1)
+
+	cell_num = int(cell_str)
+	return {"cell": cell_num, "flip": flip}
+
+func _get_palette_image(ramp_type: String) -> Image:
+	"""Get the palette image for a ramp type"""
+	return palette_images.get(ramp_type, null)
+
+# ── Character Asset Scanning ─────────────────────────────────────────────────
+func scan_character_assets():
+	"""Scan sprite system folders for available parts (Mana Seed system)"""
+	print("[CharacterCreation] Scanning Mana Seed character assets...")
+
+	for layer in LAYERS:
+		var layer_code = layer.code
+
+		# Check if this layer uses multiple sprite layers (like footwear)
+		var sprite_codes = []
+		if "sprite_layers" in layer:
+			sprite_codes = layer.sprite_layers
+		else:
+			sprite_codes = [layer_code]
+
+		if layer_code not in available_parts:
+			available_parts[layer_code] = []
+
+		# Scan all sprite layer directories
+		for sprite_code in sprite_codes:
+			var layer_path = SPRITE_PATH + sprite_code + "/"
+			var dir = DirAccess.open(layer_path)
+
+			if dir == null:
+				print("[CharacterCreation]   Sprite layer ", sprite_code, ": not found")
+				continue
+
+			dir.list_dir_begin()
+			var file_name = dir.get_next()
+			while file_name != "":
+				if file_name.ends_with(".png") and file_name.begins_with("fbas_"):
+					var full_path = layer_path + file_name
+					var part_info = parse_filename(file_name, sprite_code)
+					part_info["path"] = full_path
+					part_info["sprite_code"] = sprite_code  # Track which sprite layer this belongs to
+					available_parts[layer_code].append(part_info)
+				file_name = dir.get_next()
+			dir.list_dir_end()
+
+		# Also scan auto-match layer if defined (like 00undr for neckwear)
+		if "auto_match_layer" in layer:
+			var auto_layer_code = layer.auto_match_layer
+			var auto_layer_path = SPRITE_PATH + auto_layer_code + "/"
+			var auto_dir = DirAccess.open(auto_layer_path)
+
+			if auto_layer_code not in available_parts:
+				available_parts[auto_layer_code] = []
+
+			if auto_dir != null:
+				auto_dir.list_dir_begin()
+				var file_name = auto_dir.get_next()
+				while file_name != "":
+					if file_name.ends_with(".png") and file_name.begins_with("fbas_"):
+						var full_path = auto_layer_path + file_name
+						var part_info = parse_filename(file_name, auto_layer_code)
+						part_info["path"] = full_path
+						part_info["sprite_code"] = auto_layer_code
+						available_parts[auto_layer_code].append(part_info)
+					file_name = auto_dir.get_next()
+				auto_dir.list_dir_end()
+				print("[CharacterCreation]   Auto-match layer ", auto_layer_code, ": found ", available_parts[auto_layer_code].size(), " parts")
+
+		print("[CharacterCreation]   Layer ", layer_code, ": found ", available_parts[layer_code].size(), " parts")
+
+	print("[CharacterCreation] Asset scan complete")
+
+func parse_filename(filename: String, layer_code: String) -> Dictionary:
+	"""Parse Mana Seed filename format"""
+	var parts = filename.get_basename().split("_")
+	var result = {
+		"name": filename.get_basename(),
+		"base_name": "",
+		"palette_code": "",
+		"display_name": filename.get_basename()
+	}
+
+	if parts.size() >= 4:
+		result["base_name"] = parts[2]
+		result["palette_code"] = parts[3]
+		result["display_name"] = parts[2].capitalize()
+
+	return result
 
 func set_default_character():
-	"""Set up a default character with defaults"""
-	# Set default skin tone (Tone 0)
-	_on_body_selected(0)
-	# Set default outfit (Vest)
-	selected_outfit_type = "fstr"
-	_on_outfit_selected(0)
-	# Set default hair (Bob, Color 0)
-	selected_hair_type = "bob1"
-	_on_hair_selected(0)
+	"""Set up default character - naked with just body"""
+	# Set default body color
+	current_colors["01body"] = 0
+
+	# Initialize all part indices to -1 (None) so character starts naked
+	for layer in LAYERS:
+		if layer.has_parts:
+			current_part_indices[layer.code] = -1
 
 func _on_part_selected(layer_key: String, part):
 	"""Handle part selection"""
@@ -399,34 +548,14 @@ func _on_part_selected(layer_key: String, part):
 	update_preview()
 
 func update_preview():
-	"""Update the character preview with current selections"""
-	for layer_key in LAYERS:
-		var layer = LAYERS[layer_key]
-		var sprite = character_layers.get_node(layer.node_name)
-
-		if layer_key in current_selections and current_selections[layer_key] != null:
-			var part = current_selections[layer_key]
-			var texture = load(part.path)
-			sprite.texture = texture
-			sprite.visible = true
-		else:
-			sprite.texture = null
-			sprite.visible = false
-
-	update_frame_display()
+	"""Update the character preview with current selections (redirects to Mana Seed version)"""
+	# Redirect to the new Mana Seed preview system
+	_update_character_preview()
 
 func update_frame_display():
-	"""Update the frame and direction display"""
-	for layer_key in LAYERS:
-		var layer = LAYERS[layer_key]
-		var sprite = character_layers.get_node(layer.node_name)
-		if sprite.visible and sprite.texture:
-			# Walk animation is on rows 5-8 (direction + 4)
-			var walk_row = current_direction + 4
-			sprite.frame = walk_row * 8 + current_frame
-
-	frame_label.text = "Walk Frame: " + str(current_frame + 1) + "/6"
-	direction_label.text = "Direction: " + DIRECTIONS[current_direction]
+	"""Update the frame and direction display (legacy - now handled by Mana Seed system)"""
+	# This is handled by the Mana Seed animation system now
+	pass
 
 # ── Character Part Selection Callbacks ───────────────────────────────────────
 func _on_body_selected(idx: int):
@@ -782,79 +911,72 @@ func _on_perk_selected(_index: int) -> void:
 
 # ── confirm ──────────────────────────────────────────────────────────────────
 func _on_confirm_pressed() -> void:
-	# Validate name and surname are filled
-	var name_text: String = (_name_in.text if _name_in else "").strip_edges()
-	var surname_text: String = (_surname_in.text if _surname_in else "").strip_edges()
+	# Get existing hero_identity data (has Mana Seed customization)
+	var gs: Node = get_node_or_null(GS_PATH)
+	if not gs:
+		print("[CharacterCreation] ERROR: GameState not found!")
+		return
 
-	if name_text == "" or surname_text == "":
+	var hero_identity = {}
+	if gs.has_meta("hero_identity"):
+		hero_identity = gs.get_meta("hero_identity")
+
+	# Validate required cinematic data is present
+	if not hero_identity.has("name") or not hero_identity.has("surname"):
 		OS.alert("Please enter both a first name and last name.", "Character Creation")
 		return
 
-	# Hard gate: must have exactly 3 stats + a chosen perk
-	if _selected_order.size() != 3 or _chosen_perk_id() == "":
-		OS.alert("Pick 3 stats and 1 perk to continue.", "Character Creation")
+	if not hero_identity.has("selected_stats") or hero_identity.selected_stats.size() != 3:
+		OS.alert("Pick 3 stats to continue.", "Character Creation")
 		return
 
-	# Validate at least base body is selected
-	if "base" not in selected_variants:
-		OS.alert("Please select at least a body type.", "Character Creation")
+	if not hero_identity.has("chosen_perk") or hero_identity.chosen_perk == "":
+		OS.alert("Pick 1 perk to continue.", "Character Creation")
 		return
 
-	var pron_text: String = _opt_text(_pron_in)
+	if not hero_identity.has("character_selections") or hero_identity.character_selections.size() == 0:
+		OS.alert("Please customize your character appearance.", "Character Creation")
+		return
 
-	# Get underwear selection (0=None, 1=Boxers, 2=Undies)
-	var underwear_idx = _underwear_in.get_selected() if _underwear_in else 0
-	var selected_underwear = ""
-	if underwear_idx == 0:
-		selected_underwear = "none"
-	elif underwear_idx == 1:
-		selected_underwear = "boxr_v01"
-	elif underwear_idx == 2:
-		selected_underwear = "undi_v01"
-	else:
-		selected_underwear = "none"  # Default to none if out of range
+	# All validation passed - save final data
+	var name_text = hero_identity.name
+	var surname_text = hero_identity.surname
+	var pron_text = hero_identity.get("pronoun", "they/them")
 
-	# Save character variant data to CharacterData autoload
-	print("[CharacterCreation] Saving character variants: ", selected_variants)
-	aCharacterData.set_character(selected_variants, current_selections)
+	# Store full name for display
+	var full_name: String = "%s %s" % [name_text, surname_text]
+	if gs.has_method("set"):
+		gs.set("player_name", full_name)
 
-	var gs: Node = get_node_or_null(GS_PATH)
-	if gs:
-		# Store full name for display
-		var full_name: String = "%s %s" % [name_text, surname_text]
-		if gs.has_method("set"):
-			gs.set("player_name", full_name)
-		print("[CharacterCreation] Setting hero_identity meta with variants: ", selected_variants)
-		gs.set_meta("hero_identity", {
-			"name": name_text,
-			"surname": surname_text,
-			"pronoun": pron_text,
-			"character_variants": selected_variants.duplicate(),
-			"underwear": selected_underwear  # Save underwear for later cutscene
-		})
-		print("[CharacterCreation] Saved to GameState successfully")
-		var picked := PackedStringArray()
-		for i in range(_selected_order.size()):
-			picked.append(_selected_order[i])
-		gs.set_meta("hero_picked_stats", picked)
-		# ensure hero in party
-		if gs.has_method("get"):
-			var pv: Variant = gs.get("party")
-			var arr: Array = []
-			if typeof(pv) == TYPE_ARRAY:
-				arr = pv as Array
-			if arr.is_empty() and gs.has_method("set"):
-				gs.set("party", ["hero"])
-		# default mind type
-		if not gs.has_meta("hero_active_type"):
-			gs.set_meta("hero_active_type", "Omega")
+	# hero_identity already has all the data, just ensure party and mind type
+	print("[CharacterCreation] Final hero_identity saved with Mana Seed data")
+	gs.set_meta("hero_identity", hero_identity)
+
+	# Save picked stats
+	var picked := PackedStringArray()
+	for stat in hero_identity.selected_stats:
+		picked.append(stat)
+	gs.set_meta("hero_picked_stats", picked)
+
+	# Ensure hero in party
+	if gs.has_method("get"):
+		var pv: Variant = gs.get("party")
+		var arr: Array = []
+		if typeof(pv) == TYPE_ARRAY:
+			arr = pv as Array
+		if arr.is_empty() and gs.has_method("set"):
+			gs.set("party", ["hero"])
+
+	# Default mind type
+	if not gs.has_meta("hero_active_type"):
+		gs.set_meta("hero_active_type", "Omega")
 
 	# apply +1 level to chosen stats
 	var st: Node = get_node_or_null(STATS_PATH)
 	if st and st.has_method("apply_creation_boosts"):
 		var picks_arr: Array = []
-		for i2 in range(_selected_order.size()):
-			picks_arr.append(_selected_order[i2])
+		for stat in hero_identity.selected_stats:
+			picks_arr.append(stat)
 		st.call("apply_creation_boosts", picks_arr)
 
 	# Update HP/MP to max after stat boosts (if VTL or FCS were chosen)
@@ -891,15 +1013,12 @@ func _on_confirm_pressed() -> void:
 					hero_data["debuffs"] = []
 
 	# unlock chosen starting perk
-	var chosen_perk_id: String = _chosen_perk_id()
+	var chosen_perk_id: String = hero_identity.get("chosen_perk", "")
 	if chosen_perk_id != "":
 		var ps: Node = get_node_or_null(PERK_PATH)
-		if ps:
-			if ps.has_method("unlock_by_id"):
-				ps.call("unlock_by_id", chosen_perk_id)
-			elif ps.has_method("unlock"):
-				var idx2: int = (_perk_in.get_selected() if _perk_in else 0)
-				ps.call("unlock", String(_perk_stat_by_idx.get(idx2,"")), 0)
+		if ps and ps.has_method("unlock_by_id"):
+			ps.call("unlock_by_id", chosen_perk_id)
+			print("[CharacterCreation] Unlocked perk: ", chosen_perk_id)
 
 	# refresh combat profiles
 	var cps: Node = get_node_or_null(CPS_PATH)
@@ -948,7 +1067,161 @@ func _opt_text(ob: OptionButton) -> String:
 # CINEMATIC OPENING SYSTEM
 # ══════════════════════════════════════════════════════════════════════════════
 
+# ── Cinematic Data Persistence ───────────────────────────────────────────────
+func _save_cinematic_data_to_gamestate() -> void:
+	"""Save current cinematic progress to GameState hero_identity"""
+	var gs = get_node_or_null(GS_PATH)
+	if not gs:
+		return
+
+	var hero_id = {}
+	if gs.has_meta("hero_identity"):
+		hero_id = gs.get_meta("hero_identity")
+
+	# Save name data
+	if cinematic_name != "":
+		hero_id["name"] = cinematic_name
+	if cinematic_surname != "":
+		hero_id["surname"] = cinematic_surname
+
+	# Save pronoun from cinematic selection
+	if cinematic_pronoun != "":
+		hero_id["pronoun"] = cinematic_pronoun
+		# Also update the dropdown if it exists
+		if _pron_in:
+			for i in range(_pron_in.get_item_count()):
+				if _pron_in.get_item_text(i) == cinematic_pronoun:
+					_pron_in.select(i)
+					break
+
+	# Save stats
+	if _selected_order.size() > 0:
+		hero_id["selected_stats"] = _selected_order.duplicate()
+
+	# Save perk
+	var perk_id = _chosen_perk_id()
+	var perk_name = _chosen_perk_name()
+	if perk_id != "":
+		hero_id["chosen_perk"] = perk_id
+		hero_id["chosen_perk_name"] = perk_name
+
+	gs.set_meta("hero_identity", hero_id)
+	print("[CharacterCreation] Saved cinematic data to hero_identity")
+
+func _load_cinematic_data_from_gamestate() -> void:
+	"""Load cinematic progress from GameState hero_identity"""
+	var gs = get_node_or_null(GS_PATH)
+	if not gs or not gs.has_meta("hero_identity"):
+		return
+
+	var hero_id = gs.get_meta("hero_identity")
+
+	# Load name
+	if hero_id.has("name"):
+		cinematic_name = hero_id.name
+		if _name_in:
+			_name_in.text = cinematic_name
+
+	if hero_id.has("surname"):
+		cinematic_surname = hero_id.surname
+		if _surname_in:
+			_surname_in.text = cinematic_surname
+
+	# Load pronoun
+	if hero_id.has("pronoun"):
+		cinematic_pronoun = hero_id.pronoun
+		# Also update dropdown if it exists
+		if _pron_in:
+			for i in range(_pron_in.get_item_count()):
+				if _pron_in.get_item_text(i) == cinematic_pronoun:
+					_pron_in.select(i)
+					break
+
+	# Load stats
+	if hero_id.has("selected_stats"):
+		_selected_order = hero_id.selected_stats.duplicate()
+		# Rebuild perk dropdown based on loaded stats
+		_rebuild_perk_dropdown()
+
+	# Load perk
+	if hero_id.has("chosen_perk") and _perk_in:
+		var perk_id = hero_id.chosen_perk
+		# Find and select the perk in dropdown using _perk_id_by_idx
+		for i in range(_perk_in.get_item_count()):
+			if _perk_id_by_idx.get(i, "") == perk_id:
+				_perk_in.select(i)
+				break
+
+	print("[CharacterCreation] Loaded cinematic data from hero_identity")
+
 # ── Cinematic Setup ──────────────────────────────────────────────────────────
+func _setup_cinematic_layer_only() -> void:
+	"""Initialize the cinematic layer without starting dialogue (for returning from customization)"""
+	# Set ControllerManager context to CHARACTER_CREATION
+	var controller_manager = get_node_or_null("/root/aControllerManager")
+	if controller_manager:
+		controller_manager.set_context(controller_manager.InputContext.CHARACTER_CREATION)
+		print("[CharacterCreation] Set ControllerManager context to CHARACTER_CREATION")
+
+	# Create cinematic overlay
+	cinematic_layer = CanvasLayer.new()
+	cinematic_layer.layer = 100  # Render above everything
+	add_child(cinematic_layer)
+
+	# Create black background
+	var bg = ColorRect.new()
+	bg.color = Color.BLACK
+	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	cinematic_layer.add_child(bg)
+
+	# Create container for dialogue and arrow
+	var dialogue_container = VBoxContainer.new()
+	dialogue_container.set_anchors_preset(Control.PRESET_CENTER)
+	dialogue_container.anchor_left = 0.5
+	dialogue_container.anchor_top = 0.5
+	dialogue_container.anchor_right = 0.5
+	dialogue_container.anchor_bottom = 0.5
+	dialogue_container.offset_left = -400
+	dialogue_container.offset_right = 400
+	dialogue_container.offset_top = -30
+	dialogue_container.offset_bottom = 70
+	dialogue_container.add_theme_constant_override("separation", 10)
+	cinematic_layer.add_child(dialogue_container)
+
+	# Create dialogue label (for typing text)
+	dialogue_label = Label.new()
+	dialogue_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	dialogue_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	dialogue_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	dialogue_label.add_theme_font_size_override("font_size", 18)
+	dialogue_label.add_theme_color_override("font_color", Color.WHITE)
+	dialogue_label.text = ""
+	dialogue_container.add_child(dialogue_label)
+
+	# Create up arrow label (below the dialogue)
+	arrow_label = Label.new()
+	arrow_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	arrow_label.add_theme_font_size_override("font_size", 24)
+	arrow_label.add_theme_color_override("font_color", Color(1.0, 0.7, 0.75, 1.0))
+	arrow_label.text = "↑"
+	arrow_label.visible = false
+	dialogue_container.add_child(arrow_label)
+
+	# Create continue prompt
+	continue_prompt = Label.new()
+	continue_prompt.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	continue_prompt.anchor_top = 1.0
+	continue_prompt.anchor_bottom = 1.0
+	continue_prompt.offset_top = -50
+	continue_prompt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	continue_prompt.add_theme_font_size_override("font_size", 12)
+	continue_prompt.add_theme_color_override("font_color", Color(0.8, 0.8, 0.8, 1.0))
+	continue_prompt.text = "Press Accept or Enter to continue..."
+	continue_prompt.visible = false
+	cinematic_layer.add_child(continue_prompt)
+
+	# Don't start any stage - let caller decide
+
 func _setup_cinematic() -> void:
 	"""Initialize the cinematic layer and start the opening sequence"""
 	# Set ControllerManager context to CHARACTER_CREATION
@@ -1308,6 +1581,8 @@ func _enter_stage(stage: CinematicStage) -> void:
 			_start_typing("Hey, do you remember your name?")
 		CinematicStage.NAME_INPUT:
 			_build_name_input_ui()
+		CinematicStage.PRONOUN_SELECTION:
+			_build_pronoun_selection_ui()
 		CinematicStage.DIALOGUE_RESPONSE_1:
 			dialogue_label.text = ""
 			_start_typing("We got a response!")
@@ -1332,7 +1607,11 @@ func _enter_stage(stage: CinematicStage) -> void:
 		CinematicStage.DIALOGUE_MIRROR:
 			_start_typing("Do you recognize the person in the mirror?")
 		CinematicStage.CHARACTER_CUSTOMIZATION:
-			_build_customization_ui()
+			# Transition to CharacterCustomizer scene
+			# Save all cinematic data before transitioning
+			_save_cinematic_data_to_gamestate()
+			print("[CharacterCreation] Transitioning to character customization scene")
+			get_tree().change_scene_to_file("res://scenes/experiments/CharacterCustomizer.tscn")
 		CinematicStage.FINAL_CONFIRMATION:
 			_build_confirmation_ui()
 		CinematicStage.COMPLETE:
@@ -1822,6 +2101,9 @@ func _finalize_names() -> void:
 	if _surname_in:
 		_surname_in.text = cinematic_surname
 
+	# Save to GameState
+	_save_cinematic_data_to_gamestate()
+
 	# Fade out and advance
 	var tween = create_tween()
 	tween.tween_property(name_input_container, "modulate", Color(1, 1, 1, 0), 0.5)
@@ -1834,6 +2116,110 @@ func _finalize_names() -> void:
 		_advance_stage()
 	)
 
+# ── Pronoun Selection UI ─────────────────────────────────────────────────────
+func _build_pronoun_selection_ui() -> void:
+	"""Build pronoun selection UI with He/She/They options"""
+	# Hide dialogue label
+	if dialogue_label:
+		dialogue_label.visible = false
+
+	# Create pronoun selection container
+	pronoun_selection_container = VBoxContainer.new()
+	pronoun_selection_container.set_anchors_preset(Control.PRESET_CENTER)
+	pronoun_selection_container.anchor_left = 0.5
+	pronoun_selection_container.anchor_top = 0.5
+	pronoun_selection_container.anchor_right = 0.5
+	pronoun_selection_container.anchor_bottom = 0.5
+	pronoun_selection_container.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	pronoun_selection_container.grow_vertical = Control.GROW_DIRECTION_BOTH
+	pronoun_selection_container.add_theme_constant_override("separation", 20)
+	cinematic_layer.add_child(pronoun_selection_container)
+
+	# Title
+	var title = Label.new()
+	title.text = "What are your preferred pronouns?"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 18)
+	title.add_theme_color_override("font_color", Color(1.0, 0.7, 0.75, 1.0))
+	pronoun_selection_container.add_child(title)
+
+	# Button container
+	var buttons_container = VBoxContainer.new()
+	buttons_container.add_theme_constant_override("separation", 15)
+	pronoun_selection_container.add_child(buttons_container)
+
+	# He/Him button
+	var he_btn = Button.new()
+	he_btn.text = "He/Him"
+	he_btn.name = "HeButton"
+	he_btn.custom_minimum_size = Vector2(200, 60)
+	he_btn.add_theme_font_size_override("font_size", 16)
+	he_btn.focus_mode = Control.FOCUS_ALL
+	he_btn.pressed.connect(_on_pronoun_selected.bind("he/him"))
+	buttons_container.add_child(he_btn)
+
+	# She/Her button
+	var she_btn = Button.new()
+	she_btn.text = "She/Her"
+	she_btn.name = "SheButton"
+	she_btn.custom_minimum_size = Vector2(200, 60)
+	she_btn.add_theme_font_size_override("font_size", 16)
+	she_btn.focus_mode = Control.FOCUS_ALL
+	she_btn.pressed.connect(_on_pronoun_selected.bind("she/her"))
+	buttons_container.add_child(she_btn)
+
+	# They/Them button
+	var they_btn = Button.new()
+	they_btn.text = "They/Them"
+	they_btn.name = "TheyButton"
+	they_btn.custom_minimum_size = Vector2(200, 60)
+	they_btn.add_theme_font_size_override("font_size", 16)
+	they_btn.focus_mode = Control.FOCUS_ALL
+	they_btn.pressed.connect(_on_pronoun_selected.bind("they/them"))
+	buttons_container.add_child(they_btn)
+
+	# Set up focus neighbors for vertical navigation
+	he_btn.focus_neighbor_top = he_btn.get_path_to(they_btn)
+	he_btn.focus_neighbor_bottom = he_btn.get_path_to(she_btn)
+	she_btn.focus_neighbor_top = she_btn.get_path_to(he_btn)
+	she_btn.focus_neighbor_bottom = she_btn.get_path_to(they_btn)
+	they_btn.focus_neighbor_top = they_btn.get_path_to(she_btn)
+	they_btn.focus_neighbor_bottom = they_btn.get_path_to(he_btn)
+
+	# Fade in and set focus based on current selection
+	pronoun_selection_container.modulate = Color(1, 1, 1, 0)
+	var tween = create_tween()
+	tween.tween_property(pronoun_selection_container, "modulate", Color(1, 1, 1, 1), 0.5)
+	tween.tween_callback(func():
+		# Focus the button matching current selection
+		match cinematic_pronoun:
+			"he/him":
+				he_btn.grab_focus()
+			"she/her":
+				she_btn.grab_focus()
+			_:
+				they_btn.grab_focus()
+	)
+
+func _on_pronoun_selected(pronoun: String) -> void:
+	"""Handle pronoun selection"""
+	cinematic_pronoun = pronoun
+	print("[Cinematic] Selected pronoun: ", pronoun)
+
+	# Save to GameState
+	_save_cinematic_data_to_gamestate()
+
+	# Fade out and advance
+	var tween = create_tween()
+	tween.tween_property(pronoun_selection_container, "modulate", Color(1, 1, 1, 0), 0.5)
+	tween.tween_callback(func():
+		if pronoun_selection_container:
+			pronoun_selection_container.queue_free()
+			pronoun_selection_container = null
+		if dialogue_label:
+			dialogue_label.visible = true
+		_advance_stage()
+	)
 # ── Stat Selection UI ────────────────────────────────────────────────────────
 func _build_stat_selection_ui() -> void:
 	"""Build the stat selection UI with simple toggle buttons"""
@@ -2053,6 +2439,9 @@ func _on_stats_accepted() -> void:
 	# Rebuild perk dropdown with new selections
 	_rebuild_perk_dropdown()
 
+	# Save to GameState
+	_save_cinematic_data_to_gamestate()
+
 	# Fade out and advance
 	var tween = create_tween()
 	tween.tween_property(stat_selection_container, "modulate", Color(1, 1, 1, 0), 0.5)
@@ -2239,6 +2628,9 @@ func _on_perk_accepted() -> void:
 					_perk_in.select(i)
 					break
 
+	# Save to GameState
+	_save_cinematic_data_to_gamestate()
+
 	# Fade out and advance
 	var tween = create_tween()
 	tween.tween_property(perk_selection_container, "modulate", Color(1, 1, 1, 0), 0.5)
@@ -2293,9 +2685,275 @@ func _show_next_nurse_response() -> void:
 		# All 5 responses shown - show cursor and wait for input
 		_show_cursor_and_wait()
 
-# ── Character Customization UI ───────────────────────────────────────────────
+# ── Character Customization UI (Mana Seed) ───────────────────────────────────
 func _build_customization_ui() -> void:
-	"""Build character customization UI (pronoun, body, outfit, hair, hat)"""
+	"""Build character customization UI with Mana Seed gradient sliders"""
+	# Hide dialogue label
+	if dialogue_label:
+		dialogue_label.visible = false
+
+	# Create customization container
+	customization_container = Control.new()
+	customization_container.set_anchors_preset(Control.PRESET_FULL_RECT)
+	cinematic_layer.add_child(customization_container)
+
+	# Title
+	var title = Label.new()
+	title.text = "Customize Your Appearance"
+	title.position = Vector2(0, 30)
+	title.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 24)
+	title.add_theme_color_override("font_color", Color("#C8FF3D"))  # Electric Lime
+	customization_container.add_child(title)
+
+	# Main container - using the same HBoxContainer approach
+	var main = HBoxContainer.new()
+	main.set_anchors_preset(Control.PRESET_CENTER)
+	main.anchor_left = 0.5
+	main.anchor_top = 0.5
+	main.anchor_right = 0.5
+	main.anchor_bottom = 0.5
+	main.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	main.grow_vertical = Control.GROW_DIRECTION_BOTH
+	main.offset_left = -650
+	main.offset_top = -300
+	main.offset_right = 650
+	main.offset_bottom = 300
+	main.add_theme_constant_override("separation", 30)
+	customization_container.add_child(main)
+
+	# Left panel with customization options
+	var left_panel = _create_styled_panel()
+	left_panel.custom_minimum_size = Vector2(750, 600)
+	main.add_child(left_panel)
+
+	# Add padding
+	var padding = MarginContainer.new()
+	padding.add_theme_constant_override("margin_left", 15)
+	padding.add_theme_constant_override("margin_right", 15)
+	padding.add_theme_constant_override("margin_top", 15)
+	padding.add_theme_constant_override("margin_bottom", 15)
+	left_panel.add_child(padding)
+
+	# Scroll container
+	var scroll = ScrollContainer.new()
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	padding.add_child(scroll)
+
+	# Scroll padding
+	var scroll_padding = MarginContainer.new()
+	scroll_padding.add_theme_constant_override("margin_left", 10)
+	scroll_padding.add_theme_constant_override("margin_right", 10)
+	scroll_padding.add_theme_constant_override("margin_top", 10)
+	scroll_padding.add_theme_constant_override("margin_bottom", 10)
+	scroll.add_child(scroll_padding)
+
+	# Two-column layout
+	var columns = HBoxContainer.new()
+	columns.add_theme_constant_override("separation", 20)
+	scroll_padding.add_child(columns)
+
+	var left_column = VBoxContainer.new()
+	left_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	left_column.add_theme_constant_override("separation", 10)
+	columns.add_child(left_column)
+
+	var right_column = VBoxContainer.new()
+	right_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	right_column.add_theme_constant_override("separation", 10)
+	columns.add_child(right_column)
+
+	# Build layer sections
+	for i in range(LAYERS.size()):
+		var layer = LAYERS[i]
+		var section = _create_layer_section_mana_seed(layer, i)
+
+		# Layers 0-5 go to left column, 6-10 to right column
+		if i <= 5:
+			left_column.add_child(section)
+		else:
+			right_column.add_child(section)
+
+	# Right panel with character preview
+	var right_panel = _create_styled_panel()
+	right_panel.custom_minimum_size = Vector2(500, 600)
+	main.add_child(right_panel)
+
+	var preview_container = VBoxContainer.new()
+	right_panel.add_child(preview_container)
+
+	var preview_label = Label.new()
+	preview_label.text = "Character Preview"
+	preview_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	preview_label.add_theme_font_size_override("font_size", 18)
+	preview_label.add_theme_color_override("font_color", Color("#4DE9FF"))  # Sky Cyan
+	preview_container.add_child(preview_label)
+
+	# Reparent character_layers for preview
+	if character_layers:
+		var original_parent = character_layers.get_parent()
+		if original_parent:
+			customization_container.set_meta("original_preview_parent", original_parent)
+			original_parent.remove_child(character_layers)
+
+		var preview_center = CenterContainer.new()
+		preview_center.custom_minimum_size = Vector2(0, 500)
+		preview_container.add_child(preview_center)
+		preview_center.add_child(character_layers)
+
+		character_layers.visible = true
+		character_layers.scale = Vector2(10, 10)
+
+		# Load default body
+		_update_character_preview()
+
+	# Accept button
+	var accept_btn = Button.new()
+	accept_btn.text = "Accept"
+	accept_btn.position = Vector2(0, -70)
+	accept_btn.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	accept_btn.anchor_top = 1.0
+	accept_btn.anchor_bottom = 1.0
+	accept_btn.custom_minimum_size = Vector2(250, 60)
+	accept_btn.add_theme_font_size_override("font_size", 20)
+
+	# Style the Accept button
+	var accept_style = StyleBoxFlat.new()
+	accept_style.bg_color = Color(0.1, 0.1, 0.1, 0.9)
+	accept_style.border_color = Color("#C8FF3D")  # Electric Lime
+	accept_style.set_border_width_all(4)
+	accept_style.set_corner_radius_all(12)
+	accept_btn.add_theme_stylebox_override("normal", accept_style)
+	accept_btn.add_theme_stylebox_override("hover", accept_style)
+	accept_btn.add_theme_color_override("font_color", Color("#C8FF3D"))
+
+	accept_btn.pressed.connect(_on_mana_seed_customization_accepted)
+	customization_container.add_child(accept_btn)
+
+	# Fade in
+	customization_container.modulate = Color(1, 1, 1, 0)
+	var tween = create_tween()
+	tween.tween_property(customization_container, "modulate", Color(1, 1, 1, 1), 0.5)
+
+func _create_layer_section_mana_seed(layer: Dictionary, layer_index: int) -> VBoxContainer:
+	"""Create a Mana Seed customization section for a layer"""
+	var section = VBoxContainer.new()
+	section.add_theme_constant_override("separation", 8)
+
+	# Layer label
+	var label = Label.new()
+	label.text = layer.label
+	label.add_theme_font_size_override("font_size", 14)
+	label.add_theme_color_override("font_color", Color("#8A3FFC"))  # Grape Violet
+	section.add_child(label)
+
+	# Part selector (if layer has parts)
+	if layer.has_parts:
+		var part_row = HBoxContainer.new()
+		part_row.add_theme_constant_override("separation", 8)
+
+		var part_label = Label.new()
+		part_label.text = "Style:"
+		part_label.custom_minimum_size = Vector2(60, 0)
+		part_row.add_child(part_label)
+
+		var left_btn = Button.new()
+		left_btn.text = "◀"
+		left_btn.custom_minimum_size = Vector2(30, 30)
+		left_btn.pressed.connect(_on_part_previous_mana_seed.bind(layer_index))
+		part_row.add_child(left_btn)
+
+		var part_display = Label.new()
+		part_display.name = "PartDisplay"
+		part_display.text = "None"
+		part_display.custom_minimum_size = Vector2(200, 30)
+		part_display.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		part_display.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		part_display.add_theme_color_override("font_color", Color("#4DE9FF"))  # Sky Cyan
+		part_row.add_child(part_display)
+
+		var right_btn = Button.new()
+		right_btn.text = "▶"
+		right_btn.custom_minimum_size = Vector2(30, 30)
+		right_btn.pressed.connect(_on_part_next_mana_seed.bind(layer_index))
+		part_row.add_child(right_btn)
+
+		section.add_child(part_row)
+
+	# Color selector with gradient slider
+	var color_row = HBoxContainer.new()
+	color_row.add_theme_constant_override("separation", 8)
+
+	var color_label = Label.new()
+	color_label.text = "Color:"
+	color_label.custom_minimum_size = Vector2(60, 0)
+	color_row.add_child(color_label)
+
+	var left_btn = Button.new()
+	left_btn.text = "◀"
+	left_btn.custom_minimum_size = Vector2(30, 30)
+	left_btn.pressed.connect(_on_color_previous_mana_seed.bind(layer_index))
+	color_row.add_child(left_btn)
+
+	# Gradient slider
+	var slider_container = Control.new()
+	slider_container.custom_minimum_size = Vector2(200, 30)
+
+	# Create gradient background
+	var palette_image = _get_palette_image(layer.ramp_type)
+	var num_colors = min(layer.max_colors, palette_image.get_height() / 2 if palette_image else 0)
+
+	if palette_image and num_colors > 0:
+		var gradient = Gradient.new()
+		for i in range(num_colors):
+			var color = palette_image.get_pixel(4, i * 2)
+			var offset = float(i) / float(num_colors - 1) if num_colors > 1 else 0.0
+			gradient.add_point(offset, color)
+
+		var gradient_texture = GradientTexture2D.new()
+		gradient_texture.gradient = gradient
+		gradient_texture.width = 200
+		gradient_texture.height = 30
+		gradient_texture.fill_from = Vector2(0, 0.5)
+		gradient_texture.fill_to = Vector2(1, 0.5)
+
+		var gradient_rect = TextureRect.new()
+		gradient_rect.texture = gradient_texture
+		gradient_rect.custom_minimum_size = Vector2(200, 30)
+		gradient_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		gradient_rect.stretch_mode = TextureRect.STRETCH_SCALE
+		slider_container.add_child(gradient_rect)
+
+	var color_slider = HSlider.new()
+	color_slider.name = "ColorSlider"
+	color_slider.custom_minimum_size = Vector2(200, 30)
+	color_slider.min_value = 0
+	color_slider.max_value = num_colors - 1 if num_colors > 0 else 0
+	color_slider.step = 1
+	color_slider.value = current_colors.get(layer.code, 0)
+	color_slider.value_changed.connect(_on_color_slider_changed_mana_seed.bind(layer_index))
+	slider_container.add_child(color_slider)
+
+	color_row.add_child(slider_container)
+
+	var right_btn2 = Button.new()
+	right_btn2.text = "▶"
+	right_btn2.custom_minimum_size = Vector2(30, 30)
+	right_btn2.pressed.connect(_on_color_next_mana_seed.bind(layer_index))
+	color_row.add_child(right_btn2)
+
+	section.add_child(color_row)
+
+	# Separator
+	var sep = HSeparator.new()
+	section.add_child(sep)
+
+	return section
+
+# ── OLD Character Customization UI (DEPRECATED) ───────────────────────────────
+func _build_customization_ui_OLD() -> void:
+	"""OLD Build character customization UI (pronoun, body, outfit, hair, hat)"""
 	# Hide dialogue label
 	if dialogue_label:
 		dialogue_label.visible = false
@@ -2793,8 +3451,12 @@ func _build_confirmation_ui() -> void:
 	stats_label.add_theme_font_size_override("font_size", 14)
 	summary_panel.add_child(stats_label)
 
-	# Add perk
-	var perk_name = _chosen_perk_name()
+	# Add perk (read from saved data)
+	var perk_name = ""
+	var gs = get_node_or_null(GS_PATH)
+	if gs and gs.has_meta("hero_identity"):
+		var hero_id = gs.get_meta("hero_identity")
+		perk_name = hero_id.get("chosen_perk_name", "")
 	var perk_label = Label.new()
 	perk_label.text = "Perk: %s" % perk_name if perk_name != "" else "Perk: None"
 	perk_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -2802,10 +3464,7 @@ func _build_confirmation_ui() -> void:
 	summary_panel.add_child(perk_label)
 
 	# Add appearance summary
-	var pronoun_text = ""
-	if _pron_in:
-		var idx = _pron_in.get_selected()
-		pronoun_text = _pron_in.get_item_text(idx) if idx >= 0 else "they"
+	var pronoun_text = cinematic_pronoun.capitalize()  # Use cinematic pronoun
 	var appearance_label = Label.new()
 	appearance_label.text = "Pronouns: %s" % pronoun_text
 	appearance_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -2913,6 +3572,327 @@ func _create_styled_panel() -> PanelContainer:
 	panel.add_theme_constant_override("margin_bottom", 20)
 
 	return panel
+
+# ══════════════════════════════════════════════════════════════════════════════
+# MANA SEED CUSTOMIZATION CALLBACKS
+# ══════════════════════════════════════════════════════════════════════════════
+
+func _on_part_previous_mana_seed(layer_index: int):
+	"""Cycle to previous part"""
+	var layer = LAYERS[layer_index]
+	if layer.code not in available_parts:
+		return
+
+	var parts = available_parts[layer.code]
+	if parts.size() == 0:
+		return
+
+	var current_index = current_part_indices.get(layer.code, -1)
+	current_index -= 1
+	if current_index < -1:
+		current_index = parts.size() - 1
+
+	current_part_indices[layer.code] = current_index
+	if current_index == -1:
+		current_selections.erase(layer.code)
+	else:
+		current_selections[layer.code] = parts[current_index]
+
+	_update_character_preview()
+
+func _on_part_next_mana_seed(layer_index: int):
+	"""Cycle to next part"""
+	var layer = LAYERS[layer_index]
+	if layer.code not in available_parts:
+		return
+
+	var parts = available_parts[layer.code]
+	if parts.size() == 0:
+		return
+
+	var current_index = current_part_indices.get(layer.code, -1)
+	current_index += 1
+	if current_index >= parts.size():
+		current_index = -1
+
+	current_part_indices[layer.code] = current_index
+	if current_index == -1:
+		current_selections.erase(layer.code)
+	else:
+		current_selections[layer.code] = parts[current_index]
+
+	_update_character_preview()
+
+func _on_color_previous_mana_seed(layer_index: int):
+	"""Cycle to previous color"""
+	var layer = LAYERS[layer_index]
+	var color_index = current_colors.get(layer.code, 0)
+	color_index -= 1
+	if color_index < 0:
+		color_index = layer.max_colors - 1
+	current_colors[layer.code] = color_index
+	_update_character_preview()
+
+func _on_color_next_mana_seed(layer_index: int):
+	"""Cycle to next color"""
+	var layer = LAYERS[layer_index]
+	var color_index = current_colors.get(layer.code, 0)
+	color_index += 1
+	if color_index >= layer.max_colors:
+		color_index = 0
+	current_colors[layer.code] = color_index
+	_update_character_preview()
+
+func _on_color_slider_changed_mana_seed(value: float, layer_index: int):
+	"""Handle color slider value change"""
+	var layer = LAYERS[layer_index]
+	current_colors[layer.code] = int(value)
+	_update_character_preview()
+
+func _update_character_preview():
+	"""Update the character preview with current selections (Mana Seed system)"""
+	for layer in LAYERS:
+		var layer_code = layer.code
+
+		var sprite_codes = []
+		if "sprite_layers" in layer:
+			sprite_codes = layer.sprite_layers
+		else:
+			sprite_codes = [layer_code]
+
+		var part = null
+		if layer.has_parts:
+			part = current_selections.get(layer_code, null)
+		else:
+			if layer_code == "01body":
+				var body_parts = available_parts.get(layer_code, [])
+				if body_parts.size() > 0:
+					part = body_parts[0]
+
+		for sprite_code in sprite_codes:
+			var sprite = character_layers.get_node_or_null(sprite_code)
+			if not sprite:
+				continue
+
+			if part == null:
+				sprite.texture = null
+				continue
+
+			if "sprite_layers" in layer:
+				if part.get("sprite_code", "") != sprite_code:
+					sprite.texture = null
+					continue
+
+			var original_texture = load(part.path)
+
+			if layer_code in current_colors:
+				var color_index = current_colors[layer_code]
+				var recolored_texture = _apply_color_mapping_mana_seed(original_texture, part, layer.ramp_type, color_index)
+				sprite.texture = recolored_texture
+			else:
+				sprite.texture = original_texture
+
+		if "auto_match_layer" in layer and part != null:
+			var auto_layer_code = layer.auto_match_layer
+			var auto_sprite = character_layers.get_node_or_null(auto_layer_code)
+
+			if auto_sprite:
+				var matching_part = null
+				if auto_layer_code in available_parts:
+					for auto_part in available_parts[auto_layer_code]:
+						if auto_part.base_name == part.base_name:
+							matching_part = auto_part
+							break
+
+				if matching_part != null:
+					var auto_texture = load(matching_part.path)
+					if layer_code in current_colors:
+						var color_index = current_colors[layer_code]
+						var recolored_texture = _apply_color_mapping_mana_seed(auto_texture, matching_part, layer.ramp_type, color_index)
+						auto_sprite.texture = recolored_texture
+					else:
+						auto_sprite.texture = auto_texture
+				else:
+					auto_sprite.texture = null
+		elif "auto_match_layer" in layer and part == null:
+			var auto_layer_code = layer.auto_match_layer
+			var auto_sprite = character_layers.get_node_or_null(auto_layer_code)
+			if auto_sprite:
+				auto_sprite.texture = null
+
+func _apply_color_mapping_mana_seed(original_texture: Texture2D, part: Dictionary, ramp_type: String, color_index: int) -> ImageTexture:
+	"""Apply color mapping to a texture"""
+	var cache_key = part.path + ":" + str(color_index)
+	if cache_key in texture_cache:
+		return texture_cache[cache_key]
+
+	var original_image = original_texture.get_image()
+	var recolored_image = Image.create(original_image.get_width(), original_image.get_height(), false, original_image.get_format())
+	recolored_image.copy_from(original_image)
+
+	var palette_code = part.get("palette_code", "00")
+	var base_colors = _get_base_colors_for_palette_code(palette_code, ramp_type)
+	var target_colors = _get_target_colors_for_palette_code(palette_code, ramp_type, color_index)
+
+	if base_colors.size() == 0 or target_colors.size() == 0:
+		var result = ImageTexture.create_from_image(recolored_image)
+		texture_cache[cache_key] = result
+		return result
+
+	for y in range(recolored_image.get_height()):
+		for x in range(recolored_image.get_width()):
+			var pixel = recolored_image.get_pixel(x, y)
+			if pixel.a < 0.01:
+				continue
+
+			for i in range(min(base_colors.size(), target_colors.size())):
+				if _colors_match(pixel, base_colors[i]):
+					recolored_image.set_pixel(x, y, Color(target_colors[i].r, target_colors[i].g, target_colors[i].b, pixel.a))
+					break
+
+	var result = ImageTexture.create_from_image(recolored_image)
+	texture_cache[cache_key] = result
+	return result
+
+func _get_base_colors_for_palette_code(palette_code: String, ramp_type: String) -> Array:
+	"""Get base colors based on palette code"""
+	var base_ramp_filename = ""
+
+	match palette_code:
+		"00a": base_ramp_filename = "3-color base ramp (00a).png"
+		"00b": base_ramp_filename = "4-color base ramp (00b).png"
+		"00c": base_ramp_filename = "2x 3-color base ramps (00c).png"
+		"00d": base_ramp_filename = "4-color + 3-color base ramps (00d).png"
+		"00f": base_ramp_filename = "4-color base ramp (00b).png"
+		"00":
+			if ramp_type == "skin":
+				base_ramp_filename = "skin color base ramp.png"
+			elif ramp_type == "hair":
+				base_ramp_filename = "hair color base ramp.png"
+		_:
+			if ramp_type == "skin":
+				base_ramp_filename = "skin color base ramp.png"
+			elif ramp_type == "hair":
+				base_ramp_filename = "hair color base ramp.png"
+			elif ramp_type == "3color":
+				base_ramp_filename = "3-color base ramp (00a).png"
+			elif ramp_type == "4color":
+				base_ramp_filename = "4-color base ramp (00b).png"
+
+	if base_ramp_filename == "":
+		return []
+
+	var base_ramp_path = PALETTE_PATH + "base ramps/" + base_ramp_filename
+	if not FileAccess.file_exists(base_ramp_path):
+		return []
+
+	var texture = load(base_ramp_path)
+	if texture == null:
+		return []
+
+	var image = texture.get_image()
+	var colors = []
+
+	var num_colors = image.get_width() / 2
+	for i in range(num_colors):
+		var x = i * 2
+		var pixel_color = image.get_pixel(x, 0)
+		colors.append(pixel_color)
+
+	return colors
+
+func _get_target_colors_for_palette_code(palette_code: String, ramp_type: String, row_index: int) -> Array:
+	"""Get target colors for a specific palette row"""
+	match palette_code:
+		"00a": return _extract_colors_from_palette(ramp_type, row_index)
+		"00b": return _extract_colors_from_palette(ramp_type, row_index)
+		"00c":
+			var colors_3 = _extract_colors_from_palette("3color", row_index)
+			if colors_3.size() >= 3:
+				return colors_3 + colors_3
+			return colors_3
+		"00d":
+			var colors_4 = _extract_colors_from_palette("4color", row_index)
+			var colors_3 = _extract_colors_from_palette("3color", row_index)
+			return colors_4 + colors_3
+		"00f":
+			var colors_4 = _extract_colors_from_palette("4color", row_index)
+			var colors_hair = _extract_colors_from_palette("hair", row_index)
+			return colors_4 + colors_hair
+		"00": return _extract_colors_from_palette(ramp_type, row_index)
+		_: return _extract_colors_from_palette(ramp_type, row_index)
+
+func _extract_colors_from_palette(ramp_type: String, row_index: int) -> Array:
+	"""Extract colors from a specific row of a palette image"""
+	if ramp_type not in palette_images:
+		return []
+
+	var image = palette_images[ramp_type]
+	var colors = []
+
+	var colors_per_row = 3
+	match ramp_type:
+		"3color": colors_per_row = 3
+		"4color": colors_per_row = 4
+		"hair": colors_per_row = 5
+		"skin": colors_per_row = 4
+
+	for i in range(colors_per_row):
+		var x = i * 2
+		var y = row_index * 2
+		var pixel_color = image.get_pixel(x, y)
+		colors.append(pixel_color)
+
+	return colors
+
+func _colors_match(c1: Color, c2: Color, tolerance: float = 0.01) -> bool:
+	"""Check if two colors match within tolerance"""
+	return abs(c1.r - c2.r) < tolerance and abs(c1.g - c2.g) < tolerance and abs(c1.b - c2.b) < tolerance
+
+func _on_mana_seed_customization_accepted():
+	"""Handle Accept button press from Mana Seed customization UI"""
+	print("[CharacterCreation] Mana Seed customization accepted!")
+
+	# Save character data to GameState
+	var gs = get_node_or_null(GS_PATH)
+	if gs:
+		print("[CharacterCreation] Saving to GameState hero_identity meta...")
+		var existing_identity = {}
+		if gs.has_meta("hero_identity"):
+			existing_identity = gs.get_meta("hero_identity")
+
+		# Merge with existing data (name, surname, etc.)
+		existing_identity["character_selections"] = current_selections.duplicate()
+		existing_identity["character_indices"] = current_part_indices.duplicate()
+		existing_identity["character_colors"] = current_colors.duplicate()
+		existing_identity["character_animation"] = current_animation
+		existing_identity["character_direction"] = current_anim_direction
+
+		gs.set_meta("hero_identity", existing_identity)
+		print("[CharacterCreation] Saved ", current_selections.size(), " parts and ", current_colors.size(), " colors")
+
+	# Save to CharacterData autoload
+	var char_data = get_node_or_null("/root/aCharacterData")
+	if char_data and char_data.has_method("set_character"):
+		var variants = {}
+		for layer_code in current_selections:
+			variants[layer_code] = current_selections[layer_code].name
+		char_data.set_character(variants, current_selections)
+		print("[CharacterCreation] Saved to CharacterData")
+
+	# Fade out and advance
+	if customization_container:
+		var tween = create_tween()
+		tween.tween_property(customization_container, "modulate", Color(1, 1, 1, 0), 0.5)
+		tween.tween_callback(func():
+			if customization_container:
+				customization_container.queue_free()
+				customization_container = null
+
+			if dialogue_label:
+				dialogue_label.visible = true
+			_advance_stage()
+		)
 
 # ══════════════════════════════════════════════════════════════════════════════
 # END OF CINEMATIC SYSTEM
