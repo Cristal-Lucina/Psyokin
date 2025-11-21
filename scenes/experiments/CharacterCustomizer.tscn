@@ -1,7 +1,19 @@
-[gd_scene load_steps=3 format=3 uid="uid://psyokin_test_cc"]
+[gd_scene load_steps=4 format=3 uid="uid://c8yv7j8xqm2pk"]
 
-[ext_resource type="Script" path="res://scripts/creation/CharacterCustomizer.gd" id="1_script"]
-[ext_resource type="Shader" path="res://assets/shaders/palette_swap.gdshader" id="2_shader"]
+[ext_resource type="Script" path="res://scripts/creation/CharacterCustomizer.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/graphics/items/MirrorSprite.png" id="2_mirror"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_leftpanel"]
+bg_color = Color(0.1, 0.1, 0.1, 0.8)
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(0.301961, 0.913725, 1, 1)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
 
 [node name="CharacterCustomizer" type="Control"]
 layout_mode = 3
@@ -10,216 +22,178 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-script = ExtResource("1_script")
+script = ExtResource("1")
 
-[node name="BackgroundPanel" type="Panel" parent="."]
+[node name="MarginContainer" type="MarginContainer" parent="."]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+theme_override_constants/margin_left = 50
+theme_override_constants/margin_top = 50
+theme_override_constants/margin_right = 50
+theme_override_constants/margin_bottom = 50
 
-[node name="MainContainer" type="HBoxContainer" parent="."]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
+[node name="MainContainer" type="HBoxContainer" parent="MarginContainer"]
+layout_mode = 2
+theme_override_constants/separation = 50
 
-[node name="AnimationPanel" type="PanelContainer" parent="MainContainer"]
-custom_minimum_size = Vector2(250, 0)
+[node name="LeftPanel" type="PanelContainer" parent="MarginContainer/MainContainer"]
+custom_minimum_size = Vector2(830, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/panel = SubResource("StyleBoxFlat_leftpanel")
+
+[node name="PaddingContainer" type="MarginContainer" parent="MarginContainer/MainContainer/LeftPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 5
+theme_override_constants/margin_top = 5
+theme_override_constants/margin_right = 5
+theme_override_constants/margin_bottom = 5
+
+[node name="ScrollContainer" type="ScrollContainer" parent="MarginContainer/MainContainer/LeftPanel/PaddingContainer"]
+layout_mode = 2
+
+[node name="ScrollPadding" type="MarginContainer" parent="MarginContainer/MainContainer/LeftPanel/PaddingContainer/ScrollContainer"]
+layout_mode = 2
+theme_override_constants/margin_right = 5
+
+[node name="CustomizationList" type="HBoxContainer" parent="MarginContainer/MainContainer/LeftPanel/PaddingContainer/ScrollContainer/ScrollPadding"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 20
+alignment = 0
+
+[node name="LeftColumn" type="VBoxContainer" parent="MarginContainer/MainContainer/LeftPanel/PaddingContainer/ScrollContainer/ScrollPadding/CustomizationList"]
 layout_mode = 2
 size_flags_horizontal = 3
 
-[node name="AnimationContainer" type="VBoxContainer" parent="MainContainer/AnimationPanel"]
+[node name="RightColumn" type="VBoxContainer" parent="MarginContainer/MainContainer/LeftPanel/PaddingContainer/ScrollContainer/ScrollPadding/CustomizationList"]
 layout_mode = 2
+size_flags_horizontal = 3
 
-[node name="Title" type="Label" parent="MainContainer/AnimationPanel/AnimationContainer"]
+[node name="RightPanel" type="VBoxContainer" parent="MarginContainer/MainContainer"]
 layout_mode = 2
-text = "Animations"
+size_flags_horizontal = 3
+
+[node name="PreviewContainer" type="CenterContainer" parent="MarginContainer/MainContainer/RightPanel"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="MirrorSprite" type="Sprite2D" parent="MarginContainer/MainContainer/RightPanel/PreviewContainer"]
+position = Vector2(165, 238)
+scale = Vector2(5.28, 5.28)
+texture = ExtResource("2_mirror")
+z_index = -1
+
+[node name="CharacterLayers" type="Node2D" parent="MarginContainer/MainContainer/RightPanel/PreviewContainer"]
+position = Vector2(165, 278)
+scale = Vector2(8, 8)
+
+[node name="MirrorSpriteOverlay" type="Sprite2D" parent="MarginContainer/MainContainer/RightPanel/PreviewContainer"]
+position = Vector2(165, 238)
+scale = Vector2(5.28, 5.28)
+texture = ExtResource("2_mirror")
+z_index = 1
+modulate = Color(1, 1, 1, 0.15)
+
+[node name="00undr" type="Sprite2D" parent="MarginContainer/MainContainer/RightPanel/PreviewContainer/CharacterLayers"]
+texture_filter = 1
+hframes = 16
+vframes = 16
+
+[node name="01body" type="Sprite2D" parent="MarginContainer/MainContainer/RightPanel/PreviewContainer/CharacterLayers"]
+texture_filter = 1
+hframes = 16
+vframes = 16
+
+[node name="02sock" type="Sprite2D" parent="MarginContainer/MainContainer/RightPanel/PreviewContainer/CharacterLayers"]
+texture_filter = 1
+hframes = 16
+vframes = 16
+
+[node name="03fot1" type="Sprite2D" parent="MarginContainer/MainContainer/RightPanel/PreviewContainer/CharacterLayers"]
+texture_filter = 1
+hframes = 16
+vframes = 16
+
+[node name="04lwr1" type="Sprite2D" parent="MarginContainer/MainContainer/RightPanel/PreviewContainer/CharacterLayers"]
+texture_filter = 1
+hframes = 16
+vframes = 16
+
+[node name="05shrt" type="Sprite2D" parent="MarginContainer/MainContainer/RightPanel/PreviewContainer/CharacterLayers"]
+texture_filter = 1
+hframes = 16
+vframes = 16
+
+[node name="06lwr2" type="Sprite2D" parent="MarginContainer/MainContainer/RightPanel/PreviewContainer/CharacterLayers"]
+texture_filter = 1
+hframes = 16
+vframes = 16
+
+[node name="07fot2" type="Sprite2D" parent="MarginContainer/MainContainer/RightPanel/PreviewContainer/CharacterLayers"]
+texture_filter = 1
+hframes = 16
+vframes = 16
+
+[node name="08lwr3" type="Sprite2D" parent="MarginContainer/MainContainer/RightPanel/PreviewContainer/CharacterLayers"]
+texture_filter = 1
+hframes = 16
+vframes = 16
+
+[node name="09hand" type="Sprite2D" parent="MarginContainer/MainContainer/RightPanel/PreviewContainer/CharacterLayers"]
+texture_filter = 1
+hframes = 16
+vframes = 16
+
+[node name="10outr" type="Sprite2D" parent="MarginContainer/MainContainer/RightPanel/PreviewContainer/CharacterLayers"]
+texture_filter = 1
+hframes = 16
+vframes = 16
+
+[node name="11neck" type="Sprite2D" parent="MarginContainer/MainContainer/RightPanel/PreviewContainer/CharacterLayers"]
+texture_filter = 1
+hframes = 16
+vframes = 16
+
+[node name="12face" type="Sprite2D" parent="MarginContainer/MainContainer/RightPanel/PreviewContainer/CharacterLayers"]
+texture_filter = 1
+hframes = 16
+vframes = 16
+
+[node name="13hair" type="Sprite2D" parent="MarginContainer/MainContainer/RightPanel/PreviewContainer/CharacterLayers"]
+texture_filter = 1
+hframes = 16
+vframes = 16
+
+[node name="14head" type="Sprite2D" parent="MarginContainer/MainContainer/RightPanel/PreviewContainer/CharacterLayers"]
+texture_filter = 1
+hframes = 16
+vframes = 16
+
+[node name="AnimationLabel" type="Label" parent="MarginContainer/MainContainer/RightPanel"]
+layout_mode = 2
+text = "Animation"
 horizontal_alignment = 1
 
-[node name="ScrollContainer" type="ScrollContainer" parent="MainContainer/AnimationPanel/AnimationContainer"]
+[node name="AnimationButtons" type="HBoxContainer" parent="MarginContainer/MainContainer/RightPanel"]
 layout_mode = 2
-size_flags_vertical = 3
+alignment = 1
 
-[node name="AnimationList" type="VBoxContainer" parent="MainContainer/AnimationPanel/AnimationContainer/ScrollContainer"]
-layout_mode = 2
-size_flags_horizontal = 3
-size_flags_vertical = 3
-
-[node name="PreviewPanel" type="PanelContainer" parent="MainContainer"]
-custom_minimum_size = Vector2(600, 0)
-layout_mode = 2
-size_flags_horizontal = 3
-size_flags_stretch_ratio = 2.0
-
-[node name="PreviewContainer" type="VBoxContainer" parent="MainContainer/PreviewPanel"]
-layout_mode = 2
-
-[node name="Title" type="Label" parent="MainContainer/PreviewPanel/PreviewContainer"]
-layout_mode = 2
-text = "Psyokin Character System"
-horizontal_alignment = 1
-
-[node name="CenterContainer" type="CenterContainer" parent="MainContainer/PreviewPanel/PreviewContainer"]
-layout_mode = 2
-size_flags_vertical = 3
-
-[node name="CharacterLayers" type="Node2D" parent="MainContainer/PreviewPanel/PreviewContainer/CenterContainer"]
-position = Vector2(300, 300)
-scale = Vector2(4, 4)
-
-[node name="00undr" type="Sprite2D" parent="MainContainer/PreviewPanel/PreviewContainer/CenterContainer/CharacterLayers"]
-texture_filter = 1
-hframes = 16
-vframes = 16
-
-[node name="01body" type="Sprite2D" parent="MainContainer/PreviewPanel/PreviewContainer/CenterContainer/CharacterLayers"]
-texture_filter = 1
-hframes = 16
-vframes = 16
-
-[node name="02sock" type="Sprite2D" parent="MainContainer/PreviewPanel/PreviewContainer/CenterContainer/CharacterLayers"]
-texture_filter = 1
-hframes = 16
-vframes = 16
-
-[node name="03fot1" type="Sprite2D" parent="MainContainer/PreviewPanel/PreviewContainer/CenterContainer/CharacterLayers"]
-texture_filter = 1
-hframes = 16
-vframes = 16
-
-[node name="04lwr1" type="Sprite2D" parent="MainContainer/PreviewPanel/PreviewContainer/CenterContainer/CharacterLayers"]
-texture_filter = 1
-hframes = 16
-vframes = 16
-
-[node name="05shrt" type="Sprite2D" parent="MainContainer/PreviewPanel/PreviewContainer/CenterContainer/CharacterLayers"]
-texture_filter = 1
-hframes = 16
-vframes = 16
-
-[node name="06lwr2" type="Sprite2D" parent="MainContainer/PreviewPanel/PreviewContainer/CenterContainer/CharacterLayers"]
-texture_filter = 1
-hframes = 16
-vframes = 16
-
-[node name="07fot2" type="Sprite2D" parent="MainContainer/PreviewPanel/PreviewContainer/CenterContainer/CharacterLayers"]
-texture_filter = 1
-hframes = 16
-vframes = 16
-
-[node name="08lwr3" type="Sprite2D" parent="MainContainer/PreviewPanel/PreviewContainer/CenterContainer/CharacterLayers"]
-texture_filter = 1
-hframes = 16
-vframes = 16
-
-[node name="09hand" type="Sprite2D" parent="MainContainer/PreviewPanel/PreviewContainer/CenterContainer/CharacterLayers"]
-texture_filter = 1
-hframes = 16
-vframes = 16
-
-[node name="10outr" type="Sprite2D" parent="MainContainer/PreviewPanel/PreviewContainer/CenterContainer/CharacterLayers"]
-texture_filter = 1
-hframes = 16
-vframes = 16
-
-[node name="11neck" type="Sprite2D" parent="MainContainer/PreviewPanel/PreviewContainer/CenterContainer/CharacterLayers"]
-texture_filter = 1
-hframes = 16
-vframes = 16
-
-[node name="12face" type="Sprite2D" parent="MainContainer/PreviewPanel/PreviewContainer/CenterContainer/CharacterLayers"]
-texture_filter = 1
-hframes = 16
-vframes = 16
-
-[node name="13hair" type="Sprite2D" parent="MainContainer/PreviewPanel/PreviewContainer/CenterContainer/CharacterLayers"]
-texture_filter = 1
-hframes = 16
-vframes = 16
-
-[node name="14head" type="Sprite2D" parent="MainContainer/PreviewPanel/PreviewContainer/CenterContainer/CharacterLayers"]
-texture_filter = 1
-hframes = 16
-vframes = 16
-
-[node name="AnimationInfo" type="HBoxContainer" parent="MainContainer/PreviewPanel/PreviewContainer"]
-layout_mode = 2
-
-[node name="AnimLabel" type="Label" parent="MainContainer/PreviewPanel/PreviewContainer/AnimationInfo"]
-layout_mode = 2
-text = "Animation: Idle"
-
-[node name="DirectionLabel" type="Label" parent="MainContainer/PreviewPanel/PreviewContainer/AnimationInfo"]
-layout_mode = 2
-text = "Direction: DOWN"
-
-[node name="FrameLabel" type="Label" parent="MainContainer/PreviewPanel/PreviewContainer/AnimationInfo"]
-layout_mode = 2
-text = "Frame: 1/1"
-
-[node name="ControlsPanel" type="PanelContainer" parent="MainContainer"]
-custom_minimum_size = Vector2(500, 0)
-layout_mode = 2
-size_flags_horizontal = 3
-
-[node name="ControlsContainer" type="VBoxContainer" parent="MainContainer/ControlsPanel"]
-layout_mode = 2
-
-[node name="Title" type="Label" parent="MainContainer/ControlsPanel/ControlsContainer"]
-layout_mode = 2
-text = "Character Customization"
-horizontal_alignment = 1
-
-[node name="ScrollContainer" type="ScrollContainer" parent="MainContainer/ControlsPanel/ControlsContainer"]
-layout_mode = 2
-size_flags_vertical = 3
-
-[node name="PartsContainer" type="VBoxContainer" parent="MainContainer/ControlsPanel/ControlsContainer/ScrollContainer"]
-layout_mode = 2
-size_flags_horizontal = 3
-size_flags_vertical = 3
-
-[node name="DirectionControls" type="VBoxContainer" parent="MainContainer/ControlsPanel/ControlsContainer"]
-layout_mode = 2
-
-[node name="DirectionLabel" type="Label" parent="MainContainer/ControlsPanel/ControlsContainer/DirectionControls"]
+[node name="DirectionLabel" type="Label" parent="MarginContainer/MainContainer/RightPanel"]
 layout_mode = 2
 text = "Direction"
+horizontal_alignment = 1
 
-[node name="DirectionButtons" type="HBoxContainer" parent="MainContainer/ControlsPanel/ControlsContainer/DirectionControls"]
+[node name="DirectionButtons" type="HBoxContainer" parent="MarginContainer/MainContainer/RightPanel"]
 layout_mode = 2
+alignment = 1
 
-[node name="DownBtn" type="Button" parent="MainContainer/ControlsPanel/ControlsContainer/DirectionControls/DirectionButtons"]
-layout_mode = 2
-size_flags_horizontal = 3
-text = "DOWN"
-
-[node name="UpBtn" type="Button" parent="MainContainer/ControlsPanel/ControlsContainer/DirectionControls/DirectionButtons"]
-layout_mode = 2
-size_flags_horizontal = 3
-text = "UP"
-
-[node name="RightBtn" type="Button" parent="MainContainer/ControlsPanel/ControlsContainer/DirectionControls/DirectionButtons"]
-layout_mode = 2
-size_flags_horizontal = 3
-text = "RIGHT"
-
-[node name="LeftBtn" type="Button" parent="MainContainer/ControlsPanel/ControlsContainer/DirectionControls/DirectionButtons"]
-layout_mode = 2
-size_flags_horizontal = 3
-text = "LEFT"
-
-[node name="AcceptButton" type="Button" parent="MainContainer/ControlsPanel/ControlsContainer"]
+[node name="AcceptButton" type="Button" parent="MarginContainer/MainContainer/RightPanel"]
 layout_mode = 2
 text = "Accept Character"
 
-[connection signal="pressed" from="MainContainer/ControlsPanel/ControlsContainer/DirectionControls/DirectionButtons/DownBtn" to="." method="_on_direction_changed" binds= ["DOWN"]]
-[connection signal="pressed" from="MainContainer/ControlsPanel/ControlsContainer/DirectionControls/DirectionButtons/UpBtn" to="." method="_on_direction_changed" binds= ["UP"]]
-[connection signal="pressed" from="MainContainer/ControlsPanel/ControlsContainer/DirectionControls/DirectionButtons/RightBtn" to="." method="_on_direction_changed" binds= ["RIGHT"]]
-[connection signal="pressed" from="MainContainer/ControlsPanel/ControlsContainer/DirectionControls/DirectionButtons/LeftBtn" to="." method="_on_direction_changed" binds= ["LEFT"]]
-[connection signal="pressed" from="MainContainer/ControlsPanel/ControlsContainer/AcceptButton" to="." method="_on_accept_pressed"]
+[connection signal="pressed" from="MarginContainer/MainContainer/RightPanel/AcceptButton" to="." method="_on_accept_pressed"]
