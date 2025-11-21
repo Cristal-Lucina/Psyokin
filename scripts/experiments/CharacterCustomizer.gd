@@ -805,3 +805,29 @@ func _on_animation_selected(anim_name: String):
 			current_direction = available_dirs[0]
 
 	update_frame_display()
+
+func _on_accept_pressed():
+	"""Save character choices and return to CharacterCreation"""
+	print("Accepting character customization...")
+
+	# Get GameState reference
+	var gs = get_node_or_null("/root/GameState")
+	if gs:
+		var existing_identity = {}
+		if gs.has_meta("hero_identity"):
+			existing_identity = gs.get_meta("hero_identity")
+
+		# Save character customization data
+		existing_identity["character_selections"] = current_selections.duplicate()
+		existing_identity["character_colors"] = current_color_ramps.duplicate()
+		existing_identity["character_animation"] = current_animation
+		existing_identity["character_direction"] = current_direction
+		existing_identity["customization_completed"] = true
+
+		gs.set_meta("hero_identity", existing_identity)
+		print("Saved character data to GameState")
+	else:
+		print("WARNING: GameState not found!")
+
+	# Return to CharacterCreation scene
+	get_tree().change_scene_to_file("res://scenes/creation/CharacterCreation.tscn")

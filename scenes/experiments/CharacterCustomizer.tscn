@@ -1,9 +1,9 @@
 [gd_scene load_steps=3 format=3 uid="uid://psyokin_test_cc"]
 
-[ext_resource type="Script" path="res://scripts/experiments/PsyokinTestCharacterCreator.gd" id="1_script"]
+[ext_resource type="Script" path="res://scripts/experiments/CharacterCustomizer.gd" id="1_script"]
 [ext_resource type="Shader" path="res://assets/shaders/palette_swap.gdshader" id="2_shader"]
 
-[node name="PsyokinTestCharacterCreator" type="Control"]
+[node name="CharacterCustomizer" type="Control"]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -214,7 +214,12 @@ layout_mode = 2
 size_flags_horizontal = 3
 text = "LEFT"
 
+[node name="AcceptButton" type="Button" parent="MainContainer/ControlsPanel/ControlsContainer"]
+layout_mode = 2
+text = "Accept Character"
+
 [connection signal="pressed" from="MainContainer/ControlsPanel/ControlsContainer/DirectionControls/DirectionButtons/DownBtn" to="." method="_on_direction_changed" binds= ["DOWN"]]
 [connection signal="pressed" from="MainContainer/ControlsPanel/ControlsContainer/DirectionControls/DirectionButtons/UpBtn" to="." method="_on_direction_changed" binds= ["UP"]]
 [connection signal="pressed" from="MainContainer/ControlsPanel/ControlsContainer/DirectionControls/DirectionButtons/RightBtn" to="." method="_on_direction_changed" binds= ["RIGHT"]]
 [connection signal="pressed" from="MainContainer/ControlsPanel/ControlsContainer/DirectionControls/DirectionButtons/LeftBtn" to="." method="_on_direction_changed" binds= ["LEFT"]]
+[connection signal="pressed" from="MainContainer/ControlsPanel/ControlsContainer/AcceptButton" to="." method="_on_accept_pressed"]

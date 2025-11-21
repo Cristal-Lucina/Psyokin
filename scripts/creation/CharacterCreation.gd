@@ -191,6 +191,20 @@ var continue_prompt: Label = null
 func _ready() -> void:
 	print("Character Creation starting with cinematic opening...")
 
+	# Check if returning from character customization
+	var gs = get_node_or_null(GS_PATH)
+	if gs and gs.has_meta("hero_identity"):
+		var hero_id = gs.get_meta("hero_identity")
+		if hero_id.has("customization_completed") and hero_id.customization_completed:
+			print("[CharacterCreation] Returning from customization, skipping to confirmation")
+			# Clear the flag
+			hero_id.customization_completed = false
+			gs.set_meta("hero_identity", hero_id)
+			# Skip directly to final confirmation
+			current_stage = CinematicStage.FINAL_CONFIRMATION
+			_build_confirmation_ui()
+			return
+
 	# Apply LoadoutPanel styling to all panels
 	_style_panels()
 
@@ -1436,7 +1450,9 @@ func _enter_stage(stage: CinematicStage) -> void:
 		CinematicStage.DIALOGUE_MIRROR:
 			_start_typing("Do you recognize the person in the mirror?")
 		CinematicStage.CHARACTER_CUSTOMIZATION:
-			_build_customization_ui()
+			# Transition to CharacterCustomizer scene
+			print("[CharacterCreation] Transitioning to character customization scene")
+			get_tree().change_scene_to_file("res://scenes/experiments/CharacterCustomizer.tscn")
 		CinematicStage.FINAL_CONFIRMATION:
 			_build_confirmation_ui()
 		CinematicStage.COMPLETE:
