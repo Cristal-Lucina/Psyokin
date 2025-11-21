@@ -486,42 +486,32 @@ func create_layer_section(layer: Dictionary, layer_index: int) -> VBoxContainer:
 	var left_arrow = Button.new()
 	left_arrow.name = "LeftArrow"
 	left_arrow.text = "◀"
-	left_arrow.custom_minimum_size = Vector2(20, 0)  # Even smaller
+	left_arrow.custom_minimum_size = Vector2(20, 0)
+	left_arrow.focus_mode = Control.FOCUS_NONE
 	left_arrow.pressed.connect(_on_color_previous.bind(layer_index))
 	color_strip_row.add_child(left_arrow)
 
-	# Color strip (fixed 300px width)
-	var color_strip = HBoxContainer.new()
-	color_strip.name = "ColorStrip"
-	color_strip.custom_minimum_size = Vector2(300, 20)  # Squeezed more compact
-
+	# Color slider (volume bar style)
 	var palette_image = get_palette_image(layer.ramp_type)
 	var num_colors = min(layer.max_colors, palette_image.get_height() / 2 if palette_image else 0)
-	var block_width = 300.0 / num_colors if num_colors > 0 else 20.0
 
-	for i in range(num_colors):
-		var color_block = Panel.new()
-		color_block.name = "ColorBlock_" + str(i)
-		color_block.custom_minimum_size = Vector2(block_width, 20)  # Squeezed more compact
-		color_block.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-
-		# Add color preview
-		if palette_image:
-			var preview_color = palette_image.get_pixel(4, i * 2)  # 3rd color
-			var style = StyleBoxFlat.new()
-			style.bg_color = preview_color
-			# No borders so colors touch each other
-			color_block.add_theme_stylebox_override("panel", style)
-
-		color_strip.add_child(color_block)
-
-	color_strip_row.add_child(color_strip)
+	var color_slider = HSlider.new()
+	color_slider.name = "ColorSlider"
+	color_slider.custom_minimum_size = Vector2(300, 20)
+	color_slider.min_value = 0
+	color_slider.max_value = num_colors - 1 if num_colors > 0 else 0
+	color_slider.step = 1
+	color_slider.value = current_colors.get(layer.code, 0)
+	color_slider.focus_mode = Control.FOCUS_NONE
+	color_slider.value_changed.connect(_on_color_slider_changed.bind(layer_index))
+	color_strip_row.add_child(color_slider)
 
 	# Right arrow
 	var right_arrow = Button.new()
 	right_arrow.name = "RightArrow"
 	right_arrow.text = "▶"
-	right_arrow.custom_minimum_size = Vector2(20, 0)  # Even smaller
+	right_arrow.custom_minimum_size = Vector2(20, 0)
+	right_arrow.focus_mode = Control.FOCUS_NONE
 	right_arrow.pressed.connect(_on_color_next.bind(layer_index))
 	color_strip_row.add_child(right_arrow)
 
@@ -746,6 +736,12 @@ func update_part_label(layer_index: int):
 		else:
 			part_label.text = "None"
 
+func _on_color_slider_changed(value: float, layer_index: int):
+	"""Handle color slider value change"""
+	var layer = LAYERS[layer_index]
+	current_colors[layer.code] = int(value)
+	update_preview()
+
 func _on_color_previous(layer_index: int):
 	"""Cycle to previous color"""
 	var layer = LAYERS[layer_index]
@@ -754,6 +750,15 @@ func _on_color_previous(layer_index: int):
 	if color_index < 0:
 		color_index = layer.max_colors - 1
 	current_colors[layer.code] = color_index
+
+	# Update slider
+	var section = customization_container.get_child(layer_index)
+	var color_container = section.get_node("ColorContainer")
+	var color_bar_container = color_container.get_node("ColorBarContainer")
+	var color_strip_row = color_bar_container.get_node("ColorStripRow")
+	var slider = color_strip_row.get_node("ColorSlider")
+	slider.value = color_index
+
 	update_preview()
 	update_focus_visual()
 
@@ -765,6 +770,15 @@ func _on_color_next(layer_index: int):
 	if color_index >= layer.max_colors:
 		color_index = 0
 	current_colors[layer.code] = color_index
+
+	# Update slider
+	var section = customization_container.get_child(layer_index)
+	var color_container = section.get_node("ColorContainer")
+	var color_bar_container = color_container.get_node("ColorBarContainer")
+	var color_strip_row = color_bar_container.get_node("ColorStripRow")
+	var slider = color_strip_row.get_node("ColorSlider")
+	slider.value = color_index
+
 	update_preview()
 	update_focus_visual()
 
@@ -1142,31 +1156,6 @@ func update_focus_visual():
 			var color_container = active_section.get_node("ColorContainer")
 			var color_btn = color_container.get_node("ColorChangeButton")
 			color_btn.modulate = Color(0.5, 1.5, 0.5)  # Green highlight (active)
-
-	# Update glow effect on selected color blocks for all layers
-	for i in range(LAYERS.size()):
-		var section = customization_container.get_child(i)
-		var layer_data = LAYERS[i]
-		var color_container = section.get_node_or_null("ColorContainer")
-		if color_container:
-			var color_bar_container = color_container.get_node("ColorBarContainer")
-			var color_strip_row = color_bar_container.get_node("ColorStripRow")
-			var color_strip = color_strip_row.get_node("ColorStrip")
-
-			# Get current color index
-			var color_index = current_colors.get(layer_data.code, 0)
-
-			# Update all color blocks in this layer
-			for j in range(color_strip.get_child_count()):
-				var block = color_strip.get_child(j)
-				if j == color_index:
-					# Selected block - add glow effect
-					block.modulate = Color(1.5, 1.5, 1.5)  # Brighten
-					block.scale = Vector2(1.0, 1.2)  # Scale up slightly
-				else:
-					# Non-selected blocks - reset
-					block.modulate = Color(1.0, 1.0, 1.0)
-					block.scale = Vector2(1.0, 1.0)
 
 func ensure_section_visible():
 	"""Scroll to keep the active section visible"""
