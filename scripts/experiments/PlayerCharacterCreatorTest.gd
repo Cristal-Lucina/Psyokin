@@ -498,7 +498,7 @@ func create_layer_section(layer: Dictionary, layer_index: int) -> VBoxContainer:
 	# Container to layer gradient and slider
 	var slider_container = Control.new()
 	slider_container.name = "SliderContainer"
-	slider_container.custom_minimum_size = Vector2(300, 20)
+	slider_container.custom_minimum_size = Vector2(200, 20)
 	slider_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
 	# Create gradient background
@@ -514,7 +514,7 @@ func create_layer_section(layer: Dictionary, layer_index: int) -> VBoxContainer:
 		# Create gradient texture
 		var gradient_texture = GradientTexture2D.new()
 		gradient_texture.gradient = gradient
-		gradient_texture.width = 300
+		gradient_texture.width = 200
 		gradient_texture.height = 20
 		gradient_texture.fill_from = Vector2(0, 0.5)
 		gradient_texture.fill_to = Vector2(1, 0.5)
@@ -522,7 +522,7 @@ func create_layer_section(layer: Dictionary, layer_index: int) -> VBoxContainer:
 		# Create TextureRect to display gradient
 		var gradient_rect = TextureRect.new()
 		gradient_rect.texture = gradient_texture
-		gradient_rect.custom_minimum_size = Vector2(300, 20)
+		gradient_rect.custom_minimum_size = Vector2(200, 20)
 		gradient_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		gradient_rect.stretch_mode = TextureRect.STRETCH_SCALE
 		slider_container.add_child(gradient_rect)
@@ -530,7 +530,7 @@ func create_layer_section(layer: Dictionary, layer_index: int) -> VBoxContainer:
 	# Create slider on top of gradient
 	var color_slider = HSlider.new()
 	color_slider.name = "ColorSlider"
-	color_slider.custom_minimum_size = Vector2(300, 20)
+	color_slider.custom_minimum_size = Vector2(200, 20)
 	color_slider.min_value = 0
 	color_slider.max_value = num_colors - 1 if num_colors > 0 else 0
 	color_slider.step = 1
