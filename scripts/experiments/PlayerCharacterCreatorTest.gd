@@ -407,9 +407,9 @@ func build_customization_options():
 		var section = create_layer_section(layer, i)
 
 		# Add to appropriate column
-		# Layers 0-4 (Skin Tone to Topwear) go to left column
-		# Layers 5-10 (Handwear to Headwear) go to right column
-		if i < 5:
+		# Layers 0-5 (Skin Tone to Handwear) go to left column
+		# Layers 6-10 (Overwear to Headwear) go to right column
+		if i <= 5:
 			left_column.add_child(section)
 		else:
 			right_column.add_child(section)
