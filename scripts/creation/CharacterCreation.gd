@@ -256,6 +256,8 @@ func _ready() -> void:
 
 	# Initialize cinematic opening
 	if returning_from_customization:
+		# Load saved cinematic data
+		_load_cinematic_data_from_gamestate()
 		# Set up cinematic layer without starting dialogue
 		_setup_cinematic_layer_only()
 		_hide_form()
@@ -1072,6 +1074,84 @@ func _opt_text(ob: OptionButton) -> String:
 # CINEMATIC OPENING SYSTEM
 # ══════════════════════════════════════════════════════════════════════════════
 
+# ── Cinematic Data Persistence ───────────────────────────────────────────────
+func _save_cinematic_data_to_gamestate() -> void:
+	"""Save current cinematic progress to GameState hero_identity"""
+	var gs = get_node_or_null(GS_PATH)
+	if not gs:
+		return
+
+	var hero_id = {}
+	if gs.has_meta("hero_identity"):
+		hero_id = gs.get_meta("hero_identity")
+
+	# Save name data
+	# Set default pronoun if not already set
+	if not hero_id.has("pronoun"):
+		hero_id["pronoun"] = "they/them"
+	if cinematic_name != "":
+		hero_id["name"] = cinematic_name
+	if cinematic_surname != "":
+		hero_id["surname"] = cinematic_surname
+
+	# Save pronoun (from dropdown)
+	if _pron_in and _pron_in.get_selected() >= 0:
+		hero_id["pronoun"] = _pron_in.get_item_text(_pron_in.get_selected())
+
+	# Save stats
+	if _selected_order.size() > 0:
+		hero_id["selected_stats"] = _selected_order.duplicate()
+
+	# Save perk
+	var perk_id = _chosen_perk_id()
+	if perk_id != "":
+		hero_id["chosen_perk"] = perk_id
+
+	gs.set_meta("hero_identity", hero_id)
+	print("[CharacterCreation] Saved cinematic data to hero_identity")
+
+func _load_cinematic_data_from_gamestate() -> void:
+	"""Load cinematic progress from GameState hero_identity"""
+	var gs = get_node_or_null(GS_PATH)
+	if not gs or not gs.has_meta("hero_identity"):
+		return
+
+	var hero_id = gs.get_meta("hero_identity")
+
+	# Load name
+	if hero_id.has("name"):
+		cinematic_name = hero_id.name
+		if _name_in:
+			_name_in.text = cinematic_name
+
+	if hero_id.has("surname"):
+		cinematic_surname = hero_id.surname
+		if _surname_in:
+			_surname_in.text = cinematic_surname
+
+	# Load pronoun
+	if hero_id.has("pronoun") and _pron_in:
+		var pronoun = hero_id.pronoun
+		for i in range(_pron_in.get_item_count()):
+			if _pron_in.get_item_text(i) == pronoun:
+				_pron_in.select(i)
+				break
+
+	# Load stats
+	if hero_id.has("selected_stats"):
+		_selected_order = hero_id.selected_stats.duplicate()
+
+	# Load perk
+	if hero_id.has("chosen_perk") and _perk_in:
+		var perk_id = hero_id.chosen_perk
+		# Find and select the perk in dropdown
+		for i in range(_perk_in.get_item_count()):
+			if _perk_in.get_item_metadata(i) == perk_id:
+				_perk_in.select(i)
+				break
+
+	print("[CharacterCreation] Loaded cinematic data from hero_identity")
+
 # ── Cinematic Setup ──────────────────────────────────────────────────────────
 func _setup_cinematic_layer_only() -> void:
 	"""Initialize the cinematic layer without starting dialogue (for returning from customization)"""
@@ -1524,6 +1604,8 @@ func _enter_stage(stage: CinematicStage) -> void:
 			_start_typing("Do you recognize the person in the mirror?")
 		CinematicStage.CHARACTER_CUSTOMIZATION:
 			# Transition to CharacterCustomizer scene
+			# Save all cinematic data before transitioning
+			_save_cinematic_data_to_gamestate()
 			print("[CharacterCreation] Transitioning to character customization scene")
 			get_tree().change_scene_to_file("res://scenes/experiments/CharacterCustomizer.tscn")
 		CinematicStage.FINAL_CONFIRMATION:
@@ -2015,6 +2097,9 @@ func _finalize_names() -> void:
 	if _surname_in:
 		_surname_in.text = cinematic_surname
 
+	# Save to GameState
+	_save_cinematic_data_to_gamestate()
+
 	# Fade out and advance
 	var tween = create_tween()
 	tween.tween_property(name_input_container, "modulate", Color(1, 1, 1, 0), 0.5)
@@ -2246,6 +2331,9 @@ func _on_stats_accepted() -> void:
 	# Rebuild perk dropdown with new selections
 	_rebuild_perk_dropdown()
 
+	# Save to GameState
+	_save_cinematic_data_to_gamestate()
+
 	# Fade out and advance
 	var tween = create_tween()
 	tween.tween_property(stat_selection_container, "modulate", Color(1, 1, 1, 0), 0.5)
@@ -2431,6 +2519,9 @@ func _on_perk_accepted() -> void:
 				if _perk_id_by_idx.get(i, "") == perk_id:
 					_perk_in.select(i)
 					break
+
+	# Save to GameState
+	_save_cinematic_data_to_gamestate()
 
 	# Fade out and advance
 	var tween = create_tween()
