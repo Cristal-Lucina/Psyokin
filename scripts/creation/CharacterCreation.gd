@@ -523,34 +523,14 @@ func _on_part_selected(layer_key: String, part):
 	update_preview()
 
 func update_preview():
-	"""Update the character preview with current selections"""
-	for layer_key in LAYERS:
-		var layer = LAYERS[layer_key]
-		var sprite = character_layers.get_node(layer.node_name)
-
-		if layer_key in current_selections and current_selections[layer_key] != null:
-			var part = current_selections[layer_key]
-			var texture = load(part.path)
-			sprite.texture = texture
-			sprite.visible = true
-		else:
-			sprite.texture = null
-			sprite.visible = false
-
-	update_frame_display()
+	"""Update the character preview with current selections (redirects to Mana Seed version)"""
+	# Redirect to the new Mana Seed preview system
+	_update_character_preview()
 
 func update_frame_display():
-	"""Update the frame and direction display"""
-	for layer_key in LAYERS:
-		var layer = LAYERS[layer_key]
-		var sprite = character_layers.get_node(layer.node_name)
-		if sprite.visible and sprite.texture:
-			# Walk animation is on rows 5-8 (direction + 4)
-			var walk_row = current_direction + 4
-			sprite.frame = walk_row * 8 + current_frame
-
-	frame_label.text = "Walk Frame: " + str(current_frame + 1) + "/6"
-	direction_label.text = "Direction: " + DIRECTIONS[current_direction]
+	"""Update the frame and direction display (legacy - now handled by Mana Seed system)"""
+	# This is handled by the Mana Seed animation system now
+	pass
 
 # ── Character Part Selection Callbacks ───────────────────────────────────────
 func _on_body_selected(idx: int):
