@@ -598,10 +598,19 @@ func add_accept_button():
 	style.set_border_width_all(3)
 	style.set_corner_radius_all(10)  # Rounded corners
 
+	# Create focus style with Electric Lime background
+	var focus_style = StyleBoxFlat.new()
+	focus_style.bg_color = Color("#C8FF3D")  # Electric Lime background
+	focus_style.border_color = Color("#C8FF3D")  # Electric Lime
+	focus_style.set_border_width_all(3)
+	focus_style.set_corner_radius_all(10)  # Rounded corners
+
 	accept_btn.add_theme_stylebox_override("normal", style)
 	accept_btn.add_theme_stylebox_override("hover", style)
 	accept_btn.add_theme_stylebox_override("pressed", style)
+	accept_btn.add_theme_stylebox_override("focus", focus_style)
 	accept_btn.add_theme_color_override("font_color", Color("#C8FF3D"))  # Electric Lime text
+	accept_btn.add_theme_color_override("font_focus_color", Color.BLACK)  # Black text when focused
 	accept_btn.add_theme_font_size_override("font_size", 16)
 
 	button_container.add_child(accept_btn)
