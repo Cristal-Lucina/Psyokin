@@ -84,7 +84,7 @@ position = Vector2(165, 238)
 scale = Vector2(5.28, 5.28)
 texture = ExtResource("2_mirror")
 z_index = 1
-modulate = Color(1, 1, 1, 0.08)
+modulate = Color(1, 1, 1, 0.25)
 
 [node name="00undr" type="Sprite2D" parent="MarginContainer/MainContainer/RightPanel/PreviewContainer/CharacterLayers"]
 texture_filter = 1
