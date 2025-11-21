@@ -1110,8 +1110,10 @@ func _save_cinematic_data_to_gamestate() -> void:
 
 	# Save perk
 	var perk_id = _chosen_perk_id()
+	var perk_name = _chosen_perk_name()
 	if perk_id != "":
 		hero_id["chosen_perk"] = perk_id
+		hero_id["chosen_perk_name"] = perk_name
 
 	gs.set_meta("hero_identity", hero_id)
 	print("[CharacterCreation] Saved cinematic data to hero_identity")
@@ -1148,6 +1150,8 @@ func _load_cinematic_data_from_gamestate() -> void:
 	# Load stats
 	if hero_id.has("selected_stats"):
 		_selected_order = hero_id.selected_stats.duplicate()
+		# Rebuild perk dropdown based on loaded stats
+		_rebuild_perk_dropdown()
 
 	# Load perk
 	if hero_id.has("chosen_perk") and _perk_in:
@@ -3457,8 +3461,12 @@ func _build_confirmation_ui() -> void:
 	stats_label.add_theme_font_size_override("font_size", 14)
 	summary_panel.add_child(stats_label)
 
-	# Add perk
-	var perk_name = _chosen_perk_name()
+	# Add perk (read from saved data)
+	var perk_name = ""
+	var gs = get_node_or_null(GS_PATH)
+	if gs and gs.has_meta("hero_identity"):
+		var hero_id = gs.get_meta("hero_identity")
+		perk_name = hero_id.get("chosen_perk_name", "")
 	var perk_label = Label.new()
 	perk_label.text = "Perk: %s" % perk_name if perk_name != "" else "Perk: None"
 	perk_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
