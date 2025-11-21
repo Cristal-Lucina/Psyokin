@@ -9,6 +9,7 @@ enum CinematicStage {
 	OPENING_DIALOGUE_2,    # "Is the patient aware?"
 	OPENING_DIALOGUE_3,    # "Hey, do you remember your name?"
 	NAME_INPUT,            # Name input with validation
+	PRONOUN_SELECTION,     # Choose pronouns: He/She/They
 	DIALOGUE_RESPONSE_1,   # "We got a response!"
 	DIALOGUE_RESPONSE_2,   # "Wonderful, how are the vitals?"
 	STAT_SELECTION,        # Choose 3 stats
@@ -148,6 +149,7 @@ var stage_timer: float = 0.0
 var nurse_response_index: int = 0
 var cinematic_name: String = ""
 var cinematic_surname: String = ""
+var cinematic_pronoun: String = "they/them"  # Default pronoun
 var waiting_for_input: bool = false
 var last_input_time: float = 0.0  # Track last input time for cooldown
 
@@ -181,6 +183,7 @@ const CURSOR_BLINK_SPEED := 0.5  # Blink every 0.5 seconds
 var cinematic_layer: CanvasLayer = null
 var dialogue_label: Label = null
 var name_input_container: Control = null
+var pronoun_selection_container: Control = null
 var stat_selection_container: Control = null
 var perk_selection_container: Control = null
 var customization_container: Control = null
@@ -1086,17 +1089,20 @@ func _save_cinematic_data_to_gamestate() -> void:
 		hero_id = gs.get_meta("hero_identity")
 
 	# Save name data
-	# Set default pronoun if not already set
-	if not hero_id.has("pronoun"):
-		hero_id["pronoun"] = "they/them"
 	if cinematic_name != "":
 		hero_id["name"] = cinematic_name
 	if cinematic_surname != "":
 		hero_id["surname"] = cinematic_surname
 
-	# Save pronoun (from dropdown)
-	if _pron_in and _pron_in.get_selected() >= 0:
-		hero_id["pronoun"] = _pron_in.get_item_text(_pron_in.get_selected())
+	# Save pronoun from cinematic selection
+	if cinematic_pronoun != "":
+		hero_id["pronoun"] = cinematic_pronoun
+		# Also update the dropdown if it exists
+		if _pron_in:
+			for i in range(_pron_in.get_item_count()):
+				if _pron_in.get_item_text(i) == cinematic_pronoun:
+					_pron_in.select(i)
+					break
 
 	# Save stats
 	if _selected_order.size() > 0:
@@ -1130,12 +1136,14 @@ func _load_cinematic_data_from_gamestate() -> void:
 			_surname_in.text = cinematic_surname
 
 	# Load pronoun
-	if hero_id.has("pronoun") and _pron_in:
-		var pronoun = hero_id.pronoun
-		for i in range(_pron_in.get_item_count()):
-			if _pron_in.get_item_text(i) == pronoun:
-				_pron_in.select(i)
-				break
+	if hero_id.has("pronoun"):
+		cinematic_pronoun = hero_id.pronoun
+		# Also update dropdown if it exists
+		if _pron_in:
+			for i in range(_pron_in.get_item_count()):
+				if _pron_in.get_item_text(i) == cinematic_pronoun:
+					_pron_in.select(i)
+					break
 
 	# Load stats
 	if hero_id.has("selected_stats"):
@@ -1144,9 +1152,9 @@ func _load_cinematic_data_from_gamestate() -> void:
 	# Load perk
 	if hero_id.has("chosen_perk") and _perk_in:
 		var perk_id = hero_id.chosen_perk
-		# Find and select the perk in dropdown
+		# Find and select the perk in dropdown using _perk_id_by_idx
 		for i in range(_perk_in.get_item_count()):
-			if _perk_in.get_item_metadata(i) == perk_id:
+			if _perk_id_by_idx.get(i, "") == perk_id:
 				_perk_in.select(i)
 				break
 
@@ -1579,6 +1587,8 @@ func _enter_stage(stage: CinematicStage) -> void:
 			_start_typing("Hey, do you remember your name?")
 		CinematicStage.NAME_INPUT:
 			_build_name_input_ui()
+		CinematicStage.PRONOUN_SELECTION:
+			_build_pronoun_selection_ui()
 		CinematicStage.DIALOGUE_RESPONSE_1:
 			dialogue_label.text = ""
 			_start_typing("We got a response!")
@@ -2112,6 +2122,110 @@ func _finalize_names() -> void:
 		_advance_stage()
 	)
 
+# ── Pronoun Selection UI ─────────────────────────────────────────────────────
+func _build_pronoun_selection_ui() -> void:
+	"""Build pronoun selection UI with He/She/They options"""
+	# Hide dialogue label
+	if dialogue_label:
+		dialogue_label.visible = false
+
+	# Create pronoun selection container
+	pronoun_selection_container = VBoxContainer.new()
+	pronoun_selection_container.set_anchors_preset(Control.PRESET_CENTER)
+	pronoun_selection_container.anchor_left = 0.5
+	pronoun_selection_container.anchor_top = 0.5
+	pronoun_selection_container.anchor_right = 0.5
+	pronoun_selection_container.anchor_bottom = 0.5
+	pronoun_selection_container.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	pronoun_selection_container.grow_vertical = Control.GROW_DIRECTION_BOTH
+	pronoun_selection_container.add_theme_constant_override("separation", 20)
+	cinematic_layer.add_child(pronoun_selection_container)
+
+	# Title
+	var title = Label.new()
+	title.text = "What are your preferred pronouns?"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 18)
+	title.add_theme_color_override("font_color", Color(1.0, 0.7, 0.75, 1.0))
+	pronoun_selection_container.add_child(title)
+
+	# Button container
+	var buttons_container = VBoxContainer.new()
+	buttons_container.add_theme_constant_override("separation", 15)
+	pronoun_selection_container.add_child(buttons_container)
+
+	# He/Him button
+	var he_btn = Button.new()
+	he_btn.text = "He/Him"
+	he_btn.name = "HeButton"
+	he_btn.custom_minimum_size = Vector2(200, 60)
+	he_btn.add_theme_font_size_override("font_size", 16)
+	he_btn.focus_mode = Control.FOCUS_ALL
+	he_btn.pressed.connect(_on_pronoun_selected.bind("he/him"))
+	buttons_container.add_child(he_btn)
+
+	# She/Her button
+	var she_btn = Button.new()
+	she_btn.text = "She/Her"
+	she_btn.name = "SheButton"
+	she_btn.custom_minimum_size = Vector2(200, 60)
+	she_btn.add_theme_font_size_override("font_size", 16)
+	she_btn.focus_mode = Control.FOCUS_ALL
+	she_btn.pressed.connect(_on_pronoun_selected.bind("she/her"))
+	buttons_container.add_child(she_btn)
+
+	# They/Them button
+	var they_btn = Button.new()
+	they_btn.text = "They/Them"
+	they_btn.name = "TheyButton"
+	they_btn.custom_minimum_size = Vector2(200, 60)
+	they_btn.add_theme_font_size_override("font_size", 16)
+	they_btn.focus_mode = Control.FOCUS_ALL
+	they_btn.pressed.connect(_on_pronoun_selected.bind("they/them"))
+	buttons_container.add_child(they_btn)
+
+	# Set up focus neighbors for vertical navigation
+	he_btn.focus_neighbor_top = he_btn.get_path_to(they_btn)
+	he_btn.focus_neighbor_bottom = he_btn.get_path_to(she_btn)
+	she_btn.focus_neighbor_top = she_btn.get_path_to(he_btn)
+	she_btn.focus_neighbor_bottom = she_btn.get_path_to(they_btn)
+	they_btn.focus_neighbor_top = they_btn.get_path_to(she_btn)
+	they_btn.focus_neighbor_bottom = they_btn.get_path_to(he_btn)
+
+	# Fade in and set focus based on current selection
+	pronoun_selection_container.modulate = Color(1, 1, 1, 0)
+	var tween = create_tween()
+	tween.tween_property(pronoun_selection_container, "modulate", Color(1, 1, 1, 1), 0.5)
+	tween.tween_callback(func():
+		# Focus the button matching current selection
+		match cinematic_pronoun:
+			"he/him":
+				he_btn.grab_focus()
+			"she/her":
+				she_btn.grab_focus()
+			_:
+				they_btn.grab_focus()
+	)
+
+func _on_pronoun_selected(pronoun: String) -> void:
+	"""Handle pronoun selection"""
+	cinematic_pronoun = pronoun
+	print("[Cinematic] Selected pronoun: ", pronoun)
+
+	# Save to GameState
+	_save_cinematic_data_to_gamestate()
+
+	# Fade out and advance
+	var tween = create_tween()
+	tween.tween_property(pronoun_selection_container, "modulate", Color(1, 1, 1, 0), 0.5)
+	tween.tween_callback(func():
+		if pronoun_selection_container:
+			pronoun_selection_container.queue_free()
+			pronoun_selection_container = null
+		if dialogue_label:
+			dialogue_label.visible = true
+		_advance_stage()
+	)
 # ── Stat Selection UI ────────────────────────────────────────────────────────
 func _build_stat_selection_ui() -> void:
 	"""Build the stat selection UI with simple toggle buttons"""
@@ -3352,10 +3466,7 @@ func _build_confirmation_ui() -> void:
 	summary_panel.add_child(perk_label)
 
 	# Add appearance summary
-	var pronoun_text = ""
-	if _pron_in:
-		var idx = _pron_in.get_selected()
-		pronoun_text = _pron_in.get_item_text(idx) if idx >= 0 else "they"
+	var pronoun_text = cinematic_pronoun.capitalize()  # Use cinematic pronoun
 	var appearance_label = Label.new()
 	appearance_label.text = "Pronouns: %s" % pronoun_text
 	appearance_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
