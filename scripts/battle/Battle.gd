@@ -2844,17 +2844,20 @@ func _execute_attack(target: Dictionary) -> void:
 
 			print("[Battle] Miss! Hit chance: %.1f%%, Roll: %d" % [hit_check.hit_chance, hit_check.roll])
 		else:
-			# Hit! Launch attack minigame
-			var tpo = current_combatant.stats.get("TPO", 1)
-			var brw = current_combatant.stats.get("BRW", 1)
-			var status_effects = []
-			var ailment = str(current_combatant.get("ailment", ""))
-			if ailment != "":
-				status_effects.append(ailment)
+			# Hit! Launch attack minigame (for allies only)
+			var minigame_result = {"damage_modifier": 1.0, "is_crit": false}
 
-			_show_instruction("FIGHT!")
-			var minigame_result = await minigame_mgr.launch_attack_minigame(tpo, brw, status_effects)
-			_hide_instruction()
+			if current_combatant.is_ally:
+				var tpo = current_combatant.stats.get("TPO", 1)
+				var brw = current_combatant.stats.get("BRW", 1)
+				var status_effects = []
+				var ailment = str(current_combatant.get("ailment", ""))
+				if ailment != "":
+					status_effects.append(ailment)
+
+				_show_instruction("FIGHT!")
+				minigame_result = await minigame_mgr.launch_attack_minigame(tpo, brw, status_effects)
+				_hide_instruction()
 
 			# Play attack animation based on weapon type
 			if sprite_animator:
@@ -6912,25 +6915,28 @@ func _execute_skill_single(target: Dictionary) -> void:
 		queue_turn_message()
 		return
 
-	# ═══════ SKILL MINIGAME ═══════
-	# Get skill tier for minigame
-	var skill_tier = 1
-	if "_L" in skill_id:
-		var parts = skill_id.split("_L")
-		skill_tier = int(parts[1]) if parts.size() > 1 else 1
+	# ═══════ SKILL MINIGAME (allies only) ═══════
+	var minigame_result = {"damage_modifier": 1.0, "is_crit": false}
 
-	# Launch skill minigame (auto-starts, no message)
-	var focus_stat = current_combatant.stats.get("FCS", 1)
-	var skill_sequence = _get_skill_button_sequence(skill_id)
-	var mind_type = element  # Use the element as the mind type
-	var status_effects = []
-	var ailment = str(current_combatant.get("ailment", ""))
-	if ailment != "":
-		status_effects.append(ailment)
+	if current_combatant.is_ally:
+		# Get skill tier for minigame
+		var skill_tier = 1
+		if "_L" in skill_id:
+			var parts = skill_id.split("_L")
+			skill_tier = int(parts[1]) if parts.size() > 1 else 1
 
-	_show_instruction("SKILL!")
-	var minigame_result = await minigame_mgr.launch_skill_minigame(focus_stat, skill_sequence, skill_tier, mind_type, status_effects)
-	_hide_instruction()
+		# Launch skill minigame (auto-starts, no message)
+		var focus_stat = current_combatant.stats.get("FCS", 1)
+		var skill_sequence = _get_skill_button_sequence(skill_id)
+		var mind_type = element  # Use the element as the mind type
+		var status_effects = []
+		var ailment = str(current_combatant.get("ailment", ""))
+		if ailment != "":
+			status_effects.append(ailment)
+
+		_show_instruction("SKILL!")
+		minigame_result = await minigame_mgr.launch_skill_minigame(focus_stat, skill_sequence, skill_tier, mind_type, status_effects)
+		_hide_instruction()
 
 	# Play skill animation based on skill type
 	if sprite_animator:
