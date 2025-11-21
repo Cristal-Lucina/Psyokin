@@ -444,7 +444,7 @@ func create_layer_section(layer: Dictionary, layer_index: int) -> VBoxContainer:
 		change_btn.text = "Change"
 		change_btn.custom_minimum_size = Vector2(80, 15)  # Only 15px tall
 		change_btn.add_theme_font_size_override("font_size", 8)  # 8pt font
-		change_btn.focus_mode = Control.FOCUS_ALL
+		change_btn.focus_mode = Control.FOCUS_NONE  # Not controller-focusable, handled via navigation
 		change_btn.pressed.connect(_on_toggle_activated.bind(layer_index, "part"))
 		part_container.add_child(change_btn)
 
@@ -488,7 +488,7 @@ func create_layer_section(layer: Dictionary, layer_index: int) -> VBoxContainer:
 	color_change_btn.text = "Change"
 	color_change_btn.custom_minimum_size = Vector2(80, 15)  # Only 15px tall
 	color_change_btn.add_theme_font_size_override("font_size", 8)  # 8pt font
-	color_change_btn.focus_mode = Control.FOCUS_ALL
+	color_change_btn.focus_mode = Control.FOCUS_NONE  # Not controller-focusable, handled via navigation
 	color_change_btn.pressed.connect(_on_toggle_activated.bind(layer_index, "color"))
 	color_container.add_child(color_change_btn)
 
