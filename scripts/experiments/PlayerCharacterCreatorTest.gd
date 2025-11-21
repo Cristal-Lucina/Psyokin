@@ -411,7 +411,7 @@ func create_layer_section(layer: Dictionary, layer_index: int) -> VBoxContainer:
 	# Layer label
 	var label = Label.new()
 	label.text = layer.label
-	label.add_theme_font_size_override("font_size", 18)
+	label.add_theme_font_size_override("font_size", 14)  # Reduced from 18
 	label.add_theme_color_override("font_color", Color("#8A3FFC"))  # Grape Violet
 	section.add_child(label)
 
@@ -424,7 +424,7 @@ func create_layer_section(layer: Dictionary, layer_index: int) -> VBoxContainer:
 		var change_btn = Button.new()
 		change_btn.name = "PartChangeButton"
 		change_btn.text = "Change"
-		change_btn.custom_minimum_size = Vector2(80, 40)
+		change_btn.custom_minimum_size = Vector2(80, 0)  # Remove vertical padding
 		change_btn.focus_mode = Control.FOCUS_ALL
 		change_btn.pressed.connect(_on_toggle_activated.bind(layer_index, "part"))
 		part_container.add_child(change_btn)
@@ -433,7 +433,7 @@ func create_layer_section(layer: Dictionary, layer_index: int) -> VBoxContainer:
 		var left_arrow = Button.new()
 		left_arrow.name = "LeftArrow"
 		left_arrow.text = "◀"
-		left_arrow.custom_minimum_size = Vector2(40, 40)
+		left_arrow.custom_minimum_size = Vector2(30, 0)  # Smaller and no vertical padding
 		left_arrow.pressed.connect(_on_part_previous.bind(layer_index))
 		part_container.add_child(left_arrow)
 
@@ -445,7 +445,7 @@ func create_layer_section(layer: Dictionary, layer_index: int) -> VBoxContainer:
 		selection_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		selection_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		selection_label.custom_minimum_size = Vector2(200, 0)
-		selection_label.add_theme_font_size_override("font_size", 16)
+		selection_label.add_theme_font_size_override("font_size", 12)  # Reduced from 16
 		selection_label.add_theme_color_override("font_color", Color("#4DE9FF"))  # Sky Cyan
 		part_container.add_child(selection_label)
 
@@ -453,7 +453,7 @@ func create_layer_section(layer: Dictionary, layer_index: int) -> VBoxContainer:
 		var right_arrow = Button.new()
 		right_arrow.name = "RightArrow"
 		right_arrow.text = "▶"
-		right_arrow.custom_minimum_size = Vector2(40, 40)
+		right_arrow.custom_minimum_size = Vector2(30, 0)  # Smaller and no vertical padding
 		right_arrow.pressed.connect(_on_part_next.bind(layer_index))
 		part_container.add_child(right_arrow)
 
@@ -467,7 +467,7 @@ func create_layer_section(layer: Dictionary, layer_index: int) -> VBoxContainer:
 	var color_change_btn = Button.new()
 	color_change_btn.name = "ColorChangeButton"
 	color_change_btn.text = "Change"
-	color_change_btn.custom_minimum_size = Vector2(80, 40)
+	color_change_btn.custom_minimum_size = Vector2(80, 0)  # Remove vertical padding
 	color_change_btn.focus_mode = Control.FOCUS_ALL
 	color_change_btn.pressed.connect(_on_toggle_activated.bind(layer_index, "color"))
 	color_container.add_child(color_change_btn)
@@ -484,14 +484,14 @@ func create_layer_section(layer: Dictionary, layer_index: int) -> VBoxContainer:
 	var left_arrow = Button.new()
 	left_arrow.name = "LeftArrow"
 	left_arrow.text = "◀"
-	left_arrow.custom_minimum_size = Vector2(40, 40)
+	left_arrow.custom_minimum_size = Vector2(30, 0)  # Smaller and no vertical padding
 	left_arrow.pressed.connect(_on_color_previous.bind(layer_index))
 	color_strip_row.add_child(left_arrow)
 
 	# Color strip (fixed 300px width)
 	var color_strip = HBoxContainer.new()
 	color_strip.name = "ColorStrip"
-	color_strip.custom_minimum_size = Vector2(300, 40)
+	color_strip.custom_minimum_size = Vector2(300, 30)  # Reduced height from 40 to 30
 
 	var palette_image = get_palette_image(layer.ramp_type)
 	var num_colors = min(layer.max_colors, palette_image.get_height() / 2 if palette_image else 0)
@@ -500,7 +500,7 @@ func create_layer_section(layer: Dictionary, layer_index: int) -> VBoxContainer:
 	for i in range(num_colors):
 		var color_block = Panel.new()
 		color_block.name = "ColorBlock_" + str(i)
-		color_block.custom_minimum_size = Vector2(block_width, 40)
+		color_block.custom_minimum_size = Vector2(block_width, 30)  # Reduced from 40 to 30
 		color_block.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
 		# Add color preview
@@ -519,7 +519,7 @@ func create_layer_section(layer: Dictionary, layer_index: int) -> VBoxContainer:
 	var right_arrow = Button.new()
 	right_arrow.name = "RightArrow"
 	right_arrow.text = "▶"
-	right_arrow.custom_minimum_size = Vector2(40, 40)
+	right_arrow.custom_minimum_size = Vector2(30, 0)  # Smaller and no vertical padding
 	right_arrow.pressed.connect(_on_color_next.bind(layer_index))
 	color_strip_row.add_child(right_arrow)
 
