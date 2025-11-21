@@ -1289,33 +1289,23 @@ func _on_turn_started(combatant_id: String) -> void:
 	# Wait for player to press continue before proceeding
 	await _wait_for_message_queue()
 
-	# Fade in any sprites that are currently faded out (from previous turn's attack)
-	if sprite_animator:
-		for sprite_id in sprite_animator.sprite_instances.keys():
-			var instance = sprite_animator.sprite_instances[sprite_id]
-			var sprite_node = instance["sprite"]
+	# Slide attacker forward with Run animation
+	if sprite_animator and sprite_animator.sprite_instances.has(current_combatant.id):
+		var attacker_instance = sprite_animator.sprite_instances[current_combatant.id]
+		var attacker_sprite = attacker_instance["sprite"]
 
-			# If sprite is faded out (alpha < 1.0), fade it back in
-			if sprite_node.modulate.a < 1.0:
-				# Show frame 34 (crouch) while fading in for 900ms
-				var is_layered = instance.get("is_layered", false)
-				if is_layered:
-					var layer_sprites = instance.get("layer_sprites", {})
-					for sprite_code in layer_sprites:
-						var sprite = layer_sprites[sprite_code]
-						if sprite and sprite.visible and sprite.texture:
-							sprite.frame = 34
-				else:
-					sprite_node.frame = 34
+		# Determine direction for run animation
+		var run_direction = "RIGHT" if current_combatant.is_ally else "LEFT"
+		sprite_animator.play_animation(current_combatant.id, "Run", run_direction, false, false)
 
-				# Fade in over 900ms
-				var fade_in_tween = create_tween()
-				fade_in_tween.tween_property(sprite_node, "modulate:a", 1.0, 0.9)
-				await fade_in_tween.finished
+		# Slide forward
+		var slide_distance = 30.0 if current_combatant.is_ally else -30.0
+		var tween = create_tween()
+		tween.tween_property(attacker_sprite, "position:x", attacker_sprite.position.x + slide_distance, 0.3)
+		await tween.finished
 
-				# Return to idle
-				var idle_direction = instance.get("default_direction", "RIGHT")
-				sprite_animator.play_animation(sprite_id, "Idle", idle_direction, false, false)
+		# Return to idle
+		sprite_animator.play_animation(current_combatant.id, "Idle", run_direction, false, false)
 
 	# Animate turn indicator AFTER message is displayed
 	_animate_turn_indicator(combatant_id)
@@ -3045,37 +3035,24 @@ func _execute_attack(target: Dictionary) -> void:
 			# Wait for messages to be displayed to player
 			await _wait_for_message_queue()
 
-			# Now jump and fade out attacker
+			# Slide attacker back with Run animation
 			if sprite_animator and sprite_animator.sprite_instances.has(current_combatant.id):
 				var attacker_instance = sprite_animator.sprite_instances[current_combatant.id]
 				var attacker_sprite = attacker_instance["sprite"]
 
-				# Manually set jump frame 33 for 400ms
-				var is_layered = attacker_instance.get("is_layered", false)
-				if is_layered:
-					var layer_sprites = attacker_instance.get("layer_sprites", {})
-					for sprite_code in layer_sprites:
-						var sprite = layer_sprites[sprite_code]
-						if sprite and sprite.visible and sprite.texture:
-							sprite.frame = 33
-				else:
-					attacker_sprite.frame = 33
+				# Run animation to the right (opposite of forward direction)
+				var run_back_direction = "RIGHT"
+				sprite_animator.play_animation(current_combatant.id, "Run", run_back_direction, false, false)
 
-				await get_tree().create_timer(0.4).timeout
+				# Slide back to original position
+				var slide_distance = -30.0 if current_combatant.is_ally else 30.0
+				var tween = create_tween()
+				tween.tween_property(attacker_sprite, "position:x", attacker_sprite.position.x + slide_distance, 0.3)
+				await tween.finished
 
-				# Set jump frame 34 and fade out completely during 900ms
-				if is_layered:
-					var layer_sprites = attacker_instance.get("layer_sprites", {})
-					for sprite_code in layer_sprites:
-						var sprite = layer_sprites[sprite_code]
-						if sprite and sprite.visible and sprite.texture:
-							sprite.frame = 34
-				else:
-					attacker_sprite.frame = 34
-
-				var fade_out_tween = create_tween()
-				fade_out_tween.tween_property(attacker_sprite, "modulate:a", 0.0, 0.9)
-				await fade_out_tween.finished
+				# Return to idle facing original direction
+				var idle_direction = "RIGHT" if current_combatant.is_ally else "LEFT"
+				sprite_animator.play_animation(current_combatant.id, "Idle", idle_direction, false, false)
 
 			# Debug: show hit, crit, and damage breakdown
 			var hit_breakdown = hit_check.breakdown
@@ -4014,37 +3991,24 @@ func _execute_item_usage(target: Dictionary) -> void:
 	# Wait for ailment/debuff messages to be displayed (if any)
 	await _wait_for_message_queue()
 
-	# Now jump and fade out attacker
+	# Slide attacker back with Run animation
 	if sprite_animator and sprite_animator.sprite_instances.has(current_combatant.id):
 		var attacker_instance = sprite_animator.sprite_instances[current_combatant.id]
 		var attacker_sprite = attacker_instance["sprite"]
 
-		# Manually set jump frame 33 for 400ms
-		var is_layered = attacker_instance.get("is_layered", false)
-		if is_layered:
-			var layer_sprites = attacker_instance.get("layer_sprites", {})
-			for sprite_code in layer_sprites:
-				var sprite = layer_sprites[sprite_code]
-				if sprite and sprite.visible and sprite.texture:
-					sprite.frame = 33
-		else:
-			attacker_sprite.frame = 33
+		# Run animation to the right (opposite of forward direction)
+		var run_back_direction = "RIGHT"
+		sprite_animator.play_animation(current_combatant.id, "Run", run_back_direction, false, false)
 
-		await get_tree().create_timer(0.4).timeout
+		# Slide back to original position
+		var slide_distance = -30.0 if current_combatant.is_ally else 30.0
+		var tween = create_tween()
+		tween.tween_property(attacker_sprite, "position:x", attacker_sprite.position.x + slide_distance, 0.3)
+		await tween.finished
 
-		# Set jump frame 34 and fade out completely during 900ms
-		if is_layered:
-			var layer_sprites = attacker_instance.get("layer_sprites", {})
-			for sprite_code in layer_sprites:
-				var sprite = layer_sprites[sprite_code]
-				if sprite and sprite.visible and sprite.texture:
-					sprite.frame = 34
-		else:
-			attacker_sprite.frame = 34
-
-		var fade_out_tween = create_tween()
-		fade_out_tween.tween_property(attacker_sprite, "modulate:a", 0.0, 0.9)
-		await fade_out_tween.finished
+		# Return to idle facing original direction
+		var idle_direction = "RIGHT" if current_combatant.is_ally else "LEFT"
+		sprite_animator.play_animation(current_combatant.id, "Idle", idle_direction, false, false)
 
 	# Consume the item
 	var inventory = get_node("/root/aInventorySystem")
@@ -4925,37 +4889,24 @@ func _execute_enemy_ai() -> void:
 			# Wait for messages to be displayed to player
 			await _wait_for_message_queue()
 
-			# Now jump and fade out attacker
+			# Slide attacker back with Run animation
 			if sprite_animator and sprite_animator.sprite_instances.has(current_combatant.id):
 				var attacker_instance = sprite_animator.sprite_instances[current_combatant.id]
 				var attacker_sprite = attacker_instance["sprite"]
 
-				# Manually set jump frame 33 for 400ms
-				var is_layered = attacker_instance.get("is_layered", false)
-				if is_layered:
-					var layer_sprites = attacker_instance.get("layer_sprites", {})
-					for sprite_code in layer_sprites:
-						var sprite = layer_sprites[sprite_code]
-						if sprite and sprite.visible and sprite.texture:
-							sprite.frame = 33
-				else:
-					attacker_sprite.frame = 33
+				# Run animation to the right (opposite of forward direction)
+				var run_back_direction = "RIGHT"
+				sprite_animator.play_animation(current_combatant.id, "Run", run_back_direction, false, false)
 
-				await get_tree().create_timer(0.4).timeout
+				# Slide back to original position
+				var slide_distance = -30.0 if current_combatant.is_ally else 30.0
+				var tween = create_tween()
+				tween.tween_property(attacker_sprite, "position:x", attacker_sprite.position.x + slide_distance, 0.3)
+				await tween.finished
 
-				# Set jump frame 34 and fade out completely during 900ms
-				if is_layered:
-					var layer_sprites = attacker_instance.get("layer_sprites", {})
-					for sprite_code in layer_sprites:
-						var sprite = layer_sprites[sprite_code]
-						if sprite and sprite.visible and sprite.texture:
-							sprite.frame = 34
-				else:
-					attacker_sprite.frame = 34
-
-				var fade_out_tween = create_tween()
-				fade_out_tween.tween_property(attacker_sprite, "modulate:a", 0.0, 0.9)
-				await fade_out_tween.finished
+				# Return to idle facing original direction
+				var idle_direction = "RIGHT" if current_combatant.is_ally else "LEFT"
+				sprite_animator.play_animation(current_combatant.id, "Idle", idle_direction, false, false)
 
 			# Debug: show hit, crit, and damage breakdown
 			var hit_breakdown = hit_check.breakdown
@@ -7072,37 +7023,24 @@ func _execute_burst_on_target(target: Dictionary) -> void:
 	# Wait for messages to be displayed to player
 	await _wait_for_message_queue()
 
-	# Now jump and fade out attacker
+	# Slide attacker back with Run animation
 	if sprite_animator and sprite_animator.sprite_instances.has(current_combatant.id):
 		var attacker_instance = sprite_animator.sprite_instances[current_combatant.id]
 		var attacker_sprite = attacker_instance["sprite"]
 
-		# Manually set jump frame 33 for 400ms
-		var is_layered = attacker_instance.get("is_layered", false)
-		if is_layered:
-			var layer_sprites = attacker_instance.get("layer_sprites", {})
-			for sprite_code in layer_sprites:
-				var sprite = layer_sprites[sprite_code]
-				if sprite and sprite.visible and sprite.texture:
-					sprite.frame = 33
-		else:
-			attacker_sprite.frame = 33
+		# Run animation to the right (opposite of forward direction)
+		var run_back_direction = "RIGHT"
+		sprite_animator.play_animation(current_combatant.id, "Run", run_back_direction, false, false)
 
-		await get_tree().create_timer(0.4).timeout
+		# Slide back to original position
+		var slide_distance = -30.0 if current_combatant.is_ally else 30.0
+		var tween = create_tween()
+		tween.tween_property(attacker_sprite, "position:x", attacker_sprite.position.x + slide_distance, 0.3)
+		await tween.finished
 
-		# Set jump frame 34 and fade out completely during 900ms
-		if is_layered:
-			var layer_sprites = attacker_instance.get("layer_sprites", {})
-			for sprite_code in layer_sprites:
-				var sprite = layer_sprites[sprite_code]
-				if sprite and sprite.visible and sprite.texture:
-					sprite.frame = 34
-		else:
-			attacker_sprite.frame = 34
-
-		var fade_out_tween = create_tween()
-		fade_out_tween.tween_property(attacker_sprite, "modulate:a", 0.0, 0.9)
-		await fade_out_tween.finished
+		# Return to idle facing original direction
+		var idle_direction = "RIGHT" if current_combatant.is_ally else "LEFT"
+		sprite_animator.play_animation(current_combatant.id, "Idle", idle_direction, false, false)
 
 	# Update displays
 	_update_combatant_displays()
@@ -7540,37 +7478,24 @@ func _execute_skill_single(target: Dictionary) -> void:
 	# Wait for messages to be displayed to player
 	await _wait_for_message_queue()
 
-	# Now jump and fade out attacker
+	# Slide attacker back with Run animation
 	if sprite_animator and sprite_animator.sprite_instances.has(current_combatant.id):
 		var attacker_instance = sprite_animator.sprite_instances[current_combatant.id]
 		var attacker_sprite = attacker_instance["sprite"]
 
-		# Manually set jump frame 33 for 400ms
-		var is_layered = attacker_instance.get("is_layered", false)
-		if is_layered:
-			var layer_sprites = attacker_instance.get("layer_sprites", {})
-			for sprite_code in layer_sprites:
-				var sprite = layer_sprites[sprite_code]
-				if sprite and sprite.visible and sprite.texture:
-					sprite.frame = 33
-		else:
-			attacker_sprite.frame = 33
+		# Run animation to the right (opposite of forward direction)
+		var run_back_direction = "RIGHT"
+		sprite_animator.play_animation(current_combatant.id, "Run", run_back_direction, false, false)
 
-		await get_tree().create_timer(0.4).timeout
+		# Slide back to original position
+		var slide_distance = -30.0 if current_combatant.is_ally else 30.0
+		var tween = create_tween()
+		tween.tween_property(attacker_sprite, "position:x", attacker_sprite.position.x + slide_distance, 0.3)
+		await tween.finished
 
-		# Set jump frame 34 and fade out completely during 900ms
-		if is_layered:
-			var layer_sprites = attacker_instance.get("layer_sprites", {})
-			for sprite_code in layer_sprites:
-				var sprite = layer_sprites[sprite_code]
-				if sprite and sprite.visible and sprite.texture:
-					sprite.frame = 34
-		else:
-			attacker_sprite.frame = 34
-
-		var fade_out_tween = create_tween()
-		fade_out_tween.tween_property(attacker_sprite, "modulate:a", 0.0, 0.9)
-		await fade_out_tween.finished
+		# Return to idle facing original direction
+		var idle_direction = "RIGHT" if current_combatant.is_ally else "LEFT"
+		sprite_animator.play_animation(current_combatant.id, "Idle", idle_direction, false, false)
 
 	# Update displays
 	_update_combatant_displays()
