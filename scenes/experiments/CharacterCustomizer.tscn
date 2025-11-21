@@ -1,6 +1,6 @@
 [gd_scene load_steps=3 format=3 uid="uid://psyokin_test_cc"]
 
-[ext_resource type="Script" path="res://scripts/experiments/CharacterCustomizer.gd" id="1_script"]
+[ext_resource type="Script" path="res://scripts/creation/CharacterCustomizer.gd" id="1_script"]
 [ext_resource type="Shader" path="res://assets/shaders/palette_swap.gdshader" id="2_shader"]
 
 [node name="CharacterCustomizer" type="Control"]
