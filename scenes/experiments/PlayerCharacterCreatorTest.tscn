@@ -79,6 +79,13 @@ z_index = -1
 position = Vector2(165, 278)
 scale = Vector2(8, 8)
 
+[node name="MirrorSpriteOverlay" type="Sprite2D" parent="MarginContainer/MainContainer/RightPanel/PreviewContainer"]
+position = Vector2(165, 238)
+scale = Vector2(5.28, 5.28)
+texture = ExtResource("2_mirror")
+z_index = 1
+modulate = Color(1, 1, 1, 0.08)
+
 [node name="00undr" type="Sprite2D" parent="MarginContainer/MainContainer/RightPanel/PreviewContainer/CharacterLayers"]
 texture_filter = 1
 hframes = 16
