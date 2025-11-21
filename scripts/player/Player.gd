@@ -103,12 +103,13 @@ const JUMP_ARC_HEIGHT: float = 40.0  # Height of vertical arc for East/West jump
 const RUN_FRAME_SEQUENCE: Array[int] = [0, 1, 6, 3, 4, 7]
 
 # Frame layout (0-indexed, 16x16 grid, matching sprite_animations_data.csv):
-# Idle: column 0 (frames 0, 16, 32, 32 for South/North/East/West)
-# Push: columns 8-9 (frames 8-9, 24-25, 40-41, 40-41)
-# Pull: columns 10-11 (frames 10-11, 26-27, 42-43, 42-43)
-# Jump: columns 1-2 (frames 1-2, 17-18, 33-34, 33-34)
-# Walk: (frames 48-53 for South, 52-57 for North, 64-69 for East, 64-69 for West)
-# Run: custom sequence using walk frames + special run frames (51, 55, 70, 71)
+# Idle: column 0 (frames 0, 16, 32, 32+flip for South/North/East/West)
+# Push: columns 8-9 (frames 8-9, 24-25, 40-41, 40-41+flip)
+# Pull: columns 10-11 (frames 10-11, 26-27, 42-43, 42-43+flip)
+# Jump: columns 1-2 (frames 1-2, 17-18, 33-34, 33-34+flip)
+# Walk: (frames 48-53, 52-57, 64-69, 64-69+flip for South/North/East/West)
+# Run: custom sequence using walk frames + special run frames
+# Note: West/LEFT direction uses same frames as East/RIGHT but with flip_h = true
 
 # State
 var _current_state: MovementState = MovementState.IDLE
@@ -598,6 +599,8 @@ func _update_animation(delta: float) -> void:
 			var sprite: Sprite2D = character_layers.get_node_or_null(sprite_code)
 			if sprite and sprite.visible and sprite.texture:
 				sprite.frame = frame
+				# West/LEFT uses same frames as East but flipped (per sprite_animations_data.csv)
+				sprite.flip_h = (_current_direction == 3)  # 3 = West
 
 ## ═══════════════════════════════════════════════════════════════
 ## RANDOM ENCOUNTERS
