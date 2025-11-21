@@ -49,10 +49,13 @@ var current_direction = "DOWN"
 var current_frame_index = 0
 var animation_timer = 0.0
 var sections = []  # Array to track section nodes by layer index
+var accept_button = null  # Reference to the Accept button
+var accept_button_normal_style = null  # Normal style for Accept button
+var accept_button_active_style = null  # Active style for Accept button
 
 # Navigation state
-var active_toggle_layer = -1  # Which layer's toggle is active (-1 = none)
-var active_toggle_type = ""  # "part" or "color" - which toggle is active
+var active_toggle_layer = -1  # Which layer's toggle is active (-1 = none, LAYERS.size() = Accept button)
+var active_toggle_type = ""  # "part", "color", or "accept" - which toggle is active
 
 # Trigger debouncing
 var l2_was_pressed = false
@@ -588,7 +591,7 @@ func add_accept_button():
 	accept_btn.name = "AcceptButton"
 	accept_btn.text = "Accept"
 	accept_btn.custom_minimum_size = Vector2(150, 40)
-	accept_btn.focus_mode = Control.FOCUS_ALL
+	accept_btn.focus_mode = Control.FOCUS_NONE  # Not controller-focusable, handled via navigation
 	accept_btn.pressed.connect(_on_accept_pressed)
 
 	# Create rounded style with Electric Lime border
@@ -608,13 +611,16 @@ func add_accept_button():
 	accept_btn.add_theme_stylebox_override("normal", style)
 	accept_btn.add_theme_stylebox_override("hover", style)
 	accept_btn.add_theme_stylebox_override("pressed", style)
-	accept_btn.add_theme_stylebox_override("focus", focus_style)
 	accept_btn.add_theme_color_override("font_color", Color("#C8FF3D"))  # Electric Lime text
-	accept_btn.add_theme_color_override("font_focus_color", Color.BLACK)  # Black text when focused
 	accept_btn.add_theme_font_size_override("font_size", 16)
 
 	button_container.add_child(accept_btn)
 	right_column.add_child(button_container)
+
+	# Store references for navigation
+	accept_button = accept_btn
+	accept_button_normal_style = style
+	accept_button_active_style = focus_style
 
 func _on_accept_pressed():
 	"""Handle Accept button press"""
@@ -1132,8 +1138,9 @@ func colors_match(c1: Color, c2: Color, tolerance: float = 0.01) -> bool:
 # ========== CONTROLLER NAVIGATION ==========
 
 func handle_accept():
-	"""Handle accept/confirm button - not used in toggle system"""
-	pass
+	"""Handle accept/confirm button - trigger Accept button if active"""
+	if active_toggle_type == "accept" and accept_button:
+		accept_button.pressed.emit()
 
 func handle_back():
 	"""Handle back/cancel button - deactivate current toggle"""
@@ -1144,11 +1151,6 @@ func handle_back():
 
 func handle_up():
 	"""Handle up navigation - activate previous toggle"""
-	# Find previous toggle (wraps around)
-	var found_current = false
-	var prev_layer = -1
-	var prev_type = ""
-
 	# Build list of all toggles in order
 	var toggles = []
 	for i in range(LAYERS.size()):
@@ -1156,6 +1158,9 @@ func handle_up():
 		if layer.has_parts:
 			toggles.append({"layer": i, "type": "part"})
 		toggles.append({"layer": i, "type": "color"})
+
+	# Add Accept button at the end
+	toggles.append({"layer": LAYERS.size(), "type": "accept"})
 
 	# Find current toggle index
 	var current_idx = -1
@@ -1184,6 +1189,9 @@ func handle_down():
 		if layer.has_parts:
 			toggles.append({"layer": i, "type": "part"})
 		toggles.append({"layer": i, "type": "color"})
+
+	# Add Accept button at the end
+	toggles.append({"layer": LAYERS.size(), "type": "accept"})
 
 	# Find current toggle index
 	var current_idx = -1
@@ -1241,19 +1249,30 @@ func update_focus_visual():
 			var color_btn = color_container.get_node("ColorChangeButton")
 			color_btn.modulate = Color.WHITE
 
+	# Clear Accept button to normal state
+	if accept_button and accept_button_normal_style:
+		accept_button.add_theme_stylebox_override("normal", accept_button_normal_style)
+		accept_button.add_theme_color_override("font_color", Color("#C8FF3D"))
+
 	# Highlight active toggle if one is active
 	if active_toggle_layer != -1:
-		var active_section = sections[active_toggle_layer]
+		if active_toggle_type == "accept":
+			# Apply active style to Accept button
+			if accept_button and accept_button_active_style:
+				accept_button.add_theme_stylebox_override("normal", accept_button_active_style)
+				accept_button.add_theme_color_override("font_color", Color.BLACK)
+		else:
+			var active_section = sections[active_toggle_layer]
 
-		if active_toggle_type == "part":
-			var part_container = active_section.get_node("PartContainer")
-			var part_btn = part_container.get_node("PartChangeButton")
-			part_btn.modulate = Color(0.5, 1.5, 0.5)  # Green highlight (active)
+			if active_toggle_type == "part":
+				var part_container = active_section.get_node("PartContainer")
+				var part_btn = part_container.get_node("PartChangeButton")
+				part_btn.modulate = Color(0.5, 1.5, 0.5)  # Green highlight (active)
 
-		elif active_toggle_type == "color":
-			var color_container = active_section.get_node("ColorContainer")
-			var color_btn = color_container.get_node("ColorChangeButton")
-			color_btn.modulate = Color(0.5, 1.5, 0.5)  # Green highlight (active)
+			elif active_toggle_type == "color":
+				var color_container = active_section.get_node("ColorContainer")
+				var color_btn = color_container.get_node("ColorChangeButton")
+				color_btn.modulate = Color(0.5, 1.5, 0.5)  # Green highlight (active)
 
 func ensure_section_visible():
 	"""Scroll to keep the active section visible"""
