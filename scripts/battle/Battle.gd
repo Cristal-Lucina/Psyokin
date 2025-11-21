@@ -2891,7 +2891,28 @@ func _execute_attack(target: Dictionary) -> void:
 				# Wait for animation to play (about 0.5 seconds)
 				await get_tree().create_timer(0.6).timeout
 
-			# Slide character back immediately after minigame closes
+				# Fade out attacker while jumping back
+				if sprite_animator.sprite_instances.has(current_combatant.id):
+					var attacker_instance = sprite_animator.sprite_instances[current_combatant.id]
+					var attacker_sprite = attacker_instance["sprite"]
+
+					# Play jump animation and fade out
+					sprite_animator.play_animation(current_combatant.id, "Jump", direction, false, false)
+					var fade_out_tween = create_tween()
+					fade_out_tween.tween_property(attacker_sprite, "modulate:a", 0.0, 0.3)
+					await fade_out_tween.finished
+
+					# Hold on first frame of jump (crouch position) and fade in
+					sprite_animator.play_animation(current_combatant.id, "Jump", direction, true, false)
+					var fade_in_tween = create_tween()
+					fade_in_tween.tween_property(attacker_sprite, "modulate:a", 1.0, 0.6)
+					await get_tree().create_timer(0.6).timeout
+
+					# Return to idle
+					var idle_direction = attacker_instance.get("default_direction", direction)
+					sprite_animator.play_animation(current_combatant.id, "Idle", idle_direction, false, false)
+
+			# Reset turn indicator panel
 			await _reset_turn_indicator()
 			# Apply minigame result modifiers
 			var damage_modifier = minigame_result.get("damage_modifier", 1.0)
@@ -2933,6 +2954,20 @@ func _execute_attack(target: Dictionary) -> void:
 
 			# Wake up if asleep
 			_wake_if_asleep(target)
+
+			# Show hurt reaction on target
+			if sprite_animator and sprite_animator.sprite_instances.has(target.id):
+				var target_direction = "DOWN"
+				if not target.get("is_ally", false):
+					target_direction = "LEFT"  # Enemies face player
+				sprite_animator.play_animation(target.id, "Hurt", target_direction, true, false)
+				await get_tree().create_timer(0.6).timeout
+
+				# Return to idle if not KO'd (we'll check below)
+				if target.hp > 0:
+					var target_instance = sprite_animator.sprite_instances[target.id]
+					var idle_direction = target_instance.get("default_direction", target_direction)
+					sprite_animator.play_animation(target.id, "Idle", idle_direction, false, false)
 
 			if target.hp <= 0:
 				target.hp = 0
@@ -3477,6 +3512,27 @@ func _execute_item_usage(target: Dictionary) -> void:
 		# Wait for animation to play (about 0.5 seconds)
 		await get_tree().create_timer(0.5).timeout
 
+		# Fade out attacker while jumping back
+		if sprite_animator.sprite_instances.has(current_combatant.id):
+			var attacker_instance = sprite_animator.sprite_instances[current_combatant.id]
+			var attacker_sprite = attacker_instance["sprite"]
+
+			# Play jump animation and fade out
+			sprite_animator.play_animation(current_combatant.id, "Jump", direction, false, false)
+			var fade_out_tween = create_tween()
+			fade_out_tween.tween_property(attacker_sprite, "modulate:a", 0.0, 0.3)
+			await fade_out_tween.finished
+
+			# Hold on first frame of jump (crouch position) and fade in
+			sprite_animator.play_animation(current_combatant.id, "Jump", direction, true, false)
+			var fade_in_tween = create_tween()
+			fade_in_tween.tween_property(attacker_sprite, "modulate:a", 1.0, 0.6)
+			await get_tree().create_timer(0.6).timeout
+
+			# Return to idle
+			var idle_direction = attacker_instance.get("default_direction", direction)
+			sprite_animator.play_animation(current_combatant.id, "Idle", idle_direction, false, false)
+
 	# Get the item that was selected
 	if selected_item.is_empty():
 		log_message("Item usage failed - no item selected!")
@@ -3560,6 +3616,11 @@ func _execute_item_usage(target: Dictionary) -> void:
 			var damage = int(base_damage * (1.0 + type_bonus))
 			enemy.hp = max(0, enemy.hp - damage)
 
+			# Show hurt reaction on target
+			if sprite_animator and sprite_animator.sprite_instances.has(enemy.id):
+				var target_direction = "LEFT"  # Enemies face player
+				sprite_animator.play_animation(enemy.id, "Hurt", target_direction, true, false)
+
 			var type_msg = ""
 			if type_bonus > 0:
 				type_msg = " (Weakness!)"
@@ -3574,6 +3635,14 @@ func _execute_item_usage(target: Dictionary) -> void:
 				damage_lines.append("%s was defeated!" % enemy.display_name)
 				battle_mgr.record_enemy_defeat(enemy, false)
 				ko_list.append(enemy)
+
+		# Wait for hurt animations, then return to idle
+		await get_tree().create_timer(0.6).timeout
+		for enemy in bomb_targets:
+			if not enemy.is_ko and sprite_animator and sprite_animator.sprite_instances.has(enemy.id):
+				var target_instance = sprite_animator.sprite_instances[enemy.id]
+				var idle_direction = target_instance.get("default_direction", "LEFT")
+				sprite_animator.play_animation(enemy.id, "Idle", idle_direction, false, false)
 
 		# Build message
 		start_turn_message()
@@ -4656,7 +4725,28 @@ func _execute_enemy_ai() -> void:
 			print("[Battle] Playing enemy attack animation: %s %s for %s (weapon: %s)" % [anim_name, direction, current_combatant.id, weapon_type])
 
 			# Wait for animation to complete
-			await get_tree().create_timer(1.0).timeout
+			await get_tree().create_timer(0.6).timeout
+
+			# Fade out attacker while jumping back
+			if sprite_animator.sprite_instances.has(current_combatant.id):
+				var attacker_instance = sprite_animator.sprite_instances[current_combatant.id]
+				var attacker_sprite = attacker_instance["sprite"]
+
+				# Play jump animation and fade out
+				sprite_animator.play_animation(current_combatant.id, "Jump", direction, false, false)
+				var fade_out_tween = create_tween()
+				fade_out_tween.tween_property(attacker_sprite, "modulate:a", 0.0, 0.3)
+				await fade_out_tween.finished
+
+				# Hold on first frame of jump (crouch position) and fade in
+				sprite_animator.play_animation(current_combatant.id, "Jump", direction, true, false)
+				var fade_in_tween = create_tween()
+				fade_in_tween.tween_property(attacker_sprite, "modulate:a", 1.0, 0.6)
+				await get_tree().create_timer(0.6).timeout
+
+				# Return to idle
+				var idle_direction = attacker_instance.get("default_direction", direction)
+				sprite_animator.play_animation(current_combatant.id, "Idle", idle_direction, false, false)
 
 		# First, check if the attack hits
 		var hit_check = combat_resolver.check_physical_hit(current_combatant, target)
@@ -4701,6 +4791,20 @@ func _execute_enemy_ai() -> void:
 
 			# Wake up if asleep
 			_wake_if_asleep(target)
+
+			# Show hurt reaction on target
+			if sprite_animator and sprite_animator.sprite_instances.has(target.id):
+				var target_direction = "DOWN"
+				if not target.get("is_ally", false):
+					target_direction = "LEFT"  # Enemies face player
+				sprite_animator.play_animation(target.id, "Hurt", target_direction, true, false)
+				await get_tree().create_timer(0.6).timeout
+
+				# Return to idle if not KO'd (we'll check below)
+				if target.hp > 0:
+					var target_instance = sprite_animator.sprite_instances[target.id]
+					var idle_direction = target_instance.get("default_direction", target_direction)
+					sprite_animator.play_animation(target.id, "Idle", idle_direction, false, false)
 
 			if target.hp <= 0:
 				target.hp = 0
@@ -6822,6 +6926,20 @@ func _execute_burst_on_target(target: Dictionary) -> void:
 	# Wake up if asleep
 	_wake_if_asleep(target)
 
+	# Show hurt reaction on target
+	if sprite_animator and sprite_animator.sprite_instances.has(target.id):
+		var target_direction = "DOWN"
+		if not target.get("is_ally", false):
+			target_direction = "LEFT"  # Enemies face player
+		sprite_animator.play_animation(target.id, "Hurt", target_direction, true, false)
+		await get_tree().create_timer(0.6).timeout
+
+		# Return to idle if not KO'd (we'll check below)
+		if target.hp > 0:
+			var target_instance = sprite_animator.sprite_instances[target.id]
+			var idle_direction = target_instance.get("default_direction", target_direction)
+			sprite_animator.play_animation(target.id, "Idle", idle_direction, false, false)
+
 	if target.hp <= 0:
 		target.hp = 0
 		_set_fainted(target)
@@ -6996,9 +7114,30 @@ func _execute_skill_single(target: Dictionary) -> void:
 		print("[Battle] Playing skill animation: %s %s for %s (type: %s)" % [anim_name, direction, current_combatant.id, skill_type])
 
 		# Wait for animation to play
-		await get_tree().create_timer(anim_duration).timeout
+		await get_tree().create_timer(0.6).timeout
 
-	# Slide character back immediately after minigame closes
+		# Fade out attacker while jumping back
+		if sprite_animator.sprite_instances.has(current_combatant.id):
+			var attacker_instance = sprite_animator.sprite_instances[current_combatant.id]
+			var attacker_sprite = attacker_instance["sprite"]
+
+			# Play jump animation and fade out
+			sprite_animator.play_animation(current_combatant.id, "Jump", direction, false, false)
+			var fade_out_tween = create_tween()
+			fade_out_tween.tween_property(attacker_sprite, "modulate:a", 0.0, 0.3)
+			await fade_out_tween.finished
+
+			# Hold on first frame of jump (crouch position) and fade in
+			sprite_animator.play_animation(current_combatant.id, "Jump", direction, true, false)
+			var fade_in_tween = create_tween()
+			fade_in_tween.tween_property(attacker_sprite, "modulate:a", 1.0, 0.6)
+			await get_tree().create_timer(0.6).timeout
+
+			# Return to idle
+			var idle_direction = attacker_instance.get("default_direction", direction)
+			sprite_animator.play_animation(current_combatant.id, "Idle", idle_direction, false, false)
+
+	# Reset turn indicator panel
 	await _reset_turn_indicator()
 
 	# Apply minigame modifiers
@@ -7147,6 +7286,20 @@ func _execute_skill_single(target: Dictionary) -> void:
 
 	# Wake up if asleep
 	_wake_if_asleep(target)
+
+	# Show hurt reaction on target
+	if sprite_animator and sprite_animator.sprite_instances.has(target.id):
+		var target_direction = "DOWN"
+		if not target.get("is_ally", false):
+			target_direction = "LEFT"  # Enemies face player
+		sprite_animator.play_animation(target.id, "Hurt", target_direction, true, false)
+		await get_tree().create_timer(0.6).timeout
+
+		# Return to idle if not KO'd (we'll check below)
+		if target.hp > 0:
+			var target_instance = sprite_animator.sprite_instances[target.id]
+			var idle_direction = target_instance.get("default_direction", target_direction)
+			sprite_animator.play_animation(target.id, "Idle", idle_direction, false, false)
 
 	if target.hp <= 0:
 		target.hp = 0
