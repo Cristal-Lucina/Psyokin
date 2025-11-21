@@ -911,79 +911,72 @@ func _on_perk_selected(_index: int) -> void:
 
 # ── confirm ──────────────────────────────────────────────────────────────────
 func _on_confirm_pressed() -> void:
-	# Validate name and surname are filled
-	var name_text: String = (_name_in.text if _name_in else "").strip_edges()
-	var surname_text: String = (_surname_in.text if _surname_in else "").strip_edges()
+	# Get existing hero_identity data (has Mana Seed customization)
+	var gs: Node = get_node_or_null(GS_PATH)
+	if not gs:
+		print("[CharacterCreation] ERROR: GameState not found!")
+		return
 
-	if name_text == "" or surname_text == "":
+	var hero_identity = {}
+	if gs.has_meta("hero_identity"):
+		hero_identity = gs.get_meta("hero_identity")
+
+	# Validate required cinematic data is present
+	if not hero_identity.has("name") or not hero_identity.has("surname"):
 		OS.alert("Please enter both a first name and last name.", "Character Creation")
 		return
 
-	# Hard gate: must have exactly 3 stats + a chosen perk
-	if _selected_order.size() != 3 or _chosen_perk_id() == "":
-		OS.alert("Pick 3 stats and 1 perk to continue.", "Character Creation")
+	if not hero_identity.has("selected_stats") or hero_identity.selected_stats.size() != 3:
+		OS.alert("Pick 3 stats to continue.", "Character Creation")
 		return
 
-	# Validate at least base body is selected
-	if "base" not in selected_variants:
-		OS.alert("Please select at least a body type.", "Character Creation")
+	if not hero_identity.has("chosen_perk") or hero_identity.chosen_perk == "":
+		OS.alert("Pick 1 perk to continue.", "Character Creation")
 		return
 
-	var pron_text: String = _opt_text(_pron_in)
+	if not hero_identity.has("character_selections") or hero_identity.character_selections.size() == 0:
+		OS.alert("Please customize your character appearance.", "Character Creation")
+		return
 
-	# Get underwear selection (0=None, 1=Boxers, 2=Undies)
-	var underwear_idx = _underwear_in.get_selected() if _underwear_in else 0
-	var selected_underwear = ""
-	if underwear_idx == 0:
-		selected_underwear = "none"
-	elif underwear_idx == 1:
-		selected_underwear = "boxr_v01"
-	elif underwear_idx == 2:
-		selected_underwear = "undi_v01"
-	else:
-		selected_underwear = "none"  # Default to none if out of range
+	# All validation passed - save final data
+	var name_text = hero_identity.name
+	var surname_text = hero_identity.surname
+	var pron_text = hero_identity.get("pronoun", "they/them")
 
-	# Save character variant data to CharacterData autoload
-	print("[CharacterCreation] Saving character variants: ", selected_variants)
-	aCharacterData.set_character(selected_variants, current_selections)
+	# Store full name for display
+	var full_name: String = "%s %s" % [name_text, surname_text]
+	if gs.has_method("set"):
+		gs.set("player_name", full_name)
 
-	var gs: Node = get_node_or_null(GS_PATH)
-	if gs:
-		# Store full name for display
-		var full_name: String = "%s %s" % [name_text, surname_text]
-		if gs.has_method("set"):
-			gs.set("player_name", full_name)
-		print("[CharacterCreation] Setting hero_identity meta with variants: ", selected_variants)
-		gs.set_meta("hero_identity", {
-			"name": name_text,
-			"surname": surname_text,
-			"pronoun": pron_text,
-			"character_variants": selected_variants.duplicate(),
-			"underwear": selected_underwear  # Save underwear for later cutscene
-		})
-		print("[CharacterCreation] Saved to GameState successfully")
-		var picked := PackedStringArray()
-		for i in range(_selected_order.size()):
-			picked.append(_selected_order[i])
-		gs.set_meta("hero_picked_stats", picked)
-		# ensure hero in party
-		if gs.has_method("get"):
-			var pv: Variant = gs.get("party")
-			var arr: Array = []
-			if typeof(pv) == TYPE_ARRAY:
-				arr = pv as Array
-			if arr.is_empty() and gs.has_method("set"):
-				gs.set("party", ["hero"])
-		# default mind type
-		if not gs.has_meta("hero_active_type"):
-			gs.set_meta("hero_active_type", "Omega")
+	# hero_identity already has all the data, just ensure party and mind type
+	print("[CharacterCreation] Final hero_identity saved with Mana Seed data")
+	gs.set_meta("hero_identity", hero_identity)
+
+	# Save picked stats
+	var picked := PackedStringArray()
+	for stat in hero_identity.selected_stats:
+		picked.append(stat)
+	gs.set_meta("hero_picked_stats", picked)
+
+	# Ensure hero in party
+	if gs.has_method("get"):
+		var pv: Variant = gs.get("party")
+		var arr: Array = []
+		if typeof(pv) == TYPE_ARRAY:
+			arr = pv as Array
+		if arr.is_empty() and gs.has_method("set"):
+			gs.set("party", ["hero"])
+
+	# Default mind type
+	if not gs.has_meta("hero_active_type"):
+		gs.set_meta("hero_active_type", "Omega")
 
 	# apply +1 level to chosen stats
 	var st: Node = get_node_or_null(STATS_PATH)
 	if st and st.has_method("apply_creation_boosts"):
 		var picks_arr: Array = []
-		for i2 in range(_selected_order.size()):
-			picks_arr.append(_selected_order[i2])
+		for stat in hero_identity.selected_stats:
+			picks_arr.append(stat)
 		st.call("apply_creation_boosts", picks_arr)
 
 	# Update HP/MP to max after stat boosts (if VTL or FCS were chosen)
@@ -1020,15 +1013,12 @@ func _on_confirm_pressed() -> void:
 					hero_data["debuffs"] = []
 
 	# unlock chosen starting perk
-	var chosen_perk_id: String = _chosen_perk_id()
+	var chosen_perk_id: String = hero_identity.get("chosen_perk", "")
 	if chosen_perk_id != "":
 		var ps: Node = get_node_or_null(PERK_PATH)
-		if ps:
-			if ps.has_method("unlock_by_id"):
-				ps.call("unlock_by_id", chosen_perk_id)
-			elif ps.has_method("unlock"):
-				var idx2: int = (_perk_in.get_selected() if _perk_in else 0)
-				ps.call("unlock", String(_perk_stat_by_idx.get(idx2,"")), 0)
+		if ps and ps.has_method("unlock_by_id"):
+			ps.call("unlock_by_id", chosen_perk_id)
+			print("[CharacterCreation] Unlocked perk: ", chosen_perk_id)
 
 	# refresh combat profiles
 	var cps: Node = get_node_or_null(CPS_PATH)
