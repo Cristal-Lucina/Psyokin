@@ -1802,10 +1802,25 @@ func _set_fainted(target: Dictionary) -> void:
 	target.ailment = "fainted"
 	target.ailment_turn_count = 0
 
-	# Play faint animation (Hurt) and hold it
-	if sprite_animator and target.get("is_ally", false):
-		sprite_animator.play_animation(target.id, "Hurt", "DOWN", true)  # true = hold
+	# Play faint animation (Hurt) and fade out
+	if sprite_animator:
+		var direction = "DOWN"
+		sprite_animator.play_animation(target.id, "Hurt", direction, true)  # true = hold
 		print("[Battle] Playing faint animation (hold): Hurt for %s" % target.id)
+
+		# For enemies, fade out the sprite after hurt animation
+		if not target.get("is_ally", false):
+			await get_tree().create_timer(0.5).timeout  # Let hurt animation show briefly
+
+			# Fade out enemy sprite over 1.5 seconds
+			if sprite_animator.sprite_instances.has(target.id):
+				var sprite_instance = sprite_animator.sprite_instances[target.id]
+				var sprite_node = sprite_instance["sprite"]
+
+				# Create fade-out tween
+				var tween = create_tween()
+				tween.tween_property(sprite_node, "modulate:a", 0.0, 1.5)
+				print("[Battle] Fading out defeated enemy: %s" % target.display_name)
 
 	# Refresh turn order to show fainted status
 	if battle_mgr:
@@ -2842,7 +2857,7 @@ func _execute_attack(target: Dictionary) -> void:
 			_hide_instruction()
 
 			# Play attack animation based on weapon type
-			if sprite_animator and current_combatant.is_ally:
+			if sprite_animator:
 				var weapon_type = "Neutral"
 				if current_combatant.has("equipment") and current_combatant.equipment.has("weapon"):
 					var weapon_id = current_combatant.equipment.weapon
@@ -2864,8 +2879,10 @@ func _execute_attack(target: Dictionary) -> void:
 					_:
 						anim_name = "Sword Strike"  # Default attack animation
 
-				sprite_animator.play_animation(current_combatant.id, anim_name, "RIGHT", false, true)
-				print("[Battle] Playing attack animation: %s for %s (weapon: %s)" % [anim_name, current_combatant.id, weapon_type])
+				# Determine direction based on ally/enemy
+				var direction = "RIGHT" if current_combatant.is_ally else "LEFT"
+				sprite_animator.play_animation(current_combatant.id, anim_name, direction, false, true)
+				print("[Battle] Playing attack animation: %s %s for %s (weapon: %s)" % [anim_name, direction, current_combatant.id, weapon_type])
 
 				# Wait for animation to play (about 0.5 seconds)
 				await get_tree().create_timer(0.6).timeout
@@ -6916,7 +6933,7 @@ func _execute_skill_single(target: Dictionary) -> void:
 	_hide_instruction()
 
 	# Play skill animation based on skill type
-	if sprite_animator and current_combatant.is_ally:
+	if sprite_animator:
 		var anim_name = "Bow Shot"  # Default
 		var anim_duration = 1.2
 
@@ -6935,8 +6952,10 @@ func _execute_skill_single(target: Dictionary) -> void:
 				anim_name = "Bow Shot"  # Default for magic/ranged
 				anim_duration = 1.2
 
-		sprite_animator.play_animation(current_combatant.id, anim_name, "RIGHT", false, true)
-		print("[Battle] Playing skill animation: %s for %s (type: %s)" % [anim_name, current_combatant.id, skill_type])
+		# Determine direction based on ally/enemy
+		var direction = "RIGHT" if current_combatant.is_ally else "LEFT"
+		sprite_animator.play_animation(current_combatant.id, anim_name, direction, false, true)
+		print("[Battle] Playing skill animation: %s %s for %s (type: %s)" % [anim_name, direction, current_combatant.id, skill_type])
 
 		# Wait for animation to play
 		await get_tree().create_timer(anim_duration).timeout
