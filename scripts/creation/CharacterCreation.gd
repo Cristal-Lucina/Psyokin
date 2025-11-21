@@ -2403,9 +2403,275 @@ func _show_next_nurse_response() -> void:
 		# All 5 responses shown - show cursor and wait for input
 		_show_cursor_and_wait()
 
-# ── Character Customization UI ───────────────────────────────────────────────
+# ── Character Customization UI (Mana Seed) ───────────────────────────────────
 func _build_customization_ui() -> void:
-	"""Build character customization UI (pronoun, body, outfit, hair, hat)"""
+	"""Build character customization UI with Mana Seed gradient sliders"""
+	# Hide dialogue label
+	if dialogue_label:
+		dialogue_label.visible = false
+
+	# Create customization container
+	customization_container = Control.new()
+	customization_container.set_anchors_preset(Control.PRESET_FULL_RECT)
+	cinematic_layer.add_child(customization_container)
+
+	# Title
+	var title = Label.new()
+	title.text = "Customize Your Appearance"
+	title.position = Vector2(0, 30)
+	title.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 24)
+	title.add_theme_color_override("font_color", Color("#C8FF3D"))  # Electric Lime
+	customization_container.add_child(title)
+
+	# Main container - using the same HBoxContainer approach
+	var main = HBoxContainer.new()
+	main.set_anchors_preset(Control.PRESET_CENTER)
+	main.anchor_left = 0.5
+	main.anchor_top = 0.5
+	main.anchor_right = 0.5
+	main.anchor_bottom = 0.5
+	main.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	main.grow_vertical = Control.GROW_DIRECTION_BOTH
+	main.offset_left = -650
+	main.offset_top = -300
+	main.offset_right = 650
+	main.offset_bottom = 300
+	main.add_theme_constant_override("separation", 30)
+	customization_container.add_child(main)
+
+	# Left panel with customization options
+	var left_panel = _create_styled_panel()
+	left_panel.custom_minimum_size = Vector2(750, 600)
+	main.add_child(left_panel)
+
+	# Add padding
+	var padding = MarginContainer.new()
+	padding.add_theme_constant_override("margin_left", 15)
+	padding.add_theme_constant_override("margin_right", 15)
+	padding.add_theme_constant_override("margin_top", 15)
+	padding.add_theme_constant_override("margin_bottom", 15)
+	left_panel.add_child(padding)
+
+	# Scroll container
+	var scroll = ScrollContainer.new()
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	padding.add_child(scroll)
+
+	# Scroll padding
+	var scroll_padding = MarginContainer.new()
+	scroll_padding.add_theme_constant_override("margin_left", 10)
+	scroll_padding.add_theme_constant_override("margin_right", 10)
+	scroll_padding.add_theme_constant_override("margin_top", 10)
+	scroll_padding.add_theme_constant_override("margin_bottom", 10)
+	scroll.add_child(scroll_padding)
+
+	# Two-column layout
+	var columns = HBoxContainer.new()
+	columns.add_theme_constant_override("separation", 20)
+	scroll_padding.add_child(columns)
+
+	var left_column = VBoxContainer.new()
+	left_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	left_column.add_theme_constant_override("separation", 10)
+	columns.add_child(left_column)
+
+	var right_column = VBoxContainer.new()
+	right_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	right_column.add_theme_constant_override("separation", 10)
+	columns.add_child(right_column)
+
+	# Build layer sections
+	for i in range(LAYERS.size()):
+		var layer = LAYERS[i]
+		var section = _create_layer_section_mana_seed(layer, i)
+
+		# Layers 0-5 go to left column, 6-10 to right column
+		if i <= 5:
+			left_column.add_child(section)
+		else:
+			right_column.add_child(section)
+
+	# Right panel with character preview
+	var right_panel = _create_styled_panel()
+	right_panel.custom_minimum_size = Vector2(500, 600)
+	main.add_child(right_panel)
+
+	var preview_container = VBoxContainer.new()
+	right_panel.add_child(preview_container)
+
+	var preview_label = Label.new()
+	preview_label.text = "Character Preview"
+	preview_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	preview_label.add_theme_font_size_override("font_size", 18)
+	preview_label.add_theme_color_override("font_color", Color("#4DE9FF"))  # Sky Cyan
+	preview_container.add_child(preview_label)
+
+	# Reparent character_layers for preview
+	if character_layers:
+		var original_parent = character_layers.get_parent()
+		if original_parent:
+			customization_container.set_meta("original_preview_parent", original_parent)
+			original_parent.remove_child(character_layers)
+
+		var preview_center = CenterContainer.new()
+		preview_center.custom_minimum_size = Vector2(0, 500)
+		preview_container.add_child(preview_center)
+		preview_center.add_child(character_layers)
+
+		character_layers.visible = true
+		character_layers.scale = Vector2(10, 10)
+
+		# Load default body
+		_update_character_preview()
+
+	# Accept button
+	var accept_btn = Button.new()
+	accept_btn.text = "Accept"
+	accept_btn.position = Vector2(0, -70)
+	accept_btn.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	accept_btn.anchor_top = 1.0
+	accept_btn.anchor_bottom = 1.0
+	accept_btn.custom_minimum_size = Vector2(250, 60)
+	accept_btn.add_theme_font_size_override("font_size", 20)
+
+	# Style the Accept button
+	var accept_style = StyleBoxFlat.new()
+	accept_style.bg_color = Color(0.1, 0.1, 0.1, 0.9)
+	accept_style.border_color = Color("#C8FF3D")  # Electric Lime
+	accept_style.set_border_width_all(4)
+	accept_style.set_corner_radius_all(12)
+	accept_btn.add_theme_stylebox_override("normal", accept_style)
+	accept_btn.add_theme_stylebox_override("hover", accept_style)
+	accept_btn.add_theme_color_override("font_color", Color("#C8FF3D"))
+
+	accept_btn.pressed.connect(_on_mana_seed_customization_accepted)
+	customization_container.add_child(accept_btn)
+
+	# Fade in
+	customization_container.modulate = Color(1, 1, 1, 0)
+	var tween = create_tween()
+	tween.tween_property(customization_container, "modulate", Color(1, 1, 1, 1), 0.5)
+
+func _create_layer_section_mana_seed(layer: Dictionary, layer_index: int) -> VBoxContainer:
+	"""Create a Mana Seed customization section for a layer"""
+	var section = VBoxContainer.new()
+	section.add_theme_constant_override("separation", 8)
+
+	# Layer label
+	var label = Label.new()
+	label.text = layer.label
+	label.add_theme_font_size_override("font_size", 14)
+	label.add_theme_color_override("font_color", Color("#8A3FFC"))  # Grape Violet
+	section.add_child(label)
+
+	# Part selector (if layer has parts)
+	if layer.has_parts:
+		var part_row = HBoxContainer.new()
+		part_row.add_theme_constant_override("separation", 8)
+
+		var part_label = Label.new()
+		part_label.text = "Style:"
+		part_label.custom_minimum_size = Vector2(60, 0)
+		part_row.add_child(part_label)
+
+		var left_btn = Button.new()
+		left_btn.text = "◀"
+		left_btn.custom_minimum_size = Vector2(30, 30)
+		left_btn.pressed.connect(_on_part_previous_mana_seed.bind(layer_index))
+		part_row.add_child(left_btn)
+
+		var part_display = Label.new()
+		part_display.name = "PartDisplay"
+		part_display.text = "None"
+		part_display.custom_minimum_size = Vector2(200, 30)
+		part_display.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		part_display.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		part_display.add_theme_color_override("font_color", Color("#4DE9FF"))  # Sky Cyan
+		part_row.add_child(part_display)
+
+		var right_btn = Button.new()
+		right_btn.text = "▶"
+		right_btn.custom_minimum_size = Vector2(30, 30)
+		right_btn.pressed.connect(_on_part_next_mana_seed.bind(layer_index))
+		part_row.add_child(right_btn)
+
+		section.add_child(part_row)
+
+	# Color selector with gradient slider
+	var color_row = HBoxContainer.new()
+	color_row.add_theme_constant_override("separation", 8)
+
+	var color_label = Label.new()
+	color_label.text = "Color:"
+	color_label.custom_minimum_size = Vector2(60, 0)
+	color_row.add_child(color_label)
+
+	var left_btn = Button.new()
+	left_btn.text = "◀"
+	left_btn.custom_minimum_size = Vector2(30, 30)
+	left_btn.pressed.connect(_on_color_previous_mana_seed.bind(layer_index))
+	color_row.add_child(left_btn)
+
+	# Gradient slider
+	var slider_container = Control.new()
+	slider_container.custom_minimum_size = Vector2(200, 30)
+
+	# Create gradient background
+	var palette_image = _get_palette_image(layer.ramp_type)
+	var num_colors = min(layer.max_colors, palette_image.get_height() / 2 if palette_image else 0)
+
+	if palette_image and num_colors > 0:
+		var gradient = Gradient.new()
+		for i in range(num_colors):
+			var color = palette_image.get_pixel(4, i * 2)
+			var offset = float(i) / float(num_colors - 1) if num_colors > 1 else 0.0
+			gradient.add_point(offset, color)
+
+		var gradient_texture = GradientTexture2D.new()
+		gradient_texture.gradient = gradient
+		gradient_texture.width = 200
+		gradient_texture.height = 30
+		gradient_texture.fill_from = Vector2(0, 0.5)
+		gradient_texture.fill_to = Vector2(1, 0.5)
+
+		var gradient_rect = TextureRect.new()
+		gradient_rect.texture = gradient_texture
+		gradient_rect.custom_minimum_size = Vector2(200, 30)
+		gradient_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		gradient_rect.stretch_mode = TextureRect.STRETCH_SCALE
+		slider_container.add_child(gradient_rect)
+
+	var color_slider = HSlider.new()
+	color_slider.name = "ColorSlider"
+	color_slider.custom_minimum_size = Vector2(200, 30)
+	color_slider.min_value = 0
+	color_slider.max_value = num_colors - 1 if num_colors > 0 else 0
+	color_slider.step = 1
+	color_slider.value = current_colors.get(layer.code, 0)
+	color_slider.value_changed.connect(_on_color_slider_changed_mana_seed.bind(layer_index))
+	slider_container.add_child(color_slider)
+
+	color_row.add_child(slider_container)
+
+	var right_btn2 = Button.new()
+	right_btn2.text = "▶"
+	right_btn2.custom_minimum_size = Vector2(30, 30)
+	right_btn2.pressed.connect(_on_color_next_mana_seed.bind(layer_index))
+	color_row.add_child(right_btn2)
+
+	section.add_child(color_row)
+
+	# Separator
+	var sep = HSeparator.new()
+	section.add_child(sep)
+
+	return section
+
+# ── OLD Character Customization UI (DEPRECATED) ───────────────────────────────
+func _build_customization_ui_OLD() -> void:
+	"""OLD Build character customization UI (pronoun, body, outfit, hair, hat)"""
 	# Hide dialogue label
 	if dialogue_label:
 		dialogue_label.visible = false
@@ -3023,6 +3289,327 @@ func _create_styled_panel() -> PanelContainer:
 	panel.add_theme_constant_override("margin_bottom", 20)
 
 	return panel
+
+# ══════════════════════════════════════════════════════════════════════════════
+# MANA SEED CUSTOMIZATION CALLBACKS
+# ══════════════════════════════════════════════════════════════════════════════
+
+func _on_part_previous_mana_seed(layer_index: int):
+	"""Cycle to previous part"""
+	var layer = LAYERS[layer_index]
+	if layer.code not in available_parts:
+		return
+
+	var parts = available_parts[layer.code]
+	if parts.size() == 0:
+		return
+
+	var current_index = current_part_indices.get(layer.code, -1)
+	current_index -= 1
+	if current_index < -1:
+		current_index = parts.size() - 1
+
+	current_part_indices[layer.code] = current_index
+	if current_index == -1:
+		current_selections.erase(layer.code)
+	else:
+		current_selections[layer.code] = parts[current_index]
+
+	_update_character_preview()
+
+func _on_part_next_mana_seed(layer_index: int):
+	"""Cycle to next part"""
+	var layer = LAYERS[layer_index]
+	if layer.code not in available_parts:
+		return
+
+	var parts = available_parts[layer.code]
+	if parts.size() == 0:
+		return
+
+	var current_index = current_part_indices.get(layer.code, -1)
+	current_index += 1
+	if current_index >= parts.size():
+		current_index = -1
+
+	current_part_indices[layer.code] = current_index
+	if current_index == -1:
+		current_selections.erase(layer.code)
+	else:
+		current_selections[layer.code] = parts[current_index]
+
+	_update_character_preview()
+
+func _on_color_previous_mana_seed(layer_index: int):
+	"""Cycle to previous color"""
+	var layer = LAYERS[layer_index]
+	var color_index = current_colors.get(layer.code, 0)
+	color_index -= 1
+	if color_index < 0:
+		color_index = layer.max_colors - 1
+	current_colors[layer.code] = color_index
+	_update_character_preview()
+
+func _on_color_next_mana_seed(layer_index: int):
+	"""Cycle to next color"""
+	var layer = LAYERS[layer_index]
+	var color_index = current_colors.get(layer.code, 0)
+	color_index += 1
+	if color_index >= layer.max_colors:
+		color_index = 0
+	current_colors[layer.code] = color_index
+	_update_character_preview()
+
+func _on_color_slider_changed_mana_seed(value: float, layer_index: int):
+	"""Handle color slider value change"""
+	var layer = LAYERS[layer_index]
+	current_colors[layer.code] = int(value)
+	_update_character_preview()
+
+func _update_character_preview():
+	"""Update the character preview with current selections (Mana Seed system)"""
+	for layer in LAYERS:
+		var layer_code = layer.code
+
+		var sprite_codes = []
+		if "sprite_layers" in layer:
+			sprite_codes = layer.sprite_layers
+		else:
+			sprite_codes = [layer_code]
+
+		var part = null
+		if layer.has_parts:
+			part = current_selections.get(layer_code, null)
+		else:
+			if layer_code == "01body":
+				var body_parts = available_parts.get(layer_code, [])
+				if body_parts.size() > 0:
+					part = body_parts[0]
+
+		for sprite_code in sprite_codes:
+			var sprite = character_layers.get_node_or_null(sprite_code)
+			if not sprite:
+				continue
+
+			if part == null:
+				sprite.texture = null
+				continue
+
+			if "sprite_layers" in layer:
+				if part.get("sprite_code", "") != sprite_code:
+					sprite.texture = null
+					continue
+
+			var original_texture = load(part.path)
+
+			if layer_code in current_colors:
+				var color_index = current_colors[layer_code]
+				var recolored_texture = _apply_color_mapping_mana_seed(original_texture, part, layer.ramp_type, color_index)
+				sprite.texture = recolored_texture
+			else:
+				sprite.texture = original_texture
+
+		if "auto_match_layer" in layer and part != null:
+			var auto_layer_code = layer.auto_match_layer
+			var auto_sprite = character_layers.get_node_or_null(auto_layer_code)
+
+			if auto_sprite:
+				var matching_part = null
+				if auto_layer_code in available_parts:
+					for auto_part in available_parts[auto_layer_code]:
+						if auto_part.base_name == part.base_name:
+							matching_part = auto_part
+							break
+
+				if matching_part != null:
+					var auto_texture = load(matching_part.path)
+					if layer_code in current_colors:
+						var color_index = current_colors[layer_code]
+						var recolored_texture = _apply_color_mapping_mana_seed(auto_texture, matching_part, layer.ramp_type, color_index)
+						auto_sprite.texture = recolored_texture
+					else:
+						auto_sprite.texture = auto_texture
+				else:
+					auto_sprite.texture = null
+		elif "auto_match_layer" in layer and part == null:
+			var auto_layer_code = layer.auto_match_layer
+			var auto_sprite = character_layers.get_node_or_null(auto_layer_code)
+			if auto_sprite:
+				auto_sprite.texture = null
+
+func _apply_color_mapping_mana_seed(original_texture: Texture2D, part: Dictionary, ramp_type: String, color_index: int) -> ImageTexture:
+	"""Apply color mapping to a texture"""
+	var cache_key = part.path + ":" + str(color_index)
+	if cache_key in texture_cache:
+		return texture_cache[cache_key]
+
+	var original_image = original_texture.get_image()
+	var recolored_image = Image.create(original_image.get_width(), original_image.get_height(), false, original_image.get_format())
+	recolored_image.copy_from(original_image)
+
+	var palette_code = part.get("palette_code", "00")
+	var base_colors = _get_base_colors_for_palette_code(palette_code, ramp_type)
+	var target_colors = _get_target_colors_for_palette_code(palette_code, ramp_type, color_index)
+
+	if base_colors.size() == 0 or target_colors.size() == 0:
+		var result = ImageTexture.create_from_image(recolored_image)
+		texture_cache[cache_key] = result
+		return result
+
+	for y in range(recolored_image.get_height()):
+		for x in range(recolored_image.get_width()):
+			var pixel = recolored_image.get_pixel(x, y)
+			if pixel.a < 0.01:
+				continue
+
+			for i in range(min(base_colors.size(), target_colors.size())):
+				if _colors_match(pixel, base_colors[i]):
+					recolored_image.set_pixel(x, y, Color(target_colors[i].r, target_colors[i].g, target_colors[i].b, pixel.a))
+					break
+
+	var result = ImageTexture.create_from_image(recolored_image)
+	texture_cache[cache_key] = result
+	return result
+
+func _get_base_colors_for_palette_code(palette_code: String, ramp_type: String) -> Array:
+	"""Get base colors based on palette code"""
+	var base_ramp_filename = ""
+
+	match palette_code:
+		"00a": base_ramp_filename = "3-color base ramp (00a).png"
+		"00b": base_ramp_filename = "4-color base ramp (00b).png"
+		"00c": base_ramp_filename = "2x 3-color base ramps (00c).png"
+		"00d": base_ramp_filename = "4-color + 3-color base ramps (00d).png"
+		"00f": base_ramp_filename = "4-color base ramp (00b).png"
+		"00":
+			if ramp_type == "skin":
+				base_ramp_filename = "skin color base ramp.png"
+			elif ramp_type == "hair":
+				base_ramp_filename = "hair color base ramp.png"
+		_:
+			if ramp_type == "skin":
+				base_ramp_filename = "skin color base ramp.png"
+			elif ramp_type == "hair":
+				base_ramp_filename = "hair color base ramp.png"
+			elif ramp_type == "3color":
+				base_ramp_filename = "3-color base ramp (00a).png"
+			elif ramp_type == "4color":
+				base_ramp_filename = "4-color base ramp (00b).png"
+
+	if base_ramp_filename == "":
+		return []
+
+	var base_ramp_path = PALETTE_PATH + "base ramps/" + base_ramp_filename
+	if not FileAccess.file_exists(base_ramp_path):
+		return []
+
+	var texture = load(base_ramp_path)
+	if texture == null:
+		return []
+
+	var image = texture.get_image()
+	var colors = []
+
+	var num_colors = image.get_width() / 2
+	for i in range(num_colors):
+		var x = i * 2
+		var pixel_color = image.get_pixel(x, 0)
+		colors.append(pixel_color)
+
+	return colors
+
+func _get_target_colors_for_palette_code(palette_code: String, ramp_type: String, row_index: int) -> Array:
+	"""Get target colors for a specific palette row"""
+	match palette_code:
+		"00a": return _extract_colors_from_palette(ramp_type, row_index)
+		"00b": return _extract_colors_from_palette(ramp_type, row_index)
+		"00c":
+			var colors_3 = _extract_colors_from_palette("3color", row_index)
+			if colors_3.size() >= 3:
+				return colors_3 + colors_3
+			return colors_3
+		"00d":
+			var colors_4 = _extract_colors_from_palette("4color", row_index)
+			var colors_3 = _extract_colors_from_palette("3color", row_index)
+			return colors_4 + colors_3
+		"00f":
+			var colors_4 = _extract_colors_from_palette("4color", row_index)
+			var colors_hair = _extract_colors_from_palette("hair", row_index)
+			return colors_4 + colors_hair
+		"00": return _extract_colors_from_palette(ramp_type, row_index)
+		_: return _extract_colors_from_palette(ramp_type, row_index)
+
+func _extract_colors_from_palette(ramp_type: String, row_index: int) -> Array:
+	"""Extract colors from a specific row of a palette image"""
+	if ramp_type not in palette_images:
+		return []
+
+	var image = palette_images[ramp_type]
+	var colors = []
+
+	var colors_per_row = 3
+	match ramp_type:
+		"3color": colors_per_row = 3
+		"4color": colors_per_row = 4
+		"hair": colors_per_row = 5
+		"skin": colors_per_row = 4
+
+	for i in range(colors_per_row):
+		var x = i * 2
+		var y = row_index * 2
+		var pixel_color = image.get_pixel(x, y)
+		colors.append(pixel_color)
+
+	return colors
+
+func _colors_match(c1: Color, c2: Color, tolerance: float = 0.01) -> bool:
+	"""Check if two colors match within tolerance"""
+	return abs(c1.r - c2.r) < tolerance and abs(c1.g - c2.g) < tolerance and abs(c1.b - c2.b) < tolerance
+
+func _on_mana_seed_customization_accepted():
+	"""Handle Accept button press from Mana Seed customization UI"""
+	print("[CharacterCreation] Mana Seed customization accepted!")
+
+	# Save character data to GameState
+	var gs = get_node_or_null(GS_PATH)
+	if gs:
+		print("[CharacterCreation] Saving to GameState hero_identity meta...")
+		var existing_identity = {}
+		if gs.has_meta("hero_identity"):
+			existing_identity = gs.get_meta("hero_identity")
+
+		# Merge with existing data (name, surname, etc.)
+		existing_identity["character_selections"] = current_selections.duplicate()
+		existing_identity["character_indices"] = current_part_indices.duplicate()
+		existing_identity["character_colors"] = current_colors.duplicate()
+		existing_identity["character_animation"] = current_animation
+		existing_identity["character_direction"] = current_anim_direction
+
+		gs.set_meta("hero_identity", existing_identity)
+		print("[CharacterCreation] Saved ", current_selections.size(), " parts and ", current_colors.size(), " colors")
+
+	# Save to CharacterData autoload
+	var char_data = get_node_or_null("/root/aCharacterData")
+	if char_data and char_data.has_method("set_character"):
+		var variants = {}
+		for layer_code in current_selections:
+			variants[layer_code] = current_selections[layer_code].name
+		char_data.set_character(variants, current_selections)
+		print("[CharacterCreation] Saved to CharacterData")
+
+	# Fade out and advance
+	if customization_container:
+		var tween = create_tween()
+		tween.tween_property(customization_container, "modulate", Color(1, 1, 1, 0), 0.5)
+		tween.tween_callback(func():
+			if customization_container:
+				customization_container.queue_free()
+				customization_container = null
+
+			if dialogue_label:
+				dialogue_label.visible = true
+			_advance_stage()
+		)
 
 # ══════════════════════════════════════════════════════════════════════════════
 # END OF CINEMATIC SYSTEM
