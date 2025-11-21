@@ -47,6 +47,10 @@ const SPRITE_PATH = "res://assets/graphics/characters/New Character System/Sprit
 const PALETTE_PATH = "res://assets/graphics/characters/New Character System/SpriteSystem/_supporting files/palettes/"
 const ANIM_DATA_PATH = "res://scenes/test/sprite_animations_data.csv"
 
+# Old system compatibility paths (for legacy code)
+const CHAR_BASE_PATH = "res://assets/graphics/characters/"
+const CHAR_VARIANTS = ["char_a_p1"]
+
 # Mana Seed layer configuration (matching PlayerCharacterCreatorTest)
 const LAYERS = [
 	{"code": "01body", "label": "Skin Tone", "ramp_type": "skin", "max_colors": 18, "has_parts": false},
@@ -125,6 +129,12 @@ var current_anim_direction = "DOWN"  # Current animation direction
 # Animation state (Mana Seed system)
 var animation_timer = 0.0
 var current_frame_index = 0
+
+# Old system compatibility variables (for legacy code paths)
+var selected_variants = {}  # Old variant tracking
+var selected_outfit_type = ""  # Old outfit type
+var selected_hair_type = ""  # Old hair type
+var animation_speed = 0.135  # Old animation speed
 
 # Cinematic state
 var current_stage: CinematicStage = CinematicStage.OPENING_DIALOGUE_1
@@ -404,6 +414,10 @@ func parse_cell(cell_str: String) -> Dictionary:
 
 	cell_num = int(cell_str)
 	return {"cell": cell_num, "flip": flip}
+
+func _get_palette_image(ramp_type: String) -> Image:
+	"""Get the palette image for a ramp type"""
+	return palette_images.get(ramp_type, null)
 
 # ── Character Asset Scanning ─────────────────────────────────────────────────
 func scan_character_assets():
