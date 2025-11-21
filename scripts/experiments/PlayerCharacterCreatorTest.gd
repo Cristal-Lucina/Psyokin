@@ -49,10 +49,11 @@ var current_direction = "DOWN"
 var current_frame_index = 0
 var animation_timer = 0.0
 var sections = []  # Array to track section nodes by layer index
+var accept_button = null  # Reference to the Accept button
 
 # Navigation state
-var active_toggle_layer = -1  # Which layer's toggle is active (-1 = none)
-var active_toggle_type = ""  # "part" or "color" - which toggle is active
+var active_toggle_layer = -1  # Which layer's toggle is active (-1 = none, LAYERS.size() = Accept button)
+var active_toggle_type = ""  # "part", "color", or "accept" - which toggle is active
 
 # Trigger debouncing
 var l2_was_pressed = false
@@ -616,6 +617,9 @@ func add_accept_button():
 	button_container.add_child(accept_btn)
 	right_column.add_child(button_container)
 
+	# Store reference for navigation
+	accept_button = accept_btn
+
 func _on_accept_pressed():
 	"""Handle Accept button press"""
 	print("Character accepted!")
@@ -1132,8 +1136,9 @@ func colors_match(c1: Color, c2: Color, tolerance: float = 0.01) -> bool:
 # ========== CONTROLLER NAVIGATION ==========
 
 func handle_accept():
-	"""Handle accept/confirm button - not used in toggle system"""
-	pass
+	"""Handle accept/confirm button - trigger Accept button if focused"""
+	if active_toggle_type == "accept" and accept_button:
+		accept_button.pressed.emit()
 
 func handle_back():
 	"""Handle back/cancel button - deactivate current toggle"""
@@ -1144,11 +1149,6 @@ func handle_back():
 
 func handle_up():
 	"""Handle up navigation - activate previous toggle"""
-	# Find previous toggle (wraps around)
-	var found_current = false
-	var prev_layer = -1
-	var prev_type = ""
-
 	# Build list of all toggles in order
 	var toggles = []
 	for i in range(LAYERS.size()):
@@ -1156,6 +1156,9 @@ func handle_up():
 		if layer.has_parts:
 			toggles.append({"layer": i, "type": "part"})
 		toggles.append({"layer": i, "type": "color"})
+
+	# Add Accept button at the end
+	toggles.append({"layer": LAYERS.size(), "type": "accept"})
 
 	# Find current toggle index
 	var current_idx = -1
@@ -1184,6 +1187,9 @@ func handle_down():
 		if layer.has_parts:
 			toggles.append({"layer": i, "type": "part"})
 		toggles.append({"layer": i, "type": "color"})
+
+	# Add Accept button at the end
+	toggles.append({"layer": LAYERS.size(), "type": "accept"})
 
 	# Find current toggle index
 	var current_idx = -1
@@ -1243,17 +1249,22 @@ func update_focus_visual():
 
 	# Highlight active toggle if one is active
 	if active_toggle_layer != -1:
-		var active_section = sections[active_toggle_layer]
+		if active_toggle_type == "accept":
+			# Focus the Accept button
+			if accept_button:
+				accept_button.grab_focus()
+		else:
+			var active_section = sections[active_toggle_layer]
 
-		if active_toggle_type == "part":
-			var part_container = active_section.get_node("PartContainer")
-			var part_btn = part_container.get_node("PartChangeButton")
-			part_btn.modulate = Color(0.5, 1.5, 0.5)  # Green highlight (active)
+			if active_toggle_type == "part":
+				var part_container = active_section.get_node("PartContainer")
+				var part_btn = part_container.get_node("PartChangeButton")
+				part_btn.modulate = Color(0.5, 1.5, 0.5)  # Green highlight (active)
 
-		elif active_toggle_type == "color":
-			var color_container = active_section.get_node("ColorContainer")
-			var color_btn = color_container.get_node("ColorChangeButton")
-			color_btn.modulate = Color(0.5, 1.5, 0.5)  # Green highlight (active)
+			elif active_toggle_type == "color":
+				var color_container = active_section.get_node("ColorContainer")
+				var color_btn = color_container.get_node("ColorChangeButton")
+				color_btn.modulate = Color(0.5, 1.5, 0.5)  # Green highlight (active)
 
 func ensure_section_visible():
 	"""Scroll to keep the active section visible"""
