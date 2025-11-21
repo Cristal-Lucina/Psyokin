@@ -317,7 +317,8 @@ func _create_layered_sprite_for_hero(combatant_id: String, parent: Node, is_ally
 	undr_sprite.vframes = 16
 	undr_sprite.frame = 0
 	undr_sprite.visible = true
-	container.add_child_at_index(undr_sprite, 0)  # Add at beginning
+	container.add_child(undr_sprite)
+	container.move_child(undr_sprite, 0)  # Move to beginning for proper layer order
 	layer_sprites["00undr"] = undr_sprite
 
 	# Get hero appearance from GameState
