@@ -70,13 +70,13 @@ layout_mode = 2
 size_flags_vertical = 3
 
 [node name="MirrorSprite" type="Sprite2D" parent="MarginContainer/MainContainer/RightPanel/PreviewContainer"]
-position = Vector2(172, 238)
+position = Vector2(162, 238)
 scale = Vector2(5.28, 5.28)
 texture = ExtResource("2_mirror")
 z_index = -1
 
 [node name="CharacterLayers" type="Node2D" parent="MarginContainer/MainContainer/RightPanel/PreviewContainer"]
-position = Vector2(172, 278)
+position = Vector2(162, 278)
 scale = Vector2(8, 8)
 
 [node name="00undr" type="Sprite2D" parent="MarginContainer/MainContainer/RightPanel/PreviewContainer/CharacterLayers"]
