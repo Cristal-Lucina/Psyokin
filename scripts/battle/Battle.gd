@@ -1233,18 +1233,12 @@ func _initialize_battle() -> void:
 	# Get party from GameState
 	var party = gs.party.duplicate()
 
-	print("[Battle] GameState party before check: %s" % str(party))
+	print("[Battle] GameState party: %s" % str(party))
 
-	# If party is empty or only has hero, add Kai and Matcha for testing
+	# Validate party is not empty
 	if party.is_empty():
-		# Fallback: use hero + kai + matcha for now
-		party = ["hero", "kai", "matcha"]
-		print("[Battle] Party was empty, using default: %s" % str(party))
-	elif party.size() == 1 and party[0] == "hero":
-		# Add Kai and Matcha as default party members
-		party.append("kai")
-		party.append("matcha")
-		print("[Battle] Added kai and matcha to party: %s" % str(party))
+		push_error("[Battle] ERROR: Party is empty! Cannot start battle.")
+		return
 
 	# Get enemies from encounter data
 	var enemies = battle_mgr.encounter_data.get("enemy_ids", ["slime"])
