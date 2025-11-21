@@ -193,17 +193,15 @@ func _ready() -> void:
 
 	# Check if returning from character customization
 	var gs = get_node_or_null(GS_PATH)
+	var returning_from_customization = false
 	if gs and gs.has_meta("hero_identity"):
 		var hero_id = gs.get_meta("hero_identity")
 		if hero_id.has("customization_completed") and hero_id.customization_completed:
 			print("[CharacterCreation] Returning from customization, skipping to confirmation")
+			returning_from_customization = true
 			# Clear the flag
 			hero_id.customization_completed = false
 			gs.set_meta("hero_identity", hero_id)
-			# Skip directly to final confirmation
-			current_stage = CinematicStage.FINAL_CONFIRMATION
-			_build_confirmation_ui()
-			return
 
 	# Apply LoadoutPanel styling to all panels
 	_style_panels()
@@ -259,6 +257,11 @@ func _ready() -> void:
 	# Initialize cinematic opening
 	_setup_cinematic()
 	_hide_form()  # Hide the form initially - only shows if player says "No" at end
+
+	# If returning from customization, skip to confirmation
+	if returning_from_customization:
+		current_stage = CinematicStage.FINAL_CONFIRMATION
+		_build_confirmation_ui()
 
 func _style_panels() -> void:
 	"""Apply LoadoutPanel styling (dark gray background with pink border) to all panels"""
