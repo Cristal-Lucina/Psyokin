@@ -623,9 +623,46 @@ func add_accept_button():
 	accept_button_active_style = focus_style
 
 func _on_accept_pressed():
-	"""Handle Accept button press"""
-	print("Character accepted!")
-	# TODO: Save character data or transition to next scene
+	"""Handle Accept button press - save character and transition to main game"""
+	print("[CharacterCreator] Character accepted!")
+	print("[CharacterCreator] Saving character data...")
+
+	# Save to CharacterData autoload
+	var char_data = get_node_or_null("/root/aCharacterData")
+	if char_data and char_data.has_method("set_character"):
+		# Prepare data for saving
+		var variants = {}  # Part selections: {layer_code: part_name}
+		var parts = current_selections.duplicate()  # Full part data
+
+		# Convert current selections to variant codes (part names)
+		for layer_code in current_selections:
+			variants[layer_code] = current_selections[layer_code].name
+
+		char_data.set_character(variants, parts)
+		print("[CharacterCreator] Saved to CharacterData: ", variants)
+
+	# Save to GameState meta
+	var gs = get_node_or_null("/root/aGameState")
+	if gs:
+		print("[CharacterCreator] Saving to GameState hero_identity meta...")
+		gs.set_meta("hero_identity", {
+			"character_selections": current_selections.duplicate(),  # Full part data
+			"character_indices": current_part_indices.duplicate(),  # Part indices
+			"character_colors": current_colors.duplicate(),  # Color indices
+			"character_animation": current_animation,  # Current animation
+			"character_direction": current_direction,  # Current direction
+		})
+		print("[CharacterCreator] Saved hero_identity with ", current_selections.size(), " parts and ", current_colors.size(), " colors")
+
+	# Transition to main game
+	var scene_router = get_node_or_null("/root/aSceneRouter")
+	if scene_router and scene_router.has_method("goto_main"):
+		print("[CharacterCreator] Transitioning to main game via SceneRouter...")
+		scene_router.goto_main()
+	else:
+		# Fallback: direct scene load
+		print("[CharacterCreator] SceneRouter not available, loading Main.tscn directly...")
+		get_tree().change_scene_to_file("res://scenes/main/Main.tscn")
 
 func get_palette_image(ramp_type: String) -> Image:
 	"""Get the palette image for a ramp type"""

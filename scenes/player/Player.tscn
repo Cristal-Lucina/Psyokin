@@ -12,45 +12,80 @@ script = ExtResource("1")
 [node name="CharacterLayers" type="Node2D" parent="."]
 scale = Vector2(1.02, 1.02)
 
-[node name="BaseSprite" type="Sprite2D" parent="CharacterLayers"]
+[node name="00undr" type="Sprite2D" parent="CharacterLayers"]
 texture_filter = 1
-hframes = 8
-vframes = 8
+hframes = 16
+vframes = 16
 
-[node name="OutfitSprite" type="Sprite2D" parent="CharacterLayers"]
+[node name="01body" type="Sprite2D" parent="CharacterLayers"]
 texture_filter = 1
-hframes = 8
-vframes = 8
+hframes = 16
+vframes = 16
 
-[node name="CloakSprite" type="Sprite2D" parent="CharacterLayers"]
+[node name="02sock" type="Sprite2D" parent="CharacterLayers"]
 texture_filter = 1
-hframes = 8
-vframes = 8
+hframes = 16
+vframes = 16
 
-[node name="FaceSprite" type="Sprite2D" parent="CharacterLayers"]
+[node name="03fot1" type="Sprite2D" parent="CharacterLayers"]
 texture_filter = 1
-hframes = 8
-vframes = 8
+hframes = 16
+vframes = 16
 
-[node name="HairSprite" type="Sprite2D" parent="CharacterLayers"]
+[node name="04lwr1" type="Sprite2D" parent="CharacterLayers"]
 texture_filter = 1
-hframes = 8
-vframes = 8
+hframes = 16
+vframes = 16
 
-[node name="HatSprite" type="Sprite2D" parent="CharacterLayers"]
+[node name="05shrt" type="Sprite2D" parent="CharacterLayers"]
 texture_filter = 1
-hframes = 8
-vframes = 8
+hframes = 16
+vframes = 16
 
-[node name="ToolASprite" type="Sprite2D" parent="CharacterLayers"]
+[node name="06lwr2" type="Sprite2D" parent="CharacterLayers"]
 texture_filter = 1
-hframes = 8
-vframes = 8
+hframes = 16
+vframes = 16
 
-[node name="ToolBSprite" type="Sprite2D" parent="CharacterLayers"]
+[node name="07fot2" type="Sprite2D" parent="CharacterLayers"]
 texture_filter = 1
-hframes = 8
-vframes = 8
+hframes = 16
+vframes = 16
+
+[node name="08lwr3" type="Sprite2D" parent="CharacterLayers"]
+texture_filter = 1
+hframes = 16
+vframes = 16
+
+[node name="09hand" type="Sprite2D" parent="CharacterLayers"]
+texture_filter = 1
+hframes = 16
+vframes = 16
+
+[node name="10outr" type="Sprite2D" parent="CharacterLayers"]
+texture_filter = 1
+hframes = 16
+vframes = 16
+
+[node name="11neck" type="Sprite2D" parent="CharacterLayers"]
+texture_filter = 1
+hframes = 16
+vframes = 16
+
+[node name="12face" type="Sprite2D" parent="CharacterLayers"]
+texture_filter = 1
+hframes = 16
+vframes = 16
+
+[node name="13hair" type="Sprite2D" parent="CharacterLayers"]
+texture_filter = 1
+hframes = 16
+vframes = 16
+
+[node name="14head" type="Sprite2D" parent="CharacterLayers"]
+texture_filter = 1
+hframes = 16
+vframes = 16
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
 position = Vector2(0, 8.13513)

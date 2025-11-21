@@ -20,7 +20,7 @@ const SAVE_DIR               : String = "user://saves"
 const MAIN_SCENE             : String = "res://scenes/main/Main.tscn"
 const OPTIONS_SCENE          : String = "res://scenes/main_menu/Options.tscn"
 const LOAD_MENU_SCENE        : String = "res://scenes/ui/save/LoadMenu.tscn"
-const CHARACTER_CREATION_SCENE: String = "res://scenes/creation/CharacterCreation.tscn"
+const CHARACTER_CREATION_SCENE: String = "res://scenes/experiments/PlayerCharacterCreatorTest.tscn"
 
 # Common candidate paths for buttons (probe in this order)
 const NEW_PATHS      : PackedStringArray = [
