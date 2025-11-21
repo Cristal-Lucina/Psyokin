@@ -32,6 +32,8 @@ const DIRECTIONS = ["DOWN", "LEFT", "RIGHT", "UP"]
 @onready var animation_buttons_container = $MarginContainer/MainContainer/RightPanel/AnimationButtons
 @onready var direction_buttons_container = $MarginContainer/MainContainer/RightPanel/DirectionButtons
 @onready var customization_container = $MarginContainer/MainContainer/LeftPanel/PaddingContainer/ScrollContainer/ScrollPadding/CustomizationList
+@onready var left_column = $MarginContainer/MainContainer/LeftPanel/PaddingContainer/ScrollContainer/ScrollPadding/CustomizationList/LeftColumn
+@onready var right_column = $MarginContainer/MainContainer/LeftPanel/PaddingContainer/ScrollContainer/ScrollPadding/CustomizationList/RightColumn
 @onready var scroll_container = $MarginContainer/MainContainer/LeftPanel/PaddingContainer/ScrollContainer
 
 # State
@@ -46,6 +48,7 @@ var current_animation = "Idle"
 var current_direction = "DOWN"
 var current_frame_index = 0
 var animation_timer = 0.0
+var sections = []  # Array to track section nodes by layer index
 
 # Navigation state
 var active_toggle_layer = -1  # Which layer's toggle is active (-1 = none)
@@ -398,10 +401,21 @@ func build_animation_controls():
 
 func build_customization_options():
 	"""Build the customization list on the left panel"""
+	sections.clear()
 	for i in range(LAYERS.size()):
 		var layer = LAYERS[i]
 		var section = create_layer_section(layer, i)
-		customization_container.add_child(section)
+
+		# Add to appropriate column
+		# Layers 0-4 (Skin Tone to Topwear) go to left column
+		# Layers 5-10 (Handwear to Headwear) go to right column
+		if i < 5:
+			left_column.add_child(section)
+		else:
+			right_column.add_child(section)
+
+		# Track section by index for navigation
+		sections.append(section)
 
 func create_layer_section(layer: Dictionary, layer_index: int) -> VBoxContainer:
 	"""Create a customization section for a layer"""
@@ -754,7 +768,7 @@ func _on_part_next(layer_index: int):
 func update_part_label(layer_index: int):
 	"""Update the part selection label text"""
 	var layer = LAYERS[layer_index]
-	var section = customization_container.get_child(layer_index)
+	var section = sections[layer_index]
 	var part_container = section.get_node_or_null("PartContainer")
 	if not part_container:
 		return
@@ -787,7 +801,7 @@ func _on_color_previous(layer_index: int):
 	current_colors[layer.code] = color_index
 
 	# Update slider
-	var section = customization_container.get_child(layer_index)
+	var section = sections[layer_index]
 	var color_container = section.get_node("ColorContainer")
 	var color_bar_container = color_container.get_node("ColorBarContainer")
 	var color_strip_row = color_bar_container.get_node("ColorStripRow")
@@ -808,7 +822,7 @@ func _on_color_next(layer_index: int):
 	current_colors[layer.code] = color_index
 
 	# Update slider
-	var section = customization_container.get_child(layer_index)
+	var section = sections[layer_index]
 	var color_container = section.get_node("ColorContainer")
 	var color_bar_container = color_container.get_node("ColorBarContainer")
 	var color_strip_row = color_bar_container.get_node("ColorStripRow")
@@ -1166,7 +1180,7 @@ func update_focus_visual():
 	"""Update visual indicators for current focus"""
 	# Clear all focus indicators first
 	for i in range(LAYERS.size()):
-		var section = customization_container.get_child(i)
+		var section = sections[i]
 
 		# Clear part button
 		var part_container = section.get_node_or_null("PartContainer")
@@ -1182,7 +1196,7 @@ func update_focus_visual():
 
 	# Highlight active toggle if one is active
 	if active_toggle_layer != -1:
-		var active_section = customization_container.get_child(active_toggle_layer)
+		var active_section = sections[active_toggle_layer]
 
 		if active_toggle_type == "part":
 			var part_container = active_section.get_node("PartContainer")
@@ -1196,10 +1210,10 @@ func update_focus_visual():
 
 func ensure_section_visible():
 	"""Scroll to keep the active section visible"""
-	if active_toggle_layer < 0 or active_toggle_layer >= customization_container.get_child_count():
+	if active_toggle_layer < 0 or active_toggle_layer >= sections.size():
 		return
 
-	var active_section = customization_container.get_child(active_toggle_layer)
+	var active_section = sections[active_toggle_layer]
 	var section_pos = active_section.position.y
 	var section_height = active_section.size.y
 

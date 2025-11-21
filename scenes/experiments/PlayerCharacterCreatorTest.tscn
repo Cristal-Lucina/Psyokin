@@ -46,7 +46,17 @@ layout_mode = 2
 layout_mode = 2
 theme_override_constants/margin_right = 15
 
-[node name="CustomizationList" type="VBoxContainer" parent="MarginContainer/MainContainer/LeftPanel/PaddingContainer/ScrollContainer/ScrollPadding"]
+[node name="CustomizationList" type="HBoxContainer" parent="MarginContainer/MainContainer/LeftPanel/PaddingContainer/ScrollContainer/ScrollPadding"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 20
+alignment = 0
+
+[node name="LeftColumn" type="VBoxContainer" parent="MarginContainer/MainContainer/LeftPanel/PaddingContainer/ScrollContainer/ScrollPadding/CustomizationList"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="RightColumn" type="VBoxContainer" parent="MarginContainer/MainContainer/LeftPanel/PaddingContainer/ScrollContainer/ScrollPadding/CustomizationList"]
 layout_mode = 2
 size_flags_horizontal = 3
 
