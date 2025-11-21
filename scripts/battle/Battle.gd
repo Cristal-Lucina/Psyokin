@@ -1430,7 +1430,8 @@ func _on_battle_ended(victory: bool) -> void:
 			for ally in allies:
 				var portrait_id = ally.id + "_portrait"
 				if sprite_animator.sprite_instances.has(portrait_id):
-					var portrait_sprite = sprite_animator.sprite_instances[portrait_id]
+					var portrait_instance = sprite_animator.sprite_instances[portrait_id]
+					var portrait_sprite = portrait_instance["sprite"]
 					portrait_sprite.position.y -= 16  # Move up 16px
 					print("[Battle] Moved portrait sprite for %s up 16px (y: %d -> %d)" % [ally.display_name, portrait_sprite.position.y + 16, portrait_sprite.position.y])
 		else:
