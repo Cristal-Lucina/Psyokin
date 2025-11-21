@@ -491,10 +491,43 @@ func create_layer_section(layer: Dictionary, layer_index: int) -> VBoxContainer:
 	left_arrow.pressed.connect(_on_color_previous.bind(layer_index))
 	color_strip_row.add_child(left_arrow)
 
-	# Color slider (volume bar style)
+	# Color slider with gradient background
 	var palette_image = get_palette_image(layer.ramp_type)
 	var num_colors = min(layer.max_colors, palette_image.get_height() / 2 if palette_image else 0)
 
+	# Container to layer gradient and slider
+	var slider_container = Control.new()
+	slider_container.name = "SliderContainer"
+	slider_container.custom_minimum_size = Vector2(300, 20)
+	slider_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+
+	# Create gradient background
+	if palette_image and num_colors > 0:
+		var gradient = Gradient.new()
+
+		# Sample colors from palette and add to gradient
+		for i in range(num_colors):
+			var color = palette_image.get_pixel(4, i * 2)  # 3rd color from palette
+			var offset = float(i) / float(num_colors - 1) if num_colors > 1 else 0.0
+			gradient.add_point(offset, color)
+
+		# Create gradient texture
+		var gradient_texture = GradientTexture2D.new()
+		gradient_texture.gradient = gradient
+		gradient_texture.width = 300
+		gradient_texture.height = 20
+		gradient_texture.fill_from = Vector2(0, 0.5)
+		gradient_texture.fill_to = Vector2(1, 0.5)
+
+		# Create TextureRect to display gradient
+		var gradient_rect = TextureRect.new()
+		gradient_rect.texture = gradient_texture
+		gradient_rect.custom_minimum_size = Vector2(300, 20)
+		gradient_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		gradient_rect.stretch_mode = TextureRect.STRETCH_SCALE
+		slider_container.add_child(gradient_rect)
+
+	# Create slider on top of gradient
 	var color_slider = HSlider.new()
 	color_slider.name = "ColorSlider"
 	color_slider.custom_minimum_size = Vector2(300, 20)
@@ -504,7 +537,9 @@ func create_layer_section(layer: Dictionary, layer_index: int) -> VBoxContainer:
 	color_slider.value = current_colors.get(layer.code, 0)
 	color_slider.focus_mode = Control.FOCUS_NONE
 	color_slider.value_changed.connect(_on_color_slider_changed.bind(layer_index))
-	color_strip_row.add_child(color_slider)
+	slider_container.add_child(color_slider)
+
+	color_strip_row.add_child(slider_container)
 
 	# Right arrow
 	var right_arrow = Button.new()
@@ -756,7 +791,8 @@ func _on_color_previous(layer_index: int):
 	var color_container = section.get_node("ColorContainer")
 	var color_bar_container = color_container.get_node("ColorBarContainer")
 	var color_strip_row = color_bar_container.get_node("ColorStripRow")
-	var slider = color_strip_row.get_node("ColorSlider")
+	var slider_container = color_strip_row.get_node("SliderContainer")
+	var slider = slider_container.get_node("ColorSlider")
 	slider.value = color_index
 
 	update_preview()
@@ -776,7 +812,8 @@ func _on_color_next(layer_index: int):
 	var color_container = section.get_node("ColorContainer")
 	var color_bar_container = color_container.get_node("ColorBarContainer")
 	var color_strip_row = color_bar_container.get_node("ColorStripRow")
-	var slider = color_strip_row.get_node("ColorSlider")
+	var slider_container = color_strip_row.get_node("SliderContainer")
+	var slider = slider_container.get_node("ColorSlider")
 	slider.value = color_index
 
 	update_preview()
