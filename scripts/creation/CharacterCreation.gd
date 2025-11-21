@@ -42,21 +42,34 @@ const PERK_PATH    := "/root/aPerkSystem"
 const CPS_PATH     := "/root/aCombatProfileSystem"
 const ROUTER_PATH  := "/root/aSceneRouter"
 
-# Character directories
-const CHAR_BASE_PATH = "res://assets/graphics/characters/"
-const CHAR_VARIANTS = ["char_a_p1"]
+# Mana Seed character system paths
+const SPRITE_PATH = "res://assets/graphics/characters/New Character System/SpriteSystem/base_sheets/"
+const PALETTE_PATH = "res://assets/graphics/characters/New Character System/SpriteSystem/_supporting files/palettes/"
+const ANIM_DATA_PATH = "res://scenes/test/sprite_animations_data.csv"
 
-# Layer configuration
-const LAYERS = {
-	"base": {"code": "0bas", "node_name": "BaseSprite", "path": ""},
-	"outfit": {"code": "1out", "node_name": "OutfitSprite", "path": "1out"},
-	"cloak": {"code": "2clo", "node_name": "CloakSprite", "path": "2clo"},
-	"face": {"code": "3fac", "node_name": "FaceSprite", "path": "3fac"},
-	"hair": {"code": "4har", "node_name": "HairSprite", "path": "4har"},
-	"hat": {"code": "5hat", "node_name": "HatSprite", "path": "5hat"},
-	"tool_a": {"code": "6tla", "node_name": "ToolASprite", "path": "6tla"},
-	"tool_b": {"code": "7tlb", "node_name": "ToolBSprite", "path": "7tlb"}
-}
+# Mana Seed layer configuration (matching PlayerCharacterCreatorTest)
+const LAYERS = [
+	{"code": "01body", "label": "Skin Tone", "ramp_type": "skin", "max_colors": 18, "has_parts": false},
+	{"code": "02sock", "label": "Legwear", "ramp_type": "3color", "max_colors": 48, "has_parts": true},
+	{"code": "footwear", "label": "Footwear", "ramp_type": "3color", "max_colors": 48, "has_parts": true, "sprite_layers": ["03fot1", "07fot2"]},
+	{"code": "bottomwear", "label": "Bottomwear", "ramp_type": "3color", "max_colors": 48, "has_parts": true, "sprite_layers": ["04lwr1", "06lwr2", "08lwr3"]},
+	{"code": "05shrt", "label": "Topwear", "ramp_type": "3color", "max_colors": 48, "has_parts": true},
+	{"code": "09hand", "label": "Handwear", "ramp_type": "3color", "max_colors": 48, "has_parts": true},
+	{"code": "10outr", "label": "Overwear", "ramp_type": "3color", "max_colors": 48, "has_parts": true},
+	{"code": "11neck", "label": "Neckwear", "ramp_type": "4color", "max_colors": 59, "has_parts": true, "auto_match_layer": "00undr"},
+	{"code": "12face", "label": "Eyewear", "ramp_type": "3color", "max_colors": 48, "has_parts": true},
+	{"code": "13hair", "label": "Hairstyle", "ramp_type": "hair", "max_colors": 58, "has_parts": true},
+	{"code": "14head", "label": "Headwear", "ramp_type": "4color", "max_colors": 59, "has_parts": true}
+]
+
+# Animation options (Mana Seed system)
+const ANIMATIONS = ["Idle", "Walk", "Run", "Jump"]
+const ANIM_DIRECTIONS = ["DOWN", "RIGHT", "UP", "LEFT"]
+
+# Palette images for color mapping (loaded at runtime)
+var palette_images = {}
+var animations = {}  # Loaded from CSV
+var texture_cache = {}  # Cache for recolored textures
 
 # Direction mapping
 const DIRECTIONS = {
@@ -99,18 +112,19 @@ var _perk_id_by_idx : Dictionary = {}          # index -> perk_id
 var _perk_stat_by_idx : Dictionary = {}        # index -> stat_id (help text)
 var _perk_name_by_idx : Dictionary = {}        # index -> perk_name
 
-# Character state
-var current_direction = 0  # South
+# Character state (Mana Seed system)
+var current_direction = 0  # South (corresponds to "DOWN" in ANIM_DIRECTIONS)
 var current_frame = 0
-var available_parts = {}
-var current_selections = {}
-var selected_variants = {}  # Track variant codes for connecting animations
-var selected_outfit_type = ""  # "fstr" or "pfpn"
-var selected_hair_type = ""  # "bob1" or "dap1"
+var available_parts = {}  # Scanned sprite parts
+var current_selections = {}  # Current part selections {layer_code: part}
+var current_part_indices = {}  # Current part index for each layer {layer_code: index}
+var current_colors = {}  # Current color selections {layer_code: color_index}
+var current_animation = "Idle"  # Current animation
+var current_anim_direction = "DOWN"  # Current animation direction
 
-# Walk animation
+# Animation state (Mana Seed system)
 var animation_timer = 0.0
-var animation_speed = 0.135  # 135ms per frame for walk
+var current_frame_index = 0
 
 # Cinematic state
 var current_stage: CinematicStage = CinematicStage.OPENING_DIALOGUE_1
@@ -170,6 +184,9 @@ func _ready() -> void:
 	# Apply LoadoutPanel styling to all panels
 	_style_panels()
 
+	# Load Mana Seed system assets
+	load_palette_images()
+	load_animation_data()
 	scan_character_assets()
 	_fill_basics()
 	_wire_stat_toggles()
@@ -301,92 +318,185 @@ func _process(delta):
 	if cinematic_active:
 		_process_cinematic(delta)
 
-# ── Character Asset Scanning ─────────────────────────────────────────────────
-func scan_character_assets():
-	"""Scan the character assets folder to find all available parts"""
-	print("Scanning character assets...")
+# ── Mana Seed System Functions ──────────────────────────────────────────────
+func load_palette_images():
+	"""Load all palette images for color swapping"""
+	print("[CharacterCreation] Loading palette images...")
+	palette_images["3color"] = load(PALETTE_PATH + "mana seed 3-color ramps.png").get_image()
+	palette_images["4color"] = load(PALETTE_PATH + "mana seed 4-color ramps.png").get_image()
+	palette_images["hair"] = load(PALETTE_PATH + "mana seed hair ramps.png").get_image()
+	palette_images["skin"] = load(PALETTE_PATH + "mana seed skin ramps.png").get_image()
+	print("[CharacterCreation] Palette images loaded")
 
-	for variant in CHAR_VARIANTS:
-		var variant_path = CHAR_BASE_PATH + variant + "/"
-		var dir = DirAccess.open(variant_path)
+func load_animation_data():
+	"""Parse the CSV file to load animation data"""
+	print("[CharacterCreation] Loading animation data from CSV...")
+	var file = FileAccess.open(ANIM_DATA_PATH, FileAccess.READ)
+	if file == null:
+		print("[CharacterCreation] ERROR: Could not open animation CSV file")
+		return
 
-		if dir == null:
-			print("Could not open directory: ", variant_path)
+	# Skip header
+	file.get_csv_line()
+
+	while not file.eof_reached():
+		var line = file.get_csv_line()
+		if line.size() < 3:
 			continue
 
-		# Scan each layer
-		for layer_key in LAYERS:
-			var layer = LAYERS[layer_key]
-			var layer_path = variant_path + layer.path
+		var anim_name = line[0].strip_edges()
+		var direction = line[1].strip_edges().to_upper()
+		var frame_count = int(line[2].strip_edges())
 
-			if layer_key not in available_parts:
-				available_parts[layer_key] = []
+		if anim_name == "" or direction == "":
+			continue
 
-			# For base layer, files are directly in variant folder
-			if layer.path == "":
-				dir.list_dir_begin()
-				var file_name = dir.get_next()
-				while file_name != "":
-					if file_name.ends_with(".png") and layer.code in file_name:
-						var full_path = variant_path + file_name
-						var variant_code = extract_variant_code(file_name.get_basename())
-						available_parts[layer_key].append({
-							"name": file_name.get_basename(),
-							"path": full_path,
-							"variant": variant_code
-						})
-					file_name = dir.get_next()
-				dir.list_dir_end()
+		# Parse frames and times
+		var frames = []
+		var times = []
+
+		for i in range(frame_count):
+			var cell_idx = 3 + (i * 2)
+			var time_idx = 4 + (i * 2)
+
+			if cell_idx >= line.size() or time_idx >= line.size():
+				break
+
+			var cell_str = line[cell_idx].strip_edges()
+			var time_str = line[time_idx].strip_edges()
+
+			if cell_str == "":
+				break
+
+			# Parse cell
+			var frame_data = parse_cell(cell_str)
+			frames.append(frame_data)
+
+			# Parse time
+			var time_ms = 0
+			if time_str.to_lower() == "hold":
+				time_ms = -1
 			else:
-				# For other layers, check subdirectory
-				var subdir = DirAccess.open(layer_path)
-				if subdir:
-					subdir.list_dir_begin()
-					var file_name = subdir.get_next()
-					while file_name != "":
-						if file_name.ends_with(".png"):
-							var full_path = layer_path + "/" + file_name
-							var variant_code = extract_variant_code(file_name.get_basename())
-							available_parts[layer_key].append({
-								"name": file_name.get_basename(),
-								"path": full_path,
-								"variant": variant_code
-							})
-						file_name = subdir.get_next()
-					subdir.list_dir_end()
+				time_ms = int(time_str)
+			times.append(time_ms)
 
-	print("Asset scan complete. Found:")
-	for layer_key in available_parts:
-		print("  ", layer_key, ": ", available_parts[layer_key].size(), " items")
+		# Store animation data
+		if anim_name not in animations:
+			animations[anim_name] = {}
 
-func extract_variant_code(filename: String) -> String:
-	"""Extract the variant code from filename
-	Example: 'char_a_p1_0bas_humn_v06' -> 'humn_v06'
-	Example: 'char_a_p1_4har_bob1_v05' -> 'bob1_v05'
-	"""
-	# Split by underscores
-	var parts = filename.split("_")
+		animations[anim_name][direction] = {
+			"frames": frames,
+			"times": times,
+			"total_frames": frames.size()
+		}
 
-	# Find the part that contains the item code and variant
-	# Format is usually: char_a_p1_LAYER_ITEM_VARIANT
-	# We want the last two parts (ITEM_VARIANT)
-	if parts.size() >= 2:
-		var item_code = parts[parts.size() - 2]
-		var variant_code = parts[parts.size() - 1]
-		return item_code + "_" + variant_code
+	file.close()
+	print("[CharacterCreation] Loaded ", animations.size(), " animations")
 
-	return ""
+func parse_cell(cell_str: String) -> Dictionary:
+	"""Parse cell string like '48f' into {cell: int, flip: bool}"""
+	var flip = false
+	var cell_num = 0
+
+	if cell_str.to_lower().ends_with("f"):
+		flip = true
+		cell_str = cell_str.substr(0, cell_str.length() - 1)
+
+	cell_num = int(cell_str)
+	return {"cell": cell_num, "flip": flip}
+
+# ── Character Asset Scanning ─────────────────────────────────────────────────
+func scan_character_assets():
+	"""Scan sprite system folders for available parts (Mana Seed system)"""
+	print("[CharacterCreation] Scanning Mana Seed character assets...")
+
+	for layer in LAYERS:
+		var layer_code = layer.code
+
+		# Check if this layer uses multiple sprite layers (like footwear)
+		var sprite_codes = []
+		if "sprite_layers" in layer:
+			sprite_codes = layer.sprite_layers
+		else:
+			sprite_codes = [layer_code]
+
+		if layer_code not in available_parts:
+			available_parts[layer_code] = []
+
+		# Scan all sprite layer directories
+		for sprite_code in sprite_codes:
+			var layer_path = SPRITE_PATH + sprite_code + "/"
+			var dir = DirAccess.open(layer_path)
+
+			if dir == null:
+				print("[CharacterCreation]   Sprite layer ", sprite_code, ": not found")
+				continue
+
+			dir.list_dir_begin()
+			var file_name = dir.get_next()
+			while file_name != "":
+				if file_name.ends_with(".png") and file_name.begins_with("fbas_"):
+					var full_path = layer_path + file_name
+					var part_info = parse_filename(file_name, sprite_code)
+					part_info["path"] = full_path
+					part_info["sprite_code"] = sprite_code  # Track which sprite layer this belongs to
+					available_parts[layer_code].append(part_info)
+				file_name = dir.get_next()
+			dir.list_dir_end()
+
+		# Also scan auto-match layer if defined (like 00undr for neckwear)
+		if "auto_match_layer" in layer:
+			var auto_layer_code = layer.auto_match_layer
+			var auto_layer_path = SPRITE_PATH + auto_layer_code + "/"
+			var auto_dir = DirAccess.open(auto_layer_path)
+
+			if auto_layer_code not in available_parts:
+				available_parts[auto_layer_code] = []
+
+			if auto_dir != null:
+				auto_dir.list_dir_begin()
+				var file_name = auto_dir.get_next()
+				while file_name != "":
+					if file_name.ends_with(".png") and file_name.begins_with("fbas_"):
+						var full_path = auto_layer_path + file_name
+						var part_info = parse_filename(file_name, auto_layer_code)
+						part_info["path"] = full_path
+						part_info["sprite_code"] = auto_layer_code
+						available_parts[auto_layer_code].append(part_info)
+					file_name = auto_dir.get_next()
+				auto_dir.list_dir_end()
+				print("[CharacterCreation]   Auto-match layer ", auto_layer_code, ": found ", available_parts[auto_layer_code].size(), " parts")
+
+		print("[CharacterCreation]   Layer ", layer_code, ": found ", available_parts[layer_code].size(), " parts")
+
+	print("[CharacterCreation] Asset scan complete")
+
+func parse_filename(filename: String, layer_code: String) -> Dictionary:
+	"""Parse Mana Seed filename format"""
+	var parts = filename.get_basename().split("_")
+	var result = {
+		"name": filename.get_basename(),
+		"base_name": "",
+		"palette_code": "",
+		"display_name": filename.get_basename()
+	}
+
+	if parts.size() >= 4:
+		result["base_name"] = parts[2]
+		result["palette_code"] = parts[3]
+		result["display_name"] = parts[2].capitalize()
+
+	return result
 
 func set_default_character():
-	"""Set up a default character with defaults"""
-	# Set default skin tone (Tone 0)
-	_on_body_selected(0)
-	# Set default outfit (Vest)
-	selected_outfit_type = "fstr"
-	_on_outfit_selected(0)
-	# Set default hair (Bob, Color 0)
-	selected_hair_type = "bob1"
-	_on_hair_selected(0)
+	"""Set up default character - naked with just body"""
+	# Set default body color
+	current_colors["01body"] = 0
+
+	# Initialize all part indices to -1 (None) so character starts naked
+	for layer in LAYERS:
+		if layer.has_parts:
+			current_part_indices[layer.code] = -1
 
 func _on_part_selected(layer_key: String, part):
 	"""Handle part selection"""
