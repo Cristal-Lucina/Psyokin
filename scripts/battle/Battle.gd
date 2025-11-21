@@ -1804,7 +1804,8 @@ func _set_fainted(target: Dictionary) -> void:
 
 	# Play faint animation (Hurt) and fade out
 	if sprite_animator:
-		var direction = "DOWN"
+		# Enemies face player, so use LEFT direction to flip horizontally
+		var direction = "LEFT" if not target.get("is_ally", false) else "DOWN"
 		sprite_animator.play_animation(target.id, "Hurt", direction, true)  # true = hold
 		print("[Battle] Playing faint animation (hold): Hurt for %s" % target.id)
 
@@ -2880,7 +2881,7 @@ func _execute_attack(target: Dictionary) -> void:
 					"spear", "pierce":
 						anim_name = "Spear Strike"
 					_:
-						anim_name = "Sword Strike"  # Default attack animation
+						anim_name = "Wand Strike"  # Default attack animation (was Sword Strike)
 
 				# Determine direction based on ally/enemy
 				var direction = "RIGHT" if current_combatant.is_ally else "LEFT"
@@ -4625,6 +4626,37 @@ func _execute_enemy_ai() -> void:
 		# Start building turn message
 		start_turn_message()
 		add_turn_line("%s attacked %s!" % [current_combatant.display_name, target.display_name])
+
+		# Play enemy attack animation
+		if sprite_animator:
+			# Detect weapon type from enemy profile
+			var weapon_type = "Neutral"
+			if current_combatant.has("profile"):
+				var profile = current_combatant.profile
+				if profile != null and profile.has("weapon") and profile.weapon.has("type"):
+					weapon_type = profile.get("weapon", {}).get("type", "Neutral")
+
+			# Map weapon type to animation name
+			var anim_name = "Idle"
+			match weapon_type.to_lower():
+				"wand":
+					anim_name = "Wand Strike"
+				"sword":
+					anim_name = "Sword Strike"
+				"hammer", "impact":
+					anim_name = "Hammer Strike"
+				"spear", "pierce":
+					anim_name = "Spear Strike"
+				_:
+					anim_name = "Wand Strike"  # Default attack animation
+
+			# Enemies face player, so use LEFT direction
+			var direction = "LEFT"
+			sprite_animator.play_animation(current_combatant.id, anim_name, direction, false, true)
+			print("[Battle] Playing enemy attack animation: %s %s for %s (weapon: %s)" % [anim_name, direction, current_combatant.id, weapon_type])
+
+			# Wait for animation to complete
+			await get_tree().create_timer(1.0).timeout
 
 		# First, check if the attack hits
 		var hit_check = combat_resolver.check_physical_hit(current_combatant, target)
