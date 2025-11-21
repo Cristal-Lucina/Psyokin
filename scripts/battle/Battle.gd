@@ -3045,37 +3045,37 @@ func _execute_attack(target: Dictionary) -> void:
 			# Wait for messages to be displayed to player
 			await _wait_for_message_queue()
 
-		# Now jump and fade out attacker
-		if sprite_animator and sprite_animator.sprite_instances.has(current_combatant.id):
-			var attacker_instance = sprite_animator.sprite_instances[current_combatant.id]
-			var attacker_sprite = attacker_instance["sprite"]
+			# Now jump and fade out attacker
+			if sprite_animator and sprite_animator.sprite_instances.has(current_combatant.id):
+				var attacker_instance = sprite_animator.sprite_instances[current_combatant.id]
+				var attacker_sprite = attacker_instance["sprite"]
 
-			# Manually set jump frame 33 for 400ms
-			var is_layered = attacker_instance.get("is_layered", false)
-			if is_layered:
-				var layer_sprites = attacker_instance.get("layer_sprites", {})
-				for sprite_code in layer_sprites:
-					var sprite = layer_sprites[sprite_code]
-					if sprite and sprite.visible and sprite.texture:
-						sprite.frame = 33
-			else:
-				attacker_sprite.frame = 33
+				# Manually set jump frame 33 for 400ms
+				var is_layered = attacker_instance.get("is_layered", false)
+				if is_layered:
+					var layer_sprites = attacker_instance.get("layer_sprites", {})
+					for sprite_code in layer_sprites:
+						var sprite = layer_sprites[sprite_code]
+						if sprite and sprite.visible and sprite.texture:
+							sprite.frame = 33
+				else:
+					attacker_sprite.frame = 33
 
-			await get_tree().create_timer(0.4).timeout
+				await get_tree().create_timer(0.4).timeout
 
-			# Set jump frame 34 and fade out completely during 900ms
-			if is_layered:
-				var layer_sprites = attacker_instance.get("layer_sprites", {})
-				for sprite_code in layer_sprites:
-					var sprite = layer_sprites[sprite_code]
-					if sprite and sprite.visible and sprite.texture:
-						sprite.frame = 34
-			else:
-				attacker_sprite.frame = 34
+				# Set jump frame 34 and fade out completely during 900ms
+				if is_layered:
+					var layer_sprites = attacker_instance.get("layer_sprites", {})
+					for sprite_code in layer_sprites:
+						var sprite = layer_sprites[sprite_code]
+						if sprite and sprite.visible and sprite.texture:
+							sprite.frame = 34
+				else:
+					attacker_sprite.frame = 34
 
-			var fade_out_tween = create_tween()
-			fade_out_tween.tween_property(attacker_sprite, "modulate:a", 0.0, 0.9)
-			await fade_out_tween.finished
+				var fade_out_tween = create_tween()
+				fade_out_tween.tween_property(attacker_sprite, "modulate:a", 0.0, 0.9)
+				await fade_out_tween.finished
 
 			# Debug: show hit, crit, and damage breakdown
 			var hit_breakdown = hit_check.breakdown
@@ -7540,37 +7540,37 @@ func _execute_skill_single(target: Dictionary) -> void:
 	# Wait for messages to be displayed to player
 	await _wait_for_message_queue()
 
-		# Now jump and fade out attacker
-		if sprite_animator and sprite_animator.sprite_instances.has(current_combatant.id):
-			var attacker_instance = sprite_animator.sprite_instances[current_combatant.id]
-			var attacker_sprite = attacker_instance["sprite"]
+	# Now jump and fade out attacker
+	if sprite_animator and sprite_animator.sprite_instances.has(current_combatant.id):
+		var attacker_instance = sprite_animator.sprite_instances[current_combatant.id]
+		var attacker_sprite = attacker_instance["sprite"]
 
-			# Manually set jump frame 33 for 400ms
-			var is_layered = attacker_instance.get("is_layered", false)
-			if is_layered:
-				var layer_sprites = attacker_instance.get("layer_sprites", {})
-				for sprite_code in layer_sprites:
-					var sprite = layer_sprites[sprite_code]
-					if sprite and sprite.visible and sprite.texture:
-						sprite.frame = 33
-			else:
-				attacker_sprite.frame = 33
+		# Manually set jump frame 33 for 400ms
+		var is_layered = attacker_instance.get("is_layered", false)
+		if is_layered:
+			var layer_sprites = attacker_instance.get("layer_sprites", {})
+			for sprite_code in layer_sprites:
+				var sprite = layer_sprites[sprite_code]
+				if sprite and sprite.visible and sprite.texture:
+					sprite.frame = 33
+		else:
+			attacker_sprite.frame = 33
 
-			await get_tree().create_timer(0.4).timeout
+		await get_tree().create_timer(0.4).timeout
 
-			# Set jump frame 34 and fade out completely during 900ms
-			if is_layered:
-				var layer_sprites = attacker_instance.get("layer_sprites", {})
-				for sprite_code in layer_sprites:
-					var sprite = layer_sprites[sprite_code]
-					if sprite and sprite.visible and sprite.texture:
-						sprite.frame = 34
-			else:
-				attacker_sprite.frame = 34
+		# Set jump frame 34 and fade out completely during 900ms
+		if is_layered:
+			var layer_sprites = attacker_instance.get("layer_sprites", {})
+			for sprite_code in layer_sprites:
+				var sprite = layer_sprites[sprite_code]
+				if sprite and sprite.visible and sprite.texture:
+					sprite.frame = 34
+		else:
+			attacker_sprite.frame = 34
 
-			var fade_out_tween = create_tween()
-			fade_out_tween.tween_property(attacker_sprite, "modulate:a", 0.0, 0.9)
-			await fade_out_tween.finished
+		var fade_out_tween = create_tween()
+		fade_out_tween.tween_property(attacker_sprite, "modulate:a", 0.0, 0.9)
+		await fade_out_tween.finished
 
 	# Update displays
 	_update_combatant_displays()
