@@ -1793,23 +1793,34 @@ func _on_turn_started(combatant_id: String) -> void:
 	# Wait for player to press continue before proceeding
 	await _wait_for_message_queue()
 
-	# Slide attacker forward with Run animation
+	# Slide attacker forward with character animation from CSV
 	if sprite_animator and sprite_animator.sprite_instances.has(current_combatant.id):
 		var attacker_instance = sprite_animator.sprite_instances[current_combatant.id]
 		var attacker_sprite = attacker_instance["sprite"]
 
-		# Determine direction for run animation
-		var run_direction = "RIGHT" if current_combatant.is_ally else "LEFT"
-		sprite_animator.play_animation(current_combatant.id, "Run", run_direction, false, false)
+		# Get position config from CSV for this combatant
+		var combatant_index = _get_combatant_position_index(current_combatant.id)
+		var side = "ally" if current_combatant.is_ally else "enemy"
+		var pos_config = {}
+		if battle_flow_config and combatant_index >= 0:
+			pos_config = battle_flow_config.get_marker_position(side, combatant_index)
+
+		# Get animation and direction from CSV (or use defaults)
+		var anim_name = pos_config.get("turn_start_anim", "Run")
+		var anim_direction = pos_config.get("turn_start_direction", "RIGHT" if current_combatant.is_ally else "LEFT")
+		var slide_distance = pos_config.get("slide_forward_distance", 30.0 if current_combatant.is_ally else -30.0)
+		var slide_duration = pos_config.get("slide_forward_duration", 0.3)
+
+		# Play animation from CSV
+		sprite_animator.play_animation(current_combatant.id, anim_name, anim_direction, false, false)
 
 		# Slide forward
-		var slide_distance = 30.0 if current_combatant.is_ally else -30.0
 		var tween = create_tween()
-		tween.tween_property(attacker_sprite, "position:x", attacker_sprite.position.x + slide_distance, 0.3)
+		tween.tween_property(attacker_sprite, "position:x", attacker_sprite.position.x + slide_distance, slide_duration)
 		await tween.finished
 
 		# Return to idle
-		sprite_animator.play_animation(current_combatant.id, "Idle", run_direction, false, false)
+		sprite_animator.play_animation(current_combatant.id, "Idle", anim_direction, false, false)
 
 	# Animate turn indicator AFTER message is displayed
 	_animate_turn_indicator(combatant_id)
@@ -1984,6 +1995,55 @@ func _parse_tween_ease(ease_str: String) -> Tween.EaseType:
 			return Tween.EASE_OUT_IN
 		_:
 			return Tween.EASE_OUT  # Default
+
+func _get_combatant_position_index(combatant_id: String) -> int:
+	"""Get the position index (0, 1, 2) for a combatant based on their ID"""
+	# Check allies
+	var allies = battle_mgr.get_ally_combatants()
+	for i in range(allies.size()):
+		if allies[i].id == combatant_id:
+			return i
+
+	# Check enemies
+	var enemies = battle_mgr.get_enemy_combatants()
+	for i in range(enemies.size()):
+		if enemies[i].id == combatant_id:
+			return i
+
+	return -1  # Not found
+
+func _slide_character_back(combatant: Dictionary):
+	"""Slide character sprite back to original position with animation from CSV"""
+	if not sprite_animator or not sprite_animator.sprite_instances.has(combatant.id):
+		return
+
+	var attacker_instance = sprite_animator.sprite_instances[combatant.id]
+	var attacker_sprite = attacker_instance["sprite"]
+
+	# Get position config from CSV for this combatant
+	var combatant_index = _get_combatant_position_index(combatant.id)
+	var side = "ally" if combatant.is_ally else "enemy"
+	var pos_config = {}
+	if battle_flow_config and combatant_index >= 0:
+		pos_config = battle_flow_config.get_marker_position(side, combatant_index)
+
+	# Get animation and direction from CSV (or use defaults)
+	var anim_name = pos_config.get("turn_end_anim", "Run")
+	var anim_direction = pos_config.get("turn_end_direction", "RIGHT")
+	var slide_distance = pos_config.get("slide_back_distance", -30.0 if combatant.is_ally else 30.0)
+	var slide_duration = pos_config.get("slide_back_duration", 0.3)
+
+	# Play animation from CSV
+	sprite_animator.play_animation(combatant.id, anim_name, anim_direction, false, false)
+
+	# Slide back to original position
+	var tween = create_tween()
+	tween.tween_property(attacker_sprite, "position:x", attacker_sprite.position.x + slide_distance, slide_duration)
+	await tween.finished
+
+	# Return to idle facing appropriate direction
+	var idle_direction = "RIGHT" if combatant.is_ally else "LEFT"
+	sprite_animator.play_animation(combatant.id, "Idle", idle_direction, false, false)
 
 func _on_turn_ended(_combatant_id: String) -> void:
 	"""Called when a combatant's turn ends"""

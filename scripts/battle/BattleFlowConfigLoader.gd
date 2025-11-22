@@ -308,7 +308,7 @@ func _load_marker_positions() -> bool:
 		var line = file.get_csv_line()
 
 		# Skip empty lines
-		if line.size() < 17 or line[0].strip_edges() == "":
+		if line.size() < 22 or line[0].strip_edges() == "":
 			continue
 
 		var position_id = int(line[0].strip_edges())
@@ -329,10 +329,15 @@ func _load_marker_positions() -> bool:
 			"shadow_scale_x": float(line[10].strip_edges()),
 			"shadow_scale_y": float(line[11].strip_edges()),
 			"z_index": int(line[12].strip_edges()),
-			"slide_distance": float(line[13].strip_edges()),
-			"slide_duration": float(line[14].strip_edges()),
-			"slide_ease": line[15].strip_edges(),
-			"notes": line[16].strip_edges(),
+			"turn_start_anim": line[13].strip_edges(),
+			"turn_start_direction": line[14].strip_edges(),
+			"turn_end_anim": line[15].strip_edges(),
+			"turn_end_direction": line[16].strip_edges(),
+			"slide_forward_distance": float(line[17].strip_edges()),
+			"slide_forward_duration": float(line[18].strip_edges()),
+			"slide_back_distance": float(line[19].strip_edges()),
+			"slide_back_duration": float(line[20].strip_edges()),
+			"notes": line[21].strip_edges(),
 		}
 
 		# Store by key: "side_index" (e.g., "ally_0", "enemy_1")
