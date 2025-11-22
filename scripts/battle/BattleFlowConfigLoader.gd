@@ -7,9 +7,13 @@ class_name BattleFlowConfigLoader
 ## Loads and applies battle flow configuration from CSV files
 ## - battle_flow_config.csv: Element priorities and concurrent allowances
 ## - battle_events.csv: Special battle events and sequences
+## - character_marker_positions.csv: Character sprite positioning
+## - turn_indicator_animation.csv: Turn panel slide animation
 
 const CONFIG_PATH = "res://data/combat/battle_flow_config.csv"
 const EVENTS_PATH = "res://data/combat/battle_events.csv"
+const MARKER_POSITIONS_PATH = "res://data/combat/character_marker_positions.csv"
+const TURN_ANIM_PATH = "res://data/combat/turn_indicator_animation.csv"
 
 ## Priority mapping
 const PRIORITY_MAP = {
@@ -32,6 +36,8 @@ var element_priorities: Dictionary = {}
 var concurrent_elements: Dictionary = {}
 var active_on_start: Array[int] = []
 var battle_events: Array[Dictionary] = []
+var marker_positions: Dictionary = {}  # {side_index: position_config}
+var turn_animation: Dictionary = {}  # Turn indicator animation settings
 
 func load_config() -> bool:
 	"""Load battle flow configuration from CSV"""
@@ -43,11 +49,21 @@ func load_config() -> bool:
 		push_error("[BattleFlowConfigLoader] Failed to load events config")
 		return false
 
+	if not _load_marker_positions():
+		push_error("[BattleFlowConfigLoader] Failed to load marker positions")
+		return false
+
+	if not _load_turn_animation():
+		push_error("[BattleFlowConfigLoader] Failed to load turn animation")
+		return false
+
 	print("[BattleFlowConfigLoader] Configuration loaded successfully")
 	print("  - %d element priorities configured" % element_priorities.size())
 	print("  - %d concurrent element sets configured" % concurrent_elements.size())
 	print("  - %d elements active on battle start" % active_on_start.size())
 	print("  - %d battle events configured" % battle_events.size())
+	print("  - %d marker positions configured" % marker_positions.size())
+	print("  - Turn animation: %s" % ("enabled" if turn_animation.get("enabled", false) else "disabled"))
 
 	return true
 
@@ -276,6 +292,98 @@ func _check_trigger_condition(condition: String, context: Dictionary) -> bool:
 			return variable_value == comparison_value
 
 	return false
+
+func _load_marker_positions() -> bool:
+	"""Load character marker positions from character_marker_positions.csv"""
+	var file = FileAccess.open(MARKER_POSITIONS_PATH, FileAccess.READ)
+	if not file:
+		push_error("[BattleFlowConfigLoader] Cannot open file: %s" % MARKER_POSITIONS_PATH)
+		return false
+
+	# Skip header
+	var header = file.get_csv_line()
+
+	# Read each line
+	while not file.eof_reached():
+		var line = file.get_csv_line()
+
+		# Skip empty lines
+		if line.size() < 17 or line[0].strip_edges() == "":
+			continue
+
+		var position_id = int(line[0].strip_edges())
+		var side = line[1].strip_edges()
+		var position_index = int(line[2].strip_edges())
+
+		var position_config = {
+			"position_id": position_id,
+			"side": side,
+			"position_index": position_index,
+			"position_name": line[3].strip_edges(),
+			"sprite_x": float(line[4].strip_edges()),
+			"sprite_y": float(line[5].strip_edges()),
+			"sprite_scale": float(line[6].strip_edges()),
+			"x_offset": float(line[7].strip_edges()),
+			"shadow_x": float(line[8].strip_edges()),
+			"shadow_y": float(line[9].strip_edges()),
+			"shadow_scale_x": float(line[10].strip_edges()),
+			"shadow_scale_y": float(line[11].strip_edges()),
+			"z_index": int(line[12].strip_edges()),
+			"slide_distance": float(line[13].strip_edges()),
+			"slide_duration": float(line[14].strip_edges()),
+			"slide_ease": line[15].strip_edges(),
+			"notes": line[16].strip_edges(),
+		}
+
+		# Store by key: "side_index" (e.g., "ally_0", "enemy_1")
+		var key = "%s_%d" % [side, position_index]
+		marker_positions[key] = position_config
+
+	file.close()
+	return true
+
+func _load_turn_animation() -> bool:
+	"""Load turn indicator animation from turn_indicator_animation.csv"""
+	var file = FileAccess.open(TURN_ANIM_PATH, FileAccess.READ)
+	if not file:
+		push_error("[BattleFlowConfigLoader] Cannot open file: %s" % TURN_ANIM_PATH)
+		return false
+
+	# Skip header
+	var header = file.get_csv_line()
+
+	# Read first data line (should only be one config)
+	var line = file.get_csv_line()
+
+	if line.size() < 11 or line[0].strip_edges() == "":
+		push_error("[BattleFlowConfigLoader] Invalid turn animation config")
+		return false
+
+	turn_animation = {
+		"animation_id": int(line[0].strip_edges()),
+		"animation_name": line[1].strip_edges(),
+		"enabled": line[2].strip_edges().to_upper() == "TRUE",
+		"slide_distance": float(line[3].strip_edges()),
+		"slide_forward_duration": float(line[4].strip_edges()),
+		"slide_forward_trans": line[5].strip_edges(),
+		"slide_forward_ease": line[6].strip_edges(),
+		"slide_back_duration": float(line[7].strip_edges()),
+		"slide_back_trans": line[8].strip_edges(),
+		"slide_back_ease": line[9].strip_edges(),
+		"notes": line[10].strip_edges(),
+	}
+
+	file.close()
+	return true
+
+func get_marker_position(side: String, index: int) -> Dictionary:
+	"""Get position config for a character marker"""
+	var key = "%s_%d" % [side, index]
+	return marker_positions.get(key, {})
+
+func get_turn_animation() -> Dictionary:
+	"""Get turn indicator animation settings"""
+	return turn_animation
 
 func reset_event_triggers():
 	"""Reset all event trigger tracking"""

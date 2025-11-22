@@ -1,0 +1,7 @@
+position_id,side,position_index,position_name,sprite_x,sprite_y,sprite_scale,x_offset,shadow_x,shadow_y,shadow_scale_x,shadow_scale_y,z_index,slide_distance,slide_duration,slide_ease,notes
+1,ally,0,Hero/Top,40,40,4.375,0,40,55,3,1.5,108,140,0.3,CUBIC_OUT,Main hero position - no offset
+2,ally,1,Middle,-20,40,4.375,-60,-20,55,3,1.5,109,140,0.3,CUBIC_OUT,Middle ally - 60px left offset
+3,ally,2,Bottom,-80,40,4.375,-120,-80,55,3,1.5,110,140,0.3,CUBIC_OUT,Bottom ally - 120px left offset (formation depth)
+4,enemy,0,Top,40,40,4.375,0,40,55,3,1.5,108,140,0.3,CUBIC_OUT,Top enemy - no offset
+5,enemy,1,Middle,100,40,4.375,60,100,55,3,1.5,109,140,0.3,CUBIC_OUT,Middle enemy - 60px right offset
+6,enemy,2,Bottom,160,40,4.375,120,160,55,3,1.5,110,140,0.3,CUBIC_OUT,Bottom enemy - 120px right offset (formation depth)

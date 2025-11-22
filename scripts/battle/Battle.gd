@@ -1871,9 +1871,18 @@ func _animate_turn_indicator(combatant_id: String) -> void:
 	active_turn_panel = combatant_panels[combatant_id]
 	active_turn_original_pos = Vector2(active_turn_panel.offset_left, active_turn_panel.offset_right)
 
+	# Get turn animation config from CSV (or use defaults)
+	var turn_anim = {}
+	if battle_flow_config:
+		turn_anim = battle_flow_config.get_turn_animation()
+
+	# Check if animation is enabled
+	if not turn_anim.get("enabled", true):
+		return  # Skip animation if disabled in CSV
+
 	# Determine direction based on whether ally or enemy
 	var is_ally = active_turn_panel.get_meta("is_ally", false)
-	var slide_distance = 140.0  # Slide forward when it's their turn (40 + 100 additional)
+	var slide_distance = turn_anim.get("slide_distance", 140.0)
 
 	# Calculate target offsets for slide
 	var target_offset_left = active_turn_panel.offset_left
@@ -1888,13 +1897,18 @@ func _animate_turn_indicator(combatant_id: String) -> void:
 		target_offset_left -= slide_distance
 		target_offset_right -= slide_distance
 
+	# Get transition and ease settings from CSV
+	var trans_type = _parse_tween_trans(turn_anim.get("slide_forward_trans", "CUBIC"))
+	var ease_type = _parse_tween_ease(turn_anim.get("slide_forward_ease", "OUT"))
+	var duration = turn_anim.get("slide_forward_duration", 0.3)
+
 	# Animate slide using offsets (won't conflict with layout containers)
 	var tween = create_tween()
-	tween.set_trans(Tween.TRANS_CUBIC)
-	tween.set_ease(Tween.EASE_OUT)
+	tween.set_trans(trans_type)
+	tween.set_ease(ease_type)
 	tween.set_parallel(true)
-	tween.tween_property(active_turn_panel, "offset_left", target_offset_left, 0.3)
-	tween.tween_property(active_turn_panel, "offset_right", target_offset_right, 0.3)
+	tween.tween_property(active_turn_panel, "offset_left", target_offset_left, duration)
+	tween.tween_property(active_turn_panel, "offset_right", target_offset_right, duration)
 
 func _reset_turn_indicator() -> void:
 	"""Reset the turn indicator animation (awaitable to wait for completion)"""
@@ -1906,16 +1920,70 @@ func _reset_turn_indicator() -> void:
 		# Clear the active reference immediately
 		active_turn_panel = null
 
+		# Get turn animation config from CSV (or use defaults)
+		var turn_anim = {}
+		if battle_flow_config:
+			turn_anim = battle_flow_config.get_turn_animation()
+
+		# Get transition and ease settings for slide back
+		var trans_type = _parse_tween_trans(turn_anim.get("slide_back_trans", "CUBIC"))
+		var ease_type = _parse_tween_ease(turn_anim.get("slide_back_ease", "IN"))
+		var duration = turn_anim.get("slide_back_duration", 0.2)
+
 		# Animate back to original position
 		var tween = create_tween()
-		tween.set_trans(Tween.TRANS_CUBIC)
-		tween.set_ease(Tween.EASE_IN)
+		tween.set_trans(trans_type)
+		tween.set_ease(ease_type)
 		tween.set_parallel(true)
-		tween.tween_property(panel_to_reset, "offset_left", original_pos.x, 0.2)
-		tween.tween_property(panel_to_reset, "offset_right", original_pos.y, 0.2)
+		tween.tween_property(panel_to_reset, "offset_left", original_pos.x, duration)
+		tween.tween_property(panel_to_reset, "offset_right", original_pos.y, duration)
 
 		# Wait for animation to complete
 		await tween.finished
+
+func _parse_tween_trans(trans_str: String) -> Tween.TransitionType:
+	"""Parse tween transition type from CSV string"""
+	match trans_str.to_upper():
+		"LINEAR":
+			return Tween.TRANS_LINEAR
+		"SINE":
+			return Tween.TRANS_SINE
+		"QUINT":
+			return Tween.TRANS_QUINT
+		"QUART":
+			return Tween.TRANS_QUART
+		"QUAD":
+			return Tween.TRANS_QUAD
+		"EXPO":
+			return Tween.TRANS_EXPO
+		"ELASTIC":
+			return Tween.TRANS_ELASTIC
+		"CUBIC":
+			return Tween.TRANS_CUBIC
+		"CIRC":
+			return Tween.TRANS_CIRC
+		"BOUNCE":
+			return Tween.TRANS_BOUNCE
+		"BACK":
+			return Tween.TRANS_BACK
+		"SPRING":
+			return Tween.TRANS_SPRING
+		_:
+			return Tween.TRANS_CUBIC  # Default
+
+func _parse_tween_ease(ease_str: String) -> Tween.EaseType:
+	"""Parse tween ease type from CSV string"""
+	match ease_str.to_upper():
+		"IN":
+			return Tween.EASE_IN
+		"OUT":
+			return Tween.EASE_OUT
+		"IN_OUT":
+			return Tween.EASE_IN_OUT
+		"OUT_IN":
+			return Tween.EASE_OUT_IN
+		_:
+			return Tween.EASE_OUT  # Default
 
 func _on_turn_ended(_combatant_id: String) -> void:
 	"""Called when a combatant's turn ends"""
@@ -2396,17 +2464,23 @@ func _display_combatants() -> void:
 		ally_slots.add_child(slot)
 		combatant_panels[ally.id] = slot
 
-		# Calculate horizontal offset for fighting stance
-		# VBoxContainer controls slot position, so we offset the sprite instead
-		var x_offset = 0
-		if i == 0:  # Top ally (hero) - no offset
-			x_offset = 0
-		elif i == 1:  # Middle ally - shift left 60px
-			x_offset = -60
-		elif i == 2:  # Bottom ally - shift left 120px
-			x_offset = -120
+		# Get position config from CSV (or use defaults)
+		var pos_config = {}
+		if battle_flow_config:
+			pos_config = battle_flow_config.get_marker_position("ally", i)
 
-		print("[Battle] Ally %d (%s) will apply x_offset = %d to sprite" % [i, ally.display_name, x_offset])
+		# Calculate horizontal offset for fighting stance (use CSV or defaults)
+		var x_offset = pos_config.get("x_offset", 0.0 if i == 0 else -60.0 if i == 1 else -120.0)
+		var sprite_x = pos_config.get("sprite_x", 40.0)
+		var sprite_y = pos_config.get("sprite_y", 40.0)
+		var sprite_scale = pos_config.get("sprite_scale", 4.375)
+		var shadow_x = pos_config.get("shadow_x", sprite_x)
+		var shadow_y = pos_config.get("shadow_y", 55.0)
+		var shadow_scale_x = pos_config.get("shadow_scale_x", 3.0)
+		var shadow_scale_y = pos_config.get("shadow_scale_y", 1.5)
+		var z_index_base = pos_config.get("z_index", 108)
+
+		print("[Battle] Ally %d (%s) will apply x_offset = %.1f to sprite" % [i, ally.display_name, x_offset])
 
 		# Store sprite offset for selection indicator positioning
 		combatant_sprite_offsets[ally.id] = x_offset
@@ -2416,26 +2490,24 @@ func _display_combatants() -> void:
 		if sprite_animator:
 			var sprite = sprite_animator.create_sprite_for_combatant(ally.id, slot, ally.get("display_name", ""), true)
 			if sprite:
-				# Position and scale sprite for 70px height
-				# Apply x_offset to sprite position (not slot position, since VBoxContainer controls that)
-				sprite.position = Vector2(40 + x_offset, 40)
-				sprite.scale = Vector2(4.375, 4.375)  # 70px height
+				# Position and scale sprite using CSV config
+				sprite.position = Vector2(sprite_x, sprite_y)
+				sprite.scale = Vector2(sprite_scale, sprite_scale)
 				print("[Battle] Ally %d (%s) sprite positioned at (%.2f, %.2f)" % [i, ally.display_name, sprite.position.x, sprite.position.y])
 
-				# Create shadow circle at base of sprite (also offset)
+				# Create shadow circle at base of sprite using CSV config
 				var shadow = Sprite2D.new()
 				shadow.name = "Shadow"
 				var shadow_texture = _create_shadow_circle_texture()
 				shadow.texture = shadow_texture
 				shadow.modulate = Color(0, 0, 0, 0.7)  # Darker, more visible shadow
-				shadow.position = Vector2(40 + x_offset, 55)  # Closer to sprite base
-				shadow.scale = Vector2(3, 1.5)  # Larger ellipse shape for better visibility
+				shadow.position = Vector2(shadow_x, shadow_y)
+				shadow.scale = Vector2(shadow_scale_x, shadow_scale_y)
 				shadow.z_index = 104  # Below sprite (sprites at 108-110)
 				slot.add_child(shadow)
 
-				# Depth-based z-layering: bottom allies have higher z (appear in front)
-				# Ally 0 (top) = 108, Ally 1 (middle) = 109, Ally 2 (bottom) = 110
-				sprite.z_index = 108 + i
+				# Depth-based z-layering using CSV config
+				sprite.z_index = z_index_base
 
 				print("[Battle] Created shadow for ally: %s at position (%f, %f) with z-index %d" % [ally.id, shadow.position.x, shadow.position.y, shadow.z_index])
 
@@ -2463,16 +2535,23 @@ func _display_combatants() -> void:
 		enemy_slots.add_child(slot)
 		combatant_panels[enemy.id] = slot
 
-		# Calculate horizontal offset for fighting stance (mirrored from allies)
-		var x_offset = 0
-		if i == 0:  # Top enemy - no offset
-			x_offset = 0
-		elif i == 1:  # Middle enemy - shift right 60px
-			x_offset = 60
-		elif i == 2:  # Bottom enemy - shift right 120px
-			x_offset = 120
+		# Get position config from CSV (or use defaults)
+		var pos_config = {}
+		if battle_flow_config:
+			pos_config = battle_flow_config.get_marker_position("enemy", i)
 
-		print("[Battle] Enemy %d (%s) will apply x_offset = %d to sprite" % [i, enemy.display_name, x_offset])
+		# Calculate horizontal offset for fighting stance (use CSV or defaults)
+		var x_offset = pos_config.get("x_offset", 0.0 if i == 0 else 60.0 if i == 1 else 120.0)
+		var sprite_x = pos_config.get("sprite_x", 40.0)
+		var sprite_y = pos_config.get("sprite_y", 40.0)
+		var sprite_scale = pos_config.get("sprite_scale", 4.375)
+		var shadow_x = pos_config.get("shadow_x", sprite_x)
+		var shadow_y = pos_config.get("shadow_y", 55.0)
+		var shadow_scale_x = pos_config.get("shadow_scale_x", 3.0)
+		var shadow_scale_y = pos_config.get("shadow_scale_y", 1.5)
+		var z_index_base = pos_config.get("z_index", 108)
+
+		print("[Battle] Enemy %d (%s) will apply x_offset = %.1f to sprite" % [i, enemy.display_name, x_offset])
 
 		# Store sprite offset for selection indicator positioning
 		combatant_sprite_offsets[enemy.id] = x_offset
@@ -2482,26 +2561,24 @@ func _display_combatants() -> void:
 		if sprite_animator:
 			var sprite = sprite_animator.create_sprite_for_combatant(enemy.id, slot, enemy.get("display_name", ""), false)
 			if sprite:
-				# Position and scale sprite for 70px height
-				# Apply x_offset to sprite position (not slot position, since VBoxContainer controls that)
-				sprite.position = Vector2(40 + x_offset, 40)
-				sprite.scale = Vector2(4.375, 4.375)  # 70px height
+				# Position and scale sprite using CSV config
+				sprite.position = Vector2(sprite_x, sprite_y)
+				sprite.scale = Vector2(sprite_scale, sprite_scale)
 				print("[Battle] Enemy %d (%s) sprite positioned at (%.2f, %.2f)" % [i, enemy.display_name, sprite.position.x, sprite.position.y])
 
-				# Create shadow circle at base of sprite (also offset)
+				# Create shadow circle at base of sprite using CSV config
 				var shadow = Sprite2D.new()
 				shadow.name = "Shadow"
 				var shadow_texture = _create_shadow_circle_texture()
 				shadow.texture = shadow_texture
 				shadow.modulate = Color(0, 0, 0, 0.7)  # Darker, more visible shadow
-				shadow.position = Vector2(40 + x_offset, 55)  # Closer to sprite base
-				shadow.scale = Vector2(3, 1.5)  # Larger ellipse shape for better visibility
+				shadow.position = Vector2(shadow_x, shadow_y)
+				shadow.scale = Vector2(shadow_scale_x, shadow_scale_y)
 				shadow.z_index = 104  # Below sprite (sprites at 108-110)
 				slot.add_child(shadow)
 
-				# Depth-based z-layering: bottom enemies have higher z (appear in front)
-				# Enemy 0 (top) = 108, Enemy 1 (middle) = 109, Enemy 2 (bottom) = 110
-				sprite.z_index = 108 + i
+				# Depth-based z-layering using CSV config
+				sprite.z_index = z_index_base
 
 				print("[Battle] Created shadow for enemy: %s at position (%f, %f) with z-index %d" % [enemy.id, shadow.position.x, shadow.position.y, shadow.z_index])
 				print("[Battle] Created sprite for enemy: %s at position %s with z-index %d" % [enemy.id, sprite.position, sprite.z_index])
