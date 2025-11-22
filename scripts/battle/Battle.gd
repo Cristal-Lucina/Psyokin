@@ -150,6 +150,14 @@ func _init_battle_flow_manager():
 	"""Initialize battle flow manager state"""
 	print("[BattleFlow] Initializing Battle Flow Manager...")
 
+	# Load CSV configuration
+	battle_flow_config = BattleFlowConfigLoader.new()
+	if battle_flow_config.load_config():
+		print("[BattleFlow] CSV configuration loaded successfully")
+		_apply_csv_config()
+	else:
+		push_error("[BattleFlow] Failed to load CSV config, using default settings")
+
 	# Set all elements to inactive
 	for element in BattleElement.values():
 		battle_flow_state.active_elements[element] = false
@@ -160,6 +168,20 @@ func _init_battle_flow_manager():
 	battle_flow_state.input_locked = true  # Start locked
 
 	print("[BattleFlow] Manager initialized")
+
+func _apply_csv_config():
+	"""Apply configuration loaded from CSV files"""
+	if not battle_flow_config:
+		return
+
+	# Override ELEMENT_PRIORITIES with CSV data
+	for element_id in battle_flow_config.element_priorities.keys():
+		if element_id >= 0 and element_id < BattleElement.size():
+			ELEMENT_PRIORITIES[element_id] = battle_flow_config.element_priorities[element_id]
+
+	print("[BattleFlow] Applied CSV priorities for %d elements" % battle_flow_config.element_priorities.size())
+
+	# Activate elements that should be active on battle start will be handled in _on_battle_started()
 
 func _set_battle_state(new_state: BattleState):
 	"""Change battle state and apply appropriate locks/unlocks"""
@@ -253,6 +275,11 @@ func _can_activate_element(element: BattleElement) -> bool:
 
 func _are_concurrent(element1: BattleElement, element2: BattleElement) -> bool:
 	"""Check if two elements can run at the same time"""
+	# Use CSV config if available
+	if battle_flow_config:
+		return battle_flow_config.is_concurrent_allowed(element1, element2)
+
+	# Fallback to hardcoded CONCURRENT_ELEMENTS
 	for pair in CONCURRENT_ELEMENTS:
 		if (element1 in pair and element2 in pair):
 			return true
@@ -302,6 +329,148 @@ func _set_pause_allowed(allowed: bool):
 func _can_pause() -> bool:
 	"""Check if pause is allowed right now"""
 	return battle_flow_state.pause_allowed and not _is_element_active(BattleElement.MINIGAME)
+
+## ═══════════════════════════════════════════════════════════════
+## BATTLE EVENT TRIGGERS (CSV-Driven)
+## ═══════════════════════════════════════════════════════════════
+
+func _check_battle_events(trigger_type: String, context: Dictionary = {}):
+	"""Check and trigger battle events based on CSV configuration"""
+	if not battle_flow_config:
+		return
+
+	var triggered_events = battle_flow_config.check_event_triggers(trigger_type, context)
+
+	for event in triggered_events:
+		_execute_battle_event(event)
+
+func _execute_battle_event(event: Dictionary):
+	"""Execute actions for a triggered battle event"""
+	print("[BattleEvent] Triggering: %s" % event.event_name)
+
+	# Execute each action in the event
+	for action in event.actions:
+		_execute_event_action(action, event)
+
+func _execute_event_action(action: String, event: Dictionary):
+	"""Execute a single event action"""
+	match action:
+		"LOCK_INPUT":
+			_lock_input("Battle event: %s" % event.event_name)
+		"UNLOCK_INPUT":
+			_unlock_input()
+		"PAUSE_BATTLE":
+			# Pause implementation
+			pass
+		"RESUME_BATTLE":
+			# Resume implementation
+			pass
+		"PLAY_SOUND":
+			# Play sound effect
+			pass
+		"PLAY_WARNING_SOUND":
+			# Play warning sound
+			pass
+		"PLAY_ACHIEVEMENT_SOUND":
+			# Play achievement sound
+			pass
+		"PLAY_HEAL_SOUND":
+			# Play heal sound
+			pass
+		"PLAY_STATUS_SOUND":
+			# Play status sound
+			pass
+		"PLAY_SPECIAL_SOUND":
+			# Play special sound
+			pass
+		"PLAY_URGENT_MUSIC":
+			# Change music to urgent
+			pass
+		"PLAY_PERFECT_MUSIC":
+			# Play perfect victory music
+			pass
+		"FLASH_SCREEN":
+			# Flash screen effect
+			pass
+		"CAMERA_SHAKE":
+			# Camera shake effect
+			pass
+		"SLOW_MOTION":
+			# Slow motion effect
+			pass
+		"SHOW_MESSAGE":
+			# Show message
+			pass
+		"SHOW_NOTIFICATION":
+			# Show notification
+			pass
+		"SHOW_COMBO_TEXT":
+			# Show combo counter
+			pass
+		"SHOW_TUTORIAL_POPUP":
+			_enable_tutorial_mode()
+		"SHOW_BADGE":
+			# Show achievement badge
+			pass
+		"SHOW_TIMER":
+			# Show timer
+			pass
+		"SHOW_HINT":
+			# Show hint text
+			pass
+		"SHOW_WARNING":
+			# Show warning
+			pass
+		"SHOW_STATUS_ICON":
+			# Show status icon
+			pass
+		"PULSE_HP_BARS":
+			# Pulse HP bars
+			pass
+		"PULSE_TIMER":
+			# Pulse timer
+			pass
+		"HIGHLIGHT_CAPTURE_BUTTON":
+			# Highlight capture button
+			pass
+		"SPARKLE_EFFECT":
+			# Play sparkle particle effect
+			pass
+		"SPAWN_ENEMIES":
+			# Spawn reinforcements
+			pass
+		"PLAY_CUTSCENE":
+			# Play cutscene
+			pass
+		"BOSS_TRANSFORM":
+			# Boss transformation
+			pass
+		"BONUS_DAMAGE":
+			# Apply bonus damage multiplier
+			pass
+		"BONUS_REWARD":
+			# Increase battle rewards
+			pass
+		"BONUS_REWARDS":
+			# Increase victory rewards
+			pass
+		"APPLY_WEATHER_BUFFS":
+			# Apply weather buffs/debuffs
+			pass
+		"CHANGE_BACKGROUND":
+			# Change battle background
+			pass
+		"PLAY_WEATHER_EFFECT":
+			# Play weather particles
+			pass
+		"SPECIAL_ANIMATION":
+			# Play special victory animation
+			pass
+		"INCREASE_ESCAPE_DIFFICULTY":
+			# Make escape harder
+			pass
+		_:
+			print("[BattleEvent] Unknown action: %s" % action)
 
 ## ═══════════════════════════════════════════════════════════════
 ## END BATTLE FLOW MANAGER
@@ -406,6 +575,9 @@ var instruction_label: Label = null  # Label inside instruction popup
 
 # Active action button visual feedback
 var active_action_button: Button = null  # Currently active action button
+
+# Battle Flow Config Loader
+var battle_flow_config: BattleFlowConfigLoader = null  # CSV configuration loader
 
 # Party status panels for left-side display
 var party_status_panels: Array = []  # Array of 3 panels for player + 2 active party members
@@ -1605,6 +1777,12 @@ func _on_turn_started(combatant_id: String) -> void:
 
 	# Reset action cooldown at start of turn
 	action_cooldown = 0.0
+
+	# Check for turn-based battle events
+	_check_battle_events("TURN_COUNT", {
+		"turn_number": battle_mgr.current_turn_index + 1,
+		"round_number": battle_mgr.current_round
+	})
 
 	# Queue turn announcement message (include round number on first turn)
 	if battle_mgr.current_turn_index == 0:
