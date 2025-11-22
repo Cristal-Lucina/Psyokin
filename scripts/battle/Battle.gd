@@ -4,6 +4,309 @@ class_name Battle
 ## Battle Scene - Main battle screen controller
 ## Handles UI, combatant display, and player input for combat
 
+## ═══════════════════════════════════════════════════════════════
+## BATTLE FLOW MANAGER
+## ═══════════════════════════════════════════════════════════════
+## Centralized system for managing all battle elements, timing, and state
+## to ensure smooth combat flow without overlaps or conflicts
+
+# Battle Element Types (40 total)
+enum BattleElement {
+	# Core Systems (1-5)
+	BATTLE_STATE_MACHINE,      # Overall battle phase state
+	BATTLE_EVENTS_QUEUE,       # Sequential event ordering
+	CONTROLLER_INPUT,          # Input locking (HIGHEST PRIORITY)
+	BATTLE_VIEWPORT,           # What's visible on screen
+	Z_LAYER,                   # Layering depth
+
+	# Audio (6-8)
+	SOUND_EFFECTS,             # Sound FX playback
+	BACKGROUND_MUSIC,          # BGM control
+	VOICE_ACTING,              # Voice line playback
+
+	# Visual Environment (9-12)
+	BACKGROUND_LOCATION,       # Battle backdrop
+	SCREEN_EFFECTS,            # Full-screen effects
+	ENVIRONMENTAL_HAZARDS,     # Persistent field effects
+	CAMERA_FOCUS,              # Camera zoom/shake
+
+	# Character Systems (13-20)
+	CHARACTER_MARKERS,         # Position markers
+	CHARACTER_ANIMATION,       # Sprite animations
+	CHARACTER_EFFECTS,         # VFX on characters
+	CHARACTER_STATUS,          # Status icon display
+	CHARACTER_TEXT,            # Floating battle text
+	FORMATION_POSITIONING,     # Front/back rows
+
+	# Combat Mechanics (21-28)
+	TARGETING_SYSTEM,          # Target selection
+	DAMAGE_NUMBERS_QUEUE,      # Damage number display
+	STATUS_EFFECT_TICKER,      # DOT/HOT effects
+	COUNTER_REACTION_SYSTEM,   # Counter-attacks
+	COMBO_SYSTEM,              # Combo tracking
+	CAPTURE_SYSTEM,            # Creature capture
+	ESCAPE_ATTEMPT,            # Run mechanics
+
+	# UI Elements (29-37)
+	POPUP_FOCUS,               # Menu popups
+	MINIGAME,                  # Minigame state
+	TURN_ORDER_PANEL,          # Turn display
+	PARTY_PANEL,               # Party status
+	ACTION_MENU,               # Action buttons
+	BATTLE_INFO_PANEL,         # Battle log/info
+	BURST_GAUGE,               # Burst meter
+	CHAT_BUBBLE,               # Character speech bubbles
+	CHAT_OVERLAY,              # Full dialogue overlay
+
+	# Battle Flow (38-40)
+	BATTLE_CONDITIONS,         # Win/loss conditions
+	BATTLE_REWARDS,            # Victory rewards
+	BATTLE_TUTORIAL,           # Tutorial state
+	BATTLE_PAUSE,              # Pause state
+}
+
+# Battle State Machine
+enum BattleState {
+	INITIALIZING,              # Loading battle
+	BATTLE_START,              # Opening animations
+	TURN_START,                # Beginning of turn
+	PLAYER_INPUT,              # Waiting for action
+	EXECUTING_ACTION,          # Action animation/resolution
+	ENEMY_TURN,                # Enemy AI execution
+	STATUS_PHASE,              # Status effect processing
+	VICTORY,                   # Battle won
+	DEFEAT,                    # Battle lost
+	ESCAPED,                   # Ran away
+	REWARDS,                   # Showing rewards
+	BATTLE_END,                # Cleanup
+}
+
+# Priority Levels (determines execution order and interrupt capability)
+enum Priority {
+	CRITICAL = 0,              # Controller input locks, pause
+	URGENT = 1,                # State changes, battle events
+	HIGH = 2,                  # Character animations, attacks
+	MEDIUM = 3,                # Effects, sounds, UI updates
+	LOW = 4,                   # Background elements, ambient effects
+	AMBIENT = 5,               # Music, passive visuals
+}
+
+# Element Priority Mapping
+const ELEMENT_PRIORITIES = {
+	BattleElement.CONTROLLER_INPUT: Priority.CRITICAL,
+	BattleElement.BATTLE_PAUSE: Priority.CRITICAL,
+	BattleElement.BATTLE_STATE_MACHINE: Priority.URGENT,
+	BattleElement.BATTLE_EVENTS_QUEUE: Priority.URGENT,
+	BattleElement.TARGETING_SYSTEM: Priority.URGENT,
+	BattleElement.CHARACTER_ANIMATION: Priority.HIGH,
+	BattleElement.CHARACTER_MARKERS: Priority.HIGH,
+	BattleElement.CAMERA_FOCUS: Priority.HIGH,
+	BattleElement.MINIGAME: Priority.HIGH,
+	BattleElement.CHARACTER_EFFECTS: Priority.MEDIUM,
+	BattleElement.CHARACTER_TEXT: Priority.MEDIUM,
+	BattleElement.DAMAGE_NUMBERS_QUEUE: Priority.MEDIUM,
+	BattleElement.SOUND_EFFECTS: Priority.MEDIUM,
+	BattleElement.SCREEN_EFFECTS: Priority.MEDIUM,
+	BattleElement.POPUP_FOCUS: Priority.MEDIUM,
+	BattleElement.ACTION_MENU: Priority.MEDIUM,
+	BattleElement.BATTLE_INFO_PANEL: Priority.MEDIUM,
+	BattleElement.TURN_ORDER_PANEL: Priority.LOW,
+	BattleElement.PARTY_PANEL: Priority.LOW,
+	BattleElement.BURST_GAUGE: Priority.LOW,
+	BattleElement.CHAT_BUBBLE: Priority.LOW,
+	BattleElement.CHARACTER_STATUS: Priority.LOW,
+	BattleElement.BACKGROUND_MUSIC: Priority.AMBIENT,
+	BattleElement.BACKGROUND_LOCATION: Priority.AMBIENT,
+	BattleElement.ENVIRONMENTAL_HAZARDS: Priority.AMBIENT,
+}
+
+# Elements that CAN run concurrently (won't block each other)
+const CONCURRENT_ELEMENTS = [
+	[BattleElement.BACKGROUND_MUSIC, BattleElement.CHARACTER_ANIMATION],
+	[BattleElement.SOUND_EFFECTS, BattleElement.CHARACTER_EFFECTS],
+	[BattleElement.BACKGROUND_LOCATION, BattleElement.CHARACTER_ANIMATION],
+	[BattleElement.BURST_GAUGE, BattleElement.DAMAGE_NUMBERS_QUEUE],
+	[BattleElement.PARTY_PANEL, BattleElement.TURN_ORDER_PANEL],
+	[BattleElement.VOICE_ACTING, BattleElement.CHAT_BUBBLE],
+]
+
+# Battle Flow Manager State
+var battle_flow_state = {
+	"current_state": BattleState.INITIALIZING,
+	"active_elements": {},          # {BattleElement: is_active}
+	"blocked_elements": {},         # {BattleElement: reason}
+	"input_locked": false,          # Master input lock
+	"event_queue": [],              # Sequential events
+	"concurrent_queue": [],         # Concurrent events
+	"tutorial_mode": false,         # Tutorial restrictions
+	"pause_allowed": true,          # Can pause right now?
+}
+
+## ═══════════════════════════════════════════════════════════════
+## BATTLE FLOW MANAGER METHODS
+## ═══════════════════════════════════════════════════════════════
+
+func _init_battle_flow_manager():
+	"""Initialize battle flow manager state"""
+	print("[BattleFlow] Initializing Battle Flow Manager...")
+
+	# Set all elements to inactive
+	for element in BattleElement.values():
+		battle_flow_state.active_elements[element] = false
+		battle_flow_state.blocked_elements[element] = ""
+
+	# Set initial state
+	battle_flow_state.current_state = BattleState.INITIALIZING
+	battle_flow_state.input_locked = true  # Start locked
+
+	print("[BattleFlow] Manager initialized")
+
+func _set_battle_state(new_state: BattleState):
+	"""Change battle state and apply appropriate locks/unlocks"""
+	var old_state = battle_flow_state.current_state
+	battle_flow_state.current_state = new_state
+
+	print("[BattleFlow] State: %s → %s" % [BattleState.keys()[old_state], BattleState.keys()[new_state]])
+
+	# Apply state-specific logic
+	match new_state:
+		BattleState.BATTLE_START:
+			_lock_input("Battle starting")
+			_activate_element(BattleElement.BACKGROUND_MUSIC)
+			_activate_element(BattleElement.BACKGROUND_LOCATION)
+
+		BattleState.PLAYER_INPUT:
+			_unlock_input()
+			_activate_element(BattleElement.ACTION_MENU)
+			_activate_element(BattleElement.CONTROLLER_INPUT)
+
+		BattleState.EXECUTING_ACTION:
+			_lock_input("Executing action")
+			_activate_element(BattleElement.CHARACTER_ANIMATION)
+
+		BattleState.ENEMY_TURN:
+			_lock_input("Enemy turn")
+
+		BattleState.VICTORY, BattleState.DEFEAT, BattleState.ESCAPED:
+			_lock_input("Battle ending")
+			_deactivate_element(BattleElement.ACTION_MENU)
+
+func _lock_input(reason: String = ""):
+	"""Lock controller input (CRITICAL priority)"""
+	battle_flow_state.input_locked = true
+	_block_element(BattleElement.CONTROLLER_INPUT, reason)
+	print("[BattleFlow] Input LOCKED: %s" % reason)
+
+func _unlock_input():
+	"""Unlock controller input"""
+	battle_flow_state.input_locked = false
+	_unblock_element(BattleElement.CONTROLLER_INPUT)
+	print("[BattleFlow] Input UNLOCKED")
+
+func _is_input_locked() -> bool:
+	"""Check if input is currently locked"""
+	return battle_flow_state.input_locked
+
+func _activate_element(element: BattleElement):
+	"""Mark an element as active"""
+	battle_flow_state.active_elements[element] = true
+	print("[BattleFlow] ACTIVE: %s" % BattleElement.keys()[element])
+
+func _deactivate_element(element: BattleElement):
+	"""Mark an element as inactive"""
+	battle_flow_state.active_elements[element] = false
+	print("[BattleFlow] INACTIVE: %s" % BattleElement.keys()[element])
+
+func _is_element_active(element: BattleElement) -> bool:
+	"""Check if element is currently active"""
+	return battle_flow_state.active_elements.get(element, false)
+
+func _block_element(element: BattleElement, reason: String):
+	"""Block an element from activating"""
+	battle_flow_state.blocked_elements[element] = reason
+	print("[BattleFlow] BLOCKED: %s (%s)" % [BattleElement.keys()[element], reason])
+
+func _unblock_element(element: BattleElement):
+	"""Unblock an element"""
+	battle_flow_state.blocked_elements[element] = ""
+
+func _is_element_blocked(element: BattleElement) -> bool:
+	"""Check if element is blocked"""
+	return battle_flow_state.blocked_elements.get(element, "") != ""
+
+func _can_activate_element(element: BattleElement) -> bool:
+	"""Check if element can be activated (not blocked, priority allows it)"""
+	if _is_element_blocked(element):
+		return false
+
+	# Check if higher priority elements are blocking
+	var element_priority = ELEMENT_PRIORITIES.get(element, Priority.MEDIUM)
+	for active_element in battle_flow_state.active_elements:
+		if battle_flow_state.active_elements[active_element]:
+			var active_priority = ELEMENT_PRIORITIES.get(active_element, Priority.MEDIUM)
+			if active_priority < element_priority:  # Higher priority (lower number) blocks
+				# Check if they're allowed to be concurrent
+				if not _are_concurrent(element, active_element):
+					return false
+
+	return true
+
+func _are_concurrent(element1: BattleElement, element2: BattleElement) -> bool:
+	"""Check if two elements can run at the same time"""
+	for pair in CONCURRENT_ELEMENTS:
+		if (element1 in pair and element2 in pair):
+			return true
+	return false
+
+func _queue_event(event_data: Dictionary):
+	"""Add event to sequential queue"""
+	battle_flow_state.event_queue.append(event_data)
+	print("[BattleFlow] Event queued: %s" % event_data.get("type", "unknown"))
+
+func _queue_concurrent_event(event_data: Dictionary):
+	"""Add event to concurrent queue (can run with other concurrent events)"""
+	battle_flow_state.concurrent_queue.append(event_data)
+
+func _process_event_queue():
+	"""Process next event in queue"""
+	if battle_flow_state.event_queue.size() > 0:
+		var event = battle_flow_state.event_queue.pop_front()
+		print("[BattleFlow] Processing event: %s" % event.get("type", "unknown"))
+		return event
+	return null
+
+func _clear_event_queue():
+	"""Clear all pending events"""
+	battle_flow_state.event_queue.clear()
+	battle_flow_state.concurrent_queue.clear()
+	print("[BattleFlow] Event queues cleared")
+
+func _enable_tutorial_mode():
+	"""Enable tutorial mode with restricted controls"""
+	battle_flow_state.tutorial_mode = true
+	print("[BattleFlow] Tutorial mode ENABLED")
+
+func _disable_tutorial_mode():
+	"""Disable tutorial mode"""
+	battle_flow_state.tutorial_mode = false
+	print("[BattleFlow] Tutorial mode DISABLED")
+
+func _is_tutorial_mode() -> bool:
+	"""Check if in tutorial mode"""
+	return battle_flow_state.tutorial_mode
+
+func _set_pause_allowed(allowed: bool):
+	"""Set whether pause is currently allowed"""
+	battle_flow_state.pause_allowed = allowed
+
+func _can_pause() -> bool:
+	"""Check if pause is allowed right now"""
+	return battle_flow_state.pause_allowed and not _is_element_active(BattleElement.MINIGAME)
+
+## ═══════════════════════════════════════════════════════════════
+## END BATTLE FLOW MANAGER
+## ═══════════════════════════════════════════════════════════════
+
 @onready var battle_mgr = get_node("/root/aBattleManager")
 @onready var gs = get_node("/root/aGameState")
 @onready var combat_resolver: CombatResolver = CombatResolver.new()
@@ -136,6 +439,10 @@ func _ready() -> void:
 
 	# Add combat resolver to scene tree
 	add_child(combat_resolver)
+
+	# Initialize Battle Flow Manager
+	_init_battle_flow_manager()
+	print("[Battle] Battle Flow Manager initialized")
 
 	# Wait for next frame to ensure all autoloads are ready
 	await get_tree().process_frame
@@ -1228,6 +1535,9 @@ func _cancel_target_selection() -> void:
 
 func _initialize_battle() -> void:
 	"""Initialize the battle from encounter data"""
+	# Set battle state to initializing
+	_set_battle_state(BattleState.INITIALIZING)
+
 	log_message("Battle Start!")
 
 	# Get party from GameState
@@ -1253,6 +1563,16 @@ func _initialize_battle() -> void:
 func _on_battle_started() -> void:
 	"""Called when battle initializes"""
 	print("[Battle] Battle started")
+
+	# Set battle state and activate core elements
+	_set_battle_state(BattleState.BATTLE_START)
+	_activate_element(BattleElement.BATTLE_VIEWPORT)
+	_activate_element(BattleElement.BACKGROUND_MUSIC)
+	_activate_element(BattleElement.BACKGROUND_LOCATION)
+	_activate_element(BattleElement.PARTY_PANEL)
+	_activate_element(BattleElement.TURN_ORDER_PANEL)
+	_activate_element(BattleElement.BURST_GAUGE)
+
 	_display_combatants()
 	_update_burst_gauge()
 
@@ -1264,6 +1584,12 @@ func _on_round_started(round_number: int) -> void:
 
 func _on_turn_started(combatant_id: String) -> void:
 	"""Called when a combatant's turn starts"""
+	# Set turn start state and lock input
+	_set_battle_state(BattleState.TURN_START)
+	_lock_input("Turn transition")
+	_activate_element(BattleElement.CHARACTER_ANIMATION)
+	_activate_element(BattleElement.CHARACTER_TEXT)
+
 	current_combatant = battle_mgr.get_combatant_by_id(combatant_id)
 
 	if current_combatant.is_empty():
@@ -1432,7 +1758,16 @@ func _on_turn_order_animation_completed() -> void:
 
 func _on_battle_ended(victory: bool) -> void:
 	"""Called when battle ends"""
+	# Lock input for battle end
+	_lock_input("Battle ending")
+	_deactivate_element(BattleElement.ACTION_MENU)
+	_deactivate_element(BattleElement.CHARACTER_ANIMATION)
+
 	if victory:
+		# Set victory state
+		_set_battle_state(BattleState.VICTORY)
+		_activate_element(BattleElement.BATTLE_REWARDS)
+
 		log_message("*** VICTORY ***")
 
 		# Wait for all messages to be displayed and acknowledged before showing victory screen
@@ -1460,6 +1795,9 @@ func _on_battle_ended(victory: bool) -> void:
 
 		_show_victory_screen()
 	else:
+		# Set defeat state
+		_set_battle_state(BattleState.DEFEAT)
+
 		log_message("*** DEFEAT ***")
 		log_message("Your party has been wiped out!")
 		log_message("GAME OVER")
@@ -2717,6 +3055,11 @@ func _format_buff_description(buff_type: String, value: float, duration: int) ->
 
 func _show_action_menu() -> void:
 	"""Show the action menu for player's turn"""
+	# Set player input state and unlock input
+	_set_battle_state(BattleState.PLAYER_INPUT)
+	_unlock_input()
+	_activate_element(BattleElement.ACTION_MENU)
+
 	# Ensure input is enabled (in case animation was skipped)
 	if is_in_round_transition:
 		_enable_all_input()
@@ -2828,6 +3171,12 @@ func _on_attack_pressed() -> void:
 
 func _execute_attack(target: Dictionary) -> void:
 	"""Execute attack on selected target"""
+	# Set executing action state and activate relevant elements
+	_set_battle_state(BattleState.EXECUTING_ACTION)
+	_lock_input("Executing action")
+	_activate_element(BattleElement.DAMAGE_NUMBERS_QUEUE)
+	_activate_element(BattleElement.CHARACTER_EFFECTS)
+
 	_hide_instruction()
 	awaiting_target_selection = false
 	_clear_target_highlights()
@@ -3519,6 +3868,12 @@ func _execute_capture(target: Dictionary) -> void:
 
 func _execute_item_usage(target: Dictionary) -> void:
 	"""Execute item usage on selected target"""
+	# Set executing action state and activate elements
+	_set_battle_state(BattleState.EXECUTING_ACTION)
+	_lock_input("Using item")
+	_activate_element(BattleElement.CHARACTER_EFFECTS)
+	_activate_element(BattleElement.DAMAGE_NUMBERS_QUEUE)
+
 	awaiting_target_selection = false
 	awaiting_item_target = false
 	_clear_target_highlights()
@@ -4147,6 +4502,11 @@ func _on_run_pressed() -> void:
 
 func _execute_run() -> void:
 	"""Execute run action after confirmation"""
+	# Activate escape attempt element and minigame
+	_activate_element(BattleElement.ESCAPE_ATTEMPT)
+	_activate_element(BattleElement.MINIGAME)
+	_lock_input("Escape attempt")
+
 	# Mark that run was attempted
 	battle_mgr.run_attempted_this_round = true
 
@@ -4198,6 +4558,9 @@ func _execute_run() -> void:
 
 		# Wait for message acknowledgment
 		await _wait_for_message_queue()
+
+		# Set escaped state
+		_set_battle_state(BattleState.ESCAPED)
 
 		battle_mgr.current_state = battle_mgr.BattleState.ESCAPED
 		battle_mgr.return_to_overworld()
@@ -4715,6 +5078,11 @@ func _clear_target_highlights() -> void:
 
 func _execute_enemy_ai() -> void:
 	"""Execute AI for enemy turn"""
+	# Set enemy turn state and ensure input is locked
+	_set_battle_state(BattleState.ENEMY_TURN)
+	_lock_input("Enemy turn")
+	_deactivate_element(BattleElement.ACTION_MENU)
+
 	await get_tree().create_timer(0.5).timeout  # Brief delay
 
 	# Clear defending status when attacking
@@ -7098,6 +7466,13 @@ func _on_skill_selected(skill_entry: Dictionary) -> void:
 
 func _execute_skill_single(target: Dictionary) -> void:
 	"""Execute a single-target skill"""
+	# Set executing action state and activate elements
+	_set_battle_state(BattleState.EXECUTING_ACTION)
+	_lock_input("Executing skill")
+	_activate_element(BattleElement.MINIGAME)
+	_activate_element(BattleElement.CHARACTER_EFFECTS)
+	_activate_element(BattleElement.DAMAGE_NUMBERS_QUEUE)
+
 	# Check if frozen combatant can act
 	if not await _check_freeze_action_allowed():
 		return
@@ -7509,6 +7884,12 @@ func _execute_skill_single(target: Dictionary) -> void:
 
 func _execute_skill_aoe() -> void:
 	"""Execute an AoE skill on all valid targets"""
+	# Set executing action state and activate elements
+	_set_battle_state(BattleState.EXECUTING_ACTION)
+	_lock_input("Executing AoE skill")
+	_activate_element(BattleElement.CHARACTER_EFFECTS)
+	_activate_element(BattleElement.DAMAGE_NUMBERS_QUEUE)
+
 	# Check if frozen combatant can act
 	if not await _check_freeze_action_allowed():
 		return
