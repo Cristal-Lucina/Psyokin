@@ -91,8 +91,8 @@ enum Priority {
 	AMBIENT = 5,               # Music, passive visuals
 }
 
-# Element Priority Mapping
-const ELEMENT_PRIORITIES = {
+# Element Priority Mapping (can be overridden by CSV config)
+var ELEMENT_PRIORITIES = {
 	BattleElement.CONTROLLER_INPUT: Priority.CRITICAL,
 	BattleElement.BATTLE_PAUSE: Priority.CRITICAL,
 	BattleElement.BATTLE_STATE_MACHINE: Priority.URGENT,
