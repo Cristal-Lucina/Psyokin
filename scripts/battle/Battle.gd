@@ -1859,85 +1859,15 @@ func _on_turn_started(combatant_id: String) -> void:
 
 func _animate_turn_indicator(combatant_id: String) -> void:
 	"""Animate the active combatant's panel to indicate their turn"""
-	# Reset previous animation if any
-	await _reset_turn_indicator()
-
-	# Find the panel for this combatant
-	if not combatant_panels.has(combatant_id):
-		return
-
-	active_turn_panel = combatant_panels[combatant_id]
-	active_turn_original_pos = Vector2(active_turn_panel.offset_left, active_turn_panel.offset_right)
-
-	# Get turn animation config from CSV (or use defaults)
-	var turn_anim = {}
-	if battle_flow_config:
-		turn_anim = battle_flow_config.get_turn_animation()
-
-	# Check if animation is enabled
-	if not turn_anim.get("enabled", true):
-		return  # Skip animation if disabled in CSV
-
-	# Determine direction based on whether ally or enemy
-	var is_ally = active_turn_panel.get_meta("is_ally", false)
-	var slide_distance = turn_anim.get("slide_distance", 140.0)
-
-	# Calculate target offsets for slide
-	var target_offset_left = active_turn_panel.offset_left
-	var target_offset_right = active_turn_panel.offset_right
-
-	if is_ally:
-		# Slide right
-		target_offset_left += slide_distance
-		target_offset_right += slide_distance
-	else:
-		# Slide left
-		target_offset_left -= slide_distance
-		target_offset_right -= slide_distance
-
-	# Get transition and ease settings from CSV
-	var trans_type = _parse_tween_trans(turn_anim.get("slide_forward_trans", "CUBIC"))
-	var ease_type = _parse_tween_ease(turn_anim.get("slide_forward_ease", "OUT"))
-	var duration = turn_anim.get("slide_forward_duration", 0.3)
-
-	# Animate slide using offsets (won't conflict with layout containers)
-	var tween = create_tween()
-	tween.set_trans(trans_type)
-	tween.set_ease(ease_type)
-	tween.set_parallel(true)
-	tween.tween_property(active_turn_panel, "offset_left", target_offset_left, duration)
-	tween.tween_property(active_turn_panel, "offset_right", target_offset_right, duration)
+	# DISABLED: Turn indicator sliding disabled to keep characters stationary
+	# This was sliding the entire panel (and character sprite inside it)
+	return
 
 func _reset_turn_indicator() -> void:
 	"""Reset the turn indicator animation (awaitable to wait for completion)"""
-	if active_turn_panel and is_instance_valid(active_turn_panel):
-		# Store panel reference locally before clearing
-		var panel_to_reset = active_turn_panel
-		var original_pos = active_turn_original_pos
-
-		# Clear the active reference immediately
-		active_turn_panel = null
-
-		# Get turn animation config from CSV (or use defaults)
-		var turn_anim = {}
-		if battle_flow_config:
-			turn_anim = battle_flow_config.get_turn_animation()
-
-		# Get transition and ease settings for slide back
-		var trans_type = _parse_tween_trans(turn_anim.get("slide_back_trans", "CUBIC"))
-		var ease_type = _parse_tween_ease(turn_anim.get("slide_back_ease", "IN"))
-		var duration = turn_anim.get("slide_back_duration", 0.2)
-
-		# Animate back to original position
-		var tween = create_tween()
-		tween.set_trans(trans_type)
-		tween.set_ease(ease_type)
-		tween.set_parallel(true)
-		tween.tween_property(panel_to_reset, "offset_left", original_pos.x, duration)
-		tween.tween_property(panel_to_reset, "offset_right", original_pos.y, duration)
-
-		# Wait for animation to complete
-		await tween.finished
+	# DISABLED: Turn indicator sliding disabled
+	# Clear the active reference
+	active_turn_panel = null
 
 func _parse_tween_trans(trans_str: String) -> Tween.TransitionType:
 	"""Parse tween transition type from CSV string"""
