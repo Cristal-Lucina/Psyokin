@@ -130,8 +130,13 @@ func _setup_minigame() -> void:
 	result_label = Label.new()
 	result_label.text = ""
 	result_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	result_label.add_theme_font_size_override("font_size", 40)  # Much bigger for visibility
+	result_label.add_theme_font_size_override("font_size", 60)  # 60pt for maximum visibility
 	result_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
+
+	# Make text bold using outline
+	result_label.add_theme_constant_override("outline_size", 8)
+	result_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
+
 	result_label.modulate.a = 0.0  # Hidden initially
 
 	# Position result label at the top center
