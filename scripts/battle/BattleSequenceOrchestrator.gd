@@ -270,13 +270,15 @@ func _execute_step(step_config: Dictionary, context: Dictionary):
 			await battle_scene.get_tree().process_frame
 
 		"RUN_TO_MARKER":
-			await _run_to_marker(context.get("combatant", {}), step_config.duration)
+			# REMOVED: Character movement disabled
+			pass
 
 		"FADE_IN_ACTION_MENU":
 			await _fade_in_action_menu(step_config.fade_duration)
 
 		"RUN_BACK":
-			await _run_back(context.get("combatant", {}), step_config.duration)
+			# REMOVED: Character movement disabled
+			pass
 
 		"FACE_FORWARD":
 			_face_forward(context.get("combatant", {}))
@@ -348,56 +350,6 @@ func _fade_in_ui(duration: float):
 	print("[BattleSequence] Fading in UI (%.1fs)" % duration)
 	await battle_scene.get_tree().create_timer(duration).timeout
 
-func _run_to_marker(combatant: Dictionary, duration_override: float = 0.0):
-	"""Have character run to their battle marker position"""
-	if not sprite_animator or not combatant.has("id"):
-		return
-
-	if not sprite_animator.sprite_instances.has(combatant.id):
-		return
-
-	# Get combatant's position index
-	var combatant_index = battle_scene._get_combatant_position_index(combatant.id)
-	var side = "ally" if combatant.is_ally else "enemy"
-
-	# Get marker position
-	var marker_config = get_marker_position(side, combatant_index)
-	if marker_config.is_empty():
-		print("[BattleSequence] No marker position for %s_%d" % [side, combatant_index])
-		return
-
-	var attacker_instance = sprite_animator.sprite_instances[combatant.id]
-	var attacker_sprite = attacker_instance["sprite"]
-
-	# Get animation direction
-	var run_direction = marker_config.get("face_direction", "RIGHT")
-	var duration = duration_override if duration_override > 0 else marker_config.get("run_duration", 0.4)
-
-	# Play run animation
-	sprite_animator.play_animation(combatant.id, "Run", run_direction, false, false)
-
-	# Move to marker position
-	var marker_x = marker_config.get("marker_x", 0.0)
-	var current_x = attacker_sprite.position.x
-	var target_x = current_x + marker_x
-
-	print("[MOVEMENT DEBUG] === %s RUNNING TO MARKER ===" % combatant.display_name)
-	print("[MOVEMENT DEBUG] Starting X: %.1f" % current_x)
-	print("[MOVEMENT DEBUG] Marker offset: %.1f" % marker_x)
-	print("[MOVEMENT DEBUG] Target X: %.1f" % target_x)
-	print("[MOVEMENT DEBUG] Direction: %s" % run_direction)
-	print("[MOVEMENT DEBUG] Duration: %.2fs" % duration)
-
-	var tween = battle_scene.create_tween()
-	tween.tween_property(attacker_sprite, "position:x", target_x, duration)
-	await tween.finished
-
-	print("[MOVEMENT DEBUG] Final X: %.1f" % attacker_sprite.position.x)
-	print("[MOVEMENT DEBUG] ==============================")
-
-	# Return to idle
-	sprite_animator.play_animation(combatant.id, "Idle", run_direction, false, false)
-
 func _fade_in_action_menu(duration: float):
 	"""Fade in the action menu"""
 	if not battle_scene or not battle_scene.action_menu:
@@ -413,62 +365,6 @@ func _fade_in_action_menu(duration: float):
 	await tween.finished
 
 	print("[BattleSequence] Action menu faded in")
-
-func _run_back(combatant: Dictionary, duration_override: float = 0.0):
-	"""Have character run back to starting position"""
-	if not sprite_animator or not combatant.has("id"):
-		return
-
-	if not sprite_animator.sprite_instances.has(combatant.id):
-		return
-
-	# Get combatant's position index and marker config
-	var combatant_index = battle_scene._get_combatant_position_index(combatant.id)
-	var side = "ally" if combatant.is_ally else "enemy"
-
-	# Get marker position to know how far back to run
-	var marker_config = get_marker_position(side, combatant_index)
-	if marker_config.is_empty():
-		print("[BattleSequence] No marker position for %s_%d" % [side, combatant_index])
-		return
-
-	# Get character position config for animation direction
-	var pos_config = {}
-	if battle_scene.battle_flow_config and combatant_index >= 0:
-		pos_config = battle_scene.battle_flow_config.get_marker_position(side, combatant_index)
-
-	var attacker_instance = sprite_animator.sprite_instances[combatant.id]
-	var attacker_sprite = attacker_instance["sprite"]
-
-	# Get run back animation direction from CSV
-	var run_direction = pos_config.get("turn_end_direction", "LEFT" if combatant.is_ally else "RIGHT")
-	var duration = duration_override if duration_override > 0 else marker_config.get("run_duration", 0.4)
-
-	# Play run animation (allies run LEFT to return, enemies run RIGHT)
-	sprite_animator.play_animation(combatant.id, "Run", run_direction, false, false)
-
-	# Move back to starting position (negative of marker offset)
-	var marker_x = marker_config.get("marker_x", 0.0)
-	var current_x = attacker_sprite.position.x
-	var target_x = current_x - marker_x  # Go back by the same distance
-
-	print("[MOVEMENT DEBUG] === %s RUNNING BACK ===" % combatant.display_name)
-	print("[MOVEMENT DEBUG] Current X: %.1f" % current_x)
-	print("[MOVEMENT DEBUG] Marker offset: %.1f" % marker_x)
-	print("[MOVEMENT DEBUG] Target X: %.1f (current - offset)" % target_x)
-	print("[MOVEMENT DEBUG] Direction: %s" % run_direction)
-	print("[MOVEMENT DEBUG] Duration: %.2fs" % duration)
-
-	var tween = battle_scene.create_tween()
-	tween.tween_property(attacker_sprite, "position:x", target_x, duration)
-	await tween.finished
-
-	print("[MOVEMENT DEBUG] Final X: %.1f" % attacker_sprite.position.x)
-	print("[MOVEMENT DEBUG] ==============================")
-
-	# Return to idle facing forward
-	var idle_direction = "RIGHT" if combatant.is_ally else "LEFT"
-	sprite_animator.play_animation(combatant.id, "Idle", idle_direction, false, false)
 
 func _face_forward(combatant: Dictionary):
 	"""Turn character to face forward"""
