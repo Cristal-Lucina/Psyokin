@@ -1968,6 +1968,11 @@ func _on_battle_ended(victory: bool) -> void:
 			sprite_animator.play_animation_for_all("Thumbs Up", "DOWN", true)  # Hold the pose
 			print("[Battle] Playing victory animation: Thumbs Up (hold)")
 
+			# Keep portraits facing LEFT in Idle pose (they should never change)
+			for combatant_id in sprite_animator.sprite_instances.keys():
+				if "_portrait" in combatant_id:
+					sprite_animator.play_animation(combatant_id, "Idle", "LEFT")
+
 			# Move portrait sprites up 16px for thumbs up pose
 			var allies = battle_mgr.get_ally_combatants()
 			for ally in allies:
@@ -4731,6 +4736,11 @@ func _execute_run() -> void:
 		sprite_animator.play_animation_for_all("Run", "LEFT")
 		print("[Battle] Playing run animation: Run LEFT for entire party")
 
+		# Keep portraits facing LEFT in Idle pose (they should never change)
+		for combatant_id in sprite_animator.sprite_instances.keys():
+			if "_portrait" in combatant_id:
+				sprite_animator.play_animation(combatant_id, "Idle", "LEFT")
+
 		# Wait for animation to play (about 0.8 seconds)
 		await get_tree().create_timer(0.8).timeout
 
@@ -4762,6 +4772,11 @@ func _execute_run() -> void:
 		if sprite_animator:
 			sprite_animator.play_animation_for_all("Idle", "RIGHT")
 			print("[Battle] Failed escape - returning party to idle pose")
+
+			# Keep portraits facing LEFT in Idle pose (they should never change)
+			for combatant_id in sprite_animator.sprite_instances.keys():
+				if "_portrait" in combatant_id:
+					sprite_animator.play_animation(combatant_id, "Idle", "LEFT")
 
 		# Wait for message acknowledgment before ending turn
 		await _wait_for_message_queue()
@@ -7897,7 +7912,7 @@ func _execute_skill_single(target: Dictionary) -> void:
 
 	if target.hp <= 0:
 		target.hp = 0
-		target.is_ko = true
+		_set_fainted(target)
 
 		# Record kill for morality system (if enemy)
 		if not target.get("is_ally", false):
