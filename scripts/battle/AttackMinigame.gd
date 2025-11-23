@@ -14,7 +14,7 @@ var current_phase: Phase = Phase.FADE_IN
 
 ## Circle animation
 var circle_progress: float = 0.0  # 0.0 = fully open, 1.0 = fully closed
-var circle_speed: float = 0.5  # Speed of closing (0.5 = 2 seconds to close)
+var circle_speed: float = 1.0  # Speed of closing (1.0 = 1 second to close)
 var circle_max_radius: float = 200.0  # Maximum circle radius (increased for 200px button)
 var circle_min_radius: float = 100.0  # Minimum circle radius (stops at button edge)
 
