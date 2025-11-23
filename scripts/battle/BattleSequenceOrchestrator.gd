@@ -410,7 +410,47 @@ func _run_back(combatant: Dictionary, duration_override: float = 0.0):
 	if not sprite_animator or not combatant.has("id"):
 		return
 
-	await battle_scene._slide_character_back(combatant)
+	if not sprite_animator.sprite_instances.has(combatant.id):
+		return
+
+	# Get combatant's position index and marker config
+	var combatant_index = battle_scene._get_combatant_position_index(combatant.id)
+	var side = "ally" if combatant.is_ally else "enemy"
+
+	# Get marker position to know how far back to run
+	var marker_config = get_marker_position(side, combatant_index)
+	if marker_config.is_empty():
+		print("[BattleSequence] No marker position for %s_%d" % [side, combatant_index])
+		return
+
+	# Get character position config for animation direction
+	var pos_config = {}
+	if battle_scene.battle_flow_config and combatant_index >= 0:
+		pos_config = battle_scene.battle_flow_config.get_marker_position(side, combatant_index)
+
+	var attacker_instance = sprite_animator.sprite_instances[combatant.id]
+	var attacker_sprite = attacker_instance["sprite"]
+
+	# Get run back animation direction from CSV
+	var run_direction = pos_config.get("turn_end_direction", "LEFT" if combatant.is_ally else "RIGHT")
+	var duration = duration_override if duration_override > 0 else marker_config.get("run_duration", 0.4)
+
+	# Play run animation (allies run LEFT to return, enemies run RIGHT)
+	sprite_animator.play_animation(combatant.id, "Run", run_direction, false, false)
+
+	# Move back to starting position (negative of marker offset)
+	var marker_x = marker_config.get("marker_x", 0.0)
+	var current_x = attacker_sprite.position.x
+	var target_x = current_x - marker_x  # Go back by the same distance
+
+	var tween = battle_scene.create_tween()
+	tween.tween_property(attacker_sprite, "position:x", target_x, duration)
+	await tween.finished
+
+	# Return to idle facing forward
+	var idle_direction = "RIGHT" if combatant.is_ally else "LEFT"
+	sprite_animator.play_animation(combatant.id, "Idle", idle_direction, false, false)
+
 	print("[BattleSequence] %s ran back to starting position" % combatant.display_name)
 
 func _face_forward(combatant: Dictionary):
