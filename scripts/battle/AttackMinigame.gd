@@ -15,8 +15,8 @@ var current_phase: Phase = Phase.FADE_IN
 ## Circle animation
 var circle_progress: float = 0.0  # 0.0 = fully open, 1.0 = fully closed
 var circle_speed: float = 1.0  # Speed of closing (1.0 = 1 second to close)
-var circle_max_radius: float = 200.0  # Maximum circle radius (increased for 200px button)
-var circle_min_radius: float = 100.0  # Minimum circle radius (stops at button edge)
+var circle_max_radius: float = 60.0  # Maximum circle radius (30% of 200)
+var circle_min_radius: float = 30.0  # Minimum circle radius (30% of 100)
 
 ## Result tracking
 var final_damage_modifier: float = 1.0
@@ -62,8 +62,9 @@ func _setup_transparent_visuals() -> void:
 
 	# Central panel - also transparent
 	overlay_panel = PanelContainer.new()
-	overlay_panel.custom_minimum_size = get_viewport_rect().size * 0.5
-	overlay_panel.position = get_viewport_rect().size * 0.25
+	overlay_panel.custom_minimum_size = get_viewport_rect().size * 0.15  # 30% of original 0.5
+	var viewport_size = get_viewport_rect().size
+	overlay_panel.position = Vector2(viewport_size.x * 0.425, viewport_size.y * 0.25 - 400)  # Centered horizontally, moved up 400px
 	overlay_panel.z_index = 101
 
 	# Make panel transparent
@@ -107,7 +108,7 @@ func _setup_minigame() -> void:
 
 	# Create canvas for drawing circle and button
 	circle_canvas = Control.new()
-	circle_canvas.custom_minimum_size = Vector2(500, 500)
+	circle_canvas.custom_minimum_size = Vector2(150, 150)  # 30% of 500
 	circle_canvas.draw.connect(_draw_circle_and_button)
 	center_container.add_child(circle_canvas)
 
@@ -119,7 +120,7 @@ func _setup_minigame() -> void:
 		button_icon.texture = icon_texture
 		button_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		button_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		button_icon.custom_minimum_size = Vector2(200, 200)
+		button_icon.custom_minimum_size = Vector2(60, 60)  # 30% of 200
 		# We'll draw this manually in _draw_circle_and_button
 		print("[AttackMinigame] Loaded accept button icon")
 	else:
@@ -129,7 +130,7 @@ func _setup_minigame() -> void:
 	result_label = Label.new()
 	result_label.text = ""
 	result_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	result_label.add_theme_font_size_override("font_size", 48)
+	result_label.add_theme_font_size_override("font_size", 14)  # 30% of 48
 	result_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
 	result_label.modulate.a = 0.0  # Hidden initially
 
@@ -235,11 +236,11 @@ func _draw_circle_and_button() -> void:
 	var current_radius = lerp(circle_max_radius, circle_min_radius, circle_progress)
 
 	# Draw red circle border (closing in)
-	_draw_circle_outline(center, current_radius, Color(1.0, 0.0, 0.0), 6.0)
+	_draw_circle_outline(center, current_radius, Color(1.0, 0.0, 0.0), 2.0)  # 30% of 6
 
-	# Draw the button icon in the center (200x200)
+	# Draw the button icon in the center (60x60)
 	if button_icon and button_icon.texture:
-		var icon_size = Vector2(200, 200)
+		var icon_size = Vector2(60, 60)  # 30% of 200
 		var icon_pos = center - icon_size / 2.0
 		var icon_rect = Rect2(icon_pos, icon_size)
 
