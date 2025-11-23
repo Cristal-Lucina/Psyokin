@@ -331,10 +331,10 @@ func _stop_circle() -> void:
 		final_grade = "good"
 		result_text = "Good"
 	elif percent < 90.0:
-		# Blue zone (80-90%) - Amazing!
+		# Blue zone (80-90%) - Great!
 		final_damage_modifier = 1.3
-		final_grade = "amazing"
-		result_text = "Amazing!"
+		final_grade = "great"
+		result_text = "Great!"
 	elif percent < 100.0:
 		# Yellow zone (90-100%) - OK
 		final_damage_modifier = 0.9
