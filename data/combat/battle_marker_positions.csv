@@ -1,0 +1,7 @@
+marker_id,side,position_index,marker_name,marker_x,marker_y,run_duration,face_direction,notes
+1,ally,0,Hero Battle Marker,80,40,0.4,RIGHT,Hero's action position - 80px from starting position
+2,ally,1,Ally1 Battle Marker,50,40,0.4,RIGHT,Ally 1's action position
+3,ally,2,Ally2 Battle Marker,20,40,0.4,RIGHT,Ally 2's action position
+4,enemy,0,Enemy1 Battle Marker,-40,40,0.4,LEFT,Enemy 1's action position
+5,enemy,1,Enemy2 Battle Marker,-40,40,0.4,LEFT,Enemy 2's action position
+6,enemy,2,Enemy3 Battle Marker,-40,40,0.4,LEFT,Enemy 3's action position

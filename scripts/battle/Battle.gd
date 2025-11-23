@@ -579,6 +579,9 @@ var active_action_button: Button = null  # Currently active action button
 # Battle Flow Config Loader
 var battle_flow_config: BattleFlowConfigLoader = null  # CSV configuration loader
 
+# Battle Sequence Orchestrator
+var battle_sequence_orch: BattleSequenceOrchestrator = null  # Polished battle sequence system
+
 # Party status panels for left-side display
 var party_status_panels: Array = []  # Array of 3 panels for player + 2 active party members
 var active_button_tween: Tween = null  # Tween for pulsing animation
@@ -616,8 +619,21 @@ func _ready() -> void:
 	_init_battle_flow_manager()
 	print("[Battle] Battle Flow Manager initialized")
 
+	# Initialize Battle Sequence Orchestrator
+	battle_sequence_orch = BattleSequenceOrchestrator.new()
+	battle_sequence_orch.battle_scene = self
+	battle_sequence_orch.battle_mgr = battle_mgr
+	if battle_sequence_orch.load_config():
+		print("[Battle] Battle Sequence Orchestrator initialized")
+	else:
+		push_error("[Battle] Failed to initialize Battle Sequence Orchestrator")
+
 	# Wait for next frame to ensure all autoloads are ready
 	await get_tree().process_frame
+
+	# Set sprite_animator reference for orchestrator after scene is ready
+	if sprite_animator:
+		battle_sequence_orch.sprite_animator = sprite_animator
 
 	# Create neon-kawaii background elements
 	_create_diagonal_background()
