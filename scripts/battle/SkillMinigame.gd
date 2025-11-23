@@ -169,7 +169,7 @@ func _setup_minigame() -> void:
 	content_container.add_child(sequence_center)
 	content_container.move_child(sequence_center, 0)  # Move to top
 
-	# Create button icons for ALL tiers (tier 1 visible, tier 2/3 hidden initially)
+	# Create button icons for ALL tiers (tier 1 visible, tier 2/3 shown as "?" placeholders)
 	# Button mappings: A = Xbox A/PS Cross/Nintendo B, B = Xbox B/PS Circle/Nintendo A,
 	#                  X = Xbox X/PS Square/Nintendo Y, Y = Xbox Y/PS Triangle/Nintendo X
 	var icon_layout = get_node_or_null("/root/aControllerIconLayout")
@@ -178,41 +178,67 @@ func _setup_minigame() -> void:
 	if full_sequence.size() == 0:
 		print("[SkillMinigame] ERROR: full_sequence is empty!")
 	else:
-		print("[SkillMinigame] Creating %d button icons (T1=%d visible, T2/T3 hidden)" % [full_sequence.size(), tier_1_length])
+		print("[SkillMinigame] Creating %d button icons (T1=%d visible, T2/T3 as '?')" % [full_sequence.size(), tier_1_length])
 
 		for i in range(full_sequence.size()):
 			var button_name = full_sequence[i]
 			var icon_action = BUTTON_ICONS.get(button_name, "accept")
 
-			if icon_layout:
-				var icon_texture = icon_layout.get_button_icon(icon_action)
+			# Create container for this button position
+			var button_slot = Control.new()
+			button_slot.custom_minimum_size = Vector2(50, 50)
 
-				if icon_texture:
-					var icon_rect = TextureRect.new()
-					icon_rect.texture = icon_texture
-					icon_rect.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
-					icon_rect.custom_minimum_size = Vector2(50, 50)  # Large and visible
-					icon_rect.z_index = 1001
-
-					# Tier 1: visible, Tier 2/3: hidden initially
-					if i < tier_1_length:
-						# Tier 1 - visible
-						icon_rect.modulate = Color(1.0, 1.0, 1.0, 0.7)  # White but semi-transparent
+			if i < tier_1_length:
+				# Tier 1 - show actual button icon
+				if icon_layout:
+					var icon_texture = icon_layout.get_button_icon(icon_action)
+					if icon_texture:
+						var icon_rect = TextureRect.new()
+						icon_rect.texture = icon_texture
+						icon_rect.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+						icon_rect.custom_minimum_size = Vector2(50, 50)
+						icon_rect.modulate = Color(1.0, 1.0, 1.0, 0.7)  # Semi-transparent
+						icon_rect.z_index = 1001
+						button_slot.add_child(icon_rect)
 						print("[SkillMinigame] Created TIER 1 icon %d: %s" % [i, button_name])
-					elif i < tier_2_length:
-						# Tier 2 - hidden
-						icon_rect.modulate = Color(1.0, 1.0, 1.0, 0.0)  # Invisible
-						print("[SkillMinigame] Created TIER 2 icon %d: %s (hidden)" % [i, button_name])
-					else:
-						# Tier 3 - hidden
-						icon_rect.modulate = Color(1.0, 1.0, 1.0, 0.0)  # Invisible
-						print("[SkillMinigame] Created TIER 3 icon %d: %s (hidden)" % [i, button_name])
-
-					sequence_container.add_child(icon_rect)
-				else:
-					print("[SkillMinigame] ERROR: No texture loaded for %s (action: %s)" % [button_name, icon_action])
 			else:
-				print("[SkillMinigame] ERROR: aControllerIconLayout not found!")
+				# Tier 2/3 - show "?" placeholder circle
+				var placeholder = Control.new()
+				placeholder.custom_minimum_size = Vector2(50, 50)
+				placeholder.draw.connect(func():
+					var center = Vector2(25, 25)
+					var radius = 23.0
+					# Draw filled circle background
+					placeholder.draw_circle(center, radius, Color(0.2, 0.2, 0.2, 0.6))
+					# Draw circle outline
+					var points = 64
+					for j in range(points):
+						var angle_from = (float(j) / points) * TAU
+						var angle_to = (float(j + 1) / points) * TAU
+						var from = center + Vector2(cos(angle_from), sin(angle_from)) * radius
+						var to = center + Vector2(cos(angle_to), sin(angle_to)) * radius
+						placeholder.draw_line(from, to, Color(0.6, 0.6, 0.6, 0.7), 2.0)
+					# Draw "?" text in center
+					var font = ThemeDB.fallback_font
+					var font_size = 32
+					var text = "?"
+					var text_size = font.get_string_size(text, HORIZONTAL_ALIGNMENT_CENTER, -1, font_size)
+					var text_pos = center - text_size / 2.0
+					placeholder.draw_string(font, text_pos, text, HORIZONTAL_ALIGNMENT_CENTER, -1, font_size, Color(0.8, 0.8, 0.8, 0.9))
+				)
+				button_slot.add_child(placeholder)
+
+				# Store the actual icon texture for later reveal
+				if icon_layout:
+					var icon_texture = icon_layout.get_button_icon(icon_action)
+					if icon_texture:
+						button_slot.set_meta("hidden_texture", icon_texture)
+						button_slot.set_meta("button_name", button_name)
+
+				var tier_name = "TIER 2" if i < tier_2_length else "TIER 3"
+				print("[SkillMinigame] Created %s placeholder %d: ? (hides %s)" % [tier_name, i, button_name])
+
+			sequence_container.add_child(button_slot)
 
 		print("[SkillMinigame] Sequence container has %d children" % sequence_container.get_child_count())
 
@@ -337,11 +363,14 @@ func _check_button_input() -> void:
 
 		# Highlight the current button icon
 		if sequence_index < sequence_container.get_child_count():
-			var icon = sequence_container.get_child(sequence_index)
-			if icon is TextureRect:
-				var mind_color = _get_mind_type_color()
-				mind_color.a = 1.0  # Fully opaque
-				icon.modulate = mind_color  # Light up with mind type color
+			var button_slot = sequence_container.get_child(sequence_index)
+			# Find the TextureRect child (actual button icon)
+			for child in button_slot.get_children():
+				if child is TextureRect:
+					var mind_color = _get_mind_type_color()
+					mind_color.a = 1.0  # Fully opaque
+					child.modulate = mind_color  # Light up with mind type color
+					break
 
 		sequence_index += 1
 		fill_progress = float(sequence_index) / float(full_sequence.size())
@@ -374,31 +403,81 @@ func _check_button_input() -> void:
 			_restart_sequence()
 
 func _reveal_tier_icons(start_index: int, end_index: int) -> void:
-	"""Fade in icons for a tier"""
+	"""Replace '?' placeholders with actual button icons"""
 	for i in range(start_index, end_index):
 		if i < sequence_container.get_child_count():
-			var icon = sequence_container.get_child(i)
-			if icon is TextureRect:
+			var button_slot = sequence_container.get_child(i)
+
+			# Check if this has a hidden texture stored
+			if button_slot.has_meta("hidden_texture"):
+				var icon_texture = button_slot.get_meta("hidden_texture")
+				var button_name = button_slot.get_meta("button_name")
+
+				# Remove the "?" placeholder
+				for child in button_slot.get_children():
+					child.queue_free()
+
+				# Create the actual button icon
+				var icon_rect = TextureRect.new()
+				icon_rect.texture = icon_texture
+				icon_rect.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+				icon_rect.custom_minimum_size = Vector2(50, 50)
+				icon_rect.modulate = Color(1.0, 1.0, 1.0, 0.0)  # Start invisible
+				icon_rect.z_index = 1001
+				button_slot.add_child(icon_rect)
+
 				# Fade in over 0.3 seconds
 				var tween = create_tween()
-				tween.tween_property(icon, "modulate", Color(1.0, 1.0, 1.0, 0.7), 0.3)
-				print("[SkillMinigame] Revealing icon %d" % i)
+				tween.tween_property(icon_rect, "modulate", Color(1.0, 1.0, 1.0, 0.7), 0.3)
+
+				print("[SkillMinigame] Revealing icon %d: ? -> %s" % [i, button_name])
 
 func _restart_sequence() -> void:
-	"""Reset sequence from beginning"""
+	"""Reset sequence from beginning and restore '?' placeholders"""
 	sequence_index = 0
 	fill_progress = 0.0
 
-	# Reset all button icons - tier 1 visible, tier 2/3 hidden
+	# Reset all button icons - tier 1 visible, tier 2/3 back to "?" placeholders
 	for i in range(sequence_container.get_child_count()):
-		var icon = sequence_container.get_child(i)
-		if icon is TextureRect:
-			if i < tier_1_length:
-				# Tier 1 - visible
-				icon.modulate = Color(1.0, 1.0, 1.0, 0.7)  # Semi-transparent white
-			else:
-				# Tier 2/3 - hidden
-				icon.modulate = Color(1.0, 1.0, 1.0, 0.0)  # Invisible
+		var button_slot = sequence_container.get_child(i)
+
+		if i < tier_1_length:
+			# Tier 1 - reset to semi-transparent
+			for child in button_slot.get_children():
+				if child is TextureRect:
+					child.modulate = Color(1.0, 1.0, 1.0, 0.7)
+		else:
+			# Tier 2/3 - restore "?" placeholder if it was revealed
+			if button_slot.has_meta("hidden_texture"):
+				# Remove any revealed icon
+				for child in button_slot.get_children():
+					child.queue_free()
+
+				# Recreate "?" placeholder
+				var placeholder = Control.new()
+				placeholder.custom_minimum_size = Vector2(50, 50)
+				placeholder.draw.connect(func():
+					var center = Vector2(25, 25)
+					var radius = 23.0
+					# Draw filled circle background
+					placeholder.draw_circle(center, radius, Color(0.2, 0.2, 0.2, 0.6))
+					# Draw circle outline
+					var points = 64
+					for j in range(points):
+						var angle_from = (float(j) / points) * TAU
+						var angle_to = (float(j + 1) / points) * TAU
+						var from = center + Vector2(cos(angle_from), sin(angle_from)) * radius
+						var to = center + Vector2(cos(angle_to), sin(angle_to)) * radius
+						placeholder.draw_line(from, to, Color(0.6, 0.6, 0.6, 0.7), 2.0)
+					# Draw "?" text in center
+					var font = ThemeDB.fallback_font
+					var font_size = 32
+					var text = "?"
+					var text_size = font.get_string_size(text, HORIZONTAL_ALIGNMENT_CENTER, -1, font_size)
+					var text_pos = center - text_size / 2.0
+					placeholder.draw_string(font, text_pos, text, HORIZONTAL_ALIGNMENT_CENTER, -1, font_size, Color(0.8, 0.8, 0.8, 0.9))
+				)
+				button_slot.add_child(placeholder)
 
 func _finish_sequence(success: bool) -> void:
 	"""Sequence complete or failed"""
