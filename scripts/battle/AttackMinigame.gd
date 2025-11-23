@@ -212,23 +212,27 @@ func _update_button_modulation() -> void:
 	"""Update button icon modulation based on circle progress percentage"""
 	var percent = circle_progress * 100.0
 
+	# Color changes based on new zones
 	if percent < 10.0:
-		# 0-10%: White
-		current_button_modulation = Color.WHITE
+		# 0-10%: Red (Bad)
+		current_button_modulation = Color(1.0, 0.0, 0.0)  # Red
 	elif percent < 30.0:
-		# 10-30%: Yellow
+		# 11-30%: Yellow (OK)
 		current_button_modulation = Color(1.0, 1.0, 0.0)  # Yellow
-	elif percent < 80.0:
-		# 30-80%: Green
+	elif percent < 50.0:
+		# 31-50%: Green (Good)
 		current_button_modulation = Color(0.0, 1.0, 0.0)  # Green
-	elif percent < 90.0:
-		# 80-90%: Blue
+	elif percent < 60.0:
+		# 51-60%: Blue (Great!)
 		current_button_modulation = Color(0.3, 0.6, 1.0)  # Blue
+	elif percent < 80.0:
+		# 61-80%: Green (Good)
+		current_button_modulation = Color(0.0, 1.0, 0.0)  # Green
 	elif percent < 100.0:
-		# 90-100%: Yellow
+		# 81-99%: Yellow (OK)
 		current_button_modulation = Color(1.0, 1.0, 0.0)  # Yellow
 	else:
-		# 100%: Red
+		# 100%: Red (Bad)
 		current_button_modulation = Color(1.0, 0.0, 0.0)  # Red
 
 func _draw_circle_and_button() -> void:
@@ -236,31 +240,44 @@ func _draw_circle_and_button() -> void:
 	var canvas_size = circle_canvas.size
 	var center = canvas_size / 2.0
 
-	# Calculate zone radii
-	var radius_10 = lerp(circle_max_radius, circle_min_radius, 0.10)   # Yellow zone starts
-	var radius_30 = lerp(circle_max_radius, circle_min_radius, 0.30)   # Green zone starts
-	var radius_80 = lerp(circle_max_radius, circle_min_radius, 0.80)   # Blue zone starts (OPTIMAL)
-	var radius_90 = lerp(circle_max_radius, circle_min_radius, 0.90)   # Yellow zone again
-	var radius_100 = lerp(circle_max_radius, circle_min_radius, 1.0)   # Red zone (100%)
+	# Calculate zone radii based on new zones:
+	# BAD: 0-10%, OK: 11-30%, GOOD: 31-50%, GREAT!: 51-60%, GOOD: 61-80%, OK: 81-99%, BAD: 100%
+	var radius_10 = lerp(circle_max_radius, circle_min_radius, 0.10)   # Bad zone ends
+	var radius_30 = lerp(circle_max_radius, circle_min_radius, 0.30)   # OK zone ends
+	var radius_50 = lerp(circle_max_radius, circle_min_radius, 0.50)   # GOOD zone ends
+	var radius_60 = lerp(circle_max_radius, circle_min_radius, 0.60)   # GREAT! zone ends (OPTIMAL)
+	var radius_80 = lerp(circle_max_radius, circle_min_radius, 0.80)   # GOOD zone ends again
+	var radius_99 = lerp(circle_max_radius, circle_min_radius, 0.99)   # OK zone ends
 
 	# Fill all colored zones from outside to inside
-	# Yellow zone (10-30%)
+	# Bad zone (0-10%) - Red
+	_draw_zone_fill(center, circle_max_radius, radius_10, Color(1.0, 0.0, 0.0, 0.15))
+
+	# OK zone (11-30%) - Yellow
 	_draw_zone_fill(center, radius_10, radius_30, Color(1.0, 1.0, 0.0, 0.15))
 
-	# Green zone (30-80%)
-	_draw_zone_fill(center, radius_30, radius_80, Color(0.0, 1.0, 0.0, 0.15))
+	# GOOD zone (31-50%) - Green
+	_draw_zone_fill(center, radius_30, radius_50, Color(0.0, 1.0, 0.0, 0.15))
 
-	# Blue zone (80-90%) - OPTIMAL!
-	_draw_zone_fill(center, radius_80, radius_90, Color(0.3, 0.6, 1.0, 0.25))
+	# GREAT! zone (51-60%) - Blue (OPTIMAL!)
+	_draw_zone_fill(center, radius_50, radius_60, Color(0.3, 0.6, 1.0, 0.25))
 
-	# Yellow zone again (90-100%)
-	_draw_zone_fill(center, radius_90, circle_min_radius, Color(1.0, 1.0, 0.0, 0.15))
+	# GOOD zone (61-80%) - Green
+	_draw_zone_fill(center, radius_60, radius_80, Color(0.0, 1.0, 0.0, 0.15))
+
+	# OK zone (81-99%) - Yellow
+	_draw_zone_fill(center, radius_80, radius_99, Color(1.0, 1.0, 0.0, 0.15))
+
+	# Bad zone (100%) - Red (center)
+	_draw_zone_fill(center, radius_99, circle_min_radius, Color(1.0, 0.0, 0.0, 0.15))
 
 	# Draw zone marker rings (outlines)
-	_draw_circle_outline(center, radius_10, Color(1.0, 1.0, 0.0, 0.4), 1.0)   # Yellow start
-	_draw_circle_outline(center, radius_30, Color(0.0, 1.0, 0.0, 0.4), 1.0)   # Green start
-	_draw_circle_outline(center, radius_80, Color(0.3, 0.6, 1.0, 0.8), 2.5)   # Blue zone start (OPTIMAL - thicker)
-	_draw_circle_outline(center, radius_90, Color(0.3, 0.6, 1.0, 0.8), 2.5)   # Blue zone end (thicker)
+	_draw_circle_outline(center, radius_10, Color(1.0, 0.0, 0.0, 0.4), 1.0)     # Bad/OK boundary
+	_draw_circle_outline(center, radius_30, Color(1.0, 1.0, 0.0, 0.4), 1.0)     # OK/GOOD boundary
+	_draw_circle_outline(center, radius_50, Color(0.0, 1.0, 0.0, 0.6), 1.5)     # GOOD/GREAT! boundary
+	_draw_circle_outline(center, radius_60, Color(0.3, 0.6, 1.0, 0.8), 2.5)     # GREAT! zone end (OPTIMAL - thicker)
+	_draw_circle_outline(center, radius_80, Color(0.0, 1.0, 0.0, 0.6), 1.5)     # GOOD/OK boundary
+	_draw_circle_outline(center, radius_99, Color(1.0, 1.0, 0.0, 0.4), 1.0)     # OK/Bad boundary
 
 	# Calculate current circle radius based on progress
 	# Progress 0.0 = max radius, Progress 1.0 = min radius (stops at button edge)
@@ -315,33 +332,39 @@ func _stop_circle() -> void:
 	var percent = circle_progress * 100.0
 
 	# Determine damage modifier and result text based on final percentage
+	# BAD: 0-10% and 100%, OK: 11-30% and 81-99%, GOOD: 31-50% and 61-80%, GREAT!: 51-60%
 	if percent < 10.0:
-		# White zone (0-10%) - too early
-		final_damage_modifier = 1.0
-		final_grade = "good"
-		result_text = "GOOD"
+		# Bad zone (0-10%)
+		final_damage_modifier = 0.7
+		final_grade = "bad"
+		result_text = "BAD"
 	elif percent < 30.0:
-		# Yellow zone (10-30%) - OK
+		# OK zone (11-30%)
 		final_damage_modifier = 0.9
 		final_grade = "ok"
 		result_text = "OK"
-	elif percent < 80.0:
-		# Green zone (30-80%) - Good (normal damage)
+	elif percent < 50.0:
+		# GOOD zone (31-50%)
 		final_damage_modifier = 1.0
 		final_grade = "good"
 		result_text = "GOOD"
-	elif percent < 90.0:
-		# Blue zone (80-90%) - Great!
+	elif percent < 60.0:
+		# GREAT! zone (51-60%) - OPTIMAL!
 		final_damage_modifier = 1.3
 		final_grade = "great"
 		result_text = "GREAT!"
+	elif percent < 80.0:
+		# GOOD zone (61-80%)
+		final_damage_modifier = 1.0
+		final_grade = "good"
+		result_text = "GOOD"
 	elif percent < 100.0:
-		# Yellow zone (90-100%) - OK
+		# OK zone (81-99%)
 		final_damage_modifier = 0.9
 		final_grade = "ok"
 		result_text = "OK"
 	else:
-		# Red zone (100%) - Bad
+		# Bad zone (100%)
 		final_damage_modifier = 0.7
 		final_grade = "bad"
 		result_text = "BAD"
