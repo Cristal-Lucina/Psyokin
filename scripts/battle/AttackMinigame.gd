@@ -130,7 +130,7 @@ func _setup_minigame() -> void:
 	result_label = Label.new()
 	result_label.text = ""
 	result_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	result_label.add_theme_font_size_override("font_size", 18)  # 25% bigger than 14
+	result_label.add_theme_font_size_override("font_size", 40)  # Much bigger for visibility
 	result_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
 	result_label.modulate.a = 0.0  # Hidden initially
 
@@ -231,21 +231,31 @@ func _draw_circle_and_button() -> void:
 	var canvas_size = circle_canvas.size
 	var center = canvas_size / 2.0
 
-	# Draw zone marker rings (static guides showing where each zone is)
-	# These show the player where to aim for
-	var radius_30 = lerp(circle_max_radius, circle_min_radius, 0.30)  # Start of green zone
-	var radius_80 = lerp(circle_max_radius, circle_min_radius, 0.80)  # Start of blue zone (OPTIMAL)
-	var radius_90 = lerp(circle_max_radius, circle_min_radius, 0.90)  # End of blue zone
+	# Calculate zone radii
+	var radius_10 = lerp(circle_max_radius, circle_min_radius, 0.10)   # Yellow zone starts
+	var radius_30 = lerp(circle_max_radius, circle_min_radius, 0.30)   # Green zone starts
+	var radius_80 = lerp(circle_max_radius, circle_min_radius, 0.80)   # Blue zone starts (OPTIMAL)
+	var radius_90 = lerp(circle_max_radius, circle_min_radius, 0.90)   # Yellow zone again
+	var radius_100 = lerp(circle_max_radius, circle_min_radius, 1.0)   # Red zone (100%)
 
-	# Draw green zone ring (30% - normal damage starts here)
-	_draw_circle_outline(center, radius_30, Color(0.0, 1.0, 0.0, 0.3), 1.0)
+	# Fill all colored zones from outside to inside
+	# Yellow zone (10-30%)
+	_draw_zone_fill(center, radius_10, radius_30, Color(1.0, 1.0, 0.0, 0.15))
 
-	# Draw blue zone rings (80-90% - BEST zone, +30% damage!)
-	_draw_circle_outline(center, radius_80, Color(0.3, 0.6, 1.0, 0.6), 2.0)  # Outer blue ring
-	_draw_circle_outline(center, radius_90, Color(0.3, 0.6, 1.0, 0.6), 2.0)  # Inner blue ring
+	# Green zone (30-80%)
+	_draw_zone_fill(center, radius_30, radius_80, Color(0.0, 1.0, 0.0, 0.15))
 
-	# Fill the blue zone area with a semi-transparent blue
-	_draw_zone_fill(center, radius_80, radius_90, Color(0.3, 0.6, 1.0, 0.15))
+	# Blue zone (80-90%) - OPTIMAL!
+	_draw_zone_fill(center, radius_80, radius_90, Color(0.3, 0.6, 1.0, 0.25))
+
+	# Yellow zone again (90-100%)
+	_draw_zone_fill(center, radius_90, circle_min_radius, Color(1.0, 1.0, 0.0, 0.15))
+
+	# Draw zone marker rings (outlines)
+	_draw_circle_outline(center, radius_10, Color(1.0, 1.0, 0.0, 0.4), 1.0)   # Yellow start
+	_draw_circle_outline(center, radius_30, Color(0.0, 1.0, 0.0, 0.4), 1.0)   # Green start
+	_draw_circle_outline(center, radius_80, Color(0.3, 0.6, 1.0, 0.8), 2.5)   # Blue zone start (OPTIMAL - thicker)
+	_draw_circle_outline(center, radius_90, Color(0.3, 0.6, 1.0, 0.8), 2.5)   # Blue zone end (thicker)
 
 	# Calculate current circle radius based on progress
 	# Progress 0.0 = max radius, Progress 1.0 = min radius (stops at button edge)
