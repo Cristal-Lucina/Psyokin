@@ -319,7 +319,7 @@ func _stop_circle() -> void:
 		# White zone (0-10%) - too early
 		final_damage_modifier = 1.0
 		final_grade = "good"
-		result_text = "Good"
+		result_text = "GOOD"
 	elif percent < 30.0:
 		# Yellow zone (10-30%) - OK
 		final_damage_modifier = 0.9
@@ -329,12 +329,12 @@ func _stop_circle() -> void:
 		# Green zone (30-80%) - Good (normal damage)
 		final_damage_modifier = 1.0
 		final_grade = "good"
-		result_text = "Good"
+		result_text = "GOOD"
 	elif percent < 90.0:
 		# Blue zone (80-90%) - Great!
 		final_damage_modifier = 1.3
 		final_grade = "great"
-		result_text = "Great!"
+		result_text = "GREAT!"
 	elif percent < 100.0:
 		# Yellow zone (90-100%) - OK
 		final_damage_modifier = 0.9
@@ -344,7 +344,7 @@ func _stop_circle() -> void:
 		# Red zone (100%) - Bad
 		final_damage_modifier = 0.7
 		final_grade = "bad"
-		result_text = "Bad"
+		result_text = "BAD"
 
 	print("[AttackMinigame] Stopped at %.1f%% - %s (%.1fx damage)" % [percent, result_text, final_damage_modifier])
 
