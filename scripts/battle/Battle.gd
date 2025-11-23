@@ -2005,9 +2005,10 @@ func _get_combatant_position_index(combatant_id: String) -> int:
 
 func _on_turn_ended(_combatant_id: String) -> void:
 	"""Called when a combatant's turn ends"""
-	# Run back to starting position
-	if battle_sequence_orch and current_combatant:
-		await battle_sequence_orch._run_back(current_combatant)
+	# DISABLED: Character stays at battle marker, doesn't run back
+	# This makes battle flow feel less chaotic with constant running
+	# if battle_sequence_orch and current_combatant:
+	# 	await battle_sequence_orch._run_back(current_combatant)
 
 	# Reset turn indicator animation
 	await _reset_turn_indicator()
