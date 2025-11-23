@@ -381,13 +381,22 @@ func _run_to_marker(combatant: Dictionary, duration_override: float = 0.0):
 	var current_x = attacker_sprite.position.x
 	var target_x = current_x + marker_x
 
+	print("[MOVEMENT DEBUG] === %s RUNNING TO MARKER ===" % combatant.display_name)
+	print("[MOVEMENT DEBUG] Starting X: %.1f" % current_x)
+	print("[MOVEMENT DEBUG] Marker offset: %.1f" % marker_x)
+	print("[MOVEMENT DEBUG] Target X: %.1f" % target_x)
+	print("[MOVEMENT DEBUG] Direction: %s" % run_direction)
+	print("[MOVEMENT DEBUG] Duration: %.2fs" % duration)
+
 	var tween = battle_scene.create_tween()
 	tween.tween_property(attacker_sprite, "position:x", target_x, duration)
 	await tween.finished
 
+	print("[MOVEMENT DEBUG] Final X: %.1f" % attacker_sprite.position.x)
+	print("[MOVEMENT DEBUG] ==============================")
+
 	# Return to idle
 	sprite_animator.play_animation(combatant.id, "Idle", run_direction, false, false)
-	print("[BattleSequence] %s ran to battle marker" % combatant.display_name)
 
 func _fade_in_action_menu(duration: float):
 	"""Fade in the action menu"""
@@ -443,15 +452,23 @@ func _run_back(combatant: Dictionary, duration_override: float = 0.0):
 	var current_x = attacker_sprite.position.x
 	var target_x = current_x - marker_x  # Go back by the same distance
 
+	print("[MOVEMENT DEBUG] === %s RUNNING BACK ===" % combatant.display_name)
+	print("[MOVEMENT DEBUG] Current X: %.1f" % current_x)
+	print("[MOVEMENT DEBUG] Marker offset: %.1f" % marker_x)
+	print("[MOVEMENT DEBUG] Target X: %.1f (current - offset)" % target_x)
+	print("[MOVEMENT DEBUG] Direction: %s" % run_direction)
+	print("[MOVEMENT DEBUG] Duration: %.2fs" % duration)
+
 	var tween = battle_scene.create_tween()
 	tween.tween_property(attacker_sprite, "position:x", target_x, duration)
 	await tween.finished
 
+	print("[MOVEMENT DEBUG] Final X: %.1f" % attacker_sprite.position.x)
+	print("[MOVEMENT DEBUG] ==============================")
+
 	# Return to idle facing forward
 	var idle_direction = "RIGHT" if combatant.is_ally else "LEFT"
 	sprite_animator.play_animation(combatant.id, "Idle", idle_direction, false, false)
-
-	print("[BattleSequence] %s ran back to starting position" % combatant.display_name)
 
 func _face_forward(combatant: Dictionary):
 	"""Turn character to face forward"""
