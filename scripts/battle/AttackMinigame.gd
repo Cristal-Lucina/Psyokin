@@ -231,6 +231,22 @@ func _draw_circle_and_button() -> void:
 	var canvas_size = circle_canvas.size
 	var center = canvas_size / 2.0
 
+	# Draw zone marker rings (static guides showing where each zone is)
+	# These show the player where to aim for
+	var radius_30 = lerp(circle_max_radius, circle_min_radius, 0.30)  # Start of green zone
+	var radius_80 = lerp(circle_max_radius, circle_min_radius, 0.80)  # Start of blue zone (OPTIMAL)
+	var radius_90 = lerp(circle_max_radius, circle_min_radius, 0.90)  # End of blue zone
+
+	# Draw green zone ring (30% - normal damage starts here)
+	_draw_circle_outline(center, radius_30, Color(0.0, 1.0, 0.0, 0.3), 1.0)
+
+	# Draw blue zone rings (80-90% - BEST zone, +30% damage!)
+	_draw_circle_outline(center, radius_80, Color(0.3, 0.6, 1.0, 0.6), 2.0)  # Outer blue ring
+	_draw_circle_outline(center, radius_90, Color(0.3, 0.6, 1.0, 0.6), 2.0)  # Inner blue ring
+
+	# Fill the blue zone area with a semi-transparent blue
+	_draw_zone_fill(center, radius_80, radius_90, Color(0.3, 0.6, 1.0, 0.15))
+
 	# Calculate current circle radius based on progress
 	# Progress 0.0 = max radius, Progress 1.0 = min radius (stops at button edge)
 	var current_radius = lerp(circle_max_radius, circle_min_radius, circle_progress)
@@ -256,6 +272,25 @@ func _draw_circle_outline(center: Vector2, radius: float, color: Color, width: f
 		var point_from = center + Vector2(cos(angle_from), sin(angle_from)) * radius
 		var point_to = center + Vector2(cos(angle_to), sin(angle_to)) * radius
 		circle_canvas.draw_line(point_from, point_to, color, width)
+
+func _draw_zone_fill(center: Vector2, outer_radius: float, inner_radius: float, color: Color) -> void:
+	"""Helper to fill the area between two circles (for zone highlighting)"""
+	var points = 64
+	for i in range(points):
+		var angle_from = (float(i) / points) * TAU
+		var angle_to = (float(i + 1) / points) * TAU
+
+		# Create a quad between the two circles
+		var outer_from = center + Vector2(cos(angle_from), sin(angle_from)) * outer_radius
+		var outer_to = center + Vector2(cos(angle_to), sin(angle_to)) * outer_radius
+		var inner_from = center + Vector2(cos(angle_from), sin(angle_from)) * inner_radius
+		var inner_to = center + Vector2(cos(angle_to), sin(angle_to)) * inner_radius
+
+		# Draw two triangles to fill the quad
+		var points_array1 = PackedVector2Array([outer_from, outer_to, inner_from])
+		var points_array2 = PackedVector2Array([outer_to, inner_to, inner_from])
+		circle_canvas.draw_colored_polygon(points_array1, color)
+		circle_canvas.draw_colored_polygon(points_array2, color)
 
 func _stop_circle() -> void:
 	"""Player pressed A or circle reached 100% - calculate result"""
