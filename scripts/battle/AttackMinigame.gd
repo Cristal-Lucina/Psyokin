@@ -64,7 +64,7 @@ func _setup_transparent_visuals() -> void:
 	overlay_panel = PanelContainer.new()
 	overlay_panel.custom_minimum_size = get_viewport_rect().size * 0.15  # 30% of original 0.5
 	var viewport_size = get_viewport_rect().size
-	overlay_panel.position = Vector2(viewport_size.x * 0.425, viewport_size.y * 0.25 - 400)  # Centered horizontally, moved up 400px
+	overlay_panel.position = Vector2(viewport_size.x * 0.425, viewport_size.y * 0.25 - 200)  # Centered horizontally, moved up 200px
 	overlay_panel.z_index = 101
 
 	# Make panel transparent
