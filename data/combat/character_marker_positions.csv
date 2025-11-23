@@ -1,8 +1,8 @@
 position_id,side,position_index,position_name,sprite_x,sprite_y,sprite_scale,x_offset,shadow_x,shadow_y,shadow_scale_x,shadow_scale_y,z_index,turn_start_anim,turn_start_direction,turn_end_anim,turn_end_direction,slide_forward_distance,slide_forward_duration,slide_back_distance,slide_back_duration,notes
-1,ally,0,Hero/Top,40,40,4.375,0,40,55,3,1.5,108,Run,RIGHT,Run,RIGHT,30,0.3,-30,0.3,Main hero - slides forward 30px with Run anim
-2,ally,1,Middle,-20,40,4.375,-60,-20,55,3,1.5,109,Run,RIGHT,Run,RIGHT,30,0.3,-30,0.3,Middle ally - 60px left offset with Run anim
-3,ally,2,Bottom,-80,40,4.375,-120,-80,55,3,1.5,110,Run,RIGHT,Run,RIGHT,30,0.3,-30,0.3,Bottom ally - 120px left offset with Run anim
-4,enemy,0,Top,40,40,4.375,0,40,55,3,1.5,108,Run,LEFT,Run,RIGHT,30,0.3,-30,0.3,Top enemy - slides forward with Run LEFT
-5,enemy,1,Middle,100,40,4.375,60,100,55,3,1.5,109,Run,LEFT,Run,RIGHT,30,0.3,-30,0.3,Middle enemy - 60px right offset with Run LEFT
-6,enemy,2,Bottom,160,40,4.375,120,160,55,3,1.5,110,Run,LEFT,Run,RIGHT,30,0.3,-30,0.3,Bottom enemy - 120px right offset with Run LEFT
+1,ally,0,Hero/Top,40,40,4.375,0,40,55,3,1.5,108,Run,RIGHT,Run,LEFT,30,0.3,-30,0.3,Main hero - runs right to marker then left to return
+2,ally,1,Middle,-20,40,4.375,-60,-20,55,3,1.5,109,Run,RIGHT,Run,LEFT,30,0.3,-30,0.3,Middle ally - runs right to marker then left to return
+3,ally,2,Bottom,-80,40,4.375,-120,-80,55,3,1.5,110,Run,RIGHT,Run,LEFT,30,0.3,-30,0.3,Bottom ally - runs right to marker then left to return
+4,enemy,0,Top,40,40,4.375,0,40,55,3,1.5,108,Run,LEFT,Run,RIGHT,30,0.3,-30,0.3,Top enemy - runs left to marker then right to return
+5,enemy,1,Middle,100,40,4.375,60,100,55,3,1.5,109,Run,LEFT,Run,RIGHT,30,0.3,-30,0.3,Middle enemy - runs left to marker then right to return
+6,enemy,2,Bottom,160,40,4.375,120,160,55,3,1.5,110,Run,LEFT,Run,RIGHT,30,0.3,-30,0.3,Bottom enemy - runs left to marker then right to return
 
