@@ -135,7 +135,7 @@ func _setup_minigame() -> void:
 
 	# Button sequence display (centered above timer bar)
 	sequence_container = HBoxContainer.new()
-	sequence_container.add_theme_constant_override("separation", 15)
+	sequence_container.add_theme_constant_override("separation", 5)
 	var sequence_center = CenterContainer.new()
 	sequence_center.add_child(sequence_container)
 	content_container.add_child(sequence_center)
@@ -154,7 +154,7 @@ func _setup_minigame() -> void:
 				var icon_rect = TextureRect.new()
 				icon_rect.texture = icon_texture
 				icon_rect.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
-				icon_rect.custom_minimum_size = Vector2(50, 50)  # Bigger for visibility
+				icon_rect.custom_minimum_size = Vector2(20, 20)  # Small and compact
 				icon_rect.modulate = Color(0.5, 0.5, 0.5, 1.0)  # Start grayed out
 				sequence_container.add_child(icon_rect)
 
