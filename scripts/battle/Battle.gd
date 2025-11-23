@@ -2005,6 +2005,10 @@ func _get_combatant_position_index(combatant_id: String) -> int:
 
 func _on_turn_ended(_combatant_id: String) -> void:
 	"""Called when a combatant's turn ends"""
+	# Run back to starting position
+	if battle_sequence_orch and current_combatant:
+		await battle_sequence_orch._run_back(current_combatant)
+
 	# Reset turn indicator animation
 	await _reset_turn_indicator()
 
@@ -3661,10 +3665,6 @@ func _execute_attack(target: Dictionary) -> void:
 			# Wait for messages to be displayed to player
 			await _wait_for_message_queue()
 
-			# Run back to starting position using battle marker system
-			if battle_sequence_orch:
-				await battle_sequence_orch._run_back(current_combatant)
-
 			# Debug: show hit, crit, and damage breakdown
 			var hit_breakdown = hit_check.breakdown
 			var crit_breakdown = crit_check.breakdown
@@ -4620,10 +4620,6 @@ func _execute_item_usage(target: Dictionary) -> void:
 	# Wait for ailment/debuff messages to be displayed (if any)
 	await _wait_for_message_queue()
 
-	# Run back to starting position using battle marker system
-	if battle_sequence_orch:
-		await battle_sequence_orch._run_back(current_combatant)
-
 	# Consume the item
 	var inventory = get_node("/root/aInventorySystem")
 	inventory.remove_item(item_id, 1)
@@ -5539,10 +5535,6 @@ func _execute_enemy_ai() -> void:
 
 			# Wait for messages to be displayed to player
 			await _wait_for_message_queue()
-
-			# Run back to starting position using battle marker system
-			if battle_sequence_orch:
-				await battle_sequence_orch._run_back(current_combatant)
 
 			# Debug: show hit, crit, and damage breakdown
 			var hit_breakdown = hit_check.breakdown
@@ -7659,10 +7651,6 @@ func _execute_burst_on_target(target: Dictionary) -> void:
 	# Wait for messages to be displayed to player
 	await _wait_for_message_queue()
 
-	# Run back to starting position using battle marker system
-	if battle_sequence_orch:
-		await battle_sequence_orch._run_back(current_combatant)
-
 	# Update displays
 	_update_combatant_displays()
 	if target.is_ko:
@@ -8105,10 +8093,6 @@ func _execute_skill_single(target: Dictionary) -> void:
 
 	# Wait for messages to be displayed to player
 	await _wait_for_message_queue()
-
-	# Run back to starting position using battle marker system
-	if battle_sequence_orch:
-		await battle_sequence_orch._run_back(current_combatant)
 
 	# Update displays
 	_update_combatant_displays()
