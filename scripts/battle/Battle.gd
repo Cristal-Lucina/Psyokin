@@ -3114,8 +3114,9 @@ func _create_combatant_slot(combatant: Dictionary, is_ally: bool, slot_index: in
 
 func _update_combatant_displays() -> void:
 	"""Update all combatant HP/MP displays"""
-	# TODO: Update HP/MP bars without recreating everything
-	_display_combatants()
+	# DO NOT recreate sprites - this destroys character positions during battle!
+	# Sprites are already created and positioned at battle start
+	# Only update the party status panels (HP/MP bars)
 	_update_party_status_panels()
 
 func _shake_combatant_panel(combatant_id: String) -> void:
