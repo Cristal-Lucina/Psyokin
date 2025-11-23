@@ -3661,24 +3661,9 @@ func _execute_attack(target: Dictionary) -> void:
 			# Wait for messages to be displayed to player
 			await _wait_for_message_queue()
 
-			# Slide attacker back with Run animation
-			if sprite_animator and sprite_animator.sprite_instances.has(current_combatant.id):
-				var attacker_instance = sprite_animator.sprite_instances[current_combatant.id]
-				var attacker_sprite = attacker_instance["sprite"]
-
-				# Run animation to the right (opposite of forward direction)
-				var run_back_direction = "RIGHT"
-				sprite_animator.play_animation(current_combatant.id, "Run", run_back_direction, false, false)
-
-				# Slide back to original position
-				var slide_distance = -30.0 if current_combatant.is_ally else 30.0
-				var tween = create_tween()
-				tween.tween_property(attacker_sprite, "position:x", attacker_sprite.position.x + slide_distance, 0.3)
-				await tween.finished
-
-				# Return to idle facing original direction
-				var idle_direction = "RIGHT" if current_combatant.is_ally else "LEFT"
-				sprite_animator.play_animation(current_combatant.id, "Idle", idle_direction, false, false)
+			# Run back to starting position using battle marker system
+			if battle_sequence_orch:
+				await battle_sequence_orch._run_back(current_combatant)
 
 			# Debug: show hit, crit, and damage breakdown
 			var hit_breakdown = hit_check.breakdown
@@ -4635,24 +4620,9 @@ func _execute_item_usage(target: Dictionary) -> void:
 	# Wait for ailment/debuff messages to be displayed (if any)
 	await _wait_for_message_queue()
 
-	# Slide attacker back with Run animation
-	if sprite_animator and sprite_animator.sprite_instances.has(current_combatant.id):
-		var attacker_instance = sprite_animator.sprite_instances[current_combatant.id]
-		var attacker_sprite = attacker_instance["sprite"]
-
-		# Run animation to the right (opposite of forward direction)
-		var run_back_direction = "RIGHT"
-		sprite_animator.play_animation(current_combatant.id, "Run", run_back_direction, false, false)
-
-		# Slide back to original position
-		var slide_distance = -30.0 if current_combatant.is_ally else 30.0
-		var tween = create_tween()
-		tween.tween_property(attacker_sprite, "position:x", attacker_sprite.position.x + slide_distance, 0.3)
-		await tween.finished
-
-		# Return to idle facing original direction
-		var idle_direction = "RIGHT" if current_combatant.is_ally else "LEFT"
-		sprite_animator.play_animation(current_combatant.id, "Idle", idle_direction, false, false)
+	# Run back to starting position using battle marker system
+	if battle_sequence_orch:
+		await battle_sequence_orch._run_back(current_combatant)
 
 	# Consume the item
 	var inventory = get_node("/root/aInventorySystem")
@@ -5570,24 +5540,9 @@ func _execute_enemy_ai() -> void:
 			# Wait for messages to be displayed to player
 			await _wait_for_message_queue()
 
-			# Slide attacker back with Run animation
-			if sprite_animator and sprite_animator.sprite_instances.has(current_combatant.id):
-				var attacker_instance = sprite_animator.sprite_instances[current_combatant.id]
-				var attacker_sprite = attacker_instance["sprite"]
-
-				# Run animation to the right (opposite of forward direction)
-				var run_back_direction = "RIGHT"
-				sprite_animator.play_animation(current_combatant.id, "Run", run_back_direction, false, false)
-
-				# Slide back to original position
-				var slide_distance = -30.0 if current_combatant.is_ally else 30.0
-				var tween = create_tween()
-				tween.tween_property(attacker_sprite, "position:x", attacker_sprite.position.x + slide_distance, 0.3)
-				await tween.finished
-
-				# Return to idle facing original direction
-				var idle_direction = "RIGHT" if current_combatant.is_ally else "LEFT"
-				sprite_animator.play_animation(current_combatant.id, "Idle", idle_direction, false, false)
+			# Run back to starting position using battle marker system
+			if battle_sequence_orch:
+				await battle_sequence_orch._run_back(current_combatant)
 
 			# Debug: show hit, crit, and damage breakdown
 			var hit_breakdown = hit_check.breakdown
@@ -7704,24 +7659,9 @@ func _execute_burst_on_target(target: Dictionary) -> void:
 	# Wait for messages to be displayed to player
 	await _wait_for_message_queue()
 
-	# Slide attacker back with Run animation
-	if sprite_animator and sprite_animator.sprite_instances.has(current_combatant.id):
-		var attacker_instance = sprite_animator.sprite_instances[current_combatant.id]
-		var attacker_sprite = attacker_instance["sprite"]
-
-		# Run animation to the right (opposite of forward direction)
-		var run_back_direction = "RIGHT"
-		sprite_animator.play_animation(current_combatant.id, "Run", run_back_direction, false, false)
-
-		# Slide back to original position
-		var slide_distance = -30.0 if current_combatant.is_ally else 30.0
-		var tween = create_tween()
-		tween.tween_property(attacker_sprite, "position:x", attacker_sprite.position.x + slide_distance, 0.3)
-		await tween.finished
-
-		# Return to idle facing original direction
-		var idle_direction = "RIGHT" if current_combatant.is_ally else "LEFT"
-		sprite_animator.play_animation(current_combatant.id, "Idle", idle_direction, false, false)
+	# Run back to starting position using battle marker system
+	if battle_sequence_orch:
+		await battle_sequence_orch._run_back(current_combatant)
 
 	# Update displays
 	_update_combatant_displays()
@@ -8166,24 +8106,9 @@ func _execute_skill_single(target: Dictionary) -> void:
 	# Wait for messages to be displayed to player
 	await _wait_for_message_queue()
 
-	# Slide attacker back with Run animation
-	if sprite_animator and sprite_animator.sprite_instances.has(current_combatant.id):
-		var attacker_instance = sprite_animator.sprite_instances[current_combatant.id]
-		var attacker_sprite = attacker_instance["sprite"]
-
-		# Run animation to the right (opposite of forward direction)
-		var run_back_direction = "RIGHT"
-		sprite_animator.play_animation(current_combatant.id, "Run", run_back_direction, false, false)
-
-		# Slide back to original position
-		var slide_distance = -30.0 if current_combatant.is_ally else 30.0
-		var tween = create_tween()
-		tween.tween_property(attacker_sprite, "position:x", attacker_sprite.position.x + slide_distance, 0.3)
-		await tween.finished
-
-		# Return to idle facing original direction
-		var idle_direction = "RIGHT" if current_combatant.is_ally else "LEFT"
-		sprite_animator.play_animation(current_combatant.id, "Idle", idle_direction, false, false)
+	# Run back to starting position using battle marker system
+	if battle_sequence_orch:
+		await battle_sequence_orch._run_back(current_combatant)
 
 	# Update displays
 	_update_combatant_displays()
