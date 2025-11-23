@@ -1,75 +1,386 @@
 extends BaseMinigame
 class_name SkillMinigame
 
-## SkillMinigame - Focus charging + button sequence for skills
-## Phase 1: Hold button to charge focus (faster with higher Focus stat)
-## Phase 2: Input button sequence correctly
+## SkillMinigame - Button sequence timing minigame for skills
+## Press the correct button sequence within the time limit
+## Correct sequence = 100% damage (Tier 1)
+## Extended sequences unlock higher tiers: Tier 2 (110%), Tier 3 (130%)
 
 ## Configuration
-var focus_stat: int = 1  # Focus stat value (affects charge speed)
+var focus_stat: int = 1  # Focus stat (currently unused)
 var skill_sequence: Array = []  # Button sequence ["A", "B", "X", "Y"]
 var skill_tier: int = 1  # Skill tier (1-3)
-var mind_type: String = "none"  # Mind type for color (fire, water, earth, air, data, void, omega)
+var mind_type: String = "fire"  # Mind type for color
 
 ## Internal state
-enum Phase { CHARGING, INPUTTING, COMPLETE }
-var current_phase: Phase = Phase.CHARGING
-var focus_level: int = 0  # 0-3
-var charge_time: float = 0.0
-var sequence_index: int = 0
-var input_timeout: float = 5.0  # Time limit for sequence input
-var input_timer: float = 0.0
-var misclick_count: int = 0
-var has_started_charging: bool = false  # Track if player has pressed Space yet
-var overall_timer: float = 0.0  # Overall countdown timer
-var max_overall_time: float = 3.0  # Total time for entire minigame (reduced to 3 seconds)
-var last_input_button: String = ""  # Track last button to prevent double-input
-var minigame_complete: bool = false  # Lock out all input when complete
-var input_grace_timer: float = 0.0  # Prevent button carryover from target selection
-var input_grace_period: float = 0.3  # 0.3 second grace period
+enum Phase { FADE_IN, ACTIVE, SHOWING_RESULT, COMPLETE }
+var current_phase: Phase = Phase.FADE_IN
+
+## Sequence tracking
+var sequence_index: int = 0  # Current position in sequence
+var time_limit: float = 2.0  # 2 seconds to complete sequence
+var timer: float = 0.0
+var failed: bool = false
+
+## Result tracking
+var final_damage_modifier: float = 1.0
+var final_tier: int = 1
+var result_text: String = "GOOD"
 
 ## Visual elements
-var title_label: Label
-var instruction_label: Label
-var focus_bar: ProgressBar
-var focus_level_label: Label
-var party_icon: Control  # Changed to Control for custom drawing
-var focus_number_label: Label  # Focus number in center of circle
-var sequence_display: HBoxContainer
-var timer_bar: ProgressBar  # For input phase
-var overall_timer_bar: ProgressBar  # For entire minigame
+var circle_canvas: Control  # For drawing the filling circle
+var sequence_container: HBoxContainer  # Shows button sequence
+var timer_bar: ProgressBar  # Horizontal timer bar
+var result_label: Label
+var fade_timer: float = 0.0
+var fade_duration: float = 1.0
 
-## Number drop animation
-var is_number_dropping: bool = false
-var drop_offset: float = 0.0
-var drop_velocity: float = 0.0
-var drop_gravity: float = 800.0  # Pixels per second squared
+## Circle fill animation
+var fill_progress: float = 0.0  # 0.0 = empty, 1.0 = full
+var circle_radius: float = 37.5  # Same size as AttackMinigame button
 
-## Button mapping (InputManager action strings to button labels)
-## Using InputManager action strings for proper controller support
-## These match the face buttons on Xbox/PlayStation controllers
-const BUTTON_MAP = {
-	"menu_accept": "A",      # A button (Xbox A / PS Cross)
-	"battle_defend": "X",    # X button (Xbox X / PS Square)
-	"battle_attack": "B",    # B button (Xbox B / PS Circle)
-	"battle_skill": "Y"      # Y button (Xbox Y / PS Triangle)
+## Input locked during fade in/out
+var input_locked: bool = true
+
+## Button mapping for display
+const BUTTON_ICONS = {
+	"A": "Accept",
+	"B": "Back",
+	"X": "Special_1",
+	"Y": "Special_2"
 }
 
-## Focus charge speeds (seconds per level)
-const BASE_CHARGE_TIME_PER_LEVEL: float = 0.8
-var charge_time_per_level: float = 0.8
+func _ready() -> void:
+	# Override parent to customize background
+	set_anchors_preset(Control.PRESET_FULL_RECT)
+	z_index = 100
+	mouse_filter = Control.MOUSE_FILTER_STOP
 
-## Status effect charge halt (for poison/burned)
-var has_halt_status: bool = false
-var is_charge_halted: bool = false
-var halt_timer: float = 0.0
-var next_halt_time: float = 0.0
-var was_space_pressed: bool = false  # Track key state for halt recovery
+	_setup_transparent_visuals()
+	_apply_status_effects()
+	_setup_minigame()
 
-## Mind type colors
-func _get_mind_type_color(type: String) -> Color:
+	# Start the minigame
+	await get_tree().process_frame
+	_start_minigame()
+
+func _setup_transparent_visuals() -> void:
+	"""Create transparent background - only UI elements visible"""
+	# NO dimmed background - completely transparent
+	background_dim = ColorRect.new()
+	background_dim.color = Color(0, 0, 0, 0.0)  # Fully transparent
+	background_dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	background_dim.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(background_dim)
+
+	# Central panel - also transparent
+	overlay_panel = PanelContainer.new()
+	overlay_panel.custom_minimum_size = get_viewport_rect().size * 0.1875  # Same as attack minigame
+	var viewport_size = get_viewport_rect().size
+	overlay_panel.position = Vector2(viewport_size.x * 0.40625, viewport_size.y * 0.25 - 100)  # Same position
+	overlay_panel.z_index = 101
+
+	# Make panel transparent
+	var panel_style = StyleBoxFlat.new()
+	panel_style.bg_color = Color(0, 0, 0, 0.0)  # Fully transparent
+	panel_style.border_width_left = 0
+	panel_style.border_width_right = 0
+	panel_style.border_width_top = 0
+	panel_style.border_width_bottom = 0
+	overlay_panel.add_theme_stylebox_override("panel", panel_style)
+
+	add_child(overlay_panel)
+
+	# Content container
+	content_container = VBoxContainer.new()
+	content_container.set_anchors_preset(Control.PRESET_FULL_RECT)
+	content_container.add_theme_constant_override("separation", 10)
+	overlay_panel.add_child(content_container)
+
+func _setup_minigame() -> void:
+	base_duration = 10.0  # Maximum time allowed
+	current_duration = base_duration
+
+	# Neon-kawaii colors
+	const COLOR_MILK_WHITE = Color(0.96, 0.97, 0.98)
+
+	# Clear the default content container
+	for child in content_container.get_children():
+		child.queue_free()
+
+	# Result label (placed at top)
+	result_label = Label.new()
+	result_label.text = ""
+	result_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	result_label.add_theme_font_size_override("font_size", 60)
+	result_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
+	result_label.add_theme_constant_override("outline_size", 8)
+	result_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
+	result_label.modulate.a = 0.0  # Hidden initially
+
+	var result_container = CenterContainer.new()
+	result_container.add_child(result_label)
+	content_container.add_child(result_container)
+
+	# Create a centered container for the circle
+	var center_container = CenterContainer.new()
+	center_container.set_anchors_preset(Control.PRESET_FULL_RECT)
+	content_container.add_child(center_container)
+
+	# Create canvas for drawing filling circle
+	circle_canvas = Control.new()
+	circle_canvas.custom_minimum_size = Vector2(188, 188)  # Same as attack minigame
+	circle_canvas.draw.connect(_draw_filling_circle)
+	center_container.add_child(circle_canvas)
+
+	# Button sequence display (centered below circle)
+	sequence_container = HBoxContainer.new()
+	sequence_container.add_theme_constant_override("separation", 10)
+	var sequence_center = CenterContainer.new()
+	sequence_center.add_child(sequence_container)
+	content_container.add_child(sequence_center)
+
+	# Create button icons for sequence
+	var icon_layout = get_node_or_null("/root/aControllerIconLayout")
+	if icon_layout:
+		for i in range(skill_sequence.size()):
+			var button_name = skill_sequence[i]
+			var icon_action = BUTTON_ICONS.get(button_name, "accept")
+			var icon_texture = icon_layout.get_button_icon(icon_action)
+
+			if icon_texture:
+				var icon_rect = TextureRect.new()
+				icon_rect.texture = icon_texture
+				icon_rect.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+				icon_rect.custom_minimum_size = Vector2(40, 40)
+				icon_rect.modulate = Color(0.5, 0.5, 0.5, 1.0)  # Start grayed out
+				sequence_container.add_child(icon_rect)
+
+	# Timer bar (horizontal, below sequence)
+	timer_bar = ProgressBar.new()
+	timer_bar.max_value = 1.0
+	timer_bar.value = 1.0
+	timer_bar.show_percentage = false
+	timer_bar.custom_minimum_size = Vector2(200, 10)
+
+	# Style the timer bar
+	var timer_style = StyleBoxFlat.new()
+	timer_style.bg_color = Color(1.0, 1.0, 1.0, 0.8)  # White fill
+	timer_bar.add_theme_stylebox_override("fill", timer_style)
+
+	var timer_bg_style = StyleBoxFlat.new()
+	timer_bg_style.bg_color = Color(0.2, 0.2, 0.2, 0.5)  # Dark background
+	timer_bar.add_theme_stylebox_override("background", timer_bg_style)
+
+	var timer_center = CenterContainer.new()
+	timer_center.add_child(timer_bar)
+	content_container.add_child(timer_center)
+
+	print("[SkillMinigame] Setup complete - button sequence minigame")
+
+func _start_minigame() -> void:
+	print("[SkillMinigame] Starting button sequence minigame")
+	print("[SkillMinigame] Sequence: %s" % str(skill_sequence))
+	current_phase = Phase.FADE_IN
+	sequence_index = 0
+	fill_progress = 0.0
+	timer = 0.0
+	failed = false
+	fade_timer = 0.0
+	input_locked = true
+
+	# Fade in the overlay
+	overlay_panel.modulate.a = 0.0
+
+func _process(delta: float) -> void:
+	super._process(delta)
+
+	match current_phase:
+		Phase.FADE_IN:
+			_process_fade_in(delta)
+		Phase.ACTIVE:
+			_process_active(delta)
+		Phase.SHOWING_RESULT:
+			_process_showing_result(delta)
+
+func _process_fade_in(delta: float) -> void:
+	"""Fade in before starting"""
+	fade_timer += delta
+	var alpha = min(fade_timer / fade_duration, 1.0)
+	overlay_panel.modulate.a = alpha
+
+	circle_canvas.queue_redraw()
+
+	# After 1 second, start the active phase
+	if fade_timer >= fade_duration:
+		current_phase = Phase.ACTIVE
+		input_locked = false
+		timer = 0.0
+		print("[SkillMinigame] Sequence input active - press buttons!")
+
+func _process_active(delta: float) -> void:
+	"""Player inputting button sequence"""
+	# Update timer
+	timer += delta
+	var time_remaining = time_limit - timer
+	timer_bar.value = time_remaining / time_limit
+
+	# Redraw circle
+	circle_canvas.queue_redraw()
+
+	# Check for button inputs
+	if not input_locked and not failed:
+		_check_button_input()
+
+	# Time's up!
+	if timer >= time_limit:
+		if sequence_index < skill_sequence.size():
+			# Didn't finish in time - 50% damage
+			failed = true
+			_finish_sequence(false)
+		# If already complete, this won't trigger
+
+func _check_button_input() -> void:
+	"""Check if correct button was pressed"""
+	var expected_button = skill_sequence[sequence_index]
+	var pressed = false
+	var correct = false
+
+	# Map expected button to action
+	var action_to_check = ""
+	match expected_button:
+		"A":
+			action_to_check = aInputManager.ACTION_ACCEPT
+		"B":
+			action_to_check = aInputManager.ACTION_BACK
+		"X":
+			action_to_check = aInputManager.ACTION_DEFEND
+		"Y":
+			action_to_check = aInputManager.ACTION_SKILL
+
+	# Check if the correct button was pressed
+	if action_to_check != "" and aInputManager.is_action_just_pressed(action_to_check):
+		pressed = true
+		correct = true
+		print("[SkillMinigame] Correct button %s pressed! (%d/%d)" % [expected_button, sequence_index + 1, skill_sequence.size()])
+
+		# Highlight the current button icon
+		if sequence_index < sequence_container.get_child_count():
+			var icon = sequence_container.get_child(sequence_index)
+			if icon is TextureRect:
+				icon.modulate = _get_mind_type_color()  # Light up with mind type color
+
+		sequence_index += 1
+		fill_progress = float(sequence_index) / float(skill_sequence.size())
+
+		# Check if sequence complete
+		if sequence_index >= skill_sequence.size():
+			_finish_sequence(true)
+			return
+	else:
+		# Check if any wrong button was pressed
+		var wrong_pressed = false
+		for action in [aInputManager.ACTION_ACCEPT, aInputManager.ACTION_BACK,
+					   aInputManager.ACTION_DEFEND, aInputManager.ACTION_SKILL]:
+			if action != action_to_check and aInputManager.is_action_just_pressed(action):
+				wrong_pressed = true
+				break
+
+		if wrong_pressed:
+			print("[SkillMinigame] Wrong button pressed! Restarting sequence...")
+			_restart_sequence()
+
+func _restart_sequence() -> void:
+	"""Reset sequence from beginning"""
+	sequence_index = 0
+	fill_progress = 0.0
+
+	# Gray out all button icons again
+	for i in range(sequence_container.get_child_count()):
+		var icon = sequence_container.get_child(i)
+		if icon is TextureRect:
+			icon.modulate = Color(0.5, 0.5, 0.5, 1.0)
+
+func _finish_sequence(success: bool) -> void:
+	"""Sequence complete or failed"""
+	input_locked = true
+	current_phase = Phase.SHOWING_RESULT
+
+	if success:
+		# Successfully completed within time limit
+		final_damage_modifier = 1.0  # Tier 1: 100% damage
+		final_tier = 1
+		result_text = "GOOD"
+		print("[SkillMinigame] Sequence completed successfully! 100% damage")
+	else:
+		# Failed to complete in time
+		final_damage_modifier = 0.5  # 50% damage penalty
+		final_tier = 0
+		result_text = "MISS"
+		print("[SkillMinigame] Time's up! 50% damage penalty")
+
+	# Show result text
+	result_label.text = result_text
+	result_label.modulate.a = 1.0
+
+	# Start fade out timer
+	fade_timer = 0.0
+
+func _process_showing_result(delta: float) -> void:
+	"""Show result for a moment, then fade out"""
+	fade_timer += delta
+
+	# Show result for 1 second
+	if fade_timer >= 1.0:
+		# Start fade out
+		var fade_out_time = fade_timer - 1.0
+		var alpha = 1.0 - (fade_out_time / fade_duration)
+		overlay_panel.modulate.a = max(alpha, 0.0)
+
+		# Complete after fade out
+		if fade_out_time >= fade_duration:
+			_finish_minigame()
+
+func _draw_filling_circle() -> void:
+	"""Draw the circle that fills with mind type color"""
+	var canvas_size = circle_canvas.size
+	var center = canvas_size / 2.0
+
+	# Draw outer circle border
+	_draw_circle_outline(center, circle_radius, Color(0.5, 0.5, 0.5, 0.8), 2.0)
+
+	# Fill circle based on progress
+	if fill_progress > 0.0:
+		var fill_color = _get_mind_type_color()
+		fill_color.a = 0.6  # Semi-transparent
+		_draw_filled_circle(center, circle_radius * fill_progress, fill_color)
+
+func _draw_circle_outline(center: Vector2, radius: float, color: Color, width: float) -> void:
+	"""Helper to draw a circle outline"""
+	var points = 64
+	for i in range(points):
+		var angle_from = (float(i) / points) * TAU
+		var angle_to = (float(i + 1) / points) * TAU
+		var point_from = center + Vector2(cos(angle_from), sin(angle_from)) * radius
+		var point_to = center + Vector2(cos(angle_to), sin(angle_to)) * radius
+		circle_canvas.draw_line(point_from, point_to, color, width)
+
+func _draw_filled_circle(center: Vector2, radius: float, color: Color) -> void:
+	"""Helper to draw a filled circle"""
+	var points = 64
+	var points_array = PackedVector2Array()
+	points_array.append(center)
+
+	for i in range(points + 1):
+		var angle = (float(i) / points) * TAU
+		var point = center + Vector2(cos(angle), sin(angle)) * radius
+		points_array.append(point)
+
+	circle_canvas.draw_colored_polygon(points_array, color)
+
+func _get_mind_type_color() -> Color:
 	"""Get color for mind type"""
-	match type.to_lower():
+	match mind_type.to_lower():
 		"fire":
 			return Color(1.0, 0.3, 0.1, 1.0)  # Bright orange-red
 		"water":
@@ -87,442 +398,19 @@ func _get_mind_type_color(type: String) -> Color:
 		_:
 			return Color(0.5, 0.5, 0.5, 1.0)  # Gray for unknown
 
-func _draw_party_icon() -> void:
-	"""Draw the party icon as a circle with mind type color"""
-	var center = Vector2(60, 60)  # Center of 120x120 control
-	var base_radius = 50.0
+func _finish_minigame() -> void:
+	print("[SkillMinigame] Finishing - Tier: %d, Modifier: %.2f" % [final_tier, final_damage_modifier])
 
-	# Increase size based on focus level
-	var radius = base_radius + (focus_level * 5.0)
-
-	# Get color based on mind type
-	var base_color = _get_mind_type_color(mind_type)
-
-	# Draw outer glow (increases with focus level)
-	if focus_level > 0:
-		var glow_alpha = 0.2 + (focus_level * 0.15)
-		var glow_radius = radius + 10.0 + (focus_level * 3.0)
-		party_icon.draw_circle(center, glow_radius, Color(base_color.r, base_color.g, base_color.b, glow_alpha))
-
-	# Draw main circle
-	party_icon.draw_circle(center, radius, base_color)
-
-	# Draw highlight (gives it dimension)
-	var highlight_offset = Vector2(-radius * 0.3, -radius * 0.3)
-	var highlight_radius = radius * 0.4
-	var highlight_color = Color(1, 1, 1, 0.3)
-	party_icon.draw_circle(center + highlight_offset, highlight_radius, highlight_color)
-
-func _setup_minigame() -> void:
-	base_duration = 10.0
-	current_duration = base_duration
-
-	# Calculate charge speed based on Focus stat
-	# Each focus level gives 15% speed increase (scales well for 10 levels)
-	var speed_multiplier = 1.0 + (focus_stat * 0.15)
-	charge_time_per_level = BASE_CHARGE_TIME_PER_LEVEL / speed_multiplier
-	print("[SkillMinigame] Charge time per level: %.2fs (Focus: %d, Speed: %.0f%%)" % [charge_time_per_level, focus_stat, speed_multiplier * 100])
-
-	# Check for halt-inducing status effects
-	has_halt_status = status_effects.has("burn") or status_effects.has("poison") or status_effects.has("sleep")
-	if has_halt_status:
-		print("[SkillMinigame] Halt status detected: %s" % str(status_effects))
-		# Schedule first halt at a random time (0.5 to 1.5 seconds)
-		next_halt_time = randf_range(0.5, 1.5)
-
-	# Title (show focus stat for debugging)
-	const COLOR_MILK_WHITE = Color(0.96, 0.97, 0.98)
-	const COLOR_BUBBLE_MAGENTA = Color(1.0, 0.29, 0.85)
-
-	title_label = Label.new()
-	title_label.text = "SKILL! (Focus: %d - %d%% Speed)" % [focus_stat, int(speed_multiplier * 100)]
-	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title_label.add_theme_font_size_override("font_size", 28)
-	title_label.add_theme_color_override("font_color", COLOR_BUBBLE_MAGENTA)  # Pink magenta title
-	content_container.add_child(title_label)
-
-	# Overall timer bar (starts when Space is first pressed)
-	overall_timer_bar = ProgressBar.new()
-	overall_timer_bar.max_value = max_overall_time
-	overall_timer_bar.value = max_overall_time
-	overall_timer_bar.show_percentage = false
-	overall_timer_bar.custom_minimum_size = Vector2(300, 15)
-	var overall_timer_container = CenterContainer.new()
-	overall_timer_container.add_child(overall_timer_bar)
-	content_container.add_child(overall_timer_container)
-
-	# Party icon (circle) with focus number
-	var icon_container = CenterContainer.new()
-	content_container.add_child(icon_container)
-
-	party_icon = Control.new()
-	party_icon.custom_minimum_size = Vector2(120, 120)
-	party_icon.draw.connect(_draw_party_icon)
-	icon_container.add_child(party_icon)
-
-	# Focus number label in center of circle
-	focus_number_label = Label.new()
-	focus_number_label.text = "0"
-	focus_number_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	focus_number_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	focus_number_label.add_theme_font_size_override("font_size", 48)
-	focus_number_label.add_theme_color_override("font_color", Color(1, 1, 1, 1))
-	focus_number_label.position = Vector2(0, 0)
-	focus_number_label.size = Vector2(120, 120)
-	party_icon.add_child(focus_number_label)
-
-	# Focus bar
-	focus_bar = ProgressBar.new()
-	focus_bar.max_value = 3.0
-	focus_bar.value = 0.0
-	focus_bar.show_percentage = false
-	focus_bar.custom_minimum_size = Vector2(300, 30)
-	var bar_container = CenterContainer.new()
-	bar_container.add_child(focus_bar)
-	content_container.add_child(bar_container)
-
-	# Focus level label
-	focus_level_label = Label.new()
-	focus_level_label.text = "Focus Level: 0 | Hold A (Accept) to charge!"
-	focus_level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	focus_level_label.add_theme_font_size_override("font_size", 20)
-	focus_level_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
-	content_container.add_child(focus_level_label)
-
-	# Sequence display (hidden initially)
-	sequence_display = HBoxContainer.new()
-	sequence_display.alignment = BoxContainer.ALIGNMENT_CENTER
-	sequence_display.visible = false
-	content_container.add_child(sequence_display)
-
-	# Timer bar (for sequence input phase)
-	timer_bar = ProgressBar.new()
-	timer_bar.max_value = input_timeout
-	timer_bar.value = input_timeout
-	timer_bar.show_percentage = false
-	timer_bar.custom_minimum_size = Vector2(300, 20)
-	timer_bar.visible = false
-	var timer_container = CenterContainer.new()
-	timer_container.add_child(timer_bar)
-	content_container.add_child(timer_container)
-
-	# Instructions
-	instruction_label = Label.new()
-	instruction_label.text = "Release A (Accept) to start casting!"
-	instruction_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	instruction_label.add_theme_font_size_override("font_size", 16)
-	instruction_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
-	content_container.add_child(instruction_label)
-
-func _start_minigame() -> void:
-	print("[SkillMinigame] Starting - Focus: %d, Tier: %d, Sequence: %s" % [focus_stat, skill_tier, str(skill_sequence)])
-	current_phase = Phase.CHARGING
-	overall_timer = max_overall_time  # Initialize timer (will start counting when Space is pressed)
-	_setup_sequence_display()
-
-func _setup_sequence_display() -> void:
-	"""Pre-create sequence UI buttons"""
-	for i in range(skill_sequence.size()):
-		var btn_label = Label.new()
-		btn_label.text = "?"
-		btn_label.add_theme_font_size_override("font_size", 24)
-		btn_label.modulate = Color(0.5, 0.5, 0.5, 1.0)  # Grayed out
-		sequence_display.add_child(btn_label)
-
-func _process(delta: float) -> void:
-	# Call parent to update status effect animations
-	super._process(delta)
-
-	# Stop all processing if minigame is complete
-	if minigame_complete:
-		return
-
-	# Update number drop animation
-	if is_number_dropping:
-		drop_velocity += drop_gravity * delta
-		drop_offset += drop_velocity * delta
-
-		# Update label position
-		if focus_number_label:
-			focus_number_label.position.y = drop_offset
-
-		# Stop dropping after falling off screen
-		if drop_offset > 200:
-			is_number_dropping = false
-			drop_offset = 0.0
-			drop_velocity = 0.0
-			if focus_number_label:
-				focus_number_label.position.y = 0
-
-	match current_phase:
-		Phase.CHARGING:
-			_process_charging(delta)
-		Phase.INPUTTING:
-			_process_inputting(delta)
-
-func _process_charging(delta: float) -> void:
-	# Update input grace timer
-	if input_grace_timer < input_grace_period:
-		input_grace_timer += delta
-		# During grace period, show waiting message
-		focus_level_label.text = "Get ready..."
-		return
-
-	# Update halt timer if status effect is active
-	if has_halt_status and not is_charge_halted:
-		halt_timer += delta
-		if halt_timer >= next_halt_time:
-			# Trigger halt!
-			is_charge_halted = true
-			focus_level_label.text = "INTERRUPTED! Click again to continue!"
-			focus_level_label.modulate = Color(1.0, 0.3, 0.3, 1.0)
-			print("[SkillMinigame] Charge halted at %.2fs" % halt_timer)
-
-	# Track Accept button state (A button / Space)
-	var space_is_pressed = aInputManager.is_action_pressed(aInputManager.ACTION_ACCEPT)
-
-	# Check if button is held
-	if space_is_pressed:
-		# Start the timer on first press
-		if not has_started_charging:
-			has_started_charging = true
-			print("[SkillMinigame] Timer started!")
-
-		# If halted, don't charge until player releases and presses again
-		if is_charge_halted:
-			# Check if this is a new press (was released before)
-			if not was_space_pressed:
-				# Player pressed again! Resume charging
-				is_charge_halted = false
-				focus_level_label.text = "Focus Level: %d" % focus_level
-				focus_level_label.modulate = Color(1.0, 1.0, 1.0, 1.0)
-				# Schedule next halt
-				halt_timer = 0.0
-				next_halt_time = randf_range(0.8, 2.0)
-				print("[SkillMinigame] Charging resumed!")
-		else:
-			# Normal charging
-			charge_time += delta
-
-			# Calculate focus level
-			var new_level = min(3, int(charge_time / charge_time_per_level))
-			if new_level != focus_level:
-				focus_level = new_level
-				_update_focus_visuals()
-				print("[SkillMinigame] Focus level %d reached at %.2fs (charge_time_per_level: %.2fs)" % [focus_level, charge_time, charge_time_per_level])
-
-			focus_bar.value = charge_time / charge_time_per_level
-
-	was_space_pressed = space_is_pressed
-
-	# Update overall timer (only if charging has started)
-	if has_started_charging:
-		overall_timer -= delta
-		overall_timer_bar.value = overall_timer
-
-		# Check for timeout
-		if overall_timer <= 0:
-			print("[SkillMinigame] Overall timeout during charging!")
-			_finish_minigame_incomplete()
-			return
-
-	# Check if button was released
-	if aInputManager.is_action_just_released(aInputManager.ACTION_ACCEPT) and charge_time > 0:
-		_start_input_phase()
-
-func _update_focus_visuals() -> void:
-	"""Update focus number and redraw circle"""
-	focus_level_label.text = "Focus Level: %d" % focus_level
-	focus_number_label.text = str(focus_level)
-
-	# Reset drop animation when focus increases
-	drop_offset = 0.0
-	drop_velocity = 0.0
-	is_number_dropping = false
-
-	# Redraw the circle with new focus level (affects size/glow)
-	if party_icon:
-		party_icon.queue_redraw()
-
-func _start_input_phase() -> void:
-	"""Transition to button sequence input phase"""
-	print("[SkillMinigame] Starting input phase - Focus Level: %d" % focus_level)
-	current_phase = Phase.INPUTTING
-	sequence_index = 0
-	input_timer = input_timeout
-
-	# Hide charging UI
-	focus_bar.visible = false
-	focus_level_label.visible = false
-
-	# Show sequence UI
-	sequence_display.visible = true
-	timer_bar.visible = true
-
-	instruction_label.text = "Input the sequence!"
-	_update_sequence_display()
-
-func _process_inputting(delta: float) -> void:
-	# Update overall timer
-	overall_timer -= delta
-	overall_timer_bar.value = overall_timer
-
-	# Update input phase timer
-	input_timer -= delta
-	timer_bar.value = input_timer
-
-	# Check for overall timeout
-	if overall_timer <= 0:
-		print("[SkillMinigame] Overall timeout during input!")
-		_finish_minigame_incomplete()
-		return
-
-	if input_timer <= 0:
-		# Phase timeout!
-		_finish_minigame_incomplete()
-		return
-
-	# Check for button input (single press detection)
-	var current_button = ""
-	for action in BUTTON_MAP.keys():
-		if aInputManager.is_action_pressed(action):
-			current_button = BUTTON_MAP[action]
-			break
-
-	# Only process if a button is pressed AND it's different from last frame
-	if current_button != "" and current_button != last_input_button:
-		_on_button_input(current_button)
-
-	# Update last button state
-	last_input_button = current_button
-
-func _on_button_input(button: String) -> void:
-	"""Handle button press during input phase"""
-	# Safety check: don't process if complete or out of bounds
-	if minigame_complete or sequence_index >= skill_sequence.size():
-		return
-
-	var expected_button = skill_sequence[sequence_index]
-
-	if button == expected_button:
-		# Correct!
-		print("[SkillMinigame] Correct input: %s" % button)
-		sequence_index += 1
-		_update_sequence_display()
-
-		# Check if sequence complete
-		if sequence_index >= skill_sequence.size():
-			_finish_minigame_success()
-	else:
-		# Wrong button! Restart sequence and drop focus
-		print("[SkillMinigame] Wrong input: %s (expected %s)" % [button, expected_button])
-		misclick_count += 1
-		focus_level = max(0, focus_level - 1)
-		sequence_index = 0
-
-		# Trigger number drop animation
-		is_number_dropping = true
-		drop_offset = 0.0
-		drop_velocity = 0.0
-
-		_update_focus_visuals()
-		_update_sequence_display()
-
-		instruction_label.text = "Misclick! Restarting sequence... Focus: %d" % focus_level
-
-func _update_sequence_display() -> void:
-	"""Update sequence display to show progress"""
-	for i in range(sequence_display.get_child_count()):
-		var label = sequence_display.get_child(i) as Label
-		if i < sequence_index:
-			# Completed
-			label.text = skill_sequence[i]
-			label.modulate = Color(0.0, 1.0, 0.0, 1.0)
-		elif i == sequence_index:
-			# Current
-			label.text = skill_sequence[i]
-			label.modulate = Color(1.0, 1.0, 0.0, 1.0)
-		else:
-			# Future
-			label.text = "?"
-			label.modulate = Color(0.5, 0.5, 0.5, 1.0)
-
-func _finish_minigame_success() -> void:
-	"""Complete minigame successfully"""
-	print("[SkillMinigame] Success! Focus: %d, Misclicks: %d" % [focus_level, misclick_count])
-
-	# Lock out all input immediately
-	minigame_complete = true
 	current_phase = Phase.COMPLETE
-
-	instruction_label.text = "Great! Focus Level: %d" % focus_level
-	title_label.text = "GREAT!"
-
-	await get_tree().create_timer(1.0).timeout
-
-	# Calculate bonuses
-	var damage_modifier = 1.0
-	var mp_modifier = 1.0
-
-	match focus_level:
-		0:
-			damage_modifier = 1.0
-			mp_modifier = 1.0
-		1:
-			damage_modifier = 1.05
-			mp_modifier = 1.0
-		2:
-			damage_modifier = 1.1
-			mp_modifier = 1.0
-		3:
-			damage_modifier = 1.1
-			mp_modifier = 0.9  # Save 10 MP
 
 	var result = {
 		"success": true,
-		"grade": "focus_%d" % focus_level,
-		"damage_modifier": damage_modifier,
+		"grade": result_text.to_lower(),
+		"damage_modifier": final_damage_modifier,
 		"is_crit": false,
-		"mp_modifier": mp_modifier,
+		"mp_modifier": 1.0,
 		"tier_downgrade": 0,
-		"focus_level": focus_level
-	}
-
-	_complete_minigame(result)
-
-func _finish_minigame_incomplete() -> void:
-	"""Complete minigame with timeout/failure"""
-	print("[SkillMinigame] Incomplete! Sequence progress: %d/%d" % [sequence_index, skill_sequence.size()])
-
-	# Lock out all input immediately
-	minigame_complete = true
-	current_phase = Phase.COMPLETE
-
-	instruction_label.text = "Skill cast anyway..."
-	title_label.text = "OK"
-
-	await get_tree().create_timer(1.0).timeout
-
-	# Determine tier downgrade based on how much was completed
-	var completion_ratio = float(sequence_index) / float(skill_sequence.size())
-	var tier_downgrade = 0
-
-	if completion_ratio < 0.33:
-		# Less than 1/3 done = drop 2 tiers
-		tier_downgrade = 2
-	elif completion_ratio < 0.66:
-		# Less than 2/3 done = drop 1 tier
-		tier_downgrade = 1
-	# else: completed enough for current tier
-
-	var result = {
-		"success": false,
-		"grade": "incomplete",
-		"damage_modifier": 0.9,  # 10% penalty
-		"is_crit": false,
-		"mp_modifier": 1.1,  # 10% more MP
-		"tier_downgrade": tier_downgrade,
-		"focus_level": 0
+		"focus_level": final_tier
 	}
 
 	_complete_minigame(result)
