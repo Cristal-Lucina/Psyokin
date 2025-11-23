@@ -8,7 +8,9 @@ class_name SkillMinigame
 
 ## Configuration
 var focus_stat: int = 1  # Focus stat (currently unused)
-var skill_sequence: Array = []  # Button sequence ["A", "B", "X", "Y"]
+var skill_sequence: Array = []  # Tier 1 button sequence ["A", "B", "X", "Y"]
+var tier_2_sequence: Array = ["Y", "Y", "Y"]  # Tier 2 hidden sequence (for testing)
+var tier_3_sequence: Array = ["Y", "Y", "Y"]  # Tier 3 hidden sequence (for testing)
 var skill_tier: int = 1  # Skill tier (1-3)
 var mind_type: String = "fire"  # Mind type for color
 
@@ -17,8 +19,12 @@ enum Phase { FADE_IN, ACTIVE, SHOWING_RESULT, COMPLETE }
 var current_phase: Phase = Phase.FADE_IN
 
 ## Sequence tracking
-var sequence_index: int = 0  # Current position in sequence
-var time_limit: float = 2.0  # 2 seconds to complete sequence
+var sequence_index: int = 0  # Current position in full sequence
+var tier_1_length: int = 0  # Length of tier 1 sequence
+var tier_2_length: int = 0  # Length of tier 2 sequence (tier_1 + tier_2)
+var tier_3_length: int = 0  # Length of tier 3 sequence (tier_1 + tier_2 + tier_3)
+var full_sequence: Array = []  # Complete sequence with all tiers
+var time_limit: float = 4.0  # Extended time for potential tier 2/3
 var timer: float = 0.0
 var failed: bool = false
 
@@ -102,9 +108,21 @@ func _setup_minigame() -> void:
 	base_duration = 10.0  # Maximum time allowed
 	current_duration = base_duration
 
+	# Build full sequence from all tiers
+	full_sequence = skill_sequence.duplicate()
+	tier_1_length = skill_sequence.size()
+	tier_2_length = tier_1_length + tier_2_sequence.size()
+	tier_3_length = tier_2_length + tier_3_sequence.size()
+
+	full_sequence.append_array(tier_2_sequence)
+	full_sequence.append_array(tier_3_sequence)
+
 	print("[SkillMinigame] _setup_minigame called")
-	print("[SkillMinigame] skill_sequence = %s" % str(skill_sequence))
-	print("[SkillMinigame] skill_tier = %d" % skill_tier)
+	print("[SkillMinigame] Tier 1 sequence (visible): %s" % str(skill_sequence))
+	print("[SkillMinigame] Tier 2 sequence (hidden): %s" % str(tier_2_sequence))
+	print("[SkillMinigame] Tier 3 sequence (hidden): %s" % str(tier_3_sequence))
+	print("[SkillMinigame] Full sequence: %s" % str(full_sequence))
+	print("[SkillMinigame] Tier lengths - T1: %d, T2: %d, T3: %d" % [tier_1_length, tier_2_length, tier_3_length])
 	print("[SkillMinigame] mind_type = %s" % mind_type)
 
 	# Neon-kawaii colors
@@ -151,34 +169,46 @@ func _setup_minigame() -> void:
 	content_container.add_child(sequence_center)
 	content_container.move_child(sequence_center, 0)  # Move to top
 
-	# Create button icons for sequence
+	# Create button icons for ALL tiers (tier 1 visible, tier 2/3 hidden initially)
 	# Button mappings: A = Xbox A/PS Cross/Nintendo B, B = Xbox B/PS Circle/Nintendo A,
 	#                  X = Xbox X/PS Square/Nintendo Y, Y = Xbox Y/PS Triangle/Nintendo X
 	var icon_layout = get_node_or_null("/root/aControllerIconLayout")
 	print("[SkillMinigame] aControllerIconLayout found: %s" % str(icon_layout != null))
 
-	if skill_sequence.size() == 0:
-		print("[SkillMinigame] ERROR: skill_sequence is empty!")
+	if full_sequence.size() == 0:
+		print("[SkillMinigame] ERROR: full_sequence is empty!")
 	else:
-		print("[SkillMinigame] Creating %d button icons/labels" % skill_sequence.size())
+		print("[SkillMinigame] Creating %d button icons (T1=%d visible, T2/T3 hidden)" % [full_sequence.size(), tier_1_length])
 
-		for i in range(skill_sequence.size()):
-			var button_name = skill_sequence[i]
+		for i in range(full_sequence.size()):
+			var button_name = full_sequence[i]
 			var icon_action = BUTTON_ICONS.get(button_name, "accept")
 
 			if icon_layout:
 				var icon_texture = icon_layout.get_button_icon(icon_action)
-				print("[SkillMinigame] Button %s -> action %s -> texture: %s" % [button_name, icon_action, str(icon_texture != null)])
 
 				if icon_texture:
 					var icon_rect = TextureRect.new()
 					icon_rect.texture = icon_texture
 					icon_rect.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
 					icon_rect.custom_minimum_size = Vector2(50, 50)  # Large and visible
-					icon_rect.modulate = Color(1.0, 1.0, 1.0, 0.7)  # White but semi-transparent
 					icon_rect.z_index = 1001
+
+					# Tier 1: visible, Tier 2/3: hidden initially
+					if i < tier_1_length:
+						# Tier 1 - visible
+						icon_rect.modulate = Color(1.0, 1.0, 1.0, 0.7)  # White but semi-transparent
+						print("[SkillMinigame] Created TIER 1 icon %d: %s" % [i, button_name])
+					elif i < tier_2_length:
+						# Tier 2 - hidden
+						icon_rect.modulate = Color(1.0, 1.0, 1.0, 0.0)  # Invisible
+						print("[SkillMinigame] Created TIER 2 icon %d: %s (hidden)" % [i, button_name])
+					else:
+						# Tier 3 - hidden
+						icon_rect.modulate = Color(1.0, 1.0, 1.0, 0.0)  # Invisible
+						print("[SkillMinigame] Created TIER 3 icon %d: %s (hidden)" % [i, button_name])
+
 					sequence_container.add_child(icon_rect)
-					print("[SkillMinigame] Created icon for button %s" % button_name)
 				else:
 					print("[SkillMinigame] ERROR: No texture loaded for %s (action: %s)" % [button_name, icon_action])
 			else:
@@ -210,7 +240,9 @@ func _setup_minigame() -> void:
 
 func _start_minigame() -> void:
 	print("[SkillMinigame] Starting button sequence minigame")
-	print("[SkillMinigame] Sequence: %s" % str(skill_sequence))
+	print("[SkillMinigame] Tier 1 (visible): %s" % str(skill_sequence))
+	print("[SkillMinigame] Full sequence (T1+T2+T3): %s" % str(full_sequence))
+	print("[SkillMinigame] Time limit: %.1f seconds for all tiers" % time_limit)
 	current_phase = Phase.FADE_IN
 	sequence_index = 0
 	fill_progress = 0.0
@@ -264,15 +296,16 @@ func _process_active(delta: float) -> void:
 
 	# Time's up!
 	if timer >= time_limit:
-		if sequence_index < skill_sequence.size():
-			# Didn't finish in time - 50% damage
-			failed = true
-			_finish_sequence(false)
-		# If already complete, this won't trigger
+		# Determine what tier was achieved based on how far they got
+		_finish_sequence(false)  # Timeout
 
 func _check_button_input() -> void:
 	"""Check if correct button was pressed"""
-	var expected_button = skill_sequence[sequence_index]
+	# Check if we've completed all tiers
+	if sequence_index >= full_sequence.size():
+		return
+
+	var expected_button = full_sequence[sequence_index]
 	var pressed = false
 	var correct = false
 
@@ -292,7 +325,15 @@ func _check_button_input() -> void:
 	if action_to_check != "" and aInputManager.is_action_just_pressed(action_to_check):
 		pressed = true
 		correct = true
-		print("[SkillMinigame] Correct button %s pressed! (%d/%d)" % [expected_button, sequence_index + 1, skill_sequence.size()])
+
+		# Determine which tier we're in
+		var tier_name = "Tier 1"
+		if sequence_index >= tier_2_length:
+			tier_name = "Tier 3"
+		elif sequence_index >= tier_1_length:
+			tier_name = "Tier 2"
+
+		print("[SkillMinigame] %s - Correct button %s pressed! (%d/%d)" % [tier_name, expected_button, sequence_index + 1, full_sequence.size()])
 
 		# Highlight the current button icon
 		if sequence_index < sequence_container.get_child_count():
@@ -303,10 +344,20 @@ func _check_button_input() -> void:
 				icon.modulate = mind_color  # Light up with mind type color
 
 		sequence_index += 1
-		fill_progress = float(sequence_index) / float(skill_sequence.size())
+		fill_progress = float(sequence_index) / float(full_sequence.size())
 
-		# Check if sequence complete
-		if sequence_index >= skill_sequence.size():
+		# Check for tier completions and reveal next tier icons
+		if sequence_index == tier_1_length:
+			# Just completed Tier 1! Reveal Tier 2 icons
+			print("[SkillMinigame] TIER 1 COMPLETE! Revealing Tier 2 buttons...")
+			_reveal_tier_icons(tier_1_length, tier_2_length)
+		elif sequence_index == tier_2_length:
+			# Just completed Tier 2! Reveal Tier 3 icons
+			print("[SkillMinigame] TIER 2 COMPLETE! Revealing Tier 3 buttons...")
+			_reveal_tier_icons(tier_2_length, tier_3_length)
+		elif sequence_index >= tier_3_length:
+			# Completed all tiers!
+			print("[SkillMinigame] TIER 3 COMPLETE! Maximum damage!")
 			_finish_sequence(true)
 			return
 	else:
@@ -322,34 +373,63 @@ func _check_button_input() -> void:
 			print("[SkillMinigame] Wrong button pressed! Restarting sequence...")
 			_restart_sequence()
 
+func _reveal_tier_icons(start_index: int, end_index: int) -> void:
+	"""Fade in icons for a tier"""
+	for i in range(start_index, end_index):
+		if i < sequence_container.get_child_count():
+			var icon = sequence_container.get_child(i)
+			if icon is TextureRect:
+				# Fade in over 0.3 seconds
+				var tween = create_tween()
+				tween.tween_property(icon, "modulate", Color(1.0, 1.0, 1.0, 0.7), 0.3)
+				print("[SkillMinigame] Revealing icon %d" % i)
+
 func _restart_sequence() -> void:
 	"""Reset sequence from beginning"""
 	sequence_index = 0
 	fill_progress = 0.0
 
-	# Reset all button icons to semi-transparent white
+	# Reset all button icons - tier 1 visible, tier 2/3 hidden
 	for i in range(sequence_container.get_child_count()):
 		var icon = sequence_container.get_child(i)
 		if icon is TextureRect:
-			icon.modulate = Color(1.0, 1.0, 1.0, 0.7)  # Semi-transparent white
+			if i < tier_1_length:
+				# Tier 1 - visible
+				icon.modulate = Color(1.0, 1.0, 1.0, 0.7)  # Semi-transparent white
+			else:
+				# Tier 2/3 - hidden
+				icon.modulate = Color(1.0, 1.0, 1.0, 0.0)  # Invisible
 
 func _finish_sequence(success: bool) -> void:
 	"""Sequence complete or failed"""
 	input_locked = true
 	current_phase = Phase.SHOWING_RESULT
 
-	if success:
-		# Successfully completed within time limit
+	# Determine tier achieved based on how far the player got
+	if sequence_index >= tier_3_length:
+		# Completed all 3 tiers!
+		final_damage_modifier = 1.3  # Tier 3: 130% damage
+		final_tier = 3
+		result_text = "AMAZING!"
+		print("[SkillMinigame] TIER 3 ACHIEVED! 130% damage")
+	elif sequence_index >= tier_2_length:
+		# Completed tier 1 + tier 2
+		final_damage_modifier = 1.1  # Tier 2: 110% damage
+		final_tier = 2
+		result_text = "GREAT!"
+		print("[SkillMinigame] TIER 2 ACHIEVED! 110% damage")
+	elif sequence_index >= tier_1_length:
+		# Completed tier 1
 		final_damage_modifier = 1.0  # Tier 1: 100% damage
 		final_tier = 1
 		result_text = "GOOD"
-		print("[SkillMinigame] Sequence completed successfully! 100% damage")
+		print("[SkillMinigame] TIER 1 ACHIEVED! 100% damage")
 	else:
-		# Failed to complete in time
+		# Didn't complete tier 1 (timeout or wrong button)
 		final_damage_modifier = 0.5  # 50% damage penalty
 		final_tier = 0
 		result_text = "MISS"
-		print("[SkillMinigame] Time's up! 50% damage penalty")
+		print("[SkillMinigame] Failed to complete Tier 1! 50% damage")
 
 	# Show result text
 	result_label.text = result_text
