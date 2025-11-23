@@ -134,14 +134,17 @@ func _setup_minigame() -> void:
 	circle_canvas.draw.connect(_draw_filling_circle)
 	center_container.add_child(circle_canvas)
 
-	# Button sequence display (centered above timer bar)
+	# Button sequence display (centered above circle)
 	sequence_container = HBoxContainer.new()
-	sequence_container.add_theme_constant_override("separation", 5)
+	sequence_container.add_theme_constant_override("separation", 10)
 	sequence_container.z_index = 1000  # Ensure icons appear on top
 	var sequence_center = CenterContainer.new()
 	sequence_center.z_index = 1000  # Ensure container appears on top
 	sequence_center.add_child(sequence_container)
+
+	# Add sequence before the circle (so it appears above)
 	content_container.add_child(sequence_center)
+	content_container.move_child(sequence_center, 0)  # Move to top
 
 	# Create button icons for sequence
 	# Button mappings: A = Xbox A/PS Cross/Nintendo B, B = Xbox B/PS Circle/Nintendo A,
@@ -158,8 +161,8 @@ func _setup_minigame() -> void:
 				var icon_rect = TextureRect.new()
 				icon_rect.texture = icon_texture
 				icon_rect.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
-				icon_rect.custom_minimum_size = Vector2(20, 20)  # Small and compact
-				icon_rect.modulate = Color(0.5, 0.5, 0.5, 1.0)  # Start grayed out
+				icon_rect.custom_minimum_size = Vector2(50, 50)  # Large and visible
+				icon_rect.modulate = Color(1.0, 1.0, 1.0, 0.7)  # White but semi-transparent (not pressed yet)
 				icon_rect.z_index = 1001  # Ensure icons appear on top of everything
 				sequence_container.add_child(icon_rect)
 				print("[SkillMinigame] Created icon for button %s (action: %s)" % [button_name, icon_action])
@@ -280,7 +283,9 @@ func _check_button_input() -> void:
 		if sequence_index < sequence_container.get_child_count():
 			var icon = sequence_container.get_child(sequence_index)
 			if icon is TextureRect:
-				icon.modulate = _get_mind_type_color()  # Light up with mind type color
+				var mind_color = _get_mind_type_color()
+				mind_color.a = 1.0  # Fully opaque
+				icon.modulate = mind_color  # Light up with mind type color
 
 		sequence_index += 1
 		fill_progress = float(sequence_index) / float(skill_sequence.size())
@@ -307,11 +312,11 @@ func _restart_sequence() -> void:
 	sequence_index = 0
 	fill_progress = 0.0
 
-	# Gray out all button icons again
+	# Reset all button icons to semi-transparent white
 	for i in range(sequence_container.get_child_count()):
 		var icon = sequence_container.get_child(i)
 		if icon is TextureRect:
-			icon.modulate = Color(0.5, 0.5, 0.5, 1.0)
+			icon.modulate = Color(1.0, 1.0, 1.0, 0.7)  # Semi-transparent white
 
 func _finish_sequence(success: bool) -> void:
 	"""Sequence complete or failed"""
