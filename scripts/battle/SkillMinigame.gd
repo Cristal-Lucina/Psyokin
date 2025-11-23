@@ -102,6 +102,11 @@ func _setup_minigame() -> void:
 	base_duration = 10.0  # Maximum time allowed
 	current_duration = base_duration
 
+	print("[SkillMinigame] _setup_minigame called")
+	print("[SkillMinigame] skill_sequence = %s" % str(skill_sequence))
+	print("[SkillMinigame] skill_tier = %d" % skill_tier)
+	print("[SkillMinigame] mind_type = %s" % mind_type)
+
 	# Neon-kawaii colors
 	const COLOR_MILK_WHITE = Color(0.96, 0.97, 0.98)
 
@@ -150,26 +155,53 @@ func _setup_minigame() -> void:
 	# Button mappings: A = Xbox A/PS Cross/Nintendo B, B = Xbox B/PS Circle/Nintendo A,
 	#                  X = Xbox X/PS Square/Nintendo Y, Y = Xbox Y/PS Triangle/Nintendo X
 	var icon_layout = get_node_or_null("/root/aControllerIconLayout")
-	if icon_layout:
-		print("[SkillMinigame] Creating %d button icons" % skill_sequence.size())
+	print("[SkillMinigame] aControllerIconLayout found: %s" % str(icon_layout != null))
+
+	if skill_sequence.size() == 0:
+		print("[SkillMinigame] ERROR: skill_sequence is empty!")
+	else:
+		print("[SkillMinigame] Creating %d button icons/labels" % skill_sequence.size())
+
 		for i in range(skill_sequence.size()):
 			var button_name = skill_sequence[i]
 			var icon_action = BUTTON_ICONS.get(button_name, "accept")
-			var icon_texture = icon_layout.get_button_icon(icon_action)
 
-			if icon_texture:
-				var icon_rect = TextureRect.new()
-				icon_rect.texture = icon_texture
-				icon_rect.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
-				icon_rect.custom_minimum_size = Vector2(50, 50)  # Large and visible
-				icon_rect.modulate = Color(1.0, 1.0, 1.0, 0.7)  # White but semi-transparent (not pressed yet)
-				icon_rect.z_index = 1001  # Ensure icons appear on top of everything
-				sequence_container.add_child(icon_rect)
-				print("[SkillMinigame] Created icon for button %s (action: %s)" % [button_name, icon_action])
-			else:
-				print("[SkillMinigame] WARNING: No texture found for button %s (action: %s)" % [button_name, icon_action])
-	else:
-		print("[SkillMinigame] WARNING: aControllerIconLayout not found!")
+			# Create a container for each button (icon + text label)
+			var button_container = VBoxContainer.new()
+			button_container.add_theme_constant_override("separation", 2)
+
+			# Try to create icon
+			var icon_created = false
+			if icon_layout:
+				var icon_texture = icon_layout.get_button_icon(icon_action)
+				print("[SkillMinigame] Button %s -> action %s -> texture: %s" % [button_name, icon_action, str(icon_texture != null)])
+
+				if icon_texture:
+					var icon_rect = TextureRect.new()
+					icon_rect.texture = icon_texture
+					icon_rect.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+					icon_rect.custom_minimum_size = Vector2(50, 50)  # Large and visible
+					icon_rect.modulate = Color(1.0, 1.0, 1.0, 0.7)  # White but semi-transparent
+					icon_rect.z_index = 1001
+					button_container.add_child(icon_rect)
+					icon_created = true
+					print("[SkillMinigame] Created icon for button %s" % button_name)
+
+			# Always add text label as backup/indicator
+			var label = Label.new()
+			label.text = button_name
+			label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			label.add_theme_font_size_override("font_size", 24)
+			label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
+			label.add_theme_constant_override("outline_size", 2)
+			label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
+			label.modulate.a = 0.7
+			button_container.add_child(label)
+
+			sequence_container.add_child(button_container)
+			print("[SkillMinigame] Added button container for %s (icon: %s, label: yes)" % [button_name, str(icon_created)])
+
+		print("[SkillMinigame] Sequence container has %d children" % sequence_container.get_child_count())
 
 	# Timer bar (horizontal, below sequence)
 	timer_bar = ProgressBar.new()
@@ -279,13 +311,16 @@ func _check_button_input() -> void:
 		correct = true
 		print("[SkillMinigame] Correct button %s pressed! (%d/%d)" % [expected_button, sequence_index + 1, skill_sequence.size()])
 
-		# Highlight the current button icon
+		# Highlight the current button (icon and label)
 		if sequence_index < sequence_container.get_child_count():
-			var icon = sequence_container.get_child(sequence_index)
-			if icon is TextureRect:
-				var mind_color = _get_mind_type_color()
-				mind_color.a = 1.0  # Fully opaque
-				icon.modulate = mind_color  # Light up with mind type color
+			var button_container = sequence_container.get_child(sequence_index)
+			var mind_color = _get_mind_type_color()
+			mind_color.a = 1.0  # Fully opaque
+
+			# Update all children (icon and label)
+			for child in button_container.get_children():
+				if child is TextureRect or child is Label:
+					child.modulate = mind_color  # Light up with mind type color
 
 		sequence_index += 1
 		fill_progress = float(sequence_index) / float(skill_sequence.size())
@@ -312,11 +347,12 @@ func _restart_sequence() -> void:
 	sequence_index = 0
 	fill_progress = 0.0
 
-	# Reset all button icons to semi-transparent white
+	# Reset all button icons and labels to semi-transparent white
 	for i in range(sequence_container.get_child_count()):
-		var icon = sequence_container.get_child(i)
-		if icon is TextureRect:
-			icon.modulate = Color(1.0, 1.0, 1.0, 0.7)  # Semi-transparent white
+		var button_container = sequence_container.get_child(i)
+		for child in button_container.get_children():
+			if child is TextureRect or child is Label:
+				child.modulate = Color(1.0, 1.0, 1.0, 0.7)  # Semi-transparent white
 
 func _finish_sequence(success: bool) -> void:
 	"""Sequence complete or failed"""
