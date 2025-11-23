@@ -95,6 +95,7 @@ func _setup_transparent_visuals() -> void:
 	content_container = VBoxContainer.new()
 	content_container.set_anchors_preset(Control.PRESET_FULL_RECT)
 	content_container.add_theme_constant_override("separation", 10)
+	content_container.z_index = 102  # Above overlay_panel
 	overlay_panel.add_child(content_container)
 
 func _setup_minigame() -> void:
@@ -136,7 +137,9 @@ func _setup_minigame() -> void:
 	# Button sequence display (centered above timer bar)
 	sequence_container = HBoxContainer.new()
 	sequence_container.add_theme_constant_override("separation", 5)
+	sequence_container.z_index = 1000  # Ensure icons appear on top
 	var sequence_center = CenterContainer.new()
+	sequence_center.z_index = 1000  # Ensure container appears on top
 	sequence_center.add_child(sequence_container)
 	content_container.add_child(sequence_center)
 
@@ -145,6 +148,7 @@ func _setup_minigame() -> void:
 	#                  X = Xbox X/PS Square/Nintendo Y, Y = Xbox Y/PS Triangle/Nintendo X
 	var icon_layout = get_node_or_null("/root/aControllerIconLayout")
 	if icon_layout:
+		print("[SkillMinigame] Creating %d button icons" % skill_sequence.size())
 		for i in range(skill_sequence.size()):
 			var button_name = skill_sequence[i]
 			var icon_action = BUTTON_ICONS.get(button_name, "accept")
@@ -156,7 +160,13 @@ func _setup_minigame() -> void:
 				icon_rect.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
 				icon_rect.custom_minimum_size = Vector2(20, 20)  # Small and compact
 				icon_rect.modulate = Color(0.5, 0.5, 0.5, 1.0)  # Start grayed out
+				icon_rect.z_index = 1001  # Ensure icons appear on top of everything
 				sequence_container.add_child(icon_rect)
+				print("[SkillMinigame] Created icon for button %s (action: %s)" % [button_name, icon_action])
+			else:
+				print("[SkillMinigame] WARNING: No texture found for button %s (action: %s)" % [button_name, icon_action])
+	else:
+		print("[SkillMinigame] WARNING: aControllerIconLayout not found!")
 
 	# Timer bar (horizontal, below sequence)
 	timer_bar = ProgressBar.new()
