@@ -133,14 +133,16 @@ func _setup_minigame() -> void:
 	circle_canvas.draw.connect(_draw_filling_circle)
 	center_container.add_child(circle_canvas)
 
-	# Button sequence display (centered below circle)
+	# Button sequence display (centered above timer bar)
 	sequence_container = HBoxContainer.new()
-	sequence_container.add_theme_constant_override("separation", 10)
+	sequence_container.add_theme_constant_override("separation", 15)
 	var sequence_center = CenterContainer.new()
 	sequence_center.add_child(sequence_container)
 	content_container.add_child(sequence_center)
 
 	# Create button icons for sequence
+	# Button mappings: A = Xbox A/PS Cross/Nintendo B, B = Xbox B/PS Circle/Nintendo A,
+	#                  X = Xbox X/PS Square/Nintendo Y, Y = Xbox Y/PS Triangle/Nintendo X
 	var icon_layout = get_node_or_null("/root/aControllerIconLayout")
 	if icon_layout:
 		for i in range(skill_sequence.size()):
@@ -152,7 +154,7 @@ func _setup_minigame() -> void:
 				var icon_rect = TextureRect.new()
 				icon_rect.texture = icon_texture
 				icon_rect.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
-				icon_rect.custom_minimum_size = Vector2(40, 40)
+				icon_rect.custom_minimum_size = Vector2(50, 50)  # Bigger for visibility
 				icon_rect.modulate = Color(0.5, 0.5, 0.5, 1.0)  # Start grayed out
 				sequence_container.add_child(icon_rect)
 
