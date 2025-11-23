@@ -1809,34 +1809,9 @@ func _on_turn_started(combatant_id: String) -> void:
 	# Wait for player to press continue before proceeding
 	await _wait_for_message_queue()
 
-	# Slide attacker forward with character animation from CSV
-	if sprite_animator and sprite_animator.sprite_instances.has(current_combatant.id):
-		var attacker_instance = sprite_animator.sprite_instances[current_combatant.id]
-		var attacker_sprite = attacker_instance["sprite"]
-
-		# Get position config from CSV for this combatant
-		var combatant_index = _get_combatant_position_index(current_combatant.id)
-		var side = "ally" if current_combatant.is_ally else "enemy"
-		var pos_config = {}
-		if battle_flow_config and combatant_index >= 0:
-			pos_config = battle_flow_config.get_marker_position(side, combatant_index)
-
-		# Get animation and direction from CSV (or use defaults)
-		var anim_name = pos_config.get("turn_start_anim", "Run")
-		var anim_direction = pos_config.get("turn_start_direction", "RIGHT" if current_combatant.is_ally else "LEFT")
-		var slide_distance = pos_config.get("slide_forward_distance", 30.0 if current_combatant.is_ally else -30.0)
-		var slide_duration = pos_config.get("slide_forward_duration", 0.3)
-
-		# Play animation from CSV
-		sprite_animator.play_animation(current_combatant.id, anim_name, anim_direction, false, false)
-
-		# Slide forward
-		var tween = create_tween()
-		tween.tween_property(attacker_sprite, "position:x", attacker_sprite.position.x + slide_distance, slide_duration)
-		await tween.finished
-
-		# Return to idle
-		sprite_animator.play_animation(current_combatant.id, "Idle", anim_direction, false, false)
+	# Run to battle marker using new sequence system
+	if battle_sequence_orch:
+		await battle_sequence_orch._run_to_marker(current_combatant)
 
 	# Animate turn indicator AFTER message is displayed
 	_animate_turn_indicator(combatant_id)
@@ -2027,39 +2002,6 @@ func _get_combatant_position_index(combatant_id: String) -> int:
 			return i
 
 	return -1  # Not found
-
-func _slide_character_back(combatant: Dictionary):
-	"""Slide character sprite back to original position with animation from CSV"""
-	if not sprite_animator or not sprite_animator.sprite_instances.has(combatant.id):
-		return
-
-	var attacker_instance = sprite_animator.sprite_instances[combatant.id]
-	var attacker_sprite = attacker_instance["sprite"]
-
-	# Get position config from CSV for this combatant
-	var combatant_index = _get_combatant_position_index(combatant.id)
-	var side = "ally" if combatant.is_ally else "enemy"
-	var pos_config = {}
-	if battle_flow_config and combatant_index >= 0:
-		pos_config = battle_flow_config.get_marker_position(side, combatant_index)
-
-	# Get animation and direction from CSV (or use defaults)
-	var anim_name = pos_config.get("turn_end_anim", "Run")
-	var anim_direction = pos_config.get("turn_end_direction", "RIGHT")
-	var slide_distance = pos_config.get("slide_back_distance", -30.0 if combatant.is_ally else 30.0)
-	var slide_duration = pos_config.get("slide_back_duration", 0.3)
-
-	# Play animation from CSV
-	sprite_animator.play_animation(combatant.id, anim_name, anim_direction, false, false)
-
-	# Slide back to original position
-	var tween = create_tween()
-	tween.tween_property(attacker_sprite, "position:x", attacker_sprite.position.x + slide_distance, slide_duration)
-	await tween.finished
-
-	# Return to idle facing appropriate direction
-	var idle_direction = "RIGHT" if combatant.is_ally else "LEFT"
-	sprite_animator.play_animation(combatant.id, "Idle", idle_direction, false, false)
 
 func _on_turn_ended(_combatant_id: String) -> void:
 	"""Called when a combatant's turn ends"""
@@ -3476,6 +3418,10 @@ func _on_attack_pressed() -> void:
 	if is_in_round_transition:
 		return
 
+	# Block input when locked
+	if battle_flow_state.input_locked:
+		return
+
 	# Activate the Fight button with visual feedback
 	_activate_action_button("AttackButton", COLOR_BUBBLE_MAGENTA)
 
@@ -3792,6 +3738,10 @@ func _on_skill_pressed() -> void:
 	if is_in_round_transition:
 		return
 
+	# Block input when locked
+	if battle_flow_state.input_locked:
+		return
+
 	# Activate the Skill button with visual feedback
 	_activate_action_button("SkillButton", COLOR_SKY_CYAN)
 
@@ -3879,6 +3829,10 @@ func _on_item_pressed() -> void:
 	"""Handle Item action - show usable items menu"""
 	# Block input during round transitions
 	if is_in_round_transition:
+		return
+
+	# Block input when locked
+	if battle_flow_state.input_locked:
 		return
 
 	# Activate the Items button with visual feedback
@@ -3975,6 +3929,10 @@ func _on_capture_pressed() -> void:
 	"""Handle Capture action - show bind item selection menu"""
 	# Block input during round transitions
 	if is_in_round_transition:
+		return
+
+	# Block input when locked
+	if battle_flow_state.input_locked:
 		return
 
 	# Activate the Capture button with visual feedback
@@ -4710,6 +4668,10 @@ func _on_defend_pressed() -> void:
 	if is_in_round_transition:
 		return
 
+	# Block input when locked
+	if battle_flow_state.input_locked:
+		return
+
 	# Activate the Guard button with visual feedback
 	_activate_action_button("DefendButton", COLOR_PLASMA_TEAL)
 
@@ -4742,6 +4704,10 @@ func _on_burst_pressed() -> void:
 	"""Handle Burst action - show burst abilities menu"""
 	# Block input during round transitions
 	if is_in_round_transition:
+		return
+
+	# Block input when locked
+	if battle_flow_state.input_locked:
 		return
 
 	# Activate the Burst button with visual feedback
@@ -4814,6 +4780,10 @@ func _on_run_pressed() -> void:
 	"""Handle Run action"""
 	# Block input during round transitions
 	if is_in_round_transition:
+		return
+
+	# Block input when locked
+	if battle_flow_state.input_locked:
 		return
 
 	# Activate the Run button with visual feedback
@@ -4918,6 +4888,10 @@ func _on_status_pressed() -> void:
 	if is_in_round_transition:
 		return
 
+	# Block input when locked
+	if battle_flow_state.input_locked:
+		return
+
 	# Activate the Status button with visual feedback
 	_activate_action_button("StatusButton", COLOR_MILK_WHITE)
 
@@ -4928,6 +4902,14 @@ func _on_status_pressed() -> void:
 
 func _on_switch_panel_pressed() -> void:
 	"""Handle switching between action menu panels"""
+	# Block input when locked
+	if battle_flow_state.input_locked:
+		return
+
+	# Block input during round transitions
+	if is_in_round_transition:
+		return
+
 	_toggle_action_panel()
 
 func _toggle_action_panel() -> void:
