@@ -15,8 +15,8 @@ var current_phase: Phase = Phase.FADE_IN
 ## Circle animation
 var circle_progress: float = 0.0  # 0.0 = fully open, 1.0 = fully closed
 var circle_speed: float = 0.5  # Speed of closing (0.5 = 2 seconds to close)
-var circle_max_radius: float = 150.0  # Maximum circle radius
-var circle_min_radius: float = 20.0  # Minimum circle radius (center)
+var circle_max_radius: float = 200.0  # Maximum circle radius (increased for 200px button)
+var circle_min_radius: float = 100.0  # Minimum circle radius (stops at button edge)
 
 ## Result tracking
 var final_damage_modifier: float = 1.0
@@ -24,17 +24,64 @@ var final_grade: String = "good"
 var result_text: String = "Good"
 
 ## Visual elements
-var button_sprite: Sprite2D
+var button_icon: TextureRect  # The A button icon
 var circle_canvas: Control  # For drawing the circle
 var result_label: Label
 var fade_timer: float = 0.0
 var fade_duration: float = 1.0
 
-## Button colors based on circle progress
-var current_button_color: Color = Color.WHITE
+## Button icon modulation based on circle progress
+var current_button_modulation: Color = Color.WHITE
 
 ## Input locked during fade in/out
 var input_locked: bool = true
+
+func _ready() -> void:
+	# Override parent to customize background
+	# Set up as overlay
+	set_anchors_preset(Control.PRESET_FULL_RECT)
+	z_index = 100
+	mouse_filter = Control.MOUSE_FILTER_STOP
+
+	_setup_transparent_visuals()
+	_apply_status_effects()
+	_setup_minigame()
+
+	# Start the minigame
+	await get_tree().process_frame
+	_start_minigame()
+
+func _setup_transparent_visuals() -> void:
+	"""Create transparent background - only button and circle visible"""
+	# NO dimmed background - completely transparent
+	background_dim = ColorRect.new()
+	background_dim.color = Color(0, 0, 0, 0.0)  # Fully transparent
+	background_dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	background_dim.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(background_dim)
+
+	# Central panel - also transparent
+	overlay_panel = PanelContainer.new()
+	overlay_panel.custom_minimum_size = get_viewport_rect().size * 0.5
+	overlay_panel.position = get_viewport_rect().size * 0.25
+	overlay_panel.z_index = 101
+
+	# Make panel transparent
+	var panel_style = StyleBoxFlat.new()
+	panel_style.bg_color = Color(0, 0, 0, 0.0)  # Fully transparent
+	panel_style.border_width_left = 0
+	panel_style.border_width_right = 0
+	panel_style.border_width_top = 0
+	panel_style.border_width_bottom = 0
+	overlay_panel.add_theme_stylebox_override("panel", panel_style)
+
+	add_child(overlay_panel)
+
+	# Content container
+	content_container = VBoxContainer.new()
+	content_container.set_anchors_preset(Control.PRESET_FULL_RECT)
+	content_container.add_theme_constant_override("separation", 10)
+	overlay_panel.add_child(content_container)
 
 func _setup_minigame() -> void:
 	base_duration = 10.0  # Maximum time allowed
@@ -43,28 +90,56 @@ func _setup_minigame() -> void:
 	# Neon-kawaii colors
 	const COLOR_MILK_WHITE = Color(0.96, 0.97, 0.98)
 
-	# Clear the default content container (we'll draw custom UI)
+	# Clear the default content container
 	for child in content_container.get_children():
 		child.queue_free()
 
-	# Create canvas for drawing circle
-	circle_canvas = Control.new()
-	circle_canvas.custom_minimum_size = Vector2(400, 400)
-	circle_canvas.draw.connect(_draw_circle)
-	var canvas_center = CenterContainer.new()
-	canvas_center.add_child(circle_canvas)
-	content_container.add_child(canvas_center)
+	# Get the controller icon layout
+	var icon_layout = get_node_or_null("/root/aControllerIconLayout")
+	if not icon_layout:
+		print("[AttackMinigame] ERROR: aControllerIconLayout not found!")
+		return
 
-	# Result label (hidden initially)
+	# Create a centered container for the button and circle
+	var center_container = CenterContainer.new()
+	center_container.set_anchors_preset(Control.PRESET_FULL_RECT)
+	content_container.add_child(center_container)
+
+	# Create canvas for drawing circle and button
+	circle_canvas = Control.new()
+	circle_canvas.custom_minimum_size = Vector2(500, 500)
+	circle_canvas.draw.connect(_draw_circle_and_button)
+	center_container.add_child(circle_canvas)
+
+	# Load the Accept button icon (A button)
+	var icon_texture = icon_layout.get_button_icon("accept")
+	if icon_texture:
+		# Store the texture for drawing
+		button_icon = TextureRect.new()
+		button_icon.texture = icon_texture
+		button_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		button_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		button_icon.custom_minimum_size = Vector2(200, 200)
+		# We'll draw this manually in _draw_circle_and_button
+		print("[AttackMinigame] Loaded accept button icon")
+	else:
+		print("[AttackMinigame] ERROR: Could not load accept button icon")
+
+	# Result label (placed above the minigame)
 	result_label = Label.new()
 	result_label.text = ""
 	result_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	result_label.add_theme_font_size_override("font_size", 24)
+	result_label.add_theme_font_size_override("font_size", 48)
 	result_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
 	result_label.modulate.a = 0.0  # Hidden initially
-	content_container.add_child(result_label)
 
-	print("[AttackMinigame] Setup complete - simple circle timing")
+	# Position result label at the top center
+	var result_container = CenterContainer.new()
+	result_container.add_child(result_label)
+	content_container.add_child(result_container)
+	content_container.move_child(result_container, 0)  # Move to top
+
+	print("[AttackMinigame] Setup complete - simple circle timing with transparent background")
 
 func _start_minigame() -> void:
 	print("[AttackMinigame] Starting circle timing minigame")
@@ -93,8 +168,8 @@ func _process_fade_in(delta: float) -> void:
 	var alpha = min(fade_timer / fade_duration, 1.0)
 	overlay_panel.modulate.a = alpha
 
-	# Update button color during fade in (starts white)
-	current_button_color = Color.WHITE
+	# Update button modulation during fade in (starts white)
+	current_button_modulation = Color.WHITE
 	circle_canvas.queue_redraw()
 
 	# After 1 second, start the active phase
@@ -109,8 +184,8 @@ func _process_active(delta: float) -> void:
 	# Close the circle
 	circle_progress += delta * circle_speed
 
-	# Update button color based on circle progress
-	_update_button_color()
+	# Update button modulation based on circle progress
+	_update_button_modulation()
 
 	# Redraw the circle
 	circle_canvas.queue_redraw()
@@ -127,52 +202,49 @@ func _process_active(delta: float) -> void:
 		print("[AttackMinigame] Circle reached 100% - auto-stopping at RED")
 		_stop_circle()
 
-func _update_button_color() -> void:
-	"""Update button color based on circle progress percentage"""
+func _update_button_modulation() -> void:
+	"""Update button icon modulation based on circle progress percentage"""
 	var percent = circle_progress * 100.0
 
 	if percent < 10.0:
 		# 0-10%: White
-		current_button_color = Color.WHITE
+		current_button_modulation = Color.WHITE
 	elif percent < 30.0:
 		# 10-30%: Yellow
-		current_button_color = Color(1.0, 1.0, 0.0)  # Yellow
+		current_button_modulation = Color(1.0, 1.0, 0.0)  # Yellow
 	elif percent < 80.0:
 		# 30-80%: Green
-		current_button_color = Color(0.0, 1.0, 0.0)  # Green
+		current_button_modulation = Color(0.0, 1.0, 0.0)  # Green
 	elif percent < 90.0:
 		# 80-90%: Blue
-		current_button_color = Color(0.3, 0.6, 1.0)  # Blue
+		current_button_modulation = Color(0.3, 0.6, 1.0)  # Blue
 	elif percent < 100.0:
 		# 90-100%: Yellow
-		current_button_color = Color(1.0, 1.0, 0.0)  # Yellow
+		current_button_modulation = Color(1.0, 1.0, 0.0)  # Yellow
 	else:
 		# 100%: Red
-		current_button_color = Color(1.0, 0.0, 0.0)  # Red
+		current_button_modulation = Color(1.0, 0.0, 0.0)  # Red
 
-func _draw_circle() -> void:
-	"""Draw the closing red circle and A button in center"""
+func _draw_circle_and_button() -> void:
+	"""Draw the closing red circle and button icon in center"""
 	var canvas_size = circle_canvas.size
 	var center = canvas_size / 2.0
 
 	# Calculate current circle radius based on progress
-	# Progress 0.0 = max radius, Progress 1.0 = min radius
+	# Progress 0.0 = max radius, Progress 1.0 = min radius (stops at button edge)
 	var current_radius = lerp(circle_max_radius, circle_min_radius, circle_progress)
 
 	# Draw red circle border (closing in)
-	_draw_circle_outline(center, current_radius, Color(1.0, 0.0, 0.0), 4.0)
+	_draw_circle_outline(center, current_radius, Color(1.0, 0.0, 0.0), 6.0)
 
-	# Draw A button in center (filled circle with "A" text)
-	var button_radius = 30.0
-	circle_canvas.draw_circle(center, button_radius, current_button_color)
+	# Draw the button icon in the center (200x200)
+	if button_icon and button_icon.texture:
+		var icon_size = Vector2(200, 200)
+		var icon_pos = center - icon_size / 2.0
+		var icon_rect = Rect2(icon_pos, icon_size)
 
-	# Draw "A" text on button
-	var font = ThemeDB.fallback_font
-	var font_size = 32
-	var text = "A"
-	var text_size = font.get_string_size(text, HORIZONTAL_ALIGNMENT_CENTER, -1, font_size)
-	var text_pos = center - text_size / 2.0
-	circle_canvas.draw_string(font, text_pos, text, HORIZONTAL_ALIGNMENT_CENTER, -1, font_size, Color.BLACK)
+		# Draw with current modulation color
+		circle_canvas.draw_texture_rect(button_icon.texture, icon_rect, false, current_button_modulation)
 
 func _draw_circle_outline(center: Vector2, radius: float, color: Color, width: float) -> void:
 	"""Helper to draw a circle outline"""
@@ -193,7 +265,7 @@ func _stop_circle() -> void:
 
 	# Determine damage modifier and result text based on final percentage
 	if percent < 10.0:
-		# White zone (0-10%) - too early, no bonus/penalty yet
+		# White zone (0-10%) - too early
 		final_damage_modifier = 1.0
 		final_grade = "good"
 		result_text = "Good"
