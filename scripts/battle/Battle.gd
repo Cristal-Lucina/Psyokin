@@ -6318,6 +6318,7 @@ func _on_change_type_button_pressed() -> void:
 	# Create type selection panel
 	type_menu_panel = PanelContainer.new()
 	type_menu_panel.custom_minimum_size = Vector2(300, 0)
+	type_menu_panel.z_index = 1000  # Above all sprites
 
 	# Style the panel with cyan neon Core vibe
 	var style = StyleBoxFlat.new()
