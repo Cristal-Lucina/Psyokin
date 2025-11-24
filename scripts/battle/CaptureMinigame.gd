@@ -25,8 +25,9 @@ var fills_completed: int = 0
 
 ## Progress tracking
 var fill_progress: float = 0.0  # 0.0 to 1.0 (one complete fill)
-var fill_speed: float = 1.2  # How fast the bar fills per second (increased even more for easier gameplay)
-var decay_speed: float = 0.05  # How fast the bar drains when not inputting (reduced even more for easier gameplay)
+var fill_per_rotation: float = 0.3333  # One full rotation = 33.33% fill (3 rotations = 100%)
+var fill_per_radian: float = 0.3333 / (2.0 * PI)  # Convert rotation to fill progress
+var decay_speed: float = 0.03  # How fast the bar drains when not inputting (very slow)
 
 ## Button and direction requirements
 const CAPTURE_BUTTONS = ["A", "B", "X", "Y"]
@@ -389,6 +390,7 @@ func _process_active(delta: float) -> void:
 	var input_vec = aInputManager.get_movement_vector()
 	var is_spinning = false
 	var correct_direction = false
+	var rotation_amount: float = 0.0  # Track rotation for fill calculation
 
 	if input_vec.length() > 0.2:  # Lowered threshold from 0.3 to 0.2
 		# Calculate angle from input
@@ -409,6 +411,7 @@ func _process_active(delta: float) -> void:
 
 			if abs(angle_diff) > rotation_threshold:
 				is_spinning = true
+				rotation_amount = abs(angle_diff)  # Store rotation amount for fill calculation
 
 				# Check if spinning in correct direction
 				if current_direction == 1 and angle_diff > 0:
@@ -426,12 +429,14 @@ func _process_active(delta: float) -> void:
 
 	# Fill or drain the progress bar
 	if holding_button and is_spinning and correct_direction:
-		# Correct input! Fill the bar
-		fill_progress += fill_speed * delta
-		change_progress += fill_speed * delta
+		# Correct input! Fill the bar based on rotation amount
+		var progress_gained = rotation_amount * fill_per_radian
+
+		fill_progress += progress_gained
+		change_progress += progress_gained
 
 		if Engine.get_frames_drawn() % 30 == 0:
-			print("[CaptureMinigame] Filling! Progress: %.1f%%" % (fill_progress * 100))
+			print("[CaptureMinigame] Filling! Rotation: %.2f rad, Progress gained: %.2f%%, Total: %.1f%%" % [rotation_amount, progress_gained * 100, fill_progress * 100])
 
 		# Check for periodic changes (at 33% and 66% of each fill)
 		if change_progress >= change_interval:
@@ -439,7 +444,7 @@ func _process_active(delta: float) -> void:
 			_trigger_random_change()
 
 	else:
-		# Wrong input or no input - drain the bar
+		# Wrong input or no input - drain the bar slowly
 		fill_progress -= decay_speed * delta
 		fill_progress = max(0.0, fill_progress)
 
