@@ -5466,27 +5466,33 @@ func _execute_enemy_ai() -> void:
 			# Wake up if asleep
 			_wake_if_asleep(target)
 
-			# Show hurt reaction on target (frame 178 only)
-			if sprite_animator and sprite_animator.sprite_instances.has(target.id):
-				var target_instance = sprite_animator.sprite_instances[target.id]
-				var is_layered = target_instance.get("is_layered", false)
+			# Show hurt reaction on target (frame 178 only) - ONLY if not parried
+			if defense_modifier > 0.0:  # Only show hurt if taking damage (not parried)
+				if sprite_animator and sprite_animator.sprite_instances.has(target.id):
+					var target_instance = sprite_animator.sprite_instances[target.id]
+					var is_layered = target_instance.get("is_layered", false)
 
-				# Set frame 178 manually
-				if is_layered:
-					var layer_sprites = target_instance.get("layer_sprites", {})
-					for sprite_code in layer_sprites:
-						var sprite = layer_sprites[sprite_code]
-						if sprite and sprite.visible and sprite.texture:
-							sprite.frame = 178
-				else:
-					var target_sprite = target_instance["sprite"]
-					target_sprite.frame = 178
+					# Set frame 178 manually
+					if is_layered:
+						var layer_sprites = target_instance.get("layer_sprites", {})
+						for sprite_code in layer_sprites:
+							var sprite = layer_sprites[sprite_code]
+							if sprite and sprite.visible and sprite.texture:
+								sprite.frame = 178
+					else:
+						var target_sprite = target_instance["sprite"]
+						target_sprite.frame = 178
 
-				await get_tree().create_timer(0.6).timeout
+					await get_tree().create_timer(0.6).timeout
 
-				# Return to idle if not KO'd (we'll check below)
-				# Allies face RIGHT, enemies face LEFT
-				if target.hp > 0:
+					# Return to idle if not KO'd (we'll check below)
+					# Allies face RIGHT, enemies face LEFT
+					if target.hp > 0:
+						var idle_direction = "RIGHT" if target.get("is_ally", false) else "LEFT"
+						sprite_animator.play_animation(target.id, "Idle", idle_direction, false, false)
+			else:
+				# Parried - return to idle immediately (no hurt animation)
+				if target.hp > 0 and sprite_animator:
 					var idle_direction = "RIGHT" if target.get("is_ally", false) else "LEFT"
 					sprite_animator.play_animation(target.id, "Idle", idle_direction, false, false)
 
