@@ -45,7 +45,7 @@ const BUTTON_ACTIONS = {
 var player_attempted_parry: bool = false  # Did player press the parry button?
 var final_damage_modifier: float = 1.0  # 0.0 = no damage (parried), 1.0 = normal, 1.3 = penalty for missing
 var counter_attack_damage: float = 0.0  # Damage dealt back to enemy (30% of attack damage)
-var result_text: String = "BLOCKED"
+var result_text: String = "HIT!"
 
 ## Visual elements
 var button_icon: TextureRect  # The random button icon
@@ -359,7 +359,7 @@ func _miss_parry() -> void:
 		# Player didn't press anything - circle closed naturally - SAFE
 		print("[DefenseMinigame] No parry attempted - taking normal damage (100%)")
 		final_damage_modifier = 1.0
-		result_text = "BLOCKED"
+		result_text = "HIT!"
 
 	counter_attack_damage = 0.0
 	_finish_minigame()
@@ -372,7 +372,7 @@ func _lose_parry_battle() -> void:
 	# Take normal damage (no counter-attack)
 	final_damage_modifier = 1.0
 	counter_attack_damage = 0.0
-	result_text = "BLOCKED"
+	result_text = "HIT!"
 
 	_finish_minigame()
 
