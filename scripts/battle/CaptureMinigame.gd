@@ -145,9 +145,9 @@ func _setup_minigame() -> void:
 		print("[CaptureMinigame] ERROR: aControllerIconLayout not found!")
 		return
 
-	# Fills label at top - moved up 90px using MarginContainer
+	# Fills label at top - moved up 130px using MarginContainer
 	var label_margin = MarginContainer.new()
-	label_margin.add_theme_constant_override("margin_top", -90)
+	label_margin.add_theme_constant_override("margin_top", -130)
 
 	fills_label = Label.new()
 	fills_label.text = "Wrap 1/%d" % fills_needed
