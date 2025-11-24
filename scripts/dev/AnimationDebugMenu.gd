@@ -12,6 +12,7 @@
 ## ═══════════════════════════════════════════════════════════════════════════
 
 extends PanelContainer
+class_name AnimationDebugMenu
 
 const AnimationDataLoaderScript = preload("res://scripts/player/AnimationDataLoader.gd")
 
