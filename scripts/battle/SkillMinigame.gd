@@ -163,13 +163,13 @@ func _setup_minigame() -> void:
 	var sequence_center = CenterContainer.new()
 	sequence_center.add_child(sequence_container)
 
-	# Position manually with offset instead of using layout flow
+	# Position manually with absolute positioning - add to root (self), not overlay_panel
 	sequence_center.set_anchors_preset(Control.PRESET_CENTER_TOP)
-	sequence_center.offset_top = 130  # Move down 130px
+	sequence_center.position.y = 130  # Move down 130px from top
 	sequence_center.z_index = 1000  # Ensure appears on top
 
-	# Add directly to overlay_panel (not content_container) to avoid layout interference
-	overlay_panel.add_child(sequence_center)
+	# Add directly to self (root control) to avoid any layout interference
+	add_child(sequence_center)
 
 	# Create ONLY 3 button slots that will be reused for all tiers
 	# Start with Tier 1 buttons, then replace with Tier 2, then Tier 3
