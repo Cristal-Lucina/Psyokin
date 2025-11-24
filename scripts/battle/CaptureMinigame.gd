@@ -445,9 +445,9 @@ func _draw_capture_visual() -> void:
 		var rotation_rect = Rect2(rotation_pos, rotation_size)
 
 		# Flip horizontally for clockwise direction
-		if current_direction == 1:  # Clockwise - flip horizontal
-			# Use transform to flip horizontally
-			circle_canvas.draw_set_transform(Vector2(rotation_rect.position.x + rotation_rect.size.x, rotation_rect.position.y), 0, Vector2(-1, 1))
+		if current_direction == 1:  # Clockwise - flip horizontal, shifted left 3px
+			# Use transform to flip horizontally, shift left 3px
+			circle_canvas.draw_set_transform(Vector2(rotation_rect.position.x + rotation_rect.size.x - 3, rotation_rect.position.y), 0, Vector2(-1, 1))
 			var flipped_rect = Rect2(Vector2(0, 0), rotation_size)
 			circle_canvas.draw_texture_rect(rotation_icon, flipped_rect, false, Color.WHITE)
 			circle_canvas.draw_set_transform(Vector2.ZERO, 0, Vector2.ONE)  # Reset transform
