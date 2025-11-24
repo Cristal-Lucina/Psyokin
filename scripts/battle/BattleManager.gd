@@ -260,6 +260,9 @@ func _roll_initiative() -> void:
 				best_roll = roll
 
 		# Apply initiative bonus (from successful guards/parries)
+		# Ensure field exists (backward compatibility)
+		if not combatant.has("initiative_bonus"):
+			combatant["initiative_bonus"] = 0
 		var init_bonus = combatant.get("initiative_bonus", 0)
 		combatant.initiative = best_roll + total_speed + init_bonus
 

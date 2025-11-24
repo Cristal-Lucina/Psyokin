@@ -5346,7 +5346,10 @@ func _execute_enemy_ai() -> void:
 		print("[Battle] Defense minigame result - Modifier: %.1f%%, Counter: %.1f, Initiative Bonus: %+d" % [defense_modifier * 100, counter_damage, initiative_bonus])
 
 		# Apply initiative bonus to defender for next round
-		if initiative_bonus > 0 and target.has("initiative_bonus"):
+		if initiative_bonus > 0:
+			# Ensure the field exists (in case combatant was created before we added this field)
+			if not target.has("initiative_bonus"):
+				target["initiative_bonus"] = 0
 			target.initiative_bonus += initiative_bonus
 			print("[Battle] %s gains +%d initiative bonus for next round (total: %+d)" % [target.display_name, initiative_bonus, target.initiative_bonus])
 
