@@ -1,9 +1,13 @@
 extends BaseMinigame
 class_name CaptureMinigame
 
-## CaptureMinigame - Two-phase capture system (Toss + Bind)
-## Phase 1: Roll to see which binds land
-## Phase 2: Rotate to make knots before enemy breaks
+## CaptureMinigame - Hold button and spin joystick to capture
+## Random button (A, B, X, Y) + random direction (clockwise/counter-clockwise)
+## Fill progress bar by holding button and spinning in correct direction
+## Periodically changes button OR direction
+## Multiple fill cycles based on difficulty
+
+signal minigame_completed
 
 ## Configuration
 var binds: Array = []  # ["basic", "standard", "advanced"]
@@ -11,306 +15,171 @@ var enemy_data: Dictionary = {}
 var party_member_data: Dictionary = {}
 
 ## Internal state
-enum Phase { TOSS, BIND, COMPLETE }
-var current_phase: Phase = Phase.TOSS
-var landed_binds: Array = []
-var breaks_completed: int = 0  # Number of breaks achieved
-var breaks_needed: int = 0  # Total breaks needed (= break rating)
+enum Phase { FADE_IN, ACTIVE, SHOWING_RESULT, COMPLETE }
+var current_phase: Phase = Phase.FADE_IN
+
+## Difficulty (determines number of fill cycles)
 var break_rating: int = 6
-var break_timer: float = 0.0  # Time until enemy breaks free
-var minigame_complete: bool = false  # Lock out all input when complete
+var fills_needed: int = 3  # How many times player must fill the bar
+var fills_completed: int = 0
 
-# Bind point system
-enum BindDirection { UP, DOWN, LEFT, RIGHT }
-enum WrapDirection { CLOCKWISE, COUNTERCLOCKWISE }
-var current_bind_direction: BindDirection = BindDirection.UP
-var current_wrap_direction: WrapDirection = WrapDirection.CLOCKWISE
-var bind_point_grabbed: bool = false
-var drag_start_angle: float = 0.0
-var drag_current_angle: float = 0.0
-var wrap_progress: float = 0.0  # 0.0 to TAU (full circle)
-var wraps_in_current_break: int = 0  # Wraps completed for current break
-var wraps_per_point: int = 3  # How many wraps needed per break rating point
+## Progress tracking
+var fill_progress: float = 0.0  # 0.0 to 1.0 (one complete fill)
+var fill_speed: float = 0.25  # How fast the bar fills per second
+var decay_speed: float = 0.15  # How fast the bar drains when not inputting
 
-# Button prompt system for wrapping (harder for tougher enemies)
-var prompt_active: bool = false  # Is a button prompt currently showing?
-var prompt_timer: float = 0.0  # Time until next prompt
-var prompt_window: float = 1.5  # Time player has to press button (shorter for harder enemies)
-var prompt_interval_min: float = 2.0  # Min time between prompts (shorter for harder enemies)
-var prompt_interval_max: float = 4.0  # Max time between prompts (shorter for harder enemies)
-var last_accept_state: bool = false  # Track button state for single-press detection
+## Button and direction requirements
+const CAPTURE_BUTTONS = ["A", "B", "X", "Y"]
+const BUTTON_ACTIONS = {
+	"A": "accept",
+	"B": "cancel",
+	"X": "special_1",
+	"Y": "special_2"
+}
+var current_button: String = "A"  # Random button
+var current_button_action: String = "accept"
+var current_direction: int = 1  # 1 = clockwise, -1 = counter-clockwise
+
+## Joystick rotation tracking
+var last_input_angle: float = 0.0
+var accumulated_rotation: float = 0.0  # Track rotation progress
+var rotation_threshold: float = 0.3  # Minimum rotation to count
+
+## Change tracking (periodic button/direction changes)
+var change_progress: float = 0.0  # When this hits 1.0, trigger a change
+var change_interval: float = 0.33  # Change happens at 33% and 66% of each fill
 
 ## Visual elements
-var title_label: Label
-var phase_label: Label
-var enemy_icon: Control  # Changed to Control for circular drawing
-var bind_result_label: Label
-var break_progress_bar: ProgressBar  # Shows breaks completed
-var break_timer_bar: ProgressBar  # Shows time remaining
-var instruction_label: Label
-var charm_effect_overlay: Control  # For pink wavy border when enemy is charmed
-var charm_anim_time: float = 0.0
-var sleep_effect_overlay: Control  # For white wavy border when enemy is asleep
-var sleep_anim_time: float = 0.0
+var button_icon: TextureRect  # The current button icon
+var direction_arrow: Control  # Arrow indicating spin direction
+var circle_canvas: Control  # For drawing the progress circle
+var progress_bar: ProgressBar  # Shows fill progress
+var fills_label: Label  # Shows "Fill 1/3"
+var result_label: Label
+var fade_timer: float = 0.0
+var fade_duration: float = 0.5
 
-# Bind phase visuals
-var bind_arena: Control  # Container for dragging mechanic
-var bind_point: ColorRect  # The point to grab and drag
-var bind_trail: Line2D  # Trail showing wrap around enemy
-var prompt_label: Label  # Shows "PRESS A!" during button prompts
+## Input locked during fade in/out
+var input_locked: bool = true
+
+## Result tracking
+var capture_success: bool = false
+var result_text: String = "FAILED"
 
 # Core vibe color constants
 const COLOR_MILK_WHITE = Color(0.96, 0.97, 0.98)
 const COLOR_BUBBLE_MAGENTA = Color(1.0, 0.29, 0.85)
 
 func _ready() -> void:
-	super._ready()
-	if overlay_panel:
-		overlay_panel.position.y -= 20
+	# Set up as overlay
+	set_anchors_preset(Control.PRESET_FULL_RECT)
+	z_index = 100
+	mouse_filter = Control.MOUSE_FILTER_STOP
+
+	_setup_transparent_visuals()
+	_apply_status_effects()
+	_setup_minigame()
+
+	# Start the minigame
+	await get_tree().process_frame
+	_start_minigame()
+
+func _setup_transparent_visuals() -> void:
+	"""Create transparent background - only button, arrow, and circle visible"""
+	# Fully transparent background
+	background_dim = ColorRect.new()
+	background_dim.color = Color(0, 0, 0, 0.0)  # Fully transparent
+	background_dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	background_dim.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(background_dim)
+
+	# Central panel - also transparent
+	overlay_panel = PanelContainer.new()
+	overlay_panel.custom_minimum_size = get_viewport_rect().size * 0.25
+	var viewport_size = get_viewport_rect().size
+	overlay_panel.position = Vector2(viewport_size.x * 0.375, viewport_size.y * 0.25 - 100)  # Centered, moved up 100px
+	overlay_panel.z_index = 101
+
+	# Make panel transparent
+	var panel_style = StyleBoxFlat.new()
+	panel_style.bg_color = Color(0, 0, 0, 0.0)  # Fully transparent
+	panel_style.border_width_left = 0
+	panel_style.border_width_right = 0
+	panel_style.border_width_top = 0
+	panel_style.border_width_bottom = 0
+	overlay_panel.add_theme_stylebox_override("panel", panel_style)
+
+	add_child(overlay_panel)
+
+	# Content container
+	content_container = VBoxContainer.new()
+	content_container.set_anchors_preset(Control.PRESET_FULL_RECT)
+	content_container.add_theme_constant_override("separation", 10)
+	overlay_panel.add_child(content_container)
 
 func _setup_minigame() -> void:
-	base_duration = 10.0
+	base_duration = 30.0  # 30 seconds to complete
 	current_duration = base_duration
 
-	# Calculate break rating from enemy data
-	_calculate_break_rating()
+	# Calculate difficulty from enemy data
+	_calculate_difficulty()
 
-	# Title
-	title_label = Label.new()
-	title_label.text = "CAPTURE!"
-	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title_label.add_theme_font_size_override("font_size", 32)
-	title_label.add_theme_color_override("font_color", COLOR_BUBBLE_MAGENTA)  # Pink magenta title
-	content_container.add_child(title_label)
+	# Clear the default content container
+	for child in content_container.get_children():
+		child.queue_free()
 
-	# Phase label
-	phase_label = Label.new()
-	phase_label.text = "Phase: TOSS"
-	phase_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	phase_label.add_theme_font_size_override("font_size", 20)
-	phase_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
-	content_container.add_child(phase_label)
-
-	# Enemy icon (circular)
-	enemy_icon = Control.new()
-	enemy_icon.custom_minimum_size = Vector2(100, 100)
-	enemy_icon.draw.connect(_draw_enemy_circle)
-	var icon_container = CenterContainer.new()
-	icon_container.add_child(enemy_icon)
-	content_container.add_child(icon_container)
-
-	# Need to defer queue_redraw until after the node is in the tree
-	enemy_icon.ready.connect(func(): enemy_icon.queue_redraw())
-
-	# Bind result label
-	bind_result_label = Label.new()
-	bind_result_label.text = "Rolling binds..."
-	bind_result_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	bind_result_label.add_theme_font_size_override("font_size", 18)
-	bind_result_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
-	content_container.add_child(bind_result_label)
-
-	# Break progress bar (shows breaks completed)
-	break_progress_bar = ProgressBar.new()
-	break_progress_bar.max_value = 1.0
-	break_progress_bar.value = 0.0
-	break_progress_bar.show_percentage = false
-	break_progress_bar.custom_minimum_size = Vector2(300, 30)
-	break_progress_bar.visible = false
-	var progress_container = CenterContainer.new()
-	progress_container.add_child(break_progress_bar)
-	content_container.add_child(progress_container)
-
-	# Break timer bar (shows time remaining)
-	break_timer_bar = ProgressBar.new()
-	break_timer_bar.max_value = float(break_rating)
-	break_timer_bar.value = float(break_rating)
-	break_timer_bar.show_percentage = false
-	break_timer_bar.custom_minimum_size = Vector2(300, 30)
-	break_timer_bar.visible = false
-	var timer_container = CenterContainer.new()
-	timer_container.add_child(break_timer_bar)
-	content_container.add_child(timer_container)
-
-	# Instructions
-	instruction_label = Label.new()
-	instruction_label.text = "Rolling binds..."
-	instruction_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	instruction_label.add_theme_font_size_override("font_size", 16)
-	instruction_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
-	content_container.add_child(instruction_label)
-
-	# Charm effect overlay (pink wavy border when enemy is charmed)
-	var enemy_ailment = str(enemy_data.get("ailment", "")).to_lower()
-	if enemy_ailment == "charm" or enemy_ailment == "charmed":
-		charm_effect_overlay = Control.new()
-		charm_effect_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
-		charm_effect_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		charm_effect_overlay.z_index = 102
-		charm_effect_overlay.draw.connect(_draw_charm_effect)
-		add_child(charm_effect_overlay)
-		print("[CaptureMinigame] Enemy is charmed - adding pink wavy border!")
-
-	# Sleep effect overlay (white wavy border when enemy is asleep)
-	if enemy_ailment == "sleep" or enemy_ailment == "asleep":
-		sleep_effect_overlay = Control.new()
-		sleep_effect_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
-		sleep_effect_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		sleep_effect_overlay.z_index = 102
-		sleep_effect_overlay.draw.connect(_draw_sleep_effect)
-		add_child(sleep_effect_overlay)
-		print("[CaptureMinigame] Enemy is asleep - adding white wavy border!")
-
-func _draw_enemy_circle() -> void:
-	"""Draw the enemy as a circular shape"""
-	var center = Vector2(50, 50)  # Center of 100x100 control
-	var radius = 40.0
-	enemy_icon.draw_circle(center, radius, Color(0.8, 0.3, 0.3, 1.0))
-
-func _draw_charm_effect() -> void:
-	"""Draw animated pink wavy lines around the minigame panel (enemy is charmed!)"""
-	if not overlay_panel:
+	# Get the controller icon layout
+	var icon_layout = get_node_or_null("/root/aControllerIconLayout")
+	if not icon_layout:
+		print("[CaptureMinigame] ERROR: aControllerIconLayout not found!")
 		return
 
-	var panel_pos = overlay_panel.position
-	var panel_size = overlay_panel.size
-	var wave_segments = 20
-	var line_thickness = 3.0
+	# Fills label at top
+	fills_label = Label.new()
+	fills_label.text = "Fill 1/%d" % fills_needed
+	fills_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	fills_label.add_theme_font_size_override("font_size", 32)
+	fills_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
+	fills_label.add_theme_constant_override("outline_size", 4)
+	fills_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
+	content_container.add_child(fills_label)
 
-	# Draw smooth wavy pink lines along each edge
-	# Top edge
-	for i in range(wave_segments):
-		var progress = float(i) / wave_segments
-		var next_progress = float(i + 1) / wave_segments
+	# Create a centered container for the button, arrow, and circle
+	var center_container = CenterContainer.new()
+	center_container.set_anchors_preset(Control.PRESET_FULL_RECT)
+	content_container.add_child(center_container)
 
-		var x1 = panel_pos.x + panel_size.x * progress
-		var x2 = panel_pos.x + panel_size.x * next_progress
-		var y1 = panel_pos.y + sin((charm_anim_time * 2.0) + (progress * TAU * 2)) * 6.0
-		var y2 = panel_pos.y + sin((charm_anim_time * 2.0) + (next_progress * TAU * 2)) * 6.0
+	# Create canvas for drawing circle, button, and arrow
+	circle_canvas = Control.new()
+	circle_canvas.custom_minimum_size = Vector2(250, 250)
+	circle_canvas.draw.connect(_draw_capture_visual)
+	center_container.add_child(circle_canvas)
 
-		var intensity = 0.6 + sin(charm_anim_time * 3.0 + progress * TAU) * 0.4
-		var color = Color(1.0, 0.4, 0.8, intensity)  # Pink!
+	# Pick random starting button
+	_randomize_button()
 
-		charm_effect_overlay.draw_line(Vector2(x1, y1), Vector2(x2, y2), color, line_thickness)
+	# Pick random starting direction
+	_randomize_direction()
 
-	# Bottom edge
-	for i in range(wave_segments):
-		var progress = float(i) / wave_segments
-		var next_progress = float(i + 1) / wave_segments
+	# Result label (placed above the minigame)
+	result_label = Label.new()
+	result_label.text = ""
+	result_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	result_label.add_theme_font_size_override("font_size", 60)
+	result_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
+	result_label.add_theme_constant_override("outline_size", 8)
+	result_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
+	result_label.modulate.a = 0.0  # Hidden initially
 
-		var x1 = panel_pos.x + panel_size.x * progress
-		var x2 = panel_pos.x + panel_size.x * next_progress
-		var y1 = panel_pos.y + panel_size.y + sin((charm_anim_time * 2.0) + (progress * TAU * 2) + PI) * 6.0
-		var y2 = panel_pos.y + panel_size.y + sin((charm_anim_time * 2.0) + (next_progress * TAU * 2) + PI) * 6.0
+	var result_container = CenterContainer.new()
+	result_container.add_child(result_label)
+	content_container.add_child(result_container)
+	content_container.move_child(result_container, 0)  # Move to top
 
-		var intensity = 0.6 + sin(charm_anim_time * 3.0 + progress * TAU) * 0.4
-		var color = Color(1.0, 0.4, 0.8, intensity)
+	print("[CaptureMinigame] Setup complete - hold button and spin mechanic")
 
-		charm_effect_overlay.draw_line(Vector2(x1, y1), Vector2(x2, y2), color, line_thickness)
-
-	# Left edge
-	for i in range(wave_segments):
-		var progress = float(i) / wave_segments
-		var next_progress = float(i + 1) / wave_segments
-
-		var y1 = panel_pos.y + panel_size.y * progress
-		var y2 = panel_pos.y + panel_size.y * next_progress
-		var x1 = panel_pos.x + sin((charm_anim_time * 2.0) + (progress * TAU * 2)) * 6.0
-		var x2 = panel_pos.x + sin((charm_anim_time * 2.0) + (next_progress * TAU * 2)) * 6.0
-
-		var intensity = 0.6 + sin(charm_anim_time * 3.0 + progress * TAU) * 0.4
-		var color = Color(1.0, 0.4, 0.8, intensity)
-
-		charm_effect_overlay.draw_line(Vector2(x1, y1), Vector2(x2, y2), color, line_thickness)
-
-	# Right edge
-	for i in range(wave_segments):
-		var progress = float(i) / wave_segments
-		var next_progress = float(i + 1) / wave_segments
-
-		var y1 = panel_pos.y + panel_size.y * progress
-		var y2 = panel_pos.y + panel_size.y * next_progress
-		var x1 = panel_pos.x + panel_size.x + sin((charm_anim_time * 2.0) + (progress * TAU * 2) + PI) * 6.0
-		var x2 = panel_pos.x + panel_size.x + sin((charm_anim_time * 2.0) + (next_progress * TAU * 2) + PI) * 6.0
-
-		var intensity = 0.6 + sin(charm_anim_time * 3.0 + progress * TAU) * 0.4
-		var color = Color(1.0, 0.4, 0.8, intensity)
-
-		charm_effect_overlay.draw_line(Vector2(x1, y1), Vector2(x2, y2), color, line_thickness)
-
-func _draw_sleep_effect() -> void:
-	"""Draw animated white wavy lines around the minigame panel (enemy is asleep!)"""
-	if not overlay_panel:
-		return
-
-	var panel_pos = overlay_panel.position
-	var panel_size = overlay_panel.size
-	var wave_segments = 20
-	var line_thickness = 3.0
-
-	# Draw smooth wavy white lines along each edge
-	# Top edge
-	for i in range(wave_segments):
-		var progress = float(i) / wave_segments
-		var next_progress = float(i + 1) / wave_segments
-
-		var x1 = panel_pos.x + panel_size.x * progress
-		var x2 = panel_pos.x + panel_size.x * next_progress
-		var y1 = panel_pos.y + sin((sleep_anim_time * 2.0) + (progress * TAU * 2)) * 6.0
-		var y2 = panel_pos.y + sin((sleep_anim_time * 2.0) + (next_progress * TAU * 2)) * 6.0
-
-		var intensity = 0.6 + sin(sleep_anim_time * 3.0 + progress * TAU) * 0.4
-		var color = Color(1.0, 1.0, 1.0, intensity)  # White!
-
-		sleep_effect_overlay.draw_line(Vector2(x1, y1), Vector2(x2, y2), color, line_thickness)
-
-	# Bottom edge
-	for i in range(wave_segments):
-		var progress = float(i) / wave_segments
-		var next_progress = float(i + 1) / wave_segments
-
-		var x1 = panel_pos.x + panel_size.x * progress
-		var x2 = panel_pos.x + panel_size.x * next_progress
-		var y1 = panel_pos.y + panel_size.y + sin((sleep_anim_time * 2.0) + (progress * TAU * 2) + PI) * 6.0
-		var y2 = panel_pos.y + panel_size.y + sin((sleep_anim_time * 2.0) + (next_progress * TAU * 2) + PI) * 6.0
-
-		var intensity = 0.6 + sin(sleep_anim_time * 3.0 + progress * TAU) * 0.4
-		var color = Color(1.0, 1.0, 1.0, intensity)
-
-		sleep_effect_overlay.draw_line(Vector2(x1, y1), Vector2(x2, y2), color, line_thickness)
-
-	# Left edge
-	for i in range(wave_segments):
-		var progress = float(i) / wave_segments
-		var next_progress = float(i + 1) / wave_segments
-
-		var y1 = panel_pos.y + panel_size.y * progress
-		var y2 = panel_pos.y + panel_size.y * next_progress
-		var x1 = panel_pos.x + sin((sleep_anim_time * 2.0) + (progress * TAU * 2)) * 6.0
-		var x2 = panel_pos.x + sin((sleep_anim_time * 2.0) + (next_progress * TAU * 2)) * 6.0
-
-		var intensity = 0.6 + sin(sleep_anim_time * 3.0 + progress * TAU) * 0.4
-		var color = Color(1.0, 1.0, 1.0, intensity)
-
-		sleep_effect_overlay.draw_line(Vector2(x1, y1), Vector2(x2, y2), color, line_thickness)
-
-	# Right edge
-	for i in range(wave_segments):
-		var progress = float(i) / wave_segments
-		var next_progress = float(i + 1) / wave_segments
-
-		var y1 = panel_pos.y + panel_size.y * progress
-		var y2 = panel_pos.y + panel_size.y * next_progress
-		var x1 = panel_pos.x + panel_size.x + sin((sleep_anim_time * 2.0) + (progress * TAU * 2) + PI) * 6.0
-		var x2 = panel_pos.x + panel_size.x + sin((sleep_anim_time * 2.0) + (next_progress * TAU * 2) + PI) * 6.0
-
-		var intensity = 0.6 + sin(sleep_anim_time * 3.0 + progress * TAU) * 0.4
-		var color = Color(1.0, 1.0, 1.0, intensity)
-
-		sleep_effect_overlay.draw_line(Vector2(x1, y1), Vector2(x2, y2), color, line_thickness)
-
-func _calculate_break_rating() -> void:
-	"""Calculate enemy break rating from HP and stats"""
+func _calculate_difficulty() -> void:
+	"""Calculate difficulty from enemy data"""
 	var enemy_hp_percent = float(enemy_data.get("hp", 1)) / float(enemy_data.get("hp_max", 1))
 	var base_rating = enemy_data.get("level", 1)
 
@@ -323,450 +192,296 @@ func _calculate_break_rating() -> void:
 	else:
 		break_rating = int(base_rating * 0.75)
 
-	print("[CaptureMinigame] Break rating: %d (HP: %.1f%%)" % [break_rating, enemy_hp_percent * 100])
+	# Check for charm bonus (easier capture)
+	var enemy_ailment = str(enemy_data.get("ailment", "")).to_lower()
+	if enemy_ailment == "charm" or enemy_ailment == "charmed":
+		break_rating = max(1, int(break_rating / 2))
+		print("[CaptureMinigame] Enemy is CHARMED - halving difficulty!")
 
-func _calculate_breaks_needed() -> void:
-	"""Calculate breaks needed based on break rating"""
-	breaks_needed = enemy_data.get("break_rating", 6)
+	# Determine fills needed based on break rating
+	# Easy: 1-3 = 2 fills, Medium: 4-6 = 3 fills, Hard: 7+ = 4 fills
+	if break_rating <= 3:
+		fills_needed = 2
+	elif break_rating <= 6:
+		fills_needed = 3
+	else:
+		fills_needed = 4
 
-	# Determine wraps per break based on bind quality
-	wraps_per_point = 3  # Default to basic
-	for bind in landed_binds:
-		match bind:
-			"basic": wraps_per_point = 3
-			"standard": wraps_per_point = 2
-			"advanced": wraps_per_point = 1
+	print("[CaptureMinigame] Break rating: %d, fills needed: %d (HP: %.1f%%)" % [break_rating, fills_needed, enemy_hp_percent * 100])
 
-	print("[CaptureMinigame] Break rating: %d, wraps per break: %d" % [breaks_needed, wraps_per_point])
+func _randomize_button() -> void:
+	"""Pick a random button"""
+	current_button = CAPTURE_BUTTONS[randi() % CAPTURE_BUTTONS.size()]
+	current_button_action = BUTTON_ACTIONS[current_button]
+	print("[CaptureMinigame] Button changed to: %s (action: %s)" % [current_button, current_button_action])
+
+func _randomize_direction() -> void:
+	"""Pick a random direction"""
+	current_direction = 1 if randf() > 0.5 else -1
+	var direction_text = "CLOCKWISE" if current_direction == 1 else "COUNTER-CLOCKWISE"
+	print("[CaptureMinigame] Direction changed to: %s" % direction_text)
 
 func _start_minigame() -> void:
-	print("[CaptureMinigame] Starting - Binds: %s" % str(binds))
-	current_phase = Phase.TOSS
-	_execute_toss_phase()
+	print("[CaptureMinigame] Starting capture minigame")
+	current_phase = Phase.FADE_IN
+	fill_progress = 0.0
+	fills_completed = 0
+	change_progress = 0.0
+	fade_timer = 0.0
+	input_locked = true
 
-func _execute_toss_phase() -> void:
-	"""Phase 1: Roll each bind to see if it lands"""
-	await get_tree().create_timer(0.5).timeout
-
-	landed_binds.clear()
-
-	for bind_type in binds:
-		var land_chance = _calculate_bind_chance(bind_type)
-		var roll = randf() * 100.0
-
-		if roll <= land_chance:
-			landed_binds.append(bind_type)
-			bind_result_label.text += "\n%s LANDED! (%.1f%%)" % [bind_type.to_upper(), land_chance]
-		else:
-			bind_result_label.text += "\n%s bounced (%.1f%%)" % [bind_type, land_chance]
-
-		await get_tree().create_timer(0.3).timeout
-
-	if landed_binds.is_empty():
-		# All bounced!
-		instruction_label.text = "All binds bounced! Capture failed."
-		await get_tree().create_timer(1.0).timeout
-		_finish_capture_failed()
-	else:
-		# Move to bind phase
-		await get_tree().create_timer(0.5).timeout
-		_start_bind_phase()
-
-func _calculate_bind_chance(bind_type: String) -> float:
-	"""Calculate chance for bind to land"""
-	# Check if enemy is charmed - massive bonus!
-	var enemy_ailment = str(enemy_data.get("ailment", "")).to_lower()
-	if enemy_ailment == "charm" or enemy_ailment == "charmed":
-		print("[CaptureMinigame] Enemy is CHARMED - boosting hit chance to 90%%!")
-		return 90.0  # Charmed enemies are much easier to catch
-
-	var base_chance = 50.0
-	match bind_type:
-		"basic": base_chance = 50.0
-		"standard": base_chance = 60.0
-		"advanced": base_chance = 70.0
-
-	# Modifiers
-	var focus_diff = party_member_data.get("FOC", 1) - enemy_data.get("TPO", 1)
-	base_chance += focus_diff * 10.0
-
-	# HP modifier
-	var enemy_hp_percent = float(enemy_data.get("hp", 1)) / float(enemy_data.get("hp_max", 1))
-	if enemy_hp_percent <= 0.1:
-		base_chance += 30.0
-
-	# Clamp
-	base_chance = clampf(base_chance, 5.0, 95.0)
-
-	return base_chance
-
-func _start_bind_phase() -> void:
-	"""Phase 2: Grab and drag bind points to wrap enemy"""
-	current_phase = Phase.BIND
-	phase_label.text = "Phase: BIND"
-	bind_result_label.text = "%d binds landed!" % landed_binds.size()
-
-	# Calculate breaks needed
-	_calculate_breaks_needed()
-
-	print("[CaptureMinigame] Enemy: %s requires %d breaks" % [enemy_data.get("display_name", ""), breaks_needed])
-
-	# Set break timer based on break rating (seconds)
-	break_timer = float(break_rating) * 2.0  # 2 seconds per break rating point
-
-	# Check if enemy is charmed - they break free 50% slower (more time for player)!
-	var enemy_ailment = str(enemy_data.get("ailment", "")).to_lower()
-	if enemy_ailment == "charm" or enemy_ailment == "charmed":
-		var original_time = break_timer
-		break_timer *= 1.5  # Charmed enemies take 50% longer to break free
-		print("[CaptureMinigame] Enemy is CHARMED - 50%% slower break! (%.1fs -> %.1fs)" % [original_time, break_timer])
-
-	# Start with clockwise direction
-	current_wrap_direction = WrapDirection.CLOCKWISE
-	wraps_in_current_break = 0
-	breaks_completed = 0
-
-	# Configure button prompt difficulty based on break rating (enemy difficulty)
-	# Higher break rating = tougher enemy = more frequent prompts and shorter window
-	var difficulty_scale = break_rating / 6.0  # Normalize to 0-1+ range (6 is average)
-	prompt_interval_min = max(1.5, 3.0 - (difficulty_scale * 1.0))  # 3.0s -> 1.5s
-	prompt_interval_max = max(3.0, 5.0 - (difficulty_scale * 1.5))  # 5.0s -> 3.0s
-	prompt_window = max(0.8, 1.5 - (difficulty_scale * 0.5))  # 1.5s -> 0.8s
-	print("[CaptureMinigame] Prompt difficulty - Min: %.1fs, Max: %.1fs, Window: %.1fs (BR: %d)" % [prompt_interval_min, prompt_interval_max, prompt_window, break_rating])
-
-	# Schedule first prompt
-	prompt_timer = randf_range(prompt_interval_min, prompt_interval_max)
-	prompt_active = false
-
-	_update_instruction_label()
-
-	break_progress_bar.visible = true
-	break_progress_bar.max_value = breaks_needed
-	break_progress_bar.value = 0
-	break_timer_bar.visible = true
-	break_timer_bar.max_value = break_timer
-	break_timer_bar.value = break_timer
-
-	# Hide toss phase elements
-	bind_result_label.visible = false
-
-	# Create bind arena
-	_setup_bind_arena()
-
-	# Spawn first bind point
-	_spawn_bind_point()
-
-func _update_instruction_label() -> void:
-	"""Update instruction label with current direction and progress"""
-	var direction_text = "CLOCKWISE →" if current_wrap_direction == WrapDirection.CLOCKWISE else "← COUNTERCLOCKWISE"
-	instruction_label.text = "Wrap %s! (%d/%d breaks)" % [direction_text, breaks_completed, breaks_needed]
-
-func _setup_bind_arena() -> void:
-	"""Create the visual arena for bind dragging"""
-	bind_arena = Control.new()
-	bind_arena.custom_minimum_size = Vector2(200, 200)
-	bind_arena.position = Vector2.ZERO
-	var arena_container = CenterContainer.new()
-	arena_container.add_child(bind_arena)
-	content_container.add_child(arena_container)
-
-	# Move enemy icon into arena
-	if enemy_icon.get_parent():
-		enemy_icon.get_parent().remove_child(enemy_icon)
-	bind_arena.add_child(enemy_icon)
-	enemy_icon.position = Vector2(50, 50)
-
-	# Add bind trail (Line2D to show wrapping)
-	bind_trail = Line2D.new()
-	bind_trail.width = 3.0
-	bind_trail.default_color = Color(0.2, 0.8, 1.0, 0.8)
-	bind_arena.add_child(bind_trail)
-
-	# Create prompt label (hidden initially)
-	prompt_label = Label.new()
-	prompt_label.text = "PRESS A!"
-	prompt_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	prompt_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	prompt_label.add_theme_font_size_override("font_size", 32)
-	prompt_label.add_theme_color_override("font_color", COLOR_BUBBLE_MAGENTA)  # Pink magenta for attention
-	prompt_label.position = Vector2(50, 150)  # Below arena
-	prompt_label.size = Vector2(100, 40)
-	prompt_label.visible = false
-	bind_arena.add_child(prompt_label)
-
-func _spawn_bind_point() -> void:
-	"""Spawn a new bind point at a random direction"""
-	# Pick random direction
-	current_bind_direction = randi() % 4 as BindDirection
-
-	# Create or reposition bind point
-	if bind_point == null:
-		bind_point = ColorRect.new()
-		bind_point.custom_minimum_size = Vector2(20, 20)
-		bind_point.color = Color(1.0, 1.0, 0.0, 1.0)  # Yellow
-		bind_arena.add_child(bind_point)
-
-	# Position based on direction (around 100x100 center)
-	var arena_center = Vector2(100, 100)
-	var offset_distance = 80.0
-
-	match current_bind_direction:
-		BindDirection.UP:
-			bind_point.position = arena_center + Vector2(-10, -offset_distance)
-		BindDirection.DOWN:
-			bind_point.position = arena_center + Vector2(-10, offset_distance - 20)
-		BindDirection.LEFT:
-			bind_point.position = arena_center + Vector2(-offset_distance, -10)
-		BindDirection.RIGHT:
-			bind_point.position = arena_center + Vector2(offset_distance - 20, -10)
-
-	bind_point.visible = true
-	bind_point_grabbed = false
-	wrap_progress = 0.0
-
-	print("[CaptureMinigame] Bind point spawned at: %s" % BindDirection.keys()[current_bind_direction])
+	# Fade in the overlay
+	overlay_panel.modulate.a = 0.0
 
 func _process(delta: float) -> void:
-	# Call parent to update status effect animations
 	super._process(delta)
 
-	# Update charm effect animation
-	if charm_effect_overlay and is_instance_valid(charm_effect_overlay):
-		charm_anim_time += delta
-		charm_effect_overlay.queue_redraw()
+	match current_phase:
+		Phase.FADE_IN:
+			_process_fade_in(delta)
+		Phase.ACTIVE:
+			_process_active(delta)
+		Phase.SHOWING_RESULT:
+			_process_showing_result(delta)
 
-	# Update sleep effect animation
-	if sleep_effect_overlay and is_instance_valid(sleep_effect_overlay):
-		sleep_anim_time += delta
-		sleep_effect_overlay.queue_redraw()
+func _process_fade_in(delta: float) -> void:
+	"""Fade in the visuals before starting"""
+	fade_timer += delta
+	var alpha = min(fade_timer / fade_duration, 1.0)
+	overlay_panel.modulate.a = alpha
 
-	# Stop all processing if minigame is complete
-	if minigame_complete:
+	circle_canvas.queue_redraw()
+
+	# After fade duration, start the active phase
+	if fade_timer >= fade_duration:
+		current_phase = Phase.ACTIVE
+		input_locked = false
+		print("[CaptureMinigame] Input unlocked - start spinning!")
+
+func _process_active(delta: float) -> void:
+	"""Player holds button and spins to fill the bar"""
+	if input_locked:
 		return
 
-	if current_phase != Phase.BIND:
-		return
+	# Check if player is holding the correct button
+	var holding_button = aInputManager.is_action_pressed(current_button_action)
 
-	# Update break timer
-	break_timer -= delta
-	break_timer_bar.value = break_timer
+	# Get joystick input
+	var input_vec = aInputManager.get_movement_vector()
+	var is_spinning = false
+	var correct_direction = false
 
-	if break_timer <= 0:
-		_finish_capture_failed()
-		return
+	if input_vec.length() > 0.5:
+		# Calculate angle from input
+		var current_angle = atan2(input_vec.y, input_vec.x)
 
-	# Handle button prompt system (only when dragging)
-	if bind_point_grabbed:
-		# Check for Accept button press (single-press detection)
-		var accept_pressed = aInputManager.is_action_pressed(aInputManager.ACTION_ACCEPT)
+		# Calculate rotation delta
+		var angle_diff = angle_difference(last_input_angle, current_angle)
 
-		if prompt_active:
-			# Prompt is showing - check if player pressed the button
-			prompt_timer -= delta
+		if abs(angle_diff) > rotation_threshold:
+			is_spinning = true
 
-			# Flash the prompt label
-			if int(prompt_timer * 4) % 2 == 0:
-				prompt_label.add_theme_color_override("font_color", Color(1.0, 0.2, 0.2, 1.0))
-			else:
-				prompt_label.add_theme_color_override("font_color", Color(1.0, 0.6, 0.2, 1.0))
+			# Check if spinning in correct direction
+			if current_direction == 1 and angle_diff > 0:
+				# Clockwise
+				correct_direction = true
+			elif current_direction == -1 and angle_diff < 0:
+				# Counter-clockwise
+				correct_direction = true
 
-			# Check if button was pressed (new press, not held)
-			if accept_pressed and not last_accept_state:
-				# Success! Hide prompt and schedule next one
-				print("[CaptureMinigame] Prompt succeeded!")
-				prompt_active = false
-				prompt_label.visible = false
-				prompt_timer = randf_range(prompt_interval_min, prompt_interval_max)
-			elif prompt_timer <= 0:
-				# Failed! Player didn't press in time
-				print("[CaptureMinigame] Prompt failed! Resetting wrap progress.")
-				prompt_active = false
-				prompt_label.visible = false
-				# Punishment: reset current wrap progress
-				wrap_progress = 0.0
-				bind_trail.clear_points()
-				bind_point.color = Color(1.0, 0.0, 0.0, 1.0)  # Flash red
-				# Schedule next prompt
-				prompt_timer = randf_range(prompt_interval_min, prompt_interval_max)
-		else:
-			# No prompt active - count down to next prompt
-			prompt_timer -= delta
-			if prompt_timer <= 0:
-				# Trigger prompt!
-				print("[CaptureMinigame] Button prompt triggered!")
-				prompt_active = true
-				prompt_label.visible = true
-				prompt_timer = prompt_window  # Player has this long to respond
+		last_input_angle = current_angle
 
-		last_accept_state = accept_pressed
+	# Fill or drain the progress bar
+	if holding_button and is_spinning and correct_direction:
+		# Correct input! Fill the bar
+		fill_progress += fill_speed * delta
+		change_progress += fill_speed * delta
 
-	# Check if player is trying to grab the bind point
-	if not bind_point_grabbed:
-		var grabbed = false
-		# Use InputManager for keyboard + controller support
-		match current_bind_direction:
-			BindDirection.UP:
-				if aInputManager.is_action_pressed(aInputManager.ACTION_MOVE_UP):
-					grabbed = true
-			BindDirection.DOWN:
-				if aInputManager.is_action_pressed(aInputManager.ACTION_MOVE_DOWN):
-					grabbed = true
-			BindDirection.LEFT:
-				if aInputManager.is_action_pressed(aInputManager.ACTION_MOVE_LEFT):
-					grabbed = true
-			BindDirection.RIGHT:
-				if aInputManager.is_action_pressed(aInputManager.ACTION_MOVE_RIGHT):
-					grabbed = true
+		# Check for periodic changes (at 33% and 66% of each fill)
+		if change_progress >= change_interval:
+			change_progress = 0.0
+			_trigger_random_change()
 
-		if grabbed:
-			bind_point_grabbed = true
-			bind_point.color = Color(0.0, 1.0, 0.0, 1.0)  # Green when grabbed
-			drag_start_angle = _get_direction_angle(current_bind_direction)
-			drag_current_angle = drag_start_angle
-			bind_trail.clear_points()
-			print("[CaptureMinigame] Bind point grabbed!")
 	else:
-		# Player is dragging - track circular motion
-		# Use InputManager for keyboard + controller support
-		var input_vec = aInputManager.get_movement_vector()
+		# Wrong input or no input - drain the bar
+		fill_progress -= decay_speed * delta
+		fill_progress = max(0.0, fill_progress)
 
-		if input_vec.length() > 0.5:
-			# Calculate angle from enemy center
-			var current_angle = atan2(input_vec.y, input_vec.x)
-			var angle_diff = angle_difference(drag_current_angle, current_angle)
+	# Check if filled
+	if fill_progress >= 1.0:
+		fills_completed += 1
+		fill_progress = 0.0
+		change_progress = 0.0
 
-			if abs(angle_diff) > 0.1:
-				# Check if wrapping in correct direction
-				var is_correct_direction = false
-				if current_wrap_direction == WrapDirection.CLOCKWISE and angle_diff > 0:
-					is_correct_direction = true
-				elif current_wrap_direction == WrapDirection.COUNTERCLOCKWISE and angle_diff < 0:
-					is_correct_direction = true
+		print("[CaptureMinigame] Fill complete! (%d/%d)" % [fills_completed, fills_needed])
 
-				if is_correct_direction:
-					wrap_progress += abs(angle_diff)
-					drag_current_angle = current_angle
+		# Update label
+		if fills_completed < fills_needed:
+			fills_label.text = "Fill %d/%d" % [fills_completed + 1, fills_needed]
+			# Randomize for next fill
+			_randomize_button()
+			_randomize_direction()
 
-					# Add point to trail
-					var arena_center = Vector2(100, 100)
-					var radius = 60.0
-					var trail_point = arena_center + Vector2(cos(current_angle), sin(current_angle)) * radius
-					bind_trail.add_point(trail_point)
+		# Check if all fills completed
+		if fills_completed >= fills_needed:
+			_finish_capture_success()
+			return
 
-					# Update bind point position
-					bind_point.position = trail_point - Vector2(10, 10)
+	# Redraw
+	circle_canvas.queue_redraw()
 
-					# Check if completed a full wrap (360 degrees)
-					if wrap_progress >= TAU:
-						wraps_in_current_break += 1
-						wrap_progress = 0.0
-						print("[CaptureMinigame] Wrap complete! (%d/%d for current break)" % [wraps_in_current_break, wraps_per_point])
+func _trigger_random_change() -> void:
+	"""Randomly change either button OR direction (not both)"""
+	if randf() > 0.5:
+		# Change button
+		var old_button = current_button
+		while current_button == old_button:
+			_randomize_button()
+		print("[CaptureMinigame] Button changed mid-fill!")
+	else:
+		# Change direction
+		current_direction *= -1
+		var direction_text = "CLOCKWISE" if current_direction == 1 else "COUNTER-CLOCKWISE"
+		print("[CaptureMinigame] Direction changed mid-fill to: %s" % direction_text)
 
-						# Check if completed enough wraps for one break
-						if wraps_in_current_break >= wraps_per_point:
-							breaks_completed += 1
-							wraps_in_current_break = 0
-							break_progress_bar.value = breaks_completed
-							_update_instruction_label()
-							print("[CaptureMinigame] BREAK! (%d/%d)" % [breaks_completed, breaks_needed])
+func _draw_capture_visual() -> void:
+	"""Draw the button icon, direction arrow, and progress circle"""
+	var canvas_size = circle_canvas.size
+	var center = canvas_size / 2.0
 
-							if breaks_completed >= breaks_needed:
-								_finish_capture_success()
-								return
-							else:
-								# Switch direction for next break
-								if current_wrap_direction == WrapDirection.CLOCKWISE:
-									current_wrap_direction = WrapDirection.COUNTERCLOCKWISE
-								else:
-									current_wrap_direction = WrapDirection.CLOCKWISE
-								_update_instruction_label()
-								# Spawn next bind point
-								_spawn_bind_point()
-						else:
-							# More wraps needed for this break
-							_spawn_bind_point()
-				else:
-					# Wrong direction! Flash red and reset wrap progress
-					bind_point.color = Color(1.0, 0.0, 0.0, 1.0)
-					wrap_progress = 0.0
-					bind_trail.clear_points()
-		else:
-			# Player let go - fail this wrap attempt
-			if bind_trail.get_point_count() > 5:
-				print("[CaptureMinigame] Released too early!")
-				_spawn_bind_point()  # Reset
+	# Get the controller icon layout
+	var icon_layout = get_node_or_null("/root/aControllerIconLayout")
+	if not icon_layout:
+		return
 
-func _get_direction_angle(direction: BindDirection) -> float:
-	"""Get starting angle for a direction"""
-	match direction:
-		BindDirection.UP: return -PI / 2.0
-		BindDirection.DOWN: return PI / 2.0
-		BindDirection.LEFT: return PI
-		BindDirection.RIGHT: return 0.0
-	return 0.0
+	# Draw outer circle (empty)
+	var outer_radius = 100.0
+	_draw_circle_outline(center, outer_radius, Color(0.5, 0.5, 0.5, 0.5), 3.0)
+
+	# Draw progress fill (colored arc)
+	if fill_progress > 0.0:
+		_draw_progress_arc(center, outer_radius, fill_progress, COLOR_BUBBLE_MAGENTA)
+
+	# Draw the button icon in the center
+	var icon_texture = icon_layout.get_button_icon(current_button_action)
+	if icon_texture:
+		var icon_size = Vector2(80, 80)
+		var icon_pos = center - icon_size / 2.0
+		var icon_rect = Rect2(icon_pos, icon_size)
+		circle_canvas.draw_texture_rect(icon_texture, icon_rect, false, Color.WHITE)
+
+	# Draw direction arrow below button
+	var arrow_y = center.y + 60
+	_draw_direction_arrow(center.x, arrow_y, current_direction)
+
+func _draw_circle_outline(center: Vector2, radius: float, color: Color, width: float) -> void:
+	"""Helper to draw a circle outline"""
+	var points = 64
+	for i in range(points):
+		var angle_from = (float(i) / points) * TAU
+		var angle_to = (float(i + 1) / points) * TAU
+		var point_from = center + Vector2(cos(angle_from), sin(angle_from)) * radius
+		var point_to = center + Vector2(cos(angle_to), sin(angle_to)) * radius
+		circle_canvas.draw_line(point_from, point_to, color, width)
+
+func _draw_progress_arc(center: Vector2, radius: float, progress: float, color: Color) -> void:
+	"""Draw a filled arc showing progress (0.0 to 1.0)"""
+	var points = 64
+	var filled_points = int(points * progress)
+
+	for i in range(filled_points):
+		var angle_from = (float(i) / points) * TAU - (PI / 2.0)  # Start at top
+		var angle_to = (float(i + 1) / points) * TAU - (PI / 2.0)
+
+		# Draw thick line for progress arc
+		var point_from = center + Vector2(cos(angle_from), sin(angle_from)) * radius
+		var point_to = center + Vector2(cos(angle_to), sin(angle_to)) * radius
+		circle_canvas.draw_line(point_from, point_to, color, 6.0)
+
+func _draw_direction_arrow(x: float, y: float, direction: int) -> void:
+	"""Draw an arrow pointing left (counter-clockwise) or right (clockwise)"""
+	var arrow_size = 30.0
+	var arrow_color = COLOR_MILK_WHITE
+
+	if direction == 1:
+		# Clockwise - arrow pointing RIGHT
+		var tip = Vector2(x + arrow_size, y)
+		var back_top = Vector2(x - arrow_size / 2, y - arrow_size / 2)
+		var back_bottom = Vector2(x - arrow_size / 2, y + arrow_size / 2)
+
+		var points = PackedVector2Array([tip, back_top, back_bottom])
+		circle_canvas.draw_colored_polygon(points, arrow_color)
+	else:
+		# Counter-clockwise - arrow pointing LEFT
+		var tip = Vector2(x - arrow_size, y)
+		var back_top = Vector2(x + arrow_size / 2, y - arrow_size / 2)
+		var back_bottom = Vector2(x + arrow_size / 2, y + arrow_size / 2)
+
+		var points = PackedVector2Array([tip, back_top, back_bottom])
+		circle_canvas.draw_colored_polygon(points, arrow_color)
 
 func _finish_capture_success() -> void:
-	print("[CaptureMinigame] Capture successful! Completed all breaks.")
+	print("[CaptureMinigame] Capture successful! Completed all fills.")
 
-	# Lock out all input immediately
-	minigame_complete = true
-	current_phase = Phase.COMPLETE
+	input_locked = true
+	current_phase = Phase.SHOWING_RESULT
+	capture_success = true
+	result_text = "GREAT!"
 
-	title_label.text = "GREAT!"
-	phase_label.text = "Success!"
-	instruction_label.text = "Break rating reduced to 0!"
+	# Show result
+	result_label.text = result_text
+	result_label.modulate.a = 1.0
 
 	await get_tree().create_timer(1.5).timeout
-
-	# Calculate how much break rating we reduced
-	var current_break_rating = enemy_data.get("break_rating", 6)
-	var break_rating_reduced = current_break_rating  # Reduced all of it!
 
 	var result = {
 		"success": true,
 		"grade": "capture",
-		"break_rating_reduced": break_rating_reduced,
-		"wraps_completed": breaks_completed * wraps_per_point,  # Total wraps
+		"break_rating_reduced": break_rating,  # Reduced all of it!
 		"damage_modifier": 1.0,
 		"is_crit": false,
-		"mp_modifier": 1.0,
-		"tier_downgrade": 0,
-		"focus_level": 0
+		"mp_modifier": 1.0
 	}
 
+	minigame_completed.emit()
 	_complete_minigame(result)
 
 func _finish_capture_failed() -> void:
-	print("[CaptureMinigame] Capture failed! Breaks completed: %d/%d" % [breaks_completed, breaks_needed])
+	print("[CaptureMinigame] Capture failed!")
 
-	# Lock out all input immediately
-	minigame_complete = true
-	current_phase = Phase.COMPLETE
+	input_locked = true
+	current_phase = Phase.SHOWING_RESULT
+	capture_success = false
+	result_text = "FAILED"
 
-	# Break rating reduction is the number of breaks completed
-	var break_rating_reduced = breaks_completed
-
-	title_label.text = "OK"
-	phase_label.text = "Failed"
-	if break_rating_reduced > 0:
-		instruction_label.text = "Made progress! -%d break rating" % break_rating_reduced
-	else:
-		instruction_label.text = "Enemy broke free!"
+	# Show result
+	result_label.text = result_text
+	result_label.modulate.a = 1.0
 
 	await get_tree().create_timer(1.5).timeout
 
-	var total_wraps = (breaks_completed * wraps_per_point) + wraps_in_current_break
+	# Calculate partial progress
+	var partial_fills = fills_completed + fill_progress
+	var total_fills = fills_needed
+	var break_rating_reduced = int((partial_fills / total_fills) * break_rating)
 
 	var result = {
 		"success": false,
 		"grade": "failed",
 		"break_rating_reduced": break_rating_reduced,
-		"wraps_completed": total_wraps,
 		"damage_modifier": 1.0,
 		"is_crit": false,
-		"mp_modifier": 1.0,
-		"tier_downgrade": 0,
-		"focus_level": 0
+		"mp_modifier": 1.0
 	}
 
+	minigame_completed.emit()
 	_complete_minigame(result)
+
+func _process_showing_result(delta: float) -> void:
+	"""Just wait for the result to be shown"""
+	pass
+
+func _timeout() -> void:
+	"""Called when time runs out"""
+	if current_phase == Phase.ACTIVE:
+		_finish_capture_failed()
