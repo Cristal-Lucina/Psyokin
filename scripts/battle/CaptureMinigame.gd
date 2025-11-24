@@ -424,8 +424,14 @@ func _draw_capture_visual() -> void:
 		var rotation_rect = Rect2(rotation_pos, rotation_size)
 
 		# Flip horizontally for clockwise direction
-		var flip_h = (current_direction == 1)  # Clockwise = flip horizontal
-		circle_canvas.draw_texture_rect(rotation_icon, rotation_rect, false, Color.WHITE, false, flip_h)
+		if current_direction == 1:  # Clockwise - flip horizontal
+			# Use transform to flip horizontally
+			circle_canvas.draw_set_transform(Vector2(rotation_rect.position.x + rotation_rect.size.x, rotation_rect.position.y), 0, Vector2(-1, 1))
+			var flipped_rect = Rect2(Vector2(0, 0), rotation_size)
+			circle_canvas.draw_texture_rect(rotation_icon, flipped_rect, false, Color.WHITE)
+			circle_canvas.draw_set_transform(Vector2.ZERO, 0, Vector2.ONE)  # Reset transform
+		else:  # Counter-clockwise - draw normally
+			circle_canvas.draw_texture_rect(rotation_icon, rotation_rect, false, Color.WHITE)
 
 	# Draw outer circle (empty)
 	var outer_radius = 100.0
