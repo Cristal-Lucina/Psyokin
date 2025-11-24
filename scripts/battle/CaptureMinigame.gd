@@ -25,8 +25,8 @@ var fills_completed: int = 0
 
 ## Progress tracking
 var fill_progress: float = 0.0  # 0.0 to 1.0 (one complete fill)
-var fill_speed: float = 0.5  # How fast the bar fills per second (doubled from 0.25)
-var decay_speed: float = 0.1  # How fast the bar drains when not inputting (reduced from 0.15)
+var fill_speed: float = 0.8  # How fast the bar fills per second (increased for easier gameplay)
+var decay_speed: float = 0.08  # How fast the bar drains when not inputting (reduced for easier gameplay)
 
 ## Button and direction requirements
 const CAPTURE_BUTTONS = ["A", "B", "X", "Y"]
@@ -61,6 +61,9 @@ var result_label: Label
 var fade_timer: float = 0.0
 var fade_duration: float = 0.5
 var rotation_icon: Texture2D  # The rotate-left icon
+var timer_bar: ProgressBar  # 3-second timer bar under the circle
+var timer_progress: float = 0.0  # 0.0 to 3.0 seconds
+const TIMER_DURATION: float = 3.0  # 3 second timer
 
 ## Input locked during fade in/out
 var input_locked: bool = true
@@ -71,6 +74,7 @@ var result_text: String = "FAILED"
 
 ## Visual feedback
 var is_button_pressed: bool = false
+var pulse_timer: float = 0.0  # Timer for pulsing glow effect
 
 # Core vibe color constants
 const COLOR_MILK_WHITE = Color(0.96, 0.97, 0.98)
@@ -103,7 +107,7 @@ func _setup_transparent_visuals() -> void:
 	overlay_panel = PanelContainer.new()
 	overlay_panel.custom_minimum_size = get_viewport_rect().size * 0.25
 	var viewport_size = get_viewport_rect().size
-	overlay_panel.position = Vector2(viewport_size.x * 0.375, viewport_size.y * 0.25 - 99)  # Centered, moved up 99px
+	overlay_panel.position = Vector2(viewport_size.x * 0.375 + 1, viewport_size.y * 0.25 - 100)  # Centered, moved up 100px and right 1px
 	overlay_panel.z_index = 101
 
 	# Make panel transparent
@@ -170,6 +174,35 @@ func _setup_minigame() -> void:
 	circle_canvas.custom_minimum_size = Vector2(250, 250)
 	circle_canvas.draw.connect(_draw_capture_visual)
 	center_container.add_child(circle_canvas)
+
+	# Create timer bar below the circle
+	var timer_container = CenterContainer.new()
+	content_container.add_child(timer_container)
+
+	timer_bar = ProgressBar.new()
+	timer_bar.custom_minimum_size = Vector2(200, 20)
+	timer_bar.max_value = TIMER_DURATION
+	timer_bar.value = 0.0
+	timer_bar.show_percentage = false
+
+	# Style the timer bar
+	var timer_style_bg = StyleBoxFlat.new()
+	timer_style_bg.bg_color = Color(0.2, 0.2, 0.2, 0.8)
+	timer_style_bg.corner_radius_top_left = 4
+	timer_style_bg.corner_radius_top_right = 4
+	timer_style_bg.corner_radius_bottom_left = 4
+	timer_style_bg.corner_radius_bottom_right = 4
+	timer_bar.add_theme_stylebox_override("background", timer_style_bg)
+
+	var timer_style_fill = StyleBoxFlat.new()
+	timer_style_fill.bg_color = COLOR_BUBBLE_MAGENTA
+	timer_style_fill.corner_radius_top_left = 4
+	timer_style_fill.corner_radius_top_right = 4
+	timer_style_fill.corner_radius_bottom_left = 4
+	timer_style_fill.corner_radius_bottom_right = 4
+	timer_bar.add_theme_stylebox_override("fill", timer_style_fill)
+
+	timer_container.add_child(timer_bar)
 
 	# Pick random starting button (this sets current_button_icon_name)
 	_randomize_button()
@@ -292,6 +325,8 @@ func _start_minigame() -> void:
 	fade_timer = 0.0
 	input_locked = true
 	has_initial_angle = false  # Reset rotation tracking
+	timer_progress = 0.0  # Reset timer
+	pulse_timer = 0.0  # Reset pulse
 
 	# Fade in the overlay
 	overlay_panel.modulate.a = 0.0
@@ -325,6 +360,18 @@ func _process_active(delta: float) -> void:
 	"""Player holds button and spins to fill the bar"""
 	if input_locked:
 		return
+
+	# Update pulse timer for glow effect
+	pulse_timer += delta
+
+	# Update timer bar
+	timer_progress += delta
+	if timer_bar:
+		timer_bar.value = timer_progress
+		# Check if timer expired
+		if timer_progress >= TIMER_DURATION:
+			_finish_capture_failed()
+			return
 
 	# Check if player is holding the correct button
 	var holding_button = aInputManager.is_action_pressed(current_button_action)
@@ -446,11 +493,11 @@ func _draw_capture_visual() -> void:
 	var center = canvas_size / 2.0
 	var circle_center = center  # Centered at canvas center
 
-	# Draw rotation icon behind everything (200x200, bottom centered at circle center, moved down 94px and right 2px)
+	# Draw rotation icon behind everything (200x200, bottom centered at circle center, moved down 95px and right 1px)
 	if rotation_icon:
 		var rotation_size = Vector2(200, 200)
-		# Position so bottom of icon is at circle center, moved down 94px and right 2px (adjusted to keep icon in place while other UI moved up)
-		var rotation_pos = Vector2(circle_center.x - rotation_size.x / 2.0 + 2, circle_center.y - rotation_size.y + 94)
+		# Position so bottom of icon is at circle center, moved down 95px and right 1px (adjusted to keep icon in place while other UI moved)
+		var rotation_pos = Vector2(circle_center.x - rotation_size.x / 2.0 + 1, circle_center.y - rotation_size.y + 95)
 		var rotation_rect = Rect2(rotation_pos, rotation_size)
 
 		# Flip horizontally for clockwise direction
@@ -475,10 +522,14 @@ func _draw_capture_visual() -> void:
 	var icon_bg_radius = 50.0
 	circle_canvas.draw_circle(circle_center, icon_bg_radius, Color(0.1, 0.1, 0.15, 0.8))
 
-	# Draw blue glow when button is pressed
+	# Draw blue glow when button is pressed (with pulsing effect)
 	if is_button_pressed:
-		var glow_color = Color(0.2, 0.5, 1.0, 0.8)  # Blue glow
-		_draw_circle_outline(circle_center, icon_bg_radius + 5, glow_color, 8.0)  # Outer glow
+		# Calculate pulse using sine wave (oscillates between 0.5 and 1.0)
+		var pulse = 0.5 + 0.5 * sin(pulse_timer * 5.0)  # 5.0 controls pulse speed
+		var glow_alpha = 0.5 + 0.3 * pulse  # Alpha oscillates between 0.5 and 0.8
+		var glow_width = 6.0 + 4.0 * pulse  # Width oscillates between 6.0 and 10.0
+		var glow_color = Color(0.2, 0.5, 1.0, glow_alpha)  # Blue glow with pulsing alpha
+		_draw_circle_outline(circle_center, icon_bg_radius + 5, glow_color, glow_width)  # Outer glow
 		_draw_circle_outline(circle_center, icon_bg_radius, glow_color, 4.0)  # Inner glow
 	else:
 		_draw_circle_outline(circle_center, icon_bg_radius, COLOR_MILK_WHITE, 3.0)
