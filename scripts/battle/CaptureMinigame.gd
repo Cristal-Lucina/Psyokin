@@ -25,8 +25,8 @@ var fills_completed: int = 0
 
 ## Progress tracking
 var fill_progress: float = 0.0  # 0.0 to 1.0 (one complete fill)
-var fill_speed: float = 0.25  # How fast the bar fills per second
-var decay_speed: float = 0.15  # How fast the bar drains when not inputting
+var fill_speed: float = 0.5  # How fast the bar fills per second (doubled from 0.25)
+var decay_speed: float = 0.1  # How fast the bar drains when not inputting (reduced from 0.15)
 
 ## Button and direction requirements
 const CAPTURE_BUTTONS = ["A", "B", "X", "Y"]
@@ -42,8 +42,8 @@ var current_direction: int = 1  # 1 = clockwise, -1 = counter-clockwise
 
 ## Joystick rotation tracking
 var last_input_angle: float = 0.0
-var accumulated_rotation: float = 0.0  # Track rotation progress
-var rotation_threshold: float = 0.1  # Minimum rotation to count (reduced from 0.3)
+var accumulated_rotation: float = 0.0  # Track total rotation
+var rotation_threshold: float = 0.05  # Very low threshold (was 0.1)
 var has_initial_angle: bool = false  # Track if we've set the initial angle
 
 ## Change tracking (periodic button/direction changes)
@@ -301,7 +301,7 @@ func _process_active(delta: float) -> void:
 	var is_spinning = false
 	var correct_direction = false
 
-	if input_vec.length() > 0.3:  # Lowered threshold from 0.5 to 0.3
+	if input_vec.length() > 0.2:  # Lowered threshold from 0.3 to 0.2
 		# Calculate angle from input
 		var current_angle = atan2(input_vec.y, input_vec.x)
 
@@ -314,8 +314,8 @@ func _process_active(delta: float) -> void:
 			# Calculate rotation delta
 			var angle_diff = angle_difference(last_input_angle, current_angle)
 
-			# Debug output every 10 frames
-			if Engine.get_frames_drawn() % 10 == 0 and abs(angle_diff) > 0.01:
+			# Debug output every 30 frames (less spam)
+			if Engine.get_frames_drawn() % 30 == 0 and abs(angle_diff) > 0.01:
 				print("[CaptureMinigame] Rotation - angle_diff: %.2f, threshold: %.2f, direction: %s" % [angle_diff, rotation_threshold, "CW" if current_direction == 1 else "CCW"])
 
 			if abs(angle_diff) > rotation_threshold:
@@ -325,11 +325,13 @@ func _process_active(delta: float) -> void:
 				if current_direction == 1 and angle_diff > 0:
 					# Clockwise (positive rotation)
 					correct_direction = true
-					print("[CaptureMinigame] Clockwise spin detected!")
+					if Engine.get_frames_drawn() % 30 == 0:
+						print("[CaptureMinigame] Clockwise spin detected!")
 				elif current_direction == -1 and angle_diff < 0:
 					# Counter-clockwise (negative rotation)
 					correct_direction = true
-					print("[CaptureMinigame] Counter-clockwise spin detected!")
+					if Engine.get_frames_drawn() % 30 == 0:
+						print("[CaptureMinigame] Counter-clockwise spin detected!")
 
 			last_input_angle = current_angle
 
