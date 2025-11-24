@@ -5344,6 +5344,63 @@ func _execute_enemy_ai() -> void:
 
 		print("[Battle] Defense minigame result - Modifier: %.1f%%, Counter: %.1f" % [defense_modifier * 100, counter_damage])
 
+		# SUCCESSFUL PARRY - Play counter-attack animations
+		if counter_damage > 0:
+			print("[Battle] PARRY SUCCESS! Playing counter-attack animations")
+
+			if sprite_animator:
+				# Defender (player) does attack animation
+				var defender_weapon_type = "Neutral"
+				if target.has("profile"):
+					var profile = target.profile
+					if profile != null and profile.has("weapon") and profile.weapon.has("type"):
+						defender_weapon_type = profile.get("weapon", {}).get("type", "Neutral")
+
+				# Map weapon type to animation name
+				var attack_anim = "Idle"
+				match defender_weapon_type.to_lower():
+					"wand":
+						attack_anim = "Wand Strike"
+					"sword":
+						attack_anim = "Sword Strike"
+					"hammer", "impact":
+						attack_anim = "Hammer Strike"
+					"spear", "pierce":
+						attack_anim = "Spear Strike"
+					_:
+						attack_anim = "Wand Strike"  # Default
+
+				# Allies face RIGHT, enemies face LEFT
+				var defender_direction = "RIGHT" if target.get("is_ally", false) else "LEFT"
+				sprite_animator.play_animation(target.id, attack_anim, defender_direction, false, true)
+				print("[Battle] Playing defender counter animation: %s %s" % [attack_anim, defender_direction])
+
+				await get_tree().create_timer(0.6).timeout
+
+				# Show hurt reaction on attacker (frame 178)
+				if sprite_animator.sprite_instances.has(current_combatant.id):
+					var attacker_instance = sprite_animator.sprite_instances[current_combatant.id]
+					var is_layered = attacker_instance.get("is_layered", false)
+
+					# Set frame 178 manually
+					if is_layered:
+						var layer_sprites = attacker_instance.get("layer_sprites", {})
+						for sprite_code in layer_sprites:
+							var sprite = layer_sprites[sprite_code]
+							if sprite and sprite.visible and sprite.texture:
+								sprite.frame = 178
+					else:
+						var attacker_sprite = attacker_instance["sprite"]
+						attacker_sprite.frame = 178
+
+					print("[Battle] Playing attacker hurt reaction (frame 178)")
+					await get_tree().create_timer(0.6).timeout
+
+					# Return attacker to idle if not KO'd
+					if current_combatant.hp > 0:
+						var attacker_direction = "RIGHT" if current_combatant.get("is_ally", false) else "LEFT"
+						sprite_animator.play_animation(current_combatant.id, "Idle", attacker_direction, false, false)
+
 		# First, check if the attack hits
 		var hit_check = combat_resolver.check_physical_hit(current_combatant, target)
 
