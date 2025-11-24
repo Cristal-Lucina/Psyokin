@@ -157,22 +157,19 @@ func _setup_minigame() -> void:
 	circle_canvas.draw.connect(_draw_filling_circle)
 	center_container.add_child(circle_canvas)
 
-	# Button sequence display (centered above circle)
+	# Button sequence display (positioned independently, moved down 70px)
 	sequence_container = HBoxContainer.new()
 	sequence_container.add_theme_constant_override("separation", 10)
-	sequence_container.z_index = 1000  # Ensure icons appear on top
 	var sequence_center = CenterContainer.new()
-	sequence_center.z_index = 1000  # Ensure container appears on top
 	sequence_center.add_child(sequence_container)
 
-	# Add margin to move buttons down 70px
-	var sequence_margin = MarginContainer.new()
-	sequence_margin.add_theme_constant_override("margin_top", 70)
-	sequence_margin.add_child(sequence_center)
+	# Position manually with offset instead of using layout flow
+	sequence_center.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	sequence_center.offset_top = 70  # Move down 70px
+	sequence_center.z_index = 1000  # Ensure appears on top
 
-	# Add sequence before the circle (so it appears above)
-	content_container.add_child(sequence_margin)
-	content_container.move_child(sequence_margin, 0)  # Move to top
+	# Add directly to overlay_panel (not content_container) to avoid layout interference
+	overlay_panel.add_child(sequence_center)
 
 	# Create ONLY 3 button slots that will be reused for all tiers
 	# Start with Tier 1 buttons, then replace with Tier 2, then Tier 3
