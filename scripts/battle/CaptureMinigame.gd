@@ -60,6 +60,7 @@ var button_prompt_label: Label  # Shows "HOLD A" or "HOLD B" etc
 var result_label: Label
 var fade_timer: float = 0.0
 var fade_duration: float = 0.5
+var rotation_icon: Texture2D  # The rotate-left icon
 
 ## Input locked during fade in/out
 var input_locked: bool = true
@@ -127,6 +128,9 @@ func _setup_minigame() -> void:
 
 	# Set total duration based on fills needed
 	current_duration = base_duration * fills_needed
+
+	# Load rotation icon
+	rotation_icon = load("res://assets/graphics/icons/UI/Controller_Icons/special_buttons/rotate-left-icon.png")
 
 	# Clear the default content container
 	for child in content_container.get_children():
@@ -403,7 +407,7 @@ func _trigger_random_change() -> void:
 		print("[CaptureMinigame] Direction changed mid-fill to: %s" % direction_text)
 
 func _draw_capture_visual() -> void:
-	"""Draw the button icon, direction arrow, and progress circle"""
+	"""Draw the rotation icon, button icon, and progress circle"""
 	var canvas_size = circle_canvas.size
 	var center = canvas_size / 2.0
 
@@ -411,6 +415,17 @@ func _draw_capture_visual() -> void:
 	var icon_layout = get_node_or_null("/root/aControllerIconLayout")
 	if not icon_layout:
 		return
+
+	# Draw rotation icon behind everything (150x150, bottom centered at canvas center)
+	if rotation_icon:
+		var rotation_size = Vector2(150, 150)
+		# Position so bottom of icon is at center of canvas
+		var rotation_pos = Vector2(center.x - rotation_size.x / 2.0, center.y - rotation_size.y)
+		var rotation_rect = Rect2(rotation_pos, rotation_size)
+
+		# Flip horizontally for clockwise direction
+		var flip_h = (current_direction == 1)  # Clockwise = flip horizontal
+		circle_canvas.draw_texture_rect(rotation_icon, rotation_rect, false, Color.WHITE, false, flip_h)
 
 	# Draw outer circle (empty)
 	var outer_radius = 100.0
@@ -432,10 +447,6 @@ func _draw_capture_visual() -> void:
 		var icon_pos = center - icon_size / 2.0
 		var icon_rect = Rect2(icon_pos, icon_size)
 		circle_canvas.draw_texture_rect(icon_texture, icon_rect, false, Color.WHITE)
-
-	# Draw direction arrow below button
-	var arrow_y = center.y + 70
-	_draw_direction_arrow(center.x, arrow_y, current_direction)
 
 func _draw_circle_outline(center: Vector2, radius: float, color: Color, width: float) -> void:
 	"""Helper to draw a circle outline"""
@@ -461,27 +472,6 @@ func _draw_progress_arc(center: Vector2, radius: float, progress: float, color: 
 		var point_to = center + Vector2(cos(angle_to), sin(angle_to)) * radius
 		circle_canvas.draw_line(point_from, point_to, color, 6.0)
 
-func _draw_direction_arrow(x: float, y: float, direction: int) -> void:
-	"""Draw an arrow pointing left (counter-clockwise) or right (clockwise)"""
-	var arrow_size = 30.0
-	var arrow_color = COLOR_MILK_WHITE
-
-	if direction == 1:
-		# Clockwise - arrow pointing RIGHT
-		var tip = Vector2(x + arrow_size, y)
-		var back_top = Vector2(x - arrow_size / 2, y - arrow_size / 2)
-		var back_bottom = Vector2(x - arrow_size / 2, y + arrow_size / 2)
-
-		var points = PackedVector2Array([tip, back_top, back_bottom])
-		circle_canvas.draw_colored_polygon(points, arrow_color)
-	else:
-		# Counter-clockwise - arrow pointing LEFT
-		var tip = Vector2(x - arrow_size, y)
-		var back_top = Vector2(x + arrow_size / 2, y - arrow_size / 2)
-		var back_bottom = Vector2(x + arrow_size / 2, y + arrow_size / 2)
-
-		var points = PackedVector2Array([tip, back_top, back_bottom])
-		circle_canvas.draw_colored_polygon(points, arrow_color)
 
 func _finish_capture_success() -> void:
 	print("[CaptureMinigame] Capture successful! Completed all fills.")
