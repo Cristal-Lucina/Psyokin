@@ -51,6 +51,10 @@ var has_initial_angle: bool = false  # Track if we've set the initial angle
 ## Change tracking (random changes with increasing probability over time)
 var time_since_last_change: float = 0.0  # Time elapsed since last button/direction change
 var last_change_check: float = 0.0  # Time of last probability check
+var change_has_happened: bool = false  # Track if the single change has occurred (for low HP)
+
+## Enemy HP-based difficulty scaling
+var enemy_hp_percent: float = 1.0  # Current HP as percentage (0.0-1.0)
 
 ## Visual elements
 var button_icon: TextureRect  # The current button icon
@@ -62,9 +66,9 @@ var result_label: Label
 var fade_timer: float = 0.0
 var fade_duration: float = 0.5
 var rotation_icon: Texture2D  # The rotate-left icon
-var timer_bar: ProgressBar  # 3-second timer bar under the circle
-var timer_progress: float = 0.0  # 0.0 to 3.0 seconds
-const TIMER_DURATION: float = 3.0  # 3 second timer
+var timer_bar: ProgressBar  # Timer bar under the circle
+var timer_progress: float = 0.0  # Current timer progress
+var timer_duration: float = 3.0  # Timer duration (adjusted based on enemy HP)
 
 ## Input locked during fade in/out
 var input_locked: bool = true
@@ -186,7 +190,7 @@ func _setup_minigame() -> void:
 
 	timer_bar = ProgressBar.new()
 	timer_bar.custom_minimum_size = Vector2(200, 20)
-	timer_bar.max_value = TIMER_DURATION
+	timer_bar.max_value = timer_duration
 	timer_bar.value = 0.0
 	timer_bar.show_percentage = false
 
@@ -248,7 +252,7 @@ func _setup_minigame() -> void:
 
 func _calculate_difficulty() -> void:
 	"""Calculate difficulty from enemy data"""
-	var enemy_hp_percent = float(enemy_data.get("hp", 1)) / float(enemy_data.get("hp_max", 1))
+	enemy_hp_percent = float(enemy_data.get("hp", 1)) / float(enemy_data.get("hp_max", 1))
 	var base_rating = enemy_data.get("level", 1)
 
 	if enemy_hp_percent <= 0.1:
@@ -274,6 +278,20 @@ func _calculate_difficulty() -> void:
 		fills_needed = 3
 	else:
 		fills_needed = 4
+
+	# Adjust timer duration based on enemy HP
+	if enemy_hp_percent <= 0.15:
+		# Below 15% HP: 6 second timer, single change at 3 seconds
+		timer_duration = 6.0
+		print("[CaptureMinigame] Enemy below 15%% HP - 6 second timer, change at 3s")
+	elif enemy_hp_percent <= 0.5:
+		# Below 50% HP: 4 second timer, single change every 2 seconds
+		timer_duration = 4.0
+		print("[CaptureMinigame] Enemy below 50%% HP - 4 second timer, change every 2s")
+	else:
+		# Above 50% HP: 3 second timer, random changes
+		timer_duration = 3.0
+		print("[CaptureMinigame] Enemy above 50%% HP - 3 second timer, random changes")
 
 	print("[CaptureMinigame] Break rating: %d, fills needed: %d (HP: %.1f%%)" % [break_rating, fills_needed, enemy_hp_percent * 100])
 
@@ -344,6 +362,7 @@ func _start_minigame() -> void:
 	fills_completed = 0
 	time_since_last_change = 0.0
 	last_change_check = 0.0
+	change_has_happened = false  # Reset change flag
 	fade_timer = 0.0
 	input_locked = true
 	has_initial_angle = false  # Reset rotation tracking
@@ -391,7 +410,7 @@ func _process_active(delta: float) -> void:
 	if timer_bar:
 		timer_bar.value = timer_progress
 		# Check if timer expired
-		if timer_progress >= TIMER_DURATION:
+		if timer_progress >= timer_duration:
 			_finish_capture_failed()
 			return
 
@@ -447,17 +466,34 @@ func _process_active(delta: float) -> void:
 	# Update time since last change
 	time_since_last_change += delta
 
-	# Check for random change every 0.1 seconds
-	if time_since_last_change - last_change_check >= 0.1:
-		last_change_check = time_since_last_change
-		var change_chance = _calculate_change_probability(time_since_last_change)
-		var roll = randf()
+	# HP-based change logic
+	if enemy_hp_percent <= 0.15:
+		# Below 15% HP: Single change at 3 seconds only
+		if time_since_last_change >= 3.0 and not change_has_happened:
+			print("[CaptureMinigame] Low HP change (once at 3s)!")
+			_trigger_direction_change_only()  # Only change direction, not button
+			change_has_happened = true
 
-		if roll < change_chance:
-			print("[CaptureMinigame] Random change triggered! Time: %.2fs, Chance: %.1f%%, Roll: %.3f" % [time_since_last_change, change_chance * 100, roll])
-			_trigger_random_change()
+	elif enemy_hp_percent <= 0.5:
+		# Below 50% HP: Change every 2 seconds (deterministic)
+		if time_since_last_change >= 2.0:
+			print("[CaptureMinigame] Medium HP change (every 2s)!")
+			_trigger_direction_change_only()  # Only change direction, not button
 			time_since_last_change = 0.0
 			last_change_check = 0.0
+
+	else:
+		# Above 50% HP: Random changes with increasing probability
+		if time_since_last_change - last_change_check >= 0.1:
+			last_change_check = time_since_last_change
+			var change_chance = _calculate_change_probability(time_since_last_change)
+			var roll = randf()
+
+			if roll < change_chance:
+				print("[CaptureMinigame] Random change triggered! Time: %.2fs, Chance: %.1f%%, Roll: %.3f" % [time_since_last_change, change_chance * 100, roll])
+				_trigger_random_change()
+				time_since_last_change = 0.0
+				last_change_check = 0.0
 
 	# Fill or drain the progress bar
 	if holding_button and is_spinning and correct_direction:
@@ -489,6 +525,7 @@ func _process_active(delta: float) -> void:
 		fill_progress = 0.0
 		time_since_last_change = 0.0  # Reset timer for next fill
 		last_change_check = 0.0
+		change_has_happened = false  # Reset change flag for next fill
 		has_initial_angle = false  # Reset rotation tracking for next fill
 
 		print("[CaptureMinigame] Fill complete! (%d/%d)" % [fills_completed, fills_needed])
@@ -522,6 +559,13 @@ func _trigger_random_change() -> void:
 		has_initial_angle = false  # Reset rotation tracking when direction changes
 		var direction_text = "CLOCKWISE" if current_direction == 1 else "COUNTER-CLOCKWISE"
 		print("[CaptureMinigame] Direction changed mid-fill to: %s" % direction_text)
+
+func _trigger_direction_change_only() -> void:
+	"""Change only the direction (used for low HP scenarios)"""
+	current_direction *= -1
+	has_initial_angle = false  # Reset rotation tracking when direction changes
+	var direction_text = "CLOCKWISE" if current_direction == 1 else "COUNTER-CLOCKWISE"
+	print("[CaptureMinigame] Direction changed to: %s" % direction_text)
 
 func _draw_capture_visual() -> void:
 	"""Draw the rotation icon, button icon, and progress circle"""
