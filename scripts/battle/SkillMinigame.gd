@@ -478,19 +478,19 @@ func _finish_sequence(success: bool) -> void:
 		# Completed all 3 tiers!
 		final_damage_modifier = 1.3  # Tier 3: 130% damage
 		final_tier = 3
-		result_text = "AMAZING!"
+		result_text = "GREAT!"
 		print("[SkillMinigame] TIER 3 ACHIEVED! 130% damage")
 	elif sequence_index >= tier_2_length:
 		# Completed tier 1 + tier 2
 		final_damage_modifier = 1.1  # Tier 2: 110% damage
 		final_tier = 2
-		result_text = "GREAT!"
+		result_text = "GOOD"
 		print("[SkillMinigame] TIER 2 ACHIEVED! 110% damage")
 	elif sequence_index >= tier_1_length:
 		# Completed tier 1
 		final_damage_modifier = 1.0  # Tier 1: 100% damage
 		final_tier = 1
-		result_text = "GOOD"
+		result_text = "OK"
 		print("[SkillMinigame] TIER 1 ACHIEVED! 100% damage")
 	else:
 		# Didn't complete tier 1 (timeout or wrong button)
