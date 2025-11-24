@@ -145,7 +145,7 @@ func _setup_minigame() -> void:
 		print("[CaptureMinigame] ERROR: aControllerIconLayout not found!")
 		return
 
-	# Fills label at top - moved up 40px
+	# Fills label at top - moved up 90px
 	fills_label = Label.new()
 	fills_label.text = "Wrap 1/%d" % fills_needed
 	fills_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -153,7 +153,7 @@ func _setup_minigame() -> void:
 	fills_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
 	fills_label.add_theme_constant_override("outline_size", 4)
 	fills_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
-	fills_label.position.y = -40  # Move up 40px
+	fills_label.position.y = -90  # Move up 90px
 	content_container.add_child(fills_label)
 
 	# Create a centered container for the button, arrow, and circle
