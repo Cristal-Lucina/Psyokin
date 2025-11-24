@@ -5,6 +5,9 @@ class_name DefenseMinigame
 ## Press the shown button when circle is in parry zone (40-60%) to parry
 ## Successful parry can lead to parry battles with the enemy
 
+## Emitted when the minigame completes
+signal minigame_completed
+
 ## Configuration
 var defense_stat: int = 1  # Defense stat (currently unused)
 var attacker_damage: float = 10.0  # Base damage from attacker
