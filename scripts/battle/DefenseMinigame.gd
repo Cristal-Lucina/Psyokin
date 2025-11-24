@@ -18,7 +18,7 @@ var current_phase: Phase = Phase.FADE_IN
 
 ## Circle animation
 var circle_progress: float = 0.0  # 0.0 = fully open, 1.0 = fully closed
-var circle_speed: float = 4.0  # 2x faster than attack (0.25 seconds to close)
+var circle_speed: float = 1.0  # Slower for testing (1.0 second to close)
 var circle_max_radius: float = 75.0  # Maximum circle radius
 var circle_min_radius: float = 37.5  # Minimum circle radius
 
