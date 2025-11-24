@@ -972,7 +972,9 @@ func _calculate_battle_rewards() -> Dictionary:
 		"creds": 0,
 		"items": [],  # Array of item_ids dropped
 		"captured_count": 0,
-		"killed_count": 0
+		"killed_count": 0,
+		"member_levelups": {},  # member_id -> {"old": old_level, "new": new_level}
+		"sigil_levelups": {}  # sigil_instance_id -> {"old": old_level, "new": new_level}
 	}
 
 	# Count captures vs kills
@@ -1057,9 +1059,18 @@ func _calculate_battle_rewards() -> Dictionary:
 			print("[BattleManager] stats_system exists: %s, has add_xp: %s" % [stats_system != null, stats_system.has_method("add_xp") if stats_system else false])
 
 			if xp_amount > 0 and stats_system and stats_system.has_method("add_xp"):
+				# Track level before XP award for level-up detection
+				var level_before: int = stats_system.get_member_level(member_id) if stats_system.has_method("get_member_level") else 1
+
 				stats_system.add_xp(member_id, xp_amount)
 				rewards.lxp_awarded[member_id] = xp_amount
 				print("[BattleManager] Awarded %d LXP to %s" % [xp_amount, member_id])
+
+				# Check if member leveled up
+				var level_after: int = stats_system.get_member_level(member_id) if stats_system.has_method("get_member_level") else level_before
+				if level_after > level_before:
+					rewards.member_levelups[member_id] = {"old": level_before, "new": level_after}
+					print("[BattleManager] %s LEVELED UP! %d -> %d" % [member_id, level_before, level_after])
 			else:
 				print("[BattleManager] SKIPPED awarding LXP (xp_amount=%d, stats_system=%s)" % [xp_amount, "exists" if stats_system else "null"])
 	else:
@@ -1090,10 +1101,24 @@ func _calculate_battle_rewards() -> Dictionary:
 					gxp_to_award += 5
 					print("[BattleManager] +5 GXP bonus for sigil usage: %s" % sigil_inst_id)
 
+				# Track sigil level before XP award for level-up detection
+				var sigil_level_before: int = 1
+				if sigil_sys.has_method("get_instance_progress"):
+					var progress: Dictionary = sigil_sys.get_instance_progress(sigil_inst_id)
+					sigil_level_before = int(progress.get("level", 1))
+
 				# Award GXP to this sigil instance
 				sigil_sys.add_xp_to_instance(sigil_inst_id, gxp_to_award, false, "battle_reward")
 				rewards.gxp_awarded[sigil_inst_id] = gxp_to_award
 				print("[BattleManager] Awarded %d GXP to sigil %s" % [gxp_to_award, sigil_inst_id])
+
+				# Check if sigil leveled up
+				if sigil_sys.has_method("get_instance_progress"):
+					var progress_after: Dictionary = sigil_sys.get_instance_progress(sigil_inst_id)
+					var sigil_level_after: int = int(progress_after.get("level", 1))
+					if sigil_level_after > sigil_level_before:
+						rewards.sigil_levelups[sigil_inst_id] = {"old": sigil_level_before, "new": sigil_level_after}
+						print("[BattleManager] Sigil %s LEVELED UP! %d -> %d" % [sigil_inst_id, sigil_level_before, sigil_level_after])
 
 	# Award AXP (Affinity XP) for co-presence
 	var affinity_sys = get_node_or_null("/root/aAffinitySystem")
