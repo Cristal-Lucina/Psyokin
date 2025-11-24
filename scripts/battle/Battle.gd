@@ -6308,6 +6308,9 @@ func _on_change_type_button_pressed() -> void:
 	# Close current skill menu
 	_close_skill_menu()
 
+	# Disable action menu to prevent interference
+	_disable_action_menu()
+
 	# Reset type menu state
 	type_menu_buttons = []
 	selected_type_index = 0
