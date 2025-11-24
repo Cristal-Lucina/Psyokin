@@ -145,9 +145,9 @@ func _setup_minigame() -> void:
 		print("[CaptureMinigame] ERROR: aControllerIconLayout not found!")
 		return
 
-	# Fills label at top - moved up 130px using MarginContainer
+	# Fills label at top - moved up 50px using MarginContainer
 	var label_margin = MarginContainer.new()
-	label_margin.add_theme_constant_override("margin_top", -130)
+	label_margin.add_theme_constant_override("margin_top", -50)
 
 	fills_label = Label.new()
 	fills_label.text = "Wrap 1/%d" % fills_needed
@@ -444,7 +444,7 @@ func _draw_capture_visual() -> void:
 	"""Draw the rotation icon, button icon, and progress circle"""
 	var canvas_size = circle_canvas.size
 	var center = canvas_size / 2.0
-	var circle_center = center - Vector2(0, 80)  # Offset circle and button up 80px
+	var circle_center = center  # Centered at canvas center
 
 	# Draw rotation icon behind everything (200x200, bottom centered at canvas center, moved down 15px and right 2px)
 	if rotation_icon:
@@ -463,15 +463,15 @@ func _draw_capture_visual() -> void:
 		else:  # Counter-clockwise - draw normally
 			circle_canvas.draw_texture_rect(rotation_icon, rotation_rect, false, Color.WHITE)
 
-	# Draw outer circle (empty) - offset up 60px
+	# Draw outer circle (empty)
 	var outer_radius = 100.0
 	_draw_circle_outline(circle_center, outer_radius, Color(0.5, 0.5, 0.5, 0.5), 3.0)
 
-	# Draw progress fill (colored arc) - offset up 60px
+	# Draw progress fill (colored arc)
 	if fill_progress > 0.0:
 		_draw_progress_arc(circle_center, outer_radius, fill_progress, COLOR_BUBBLE_MAGENTA)
 
-	# Draw background circle behind button icon for visibility - offset up 60px
+	# Draw background circle behind button icon for visibility
 	var icon_bg_radius = 50.0
 	circle_canvas.draw_circle(circle_center, icon_bg_radius, Color(0.1, 0.1, 0.15, 0.8))
 
@@ -483,7 +483,7 @@ func _draw_capture_visual() -> void:
 	else:
 		_draw_circle_outline(circle_center, icon_bg_radius, COLOR_MILK_WHITE, 3.0)
 
-	# Draw the button icon in the center (70x70) - offset up 60px
+	# Draw the button icon in the center (70x70)
 	if button_icon and button_icon.texture:
 		var icon_size = Vector2(70, 70)
 		var icon_pos = circle_center - icon_size / 2.0
