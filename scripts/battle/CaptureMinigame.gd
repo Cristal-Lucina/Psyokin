@@ -179,6 +179,20 @@ func _setup_minigame() -> void:
 	# Pick random starting direction
 	_randomize_direction()
 
+	# Load the current button icon (will be updated by _randomize_button)
+	var icon_texture = icon_layout.get_button_icon(current_button_action)
+	if icon_texture:
+		# Store the texture for drawing
+		button_icon = TextureRect.new()
+		button_icon.texture = icon_texture
+		button_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		button_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		button_icon.custom_minimum_size = Vector2(70, 70)
+		# We'll draw this manually in _draw_capture_visual
+		print("[CaptureMinigame] Loaded button icon for %s" % current_button)
+	else:
+		print("[CaptureMinigame] ERROR: Could not load button icon for %s" % current_button)
+
 	# Result label (placed above the minigame)
 	result_label = Label.new()
 	result_label.text = ""
@@ -241,6 +255,14 @@ func _randomize_button() -> void:
 	# Update button prompt label
 	if button_prompt_label:
 		button_prompt_label.text = "HOLD %s" % current_button
+
+	# Update button icon texture
+	var icon_layout = get_node_or_null("/root/aControllerIconLayout")
+	if icon_layout and button_icon:
+		var icon_texture = icon_layout.get_button_icon(current_button_action)
+		if icon_texture:
+			button_icon.texture = icon_texture
+			print("[CaptureMinigame] Updated button icon for %s" % current_button)
 
 	print("[CaptureMinigame] Button changed to: %s (action: %s)" % [current_button, current_button_action])
 
@@ -411,11 +433,6 @@ func _draw_capture_visual() -> void:
 	var canvas_size = circle_canvas.size
 	var center = canvas_size / 2.0
 
-	# Get the controller icon layout
-	var icon_layout = get_node_or_null("/root/aControllerIconLayout")
-	if not icon_layout:
-		return
-
 	# Draw rotation icon behind everything (150x150, bottom centered at canvas center)
 	if rotation_icon:
 		var rotation_size = Vector2(150, 150)
@@ -446,13 +463,12 @@ func _draw_capture_visual() -> void:
 	circle_canvas.draw_circle(center, icon_bg_radius, Color(0.1, 0.1, 0.15, 0.8))
 	_draw_circle_outline(center, icon_bg_radius, COLOR_MILK_WHITE, 3.0)
 
-	# Draw the button icon in the center (larger)
-	var icon_texture = icon_layout.get_button_icon(current_button_action)
-	if icon_texture:
+	# Draw the button icon in the center (70x70)
+	if button_icon and button_icon.texture:
 		var icon_size = Vector2(70, 70)  # Slightly smaller to fit inside background circle
 		var icon_pos = center - icon_size / 2.0
 		var icon_rect = Rect2(icon_pos, icon_size)
-		circle_canvas.draw_texture_rect(icon_texture, icon_rect, false, Color.WHITE)
+		circle_canvas.draw_texture_rect(button_icon.texture, icon_rect, false, Color.WHITE)
 
 func _draw_circle_outline(center: Vector2, radius: float, color: Color, width: float) -> void:
 	"""Helper to draw a circle outline"""
