@@ -43,7 +43,8 @@ var current_direction: int = 1  # 1 = clockwise, -1 = counter-clockwise
 ## Joystick rotation tracking
 var last_input_angle: float = 0.0
 var accumulated_rotation: float = 0.0  # Track rotation progress
-var rotation_threshold: float = 0.3  # Minimum rotation to count
+var rotation_threshold: float = 0.1  # Minimum rotation to count (reduced from 0.3)
+var has_initial_angle: bool = false  # Track if we've set the initial angle
 
 ## Change tracking (periodic button/direction changes)
 var change_progress: float = 0.0  # When this hits 1.0, trigger a change
@@ -247,6 +248,7 @@ func _start_minigame() -> void:
 	change_progress = 0.0
 	fade_timer = 0.0
 	input_locked = true
+	has_initial_angle = false  # Reset rotation tracking
 
 	# Fade in the overlay
 	overlay_panel.modulate.a = 0.0
@@ -289,31 +291,46 @@ func _process_active(delta: float) -> void:
 	var is_spinning = false
 	var correct_direction = false
 
-	if input_vec.length() > 0.5:
+	if input_vec.length() > 0.3:  # Lowered threshold from 0.5 to 0.3
 		# Calculate angle from input
 		var current_angle = atan2(input_vec.y, input_vec.x)
 
-		# Calculate rotation delta
-		var angle_diff = angle_difference(last_input_angle, current_angle)
+		# Initialize angle on first input
+		if not has_initial_angle:
+			last_input_angle = current_angle
+			has_initial_angle = true
+			print("[CaptureMinigame] Initial angle set: %.2f" % current_angle)
+		else:
+			# Calculate rotation delta
+			var angle_diff = angle_difference(last_input_angle, current_angle)
 
-		if abs(angle_diff) > rotation_threshold:
-			is_spinning = true
+			# Debug output every 10 frames
+			if Engine.get_frames_drawn() % 10 == 0 and abs(angle_diff) > 0.01:
+				print("[CaptureMinigame] Rotation - angle_diff: %.2f, threshold: %.2f, direction: %s" % [angle_diff, rotation_threshold, "CW" if current_direction == 1 else "CCW"])
 
-			# Check if spinning in correct direction
-			if current_direction == 1 and angle_diff > 0:
-				# Clockwise
-				correct_direction = true
-			elif current_direction == -1 and angle_diff < 0:
-				# Counter-clockwise
-				correct_direction = true
+			if abs(angle_diff) > rotation_threshold:
+				is_spinning = true
 
-		last_input_angle = current_angle
+				# Check if spinning in correct direction
+				if current_direction == 1 and angle_diff > 0:
+					# Clockwise (positive rotation)
+					correct_direction = true
+					print("[CaptureMinigame] Clockwise spin detected!")
+				elif current_direction == -1 and angle_diff < 0:
+					# Counter-clockwise (negative rotation)
+					correct_direction = true
+					print("[CaptureMinigame] Counter-clockwise spin detected!")
+
+			last_input_angle = current_angle
 
 	# Fill or drain the progress bar
 	if holding_button and is_spinning and correct_direction:
 		# Correct input! Fill the bar
 		fill_progress += fill_speed * delta
 		change_progress += fill_speed * delta
+
+		if Engine.get_frames_drawn() % 30 == 0:
+			print("[CaptureMinigame] Filling! Progress: %.1f%%" % (fill_progress * 100))
 
 		# Check for periodic changes (at 33% and 66% of each fill)
 		if change_progress >= change_interval:
@@ -325,11 +342,21 @@ func _process_active(delta: float) -> void:
 		fill_progress -= decay_speed * delta
 		fill_progress = max(0.0, fill_progress)
 
+		# Debug why not filling
+		if Engine.get_frames_drawn() % 60 == 0:
+			if not holding_button:
+				print("[CaptureMinigame] Not holding button %s" % current_button)
+			elif not is_spinning:
+				print("[CaptureMinigame] Not spinning (input_vec: %.2f)" % input_vec.length())
+			elif not correct_direction:
+				print("[CaptureMinigame] Wrong direction")
+
 	# Check if filled
 	if fill_progress >= 1.0:
 		fills_completed += 1
 		fill_progress = 0.0
 		change_progress = 0.0
+		has_initial_angle = false  # Reset rotation tracking for next fill
 
 		print("[CaptureMinigame] Fill complete! (%d/%d)" % [fills_completed, fills_needed])
 
@@ -359,6 +386,7 @@ func _trigger_random_change() -> void:
 	else:
 		# Change direction
 		current_direction *= -1
+		has_initial_angle = false  # Reset rotation tracking when direction changes
 		var direction_text = "CLOCKWISE" if current_direction == 1 else "COUNTER-CLOCKWISE"
 		print("[CaptureMinigame] Direction changed mid-fill to: %s" % direction_text)
 
