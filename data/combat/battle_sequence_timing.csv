@@ -1,0 +1,17 @@
+timing_id,event_name,duration,fade_duration,wait_after,enabled,notes
+1,background_fade_in,0.8,0.8,0,TRUE,Background location fades in
+2,characters_fade_in,0.8,0.8,0,TRUE,All characters fade in
+3,camera_focus_enemies,0.5,0,0,TRUE,Camera pulls in on enemies
+4,exclamation_show,0.3,0,0.5,TRUE,Exclamation points appear and hold
+5,camera_slide_back,0.6,0,0.2,TRUE,Camera returns to normal position
+6,ui_fade_in,0.5,0.5,0,TRUE,UI elements fade in
+7,run_to_marker,0.4,0,0,TRUE,Character runs to battle marker
+8,run_back,0.4,0,0,TRUE,Character runs back from marker
+9,action_menu_fade_in,0.3,0.3,0,TRUE,Action menu appears
+10,action_menu_fade_out,0.2,0.2,0,TRUE,Action menu disappears
+11,hit_animation,0.3,0,0,TRUE,Hit/attack animation duration
+12,hurt_animation,0.3,0,0,TRUE,Hurt animation duration
+13,guard_animation,0.3,0,0,TRUE,Guard/block animation duration
+14,miss_text_show,0.2,0,0.5,TRUE,MISS text appears and holds
+15,turn_order_slide_out,0.4,0,0,TRUE,Turn order panel slides out
+16,turn_marker_move,0.2,0,0,TRUE,Turn indicator moves to next combatant

@@ -1,0 +1,2 @@
+animation_id,animation_name,enabled,slide_distance,slide_forward_duration,slide_forward_trans,slide_forward_ease,slide_back_duration,slide_back_trans,slide_back_ease,notes
+1,TURN_PANEL_SLIDE,TRUE,140,0.3,CUBIC,OUT,0.2,CUBIC,IN,Panel slides forward when turn starts and back when turn ends

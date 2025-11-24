@@ -4,6 +4,478 @@ class_name Battle
 ## Battle Scene - Main battle screen controller
 ## Handles UI, combatant display, and player input for combat
 
+## ═══════════════════════════════════════════════════════════════
+## BATTLE FLOW MANAGER
+## ═══════════════════════════════════════════════════════════════
+## Centralized system for managing all battle elements, timing, and state
+## to ensure smooth combat flow without overlaps or conflicts
+
+# Battle Element Types (40 total)
+enum BattleElement {
+	# Core Systems (1-5)
+	BATTLE_STATE_MACHINE,      # Overall battle phase state
+	BATTLE_EVENTS_QUEUE,       # Sequential event ordering
+	CONTROLLER_INPUT,          # Input locking (HIGHEST PRIORITY)
+	BATTLE_VIEWPORT,           # What's visible on screen
+	Z_LAYER,                   # Layering depth
+
+	# Audio (6-8)
+	SOUND_EFFECTS,             # Sound FX playback
+	BACKGROUND_MUSIC,          # BGM control
+	VOICE_ACTING,              # Voice line playback
+
+	# Visual Environment (9-12)
+	BACKGROUND_LOCATION,       # Battle backdrop
+	SCREEN_EFFECTS,            # Full-screen effects
+	ENVIRONMENTAL_HAZARDS,     # Persistent field effects
+	CAMERA_FOCUS,              # Camera zoom/shake
+
+	# Character Systems (13-20)
+	CHARACTER_MARKERS,         # Position markers
+	CHARACTER_ANIMATION,       # Sprite animations
+	CHARACTER_EFFECTS,         # VFX on characters
+	CHARACTER_STATUS,          # Status icon display
+	CHARACTER_TEXT,            # Floating battle text
+	FORMATION_POSITIONING,     # Front/back rows
+
+	# Combat Mechanics (21-28)
+	TARGETING_SYSTEM,          # Target selection
+	DAMAGE_NUMBERS_QUEUE,      # Damage number display
+	STATUS_EFFECT_TICKER,      # DOT/HOT effects
+	COUNTER_REACTION_SYSTEM,   # Counter-attacks
+	COMBO_SYSTEM,              # Combo tracking
+	CAPTURE_SYSTEM,            # Creature capture
+	ESCAPE_ATTEMPT,            # Run mechanics
+
+	# UI Elements (29-37)
+	POPUP_FOCUS,               # Menu popups
+	MINIGAME,                  # Minigame state
+	TURN_ORDER_PANEL,          # Turn display
+	PARTY_PANEL,               # Party status
+	ACTION_MENU,               # Action buttons
+	BATTLE_INFO_PANEL,         # Battle log/info
+	BURST_GAUGE,               # Burst meter
+	CHAT_BUBBLE,               # Character speech bubbles
+	CHAT_OVERLAY,              # Full dialogue overlay
+
+	# Battle Flow (38-40)
+	BATTLE_CONDITIONS,         # Win/loss conditions
+	BATTLE_REWARDS,            # Victory rewards
+	BATTLE_TUTORIAL,           # Tutorial state
+	BATTLE_PAUSE,              # Pause state
+}
+
+# Battle State Machine
+enum BattleState {
+	INITIALIZING,              # Loading battle
+	BATTLE_START,              # Opening animations
+	TURN_START,                # Beginning of turn
+	PLAYER_INPUT,              # Waiting for action
+	EXECUTING_ACTION,          # Action animation/resolution
+	ENEMY_TURN,                # Enemy AI execution
+	STATUS_PHASE,              # Status effect processing
+	VICTORY,                   # Battle won
+	DEFEAT,                    # Battle lost
+	ESCAPED,                   # Ran away
+	REWARDS,                   # Showing rewards
+	BATTLE_END,                # Cleanup
+}
+
+# Priority Levels (determines execution order and interrupt capability)
+enum Priority {
+	CRITICAL = 0,              # Controller input locks, pause
+	URGENT = 1,                # State changes, battle events
+	HIGH = 2,                  # Character animations, attacks
+	MEDIUM = 3,                # Effects, sounds, UI updates
+	LOW = 4,                   # Background elements, ambient effects
+	AMBIENT = 5,               # Music, passive visuals
+}
+
+# Element Priority Mapping (can be overridden by CSV config)
+var ELEMENT_PRIORITIES = {
+	BattleElement.CONTROLLER_INPUT: Priority.CRITICAL,
+	BattleElement.BATTLE_PAUSE: Priority.CRITICAL,
+	BattleElement.BATTLE_STATE_MACHINE: Priority.URGENT,
+	BattleElement.BATTLE_EVENTS_QUEUE: Priority.URGENT,
+	BattleElement.TARGETING_SYSTEM: Priority.URGENT,
+	BattleElement.CHARACTER_ANIMATION: Priority.HIGH,
+	BattleElement.CHARACTER_MARKERS: Priority.HIGH,
+	BattleElement.CAMERA_FOCUS: Priority.HIGH,
+	BattleElement.MINIGAME: Priority.HIGH,
+	BattleElement.CHARACTER_EFFECTS: Priority.MEDIUM,
+	BattleElement.CHARACTER_TEXT: Priority.MEDIUM,
+	BattleElement.DAMAGE_NUMBERS_QUEUE: Priority.MEDIUM,
+	BattleElement.SOUND_EFFECTS: Priority.MEDIUM,
+	BattleElement.SCREEN_EFFECTS: Priority.MEDIUM,
+	BattleElement.POPUP_FOCUS: Priority.MEDIUM,
+	BattleElement.ACTION_MENU: Priority.MEDIUM,
+	BattleElement.BATTLE_INFO_PANEL: Priority.MEDIUM,
+	BattleElement.TURN_ORDER_PANEL: Priority.LOW,
+	BattleElement.PARTY_PANEL: Priority.LOW,
+	BattleElement.BURST_GAUGE: Priority.LOW,
+	BattleElement.CHAT_BUBBLE: Priority.LOW,
+	BattleElement.CHARACTER_STATUS: Priority.LOW,
+	BattleElement.BACKGROUND_MUSIC: Priority.AMBIENT,
+	BattleElement.BACKGROUND_LOCATION: Priority.AMBIENT,
+	BattleElement.ENVIRONMENTAL_HAZARDS: Priority.AMBIENT,
+}
+
+# Elements that CAN run concurrently (won't block each other)
+const CONCURRENT_ELEMENTS = [
+	[BattleElement.BACKGROUND_MUSIC, BattleElement.CHARACTER_ANIMATION],
+	[BattleElement.SOUND_EFFECTS, BattleElement.CHARACTER_EFFECTS],
+	[BattleElement.BACKGROUND_LOCATION, BattleElement.CHARACTER_ANIMATION],
+	[BattleElement.BURST_GAUGE, BattleElement.DAMAGE_NUMBERS_QUEUE],
+	[BattleElement.PARTY_PANEL, BattleElement.TURN_ORDER_PANEL],
+	[BattleElement.VOICE_ACTING, BattleElement.CHAT_BUBBLE],
+]
+
+# Battle Flow Manager State
+var battle_flow_state = {
+	"current_state": BattleState.INITIALIZING,
+	"active_elements": {},          # {BattleElement: is_active}
+	"blocked_elements": {},         # {BattleElement: reason}
+	"input_locked": false,          # Master input lock
+	"event_queue": [],              # Sequential events
+	"concurrent_queue": [],         # Concurrent events
+	"tutorial_mode": false,         # Tutorial restrictions
+	"pause_allowed": true,          # Can pause right now?
+}
+
+## ═══════════════════════════════════════════════════════════════
+## BATTLE FLOW MANAGER METHODS
+## ═══════════════════════════════════════════════════════════════
+
+func _init_battle_flow_manager():
+	"""Initialize battle flow manager state"""
+	print("[BattleFlow] Initializing Battle Flow Manager...")
+
+	# Load CSV configuration
+	battle_flow_config = BattleFlowConfigLoader.new()
+	if battle_flow_config.load_config():
+		print("[BattleFlow] CSV configuration loaded successfully")
+		_apply_csv_config()
+	else:
+		push_error("[BattleFlow] Failed to load CSV config, using default settings")
+
+	# Set all elements to inactive
+	for element in BattleElement.values():
+		battle_flow_state.active_elements[element] = false
+		battle_flow_state.blocked_elements[element] = ""
+
+	# Set initial state
+	battle_flow_state.current_state = BattleState.INITIALIZING
+	battle_flow_state.input_locked = true  # Start locked
+
+	print("[BattleFlow] Manager initialized")
+
+func _apply_csv_config():
+	"""Apply configuration loaded from CSV files"""
+	if not battle_flow_config:
+		return
+
+	# Override ELEMENT_PRIORITIES with CSV data
+	for element_id in battle_flow_config.element_priorities.keys():
+		if element_id >= 0 and element_id < BattleElement.size():
+			ELEMENT_PRIORITIES[element_id] = battle_flow_config.element_priorities[element_id]
+
+	print("[BattleFlow] Applied CSV priorities for %d elements" % battle_flow_config.element_priorities.size())
+
+	# Activate elements that should be active on battle start will be handled in _on_battle_started()
+
+func _set_battle_state(new_state: BattleState):
+	"""Change battle state and apply appropriate locks/unlocks"""
+	var old_state = battle_flow_state.current_state
+	battle_flow_state.current_state = new_state
+
+	print("[BattleFlow] State: %s → %s" % [BattleState.keys()[old_state], BattleState.keys()[new_state]])
+
+	# Apply state-specific logic
+	match new_state:
+		BattleState.BATTLE_START:
+			_lock_input("Battle starting")
+			_activate_element(BattleElement.BACKGROUND_MUSIC)
+			_activate_element(BattleElement.BACKGROUND_LOCATION)
+
+		BattleState.PLAYER_INPUT:
+			_unlock_input()
+			_activate_element(BattleElement.ACTION_MENU)
+			_activate_element(BattleElement.CONTROLLER_INPUT)
+
+		BattleState.EXECUTING_ACTION:
+			_lock_input("Executing action")
+			_activate_element(BattleElement.CHARACTER_ANIMATION)
+
+		BattleState.ENEMY_TURN:
+			_lock_input("Enemy turn")
+
+		BattleState.VICTORY, BattleState.DEFEAT, BattleState.ESCAPED:
+			_lock_input("Battle ending")
+			_deactivate_element(BattleElement.ACTION_MENU)
+
+func _lock_input(reason: String = ""):
+	"""Lock controller input (CRITICAL priority)"""
+	battle_flow_state.input_locked = true
+	_block_element(BattleElement.CONTROLLER_INPUT, reason)
+	print("[BattleFlow] Input LOCKED: %s" % reason)
+
+func _unlock_input():
+	"""Unlock controller input"""
+	battle_flow_state.input_locked = false
+	_unblock_element(BattleElement.CONTROLLER_INPUT)
+	print("[BattleFlow] Input UNLOCKED")
+
+func _is_input_locked() -> bool:
+	"""Check if input is currently locked"""
+	return battle_flow_state.input_locked
+
+func _activate_element(element: BattleElement):
+	"""Mark an element as active"""
+	battle_flow_state.active_elements[element] = true
+	print("[BattleFlow] ACTIVE: %s" % BattleElement.keys()[element])
+
+func _deactivate_element(element: BattleElement):
+	"""Mark an element as inactive"""
+	battle_flow_state.active_elements[element] = false
+	print("[BattleFlow] INACTIVE: %s" % BattleElement.keys()[element])
+
+func _is_element_active(element: BattleElement) -> bool:
+	"""Check if element is currently active"""
+	return battle_flow_state.active_elements.get(element, false)
+
+func _block_element(element: BattleElement, reason: String):
+	"""Block an element from activating"""
+	battle_flow_state.blocked_elements[element] = reason
+	print("[BattleFlow] BLOCKED: %s (%s)" % [BattleElement.keys()[element], reason])
+
+func _unblock_element(element: BattleElement):
+	"""Unblock an element"""
+	battle_flow_state.blocked_elements[element] = ""
+
+func _is_element_blocked(element: BattleElement) -> bool:
+	"""Check if element is blocked"""
+	return battle_flow_state.blocked_elements.get(element, "") != ""
+
+func _can_activate_element(element: BattleElement) -> bool:
+	"""Check if element can be activated (not blocked, priority allows it)"""
+	if _is_element_blocked(element):
+		return false
+
+	# Check if higher priority elements are blocking
+	var element_priority = ELEMENT_PRIORITIES.get(element, Priority.MEDIUM)
+	for active_element in battle_flow_state.active_elements:
+		if battle_flow_state.active_elements[active_element]:
+			var active_priority = ELEMENT_PRIORITIES.get(active_element, Priority.MEDIUM)
+			if active_priority < element_priority:  # Higher priority (lower number) blocks
+				# Check if they're allowed to be concurrent
+				if not _are_concurrent(element, active_element):
+					return false
+
+	return true
+
+func _are_concurrent(element1: BattleElement, element2: BattleElement) -> bool:
+	"""Check if two elements can run at the same time"""
+	# Use CSV config if available
+	if battle_flow_config:
+		return battle_flow_config.is_concurrent_allowed(element1, element2)
+
+	# Fallback to hardcoded CONCURRENT_ELEMENTS
+	for pair in CONCURRENT_ELEMENTS:
+		if (element1 in pair and element2 in pair):
+			return true
+	return false
+
+func _queue_event(event_data: Dictionary):
+	"""Add event to sequential queue"""
+	battle_flow_state.event_queue.append(event_data)
+	print("[BattleFlow] Event queued: %s" % event_data.get("type", "unknown"))
+
+func _queue_concurrent_event(event_data: Dictionary):
+	"""Add event to concurrent queue (can run with other concurrent events)"""
+	battle_flow_state.concurrent_queue.append(event_data)
+
+func _process_event_queue():
+	"""Process next event in queue"""
+	if battle_flow_state.event_queue.size() > 0:
+		var event = battle_flow_state.event_queue.pop_front()
+		print("[BattleFlow] Processing event: %s" % event.get("type", "unknown"))
+		return event
+	return null
+
+func _clear_event_queue():
+	"""Clear all pending events"""
+	battle_flow_state.event_queue.clear()
+	battle_flow_state.concurrent_queue.clear()
+	print("[BattleFlow] Event queues cleared")
+
+func _enable_tutorial_mode():
+	"""Enable tutorial mode with restricted controls"""
+	battle_flow_state.tutorial_mode = true
+	print("[BattleFlow] Tutorial mode ENABLED")
+
+func _disable_tutorial_mode():
+	"""Disable tutorial mode"""
+	battle_flow_state.tutorial_mode = false
+	print("[BattleFlow] Tutorial mode DISABLED")
+
+func _is_tutorial_mode() -> bool:
+	"""Check if in tutorial mode"""
+	return battle_flow_state.tutorial_mode
+
+func _set_pause_allowed(allowed: bool):
+	"""Set whether pause is currently allowed"""
+	battle_flow_state.pause_allowed = allowed
+
+func _can_pause() -> bool:
+	"""Check if pause is allowed right now"""
+	return battle_flow_state.pause_allowed and not _is_element_active(BattleElement.MINIGAME)
+
+## ═══════════════════════════════════════════════════════════════
+## BATTLE EVENT TRIGGERS (CSV-Driven)
+## ═══════════════════════════════════════════════════════════════
+
+func _check_battle_events(trigger_type: String, context: Dictionary = {}):
+	"""Check and trigger battle events based on CSV configuration"""
+	if not battle_flow_config:
+		return
+
+	var triggered_events = battle_flow_config.check_event_triggers(trigger_type, context)
+
+	for event in triggered_events:
+		_execute_battle_event(event)
+
+func _execute_battle_event(event: Dictionary):
+	"""Execute actions for a triggered battle event"""
+	print("[BattleEvent] Triggering: %s" % event.event_name)
+
+	# Execute each action in the event
+	for action in event.actions:
+		_execute_event_action(action, event)
+
+func _execute_event_action(action: String, event: Dictionary):
+	"""Execute a single event action"""
+	match action:
+		"LOCK_INPUT":
+			_lock_input("Battle event: %s" % event.event_name)
+		"UNLOCK_INPUT":
+			_unlock_input()
+		"PAUSE_BATTLE":
+			# Pause implementation
+			pass
+		"RESUME_BATTLE":
+			# Resume implementation
+			pass
+		"PLAY_SOUND":
+			# Play sound effect
+			pass
+		"PLAY_WARNING_SOUND":
+			# Play warning sound
+			pass
+		"PLAY_ACHIEVEMENT_SOUND":
+			# Play achievement sound
+			pass
+		"PLAY_HEAL_SOUND":
+			# Play heal sound
+			pass
+		"PLAY_STATUS_SOUND":
+			# Play status sound
+			pass
+		"PLAY_SPECIAL_SOUND":
+			# Play special sound
+			pass
+		"PLAY_URGENT_MUSIC":
+			# Change music to urgent
+			pass
+		"PLAY_PERFECT_MUSIC":
+			# Play perfect victory music
+			pass
+		"FLASH_SCREEN":
+			# Flash screen effect
+			pass
+		"CAMERA_SHAKE":
+			# Camera shake effect
+			pass
+		"SLOW_MOTION":
+			# Slow motion effect
+			pass
+		"SHOW_MESSAGE":
+			# Show message
+			pass
+		"SHOW_NOTIFICATION":
+			# Show notification
+			pass
+		"SHOW_COMBO_TEXT":
+			# Show combo counter
+			pass
+		"SHOW_TUTORIAL_POPUP":
+			_enable_tutorial_mode()
+		"SHOW_BADGE":
+			# Show achievement badge
+			pass
+		"SHOW_TIMER":
+			# Show timer
+			pass
+		"SHOW_HINT":
+			# Show hint text
+			pass
+		"SHOW_WARNING":
+			# Show warning
+			pass
+		"SHOW_STATUS_ICON":
+			# Show status icon
+			pass
+		"PULSE_HP_BARS":
+			# Pulse HP bars
+			pass
+		"PULSE_TIMER":
+			# Pulse timer
+			pass
+		"HIGHLIGHT_CAPTURE_BUTTON":
+			# Highlight capture button
+			pass
+		"SPARKLE_EFFECT":
+			# Play sparkle particle effect
+			pass
+		"SPAWN_ENEMIES":
+			# Spawn reinforcements
+			pass
+		"PLAY_CUTSCENE":
+			# Play cutscene
+			pass
+		"BOSS_TRANSFORM":
+			# Boss transformation
+			pass
+		"BONUS_DAMAGE":
+			# Apply bonus damage multiplier
+			pass
+		"BONUS_REWARD":
+			# Increase battle rewards
+			pass
+		"BONUS_REWARDS":
+			# Increase victory rewards
+			pass
+		"APPLY_WEATHER_BUFFS":
+			# Apply weather buffs/debuffs
+			pass
+		"CHANGE_BACKGROUND":
+			# Change battle background
+			pass
+		"PLAY_WEATHER_EFFECT":
+			# Play weather particles
+			pass
+		"SPECIAL_ANIMATION":
+			# Play special victory animation
+			pass
+		"INCREASE_ESCAPE_DIFFICULTY":
+			# Make escape harder
+			pass
+		_:
+			print("[BattleEvent] Unknown action: %s" % action)
+
+## ═══════════════════════════════════════════════════════════════
+## END BATTLE FLOW MANAGER
+## ═══════════════════════════════════════════════════════════════
+
 @onready var battle_mgr = get_node("/root/aBattleManager")
 @onready var gs = get_node("/root/aGameState")
 @onready var combat_resolver: CombatResolver = CombatResolver.new()
@@ -104,6 +576,12 @@ var instruction_label: Label = null  # Label inside instruction popup
 # Active action button visual feedback
 var active_action_button: Button = null  # Currently active action button
 
+# Battle Flow Config Loader
+var battle_flow_config: BattleFlowConfigLoader = null  # CSV configuration loader
+
+# Battle Sequence Orchestrator
+var battle_sequence_orch: BattleSequenceOrchestrator = null  # Polished battle sequence system
+
 # Party status panels for left-side display
 var party_status_panels: Array = []  # Array of 3 panels for player + 2 active party members
 var active_button_tween: Tween = null  # Tween for pulsing animation
@@ -137,8 +615,25 @@ func _ready() -> void:
 	# Add combat resolver to scene tree
 	add_child(combat_resolver)
 
+	# Initialize Battle Flow Manager
+	_init_battle_flow_manager()
+	print("[Battle] Battle Flow Manager initialized")
+
+	# Initialize Battle Sequence Orchestrator
+	battle_sequence_orch = BattleSequenceOrchestrator.new()
+	battle_sequence_orch.battle_scene = self
+	battle_sequence_orch.battle_mgr = battle_mgr
+	if battle_sequence_orch.load_config():
+		print("[Battle] Battle Sequence Orchestrator initialized")
+	else:
+		push_error("[Battle] Failed to initialize Battle Sequence Orchestrator")
+
 	# Wait for next frame to ensure all autoloads are ready
 	await get_tree().process_frame
+
+	# Set sprite_animator reference for orchestrator after scene is ready
+	if sprite_animator:
+		battle_sequence_orch.sprite_animator = sprite_animator
 
 	# Create neon-kawaii background elements
 	_create_diagonal_background()
@@ -1228,23 +1723,20 @@ func _cancel_target_selection() -> void:
 
 func _initialize_battle() -> void:
 	"""Initialize the battle from encounter data"""
+	# Set battle state to initializing
+	_set_battle_state(BattleState.INITIALIZING)
+
 	log_message("Battle Start!")
 
 	# Get party from GameState
 	var party = gs.party.duplicate()
 
-	print("[Battle] GameState party before check: %s" % str(party))
+	print("[Battle] GameState party: %s" % str(party))
 
-	# If party is empty or only has hero, add Kai and Matcha for testing
+	# Validate party is not empty
 	if party.is_empty():
-		# Fallback: use hero + kai + matcha for now
-		party = ["hero", "kai", "matcha"]
-		print("[Battle] Party was empty, using default: %s" % str(party))
-	elif party.size() == 1 and party[0] == "hero":
-		# Add Kai and Matcha as default party members
-		party.append("kai")
-		party.append("matcha")
-		print("[Battle] Added kai and matcha to party: %s" % str(party))
+		push_error("[Battle] ERROR: Party is empty! Cannot start battle.")
+		return
 
 	# Get enemies from encounter data
 	var enemies = battle_mgr.encounter_data.get("enemy_ids", ["slime"])
@@ -1259,6 +1751,16 @@ func _initialize_battle() -> void:
 func _on_battle_started() -> void:
 	"""Called when battle initializes"""
 	print("[Battle] Battle started")
+
+	# Set battle state and activate core elements
+	_set_battle_state(BattleState.BATTLE_START)
+	_activate_element(BattleElement.BATTLE_VIEWPORT)
+	_activate_element(BattleElement.BACKGROUND_MUSIC)
+	_activate_element(BattleElement.BACKGROUND_LOCATION)
+	_activate_element(BattleElement.PARTY_PANEL)
+	_activate_element(BattleElement.TURN_ORDER_PANEL)
+	_activate_element(BattleElement.BURST_GAUGE)
+
 	_display_combatants()
 	_update_burst_gauge()
 
@@ -1270,6 +1772,12 @@ func _on_round_started(round_number: int) -> void:
 
 func _on_turn_started(combatant_id: String) -> void:
 	"""Called when a combatant's turn starts"""
+	# Set turn start state and lock input
+	_set_battle_state(BattleState.TURN_START)
+	_lock_input("Turn transition")
+	_activate_element(BattleElement.CHARACTER_ANIMATION)
+	_activate_element(BattleElement.CHARACTER_TEXT)
+
 	current_combatant = battle_mgr.get_combatant_by_id(combatant_id)
 
 	if current_combatant.is_empty():
@@ -1285,6 +1793,12 @@ func _on_turn_started(combatant_id: String) -> void:
 
 	# Reset action cooldown at start of turn
 	action_cooldown = 0.0
+
+	# Check for turn-based battle events
+	_check_battle_events("TURN_COUNT", {
+		"turn_number": battle_mgr.current_turn_index + 1,
+		"round_number": battle_mgr.current_round
+	})
 
 	# Queue turn announcement message (include round number on first turn)
 	if battle_mgr.current_turn_index == 0:
@@ -1345,61 +1859,75 @@ func _on_turn_started(combatant_id: String) -> void:
 
 func _animate_turn_indicator(combatant_id: String) -> void:
 	"""Animate the active combatant's panel to indicate their turn"""
-	# Reset previous animation if any
-	await _reset_turn_indicator()
-
-	# Find the panel for this combatant
-	if not combatant_panels.has(combatant_id):
-		return
-
-	active_turn_panel = combatant_panels[combatant_id]
-	active_turn_original_pos = Vector2(active_turn_panel.offset_left, active_turn_panel.offset_right)
-
-	# Determine direction based on whether ally or enemy
-	var is_ally = active_turn_panel.get_meta("is_ally", false)
-	var slide_distance = 140.0  # Slide forward when it's their turn (40 + 100 additional)
-
-	# Calculate target offsets for slide
-	var target_offset_left = active_turn_panel.offset_left
-	var target_offset_right = active_turn_panel.offset_right
-
-	if is_ally:
-		# Slide right
-		target_offset_left += slide_distance
-		target_offset_right += slide_distance
-	else:
-		# Slide left
-		target_offset_left -= slide_distance
-		target_offset_right -= slide_distance
-
-	# Animate slide using offsets (won't conflict with layout containers)
-	var tween = create_tween()
-	tween.set_trans(Tween.TRANS_CUBIC)
-	tween.set_ease(Tween.EASE_OUT)
-	tween.set_parallel(true)
-	tween.tween_property(active_turn_panel, "offset_left", target_offset_left, 0.3)
-	tween.tween_property(active_turn_panel, "offset_right", target_offset_right, 0.3)
+	# DISABLED: Turn indicator sliding disabled to keep characters stationary
+	# This was sliding the entire panel (and character sprite inside it)
+	return
 
 func _reset_turn_indicator() -> void:
 	"""Reset the turn indicator animation (awaitable to wait for completion)"""
-	if active_turn_panel and is_instance_valid(active_turn_panel):
-		# Store panel reference locally before clearing
-		var panel_to_reset = active_turn_panel
-		var original_pos = active_turn_original_pos
+	# DISABLED: Turn indicator sliding disabled
+	# Clear the active reference
+	active_turn_panel = null
 
-		# Clear the active reference immediately
-		active_turn_panel = null
+func _parse_tween_trans(trans_str: String) -> Tween.TransitionType:
+	"""Parse tween transition type from CSV string"""
+	match trans_str.to_upper():
+		"LINEAR":
+			return Tween.TRANS_LINEAR
+		"SINE":
+			return Tween.TRANS_SINE
+		"QUINT":
+			return Tween.TRANS_QUINT
+		"QUART":
+			return Tween.TRANS_QUART
+		"QUAD":
+			return Tween.TRANS_QUAD
+		"EXPO":
+			return Tween.TRANS_EXPO
+		"ELASTIC":
+			return Tween.TRANS_ELASTIC
+		"CUBIC":
+			return Tween.TRANS_CUBIC
+		"CIRC":
+			return Tween.TRANS_CIRC
+		"BOUNCE":
+			return Tween.TRANS_BOUNCE
+		"BACK":
+			return Tween.TRANS_BACK
+		"SPRING":
+			return Tween.TRANS_SPRING
+		_:
+			return Tween.TRANS_CUBIC  # Default
 
-		# Animate back to original position
-		var tween = create_tween()
-		tween.set_trans(Tween.TRANS_CUBIC)
-		tween.set_ease(Tween.EASE_IN)
-		tween.set_parallel(true)
-		tween.tween_property(panel_to_reset, "offset_left", original_pos.x, 0.2)
-		tween.tween_property(panel_to_reset, "offset_right", original_pos.y, 0.2)
+func _parse_tween_ease(ease_str: String) -> Tween.EaseType:
+	"""Parse tween ease type from CSV string"""
+	match ease_str.to_upper():
+		"IN":
+			return Tween.EASE_IN
+		"OUT":
+			return Tween.EASE_OUT
+		"IN_OUT":
+			return Tween.EASE_IN_OUT
+		"OUT_IN":
+			return Tween.EASE_OUT_IN
+		_:
+			return Tween.EASE_OUT  # Default
 
-		# Wait for animation to complete
-		await tween.finished
+func _get_combatant_position_index(combatant_id: String) -> int:
+	"""Get the position index (0, 1, 2) for a combatant based on their ID"""
+	# Check allies
+	var allies = battle_mgr.get_ally_combatants()
+	for i in range(allies.size()):
+		if allies[i].id == combatant_id:
+			return i
+
+	# Check enemies
+	var enemies = battle_mgr.get_enemy_combatants()
+	for i in range(enemies.size()):
+		if enemies[i].id == combatant_id:
+			return i
+
+	return -1  # Not found
 
 func _on_turn_ended(_combatant_id: String) -> void:
 	"""Called when a combatant's turn ends"""
@@ -1420,7 +1948,16 @@ func _on_turn_order_animation_completed() -> void:
 
 func _on_battle_ended(victory: bool) -> void:
 	"""Called when battle ends"""
+	# Lock input for battle end
+	_lock_input("Battle ending")
+	_deactivate_element(BattleElement.ACTION_MENU)
+	_deactivate_element(BattleElement.CHARACTER_ANIMATION)
+
 	if victory:
+		# Set victory state
+		_set_battle_state(BattleState.VICTORY)
+		_activate_element(BattleElement.BATTLE_REWARDS)
+
 		log_message("*** VICTORY ***")
 
 		# Wait for all messages to be displayed and acknowledged before showing victory screen
@@ -1431,14 +1968,10 @@ func _on_battle_ended(victory: bool) -> void:
 			sprite_animator.play_animation_for_all("Thumbs Up", "DOWN", true)  # Hold the pose
 			print("[Battle] Playing victory animation: Thumbs Up (hold)")
 
-			# Move portrait sprites up 16px for thumbs up pose
-			var allies = battle_mgr.get_ally_combatants()
-			for ally in allies:
-				var portrait_id = ally.id + "_portrait"
-				if sprite_animator.sprite_instances.has(portrait_id):
-					var portrait_sprite = sprite_animator.sprite_instances[portrait_id]
-					portrait_sprite.position.y -= 16  # Move up 16px
-					print("[Battle] Moved portrait sprite for %s up 16px (y: %d -> %d)" % [ally.display_name, portrait_sprite.position.y + 16, portrait_sprite.position.y])
+			# Keep portraits facing LEFT in Idle pose (they should never change)
+			for combatant_id in sprite_animator.sprite_instances.keys():
+				if "_portrait" in combatant_id:
+					sprite_animator.play_animation(combatant_id, "Idle", "LEFT")
 		else:
 			print("[Battle] ERROR: sprite_animator is null, cannot play victory animation!")
 
@@ -1447,6 +1980,9 @@ func _on_battle_ended(victory: bool) -> void:
 
 		_show_victory_screen()
 	else:
+		# Set defeat state
+		_set_battle_state(BattleState.DEFEAT)
+
 		log_message("*** DEFEAT ***")
 		log_message("Your party has been wiped out!")
 		log_message("GAME OVER")
@@ -1807,10 +2343,26 @@ func _set_fainted(target: Dictionary) -> void:
 	target.ailment = "fainted"
 	target.ailment_turn_count = 0
 
-	# Play faint animation (Hurt) and hold it
-	if sprite_animator and target.get("is_ally", false):
-		sprite_animator.play_animation(target.id, "Hurt", "DOWN", true)  # true = hold
+	# Play faint animation (Hurt) and fade out
+	if sprite_animator:
+		# Enemies face player, so use LEFT direction to flip horizontally
+		var direction = "LEFT" if not target.get("is_ally", false) else "DOWN"
+		sprite_animator.play_animation(target.id, "Hurt", direction, true)  # true = hold
 		print("[Battle] Playing faint animation (hold): Hurt for %s" % target.id)
+
+		# For enemies, fade out the sprite after hurt animation
+		if not target.get("is_ally", false):
+			await get_tree().create_timer(0.5).timeout  # Let hurt animation show briefly
+
+			# Fade out enemy sprite over 1.5 seconds
+			if sprite_animator.sprite_instances.has(target.id):
+				var sprite_instance = sprite_animator.sprite_instances[target.id]
+				var sprite_node = sprite_instance["sprite"]
+
+				# Create fade-out tween
+				var tween = create_tween()
+				tween.tween_property(sprite_node, "modulate:a", 0.0, 1.5)
+				print("[Battle] Fading out defeated enemy: %s" % target.display_name)
 
 	# Refresh turn order to show fainted status
 	if battle_mgr:
@@ -1851,17 +2403,23 @@ func _display_combatants() -> void:
 		ally_slots.add_child(slot)
 		combatant_panels[ally.id] = slot
 
-		# Calculate horizontal offset for fighting stance
-		# VBoxContainer controls slot position, so we offset the sprite instead
-		var x_offset = 0
-		if i == 0:  # Top ally (hero) - no offset
-			x_offset = 0
-		elif i == 1:  # Middle ally - shift left 60px
-			x_offset = -60
-		elif i == 2:  # Bottom ally - shift left 120px
-			x_offset = -120
+		# Get position config from CSV (or use defaults)
+		var pos_config = {}
+		if battle_flow_config:
+			pos_config = battle_flow_config.get_marker_position("ally", i)
 
-		print("[Battle] Ally %d (%s) will apply x_offset = %d to sprite" % [i, ally.display_name, x_offset])
+		# Calculate horizontal offset for fighting stance (use CSV or defaults)
+		var x_offset = pos_config.get("x_offset", 0.0 if i == 0 else -60.0 if i == 1 else -120.0)
+		var sprite_x = pos_config.get("sprite_x", 40.0)
+		var sprite_y = pos_config.get("sprite_y", 40.0)
+		var sprite_scale = pos_config.get("sprite_scale", 4.375)
+		var shadow_x = pos_config.get("shadow_x", sprite_x)
+		var shadow_y = pos_config.get("shadow_y", 55.0)
+		var shadow_scale_x = pos_config.get("shadow_scale_x", 3.0)
+		var shadow_scale_y = pos_config.get("shadow_scale_y", 1.5)
+		var z_index_base = pos_config.get("z_index", 108)
+
+		print("[Battle] Ally %d (%s) will apply x_offset = %.1f to sprite" % [i, ally.display_name, x_offset])
 
 		# Store sprite offset for selection indicator positioning
 		combatant_sprite_offsets[ally.id] = x_offset
@@ -1871,26 +2429,24 @@ func _display_combatants() -> void:
 		if sprite_animator:
 			var sprite = sprite_animator.create_sprite_for_combatant(ally.id, slot, ally.get("display_name", ""), true)
 			if sprite:
-				# Position and scale sprite for 70px height
-				# Apply x_offset to sprite position (not slot position, since VBoxContainer controls that)
-				sprite.position = Vector2(40 + x_offset, 40)
-				sprite.scale = Vector2(4.375, 4.375)  # 70px height
+				# Position and scale sprite using CSV config
+				sprite.position = Vector2(sprite_x, sprite_y)
+				sprite.scale = Vector2(sprite_scale, sprite_scale)
 				print("[Battle] Ally %d (%s) sprite positioned at (%.2f, %.2f)" % [i, ally.display_name, sprite.position.x, sprite.position.y])
 
-				# Create shadow circle at base of sprite (also offset)
+				# Create shadow circle at base of sprite using CSV config
 				var shadow = Sprite2D.new()
 				shadow.name = "Shadow"
 				var shadow_texture = _create_shadow_circle_texture()
 				shadow.texture = shadow_texture
 				shadow.modulate = Color(0, 0, 0, 0.7)  # Darker, more visible shadow
-				shadow.position = Vector2(40 + x_offset, 55)  # Closer to sprite base
-				shadow.scale = Vector2(3, 1.5)  # Larger ellipse shape for better visibility
+				shadow.position = Vector2(shadow_x, shadow_y)
+				shadow.scale = Vector2(shadow_scale_x, shadow_scale_y)
 				shadow.z_index = 104  # Below sprite (sprites at 108-110)
 				slot.add_child(shadow)
 
-				# Depth-based z-layering: bottom allies have higher z (appear in front)
-				# Ally 0 (top) = 108, Ally 1 (middle) = 109, Ally 2 (bottom) = 110
-				sprite.z_index = 108 + i
+				# Depth-based z-layering using CSV config
+				sprite.z_index = z_index_base
 
 				print("[Battle] Created shadow for ally: %s at position (%f, %f) with z-index %d" % [ally.id, shadow.position.x, shadow.position.y, shadow.z_index])
 
@@ -1918,16 +2474,23 @@ func _display_combatants() -> void:
 		enemy_slots.add_child(slot)
 		combatant_panels[enemy.id] = slot
 
-		# Calculate horizontal offset for fighting stance (mirrored from allies)
-		var x_offset = 0
-		if i == 0:  # Top enemy - no offset
-			x_offset = 0
-		elif i == 1:  # Middle enemy - shift right 60px
-			x_offset = 60
-		elif i == 2:  # Bottom enemy - shift right 120px
-			x_offset = 120
+		# Get position config from CSV (or use defaults)
+		var pos_config = {}
+		if battle_flow_config:
+			pos_config = battle_flow_config.get_marker_position("enemy", i)
 
-		print("[Battle] Enemy %d (%s) will apply x_offset = %d to sprite" % [i, enemy.display_name, x_offset])
+		# Calculate horizontal offset for fighting stance (use CSV or defaults)
+		var x_offset = pos_config.get("x_offset", 0.0 if i == 0 else 60.0 if i == 1 else 120.0)
+		var sprite_x = pos_config.get("sprite_x", 40.0)
+		var sprite_y = pos_config.get("sprite_y", 40.0)
+		var sprite_scale = pos_config.get("sprite_scale", 4.375)
+		var shadow_x = pos_config.get("shadow_x", sprite_x)
+		var shadow_y = pos_config.get("shadow_y", 55.0)
+		var shadow_scale_x = pos_config.get("shadow_scale_x", 3.0)
+		var shadow_scale_y = pos_config.get("shadow_scale_y", 1.5)
+		var z_index_base = pos_config.get("z_index", 108)
+
+		print("[Battle] Enemy %d (%s) will apply x_offset = %.1f to sprite" % [i, enemy.display_name, x_offset])
 
 		# Store sprite offset for selection indicator positioning
 		combatant_sprite_offsets[enemy.id] = x_offset
@@ -1937,26 +2500,24 @@ func _display_combatants() -> void:
 		if sprite_animator:
 			var sprite = sprite_animator.create_sprite_for_combatant(enemy.id, slot, enemy.get("display_name", ""), false)
 			if sprite:
-				# Position and scale sprite for 70px height
-				# Apply x_offset to sprite position (not slot position, since VBoxContainer controls that)
-				sprite.position = Vector2(40 + x_offset, 40)
-				sprite.scale = Vector2(4.375, 4.375)  # 70px height
+				# Position and scale sprite using CSV config
+				sprite.position = Vector2(sprite_x, sprite_y)
+				sprite.scale = Vector2(sprite_scale, sprite_scale)
 				print("[Battle] Enemy %d (%s) sprite positioned at (%.2f, %.2f)" % [i, enemy.display_name, sprite.position.x, sprite.position.y])
 
-				# Create shadow circle at base of sprite (also offset)
+				# Create shadow circle at base of sprite using CSV config
 				var shadow = Sprite2D.new()
 				shadow.name = "Shadow"
 				var shadow_texture = _create_shadow_circle_texture()
 				shadow.texture = shadow_texture
 				shadow.modulate = Color(0, 0, 0, 0.7)  # Darker, more visible shadow
-				shadow.position = Vector2(40 + x_offset, 55)  # Closer to sprite base
-				shadow.scale = Vector2(3, 1.5)  # Larger ellipse shape for better visibility
+				shadow.position = Vector2(shadow_x, shadow_y)
+				shadow.scale = Vector2(shadow_scale_x, shadow_scale_y)
 				shadow.z_index = 104  # Below sprite (sprites at 108-110)
 				slot.add_child(shadow)
 
-				# Depth-based z-layering: bottom enemies have higher z (appear in front)
-				# Enemy 0 (top) = 108, Enemy 1 (middle) = 109, Enemy 2 (bottom) = 110
-				sprite.z_index = 108 + i
+				# Depth-based z-layering using CSV config
+				sprite.z_index = z_index_base
 
 				print("[Battle] Created shadow for enemy: %s at position (%f, %f) with z-index %d" % [enemy.id, shadow.position.x, shadow.position.y, shadow.z_index])
 				print("[Battle] Created sprite for enemy: %s at position %s with z-index %d" % [enemy.id, sprite.position, sprite.z_index])
@@ -2470,8 +3031,9 @@ func _create_combatant_slot(combatant: Dictionary, is_ally: bool, slot_index: in
 
 func _update_combatant_displays() -> void:
 	"""Update all combatant HP/MP displays"""
-	# TODO: Update HP/MP bars without recreating everything
-	_display_combatants()
+	# DO NOT recreate sprites - this destroys character positions during battle!
+	# Sprites are already created and positioned at battle start
+	# Only update the party status panels (HP/MP bars)
 	_update_party_status_panels()
 
 func _shake_combatant_panel(combatant_id: String) -> void:
@@ -2688,6 +3250,11 @@ func _format_buff_description(buff_type: String, value: float, duration: int) ->
 
 func _show_action_menu() -> void:
 	"""Show the action menu for player's turn"""
+	# Set player input state and unlock input
+	_set_battle_state(BattleState.PLAYER_INPUT)
+	_unlock_input()
+	_activate_element(BattleElement.ACTION_MENU)
+
 	# Ensure input is enabled (in case animation was skipped)
 	if is_in_round_transition:
 		_enable_all_input()
@@ -2773,6 +3340,10 @@ func _on_attack_pressed() -> void:
 	if is_in_round_transition:
 		return
 
+	# Block input when locked
+	if battle_flow_state.input_locked:
+		return
+
 	# Activate the Fight button with visual feedback
 	_activate_action_button("AttackButton", COLOR_BUBBLE_MAGENTA)
 
@@ -2799,6 +3370,12 @@ func _on_attack_pressed() -> void:
 
 func _execute_attack(target: Dictionary) -> void:
 	"""Execute attack on selected target"""
+	# Set executing action state and activate relevant elements
+	_set_battle_state(BattleState.EXECUTING_ACTION)
+	_lock_input("Executing action")
+	_activate_element(BattleElement.DAMAGE_NUMBERS_QUEUE)
+	_activate_element(BattleElement.CHARACTER_EFFECTS)
+
 	_hide_instruction()
 	awaiting_target_selection = false
 	_clear_target_highlights()
@@ -2834,20 +3411,23 @@ func _execute_attack(target: Dictionary) -> void:
 
 			print("[Battle] Miss! Hit chance: %.1f%%, Roll: %d" % [hit_check.hit_chance, hit_check.roll])
 		else:
-			# Hit! Launch attack minigame
-			var tpo = current_combatant.stats.get("TPO", 1)
-			var brw = current_combatant.stats.get("BRW", 1)
-			var status_effects = []
-			var ailment = str(current_combatant.get("ailment", ""))
-			if ailment != "":
-				status_effects.append(ailment)
+			# Hit! Launch attack minigame (for allies only)
+			var minigame_result = {"damage_modifier": 1.0, "is_crit": false}
 
-			_show_instruction("FIGHT!")
-			var minigame_result = await minigame_mgr.launch_attack_minigame(tpo, brw, status_effects)
-			_hide_instruction()
+			if current_combatant.is_ally:
+				var tpo = current_combatant.stats.get("TPO", 1)
+				var brw = current_combatant.stats.get("BRW", 1)
+				var status_effects = []
+				var ailment = str(current_combatant.get("ailment", ""))
+				if ailment != "":
+					status_effects.append(ailment)
+
+				_show_instruction("FIGHT!")
+				minigame_result = await minigame_mgr.launch_attack_minigame(tpo, brw, status_effects)
+				_hide_instruction()
 
 			# Play attack animation based on weapon type
-			if sprite_animator and current_combatant.is_ally:
+			if sprite_animator:
 				var weapon_type = "Neutral"
 				if current_combatant.has("equipment") and current_combatant.equipment.has("weapon"):
 					var weapon_id = current_combatant.equipment.weapon
@@ -2867,15 +3447,17 @@ func _execute_attack(target: Dictionary) -> void:
 					"spear", "pierce":
 						anim_name = "Spear Strike"
 					_:
-						anim_name = "Sword Strike"  # Default attack animation
+						anim_name = "Wand Strike"  # Default attack animation (was Sword Strike)
 
-				sprite_animator.play_animation(current_combatant.id, anim_name, "RIGHT", false, true)
-				print("[Battle] Playing attack animation: %s for %s (weapon: %s)" % [anim_name, current_combatant.id, weapon_type])
+				# Determine direction based on ally/enemy
+				var direction = "RIGHT" if current_combatant.is_ally else "LEFT"
+				sprite_animator.play_animation(current_combatant.id, anim_name, direction, false, true)
+				print("[Battle] Playing attack animation: %s %s for %s (weapon: %s)" % [anim_name, direction, current_combatant.id, weapon_type])
 
 				# Wait for animation to play (about 0.5 seconds)
 				await get_tree().create_timer(0.6).timeout
 
-			# Slide character back immediately after minigame closes
+			# Reset turn indicator panel
 			await _reset_turn_indicator()
 			# Apply minigame result modifiers
 			var damage_modifier = minigame_result.get("damage_modifier", 1.0)
@@ -2917,6 +3499,30 @@ func _execute_attack(target: Dictionary) -> void:
 
 			# Wake up if asleep
 			_wake_if_asleep(target)
+
+			# Show hurt reaction on target (frame 178 only)
+			if sprite_animator and sprite_animator.sprite_instances.has(target.id):
+				var target_instance = sprite_animator.sprite_instances[target.id]
+				var is_layered = target_instance.get("is_layered", false)
+
+				# Set frame 178 manually
+				if is_layered:
+					var layer_sprites = target_instance.get("layer_sprites", {})
+					for sprite_code in layer_sprites:
+						var sprite = layer_sprites[sprite_code]
+						if sprite and sprite.visible and sprite.texture:
+							sprite.frame = 178
+				else:
+					var target_sprite = target_instance["sprite"]
+					target_sprite.frame = 178
+
+				await get_tree().create_timer(0.6).timeout
+
+				# Return to idle if not KO'd (we'll check below)
+				# Allies face RIGHT, enemies face LEFT
+				if target.hp > 0:
+					var idle_direction = "RIGHT" if target.get("is_ally", false) else "LEFT"
+					sprite_animator.play_animation(target.id, "Idle", idle_direction, false, false)
 
 			if target.hp <= 0:
 				target.hp = 0
@@ -3035,6 +3641,10 @@ func _on_skill_pressed() -> void:
 	if is_in_round_transition:
 		return
 
+	# Block input when locked
+	if battle_flow_state.input_locked:
+		return
+
 	# Activate the Skill button with visual feedback
 	_activate_action_button("SkillButton", COLOR_SKY_CYAN)
 
@@ -3122,6 +3732,10 @@ func _on_item_pressed() -> void:
 	"""Handle Item action - show usable items menu"""
 	# Block input during round transitions
 	if is_in_round_transition:
+		return
+
+	# Block input when locked
+	if battle_flow_state.input_locked:
 		return
 
 	# Activate the Items button with visual feedback
@@ -3218,6 +3832,10 @@ func _on_capture_pressed() -> void:
 	"""Handle Capture action - show bind item selection menu"""
 	# Block input during round transitions
 	if is_in_round_transition:
+		return
+
+	# Block input when locked
+	if battle_flow_state.input_locked:
 		return
 
 	# Activate the Capture button with visual feedback
@@ -3442,6 +4060,12 @@ func _execute_capture(target: Dictionary) -> void:
 
 func _execute_item_usage(target: Dictionary) -> void:
 	"""Execute item usage on selected target"""
+	# Set executing action state and activate elements
+	_set_battle_state(BattleState.EXECUTING_ACTION)
+	_lock_input("Using item")
+	_activate_element(BattleElement.CHARACTER_EFFECTS)
+	_activate_element(BattleElement.DAMAGE_NUMBERS_QUEUE)
+
 	awaiting_target_selection = false
 	awaiting_item_target = false
 	_clear_target_highlights()
@@ -3544,6 +4168,22 @@ func _execute_item_usage(target: Dictionary) -> void:
 			var damage = int(base_damage * (1.0 + type_bonus))
 			enemy.hp = max(0, enemy.hp - damage)
 
+			# Show hurt reaction on target (frame 178 only)
+			if sprite_animator and sprite_animator.sprite_instances.has(enemy.id):
+				var target_instance = sprite_animator.sprite_instances[enemy.id]
+				var is_layered = target_instance.get("is_layered", false)
+
+				# Set frame 178 manually
+				if is_layered:
+					var layer_sprites = target_instance.get("layer_sprites", {})
+					for sprite_code in layer_sprites:
+						var sprite = layer_sprites[sprite_code]
+						if sprite and sprite.visible and sprite.texture:
+							sprite.frame = 178
+				else:
+					var target_sprite = target_instance["sprite"]
+					target_sprite.frame = 178
+
 			var type_msg = ""
 			if type_bonus > 0:
 				type_msg = " (Weakness!)"
@@ -3558,6 +4198,14 @@ func _execute_item_usage(target: Dictionary) -> void:
 				damage_lines.append("%s was defeated!" % enemy.display_name)
 				battle_mgr.record_enemy_defeat(enemy, false)
 				ko_list.append(enemy)
+
+		# Wait for hurt animations, then return to idle
+		await get_tree().create_timer(0.6).timeout
+		for enemy in bomb_targets:
+			if not enemy.is_ko and sprite_animator and sprite_animator.sprite_instances.has(enemy.id):
+				# Return to idle: allies face RIGHT, enemies face LEFT
+				var idle_direction = "RIGHT" if enemy.get("is_ally", false) else "LEFT"
+				sprite_animator.play_animation(enemy.id, "Idle", idle_direction, false, false)
 
 		# Build message
 		start_turn_message()
@@ -3904,6 +4552,10 @@ func _on_defend_pressed() -> void:
 	if is_in_round_transition:
 		return
 
+	# Block input when locked
+	if battle_flow_state.input_locked:
+		return
+
 	# Activate the Guard button with visual feedback
 	_activate_action_button("DefendButton", COLOR_PLASMA_TEAL)
 
@@ -3936,6 +4588,10 @@ func _on_burst_pressed() -> void:
 	"""Handle Burst action - show burst abilities menu"""
 	# Block input during round transitions
 	if is_in_round_transition:
+		return
+
+	# Block input when locked
+	if battle_flow_state.input_locked:
 		return
 
 	# Activate the Burst button with visual feedback
@@ -4010,6 +4666,10 @@ func _on_run_pressed() -> void:
 	if is_in_round_transition:
 		return
 
+	# Block input when locked
+	if battle_flow_state.input_locked:
+		return
+
 	# Activate the Run button with visual feedback
 	_activate_action_button("RunButton", COLOR_INK_CHARCOAL)
 
@@ -4027,6 +4687,11 @@ func _on_run_pressed() -> void:
 
 func _execute_run() -> void:
 	"""Execute run action after confirmation"""
+	# Activate escape attempt element and minigame
+	_activate_element(BattleElement.ESCAPE_ATTEMPT)
+	_activate_element(BattleElement.MINIGAME)
+	_lock_input("Escape attempt")
+
 	# Mark that run was attempted
 	battle_mgr.run_attempted_this_round = true
 
@@ -4061,6 +4726,11 @@ func _execute_run() -> void:
 		sprite_animator.play_animation_for_all("Run", "LEFT")
 		print("[Battle] Playing run animation: Run LEFT for entire party")
 
+		# Keep portraits facing LEFT in Idle pose (they should never change)
+		for combatant_id in sprite_animator.sprite_instances.keys():
+			if "_portrait" in combatant_id:
+				sprite_animator.play_animation(combatant_id, "Idle", "LEFT")
+
 		# Wait for animation to play (about 0.8 seconds)
 		await get_tree().create_timer(0.8).timeout
 
@@ -4079,6 +4749,9 @@ func _execute_run() -> void:
 		# Wait for message acknowledgment
 		await _wait_for_message_queue()
 
+		# Set escaped state
+		_set_battle_state(BattleState.ESCAPED)
+
 		battle_mgr.current_state = battle_mgr.BattleState.ESCAPED
 		battle_mgr.return_to_overworld()
 	else:
@@ -4089,6 +4762,11 @@ func _execute_run() -> void:
 		if sprite_animator:
 			sprite_animator.play_animation_for_all("Idle", "RIGHT")
 			print("[Battle] Failed escape - returning party to idle pose")
+
+			# Keep portraits facing LEFT in Idle pose (they should never change)
+			for combatant_id in sprite_animator.sprite_instances.keys():
+				if "_portrait" in combatant_id:
+					sprite_animator.play_animation(combatant_id, "Idle", "LEFT")
 
 		# Wait for message acknowledgment before ending turn
 		await _wait_for_message_queue()
@@ -4104,6 +4782,10 @@ func _on_status_pressed() -> void:
 	if is_in_round_transition:
 		return
 
+	# Block input when locked
+	if battle_flow_state.input_locked:
+		return
+
 	# Activate the Status button with visual feedback
 	_activate_action_button("StatusButton", COLOR_MILK_WHITE)
 
@@ -4114,6 +4796,14 @@ func _on_status_pressed() -> void:
 
 func _on_switch_panel_pressed() -> void:
 	"""Handle switching between action menu panels"""
+	# Block input when locked
+	if battle_flow_state.input_locked:
+		return
+
+	# Block input during round transitions
+	if is_in_round_transition:
+		return
+
 	_toggle_action_panel()
 
 func _toggle_action_panel() -> void:
@@ -4595,6 +5285,11 @@ func _clear_target_highlights() -> void:
 
 func _execute_enemy_ai() -> void:
 	"""Execute AI for enemy turn"""
+	# Set enemy turn state and ensure input is locked
+	_set_battle_state(BattleState.ENEMY_TURN)
+	_lock_input("Enemy turn")
+	_deactivate_element(BattleElement.ACTION_MENU)
+
 	await get_tree().create_timer(0.5).timeout  # Brief delay
 
 	# Clear defending status when attacking
@@ -4611,6 +5306,101 @@ func _execute_enemy_ai() -> void:
 		start_turn_message()
 		add_turn_line("%s attacked %s!" % [current_combatant.display_name, target.display_name])
 
+		# Play enemy attack animation
+		if sprite_animator:
+			# Detect weapon type from enemy profile
+			var weapon_type = "Neutral"
+			if current_combatant.has("profile"):
+				var profile = current_combatant.profile
+				if profile != null and profile.has("weapon") and profile.weapon.has("type"):
+					weapon_type = profile.get("weapon", {}).get("type", "Neutral")
+
+			# Map weapon type to animation name
+			var anim_name = "Idle"
+			match weapon_type.to_lower():
+				"wand":
+					anim_name = "Wand Strike"
+				"sword":
+					anim_name = "Sword Strike"
+				"hammer", "impact":
+					anim_name = "Hammer Strike"
+				"spear", "pierce":
+					anim_name = "Spear Strike"
+				_:
+					anim_name = "Wand Strike"  # Default attack animation
+
+			# Enemies face player, so use LEFT direction
+			var direction = "LEFT"
+			sprite_animator.play_animation(current_combatant.id, anim_name, direction, false, true)
+			print("[Battle] Playing enemy attack animation: %s %s for %s (weapon: %s)" % [anim_name, direction, current_combatant.id, weapon_type])
+
+			# Wait for animation to complete
+			await get_tree().create_timer(0.6).timeout
+
+		# DEFENSE MINIGAME - Give player chance to parry
+		var defense_result = await _show_defense_minigame(target, current_combatant)
+		var defense_modifier = defense_result.damage_modifier  # 0.0 = parried, 1.0 = normal, 1.3 = failed
+		var counter_damage = defense_result.counter_damage  # Damage to deal back to attacker
+
+		print("[Battle] Defense minigame result - Modifier: %.1f%%, Counter: %.1f" % [defense_modifier * 100, counter_damage])
+
+		# SUCCESSFUL PARRY - Play counter-attack animations
+		if counter_damage > 0:
+			print("[Battle] PARRY SUCCESS! Playing counter-attack animations")
+
+			if sprite_animator:
+				# Defender (player) does attack animation
+				var defender_weapon_type = "Neutral"
+				if target.has("profile"):
+					var profile = target.profile
+					if profile != null and profile.has("weapon") and profile.weapon.has("type"):
+						defender_weapon_type = profile.get("weapon", {}).get("type", "Neutral")
+
+				# Map weapon type to animation name
+				var attack_anim = "Idle"
+				match defender_weapon_type.to_lower():
+					"wand":
+						attack_anim = "Wand Strike"
+					"sword":
+						attack_anim = "Sword Strike"
+					"hammer", "impact":
+						attack_anim = "Hammer Strike"
+					"spear", "pierce":
+						attack_anim = "Spear Strike"
+					_:
+						attack_anim = "Wand Strike"  # Default
+
+				# Allies face RIGHT, enemies face LEFT
+				var defender_direction = "RIGHT" if target.get("is_ally", false) else "LEFT"
+				sprite_animator.play_animation(target.id, attack_anim, defender_direction, false, true)
+				print("[Battle] Playing defender counter animation: %s %s" % [attack_anim, defender_direction])
+
+				await get_tree().create_timer(0.6).timeout
+
+				# Show hurt reaction on attacker (frame 178)
+				if sprite_animator.sprite_instances.has(current_combatant.id):
+					var attacker_instance = sprite_animator.sprite_instances[current_combatant.id]
+					var is_layered = attacker_instance.get("is_layered", false)
+
+					# Set frame 178 manually
+					if is_layered:
+						var layer_sprites = attacker_instance.get("layer_sprites", {})
+						for sprite_code in layer_sprites:
+							var sprite = layer_sprites[sprite_code]
+							if sprite and sprite.visible and sprite.texture:
+								sprite.frame = 178
+					else:
+						var attacker_sprite = attacker_instance["sprite"]
+						attacker_sprite.frame = 178
+
+					print("[Battle] Playing attacker hurt reaction (frame 178)")
+					await get_tree().create_timer(0.6).timeout
+
+					# Return attacker to idle if not KO'd
+					if current_combatant.hp > 0:
+						var attacker_direction = "RIGHT" if current_combatant.get("is_ally", false) else "LEFT"
+						sprite_animator.play_animation(current_combatant.id, "Idle", attacker_direction, false, false)
+
 		# First, check if the attack hits
 		var hit_check = combat_resolver.check_physical_hit(current_combatant, target)
 
@@ -4619,6 +5409,23 @@ func _execute_enemy_ai() -> void:
 			_show_miss_feedback(target)  # Show big MISS text above target
 			add_turn_line("But it missed!")
 			add_turn_line("(Hit chance: %d%%, rolled %d)" % [int(hit_check.hit_chance), hit_check.roll])
+
+			# Handle counter damage even on miss (if player got perfect parry)
+			if counter_damage > 0:
+				current_combatant.hp -= int(counter_damage)
+				if current_combatant.hp < 0:
+					current_combatant.hp = 0
+
+				add_turn_line("%s countered for %d damage!" % [target.display_name, int(counter_damage)])
+
+				if current_combatant.hp <= 0:
+					_set_fainted(current_combatant)
+					add_turn_line("%s fainted from the counter!" % current_combatant.display_name)
+					# Record kill for morality system
+					battle_mgr.record_enemy_defeat(current_combatant, false)  # false = kill
+				else:
+					add_turn_line("%s has %d HP left." % [current_combatant.display_name, current_combatant.hp])
+
 			queue_turn_message()  # Queue the full turn message
 			print("[Battle] Enemy Miss! Hit chance: %.1f%%, Roll: %d" % [hit_check.hit_chance, hit_check.roll])
 		else:
@@ -4649,11 +5456,45 @@ func _execute_enemy_ai() -> void:
 			var damage = damage_result.damage
 			var is_stumble = damage_result.is_stumble
 
+			# Apply defense modifier from minigame
+			damage = int(damage * defense_modifier)
+			print("[Battle] Damage after defense modifier: %d (modifier: %.1f%%)" % [damage, defense_modifier * 100])
+
 			# Apply damage
 			target.hp -= damage
 
 			# Wake up if asleep
 			_wake_if_asleep(target)
+
+			# Show hurt reaction on target (frame 178 only) - ONLY if not parried
+			if defense_modifier > 0.0:  # Only show hurt if taking damage (not parried)
+				if sprite_animator and sprite_animator.sprite_instances.has(target.id):
+					var target_instance = sprite_animator.sprite_instances[target.id]
+					var is_layered = target_instance.get("is_layered", false)
+
+					# Set frame 178 manually
+					if is_layered:
+						var layer_sprites = target_instance.get("layer_sprites", {})
+						for sprite_code in layer_sprites:
+							var sprite = layer_sprites[sprite_code]
+							if sprite and sprite.visible and sprite.texture:
+								sprite.frame = 178
+					else:
+						var target_sprite = target_instance["sprite"]
+						target_sprite.frame = 178
+
+					await get_tree().create_timer(0.6).timeout
+
+					# Return to idle if not KO'd (we'll check below)
+					# Allies face RIGHT, enemies face LEFT
+					if target.hp > 0:
+						var idle_direction = "RIGHT" if target.get("is_ally", false) else "LEFT"
+						sprite_animator.play_animation(target.id, "Idle", idle_direction, false, false)
+			else:
+				# Parried - return to idle immediately (no hurt animation)
+				if target.hp > 0 and sprite_animator:
+					var idle_direction = "RIGHT" if target.get("is_ally", false) else "LEFT"
+					sprite_animator.play_animation(target.id, "Idle", idle_direction, false, false)
 
 			if target.hp <= 0:
 				target.hp = 0
@@ -4707,6 +5548,22 @@ func _execute_enemy_ai() -> void:
 					add_turn_line(_get_enemy_health_hint(target))
 				else:
 					add_turn_line("%s has %d HP left." % [target.display_name, target.hp])
+
+			# Handle counter damage from successful parry
+			if counter_damage > 0:
+				current_combatant.hp -= int(counter_damage)
+				if current_combatant.hp < 0:
+					current_combatant.hp = 0
+
+				add_turn_line("%s countered for %d damage!" % [target.display_name, int(counter_damage)])
+
+				if current_combatant.hp <= 0:
+					_set_fainted(current_combatant)
+					add_turn_line("%s fainted from the counter!" % current_combatant.display_name)
+					# Record kill for morality system
+					battle_mgr.record_enemy_defeat(current_combatant, false)  # false = kill
+				else:
+					add_turn_line("%s has %d HP left." % [current_combatant.display_name, current_combatant.hp])
 
 			# Queue the full turn message
 			queue_turn_message()
@@ -6700,13 +7557,6 @@ func _execute_burst_on_target(target: Dictionary) -> void:
 	var scaling_mnd = float(selected_burst.get("scaling_mnd", 1.0))
 	var scaling_fcs = float(selected_burst.get("scaling_fcs", 0.5))
 
-	# Play Jump animation once for burst ability
-	if sprite_animator and current_combatant.is_ally:
-		sprite_animator.play_animation(current_combatant.id, "Jump", "RIGHT", false, true)  # play_once=true
-		print("[Battle] Playing burst animation: Jump (play once) for %s" % current_combatant.id)
-
-		# Wait for animation to complete
-		await get_tree().create_timer(0.6).timeout
 
 	# Check if hit (bursts have high accuracy)
 	var hit_check = combat_resolver.check_sigil_hit(current_combatant, target, {"skill_acc": acc})
@@ -6774,6 +7624,30 @@ func _execute_burst_on_target(target: Dictionary) -> void:
 
 	# Wake up if asleep
 	_wake_if_asleep(target)
+
+	# Show hurt reaction on target (frame 178 only)
+	if sprite_animator and sprite_animator.sprite_instances.has(target.id):
+		var target_instance = sprite_animator.sprite_instances[target.id]
+		var is_layered = target_instance.get("is_layered", false)
+
+		# Set frame 178 manually
+		if is_layered:
+			var layer_sprites = target_instance.get("layer_sprites", {})
+			for sprite_code in layer_sprites:
+				var sprite = layer_sprites[sprite_code]
+				if sprite and sprite.visible and sprite.texture:
+					sprite.frame = 178
+		else:
+			var target_sprite = target_instance["sprite"]
+			target_sprite.frame = 178
+
+		await get_tree().create_timer(0.6).timeout
+
+		# Return to idle if not KO'd (we'll check below)
+		# Allies face RIGHT, enemies face LEFT
+		if target.hp > 0:
+			var idle_direction = "RIGHT" if target.get("is_ally", false) else "LEFT"
+			sprite_animator.play_animation(target.id, "Idle", idle_direction, false, false)
 
 	if target.hp <= 0:
 		target.hp = 0
@@ -6868,6 +7742,13 @@ func _on_skill_selected(skill_entry: Dictionary) -> void:
 
 func _execute_skill_single(target: Dictionary) -> void:
 	"""Execute a single-target skill"""
+	# Set executing action state and activate elements
+	_set_battle_state(BattleState.EXECUTING_ACTION)
+	_lock_input("Executing skill")
+	_activate_element(BattleElement.MINIGAME)
+	_activate_element(BattleElement.CHARACTER_EFFECTS)
+	_activate_element(BattleElement.DAMAGE_NUMBERS_QUEUE)
+
 	# Check if frozen combatant can act
 	if not await _check_freeze_action_allowed():
 		return
@@ -6900,28 +7781,31 @@ func _execute_skill_single(target: Dictionary) -> void:
 		queue_turn_message()
 		return
 
-	# ═══════ SKILL MINIGAME ═══════
-	# Get skill tier for minigame
-	var skill_tier = 1
-	if "_L" in skill_id:
-		var parts = skill_id.split("_L")
-		skill_tier = int(parts[1]) if parts.size() > 1 else 1
+	# ═══════ SKILL MINIGAME (allies only) ═══════
+	var minigame_result = {"damage_modifier": 1.0, "is_crit": false}
 
-	# Launch skill minigame (auto-starts, no message)
-	var focus_stat = current_combatant.stats.get("FCS", 1)
-	var skill_sequence = _get_skill_button_sequence(skill_id)
-	var mind_type = element  # Use the element as the mind type
-	var status_effects = []
-	var ailment = str(current_combatant.get("ailment", ""))
-	if ailment != "":
-		status_effects.append(ailment)
+	if current_combatant.is_ally:
+		# Get skill tier for minigame
+		var skill_tier = 1
+		if "_L" in skill_id:
+			var parts = skill_id.split("_L")
+			skill_tier = int(parts[1]) if parts.size() > 1 else 1
 
-	_show_instruction("SKILL!")
-	var minigame_result = await minigame_mgr.launch_skill_minigame(focus_stat, skill_sequence, skill_tier, mind_type, status_effects)
-	_hide_instruction()
+		# Launch skill minigame (auto-starts, no message)
+		var focus_stat = current_combatant.stats.get("FCS", 1)
+		var skill_sequence = _get_skill_button_sequence(skill_id)
+		var mind_type = element  # Use the element as the mind type
+		var status_effects = []
+		var ailment = str(current_combatant.get("ailment", ""))
+		if ailment != "":
+			status_effects.append(ailment)
+
+		_show_instruction("SKILL!")
+		minigame_result = await minigame_mgr.launch_skill_minigame(focus_stat, skill_sequence, skill_tier, mind_type, status_effects)
+		_hide_instruction()
 
 	# Play skill animation based on skill type
-	if sprite_animator and current_combatant.is_ally:
+	if sprite_animator:
 		var anim_name = "Bow Shot"  # Default
 		var anim_duration = 1.2
 
@@ -6940,13 +7824,16 @@ func _execute_skill_single(target: Dictionary) -> void:
 				anim_name = "Bow Shot"  # Default for magic/ranged
 				anim_duration = 1.2
 
-		sprite_animator.play_animation(current_combatant.id, anim_name, "RIGHT", false, true)
-		print("[Battle] Playing skill animation: %s for %s (type: %s)" % [anim_name, current_combatant.id, skill_type])
+		# Determine direction based on ally/enemy
+		var direction = "RIGHT" if current_combatant.is_ally else "LEFT"
+		sprite_animator.play_animation(current_combatant.id, anim_name, direction, false, true)
+		print("[Battle] Playing skill animation: %s %s for %s (type: %s)" % [anim_name, direction, current_combatant.id, skill_type])
 
 		# Wait for animation to play
-		await get_tree().create_timer(anim_duration).timeout
+		await get_tree().create_timer(0.6).timeout
 
-	# Slide character back immediately after minigame closes
+
+	# Reset turn indicator panel
 	await _reset_turn_indicator()
 
 	# Apply minigame modifiers
@@ -7096,9 +7983,33 @@ func _execute_skill_single(target: Dictionary) -> void:
 	# Wake up if asleep
 	_wake_if_asleep(target)
 
+	# Show hurt reaction on target (frame 178 only)
+	if sprite_animator and sprite_animator.sprite_instances.has(target.id):
+		var target_instance = sprite_animator.sprite_instances[target.id]
+		var is_layered = target_instance.get("is_layered", false)
+
+		# Set frame 178 manually
+		if is_layered:
+			var layer_sprites = target_instance.get("layer_sprites", {})
+			for sprite_code in layer_sprites:
+				var sprite = layer_sprites[sprite_code]
+				if sprite and sprite.visible and sprite.texture:
+					sprite.frame = 178
+		else:
+			var target_sprite = target_instance["sprite"]
+			target_sprite.frame = 178
+
+		await get_tree().create_timer(0.6).timeout
+
+		# Return to idle if not KO'd (we'll check below)
+		# Allies face RIGHT, enemies face LEFT
+		if target.hp > 0:
+			var idle_direction = "RIGHT" if target.get("is_ally", false) else "LEFT"
+			sprite_animator.play_animation(target.id, "Idle", idle_direction, false, false)
+
 	if target.hp <= 0:
 		target.hp = 0
-		target.is_ko = true
+		_set_fainted(target)
 
 		# Record kill for morality system (if enemy)
 		if not target.get("is_ally", false):
@@ -7230,6 +8141,12 @@ func _execute_skill_single(target: Dictionary) -> void:
 
 func _execute_skill_aoe() -> void:
 	"""Execute an AoE skill on all valid targets"""
+	# Set executing action state and activate elements
+	_set_battle_state(BattleState.EXECUTING_ACTION)
+	_lock_input("Executing AoE skill")
+	_activate_element(BattleElement.CHARACTER_EFFECTS)
+	_activate_element(BattleElement.DAMAGE_NUMBERS_QUEUE)
+
 	# Check if frozen combatant can act
 	if not await _check_freeze_action_allowed():
 		return
@@ -7354,3 +8271,34 @@ func _add_captured_enemy(enemy: Dictionary) -> void:
 	gs.set_meta("captured_enemies", captured)
 
 	print("[Battle] Captured enemy added to collection: %s (Total captures: %d)" % [actor_id, captured.size()])
+
+## ═══════════════════════════════════════════════════════════════
+## DEFENSE MINIGAME HELPER
+## ═══════════════════════════════════════════════════════════════
+
+func _show_defense_minigame(defender: Dictionary, attacker: Dictionary) -> Dictionary:
+	"""Show defense minigame and return results"""
+	# Load DefenseMinigame scene
+	var defense_scene = load("res://scripts/battle/DefenseMinigame.gd")
+	var defense_minigame = defense_scene.new()
+
+	# Calculate base damage for counter calculation
+	var base_damage = attacker.get("brw", 5) * 2.0  # Rough estimate
+	defense_minigame.attacker_damage = base_damage
+
+	# Add to scene
+	add_child(defense_minigame)
+
+	# Wait for completion
+	await defense_minigame.minigame_completed
+
+	# Get results
+	var result = {
+		"damage_modifier": defense_minigame.final_damage_modifier,
+		"counter_damage": defense_minigame.counter_attack_damage
+	}
+
+	# Clean up
+	defense_minigame.queue_free()
+
+	return result

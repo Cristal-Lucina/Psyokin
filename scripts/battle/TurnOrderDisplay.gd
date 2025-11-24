@@ -14,7 +14,6 @@ signal animation_completed  # Emitted when any animation finishes
 const SHOW_UPCOMING_TURNS: int = 8  # How many turns to show
 const ANIMATION_DURATION: float = 0.3  # Duration of slide animations
 const REVEAL_DELAY: float = 0.15  # Delay between each combatant reveal
-const KO_FALL_DURATION: float = 0.5  # Duration of KO falling animation
 
 ## Container for turn slots
 var turn_slots: Array[MarginContainer] = []
@@ -726,48 +725,11 @@ func update_combatant_hp(_combatant_id: String) -> void:
 	pass
 
 func animate_ko_fall(combatant_id: String) -> void:
-	"""Animate a combatant falling when KO'd - drops to bottom of screen"""
-	# Find the slot for this combatant
-	var target_slot: MarginContainer = null
-	for slot in turn_slots:
-		if slot.get_meta("combatant_id", "") == combatant_id:
-			target_slot = slot
-			break
-
-	if not target_slot:
-		return
-
-	print("[TurnOrderDisplay] Animating KO fall for %s" % combatant_id)
-
-	# Store original position of KO'd slot
-	var original_position = target_slot.global_position
-
-	# Create canvas layer for KO'd slot animation
-	var canvas_layer = CanvasLayer.new()
-	get_tree().root.add_child(canvas_layer)
-
-	# Reparent KO'd slot to canvas layer so it can drop freely
-	target_slot.reparent(canvas_layer, false)
-	target_slot.global_position = original_position
-
-	# Calculate drop distance to bottom of screen
-	var viewport_height = get_viewport_rect().size.y
-
-	# Animate KO'd slot dropping
-	var tween = create_tween()
-	tween.set_ease(Tween.EASE_IN)
-	tween.set_trans(Tween.TRANS_CUBIC)
-	tween.tween_property(target_slot, "global_position:y", viewport_height + 100, KO_FALL_DURATION)
-	tween.parallel().tween_property(target_slot, "rotation", deg_to_rad(25), KO_FALL_DURATION)
-	tween.parallel().tween_property(target_slot, "modulate:a", 0.0, KO_FALL_DURATION)
-	tween.parallel().tween_property(target_slot, "scale", Vector2(0.7, 0.7), KO_FALL_DURATION)
-
-	# Wait for animation to finish
-	await tween.finished
-
-	# Clean up canvas layer and KO'd slot
-	if is_instance_valid(canvas_layer):
-		canvas_layer.queue_free()
+	"""Placeholder for KO animation - no longer animates falling (was glitchy)"""
+	# Just return immediately - the turn order display will update naturally
+	# when the display is rebuilt after the KO
+	print("[TurnOrderDisplay] KO'd combatant %s (no fall animation)" % combatant_id)
+	return
 
 func animate_capture(combatant_id: String) -> void:
 	"""Animate a combatant being captured - turns cell green"""

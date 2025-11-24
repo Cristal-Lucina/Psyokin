@@ -1,0 +1,49 @@
+sequence_id,sequence_name,phase,step,action,duration,fade_duration,camera_distance,lock_input,unlock_input,text,wait_for_input,enabled,notes
+1,BATTLE_START,battle_start,1,LOCK_INPUT,0,0,0,TRUE,FALSE,"",FALSE,TRUE,Lock all input buttons
+2,BATTLE_START,battle_start,2,FADE_IN_BACKGROUND,0,0.8,0,FALSE,FALSE,"",FALSE,TRUE,Location background fades in
+3,BATTLE_START,battle_start,3,FADE_IN_CHARACTERS,0,0.8,0,FALSE,FALSE,"",FALSE,TRUE,Characters fade in
+4,BATTLE_START,battle_start,4,CAMERA_FOCUS_ENEMIES,0.5,0,0.7,FALSE,FALSE,"",FALSE,TRUE,Camera pulls in dramatically on enemies
+5,BATTLE_START,battle_start,5,SHOW_EXCLAMATION,0.3,0,0,FALSE,FALSE,"",FALSE,TRUE,Exclamation points over enemy heads
+6,BATTLE_START,battle_start,6,WAIT,0.5,0,0,FALSE,FALSE,"",FALSE,TRUE,Hold dramatic moment
+7,BATTLE_START,battle_start,7,CAMERA_SLIDE_BACK,0.6,0,1.0,FALSE,FALSE,"",FALSE,TRUE,Camera slides back to normal
+8,BATTLE_START,battle_start,8,FADE_IN_UI,0,0.5,0,FALSE,FALSE,"",FALSE,TRUE,Turn order/burst/info/party panels fade in
+9,BATTLE_START,battle_start,9,SHOW_TEXT,0,0,0,FALSE,FALSE,"Battle Start!",TRUE,TRUE,Show battle start text
+10,BATTLE_START,battle_start,10,PLACE_TURN_ORDER,0,0,0,FALSE,FALSE,"",FALSE,TRUE,Place everyone in turn order
+11,TURN_START_ALLY,turn_start,1,SHOW_TEXT,0,0,0,FALSE,FALSE,"[COMBATANT]'s Turn!",TRUE,TRUE,Show turn announcement
+12,TURN_START_ALLY,turn_start,2,RUN_TO_MARKER,0.4,0,0,FALSE,FALSE,"",FALSE,TRUE,Character runs to battle marker
+13,TURN_START_ALLY,turn_start,3,FADE_IN_ACTION_MENU,0,0.3,0,FALSE,FALSE,"",FALSE,TRUE,Action menu fades in
+14,TURN_START_ALLY,turn_start,4,UNLOCK_ACTION_MENU,0,0,0,FALSE,TRUE,"",FALSE,TRUE,Unlock action menu input
+15,ACTION_ATTACK_ALLY,action_execute,1,LOCK_ACTION_MENU,0,0,0,TRUE,FALSE,"",FALSE,TRUE,Lock action menu
+16,ACTION_ATTACK_ALLY,action_execute,2,UNLOCK_TARGET_SELECT,0,0,0,FALSE,TRUE,"",FALSE,TRUE,Unlock enemy selection
+17,ACTION_ATTACK_ALLY,action_execute,3,WAIT_TARGET_SELECT,0,0,0,FALSE,FALSE,"",FALSE,TRUE,Wait for target selection
+18,ACTION_ATTACK_ALLY,action_execute,4,LOCK_TARGET_SELECT,0,0,0,TRUE,FALSE,"",FALSE,TRUE,Lock target selection
+19,ACTION_ATTACK_ALLY,action_execute,5,CALCULATE_HIT,0,0,0,FALSE,FALSE,"",FALSE,TRUE,Calculate hit or miss
+20,ACTION_ATTACK_MISS,action_result,1,SHOW_MISS_TEXT,0.2,0,0,FALSE,FALSE,"",FALSE,TRUE,Show MISS over target
+21,ACTION_ATTACK_MISS,action_result,2,PLAY_ATTACK_ANIM,0.3,0,0,FALSE,FALSE,"",FALSE,TRUE,Attacker hit animation
+22,ACTION_ATTACK_MISS,action_result,3,PLAY_GUARD_ANIM,0.3,0,0,FALSE,FALSE,"",FALSE,TRUE,Defender guard animation
+23,ACTION_ATTACK_MISS,action_result,4,BOTH_TO_IDLE,0,0,0,FALSE,FALSE,"",FALSE,TRUE,Both return to idle
+24,ACTION_ATTACK_MISS,action_result,5,SHOW_TEXT,0,0,0,FALSE,FALSE,"[ATTACKER] attacked [TARGET]!",FALSE,TRUE,Show attack text
+25,ACTION_ATTACK_MISS,action_result,6,SHOW_TEXT,0,0,0,FALSE,FALSE,"The attack missed!",TRUE,TRUE,Show miss text
+26,ACTION_ATTACK_HIT,action_result,1,START_MINIGAME,0,0,0,FALSE,TRUE,"",FALSE,TRUE,Start attack minigame
+27,ACTION_ATTACK_HIT,action_result,2,WAIT_MINIGAME,0,0,0,FALSE,FALSE,"",FALSE,TRUE,Wait for minigame completion
+28,ACTION_ATTACK_HIT,action_result,3,LOCK_MINIGAME,0,0,0,TRUE,FALSE,"",FALSE,TRUE,Lock minigame input
+29,ACTION_ATTACK_HIT,action_result,4,CALCULATE_DAMAGE,0,0,0,FALSE,FALSE,"",FALSE,TRUE,Calculate damage
+30,ACTION_ATTACK_HIT,action_result,5,PLAY_ATTACK_ANIM,0.3,0,0,FALSE,FALSE,"",FALSE,TRUE,Attacker hit animation
+31,ACTION_ATTACK_HIT,action_result,6,PLAY_HURT_ANIM,0.3,0,0,FALSE,FALSE,"",FALSE,TRUE,Defender hurt animation
+32,ACTION_ATTACK_HIT,action_result,7,BOTH_TO_IDLE,0,0,0,FALSE,FALSE,"",FALSE,TRUE,Both return to idle
+33,ACTION_ATTACK_HIT,action_result,8,SHOW_TEXT,0,0,0,FALSE,FALSE,"[ATTACKER] attacked [TARGET]!",FALSE,TRUE,Show attack text
+34,ACTION_ATTACK_HIT,action_result,9,SHOW_TEXT,0,0,0,FALSE,FALSE,"[TARGET] is hit for [DAMAGE] damage!",FALSE,TRUE,Show damage text
+35,ACTION_ATTACK_HIT,action_result,10,SHOW_TEXT,0,0,0,FALSE,FALSE,"[HEALTH_HINT]",TRUE,TRUE,Show health hint
+36,TURN_END,turn_end,1,RUN_BACK,0.4,0,0,FALSE,FALSE,"",FALSE,TRUE,Character runs back to start
+37,TURN_END,turn_end,2,FACE_FORWARD,0,0,0,FALSE,FALSE,"",FALSE,TRUE,Turn to face forward (idle)
+38,TURN_END,turn_end,3,MOVE_TURN_MARKER,0.2,0,0,FALSE,FALSE,"",FALSE,TRUE,Turn order marker moves to next
+39,ROUND_END,round_end,1,SLIDE_OUT_TURN_ORDER,0,0.4,0,FALSE,FALSE,"",FALSE,TRUE,Turn order slides out
+40,ROUND_END,round_end,2,SHOW_TEXT,0,0,0,FALSE,FALSE,"End of round!",TRUE,TRUE,Show end of round text
+41,ROUND_END,round_end,3,CALCULATE_INITIATIVE,0,0,0,FALSE,FALSE,"",FALSE,TRUE,Calculate new turn order
+42,ROUND_END,round_end,4,PLACE_TURN_ORDER,0,0,0,FALSE,FALSE,"",FALSE,TRUE,Show new turn order
+43,ROUND_END,round_end,5,SHOW_TEXT,0,0,0,FALSE,FALSE,"Round [ROUND] - [COMBATANT]'s Turn!",TRUE,TRUE,Show new round announcement
+44,TURN_START_ENEMY,turn_start,1,SHOW_TEXT,0,0,0,FALSE,FALSE,"[COMBATANT]'s Turn!",TRUE,TRUE,Show enemy turn
+45,TURN_START_ENEMY,turn_start,2,RUN_TO_MARKER,0.4,0,0,FALSE,FALSE,"",FALSE,TRUE,Enemy runs to battle marker
+46,TURN_START_ENEMY,turn_start,3,EXECUTE_AI,0.5,0,0,FALSE,FALSE,"",FALSE,TRUE,Enemy uses AI to select action
+47,ACTION_ATTACK_ENEMY,action_execute,1,SELECT_TARGET_AI,0,0,0,FALSE,FALSE,"",FALSE,TRUE,AI selects target
+48,ACTION_ATTACK_ENEMY,action_execute,2,CALCULATE_HIT,0,0,0,FALSE,FALSE,"",FALSE,TRUE,Calculate hit or miss

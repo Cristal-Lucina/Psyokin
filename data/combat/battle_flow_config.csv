@@ -1,0 +1,39 @@
+element_id,element_name,priority,can_interrupt,concurrent_with,active_on_battle_start,notes
+1,BATTLE_STATE_MACHINE,0,TRUE,"2,6,7,9,10,11,12",TRUE,Core state machine - highest priority
+2,BATTLE_EVENTS_QUEUE,1,TRUE,"1,6,7,9,10,11,12",TRUE,Event queue system
+3,CONTROLLER_INPUT,0,TRUE,,FALSE,Player input - CRITICAL priority
+4,BATTLE_VIEWPORT,2,FALSE,ALL,TRUE,Main battle viewport
+5,Z_LAYER,2,FALSE,ALL,TRUE,Z-layer management
+6,SOUND_EFFECTS,5,FALSE,ALL,TRUE,Battle sound effects
+7,BACKGROUND_MUSIC,5,FALSE,ALL,TRUE,Background music
+8,VOICE_ACTING,4,FALSE,ALL,FALSE,Voice acting clips
+9,BACKGROUND_LOCATION,3,FALSE,ALL,TRUE,Background visuals
+10,SCREEN_EFFECTS,4,FALSE,ALL,FALSE,Screen shake/flash effects
+11,ENVIRONMENTAL_HAZARDS,3,FALSE,ALL,FALSE,Environmental damage zones
+12,CAMERA_FOCUS,3,FALSE,"6,7,9,10,11,14,15",TRUE,Camera movement/zoom
+13,CHARACTER_MARKERS,3,FALSE,ALL,TRUE,Turn indicators/markers
+14,CHARACTER_ANIMATION,3,FALSE,"6,7,9,10,11,12,15,16,17,18,24,25,29,30,31,32,33,34,35,36,37,38",FALSE,Character sprite animations
+15,CHARACTER_EFFECTS,3,FALSE,"6,7,9,10,11,12,14,24,25",FALSE,Status effect visuals
+16,CHARACTER_STATUS,2,FALSE,ALL,TRUE,Status effect tracking
+17,CHARACTER_TEXT,3,FALSE,"6,7,9,10,11,12,14,15,24,25,36,37",FALSE,Damage numbers/text above characters
+18,FORMATION_POSITIONING,2,FALSE,"6,7,9,10,11,12",TRUE,Party/enemy positioning
+19,TARGETING_SYSTEM,1,TRUE,,FALSE,Target selection system
+20,DAMAGE_NUMBERS_QUEUE,3,FALSE,"6,7,9,10,11,12,14,15,17,24,25",FALSE,Floating damage numbers queue
+21,STATUS_EFFECT_TICKER,2,FALSE,ALL,FALSE,Status effect turn counter
+22,COUNTER_REACTION_SYSTEM,1,TRUE,,FALSE,Counter/reaction mechanics
+23,COMBO_SYSTEM,2,FALSE,"6,7,9,10,11,12,14,15",FALSE,Combo attack tracking
+24,CAPTURE_SYSTEM,1,TRUE,"14,15,17,20",FALSE,Monster capture system
+25,ESCAPE_ATTEMPT,1,TRUE,"14,15,17,20,26",FALSE,Run away attempts
+26,MINIGAME,1,TRUE,"14,15,17,20",FALSE,Battle minigames
+27,POPUP_FOCUS,0,TRUE,,FALSE,Modal popups - blocks all input
+28,TURN_ORDER_PANEL,4,FALSE,ALL,TRUE,Turn order display panel
+29,PARTY_PANEL,4,FALSE,ALL,TRUE,Party HP/MP display
+30,ACTION_MENU,1,FALSE,"6,7,9,10,11,12,28,29,31,32,33,34,35",FALSE,Player action menu
+31,BATTLE_INFO_PANEL,4,FALSE,ALL,TRUE,Battle info/log display
+32,BURST_GAUGE,4,FALSE,ALL,TRUE,Burst gauge display
+33,CHAT_BUBBLE,4,FALSE,"6,7,9,10,11,12,14,15,28,29,30,31,32,34,35",FALSE,Character speech bubbles
+34,CHAT_OVERLAY,3,FALSE,"6,7,9,10,11,12,28,29,30,31,32,33,35",FALSE,Full-screen dialogue overlay
+35,BATTLE_CONDITIONS,2,FALSE,ALL,FALSE,Victory/defeat conditions tracker
+36,BATTLE_REWARDS,2,FALSE,"6,7,9,10,11,12,31",FALSE,Victory rewards screen
+37,BATTLE_TUTORIAL,1,TRUE,,FALSE,Tutorial popups/hints
+38,BATTLE_PAUSE,0,TRUE,,FALSE,Pause menu - blocks everything

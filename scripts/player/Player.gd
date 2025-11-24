@@ -102,13 +102,14 @@ const JUMP_ARC_HEIGHT: float = 40.0  # Height of vertical arc for East/West jump
 # and 6th walk frame with 8th (second run frame)
 const RUN_FRAME_SEQUENCE: Array[int] = [0, 1, 6, 3, 4, 7]
 
-# Frame layout (0-indexed, rows 0-3 for actions, rows 4-7 for walk/run):
-# Idle: column 0 (frames 0, 8, 16, 24)
-# Push: columns 1-2 (frames 1-2, 9-10, 17-18, 25-26)
-# Pull: columns 3-4 (frames 3-4, 11-12, 19-20, 27-28)
-# Jump: columns 5-7 (frames 5-7, 13-15, 21-23, 29-31)
-# Walk: row 4-7, columns 0-5 (frames 32-37, 40-45, 48-53, 56-61)
-# Run: row 4-7, custom sequence using columns 0,1,6,3,4,7
+# Frame layout (0-indexed, 16x16 grid, matching sprite_animations_data.csv):
+# Idle: column 0 (frames 0, 16, 32, 32+flip for South/North/East/West)
+# Push: columns 8-9 (frames 8-9, 24-25, 40-41, 40-41+flip)
+# Pull: columns 10-11 (frames 10-11, 26-27, 42-43, 42-43+flip)
+# Jump: columns 1-2 (frames 1-2, 17-18, 33-34, 33-34+flip)
+# Walk: (frames 48-53, 52-57, 64-69, 64-69+flip for South/North/East/West)
+# Run: custom sequence using walk frames + special run frames
+# Note: West/LEFT direction uses same frames as East/RIGHT but with flip_h = true
 
 # State
 var _current_state: MovementState = MovementState.IDLE
@@ -474,76 +475,132 @@ func _update_animation(delta: float) -> void:
 
 	match _current_state:
 		MovementState.IDLE:
-			# Idle: column 0 (frames 0, 8, 16, 24)
-			frame = _current_direction * 8
+			# Idle: frames 0 (South), 16 (North), 32 (East/West)
+			match _current_direction:
+				0: frame = 0   # South
+				1: frame = 16  # North
+				2: frame = 32  # East
+				3: frame = 32  # West (same as East)
 			_anim_frame_index = 0
 			_anim_frame_timer = 0.0
 
 		MovementState.WALK:
-			# Walk: rows 4-7, columns 0-5
-			# South: 32-37, North: 40-45, East: 48-53, West: 56-61
+			# Walk: 6 frames per direction
+			# South: 48-53, North: 52-57, East/West: 64-69
 			_anim_frame_timer += delta
 			if _anim_frame_timer >= WALK_FRAME_TIME:
 				_anim_frame_timer -= WALK_FRAME_TIME
 				_anim_frame_index = (_anim_frame_index + 1) % WALK_FRAMES
-			frame = (4 + _current_direction) * 8 + _anim_frame_index
+
+			match _current_direction:
+				0: frame = 48 + _anim_frame_index  # South
+				1: frame = 52 + _anim_frame_index  # North
+				2: frame = 64 + _anim_frame_index  # East
+				3: frame = 64 + _anim_frame_index  # West (same as East)
 
 		MovementState.RUN:
-			# Run: custom sequence using columns 0,1,6,3,4,7
-			# South: 32,33,38,35,36,39 North: 40,41,46,43,44,47
-			# East: 48,49,54,51,52,55 West: 56,57,62,59,60,63
+			# Run: custom sequence (CSV shows frames 48,49,51 for South, 52,53,55 for North, 64,65,70,67,68,71 for East/West)
 			_anim_frame_timer += delta
 			if _anim_frame_timer >= RUN_FRAME_TIME:
 				_anim_frame_timer -= RUN_FRAME_TIME
 				_anim_frame_index = (_anim_frame_index + 1) % RUN_FRAMES
-			var run_col: int = RUN_FRAME_SEQUENCE[_anim_frame_index]
-			frame = (4 + _current_direction) * 8 + run_col
+
+			match _current_direction:
+				0:  # South: 48, 49, 51, 48, 49, 51
+					var run_sequence = [48, 49, 51, 48, 49, 51]
+					frame = run_sequence[_anim_frame_index]
+				1:  # North: 52, 53, 55, 52, 53, 55
+					var run_sequence = [52, 53, 55, 52, 53, 55]
+					frame = run_sequence[_anim_frame_index]
+				2:  # East: 64, 65, 70, 67, 68, 71
+					var run_sequence = [64, 65, 70, 67, 68, 71]
+					frame = run_sequence[_anim_frame_index]
+				3:  # West: same as East
+					var run_sequence = [64, 65, 70, 67, 68, 71]
+					frame = run_sequence[_anim_frame_index]
 
 		MovementState.JUMP:
-			# Jump animation varies by phase
+			# Jump animation: frames 1-2 (South), 17-18 (North), 33-34 (East/West)
 			match _jump_phase:
 				JumpPhase.CHARGING:
-					# Hold first frame (crouch/windup): column 5
-					frame = _current_direction * 8 + 5
+					# Windup frame
+					match _current_direction:
+						0: frame = 1   # South
+						1: frame = 17  # North
+						2: frame = 33  # East
+						3: frame = 33  # West
 
 				JumpPhase.AIRBORNE:
-					# Cycle through airborne frames (columns 6-7)
+					# Airborne frame (frame 2)
 					_anim_frame_timer += delta
 					if _anim_frame_timer >= WALK_FRAME_TIME:
 						_anim_frame_timer -= WALK_FRAME_TIME
 						_anim_frame_index = (_anim_frame_index + 1) % JUMP_AIRBORNE_FRAMES
-					frame = _current_direction * 8 + 6 + _anim_frame_index
+
+					match _current_direction:
+						0: frame = 1 + _anim_frame_index   # South (1-2)
+						1: frame = 17 + _anim_frame_index  # North (17-18)
+						2: frame = 33 + _anim_frame_index  # East (33-34)
+						3: frame = 33 + _anim_frame_index  # West (33-34)
 
 				JumpPhase.LANDING:
-					# Hold first frame (crouch): column 5
-					frame = _current_direction * 8 + 5
+					# Landing frame (back to windup)
+					match _current_direction:
+						0: frame = 1   # South
+						1: frame = 17  # North
+						2: frame = 33  # East
+						3: frame = 33  # West
 
 				_:
 					# Fallback
-					frame = _current_direction * 8 + 5
+					match _current_direction:
+						0: frame = 1   # South
+						1: frame = 17  # North
+						2: frame = 33  # East
+						3: frame = 33  # West
 
 		MovementState.PUSH:
-			# Push: columns 1-2 (frames 1-2, 9-10, 17-18, 25-26)
+			# Push: frames 8-9 (South), 24-25 (North), 40-41 (East/West)
 			_anim_frame_timer += delta
 			if _anim_frame_timer >= PUSH_PULL_FRAME_TIME:
 				_anim_frame_timer -= PUSH_PULL_FRAME_TIME
 				_anim_frame_index = (_anim_frame_index + 1) % PUSH_FRAMES
-			frame = _current_direction * 8 + 1 + _anim_frame_index
+
+			match _current_direction:
+				0: frame = 8 + _anim_frame_index   # South
+				1: frame = 24 + _anim_frame_index  # North
+				2: frame = 40 + _anim_frame_index  # East
+				3: frame = 40 + _anim_frame_index  # West
 
 		MovementState.PULL:
-			# Pull: columns 3-4 (frames 3-4, 11-12, 19-20, 27-28)
+			# Pull: frames 26-27 (South), 10-11 (North), 42-43 (East/West)
 			_anim_frame_timer += delta
 			if _anim_frame_timer >= PUSH_PULL_FRAME_TIME:
 				_anim_frame_timer -= PUSH_PULL_FRAME_TIME
 				_anim_frame_index = (_anim_frame_index + 1) % PULL_FRAMES
-			frame = _current_direction * 8 + 3 + _anim_frame_index
+
+			match _current_direction:
+				0: frame = 26 + _anim_frame_index  # South
+				1: frame = 10 + _anim_frame_index  # North
+				2: frame = 42 + _anim_frame_index  # East
+				3: frame = 42 + _anim_frame_index  # West
 
 	# Update all visible sprites
-	for layer_key in LAYERS:
-		var layer = LAYERS[layer_key]
-		var sprite: Sprite2D = character_layers.get_node(layer.node_name)
-		if sprite and sprite.visible and sprite.texture:
-			sprite.frame = frame
+	for layer in LAYERS:
+		# Get sprite codes (single or multiple for combined layers)
+		var sprite_codes = []
+		if "sprite_layers" in layer:
+			sprite_codes = layer.sprite_layers
+		else:
+			sprite_codes = [layer.code]
+
+		# Update each sprite node for this layer
+		for sprite_code in sprite_codes:
+			var sprite: Sprite2D = character_layers.get_node_or_null(sprite_code)
+			if sprite and sprite.visible and sprite.texture:
+				sprite.frame = frame
+				# West/LEFT uses same frames as East but flipped (per sprite_animations_data.csv)
+				sprite.flip_h = (_current_direction == 3)  # 3 = West
 
 ## ═══════════════════════════════════════════════════════════════
 ## RANDOM ENCOUNTERS
