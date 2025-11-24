@@ -103,7 +103,7 @@ func _setup_transparent_visuals() -> void:
 	overlay_panel = PanelContainer.new()
 	overlay_panel.custom_minimum_size = get_viewport_rect().size * 0.25
 	var viewport_size = get_viewport_rect().size
-	overlay_panel.position = Vector2(viewport_size.x * 0.375, viewport_size.y * 0.25 - 80)  # Centered, moved up 80px (shifted up 60px from previous position)
+	overlay_panel.position = Vector2(viewport_size.x * 0.375, viewport_size.y * 0.25 - 95)  # Centered, moved up 95px (shifted up additional 15px)
 	overlay_panel.z_index = 101
 
 	# Make panel transparent
@@ -446,11 +446,11 @@ func _draw_capture_visual() -> void:
 	var center = canvas_size / 2.0
 	var circle_center = center  # Centered at canvas center
 
-	# Draw rotation icon behind everything (200x200, bottom centered at circle center, moved down 75px and right 2px)
+	# Draw rotation icon behind everything (200x200, bottom centered at circle center, moved down 90px and right 2px)
 	if rotation_icon:
 		var rotation_size = Vector2(200, 200)
-		# Position so bottom of icon is at circle center, moved down 75px and right 2px (adjusted +60px to keep icon in place while other UI moved up)
-		var rotation_pos = Vector2(circle_center.x - rotation_size.x / 2.0 + 2, circle_center.y - rotation_size.y + 75)
+		# Position so bottom of icon is at circle center, moved down 90px and right 2px (adjusted to keep icon in place while other UI moved up)
+		var rotation_pos = Vector2(circle_center.x - rotation_size.x / 2.0 + 2, circle_center.y - rotation_size.y + 90)
 		var rotation_rect = Rect2(rotation_pos, rotation_size)
 
 		# Flip horizontally for clockwise direction
