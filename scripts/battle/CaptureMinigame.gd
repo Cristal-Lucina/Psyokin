@@ -25,8 +25,8 @@ var fills_completed: int = 0
 
 ## Progress tracking
 var fill_progress: float = 0.0  # 0.0 to 1.0 (one complete fill)
-var fill_speed: float = 0.8  # How fast the bar fills per second (increased for easier gameplay)
-var decay_speed: float = 0.08  # How fast the bar drains when not inputting (reduced for easier gameplay)
+var fill_speed: float = 1.2  # How fast the bar fills per second (increased even more for easier gameplay)
+var decay_speed: float = 0.05  # How fast the bar drains when not inputting (reduced even more for easier gameplay)
 
 ## Button and direction requirements
 const CAPTURE_BUTTONS = ["A", "B", "X", "Y"]
@@ -175,9 +175,13 @@ func _setup_minigame() -> void:
 	circle_canvas.draw.connect(_draw_capture_visual)
 	center_container.add_child(circle_canvas)
 
-	# Create timer bar below the circle
+	# Create timer bar below the circle (with margin to move it up 10px)
+	var timer_margin = MarginContainer.new()
+	timer_margin.add_theme_constant_override("margin_top", -10)
+	content_container.add_child(timer_margin)
+
 	var timer_container = CenterContainer.new()
-	content_container.add_child(timer_container)
+	timer_margin.add_child(timer_container)
 
 	timer_bar = ProgressBar.new()
 	timer_bar.custom_minimum_size = Vector2(200, 20)
