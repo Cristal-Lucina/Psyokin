@@ -37,9 +37,47 @@ var instruction_label: Label
 
 func _ready() -> void:
 	super._ready()
-	# Move the minigame left by 10px
-	if overlay_panel:
-		overlay_panel.position.x -= 10
+
+func _setup_visuals() -> void:
+	"""Override to create transparent background - only game elements visible"""
+	# Fully transparent background
+	background_dim = ColorRect.new()
+	background_dim.color = Color(0, 0, 0, 0.0)  # Fully transparent
+	background_dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	background_dim.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(background_dim)
+
+	# Central panel - also transparent
+	overlay_panel = PanelContainer.new()
+	overlay_panel.custom_minimum_size = get_viewport_rect().size * 0.35
+	overlay_panel.position = get_viewport_rect().size * 0.325
+	overlay_panel.position.y -= 160  # Move up 160px
+	overlay_panel.position.x -= 10  # Move left by 10px
+	overlay_panel.z_index = 101
+
+	# Make panel transparent
+	var panel_style = StyleBoxFlat.new()
+	panel_style.bg_color = Color(0, 0, 0, 0.0)  # Fully transparent
+	panel_style.border_width_left = 0
+	panel_style.border_width_right = 0
+	panel_style.border_width_top = 0
+	panel_style.border_width_bottom = 0
+	overlay_panel.add_theme_stylebox_override("panel", panel_style)
+
+	add_child(overlay_panel)
+
+	# Content container
+	content_container = VBoxContainer.new()
+	content_container.set_anchors_preset(Control.PRESET_FULL_RECT)
+	content_container.add_theme_constant_override("separation", 10)
+	overlay_panel.add_child(content_container)
+
+	# Status effect overlay (for animated border effects)
+	status_effect_overlay = Control.new()
+	status_effect_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	status_effect_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	status_effect_overlay.z_index = 102
+	add_child(status_effect_overlay)
 
 func _setup_minigame() -> void:
 	base_duration = 8.0
@@ -135,8 +173,8 @@ func _start_minigame() -> void:
 
 func _draw_arena() -> void:
 	"""Draw the circles and player"""
-	# Draw outer boundary circle background (light gray)
-	arena.draw_circle(arena_center, max_radius, Color(0.3, 0.3, 0.3, 0.3))
+	# Draw outer boundary circle background (very subtle for transparency)
+	arena.draw_circle(arena_center, max_radius, Color(0.3, 0.3, 0.3, 0.1))
 
 	# Draw the OUTER ESCAPE CIRCLE boundary (static, doesn't rotate)
 	# Green = escapable (run_chance %), Red = blocked (100-run_chance %)

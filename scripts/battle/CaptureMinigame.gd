@@ -25,8 +25,8 @@ var fills_completed: int = 0
 
 ## Progress tracking
 var fill_progress: float = 0.0  # 0.0 to 1.0 (one complete fill)
-var fill_speed: float = 0.5  # How fast the bar fills per second (doubled from 0.25)
-var decay_speed: float = 0.1  # How fast the bar drains when not inputting (reduced from 0.15)
+var fill_speed: float = 1.2  # How fast the bar fills per second (increased even more for easier gameplay)
+var decay_speed: float = 0.05  # How fast the bar drains when not inputting (reduced even more for easier gameplay)
 
 ## Button and direction requirements
 const CAPTURE_BUTTONS = ["A", "B", "X", "Y"]
@@ -38,6 +38,7 @@ const BUTTON_ACTIONS = {
 }
 var current_button: String = "A"  # Random button
 var current_button_action: String = ""  # Will be set to InputManager constant
+var current_button_icon_name: String = ""  # Icon layout name (accept, back, defend, skill)
 var current_direction: int = 1  # 1 = clockwise, -1 = counter-clockwise
 
 ## Joystick rotation tracking
@@ -56,10 +57,13 @@ var direction_arrow: Control  # Arrow indicating spin direction
 var circle_canvas: Control  # For drawing the progress circle
 var progress_bar: ProgressBar  # Shows fill progress
 var fills_label: Label  # Shows "Fill 1/3"
-var button_prompt_label: Label  # Shows "HOLD A" or "HOLD B" etc
 var result_label: Label
 var fade_timer: float = 0.0
 var fade_duration: float = 0.5
+var rotation_icon: Texture2D  # The rotate-left icon
+var timer_bar: ProgressBar  # 3-second timer bar under the circle
+var timer_progress: float = 0.0  # 0.0 to 3.0 seconds
+const TIMER_DURATION: float = 3.0  # 3 second timer
 
 ## Input locked during fade in/out
 var input_locked: bool = true
@@ -67,6 +71,10 @@ var input_locked: bool = true
 ## Result tracking
 var capture_success: bool = false
 var result_text: String = "FAILED"
+
+## Visual feedback
+var is_button_pressed: bool = false
+var pulse_timer: float = 0.0  # Timer for pulsing glow effect
 
 # Core vibe color constants
 const COLOR_MILK_WHITE = Color(0.96, 0.97, 0.98)
@@ -99,7 +107,7 @@ func _setup_transparent_visuals() -> void:
 	overlay_panel = PanelContainer.new()
 	overlay_panel.custom_minimum_size = get_viewport_rect().size * 0.25
 	var viewport_size = get_viewport_rect().size
-	overlay_panel.position = Vector2(viewport_size.x * 0.375, viewport_size.y * 0.25 - 100)  # Centered, moved up 100px
+	overlay_panel.position = Vector2(viewport_size.x * 0.375 + 1, viewport_size.y * 0.25 - 100)  # Centered, moved up 100px and right 1px
 	overlay_panel.z_index = 101
 
 	# Make panel transparent
@@ -128,6 +136,9 @@ func _setup_minigame() -> void:
 	# Set total duration based on fills needed
 	current_duration = base_duration * fills_needed
 
+	# Load rotation icon
+	rotation_icon = load("res://assets/graphics/icons/UI/Controller_Icons/special_buttons/rotate-left-icon.png")
+
 	# Clear the default content container
 	for child in content_container.get_children():
 		child.queue_free()
@@ -138,25 +149,20 @@ func _setup_minigame() -> void:
 		print("[CaptureMinigame] ERROR: aControllerIconLayout not found!")
 		return
 
-	# Fills label at top
+	# Fills label at top - moved up 50px using MarginContainer
+	var label_margin = MarginContainer.new()
+	label_margin.add_theme_constant_override("margin_top", -50)
+
 	fills_label = Label.new()
-	fills_label.text = "Fill 1/%d" % fills_needed
+	fills_label.text = "Wrap 1/%d" % fills_needed
 	fills_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	fills_label.add_theme_font_size_override("font_size", 32)
 	fills_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
 	fills_label.add_theme_constant_override("outline_size", 4)
 	fills_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
-	content_container.add_child(fills_label)
 
-	# Button prompt label (shows "HOLD A" or "HOLD B" etc)
-	button_prompt_label = Label.new()
-	button_prompt_label.text = "HOLD A"  # Will be updated by _randomize_button()
-	button_prompt_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	button_prompt_label.add_theme_font_size_override("font_size", 40)
-	button_prompt_label.add_theme_color_override("font_color", COLOR_BUBBLE_MAGENTA)
-	button_prompt_label.add_theme_constant_override("outline_size", 6)
-	button_prompt_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
-	content_container.add_child(button_prompt_label)
+	label_margin.add_child(fills_label)
+	content_container.add_child(label_margin)
 
 	# Create a centered container for the button, arrow, and circle
 	var center_container = CenterContainer.new()
@@ -169,11 +175,58 @@ func _setup_minigame() -> void:
 	circle_canvas.draw.connect(_draw_capture_visual)
 	center_container.add_child(circle_canvas)
 
-	# Pick random starting button
+	# Create timer bar below the circle (with margin to move it up 10px)
+	var timer_margin = MarginContainer.new()
+	timer_margin.add_theme_constant_override("margin_top", -10)
+	content_container.add_child(timer_margin)
+
+	var timer_container = CenterContainer.new()
+	timer_margin.add_child(timer_container)
+
+	timer_bar = ProgressBar.new()
+	timer_bar.custom_minimum_size = Vector2(200, 20)
+	timer_bar.max_value = TIMER_DURATION
+	timer_bar.value = 0.0
+	timer_bar.show_percentage = false
+
+	# Style the timer bar
+	var timer_style_bg = StyleBoxFlat.new()
+	timer_style_bg.bg_color = Color(0.2, 0.2, 0.2, 0.8)
+	timer_style_bg.corner_radius_top_left = 4
+	timer_style_bg.corner_radius_top_right = 4
+	timer_style_bg.corner_radius_bottom_left = 4
+	timer_style_bg.corner_radius_bottom_right = 4
+	timer_bar.add_theme_stylebox_override("background", timer_style_bg)
+
+	var timer_style_fill = StyleBoxFlat.new()
+	timer_style_fill.bg_color = COLOR_BUBBLE_MAGENTA
+	timer_style_fill.corner_radius_top_left = 4
+	timer_style_fill.corner_radius_top_right = 4
+	timer_style_fill.corner_radius_bottom_left = 4
+	timer_style_fill.corner_radius_bottom_right = 4
+	timer_bar.add_theme_stylebox_override("fill", timer_style_fill)
+
+	timer_container.add_child(timer_bar)
+
+	# Pick random starting button (this sets current_button_icon_name)
 	_randomize_button()
 
 	# Pick random starting direction
 	_randomize_direction()
+
+	# Load the current button icon
+	var icon_texture = icon_layout.get_button_icon(current_button_icon_name)
+	if icon_texture:
+		# Store the texture for drawing
+		button_icon = TextureRect.new()
+		button_icon.texture = icon_texture
+		button_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		button_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		button_icon.custom_minimum_size = Vector2(70, 70)
+		# We'll draw this manually in _draw_capture_visual
+		print("[CaptureMinigame] Loaded button icon: %s (%s)" % [current_button, current_button_icon_name])
+	else:
+		print("[CaptureMinigame] ERROR: Could not load button icon for %s (icon name: %s)" % [current_button, current_button_icon_name])
 
 	# Result label (placed above the minigame)
 	result_label = Label.new()
@@ -227,18 +280,39 @@ func _randomize_button() -> void:
 	"""Pick a random button"""
 	current_button = CAPTURE_BUTTONS[randi() % CAPTURE_BUTTONS.size()]
 
-	# Map to InputManager action constant (like DefenseMinigame does)
+	# Map to InputManager action constant (for input checking)
+	# Map to icon name (for loading the icon from ControllerIconLayout)
 	match current_button:
-		"A": current_button_action = aInputManager.ACTION_ACCEPT
-		"B": current_button_action = aInputManager.ACTION_BACK
-		"X": current_button_action = aInputManager.ACTION_DEFEND
-		"Y": current_button_action = aInputManager.ACTION_SKILL
+		"A":
+			current_button_action = aInputManager.ACTION_ACCEPT
+			current_button_icon_name = "accept"
+		"B":
+			current_button_action = aInputManager.ACTION_BACK
+			current_button_icon_name = "back"
+		"X":
+			current_button_action = aInputManager.ACTION_DEFEND
+			current_button_icon_name = "special_1"  # X/Square button
+		"Y":
+			current_button_action = aInputManager.ACTION_SKILL
+			current_button_icon_name = "special_2"  # Y/Triangle button
 
-	# Update button prompt label
-	if button_prompt_label:
-		button_prompt_label.text = "HOLD %s" % current_button
-
-	print("[CaptureMinigame] Button changed to: %s (action: %s)" % [current_button, current_button_action])
+	# Update button icon texture
+	var icon_layout = get_node_or_null("/root/aControllerIconLayout")
+	if icon_layout and button_icon:
+		var icon_texture = icon_layout.get_button_icon(current_button_icon_name)
+		if icon_texture:
+			button_icon.texture = icon_texture
+			# Force redraw to update visual immediately
+			if circle_canvas:
+				circle_canvas.queue_redraw()
+			print("[CaptureMinigame] Updated button icon: %s -> %s (texture: %s)" % [current_button, current_button_icon_name, icon_texture.get_size()])
+		else:
+			print("[CaptureMinigame] ERROR: Could not load texture for icon name '%s'" % current_button_icon_name)
+	else:
+		if not icon_layout:
+			print("[CaptureMinigame] ERROR: icon_layout not found")
+		if not button_icon:
+			print("[CaptureMinigame] ERROR: button_icon not initialized yet")
 
 func _randomize_direction() -> void:
 	"""Pick a random direction"""
@@ -255,6 +329,8 @@ func _start_minigame() -> void:
 	fade_timer = 0.0
 	input_locked = true
 	has_initial_angle = false  # Reset rotation tracking
+	timer_progress = 0.0  # Reset timer
+	pulse_timer = 0.0  # Reset pulse
 
 	# Fade in the overlay
 	overlay_panel.modulate.a = 0.0
@@ -289,8 +365,21 @@ func _process_active(delta: float) -> void:
 	if input_locked:
 		return
 
+	# Update pulse timer for glow effect
+	pulse_timer += delta
+
+	# Update timer bar
+	timer_progress += delta
+	if timer_bar:
+		timer_bar.value = timer_progress
+		# Check if timer expired
+		if timer_progress >= TIMER_DURATION:
+			_finish_capture_failed()
+			return
+
 	# Check if player is holding the correct button
 	var holding_button = aInputManager.is_action_pressed(current_button_action)
+	is_button_pressed = holding_button  # Track for visual feedback
 
 	# Debug button holding every 30 frames
 	if Engine.get_frames_drawn() % 30 == 0:
@@ -374,7 +463,7 @@ func _process_active(delta: float) -> void:
 
 		# Update label
 		if fills_completed < fills_needed:
-			fills_label.text = "Fill %d/%d" % [fills_completed + 1, fills_needed]
+			fills_label.text = "Wrap %d/%d" % [fills_completed + 1, fills_needed]
 			# Randomize for next fill
 			_randomize_button()
 			_randomize_direction()
@@ -403,39 +492,58 @@ func _trigger_random_change() -> void:
 		print("[CaptureMinigame] Direction changed mid-fill to: %s" % direction_text)
 
 func _draw_capture_visual() -> void:
-	"""Draw the button icon, direction arrow, and progress circle"""
+	"""Draw the rotation icon, button icon, and progress circle"""
 	var canvas_size = circle_canvas.size
 	var center = canvas_size / 2.0
+	var circle_center = center  # Centered at canvas center
 
-	# Get the controller icon layout
-	var icon_layout = get_node_or_null("/root/aControllerIconLayout")
-	if not icon_layout:
-		return
+	# Draw rotation icon behind everything (200x200, bottom centered at circle center, moved down 95px and right 1px)
+	if rotation_icon:
+		var rotation_size = Vector2(200, 200)
+		# Position so bottom of icon is at circle center, moved down 95px and right 1px (adjusted to keep icon in place while other UI moved)
+		var rotation_pos = Vector2(circle_center.x - rotation_size.x / 2.0 + 1, circle_center.y - rotation_size.y + 95)
+		var rotation_rect = Rect2(rotation_pos, rotation_size)
+
+		# Flip horizontally for clockwise direction
+		if current_direction == 1:  # Clockwise - flip horizontal, shifted left 4px
+			# Use transform to flip horizontally, shift left 4px
+			circle_canvas.draw_set_transform(Vector2(rotation_rect.position.x + rotation_rect.size.x - 4, rotation_rect.position.y), 0, Vector2(-1, 1))
+			var flipped_rect = Rect2(Vector2(0, 0), rotation_size)
+			circle_canvas.draw_texture_rect(rotation_icon, flipped_rect, false, Color.WHITE)
+			circle_canvas.draw_set_transform(Vector2.ZERO, 0, Vector2.ONE)  # Reset transform
+		else:  # Counter-clockwise - draw normally
+			circle_canvas.draw_texture_rect(rotation_icon, rotation_rect, false, Color.WHITE)
 
 	# Draw outer circle (empty)
 	var outer_radius = 100.0
-	_draw_circle_outline(center, outer_radius, Color(0.5, 0.5, 0.5, 0.5), 3.0)
+	_draw_circle_outline(circle_center, outer_radius, Color(0.5, 0.5, 0.5, 0.5), 3.0)
 
 	# Draw progress fill (colored arc)
 	if fill_progress > 0.0:
-		_draw_progress_arc(center, outer_radius, fill_progress, COLOR_BUBBLE_MAGENTA)
+		_draw_progress_arc(circle_center, outer_radius, fill_progress, COLOR_BUBBLE_MAGENTA)
 
 	# Draw background circle behind button icon for visibility
 	var icon_bg_radius = 50.0
-	circle_canvas.draw_circle(center, icon_bg_radius, Color(0.1, 0.1, 0.15, 0.8))
-	_draw_circle_outline(center, icon_bg_radius, COLOR_MILK_WHITE, 3.0)
+	circle_canvas.draw_circle(circle_center, icon_bg_radius, Color(0.1, 0.1, 0.15, 0.8))
 
-	# Draw the button icon in the center (larger)
-	var icon_texture = icon_layout.get_button_icon(current_button_action)
-	if icon_texture:
-		var icon_size = Vector2(70, 70)  # Slightly smaller to fit inside background circle
-		var icon_pos = center - icon_size / 2.0
+	# Draw blue glow when button is pressed (with pulsing effect)
+	if is_button_pressed:
+		# Calculate pulse using sine wave (oscillates between 0.5 and 1.0)
+		var pulse = 0.5 + 0.5 * sin(pulse_timer * 5.0)  # 5.0 controls pulse speed
+		var glow_alpha = 0.5 + 0.3 * pulse  # Alpha oscillates between 0.5 and 0.8
+		var glow_width = 6.0 + 4.0 * pulse  # Width oscillates between 6.0 and 10.0
+		var glow_color = Color(0.2, 0.5, 1.0, glow_alpha)  # Blue glow with pulsing alpha
+		_draw_circle_outline(circle_center, icon_bg_radius + 5, glow_color, glow_width)  # Outer glow
+		_draw_circle_outline(circle_center, icon_bg_radius, glow_color, 4.0)  # Inner glow
+	else:
+		_draw_circle_outline(circle_center, icon_bg_radius, COLOR_MILK_WHITE, 3.0)
+
+	# Draw the button icon in the center (70x70)
+	if button_icon and button_icon.texture:
+		var icon_size = Vector2(70, 70)
+		var icon_pos = circle_center - icon_size / 2.0
 		var icon_rect = Rect2(icon_pos, icon_size)
-		circle_canvas.draw_texture_rect(icon_texture, icon_rect, false, Color.WHITE)
-
-	# Draw direction arrow below button
-	var arrow_y = center.y + 70
-	_draw_direction_arrow(center.x, arrow_y, current_direction)
+		circle_canvas.draw_texture_rect(button_icon.texture, icon_rect, false, Color.WHITE)
 
 func _draw_circle_outline(center: Vector2, radius: float, color: Color, width: float) -> void:
 	"""Helper to draw a circle outline"""
@@ -461,27 +569,6 @@ func _draw_progress_arc(center: Vector2, radius: float, progress: float, color: 
 		var point_to = center + Vector2(cos(angle_to), sin(angle_to)) * radius
 		circle_canvas.draw_line(point_from, point_to, color, 6.0)
 
-func _draw_direction_arrow(x: float, y: float, direction: int) -> void:
-	"""Draw an arrow pointing left (counter-clockwise) or right (clockwise)"""
-	var arrow_size = 30.0
-	var arrow_color = COLOR_MILK_WHITE
-
-	if direction == 1:
-		# Clockwise - arrow pointing RIGHT
-		var tip = Vector2(x + arrow_size, y)
-		var back_top = Vector2(x - arrow_size / 2, y - arrow_size / 2)
-		var back_bottom = Vector2(x - arrow_size / 2, y + arrow_size / 2)
-
-		var points = PackedVector2Array([tip, back_top, back_bottom])
-		circle_canvas.draw_colored_polygon(points, arrow_color)
-	else:
-		# Counter-clockwise - arrow pointing LEFT
-		var tip = Vector2(x - arrow_size, y)
-		var back_top = Vector2(x + arrow_size / 2, y - arrow_size / 2)
-		var back_bottom = Vector2(x + arrow_size / 2, y + arrow_size / 2)
-
-		var points = PackedVector2Array([tip, back_top, back_bottom])
-		circle_canvas.draw_colored_polygon(points, arrow_color)
 
 func _finish_capture_success() -> void:
 	print("[CaptureMinigame] Capture successful! Completed all fills.")
