@@ -5341,8 +5341,14 @@ func _execute_enemy_ai() -> void:
 		var defense_result = await _show_defense_minigame(target, current_combatant)
 		var defense_modifier = defense_result.damage_modifier  # 0.0 = parried, 1.0 = normal, 1.3 = failed
 		var counter_damage = defense_result.counter_damage  # Damage to deal back to attacker
+		var initiative_bonus = defense_result.get("initiative_bonus", 0)  # Initiative bonus for next round
 
-		print("[Battle] Defense minigame result - Modifier: %.1f%%, Counter: %.1f" % [defense_modifier * 100, counter_damage])
+		print("[Battle] Defense minigame result - Modifier: %.1f%%, Counter: %.1f, Initiative Bonus: %+d" % [defense_modifier * 100, counter_damage, initiative_bonus])
+
+		# Apply initiative bonus to defender for next round
+		if initiative_bonus > 0 and target.has("initiative_bonus"):
+			target.initiative_bonus += initiative_bonus
+			print("[Battle] %s gains +%d initiative bonus for next round (total: %+d)" % [target.display_name, initiative_bonus, target.initiative_bonus])
 
 		# SUCCESSFUL PARRY - Play counter-attack animations
 		if counter_damage > 0:
@@ -8304,7 +8310,8 @@ func _show_defense_minigame(defender: Dictionary, attacker: Dictionary) -> Dicti
 	# Get results
 	var result = {
 		"damage_modifier": defense_minigame.final_damage_modifier,
-		"counter_damage": defense_minigame.counter_attack_damage
+		"counter_damage": defense_minigame.counter_attack_damage,
+		"initiative_bonus": defense_minigame.initiative_bonus
 	}
 
 	# Clean up

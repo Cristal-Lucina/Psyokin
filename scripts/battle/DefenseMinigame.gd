@@ -45,6 +45,7 @@ const BUTTON_ACTIONS = {
 var player_attempted_parry: bool = false  # Did player press the parry button?
 var final_damage_modifier: float = 1.0  # 0.0 = no damage (parried), 1.0 = normal, 1.3 = penalty for missing
 var counter_attack_damage: float = 0.0  # Damage dealt back to enemy (30% of attack damage)
+var initiative_bonus: int = 0  # Initiative bonus for next round (10 for successful parry)
 var result_text: String = "HIT!"
 
 ## Visual elements
@@ -408,11 +409,12 @@ func _lose_parry_battle() -> void:
 func _win_parry_battle() -> void:
 	"""Player won the parry battle!"""
 	input_locked = true
-	print("[DefenseMinigame] WON PARRY BATTLE! Dealing 30%% counter damage")
+	print("[DefenseMinigame] WON PARRY BATTLE! Dealing 30%% counter damage + Initiative bonus!")
 
 	# No damage taken, deal 30% counter damage
 	final_damage_modifier = 0.0
 	counter_attack_damage = attacker_damage * 0.3
+	initiative_bonus = 10  # Grant +10 initiative for next round
 	result_text = "PARRY!"
 
 	_finish_minigame()
