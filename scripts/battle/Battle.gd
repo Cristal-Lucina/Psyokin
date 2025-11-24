@@ -5337,6 +5337,13 @@ func _execute_enemy_ai() -> void:
 			# Wait for animation to complete
 			await get_tree().create_timer(0.6).timeout
 
+		# DEFENSE MINIGAME - Give player chance to parry
+		var defense_result = await _show_defense_minigame(target, current_combatant)
+		var defense_modifier = defense_result.damage_modifier  # 0.0 = parried, 1.0 = normal, 1.3 = failed
+		var counter_damage = defense_result.counter_damage  # Damage to deal back to attacker
+
+		print("[Battle] Defense minigame result - Modifier: %.1f%%, Counter: %.1f" % [defense_modifier * 100, counter_damage])
+
 		# First, check if the attack hits
 		var hit_check = combat_resolver.check_physical_hit(current_combatant, target)
 
@@ -5345,6 +5352,23 @@ func _execute_enemy_ai() -> void:
 			_show_miss_feedback(target)  # Show big MISS text above target
 			add_turn_line("But it missed!")
 			add_turn_line("(Hit chance: %d%%, rolled %d)" % [int(hit_check.hit_chance), hit_check.roll])
+
+			# Handle counter damage even on miss (if player got perfect parry)
+			if counter_damage > 0:
+				current_combatant.hp -= int(counter_damage)
+				if current_combatant.hp < 0:
+					current_combatant.hp = 0
+
+				add_turn_line("%s countered for %d damage!" % [target.display_name, int(counter_damage)])
+
+				if current_combatant.hp <= 0:
+					_set_fainted(current_combatant)
+					add_turn_line("%s fainted from the counter!" % current_combatant.display_name)
+					# Record kill for morality system
+					battle_mgr.record_enemy_defeat(current_combatant, false)  # false = kill
+				else:
+					add_turn_line("%s has %d HP left." % [current_combatant.display_name, current_combatant.hp])
+
 			queue_turn_message()  # Queue the full turn message
 			print("[Battle] Enemy Miss! Hit chance: %.1f%%, Roll: %d" % [hit_check.hit_chance, hit_check.roll])
 		else:
@@ -5374,6 +5398,10 @@ func _execute_enemy_ai() -> void:
 
 			var damage = damage_result.damage
 			var is_stumble = damage_result.is_stumble
+
+			# Apply defense modifier from minigame
+			damage = int(damage * defense_modifier)
+			print("[Battle] Damage after defense modifier: %d (modifier: %.1f%%)" % [damage, defense_modifier * 100])
 
 			# Apply damage
 			target.hp -= damage
@@ -5457,6 +5485,22 @@ func _execute_enemy_ai() -> void:
 					add_turn_line(_get_enemy_health_hint(target))
 				else:
 					add_turn_line("%s has %d HP left." % [target.display_name, target.hp])
+
+			# Handle counter damage from successful parry
+			if counter_damage > 0:
+				current_combatant.hp -= int(counter_damage)
+				if current_combatant.hp < 0:
+					current_combatant.hp = 0
+
+				add_turn_line("%s countered for %d damage!" % [target.display_name, int(counter_damage)])
+
+				if current_combatant.hp <= 0:
+					_set_fainted(current_combatant)
+					add_turn_line("%s fainted from the counter!" % current_combatant.display_name)
+					# Record kill for morality system
+					battle_mgr.record_enemy_defeat(current_combatant, false)  # false = kill
+				else:
+					add_turn_line("%s has %d HP left." % [current_combatant.display_name, current_combatant.hp])
 
 			# Queue the full turn message
 			queue_turn_message()
@@ -8164,3 +8208,34 @@ func _add_captured_enemy(enemy: Dictionary) -> void:
 	gs.set_meta("captured_enemies", captured)
 
 	print("[Battle] Captured enemy added to collection: %s (Total captures: %d)" % [actor_id, captured.size()])
+
+## ═══════════════════════════════════════════════════════════════
+## DEFENSE MINIGAME HELPER
+## ═══════════════════════════════════════════════════════════════
+
+func _show_defense_minigame(defender: Dictionary, attacker: Dictionary) -> Dictionary:
+	"""Show defense minigame and return results"""
+	# Load DefenseMinigame scene
+	var defense_scene = load("res://scripts/battle/DefenseMinigame.gd")
+	var defense_minigame = defense_scene.new()
+
+	# Calculate base damage for counter calculation
+	var base_damage = attacker.get("brw", 5) * 2.0  # Rough estimate
+	defense_minigame.attacker_damage = base_damage
+
+	# Add to scene
+	add_child(defense_minigame)
+
+	# Wait for completion
+	await defense_minigame.minigame_completed
+
+	# Get results
+	var result = {
+		"damage_modifier": defense_minigame.final_damage_modifier,
+		"counter_damage": defense_minigame.counter_attack_damage
+	}
+
+	# Clean up
+	defense_minigame.queue_free()
+
+	return result

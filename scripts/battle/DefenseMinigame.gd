@@ -39,7 +39,8 @@ const BUTTON_ACTIONS = {
 }
 
 ## Result tracking
-var final_damage_modifier: float = 1.0  # 0.0 = no damage (parried), 1.3 = penalty for missing
+var player_attempted_parry: bool = false  # Did player press the parry button?
+var final_damage_modifier: float = 1.0  # 0.0 = no damage (parried), 1.0 = normal, 1.3 = penalty for missing
 var counter_attack_damage: float = 0.0  # Damage dealt back to enemy (30% of attack damage)
 var result_text: String = "BLOCKED"
 
@@ -266,6 +267,9 @@ func _check_parry_input() -> void:
 		"Y": action_to_check = aInputManager.ACTION_SKILL
 
 	if action_to_check != "" and aInputManager.is_action_just_pressed(action_to_check):
+		# Player attempted the parry!
+		player_attempted_parry = true
+
 		# Check if in parry zone
 		if circle_progress >= player_parry_min and circle_progress <= player_parry_max:
 			_successful_parry()
@@ -340,15 +344,21 @@ func _update_parry_windows() -> void:
 		enemy_parry_chance = 0.3
 
 func _miss_parry() -> void:
-	"""Player missed the parry"""
+	"""Player missed the parry (or didn't attempt)"""
 	input_locked = true
-	print("[DefenseMinigame] PARRY FAILED! Taking increased damage")
 
-	# Take increased damage (130% of original)
-	final_damage_modifier = 1.3
+	if player_attempted_parry:
+		# Player pressed the button but missed the timing - PENALTY
+		print("[DefenseMinigame] PARRY ATTEMPTED BUT FAILED! Taking increased damage (130%)")
+		final_damage_modifier = 1.3
+		result_text = "MISS"
+	else:
+		# Player didn't press anything - circle closed naturally - SAFE
+		print("[DefenseMinigame] No parry attempted - taking normal damage (100%)")
+		final_damage_modifier = 1.0
+		result_text = "BLOCKED"
+
 	counter_attack_damage = 0.0
-	result_text = "MISS"
-
 	_finish_minigame()
 
 func _lose_parry_battle() -> void:
