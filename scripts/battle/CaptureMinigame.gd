@@ -55,6 +55,7 @@ var direction_arrow: Control  # Arrow indicating spin direction
 var circle_canvas: Control  # For drawing the progress circle
 var progress_bar: ProgressBar  # Shows fill progress
 var fills_label: Label  # Shows "Fill 1/3"
+var button_prompt_label: Label  # Shows "HOLD A" or "HOLD B" etc
 var result_label: Label
 var fade_timer: float = 0.0
 var fade_duration: float = 0.5
@@ -118,11 +119,13 @@ func _setup_transparent_visuals() -> void:
 	overlay_panel.add_child(content_container)
 
 func _setup_minigame() -> void:
-	base_duration = 30.0  # 30 seconds to complete
-	current_duration = base_duration
+	base_duration = 2.0  # 2 seconds per fill (will be multiplied by fills_needed)
 
 	# Calculate difficulty from enemy data
 	_calculate_difficulty()
+
+	# Set total duration based on fills needed
+	current_duration = base_duration * fills_needed
 
 	# Clear the default content container
 	for child in content_container.get_children():
@@ -143,6 +146,16 @@ func _setup_minigame() -> void:
 	fills_label.add_theme_constant_override("outline_size", 4)
 	fills_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
 	content_container.add_child(fills_label)
+
+	# Button prompt label (shows "HOLD A" or "HOLD B" etc)
+	button_prompt_label = Label.new()
+	button_prompt_label.text = "HOLD A"  # Will be updated by _randomize_button()
+	button_prompt_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	button_prompt_label.add_theme_font_size_override("font_size", 40)
+	button_prompt_label.add_theme_color_override("font_color", COLOR_BUBBLE_MAGENTA)
+	button_prompt_label.add_theme_constant_override("outline_size", 6)
+	button_prompt_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
+	content_container.add_child(button_prompt_label)
 
 	# Create a centered container for the button, arrow, and circle
 	var center_container = CenterContainer.new()
@@ -213,6 +226,11 @@ func _randomize_button() -> void:
 	"""Pick a random button"""
 	current_button = CAPTURE_BUTTONS[randi() % CAPTURE_BUTTONS.size()]
 	current_button_action = BUTTON_ACTIONS[current_button]
+
+	# Update button prompt label
+	if button_prompt_label:
+		button_prompt_label.text = "HOLD %s" % current_button
+
 	print("[CaptureMinigame] Button changed to: %s (action: %s)" % [current_button, current_button_action])
 
 func _randomize_direction() -> void:
@@ -362,16 +380,21 @@ func _draw_capture_visual() -> void:
 	if fill_progress > 0.0:
 		_draw_progress_arc(center, outer_radius, fill_progress, COLOR_BUBBLE_MAGENTA)
 
-	# Draw the button icon in the center
+	# Draw background circle behind button icon for visibility
+	var icon_bg_radius = 50.0
+	circle_canvas.draw_circle(center, icon_bg_radius, Color(0.1, 0.1, 0.15, 0.8))
+	_draw_circle_outline(center, icon_bg_radius, COLOR_MILK_WHITE, 3.0)
+
+	# Draw the button icon in the center (larger)
 	var icon_texture = icon_layout.get_button_icon(current_button_action)
 	if icon_texture:
-		var icon_size = Vector2(80, 80)
+		var icon_size = Vector2(70, 70)  # Slightly smaller to fit inside background circle
 		var icon_pos = center - icon_size / 2.0
 		var icon_rect = Rect2(icon_pos, icon_size)
 		circle_canvas.draw_texture_rect(icon_texture, icon_rect, false, Color.WHITE)
 
 	# Draw direction arrow below button
-	var arrow_y = center.y + 60
+	var arrow_y = center.y + 70
 	_draw_direction_arrow(center.x, arrow_y, current_direction)
 
 func _draw_circle_outline(center: Vector2, radius: float, color: Color, width: float) -> void:
