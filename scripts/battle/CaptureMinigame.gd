@@ -38,6 +38,7 @@ const BUTTON_ACTIONS = {
 }
 var current_button: String = "A"  # Random button
 var current_button_action: String = ""  # Will be set to InputManager constant
+var current_button_icon_name: String = ""  # Icon layout name (accept, back, defend, skill)
 var current_direction: int = 1  # 1 = clockwise, -1 = counter-clockwise
 
 ## Joystick rotation tracking
@@ -162,15 +163,15 @@ func _setup_minigame() -> void:
 	circle_canvas.draw.connect(_draw_capture_visual)
 	center_container.add_child(circle_canvas)
 
-	# Pick random starting button
+	# Pick random starting button (this sets current_button_icon_name)
 	_randomize_button()
 
 	# Pick random starting direction
 	_randomize_direction()
 
-	# Load the current button icon (will be updated by _randomize_button)
-	var icon_texture = icon_layout.get_button_icon(current_button_action)
-	print("[CaptureMinigame] DEBUG: Trying to load icon for button %s, action: %s, texture: %s" % [current_button, current_button_action, icon_texture])
+	# Load the current button icon
+	var icon_texture = icon_layout.get_button_icon(current_button_icon_name)
+	print("[CaptureMinigame] DEBUG: Trying to load icon for button %s, icon name: %s, texture: %s" % [current_button, current_button_icon_name, icon_texture])
 	if icon_texture:
 		# Store the texture for drawing
 		button_icon = TextureRect.new()
@@ -181,7 +182,7 @@ func _setup_minigame() -> void:
 		# We'll draw this manually in _draw_capture_visual
 		print("[CaptureMinigame] Loaded button icon for %s - texture size: %s" % [current_button, icon_texture.get_size()])
 	else:
-		print("[CaptureMinigame] ERROR: Could not load button icon for %s" % current_button)
+		print("[CaptureMinigame] ERROR: Could not load button icon for %s (icon name: %s)" % [current_button, current_button_icon_name])
 
 	# Result label (placed above the minigame)
 	result_label = Label.new()
@@ -235,28 +236,37 @@ func _randomize_button() -> void:
 	"""Pick a random button"""
 	current_button = CAPTURE_BUTTONS[randi() % CAPTURE_BUTTONS.size()]
 
-	# Map to InputManager action constant (like DefenseMinigame does)
+	# Map to InputManager action constant (for input checking)
+	# Map to icon name (for loading the icon)
 	match current_button:
-		"A": current_button_action = aInputManager.ACTION_ACCEPT
-		"B": current_button_action = aInputManager.ACTION_BACK
-		"X": current_button_action = aInputManager.ACTION_DEFEND
-		"Y": current_button_action = aInputManager.ACTION_SKILL
+		"A":
+			current_button_action = aInputManager.ACTION_ACCEPT
+			current_button_icon_name = "accept"
+		"B":
+			current_button_action = aInputManager.ACTION_BACK
+			current_button_icon_name = "back"
+		"X":
+			current_button_action = aInputManager.ACTION_DEFEND
+			current_button_icon_name = "defend"
+		"Y":
+			current_button_action = aInputManager.ACTION_SKILL
+			current_button_icon_name = "skill"
 
 	# Update button icon texture
 	var icon_layout = get_node_or_null("/root/aControllerIconLayout")
 	print("[CaptureMinigame] DEBUG _randomize_button: icon_layout: %s, button_icon: %s" % [icon_layout, button_icon])
 	if icon_layout and button_icon:
-		var icon_texture = icon_layout.get_button_icon(current_button_action)
-		print("[CaptureMinigame] DEBUG: Got texture for %s: %s" % [current_button_action, icon_texture])
+		var icon_texture = icon_layout.get_button_icon(current_button_icon_name)
+		print("[CaptureMinigame] DEBUG: Got texture for %s (%s): %s" % [current_button, current_button_icon_name, icon_texture])
 		if icon_texture:
 			button_icon.texture = icon_texture
 			print("[CaptureMinigame] Updated button icon for %s - texture size: %s" % [current_button, icon_texture.get_size()])
 		else:
-			print("[CaptureMinigame] ERROR: icon_texture is null for %s" % current_button_action)
+			print("[CaptureMinigame] ERROR: icon_texture is null for icon name '%s'" % current_button_icon_name)
 	else:
 		print("[CaptureMinigame] ERROR: Can't update icon - icon_layout: %s, button_icon: %s" % [icon_layout, button_icon])
 
-	print("[CaptureMinigame] Button changed to: %s (action: %s)" % [current_button, current_button_action])
+	print("[CaptureMinigame] Button changed to: %s (action: %s, icon: %s)" % [current_button, current_button_action, current_button_icon_name])
 
 func _randomize_direction() -> void:
 	"""Pick a random direction"""
