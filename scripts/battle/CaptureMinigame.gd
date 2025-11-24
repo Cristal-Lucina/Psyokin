@@ -69,6 +69,9 @@ var input_locked: bool = true
 var capture_success: bool = false
 var result_text: String = "FAILED"
 
+## Visual feedback
+var is_button_pressed: bool = false
+
 # Core vibe color constants
 const COLOR_MILK_WHITE = Color(0.96, 0.97, 0.98)
 const COLOR_BUBBLE_MAGENTA = Color(1.0, 0.29, 0.85)
@@ -142,14 +145,15 @@ func _setup_minigame() -> void:
 		print("[CaptureMinigame] ERROR: aControllerIconLayout not found!")
 		return
 
-	# Fills label at top
+	# Fills label at top - moved up 40px
 	fills_label = Label.new()
-	fills_label.text = "Fill 1/%d" % fills_needed
+	fills_label.text = "Wrap 1/%d" % fills_needed
 	fills_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	fills_label.add_theme_font_size_override("font_size", 32)
 	fills_label.add_theme_color_override("font_color", COLOR_MILK_WHITE)
 	fills_label.add_theme_constant_override("outline_size", 4)
 	fills_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
+	fills_label.position.y = -40  # Move up 40px
 	content_container.add_child(fills_label)
 
 	# Create a centered container for the button, arrow, and circle
@@ -320,6 +324,7 @@ func _process_active(delta: float) -> void:
 
 	# Check if player is holding the correct button
 	var holding_button = aInputManager.is_action_pressed(current_button_action)
+	is_button_pressed = holding_button  # Track for visual feedback
 
 	# Debug button holding every 30 frames
 	if Engine.get_frames_drawn() % 30 == 0:
@@ -403,7 +408,7 @@ func _process_active(delta: float) -> void:
 
 		# Update label
 		if fills_completed < fills_needed:
-			fills_label.text = "Fill %d/%d" % [fills_completed + 1, fills_needed]
+			fills_label.text = "Wrap %d/%d" % [fills_completed + 1, fills_needed]
 			# Randomize for next fill
 			_randomize_button()
 			_randomize_direction()
@@ -445,9 +450,9 @@ func _draw_capture_visual() -> void:
 		var rotation_rect = Rect2(rotation_pos, rotation_size)
 
 		# Flip horizontally for clockwise direction
-		if current_direction == 1:  # Clockwise - flip horizontal, shifted left 3px
-			# Use transform to flip horizontally, shift left 3px
-			circle_canvas.draw_set_transform(Vector2(rotation_rect.position.x + rotation_rect.size.x - 3, rotation_rect.position.y), 0, Vector2(-1, 1))
+		if current_direction == 1:  # Clockwise - flip horizontal, shifted left 4px
+			# Use transform to flip horizontally, shift left 4px
+			circle_canvas.draw_set_transform(Vector2(rotation_rect.position.x + rotation_rect.size.x - 4, rotation_rect.position.y), 0, Vector2(-1, 1))
 			var flipped_rect = Rect2(Vector2(0, 0), rotation_size)
 			circle_canvas.draw_texture_rect(rotation_icon, flipped_rect, false, Color.WHITE)
 			circle_canvas.draw_set_transform(Vector2.ZERO, 0, Vector2.ONE)  # Reset transform
@@ -465,7 +470,14 @@ func _draw_capture_visual() -> void:
 	# Draw background circle behind button icon for visibility - offset up 60px
 	var icon_bg_radius = 50.0
 	circle_canvas.draw_circle(circle_center, icon_bg_radius, Color(0.1, 0.1, 0.15, 0.8))
-	_draw_circle_outline(circle_center, icon_bg_radius, COLOR_MILK_WHITE, 3.0)
+
+	# Draw blue glow when button is pressed
+	if is_button_pressed:
+		var glow_color = Color(0.2, 0.5, 1.0, 0.8)  # Blue glow
+		_draw_circle_outline(circle_center, icon_bg_radius + 5, glow_color, 8.0)  # Outer glow
+		_draw_circle_outline(circle_center, icon_bg_radius, glow_color, 4.0)  # Inner glow
+	else:
+		_draw_circle_outline(circle_center, icon_bg_radius, COLOR_MILK_WHITE, 3.0)
 
 	# Draw the button icon in the center (70x70) - offset up 60px
 	if button_icon and button_icon.texture:
