@@ -157,7 +157,7 @@ func _setup_minigame() -> void:
 	circle_canvas.draw.connect(_draw_filling_circle)
 	center_container.add_child(circle_canvas)
 
-	# Button sequence display (positioned independently, moved down 70px)
+	# Button sequence display (positioned independently, moved down 130px)
 	sequence_container = HBoxContainer.new()
 	sequence_container.add_theme_constant_override("separation", 10)
 	var sequence_center = CenterContainer.new()
@@ -165,7 +165,7 @@ func _setup_minigame() -> void:
 
 	# Position manually with offset instead of using layout flow
 	sequence_center.set_anchors_preset(Control.PRESET_CENTER_TOP)
-	sequence_center.offset_top = 70  # Move down 70px
+	sequence_center.offset_top = 130  # Move down 130px
 	sequence_center.z_index = 1000  # Ensure appears on top
 
 	# Add directly to overlay_panel (not content_container) to avoid layout interference
