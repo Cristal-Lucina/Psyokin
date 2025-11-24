@@ -56,7 +56,6 @@ var direction_arrow: Control  # Arrow indicating spin direction
 var circle_canvas: Control  # For drawing the progress circle
 var progress_bar: ProgressBar  # Shows fill progress
 var fills_label: Label  # Shows "Fill 1/3"
-var button_prompt_label: Label  # Shows "HOLD A" or "HOLD B" etc
 var result_label: Label
 var fade_timer: float = 0.0
 var fade_duration: float = 0.5
@@ -152,16 +151,6 @@ func _setup_minigame() -> void:
 	fills_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
 	content_container.add_child(fills_label)
 
-	# Button prompt label (shows "HOLD A" or "HOLD B" etc)
-	button_prompt_label = Label.new()
-	button_prompt_label.text = "HOLD A"  # Will be updated by _randomize_button()
-	button_prompt_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	button_prompt_label.add_theme_font_size_override("font_size", 40)
-	button_prompt_label.add_theme_color_override("font_color", COLOR_BUBBLE_MAGENTA)
-	button_prompt_label.add_theme_constant_override("outline_size", 6)
-	button_prompt_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
-	content_container.add_child(button_prompt_label)
-
 	# Create a centered container for the button, arrow, and circle
 	var center_container = CenterContainer.new()
 	center_container.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -251,10 +240,6 @@ func _randomize_button() -> void:
 		"B": current_button_action = aInputManager.ACTION_BACK
 		"X": current_button_action = aInputManager.ACTION_DEFEND
 		"Y": current_button_action = aInputManager.ACTION_SKILL
-
-	# Update button prompt label
-	if button_prompt_label:
-		button_prompt_label.text = "HOLD %s" % current_button
 
 	# Update button icon texture
 	var icon_layout = get_node_or_null("/root/aControllerIconLayout")
