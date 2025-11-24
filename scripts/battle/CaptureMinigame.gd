@@ -435,6 +435,7 @@ func _draw_capture_visual() -> void:
 	"""Draw the rotation icon, button icon, and progress circle"""
 	var canvas_size = circle_canvas.size
 	var center = canvas_size / 2.0
+	var circle_center = center - Vector2(0, 60)  # Offset circle and button up 60px
 
 	# Draw rotation icon behind everything (150x150, bottom centered at canvas center)
 	if rotation_icon:
@@ -453,23 +454,23 @@ func _draw_capture_visual() -> void:
 		else:  # Counter-clockwise - draw normally
 			circle_canvas.draw_texture_rect(rotation_icon, rotation_rect, false, Color.WHITE)
 
-	# Draw outer circle (empty)
+	# Draw outer circle (empty) - offset up 60px
 	var outer_radius = 100.0
-	_draw_circle_outline(center, outer_radius, Color(0.5, 0.5, 0.5, 0.5), 3.0)
+	_draw_circle_outline(circle_center, outer_radius, Color(0.5, 0.5, 0.5, 0.5), 3.0)
 
-	# Draw progress fill (colored arc)
+	# Draw progress fill (colored arc) - offset up 60px
 	if fill_progress > 0.0:
-		_draw_progress_arc(center, outer_radius, fill_progress, COLOR_BUBBLE_MAGENTA)
+		_draw_progress_arc(circle_center, outer_radius, fill_progress, COLOR_BUBBLE_MAGENTA)
 
-	# Draw background circle behind button icon for visibility
+	# Draw background circle behind button icon for visibility - offset up 60px
 	var icon_bg_radius = 50.0
-	circle_canvas.draw_circle(center, icon_bg_radius, Color(0.1, 0.1, 0.15, 0.8))
-	_draw_circle_outline(center, icon_bg_radius, COLOR_MILK_WHITE, 3.0)
+	circle_canvas.draw_circle(circle_center, icon_bg_radius, Color(0.1, 0.1, 0.15, 0.8))
+	_draw_circle_outline(circle_center, icon_bg_radius, COLOR_MILK_WHITE, 3.0)
 
-	# Draw the button icon in the center (70x70)
+	# Draw the button icon in the center (70x70) - offset up 60px
 	if button_icon and button_icon.texture:
 		var icon_size = Vector2(70, 70)
-		var icon_pos = center - icon_size / 2.0
+		var icon_pos = circle_center - icon_size / 2.0
 		var icon_rect = Rect2(icon_pos, icon_size)
 		circle_canvas.draw_texture_rect(button_icon.texture, icon_rect, false, Color.WHITE)
 
