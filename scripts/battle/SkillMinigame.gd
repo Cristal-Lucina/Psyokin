@@ -165,8 +165,8 @@ func _setup_minigame() -> void:
 
 	# Position manually with absolute positioning - add to root (self), not overlay_panel
 	sequence_center.set_anchors_preset(Control.PRESET_CENTER_TOP)
-	sequence_center.position.x = -88  # Move 88px left from center (90 - 2)
-	sequence_center.position.y = 300  # Move down 300px from top (350 - 50)
+	sequence_center.position.x = -86  # Move 86px left from center (88 - 2)
+	sequence_center.position.y = 310  # Move down 310px from top (300 + 10)
 	sequence_center.z_index = 1000  # Ensure appears on top
 
 	# Add directly to self (root control) to avoid any layout interference
