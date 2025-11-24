@@ -435,7 +435,7 @@ func _draw_capture_visual() -> void:
 	"""Draw the rotation icon, button icon, and progress circle"""
 	var canvas_size = circle_canvas.size
 	var center = canvas_size / 2.0
-	var circle_center = center - Vector2(0, 60)  # Offset circle and button up 60px
+	var circle_center = center - Vector2(0, 80)  # Offset circle and button up 80px
 
 	# Draw rotation icon behind everything (150x150, bottom centered at canvas center)
 	if rotation_icon:
