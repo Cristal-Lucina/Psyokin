@@ -171,7 +171,6 @@ func _setup_minigame() -> void:
 
 	# Load the current button icon
 	var icon_texture = icon_layout.get_button_icon(current_button_icon_name)
-	print("[CaptureMinigame] DEBUG: Trying to load icon for button %s, icon name: %s, texture: %s" % [current_button, current_button_icon_name, icon_texture])
 	if icon_texture:
 		# Store the texture for drawing
 		button_icon = TextureRect.new()
@@ -180,7 +179,7 @@ func _setup_minigame() -> void:
 		button_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		button_icon.custom_minimum_size = Vector2(70, 70)
 		# We'll draw this manually in _draw_capture_visual
-		print("[CaptureMinigame] Loaded button icon for %s - texture size: %s" % [current_button, icon_texture.get_size()])
+		print("[CaptureMinigame] Loaded button icon: %s (%s)" % [current_button, current_button_icon_name])
 	else:
 		print("[CaptureMinigame] ERROR: Could not load button icon for %s (icon name: %s)" % [current_button, current_button_icon_name])
 
@@ -237,7 +236,7 @@ func _randomize_button() -> void:
 	current_button = CAPTURE_BUTTONS[randi() % CAPTURE_BUTTONS.size()]
 
 	# Map to InputManager action constant (for input checking)
-	# Map to icon name (for loading the icon)
+	# Map to icon name (for loading the icon from ControllerIconLayout)
 	match current_button:
 		"A":
 			current_button_action = aInputManager.ACTION_ACCEPT
@@ -247,26 +246,28 @@ func _randomize_button() -> void:
 			current_button_icon_name = "back"
 		"X":
 			current_button_action = aInputManager.ACTION_DEFEND
-			current_button_icon_name = "defend"
+			current_button_icon_name = "special_1"  # X/Square button
 		"Y":
 			current_button_action = aInputManager.ACTION_SKILL
-			current_button_icon_name = "skill"
+			current_button_icon_name = "special_2"  # Y/Triangle button
 
 	# Update button icon texture
 	var icon_layout = get_node_or_null("/root/aControllerIconLayout")
-	print("[CaptureMinigame] DEBUG _randomize_button: icon_layout: %s, button_icon: %s" % [icon_layout, button_icon])
 	if icon_layout and button_icon:
 		var icon_texture = icon_layout.get_button_icon(current_button_icon_name)
-		print("[CaptureMinigame] DEBUG: Got texture for %s (%s): %s" % [current_button, current_button_icon_name, icon_texture])
 		if icon_texture:
 			button_icon.texture = icon_texture
-			print("[CaptureMinigame] Updated button icon for %s - texture size: %s" % [current_button, icon_texture.get_size()])
+			# Force redraw to update visual immediately
+			if circle_canvas:
+				circle_canvas.queue_redraw()
+			print("[CaptureMinigame] Updated button icon: %s -> %s (texture: %s)" % [current_button, current_button_icon_name, icon_texture.get_size()])
 		else:
-			print("[CaptureMinigame] ERROR: icon_texture is null for icon name '%s'" % current_button_icon_name)
+			print("[CaptureMinigame] ERROR: Could not load texture for icon name '%s'" % current_button_icon_name)
 	else:
-		print("[CaptureMinigame] ERROR: Can't update icon - icon_layout: %s, button_icon: %s" % [icon_layout, button_icon])
-
-	print("[CaptureMinigame] Button changed to: %s (action: %s, icon: %s)" % [current_button, current_button_action, current_button_icon_name])
+		if not icon_layout:
+			print("[CaptureMinigame] ERROR: icon_layout not found")
+		if not button_icon:
+			print("[CaptureMinigame] ERROR: button_icon not initialized yet")
 
 func _randomize_direction() -> void:
 	"""Pick a random direction"""
@@ -467,25 +468,10 @@ func _draw_capture_visual() -> void:
 
 	# Draw the button icon in the center (70x70)
 	if button_icon and button_icon.texture:
-		var icon_size = Vector2(70, 70)  # Slightly smaller to fit inside background circle
+		var icon_size = Vector2(70, 70)
 		var icon_pos = center - icon_size / 2.0
 		var icon_rect = Rect2(icon_pos, icon_size)
-
-		# Debug: Draw a red rectangle where the icon should be
-		circle_canvas.draw_rect(icon_rect, Color(1, 0, 0, 0.3), false, 2.0)
-
-		# Debug logging (only every 60 frames to reduce spam)
-		if Engine.get_frames_drawn() % 60 == 0:
-			print("[CaptureMinigame] Drawing button icon - texture: %s, rect: %s, size: %s" % [button_icon.texture, icon_rect, icon_size])
-
 		circle_canvas.draw_texture_rect(button_icon.texture, icon_rect, false, Color.WHITE)
-	else:
-		# Debug: Icon not showing - log why
-		if Engine.get_frames_drawn() % 60 == 0:
-			print("[CaptureMinigame] Button icon NOT drawing - button_icon: %s, texture: %s" % [button_icon, button_icon.texture if button_icon else "N/A"])
-
-		# Draw debug marker at center
-		circle_canvas.draw_circle(center, 5.0, Color(1, 0, 0, 1.0))
 
 func _draw_circle_outline(center: Vector2, radius: float, color: Color, width: float) -> void:
 	"""Helper to draw a circle outline"""
