@@ -341,18 +341,18 @@ func _randomize_direction() -> void:
 
 func _calculate_change_probability(time_elapsed: float) -> float:
 	"""Calculate probability of a random change based on time elapsed since last change
-	0.5s = 10%, 1.0s = 50%, 2.0s = 75%"""
-	if time_elapsed <= 0.5:
-		# 0s to 0.5s: 0% to 10%
-		return 0.20 * time_elapsed
-	elif time_elapsed <= 1.0:
-		# 0.5s to 1.0s: 10% to 50%
-		return 0.10 + 0.80 * (time_elapsed - 0.5)
+	1.0s = 10%, 2.0s = 50%, 3.0s = 75%"""
+	if time_elapsed <= 1.0:
+		# 0s to 1.0s: 0% to 10%
+		return 0.10 * time_elapsed
 	elif time_elapsed <= 2.0:
-		# 1.0s to 2.0s: 50% to 75%
-		return 0.50 + 0.25 * (time_elapsed - 1.0)
+		# 1.0s to 2.0s: 10% to 50%
+		return 0.10 + 0.40 * (time_elapsed - 1.0)
+	elif time_elapsed <= 3.0:
+		# 2.0s to 3.0s: 50% to 75%
+		return 0.50 + 0.25 * (time_elapsed - 2.0)
 	else:
-		# After 2.0s: cap at 75%
+		# After 3.0s: cap at 75%
 		return 0.75
 
 func _start_minigame() -> void:
