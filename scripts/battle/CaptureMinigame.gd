@@ -437,11 +437,11 @@ func _draw_capture_visual() -> void:
 	var center = canvas_size / 2.0
 	var circle_center = center - Vector2(0, 80)  # Offset circle and button up 80px
 
-	# Draw rotation icon behind everything (200x200, bottom centered at canvas center, moved down 10px)
+	# Draw rotation icon behind everything (200x200, bottom centered at canvas center, moved down 14px)
 	if rotation_icon:
 		var rotation_size = Vector2(200, 200)
-		# Position so bottom of icon is at center of canvas, moved down 10px
-		var rotation_pos = Vector2(center.x - rotation_size.x / 2.0, center.y - rotation_size.y + 10)
+		# Position so bottom of icon is at center of canvas, moved down 14px
+		var rotation_pos = Vector2(center.x - rotation_size.x / 2.0, center.y - rotation_size.y + 14)
 		var rotation_rect = Rect2(rotation_pos, rotation_size)
 
 		# Flip horizontally for clockwise direction
