@@ -5423,8 +5423,7 @@ func _execute_enemy_ai() -> void:
 					add_turn_line("%s fainted from the counter!" % current_combatant.display_name)
 					# Record kill for morality system
 					battle_mgr.record_enemy_defeat(current_combatant, false)  # false = kill
-				else:
-					add_turn_line("%s has %d HP left." % [current_combatant.display_name, current_combatant.hp])
+				# Don't show HP remaining after counter
 
 			queue_turn_message()  # Queue the full turn message
 			print("[Battle] Enemy Miss! Hit chance: %.1f%%, Roll: %d" % [hit_check.hit_chance, hit_check.roll])
@@ -5519,35 +5518,42 @@ func _execute_enemy_ai() -> void:
 			if weakness_line != "":
 				add_turn_line(weakness_line)
 
-			# Build hit message line
-			var hit_msg = "%s is hit for %d damage!" % [target.display_name, damage]
+			# Check if this was a perfect parry (defense_modifier = 0.0)
+			var was_parried = (defense_modifier == 0.0)
 
-			# Add special effects to message
-			var effect_parts = []
-			if is_crit:
-				effect_parts.append("CRITICAL")
-			if type_bonus > 0.0:
-				effect_parts.append("Super Effective")
-			elif type_bonus < 0.0:
-				effect_parts.append("Not Very Effective")
-			if target.get("is_defending", false):
-				effect_parts.append("Guarded")
+			if was_parried:
+				# Perfect parry - special messaging
+				add_turn_line("%s parried the attack!" % target.display_name)
+			else:
+				# Normal hit - Build hit message line
+				var hit_msg = "%s is hit for %d damage!" % [target.display_name, damage]
 
-			if not effect_parts.is_empty():
-				hit_msg = "%s (%s)" % [hit_msg, ", ".join(effect_parts)]
+				# Add special effects to message
+				var effect_parts = []
+				if is_crit:
+					effect_parts.append("CRITICAL")
+				if type_bonus > 0.0:
+					effect_parts.append("Super Effective")
+				elif type_bonus < 0.0:
+					effect_parts.append("Not Very Effective")
+				if target.get("is_defending", false):
+					effect_parts.append("Guarded")
 
-			add_turn_line(hit_msg)
+				if not effect_parts.is_empty():
+					hit_msg = "%s (%s)" % [hit_msg, ", ".join(effect_parts)]
 
-			# Add KO or status line
-			if target.is_ko:
-				add_turn_line("%s fainted!" % target.display_name)
-			elif weakness_line == "":  # Only show status hint if no weakness
-				# For enemies, show health hint instead of exact HP
-				var is_enemy = target in battle_mgr.get_enemy_combatants()
-				if is_enemy:
-					add_turn_line(_get_enemy_health_hint(target))
-				else:
-					add_turn_line("%s has %d HP left." % [target.display_name, target.hp])
+				add_turn_line(hit_msg)
+
+				# Add KO or status line (only for non-parried hits)
+				if target.is_ko:
+					add_turn_line("%s fainted!" % target.display_name)
+				elif weakness_line == "":  # Only show status hint if no weakness
+					# For enemies, show health hint instead of exact HP
+					var is_enemy = target in battle_mgr.get_enemy_combatants()
+					if is_enemy:
+						add_turn_line(_get_enemy_health_hint(target))
+					else:
+						add_turn_line("%s has %d HP left." % [target.display_name, target.hp])
 
 			# Handle counter damage from successful parry
 			if counter_damage > 0:
@@ -5562,8 +5568,7 @@ func _execute_enemy_ai() -> void:
 					add_turn_line("%s fainted from the counter!" % current_combatant.display_name)
 					# Record kill for morality system
 					battle_mgr.record_enemy_defeat(current_combatant, false)  # false = kill
-				else:
-					add_turn_line("%s has %d HP left." % [current_combatant.display_name, current_combatant.hp])
+				# Don't show HP remaining after counter
 
 			# Queue the full turn message
 			queue_turn_message()
