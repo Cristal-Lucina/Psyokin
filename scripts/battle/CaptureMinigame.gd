@@ -32,12 +32,12 @@ var decay_speed: float = 0.15  # How fast the bar drains when not inputting
 const CAPTURE_BUTTONS = ["A", "B", "X", "Y"]
 const BUTTON_ACTIONS = {
 	"A": "accept",
-	"B": "cancel",
-	"X": "special_1",
-	"Y": "special_2"
+	"B": "back",
+	"X": "defend",
+	"Y": "skill"
 }
 var current_button: String = "A"  # Random button
-var current_button_action: String = "accept"
+var current_button_action: String = ""  # Will be set to InputManager constant
 var current_direction: int = 1  # 1 = clockwise, -1 = counter-clockwise
 
 ## Joystick rotation tracking
@@ -226,7 +226,13 @@ func _calculate_difficulty() -> void:
 func _randomize_button() -> void:
 	"""Pick a random button"""
 	current_button = CAPTURE_BUTTONS[randi() % CAPTURE_BUTTONS.size()]
-	current_button_action = BUTTON_ACTIONS[current_button]
+
+	# Map to InputManager action constant (like DefenseMinigame does)
+	match current_button:
+		"A": current_button_action = aInputManager.ACTION_ACCEPT
+		"B": current_button_action = aInputManager.ACTION_BACK
+		"X": current_button_action = aInputManager.ACTION_DEFEND
+		"Y": current_button_action = aInputManager.ACTION_SKILL
 
 	# Update button prompt label
 	if button_prompt_label:
@@ -285,6 +291,10 @@ func _process_active(delta: float) -> void:
 
 	# Check if player is holding the correct button
 	var holding_button = aInputManager.is_action_pressed(current_button_action)
+
+	# Debug button holding every 30 frames
+	if Engine.get_frames_drawn() % 30 == 0:
+		print("[CaptureMinigame] Button check - expecting: %s, action: %s, holding: %s" % [current_button, current_button_action, holding_button])
 
 	# Get joystick input
 	var input_vec = aInputManager.get_movement_vector()
