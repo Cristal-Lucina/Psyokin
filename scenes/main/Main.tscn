@@ -1,4 +1,4 @@
-[gd_scene load_steps=7 format=4 uid="uid://g3m77iaqotvk"]
+[gd_scene load_steps=8 format=4 uid="uid://g3m77iaqotvk"]
 
 [ext_resource type="Script" uid="uid://d3wliev4lvrsw" path="res://scripts/main/Main.gd" id="1"]
 [ext_resource type="Script" uid="uid://cvvlil5s3jb1f" path="res://scripts/dev/ItemCheatBar.gd" id="2"]
@@ -6,6 +6,7 @@
 [ext_resource type="TileSet" uid="uid://dcvxj8yqm2hhp" path="res://resources/tilesets/environment_tileset.tres" id="4"]
 [ext_resource type="TileSet" path="res://assets/graphics/envirnments/Master_TileSet/master_tileset.tres" id="5_master"]
 [ext_resource type="TileSet" path="res://assets/graphics/envirnments/Master_TileSet/animated_objects_tileset.tres" id="6_animated"]
+[ext_resource type="TileSet" path="res://assets/graphics/envirnments/Master_TileSet/master_tileset_16x16.tres" id="7_16x16"]
 
 [node name="Main" type="Control"]
 layout_mode = 3
@@ -103,6 +104,31 @@ metadata/_edit_snap_size = Vector2(32, 32)
 [node name="ObjectMarkers" type="TileMapLayer" parent="GameWorld/AnimatedObjectsMap"]
 tile_set = ExtResource("6_animated")
 rendering_quadrant_size = 32
+
+[node name="MasterTileMap16x16" type="TileMap" parent="GameWorld"]
+scale = Vector2(2, 2)
+tile_set = ExtResource("7_16x16")
+rendering_quadrant_size = 16
+format = 2
+metadata/_edit_snap_grid = true
+metadata/_edit_snap_size = Vector2(16, 16)
+
+[node name="Ground" type="TileMapLayer" parent="GameWorld/MasterTileMap16x16"]
+tile_set = ExtResource("7_16x16")
+rendering_quadrant_size = 16
+
+[node name="Buildings" type="TileMapLayer" parent="GameWorld/MasterTileMap16x16"]
+tile_set = ExtResource("7_16x16")
+rendering_quadrant_size = 16
+
+[node name="Props" type="TileMapLayer" parent="GameWorld/MasterTileMap16x16"]
+tile_set = ExtResource("7_16x16")
+rendering_quadrant_size = 16
+
+[node name="Foreground" type="TileMapLayer" parent="GameWorld/MasterTileMap16x16"]
+top_level = true
+tile_set = ExtResource("7_16x16")
+rendering_quadrant_size = 16
 
 [node name="Player" parent="GameWorld" instance=ExtResource("3")]
 position = Vector2(287, 250)
