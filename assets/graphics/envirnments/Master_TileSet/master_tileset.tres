@@ -1,0 +1,187 @@
+[gd_resource type="TileSet" load_steps=28 format=3]
+
+[ext_resource type="Texture2D" path="res://assets/graphics/envirnments/Tilemap/Arcade/Tilemap/Tilemap.png" id="1_arcade"]
+[ext_resource type="Texture2D" path="res://assets/graphics/envirnments/Tilemap/Bakery/Tilemap/Tilemap.png" id="2_bakery"]
+[ext_resource type="Texture2D" path="res://assets/graphics/envirnments/Tilemap/Batting_cages/Tilemap/Tilemap.png" id="3_batting"]
+[ext_resource type="Texture2D" path="res://assets/graphics/envirnments/Tilemap/Clothing_Store/21_Clothing_Store_32x32.png" id="4_clothing"]
+[ext_resource type="Texture2D" path="res://assets/graphics/envirnments/Tilemap/Dark_Tokyo/Tilemap/Tilemap.png" id="5_darktokyo"]
+[ext_resource type="Texture2D" path="res://assets/graphics/envirnments/Tilemap/Dotonbori_city/Tilemap/MainTileMap.png" id="6_dotonbori"]
+[ext_resource type="Texture2D" path="res://assets/graphics/envirnments/Tilemap/Feastival/Tilemap/Maintilemap.png" id="7_feastival"]
+[ext_resource type="Texture2D" path="res://assets/graphics/envirnments/Tilemap/Forest_Greaveyard/Tilemaps/Fulltilemap.png" id="8_forest"]
+[ext_resource type="Texture2D" path="res://assets/graphics/envirnments/Tilemap/Horror_Interiors/Tilemap/MainTileMap.png" id="9_horror"]
+[ext_resource type="Texture2D" path="res://assets/graphics/envirnments/Tilemap/Interior_Decor/Tilemap/Maintilemap.png" id="10_decor"]
+[ext_resource type="Texture2D" path="res://assets/graphics/envirnments/Tilemap/Japanese_Bar/TilemapDay.png" id="11_bar"]
+[ext_resource type="Texture2D" path="res://assets/graphics/envirnments/Tilemap/Japanese_City/Tilemap/Tilemap.png" id="12_city"]
+[ext_resource type="Texture2D" path="res://assets/graphics/envirnments/Tilemap/Japanese_Cornerstore/Tilemap/MainTilemap.png" id="13_cornerstore"]
+[ext_resource type="Texture2D" path="res://assets/graphics/envirnments/Tilemap/Japanese_Interiors/Tilemap/MainTileMap.png" id="14_interiors"]
+[ext_resource type="Texture2D" path="res://assets/graphics/envirnments/Tilemap/Japanese_Office_Interiors/Tilemap/MainTileMap.png" id="15_office"]
+[ext_resource type="Texture2D" path="res://assets/graphics/envirnments/Tilemap/Japanese_School/Tilemap/Fulltilemap.png" id="16_school"]
+[ext_resource type="Texture2D" path="res://assets/graphics/envirnments/Tilemap/Kanagawa/Non-RPGMaker_Tilemap/Tilemap.png" id="17_kanagawa"]
+[ext_resource type="Texture2D" path="res://assets/graphics/envirnments/Tilemap/Onsen/Tilemap/Tilemap.png" id="18_onsen"]
+[ext_resource type="Texture2D" path="res://assets/graphics/envirnments/Tilemap/Osaka/Tilemap/Tilemap.png" id="19_osaka"]
+[ext_resource type="Texture2D" path="res://assets/graphics/envirnments/Tilemap/Overgrown_backstreets/Tilemap/MainTileMap.png" id="20_overgrown"]
+[ext_resource type="Texture2D" path="res://assets/graphics/envirnments/Tilemap/TempleShrines/Non-RPGMaker_Tilemap/Main_Tilemap.png" id="21_templeshrines"]
+[ext_resource type="Texture2D" path="res://assets/graphics/envirnments/Tilemap/TempleandShrines/MainTileMap/MainTileMap.png" id="22_templeandshrines"]
+[ext_resource type="Texture2D" path="res://assets/graphics/envirnments/Tilemap/Train_Exterior/Tilemap/MainTileMap.png" id="23_trainext"]
+[ext_resource type="Texture2D" path="res://assets/graphics/envirnments/Tilemap/Train_Interiors/Tilemap/Tilemap_full.png" id="24_trainint"]
+[ext_resource type="Texture2D" path="res://assets/graphics/envirnments/Tilemap/Train_Station/Tilemaps/Non-RPGMaker/Maintilemap.png" id="25_station"]
+[ext_resource type="Texture2D" path="res://assets/graphics/envirnments/Tilemap/Urban_Accessories/Tilemap.png" id="26_urban"]
+
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_0"]
+resource_name = "Arcade"
+texture = ExtResource("1_arcade")
+texture_region_size = Vector2i(32, 32)
+
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_1"]
+resource_name = "Bakery"
+texture = ExtResource("2_bakery")
+texture_region_size = Vector2i(32, 32)
+
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_2"]
+resource_name = "Batting_Cages"
+texture = ExtResource("3_batting")
+texture_region_size = Vector2i(32, 32)
+
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_3"]
+resource_name = "Clothing_Store"
+texture = ExtResource("4_clothing")
+texture_region_size = Vector2i(32, 32)
+
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_4"]
+resource_name = "Dark_Tokyo"
+texture = ExtResource("5_darktokyo")
+texture_region_size = Vector2i(32, 32)
+
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_5"]
+resource_name = "Dotonbori_City"
+texture = ExtResource("6_dotonbori")
+texture_region_size = Vector2i(32, 32)
+
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_6"]
+resource_name = "Feastival"
+texture = ExtResource("7_feastival")
+texture_region_size = Vector2i(32, 32)
+
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_7"]
+resource_name = "Forest_Graveyard"
+texture = ExtResource("8_forest")
+texture_region_size = Vector2i(32, 32)
+
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_8"]
+resource_name = "Horror_Interiors"
+texture = ExtResource("9_horror")
+texture_region_size = Vector2i(32, 32)
+
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_9"]
+resource_name = "Interior_Decor"
+texture = ExtResource("10_decor")
+texture_region_size = Vector2i(32, 32)
+
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_10"]
+resource_name = "Japanese_Bar"
+texture = ExtResource("11_bar")
+texture_region_size = Vector2i(32, 32)
+
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_11"]
+resource_name = "Japanese_City"
+texture = ExtResource("12_city")
+texture_region_size = Vector2i(32, 32)
+
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_12"]
+resource_name = "Japanese_Cornerstore"
+texture = ExtResource("13_cornerstore")
+texture_region_size = Vector2i(32, 32)
+
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_13"]
+resource_name = "Japanese_Interiors"
+texture = ExtResource("14_interiors")
+texture_region_size = Vector2i(32, 32)
+
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_14"]
+resource_name = "Japanese_Office"
+texture = ExtResource("15_office")
+texture_region_size = Vector2i(32, 32)
+
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_15"]
+resource_name = "Japanese_School"
+texture = ExtResource("16_school")
+texture_region_size = Vector2i(32, 32)
+
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_16"]
+resource_name = "Kanagawa"
+texture = ExtResource("17_kanagawa")
+texture_region_size = Vector2i(32, 32)
+
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_17"]
+resource_name = "Onsen"
+texture = ExtResource("18_onsen")
+texture_region_size = Vector2i(32, 32)
+
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_18"]
+resource_name = "Osaka"
+texture = ExtResource("19_osaka")
+texture_region_size = Vector2i(32, 32)
+
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_19"]
+resource_name = "Overgrown_Backstreets"
+texture = ExtResource("20_overgrown")
+texture_region_size = Vector2i(32, 32)
+
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_20"]
+resource_name = "Temple_Shrines"
+texture = ExtResource("21_templeshrines")
+texture_region_size = Vector2i(32, 32)
+
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_21"]
+resource_name = "Temple_and_Shrines"
+texture = ExtResource("22_templeandshrines")
+texture_region_size = Vector2i(32, 32)
+
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_22"]
+resource_name = "Train_Exterior"
+texture = ExtResource("23_trainext")
+texture_region_size = Vector2i(32, 32)
+
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_23"]
+resource_name = "Train_Interiors"
+texture = ExtResource("24_trainint")
+texture_region_size = Vector2i(32, 32)
+
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_24"]
+resource_name = "Train_Station"
+texture = ExtResource("25_station")
+texture_region_size = Vector2i(32, 32)
+
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_25"]
+resource_name = "Urban_Accessories"
+texture = ExtResource("26_urban")
+texture_region_size = Vector2i(32, 32)
+
+[resource]
+tile_size = Vector2i(32, 32)
+sources/0 = SubResource("TileSetAtlasSource_0")
+sources/1 = SubResource("TileSetAtlasSource_1")
+sources/2 = SubResource("TileSetAtlasSource_2")
+sources/3 = SubResource("TileSetAtlasSource_3")
+sources/4 = SubResource("TileSetAtlasSource_4")
+sources/5 = SubResource("TileSetAtlasSource_5")
+sources/6 = SubResource("TileSetAtlasSource_6")
+sources/7 = SubResource("TileSetAtlasSource_7")
+sources/8 = SubResource("TileSetAtlasSource_8")
+sources/9 = SubResource("TileSetAtlasSource_9")
+sources/10 = SubResource("TileSetAtlasSource_10")
+sources/11 = SubResource("TileSetAtlasSource_11")
+sources/12 = SubResource("TileSetAtlasSource_12")
+sources/13 = SubResource("TileSetAtlasSource_13")
+sources/14 = SubResource("TileSetAtlasSource_14")
+sources/15 = SubResource("TileSetAtlasSource_15")
+sources/16 = SubResource("TileSetAtlasSource_16")
+sources/17 = SubResource("TileSetAtlasSource_17")
+sources/18 = SubResource("TileSetAtlasSource_18")
+sources/19 = SubResource("TileSetAtlasSource_19")
+sources/20 = SubResource("TileSetAtlasSource_20")
+sources/21 = SubResource("TileSetAtlasSource_21")
+sources/22 = SubResource("TileSetAtlasSource_22")
+sources/23 = SubResource("TileSetAtlasSource_23")
+sources/24 = SubResource("TileSetAtlasSource_24")
+sources/25 = SubResource("TileSetAtlasSource_25")
