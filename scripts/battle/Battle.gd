@@ -2068,6 +2068,54 @@ func _show_victory_screen() -> void:
 	# Get rewards data from battle manager
 	var rewards = battle_mgr.battle_rewards
 
+	# Level Up Section - Display prominently if anyone leveled up
+	var member_levelups = rewards.get("member_levelups", {})
+	var sigil_levelups = rewards.get("sigil_levelups", {})
+	var has_levelups = not member_levelups.is_empty() or not sigil_levelups.is_empty()
+
+	if has_levelups:
+		var levelup_container = VBoxContainer.new()
+		levelup_container.add_theme_constant_override("separation", 4)
+		content_vbox.add_child(levelup_container)
+
+		# Level Up header
+		var levelup_header = Label.new()
+		levelup_header.text = "★ LEVEL UP! ★"
+		levelup_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		levelup_header.add_theme_font_size_override("font_size", 22)
+		levelup_header.add_theme_color_override("font_color", COLOR_CITRUS_YELLOW)  # Bright yellow for emphasis
+		levelup_container.add_child(levelup_header)
+
+		# Member level-ups
+		for member_id in member_levelups.keys():
+			var levelup_info = member_levelups[member_id]
+			var display_name = _get_member_display_name(member_id)
+			var member_levelup_label = Label.new()
+			member_levelup_label.text = "  %s: Lv.%d → Lv.%d" % [display_name, levelup_info.old, levelup_info.new]
+			member_levelup_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			member_levelup_label.add_theme_font_size_override("font_size", 16)
+			member_levelup_label.add_theme_color_override("font_color", COLOR_ELECTRIC_LIME)  # Lime green for member level-ups
+			levelup_container.add_child(member_levelup_label)
+
+		# Sigil level-ups
+		var sigil_sys = get_node_or_null("/root/aSigilSystem")
+		for sigil_inst_id in sigil_levelups.keys():
+			var levelup_info = sigil_levelups[sigil_inst_id]
+			var sigil_name = "Unknown Sigil"
+			if sigil_sys and sigil_sys.has_method("get_display_name_for"):
+				sigil_name = sigil_sys.get_display_name_for(sigil_inst_id)
+			var sigil_levelup_label = Label.new()
+			sigil_levelup_label.text = "  %s: Lv.%d → Lv.%d" % [sigil_name, levelup_info.old, levelup_info.new]
+			sigil_levelup_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			sigil_levelup_label.add_theme_font_size_override("font_size", 16)
+			sigil_levelup_label.add_theme_color_override("font_color", COLOR_SKY_CYAN)  # Cyan for sigil level-ups
+			levelup_container.add_child(sigil_levelup_label)
+
+		# Add a small spacer after level-ups
+		var levelup_spacer = Control.new()
+		levelup_spacer.custom_minimum_size = Vector2(0, 8)
+		content_vbox.add_child(levelup_spacer)
+
 	# Rewards display (no scrolling) - increased width for 2 columns
 	var rewards_scroll = ScrollContainer.new()
 	rewards_scroll.custom_minimum_size = Vector2(660, 450)  # Taller to fit all content without scrolling
