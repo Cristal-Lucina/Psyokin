@@ -1,10 +1,11 @@
-[gd_scene load_steps=6 format=4 uid="uid://g3m77iaqotvk"]
+[gd_scene load_steps=7 format=4 uid="uid://g3m77iaqotvk"]
 
 [ext_resource type="Script" uid="uid://d3wliev4lvrsw" path="res://scripts/main/Main.gd" id="1"]
 [ext_resource type="Script" uid="uid://cvvlil5s3jb1f" path="res://scripts/dev/ItemCheatBar.gd" id="2"]
 [ext_resource type="PackedScene" uid="uid://b8qx5y2n3m1k4" path="res://scenes/player/Player.tscn" id="3"]
 [ext_resource type="TileSet" uid="uid://dcvxj8yqm2hhp" path="res://resources/tilesets/environment_tileset.tres" id="4"]
 [ext_resource type="TileSet" path="res://assets/graphics/envirnments/Master_TileSet/master_tileset.tres" id="5_master"]
+[ext_resource type="TileSet" path="res://assets/graphics/envirnments/Master_TileSet/animated_objects_tileset.tres" id="6_animated"]
 
 [node name="Main" type="Control"]
 layout_mode = 3
@@ -90,6 +91,17 @@ rendering_quadrant_size = 32
 top_level = true
 tile_map_data = PackedByteArray("AAAkAAoAAQAJAAsAAAAkAAkAAQANAAUAAAAkAAgAAQANAAUAAAAkAAcAAQANAAQAAAAlAAcAAQAOAAQAAAAlAAoAAQAOAAYAAAAlAAkAAQAOAAUAAAAlAAgAAQAOAAUAAAAhAAoAAQABAAsAAAAiAAoAAQACAAsAAAAjAAoAAQADAAsAAAAgAAoAAQANAAYAAAAfAAoAAQANAAYAAAAeAAoAAQANAAYAAAAdAAoAAQAMAAYAAAAdAAkAAQAMAAUAAAAdAAgAAQAMAAUAAAAdAAcAAQAMAAQAAAAeAAcAAQANAAQAAAAfAAcAAQANAAQAAAAgAAcAAQANAAQAAAAhAAcAAQANAAQAAAAiAAcAAQANAAQAAAAjAAcAAQANAAQAAAA=")
 tile_set = ExtResource("5_master")
+rendering_quadrant_size = 32
+
+[node name="AnimatedObjectsMap" type="TileMap" parent="GameWorld"]
+tile_set = ExtResource("6_animated")
+rendering_quadrant_size = 32
+format = 2
+metadata/_edit_snap_grid = true
+metadata/_edit_snap_size = Vector2(32, 32)
+
+[node name="ObjectMarkers" type="TileMapLayer" parent="GameWorld/AnimatedObjectsMap"]
+tile_set = ExtResource("6_animated")
 rendering_quadrant_size = 32
 
 [node name="Player" parent="GameWorld" instance=ExtResource("3")]
