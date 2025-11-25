@@ -157,17 +157,20 @@ func _setup_minigame() -> void:
 	circle_canvas.draw.connect(_draw_filling_circle)
 	center_container.add_child(circle_canvas)
 
-	# Button sequence display (centered above circle)
+	# Button sequence display (positioned independently, moved down 130px)
 	sequence_container = HBoxContainer.new()
 	sequence_container.add_theme_constant_override("separation", 10)
-	sequence_container.z_index = 1000  # Ensure icons appear on top
 	var sequence_center = CenterContainer.new()
-	sequence_center.z_index = 1000  # Ensure container appears on top
 	sequence_center.add_child(sequence_container)
 
-	# Add sequence before the circle (so it appears above)
-	content_container.add_child(sequence_center)
-	content_container.move_child(sequence_center, 0)  # Move to top
+	# Position manually with absolute positioning - add to root (self), not overlay_panel
+	sequence_center.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	sequence_center.position.x = -86  # Move 86px left from center (88 - 2)
+	sequence_center.position.y = 310  # Move down 310px from top (300 + 10)
+	sequence_center.z_index = 1000  # Ensure appears on top
+
+	# Add directly to self (root control) to avoid any layout interference
+	add_child(sequence_center)
 
 	# Create ONLY 3 button slots that will be reused for all tiers
 	# Start with Tier 1 buttons, then replace with Tier 2, then Tier 3
@@ -180,21 +183,29 @@ func _setup_minigame() -> void:
 
 	print("[SkillMinigame] Sequence container has %d children" % sequence_container.get_child_count())
 
-	# Timer bar (horizontal, below sequence)
+	# Timer bar (horizontal, below sequence) - styled like CaptureMinigame
 	timer_bar = ProgressBar.new()
 	timer_bar.max_value = 1.0
 	timer_bar.value = 1.0
 	timer_bar.show_percentage = false
-	timer_bar.custom_minimum_size = Vector2(200, 10)
+	timer_bar.custom_minimum_size = Vector2(200, 20)  # Taller like CaptureMinigame
 
-	# Style the timer bar
-	var timer_style = StyleBoxFlat.new()
-	timer_style.bg_color = Color(1.0, 1.0, 1.0, 0.8)  # White fill
-	timer_bar.add_theme_stylebox_override("fill", timer_style)
+	# Style the timer bar - match CaptureMinigame style
+	var timer_style_bg = StyleBoxFlat.new()
+	timer_style_bg.bg_color = Color(0.2, 0.2, 0.2, 0.8)
+	timer_style_bg.corner_radius_top_left = 4
+	timer_style_bg.corner_radius_top_right = 4
+	timer_style_bg.corner_radius_bottom_left = 4
+	timer_style_bg.corner_radius_bottom_right = 4
+	timer_bar.add_theme_stylebox_override("background", timer_style_bg)
 
-	var timer_bg_style = StyleBoxFlat.new()
-	timer_bg_style.bg_color = Color(0.2, 0.2, 0.2, 0.5)  # Dark background
-	timer_bar.add_theme_stylebox_override("background", timer_bg_style)
+	var timer_style_fill = StyleBoxFlat.new()
+	timer_style_fill.bg_color = Color(1.0, 0.29, 0.85)  # Bubble magenta
+	timer_style_fill.corner_radius_top_left = 4
+	timer_style_fill.corner_radius_top_right = 4
+	timer_style_fill.corner_radius_bottom_left = 4
+	timer_style_fill.corner_radius_bottom_right = 4
+	timer_bar.add_theme_stylebox_override("fill", timer_style_fill)
 
 	var timer_center = CenterContainer.new()
 	timer_center.add_child(timer_bar)

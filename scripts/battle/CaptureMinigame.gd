@@ -25,8 +25,9 @@ var fills_completed: int = 0
 
 ## Progress tracking
 var fill_progress: float = 0.0  # 0.0 to 1.0 (one complete fill)
-var fill_speed: float = 1.2  # How fast the bar fills per second (increased even more for easier gameplay)
-var decay_speed: float = 0.05  # How fast the bar drains when not inputting (reduced even more for easier gameplay)
+var fill_per_rotation: float = 0.3333  # One full rotation = 33.33% fill (3 rotations = 100%)
+var fill_per_radian: float = 0.3333 / (2.0 * PI)  # Convert rotation to fill progress
+var decay_speed: float = 0.03  # How fast the bar drains when not inputting (very slow)
 
 ## Button and direction requirements
 const CAPTURE_BUTTONS = ["A", "B", "X", "Y"]
@@ -47,9 +48,13 @@ var accumulated_rotation: float = 0.0  # Track total rotation
 var rotation_threshold: float = 0.05  # Very low threshold (was 0.1)
 var has_initial_angle: bool = false  # Track if we've set the initial angle
 
-## Change tracking (periodic button/direction changes)
-var change_progress: float = 0.0  # When this hits 1.0, trigger a change
-var change_interval: float = 0.33  # Change happens at 33% and 66% of each fill
+## Change tracking (random changes with increasing probability over time)
+var time_since_last_change: float = 0.0  # Time elapsed since last button/direction change
+var last_change_check: float = 0.0  # Time of last probability check
+var change_has_happened: bool = false  # Track if the single change has occurred (for low HP)
+
+## Enemy HP-based difficulty scaling
+var enemy_hp_percent: float = 1.0  # Current HP as percentage (0.0-1.0)
 
 ## Visual elements
 var button_icon: TextureRect  # The current button icon
@@ -61,9 +66,9 @@ var result_label: Label
 var fade_timer: float = 0.0
 var fade_duration: float = 0.5
 var rotation_icon: Texture2D  # The rotate-left icon
-var timer_bar: ProgressBar  # 3-second timer bar under the circle
-var timer_progress: float = 0.0  # 0.0 to 3.0 seconds
-const TIMER_DURATION: float = 3.0  # 3 second timer
+var timer_bar: ProgressBar  # Timer bar under the circle
+var timer_progress: float = 0.0  # Current timer progress
+var timer_duration: float = 3.0  # Timer duration (adjusted based on enemy HP)
 
 ## Input locked during fade in/out
 var input_locked: bool = true
@@ -185,7 +190,7 @@ func _setup_minigame() -> void:
 
 	timer_bar = ProgressBar.new()
 	timer_bar.custom_minimum_size = Vector2(200, 20)
-	timer_bar.max_value = TIMER_DURATION
+	timer_bar.max_value = timer_duration
 	timer_bar.value = 0.0
 	timer_bar.show_percentage = false
 
@@ -247,7 +252,7 @@ func _setup_minigame() -> void:
 
 func _calculate_difficulty() -> void:
 	"""Calculate difficulty from enemy data"""
-	var enemy_hp_percent = float(enemy_data.get("hp", 1)) / float(enemy_data.get("hp_max", 1))
+	enemy_hp_percent = float(enemy_data.get("hp", 1)) / float(enemy_data.get("hp_max", 1))
 	var base_rating = enemy_data.get("level", 1)
 
 	if enemy_hp_percent <= 0.1:
@@ -273,6 +278,20 @@ func _calculate_difficulty() -> void:
 		fills_needed = 3
 	else:
 		fills_needed = 4
+
+	# Adjust timer duration based on enemy HP
+	if enemy_hp_percent <= 0.15:
+		# Below 15% HP: 6 second timer, single change at 3 seconds
+		timer_duration = 6.0
+		print("[CaptureMinigame] Enemy below 15%% HP - 6 second timer, change at 3s")
+	elif enemy_hp_percent <= 0.5:
+		# Below 50% HP: 4 second timer, single change every 2 seconds
+		timer_duration = 4.0
+		print("[CaptureMinigame] Enemy below 50%% HP - 4 second timer, change every 2s")
+	else:
+		# Above 50% HP: 3 second timer, random changes
+		timer_duration = 3.0
+		print("[CaptureMinigame] Enemy above 50%% HP - 3 second timer, random changes")
 
 	print("[CaptureMinigame] Break rating: %d, fills needed: %d (HP: %.1f%%)" % [break_rating, fills_needed, enemy_hp_percent * 100])
 
@@ -320,12 +339,30 @@ func _randomize_direction() -> void:
 	var direction_text = "CLOCKWISE" if current_direction == 1 else "COUNTER-CLOCKWISE"
 	print("[CaptureMinigame] Direction changed to: %s" % direction_text)
 
+func _calculate_change_probability(time_elapsed: float) -> float:
+	"""Calculate probability of a random change based on time elapsed since last change
+	1.0s = 10%, 2.0s = 50%, 3.0s = 75%"""
+	if time_elapsed <= 1.0:
+		# 0s to 1.0s: 0% to 10%
+		return 0.10 * time_elapsed
+	elif time_elapsed <= 2.0:
+		# 1.0s to 2.0s: 10% to 50%
+		return 0.10 + 0.40 * (time_elapsed - 1.0)
+	elif time_elapsed <= 3.0:
+		# 2.0s to 3.0s: 50% to 75%
+		return 0.50 + 0.25 * (time_elapsed - 2.0)
+	else:
+		# After 3.0s: cap at 75%
+		return 0.75
+
 func _start_minigame() -> void:
 	print("[CaptureMinigame] Starting capture minigame")
 	current_phase = Phase.FADE_IN
 	fill_progress = 0.0
 	fills_completed = 0
-	change_progress = 0.0
+	time_since_last_change = 0.0
+	last_change_check = 0.0
+	change_has_happened = false  # Reset change flag
 	fade_timer = 0.0
 	input_locked = true
 	has_initial_angle = false  # Reset rotation tracking
@@ -373,7 +410,7 @@ func _process_active(delta: float) -> void:
 	if timer_bar:
 		timer_bar.value = timer_progress
 		# Check if timer expired
-		if timer_progress >= TIMER_DURATION:
+		if timer_progress >= timer_duration:
 			_finish_capture_failed()
 			return
 
@@ -389,6 +426,7 @@ func _process_active(delta: float) -> void:
 	var input_vec = aInputManager.get_movement_vector()
 	var is_spinning = false
 	var correct_direction = false
+	var rotation_amount: float = 0.0  # Track rotation for fill calculation
 
 	if input_vec.length() > 0.2:  # Lowered threshold from 0.3 to 0.2
 		# Calculate angle from input
@@ -409,6 +447,7 @@ func _process_active(delta: float) -> void:
 
 			if abs(angle_diff) > rotation_threshold:
 				is_spinning = true
+				rotation_amount = abs(angle_diff)  # Store rotation amount for fill calculation
 
 				# Check if spinning in correct direction
 				if current_direction == 1 and angle_diff > 0:
@@ -424,22 +463,50 @@ func _process_active(delta: float) -> void:
 
 			last_input_angle = current_angle
 
-	# Fill or drain the progress bar
-	if holding_button and is_spinning and correct_direction:
-		# Correct input! Fill the bar
-		fill_progress += fill_speed * delta
-		change_progress += fill_speed * delta
+	# Update time since last change
+	time_since_last_change += delta
 
-		if Engine.get_frames_drawn() % 30 == 0:
-			print("[CaptureMinigame] Filling! Progress: %.1f%%" % (fill_progress * 100))
+	# HP-based change logic
+	if enemy_hp_percent <= 0.15:
+		# Below 15% HP: Single change at 3 seconds only
+		if time_since_last_change >= 3.0 and not change_has_happened:
+			print("[CaptureMinigame] Low HP change (once at 3s)!")
+			_trigger_direction_change_only()  # Only change direction, not button
+			change_has_happened = true
 
-		# Check for periodic changes (at 33% and 66% of each fill)
-		if change_progress >= change_interval:
-			change_progress = 0.0
-			_trigger_random_change()
+	elif enemy_hp_percent <= 0.5:
+		# Below 50% HP: Change every 2 seconds (deterministic)
+		if time_since_last_change >= 2.0:
+			print("[CaptureMinigame] Medium HP change (every 2s)!")
+			_trigger_direction_change_only()  # Only change direction, not button
+			time_since_last_change = 0.0
+			last_change_check = 0.0
 
 	else:
-		# Wrong input or no input - drain the bar
+		# Above 50% HP: Random changes with increasing probability
+		if time_since_last_change - last_change_check >= 0.1:
+			last_change_check = time_since_last_change
+			var change_chance = _calculate_change_probability(time_since_last_change)
+			var roll = randf()
+
+			if roll < change_chance:
+				print("[CaptureMinigame] Random change triggered! Time: %.2fs, Chance: %.1f%%, Roll: %.3f" % [time_since_last_change, change_chance * 100, roll])
+				_trigger_random_change()
+				time_since_last_change = 0.0
+				last_change_check = 0.0
+
+	# Fill or drain the progress bar
+	if holding_button and is_spinning and correct_direction:
+		# Correct input! Fill the bar based on rotation amount
+		var progress_gained = rotation_amount * fill_per_radian
+
+		fill_progress += progress_gained
+
+		if Engine.get_frames_drawn() % 30 == 0:
+			print("[CaptureMinigame] Filling! Rotation: %.2f rad, Progress gained: %.2f%%, Total: %.1f%%" % [rotation_amount, progress_gained * 100, fill_progress * 100])
+
+	else:
+		# Wrong input or no input - drain the bar slowly
 		fill_progress -= decay_speed * delta
 		fill_progress = max(0.0, fill_progress)
 
@@ -456,7 +523,9 @@ func _process_active(delta: float) -> void:
 	if fill_progress >= 1.0:
 		fills_completed += 1
 		fill_progress = 0.0
-		change_progress = 0.0
+		time_since_last_change = 0.0  # Reset timer for next fill
+		last_change_check = 0.0
+		change_has_happened = false  # Reset change flag for next fill
 		has_initial_angle = false  # Reset rotation tracking for next fill
 
 		print("[CaptureMinigame] Fill complete! (%d/%d)" % [fills_completed, fills_needed])
@@ -490,6 +559,13 @@ func _trigger_random_change() -> void:
 		has_initial_angle = false  # Reset rotation tracking when direction changes
 		var direction_text = "CLOCKWISE" if current_direction == 1 else "COUNTER-CLOCKWISE"
 		print("[CaptureMinigame] Direction changed mid-fill to: %s" % direction_text)
+
+func _trigger_direction_change_only() -> void:
+	"""Change only the direction (used for low HP scenarios)"""
+	current_direction *= -1
+	has_initial_angle = false  # Reset rotation tracking when direction changes
+	var direction_text = "CLOCKWISE" if current_direction == 1 else "COUNTER-CLOCKWISE"
+	print("[CaptureMinigame] Direction changed to: %s" % direction_text)
 
 func _draw_capture_visual() -> void:
 	"""Draw the rotation icon, button icon, and progress circle"""
