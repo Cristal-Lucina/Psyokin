@@ -190,6 +190,7 @@ var _party_csv_path: String = ""
 var _game_menu: Control = null
 var _phone_menu: Control = null
 var _status_cheat_bar: Control = null
+var _animation_debug_menu: Control = null
 
 # ---------- helpers: canonical hero id ----------
 func _hero_id() -> String:
@@ -477,6 +478,11 @@ func _unhandled_input(event: InputEvent) -> void:
 		_toggle_status_cheat_bar()
 		get_viewport().set_input_as_handled()
 		return
+	# Toggle AnimationDebugMenu with "Y" key
+	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_Y:
+		_toggle_animation_debug_menu()
+		get_viewport().set_input_as_handled()
+		return
 	if event.is_action_pressed(INPUT_MENU_ACTION):
 		_toggle_game_menu()
 		get_viewport().set_input_as_handled()
@@ -557,6 +563,25 @@ func _toggle_status_cheat_bar() -> void:
 	parent.add_child(_status_cheat_bar)
 	_status_cheat_bar.visible = true
 	_status_cheat_bar.move_to_front()
+
+func _toggle_animation_debug_menu() -> void:
+	if _animation_debug_menu and is_instance_valid(_animation_debug_menu):
+		_animation_debug_menu.visible = not _animation_debug_menu.visible
+		return
+	# Create AnimationDebugMenu instance
+	var script_path := "res://scripts/dev/AnimationDebugMenu.gd"
+	if not ResourceLoader.exists(script_path): return
+	var script: Script = load(script_path) as Script
+	if script == null: return
+	_animation_debug_menu = (script.new() as Control)
+	_animation_debug_menu.name = "AnimationDebugMenu"
+	_animation_debug_menu.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_animation_debug_menu.process_mode = Node.PROCESS_MODE_ALWAYS
+	var parent: Node = get_node_or_null("OverlaysLayer/Overlays")
+	if parent == null: parent = self
+	parent.add_child(_animation_debug_menu)
+	_animation_debug_menu.visible = true
+	_animation_debug_menu.move_to_front()
 
 # ---------- Header ----------
 func _refresh_ui() -> void:

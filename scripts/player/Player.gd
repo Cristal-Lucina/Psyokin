@@ -33,6 +33,9 @@
 extends CharacterBody2D
 class_name Player
 
+# Import animation loader
+const AnimationDataLoaderScript = preload("res://scripts/player/AnimationDataLoader.gd")
+
 # Constants
 const GS_PATH = "/root/aGameState"
 const SPRITE_PATH = "res://assets/graphics/characters/New Character System/SpriteSystem/base_sheets/"
@@ -116,6 +119,8 @@ var _current_state: MovementState = MovementState.IDLE
 var _current_direction: int = 0  # 0=South, 1=North, 2=East, 3=West
 var _anim_frame_index: int = 0
 var _anim_frame_timer: float = 0.0
+var _current_sequence: AnimationDataLoaderScript.AnimationSequence = null
+var _force_flip: bool = false  # Force flip for current frame (from CSV)
 
 # Jump state
 var _jump_phase: JumpPhase = JumpPhase.NONE
@@ -142,6 +147,8 @@ func _ready() -> void:
 	_gs = get_node_or_null(GS_PATH)
 	_load_palettes()
 	_load_character_appearance()
+	# Initialize animation data loader
+	AnimationDataLoaderScript.get_instance()
 
 func _load_palettes() -> void:
 	"""Load palette images for color mapping"""
@@ -467,123 +474,71 @@ func _handle_movement(_delta: float) -> void:
 	move_and_slide()
 
 func _update_animation(delta: float) -> void:
-	"""Update sprite animation frames based on current state"""
+	"""Update sprite animation frames based on current state - uses CSV data"""
 	if not character_layers:
 		return
 
-	var frame: int = 0
+	# Get animation name based on state
+	var anim_name = ""
+	var direction_name = _get_direction_name(_current_direction)
 
 	match _current_state:
 		MovementState.IDLE:
-			# Idle: frames 0 (South), 16 (North), 32 (East/West)
-			match _current_direction:
-				0: frame = 0   # South
-				1: frame = 16  # North
-				2: frame = 32  # East
-				3: frame = 32  # West (same as East)
+			anim_name = "Idle"
 			_anim_frame_index = 0
 			_anim_frame_timer = 0.0
 
 		MovementState.WALK:
-			# Walk: 6 frames per direction
-			# South: 48-53, North: 52-57, East/West: 64-69
-			_anim_frame_timer += delta
-			if _anim_frame_timer >= WALK_FRAME_TIME:
-				_anim_frame_timer -= WALK_FRAME_TIME
-				_anim_frame_index = (_anim_frame_index + 1) % WALK_FRAMES
-
-			match _current_direction:
-				0: frame = 48 + _anim_frame_index  # South
-				1: frame = 52 + _anim_frame_index  # North
-				2: frame = 64 + _anim_frame_index  # East
-				3: frame = 64 + _anim_frame_index  # West (same as East)
+			anim_name = "Walk"
 
 		MovementState.RUN:
-			# Run: custom sequence (CSV shows frames 48,49,51 for South, 52,53,55 for North, 64,65,70,67,68,71 for East/West)
-			_anim_frame_timer += delta
-			if _anim_frame_timer >= RUN_FRAME_TIME:
-				_anim_frame_timer -= RUN_FRAME_TIME
-				_anim_frame_index = (_anim_frame_index + 1) % RUN_FRAMES
-
-			match _current_direction:
-				0:  # South: 48, 49, 51, 48, 49, 51
-					var run_sequence = [48, 49, 51, 48, 49, 51]
-					frame = run_sequence[_anim_frame_index]
-				1:  # North: 52, 53, 55, 52, 53, 55
-					var run_sequence = [52, 53, 55, 52, 53, 55]
-					frame = run_sequence[_anim_frame_index]
-				2:  # East: 64, 65, 70, 67, 68, 71
-					var run_sequence = [64, 65, 70, 67, 68, 71]
-					frame = run_sequence[_anim_frame_index]
-				3:  # West: same as East
-					var run_sequence = [64, 65, 70, 67, 68, 71]
-					frame = run_sequence[_anim_frame_index]
+			anim_name = "Run"
 
 		MovementState.JUMP:
-			# Jump animation: frames 1-2 (South), 17-18 (North), 33-34 (East/West)
 			match _jump_phase:
-				JumpPhase.CHARGING:
-					# Windup frame
-					match _current_direction:
-						0: frame = 1   # South
-						1: frame = 17  # North
-						2: frame = 33  # East
-						3: frame = 33  # West
-
+				JumpPhase.CHARGING, JumpPhase.LANDING:
+					anim_name = "Jump"
+					_anim_frame_index = 0
 				JumpPhase.AIRBORNE:
-					# Airborne frame (frame 2)
-					_anim_frame_timer += delta
-					if _anim_frame_timer >= WALK_FRAME_TIME:
-						_anim_frame_timer -= WALK_FRAME_TIME
-						_anim_frame_index = (_anim_frame_index + 1) % JUMP_AIRBORNE_FRAMES
-
-					match _current_direction:
-						0: frame = 1 + _anim_frame_index   # South (1-2)
-						1: frame = 17 + _anim_frame_index  # North (17-18)
-						2: frame = 33 + _anim_frame_index  # East (33-34)
-						3: frame = 33 + _anim_frame_index  # West (33-34)
-
-				JumpPhase.LANDING:
-					# Landing frame (back to windup)
-					match _current_direction:
-						0: frame = 1   # South
-						1: frame = 17  # North
-						2: frame = 33  # East
-						3: frame = 33  # West
-
-				_:
-					# Fallback
-					match _current_direction:
-						0: frame = 1   # South
-						1: frame = 17  # North
-						2: frame = 33  # East
-						3: frame = 33  # West
+					anim_name = "Jump"
 
 		MovementState.PUSH:
-			# Push: frames 8-9 (South), 24-25 (North), 40-41 (East/West)
-			_anim_frame_timer += delta
-			if _anim_frame_timer >= PUSH_PULL_FRAME_TIME:
-				_anim_frame_timer -= PUSH_PULL_FRAME_TIME
-				_anim_frame_index = (_anim_frame_index + 1) % PUSH_FRAMES
-
-			match _current_direction:
-				0: frame = 8 + _anim_frame_index   # South
-				1: frame = 24 + _anim_frame_index  # North
-				2: frame = 40 + _anim_frame_index  # East
-				3: frame = 40 + _anim_frame_index  # West
+			anim_name = "Push"
 
 		MovementState.PULL:
-			# Pull: frames 26-27 (South), 10-11 (North), 42-43 (East/West)
-			_anim_frame_timer += delta
-			if _anim_frame_timer >= PUSH_PULL_FRAME_TIME:
-				_anim_frame_timer -= PUSH_PULL_FRAME_TIME
-				_anim_frame_index = (_anim_frame_index + 1) % PULL_FRAMES
+			anim_name = "Pull"
 
-			match _current_direction:
-				0: frame = 26 + _anim_frame_index  # South
-				1: frame = 10 + _anim_frame_index  # North
-				2: frame = 42 + _anim_frame_index  # East
-				3: frame = 42 + _anim_frame_index  # West
+	# Get animation sequence from CSV
+	_current_sequence = AnimationDataLoaderScript.get_animation(anim_name, direction_name)
+
+	if _current_sequence.frames.is_empty():
+		# Fallback to idle frame if animation not found
+		var idle_seq = AnimationDataLoaderScript.get_animation("Idle", direction_name)
+		if not idle_seq.frames.is_empty():
+			_apply_frame(idle_seq.frames[0])
+		return
+
+	# Advance animation timer for non-idle states
+	if _current_state != MovementState.IDLE:
+		var current_frame_data = _current_sequence.get_frame_at_index(_anim_frame_index)
+		var frame_time = current_frame_data.time_ms / 1000.0  # Convert ms to seconds
+
+		_anim_frame_timer += delta
+		if _anim_frame_timer >= frame_time and not current_frame_data.hold:
+			_anim_frame_timer -= frame_time
+			_anim_frame_index = (_anim_frame_index + 1) % _current_sequence.frames.size()
+
+	# Apply current frame
+	var frame_data = _current_sequence.get_frame_at_index(_anim_frame_index)
+	_apply_frame(frame_data)
+
+func _apply_frame(frame_data: AnimationDataLoaderScript.AnimationFrame) -> void:
+	"""Apply a frame to all sprite layers"""
+	if not character_layers:
+		return
+
+	var frame_num = frame_data.frame
+	var flip_from_csv = frame_data.flip_h
 
 	# Update all visible sprites
 	for layer in LAYERS:
@@ -598,9 +553,18 @@ func _update_animation(delta: float) -> void:
 		for sprite_code in sprite_codes:
 			var sprite: Sprite2D = character_layers.get_node_or_null(sprite_code)
 			if sprite and sprite.visible and sprite.texture:
-				sprite.frame = frame
-				# West/LEFT uses same frames as East but flipped (per sprite_animations_data.csv)
-				sprite.flip_h = (_current_direction == 3)  # 3 = West
+				sprite.frame = frame_num
+				# West/LEFT direction uses flip, OR if CSV specifies flip
+				sprite.flip_h = (_current_direction == 3) or flip_from_csv
+
+func _get_direction_name(direction: int) -> String:
+	"""Convert direction index to name"""
+	match direction:
+		0: return "DOWN"
+		1: return "UP"
+		2: return "RIGHT"
+		3: return "LEFT"
+		_: return "DOWN"
 
 ## ═══════════════════════════════════════════════════════════════
 ## RANDOM ENCOUNTERS

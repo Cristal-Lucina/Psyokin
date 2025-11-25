@@ -5389,8 +5389,17 @@ func _execute_enemy_ai() -> void:
 		var defense_result = await _show_defense_minigame(target, current_combatant)
 		var defense_modifier = defense_result.damage_modifier  # 0.0 = parried, 1.0 = normal, 1.3 = failed
 		var counter_damage = defense_result.counter_damage  # Damage to deal back to attacker
+		var initiative_bonus = defense_result.get("initiative_bonus", 0)  # Initiative bonus for next round
 
-		print("[Battle] Defense minigame result - Modifier: %.1f%%, Counter: %.1f" % [defense_modifier * 100, counter_damage])
+		print("[Battle] Defense minigame result - Modifier: %.1f%%, Counter: %.1f, Initiative Bonus: %+d" % [defense_modifier * 100, counter_damage, initiative_bonus])
+
+		# Apply initiative bonus to defender for next round
+		if initiative_bonus > 0:
+			# Ensure the field exists (in case combatant was created before we added this field)
+			if not target.has("initiative_bonus"):
+				target["initiative_bonus"] = 0
+			target.initiative_bonus += initiative_bonus
+			print("[Battle] %s gains +%d initiative bonus for next round (total: %+d)" % [target.display_name, initiative_bonus, target.initiative_bonus])
 
 		# SUCCESSFUL PARRY - Play counter-attack animations
 		if counter_damage > 0:
@@ -6356,6 +6365,9 @@ func _on_change_type_button_pressed() -> void:
 	# Close current skill menu
 	_close_skill_menu()
 
+	# Disable action menu to prevent interference
+	_disable_action_menu()
+
 	# Reset type menu state
 	type_menu_buttons = []
 	selected_type_index = 0
@@ -6363,6 +6375,7 @@ func _on_change_type_button_pressed() -> void:
 	# Create type selection panel
 	type_menu_panel = PanelContainer.new()
 	type_menu_panel.custom_minimum_size = Vector2(300, 0)
+	type_menu_panel.z_index = 1000  # Above all sprites
 
 	# Style the panel with cyan neon Core vibe
 	var style = StyleBoxFlat.new()
@@ -8348,7 +8361,8 @@ func _show_defense_minigame(defender: Dictionary, attacker: Dictionary) -> Dicti
 	# Get results
 	var result = {
 		"damage_modifier": defense_minigame.final_damage_modifier,
-		"counter_damage": defense_minigame.counter_attack_damage
+		"counter_damage": defense_minigame.counter_attack_damage,
+		"initiative_bonus": defense_minigame.initiative_bonus
 	}
 
 	# Clean up

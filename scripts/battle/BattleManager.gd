@@ -259,15 +259,30 @@ func _roll_initiative() -> void:
 			if roll > best_roll:
 				best_roll = roll
 
-		combatant.initiative = best_roll + total_speed
-		if speed_modifier != 0:
-			print("[BattleManager] %s [ID: %s] initiative: %dd20(H) = %d + Speed %d (base %d + buff %+d) = %d" % [
-				combatant.display_name, combatant.id, dice_count, best_roll, total_speed, base_speed, int(speed_modifier), combatant.initiative
+		# Apply initiative bonus (from successful guards/parries)
+		# Ensure field exists (backward compatibility)
+		if not combatant.has("initiative_bonus"):
+			combatant["initiative_bonus"] = 0
+		var init_bonus = combatant.get("initiative_bonus", 0)
+		combatant.initiative = best_roll + total_speed + init_bonus
+
+		if init_bonus != 0 or speed_modifier != 0:
+			var bonus_text = ""
+			if init_bonus != 0:
+				bonus_text = " + Guard Bonus %+d" % init_bonus
+			var speed_text = ""
+			if speed_modifier != 0:
+				speed_text = " (base %d + buff %+d)" % [base_speed, int(speed_modifier)]
+			print("[BattleManager] %s [ID: %s] initiative: %dd20(H) = %d + Speed %d%s%s = %d" % [
+				combatant.display_name, combatant.id, dice_count, best_roll, total_speed, speed_text, bonus_text, combatant.initiative
 			])
 		else:
 			print("[BattleManager] %s [ID: %s] initiative: %dd20(H) = %d + Speed %d = %d" % [
 				combatant.display_name, combatant.id, dice_count, best_roll, total_speed, combatant.initiative
 			])
+
+		# Reset initiative bonus after using it
+		combatant.initiative_bonus = 0
 
 func _sort_by_initiative(a: Dictionary, b: Dictionary) -> bool:
 	"""Sort comparator for initiative (higher first, Fallen above KO'd, KO'd to bottom)"""
@@ -1552,6 +1567,7 @@ func _create_ally_combatant(member_id: String, slot: int) -> Dictionary:
 		"mp": mp_current,
 		"mp_max": mp_max,
 		"initiative": 0,
+		"initiative_bonus": 0,  # Bonus from successful parries/guards
 		"is_ko": false,
 		"is_fled": false,
 		"is_fallen": false,
@@ -1633,6 +1649,7 @@ func _create_enemy_combatant(enemy_id: String, slot: int) -> Dictionary:
 		"mp": mp_max,
 		"mp_max": mp_max,
 		"initiative": 0,
+		"initiative_bonus": 0,  # Bonus from successful parries/guards
 		"is_ko": false,
 		"is_fled": false,
 		"is_captured": false,  # Captured via Bind

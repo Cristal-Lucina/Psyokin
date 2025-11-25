@@ -45,6 +45,7 @@ const BUTTON_ACTIONS = {
 var player_attempted_parry: bool = false  # Did player press the parry button?
 var final_damage_modifier: float = 1.0  # 0.0 = no damage (parried), 1.0 = normal, 1.3 = penalty for missing
 var counter_attack_damage: float = 0.0  # Damage dealt back to enemy (30% of attack damage)
+var initiative_bonus: int = 0  # Initiative bonus for next round (10 for successful parry)
 var result_text: String = "HIT!"
 
 ## Visual elements
@@ -317,12 +318,15 @@ func _enemy_parry_attempt() -> void:
 		# Update parry windows
 		_update_parry_windows()
 
+		# Change the button to make it harder!
+		_change_parry_button()
+
 		# Player's turn to counter
 		circle_progress = 0.0
 		input_locked = false
 		battle_label.text = "COUNTER!"
 
-		print("[DefenseMinigame] Player counter window: %.0f%% - %.0f%%" % [player_parry_min * 100, player_parry_max * 100])
+		print("[DefenseMinigame] Player counter window: %.0f%% - %.0f%%, New button: %s" % [player_parry_min * 100, player_parry_max * 100, parry_button])
 	else:
 		# Enemy failed to parry - player wins!
 		print("[DefenseMinigame] Enemy FAILED to parry - Player wins battle!")
@@ -345,6 +349,32 @@ func _update_parry_windows() -> void:
 		player_parry_min = 0.30
 		player_parry_max = 0.70
 		enemy_parry_chance = 0.3
+
+func _change_parry_button() -> void:
+	"""Change the parry button to a different one (makes counter harder)"""
+	var old_button = parry_button
+
+	# Pick a different button
+	var available_buttons = []
+	for btn in PARRY_BUTTONS:
+		if btn != old_button:
+			available_buttons.append(btn)
+
+	parry_button = available_buttons[randi() % available_buttons.size()]
+
+	print("[DefenseMinigame] Button changed: %s -> %s" % [old_button, parry_button])
+
+	# Update the button icon
+	var icon_layout = get_node_or_null("/root/aControllerIconLayout")
+	if icon_layout and button_icon:
+		var button_action = BUTTON_ACTIONS.get(parry_button, "accept")
+		var button_texture = icon_layout.get_button_icon(button_action)
+
+		if button_texture:
+			button_icon.texture = button_texture
+			print("[DefenseMinigame] Updated button icon to %s" % parry_button)
+		else:
+			push_error("[DefenseMinigame] Failed to load new button icon for %s" % parry_button)
 
 func _miss_parry() -> void:
 	"""Player missed the parry (or didn't attempt)"""
@@ -379,11 +409,12 @@ func _lose_parry_battle() -> void:
 func _win_parry_battle() -> void:
 	"""Player won the parry battle!"""
 	input_locked = true
-	print("[DefenseMinigame] WON PARRY BATTLE! Dealing 30%% counter damage")
+	print("[DefenseMinigame] WON PARRY BATTLE! Dealing 30%% counter damage + Initiative bonus!")
 
 	# No damage taken, deal 30% counter damage
 	final_damage_modifier = 0.0
 	counter_attack_damage = attacker_damage * 0.3
+	initiative_bonus = 10  # Grant +10 initiative for next round
 	result_text = "PARRY!"
 
 	_finish_minigame()
