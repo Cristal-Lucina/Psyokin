@@ -26,10 +26,10 @@
 [ext_resource type="Texture2D" path="res://assets/graphics/envirnments/Tilemap/Train_Interiors/Tilemap/Tilemap_full.png" id="24_train_interiors"]
 [ext_resource type="Texture2D" path="res://assets/graphics/envirnments/Tilemap/Train_Station/Tilemaps/Non-RPGMaker/Maintilemap.png" id="25_train_station"]
 [ext_resource type="Texture2D" path="res://assets/graphics/envirnments/Tilemap/Urban_Accessories/Tilemap.png" id="26_urban_accessories"]
-[ext_resource type="Texture2D" path="res://assets/graphics/envirnments/Tilemap/Modern_Interiors/Modern_Interiors1.png" id="27_modern_interiors1"]
-[ext_resource type="Texture2D" path="res://assets/graphics/envirnments/Tilemap/Modern_Interiors/Modern_Interiors2.png" id="28_modern_interiors2"]
-[ext_resource type="Texture2D" path="res://assets/graphics/envirnments/Tilemap/Modern_Interiors/Modern_Interiors3.png" id="29_modern_interiors3"]
-[ext_resource type="Texture2D" path="res://assets/graphics/envirnments/Tilemap/Modern_Interiors/Modern_Room_Builder_32x32.png" id="30_modern_room_builder"]
+[ext_resource type="Texture2D" path="res://assets/graphics/envirnments/Tilemap/Modern_Interiors/Modern_Interiors_16x16_1.png" id="27_modern_interiors_16x16_1"]
+[ext_resource type="Texture2D" path="res://assets/graphics/envirnments/Tilemap/Modern_Interiors/Modern_Interiors_16x16_2.png" id="28_modern_interiors_16x16_2"]
+[ext_resource type="Texture2D" path="res://assets/graphics/envirnments/Tilemap/Modern_Interiors/Modern_Interiors_16x16_3.png" id="29_modern_interiors_16x16_3"]
+[ext_resource type="Texture2D" path="res://assets/graphics/envirnments/Tilemap/Modern_Interiors/Modern_Room_Builder_16x16.png" id="30_modern_room_builder_16x16"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_0"]
 resource_name = "Arcade"
@@ -30138,9 +30138,9 @@ texture_region_size = Vector2i(32, 32)
 15:15/0 = 0
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_26"]
-resource_name = "Modern_Interiors1"
-texture = ExtResource("27_modern_interiors1")
-texture_region_size = Vector2i(32, 32)
+resource_name = "Modern_Interiors_16x16_1"
+texture = ExtResource("27_modern_interiors_16x16_1")
+texture_region_size = Vector2i(16, 16)
 0:0/0 = 0
 1:0/0 = 0
 2:0/0 = 0
@@ -35823,9 +35823,9 @@ texture_region_size = Vector2i(32, 32)
 15:354/0 = 0
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_27"]
-resource_name = "Modern_Interiors2"
-texture = ExtResource("28_modern_interiors2")
-texture_region_size = Vector2i(32, 32)
+resource_name = "Modern_Interiors_16x16_2"
+texture = ExtResource("28_modern_interiors_16x16_2")
+texture_region_size = Vector2i(16, 16)
 0:0/0 = 0
 1:0/0 = 0
 2:0/0 = 0
@@ -41508,9 +41508,9 @@ texture_region_size = Vector2i(32, 32)
 15:354/0 = 0
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_28"]
-resource_name = "Modern_Interiors3"
-texture = ExtResource("29_modern_interiors3")
-texture_region_size = Vector2i(32, 32)
+resource_name = "Modern_Interiors_16x16_3"
+texture = ExtResource("29_modern_interiors_16x16_3")
+texture_region_size = Vector2i(16, 16)
 0:0/0 = 0
 1:0/0 = 0
 2:0/0 = 0
@@ -47177,9 +47177,9 @@ texture_region_size = Vector2i(32, 32)
 15:353/0 = 0
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_29"]
-resource_name = "Modern_Room_Builder"
-texture = ExtResource("30_modern_room_builder")
-texture_region_size = Vector2i(32, 32)
+resource_name = "Modern_Room_Builder_16x16"
+texture = ExtResource("30_modern_room_builder_16x16")
+texture_region_size = Vector2i(16, 16)
 0:0/0 = 0
 1:0/0 = 0
 2:0/0 = 0
