@@ -1,9 +1,12 @@
-[gd_scene load_steps=5 format=4 uid="uid://g3m77iaqotvk"]
+[gd_scene load_steps=8 format=4 uid="uid://g3m77iaqotvk"]
 
 [ext_resource type="Script" uid="uid://d3wliev4lvrsw" path="res://scripts/main/Main.gd" id="1"]
 [ext_resource type="Script" uid="uid://cvvlil5s3jb1f" path="res://scripts/dev/ItemCheatBar.gd" id="2"]
 [ext_resource type="PackedScene" uid="uid://b8qx5y2n3m1k4" path="res://scenes/player/Player.tscn" id="3"]
 [ext_resource type="TileSet" uid="uid://dcvxj8yqm2hhp" path="res://resources/tilesets/environment_tileset.tres" id="4"]
+[ext_resource type="TileSet" path="res://assets/graphics/envirnments/Master_TileSet/master_tileset.tres" id="5_master"]
+[ext_resource type="TileSet" path="res://assets/graphics/envirnments/Master_TileSet/animated_objects_tileset.tres" id="6_animated"]
+[ext_resource type="TileSet" path="res://assets/graphics/envirnments/Master_TileSet/master_tileset_16x16.tres" id="7_16x16"]
 
 [node name="Main" type="Control"]
 layout_mode = 3
@@ -65,11 +68,73 @@ use_parent_material = true
 tile_set = ExtResource("4")
 rendering_quadrant_size = 32
 
+[node name="MasterTileMap" type="TileMap" parent="GameWorld"]
+tile_set = ExtResource("5_master")
+rendering_quadrant_size = 32
+format = 2
+metadata/_edit_snap_grid = true
+metadata/_edit_snap_size = Vector2(32, 32)
+
+[node name="Ground" type="TileMapLayer" parent="GameWorld/MasterTileMap"]
+tile_map_data = PackedByteArray("AAAbAAcAEwAHAAIAAAAbAAgAEwAHAAMAAAAbAAoAEwAHAAUAAAAbAAsAEwAHAAYAAAAbAAwAAQAQAAsAAAAbAA0AAQAQAAsAAAAcAAcAEwAIAAIAAAAcAAgAEwAIAAMAAAAcAAkAEwAIAAQAAAAcAAoAEwAIAAUAAAAcAAsAEwAIAAYAAAAcAAwAAQAQAAsAAAAcAA0AAQAQAAsAAAAdAAcAAQAQAAsAAAAdAAgAAQAQAAsAAAAdAAwAAQAQAAsAAAAdAA0AAQAQAAsAAAAeAAcAAQAQAAsAAAAeAAgAAQAQAAYAAAAeAAwAAQAQAAsAAAAeAA0AAQAQAAsAAAAfAAcAAQAQAAsAAAAfAAgAAQAQAAYAAAAfAAwAAQAQAAsAAAAfAA0AAQAQAAsAAAAgAAcAAQAQAAsAAAAgAAgAAQAQAAYAAAAgAAkAAQAQAAYAAAAgAAoADwAJAAgAAAAgAAsAAQAQAAsAAAAgAAwAAQAQAAsAAAAgAA0AAQAQAAsAAAAhAAcAAQAQAAsAAAAhAAgAAQAQAAYAAAAhAAkAAQAQAAYAAAAhAAoADwAKAAgAAAAhAAsAAQAQAAsAAAAhAAwAAQAQAAsAAAAhAA0AAQAQAAsAAAAiAAcAAQAQAAsAAAAiAAgAAQAQAAYAAAAiAAkAAQAQAAYAAAAiAAoADwALAAgAAAAiAAsAAQAQAAsAAAAiAAwAAQAQAAsAAAAiAA0AAQAQAAsAAAAjAAcAAQAQAAsAAAAjAAgAAQAQAAYAAAAjAAkAAQAQAAYAAAAjAAoAAQAQAAYAAAAjAAsAAQAQAAsAAAAjAAwAAQAQAAsAAAAjAA0AAQAQAAsAAAAkAAcAAQAQAAsAAAAkAAgAAQAQAAYAAAAkAAkAAQAQAAYAAAAkAAoAAQAQAAYAAAAkAAsAAQAQAAsAAAAkAAwAAQAQAAsAAAAkAA0AAQAQAAsAAAAVAAYAAQAQAAsAAAAVAAcAAQAQAAsAAAAVAAgAAQAQAAsAAAAVAAkAAQAQAAsAAAAVAAoAGQAKAAYAAAAVAAsAGQAKAAcAAAAVAAwAAQAQAAsAAAAVAA0AAQAQAAsAAAAVAA4AAQAQAAsAAAAWAAYAAQAQAAsAAAAWAAcAAQAQAAsAAAAWAAgAEwACAAwAAAAWAAkAEwACAA0AAAAWAAoAEwACAA4AAAAWAAsAEwACAA8AAAAWAAwAAQAQAAsAAAAWAA0AAQAQAAsAAAAWAA4AAQAQAAsAAAAXAAYAAQAQAAsAAAAXAAcAAQAQAAsAAAAXAAgAEwADAAwAAAAXAAkAEwADAA0AAAAXAAoAEwADAA4AAAAXAAsAEwADAA8AAAAXAAwAAQAQAAsAAAAXAA0AAQAQAAsAAAAXAA4AAQAQAAsAAAAYAAYAAQAQAAsAAAAYAAcAAQAQAAsAAAAYAAgAAQAQAAsAAAAYAAkADwAVAAIAAAAYAAoAAQAQAAsAAAAYAAsADwARAAEAAAAYAAwAAQAQAAsAAAAYAA0AAQAQAAsAAAAYAA4AAQAQAAsAAAAZAAYAAQAQAAsAAAAZAAcAAQAQAAsAAAAZAAgAAQAQAAsAAAAZAAkAAQAQAAsAAAAZAAoAAQAQAAsAAAAZAAsAAQAQAAsAAAAZAAwAAQAQAAsAAAAZAA0AAQAQAAsAAAAZAA4AAQAQAAsAAAAaAAYAEwAGAAEAAAAaAAcAEwAGAAIAAAAaAAgAEwAGAAMAAAAaAAkAEwAGAAQAAAAaAAoAEwAGAAUAAAAaAAsAEwAGAAYAAAAaAAwAAQAQAAsAAAAaAA0AAQAQAAsAAAAaAA4AAQAQAAsAAAAbAAYAEwAHAAEAAAAbAA4AAQAQAAsAAAAcAAYAEwAIAAEAAAAcAA4AAQAQAAsAAAAdAAYAAQAQAAsAAAAdAA4AAQAQAAsAAAAeAAYAAQAQAAsAAAAeAA4AAQAQAAsAAAAfAAYAAQAQAAsAAAAfAA4AAQAQAAsAAAAgAAYAAQAQAAsAAAAgAA4AAQAQAAsAAAAhAAYAAQAQAAsAAAAhAA4AAQAQAAsAAAAiAAYAAQAQAAsAAAAiAA4AAQAQAAsAAAAjAAYAAQAQAAsAAAAjAA4AAQAQAAsAAAAkAAYAAQAQAAsAAAAkAA4AAQAQAAsAAAAlAAYAAQAQAAsAAAAlAAcAAQAQAAsAAAAlAAgAAQAQAAsAAAAlAAkAAQAQAAsAAAAlAAoAAQAQAAsAAAAlAAsAAQAQAAsAAAAlAAwAAQAQAAsAAAAlAA0AAQAQAAsAAAAlAA4AAQAQAAsAAAAmAAYAAQAQAAsAAAAmAAcAAQAQAAsAAAAmAAgAAQAQAAsAAAAmAAkAAQAQAAsAAAAmAAoAAQAQAAsAAAAmAAsAAQAQAAsAAAAmAAwAAQAQAAsAAAAmAA0AAQAQAAsAAAAmAA4AAQAQAAsAAAAbAAkAEwAHAAQAAAAaAAUAEwAGAAAAAAAbAAUAEwAHAAAAAAAcAAUAEwAIAAAAAAAfAAoADwAPAAAAAAAfAAsADwAPAAEAAAA=")
+tile_set = ExtResource("5_master")
+rendering_quadrant_size = 32
+
+[node name="Buildings" type="TileMapLayer" parent="GameWorld/MasterTileMap"]
+tile_set = ExtResource("5_master")
+rendering_quadrant_size = 32
+
+[node name="Props" type="TileMapLayer" parent="GameWorld/MasterTileMap"]
+tile_set = ExtResource("5_master")
+rendering_quadrant_size = 32
+
+[node name="Foreground" type="TileMapLayer" parent="GameWorld/MasterTileMap"]
+top_level = true
+tile_map_data = PackedByteArray("AAAkAAoAAQAJAAsAAAAkAAkAAQANAAUAAAAkAAgAAQANAAUAAAAkAAcAAQANAAQAAAAlAAcAAQAOAAQAAAAlAAoAAQAOAAYAAAAlAAkAAQAOAAUAAAAlAAgAAQAOAAUAAAAhAAoAAQABAAsAAAAiAAoAAQACAAsAAAAjAAoAAQADAAsAAAAgAAoAAQANAAYAAAAfAAoAAQANAAYAAAAeAAoAAQANAAYAAAAdAAoAAQAMAAYAAAAdAAkAAQAMAAUAAAAdAAgAAQAMAAUAAAAdAAcAAQAMAAQAAAAeAAcAAQANAAQAAAAfAAcAAQANAAQAAAAgAAcAAQANAAQAAAAhAAcAAQANAAQAAAAiAAcAAQANAAQAAAAjAAcAAQANAAQAAAA=")
+tile_set = ExtResource("5_master")
+rendering_quadrant_size = 32
+
+[node name="AnimatedObjectsMap" type="TileMap" parent="GameWorld"]
+tile_set = ExtResource("6_animated")
+rendering_quadrant_size = 32
+format = 2
+metadata/_edit_snap_grid = true
+metadata/_edit_snap_size = Vector2(32, 32)
+
+[node name="ObjectMarkers" type="TileMapLayer" parent="GameWorld/AnimatedObjectsMap"]
+tile_set = ExtResource("6_animated")
+rendering_quadrant_size = 32
+
+[node name="MasterTileMap16x16" type="TileMap" parent="GameWorld"]
+scale = Vector2(2, 2)
+tile_set = ExtResource("7_16x16")
+rendering_quadrant_size = 16
+format = 2
+metadata/_edit_snap_grid = true
+metadata/_edit_snap_size = Vector2(16, 16)
+
+[node name="Ground" type="TileMapLayer" parent="GameWorld/MasterTileMap16x16"]
+tile_set = ExtResource("7_16x16")
+rendering_quadrant_size = 16
+
+[node name="Buildings" type="TileMapLayer" parent="GameWorld/MasterTileMap16x16"]
+tile_set = ExtResource("7_16x16")
+rendering_quadrant_size = 16
+
+[node name="Props" type="TileMapLayer" parent="GameWorld/MasterTileMap16x16"]
+tile_set = ExtResource("7_16x16")
+rendering_quadrant_size = 16
+
+[node name="Foreground" type="TileMapLayer" parent="GameWorld/MasterTileMap16x16"]
+top_level = true
+tile_set = ExtResource("7_16x16")
+rendering_quadrant_size = 16
+
 [node name="Player" parent="GameWorld" instance=ExtResource("3")]
 position = Vector2(287, 250)
 
 [node name="MarginContainer" type="MarginContainer" parent="."]
-layout_mode = 2
+layout_mode = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
 offset_left = 24.0
@@ -91,11 +156,11 @@ layout_mode = 2
 layout_mode = 2
 
 [node name="CheatContainer" type="VBoxContainer" parent="MarginContainer/Root"]
+visible = false
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 theme_override_constants/separation = 8
-visible = false
 
 [node name="HBoxContainer" type="HBoxContainer" parent="MarginContainer/Root/CheatContainer"]
 layout_mode = 2
@@ -147,7 +212,7 @@ size_flags_horizontal = 3
 script = ExtResource("2")
 
 [node name="Row" type="HBoxContainer" parent="MarginContainer/Root/CheatContainer/ItemsCheatBar"]
-layout_mode = 2
+layout_mode = 0
 anchor_left = 0.238
 anchor_right = 0.238
 offset_left = -193.752
@@ -192,7 +257,7 @@ layout_mode = 2
 text = "Reload CSV (defs)"
 
 [node name="CheatRoot" type="VBoxContainer" parent="MarginContainer/Root/CheatContainer/ItemsCheatBar"]
-layout_mode = 2
+layout_mode = 0
 offset_top = 8.0
 offset_right = 1104.0
 offset_bottom = 382.0
